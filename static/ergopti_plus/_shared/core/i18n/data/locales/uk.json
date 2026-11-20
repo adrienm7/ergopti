@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "мертва клавіша {detail}",
 	"layout_analysis.formats.loss.multi_character": "кілька символів на одній клавіші ({detail})",
 	"layout_analysis.formats.loss.layer": "шар {detail} пропущено",
+	"layout_analysis.formats.loss.level_as_altgr": "рівень {detail} записано як AltGr",
+	"layout_analysis.formats.loss.level_keys": "клавіші, що утримують {detail}, пропущено: цей формат називає лише свої шари",
 	"layout_analysis.formats.loss.rule": "чарівну клавішу або комбінацію {detail} не прочитано",
 	"layout_analysis.formats.loss.special": "спеціальну клавішу {detail} пропущено, бо вона не друкує символ",
 	"layout_analysis.formats.loss.character": "символ {detail}, який цей формат не може містити",

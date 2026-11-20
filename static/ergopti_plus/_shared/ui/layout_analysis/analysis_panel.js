@@ -136,13 +136,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const unitText = INFO.metricUnit;
 
 	/**
-	 * The engine's layout for an editor document.
+	 * The engine's layout for an editor document: its compiled ISO .keylayout,
+	 * as macOS types it; a source with levels of its own (Neo's Mod3 and Mod4
+	 * on custom held modifiers, which no .keylayout holds) is read from its
+	 * layers instead, every level kept (LAYOUT_FORMATS.fromSource).
 	 * @param {object} doc - A LayoutSourceIO document.
 	 * @returns {object} The layout in the library shape.
 	 * @throws {Error} When the document cannot be compiled to an ISO .keylayout
-	 *   (the compiler's refusal, with its code).
+	 *   (the compiler's refusal, with its code), or its levels are malformed.
 	 */
 	function layoutFromEditorDoc(doc) {
+		const formats = window.LAYOUT_FORMATS;
+		if (!window.LayoutSourceIO.isPreserved(doc) && formats.sourceHoldSets(doc)) {
+			const read = formats.fromSource(doc, DATA.model.fingerings.standard, E.typingCodes());
+			return E.layoutFromRows(Object.assign(read, { origin: 'user' }));
+		}
 		const file = window.LayoutSourceIO.keylayoutFile(doc, SOURCE_BOARD);
 		const source = window.LayoutComposer.parseSource(
 			doc.layout.id,

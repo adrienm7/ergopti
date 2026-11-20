@@ -1044,7 +1044,34 @@ a Kalamine ISO `full` drawing, listing what Kalamine cannot hold (another dead
 key, several characters on one key); `toDof` a DOF on libdof's ISO board
 anchored at its top left key, all four levels written; `toGenkey` and
 `toCmini` the base characters of the three letter rows with their fingers,
-listing a dead key, a repeated character and the levels above the base. A
+listing a dead key, a repeated character and the levels above the base.
+
+A layout with levels of its own (« Levels » above: the Neo family's Mod3 and
+Mod4) keeps them in its source: `toSource` writes each modifier as a held
+custom modifier on every key that holds it (Neo's Mod3 on Caps Lock and the
+ISO key left of Enter, its Mod4 on the key right of left Shift and AltGr) and
+each level as a layer of its id held by Shift and its modifiers, so the
+source format needs no new field and stays at version 1; a dead key typed in
+another one's state is an `input_dead_key` rule. `fromSource(doc, fingering,
+codes)` reads such a source back (`sourceHoldSets` says whether it has such
+levels): each modifier labelled by its id (`mod3` → « Mod3 ») and pressed,
+for a key of either hand, by its keys of the other hand first, as the
+library declares them. The editor's reading of its document
+(`analysis_panel.js` `layoutFromEditorDoc`, which the editor's exports, its
+analysis and its « Compare » take) uses it for such a source, since no
+.keylayout holds a custom modifier; every other source reads through its
+compiled .keylayout as before. The four-level writers name what they cannot
+carry (`levelLosses`): KLA and Kalamine write the third and fourth levels
+where they put AltGr (`level_as_altgr`, « level Mod3 written as AltGr ») and
+leave out each further level (`layer`, « layer Mod4 left out »); genkey and
+cmini name each level by its label; DOF writes every level on a layer of its
+id (libdof reserves only `main` and `shift`) and names the keys holding them
+(`level_keys`), which DOF has no word for. A share link carries the levels
+and their modifiers (`v` and `m` beside the rows); a page that predates them
+refuses the link as `link_invalid` instead of reading four levels.
+`tools/test/test-layout-editor-levels.cjs` takes Neo 2 through the editor's
+start, its TOML save and reload and that reading, and checks every export and
+the drivers' emulation table. A
 .keylayout is written by the layout
 source compiler from the source `toSource` builds (the editor's macOS
 download). `tools/test/test-layout-formats.cjs` holds the readers to the

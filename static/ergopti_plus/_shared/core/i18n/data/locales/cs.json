@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "mrtvá klávesa {detail}",
 	"layout_analysis.formats.loss.multi_character": "více znaků na jedné klávese ({detail})",
 	"layout_analysis.formats.loss.layer": "vrstva {detail} vynechána",
+	"layout_analysis.formats.loss.level_as_altgr": "úroveň {detail} zapsána jako AltGr",
+	"layout_analysis.formats.loss.level_keys": "klávesy držící {detail} vynechány, tento formát pojmenovává jen své vrstvy",
 	"layout_analysis.formats.loss.rule": "magická klávesa nebo kombinace {detail} nepřečtena",
 	"layout_analysis.formats.loss.special": "speciální klávesa {detail} vynechána, protože nepíše žádný znak",
 	"layout_analysis.formats.loss.character": "znak {detail}, který tento formát nepojme",

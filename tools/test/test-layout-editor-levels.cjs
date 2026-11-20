@@ -1,0 +1,286 @@
+// tools/test/test-layout-editor-levels.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Layout Levels Round Trip Tests
+ * DESCRIPTION:
+ * A layout's own levels (the Neo family's Mod3 and Mod4) through the Studio:
+ * the layout editor's scripts run in a vm context in the order its page loads
+ * them, and Neo 2 from the library goes through the editor's start, its TOML
+ * save and reading back, and the editor's own reading of the document (the
+ * analysis panel's layoutFromEditorDoc, which every export and the Comparer
+ * handoff take).
+ *
+ * WHAT IS CHECKED:
+ * 1. The source holds Mod3 and Mod4 as held custom modifiers on Neo's keys
+ *    (Caps Lock and the ISO key left of Enter, the key right of left Shift
+ *    and AltGr) and one layer per level; a dead key typed in another's state
+ *    is an input_dead_key rule, never the text « dead:… ».
+ * 2. Save and reload give the seven levels, their modifiers and every key
+ *    back: each character is typed with the same keys as the library's Neo 2.
+ * 3. A layout of four levels still reads through its compiled .keylayout.
+ * 4. Exports: the DOF writes the Mod4 layer (¡) under its name and says the
+ *    holding keys are left out; KLA, Kalamine, genkey and cmini name every
+ *    level they leave out and the levels written as AltGr; a share link
+ *    carries the levels and a link with levels but no modifiers is refused.
+ * 5. Emulation: on Windows, macOS and Linux the drivers' table holds Mod3 on
+ *    the ISO key left of Enter and Mod4 on the key right of left Shift, and
+ *    lists Caps Lock and AltGr, which it cannot hold, by path and reason.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { shared } = require('../lib/paths.cjs');
+
+const UI = shared('ui');
+// Page scripts that need a rendered page (the visitor's preferences, the
+// translations, the editor's own page): no reading here uses them.
+const PAGE_ONLY = [
+	'a11y_prefs.js',
+	'theme_choice.js',
+	'i18n.js',
+	'layout_editor/editor_page.js',
+	'layout_editor/standalone.js'
+];
+const NEO = 'neo2_new';
+const NEO_LEVELS = ['base', 'shift', 'mod3', 'shift_mod3', 'mod4', 'shift_mod4', 'mod3_mod4'];
+
+/** The editor page's scripts, in its order, in one vm context. */
+function loadEditor() {
+	const html = fs.readFileSync(path.join(UI, 'layout_editor', 'index.html'), 'utf8');
+	const scripts = [...html.matchAll(/<script src="([^"]+)"/g)]
+		.map((m) =>
+			path
+				.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1]))
+				.split(path.sep)
+				.join('/')
+		)
+		.filter((file) => !PAGE_ONLY.includes(file));
+	for (const needed of ['layout_analysis/analysis_panel.js', 'layout_analysis/layout_formats.js'])
+		assert(scripts.includes(needed), `the editor page loads ${needed}`);
+	const context = vm.createContext({
+		TextEncoder,
+		TextDecoder,
+		Blob,
+		Response,
+		CompressionStream,
+		DecompressionStream,
+		atob,
+		btoa,
+		// Still loading: the scripts that draw wait for it, and the analysis
+		// panel listens for the app's typing tables from its load.
+		document: { readyState: 'loading', addEventListener() {} }
+	});
+	context.window = context;
+	for (const file of scripts) {
+		const text = fs
+			.readFileSync(path.join(UI, file), 'utf8')
+			.replace(
+				/^const (LAYOUT_COMPOSER_DATA|LAYER_EDITOR_DATA|LAYOUT_SOURCE_TABLES) =/m,
+				'var $1 ='
+			);
+		vm.runInContext(text, context, { filename: file });
+	}
+	return vm.runInContext(
+		'({ IO: LayoutSourceIO, E: LAYOUT_ANALYSIS, F: LAYOUT_FORMATS, DATA: LAYOUT_ANALYSIS_DATA, PANEL: LAYOUT_ANALYSIS_PANEL })',
+		context
+	);
+}
+
+const { IO, E, F, DATA, PANEL } = loadEditor();
+const plain = (value) => JSON.parse(JSON.stringify(value));
+const board = E.keyboard('iso');
+
+/** Character → the keys that type it, substitutes excluded. */
+function sequences(layout) {
+	const out = {};
+	for (const [char, seq] of E.compileLayout(layout, board, null))
+		if (!seq.substituted) out[char] = seq.keys.join(',');
+	return out;
+}
+
+const neo = E.libraryLayouts().find((layout) => layout.id === NEO);
+assert(neo && neo.levels, 'the library has Neo 2 with its levels');
+
+// =================================================
+// ======= 1/ The source of a layout's levels ======
+// =================================================
+
+const started = IO.startFromDocument(F.toSource(neo), 'neo2_copy', 'Neo 2 copy');
+const text = IO.serialize(started.doc);
+const source = plain(started.doc);
+assert.deepEqual(
+	source.modifiers,
+	[
+		{ id: 'mod3', mode: 'held', keys: ['CapsLock', 'Backslash'] },
+		{ id: 'mod4', mode: 'held', keys: ['IntlBackslash', 'AltRight'] }
+	],
+	'Mod3 and Mod4 are held custom modifiers on their keys'
+);
+assert.deepEqual(
+	source.layers.map((layer) => [layer.id, layer.required]),
+	[
+		['base', []],
+		['shift', ['shift']],
+		['mod3', ['mod3']],
+		['shift_mod3', ['mod3', 'shift']],
+		['mod4', ['mod4']],
+		['shift_mod4', ['mod4', 'shift']],
+		['mod3_mod4', ['mod3', 'mod4']]
+	],
+	'one layer per level, held by its modifiers'
+);
+const rules = source.dead_keys.flatMap((entry) => entry.rules);
+assert(
+	rules.some((rule) => typeof rule.input_dead_key === 'string'),
+	'a dead key typed in a dead state is an input_dead_key rule'
+);
+assert(
+	!rules.some((rule) => typeof rule.input === 'string' && rule.input.startsWith('dead:')),
+	'no rule answers to the text « dead:… »'
+);
+const mod4 = source.layers.find((layer) => layer.id === 'mod4');
+assert(
+	Object.values(mod4.keys).some((mapping) => mapping.text === '¡'),
+	'the Mod4 layer types ¡'
+);
+
+// ======================================
+// ======= 2/ Save, reload and read =====
+// ======================================
+
+const reloaded = IO.parse(text);
+assert(reloaded.ok, `the saved TOML reads back: ${JSON.stringify(reloaded.error)}`);
+assert.equal(IO.serialize(reloaded.doc), text, 'a second save writes the same TOML');
+const read = PANEL.layoutFromEditorDoc(reloaded.doc);
+assert.deepEqual(
+	plain(read.levels).map((level) => level.id),
+	NEO_LEVELS,
+	'the editor reads the seven levels'
+);
+assert.deepEqual(plain(read.levels), plain(neo.levels), 'the levels come back as declared');
+assert.deepEqual(plain(read.modifiers), plain(neo.modifiers), 'the modifiers come back');
+assert.deepEqual(
+	Object.keys(read.rows).sort(),
+	Object.keys(neo.rows).sort(),
+	'every typing key comes back'
+);
+const expected = sequences(neo);
+const got = sequences(read);
+const differing = Object.keys(Object.assign({}, expected, got)).filter(
+	(char) => expected[char] !== got[char]
+);
+assert.deepEqual(differing, [], 'every character is typed with the same keys after a reload');
+for (const char of ['¡', '¿', 'Λ'])
+	assert(got[char], `${char} is typed after the reload (Mod4 and Mod3+Mod4)`);
+
+// ==========================================
+// ======= 3/ A layout of four levels =======
+// ==========================================
+
+const qwerty = E.libraryLayouts().find((layout) => layout.id === 'qwerty');
+const four = IO.startFromDocument(F.toSource(qwerty), 'qwerty_copy', 'QWERTY copy').doc;
+assert.equal(F.sourceHoldSets(four), null, 'QWERTY has no level of its own');
+const fourRead = PANEL.layoutFromEditorDoc(IO.parse(IO.serialize(four)).doc);
+assert.equal(fourRead.levels, undefined, 'a layout of four levels reads as four');
+assert.equal(fourRead.rows.KeyQ[0], 'q', 'through its .keylayout');
+
+// ============================
+// ======= 4/ The exports =====
+// ============================
+
+const losses = (unmapped, what) =>
+	unmapped.filter((entry) => entry.what === what).map((entry) => entry.detail);
+const dof = F.toDof(read);
+const dofJson = JSON.parse(dof.text);
+assert.deepEqual(
+	Object.keys(dofJson.layers),
+	['main', 'shift'].concat(NEO_LEVELS.slice(2)),
+	'the DOF writes every level under its name'
+);
+assert(
+	dofJson.layers.mod4.some((row) => row.split(' ').includes('¡')),
+	'the DOF Mod4 layer types ¡'
+);
+assert.equal(losses(dof.unmapped, 'level_keys').length, 2, 'the DOF names the keys it cannot hold');
+const levelLosses = [];
+F.levelLosses(read, levelLosses);
+assert.deepEqual(
+	losses(levelLosses, 'level_as_altgr'),
+	['Mod3', 'Shift+Mod3'],
+	'a four-level format says Mod3 is written as AltGr'
+);
+assert.deepEqual(
+	losses(levelLosses, 'layer'),
+	['Mod4', 'Shift+Mod4', 'Mod3+Mod4'],
+	'a four-level format names every level it leaves out'
+);
+const kalamine = F.toKalamineToml(read);
+for (const level of ['Mod4', 'Shift+Mod4', 'Mod3+Mod4'])
+	assert(losses(kalamine.unmapped, 'layer').includes(level), `Kalamine names ${level} left out`);
+for (const write of [F.toGenkey, F.toCmini])
+	assert(losses(write(read).unmapped, 'layer').includes('Mod4'), 'a letter block names Mod4');
+for (const entry of levelLosses.concat(dof.unmapped))
+	assert(
+		F.lossMessage(entry).key.startsWith('layout_analysis.formats.loss.'),
+		'each loss is worded'
+	);
+
+(async () => {
+	const part = await F.toLink([read]);
+	const [linked] = await F.fromLink(`#${part}`, E);
+	assert.deepEqual(plain(linked.levels), plain(neo.levels), 'a share link carries the levels');
+	assert.deepEqual(sequences(linked), expected, 'a linked Neo 2 types as the library one');
+	const json = new TextEncoder().encode(
+		JSON.stringify([{ n: 'Half', r: { KeyA: ['a', 'A', null, null, null] }, v: neo.levels }])
+	);
+	const packed = new Uint8Array(
+		await new Response(
+			new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'))
+		).arrayBuffer()
+	);
+	const half = `l=1.${Buffer.from(packed).toString('base64url')}`;
+	await assert.rejects(F.fromLink(`#${half}`, E), (error) => error.code === 'link_invalid');
+
+	// ===============================
+	// ======= 5/ The emulation ======
+	// ===============================
+
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const table = plain(IO.emulationTable(reloaded.doc, platform));
+		assert.deepEqual(
+			table.modifiers,
+			[
+				{ id: 'mod3', mode: 'held', keys: ['Backslash'] },
+				{ id: 'mod4', mode: 'held', keys: ['IntlBackslash'] }
+			],
+			`${platform}: the drivers hold Mod3 and Mod4 on the keys they see`
+		);
+		const layer = table.layers.find((entry) => entry.id === 'mod4');
+		assert(
+			Object.values(layer.keys).some((mapping) => mapping.text === '¡'),
+			`${platform}: the emulated Mod4 layer types ¡`
+		);
+		assert.deepEqual(
+			table.not_emulated
+				.filter((entry) => entry.path.startsWith('modifiers.'))
+				.map((entry) => [entry.path, entry.reason]),
+			[
+				['modifiers.mod3.keys[0]', 'modifier_key_not_emulated'],
+				['modifiers.mod4.keys[1]', 'modifier_key_not_emulated']
+			],
+			`${platform}: Caps Lock and AltGr are listed, not dropped`
+		);
+	}
+	console.log(
+		`test-layout-editor-levels: OK (${NEO_LEVELS.length} levels, ${Object.keys(got).length} characters, 3 platforms)`
+	);
+})().catch((error) => {
+	console.error(error);
+	process.exit(1);
+});

@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "데드 키 {detail}",
 	"layout_analysis.formats.loss.multi_character": "한 키에 여러 문자({detail})",
 	"layout_analysis.formats.loss.layer": "레이어 {detail} 제외됨",
+	"layout_analysis.formats.loss.level_as_altgr": "레벨 {detail}을(를) AltGr로 기록함",
+	"layout_analysis.formats.loss.level_keys": "이 형식은 레이어 이름만 담으므로 {detail}을(를) 누르는 키는 제외됨",
 	"layout_analysis.formats.loss.rule": "매직 키 또는 콤보 {detail} 읽지 않음",
 	"layout_analysis.formats.loss.special": "특수 키 {detail}는 문자를 입력하지 않으므로 제외됨",
 	"layout_analysis.formats.loss.character": "이 형식에 담을 수 없는 문자 {detail}",

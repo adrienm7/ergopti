@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "dode toets {detail}",
 	"layout_analysis.formats.loss.multi_character": "meerdere tekens op één toets ({detail})",
 	"layout_analysis.formats.loss.layer": "laag {detail} weggelaten",
+	"layout_analysis.formats.loss.level_as_altgr": "niveau {detail} als AltGr geschreven",
+	"layout_analysis.formats.loss.level_keys": "de toetsen die {detail} vasthouden weggelaten, want dit formaat noemt alleen zijn lagen",
 	"layout_analysis.formats.loss.rule": "magische toets of combinatie {detail} niet gelezen",
 	"layout_analysis.formats.loss.special": "speciale toets {detail} weggelaten, omdat die geen teken typt",
 	"layout_analysis.formats.loss.character": "teken {detail}, dat dit formaat niet kan bevatten",

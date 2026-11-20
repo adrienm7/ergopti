@@ -214,7 +214,13 @@ Ergopti+ magic key types `★` and composes as `j`). `compose = false` types the
 text outside every dead key: a pending dead key types its terminator, then the
 text.
 Empty text is an explicit empty output. Dead keys and modifiers must resolve
-to declarations. The built-in modifiers are `shift`, `control`, `alt`, `meta`,
+to declarations. A layout with levels beyond Shift and AltGr (the Neo family's
+Mod3 and Mod4) is written with these records alone: each modifier a held
+custom modifier on its keys (Caps Lock and the ISO key left of Enter, the key
+right of left Shift and AltGr), each level a layer it requires
+(`docs/design/layout-analysis.md`, « Layout file formats »). The macOS `.keylayout`
+leaves them out, XKB takes one on its fifth level and the drivers' emulation
+holds them on the keys it sees, each target listing the rest by path. The built-in modifiers are `shift`, `control`, `alt`, `meta`,
 their `_left` and `_right` variants, and `caps_lock`, `num_lock`, `scroll_lock`.
 Their separate names avoid collapsing platform-specific shortcut semantics.
 

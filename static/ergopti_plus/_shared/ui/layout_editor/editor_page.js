@@ -1512,17 +1512,18 @@ var LayoutEditorPage = (function () {
 
 		/**
 		 * The KLA JSON of the edited layout and what KLA cannot hold (dead keys,
-		 * several characters on one key).
+		 * several characters on one key, a layout's own levels past its four).
 		 */
 		function klaExport(layout) {
 			const unmapped = [];
 			for (const row of Object.values(layout.rows))
-				for (const cell of row) {
+				for (const cell of row.slice(0, LAYOUT_ANALYSIS.LAYER_IDS.length)) {
 					if (cell && typeof cell === 'object')
 						unmapped.push({ what: 'dead_key', detail: cell.dead });
 					else if (typeof cell === 'string' && Array.from(cell).length > 1)
 						unmapped.push({ what: 'multi_character', detail: cell });
 				}
+			LAYOUT_FORMATS.levelLosses(layout, unmapped);
 			const json = LAYOUT_FORMATS.toKla(layout, LAYOUT_ANALYSIS_DATA.model.fingerings.standard);
 			return { text: `${JSON.stringify(json, null, 2)}\n`, unmapped };
 		}

@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "डेड की {detail}",
 	"layout_analysis.formats.loss.multi_character": "एक कुंजी पर कई अक्षर ({detail})",
 	"layout_analysis.formats.loss.layer": "परत {detail} छोड़ी गई",
+	"layout_analysis.formats.loss.level_as_altgr": "स्तर {detail} AltGr के रूप में लिखा गया",
+	"layout_analysis.formats.loss.level_keys": "{detail} को थामने वाली कुंजियाँ छोड़ी गईं, क्योंकि यह फ़ॉर्मेट केवल अपनी परतों के नाम रखता है",
 	"layout_analysis.formats.loss.rule": "मैजिक कुंजी या कॉम्बो {detail} नहीं पढ़ा गया",
 	"layout_analysis.formats.loss.special": "विशेष कुंजी {detail} छोड़ी गई, क्योंकि यह कोई अक्षर नहीं टाइप करती",
 	"layout_analysis.formats.loss.character": "अक्षर {detail}, जिसे यह फ़ॉर्मैट नहीं रख सकता",

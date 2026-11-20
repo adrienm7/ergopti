@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "מקש מת {detail}",
 	"layout_analysis.formats.loss.multi_character": "כמה תווים על מקש אחד ({detail})",
 	"layout_analysis.formats.loss.layer": "השכבה {detail} הושמטה",
+	"layout_analysis.formats.loss.level_as_altgr": "הרמה {detail} נכתבה כ-AltGr",
+	"layout_analysis.formats.loss.level_keys": "המקשים שמחזיקים את {detail} הושמטו, כי פורמט זה נותן שמות לשכבות בלבד",
 	"layout_analysis.formats.loss.rule": "מקש קסם או צירוף {detail} לא נקראו",
 	"layout_analysis.formats.loss.special": "המקש המיוחד {detail} הושמט, כי הוא אינו מקליד תו",
 	"layout_analysis.formats.loss.character": "התו {detail}, שתבנית זו אינה יכולה להכיל",

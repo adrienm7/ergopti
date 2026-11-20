@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "dødtast {detail}",
 	"layout_analysis.formats.loss.multi_character": "flere tegn på én tast ({detail})",
 	"layout_analysis.formats.loss.layer": "laget {detail} udeladt",
+	"layout_analysis.formats.loss.level_as_altgr": "niveau {detail} skrevet som AltGr",
+	"layout_analysis.formats.loss.level_keys": "tasterne, der holder {detail}, udeladt, da dette format kun navngiver sine lag",
 	"layout_analysis.formats.loss.rule": "magisk tast eller kombination {detail} ikke læst",
 	"layout_analysis.formats.loss.special": "specialtasten {detail} udeladt, da den ikke skriver noget tegn",
 	"layout_analysis.formats.loss.character": "tegnet {detail}, som dette format ikke kan rumme",

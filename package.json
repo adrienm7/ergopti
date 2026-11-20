@@ -800,6 +800,7 @@
 		"test:layout-editor-model": "node ./tools/test/test-layout-editor-model.cjs",
 		"test:layout-editor-unicode-names": "node ./tools/test/test-layout-editor-unicode-names.cjs",
 		"test:layout-editor-target-exports": "node ./tools/test/test-layout-editor-target-exports.cjs",
+		"test:layout-editor-levels": "node ./tools/test/test-layout-editor-levels.cjs",
 		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
 		"test:browser:layout-optimizer": "node ./tools/test/browser/layout-optimizer.playwright.cjs",
 		"test:browser:studio-keyboard": "node ./tools/test/browser/studio-keyboard.playwright.cjs",

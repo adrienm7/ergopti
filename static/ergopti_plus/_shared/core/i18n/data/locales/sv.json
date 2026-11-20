@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "död tangent {detail}",
 	"layout_analysis.formats.loss.multi_character": "flera tecken på en tangent ({detail})",
 	"layout_analysis.formats.loss.layer": "lagret {detail} utelämnat",
+	"layout_analysis.formats.loss.level_as_altgr": "nivå {detail} skriven som AltGr",
+	"layout_analysis.formats.loss.level_keys": "tangenterna som håller {detail} utelämnade, eftersom formatet bara namnger sina lager",
 	"layout_analysis.formats.loss.rule": "magisk tangent eller kombination {detail} inte läst",
 	"layout_analysis.formats.loss.special": "specialtangenten {detail} utelämnad, eftersom den inte skriver något tecken",
 	"layout_analysis.formats.loss.character": "tecknet {detail}, som detta format inte kan rymma",

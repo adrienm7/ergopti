@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "tasto morto {detail}",
 	"layout_analysis.formats.loss.multi_character": "più caratteri su un tasto ({detail})",
 	"layout_analysis.formats.loss.layer": "livello {detail} tralasciato",
+	"layout_analysis.formats.loss.level_as_altgr": "livello {detail} scritto come AltGr",
+	"layout_analysis.formats.loss.level_keys": "tasti che tengono {detail} tralasciati, perché questo formato nomina solo i suoi livelli",
 	"layout_analysis.formats.loss.rule": "tasto magico o combinazione {detail} non letto",
 	"layout_analysis.formats.loss.special": "tasto speciale {detail} tralasciato, perché non digita alcun carattere",
 	"layout_analysis.formats.loss.character": "carattere {detail}, che questo formato non può contenere",

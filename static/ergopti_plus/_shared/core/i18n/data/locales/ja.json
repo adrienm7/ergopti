@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "デッドキー {detail}",
 	"layout_analysis.formats.loss.multi_character": "1 つのキーに複数の文字（{detail}）",
 	"layout_analysis.formats.loss.layer": "レイヤー {detail} は省きました",
+	"layout_analysis.formats.loss.level_as_altgr": "レベル {detail} を AltGr として書きました",
+	"layout_analysis.formats.loss.level_keys": "この形式はレイヤー名しか持たないため、{detail} を押さえるキーは省きました",
 	"layout_analysis.formats.loss.rule": "マジックキーまたはコンボ {detail} は読み込んでいません",
 	"layout_analysis.formats.loss.special": "特殊キー {detail} は文字を入力しないため省きました",
 	"layout_analysis.formats.loss.character": "この形式では保持できない文字 {detail}",

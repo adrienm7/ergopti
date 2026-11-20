@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "touche morte {detail}",
 	"layout_analysis.formats.loss.multi_character": "plusieurs caractères sur une touche ({detail})",
 	"layout_analysis.formats.loss.layer": "couche {detail} laissée de côté",
+	"layout_analysis.formats.loss.level_as_altgr": "niveau {detail} écrit en AltGr",
+	"layout_analysis.formats.loss.level_keys": "touches tenant {detail} laissées de côté, ce format ne nomme que ses couches",
 	"layout_analysis.formats.loss.rule": "touche magique ou combinaison {detail} non lue",
 	"layout_analysis.formats.loss.special": "touche spéciale {detail} laissée de côté, car elle ne tape aucun caractère",
 	"layout_analysis.formats.loss.character": "caractère {detail}, que ce format ne peut pas contenir",

@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "martwy klawisz {detail}",
 	"layout_analysis.formats.loss.multi_character": "kilka znaków na jednym klawiszu ({detail})",
 	"layout_analysis.formats.loss.layer": "warstwa {detail} pominięta",
+	"layout_analysis.formats.loss.level_as_altgr": "poziom {detail} zapisany jako AltGr",
+	"layout_analysis.formats.loss.level_keys": "klawisze trzymające {detail} pominięte, bo ten format nazywa tylko swoje warstwy",
 	"layout_analysis.formats.loss.rule": "magiczny klawisz lub kombinacja {detail} nieodczytane",
 	"layout_analysis.formats.loss.special": "klawisz specjalny {detail} pominięty, bo nie wpisuje żadnego znaku",
 	"layout_analysis.formats.loss.character": "znak {detail}, którego ten format nie pomieści",

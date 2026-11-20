@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "المفتاح الميت {detail}",
 	"layout_analysis.formats.loss.multi_character": "عدة محارف على مفتاح واحد ({detail})",
 	"layout_analysis.formats.loss.layer": "الطبقة {detail} متروكة",
+	"layout_analysis.formats.loss.level_as_altgr": "المستوى {detail} مكتوب كـ AltGr",
+	"layout_analysis.formats.loss.level_keys": "المفاتيح التي تمسك {detail} متروكة، فهذا التنسيق لا يسمّي إلا طبقاته",
 	"layout_analysis.formats.loss.rule": "المفتاح السحري أو التركيبة {detail} لم تُقرأ",
 	"layout_analysis.formats.loss.special": "المفتاح الخاص {detail} متروك لأنه لا يكتب أي محرف",
 	"layout_analysis.formats.loss.character": "المحرف {detail} الذي لا يستطيع هذا التنسيق حمله",

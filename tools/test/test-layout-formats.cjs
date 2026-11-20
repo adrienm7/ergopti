@@ -1371,9 +1371,16 @@ const catalogues = fs
 	.map((file) => [file, JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'))]);
 check(catalogues.length === 21, `${catalogues.length} locales`);
 // The writers' losses, and every kind the module declares, whether or not a file above showed it.
-['dead_key', 'multi_character', 'layer', 'rule', 'special', 'character'].forEach((what) =>
-	lossKinds.add(what)
-);
+[
+	'dead_key',
+	'multi_character',
+	'layer',
+	'level_as_altgr',
+	'level_keys',
+	'rule',
+	'special',
+	'character'
+].forEach((what) => lossKinds.add(what));
 for (const what of lossKinds) {
 	const { key } = F.lossMessage({ what, detail: 'x' });
 	for (const [file, strings] of catalogues)

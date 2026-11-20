@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "ölü tuş {detail}",
 	"layout_analysis.formats.loss.multi_character": "bir tuşta birden çok karakter ({detail})",
 	"layout_analysis.formats.loss.layer": "{detail} katmanı dışarıda bırakıldı",
+	"layout_analysis.formats.loss.level_as_altgr": "{detail} seviyesi AltGr olarak yazıldı",
+	"layout_analysis.formats.loss.level_keys": "{detail} seviyesini tutan tuşlar dışarıda bırakıldı, bu biçim yalnızca katmanlarını adlandırır",
 	"layout_analysis.formats.loss.rule": "{detail} sihirli tuşu veya kombinasyonu okunmadı",
 	"layout_analysis.formats.loss.special": "{detail} özel tuşu karakter yazmadığı için dışarıda bırakıldı",
 	"layout_analysis.formats.loss.character": "bu biçimin tutamadığı {detail} karakteri",

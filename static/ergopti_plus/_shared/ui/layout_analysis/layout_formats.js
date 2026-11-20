@@ -158,10 +158,23 @@ var LAYOUT_FORMATS = (function () {
 		'dead_key',
 		'multi_character',
 		'layer',
+		// A layout's own levels (Neo's Mod3 and Mod4) in a format of four levels:
+		// its third and fourth written where the format puts AltGr, and a level's
+		// holding keys, which a format naming its layers only cannot say.
+		'level_as_altgr',
+		'level_keys',
 		'rule',
 		'special',
 		'character'
 	];
+	// The words of a level the losses name: Shift, then the modifiers it holds.
+	const SHIFT_LABEL = 'Shift';
+	// A dead key typed in another dead key's state, as the analysis engine writes
+	// it in a dead table (« dead:<state> », its DEAD_TYPED).
+	const DEAD_TYPED = 'dead:';
+	const ALTGR_LABEL = 'AltGr';
+	// The modifier name of a source's AltGr levels when it also declares levels of its own.
+	const ALTGR_MODIFIER = 'altgr';
 	// XKB and Kalamine key names of the keys a layout defines.
 	const XKB_KEYS = (() => {
 		const out = { TLDE: 'Backquote', BKSL: 'Backslash', LSGT: 'IntlBackslash', SPCE: 'Space' };
@@ -1380,7 +1393,8 @@ var LAYOUT_FORMATS = (function () {
 			for (const [typed, made] of Object.entries(table)) {
 				if (typeof made !== 'string') continue;
 				// A dead key typed in a dead state (Ergo-L's ** then **) is « dead:<state> ».
-				const key = typed.length > 1 && typed[0] === '*' ? `dead:${deadState(typed)}` : typed;
+				const key =
+					typed.length > 1 && typed[0] === '*' ? `${DEAD_TYPED}${deadState(typed)}` : typed;
 				rules[key] = made.length > 1 && made[0] === '*' ? { dead: deadState(made) } : made;
 			}
 		}
@@ -2166,8 +2180,78 @@ var LAYOUT_FORMATS = (function () {
 	// ==========================
 
 	/**
+	 * The words of each level of a layout, as the losses name it: « » for the
+	 * base, « Shift », the modifiers it holds by their labels (« Mod3 »,
+	 * « Shift+Mod4 », « Mod3+Mod4 »); a layout of four levels has AltGr's.
+	 * @param {object} layout - The layout (library shape).
+	 * @returns {string[]} One label per level.
+	 */
+	function levelLabels(layout) {
+		if (!layout.levels) return ['', SHIFT_LABEL, ALTGR_LABEL, `${SHIFT_LABEL}+${ALTGR_LABEL}`];
+		return layout.levels.map((level) =>
+			(level.shift ? [SHIFT_LABEL] : [])
+				.concat((level.hold || []).map((name) => layout.modifiers[name].label))
+				.join('+')
+		);
+	}
+
+	/**
+	 * What a writer of four levels (base, Shift, AltGr, Shift+AltGr) cannot
+	 * carry of a layout's own levels: the third and fourth go where the format
+	 * puts AltGr, unless they hold AltGr itself, and each further level that
+	 * types something is left out, both named by their labels.
+	 * @param {object} layout - The layout (library shape).
+	 * @param {object[]} unmapped - The writer's losses, appended to.
+	 * @param {number} [written] - The levels the format holds (four).
+	 */
+	function levelLosses(layout, unmapped, written = LAYERS) {
+		if (!layout.levels) return;
+		const labels = levelLabels(layout);
+		const used = (level) => Object.values(layout.rows).some((row) => row[level] !== NONE);
+		const altgr = (layout.levels[2].hold || []).every((name) => name === ALTGR_MODIFIER);
+		for (let level = 2; level < Math.min(written, LAYERS); level++)
+			if (!altgr && used(level)) unmapped.push({ what: 'level_as_altgr', detail: labels[level] });
+		for (let level = written; level < layout.levels.length; level++)
+			if (used(level)) unmapped.push({ what: 'layer', detail: labels[level] });
+	}
+
+	/**
+	 * The source layers and custom modifiers a layout's levels make: the four
+	 * default levels on Shift and Right Alt; a layout's own levels (Neo's Mod3
+	 * and Mod4) each on a layer named after it, held by its modifiers, each a
+	 * held custom modifier on every key the layout holds it with (those for the
+	 * right hand first). fromSource reads them back.
+	 * @param {object} layout - The layout (library shape).
+	 * @returns {{layers: {id: string, required: string[]}[], modifiers: object[]}}
+	 */
+	function sourceLevels(layout) {
+		if (!layout.levels)
+			return {
+				layers: [
+					{ id: 'base', required: [] },
+					{ id: 'shift', required: ['shift'] },
+					{ id: 'altgr', required: ['alt_right'] },
+					{ id: 'shift_altgr', required: ['alt_right', 'shift'] }
+				],
+				modifiers: []
+			};
+		const modifiers = Object.entries(layout.modifiers).map(([id, modifier]) => ({
+			id,
+			mode: 'held',
+			keys: Array.from(new Set(modifier.for_right_hand.concat(modifier.for_left_hand)))
+		}));
+		const layers = layout.levels.map((level) => ({
+			id: level.id,
+			required: (level.hold || []).concat(level.shift ? ['shift'] : [])
+		}));
+		return { layers, modifiers };
+	}
+
+	/**
 	 * Writes a layout as an Ergopti layout source document (the TOML model of
-	 * docs/design/layout-source-format.md, before TOML encoding).
+	 * docs/design/layout-source-format.md, before TOML encoding). A layout's
+	 * own levels become custom held modifiers and their layers (sourceLevels),
+	 * a dead key typed in another dead key's state an `input_dead_key` rule.
 	 * @param {object} layout - The layout (library shape).
 	 * @returns {object} The source document.
 	 */
@@ -2182,12 +2266,7 @@ var LAYOUT_FORMATS = (function () {
 			}
 			return ids.get(state);
 		};
-		const layerSpecs = [
-			{ id: 'base', required: [] },
-			{ id: 'shift', required: ['shift'] },
-			{ id: 'altgr', required: ['alt_right'] },
-			{ id: 'shift_altgr', required: ['alt_right', 'shift'] }
-		];
+		const { layers: layerSpecs, modifiers } = sourceLevels(layout);
 		const layers = layerSpecs.map((spec, index) => {
 			const keys = {};
 			for (const [code, row] of Object.entries(layout.rows)) {
@@ -2209,10 +2288,15 @@ var LAYOUT_FORMATS = (function () {
 			const rules = [];
 			for (const [typed, made] of Object.entries(layout.dead[state])) {
 				if (typed === ' ') continue;
+				// A dead key pressed while this one is pending answers by its own id.
+				const input = typed.startsWith(DEAD_TYPED)
+					? { input_dead_key: idOf(typed.slice(DEAD_TYPED.length)) }
+					: { input: typed };
 				rules.push(
-					typeof made === 'string'
-						? { input: typed, text: made }
-						: { input: typed, next: idOf(made.dead) }
+					Object.assign(
+						input,
+						typeof made === 'string' ? { text: made } : { next: idOf(made.dead) }
+					)
 				);
 			}
 			const terminator = typeof layout.dead[state][' '] === 'string' ? layout.dead[state][' '] : '';
@@ -2221,13 +2305,161 @@ var LAYOUT_FORMATS = (function () {
 		// Every dead key a cell names must be declared, even without rules.
 		for (const state of ids.keys())
 			if (!layout.dead[state]) deadKeys.push({ id: idOf(state), terminator: '', rules: [] });
-		return {
+		const doc = {
 			format: 'ergopti-layout',
 			version: 1,
 			layout: { id: slug(layout.id), name: layout.name || layout.id },
-			physical: { base: 'iso' },
-			layers: layers.filter((layer) => Object.keys(layer.keys).length > 0 || layer.id === 'base'),
-			dead_keys: deadKeys
+			physical: { base: 'iso' }
+		};
+		if (modifiers.length > 0) doc.modifiers = modifiers;
+		// A layout's own levels keep every layer, empty or not: each one is a level.
+		doc.layers = layers.filter(
+			(layer) => Object.keys(layer.keys).length > 0 || layer.id === 'base' || Boolean(layout.levels)
+		);
+		doc.dead_keys = deadKeys;
+		return doc;
+	}
+
+	/**
+	 * The levels of an Ergopti source that holds custom modifiers of its own
+	 * (toSource's Neo layers): each layer reached by Shift, Right Alt (or Alt)
+	 * and held custom modifiers that types a text or a dead key is a level, its
+	 * hold set in the order the layers come, the first one making the third
+	 * and fourth levels. A source without such a layer has the four default
+	 * levels, which the compiled .keylayout reads (null).
+	 * @param {object} doc - A structured source.
+	 * @returns {{sets: string[][], layers: Map<string, object>}|null} The hold
+	 *   sets (AltGr as ALTGR_MODIFIER) and each level's layer, by « shift|hold ».
+	 */
+	function sourceHoldSets(doc) {
+		const held = new Set((doc.modifiers || []).filter((m) => m.mode === 'held').map((m) => m.id));
+		if (held.size === 0) return null;
+		const typing = (layer) =>
+			Object.values(layer.keys || {}).some(
+				(mapping) => typeof mapping.text === 'string' || typeof mapping.dead_key === 'string'
+			);
+		const sets = [];
+		const layers = new Map();
+		let custom = false;
+		for (const layer of doc.layers || []) {
+			if (layer.optional.length > 0 || (layer.alternatives || []).length > 0) continue;
+			const shift = layer.required.includes('shift');
+			const hold = layer.required
+				.filter((id) => id !== 'shift')
+				.map((id) => (id === 'alt_right' || id === 'alt' ? ALTGR_MODIFIER : id));
+			if (hold.some((id) => id !== ALTGR_MODIFIER && !held.has(id))) continue;
+			if (hold.some((id) => held.has(id))) {
+				if (!typing(layer)) continue;
+				custom = true;
+			}
+			const set = hold.slice().sort();
+			const shape = `${shift ? 1 : 0}|${set.join('+')}`;
+			if (layers.has(shape)) continue;
+			layers.set(shape, layer);
+			if (set.length > 0 && !sets.some((each) => each.join('+') === set.join('+'))) sets.push(set);
+		}
+		return custom ? { sets, layers } : null;
+	}
+
+	/**
+	 * Reads an Ergopti source with levels of its own (sourceHoldSets) into the
+	 * library shape, as toSource wrote it: each level from its layer (an absent
+	 * Shift or modifier level of the first hold set is an empty level, as the
+	 * first four levels need), each custom modifier labelled by its id
+	 * (« mod3 » → « Mod3 ») and held, for a key of either hand, by its keys of
+	 * the other hand first (the keys of a key's own hand then), as the analysis
+	 * presses Shift. A layer's text and dead keys are read on its ISO keys; an
+	 * action, a key chord or a disabled key types no character there.
+	 * @param {object} doc - A structured source holding such levels.
+	 * @param {object} fingering - code → finger id (LAYOUT_ANALYSIS_DATA.model.fingerings.standard).
+	 * @param {string[]} codes - The physical keys to keep (LAYOUT_ANALYSIS.typingCodes).
+	 * @returns {object} The layout: {id, name, rows, dead, command, levels, modifiers}.
+	 * @throws {Error} format_invalid for a source without levels of its own.
+	 */
+	function fromSource(doc, fingering, codes) {
+		const found = sourceHoldSets(doc);
+		if (!found) fail('format_invalid', 'no level of its own');
+		const shapes = [
+			{ shift: false, set: [] },
+			{ shift: true, set: [] }
+		];
+		found.sets.forEach((set, index) => {
+			for (const shift of [false, true])
+				if (index === 0 || found.layers.has(`${shift ? 1 : 0}|${set.join('+')}`))
+					shapes.push({ shift, set });
+		});
+		const levelIds = new Set();
+		const levels = shapes.map(({ shift, set }) => {
+			const layer = found.layers.get(`${shift ? 1 : 0}|${set.join('+')}`);
+			let id = layer ? layer.id : (shift ? ['shift'] : []).concat(set).join('_');
+			for (let n = 2; levelIds.has(id); n++) id = `${layer ? layer.id : 'level'}_${n}`;
+			levelIds.add(id);
+			const level = { id };
+			if (shift) level.shift = true;
+			if (set.length > 0) level.hold = set.slice();
+			return level;
+		});
+		const declared = new Map((doc.modifiers || []).map((m) => [m.id, m]));
+		const hand = (code) => String(fingering[code] || '')[0];
+		const modifiers = {};
+		for (const name of new Set(found.sets.flat())) {
+			const keys =
+				name === ALTGR_MODIFIER && !declared.has(name) ? ['AltRight'] : declared.get(name).keys;
+			const otherFirst = (side) =>
+				keys
+					.filter((code) => hand(code) === side)
+					.concat(keys.filter((code) => hand(code) !== side));
+			modifiers[name] = {
+				label:
+					name === ALTGR_MODIFIER && !declared.has(name)
+						? ALTGR_LABEL
+						: name[0].toUpperCase() + name.slice(1),
+				for_left_hand: otherFirst('r'),
+				for_right_hand: otherFirst('l')
+			};
+		}
+		const held = new Set(Object.values(modifiers).flatMap((m) => m.for_left_hand));
+		const rows = {};
+		for (const code of codes) {
+			if (held.has(code)) continue;
+			const row = shapes.map(({ shift, set }) => {
+				const layer = found.layers.get(`${shift ? 1 : 0}|${set.join('+')}`);
+				const mapping = layer && (layer.keys || {})[code];
+				if (!mapping) return NONE;
+				if (typeof mapping.text === 'string') return mapping.text === '' ? NONE : mapping.text;
+				if (typeof mapping.dead_key === 'string') return { dead: mapping.dead_key };
+				return NONE;
+			});
+			if (row.some((cell) => cell !== NONE)) rows[code] = row;
+		}
+		const dead = {};
+		for (const entry of doc.dead_keys || []) {
+			const rules = {};
+			for (const rule of entry.rules) {
+				const typed =
+					typeof rule.input_dead_key === 'string'
+						? `${DEAD_TYPED}${rule.input_dead_key}`
+						: rule.input;
+				rules[typed] = typeof rule.next === 'string' ? { dead: rule.next } : rule.text;
+			}
+			if (entry.terminator !== '') rules[' '] = entry.terminator;
+			dead[entry.id] = rules;
+		}
+		const command = {};
+		const shortcuts = (doc.layers || []).find(
+			(layer) => layer.required.length === 1 && layer.required[0] === 'meta'
+		);
+		for (const [code, mapping] of Object.entries((shortcuts && shortcuts.keys) || {}))
+			if (typeof mapping.text === 'string' && rows[code] && mapping.text !== rows[code][0])
+				command[code] = mapping.text;
+		return {
+			id: doc.layout.id,
+			name: doc.layout.name || doc.layout.id,
+			rows,
+			dead,
+			command,
+			levels,
+			modifiers
 		};
 	}
 
@@ -2332,7 +2564,8 @@ var LAYOUT_FORMATS = (function () {
 
 	/**
 	 * Writes a layout as a Kalamine TOML (ISO geometry, one `full` block);
-	 * dead keys outside Kalamine's own set cannot be written and are reported.
+	 * dead keys outside Kalamine's own set cannot be written and are reported,
+	 * as are a layout's own levels (levelLosses: Kalamine has four).
 	 * @param {object} layout - The layout (library shape).
 	 * @returns {{text: string, unmapped: object[]}} The TOML text and the losses.
 	 */
@@ -2371,6 +2604,7 @@ var LAYOUT_FORMATS = (function () {
 				write(1 + KALAMINE_LINES_PER_ROW * r, at + 2, row[3]);
 			});
 		});
+		levelLosses(layout, unmapped);
 		const art = lines.map((line) => line.join('')).join('\n');
 		const quote = (s) => JSON.stringify(s);
 		const text = [
@@ -2389,9 +2623,11 @@ var LAYOUT_FORMATS = (function () {
 	 * Writes a layout as an Oxeylyzer DOF on libdof's ISO board, anchored at
 	 * its top left key so the number row and the ISO key are written: the
 	 * base layer as `main`, then `shift`, `altgr` and `shift_altgr` (each
-	 * written in full, so nothing depends on libdof's generated Shift). DOF has
-	 * no dead keys, and a character libdof splits words on (a space other than
-	 * the space bar's) cannot be written; both are reported.
+	 * written in full, so nothing depends on libdof's generated Shift); a
+	 * layout's own levels each on a layer named after it, the keys holding
+	 * them reported (level_keys). DOF has no dead keys, and a character libdof
+	 * splits words on (a space other than the space bar's) cannot be written;
+	 * both are reported.
 	 * @param {object} layout - The layout (library shape).
 	 * @returns {{text: string, unmapped: object[]}} The JSON text and the losses.
 	 */
@@ -2439,8 +2675,23 @@ var LAYOUT_FORMATS = (function () {
 			if (!placed.has(code) && row.some((cell) => typeof cell === 'string'))
 				lose('key', `${code} (${row.filter((cell) => typeof cell === 'string').join(' ')})`);
 		const layers = { main: layer(0), shift: layer(1) };
-		if (used(2)) layers.altgr = layer(2);
-		if (used(3)) layers.shift_altgr = layer(3);
+		if (layout.levels) {
+			// A layout's own levels keep their names (libdof reserves only main and
+			// shift); DOF has no word for the keys that hold them.
+			const labels = levelLabels(layout);
+			layout.levels.forEach((level, index) => {
+				if (index >= 2 && used(index)) layers[level.id] = layer(index);
+			});
+			for (const name of Object.keys(layout.modifiers)) {
+				const holding = labels.filter(
+					(label, index) => (layout.levels[index].hold || []).includes(name) && used(index)
+				);
+				if (holding.length > 0) lose('level_keys', holding.join(', '));
+			}
+		} else {
+			if (used(2)) layers.altgr = layer(2);
+			if (used(3)) layers.shift_altgr = layer(3);
+		}
 		const json = {
 			name: layout.name || layout.id,
 			board: 'iso',
@@ -2454,8 +2705,8 @@ var LAYOUT_FORMATS = (function () {
 	/**
 	 * The base characters of the three letter rows for a letter-block format
 	 * (genkey, cmini), and what such a format leaves out: a dead key, several
-	 * characters on a key, a character typed twice, and the layers above the
-	 * base when they hold more than its upper case.
+	 * characters on a key, a character typed twice, and the levels above the
+	 * base when they hold more than its upper case (named by levelLabels).
 	 */
 	function letterBlock(layout, unmapped) {
 		const seen = new Set();
@@ -2480,13 +2731,14 @@ var LAYOUT_FORMATS = (function () {
 			})
 		);
 		const lost = new Set();
+		const labels = levelLabels(layout);
 		ROW_CODES.flat().forEach((code) => {
 			const row = layout.rows[code] || [];
 			const base = row[0];
 			if (typeof row[1] === 'string' && (typeof base !== 'string' || row[1] !== base.toUpperCase()))
-				lost.add('Shift');
-			if (row[2] !== NONE && row[2] !== undefined) lost.add('AltGr');
-			if (row[3] !== NONE && row[3] !== undefined) lost.add('Shift+AltGr');
+				lost.add(SHIFT_LABEL);
+			for (let level = 2; level < labels.length; level++)
+				if (row[level] !== NONE && row[level] !== undefined) lost.add(labels[level]);
 		});
 		lost.forEach((level) => unmapped.push({ what: 'layer', detail: level }));
 		return rows;
@@ -2611,8 +2863,10 @@ var LAYOUT_FORMATS = (function () {
 
 	/**
 	 * The fragment part that carries layouts in a share link.
-	 * @param {Array<{name: string, rows: object, dead?: object, command?: object}>} layouts
-	 *   The layouts (library shape).
+	 * @param {Array<{name: string, rows: object, dead?: object, command?: object,
+	 *   levels?: object[], modifiers?: object}>} layouts The layouts (library
+	 *   shape), a layout's own levels included (a page that knows none refuses
+	 *   them as an unknown field, never reads them as four).
 	 * @returns {Promise<string>} « l=1.<data> », to put after the link's « # ».
 	 * @throws {Error} link_unsupported when the browser cannot deflate;
 	 *   link_too_large past the caps fromLink reads.
@@ -2625,6 +2879,11 @@ var LAYOUT_FORMATS = (function () {
 			const entry = { n: String(layout.name || layout.id).slice(0, LINK_MAX_NAME), r: layout.rows };
 			if (layout.dead && Object.keys(layout.dead).length > 0) entry.d = layout.dead;
 			if (layout.command && Object.keys(layout.command).length > 0) entry.c = layout.command;
+			// A layout's own levels (Neo's Mod3 and Mod4), which its rows' cells follow.
+			if (layout.levels) {
+				entry.v = layout.levels;
+				entry.m = layout.modifiers;
+			}
 			return entry;
 		});
 		const json = new TextEncoder().encode(JSON.stringify(compact));
@@ -2658,14 +2917,21 @@ var LAYOUT_FORMATS = (function () {
 		const where = `layout ${index + 1}`;
 		if (!isPlain(entry)) fail('link_invalid', where);
 		for (const key of Object.keys(entry))
-			if (!['n', 'r', 'd', 'c'].includes(key)) fail('link_invalid', `${where}: ${key}`);
+			if (!['n', 'r', 'd', 'c', 'v', 'm'].includes(key)) fail('link_invalid', `${where}: ${key}`);
+		// The engine checks the levels and their modifiers (layoutFromRows); a link
+		// holds both or neither.
+		if ((entry.v === undefined) !== (entry.m === undefined))
+			fail('link_invalid', `${where}: levels`);
+		if (entry.v !== undefined && (!Array.isArray(entry.v) || !isPlain(entry.m)))
+			fail('link_invalid', `${where}: levels`);
+		const width = entry.v === undefined ? LAYERS : entry.v.length;
 		const name = typeof entry.n === 'string' ? entry.n.trim() : '';
 		if (name === '' || name.length > LINK_MAX_NAME) fail('link_invalid', `${where}: name`);
 		if (!isPlain(entry.r) || Object.keys(entry.r).length === 0)
 			fail('link_invalid', `${where}: keys`);
 		for (const [code, row] of Object.entries(entry.r)) {
 			if (!codes.has(code)) fail('link_invalid', `${where}: ${code}`);
-			if (!Array.isArray(row) || row.length !== LAYERS || !row.every(linkCell))
+			if (!Array.isArray(row) || row.length !== width || !row.every(linkCell))
 				fail('link_invalid', `${where}: ${code}`);
 		}
 		const dead = entry.d === undefined ? {} : entry.d;
@@ -2688,6 +2954,8 @@ var LAYOUT_FORMATS = (function () {
 				rows: entry.r,
 				dead,
 				command,
+				levels: entry.v,
+				modifiers: entry.m,
 				origin: 'user'
 			});
 		} catch (error) {
@@ -2769,6 +3037,10 @@ var LAYOUT_FORMATS = (function () {
 		refusalMessage,
 		lossMessage,
 		toSource,
+		sourceHoldSets,
+		fromSource,
+		levelLabels,
+		levelLosses,
 		toKla,
 		toKalamineToml,
 		toDof,

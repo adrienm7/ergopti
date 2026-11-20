@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "tecla morta {detail}",
 	"layout_analysis.formats.loss.multi_character": "vários caracteres numa tecla ({detail})",
 	"layout_analysis.formats.loss.layer": "camada {detail} deixada de fora",
+	"layout_analysis.formats.loss.level_as_altgr": "nível {detail} escrito como AltGr",
+	"layout_analysis.formats.loss.level_keys": "teclas que mantêm {detail} deixadas de fora, pois este formato só nomeia as suas camadas",
 	"layout_analysis.formats.loss.rule": "tecla mágica ou combinação {detail} não lida",
 	"layout_analysis.formats.loss.special": "tecla especial {detail} deixada de fora, porque não escreve nenhum caráter",
 	"layout_analysis.formats.loss.character": "caráter {detail}, que este formato não consegue guardar",

@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "мёртвая клавиша {detail}",
 	"layout_analysis.formats.loss.multi_character": "несколько символов на одной клавише ({detail})",
 	"layout_analysis.formats.loss.layer": "слой {detail} пропущен",
+	"layout_analysis.formats.loss.level_as_altgr": "уровень {detail} записан как AltGr",
+	"layout_analysis.formats.loss.level_keys": "клавиши, удерживающие {detail}, пропущены: этот формат называет только свои слои",
 	"layout_analysis.formats.loss.rule": "волшебная клавиша или комбинация {detail} не прочитана",
 	"layout_analysis.formats.loss.special": "специальная клавиша {detail} пропущена, так как она не печатает символ",
 	"layout_analysis.formats.loss.character": "символ {detail}, который этот формат не может хранить",

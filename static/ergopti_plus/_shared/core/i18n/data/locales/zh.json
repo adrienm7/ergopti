@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "死键 {detail}",
 	"layout_analysis.formats.loss.multi_character": "一个按键上有多个字符（{detail}）",
 	"layout_analysis.formats.loss.layer": "已略去图层 {detail}",
+	"layout_analysis.formats.loss.level_as_altgr": "层级 {detail} 写作 AltGr",
+	"layout_analysis.formats.loss.level_keys": "已略去按住 {detail} 的键，此格式只记录图层名称",
 	"layout_analysis.formats.loss.rule": "未读取魔法键或组合键 {detail}",
 	"layout_analysis.formats.loss.special": "已略去特殊键 {detail}，因为它不输入字符",
 	"layout_analysis.formats.loss.character": "此格式无法容纳的字符 {detail}",

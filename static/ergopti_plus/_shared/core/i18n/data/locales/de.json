@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "Tottaste {detail}",
 	"layout_analysis.formats.loss.multi_character": "mehrere Zeichen auf einer Taste ({detail})",
 	"layout_analysis.formats.loss.layer": "Ebene {detail} ausgelassen",
+	"layout_analysis.formats.loss.level_as_altgr": "Ebene {detail} als AltGr geschrieben",
+	"layout_analysis.formats.loss.level_keys": "die Tasten, die {detail} halten, ausgelassen, da dieses Format nur seine Ebenen benennt",
 	"layout_analysis.formats.loss.rule": "Magische Taste oder Kombination {detail} nicht gelesen",
 	"layout_analysis.formats.loss.special": "Sondertaste {detail} ausgelassen, da sie kein Zeichen tippt",
 	"layout_analysis.formats.loss.character": "Zeichen {detail}, das dieses Format nicht aufnehmen kann",

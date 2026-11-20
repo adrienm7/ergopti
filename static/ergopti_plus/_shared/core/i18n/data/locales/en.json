@@ -4772,6 +4772,8 @@
 	"layout_analysis.formats.loss.dead_key": "dead key {detail}",
 	"layout_analysis.formats.loss.multi_character": "several characters on one key ({detail})",
 	"layout_analysis.formats.loss.layer": "layer {detail} left out",
+	"layout_analysis.formats.loss.level_as_altgr": "level {detail} written as AltGr",
+	"layout_analysis.formats.loss.level_keys": "the keys holding {detail} left out, as this format names its layers only",
 	"layout_analysis.formats.loss.rule": "magic key or combo {detail} not read",
 	"layout_analysis.formats.loss.special": "special key {detail} left out, as it types no character",
 	"layout_analysis.formats.loss.character": "character {detail}, which this format cannot hold",
