@@ -250,12 +250,13 @@ check(
 				'what this gate exists to prevent, or it does not purge at all.'
 		);
 	}
-	// The purge lists the folder natively, ages each rolled or topical file against a
-	// cutoff built from the retention window, and removes the expired ones.
+	// The purge lists the folder natively, ages each rolled file against the
+	// retention window and each topical view against today (the dated_retention
+	// and topical_retention cases of parity_vectors.json), and removes the expired ones.
 	const agePurge =
 		/NativeDirectory\.entries\(?[^\n]*|NativeDirectory\.entries/.test(sink) &&
-		/local cutoff = now - \(math\.floor\(days\) \+ 1\) \* DAY_SECONDS/.test(sink) &&
-		/stat\.modified < cutoff/.test(sink) &&
+		/M\.dated_log_expired\(date, now, days\)/.test(sink) &&
+		/M\.topical_log_stale\(stat\.modified, now\)/.test(sink) &&
 		/pcall\(os\.remove, path\)/.test(sink);
 	if (!agePurge) {
 		errors.push(

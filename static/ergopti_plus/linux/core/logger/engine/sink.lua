@@ -84,9 +84,6 @@ local LOG_EXT       = AppDirs.files.extension
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
 
---- Seconds in the whole day the retention window counts in.
-local DAY_SECONDS = 86400
-
 --- How many days of rolled files are kept. From the shared registry, which the
 --- other two drivers already read for the same purpose — this driver rolled a
 --- new pair of files every day and deleted none, so the directory grew without
@@ -391,6 +388,30 @@ local function report_purge_refusal(what, path, message)
 	end)
 end
 
+--- Whether a dated archive is past retention: its date is older than today
+--- minus `days`, compared as calendar days (DST-safe through a noon anchor).
+--- @param date string "YYYY-MM-DD" from the file name.
+--- @param now number Current epoch seconds.
+--- @param days number Retention window in whole days.
+--- @return boolean expired
+function M.dated_log_expired(date, now, days)
+	local cutoff_calendar = os.date("*t", now)
+	cutoff_calendar.day = cutoff_calendar.day - math.floor(days)
+	cutoff_calendar.hour, cutoff_calendar.min, cutoff_calendar.sec, cutoff_calendar.isdst = 12, 0, 0, nil
+	return date < os.date("%Y-%m-%d", os.time(cutoff_calendar))
+end
+
+--- Whether a topical view is stale: it was last modified on another calendar
+--- day than `now`. Topical files are today's view, as on Windows and macOS; this
+--- sweep used to keep one until it was N + 1 days old, so a topic that logged
+--- nothing today still showed an older day (logger parity audit LOG-04).
+--- @param modified number Modification epoch seconds.
+--- @param now number Current epoch seconds.
+--- @return boolean stale
+function M.topical_log_stale(modified, now)
+	return os.date("%Y-%m-%d", modified) ~= os.date("%Y-%m-%d", now)
+end
+
 --- Deletes rolled files older than the retention window.
 ---
 --- Called at install and again on each rollover. Install is the one that
@@ -407,7 +428,7 @@ end
 ---
 --- The sweep selects regular files directly in the folder (never a link or
 --- folder). Daily dates older than the calendar cutoff expire; declared topical
---- names retain the historical mtime cutoff of N + 1 whole days.
+--- names expire once last modified on another day (M.topical_log_stale).
 --- A refusal the purge used to discard is now reported, and never fatal.
 local function purge_old()
 	local days = retention_days()
@@ -426,11 +447,6 @@ local function purge_old()
 		return
 	end
 	local now = os.time()
-	local cutoff = now - (math.floor(days) + 1) * DAY_SECONDS
-	local cutoff_calendar = os.date("*t", now)
-	cutoff_calendar.day = cutoff_calendar.day - math.floor(days)
-	cutoff_calendar.hour, cutoff_calendar.min, cutoff_calendar.sec, cutoff_calendar.isdst = 12, 0, 0, nil
-	local cutoff_date = os.date("%Y-%m-%d", os.time(cutoff_calendar))
 	for _, entry in ipairs(entries) do
 		local name = entry.name
 		local date = rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)
@@ -444,7 +460,8 @@ local function purge_old()
 				report_purge_refusal("inspect", path, stat_message)
 			end
 			-- lstat again: the entry may have been replaced since the listing.
-			local expired = (date and date < cutoff_date) or (not date and stat and stat.modified and stat.modified < cutoff)
+			local expired = (date and M.dated_log_expired(date, now, days))
+				or (not date and stat and stat.modified and M.topical_log_stale(stat.modified, now))
 			if stat and stat.kind == "file" and expired then
 				local called, removed, remove_error = pcall(os.remove, path)
 				if not called or not removed then report_purge_refusal("delete", path, called and remove_error or removed) end
