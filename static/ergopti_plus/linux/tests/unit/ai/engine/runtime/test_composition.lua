@@ -17,16 +17,30 @@ local function run_registered()
 package.loaded['ai.engine.local_servers.runtime_repair']={new=function(ports,policy)return{ports=ports,policy=policy}end}
 local Compose = helpers.load_module("ai.engine.local_servers.runtime_composition")
 local ManagedEnvironment = helpers.load_module("ai.engine.ollama.managed_ollama_environment")
+local Seal = helpers.load_module("ai.engine.ollama.runtime_seal")
+local SHA = string.rep('c', 64)
+local RELEASE = '/data/runtimes/ollama/0.40.6-linux-amd64-' .. SHA
 local function eq(a,b)assert(a==b,'expected '..tostring(b)..' got '..tostring(a))end
 local function test(name, body) helpers.it(name .. " (ollama-runtime)", body) end
 local function fixture(extra)
 	local w={authorized=true,ancestry=true,left=100,env={'PATH=/usr/bin','OLLAMA_HOST=https://remote:443','OLLAMA_NO_CLOUD=0'},op={token='exact native operation'}}
 	local source={current=function()return w.authorized end,publish=function()end,app_capture=function()end,app_current=function()end,compensate=function()return true end}
-	local resolver={plan=function()return{asset=w.asset}end,current=function()return w.ancestry end}
-	w.asset={name='independent-pinned-fixture'};w.descriptor={};w.file_owner={}
+	local resolver={plan=function()return{asset=w.asset,parent=RELEASE,directory=RELEASE..'/ollama',
+		runtime='/data/runtimes/ollama',uid=1000}end,current=function()return w.ancestry end}
+	w.asset={name='independent-pinned-fixture',version='0.40.6',sha256=SHA}
+	w.files={RELEASE..'/ollama/bin/ollama',RELEASE..'/ollama/lib/ollama/libggml.so'}
+	w.descriptor={files=function()return w.files end};w.file_owner={}
+	w.listening={};w.owner_ok=true;w.removed={};w.finite={}
+	local listeners={listening=function(port)w.listened=port;return w.listening end,
+		owned=function(port,pid)w.owned_port,w.owned_pid=port,pid;if w.owner_ok then return true end;return false,'listener_foreign' end}
+	local seal={NAME=Seal.NAME,command=Seal.command,digests=Seal.digests,encode=Seal.encode,matches=Seal.matches,
+		read=function(path)w.seal_read=path;return w.seal_text,w.seal_missing end,
+		write=function(path,text)w.sealed={path=path,text=text};return w.write_ok~=false end}
+	local retention={stale=function(plan)w.stale_plan=plan;return w.stale or {} end,
+		remove=function(paths,process,timeout,label)w.removed[#w.removed+1]={paths=paths,label=label,timeout=timeout};return nil end}
 	local installed={capture=function()return{status='installed',runtime=w.descriptor}end}
 	local phase={start=function(ports,opts,done)w.phase_ports,w.phase_options=ports,opts;return w.op end}
-	local process={start=function()end,start_service=function(binary,args,options,done)w.service={binary=binary,args=args,opts=options};return w.op end}
+	local process={start=function(program,args,options,done)w.finite[#w.finite+1]={program=program,args=args,opts=options,done=done};return w.op end,start_service=function(binary,args,options,done)w.service={binary=binary,args=args,opts=options};return w.op end}
 	local http={get_owned=function(url,headers,options,done)w.http={url=url,headers=headers,opts=options,done=done};return w.op end}
 	local admission={new=function(r,f,authorized,consent)w.admission={r=r,f=f,authorized=authorized,consent=consent};return w.file_owner end}
 	local timer={after=function()end,now_ms=function()return 0 end}
@@ -36,7 +50,8 @@ local function fixture(extra)
 	w.factory={}
 	w.controller=Compose.new({source=source,resolver=resolver,installed=installed,file_factory=w.factory,admission=admission,
 		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,environment=function()return w.env end,
-		serve_environment=w.serve_environment or ManagedEnvironment.load(),network=extra and extra.network})
+		serve_environment=w.serve_environment or ManagedEnvironment.load(),network=extra and extra.network,
+		listeners=listeners,seal=seal,retention=retention})
 	w.budget={remaining_ms=function()return w.left end}
 	w.authorizer=function()if w.on_authorized then w.on_authorized()end;return w.authorized end
 	w.options={authorized=w.authorizer,owner='originating-service',host='127.0.0.1:12345'}
@@ -72,7 +87,8 @@ test('composition refuses a missing or invalid serve environment',function()
 			resolver={plan=function()end,current=function()end},installed={capture=function()end},file_factory={},admission={new=function()end},
 			install_phase={start=function()end},process={start_service=function()end},http={get_owned=function()end},
 			owned_timer={after=function()end,now_ms=function()return 0 end},timings={ms=function()return 1 end},
-			environment=function()return{}end,serve_environment=w.serve_environment})end)
+			environment=function()return{}end,serve_environment=w.serve_environment,
+			listeners={listening=function()end,owned=function()end},seal=Seal,retention={stale=function()end,remove=function()end}})end)
 		eq(ok,false)
 	end
 end)
@@ -101,6 +117,97 @@ end)
 test('stale logical HTTP response does not publish callback or erase capability',function()
 	local w=fixture();local count=0;local o=w.controller.ports.probe('http://127.0.0.1:12345/api/version',w.budget,w.authorizer,function()count=count+1 end)
 	w.authorized=false;w.http.done({ok=true});eq(count,0);eq(o,w.op)
+end)
+
+-- OLL-13: Linux took any GET /api/version answer on the owned port as its
+-- daemon's readiness; Windows refuses a listener already there and admits only
+-- its child's socket with the pinned version.
+local function hashes(w,digests)
+	local out={}
+	for index,path in ipairs(w.files)do out[#out+1]=(digests and digests[index] or string.rep(tostring(index),64))..'  '..path..'\0' end
+	return {ok=true,exit_code=0,stdout=table.concat(out)}
+end
+local function ready(w)
+	w.op.pid=function()return 4242 end
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	local result
+	w.controller.ports.probe('http://127.0.0.1:12345/api/version',w.budget,w.authorizer,function(value)result=value end)
+	return function(answer)w.http.done(answer);return result end
+end
+test('(oll-13) a server already listening on the owned port is refused before the daemon starts',function()
+	local w=fixture();w.listening={['1234']=true};local result
+	local o=w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function(r)result=r end)
+	eq(w.service,nil);eq(o:is_settled(),true);eq(result.error,'runtime_port_occupied');eq(w.listened,12345)
+end)
+test('(oll-13) an unreadable socket table refuses the start instead of guessing',function()
+	local w=fixture();w.listening=nil;local result
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function(r)result=r end)
+	eq(w.service,nil);eq(result.error,'runtime_listener_unreadable')
+end)
+test('(oll-13) a version answer from a socket the daemon does not hold is not readiness',function()
+	local w=fixture();w.owner_ok=false
+	local result=ready(w)({ok=true,status=200,body='{"version":"0.40.6"}'})
+	eq(result.ok,false);eq(result.error,'runtime_listener_foreign');eq(w.owned_port,12345);eq(w.owned_pid,4242)
+	eq(#w.removed,0,'nothing is retired on a foreign answer')
+end)
+test('(oll-13) the owned daemon answering another version is stopped',function()
+	local w=fixture();local cancelled=0;w.op.cancel=function()cancelled=cancelled+1 end
+	local result=ready(w)({ok=true,status=200,body='{"version":"0.24.0"}'})
+	eq(result.ok,false);eq(result.error,'runtime_version_mismatch');eq(cancelled,1)
+end)
+test('(oll-13) the owned daemon answering the pinned version is ready',function()
+	local w=fixture();local answer={ok=true,status=200,body='{"version":"0.40.6"}'}
+	eq(ready(w)(answer),answer)
+end)
+-- OLL-07: an update installed beside the earlier release and nothing removed it.
+test('(oll-07) a verified, serving pinned release retires the earlier release folders',function()
+	local w=fixture();w.stale={'/data/runtimes/ollama/0.24.0-linux-amd64-'..string.rep('d',64)}
+	ready(w)({ok=true,status=200,body='{"version":"0.40.6"}'})
+	eq(#w.removed,1);eq(w.removed[1].paths[1],w.stale[1]);eq(w.removed[1].timeout,100)
+	eq(w.stale_plan.parent,RELEASE)
+end)
+test('(oll-07) no answer of the pinned daemon retires nothing',function()
+	local w=fixture();w.stale={'/data/runtimes/ollama/0.24.0-linux-amd64-'..string.rep('d',64)}
+	ready(w)({ok=false,status=0})
+	eq(#w.removed,0);eq(w.stale_plan,nil)
+end)
+-- OLL-08: Linux reused an installed tree on its metadata alone.
+test('(oll-08) a fresh install seals every file of the tree beside it',function()
+	local w=fixture();local verdict
+	eq(w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,true,function(r)verdict=r end),w.op)
+	eq(w.seal_read,nil,'a fresh tree is sealed, not read');eq(w.finite[1].program,'sha256sum')
+	eq(w.finite[1].args[3],w.files[1]);eq(w.finite[1].opts.timeout_ms,100)
+	w.finite[1].done(hashes(w))
+	eq(verdict.ok,true);eq(w.sealed.path,RELEASE..'/'..Seal.NAME)
+	eq(Seal.matches(w.sealed.text,RELEASE..'/ollama',assert(Seal.digests(hashes(w),w.files)),SHA),true)
+end)
+test('(oll-08) a reused tree is re-hashed and admitted only when it matches its seal',function()
+	local w=fixture();w.seal_text=Seal.encode(RELEASE..'/ollama',assert(Seal.digests(hashes(w),w.files)),SHA)
+	local verdict;w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,false,function(r)verdict=r end)
+	eq(w.seal_read,RELEASE..'/'..Seal.NAME);w.finite[1].done(hashes(w))
+	eq(verdict.ok,true);eq(#w.removed,0);eq(w.sealed,nil)
+end)
+test('(oll-08) a reused tree whose bytes changed is refused and removed for a new download',function()
+	local w=fixture();w.seal_text=Seal.encode(RELEASE..'/ollama',assert(Seal.digests(hashes(w),w.files)),SHA)
+	local verdict;w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,false,function(r)verdict=r end)
+	w.finite[1].done(hashes(w,{string.rep('e',64),string.rep('2',64)}))
+	eq(verdict.ok,false);eq(verdict.error,'runtime_seal_mismatch');eq(w.removed[1].paths[1],RELEASE)
+end)
+test('(oll-08) a seal of another archive is refused',function()
+	local w=fixture();w.seal_text=Seal.encode(RELEASE..'/ollama',assert(Seal.digests(hashes(w),w.files)),string.rep('f',64))
+	local verdict;w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,false,function(r)verdict=r end)
+	w.finite[1].done(hashes(w));eq(verdict.error,'runtime_seal_foreign')
+end)
+test('(oll-08) an unsealed tree is refused without hashing and removed',function()
+	local w=fixture();w.seal_missing='runtime_seal_missing';local verdict
+	local o=w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,false,function(r)verdict=r end)
+	eq(o:is_settled(),true);eq(#w.finite,0);eq(verdict.error,'runtime_seal_missing');eq(w.removed[1].paths[1],RELEASE)
+end)
+test('(oll-08) a failed hash is reported and removes nothing',function()
+	local w=fixture();w.seal_text='{}';local verdict
+	w.controller.ports.verify(w.descriptor,w.budget,w.authorizer,false,function(r)verdict=r end)
+	w.finite[1].done({ok=false,exit_code=1,stdout=''})
+	eq(verdict.error,'runtime_seal_hash_failed');eq(#w.removed,0)
 end)
 
 local function relay_policy()

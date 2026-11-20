@@ -118,3 +118,16 @@ test("service running proof excludes settled or superseded exact operations", fu
 	expect(old:is_settled() and not old:is_running() and successor:is_running(), "successor never lends lifecycle to old operation")
 	successor:cancel(); f.calls[2].retire(); f.close(2)
 end)
+-- OLL-13: readiness is admitted only from the socket of the daemon's own
+-- process group, so the running service must name its child's pid.
+test("(oll-13) a running service names its child's pid and nothing once it is not running", function()
+	local f = fixture(); local op = f.start(); local cap = f.calls[1].operation
+	cap.pid = function() return 4242 end
+	expect(op:pid() == 4242, "the running child's pid")
+	cap.pid = function() return "4242" end
+	expect(op:pid() == nil, "a malformed pid is no pid")
+	cap.pid = function() return 4242 end
+	f.calls[1].exited = true
+	expect(op:pid() == nil, "an exited child names no pid")
+	op:cancel(); f.calls[1].retire(); f.close()
+end)

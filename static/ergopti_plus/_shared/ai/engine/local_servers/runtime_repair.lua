@@ -38,7 +38,7 @@ end
 function M.new(ports, policy)
 	assert(type(ports) == 'table' and type(policy) == 'table'
 		and positive(policy.bootstrap_timeout_ms) and positive(policy.poll_ms), 'runtime policy invalid')
-	for _, key in ipairs({'current', 'resolve', 'install', 'start_service', 'probe', 'after',
+	for _, key in ipairs({'current', 'resolve', 'install', 'verify', 'start_service', 'probe', 'after',
 		'now_ms', 'publish', 'app_capture', 'app_current', 'compensate'}) do
 		assert(type(ports[key]) == 'function', 'runtime port missing: ' .. key)
 	end
@@ -351,6 +351,19 @@ function M.new(ports, policy)
 			-- A lookup that settled synchronously must be observed by this pump.
 			again=true
 		end
+		-- The installed tree's bytes are checked against its seal before every
+		-- start; the install that just wrote the tree from the pinned archive
+		-- seals it instead (OLL-08).
+		local function begin_verify()
+			if not current() or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
+			entry.stage='verify'
+			entry.verify=acquire('verify', function(done)
+				return P.verify(descriptor, budget, current, entry.installed==true, done)
+			end)
+			if entry.verify.unknown then fail('runtime_verify_acquisition_unknown'); return end
+			-- A verification that settled synchronously must be observed by this pump.
+			again=true
+		end
 		local function resolved()
 			if not current() then fail('runtime_source_changed'); return end
 			local answer=call(P.resolve, snapshot)
@@ -366,7 +379,7 @@ function M.new(ports, policy)
 			executable=call(get)
 			if type(executable)~='string' or executable:sub(1,1)~='/' or executable:find('\0',1,true)
 				or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
-			begin_network()
+			begin_verify()
 		end
 		pump=function()
 			if pumping then again=true; return end
@@ -383,6 +396,16 @@ function M.new(ports, policy)
 						if held.delivered and type(held.result)=='table' and held.result.ok==true then
 							entry.installed=true; resolved()
 						else fail('runtime_install_failed') end
+					end
+				elseif entry.stage=='verify' then
+					local held=entry.verify
+					if held and op_settled(held) then
+						local answer=held.result
+						if held.delivered and type(answer)=='table' and answer.ok==true and yes(runtime_current) then
+							begin_network()
+						else
+							fail(type(answer)=='table' and type(answer.error)=='string' and answer.error or 'runtime_seal_refused')
+						end
 					end
 				elseif entry.stage=='network' then
 					local held=entry.network

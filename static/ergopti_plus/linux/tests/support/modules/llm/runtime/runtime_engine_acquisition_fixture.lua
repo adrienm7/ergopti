@@ -208,6 +208,10 @@ local function with_managed_responses(body)
 				current = function() return engine_port.state().enabled == false end,
 				resolve = function() return { status = "installed", runtime = runtime } end,
 				install = function() error("this graph never installs a binary") end,
+				verify = function(_, _, _, _, done)
+					local verified = operation("verify", done, function() return true end)
+					verified:answer({ ok = true }); return verified
+				end,
 				after = function(_, done) return operation("timer", done, function() return true end) end,
 				now_ms = function() return 0 end,
 				start_service = function(_, _, options, done)

@@ -70,6 +70,12 @@ local function world(options)
 		if w.sync_install then w.installed=true; install:answer({ok=true}) end
 		return install
 	end
+	function p.verify(runtime,budget,authorized,fresh,done)
+		w.verify_runtime,w.verify_budget,w.verify_fresh=runtime,budget,fresh
+		local verified=op(w,'verify',done)
+		if not w.async_verify then verified:answer(w.verify_answer or {ok=true}) end
+		return verified
+	end
 	function p.start_service(binary,args,options,done)
 		w.binary,w.args,w.service_options=binary,args,options
 		if w.on_start then w.on_start() end
@@ -397,6 +403,31 @@ test('cancel during the proxy lookup retains it until its physical close',functi
 	local w=world({with_network=true});w.hold.network=true;local r=w:start()
 	eq(r:cancel(),false);eq(w:last('network').cancelled,true);eq(w:last('service'),nil);eq(w.controller:has_debt(),true)
 	w:last('network'):close();eq(r:is_settled(),true)
+end)
+-- OLL-08: Linux started an installed tree on its metadata alone; Windows and
+-- macOS hash it against the pinned release before every start.
+test('(oll-08) the installed tree is verified against its seal before the daemon starts',function()
+	local w=world({async_verify=true});local r=w:start()
+	assert(w:last('verify'),'a reuse must verify the tree');eq(w.verify_fresh,false);eq(w.verify_runtime,w.runtime)
+	eq(w:last('service'),nil,'nothing starts before the verdict');eq(r:is_settled(),false)
+	w:last('verify'):answer({ok=true})
+	assert(w:last('service'),'the verified tree starts');w:ready();eq(r.result.ok,true)
+end)
+test('(oll-08) a tree that does not match its seal never starts',function()
+	local w=world({async_verify=true});local r=w:start()
+	w:last('verify'):answer({ok=false,error='runtime_seal_mismatch'})
+	eq(w:last('service'),nil);eq(r.result.ok,false);eq(r.result.error,'runtime_seal_mismatch');eq(r:is_settled(),true)
+end)
+test('(oll-08) the install that checked the archive seals the tree instead of verifying it',function()
+	local w=world({installed=false,async_verify=true});local r=w:start('download')
+	w.installed=true;w:last('install'):answer({ok=true})
+	assert(w:last('verify'),'the fresh tree is sealed');eq(w.verify_fresh,true);eq(w:last('service'),nil)
+	w:last('verify'):answer({ok=true});w:ready();eq(r.result.ok,true);eq(r.result.installed,true)
+end)
+test('(oll-08) a verification still running is cancelled with the repair and joined',function()
+	local w=world({async_verify=true});w.hold.verify=true;local r=w:start()
+	eq(r:cancel(),false);eq(w:last('verify').cancelled,true);eq(w:last('service'),nil)
+	w:last('verify'):close();eq(r:is_settled(),true)
 end)
 
 end

@@ -3,6 +3,8 @@
 --- Reads a canonical managed runtime without spawning, writing or acquiring FDs.
 --- The descriptor fences observed native inventory drift; its logical release
 --- never represents process exit, immutable bytes or a physical executable lease.
+--- The metadata fences replacement between capture and start only; the bytes
+--- are checked against the tree's seal before each start (runtime_seal.lua).
 local M = {}
 local available, native = pcall(require, "luv")
 if not available then native = nil end
@@ -138,6 +140,17 @@ function M.capture(resolver, backend)
 		local admitted, refusal = current()
 		if admitted then return executable end
 		return nil, refusal
+	end
+	--- The regular files of the captured tree, which its seal names
+	--- (runtime_seal.lua); links resolve inside the library tree to these.
+	--- @return table paths Sorted absolute paths.
+	function runtime.files()
+		local paths = {}
+		for path, receipt in pairs(captured) do
+			if receipt.type == "file" then paths[#paths + 1] = path end
+		end
+		table.sort(paths)
+		return paths
 	end
 	function runtime.release()
 		if released then return true end

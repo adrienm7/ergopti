@@ -22,7 +22,9 @@ helpers.describe("Retained Ollama runtime composition", function()
     return result
    end }, process = { start_service = function() end }, http = { get_owned = function() end },
    owned_timer = { after = function() end, now_ms = function() return 0 end }, environment = function() return {} end,
-   serve_environment = { "OLLAMA_NO_CLOUD=1" } })
+   serve_environment = { "OLLAMA_NO_CLOUD=1" },
+   listeners = { listening = function() return {} end, owned = function() return true end },
+   seal = require("ai.engine.ollama.runtime_seal"), retention = { stale = function() return {} end, remove = function() end } })
   assert(captured.install({}, budget, yes, function() end) == result)
  end)
 end)

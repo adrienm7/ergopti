@@ -8,6 +8,10 @@
 --- ==============================================================================
 
 local Repair=require('ai.engine.local_servers.runtime_repair')
+local Receipt=require('ai.engine.settings.enable_admission_core')
+local Json=require('core.text.engine.json')
+local Logger=require('core.logger.engine.shim')
+local LOG='ai.engine.local_servers.runtime_composition'
 local M={}
 local function empty(reason, done)
 	local op={started=false,result={ok=false,error=reason}}
@@ -27,6 +31,11 @@ end
 --- the owned system proxy lookup, its bound, the route_origins.json "ollama"
 --- inventory and the sign-in relay binding (core/network/engine/proxy_auth_relay.lua: policy,
 --- probe, timeout_ms, executable, timings), see ../ollama/managed_ollama_proxy.lua).
+--- listeners ({listening,owned}, ../ollama/listener_owner.lua) proves the
+--- answering socket is the owned daemon's; seal ({command,digests,encode,matches,
+--- read,write,NAME}, ../ollama/runtime_seal.lua) checks the tree against its
+--- pinned archive; retention ({stale,remove}, ../ollama/runtime_retention.lua)
+--- removes the release folders an update left behind.
 --- `source` owns captured enable/app source proofs and existing writer ACK.
 function M.new(deps)
 	assert(type(deps)=='table', 'runtime composition unavailable')
@@ -42,6 +51,22 @@ function M.new(deps)
 	local phase_start,serve_start,http_get=d.install_phase.start,d.process.start_service,d.http.get_owned
 	local get_plan,resolve_current=d.resolver.plan,d.resolver.current
 	local installed_capture=d.installed.capture
+	local listeners,seal,retention=d.listeners,d.seal,d.retention
+	assert(type(listeners)=='table' and type(listeners.listening)=='function' and type(listeners.owned)=='function',
+		'runtime listener port unavailable')
+	assert(type(seal)=='table' and type(seal.command)=='function' and type(seal.digests)=='function'
+		and type(seal.encode)=='function' and type(seal.matches)=='function' and type(seal.read)=='function'
+		and type(seal.write)=='function' and type(seal.NAME)=='string', 'runtime seal port unavailable')
+	assert(type(retention)=='table' and type(retention.stale)=='function' and type(retention.remove)=='function',
+		'runtime retention port unavailable')
+	-- The service the last start dispatched: readiness is admitted from its socket only.
+	local owned_service=nil
+	-- One removal at a time; a refused one is listed again by the next start.
+	local retiring=nil
+	local function retire(paths,label)
+		if retiring and not retiring:is_settled() then return end
+		retiring=retention.remove(paths,d.process,bootstrap,label)
+	end
 	local admission_new=d.admission.new
 	local environment=d.environment
 	assert(type(environment)=='function', 'captured native environment port unavailable')
@@ -70,6 +95,61 @@ function M.new(deps)
 		local result=installed_capture(d.resolver)
 		if not current(function()return s.current(snapshot)end) or not current(resolve_current) then return {status='unavailable'} end
 		return result
+	end
+	--- Hashes the tree's files and checks them against the seal its install
+	--- wrote, or writes that seal right after the install that checked the
+	--- pinned archive (fresh). A tree that fails is never started and is
+	--- removed, so the next download installs it again from the archive.
+	function p.verify(runtime,budget,authorized,fresh,done)
+		if not current(authorized) then return empty('runtime_source_changed',done) end
+		local plan=get_plan()
+		local files=type(runtime)=='table' and type(runtime.files)=='function' and runtime.files() or nil
+		if type(plan)~='table' or type(plan.asset)~='table' or type(plan.parent)~='string'
+			or type(plan.directory)~='string' or type(files)~='table' or #files==0 then
+			return empty('runtime_seal_plan_unavailable',done)
+		end
+		local path=plan.parent .. '/' .. seal.NAME
+		local text,missing
+		if not fresh then
+			text,missing=seal.read(path)
+			if not text then
+				Logger.error(LOG,'The managed Ollama at %s has no readable seal (%s); it is removed and must be downloaded again.',
+					plan.directory,tostring(missing))
+				retire({plan.parent},'the unsealed Ollama runtime')
+				return empty(missing or 'runtime_seal_unreadable',done)
+			end
+		end
+		local remaining=budget.remaining_ms()
+		if type(remaining)~='number' or remaining<=0 then return empty('runtime_timeout',done) end
+		local program,args=seal.command(files)
+		Logger.info(LOG,'%s the managed Ollama runtime (%d files)...',fresh and 'Sealing' or 'Verifying',#files)
+		return d.process.start(program,args,{owner='ollama-runtime-seal',authorized=authorized,
+			timeout_ms=math.min(bootstrap,remaining)},function(result)
+			if not current(authorized) then return end
+			local digests,reason=seal.digests(result,files)
+			if not digests then
+				Logger.warn(LOG,'The managed Ollama runtime could not be hashed (%s).',tostring(reason))
+				done({ok=false,error=reason});return
+			end
+			if fresh then
+				local rendered=seal.encode(plan.directory,digests,plan.asset.sha256)
+				if not rendered or not seal.write(path,rendered) then
+					Logger.error(LOG,'The seal of the managed Ollama runtime could not be written to %s.',path)
+					done({ok=false,error='runtime_seal_write_refused'});return
+				end
+				Logger.info(LOG,'Managed Ollama runtime sealed.')
+				done({ok=true});return
+			end
+			local matches,refusal=seal.matches(text,plan.directory,digests,plan.asset.sha256)
+			if not matches then
+				Logger.error(LOG,'The managed Ollama at %s does not match its seal (%s); it is removed and must be downloaded again.',
+					plan.directory,tostring(refusal))
+				retire({plan.parent},'the altered Ollama runtime')
+				done({ok=false,error=refusal});return
+			end
+			Logger.info(LOG,'Managed Ollama runtime verified.')
+			done({ok=true})
+		end)
 	end
 	function p.install(snapshot,budget,authorized,done)
 		if not current(authorized) then return empty('runtime_source_changed',done) end
@@ -115,6 +195,15 @@ function M.new(deps)
 		for _,row in ipairs(serve_environment) do env[#env+1]=row end
 		for _,row in ipairs(selected) do env[#env+1]=row end
 		if not current(authorized) then return empty('runtime_source_changed',done) end
+		-- The owned daemon binds its own port: a server already listening there
+		-- would answer the readiness probe in its place (OLL-13).
+		local port=tonumber(type(options.host)=='string' and options.host:match(':(%d+)$'))
+		local held,unreadable=listeners.listening(port)
+		if not held then return empty(unreadable or 'runtime_listener_unreadable',done) end
+		if next(held)~=nil then
+			Logger.warn(LOG,'Another server already listens on port %s; the managed Ollama is not started.',tostring(port))
+			return empty('runtime_port_occupied',done)
+		end
 		-- A proxy that demands an NTLM/Negotiate sign-in: the relay serves the
 		-- daemon for its lifetime and is the process this service owns, so it
 		-- stops with Ergopti exactly as the daemon did (proxy-auth-relay.md).
@@ -129,8 +218,10 @@ function M.new(deps)
 			if not wrapped then return empty('runtime_proxy_relay_unavailable',done) end
 			executable,args=relay_executable,wrapped
 		end
-		return serve_start(executable,args,{owner=options.owner,authorized=authorized,
+		local service=serve_start(executable,args,{owner=options.owner,authorized=authorized,
 			timeout_ms=false,env=env,capture_tail=true},done)
+		owned_service=service
+		return service
 	end
 	if network~=nil then
 		local proxy_port=require('ai.engine.ollama.managed_ollama_proxy').new({policy=network.policy,lookup=network.lookup,
@@ -144,11 +235,41 @@ function M.new(deps)
 		-- Native source admission precedes the final remaining-budget read.
 		local remaining=budget.remaining_ms()
 		if type(remaining)~='number' or remaining<=0 then return empty('runtime_timeout',done) end
+		local port=tonumber(url:match('^http://[^/]*:(%d+)/'))
 		return http_get(url,{}, {timeout_ms=math.min(probe_timeout,remaining),
 			owner='ollama-runtime-version',follow_redirects=false,https_only=false,authorized=authorized},function(result)
 			-- A stale logical response never publishes. The returned HTTP operation
 			-- remains independently retained until physical process/group/close ACK.
-			if current(authorized) then done(result) end
+			if not current(authorized) then return end
+			if not Receipt.receipt(result) then done(result);return end
+			-- Only the daemon this composition started may answer, with the pinned
+			-- version, as Windows admits only its child's socket (OLL-13). A
+			-- foreign answer is not readiness: the owned daemon, which cannot
+			-- bind, exits and ends the repair.
+			local service=owned_service
+			local pid=service and type(service.pid)=='function' and service:pid() or nil
+			local owned,refusal=listeners.owned(port,pid)
+			if not owned then
+				Logger.warn(LOG,'A server on port %s answered that is not the managed Ollama (%s).',tostring(port),tostring(refusal))
+				done({ok=false,error='runtime_'..tostring(refusal)});return
+			end
+			local plan=get_plan()
+			local version=Json.decode_lossless(result.body).version
+			if type(plan)~='table' or type(plan.asset)~='table' or version~=plan.asset.version then
+				Logger.error(LOG,'The managed Ollama answered version %s, not the pinned %s; it is stopped.',
+					tostring(version),tostring(type(plan)=='table' and type(plan.asset)=='table' and plan.asset.version))
+				pcall(service.cancel,service)
+				done({ok=false,error='runtime_version_mismatch'});return
+			end
+			-- The pinned release is verified and serving: an update's earlier
+			-- release folders can go (OLL-07).
+			local stale,scan_refusal=retention.stale(plan)
+			if not stale then
+				Logger.warn(LOG,'Earlier Ollama runtimes could not be listed (%s); retried at the next start.',tostring(scan_refusal))
+			elseif #stale>0 then
+				retire(stale,'the earlier Ollama runtimes')
+			end
+			done(result)
 		end)
 	end
 	return Repair.new(p,{bootstrap_timeout_ms=bootstrap,poll_ms=poll})

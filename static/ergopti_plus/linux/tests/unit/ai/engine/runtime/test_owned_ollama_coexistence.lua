@@ -124,6 +124,9 @@ local function composition(http)
 		timings = { ms = function() return 2000 end },
 		environment = function() return { "PATH=/usr/bin", "OLLAMA_HOST=127.0.0.1:" .. STOCK } end,
 		serve_environment = { "OLLAMA_NO_CLOUD=1" },
+		listeners = { listening = function() return {} end, owned = function() return false, "listener_absent" end },
+		seal = require("ai.engine.ollama.runtime_seal"),
+		retention = { stale = function() return {} end, remove = function() end },
 	})
 	return controller, served
 end

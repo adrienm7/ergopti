@@ -346,6 +346,8 @@ return {
 	"tests.unit.ai.engine.ollama.test_install_phase",
 	"tests.unit.ai.engine.ollama.test_install_boundaries",
 	"tests.unit.ai.engine.ollama.test_installed_runtime",
+	"tests.unit.ai.engine.ollama.test_listener_owner",
+	"tests.unit.ai.engine.ollama.test_runtime_seal",
 	"tests.unit.ai.engine.runtime.test_scope_native_ack",
 	"tests.unit.settings.scope.test_metrics_scope",
 	"tests.unit.settings.test_onboarding_answers",
