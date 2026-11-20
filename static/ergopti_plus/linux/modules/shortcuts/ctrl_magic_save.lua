@@ -1,12 +1,14 @@
 --- modules/shortcuts/ctrl_magic_save.lua
 
 --- ==============================================================================
---- MODULE: Ctrl + Magic Key Saves (Linux)
+--- MODULE: Modifiers + Magic Key Saves (Linux)
 --- DESCRIPTION:
---- With [layout] ctrl_magic_save on, Ctrl alone on the layout's own magic key
---- sends a bare Ctrl+S instead of a Ctrl+★ chord no application binds. Windows
---- defines the contract (windows/modules/keymap/keylayout/layout_registry.ahk,
---- LayoutRegistry_MagicKeyHotkeys); this follows it.
+--- With [layout] ctrl_magic_save on, a shortcut chord on the layout's own magic
+--- key sends the same modifiers with S: Ctrl+★ gives Ctrl+S, Ctrl+Shift+★
+--- Ctrl+Shift+S, Alt+★ Alt+S, Super+★ Super+S. ★ alone stays the magic key.
+--- The rule is the three drivers' shared one
+--- (_shared/shortcuts/engine/magic_key_save_core.lua); this applies it to the
+--- keyboard hook's presses.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The layout's own magic key: the key whose plain press types the magic key,
@@ -14,15 +16,19 @@
 ---    session's XKB keymap. A physical magic key the user chose
 ---    (hotstrings.magic_key_source) keeps every chord the layout gives it, as on
 ---    Windows, where only its plain press becomes the magic key.
---- 2. Ctrl alone, as the Windows ^SCxxx hotkey: Shift, Alt, AltGr or Super held
----    with it leave the chord to the application.
+--- 2. Shift alone and AltGr, whatever else is held, keep the layout's level:
+---    AltGr+★ types the layout's AltGr character, never AltGr+S.
 --- 3. Only while the magic key is replaced (the magickey replace section) and
 ---    the driver is not paused, the condition under which Windows registers it.
---- 4. Read at the press: config.toml is read only when Ctrl is held on that key,
----    so a restore or clear of the configuration applies at the next press.
---- 5. Decided in the keyboard hook's consumption callback, the one place the
----    daemon can keep a key from the application; Ctrl+S is pressed on the next
----    loop tick, where the live layout types « s ».
+--- 4. A keyboard shortcut assigned to the chord keeps it: the daemon decides the
+---    keyboard slots, the magic editor's Super+★ included, before this module,
+---    and its shortcut_owns port reports what they left.
+--- 5. Read at the press: config.toml is read only when a shortcut chord is held
+---    on that key, so a restore or clear of the configuration applies at the
+---    next press.
+--- 6. Decided in the keyboard hook's consumption callback, the one place the
+---    daemon can keep a key from the application; the chord is pressed on the
+---    next loop tick, where the live layout types « s ».
 --- ==============================================================================
 
 local M = {}
@@ -33,15 +39,16 @@ local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local ConfigKeys = require("settings.engine.keys")
+local Policy = require("shortcuts.engine.magic_key_save_core")
 
 local LOG = "modules.shortcuts.ctrl_magic_save"
 
--- The configuration path of the switch, and the chord it sends.
+-- The configuration path of the switch.
 M.PATH = ConfigKeys.KEY.LAYOUT_CTRL_MAGIC_SAVE
-M.COMBO = "ctrl+s"
 
--- The modifiers that make the press another chord than Ctrl alone.
-local OTHER_MODIFIERS = { "shift", "alt", "altgr", "meta" }
+-- The modifiers the keyboard hook reports, and their combo_emitter spelling.
+local HELD = { "ctrl", "alt", "shift", "meta", "altgr" }
+local COMBO_NAME = { ctrl = "ctrl", alt = "alt", shift = "shift", meta = "super" }
 
 
 
@@ -105,7 +112,7 @@ end
 function M.set(value)
 	if type(value) ~= "boolean" then error("ctrl_magic_save.set needs a boolean", 2) end
 	if require("settings.engine.scope.registry").pending() then
-		Logger.error(LOG, "Ctrl + magic key change refused: a configuration scope is still pending.")
+		Logger.error(LOG, "Modifiers + magic key change refused: a configuration scope is still pending.")
 		return false
 	end
 	local called, committed, detail = pcall(function()
@@ -115,10 +122,10 @@ function M.set(value)
 			{ Manifest.sparse_operation(M.PATH, value) }, nil, source)
 	end)
 	if not called or committed ~= true then
-		Logger.error(LOG, "Ctrl + magic key was not persisted: %s.", tostring(called and detail or committed))
+		Logger.error(LOG, "Modifiers + magic key was not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
-	Logger.info(LOG, "Ctrl + magic key set to %s.", value and "save" or "the layout's chord")
+	Logger.info(LOG, "Modifiers + magic key set to %s.", value and "save" or "the layout's chords")
 	return true
 end
 
@@ -132,66 +139,101 @@ end
 -- ===========================================
 -- ===========================================
 
---- Whether a press is Ctrl alone on the layout's own magic key, the hook active
---- and the switch on. The press itself is decided first: any other key or chord
---- returns before the driver state or config.toml is read.
+--- The combo_emitter chord of a press's modifiers with S.
+--- @param sends table Modifier names, as the shared rule orders them.
+--- @return string combo "ctrl+shift+s".
+local function combo_of(sends)
+	local parts = {}
+	for _, name in ipairs(sends) do parts[#parts + 1] = COMBO_NAME[name] end
+	parts[#parts + 1] = Policy.SAVE_KEY
+	return table.concat(parts, "+")
+end
+
+--- The held modifiers of a key press, nil when the rule leaves the press to the
+--- layout whatever key it is (a release, a plain press, Shift, AltGr). Reads
+--- nothing but the event.
+--- @param detail table { code, value, mods } as the keyboard hook reports it.
+--- @return table|nil held Modifier names.
+local function shortcut_chord(detail)
+	if type(detail) ~= "table" or type(detail.code) ~= "number" then return nil end
+	if detail.value ~= nil and detail.value ~= 1 then return nil end
+	local mods = type(detail.mods) == "table" and detail.mods or {}
+	local held = {}
+	for _, name in ipairs(HELD) do
+		if mods[name] == true then held[#held + 1] = name end
+	end
+	if Policy.decide("linux", held) == nil then return nil end
+	return held
+end
+
+--- The chord a press sends instead of its own, with the hook active and the
+--- switch on. The press itself is decided first: a press the rule leaves to the
+--- layout, and any chord of another key, return before the driver state or
+--- config.toml is read (CI run 44733461420: a Ctrl+U that read the driver state
+--- raised there and never reached the consumers behind this one).
 --- @param detail table { code, value, mods } as the keyboard hook reports it.
 --- @param ports table { magic_key = fn() -> string, chosen_source = fn() -> boolean,
----   plain_text = fn(evdev) -> string|nil, active = fn() -> boolean, enabled = fn() -> boolean|nil }.
---- @return boolean
-function M.matches(detail, ports)
-	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
-	if detail.value ~= nil and detail.value ~= 1 then return false end
-	local mods = type(detail.mods) == "table" and detail.mods or {}
-	if mods.ctrl ~= true then return false end
-	for _, name in ipairs(OTHER_MODIFIERS) do
-		if mods[name] then return false end
-	end
+---   plain_text = fn(evdev) -> string|nil, active = fn() -> boolean,
+---   enabled = fn() -> boolean|nil, shortcut_owns = fn(detail) -> boolean }.
+--- @return string|nil combo "ctrl+shift+s", nil when the press stays the layout's.
+function M.match(detail, ports)
+	local held = shortcut_chord(detail)
+	if held == nil then return nil end
 	local magic = ports.magic_key()
-	if type(magic) ~= "string" or magic == "" or ports.plain_text(detail.code) ~= magic then return false end
-	if ports.chosen_source() == true then return false end
-	if not ports.active() then return false end
+	if type(magic) ~= "string" or magic == "" or ports.plain_text(detail.code) ~= magic then return nil end
+	if ports.chosen_source() == true then return nil end
+	-- active() reads the pause and the replace section.
+	if not ports.active() then return nil end
+	local decision = Policy.resolve({ os = "linux", held = held, paused = false, replace_on = true,
+		chosen_source = false, is_magic_key = true, shortcut_owns = false })
+	if decision.action ~= "save" then return nil end
+	if ports.shortcut_owns(detail) == true then return nil end
 	local enabled = ports.enabled()
 	if enabled == nil then
-		Logger.error(LOG, "The Ctrl + magic key switch cannot be read: the chord goes to the application.")
-		return false
+		Logger.error(LOG, "The modifiers + magic key switch cannot be read: the chord goes to the application.")
+		return nil
 	end
-	return enabled
+	return enabled and combo_of(decision.sends) or nil
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
 --- @param detail table { code, value, mods }.
 --- @param options table { active = fn() -> boolean, defer = fn(fn) -> boolean,
----   press = fn(combo) -> boolean, magic_key, chosen_source, plain_text, enabled? }.
---- @return boolean consumed True when the press became Ctrl+S.
+---   press = fn(combo) -> boolean, magic_key, chosen_source, plain_text,
+---   shortcut_owns, enabled? }.
+--- @return boolean consumed True when the press became its modifiers + S.
 --- @return function|nil repeat_callback Owner of the held press's auto-repeats.
 function M.on_key(detail, options)
 	if type(options) ~= "table" or type(options.active) ~= "function" or type(options.defer) ~= "function"
 		or type(options.press) ~= "function" or type(options.magic_key) ~= "function"
-		or type(options.chosen_source) ~= "function" or type(options.plain_text) ~= "function" then
-		error("ctrl_magic_save.on_key needs active, defer, press, magic_key, chosen_source and plain_text", 2)
+		or type(options.chosen_source) ~= "function" or type(options.plain_text) ~= "function"
+		or type(options.shortcut_owns) ~= "function" then
+		error("ctrl_magic_save.on_key needs active, defer, press, magic_key, chosen_source, plain_text"
+			.. " and shortcut_owns", 2)
 	end
 	local ports = { magic_key = options.magic_key, chosen_source = options.chosen_source,
-		plain_text = options.plain_text, active = options.active, enabled = options.enabled or M.enabled }
+		plain_text = options.plain_text, active = options.active, shortcut_owns = options.shortcut_owns,
+		enabled = options.enabled or M.enabled }
 
-	--- Queues Ctrl+S for one key event; false lets that event through.
+	--- Queues the chord for one key event; false lets that event through.
 	local function queue(event)
-		if not M.matches(event, ports) then return false end
+		local combo = M.match(event, ports)
+		if combo == nil then return false end
 		local queued = options.defer(function()
 			if not options.active() then return end
-			if options.press(M.COMBO) ~= true then Logger.error(LOG, "Ctrl + magic key could not press %s.", M.COMBO) end
+			if options.press(combo) ~= true then Logger.error(LOG, "Modifiers + magic key could not press %s.", combo) end
 		end)
 		if queued ~= true then
-			Logger.error(LOG, "Ctrl + magic key could not be queued: the chord goes to the application.")
+			Logger.error(LOG, "Modifiers + magic key could not be queued: the chord goes to the application.")
 			return false
 		end
-		Logger.debug(LOG, "Ctrl + magic key → %s.", M.COMBO)
+		Logger.debug(LOG, "Modifiers + magic key → %s.", combo)
 		return true
 	end
 
 	if not queue(detail) then return false end
-	-- Each auto-repeat saves again, as the Windows ^SCxxx hotkey fires on every
-	-- repeat, with the modifiers held at that repeat.
+	-- Each auto-repeat saves again, as the Windows hotkeys fire on every repeat,
+	-- with the modifiers held at that repeat.
 	return true, function(repeat_detail)
 		if type(repeat_detail) ~= "table" or repeat_detail.code ~= detail.code or not options.active() then
 			return false
