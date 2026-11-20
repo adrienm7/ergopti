@@ -978,6 +978,27 @@ function M.install(id, on_done, deps)
 	return true
 end
 
+--- Records the layout this daemon just loaded into the X server.
+--- @param deps table Resolved collaborators.
+--- @param id string
+local function remember_x11_selection(deps, id)
+	local ok, err = deps.write(deps.local_dir .. deps.settings.x11_selection_file, id .. "\n")
+	if not ok then
+		Logger.warn(LOG, "The X11 layout '%s' is loaded but not recorded for the next session: %s.", id, tostring(err))
+	end
+end
+
+--- Forgets the recorded X11 layout when it is `id`.
+--- @param deps table Resolved collaborators.
+--- @param id string
+local function forget_x11_selection(deps, id)
+	local path = deps.local_dir .. deps.settings.x11_selection_file
+	local text = deps.read(path)
+	if type(text) == "string" and TextUtils.trim(text) == id and not deps.delete(path) then
+		Logger.warn(LOG, "Cannot delete %s.", path)
+	end
+end
+
 --- Uninstalls one registry layout: removes it from the user XKB tree and the
 --- desktop's input sources, then deletes the local copy and its record.
 --- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
@@ -1033,6 +1054,7 @@ function M.uninstall(id, on_done, deps)
 			return
 		end
 		if _active == id then _active = "" end
+		forget_x11_selection(deps, id)
 		Logger.success(LOG, "Uninstalled the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
@@ -1076,11 +1098,51 @@ function M.select(id, on_done, deps)
 			return
 		end
 		_active = id
-		if x11 and deps.keep_x11_layout then deps.keep_x11_layout(id) end
+		if x11 then
+			remember_x11_selection(deps, id)
+			if deps.keep_x11_layout then deps.keep_x11_layout(id) end
+		end
 		Logger.success(LOG, "Activated the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
 	return true
+end
+
+
+
+
+
+--- Loads into the X server, at the daemon's start, the layout recorded by the
+--- last X11 selection (registry x11_selection_file): apply-x11 lasts for the session
+--- only, and Xorg reads no user XKB tree. Nothing runs on another session, when
+--- nothing is recorded, or when the recorded layout is no longer installed.
+--- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
+--- runs once when a selection was dispatched.
+--- @param on_done function|nil
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.restore_x11_selection(on_done, deps)
+	if _stopping then return false end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		Logger.error(LOG, "The X11 layout of the last session cannot be loaded: %s.", tostring(deps_err))
+		return false
+	end
+	if M.live_path(resolved) ~= "x11" then return false end
+	local path = resolved.local_dir .. resolved.settings.x11_selection_file
+	local text = resolved.read(path)
+	if type(text) ~= "string" then return false end
+	local id = TextUtils.trim(text)
+	local record = read_installed(resolved)
+	if not (Registry.is_valid_id(id) and record and record.layouts[id]) then
+		Logger.warn(LOG, "The X11 layout recorded for this session ('%s') is not installed: it is forgotten.", id)
+		if not resolved.delete(path) then Logger.warn(LOG, "Cannot delete %s.", path) end
+		return false
+	end
+	Logger.info(LOG, "Loading the '%s' layout selected in an earlier X11 session…", id)
+	return M.select(id, on_done or function(ok, _, detail)
+		if not ok then Logger.error(LOG, "The X11 layout '%s' was not loaded again: %s.", id, tostring(detail)) end
+	end, deps)
 end
 
 
@@ -1232,6 +1294,7 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				remember_x11_selection(deps, base)
 				-- GNOME and Plasma under X11 put their own layouts back on a new
 				-- keyboard (W4): keep this one loaded from now on.
 				if deps.keep_x11_layout then deps.keep_x11_layout(base) end

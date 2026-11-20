@@ -672,6 +672,56 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
 	end)
 
+	-- apply-x11 lasts for the X session: the daemon's start loads the recorded
+	-- selection again (x11-layout-restore).
+	helpers.it("loads the layout selected on X11 again at the next daemon start (x11-layout-restore)", function()
+		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		deps.session_type = function() return "x11" end
+		deps.keep_x11_layout = function() end
+		helpers.assert_true(run(function(done) LayoutRegistry.select("ergol", done, deps) end).ok)
+		helpers.assert_eq(state.files[LOCAL_DIR .. deps.settings.x11_selection_file], "ergol\n",
+			"the X11 selection is recorded for the next session")
+		-- A new session: the module starts again, nothing in memory, the file kept.
+		LayoutRegistry._reset()
+		local runs = { OK_RUN, INSTALLED_RUN }
+		deps.run = function(program, args, _, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args }
+			callback(assert(table.remove(runs, 1), "unexpected process run"))
+			return true
+		end
+		local kept = {}
+		deps.keep_x11_layout = function(id) kept[#kept + 1] = id end
+		local before = #state.runs
+		local result = run(function(done) helpers.assert_true(LayoutRegistry.restore_x11_selection(done, deps)) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(state.runs[before + 2].args[2], "apply-x11")
+		helpers.assert_eq(arg_value(state.runs[before + 2].args, "--layout-id"), "ergol")
+		helpers.assert_eq(kept, { "ergol" }, "the restored layout is kept against the desktop too")
+	end)
+
+	helpers.it("restores nothing off X11, without a record or for a layout no longer installed (x11-layout-restore)", function()
+		local LayoutRegistry, deps, state = with_ergol({})
+		local path = LOCAL_DIR .. deps.settings.x11_selection_file
+		deps.session_type = function() return "wayland" end
+		deps.desktop_is = function(token) return token == "gnome" end
+		state.files[path] = "ergol\n"
+		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "Wayland desktops keep their own setting")
+		deps.session_type = function() return "x11" end
+		state.files[path] = nil
+		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "no record, nothing to load")
+		state.files[path] = "bepo\n"
+		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "a layout no longer installed is not loaded")
+		helpers.assert_nil(state.files[path], "and its record is forgotten")
+		helpers.assert_eq(#state.runs, 0, "no installer child ran")
+	end)
+
+	helpers.it("forgets the X11 selection when its layout is uninstalled (x11-layout-restore)", function()
+		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		state.files[LOCAL_DIR .. deps.settings.x11_selection_file] = "ergol\n"
+		helpers.assert_true(run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end).ok)
+		helpers.assert_nil(state.files[LOCAL_DIR .. deps.settings.x11_selection_file])
+	end)
+
 	helpers.it("installs a registry layout and a composed one on X11 with the Xorg permission only there (x11-layout-install)", function()
 		for _, case in ipairs({ { "x11", true }, { "wayland", false } }) do
 			local layout = registry_file("ergol/ergol.keylayout")
