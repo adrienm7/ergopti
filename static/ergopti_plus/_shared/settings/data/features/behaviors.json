@@ -8,7 +8,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "aa05e42a74907c25cf60901fb94bbfbd0a50b9b3fc36eec971c8ed6dcc8c3c33"
+			"sha256": "c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2"
 		},
 		{
 			"id": "windows-control",
@@ -22,28 +22,28 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 			"symbol": "HSE_UndoExpansion(Undo",
-			"sha256": "8bf0f2e0026bdcf27a51735d7fe419f502370492a86682027dc1a4f64f4174a6"
+			"sha256": "a719a2c0166e07e6a80b7f3406284cf00796496099d93ca915c889ecf5a83866"
 		},
 		{
 			"id": "macos-repeat",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "79b1971e0687679e8e96fcb64932495c1f88d2435180bdc212cd327b438ede95"
+			"sha256": "3f80e94e20388c5341f86098ccfe797a42474d3707d2961770352d14fb7ccf38"
 		},
 		{
 			"id": "macos-control",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "7e87be2b81b0cc72d117dcb1cbafda9b97b7da34942e32b87236c35dd09740c2"
+			"sha256": "49f9062054c84dd172882b5b159d2cc56f1cf80ea1eec9d8dd800aa5d09b88bf"
 		},
 		{
 			"id": "macos-undo",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "79b1971e0687679e8e96fcb64932495c1f88d2435180bdc212cd327b438ede95"
+			"sha256": "3f80e94e20388c5341f86098ccfe797a42474d3707d2961770352d14fb7ccf38"
 		},
 		{
 			"id": "linux-repeat",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "a134317393c242e660420e260555a17a35e537ce47648c89c91b619a2539a8f2"
+			"sha256": "3dde0183bf072e8ebb73cd3a645267672003dfb586d3b53899b1ec74704f0201"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -78,7 +78,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "7e87be2b81b0cc72d117dcb1cbafda9b97b7da34942e32b87236c35dd09740c2"
+			"sha256": "49f9062054c84dd172882b5b159d2cc56f1cf80ea1eec9d8dd800aa5d09b88bf"
 		},
 		{
 			"id": "linux-dead-capture",

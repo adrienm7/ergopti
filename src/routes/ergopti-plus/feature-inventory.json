@@ -159,6 +159,36 @@
 		"reason": null
 	},
 	{
+		"path": "hotstrings.backspace_restore_enabled",
+		"family": "setting",
+		"labels": {
+			"fr": "Retour arrière annule la dernière expansion",
+			"en": "Backspace undoes the last expansion"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
+		"path": "hotstrings.backspace_restore_window_ms",
+		"family": "setting",
+		"labels": {
+			"fr": "Délai d’annulation par Retour arrière",
+			"en": "Backspace undo window"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "hotstrings.idle_reset_seconds",
 		"family": "setting",
 		"labels": {
