@@ -224,7 +224,7 @@ LLM_RequestPlanBatching(BatchProfile, Requested, SequentialMode) {
 	_LLM_RequestPlanRequireBool(BatchProfile, "batch_profile")
 	if !(Requested is Integer) || Requested < 1
 		throw ValueError("requested must be a whole number from 1")
-	_LLM_RequestPlanRequireBool(SequentialMode, "sequential_mode")
+	_LLM_RequestPlanRequireBool(SequentialMode, ConfigLeaf.SEQUENTIAL_MODE)
 	if BatchProfile && Requested > 1
 		return Map("mode", "batch", "calls", 1, "per_call", Requested, "concurrent", false)
 	return Map("mode", "sequential", "calls", Requested, "per_call", 1,
