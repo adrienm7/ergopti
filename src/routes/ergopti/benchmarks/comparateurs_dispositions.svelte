@@ -120,9 +120,9 @@
 	</p>
 	<p>
 		En résumé, l’analyse Ergo‑L ne sera pas tout à fait avec la vraie disposition, ceci à cause du
-		déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires,
-		peut-être avec un tout petit plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité, car
-		il y a plus de
+		déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires. Il y
+		aura peut-être un tout petit peu plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité,
+		car il y a plus de
 		<kbd-output>KA</kbd-output>
 		que de <kbd-output>KU</kbd-output>.
 	</p>

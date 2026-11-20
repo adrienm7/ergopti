@@ -96,9 +96,9 @@
 			le tap ;
 
 			<p>
-				Avoir la possibilité de <kbd-output>Coller</kbd-output> par appui de la main gauche sur une touche
-				est très utile, particulièrement lorsque la souris est utilisée en même temps par la main droite.
-				Cela permet de remplacer à la volée des parties de texte.
+				Pouvoir <kbd-output>Coller</kbd-output> par appui de la main gauche sur une touche est très utile,
+				particulièrement lorsque la souris est utilisée en même temps par la main droite. Cela permet
+				de remplacer à la volée des parties de texte.
 			</p>
 		</li>
 	</ul>

@@ -28,10 +28,10 @@
 			est très peu commun, mais les <span lang="en">Data Scientists</span> l’utiliseront
 			régulièrement pour écrire
 			<em>XGBoost</em>. Si c’est le cas, il est possible de désactiver certains des ajouts d’<ErgoptiPlus
-			/>, de les modifier, ou d’ajouter des raccourcis pour les contourner (par exemple avec une
-			macro/remplacement de texte qui écrit <em>XGBoost</em>). À noter que le raccourci transformant
-			XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce n’était
-			qu’un exemple illustratif.
+			/>, de les modifier, ou d’ajouter des raccourcis pour les contourner. Par exemple, une
+			macro/remplacement de texte peut écrire <em>XGBoost</em>. À noter que le raccourci
+			transformant XG en quelque chose d’autre n’est pas implémenté justement pour cette raison ; ce
+			n’était qu’un exemple illustratif.
 		</p>
 	</aside>
 
@@ -44,10 +44,10 @@
 		<li>
 			<kbd>hc</kbd> ➜ <kbd-output>wh</kbd-output> ;
 			<p>
-				Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Ergopti />,
-				car cette combinaison est très fréquente et se produit en roulement, ce qui la rend
-				extrêmement confortable. L’ajout du roulement donnant <kbd-output>WH</kbd-output> permet d’avoir
-				une frappe en anglais encore plus fluide.
+				Le roulement <kbd>CH</kbd> était déjà l’un des grands atouts de la disposition <Ergopti />.
+				Cette combinaison est très fréquente et se produit en roulement, ce qui la rend extrêmement
+				confortable. L’ajout du roulement donnant <kbd-output>WH</kbd-output> permet d’avoir une frappe
+				en anglais encore plus fluide.
 			</p>
 		</li>
 		<li>

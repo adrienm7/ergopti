@@ -10,9 +10,9 @@
 		Maintenant que vous avez été avertis sur comment bien comparer des dispositions, il reste encore
 		la <strong>question fondamentale du corpus</strong>. Effectivement, vos résultats vont
 		sensiblement différer selon le corpus utilisé. Un corpus avec beaucoup de dialogues aura de
-		nombreux "je", un corpus plus "sérieux" aura une sur-représentation de <kbd>Z</kbd> à cause du
-		vouvoiement, tandis qu’un corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus
-		élevée du mot "wagon".
+		nombreux "je". Un corpus plus "sérieux" aura une sur-représentation de <kbd>Z</kbd> à cause du
+		vouvoiement. Un corpus parlant de trains aura plus de <kbd>W</kbd> dû à une fréquence plus élevée
+		du mot "wagon".
 	</p>
 	<p>
 		Évidemment, plus le corpus sera volumineux et diversifié, plus les résultats obtenus seront
@@ -29,8 +29,8 @@
 		marginaux.
 	</p>
 	<p>
-		Par exemple, il serait probablement possible d’améliorer encore les résultats d’<Ergopti /> sur KLAnext,
-		mais cela se ferait au détriment d’autres choses pas forcément quantifiables comme le confort général
+		Par exemple, il serait probablement possible d’améliorer encore les résultats d’<Ergopti /> sur KLAnext.
+		Mais cela se ferait au détriment d’autres choses pas forcément quantifiables, comme le confort général
 		ou la disparition de certains roulements. Autre exemple, certaines dispositions optimisent tellement
 		que les chiffres ne sont pas dans l’ordre mais plutôt du genre <kbd>3210987654</kbd>. Cela rend
 		la disposition beaucoup moins logique et donc plus difficile à apprendre, pour seulement

@@ -11,10 +11,10 @@
 
 	<p>
 		Lors de l’utilisation d’un ordinateur, la plupart du temps la souris est tenue de la main droite
-		et la main gauche repose près de la partie gauche du clavier. Quand vient le moment de taper sur
-		une touche ou de réaliser une combinaison de touches pour faire un raccourci, il est bien
-		souvent nécessaire de bouger la main droite. Celle-ci doit se déplacer de la souris à la partie
-		droite du clavier, taper dessus, puis retourner à la souris pour continuer la navigation.
+		et la main gauche repose près de la partie gauche du clavier. Pour taper sur une touche ou faire
+		un raccourci, il est bien souvent nécessaire de bouger la main droite. Celle-ci doit se déplacer
+		de la souris à la partie droite du clavier, taper dessus, puis retourner à la souris pour
+		continuer la navigation.
 	</p>
 	<p>
 		Une bonne disposition clavier permet donc de faire beaucoup d’actions courantes avec la seule
@@ -50,7 +50,7 @@
 	<tiny-space></tiny-space>
 	<p>
 		La version d’<Ergopti /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
-		à une main, car des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
+		à une main. En effet, des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
 		<kbd>Alt+Tab</kbd> ont été directement incluses à gauche du clavier. À noter que ces touches ne sont
 		pas définies dans le pilote et que ce sont uniquement des idées d’implémentation. Les claviers de
 		type Ergodox peuvent en effet être programmés pour ajouter et déplacer des touches.

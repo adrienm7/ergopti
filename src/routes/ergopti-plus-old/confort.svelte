@@ -105,10 +105,10 @@
 		Lorsqu’on écrit en français ou anglais, il faudrait idéalement utiliser l’apostrophe
 		typographique plutôt que l’apostrophe droite. C’est pour cette raison qu’<ErgoptiPlus /> va automatiquement
 		l’utiliser à la place de l’apostrophe droite lors de l’écriture de texte. Cette apostrophe est d’ailleurs
-		plus jolie et présente l’avantage de ne pas avoir à être échappée en programmation si une chaîne
-		de caractères est écrite avec ce caractère à l’intérieur. Il n’y a pas besoin de réfléchir : il suffit
-		d’écrire normalement et l’apostrophe typographique apparaîtra automatiquement si c’est du texte qui
-		est écrit et non du code. Les faux positifs devraient être extrêmement rares.
+		plus jolie. Elle présente aussi l’avantage de ne pas avoir à être échappée en programmation si une
+		chaîne de caractères est écrite avec ce caractère à l’intérieur. Il n’y a pas besoin de réfléchir :
+		il suffit d’écrire normalement et l’apostrophe typographique apparaîtra automatiquement si c’est
+		du texte qui est écrit et non du code. Les faux positifs devraient être extrêmement rares.
 	</p>
 	<p>
 		Un autre raccourci a aussi été ajouté pour avoir la possibilité d’écrire <kbd-output
@@ -130,8 +130,8 @@
 		seront détaillées par la suite. Toutefois, elle prend la place du <kbd>j</kbd> et il convient
 		donc de replacer ce caractère autre part. Il convient de noter que seul le caractère
 		<kbd-output>j</kbd-output>
-		change de place, la touche <kbd class="glow">j/★</kbd> restant une touche <kbd>J</kbd> dans tous
-		les autres cas, que ce soit pour les raccourcis avec
+		change de place. La touche <kbd class="glow">j/★</kbd> reste une touche <kbd>J</kbd> dans tous
+		les autres cas. Cela vaut pour les raccourcis avec
 		<kbd>Ctrl</kbd>
 		(<kbd-output>Ctrl</kbd-output>
 		+
@@ -158,9 +158,9 @@
 		nativement en <kbd>Shift</kbd> + <kbd>AltGr</kbd> +
 		<kbd class="glow">j/★</kbd>. En fait, on pourrait même toujours utiliser cet emplacement en
 		<kbd>Shift</kbd>
-		+ <kbd>AltGr</kbd> sans utiliser l’astuce de la touche <kbd>,</kbd>, mais utiliser cette
-		dernière permet une frappe plus rapide et plus fluide, car il suffit de taper sur <kbd>,</kbd> et
-		non d’activer plusieurs modificateurs en même temps.
+		+ <kbd>AltGr</kbd> sans utiliser l’astuce de la touche <kbd>,</kbd>. Mais utiliser cette
+		dernière permet une frappe plus rapide et plus fluide. Il suffit en effet de taper sur
+		<kbd>,</kbd> et non d’activer plusieurs modificateurs en même temps.
 	</p>
 
 	<p class="text-bold">En résumé :</p>
@@ -198,8 +198,8 @@
 	</h3>
 	<p>
 		La disposition <Ergopti></Ergopti> n’est pas 1DFH de base. En effet, il y a trop de lettres à placer,
-		notamment les voyelles accentuées du français, pour que toutes les touches soient à une distance
-		maximale d’une touche de la position de repos de chaque doigt («
+		notamment les voyelles accentuées du français. Toutes les touches ne peuvent donc pas être à une
+		distance maximale d’une touche de la position de repos de chaque doigt («
 		<span lang="en">1u Distance From Home</span>
 		»). C’est pourquoi il y a les lettres <kbd>Q</kbd> et <kbd>Z</kbd> sur l’auriculaire droit, non
 		sur la colonne de repos de ce doigt, mais à droite de celle-ci. De même pour la touche

@@ -102,10 +102,10 @@
 	<li>
 		<b>Microsoft Excel :</b> Taper un <kbd-output>+</kbd-output> avec <kbd>AltGr</kbd> +
 		<kbd>P</kbd>
-		cause des problèmes d'édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé
+		cause des problèmes d'édition de la cellule. Tout ce qui est tapé avant disparaît et est remplacé
 		par un <kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le driver
 		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>
-		pour émuler la disposition et garantir que ce soit bien un symbole <kbd-output>+</kbd-output> qui
-		soit envoyé et non un raccourci interne d'Excel qui interfère.
+		pour émuler la disposition. Il garantit que c'est bien un symbole <kbd-output>+</kbd-output> qui
+		est envoyé, et non un raccourci interne d'Excel qui interfère.
 	</li>
 </ul>

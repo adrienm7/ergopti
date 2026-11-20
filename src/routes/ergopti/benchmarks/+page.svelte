@@ -88,7 +88,7 @@
 		la disposition clavier française la mieux notée sur KLAnext. Là encore, ce n’est pas parce qu’Adextre
 		est mieux notée que cette disposition est "meilleure". Par exemple, Adextre nécessite un clavier
 		de type Ergodox et ne peut donc pas être utilisée sur les claviers standards (ISO). En outre, elle
-		a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche, ce qui peut
+		a une faible alternance des mains ainsi que la touche <kbd>E</kbd> sur le pouce gauche. Cela peut
 		entraver la fluidité lors de l’écriture de texte ainsi que le confort général.
 	</p>
 	<p>
@@ -100,8 +100,8 @@
 
 	<h3 id="comparaison">Comparaison en direct</h3>
 	<p>
-		Ces résultats sont calculés dans votre navigateur, avec le même moteur d’analyse, la même
-		bibliothèque de dispositions et les mêmes corpus que l’onglet <a
+		Ces résultats sont calculés dans votre navigateur. Ils utilisent le même moteur d’analyse, la
+		même bibliothèque de dispositions et les mêmes corpus que l’onglet <a
 			class="link"
 			href={resolve('/studio/comparer')}>Comparer</a
 		>

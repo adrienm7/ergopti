@@ -27,9 +27,9 @@
 	<p>
 		Toutefois, modifier le corpus rend la comparaison avec les autres dispositions plus compliquée,
 		car ce ne sera pas le même corpus pour toutes. Utiliser le même corpus modifié pour les autres
-		dispositions peut engendrer des très bonnes performances chez elles, ceci car la touche <kbd
+		dispositions peut engendrer des très bonnes performances chez elles. En effet, la touche <kbd
 			>★</kbd
-		> ne sera pas parmi leurs touches et sera donc systématiquement ignorée, améliorant sensiblement
+		> ne sera pas parmi leurs touches et sera donc systématiquement ignorée, ce qui améliore sensiblement
 		leurs stats.
 	</p>
 	<p>

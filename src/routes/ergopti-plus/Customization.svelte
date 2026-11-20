@@ -168,7 +168,7 @@ FEATURES & RATIONALE:
 			<p class="win-all-lead">
 				Le driver ouvre <strong>{webviews.length} fenêtres natives</strong> — réglages, éditeurs,
 				assistants, tableaux de bord. Chacune est une vraie fenêtre de votre système (WebView2 sur
-				Windows, WKWebView sur macOS, WebKitGTK sur Linux), mais toutes partagent
+				Windows, WKWebView sur macOS, WebKitGTK sur Linux). Toutes partagent pourtant
 				<strong>un seul et même code</strong> : même apparence, même comportement sur les trois OS. Liste
 				générée depuis le manifeste du driver :
 			</p>

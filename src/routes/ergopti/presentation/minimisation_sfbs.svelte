@@ -24,7 +24,7 @@
 	</p>
 	<p>
 		Il est donc impossible de paralléliser sa frappe lors d’un <SFB />. Suivre un chemin linéaire
-		est nécessaire : d’abord taper la première touche, puis bouger son doigt pour atteindre la
+		est nécessaire. D’abord taper la première touche, puis bouger son doigt pour atteindre la
 		deuxième, puis enfin frapper la deuxième touche, toujours avec le même doigt. Impossible de
 		déplacer deux doigts en même temps pour ne plus avoir qu’à taper dans le bon ordre sur les
 		touches atteintes. Le pire est quand ces <SFB />s constituent la majorité de nos frappes, ce qui
@@ -36,7 +36,7 @@
 			>bigramme</em
 		>
 		(ou <em>digramme</em>). Pour optimiser une disposition clavier, il faut s’assurer que les
-		bigrammes les plus fréquents ne se fassent pas avec le même doigt : on parle de
+		bigrammes les plus fréquents ne se fassent pas avec le même doigt. On parle de
 		<strong>limiter les <em lang="en">Same Finger Bigrams</em></strong>.
 	</p>
 	<p>

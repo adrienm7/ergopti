@@ -45,8 +45,9 @@ in docs/audits/accessibility/; update both together.
 		<h2>Objectif</h2>
 		<p>
 			Le site <Ergopti></Ergopti>, Ergopti Studio et <ErgoptiPlus></ErgoptiPlus> doivent pouvoir être
-			utilisés par tout le monde : au clavier seul, avec un lecteur d’écran, avec un zoom important,
-			sans animations ou avec une police adaptée. L’objectif est la conformité au niveau
+			utilisés par tout le monde. Ils doivent fonctionner au clavier seul, avec un lecteur d’écran, avec
+			un zoom important, sans animations ou avec une police adaptée. L’objectif est la conformité au
+			niveau
 			<strong>AA</strong> des
 			<a href="https://www.w3.org/TR/WCAG22/" class="link" lang="en"
 				>Web Content Accessibility Guidelines 2.2</a

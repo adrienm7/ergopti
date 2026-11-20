@@ -21,14 +21,15 @@
 		Par exemple, le <kbd>E</kbd> n’est pas sur l’index de la rangée de repos. Cela peut sembler
 		étrange, tant son apparition est incontournable dans les textes (sauf dans le livre
 		<em>La Disparition</em> qui réussit l’exploit de ne jamais l’utiliser). Le <kbd>E</kbd> est de
-		loin la lettre la plus fréquente. Elle est tellement incontournable que sur le
+		loin la lettre la plus fréquente. Elle est tellement incontournable qu’il a fallu une
+		transformation mathématique sur le
 		<a href={resolve('/ergopti/presentation') + '#keyboard_frequences'} class="link"
 			>clavier affichant la fréquence des touches</a
 		>
-		de la page d’accueil, une transformation mathématique a été nécessaire pour que les fréquences relatives
-		aux autres touches soient visibles et comparables (passage au logarithme). En effet, si l’on affichait
-		les fréquences relatives telles quelles, le <kbd>E</kbd> serait tellement plus fréquent qu’il écraserait
-		complètement les autres fréquences, rendant impossible de les comparer par un code couleur.
+		de la page d’accueil (passage au logarithme). Elle rend visibles et comparables les fréquences relatives
+		aux autres touches. En effet, si l’on affichait les fréquences relatives telles quelles, le
+		<kbd>E</kbd> serait tellement plus fréquent qu’il écraserait complètement les autres fréquences.
+		Il serait alors impossible de les comparer par un code couleur.
 	</p>
 	<p>
 		Pourtant, cette lettre n’a pas été placée sur l’index, comme le fait pourtant BÉPO. La raison
@@ -52,11 +53,10 @@
 	<ul>
 		<li>
 			<kbd>E</kbd> est sur le majeur et non sur l’index. Théoriquement, l’index est plus fort et
-			devrait donc être l’endroit idéal pour la lettre <kbd>E</kbd> qui est de loin la lettre la
-			plus fréquente, loin devant la deuxième lettre la plus fréquente de l’alphabet. Cependant,
-			comme l’index se charge de 6 touches, il faut aussi veiller à ne pas le surcharger. Par
-			conséquent, ce n’est en réalité pas si grave que cela que le <kbd>E</kbd> soit sur le majeur et
-			non sur l’index.
+			devrait donc être l’endroit idéal pour la lettre <kbd>E</kbd>. C’est de loin la lettre la plus
+			fréquente, loin devant la deuxième lettre la plus fréquente de l’alphabet. Cependant, comme
+			l’index se charge de 6 touches, il faut aussi veiller à ne pas le surcharger. Par conséquent,
+			ce n’est en réalité pas si grave que cela que le <kbd>E</kbd> soit sur le majeur et non sur l’index.
 		</li>
 		<li>
 			Le <kbd>K</kbd>, bien que très rare en français et peu fréquent en anglais, est à une position
@@ -77,14 +77,13 @@
 			étant sur un excellent emplacement sur l’index gauche. En effet, cette lettre a l’une des
 			fréquences les plus faibles de toutes les lettres, que ce soit en français et en anglais. Si
 			elle a été placée ici en <Ergopti></Ergopti>, c’est en vue de l’utilisation d’<ErgoptiPlus
-			></ErgoptiPlus>, pensée dès le début comme une extension de la disposition. Ainsi, ce choix de
-			placement de la touche <kbd>J</kbd> est justifié par le fait que cela permet de facilement
-			ajouter de nouvelles fonctionnalités à la disposition sans avoir à créer une toute nouvelle
-			disposition pour tirer parti de ces nouvelles fonctionnalités sans que cela n’ait d’impact
-			négatif. Si la touche magique <kbd class="glow">★</kbd> est à cet emplacement, c’est aussi
-			parce que c’est sur la colonne du <kbd>U</kbd>, pour éviter le maximum de <SFB></SFB>s lors de
-			la conversion de cette touche en touche de répétition. En effet, les doubles consonnes sont
-			très peu suivies d’un <kbd>U</kbd>.
+			></ErgoptiPlus>, pensée dès le début comme une extension de la disposition. Ainsi, ce
+			placement de la touche <kbd>J</kbd> permet de facilement ajouter de nouvelles fonctionnalités
+			à la disposition. Il n’y a pas besoin de créer une toute nouvelle disposition pour en tirer
+			parti, et cela n’a pas d’impact négatif. Si la touche magique <kbd class="glow">★</kbd> est à
+			cet emplacement, c’est aussi parce que c’est sur la colonne du <kbd>U</kbd>. Cela évite le
+			maximum de <SFB></SFB>s lors de la conversion de cette touche en touche de répétition. En
+			effet, les doubles consonnes sont très peu suivies d’un <kbd>U</kbd>.
 		</li>
 	</ul>
 
@@ -95,7 +94,7 @@
 		donc 6 colonnes à gauche et 7 à droite. Sur la dernière colonne de droite, il n’y a cependant que
 		les touches mortes <kbd class="deadkey">◌̂</kbd> et <kbd class="deadkey">◌̈</kbd> qui seront
 		beaucoup plus rarement utilisées. Ces touches mortes sont en accès direct sur la septième
-		colonne, mais peuvent également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec
+		colonne. Elles peuvent également être obtenues sur la couche <kbd>ShiftAltGr</kbd> avec
 		<kbd>Shift</kbd>
 		+
 		<kbd>AltGr</kbd> + <kbd>Ê</kbd> pour <kbd-output class="deadkey">◌̂</kbd-output> et
@@ -105,12 +104,12 @@
 	<p>
 		Il n’en demeure pas moins qu’<Ergopti></Ergopti> n’est pas 1DFH (<span lang="en"
 			>1u Distance From Home</span
-		>). Les lettres accentuées du français étant en accès direct avec <Ergopti></Ergopti>, il est
-		impossible de réaliser une disposition 1DFH, car il y a trop de touches à placer par rapport à
-		l’espace disponible. La disposition
+		>). Les lettres accentuées du français sont en accès direct avec <Ergopti></Ergopti>. Il est
+		donc impossible de réaliser une disposition 1DFH, car il y a trop de touches à placer par
+		rapport à l’espace disponible. La disposition
 		<a href="https://ergol.org" target="_blank" class="link">Ergo‑L</a> est quant à elle une disposition
 		1DFH, mais au prix d’une touche morte permettant de réaliser les accents. Cela signifie que dans
-		ce genre de dispositions, il y a plus de frappes pour écrire un mot, car pour écrire une lettre accentuée,
+		ce genre de dispositions, il y a plus de frappes pour écrire un mot. Pour écrire une lettre accentuée,
 		il faut d’abord appuyer sur la touche morte, puis sur la lettre.
 	</p>
 	<!-- <p class="encadre">
@@ -186,7 +185,7 @@
 	<h3>Manque de caractères et non optimisation pour les autres langues</h3>
 	<p>
 		<Ergopti></Ergopti> possède peu de touches mortes et de couches de symboles. En effet, la disposition
-		ne se prétend pas être exhaustive en incorporant tous les alphabets des langues européennes comme
+		ne se prétend pas exhaustive. Elle n’incorpore pas tous les alphabets des langues européennes comme
 		le BÉPO, ou encore le cyrillique, l’écriture phonétique, les pièces d’échec, etc. comme Optimot.
 		Ces couches n’intéressent que peu d’utilisateurs et occupent des emplacements du clavier très accessibles
 		pour une utilisation très rare.

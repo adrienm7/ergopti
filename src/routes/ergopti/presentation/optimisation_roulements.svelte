@@ -75,8 +75,8 @@
 	</p>
 	<p class="encadre">
 		La disposition <Ergopti /> a été construite avant tout pour que les paires de consonnes et les paires
-		de voyelles les plus courantes se tapent par des roulements, de préférence sur deux doigts consécutifs,
-		dans un mouvement horizontal.
+		de voyelles les plus courantes se tapent par des roulements. Ces roulements se font de préférence
+		sur deux doigts consécutifs, dans un mouvement horizontal.
 	</p>
 
 	<tiny-space></tiny-space>

@@ -123,16 +123,16 @@
 	<p>
 		Une fois que les lettres les plus fréquentes ont été placées sur la rangée du milieu, il reste
 		encore beaucoup à faire. En effet, <strong>chaque doigt a une force différente</strong>. Ainsi,
-		un pouce a plus de force qu’un index, qui a plus de force qu’un majeur, qui a plus de force
-		qu’un annulaire, qui a plus de force qu’un auriculaire. Il est facile de s’en rendre compte :
-		presser fort de l’index sur une table, puis tenter de faire de même avec son auriculaire met en
-		lumière cette différence.
+		un pouce a plus de force qu’un index, qui a plus de force qu’un majeur. Le majeur a plus de
+		force qu’un annulaire, qui a plus de force qu’un auriculaire. Il est facile de s’en rendre
+		compte : presser fort de l’index sur une table, puis tenter de faire de même avec son
+		auriculaire met en lumière cette différence.
 	</p>
 	<p>
-		Par conséquent, ce constat de la force des doigts pris en compte, les meilleurs emplacements
-		sont ceux sur la rangée de repos, en partant de l’index pour aller vers l’annulaire. Puis, les
-		meilleurs emplacements seront sur les touches au-dessus et en-dessous de la rangée de repos, en
-		partant là encore de l’index pour aller vers l’annulaire.
+		Par conséquent, les meilleurs emplacements sont ceux sur la rangée de repos, en partant de
+		l’index pour aller vers l’annulaire. Puis, les meilleurs emplacements seront sur les touches
+		au-dessus et en-dessous de la rangée de repos, en partant là encore de l’index pour aller vers
+		l’annulaire.
 	</p>
 	<!-- <p style="text-align:center; color:red;">
 			[METTRE ICI UN CLAVIER VIDE MONTRANT LES MEILLEURS EMPLACEMENTS EN COULEUR]
@@ -142,11 +142,10 @@
 
 	<p>
 		La rangée des chiffres est donc encore moins accessible, car il faut traverser deux rangées
-		depuis la rangée de repos pour l’atteindre. C’est pour cette raison que laisser le <kbd>É</kbd>
-		sur cette ligne comme en AZERTY est une très mauvaise idée, car cette lettre est beaucoup utilisée
-		en français : il y est environ 2 fois plus fréquent que le <kbd>J</kbd>. Pourtant, en AZERTY,
-		c’est le <kbd>J</kbd> qui occupe l’un des meilleurs emplacements du clavier : la touche de repos
-		de l’index.
+		depuis la rangée de repos pour l’atteindre. Laisser le <kbd>É</kbd> sur cette ligne comme en
+		AZERTY est donc une très mauvaise idée, car cette lettre est beaucoup utilisée en français. Il y
+		est environ 2 fois plus fréquent que le <kbd>J</kbd>. Pourtant, en AZERTY, c’est le <kbd>J</kbd>
+		qui occupe l’un des meilleurs emplacements du clavier : la touche de repos de l’index.
 	</p>
 	<p>
 		Enfin, contrairement à BÉPO ou Optimot, <Ergopti /> ne place pas de symboles de programmation ou

@@ -108,8 +108,8 @@
 	(et ses dérivés), la disposition est placée en tête de vos sources de saisie, sans en retirer
 	aucune. Sur KDE Plasma, elle est ajoutée en tête de la liste des dispositions. Sur une session
 	X11, elle est appliquée immédiatement avec <code>setxkbmap</code>. Les compositeurs qui gèrent
-	eux-mêmes leur clavier (Hyprland, Sway, niri, river, Wayfire, labwc) n'ont pas de réglage commun :
-	l'installeur affiche alors le fragment de configuration exact à coller dans leur fichier.
+	eux-mêmes leur clavier (Hyprland, Sway, niri, river, Wayfire, labwc) n'ont pas de réglage commun.
+	L'installeur affiche alors le fragment de configuration exact à coller dans leur fichier.
 </p>
 <p>
 	Le script demande les droits <code>sudo</code>. Pour désinstaller :
@@ -123,7 +123,7 @@
 <p>
 	Si la disposition ne fonctionne pas, relancez la commande ci-dessus en ajoutant
 	<code>-s -- --diagnose</code> après <code>bash</code>. Joignez le rapport obtenu à votre rapport
-	de bug : il décrit le système, la session, les versions XKB, les fichiers installés, les réglages
+	de bug. Il décrit le système, la session, les versions XKB, les fichiers installés, les réglages
 	du bureau et la compilation de la disposition. Il ne demande aucun droit administrateur et ne
 	modifie rien.
 </p>
@@ -140,7 +140,7 @@
 		aucun fichier système existant.
 	</li>
 	<li>
-		<strong>.XCompose</strong> : le fichier Compose d'Ergopti est copié dans le paquet et une ligne
+		<strong>.XCompose</strong> : le fichier Compose d'Ergopti est copié dans le paquet. Une ligne
 		<code>include</code>
 		est ajoutée à votre <code>~/.XCompose</code> sans toucher au reste du fichier (elle est retirée à
 		la désinstallation). Cela permet d'utiliser les touches mortes ainsi que les sorties en plusieurs
@@ -149,8 +149,8 @@
 	<li>
 		<strong>Vérification puis activation</strong> : la disposition est compilée avec
 		<code>xkbcli</code> (et <code>xkbcomp</code> quand il est présent), seule puis à côté d'une
-		autre disposition, pour prouver que la touche È est bien liée au type personnalisé et que
-		<kbd>Ctrl</kbd> conserve sa couche ; une disposition inutilisable arrête l'installation au lieu d'annoncer
+		autre disposition. Cela prouve que la touche È est bien liée au type personnalisé et que
+		<kbd>Ctrl</kbd> conserve sa couche. Une disposition inutilisable arrête l'installation au lieu d'annoncer
 		un succès. Le cache XKB est ensuite purgé, puis la disposition est activée dans votre session (voir
 		ci-dessus).
 	</li>
@@ -174,7 +174,8 @@
 
 	<li>
 		<strong>XKB Types</strong> : ajout (ou mise à jour si elles existent déjà) des définitions de
-		types personnalisées d'<Ergopti></Ergopti> <em>à l'intérieur</em> de la section
+		types personnalisées d'<Ergopti></Ergopti>. Elles sont placées <em>à l'intérieur</em> de la
+		section
 		<code>xkb_types</code> du fichier <code>/usr/share/X11/xkb/types/extra</code>, que toutes les
 		dispositions incluent. Les types définissent l'association entre le numéro de couche défini dans
 		XKB Symbols avec les modificateurs qui doivent être pressés pour atterrir sur cette couche.
@@ -198,8 +199,8 @@
 
 	<li>
 		<strong>Vérification</strong> : la disposition est compilée avec <code>xkbcli</code> et avec
-		<code>xkbcomp</code> (le compilateur de Xorg) quand ils sont installés ; si le type personnalisé
-		manque, chaque fichier touché est restauré depuis sa sauvegarde et l'installation est annulée.
+		<code>xkbcomp</code> (le compilateur de Xorg) quand ils sont installés. Si le type personnalisé manque,
+		chaque fichier touché est restauré depuis sa sauvegarde et l'installation est annulée.
 	</li>
 	<li>
 		<strong>Activation</strong> : la disposition est activée dans votre session (voir ci-dessus)
@@ -241,7 +242,7 @@
 		touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de remappage de
 		clavier, comme cela a été corrigé sur macOS. <br /> Un autre problème plus embêtant est que la
 		répétition de deux lettres ne fonctionne pas, notamment pour la lettre
-		<kbd>P</kbd> : pour taper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
+		<kbd>P</kbd>. Pour taper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
 		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d'utiliser la version standard d'<Ergopti
 		></Ergopti> ou « Ergopti+ » (un seul +) avec le driver
 		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>.

@@ -18,14 +18,14 @@
 		la suite une disposition encore meilleure, était peu attrayante.
 	</p>
 	<p>
-		Pour m’assurer de ne pas avoir à passer mon temps à apprendre de nouvelles dispositions, toutes
-		meilleures les unes que les autres, la solution a été radicale : développer la mienne, optimisée
-		pour mes besoins. Évidemment, une telle tâche nécessite un investissement en temps considérable.
-		Il faut déjà comprendre ce qui fait une bonne disposition, puis réarranger les touches pour en
-		créer une au moins aussi bonne, si ce n’est meilleure, que les autres dispositions déjà
-		disponibles. Enfin, il faut tester soi-même la disposition, car certains défauts n’apparaissent
-		pas toujours sur un analyseur théorique. Et pour la tester, il faut réapprendre totalement à
-		taper au clavier, et ce à chaque fois que l’on essaie une nouvelle disposition.
+		Je ne voulais pas passer mon temps à apprendre de nouvelles dispositions, toutes meilleures les
+		unes que les autres. La solution a été radicale : développer la mienne, optimisée pour mes
+		besoins. Évidemment, une telle tâche nécessite un investissement en temps considérable. Il faut
+		déjà comprendre ce qui fait une bonne disposition. Puis, il faut réarranger les touches pour en
+		créer une au moins aussi bonne, si ce n’est meilleure, que celles déjà disponibles. Enfin, il
+		faut tester soi-même la disposition, car certains défauts n’apparaissent pas toujours sur un
+		analyseur théorique. Et pour la tester, il faut réapprendre totalement à taper au clavier, et ce
+		à chaque fois que l’on essaie une nouvelle disposition.
 	</p>
 
 	<tiny-space></tiny-space>
@@ -69,9 +69,9 @@
 	<p>
 		La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche
 		a plusieurs fois changé :
-		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd> et enfin la création d’une touche spéciale
+		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd>. Enfin, une touche spéciale
 		<kbd>★</kbd>
-		et le déplacement de <kbd>É</kbd> sur l’annulaire gauche.
+		a été créée et le <kbd>É</kbd> a été déplacé sur l’annulaire gauche.
 	</p>
 	<p>
 		Bien que la création d’<Ergopti></Ergopti> ait été un processus étalé sur plusieurs années, près
@@ -87,14 +87,13 @@
 	<p>
 		À un certain stade de développement, il devint évident que la disposition
 		<strong>Optim7</strong> n'était plus une simple variante d’Optimot. Le besoin de renommer ce
-		projet s’est alors imposé. Grâce à la suggestion d’un utilisateur nommé
-		<strong>Zigmund</strong> sur Discord, après avoir longtemps cherché avec lui un nom aussi
-		remarquablement bien trouvé que celui d’Optimot, le nom
+		projet s’est alors imposé. Un utilisateur nommé
+		<strong>Zigmund</strong> sur Discord a longtemps cherché avec moi un nom aussi remarquablement
+		bien trouvé que celui d’Optimot. Grâce à sa suggestion, le nom
 		<strong>HyperTexte</strong> fut d’abord retenu. Cependant, il s’avéra par la suite que ce nom était
-		mal choisi, car déjà utilisé sur de nombreux sites ailleurs (ce qui n’est pas étonnant, avec toutes
-		les mentions de « lien hypertexte »). La découverte de la disposition, notamment grâce à un moteur
-		de recherche, s’en trouvait compromise. Le site de présentation n’apparaissait même pas en première
-		page des résultats.
+		mal choisi, car déjà utilisé sur de nombreux sites. Ce n’est pas étonnant, avec toutes les mentions
+		de « lien hypertexte ». La découverte de la disposition, notamment grâce à un moteur de recherche,
+		s’en trouvait compromise. Le site de présentation n’apparaissait même pas en première page des résultats.
 	</p>
 	<p>
 		Environ un mois après la sortie publique de la disposition,
@@ -112,9 +111,8 @@
 			><span class="path1"></span><span class="path2"></span></i
 		>
 		La première étape dans la création d’<Ergopti /> a été de partager les touches du clavier en deux
-		groupes : main gauche et main droite. L’objectif est de maximiser l’alternance des mains, c’est-à-dire
-		de faire en sorte que les touches qui sont le plus souvent tapées l’une après l’autre le soient par
-		des mains différentes.
+		groupes : main gauche et main droite. L’objectif est de maximiser l’alternance des mains. Les touches
+		qui sont le plus souvent tapées l’une après l’autre doivent l’être par des mains différentes.
 	</p>
 	<p>
 		Pour optimiser ce critère, les voyelles ont toutes été placées d’un côté du clavier. Celles-ci
@@ -127,13 +125,13 @@
 		sur la plupart des claviers standards, il y a moins de touches sur ce côté. Le côté droit a en
 		effet trois colonnes de touches pour l’auriculaire alors que l’auriculaire gauche n’en a qu’une.
 		Ces nombreux emplacements sont précieux, surtout pour les langues ayant besoin de caractères
-		supplémentaires, comme les accents en français. Le nombre de consonnes étant largement supérieur
-		au nombre de voyelles, même en comptant les voyelles accentuées du français, les placer du côté
-		avec le plus de touches était logique.
+		supplémentaires, comme les accents en français. Le nombre de consonnes est largement supérieur
+		au nombre de voyelles, même en comptant les voyelles accentuées du français. Les placer du côté
+		avec le plus de touches était donc logique.
 	</p>
 	<p>
-		Le seul problème avec cette approche est que l’on perd des raccourcis utiles sur la main gauche
-		qui se font avec des consonnes, comme <kbd>Ctrl</kbd> + <kbd>C</kbd> pour copier ou
+		Le seul problème avec cette approche est que l’on perd des raccourcis utiles sur la main gauche.
+		Ils se font avec des consonnes, comme <kbd>Ctrl</kbd> + <kbd>C</kbd> pour copier ou
 		<kbd>Ctrl</kbd> + <kbd>V</kbd> pour coller. Cependant, <Ergopti></Ergopti> a une solution pour que
 		ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
 	</p>
@@ -153,9 +151,9 @@
 	<p>
 		De même, certaines touches sont plus facilement accessibles que d’autres sur les claviers
 		standards à cause de la longueur des doigts. Par exemple, la touche <kbd>C</kbd> en
-		AZERTY/QWERTY est plus accessible que la touche <kbd>R</kbd>, car il est plus aisé de déplacer
-		l’index gauche vers le bas que vers le haut. Ainsi, les touches les plus utilisées ont été
-		placées sur la rangée de repos, et les autres lettres ont été placées sur les autres lignes en
+		AZERTY/QWERTY est plus accessible que la touche <kbd>R</kbd>. Il est en effet plus aisé de
+		déplacer l’index gauche vers le bas que vers le haut. Ainsi, les touches les plus utilisées ont
+		été placées sur la rangée de repos. Les autres lettres ont été placées sur les autres lignes en
 		fonction de leur accessibilité.
 	</p>
 
@@ -192,12 +190,12 @@
 	<p>
 		En outre, les chiffres sont quant à eux passés en accès direct, un changement très appréciable
 		lors de l'utilisation quotidienne. C’est une fois avoir passé les chiffres en accès direct que
-		l’on se rend compte de l’énorme gain de confort que cela procure et l’on se demande pourquoi on
-		n’avait pas cela plus tôt. Pourtant, même BÉPO, qui est déjà largement plus optimisé qu’AZERTY,
-		ne le propose pas, pas plus qu’Optimot. D’ailleurs, en dehors des dispositions françaises, la
-		plupart des dispositions alternatives proposent les chiffres en accès direct, comme Dvorak,
-		Colemak, Neo, etc. Même le QWERTY américain propose les chiffres en accès direct, ce qui est un
-		comble pour cette disposition qui est l’une des moins optimisées au monde.
+		l’on se rend compte de l’énorme gain de confort que cela procure. On se demande alors pourquoi
+		on n’avait pas cela plus tôt. Pourtant, même BÉPO, qui est déjà largement plus optimisé
+		qu’AZERTY, ne le propose pas, pas plus qu’Optimot. D’ailleurs, en dehors des dispositions
+		françaises, la plupart des dispositions alternatives proposent les chiffres en accès direct,
+		comme Dvorak, Colemak, Neo, etc. Même le QWERTY américain propose les chiffres en accès direct,
+		ce qui est un comble pour cette disposition qui est l’une des moins optimisées au monde.
 	</p>
 
 	<h3>
@@ -213,14 +211,14 @@
 	<p>
 		Le qualificatif d’exceptionnel n’est pas exagéré : <ErgoptiPlus></ErgoptiPlus> permet, une fois maîtrisée,
 		de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d’une même
-		touche. Cela est rendu possible grâce à la touche spéciale <kbd class="glow">★</kbd>, permettant
-		de réitérer la frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche
+		touche. Cela est rendu possible grâce à la touche spéciale <kbd class="glow">★</kbd>, qui
+		réitère la frappe de la touche précédente avec une fluidité inédite. La touche
 		<kbd>,</kbd>
-		de réduction des <SFB></SFB>s.
+		de réduction des <SFB></SFB>s y contribue aussi.
 	</p>
 	<p>
 		Il convient de préciser que l’idée de cette touche de répétition ne vient pas d’<Ergopti
-		></Ergopti>. Elle provient d’une (voire plus) disposition anglophone. d’autres concepts ont
+		></Ergopti>. Elle provient d’une (voire plus) disposition anglophone. D’autres concepts ont
 		également été empruntés, comme l'utilisation d’AHK (AutoHotkey) dans la disposition
 		<a href="https://ballerboo.github.io/boolayout/" target="_blank" class="link">Boo</a> afin de modifier
 		le comportement des combinaisons de touches. Ce système permet d’optimiser encore davantage les roulements

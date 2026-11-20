@@ -72,19 +72,21 @@
 		apparaissant lors du clic sur l’icône du script dans la barre des taches.
 	</p>
 	<p>
-		Cette nouvelle version permet à tout le monde d’utiliser des raccourcis, la couche de symboles,
-		les chiffres en accès direct, etc. à la carte, quelle que soit sa disposition actuelle. Ainsi,
-		même une personne utilisant AZERTY, BÉPO, Optimot, etc. et ne souhaitant pas apprendre <Ergopti
-		></Ergopti> peut avoir à sa disposition ces nombreuses <span lang="en">features</span>. Certains
-		raccourcis de cette nouvelle version ont été inversés afin d’être encore plus confortables à
-		utiliser et de nombreux ont été ajoutés.
+		Cette nouvelle version permet à tout le monde d’utiliser à la carte des raccourcis, la couche de
+		symboles, les chiffres en accès direct, etc. Cela fonctionne quelle que soit sa disposition
+		actuelle. Ainsi, même une personne utilisant AZERTY, BÉPO, Optimot, etc. et ne souhaitant pas
+		apprendre <Ergopti></Ergopti> peut avoir à sa disposition ces nombreuses
+		<span lang="en">features</span>. Certains raccourcis de cette nouvelle version ont été inversés
+		afin d’être encore plus confortables à utiliser et de nombreux ont été ajoutés.
 	</p>
 
 	<h3>Version 2.1 (Janvier 2025)</h3>
 	<p>
 		<Ergopti></Ergopti> v2.1 intervertit le <kbd>C</kbd> et le <kbd>G</kbd>. Les résultats sur les
-		analyseurs sont tous un peu moins bons avec ce changement, car le <SFB></SFB> <kbd>CT</kbd> est
-		plus fréquent que l'ancien qui était <kbd>SC</kbd> et intervient sur l’annulaire au lieu de l’index.
+		analyseurs sont tous un peu moins bons avec ce changement. En effet, le <SFB></SFB>
+		<kbd>CT</kbd>
+		est plus fréquent que l'ancien qui était <kbd>SC</kbd>, et intervient sur l’annulaire au lieu de
+		l’index.
 	</p>
 	<p>
 		Cependant, cette modification était importante à réaliser, car le <kbd>C</kbd> est désormais
@@ -128,11 +130,10 @@
 		anglais, et prend la place de <kbd>NC</kbd> dont la fréquence d’apparition est en comparaison minime.
 	</p>
 	<p>
-		La raison pour laquelle le <kbd>TH</kbd> est beaucoup plus confortable avec la version 2.0 est
-		que le majeur et l’annulaire étant des doigts longs, ils ont plus de facilité à atteindre la
-		rangée supérieure que celle inférieure. Au contraire, l’index étant un peu plus court, c’est la
-		rangée inférieure qui est plus accessible pour ce doigt. C’est d’ailleurs aussi pour cela que la
-		touche
+		Le <kbd>TH</kbd> est beaucoup plus confortable avec la version 2.0, car le majeur et l’annulaire
+		sont des doigts longs. Ils ont plus de facilité à atteindre la rangée supérieure que celle
+		inférieure. Au contraire, l’index étant un peu plus court, c’est la rangée inférieure qui est
+		plus accessible pour ce doigt. C’est d’ailleurs aussi pour cela que la touche
 		<kbd>★</kbd> a été placée sur l’index gauche en rangée du bas et non du haut : car cette position
 		est la plus confortable.
 	</p>

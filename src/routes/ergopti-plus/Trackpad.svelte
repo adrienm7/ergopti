@@ -64,8 +64,8 @@ FEATURES & RATIONALE:
 			<p class="kicker">Gestes trackpad</p>
 			<h2><span use:countup={36}>36</span> emplacements de gestes. 3 axes continus.</h2>
 			<p class="lead">
-				Le driver intercepte les gestes multi-touch bruts (pas les événements souris) et les mappe
-				sur l’action de votre choix — taps et swipes de 2 à 5 doigts, catalogue d’actions intégré,
+				Le driver intercepte les gestes multi-touch bruts (pas les événements souris) et les associe
+				à l’action de votre choix. Taps et swipes de 2 à 5 doigts, catalogue d’actions intégré,
 				sensibilité réglable par geste.
 			</p>
 		</header>

@@ -14,10 +14,11 @@
 	<p>
 		Les <SFB />s les plus fréquents de la disposition sont : <kbd>ct</kbd>,
 		<kbd>pt</kbd>, <kbd>eo</kbd>, <kbd>oe</kbd>,
-		<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. <kbd>ct</kbd> est de loin le plus fréquent.
-		<kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour écrire
+		<kbd>ub</kbd>, <kbd>bu</kbd> et <kbd>ds</kbd>. Le plus fréquent est de loin <kbd>ct</kbd>. Les
+		bigrammes <kbd>eo</kbd> et <kbd>oe</kbd> sont aussi relativement fréquents en anglais (pour
+		écrire
 		<kbd-output lang="en">does</kbd-output>,
-		<kbd-output lang="en">people</kbd-output>, etc.) Tous ces <SFB />s sont supprimés avec <ErgoptiPlus
+		<kbd-output lang="en">people</kbd-output>, etc.). Tous ces <SFB />s sont supprimés avec <ErgoptiPlus
 		/>, plus de nombreux autres encore plus rares.
 	</p>
 
@@ -27,8 +28,8 @@
 	<p>
 		La touche <kbd>,</kbd> est l’une des plus importantes d’<ErgoptiPlus />. C’est grâce à elle que
 		la plupart des <SFB />s restants sont supprimés. De plus, certaines combinaisons ont aussi été
-		ajoutées pour plus de confort, afin d’éviter de devoir sauter de 2 rangées avec des doigts
-		consécutifs pour écrire un bigramme (donc éviter les <em>ciseaux</em>). C’est le cas de
+		ajoutées pour plus de confort. Elles évitent de devoir sauter de 2 rangées avec des doigts
+		consécutifs pour écrire un bigramme (donc les <em>ciseaux</em>). C’est le cas de
 		<kbd>cl</kbd> ou encore de <kbd>ph</kbd>.
 	</p>
 	<KeyboardBasis id="virgule" />
