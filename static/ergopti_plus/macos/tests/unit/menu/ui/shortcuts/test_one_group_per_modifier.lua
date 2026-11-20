@@ -87,14 +87,15 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 		local rows = render_shortcuts_submenu()
 		helpers.assert_eq(rows[1].title, "menu.shortcuts.enable", "the submenu opens with its category switch")
 		-- The first group (2026-09-30): the restore and the clear follow the
-		-- switch, greyed here because the Shortcuts scope is not yet ported to
-		-- macOS, then a separator sets the group apart.
+		-- switch, then a separator sets the group apart. Both run the Shortcuts
+		-- scope on macOS since its key combinations compose with its config.toml
+		-- rows (2026-11-20), so neither is a greyed stand-in any more.
 		for index, key in ipairs({ "common.restore_recommended", "common.clear_to_system" }) do
 			local row = rows[index + 1]
 			helpers.assert_true(type(row.title) == "string" and row.title:find(key, 1, true) == 1,
 				key .. " must follow the switch, got " .. tostring(row.title))
-			helpers.assert_eq(row.disabled, true, key .. " is greyed on macOS")
-			helpers.assert_nil(row.fn, key .. " runs nothing on macOS")
+			helpers.assert_true(row.disabled ~= true, key .. " is live on macOS")
+			helpers.assert_type(row.fn, "function", key .. " runs its scope command on macOS")
 		end
 		helpers.assert_eq(rows[4].title, "-", "a separator closes the first group")
 		-- The number-row tap keys follow the category switch and replace the fixed

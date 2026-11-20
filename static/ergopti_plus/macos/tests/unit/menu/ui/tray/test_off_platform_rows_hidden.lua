@@ -9,12 +9,12 @@
 --- Renders every menu of the real shared manifest for hs and fails on any row
 --- whose title carries a `platform_reason.*` text, except the stand-in of a row
 --- declared `unavailable = "grey"` (not yet ported here, the maintainer's rule
---- of 2026-09-30): the Shortcuts restore and clear, the tap-hold word reset
---- (Karabiner owns tap-hold on macOS), and the row of the emulated-rows
---- submenu (macOS emulates no layout). This check renders every declared menu
---- on its own, so the four row switches of that submenu's table count too,
---- though the tray never opens them on macOS. The fixture cases for every
---- row shape live in the Linux suite, which runs the same shared renderer.
+--- of 2026-09-30). No such row is left for macOS: the tap-hold word reset, the
+--- emulated-rows submenu and, last, the Shortcuts restore and clear
+--- (2026-11-20) are all live here, so the greyed count is zero and a row that
+--- comes back greyed fails. The fixture cases for every row shape, the greyed
+--- stand-in included, live in the Linux suite, which runs the same shared
+--- renderer.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -44,10 +44,10 @@ helpers.describe("menu: no off-platform explanation is rendered on macOS", funct
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)
 		helpers.assert_eq(found, {}, "a row another platform has must not reach the macOS tray")
-		-- The tap-hold word reset is live on macOS since its Karabiner marker, and the
-		-- emulated-rows submenu since the macOS emulation (2026-11-06).
-		helpers.assert_eq(greyed, 2,
-			"the Shortcuts restore and clear are drawn greyed with their reason")
+		-- The tap-hold word reset is live on macOS since its Karabiner marker, the
+		-- emulated-rows submenu since the macOS emulation (2026-11-06), and the
+		-- Shortcuts restore and clear since their composed scope (2026-11-20).
+		helpers.assert_eq(greyed, 0, "no row is drawn greyed as not yet ported on macOS")
 	end)
 
 end)
