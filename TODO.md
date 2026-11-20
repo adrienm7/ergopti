@@ -340,8 +340,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `not_yet` reasons are closed: Ollama token streaming on Windows (streaming-parity, `test_engine_state.ahk`) and
       the macOS Shortcuts restore and clear (shortcuts-scope-macos, `test_global_scope.lua`). Left:
   - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);
-  - the next campaigns in the report's order: logger engines, the managed Ollama runtime drift, tray adapters,
-    update and download windows, pickers and prompts, metrics views, small native units, layout tool pages.
+  - logger engines, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-logger-engines/report.md)):
+    LOG-01 to LOG-05, LOG-07 and LOG-08 fixed, replayed from `_shared/tests/corpus/logger/parity_vectors.json` by
+    the three suites and the macOS native worker. Left: LOG-06, pair the 15 Lua files the report lists (among them
+    `text_cipher.lua` on both drivers and macOS `phase_stats.lua`), then gate Lua pairing like
+    `test_pairing.ahk`; the boot profilers, perf counters and keystroke integrity still need their own reading;
+    the Swift retention replay runs in macOS CI only;
+  - the next campaigns in the report's order: the managed Ollama runtime drift, tray adapters, update and download
+    windows, pickers and prompts, metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release

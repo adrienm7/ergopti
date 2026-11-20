@@ -178,6 +178,18 @@ named file is not a reviewed file.
 | Module                         | Campaign                                                                                           |
 | ------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Secure-field detection (focus) | [report](audits/platform-parity/2026-11-19-census/report.md#first-campaign-secure-field-detection) |
+| Logger engines                 | [report](audits/platform-parity/2026-11-20-logger-engines/report.md)                               |
+
+The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
+LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
+INFO default, a visible refusal), a format error is marked on the line on the
+three, macOS keeps the 14-days-old log all day, Linux removes a topical view
+from another day, a refused Linux file reopens and counts the lines it
+missed, the shared core reports the lines a raising sink lost, and the shim
+fallback prints the shared labels. One corpus,
+`_shared/tests/corpus/logger/parity_vectors.json`, is replayed by the three
+suites and the macOS native worker. Left open: LOG-06, lifecycle pairing is
+gated on Windows only (15 Lua call-site files to pair first).
 
 ## Review status at resumption — November 12, 2026
 

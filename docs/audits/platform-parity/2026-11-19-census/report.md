@@ -357,7 +357,12 @@ owner. Windows is the reference unless a shared contract says otherwise.
 2. **Logger engines.** `macos/core/logger` (4,982 lines) and
    `linux/core/logger` (1,496), against `windows/core/logger`: the boot
    journal, perf counters, keystroke integrity and sinks. The single-source
-   gates hold the vocabulary, not these engines.
+   gates hold the vocabulary, not these engines. **Taken on 2026-11-20**
+   ([report](../2026-11-20-logger-engines/report.md)): the levels, sinks,
+   retention, refused writes, redaction and flushes; LOG-01 to LOG-05, LOG-07
+   and LOG-08 fixed, LOG-06 (Lua pairing gate) open. The boot profilers, perf
+   counters and keystroke integrity were read only where they reach a sink and
+   remain for a re-campaign.
 3. **Managed Ollama runtime, re-read for drift.** `macos/ai/adapters` (3,345)
    and `shared/ai/adapters` (2,113): the bootstrap, daemon authority, pull and
    sessions, created after the 2026-11-05 native-ui campaign.

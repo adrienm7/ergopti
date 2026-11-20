@@ -1,8 +1,8 @@
 # Ergopti+ — Logger Specification (cross-driver)
 
 This document is the **single source of truth** for the logger contract shared by
-**all three** drivers. `windows/lib/logger.ahk`, `macos/lib/logger.lua` and
-`_shared/core/logger/engine/init.lua` MUST conform to every behaviour described here.
+**all three** drivers. `windows/core/logger/engine/logger.ahk`,
+`macos/core/logger/engine/logger.lua` and `_shared/core/logger/engine/init.lua` MUST conform to every behaviour described here.
 Divergences are listed explicitly in
 [§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
 
@@ -151,7 +151,14 @@ The caller-supplied tag is wrapped in square brackets verbatim.
 [menu_llm]
 ```
 
-### 3.4 Full example lines
+### 3.4 Format failure
+
+A format error never costs the line and never passes for a normal one: the
+body is the unformatted template followed by
+`  [!! log format failed: <error> — N arg(s) not substituted]`. The
+`format_failure` cases of `parity_vectors.json` pin it on the three drivers.
+
+### 3.5 Full example lines
 
 ```
 2026-05-26 14:32:15:042 [INFO] [TapHoldLoader] Tap-hold config loaded (8 key(s), 2 layer(s)).
@@ -176,9 +183,17 @@ active level are discarded and never written to any output.
 | 40            | ERROR only                                               |
 
 String aliases accepted by `set_level()`:
-`"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40.
+`"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40, and every
+variant name (`"trace"` → 10, `"success"` → 20…), in any case. An unknown name
+raises; it never selects a level silently.
 
-Default level: **10** (all variants active).
+Default level of the shared core: **10** (all variants active). Each driver
+then applies the stored `script.log_level` through one rule: the threshold of
+its declared name (the eight of the manifest, matched without case), or the
+manifest default (INFO) with a warning when the value is no declared name.
+Windows resolves it in `LoggerResolveLevel`, macOS and Linux in
+`_shared/core/logger/engine/level_setting.lua`; the `level_setting` cases of
+`_shared/tests/corpus/logger/parity_vectors.json` hold the three to it.
 
 A line that passes the filter can still be withheld by one of the two
 suppression layers below. Both are implemented once in the shared Lua core
@@ -359,6 +374,7 @@ after the line's native ACK. Linux: the daemon installs the shared core's
 | Rotation       | Daily — a new file is created when the calendar day changes   |
 | Retention      | Files older than **14 days** are deleted on the next rotation |
 | Purge strategy | Based on date in filename, not file modification time         |
+| Cutoff         | A file dated before today minus 14 calendar days, any hour    |
 
 The logs folder, the file-name prefixes and the crash-reports subfolder are
 declared once in [`paths/app_dirs.toml`](../../fs/data/paths/app_dirs.toml) and generated
@@ -399,13 +415,23 @@ topical sub-files when the line matches the sub-file's routing rule.
 Routing rules are defined in [`sub_files.toml`](./sub_files.toml) (see § 7).
 
 Every sub-file uses the same UTF-8 encoding, CRLF/LF line endings, and
-daily rotation as the main log. The retention policy (14 days) also applies.
+daily rotation as the main log. A sub-file is a view of today: the retention
+pass removes one last modified on another calendar day. The `dated_retention`
+and `topical_retention` cases of `parity_vectors.json` pin both rules on the
+three drivers and the macOS native worker.
 
 ### 6.3 Write strategy
 
-- Lines are buffered and flushed on a timer interval (≤ 500 ms).
-- Lines at `WARNING` or `ERROR` severity trigger an immediate forced flush
-  to prevent data loss on crash.
+- Windows buffers lines and appends them on its `flush_interval_ms` tick
+  (500 ms); an `ERROR` line forces an immediate durable flush, a `WARNING`
+  waits for the tick. Linux writes and flushes every line. macOS hands every
+  line to the native worker, which acknowledges each batch once written.
+- A refused write is never silent. Windows keeps the refused lines queued and
+  retries them on its tick, reporting what its queue cap dropped; Linux retires
+  the refused file, reopens it with the first line after `flush_interval_ms`,
+  and writes how many lines it missed first; the shared core reports the lines
+  a raising sink lost in a `[WARNING] [logger]` line after the next accepted
+  one (the `sink_failure` cases of `parity_vectors.json`).
 - The file handle is kept open for the process lifetime to minimise I/O overhead.
 
 ---
@@ -545,7 +571,9 @@ Errors caught by `try`/`pcall` on non-hot paths are logged, never discarded.
 
 ## References
 
-- AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)
-- HS implementation: [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
+- AHK implementation: [`windows/core/logger/engine/logger.ahk`](../../../../windows/core/logger/engine/logger.ahk)
+- HS implementation: [`macos/core/logger/engine/logger.lua`](../../../../macos/core/logger/engine/logger.lua)
+- Linux sink: [`linux/core/logger/engine/sink.lua`](../../../../linux/core/logger/engine/sink.lua)
+- Parity corpus: [`parity_vectors.json`](../../../tests/corpus/logger/parity_vectors.json)
 - Sub-file routing: [`sub_files.toml`](./sub_files.toml)
 - Test vectors: [`test_vectors.json`](./test_vectors.json)
