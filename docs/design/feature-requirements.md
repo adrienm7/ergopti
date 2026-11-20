@@ -33,6 +33,8 @@ two disagree in either direction.
 | `script.locale`                                               | —               | —                                      | —                    |
 | `script.log_level`                                            | —               | —                                      | —                    |
 | `script.show_error_dialog`                                    | —               | —                                      | `webview2`           |
+| `script.reading_font`                                         | —               | —                                      | —                    |
+| `script.reading_spacing`                                      | —               | —                                      | —                    |
 | `script.alt_gr_is_kana_remap`                                 | n/a             | n/a                                    | —                    |
 | `hotstrings.enabled`                                          | —               | n/a                                    | n/a                  |
 | `hotstrings.dynamic.enabled`                                  | —               | `evdev`, `uinput`                      | —                    |
@@ -40,6 +42,8 @@ two disagree in either direction.
 | `hotstrings.magic_key_source`                                 | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.magic_key_source_char`                            | n/a             | n/a                                    | —                    |
 | `hotstrings.repeat_key_enabled`                               | —               | `evdev`, `uinput`                      | —                    |
+| `hotstrings.backspace_restore_enabled`                        | —               | `evdev`, `uinput`                      | —                    |
+| `hotstrings.backspace_restore_window_ms`                      | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.idle_reset_seconds`                               | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.click_resets_word`                                | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.arrow_resets_word`                                | —               | `evdev`, `uinput`                      | —                    |

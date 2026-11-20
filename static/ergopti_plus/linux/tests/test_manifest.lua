@@ -624,6 +624,7 @@ return {
 	"tests.unit.modules.updater.vectors.test_version_label_vectors",
 	"tests.unit.core.ui.webview.test_webkit_host",
 	"tests.unit.core.ui.webview.test_webkit_host_asset_query",
+	"tests.unit.core.ui.webview.test_reading_preferences",
 	"tests.meta.architecture.test_webview_app_names_have_pages",
 	"tests.unit.ui.metrics.test_wpm_widget_persistence",
 	"tests.unit.hotstrings.engine.menu.test_category_counts_and_ticks",

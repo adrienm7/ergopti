@@ -296,6 +296,7 @@ _CLW_BuildWindow(Channel, Request) {
 	session     := _CLW_BridgeSessionToken
 	seed := "window.__i18n_base='" . locales_url . "';"
 		. "window._i18n_locale='" . locale_code . "';"
+		. ReadingPrefs_SeedScript()
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
 		. "window.__changelog_channel="  . _CLW_JsStr(Channel)  . ";"

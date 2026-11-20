@@ -365,6 +365,7 @@ KLWV_Open(which, metrics_dir) {
 			locales_url := KLWV_LocalesUrl()
 			locale_code := I18nGetLocale()
 			seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
+				. ReadingPrefs_SeedScript()
 			try {
 					if !Cached
 							webview.AddScriptToExecuteOnDocumentCreated(seed_script)

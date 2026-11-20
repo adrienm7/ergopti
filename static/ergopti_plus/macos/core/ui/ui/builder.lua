@@ -213,6 +213,17 @@ local function read_file(path)
 	return content
 end
 
+--- Reads a file's bytes, for the inlined fonts.
+--- @param path string Full path to the file.
+--- @return string|nil bytes The content, or nil if unreadable.
+local function read_binary(path)
+	local ok, fh = pcall(io.open, path, "rb")
+	if not ok or not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
 --- Builds a self-contained HTML string by inlining all local <script src> and
 --- <link rel="stylesheet"> tags found in the HTML file. External URLs (http/https)
 --- are kept as-is so CDN libraries still load from the network. Using function
@@ -226,7 +237,10 @@ function M.build_injected_html(assets_dir, html_name)
 	-- built before a language switch must not be served after it.
 	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
-	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale
+	-- The reading choices are part of it too: they are written into the page.
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local reading = Reading.current()
+	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale .. "|" .. Reading.cache_key(reading)
 	if _html_cache[cache_key] then
 		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
 		return _html_cache[cache_key]
@@ -251,6 +265,15 @@ function M.build_injected_html(assets_dir, html_name)
 		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
 		_locales_base_url, active_locale, strings_seed(html_path)
 	)
+	-- The reader's font and spacing (Configuration menu), seeded for
+	-- a11y_prefs.js; the page has no base URL, so the chosen font comes inline.
+	local reading_head, reading_err = Reading.head_fragment(reading, Paths.shared("ui/fonts"), read_binary)
+	if reading_head == nil then
+		Logger.error(LOG, "Page '%s' is built in the default font: %s.", html_name, tostring(reading_err))
+		reading_head = Reading.head_fragment(
+			{ font = "default", spacing = reading.spacing }, Paths.shared("ui/fonts"), read_binary)
+	end
+	i18n_boot = i18n_boot .. reading_head
 	-- Use a function replacement to avoid gsub interpreting % in the boot script
 	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. i18n_boot end, 1)
 

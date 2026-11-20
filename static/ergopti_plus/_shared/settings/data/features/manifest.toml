@@ -407,6 +407,35 @@ family = "setting"
 type = "boolean"
 description_key = "menu.debug.show_error_dialog"
 
+# The reading choices of the app's own windows, ticked from the Configuration
+# menu: the font (a hyperlegible or a dyslexia font) and the WCAG 1.4.12 text
+# spacing. Every WebView window's host seeds them before the page's scripts as
+# window.__ergopti_reading, which _shared/ui/a11y_prefs.js applies before the
+# first paint, with the same names and values as the website's reading
+# settings (the site keeps its own, per browser). The values are a11y_prefs.js's
+# own lists, first one its default; test-reading-preferences-seed.cjs pins them.
+[[features.script]]
+id = "reading_font"
+requires = { macos = [], linux = [], windows = [] }
+default = "default"
+recommended = "default"
+family = "setting"
+type = "enum"
+enum_values = ["default", "hyperlegible", "dyslexic"]
+description_key = "menu.configuration.reading_font"
+platforms = ["ahk", "hs", "linux"]
+
+[[features.script]]
+id = "reading_spacing"
+requires = { macos = [], linux = [], windows = [] }
+default = "default"
+recommended = "default"
+family = "setting"
+type = "enum"
+enum_values = ["default", "wide"]
+description_key = "menu.configuration.reading_spacing"
+platforms = ["ahk", "hs", "linux"]
+
 # "auto" reads the AltGr family from the layout; true and false force it when
 # that probe is wrong. It is a parameter, not an activation: it tells the driver
 # which key the layout's AltGr is and changes no input by itself, so an empty

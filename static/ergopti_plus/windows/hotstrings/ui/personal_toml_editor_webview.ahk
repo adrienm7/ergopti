@@ -604,6 +604,7 @@ _HsEdWeb_I18nSeed() {
 	loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
 	return "window.__i18n_base='https://" . HSED_VHOST . "/core/i18n/data/locales/';"
 		. "window._i18n_locale='" . loc . "';"
+		. ReadingPrefs_SeedScript()
 }
 
 ; Virtual-host URL for the editor's index.html (served from _SharedDir via

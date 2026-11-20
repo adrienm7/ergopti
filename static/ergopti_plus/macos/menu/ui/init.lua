@@ -1248,6 +1248,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 			return true
 		end,
+		-- The windows opened from now on read the choice (ui/ui/builder.lua).
+		set_reading_preference    = function(owner, value)
+			if not require(owner).set(value) then
+				require("core.logger.engine.logger").error("menu", "Reading choice %s could not be saved; it is unchanged.", tostring(value))
+				return false
+			end
+			require("core.logger.engine.logger").info("menu", "Reading choice set to %s.", tostring(value))
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+			return true
+		end,
 		toggle_error_dialog       = function()
 			local ErrorDialog = require("diagnostics.ui.error_dialog")
 			if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end

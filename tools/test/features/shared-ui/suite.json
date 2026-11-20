@@ -679,12 +679,12 @@
 			"repro": "npm run test:app-windows-semantic-markup"
 		},
 		{
-			"id": "layout-editor-levels",
-			"ordinal": 714,
-			"name": "Neo 2's Mod3 and Mod4 levels and their held keys go through the layout editor's TOML save and reload, its exports name what they leave out, and the drivers' emulation lists the keys it cannot hold",
+			"id": "reading-preferences-seed",
+			"ordinal": 715,
+			"name": "the reader's font and spacing are features with a11y_prefs.js's values, offered in the Configuration menu on the three drivers, and every app window's host seeds them",
 			"cmd": "node",
-			"args": ["tools/test/test-layout-editor-levels.cjs"],
-			"repro": "npm run test:layout-editor-levels"
+			"args": ["tools/test/test-reading-preferences-seed.cjs"],
+			"repro": "npm run test:reading-preferences-seed"
 		}
 	]
 }

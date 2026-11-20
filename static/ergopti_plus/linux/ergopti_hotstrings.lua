@@ -3167,6 +3167,16 @@ local function main()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 				return true
 			end,
+			-- The windows opened from now on read the choice (webkit_host.lua).
+			on_set_reading_preference = function(owner, value)
+				if not require(owner).set(value) then
+					Logger.error(LOG, "Reading choice %s could not be saved; it is unchanged.", tostring(value))
+					return false
+				end
+				Logger.info(LOG, "Reading choice set to %s.", tostring(value))
+				if rebuild_tray_menu then rebuild_tray_menu() end
+				return true
+			end,
 			on_toggle_error_dialog = function()
 				if not ErrorDialog then
 					Logger.error(LOG, "The error window did not load; its setting cannot change.")

@@ -31,6 +31,10 @@ local EXPECTED = {
 	"menu.global.setup_wizard",
 	"-",
 	"menu.debug.proxy_override",
+	-- The windows' reading choices, captioned with their current value.
+	"-",
+	"menu.configuration.reading_font: menu.configuration.reading_font.default",
+	"menu.configuration.reading_spacing: menu.configuration.reading_spacing.default",
 }
 
 -- The rows that rewrite the configuration, and the action each one runs.
@@ -208,6 +212,9 @@ helpers.describe("configuration submenu (macOS): no row acts on the user's Karab
 				"menu.global.setup_wizard",
 				"-",
 				"menu.debug.proxy_override",
+				"-",
+				"menu.configuration.reading_font: menu.configuration.reading_font.default",
+				"menu.configuration.reading_spacing: menu.configuration.reading_spacing.default",
 			}, ", "))
 			helpers.assert_nil(row_titled(rows, "menu.global.karabiner_integration"))
 			helpers.assert_nil(row_titled(rows, "menu.global.remove_from_karabiner"))

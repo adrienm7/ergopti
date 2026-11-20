@@ -744,6 +744,7 @@ _Updater_ReleaseNotesSeed(Body, Session) {
 	global _I18nLocale, UPDATER_GH_OWNER, UPDATER_GH_REPO, RELEASE_NOTES_VHOST
 	return "window.__i18n_base=" . JsonStringLiteral("https://" . RELEASE_NOTES_VHOST . "/core/i18n/data/locales/", true) . ";"
 		. "window._i18n_locale=" . JsonStringLiteral(_I18nLocale, true) . ";"
+		. ReadingPrefs_SeedScript()
 		. "window.__release_notes={body:" . JsonStringLiteral(Body, true)
 		. ",owner:" . JsonStringLiteral(UPDATER_GH_OWNER, true)
 		. ",repo:" . JsonStringLiteral(UPDATER_GH_REPO, true)

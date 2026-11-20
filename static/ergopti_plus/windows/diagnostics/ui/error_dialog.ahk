@@ -447,7 +447,8 @@ _ErrorDialog_Open(Record) {
 			return false
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
 		try WV.AddScriptToExecuteOnDocumentCreated(
-			"window.__i18n_base='https://" . ED_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';")
+			"window.__i18n_base='https://" . ED_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
+			. ReadingPrefs_SeedScript())
 		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
 			return false
 		Subscription := WV.WebMessageReceived(_ErrorDialog_OnWebMessage.Bind(Epoch))

@@ -45,6 +45,36 @@
 		"reason": null
 	},
 	{
+		"path": "script.reading_font",
+		"family": "setting",
+		"labels": {
+			"fr": "Police des fenêtres",
+			"en": "Font of the windows"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
+		"path": "script.reading_spacing",
+		"family": "setting",
+		"labels": {
+			"fr": "Espacement du texte des fenêtres",
+			"en": "Text spacing of the windows"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "script.alt_gr_is_kana_remap",
 		"family": "setting",
 		"labels": {

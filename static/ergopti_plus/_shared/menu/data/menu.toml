@@ -991,6 +991,28 @@ type = "command"
 id = "proxy_override"
 i18n = "menu.debug.proxy_override"
 
+# How the app's own windows show their text (the features' comment in
+# manifest.toml): each driver seeds the choice into every WebView window it
+# opens from then on.
+[[menu.configuration_menu]]
+type = "---"
+
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_font"
+i18n = "menu.configuration.reading_font"
+path = "script.reading_font"
+show_current_choice = true
+current_choice_label_value = true
+
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_spacing"
+i18n = "menu.configuration.reading_spacing"
+path = "script.reading_spacing"
+show_current_choice = true
+current_choice_label_value = true
+
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
 # They are `command` now, like the four rows below them, and the label is the

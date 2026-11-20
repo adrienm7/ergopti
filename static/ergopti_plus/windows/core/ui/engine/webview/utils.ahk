@@ -4,6 +4,7 @@
 
 #Include script.ahk
 #Include ../../adapters/webview_profiles.ahk
+#Include reading_preferences.ahk
 
 ; ==============================================================================
 ; MODULE: WebView Utils
@@ -621,6 +622,7 @@ class WebViewHost {
 						Loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
 						Seed := "window.__i18n_base='https://" . Vhost . "/core/i18n/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
+								. ReadingPrefs_SeedScript()
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
 						if this.CloseRequested
 								return false

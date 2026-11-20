@@ -72,6 +72,12 @@ M.features = {
 		path = "script.show_error_dialog", id = "show_error_dialog", section = "script", default = true, type = "boolean", description_key = "menu.debug.show_error_dialog", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
+		path = "script.reading_font", id = "reading_font", section = "script", default = "default", type = "enum", description_key = "menu.configuration.reading_font", platforms = { "ahk", "hs", "linux" }, recommended = "default", family = "setting", enum_values = { "default", "hyperlegible", "dyslexic" },
+	},
+	{
+		path = "script.reading_spacing", id = "reading_spacing", section = "script", default = "default", type = "enum", description_key = "menu.configuration.reading_spacing", platforms = { "ahk", "hs", "linux" }, recommended = "default", family = "setting", enum_values = { "default", "wide" },
+	},
+	{
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
 	},
 	{

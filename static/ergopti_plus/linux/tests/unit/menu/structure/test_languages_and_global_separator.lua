@@ -102,6 +102,11 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			i18n.get("menu.global.setup_wizard"),
 			"-",
 			i18n.get("menu.debug.proxy_override"),
+			"-",
+			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_font"))
+				:gsub("{2}", i18n.get("menu.configuration.reading_font.default"))),
+			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_spacing"))
+				:gsub("{2}", i18n.get("menu.configuration.reading_spacing.default"))),
 		}, " | "), "Uninstall moved to the Version / Updates submenu; the download proxy moved here from Debug")
 		-- The folders editor, as on the other two drivers, not the file manager.
 		local folder = rows[6]

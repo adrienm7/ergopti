@@ -582,10 +582,17 @@ _MI_BuildConfigurationMenu() {
 		MenuCommand.CLEAN_UNUSED_KEYS,   ShowUnusedConfigKeysCleanup,
 		MenuCommand.CONFIG_FOLDER,       FilePathsEditor,
 		MenuCommand.SETUP_WIZARD,        Onboarding_ShowFromMenu,
-		MenuCommand.PROXY_OVERRIDE,      ProxyOverride_Command
+		MenuCommand.PROXY_OVERRIDE,      ProxyOverride_Command,
+		MenuCommand.READING_FONT,        (Value, *) => ReadingPrefs_Set(ConfigLeaf.READING_FONT, Value),
+		MenuCommand.READING_SPACING,     (Value, *) => ReadingPrefs_Set(ConfigLeaf.READING_SPACING, Value)
 	)
 		Commands[Id] := Callback
-	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands)
+	; The reading choices of the windows tick their current value
+	; (core/ui/engine/webview/reading_preferences.ahk).
+	StateGetters := Map(
+		ConfigKey.SCRIPT_READING_FONT,    (*) => ReadingPrefs_Get(ConfigLeaf.READING_FONT),
+		ConfigKey.SCRIPT_READING_SPACING, (*) => ReadingPrefs_Get(ConfigLeaf.READING_SPACING))
+	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands, StateGetters)
 }
 
 

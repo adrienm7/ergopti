@@ -6790,7 +6790,14 @@ function languageParentSource(source, driver) {
 			locale['menu.global.config_folder'],
 			locale['menu.global.setup_wizard'],
 			'-',
-			locale['menu.debug.proxy_override']
+			locale['menu.debug.proxy_override'],
+			'-',
+			locale['common.label_value']
+				.replace('{1}', locale['menu.configuration.reading_font'])
+				.replace('{2}', locale['menu.configuration.reading_font.default']),
+			locale['common.label_value']
+				.replace('{1}', locale['menu.configuration.reading_spacing'])
+				.replace('{2}', locale['menu.configuration.reading_spacing.default'])
 		]);
 	}
 	function tokenDepths(tokens) {

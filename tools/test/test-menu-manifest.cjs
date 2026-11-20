@@ -8800,7 +8800,15 @@ console.log(
 			locale['menu.global.config_folder'],
 			locale['menu.global.setup_wizard'],
 			'-',
-			locale['menu.debug.proxy_override']
+			locale['menu.debug.proxy_override'],
+			'-',
+			// The reading choices show their current value after the title.
+			...['reading_font', 'reading_spacing'].map(
+				(id) =>
+					locale['menu.configuration.' + id] +
+					(code === 'fr' ? ' : ' : ': ') +
+					locale['menu.configuration.' + id + '.default']
+			)
 		]);
 	}
 	function tokenDepths(tokens) {

@@ -8,6 +8,8 @@
 locale = "fr"
 log_level = "INFO"
 show_error_dialog = true
+reading_font = "default"
+reading_spacing = "default"
 alt_gr_is_kana_remap = "auto"
 
 

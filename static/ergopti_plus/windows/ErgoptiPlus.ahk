@@ -841,6 +841,8 @@ LoggerInit()
 ; Right after the logger: every later ERROR of the boot can open the error
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
+; The windows' font and spacing, read before any window can open
+ReadingPrefs_Init(_IniCache)
 ManagedNetworkFailureWindows_Init()
 ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),

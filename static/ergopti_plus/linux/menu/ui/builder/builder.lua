@@ -293,6 +293,7 @@ end
 ---   on_healthcheck function (optional) Launch healthcheck.
 ---   on_composer_check function (optional) Run the composed layout check.
 ---   on_show_setup_wizard function (optional) Launch setup wizard.
+---   on_set_reading_preference function (optional) Reading choice of the windows.
 --- }
 --- @return table Array of { title, menu?, fn?, checked?, disabled? } items.
 function M.build(ctx)

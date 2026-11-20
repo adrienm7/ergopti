@@ -95,12 +95,13 @@ _MLG_Order(MenuName) {
 ; The Configuration submenu: the global restore and clear, a separator, the
 ; cleanup, a separator, then configuration windows, then a separator and the
 ; download proxy (moved from Debug on 2026-11-03), with no separator left
-; dangling at its end. The Windows-only touchpad restore was merged into the
+; dangling at its end, then the windows' reading font and spacing
+; (2026-11-20). The Windows-only touchpad restore was merged into the
 ; Gestures clear (2026-11-03). The macOS-only Karabiner rows left with the owned
 ; runtime default (ADR 011).
 _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, "
-		. "setup_wizard, ---, proxy_override",
+		. "setup_wizard, ---, proxy_override, ---, reading_font, reading_spacing",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
 	AssertFalse(InStr(_MLG_Order("debug_menu"), "proxy_override"), "Debug no longer declares the proxy row")
@@ -118,7 +119,9 @@ _MLG_ConfigurationRowsInOrder() {
 	for _, Pair in [["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
 			["config_folder", "FilePathsEditor"],
 			["setup_wizard", "Onboarding_ShowFromMenu"],
-			["proxy_override", "ProxyOverride_Command"]]
+			["proxy_override", "ProxyOverride_Command"],
+			["reading_font", "\(Value, \*\) => ReadingPrefs_Set"],
+			["reading_spacing", "\(Value, \*\) => ReadingPrefs_Set"]]
 		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
 			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 	AssertEqual(0, InStr(Body, "ShowUninstallErgopti"), "Configuration no longer offers Uninstall")

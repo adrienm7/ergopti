@@ -631,6 +631,34 @@
 				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_script_settings.lua"
 			]
 		},
+		"script.reading_font": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/_shared/core/ui/engine/webview/reading_preferences.lua",
+				"static/ergopti_plus/linux/core/ui/ui/webkit_host.lua",
+				"static/ergopti_plus/linux/tests/unit/core/ui/webview/test_reading_preferences.lua"
+			]
+		},
+		"script.reading_spacing": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/_shared/core/ui/engine/webview/reading_preferences.lua",
+				"static/ergopti_plus/linux/core/ui/ui/webkit_host.lua",
+				"static/ergopti_plus/linux/tests/unit/core/ui/webview/test_reading_preferences.lua"
+			]
+		},
 		"script.show_error_dialog": {
 			"registered": "yes",
 			"production_caller": "yes",

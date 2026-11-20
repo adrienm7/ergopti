@@ -106,6 +106,14 @@
 					"type": "boolean",
 					"description": "Whether a logged error may open the error window (Debug menu)."
 				},
+				"reading_font": {
+					"enum": ["default", "hyperlegible", "dyslexic"],
+					"description": "The font of the app's windows (Configuration menu)."
+				},
+				"reading_spacing": {
+					"enum": ["default", "wide"],
+					"description": "The text spacing of the app's windows (Configuration menu)."
+				},
 				"alt_gr_is_kana_remap": {
 					"oneOf": [{ "type": "boolean" }, { "const": "auto" }]
 				}

@@ -130,6 +130,19 @@ local function _build_configuration(ctx)
 
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	-- The reading choices of the windows: each row's command and its tick come
+	-- from the choice's shared owner (core/ui/engine/webview/reading_preferences.lua).
+	for _, preference in ipairs(require("core.ui.engine.webview.reading_preferences").PREFERENCES) do
+		local leaf = assert(preference.path:match("^script%.(.+)$"))
+		render_ctx.commands[leaf] = function(value)
+			if type(ctx.on_set_reading_preference) ~= "function" then
+				Logger.error(LOG, "Configuration: ctx.on_set_reading_preference is absent — the row does nothing.")
+				return false
+			end
+			return ctx.on_set_reading_preference(preference.module, value)
+		end
+		render_ctx.state_getters[preference.path] = function() return require(preference.module).get() end
+	end
 	local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx)
 	if not configuration_dense(rows, true) then return nil end
 	local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "linux")

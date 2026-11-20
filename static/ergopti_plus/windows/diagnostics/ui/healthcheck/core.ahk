@@ -816,7 +816,8 @@ HealthCheck_ShowWindow() {
 				; the strings through the virtual host
 				if !Reuse
 					try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
-						"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';")
+						"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
+						. ReadingPrefs_SeedScript())
 
 				; The subscription is bound to this window's epoch, so a late message of
 				; a closed window cannot reach its replacement through the globals.

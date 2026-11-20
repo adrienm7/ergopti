@@ -733,6 +733,13 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
+			-- The reading choices of the windows: each row's command and its tick
+			-- come from the choice's shared owner (core/ui/engine/webview/reading_preferences.lua).
+			for _, preference in ipairs(require("core.ui.engine.webview.reading_preferences").PREFERENCES) do
+				local leaf = assert(preference.path:match("^script%.(.+)$"))
+				cfg_ctx.commands[leaf] = function(value) return actions.set_reading_preference(preference.module, value) end
+				cfg_ctx.state_getters[preference.path] = function() return require(preference.module).get() end
+			end
 			-- A pause stops typing, not configuration (EDD-1, maintainer decision
 			-- 2026-11-12): every row stays live while paused, the restore, the
 			-- clear and the unused-key clean included.

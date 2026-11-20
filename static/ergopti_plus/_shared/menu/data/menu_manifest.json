@@ -1170,6 +1170,49 @@
 			"type": "command",
 			"id": "proxy_override",
 			"i18n": "menu.debug.proxy_override"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "choice",
+			"id": "reading_font",
+			"i18n": "menu.configuration.reading_font",
+			"path": "script.reading_font",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"choices": [
+				{
+					"value": "default",
+					"i18n": "menu.configuration.reading_font.default"
+				},
+				{
+					"value": "hyperlegible",
+					"i18n": "menu.configuration.reading_font.hyperlegible"
+				},
+				{
+					"value": "dyslexic",
+					"i18n": "menu.configuration.reading_font.dyslexic"
+				}
+			]
+		},
+		{
+			"type": "choice",
+			"id": "reading_spacing",
+			"i18n": "menu.configuration.reading_spacing",
+			"path": "script.reading_spacing",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"choices": [
+				{
+					"value": "default",
+					"i18n": "menu.configuration.reading_spacing.default"
+				},
+				{
+					"value": "wide",
+					"i18n": "menu.configuration.reading_spacing.wide"
+				}
+			]
 		}
 	],
 	"debug_menu": [

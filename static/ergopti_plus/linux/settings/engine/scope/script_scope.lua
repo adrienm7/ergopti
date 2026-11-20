@@ -20,6 +20,8 @@ local ALIAS_NAMES = {
 	[ConfigKeys.KEY.SCRIPT_LOCALE] = "locale",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = ConfigKeys.KEY.SCRIPT_LOG_LEVEL,
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+	[ConfigKeys.KEY.SCRIPT_READING_FONT] = ConfigKeys.KEY.SCRIPT_READING_FONT,
+	[ConfigKeys.KEY.SCRIPT_READING_SPACING] = ConfigKeys.KEY.SCRIPT_READING_SPACING,
 }
 
 --- Native field owner module of each directly declared script row.
@@ -27,6 +29,8 @@ local NATIVE_OWNERS = {
 	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "settings.engine.scope.script_settings",
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "diagnostics.ui.error_dialog",
+	[ConfigKeys.KEY.SCRIPT_READING_FONT] = "core.ui.engine.webview.reading_font",
+	[ConfigKeys.KEY.SCRIPT_READING_SPACING] = "core.ui.engine.webview.reading_spacing",
 }
 
 --- Binds the actual native aliases; policy and available rows come from metadata.
