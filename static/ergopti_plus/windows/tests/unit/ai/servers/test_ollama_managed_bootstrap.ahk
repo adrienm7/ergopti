@@ -158,14 +158,11 @@ _G4B_FirstPullOwnCeiling() {
 }
 Test("managed bootstrap: the first model pull has its own ceiling, not the install budget (OLL-02)", _G4B_FirstPullOwnCeiling)
 
-; OLL-02: the plan's pull ceiling is the shared registry's, apart from the install budget.
+; OLL-02: the registry gives a pull more time than the install budget. The real
+; constructor case ("postports") proves the captured plan carries this ceiling.
 _G4B_PullCeilingFromRegistry() {
-	global _StaticDir
 	AssertTrue(TimingsGet("llm", "ollama_model_pull_timeout_ms") > TimingsGet("llm", "dependency_bootstrap_timeout_ms"),
 		"a pull may outlast the install budget")
-	Source := FileRead(_StaticDir . "\ergopti_plus\windows\ai\engine\ollama\managed_bootstrap.ahk", "UTF-8")
-	AssertTrue(InStr(Source, '"pull_deadline_ms", TimingsGet("llm", "ollama_model_pull_timeout_ms")'),
-		"the production plan reads the pull ceiling from the registry")
 }
 Test("managed bootstrap: the pull ceiling comes from the timing registry (OLL-02)", _G4B_PullCeilingFromRegistry)
 
@@ -1555,6 +1552,12 @@ _G4CX_CaseWithTimingsReady(Mode) {
 				"Normal constructor success must replace every provisional physical observer before returning")
 			; PAR-83: the archive helper builds its download URL from the shared
 			; identifiers' host, which only this captured plan hands it.
+			; OLL-02: the real plan captures the registry's pull ceiling, not
+			; the install budget.
+			AssertEqual(TimingsGet("llm", "ollama_model_pull_timeout_ms"), Returned.Plan["pull_deadline_ms"],
+				"The captured plan reads the pull ceiling from the timing registry")
+			AssertTrue(Returned.Plan["pull_deadline_ms"] != Returned.Plan["deadline_ms"],
+				"The pull ceiling is not the install budget")
 			Download := Returned.Plan["download"].Clone()
 			AssertEqual(Identifiers.Hosts.GITHUB, Download["ReleaseHost"],
 				"The download plan carries the shared identifiers' release host")
