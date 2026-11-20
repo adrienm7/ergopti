@@ -7,8 +7,8 @@
 --- replaced by a test double, and fails that module by name. One fixture that
 --- failed before its own restore otherwise left its doubles for every later
 --- module: the document fixture's timings double failed about 1200 Linux tests.
---- It also puts back a manifest facade a module replaced under the cached tray
---- root, which then built an empty tray for every later module.
+--- It also forgets a tray root left cached under a manifest facade a module
+--- replaced, a root that then built an empty tray for every later module.
 --- These cases drive the detectors directly, so they record no runner failure.
 --- ==============================================================================
 
@@ -70,12 +70,14 @@ helpers.describe("runner: the tray root never outlives its manifest facade", fun
 		if not ok then error(err, 0) end
 	end
 
-	helpers.it("puts back a facade a module replaced under the cached tray root", function()
-		with_tray_pair(function(_, facade)
+	helpers.it("forgets the cached tray root when a module replaced its facade", function()
+		with_tray_pair(function()
 			local before = snapshot()
-			package.loaded[FACADE] = { name = "reloaded facade" }
-			helpers.assert_true(helpers.restore_stale_tray_root(before), "the stale pair is detected")
-			helpers.assert_true(rawequal(package.loaded[FACADE], facade), "the facade the root captured is back")
+			local reloaded = { name = "reloaded facade" }
+			package.loaded[FACADE] = reloaded
+			helpers.assert_true(helpers.forget_stale_tray_root(before), "the stale root is detected")
+			helpers.assert_nil(package.loaded[ROOT], "the next require binds a fresh root")
+			helpers.assert_true(rawequal(package.loaded[FACADE], reloaded), "the facade later modules captured stays")
 		end)
 	end)
 
@@ -84,12 +86,12 @@ helpers.describe("runner: the tray root never outlives its manifest facade", fun
 			local before = snapshot()
 			local facade, root = { name = "new facade" }, { name = "new root" }
 			package.loaded[FACADE], package.loaded[ROOT] = facade, root
-			helpers.assert_eq(helpers.restore_stale_tray_root(before), false)
-			helpers.assert_true(rawequal(package.loaded[FACADE], facade), "a consistent reload stays")
+			helpers.assert_eq(helpers.forget_stale_tray_root(before), false)
+			helpers.assert_true(rawequal(package.loaded[ROOT], root), "a consistent reload stays")
 			package.loaded[ROOT] = nil
 			before = snapshot()
 			package.loaded[FACADE] = { name = "later facade" }
-			helpers.assert_eq(helpers.restore_stale_tray_root(before), false, "no cached root reads the old facade")
+			helpers.assert_eq(helpers.forget_stale_tray_root(before), false, "no cached root reads the old facade")
 		end)
 	end)
 end)

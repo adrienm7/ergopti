@@ -46,12 +46,6 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 -- catalogues. Production is unaffected — `set_locale` mutates the module in
 -- place and nothing there ever wipes the cache — so this is the harness being
 -- made to agree with itself, not a defect being worked around.
---
--- The tray root captures the facade it loaded with and builds nothing for any
--- other (menu/ui/builder/builder.lua, separator_facade_current), so the pair is
--- restored together when this file ends: a root cached before this file then
--- still matches the facade later files read, and the reloads below stay ours.
-local restore_tray_pair = helpers.keep_loaded({ "menu.engine.manifest_menu", "menu.ui.builder.builder" })
 local ManifestMenu = helpers.load_module("menu.engine.manifest_menu")
 local i18n         = require("core.i18n.engine.i18n")
 
@@ -1814,5 +1808,8 @@ helpers.describe("Gestures Infos row opens the explanation in a dialog", functio
 	end)
 end)
 
--- Hands the next file the facade and tray root it would have seen without this one.
-restore_tray_pair()
+-- The tray root captures the facade it loaded with and builds nothing for any
+-- other (menu/ui/builder/builder.lua, separator_facade_current). One cached
+-- before this file still holds the facade replaced above, so it is forgotten:
+-- the next require binds a fresh root to the facade later files read.
+package.loaded["menu.ui.builder.builder"] = nil

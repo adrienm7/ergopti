@@ -26,9 +26,6 @@
 
 local helpers = require("tests.helpers")
 
--- Every case reloads the facade; the pair is put back when this file ends.
-local restore_tray_pair = helpers.keep_loaded({ "menu.engine.manifest_menu", "menu.ui.builder.builder" })
-
 --- Reads the menu builder's source. This driver's helpers expose a root path
 --- rather than a source reader, so the path is resolved here — from that root,
 --- not from the test's own location, which moves when a test does.
@@ -130,5 +127,6 @@ helpers.describe("Single manual LLM profile selection", function()
 end)
 
 -- The facade reloads above would leave a tray root cached before this file
--- bound to a facade later files no longer read: it then builds nothing.
-restore_tray_pair()
+-- bound to a facade later files no longer read, and it then builds nothing:
+-- it is forgotten, so the next require binds a fresh root.
+package.loaded["menu.ui.builder.builder"] = nil
