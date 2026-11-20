@@ -105,7 +105,8 @@ _LMCT_ChildSource() {
 	Code .= "#Include " . _DriverDir . "\_generated\identifiers.ahk`n"
 	Seen := Map()
 	for Symbol in ["UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_IsLocalSource",
-		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem"] {
+		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem",
+		"KbdRegister_Installed"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The public catalogue path requires its genuine whole owner: " . Symbol)
 		Source := FSReadStrict(Owner)
@@ -115,7 +116,8 @@ _LMCT_ChildSource() {
 		Seen[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
-	AssertEqual(6, Seen.Count, "The real catalogue, extension validation, built-in data and source-mode refresh owners must all be present")
+	; The page state lists the layout DLLs Studio registered (KbdRegister_Installed).
+	AssertEqual(7, Seen.Count, "The real catalogue, extension validation, built-in data, source-mode refresh and layout DLL owners must all be present")
 	Owner := _DriverProductionFileForSymbol("LayoutManager_Open")
 	Source := FSReadStrict(Owner)
 	for Symbol in ["LayoutManager_Open", "_LayMgrWeb_OnWebMessage", "_LayMgrWeb_SessionCall", "LayoutManager_HandleMessage"]

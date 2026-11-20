@@ -49,6 +49,7 @@ KbdRegister_Constant(Name) {
 	switch Name {
 		case "layouts_key": return "HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts"
 		case "uninstall_root": return "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+		case "uninstall_prefix": return "Ergopti_kbd_"
 		case "substitutes_key": return "HKCU\Keyboard Layout\Substitutes"
 		case "preload_key": return "HKCU\Keyboard Layout\Preload"
 		case "dll_name": return "^[a-z][a-z0-9]{0,7}$"
@@ -74,7 +75,7 @@ KbdRegister_Architectures() {
  * @param {String} Dll - The DLL name without its extension.
  * @returns {String}
  */
-KbdRegister_UninstallKey(Dll) => KbdRegister_Constant("uninstall_root") . "\Ergopti_kbd_" . Dll
+KbdRegister_UninstallKey(Dll) => KbdRegister_Constant("uninstall_root") . "\" . KbdRegister_Constant("uninstall_prefix") . Dll
 
 
 
@@ -130,6 +131,37 @@ KbdRegister_Inspect(Dll, Ports) {
 		return Map("state", "new", "klid", "", "layout_id", "")
 	return Map("state", "installed", "klid", Owned,
 		"layout_id", Ports["reg_read"].Call(LayoutsKey . "\" . Owned, "Layout Id"))
+}
+
+/**
+ * The layout DLLs this registration installed on the machine: every
+ * Ergopti_kbd_<dll> uninstall entry whose KLID still names <dll>.dll. Reading
+ * needs no right; the layout manager lists them so they can be removed.
+ * @param {Map} Ports - "reg_read" and "reg_subkeys".
+ * @returns {Array} Maps dll, klid, text (the entry's DisplayName) and company
+ *   (its Publisher), sorted by DLL name.
+ */
+KbdRegister_Installed(Ports) {
+	Prefix := KbdRegister_Constant("uninstall_prefix")
+	; A Map enumerates its keys in order: the list comes out sorted.
+	Names := Map()
+	for Name in Ports["reg_subkeys"].Call(KbdRegister_Constant("uninstall_root")) {
+		if StrCompare(SubStr(Name, 1, StrLen(Prefix)), Prefix, false) != 0
+			continue
+		Dll := SubStr(Name, StrLen(Prefix) + 1)
+		if RegExMatch(Dll, KbdRegister_Constant("dll_name"))
+			Names[Dll] := true
+	}
+	Found := []
+	for Dll in Names {
+		Seen := KbdRegister_Inspect(Dll, Ports)
+		if Seen["state"] != "installed"
+			continue
+		Entry := KbdRegister_UninstallKey(Dll)
+		Found.Push(Map("dll", Dll, "klid", Seen["klid"], "text", Ports["reg_read"].Call(Entry, "DisplayName"),
+			"company", Ports["reg_read"].Call(Entry, "Publisher")))
+	}
+	return Found
 }
 
 /**

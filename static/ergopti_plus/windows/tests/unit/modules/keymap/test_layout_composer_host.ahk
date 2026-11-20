@@ -46,6 +46,8 @@ _LCH_Deps(Dir, Log, Selected := "") {
 		"select_settled", (Id, OnDone) => (Log.Push(Map("call", "select " . Id)), OnDone.Call(true), true),
 		"after", (Id, Action, OnDone) => (Log.Push(Map("call", "after " . Id . " " . Action)),
 			OnDone.Call(true), 1),
+		; No keyboard layout DLL is registered: the page state never reads the machine.
+		"registry", Map("reg_read", (*) => "", "reg_subkeys", (*) => []),
 		"state", State
 	)
 }

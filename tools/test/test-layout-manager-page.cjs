@@ -529,6 +529,49 @@ check('the page renders the rows and posts the action of each button', () => {
 	assert.throws(() => context.send('delete_everything'), /unknown action/);
 });
 
+// The layout manager listed no DLL Studio registered on Windows: removing one
+// went through Windows Settings › Apps (kbd-dll-manager).
+check('(kbd-dll-manager) a Windows layout DLL is a row that can only be uninstalled', () => {
+	const { byId, window, messages } = loadPage();
+	const state = {
+		platform: 'windows',
+		shortcut_menu_path: SHORTCUT_MENU.windows,
+		index,
+		installed: {},
+		native: [
+			{ dll: 'kbdsrcfx', name: 'Source Fixture', author: 'Me', klid: 'a002040c' },
+			{ dll: '../evil', name: 'Refused' }
+		]
+	};
+	window.initData({ strings, state });
+	const list = byId.get('layout-list');
+	assert.equal(list.children.length, 4, 'the three catalogue layouts and the one valid DLL');
+	const row = list.children[3];
+	assert.equal(row.dataset.id, 'native:kbdsrcfx');
+	assert.ok(textOf(row).includes('Source Fixture'));
+	assert.ok(textOf(row).includes(strings['layout_manager.status_native']));
+	assert.ok(textOf(row).includes(strings['layout_manager.meta_dll'].replace('%s', 'kbdsrcfx')));
+	const buttons = findAll(row, (el) => el.tagName === 'BUTTON');
+	assert.deepEqual(
+		buttons.map((button) => button.dataset.action),
+		['uninstall'],
+		'a DLL is neither installed again nor selected from here'
+	);
+	buttons[0].click();
+	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'uninstall', dll: 'kbdsrcfx' });
+	// Removed, the row is gone and the result still names it.
+	window.updateState({
+		...state,
+		native: [],
+		result: { id: 'native:kbdsrcfx', action: 'uninstall', ok: 1, name: 'Source Fixture' }
+	});
+	assert.equal(list.children.length, 3);
+	assert.ok(byId.get('result').textContent.includes('Source Fixture'));
+	// A host that registers no DLL sends no `native`: nothing changes.
+	window.updateState({ ...state, native: undefined, result: null });
+	assert.equal(list.children.length, 3);
+});
+
 check('an operation in flight disables every button and says what runs', () => {
 	const { byId, window } = loadPage();
 	window.initData({
@@ -754,7 +797,15 @@ check(
 		for (const match of source.matchAll(/'((?:layout_manager|layouts)\.[a-z_]+)'/g))
 			keys.add(match[1]);
 		// The status and source keys are composed from the codes the hosts send.
-		for (const status of ['installed', 'update', 'available', 'builtin', 'provided', 'active']) {
+		for (const status of [
+			'installed',
+			'update',
+			'available',
+			'builtin',
+			'provided',
+			'native',
+			'active'
+		]) {
 			keys.add('layout_manager.status_' + status);
 		}
 		for (const origin of ['network', 'cache', 'bundled', 'none'])

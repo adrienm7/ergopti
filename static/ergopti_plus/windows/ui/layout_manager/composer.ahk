@@ -493,7 +493,7 @@ _LayoutComposer_WriteText(Path, Text) {
 _LayoutComposer_Report(Deps, Action, Ok, Code := "", Detail := "", Used := false) {
 	Deps["push"].Call("composerResult", Map("action", Action, "ok", Ok ? 1 : 0, "code", Code,
 		"detail", Detail, "used", Used ? 1 : 0))
-	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
+	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"], Deps["registry"]))
 }
 
 /**
@@ -571,7 +571,7 @@ _LayoutComposer_Deps(Deps) {
 		"staging_root", AppFoldersRoot() . LayoutRegistry_Composer()["folder"] . "\" . LayoutRegistry_Composer()["dll_folder"] . "\",
 		"write_bytes", LayoutInstallWriteStagedBytes,
 		"read_text", (Path) => FSReadUtf8ExactBounded(Path, 65536),
-		"registry", Map("reg_read", LayoutInstallRegRead64, "reg_subkeys", LayoutInstallRegSubkeys64),
+		"registry", LayoutManager_RegistryPorts(),
 		"self_env", KbdRegister_SelfEnv(),
 		"elevate", LayoutInstallElevate,
 		"activate", LayoutInstallActivate
@@ -741,7 +741,7 @@ _LayoutComposer_BaseEnabled() {
 _LayoutComposer_ReportSource(Deps, Action, Ok, Code := "", Detail := "", Used := false) {
 	Deps["push"].Call("composerResult", Map("action", Action, "ok", LayMgrJsonBool_Of(Ok), "code", Code,
 		"detail", Detail, "used", LayMgrJsonBool_Of(Used), "pending", LayMgrJsonBool_Of(false)))
-	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
+	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"], Deps["registry"]))
 }
 
 ; Deletes the composer files of the other form; returns the path that could not go.
@@ -850,6 +850,17 @@ _LayoutComposer_SaveSource(Deps, Payload, Use) {
 		_LayoutComposer_ReportSource(Deps, Action, false, Err.Extra != "" ? Err.Extra : LAYOUT_COMPOSER_FAILURE_INVALID,
 			Err.Message)
 		return
+	}
+	; The stored source is the only record of the DLL it registered: a source
+	; registered under another DLL name replaces it, so the previous DLL goes
+	; first (its own UAC prompt), or nothing finds it once the source is overwritten.
+	Previous := _LayoutComposer_StoredDll(Deps["config_dir"])
+	if Previous != "" && Previous != Native["dll"] {
+		Replaced := LayoutComposer_UninstallDll(Deps, Previous)
+		if Replaced["code"] != "" {
+			_LayoutComposer_ReportSource(Deps, Action, false, Replaced["code"], Replaced["detail"])
+			return
+		}
 	}
 	try _LayoutComposer_StoreSource(Deps, Payload)
 	catch as Err {
@@ -983,7 +994,22 @@ _LayoutComposer_StoredDll(ConfigDir) {
 ; Uninstalls the Windows layout of the stored source when Ergopti installed it.
 _LayoutComposer_UninstallNative(Deps) {
 	Dll := _LayoutComposer_StoredDll(Deps["config_dir"])
-	if Dll == "" || KbdRegister_Inspect(Dll, Deps["registry"])["state"] != "installed"
+	if Dll == ""
+		return Map("code", "", "detail", "")
+	return LayoutComposer_UninstallDll(Deps, Dll)
+}
+
+/**
+ * Uninstalls one layout DLL Ergopti registered, through the elevated helper
+ * (one UAC prompt); a DLL Ergopti does not own is left alone.
+ * @param {Map} Deps - The composer's collaborators (_LayoutComposer_Deps); the
+ *   production ones when it is not a Map.
+ * @param {String} Dll - The DLL name.
+ * @returns {Map} code ("" on success or when nothing was installed) and detail.
+ */
+LayoutComposer_UninstallDll(Deps, Dll) {
+	Deps := _LayoutComposer_Deps(Deps)
+	if KbdRegister_Inspect(Dll, Deps["registry"])["state"] != "installed"
 		return Map("code", "", "detail", "")
 	Staging := RTrim(Deps["staging_root"], "\") . "\" . Dll
 	try DirCreate(Staging)

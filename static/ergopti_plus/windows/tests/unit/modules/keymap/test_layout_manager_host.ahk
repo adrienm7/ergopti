@@ -73,6 +73,8 @@ _LMH_Deps(Dir, Log) {
 		"select", (Id) => Log.Push(Map("call", "select " . Id)),
 		"open_url", (Url) => (Log.Push(Map("call", "open " . Url)), true),
 		"close", () => Log.Push(Map("call", "close")),
+		; No keyboard layout DLL is registered: the page state never reads the machine.
+		"registry", Map("reg_read", (*) => "", "reg_subkeys", (*) => []),
 		"pending", Pending
 	)
 }

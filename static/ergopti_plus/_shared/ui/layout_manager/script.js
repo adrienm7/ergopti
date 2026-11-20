@@ -9,6 +9,8 @@
 // buttons. The three drivers host this page and send it the same state:
 //   { platform, shortcut_menu_path, index, source, error, installed, provided,
 //     builtin, active, busy, result }
+// Windows adds `native`, the keyboard layouts Studio registered as DLLs,
+// each removed through its own uninstaller ({ action: 'uninstall', dll }).
 // The page decides the rows from that state (one source for every driver)
 // and only ever posts the allowlisted actions below; each host checks them
 // again before acting.
@@ -42,6 +44,9 @@ const FAILURE_KEYS = Object.freeze({
 	download_failed: 'layout_manager.failure_download',
 	python_missing: 'layouts.linux_needs_python'
 });
+
+// The DLL name of a Windows keyboard layout (KbdRegister_Constant("dll_name")).
+const NATIVE_DLL_NAME = /^[a-z][a-z0-9]{0,7}$/;
 
 // Catalogue error codes (_shared/layouts/engine/composer/catalogue.lua and its AHK twin).
 const CATALOGUE_ERROR_KEYS = Object.freeze({
@@ -191,7 +196,37 @@ function layoutRows(state) {
 			rows.push(makeRow(null, installed[id], false, false, active, state.shortcut_menu_path));
 		}
 	}
+	const native = Array.isArray(state.native) ? state.native : [];
+	for (const layout of native) {
+		if (layout && typeof layout.dll === 'string' && NATIVE_DLL_NAME.test(layout.dll))
+			rows.push(nativeRow(layout));
+	}
 	return rows;
+}
+
+/**
+ * One keyboard layout Studio registered as a Windows DLL: it can only be
+ * removed, through its own uninstaller.
+ * @param {Object} layout - { dll, name, author, klid } from the host.
+ * @returns {Object}
+ */
+function nativeRow(layout) {
+	return {
+		id: 'native:' + layout.dll,
+		dll: layout.dll,
+		name: typeof layout.name === 'string' && layout.name !== '' ? layout.name : layout.dll,
+		author: typeof layout.author === 'string' ? layout.author : '',
+		licence: '',
+		homepage: '',
+		version: '',
+		installedVersion: '',
+		status: 'native',
+		active: false,
+		removed: false,
+		hotstrings: 0,
+		shortcuts: 0,
+		actions: ['uninstall']
+	};
 }
 
 /**
@@ -224,7 +259,8 @@ function catalogueStatus(state) {
 function resultMessage(result, rows) {
 	if (!result || typeof result !== 'object' || typeof result.id !== 'string') return null;
 	const row = rows.find((candidate) => candidate.id === result.id);
-	const name = row ? row.name : result.id;
+	// A removed DLL row is gone from the list: the host names it in the result.
+	const name = row ? row.name : typeof result.name === 'string' ? result.name : result.id;
 	const detail = typeof result.detail === 'string' ? result.detail : '';
 	if (!result.ok) {
 		const key = FAILURE_KEYS[result.code] || 'layout_manager.failure_other';
@@ -316,6 +352,7 @@ function renderRow(row, busy) {
 		meta.appendChild(element('li', '', _fmt('layout_manager.meta_licence', row.licence)));
 	if (row.version)
 		meta.appendChild(element('li', '', _fmt('layout_manager.meta_version', row.version)));
+	if (row.dll) meta.appendChild(element('li', '', _fmt('layout_manager.meta_dll', row.dll)));
 	if (row.installedVersion && row.installedVersion !== row.version) {
 		meta.appendChild(
 			element('li', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
@@ -344,7 +381,13 @@ function renderRow(row, busy) {
 	if (row.homepage) buttons.appendChild(actionButton('open_homepage', row.id, false, 'link'));
 	for (const action of row.actions) {
 		buttons.appendChild(
-			actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : '')
+			actionButton(
+				action,
+				row.id,
+				Boolean(busy),
+				action === 'uninstall' ? 'danger' : '',
+				row.dll ? { dll: row.dll } : undefined
+			)
 		);
 	}
 	card.appendChild(buttons);
@@ -357,9 +400,10 @@ function renderRow(row, busy) {
  * @param {string} id
  * @param {boolean} disabled
  * @param {string} variant - Extra class.
+ * @param {Object} [target] - { dll } for a Windows DLL row, which has no registry id.
  * @returns {HTMLElement}
  */
-function actionButton(action, id, disabled, variant) {
+function actionButton(action, id, disabled, variant, target) {
 	const labels = {
 		install: 'layout_manager.btn_install',
 		update: 'layout_manager.btn_update',
@@ -372,7 +416,8 @@ function actionButton(action, id, disabled, variant) {
 	button.disabled = disabled;
 	button.dataset.action = action;
 	button.addEventListener('click', function () {
-		send(action, id);
+		if (target) send(action, undefined, target);
+		else send(action, id);
 	});
 	return button;
 }

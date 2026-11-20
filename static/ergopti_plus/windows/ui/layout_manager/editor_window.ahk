@@ -102,7 +102,7 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 	Action := Payload["action"]
 	if (Action == "ready") {
 		Deps["push"].Call("initData", Map("strings", LayoutEditorWindow_Strings(),
-			"state", LayoutManager_PageState(Deps["local_dir"]),
+			"state", LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0)),
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
 			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
 			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true),

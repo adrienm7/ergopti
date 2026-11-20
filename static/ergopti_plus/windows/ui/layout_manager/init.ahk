@@ -161,11 +161,36 @@ _LayMgrWeb_Json(Value) {
 }
 
 /**
+ * The read-only registry ports of KbdRegister_Inspect and KbdRegister_Installed,
+ * on the 64-bit view where the layout DLLs are registered.
+ * @returns {Map} "reg_read" and "reg_subkeys".
+ */
+LayoutManager_RegistryPorts() {
+	return Map("reg_read", LayoutInstallRegRead64, "reg_subkeys", LayoutInstallRegSubkeys64)
+}
+
+/**
+ * The keyboard layouts Studio registered as Windows DLLs, as the page lists
+ * them (the `native` field of the page state).
+ * @param {Map} Registry - LayoutManager_RegistryPorts or a fake.
+ * @returns {Array} Maps dll, name, author and klid.
+ */
+LayoutManager_NativeLayouts(Registry) {
+	Rows := []
+	for Found in KbdRegister_Installed(Registry)
+		Rows.Push(Map("dll", Found["dll"], "name", Found["text"] != "" ? Found["text"] : Found["dll"],
+			"author", Found["company"], "klid", Found["klid"]))
+	return Rows
+}
+
+/**
  * The state the page renders (the shape every host sends).
  * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir; the configured one by default.
+ * @param {Map} Registry - The registry ports the native layouts are read with;
+ *   LayoutManager_RegistryPorts when it is not a Map.
  * @returns {Map}
  */
-LayoutManager_PageState(LocalDir := unset) {
+LayoutManager_PageState(LocalDir := unset, Registry := 0) {
 	global _ConfigDir, _LayMgrWeb_Result, JSON_NULL, LAYOUT_CATALOGUE_SOURCE_BUNDLED
 	if !IsSet(LocalDir)
 		LocalDir := LayoutRegistry_LocalDir(_ConfigDir)
@@ -185,6 +210,13 @@ LayoutManager_PageState(LocalDir := unset) {
 		Installed := Map()
 		RecordError := Err.Message
 	}
+	; A registry that cannot be read lists no DLL; the record error says so.
+	try Native := LayoutManager_NativeLayouts((Registry is Map) ? Registry : LayoutManager_RegistryPorts())
+	catch as Err {
+		Native := []
+		LoggerError("LayoutManager", "The keyboard layouts registered by Studio cannot be listed: {1}", Err.Message)
+		RecordError := Err.Message
+	}
 	global _LayMgrWeb_RuntimeRefresh
 	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
 	; shortcut_menu_path: the extension file this driver loads as a layout's
@@ -197,6 +229,7 @@ LayoutManager_PageState(LocalDir := unset) {
 		"source", Source,
 		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
 		"installed", Installed,
+		"native", Native,
 		"provided", Map(),
 		"builtin", LayoutManager_BuiltinIds(),
 		"active", LayoutManager_ActiveId(),
@@ -267,7 +300,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
 		; The page offers the layout editor's window only for a host that stores its files.
-		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]),
+		Initial := Map("strings", _LayMgrWeb_Strings(),
+			"state", LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0)),
 			"source_editor", LayMgrJsonBool_Of(true))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
@@ -287,12 +321,14 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["close"].Call()
 		return true
 	}
+	if (Action == "uninstall" && Payload.Has("dll"))
+		return _LayMgrWeb_UninstallNative(Deps, Payload["dll"], SessionEpoch)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
 		return false
 	}
-	State := LayoutManager_PageState(Deps["local_dir"])
+	State := LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0))
 	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 		return false
 	Entry := LayoutCatalogue_Entry(State["index"], Id)
@@ -340,6 +376,63 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		return false
 	Deps["select"].Call(Id)
 	return true
+}
+
+/**
+ * Removes a keyboard layout Studio registered as a Windows DLL: the page lists
+ * it from its Ergopti_kbd_<dll> uninstall entry (LayoutManager_NativeLayouts),
+ * the user confirms, then the elevated helper runs its uninstall (one UAC
+ * prompt), as Windows Settings › Apps would.
+ * @param {Map} Deps - The page's collaborators: "registry", "confirm" (Text) ->
+ *   Boolean and "uninstall_native" (Dll) -> Map code, detail; the production ones by default.
+ * @param {Any} Dll - The DLL name the page sent.
+ * @param {Integer} SessionEpoch - The page session.
+ * @returns {Boolean} Whether the message was accepted.
+ */
+_LayMgrWeb_UninstallNative(Deps, Dll, SessionEpoch) {
+	Registry := Deps.Get("registry", 0)
+	if !(Registry is Map)
+		Registry := LayoutManager_RegistryPorts()
+	Row := 0
+	if (Dll is String)
+		for Candidate in LayoutManager_NativeLayouts(Registry)
+			if Candidate["dll"] == Dll
+				Row := Candidate
+	if !(Row is Map) {
+		LoggerWarn("LayoutManager", "Refused to uninstall a keyboard layout DLL Ergopti did not register.")
+		return false
+	}
+	Id := "native:" . Dll
+	Confirm := Deps.Get("confirm", _LayMgrWeb_Confirm)
+	if !Confirm.Call(Format(t("layout_manager.confirm_uninstall_native"), Row["name"], Dll)) {
+		LoggerInfo("LayoutManager", "The removal of the keyboard layout {1}.dll was cancelled.", Dll)
+		return true
+	}
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, "uninstall")
+		return false
+	LoggerStart("LayoutManager", "Uninstalling the keyboard layout {1}.dll registered by Studio…", Dll)
+	Outcome := Deps.Get("uninstall_native", (Name) => LayoutComposer_UninstallDll(0, Name)).Call(Dll)
+	Ok := Outcome["code"] == ""
+	if Ok
+		LoggerSuccess("LayoutManager", "Uninstalled the keyboard layout {1}.dll.", Dll)
+	else
+		LoggerError("LayoutManager", "The keyboard layout {1}.dll was not uninstalled ({2}).", Dll, Outcome["code"])
+	; The row is gone once removed: the page names the layout from the result.
+	Result := Map("id", Id, "action", "uninstall", "ok", Ok, "name", Row["name"])
+	if !Ok {
+		Result["code"] := Outcome["code"]
+		Result["detail"] := Outcome["detail"]
+	}
+	_LayMgrWeb_PublishResult(Deps, Result)
+	_LayMgrWeb_PushState(Deps)
+	return true
+}
+
+; The removal's own question, before Windows asks for the administrator right.
+_LayMgrWeb_Confirm(Text) {
+	global _LayMgrWeb_Gui
+	Options := "YesNo Icon! Default2" . (_LayMgrWeb_Gui ? " Owner" . _LayMgrWeb_Gui.Hwnd : "")
+	return Ui_MsgBox(Text, t("layout_manager.window_title"), Options) = "Yes"
 }
 
 ; A command belongs to the page session that sent it. A pause stops typing, not
@@ -422,7 +515,7 @@ _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
 _LayMgrWeb_PushState(Deps, *) {
 	if !_LayMgrWeb_PresentationCurrent(Deps)
 		return false
-	State := LayoutManager_PageState(Deps["local_dir"])
+	State := LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0))
 	if !_LayMgrWeb_PresentationCurrent(Deps)
 		return false
 	return _LayMgrWeb_PushPayload(Deps, "updateState", State)

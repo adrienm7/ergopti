@@ -63,8 +63,8 @@ _LCS_Deps(Dir, Log, Machine, Options := 0) {
 			return Options["elevate"].Call(Command)
 		Words := StrSplit(StrReplace(Command["arguments"], '"'), " ")
 		Words.RemoveAt(1, 2)
-		Staging := Dir . "stage\kbdsrcfx"
-		return KbdRegister_Run(Words[1] == "install" ? ["install", Staging] : ["uninstall", Words[2], Staging], Ports)
+		; install <staging> or uninstall <dll> <staging>, the folder of that DLL.
+		return KbdRegister_Run(Words, Ports)
 	}
 	Deps["registry"] := Machine.Ports
 	Deps["staging_root"] := Dir . "stage\"
@@ -78,6 +78,14 @@ _LCS_Deps(Dir, Log, Machine, Options := 0) {
 }
 
 _LCS_Composer(Dir, Field) => LayoutRegistry_ComposerDir(Dir) . LayoutRegistry_Composer()[Field]
+
+; The main fixture registered under another DLL name, as a re-saved source.
+_LCS_Renamed(Dll) {
+	Payload := _LCS_Payload()
+	Payload["source"] := StrReplace(_LCS_Source(), 'dll_name = "kbdsrcfx"', 'dll_name = "' . Dll . '"')
+	Payload["dll_name"] := Dll
+	return Payload
+}
 
 _LCS_Bool(Value) => (Value is LayMgrJsonBool) ? (Value.Value ? "true" : "false") : "not a JSON boolean"
 
@@ -278,6 +286,134 @@ _LCS_EmulateOperationsCase() {
 	AssertEqual(2, Operations.Length)
 	Plain := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
 	AssertEqual(1, Plain.Length, "a registry selection still writes only its identifier")
+}
+
+Test("layout editor host: a source re-saved under another DLL name uninstalls the previous DLL first (kbd-dll-replaced)",
+	_LCS_RenamedCase)
+
+; The stored source is the only record of the DLL it registered: overwriting
+; it left the previous DLL registered, found only by Windows Settings › Apps.
+_LCS_RenamedCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Deps := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Deps)
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		Log.Length := 0
+		AssertTrue(LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"), Deps))
+		Result := _LCH_Pushed(Log, "composerResult")
+		AssertEqual("true", _LCS_Bool(Result["ok"]), "installed: " . Result["detail"])
+		Calls := _LCH_Calls(Log)
+		Removed := InStr(Calls, "elevate /force C:\E\kbd_register.ahk uninstall kbdsrcfx")
+		AssertTrue(Removed, "the previous DLL is uninstalled: " . Calls)
+		AssertTrue(Removed < InStr(Calls, "install " . Dir . "stage\kbdsrcfy"), "before the new one is registered")
+		AssertEqual("new", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"], "nothing is left of kbdsrcfx")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfy", Machine.Ports)["state"])
+		AssertEqual("kbdsrcfy", _LayoutComposer_StoredDll(Dir))
+		; The same DLL name again upgrades in place: no uninstall.
+		Log.Length := 0
+		LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"), Deps)
+		AssertFalse(InStr(_LCH_Calls(Log), "uninstall"), "an upgrade keeps its DLL")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout editor host: a refused uninstall of the previous DLL keeps the stored source (kbd-dll-replaced)",
+	_LCS_RenamedRefusedCase)
+
+_LCS_RenamedRefusedCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), _LCS_Deps(Dir, Log, Machine))
+		Cancelled(Command) {
+			throw OSError(1223)
+		}
+		Log.Length := 0
+		LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"),
+			_LCS_Deps(Dir, Log, Machine, Map("elevate", Cancelled)))
+		Result := _LCH_Pushed(Log, "composerResult")
+		AssertEqual("false", _LCS_Bool(Result["ok"]))
+		AssertEqual("elevation_refused", Result["code"])
+		AssertEqual("kbdsrcfx", _LayoutComposer_StoredDll(Dir), "the source of the registered DLL is kept")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout editor host: an emulation that replaces the source keeps the DLL, which the manager still lists (kbd-dll-replaced)",
+	_LCS_EmulationKeepsDllCase)
+
+; Emulating needs no administrator right, so it never asks to uninstall: the
+; DLL stays a Windows layout the user may keep using, and the layout manager
+; finds it from its uninstall entry rather than from the stored source.
+_LCS_EmulationKeepsDllCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Deps := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Deps)
+		Payload := _LCS_Renamed("kbdsrcfy")
+		Payload["action"] := "composer_emulate"
+		Log.Length := 0
+		LayoutComposer_Handle("composer_emulate", Payload, Deps)
+		AssertEqual("emulate composed", _LCH_Calls(Log), "no UAC prompt for an emulation")
+		AssertEqual("kbdsrcfy", _LayoutComposer_StoredDll(Dir))
+		Native := LayoutManager_PageState(Deps["local_dir"], Machine.Ports)["native"]
+		AssertEqual(1, Native.Length)
+		AssertEqual("kbdsrcfx", Native[1]["dll"], "the DLL the source no longer names is still found")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout manager: a DLL Studio registered is listed and removed after its own confirmation (kbd-dll-manager)",
+	_LCS_NativeManagerCase)
+
+; The layout manager listed no DLL Studio registered: removing one went through
+; Windows Settings › Apps. Each Ergopti_kbd_<dll> uninstall entry is now a row
+; whose « Uninstall » asks first, then runs the elevated uninstaller.
+_LCS_NativeManagerCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Composer := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Composer)
+		Native := LayoutManager_PageState(Composer["local_dir"], Machine.Ports)["native"]
+		AssertEqual(1, Native.Length, "the registered DLL is listed")
+		AssertEqual("kbdsrcfx", Native[1]["dll"])
+		AssertEqual("Source Fixture", Native[1]["name"])
+		AssertEqual("a002040c", Native[1]["klid"])
+		AssertEqual(0, LayoutManager_PageState(Composer["local_dir"], _KBR_Machine().Ports)["native"].Length,
+			"a machine without an Ergopti_kbd_ entry lists none")
+		Manager := _LMH_Deps(Composer["local_dir"], Log)
+		Manager["registry"] := Machine.Ports
+		Asked := []
+		Answer := false
+		Manager["confirm"] := (Text) => (Asked.Push(Text), Answer)
+		Manager["uninstall_native"] := (Dll) => LayoutComposer_UninstallDll(Composer, Dll)
+		Message := Map("action", "uninstall", "dll", "kbdsrcfx")
+		; « No »: nothing runs.
+		Log.Length := 0
+		AssertTrue(LayoutManager_HandleMessage(Message, Manager))
+		AssertEqual(1, Asked.Length, "the removal asks first")
+		AssertContains(Asked[1], "kbdsrcfx")
+		AssertFalse(InStr(_LCH_Calls(Log), "elevate"), "no UAC prompt after « No »")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		; « Yes »: the elevated uninstaller, then the page lists nothing.
+		Answer := true
+		Log.Length := 0
+		AssertTrue(LayoutManager_HandleMessage(Message, Manager))
+		AssertContains(_LCH_Calls(Log), "elevate /force C:\E\kbd_register.ahk uninstall kbdsrcfx")
+		AssertEqual("new", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		State := _LMH_LastPush(Log)["payload"]
+		AssertEqual(0, State["native"].Length, "the row is gone")
+		AssertEqual("native:kbdsrcfx", State["result"]["id"])
+		AssertEqual(true, State["result"]["ok"])
+		AssertEqual("Source Fixture", State["result"]["name"])
+		; A DLL Ergopti did not register is refused without a question.
+		Asked.Length := 0
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "uninstall", "dll", "kbdother"), Manager))
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "uninstall", "dll", "../x"), Manager))
+		AssertEqual(0, Asked.Length)
+	} finally DirDelete(Dir, true)
 }
 
 Test("layout editor host: removing the composed layout uninstalls its Windows layout elevated (layout-editor-windows)",
