@@ -243,9 +243,8 @@ waits for the maintainer's review).
       view are in the engine and the Comparer, at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
       « Global score »); `sfb_distance` was weighed by the maintainer on 2026-11-19. Pending decisions: whether
       `pinky_ring` gets a weight once it is seen to rank layouts differently from `half_scissors`; any non-zero
-      floor (Cyanophage: SFB 0.3 %, hand balance 1 point). Left: the floors are read from `score_weights.json` only;
-      the Comparer's score settings, their export file (`ergopti-score-settings`, a new required entry) and
-      `score_settings.js` do not edit them yet.
+      floor (Cyanophage: SFB 0.3 %, hand balance 1 point). The Comparer's score settings edit each floor with its
+      help, and its export file (`ergopti-score-settings`, version 2) requires them.
 - [ ] **Longer skipgrams (2026-11-19).** genkey's gaps 1 to 9 and Oxeylyzer's 1 to 3 need skipgram tables in the
       corpus format. Measured: gaps 2–3 add 1.26 MB to the 9.2 MB of corpus files (about +40 % per text corpus,
       57 KB on Don Quichotte's 148 KB), gaps 2–9 5.93 MB (about +185 %); the 12 count-table corpora have no text to
