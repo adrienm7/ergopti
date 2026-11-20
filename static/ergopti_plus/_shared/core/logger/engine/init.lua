@@ -157,6 +157,10 @@ local _ring      = {}   -- Array of log lines (strings)
 local _ring_head = 0    -- Points to the slot to write NEXT (0-indexed)
 local _ring_size = 0    -- Number of entries currently stored
 
+--- Lines a raising sink lost since the last line it accepted, the last error it
+--- raised, and whether the report of those lines is being delivered right now.
+local _sink_refusal = { count = 0, last = nil, reporting = false }
+
 
 
 
@@ -266,6 +270,16 @@ end
 --- @param fn function|nil  function(line: string, variant: string) → void
 function M.set_sink(fn)
 	_sink = (type(fn) == "function") and fn or nil
+	-- Refusals belong to the sink that raised them; a new sink starts clean.
+	_sink_refusal.count, _sink_refusal.last, _sink_refusal.reporting = 0, nil, false
+end
+
+--- Reports the lines the current sink refused (raised on) and that no accepted
+--- line has reported yet, with the last error it raised.
+--- @return number count
+--- @return string|nil last
+function M.sink_refusals()
+	return _sink_refusal.count, _sink_refusal.last
 end
 
 --- Installs the ERROR observer. Call with nil to remove it (tests).
@@ -297,11 +311,32 @@ local function deliver(line, variant)
 	_ring_head  = _ring_head + 1
 	if _ring_size < RING_CAPACITY then _ring_size = _ring_size + 1 end
 
-	if _sink then
-		local ok = pcall(_sink, line, variant)
-		-- Sink errors are deliberately swallowed — a broken sink must never
-		-- prevent the calling code from completing its own work
-		if not ok then end
+	if not _sink then return end
+	-- A raising sink must never break the caller's own work, so the error stays
+	-- here; but the line it lost is counted and reported by the next line the
+	-- sink accepts, as the Windows logger reports the lines its queue cap dropped.
+	-- Swallowing it without a trace let a sink fault erase lines silently
+	-- (logger parity audit LOG-05).
+	local ok, err = pcall(_sink, line, variant)
+	if not ok then
+		_sink_refusal.count = _sink_refusal.count + 1
+		_sink_refusal.last = tostring(err)
+		return
+	end
+	if _sink_refusal.count == 0 or _sink_refusal.reporting then return end
+	local count = _sink_refusal.count
+	local stamp = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d) ") or M.timestamp_fn()
+	local report = string.format("%s [%s] [logger] %d %s refused by the log sink before this one (last refusal: %s).",
+		stamp, LABELS.warn, count, count == 1 and "line was" or "lines were", _sink_refusal.last)
+	-- The report takes the path of any line (ring, volume, sink). A refused
+	-- report keeps the count for the next accepted line; it is not itself a lost line.
+	_sink_refusal.reporting = true
+	deliver(report, "warn")
+	_sink_refusal.reporting = false
+	if _sink_refusal.count == count then
+		_sink_refusal.count, _sink_refusal.last = 0, nil
+	else
+		_sink_refusal.count = count
 	end
 end
 
