@@ -72,6 +72,8 @@ return {
 		xkb_user_root_env = "ERGOPTI_XKB_USER_ROOT",
 		wayland_toplevel_list = "ext_foreign_toplevel_list_v1",
 		wayland_toplevel_handle = "ext_foreign_toplevel_handle_v1",
+		dialog_host_guard_env = "ERGOPTI_DIALOG_HOST_GUARD",
+		dialog_host_guard_case_env = "ERGOPTI_DIALOG_HOST_GUARD_CASE",
 	},
 	locales = {
 		system_fallback = "en",

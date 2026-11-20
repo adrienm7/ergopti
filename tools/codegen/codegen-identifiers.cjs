@@ -60,8 +60,9 @@ const GROUPS = [
 // catalogue shown for a system language without one also reaches AutoHotkey.
 // The Linux desktop names (the Ergopti GNOME Shell extension's D-Bus switch, the
 // Compose state file the user installer writes, the Wayland protocols of the
-// COSMIC focus worker) are the Linux daemon's: its Python installer and the
-// extension pin the same values in their tests.
+// COSMIC focus worker, the environment variables of the dialog host's test
+// guard) are the Linux daemon's: its Python installer and the extension pin the
+// same values in their tests.
 const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'linux_desktop', 'locales']);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).

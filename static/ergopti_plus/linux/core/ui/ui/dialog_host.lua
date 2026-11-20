@@ -28,9 +28,30 @@ end
 --- 4. Text is plain unless the caller omits --no-markup, in which case it is
 ---    Pango markup, as zenity read it.
 --- 5. Importing the module (tests) parses only; it never opens a display.
+--- 6. Run as a script, the host puts its own tree on the search path: the daemon
+---    exports no LUA_PATH from a checkout, and the names below come from the
+---    shared tree (_shared/core/text/data/identifiers.json).
 --- ==============================================================================
 
+-- Whether this file is the program the interpreter runs, not a required module.
+local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
+local RUN_AS_SCRIPT = type(arg) == "table" and arg[0] == invoked_source
+if RUN_AS_SCRIPT and not (literal_driver and literal_driver ~= "") then
+	-- The literal loader already resolves both trees; a plain run joins them to
+	-- package.path. The shared tree sits beside the driver in a checkout and a
+	-- release tarball and inside it in a system package (core/fs/engine/paths.lua
+	-- shared_root_from), so both templates are listed, sibling first.
+	local root = ("/" .. invoked_source):match("^/(.*)/core/ui/ui/dialog_host%.lua$")
+		or (("/" .. invoked_source):match("^/core/ui/ui/dialog_host%.lua$") and ".")
+	assert(root, "the dialog host runs from its driver tree")
+	assert(not root:find("[;?]"), "a driver root with template bytes needs the literal loader")
+	package.path = root .. "/?.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/_shared/?.lua;" .. package.path
+end
+
 local M = {}
+
+-- The test guard's variable names (_shared/core/text/data/identifiers.json).
+local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
 
 --- Exit statuses the callers read.
 M.EXIT_ACCEPTED = 0
@@ -568,10 +589,10 @@ end
 --- runner exports it (tests/support/dialog_host_guard.lua) so that no test can
 --- open a window: one forgotten stub used to leave a modal error dialog waiting
 --- for a click and hold the whole unit run for sixteen minutes.
-M.GUARD_VARIABLE = "ERGOPTI_DIALOG_HOST_GUARD"
+M.GUARD_VARIABLE = LinuxDesktop.dialog_host_guard_env
 
 --- The environment variable naming the test case of a guarded run.
-M.GUARD_CASE_VARIABLE = "ERGOPTI_DIALOG_HOST_GUARD_CASE"
+M.GUARD_CASE_VARIABLE = LinuxDesktop.dialog_host_guard_case_env
 
 --- Refuses a dialog under the test runner: the request is recorded, never shown.
 --- @param argv table The arguments, without the program name.
@@ -600,8 +621,7 @@ function M.refuse_guarded(argv, record, case, io_err)
 end
 
 -- Importing the module parses nothing and opens no display.
-local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
-if type(arg) == "table" and arg[0] == invoked_source then
+if RUN_AS_SCRIPT then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
 	local guard = os.getenv(M.GUARD_VARIABLE)
