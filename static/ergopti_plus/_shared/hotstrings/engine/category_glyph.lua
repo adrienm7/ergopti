@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Hotstring Category Glyph (Shared)
 --- DESCRIPTION:
---- Picks the small symbol a preview row shows beside its trigger label, and the
---- i18n key that names it for a screen reader.
+--- Picks the small symbol a preview row shows in a framed badge at its far
+--- left, the i18n key that names it for a screen reader, and the badge's size.
 ---
 --- WHY A GLYPH:
 --- The preview tints sit at one lightness, so a colour-blind reader cannot tell
@@ -136,18 +136,36 @@ function M.resolve(inputs)
 	return { glyph = glyph, name_key = name_key, rejected = rejected }
 end
 
---- The label a preview row draws at its right: the glyph, a space, then the
---- key that fires it. Either part may be absent.
---- @param glyph string|nil
---- @param trigger_label string|nil
---- @return string
-function M.row_label(glyph, trigger_label)
-	local has_glyph = type(glyph) == "string" and glyph ~= ""
-	local has_label = type(trigger_label) == "string" and trigger_label ~= ""
-	if has_glyph and has_label then return glyph .. " " .. trigger_label end
-	if has_glyph then return glyph end
-	if has_label then return trigger_label end
-	return ""
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 3/ The badge ========================
+-- =============================================
+-- =============================================
+
+--- The framed badge a preview row draws its glyph in: the first cell of the
+--- row, at its far left, before the output text. The frame says the glyph is
+--- an annotation, not part of what the expansion types (the maintainer's
+--- request of 2026-11-19). Every row of a stack shares one badge column, as
+--- wide as its widest glyph, so the outputs stay aligned; a stack without a
+--- glyph has no column and keeps the row it had before the glyphs.
+--- @param glyph_w number Widest glyph of the stack, 0 when no row shows one.
+--- @param glyph_h number Tallest glyph of the stack.
+--- @param layout table { glyph_badge_pad_x, glyph_badge_border, glyph_badge_gap },
+---   the [layout] keys of _shared/core/ui/data/tooltip/constants.toml.
+--- @return table { w, h, zone }: the frame's outer size, and how far right the
+---   output text starts from the row's padding.
+function M.badge_geometry(glyph_w, glyph_h, layout)
+	if type(glyph_w) ~= "number" or glyph_w <= 0 then return { w = 0, h = 0, zone = 0 } end
+	assert(type(layout) == "table", "badge_geometry needs the tooltip layout")
+	local border = assert(tonumber(layout.glyph_badge_border), "glyph_badge_border is required")
+	local pad_x = assert(tonumber(layout.glyph_badge_pad_x), "glyph_badge_pad_x is required")
+	local gap = assert(tonumber(layout.glyph_badge_gap), "glyph_badge_gap is required")
+	local w = glyph_w + 2 * (pad_x + border)
+	return { w = w, h = glyph_h + 2 * border, zone = w + gap }
 end
 
 return M

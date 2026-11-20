@@ -69,6 +69,11 @@ const SHARED = [
 	['layout', 'hint_spacing'],
 	['layout', 'llm_max_content_width'],
 	['layout', 'corner_radius'],
+	// The framed badge of a preview row's category glyph, the same on the three OS.
+	['layout', 'glyph_badge_pad_x'],
+	['layout', 'glyph_badge_border'],
+	['layout', 'glyph_badge_gap'],
+	['colors', 'glyph_badge_white'],
 	['layout', 'screen_margin'],
 	['positioning', 'caret_offset_x'],
 	['positioning', 'caret_offset_y'],
@@ -122,8 +127,15 @@ const LINUX = fs.readFileSync(
 	path.join(SP, 'linux', 'core', 'ui', 'ui', 'tooltip', 'config.lua'),
 	'utf8'
 );
-// The timing keys every driver reads, Linux included (TWD-1).
-for (const [section, key] of [['timing', 'safety_timeout_sec']]) {
+// The timing keys every driver reads, Linux included (TWD-1), and the glyph
+// badge, drawn alike on the three OS.
+for (const [section, key] of [
+	['timing', 'safety_timeout_sec'],
+	['layout', 'glyph_badge_pad_x'],
+	['layout', 'glyph_badge_border'],
+	['layout', 'glyph_badge_gap'],
+	['colors', 'glyph_badge_white']
+]) {
 	if (!new RegExp(`require_key\\("${section}",\\s*"${key}"\\)`).test(LINUX))
 		errors.push(`Linux does not read [${section}].${key} through require_key`);
 }
@@ -176,7 +188,7 @@ const luminance = (channels) => {
 	});
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
-for (const key of ['hint_hex', 'info_hex', 'dim_hex', 'loading_text_hex']) {
+for (const key of ['hint_hex', 'info_hex', 'dim_hex', 'loading_text_hex', 'glyph_badge_white']) {
 	if (!declared('colors', key) || !declared('colors', 'bg_hex')) continue;
 	const [high, low] = [rgb(toml.colors[key]), rgb(toml.colors.bg_hex)]
 		.map(luminance)
@@ -184,6 +196,48 @@ for (const key of ['hint_hex', 'info_hex', 'dim_hex', 'loading_text_hex']) {
 	const ratio = (high + 0.05) / (low + 0.05);
 	if (ratio < TEXT_CONTRAST)
 		errors.push(`[colors].${key} is ${ratio.toFixed(2)}:1 on bg_hex, below ${TEXT_CONTRAST}:1`);
+}
+
+// The category glyph and the frame of its badge sit on a row's tint, not on the
+// plain background: every hue at [tint] lightness and saturation must keep the
+// glyph at 4.5:1 (its frame, a component, needs 3:1 and gets the same colour).
+/** RGB triple in 0..255 of an HSL colour, h in degrees. */
+function hsl(h, sat, light) {
+	const c = (1 - Math.abs(2 * light - 1)) * sat;
+	const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+	const m = light - c / 2;
+	const [r, g, b] =
+		h < 60
+			? [c, x, 0]
+			: h < 120
+				? [x, c, 0]
+				: h < 180
+					? [0, c, x]
+					: h < 240
+						? [0, x, c]
+						: h < 300
+							? [x, 0, c]
+							: [c, 0, x];
+	return [r, g, b].map((v) => Math.round((v + m) * 255));
+}
+if (
+	declared('colors', 'glyph_badge_white') &&
+	declared('tint', 'lightness') &&
+	declared('tint', 'saturation')
+) {
+	const glyph = luminance(rgb(toml.colors.glyph_badge_white));
+	const light = parseFloat(toml.tint.lightness);
+	const sat = parseFloat(toml.tint.saturation);
+	let worst = { ratio: Infinity, hue: null };
+	for (let hue = 0; hue < 360; hue += 1) {
+		const ratio = (glyph + 0.05) / (luminance(hsl(hue, sat, light)) + 0.05);
+		if (ratio < worst.ratio) worst = { ratio, hue };
+	}
+	if (worst.ratio < TEXT_CONTRAST)
+		errors.push(
+			`[colors].glyph_badge_white is ${worst.ratio.toFixed(2)}:1 on the tint of hue ${worst.hue}, ` +
+				`below ${TEXT_CONTRAST}:1`
+		);
 }
 
 // The shortcut column's joiner is each OS's own; its modifiers are named by the
@@ -217,6 +271,10 @@ const STYLE_GLOBALS = [
 	'UI_HINT_COLOR_HEX',
 	'UI_INFO_COLOR_HEX',
 	'UI_LOADING_TEXT_HEX',
+	'UI_GLYPH_BADGE_HEX',
+	'UI_GLYPH_BADGE_PAD_X',
+	'UI_GLYPH_BADGE_BORDER',
+	'UI_GLYPH_BADGE_GAP',
 	'UI_OFFSET_BELOW',
 	'UI_OFFSET_RIGHT',
 	'UI_WINDOW_OFFSET_Y',

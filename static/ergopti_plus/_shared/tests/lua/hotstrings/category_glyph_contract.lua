@@ -13,7 +13,7 @@ return function(helpers)
 	local handle = assert(io.open(shared .. "/tests/corpus/hotstrings/category_glyph_vectors.json", "rb"))
 	local document = assert(Json.decode(handle:read("*a")))
 	handle:close()
-	assert(#document.vectors > 0 and #document.row_label_vectors > 0, "the vector corpus must not be empty")
+	assert(#document.vectors > 0 and #document.badge_vectors > 0, "the vector corpus must not be empty")
 
 	for _, vector in ipairs(document.vectors) do
 		helpers.it("category glyph vector: " .. vector.id, function()
@@ -38,11 +38,28 @@ return function(helpers)
 		end)
 	end
 
-	for _, vector in ipairs(document.row_label_vectors) do
-		helpers.it("row label vector: " .. vector.id, function()
-			helpers.assert_eq(CategoryGlyph.row_label(vector.glyph, vector.trigger_label), vector.expected)
+	for _, vector in ipairs(document.badge_vectors) do
+		helpers.it("glyph badge vector: " .. vector.id, function()
+			local badge = CategoryGlyph.badge_geometry(vector.glyph_w, vector.glyph_h, document.badge_layout)
+			helpers.assert_eq(badge.w, vector.expected.w, "frame width")
+			helpers.assert_eq(badge.h, vector.expected.h, "frame height")
+			helpers.assert_eq(badge.zone, vector.expected.zone, "output offset")
 		end)
 	end
+
+	helpers.it("the shipped badge geometry draws a visible frame and a gap before the output", function()
+		local handle = assert(io.open(shared .. "/core/ui/data/tooltip/constants.toml", "rb"))
+		local text = handle:read("*a")
+		handle:close()
+		local layout = {}
+		for _, key in ipairs({ "glyph_badge_pad_x", "glyph_badge_border", "glyph_badge_gap" }) do
+			layout[key] = tonumber(text:match("\n" .. key .. "%s*=%s*([%d.]+)"))
+			assert(layout[key], "constants.toml must declare [layout]." .. key)
+		end
+		local badge = CategoryGlyph.badge_geometry(10, 15, layout)
+		assert(layout.glyph_badge_border >= 1, "the badge needs a border to read as an annotation")
+		assert(badge.zone > badge.w, "the output must start after the badge, with a gap")
+	end)
 
 	--- The [_meta] glyph fields of a catalogue file, read from its head: a whole
 	--- catalogue parse costs seconds and the table is at the top of the file.

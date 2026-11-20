@@ -56,13 +56,14 @@ local GTK_WINDOW_POPUP = 1
 local ACCENT_BAR_WIDTH = 3
 local ACCENT_BAR_INSET = 4
 
---- The label a hotstring row draws at its right: its category glyph, a space,
---- then the key that fires it, in the label's font and colour so the glyph keeps
---- the label's contrast on every tint. Shared by the measure and the paint.
---- @param row table { label?, glyph? }
---- @return string
-function M.row_label(row)
-	return CategoryGlyph.row_label(row.glyph, row.label)
+--- Whether a hotstring row shows a category glyph. The glyph is the row's
+--- first cell, at its far left in a framed badge, so it reads as an annotation
+--- and not as text the expansion types; the trigger label stays alone at the
+--- right.
+--- @param row table { glyph? }
+--- @return boolean
+function M.has_glyph(row)
+	return type(row.glyph) == "string" and row.glyph ~= ""
 end
 
 
@@ -250,6 +251,18 @@ function M.measure_rows(rows, style, pango_layout)
 	local metrics = {}
 	local widest, total_height = 0, 0
 
+	-- One badge column for the hotstring rows, as wide as their widest glyph, so
+	-- the outputs stay aligned; zero wide, with no gap, when none shows a glyph.
+	local glyph_w, glyph_h, glyph_widths = 0, 0, {}
+	for i, row in ipairs(rows) do
+		if type(row.segments) ~= "table" and M.has_glyph(row) then
+			local w, h = measure(pango_layout, row.glyph, style.fonts.main, style.sizes.hint)
+			glyph_widths[i] = w
+			glyph_w, glyph_h = math.max(glyph_w, w), math.max(glyph_h, h)
+		end
+	end
+	local badge = CategoryGlyph.badge_geometry(glyph_w, glyph_h, style.layout)
+
 	for i, row in ipairs(rows) do
 		local row_w, row_h
 		if type(row.segments) == "table" then
@@ -259,17 +272,19 @@ function M.measure_rows(rows, style, pango_layout)
 		else
 			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
 			local label_w, label_h = 0, 0
-			local label = M.row_label(row)
-			if label ~= "" then
-				label_w, label_h = measure(pango_layout, label, style.fonts.main, style.sizes.hint)
+			if row.label and row.label ~= "" then
+				label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
 			end
 
 			-- The label is right-aligned on the same line, so the row is as wide as
-			-- both plus the gap between them — not as wide as the wider of the two.
-			row_w = text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
-			row_h = math.max(text_h, label_h)
+			-- the badge column, the text and the label plus the gaps between them —
+			-- not as wide as the wider of them.
+			row_w = badge.zone + text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
+			row_h = math.max(text_h, label_h, glyph_widths[i] and badge.h or 0)
 
-			metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h }
+			metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h,
+				text_x = style.layout.pad_x + badge.zone, badge = glyph_widths[i] and badge or nil,
+				glyph_w = glyph_widths[i] }
 		end
 		widest = math.max(widest, row_w)
 		total_height = total_height + row_h
@@ -419,13 +434,33 @@ local function paint(cr, rows, metrics, style, size, background)
 			cr:fill()
 		end
 
+		-- The category glyph badge first, at the far left: a 1 px frame in the
+		-- glyph's colour, inset by half its stroke so the line stays crisp, and
+		-- the glyph centred inside, dimmed with the row like its label.
+		local text_y = y + math.floor((m.height - m.text_h) / 2)
+		if m.badge then
+			local badge, border = m.badge, style.layout.glyph_badge_border
+			local badge_y = y + math.floor((m.height - badge.h) / 2)
+			local white = style.colors.glyph_badge_white
+			cr:set_source_rgba(white, white, white, alpha)
+			cr:set_line_width(border)
+			cr:rectangle(style.layout.pad_x + border / 2, badge_y + border / 2, badge.w - border, badge.h - border)
+			cr:stroke()
+			local glyph_description = g.Pango.FontDescription.from_string(style.fonts.main)
+			glyph_description:set_size(style.sizes.hint * PANGO_SCALE)
+			pango_layout:set_font_description(glyph_description)
+			pango_layout:set_text(row.glyph, -1)
+			cr:move_to(style.layout.pad_x + math.floor((badge.w - m.glyph_w) / 2), badge_y + border)
+			g.PangoCairo.show_layout(cr, pango_layout)
+		end
+
 		local description = g.Pango.FontDescription.from_string(style.fonts.main)
 		description:set_size(style.sizes.main * PANGO_SCALE)
 		pango_layout:set_font_description(description)
 		pango_layout:set_text(row.text or "", -1)
 
 		cr:set_source_rgba(1, 1, 1, alpha)
-		cr:move_to(style.layout.pad_x, y)
+		cr:move_to(m.text_x, text_y)
 		g.PangoCairo.show_layout(cr, pango_layout)
 
 		if row.struck then
@@ -433,21 +468,20 @@ local function paint(cr, rows, metrics, style, size, background)
 			-- more useful shown crossed out than absent, because absent looks like
 			-- the driver failing to notice it.
 			cr:set_line_width(1)
-			cr:move_to(style.layout.pad_x, y + m.text_h / 2)
-			cr:line_to(style.layout.pad_x + m.text_w, y + m.text_h / 2)
+			cr:move_to(m.text_x, text_y + m.text_h / 2)
+			cr:line_to(m.text_x + m.text_w, text_y + m.text_h / 2)
 			cr:stroke()
 		end
 
-		local label = M.row_label(row)
-		if label ~= "" then
+		if row.label and row.label ~= "" then
 			local label_description = g.Pango.FontDescription.from_string(style.fonts.main)
 			label_description:set_size(style.sizes.hint * PANGO_SCALE)
 			pango_layout:set_font_description(label_description)
-			pango_layout:set_text(label, -1)
+			pango_layout:set_text(row.label, -1)
 			cr:set_source_rgba(1, 1, 1, alpha * 0.6)
 			-- Right-aligned against the panel's inner edge, which is what makes a
 			-- column of triggers readable down the right-hand side.
-			cr:move_to(size.w - style.layout.pad_x - m.label_w, y)
+			cr:move_to(size.w - style.layout.pad_x - m.label_w, text_y)
 			g.PangoCairo.show_layout(cr, pango_layout)
 		end
 
@@ -460,8 +494,9 @@ end
 
 
 --- The plain text of a preview, for AT-SPI: the rows that will be sent, each
---- with its trigger and the category its glyph stands for, never the
---- struck-through alternatives. The glyph itself is not read: its name is.
+--- with the category its glyph stands for first, as the badge comes first in
+--- the row, then its trigger, never the struck-through alternatives. The glyph
+--- itself is not read: its name is.
 --- @param rows table Array of { text, label?, glyph?, glyph_name_key?, dimmed?, struck? }.
 --- @return string
 function M.accessible_text(rows)
@@ -471,9 +506,9 @@ function M.accessible_text(rows)
 			local label = type(row.label) == "string" and row.label ~= "" and (" " .. row.label) or ""
 			local category = ""
 			if type(row.glyph) == "string" and row.glyph ~= "" and type(row.glyph_name_key) == "string" then
-				category = ", " .. require("core.i18n.engine.i18n").get(row.glyph_name_key)
+				category = require("core.i18n.engine.i18n").get(row.glyph_name_key) .. ", "
 			end
-			parts[#parts + 1] = row.text .. label .. category
+			parts[#parts + 1] = category .. row.text .. label
 		end
 	end
 	return table.concat(parts, "; ")
@@ -694,5 +729,9 @@ function M.destroy()
 	_surface_rows = nil
 	return true
 end
+
+--- Test seam: paints rows onto a recording cairo context, so a test reads the
+--- drawn order and geometry without a display.
+M._paint_for_test = paint
 
 return M

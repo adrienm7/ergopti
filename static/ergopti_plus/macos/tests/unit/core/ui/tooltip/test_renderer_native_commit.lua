@@ -271,7 +271,7 @@ helpers.describe("tooltip renderer native commit: show transitions", function()
 
 	Fixture.it("applies the same native show gate to stacked canvases (renderer-native-show-commit)", function()
 		local renderer = load_renderer()
-		local committed_canvas = make_canvas({ element_count = 5, showing = false })
+		local committed_canvas = make_canvas({ element_count = #renderer._build_stacked_elements(1), showing = false })
 		local callbacks = 0
 		renderer.stacked_canvas = committed_canvas
 
@@ -285,7 +285,8 @@ helpers.describe("tooltip renderer native commit: show transitions", function()
 			renderer = load_renderer()
 			local options = {}
 			for key, value in pairs(case.options) do options[key] = value end
-			options.element_count = 5
+			-- One row: the size the stacked canvas keeps, so the double is reused.
+			options.element_count = #renderer._build_stacked_elements(1)
 			local canvas = make_canvas(options)
 			callbacks = 0
 			renderer.stacked_canvas = canvas

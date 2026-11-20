@@ -1507,12 +1507,17 @@ _LLM_TooltipExpireSharedHeader(Surface) {
 
 ; Geometry of the hotstring rows heading a shared panel, drawn like the
 ; hotstring stack: a band per row, each followed by its 1 px rule (the last one
-; separates the predictions). Pure, layout units.
+; separates the predictions), the category glyph badge first in a row that
+; shows one. Pure, layout units.
 ; @param Sizes       Array of { W, H } — each row's text.
 ; @param LabelSizes  Array of { W, H } — each row's trigger label, W 0 when none.
 ; @param Style       { PadX, PadY, LabelGap }.
-; @returns { W, H, TextW, LabelW, RowY[], RowH[], Sizes, LabelSizes }
-_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
+; @param Badge       { W, H, Zone } from TooltipGlyphBadge, or 0 when no row shows a glyph.
+; @param Glyphs      Array of each row's glyph, "" when none; omitted with Badge.
+; @returns { W, H, TextX, TextW, LabelW, Badge, ContentH[], RowY[], RowH[], Sizes, LabelSizes }
+_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style, Badge := 0, Glyphs := 0) {
+	if !IsObject(Badge)
+		Badge := { W: 0, H: 0, Zone: 0 }
 	TextW := 0
 	LabelW := 0
 	for , Size in Sizes
@@ -1520,10 +1525,14 @@ _LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
 	for , Size in LabelSizes
 		LabelW := Max(LabelW, Size.W)
 	LabelZone := LabelW > 0 ? Style.LabelGap + LabelW : 0
-	L := { W: Sizes.Length > 0 ? Style.PadX + TextW + LabelZone + Style.PadX : 0, H: 0,
-		TextW: TextW, LabelW: LabelW, RowY: [], RowH: [], Sizes: Sizes, LabelSizes: LabelSizes }
-	for , Size in Sizes {
-		RowH := Style.PadY + Size.H + Style.PadY
+	TextX := Style.PadX + Badge.Zone
+	L := { W: Sizes.Length > 0 ? TextX + TextW + LabelZone + Style.PadX : 0, H: 0, TextX: TextX,
+		TextW: TextW, LabelW: LabelW, Badge: Badge, ContentH: [], RowY: [], RowH: [], Sizes: Sizes,
+		LabelSizes: LabelSizes }
+	for Idx, Size in Sizes {
+		ContentH := _TooltipRowContentH(Size.H, IsObject(Glyphs) ? Glyphs[Idx] : "", Badge)
+		RowH := Style.PadY + ContentH + Style.PadY
+		L.ContentH.Push(ContentH)
 		L.RowY.Push(L.H)
 		L.RowH.Push(RowH)
 		L.H += RowH + 1
@@ -1549,14 +1558,17 @@ _LLM_TooltipMeasureHeader(Items) {
 	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
 	Sizes := []
 	LabelSizes := []
+	Glyphs := []
 	for , Item in Items {
 		Sizes.Push(_TooltipMeasureText(Item.Text))
 		Label := _TooltipItemLabel(Item)
 		Measured := _LLM_TooltipMeasureOptional(Label, _TOOLTIP_LABEL_FONT_SIZE)
 		LabelSizes.Push(IsObject(Measured) ? Measured : { W: 0, H: 0 })
+		Glyphs.Push(_TooltipItemGlyph(Item))
 	}
 	return _LLM_TooltipHeaderLayout(Sizes, LabelSizes,
-		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP })
+		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP },
+		_TooltipMeasureGlyphBadge(Items), Glyphs)
 }
 
 ; Geometry of the prediction panel — the Windows port of the macOS layout in

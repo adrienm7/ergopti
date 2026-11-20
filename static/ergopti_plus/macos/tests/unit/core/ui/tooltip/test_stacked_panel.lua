@@ -47,32 +47,35 @@ helpers.describe("tooltip stacked panel: outer-box rounding, no clip", function(
 		end
 	end)
 
-	helpers.it("has a uniform 4-slot row block + separators + border element count", function()
+	helpers.it("has a uniform 6-slot row block + separators + border element count", function()
 		for _, n in ipairs({ 1, 2, 3 }) do
 			local els = Renderer._build_stacked_elements(n)
-			-- 4*n per-row (bg base, cap, text, label) + (n-1) separators + 1 border = 5n
-			helpers.assert_eq(#els, n * 5)
+			-- 6*n per-row (bg base, cap, badge frame, glyph, text, label) + (n-1)
+			-- separators + 1 border = 7n
+			helpers.assert_eq(#els, n * 7)
 		end
 	end)
 
-	helpers.it("each row block is [rect bg][rect cap][text][text]", function()
+	helpers.it("each row block is [rect bg][rect cap][rect badge][text glyph][text][text]", function()
 		for _, n in ipairs({ 1, 2, 3 }) do
 			local els = Renderer._build_stacked_elements(n)
 			for i = 1, n do
-				local base = (i - 1) * 4 + 1
+				local base = (i - 1) * 6 + 1
 				helpers.assert_eq(els[base].type, "rectangle")      -- background base
 				helpers.assert_eq(els[base + 1].type, "rectangle")  -- corner cap
-				helpers.assert_eq(els[base + 2].type, "text")       -- output text
-				helpers.assert_eq(els[base + 3].type, "text")       -- trigger label
+				helpers.assert_eq(els[base + 2].type, "rectangle")  -- glyph badge frame
+				helpers.assert_eq(els[base + 3].type, "text")       -- category glyph
+				helpers.assert_eq(els[base + 4].type, "text")       -- output text
+				helpers.assert_eq(els[base + 5].type, "text")       -- trigger label
 			end
 		end
 	end)
 
-	helpers.it("ends with a rounded stroked border at index 5n", function()
+	helpers.it("ends with a rounded stroked border at index 7n", function()
 		for _, n in ipairs({ 1, 2, 3 }) do
 			local els = Renderer._build_stacked_elements(n)
 			local last = els[#els]
-			helpers.assert_eq(#els, n * 5)
+			helpers.assert_eq(#els, n * 7)
 			helpers.assert_eq(last.action, "strokeAndFill")
 			helpers.assert_true(type(last.roundedRectRadii) == "table",
 				"the border must be rounded to match the outer box corners")

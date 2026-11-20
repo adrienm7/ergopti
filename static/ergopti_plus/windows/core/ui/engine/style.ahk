@@ -24,11 +24,15 @@
 ;   [layout]      pad_x                  → UI_PAD_X
 ;   [layout]      pad_y                  → UI_PAD_Y
 ;   [layout]      label_gap              → UI_LABEL_GAP
+;   [layout]      glyph_badge_pad_x      → UI_GLYPH_BADGE_PAD_X
+;   [layout]      glyph_badge_border     → UI_GLYPH_BADGE_BORDER
+;   [layout]      glyph_badge_gap        → UI_GLYPH_BADGE_GAP
 ;   [layout]      llm_max_content_width  → UI_LLM_MAX_CONTENT_WIDTH
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
 ;   [colors]      bg_hex                 → UI_BG_HEX
 ;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
 ;   [colors]      label_hex              → UI_LABEL_COLOR_HEX
+;   [colors]      glyph_badge_white      → UI_GLYPH_BADGE_HEX
 ;   [colors]      loading_text_hex       → UI_LOADING_TEXT_HEX
 ;   [layout]      screen_margin          → UI_SCREEN_MARGIN
 ;   [positioning] window_offset_y        → UI_WINDOW_OFFSET_Y
@@ -61,6 +65,9 @@ global UI_FONT_SIZE_INFO  := 0
 global UI_PAD_X           := 0
 global UI_PAD_Y           := 0
 global UI_LABEL_GAP       := 0
+global UI_GLYPH_BADGE_PAD_X  := 0
+global UI_GLYPH_BADGE_BORDER := 0
+global UI_GLYPH_BADGE_GAP    := 0
 global UI_LLM_MAX_CONTENT_WIDTH := 0
 global UI_LINE_SPACING    := 0
 global UI_HINT_SPACING    := 0
@@ -74,6 +81,8 @@ global UI_BORDER_COLOR_HEX := "FFFFFF"   ; AHK-only constant, not in TOML
 global UI_BORDER_ALPHA     := 0.25
 global UI_BORDER_THICKNESS := 1          ; AHK-only constant, not in TOML
 global UI_LABEL_COLOR_HEX  := ""
+; The category glyph of a preview row and the frame of its badge.
+global UI_GLYPH_BADGE_HEX  := ""
 global UI_HINT_COLOR_HEX   := ""
 global UI_INFO_COLOR_HEX   := ""
 global UI_LOADING_TEXT_HEX := ""
@@ -190,6 +199,9 @@ UiStyle_LoadSharedConst() {
 	global UI_PAD_X                := Integer(_UiStyleRequire(c, "layout", "pad_x"))
 	global UI_PAD_Y                := Integer(_UiStyleRequire(c, "layout", "pad_y"))
 	global UI_LABEL_GAP            := Integer(_UiStyleRequire(c, "layout", "label_gap"))
+	global UI_GLYPH_BADGE_PAD_X    := Integer(_UiStyleRequire(c, "layout", "glyph_badge_pad_x"))
+	global UI_GLYPH_BADGE_BORDER   := Integer(_UiStyleRequire(c, "layout", "glyph_badge_border"))
+	global UI_GLYPH_BADGE_GAP      := Integer(_UiStyleRequire(c, "layout", "glyph_badge_gap"))
 	global UI_LLM_MAX_CONTENT_WIDTH := Integer(_UiStyleRequire(c, "layout", "llm_max_content_width"))
 	global UI_LINE_SPACING         := Integer(_UiStyleRequire(c, "layout", "line_spacing"))
 	global UI_HINT_SPACING         := Integer(_UiStyleRequire(c, "layout", "hint_spacing"))
@@ -198,9 +210,9 @@ UiStyle_LoadSharedConst() {
 
 	; [colors]
 	global UI_BG_HEX               := _UiStyleRequireHex(c, "colors", "bg_hex")
-	text_v := Round(255 * Float(_UiStyleRequire(c, "colors", "text_white")))
-	global UI_TEXT_HEX             := Format("{1:02X}{1:02X}{1:02X}", text_v)
+	global UI_TEXT_HEX             := UiStyle_GreyHex(_UiStyleRequire(c, "colors", "text_white"))
 	global UI_LABEL_COLOR_HEX      := _UiStyleRequireHex(c, "colors", "label_hex")
+	global UI_GLYPH_BADGE_HEX      := UiStyle_GreyHex(_UiStyleRequire(c, "colors", "glyph_badge_white"))
 	global UI_HINT_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "hint_hex")
 	global UI_INFO_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "info_hex")
 	global UI_DIM_COLOR_HEX        := _UiStyleRequireHex(c, "colors", "dim_hex")
@@ -280,8 +292,16 @@ UiStyle_LoadSharedConst() {
 		Tooltip_LlmUiSyncFromShared()
 }
 
+; The "RRGGBB" grey of a [colors] *_white level, as the Lua drivers draw it.
+; @param White {Number|String} The level, 0 to 1.
+; @returns {String}
+UiStyle_GreyHex(White) {
+	Level := Round(255 * Float(White))
+	return Format("{1:02X}{1:02X}{1:02X}", Level)
+}
+
 ; The colour globals a high-contrast theme repaints in its tooltip text colour.
-global UI_STYLE_TEXT_COLOR_NAMES := ["UI_TEXT_HEX", "UI_LABEL_COLOR_HEX", "UI_HINT_COLOR_HEX",
+global UI_STYLE_TEXT_COLOR_NAMES := ["UI_TEXT_HEX", "UI_LABEL_COLOR_HEX", "UI_GLYPH_BADGE_HEX", "UI_HINT_COLOR_HEX",
 	"UI_INFO_COLOR_HEX", "UI_DIM_COLOR_HEX", "UI_LOADING_TEXT_HEX", "UI_SEP_COLOR_HEX",
 	"UI_BORDER_COLOR_HEX", "UI_LLM_CORR_SEL_HEX", "UI_LLM_NW_SEL_HEX", "UI_LLM_UNSEL_GRAY_HEX",
 	"UI_LLM_LOADING_HEX", "UI_LLM_CURSOR_HEX", "UI_LLM_CMD_DIM_HEX"]
@@ -374,6 +394,7 @@ _UiStyleRead(Name) {
 		case "UI_BG_HEX": return UI_BG_HEX
 		case "UI_TEXT_HEX": return UI_TEXT_HEX
 		case "UI_LABEL_COLOR_HEX": return UI_LABEL_COLOR_HEX
+		case "UI_GLYPH_BADGE_HEX": return UI_GLYPH_BADGE_HEX
 		case "UI_HINT_COLOR_HEX": return UI_HINT_COLOR_HEX
 		case "UI_INFO_COLOR_HEX": return UI_INFO_COLOR_HEX
 		case "UI_DIM_COLOR_HEX": return UI_DIM_COLOR_HEX
@@ -401,6 +422,7 @@ _UiStyleWrite(Name, Value) {
 		case "UI_BG_HEX": UI_BG_HEX := Value
 		case "UI_TEXT_HEX": UI_TEXT_HEX := Value
 		case "UI_LABEL_COLOR_HEX": UI_LABEL_COLOR_HEX := Value
+		case "UI_GLYPH_BADGE_HEX": UI_GLYPH_BADGE_HEX := Value
 		case "UI_HINT_COLOR_HEX": UI_HINT_COLOR_HEX := Value
 		case "UI_INFO_COLOR_HEX": UI_INFO_COLOR_HEX := Value
 		case "UI_DIM_COLOR_HEX": UI_DIM_COLOR_HEX := Value

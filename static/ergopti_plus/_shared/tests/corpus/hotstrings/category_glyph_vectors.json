@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver contract of the hotstring category glyph resolver (_shared/hotstrings/engine/category_glyph.lua and windows/hotstrings/engine/catalogue/category_glyph.ahk). Each vector gives the category's [_meta] fields (omitted when unset), the per-category default (omitted when the category has none) and the expected glyph, name key and refused fields; the shared defaults apply to every vector. row_label vectors pin the label a preview row draws: the glyph, a space, then the trigger label.",
+	"description": "Cross-driver contract of the hotstring category glyph resolver (_shared/hotstrings/engine/category_glyph.lua and windows/hotstrings/engine/catalogue/category_glyph.ahk). Each vector gives the category's [_meta] fields (omitted when unset), the per-category default (omitted when the category has none) and the expected glyph, name key and refused fields; the shared defaults apply to every vector. badge_vectors pin the framed badge a preview row draws its glyph in, the first cell of the row: the badge starts at the row's padding, its frame is the widest glyph plus glyph_badge_pad_x and glyph_badge_border on each side, and the output text starts zone (the frame plus glyph_badge_gap) further right. A stack without a glyph has no badge and no gap: the output keeps the padding it had before the glyphs. The trigger label stays alone at the right. badge_layout holds the geometry the vectors use, not the shipped values.",
 	"defaults": {
 		"default_glyph": "•",
 		"default_name_key": "hs_config.cat_other",
@@ -79,15 +79,25 @@
 			}
 		}
 	],
-	"row_label_vectors": [
-		{ "id": "glyph_and_trigger", "glyph": "✓", "trigger_label": "↵", "expected": "✓ ↵" },
-		{ "id": "glyph_only", "glyph": "✦", "trigger_label": "", "expected": "✦" },
+	"badge_layout": { "glyph_badge_pad_x": 3, "glyph_badge_border": 1, "glyph_badge_gap": 8 },
+	"badge_vectors": [
 		{
-			"id": "trigger_only_when_glyphs_are_off",
-			"glyph": "",
-			"trigger_label": "★",
-			"expected": "★"
+			"id": "a_glyph_gets_a_framed_badge_before_the_output",
+			"glyph_w": 10,
+			"glyph_h": 15,
+			"expected": { "w": 18, "h": 17, "zone": 26 }
 		},
-		{ "id": "nothing", "glyph": "", "trigger_label": "", "expected": "" }
+		{
+			"id": "the_widest_glyph_sets_the_column",
+			"glyph_w": 14,
+			"glyph_h": 20,
+			"expected": { "w": 22, "h": 22, "zone": 30 }
+		},
+		{
+			"id": "no_glyph_no_column_no_gap",
+			"glyph_w": 0,
+			"glyph_h": 0,
+			"expected": { "w": 0, "h": 0, "zone": 0 }
+		}
 	]
 }

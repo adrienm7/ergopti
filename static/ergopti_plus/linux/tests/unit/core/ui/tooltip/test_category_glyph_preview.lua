@@ -3,10 +3,12 @@
 --- ==============================================================================
 --- MODULE: Category Glyph in the Hotstring Preview
 --- DESCRIPTION:
---- Each preview row shows its category's glyph beside the trigger label, so a
---- reader who cannot tell the tints apart still tells the categories apart (the
---- maintainer's decision of 2026-11-19). These cases pin the row, the label the
---- renderer measures and draws, the glyphs switch, and the text AT-SPI reads.
+--- Each preview row shows its category's glyph, so a reader who cannot tell the
+--- tints apart still tells the categories apart (the maintainer's decision of
+--- 2026-11-19). The glyph is the row's first cell, at its far left, in a framed
+--- badge that ends before the output, so it reads as an annotation and not as
+--- typed text (his request of the same day). These cases pin the row, the
+--- drawn order and frame, the glyphs switch, and the text AT-SPI reads.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -40,27 +42,91 @@ local CANDIDATES = {
 	{ trigger = "sig", replacement = "Signature", group = "personal", fires = false },
 }
 
---- A Pango stand-in that records every text it is asked to measure.
---- @return table binding, table measured
+--- A Pango and cairo stand-in that records every text it draws and every
+--- rectangle it strokes, in order, with the point it was drawn at. A text is
+--- measured as 10 px per character, 12 px high.
+--- @return table binding, table ops, table layout, table cr
 local function fake_binding()
-	local measured = {}
+	local ops = {}
 	local description = { set_size = function() end }
+	local layout = { text = "" }
+	function layout:set_font_description() end
+	function layout:set_text(text) self.text = text end
+	function layout:get_pixel_size()
+		local count = 0
+		for _ in self.text:gmatch("[^\128-\191]") do count = count + 1 end
+		return count * 10, 12
+	end
+	function layout:set_width() end
+	function layout:set_ellipsize() end
+	local cr = { x = 0, y = 0, path = nil }
+	function cr:set_operator() end
+	function cr:set_source_rgba(r, g, b, a) self.color = { r, g, b, a } end
+	function cr:paint() end
+	function cr:new_sub_path() self.path = nil end
+	function cr:arc() end
+	function cr:close_path() end
+	function cr:fill_preserve() end
+	function cr:fill() self.path = nil end
+	function cr:set_line_width(width) self.line_width = width end
+	function cr:rectangle(x, y, w, h) self.path = { x = x, y = y, w = w, h = h } end
+	function cr:stroke()
+		if self.path then
+			ops[#ops + 1] = { kind = "frame", x = self.path.x, y = self.path.y, w = self.path.w,
+				h = self.path.h, width = self.line_width, alpha = self.color[4] }
+		end
+		self.path = nil
+	end
+	function cr:move_to(x, y) self.x, self.y = x, y end
+	function cr:line_to() end
 	local binding = {
 		Pango = { FontDescription = { from_string = function() return description end } },
+		PangoCairo = {
+			create_layout = function() return layout end,
+			show_layout = function(context)
+				local w, h = layout:get_pixel_size()
+				ops[#ops + 1] = { kind = "text", text = layout.text, x = context.x, y = context.y, w = w, h = h }
+			end,
+		},
 	}
-	local layout = {
-		set_font_description = function() end,
-		set_text = function(_, text) measured[#measured + 1] = text end,
-		get_pixel_size = function() return 10, 10 end,
-	}
-	return binding, measured, layout
+	return binding, ops, layout, cr
 end
 
 local STYLE = {
 	fonts = { main = "Sans" },
 	sizes = { main = 13, hint = 11 },
-	layout = { label_gap = 8, line_spacing = 2, pad_x = 10, pad_y = 6, llm_max_content_width = 400 },
+	layout = { label_gap = 8, line_spacing = 2, pad_x = 10, pad_y = 6, llm_max_content_width = 400,
+		corner_radius = 4, glyph_badge_pad_x = 3, glyph_badge_border = 1, glyph_badge_gap = 8 },
+	colors = { canvas_alpha = 1, border_white = 1, border_alpha = 0.13, glyph_badge_white = 0.667 },
 }
+
+--- Measures then paints rows on the recording context.
+--- @param rows table
+--- @return table ops The drawn texts and stroked frames, in order.
+local function painted(rows)
+	local Renderer = helpers.load_module("core.ui.adapters.graphics_renderer")
+	local binding, ops, layout, cr = fake_binding()
+	Renderer._set_binding_for_test(binding)
+	local ok, err = pcall(function()
+		local size, metrics = Renderer.measure_rows(rows, STYLE, layout)
+		Renderer._paint_for_test(cr, rows, metrics, STYLE, size, { red = 0, green = 0, blue = 0, alpha = 1 })
+	end)
+	Renderer._set_binding_for_test(nil)
+	assert(ok, err)
+	return ops
+end
+
+--- The first drawn op matching a predicate, or nil.
+local function find(ops, predicate)
+	for _, op in ipairs(ops) do
+		if predicate(op) then return op end
+	end
+	return nil
+end
+
+local function text_op(ops, text)
+	return find(ops, function(op) return op.kind == "text" and op.text == text end)
+end
 
 helpers.describe("preview: category glyph", function()
 	helpers.it("gives each row the glyph and name of the category its tint follows", function()
@@ -84,23 +150,44 @@ helpers.describe("preview: category glyph", function()
 			"switched back on, the glyph returns")
 	end)
 
-	helpers.it("measures the glyph beside the trigger label, in the label's size", function()
-		local Renderer = helpers.load_module("core.ui.adapters.graphics_renderer")
-		local binding, measured, layout = fake_binding()
-		Renderer._set_binding_for_test(binding)
+	helpers.it("draws the glyph first, framed, before the output; the label alone at the right", function()
 		local rows = preview().build_rows(CANDIDATES, { kind = "autocorrect" })
-		Renderer.measure_rows(rows, STYLE, layout)
-		Renderer._set_binding_for_test(nil)
-		helpers.assert_eq(measured[2], "✓ ↵", "the first row's label is its glyph then its key")
-		helpers.assert_eq(Renderer.row_label({ label = "↵" }), "↵", "a row without a glyph keeps its bare label")
+		local ops = painted(rows)
+		local first_text = find(ops, function(op) return op.kind == "text" end)
+		helpers.assert_eq(first_text and first_text.text, "✓", "the row's glyph is the first thing drawn")
+		local glyph, output, label = text_op(ops, "✓"), text_op(ops, "by the way"), text_op(ops, "↵")
+		assert(output and label, "the output and the bare trigger label are drawn")
+		assert(glyph.x < output.x, "the glyph is drawn left of the output")
+		local frame = find(ops, function(op)
+			return op.kind == "frame" and op.x <= glyph.x and op.y <= glyph.y
+				and op.x + op.w >= glyph.x + glyph.w and op.y + op.h >= glyph.y + glyph.h
+		end)
+		assert(frame, "a frame rings the glyph")
+		assert(frame.width >= 1, "the frame is visible")
+		assert(frame.x + frame.w < output.x, "the frame ends before the output, with a gap")
+		assert(label.x > output.x, "the trigger label stays right of the output")
+		local struck_output = text_op(ops, "Signature")
+		helpers.assert_eq(struck_output.x, output.x, "every output starts after the one badge column")
+		local dimmed_frame = find(ops, function(op) return op.kind == "frame" and op ~= frame end)
+		assert(dimmed_frame and dimmed_frame.alpha < frame.alpha, "a dimmed row dims its badge")
 	end)
 
-	helpers.it("names the category in the text a screen reader is told", function()
+	helpers.it("draws no badge and leaves no gap without a glyph", function()
+		local P = preview()
+		P.set_enabled("glyphs", false)
+		local rows = P.build_rows(CANDIDATES, { kind = "autocorrect" })
+		P.set_enabled("glyphs", true)
+		local ops = painted(rows)
+		helpers.assert_nil(find(ops, function(op) return op.kind == "frame" end), "no frame is stroked")
+		helpers.assert_eq(text_op(ops, "by the way").x, STYLE.layout.pad_x, "the output keeps the padding")
+	end)
+
+	helpers.it("names the category first in the text a screen reader is told", function()
 		local Renderer = helpers.load_module("core.ui.adapters.graphics_renderer")
 		local I18n = require("core.i18n.engine.i18n")
 		local rows = preview().build_rows(CANDIDATES, { kind = "autocorrect" })
 		local text = Renderer.accessible_text(rows)
-		helpers.assert_eq(text, "by the way ↵, " .. I18n.get("hs_config.cat_autocorrection"),
-			"the fired row, its key and its category; never the glyph itself")
+		helpers.assert_eq(text, I18n.get("hs_config.cat_autocorrection") .. ", by the way ↵",
+			"the category first, as the badge comes first, then the fired row and its key; never the glyph")
 	end)
 end)

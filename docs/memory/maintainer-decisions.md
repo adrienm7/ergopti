@@ -1801,9 +1801,13 @@ user's own hotstrings, • any other category. Each category declares `glyph`
 and `glyph_name_key` in its `[_meta]`; `defaults.toml [glyphs]` holds the
 personal and shared defaults, resolved by
 `_shared/hotstrings/engine/category_glyph.lua` (AHK port `category_glyph.ahk`,
-both pinned by `category_glyph_vectors.json`) on the tint's rungs. The glyph
-sits before the trigger label, in its font and colour (« ✓ ↵ »); the
-screen-reader notice reads its name; `hotstrings.preview_category_glyphs`
-(default on, three OS) hides it. A new glyph must come from a block that
+both pinned by `category_glyph_vectors.json`) on the tint's rungs. The same
+day the maintainer asked for the glyph on the left and visibly apart from the
+output (« les glyphes doivent être plutôt à gauche [...] avec une bordure »):
+it is the row's first cell, in a 1 px framed badge before the output, the
+trigger label alone at the right (`badge_geometry`, `[layout] glyph_badge_*`,
+`[colors] glyph_badge_white` at 4.5:1 on every tint, dimmed with its row). The
+screen-reader notice names the category first; `hotstrings.preview_category_glyphs`
+(default on, three OS) hides the badge and its gap. A new glyph must come from a block that
 Segoe UI Symbol, the macOS system fonts and DejaVu Sans all draw (Dingbats,
 Geometric Shapes, General Punctuation).

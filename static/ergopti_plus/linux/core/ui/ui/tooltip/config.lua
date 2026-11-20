@@ -127,6 +127,11 @@ function M.load()
 			line_spacing     = require_key("layout", "line_spacing"),
 			hint_spacing     = require_key("layout", "hint_spacing"),
 			label_gap        = require_key("layout", "label_gap"),
+			-- The framed badge of a preview row's category glyph
+			-- (CategoryGlyph.badge_geometry).
+			glyph_badge_pad_x  = require_key("layout", "glyph_badge_pad_x"),
+			glyph_badge_border = require_key("layout", "glyph_badge_border"),
+			glyph_badge_gap    = require_key("layout", "glyph_badge_gap"),
 			llm_max_content_width = require_key("layout", "llm_max_content_width"),
 			corner_radius    = require_key("layout", "corner_radius"),
 			separator_height = require_key("layout", "separator_height"),
@@ -153,6 +158,8 @@ function M.load()
 			border_white = require_key("colors", "border_white"),
 			border_alpha = require_driver_key("colors", "border_alpha"),
 			sep_alpha    = require_driver_key("colors", "sep_alpha"),
+			-- The category glyph and the frame of its badge, 4.5:1 on every tint.
+			glyph_badge_white = require_key("colors", "glyph_badge_white"),
 		},
 		tint = {
 			lightness  = require_key("tint", "lightness"),

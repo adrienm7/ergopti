@@ -465,12 +465,13 @@ function M.announcement_for_stacked(rows)
 		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed then
 			local label = type(row.trigger_label) == "string" and row.trigger_label ~= "" and (" " .. row.trigger_label) or ""
 			-- The glyph is a shape a screen reader cannot describe usefully: it is
-			-- named by its category instead, and only when the row shows one.
+			-- named by its category instead, and only when the row shows one. The
+			-- name comes first, as the badge comes first in the row.
 			local category = ""
 			if type(row.glyph) == "string" and row.glyph ~= "" and type(row.glyph_name_key) == "string" then
-				category = ", " .. require("core.i18n.engine.i18n").get(row.glyph_name_key)
+				category = require("core.i18n.engine.i18n").get(row.glyph_name_key) .. ", "
 			end
-			parts[#parts + 1] = row.text .. label .. category
+			parts[#parts + 1] = category .. row.text .. label
 		end
 	end
 	if #parts == 0 then return nil end
@@ -653,20 +654,29 @@ M.stacked_canvas = nil
 -- Because each cap is the SAME color as its row, flattening a corner can never
 -- reveal a different color — the bug that an earlier single-panel attempt hit.
 --
--- Element layout (1-based), a uniform 4-slot block per row:
---   row i: base = (i-1)*4+1  : [base]   row background base (rounded or square)
+-- Element layout (1-based), a uniform block of ROW_SLOTS per row:
+--   row i: base = (i-1)*6+1  : [base]   row background base (rounded or square)
 --                              [base+1] corner-flattening cap (skipped if unused)
---                              [base+2] output styled text
---                              [base+3] trigger label styled text
---   separators               : sep_base = row_count*4 + 1, one rectangle per gap
---   border                   : last element = row_count*5, rounded stroke
+--                              [base+2] category glyph badge frame (skipped without a glyph)
+--                              [base+3] category glyph styled text (skipped without a glyph)
+--                              [base+4] output styled text
+--                              [base+5] trigger label styled text
+--   separators               : sep_base = row_count*6 + 1, one rectangle per gap
+--   border                   : last element = row_count*7, rounded stroke
+-- The badge slots come before the output: the glyph is the row's first cell, at
+-- its far left, framed so it reads as an annotation and not as typed text.
+M.ROW_SLOTS = 6
 function M._build_stacked_elements(row_count)
 	local elements = {}
 	for _ = 1, row_count do
-		-- Background base + same-color corner cap, then the two text slots. The cap
-		-- starts skipped (middle rows and single-row stacks never need it).
+		-- Background base + same-color corner cap, the glyph badge's frame and
+		-- glyph, then the two text slots. The cap and the badge start skipped
+		-- (middle rows and single-row stacks never need a cap; a row without a
+		-- glyph never draws a badge).
 		elements[#elements + 1] = { type = "rectangle", action = "fill" }
 		elements[#elements + 1] = { type = "rectangle", action = "skip" }
+		elements[#elements + 1] = { type = "rectangle", action = "skip", fillColor = { white = 0, alpha = 0 } }
+		elements[#elements + 1] = { type = "text", action = "skip" }
 		elements[#elements + 1] = { type = "text", action = "fill" }
 		elements[#elements + 1] = { type = "text", action = "fill" }
 	end
@@ -767,11 +777,19 @@ end
 -- so the cache behaviour is what is verifiable rather than the pixel sizes).
 M._measure_styled = measure_styled
 
+--- Whether a stacked row shows a category glyph.
+--- @param row table
+--- @return boolean
+local function has_glyph(row)
+	return type(row.glyph) == "string" and row.glyph ~= ""
+end
+
 --- Renders a stack of hotstring rows into a single canvas.
 --- Each row is { text: string, tint: table|nil, trigger_label: string|nil,
---- glyph: string|nil }. The label drawn at the right is the category glyph, a
---- space, then the trigger label (CategoryGlyph.row_label), in the label's font
---- and colour so the glyph keeps the label's contrast on every tint.
+--- glyph: string|nil }. The category glyph is the row's first cell, at its far
+--- left in a framed badge (CategoryGlyph.badge_geometry), in the shared
+--- glyph_badge colour; the output follows it and the trigger label stays alone
+--- at the right. A stack without a glyph draws no badge and leaves no gap.
 --- @param rows table Array of row descriptors.
 --- @param state table Must contain fixed_width (or nil) and timeout_sec.
 --- @param start_watchers_callback function|nil Called after canvas is shown.
@@ -798,7 +816,8 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		local max_label_w  = 0
 		local row_heights  = {}
 		local label_heights = {}
-		local labels       = {}
+		local max_glyph_w  = 0
+		local max_glyph_h  = 0
 
 		-- Dimmed (non-firing) alternative rows use a gray, strikethrough style so
 		-- the user can still read them but understands they will NOT be sent.
@@ -824,10 +843,16 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			local sz = measure_styled(temp_canvas, 2, row.text, "main", build_text_style(row.dimmed))
 			if sz.w > max_text_w then max_text_w = sz.w end
 			table.insert(row_heights, sz.h)
-			local label = CategoryGlyph.row_label(row.glyph, row.trigger_label)
-			table.insert(labels, label)
-			if label ~= "" then
-				local lsz = measure_styled(temp_canvas, 2, label, "hint", {
+			if has_glyph(row) then
+				local gsz = measure_styled(temp_canvas, 2, row.glyph, "hint", {
+					font  = { name = Config.fonts.main, size = Config.sizes.hint },
+					color = Config.colors.glyph_badge,
+				})
+				if gsz.w > max_glyph_w then max_glyph_w = gsz.w end
+				if gsz.h > max_glyph_h then max_glyph_h = gsz.h end
+			end
+			if row.trigger_label and row.trigger_label ~= "" then
+				local lsz = measure_styled(temp_canvas, 2, row.trigger_label, "hint", {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = { white = 0.45, alpha = 1 },
 				})
@@ -839,12 +864,17 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		end
 
 		local label_zone = max_label_w > 0 and (label_gap + max_label_w) or 0
-		local canvas_width  = pad_x + max_text_w + label_zone + pad_x
+		-- One badge column for the stack; zero wide when no row shows a glyph.
+		local badge = CategoryGlyph.badge_geometry(max_glyph_w, max_glyph_h, Config.layout)
+		local text_x = pad_x + badge.zone
+		local canvas_width  = text_x + max_text_w + label_zone + pad_x
 		local total_height  = 0
 		local row_top_y     = {}
+		local content_h     = {}
 		for i, rh in ipairs(row_heights) do
+			content_h[i] = has_glyph(rows[i]) and math.max(rh, badge.h) or rh
 			row_top_y[i] = total_height
-			total_height = total_height + pad_y + rh + pad_y
+			total_height = total_height + pad_y + content_h[i] + pad_y
 			if i < row_count then
 				total_height = total_height + 1   -- 1 px separator
 			end
@@ -880,9 +910,10 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		-- Fill in per-row elements (uniform 4-slot block per row).
 		for i, row in ipairs(rows) do
-			local base   = (i - 1) * 4 + 1
+			local base   = (i - 1) * M.ROW_SLOTS + 1
 			local top_y  = row_top_y[i]
-			local row_h  = row_heights[i] + pad_y * 2
+			local row_h  = content_h[i] + pad_y * 2
+			local text_y = top_y + pad_y + math.floor((content_h[i] - row_heights[i]) / 2)
 			local col    = M.apply_tint(row.tint)
 			local plan   = M._row_corner_plan(i, row_count)
 
@@ -911,46 +942,73 @@ function M.render_stacked(rows, state, start_watchers_callback)
 				cap.action = "skip"
 			end
 
+			-- The category glyph badge, the row's first cell: a frame in the
+			-- glyph's colour, inset by half its stroke so the line stays crisp, and
+			-- the glyph centred inside. Dimmed with the row, like its label.
+			local frame_el, glyph_el = M.stacked_canvas[base + 2], M.stacked_canvas[base + 3]
+			if has_glyph(row) and badge.w > 0 then
+				local border = Config.layout.glyph_badge_border
+				local badge_y = top_y + pad_y + math.floor((content_h[i] - badge.h) / 2)
+				local glyph_color = row.dimmed
+					and { white = Config.colors.glyph_badge.white, alpha = 0.55 } or Config.colors.glyph_badge
+				frame_el.action      = "stroke"
+				frame_el.strokeColor = glyph_color
+				frame_el.strokeWidth = border
+				frame_el.frame       = { x = pad_x + border / 2, y = badge_y + border / 2,
+					w = badge.w - border, h = badge.h - border }
+				glyph_el.action = "fill"
+				glyph_el.text   = hs.styledtext.new(row.glyph, {
+					font  = { name = Config.fonts.main, size = Config.sizes.hint },
+					color = glyph_color,
+					paragraphStyle = { alignment = "center" },
+				})
+				glyph_el.frame  = { x = pad_x + border, y = badge_y + border,
+					w = badge.w - 2 * border, h = badge.h - 2 * border }
+			else
+				frame_el.action = "skip"
+				glyph_el.action = "skip"
+			end
+
 			-- Output text (gray + strikethrough when row.dimmed; see build_text_style).
 			local styled_text = hs.styledtext.new(row.text, build_text_style(row.dimmed))
-			M.stacked_canvas[base + 2].text  = styled_text
-			M.stacked_canvas[base + 2].frame = { x = pad_x, y = top_y + pad_y,
+			M.stacked_canvas[base + 4].text  = styled_text
+			M.stacked_canvas[base + 4].frame = { x = text_x, y = text_y,
 				w = max_text_w, h = row_heights[i] }
 
 			-- Trigger label (dim, smaller font, right-aligned in label zone).
 			-- Vertically centred relative to the main text row height.
 			-- The label is pulled further down (alpha 0.25 vs 0.45) on dimmed
 			-- rows so the whole row reads as "disabled" together.
-			if labels[i] ~= "" and label_zone > 0 then
-				local label_x      = pad_x + max_text_w + label_gap
+			if row.trigger_label and row.trigger_label ~= "" and label_zone > 0 then
+				local label_x      = text_x + max_text_w + label_gap
 				local label_h      = label_heights[i] > 0 and label_heights[i] or row_heights[i]
 				local label_offset = math.floor((row_heights[i] - label_h) / 2)
 				local label_color  = row.dimmed and { white = 0.45, alpha = 0.55 }
 					or { white = 0.45, alpha = 1 }
-				M.stacked_canvas[base + 3].action = "fill"
-				M.stacked_canvas[base + 3].text   = hs.styledtext.new(labels[i], {
+				M.stacked_canvas[base + 5].action = "fill"
+				M.stacked_canvas[base + 5].text   = hs.styledtext.new(row.trigger_label, {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = label_color,
 				})
-				M.stacked_canvas[base + 3].frame = { x = label_x,
-					y = top_y + pad_y + label_offset,
+				M.stacked_canvas[base + 5].frame = { x = label_x,
+					y = text_y + label_offset,
 					w = max_label_w, h = label_h }
 			else
-				M.stacked_canvas[base + 3].action = "skip"
+				M.stacked_canvas[base + 5].action = "skip"
 			end
 		end
 
 		-- Separators between rows: a straight 1 px line in each gap.
-		local sep_base = row_count * 4 + 1
+		local sep_base = row_count * M.ROW_SLOTS + 1
 		for i = 1, row_count - 1 do
-			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
+			local sep_y = row_top_y[i] + content_h[i] + pad_y * 2
 			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
 			M.stacked_canvas[sep_base + i - 1].fillColor = Config.colors.sep
 			M.stacked_canvas[sep_base + i - 1].action    = "fill"
 		end
 
-		-- Rounded border on top (last element): rows + separators + border = 5*row_count.
-		local border_idx = row_count * 5
+		-- Rounded border on top (last element): rows + separators + border.
+		local border_idx = row_count * (M.ROW_SLOTS + 1)
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
 		if not show_canvas_verified(M.stacked_canvas, "stacked tooltip canvas") then return false end

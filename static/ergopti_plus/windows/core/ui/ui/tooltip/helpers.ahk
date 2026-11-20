@@ -426,10 +426,11 @@ _TooltipAnnouncementText(Items, LlmRecord) {
 				if Item.HasOwnProp("IsDimmed") && Item.IsDimmed
 					continue
 				; A shown category glyph is read as the category it stands for:
-				; the shape tells the categories apart, its name says which.
+				; the shape tells the categories apart, its name says which. It
+				; comes first, as the badge comes first in the row.
 				Shown := Item.HasOwnProp("Glyph") && Item.Glyph != ""
 					&& Item.HasOwnProp("GlyphNameKey") && Item.GlyphNameKey != ""
-				Parts.Push(Shown ? Item.Text . ", " . t(Item.GlyphNameKey) : Item.Text)
+				Parts.Push(Shown ? t(Item.GlyphNameKey) . ", " . Item.Text : Item.Text)
 			}
 		}
 		if IsObject(LlmRecord) && LlmRecord.HasOwnProp("IsFinal") && LlmRecord.IsFinal
@@ -886,25 +887,109 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 		return true
 }
 
-; The label a preview row draws at its right, in the trigger label's font and
-; colour: the category glyph, a space, then the key that fires it. Either part may
-; be empty. The rule of _shared/hotstrings/engine/category_glyph.lua row_label,
-; pinned by the same vectors.
-; @param Glyph {String}
-; @param TriggerLabel {String}
-; @returns {String}
-TooltipRowLabel(Glyph, TriggerLabel) {
-	if (Glyph != "" && TriggerLabel != "")
-		return Glyph . " " . TriggerLabel
-	return (Glyph != "") ? Glyph : TriggerLabel
+; The framed badge a preview row draws its category glyph in: the first cell of
+; the row, before the output, so the glyph reads as an annotation and not as
+; text the expansion types. One column for the whole stack, as wide as its
+; widest glyph; no glyph, no column and no gap. The port of
+; _shared/hotstrings/engine/category_glyph.lua badge_geometry, pinned by the
+; same vectors.
+; @param GlyphW {Number} Widest glyph of the stack, 0 when none is shown.
+; @param GlyphH {Number} Tallest glyph of the stack.
+; @param PadX {Number} [layout] glyph_badge_pad_x.
+; @param Border {Number} [layout] glyph_badge_border.
+; @param Gap {Number} [layout] glyph_badge_gap.
+; @returns {Object} { W, H, Zone }: the frame's outer size, and how far right
+;   of the row's padding the output starts.
+TooltipGlyphBadge(GlyphW, GlyphH, PadX, Border, Gap) {
+	if (GlyphW <= 0)
+		return { W: 0, H: 0, Zone: 0 }
+	W := GlyphW + 2 * (PadX + Border)
+	return { W: W, H: GlyphH + 2 * Border, Zone: W + Gap }
 }
 
-; The label of one tooltip row object (Glyph and TriggerLabel are optional).
+; The glyph a tooltip row shows, "" when it shows none.
+; @param Item {Object}
+; @returns {String}
+_TooltipItemGlyph(Item) {
+	return Item.HasOwnProp("Glyph") ? Item.Glyph : ""
+}
+
+; The trigger label a tooltip row draws at its right, "" when it has none.
 ; @param Item {Object}
 ; @returns {String}
 _TooltipItemLabel(Item) {
-	return TooltipRowLabel(Item.HasOwnProp("Glyph") ? Item.Glyph : "",
-		Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : "")
+	return Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+}
+
+; The badge column of a stack, measured at the trigger label's size.
+; @param Items {Array}
+; @returns {Object} As TooltipGlyphBadge.
+_TooltipMeasureGlyphBadge(Items) {
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_GLYPH_BADGE_PAD_X, _TOOLTIP_GLYPH_BADGE_BORDER
+	global _TOOLTIP_GLYPH_BADGE_GAP
+	GlyphW := 0
+	GlyphH := 0
+	for , Item in Items {
+		Glyph := _TooltipItemGlyph(Item)
+		if (Glyph == "")
+			continue
+		Size := _TooltipMeasureTextSize(Glyph, _TOOLTIP_LABEL_FONT_SIZE)
+		GlyphW := Max(GlyphW, Size.W)
+		GlyphH := Max(GlyphH, Size.H)
+	}
+	return TooltipGlyphBadge(GlyphW, GlyphH, _TOOLTIP_GLYPH_BADGE_PAD_X,
+		_TOOLTIP_GLYPH_BADGE_BORDER, _TOOLTIP_GLYPH_BADGE_GAP)
+}
+
+; The height a row's content takes: its text, or its badge when that is taller.
+; @param TextH {Number}
+; @param Glyph {String}
+; @param Badge {Object} As TooltipGlyphBadge.
+; @returns {Number}
+_TooltipRowContentH(TextH, Glyph, Badge) {
+	return (Glyph != "") ? Max(TextH, Badge.H) : TextH
+}
+
+; The colour of a row's annotations (trigger label, glyph badge): a dimmed row
+; dims them with its text, so the whole row reads as one that will not fire.
+; @param BaseHex {String}
+; @param IsDimmed {Boolean}
+; @returns {String}
+_TooltipAnnotationColorHex(BaseHex, IsDimmed) {
+	global UI_HIGH_CONTRAST, _TOOLTIP_DIM_COLOR_HEX
+	return IsDimmed ? (UI_HIGH_CONTRAST ? _TOOLTIP_DIM_COLOR_HEX : "707070") : BaseHex
+}
+
+; The font options of a row's annotation (trigger label, glyph) in a colour.
+; @param ColorHex {String}
+; @returns {String}
+_TooltipAnnotationFont(ColorHex) {
+	global _TOOLTIP_LABEL_FONT_SIZE
+	return "norm c" . ColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE
+}
+
+; Draws a row's glyph badge at (X, Y): the frame, in the annotation colour, then
+; the glyph centred on the row's own tint inside it, so the frame is a 1 px ring.
+; Two controls and one font change, the whole cost of the badge on the keystroke
+; path: the empty frame takes whatever font is current, and the caller reuses
+; the glyph's font for the trigger label when their colours agree.
+; @param G {Gui}
+; @param Glyph {String}
+; @param Badge {Object} As TooltipGlyphBadge.
+; @param X {Number}
+; @param Y {Number}
+; @param BgHex {String} The row's tint.
+; @param ColorHex {String} The glyph and frame colour.
+; @returns {String} The font options now current on G.
+_TooltipDrawGlyphBadge(G, Glyph, Badge, X, Y, BgHex, ColorHex) {
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_GLYPH_BADGE_BORDER
+	Border := _TOOLTIP_GLYPH_BADGE_BORDER
+	G.Add("Text", Format("Background{1} x{2} y{3} w{4} h{5}", ColorHex, X, Y, Badge.W, Badge.H), "")
+	Font := _TooltipAnnotationFont(ColorHex)
+	G.SetFont(Font, _TOOLTIP_FONT_NAME)
+	G.Add("Text", Format("Center Background{1} x{2} y{3} w{4} h{5}", BgHex, X + Border, Y + Border,
+		Badge.W - 2 * Border, Badge.H - 2 * Border), Glyph)
+	return Font
 }
 
 ; Draws hotstring rows heading a prediction Gui (llm.trigger.while_hotstring_tooltip
@@ -913,20 +998,30 @@ _TooltipItemLabel(Item) {
 _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
 	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
-	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_TEXT_HEX
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_TEXT_HEX, _TOOLTIP_GLYPH_BADGE_HEX
 	for Idx, Item in Items {
 		RowY := Header.RowY[Idx]
 		RowH := Header.RowH[Idx]
 		ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+		BgHex := _TooltipMixTintHex(ColorHex)
 		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TooltipMixTintHex(ColorHex), RowY, TotalW, RowH), "")
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
 		IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+		; The glyph badge first, at the far left, as in the hotstring stack.
+		TextH := Header.Sizes[Idx].H
+		ContentH := Header.ContentH[Idx]
+		Glyph := _TooltipItemGlyph(Item)
+		if (Glyph != "" && Header.Badge.W > 0)
+			_TooltipDrawGlyphBadge(G, Glyph, Header.Badge, _TOOLTIP_PADDING_X,
+				RowY + _TOOLTIP_PADDING_Y + (ContentH - Header.Badge.H) // 2, BgHex,
+				_TooltipAnnotationColorHex(_TOOLTIP_GLYPH_BADGE_HEX, IsDimmed))
+		TextY := RowY + _TOOLTIP_PADDING_Y + (ContentH - TextH) // 2
 		if IsDimmed
 			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 		else
 			G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
-			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", Header.TextX,
+			TextY, Header.TextW, TextH), Item.Text)
 		Label := _TooltipItemLabel(Item)
 		if (Label != "" && Header.LabelW > 0) {
 			LabelSize := Header.LabelSizes[Idx]
@@ -934,7 +1029,7 @@ _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 				. " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 				TotalW - _TOOLTIP_PADDING_X - Header.LabelW,
-				RowY + _TOOLTIP_PADDING_Y + Max(0, (Header.Sizes[Idx].H - LabelSize.H) // 2),
+				TextY + Max(0, (TextH - LabelSize.H) // 2),
 				Header.LabelW, LabelSize.H), Label)
 		}
 		G.SetFont("s1", _TOOLTIP_FONT_NAME)
@@ -1000,7 +1095,11 @@ _TooltipBuildGui(Items) {
 		}
 
 		LabelZone := MaxLabelW > 0 ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
-		TotalW := _TOOLTIP_PADDING_X + MaxW + LabelZone + _TOOLTIP_PADDING_X
+		; The category glyph badge is the first cell of a row: the output moves
+		; right by its column, which is empty when no row shows a glyph.
+		Badge := _TooltipMeasureGlyphBadge(Items)
+		TextX := _TOOLTIP_PADDING_X + Badge.Zone
+		TotalW := TextX + MaxW + LabelZone + _TOOLTIP_PADDING_X
 		Count := Items.Length
 		SEP_H := 1   ; 1 px separator between rows, in logical pixels
 
@@ -1009,8 +1108,9 @@ _TooltipBuildGui(Items) {
 		TotalH := 0
 		for Idx, Item in Items {
 				S := Sizes[Idx]
-				RowH := _TOOLTIP_PADDING_Y + S.H + _TOOLTIP_PADDING_Y
-				RowMeta.Push({ H: RowH, Y: TotalH })
+				ContentH := _TooltipRowContentH(S.H, _TooltipItemGlyph(Item), Badge)
+				RowH := _TOOLTIP_PADDING_Y + ContentH + _TOOLTIP_PADDING_Y
+				RowMeta.Push({ H: RowH, Y: TotalH, ContentH: ContentH })
 				TotalH += RowH
 				if (Idx < Count)
 						TotalH += SEP_H
@@ -1048,6 +1148,41 @@ _TooltipBuildGui(Items) {
 						G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
 				}
 
+				; The category glyph badge, first cell of the row: framed so the glyph
+				; reads as an annotation, not as text the expansion will type.
+				Glyph := _TooltipItemGlyph(Item)
+				CurrentFont := ""
+				if (Glyph != "")
+						CurrentFont := _TooltipDrawGlyphBadge(G, Glyph, Badge, _TOOLTIP_PADDING_X,
+								RowY + _TOOLTIP_PADDING_Y + (Meta.ContentH - Badge.H) // 2, BgHex,
+								_TooltipAnnotationColorHex(_TOOLTIP_GLYPH_BADGE_HEX, IsDimmed))
+				TextY := RowY + _TOOLTIP_PADDING_Y + (Meta.ContentH - S.H) // 2
+
+				; Trigger label on the right, drawn while the glyph's font is current:
+				; the controls do not overlap, so their order is free, and the label
+				; then needs no font change of its own when its colour is the glyph's.
+				Label := _TooltipItemLabel(Item)
+				if (Label != "" and LabelZone > 0) {
+						LS := LabelSizes[Idx]
+						LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
+						; * sits high in its bounding box in Segoe UI — nudge down slightly.
+						StarFix      := (Label == "*") ? 1 : 0
+						RightFix     := (Label == "↵") ? 3 : 0
+						CenterOffset := Max(0, (S.H - LS.H) // 2)
+						; ↵ appears lower than center only when the row is tall enough for
+						; centering to kick in (multi-line text); for single-line rows the
+						; centering offset is 0 and no upward shift is needed.
+						DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
+						LabelY := TextY + CenterOffset - DescenderFix + StarFix
+						; Dimmed rows get a darker label so the entire row reads as
+						; "disabled" — same visual treatment as the main text.
+						LabelFont := _TooltipAnnotationFont(_TooltipAnnotationColorHex(_TOOLTIP_LABEL_COLOR_HEX, IsDimmed))
+						if (LabelFont != CurrentFont)
+								G.SetFont(LabelFont, _TOOLTIP_FONT_NAME)
+						G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+								LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
+				}
+
 				; Main text overlay. Dimmed alternates (rows beyond the firing one of
 				; their group) get gray text + strikethrough so the user sees what is
 				; available without confusing it with the actual outcome. ``norm``
@@ -1062,29 +1197,7 @@ _TooltipBuildGui(Items) {
 						G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 				}
 				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-						_TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
-
-				; Trigger label on the right, after the category glyph.
-				Label := _TooltipItemLabel(Item)
-				if (Label != "" and LabelZone > 0) {
-						LS := LabelSizes[Idx]
-						LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
-						; * sits high in its bounding box in Segoe UI — nudge down slightly.
-						StarFix      := (Label == "*") ? 1 : 0
-						RightFix     := (Label == "↵") ? 3 : 0
-						CenterOffset := Max(0, (S.H - LS.H) // 2)
-						; ↵ appears lower than center only when the row is tall enough for
-						; centering to kick in (multi-line text); for single-line rows the
-						; centering offset is 0 and no upward shift is needed.
-						DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
-						LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
-						; Dimmed rows get a darker label so the entire row reads as
-						; "disabled" — same visual treatment as the main text.
-						LabelColorHex := IsDimmed ? (UI_HIGH_CONTRAST ? _TOOLTIP_DIM_COLOR_HEX : "707070") : _TOOLTIP_LABEL_COLOR_HEX
-						G.SetFont("norm c" . LabelColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-						G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-								LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
-				}
+						TextX, TextY, MaxW, S.H), Item.Text)
 
 				; 1 px separator — same opacity as the tooltip border (white alpha=0.25).
 				; Colors are pre-blended in UI_SEP_COLOR_HEX during UiStyle_LoadSharedConst.

@@ -4,16 +4,21 @@
 ; MODULE: Category glyph in the hotstring preview
 ; DESCRIPTION:
 ; The preview tints sit at one lightness, so a colour-blind reader tells the
-; categories apart by a glyph beside the trigger label (the maintainer's
-; decision of 2026-11-19). These cases pin the Windows side:
+; categories apart by a glyph (the maintainer's decision of 2026-11-19). The
+; glyph is drawn first, at the far left of the row, in a framed badge, so it
+; reads as an annotation and not as text the expansion types (his request of
+; the same day). These cases pin the Windows side:
 ;
-; 1. The resolver answers the cross-driver vectors of
-;    _shared/tests/corpus/hotstrings/category_glyph_vectors.json, and the row
-;    label is the glyph, a space, then the trigger label.
+; 1. The resolver and the badge geometry answer the cross-driver vectors of
+;    _shared/tests/corpus/hotstrings/category_glyph_vectors.json.
 ; 2. A magic-key row typed through the real prefix watcher carries its
-;    category's glyph, and the built tooltip Gui draws it beside the trigger.
-; 3. The glyph switch off draws the bare trigger label.
-; 4. The screen-reader notice names the category the glyph stands for.
+;    category's glyph, and the built tooltip Gui draws it first, inside a frame
+;    that ends before the output text; the trigger label stays alone at the
+;    right.
+; 3. The glyph switch off draws neither badge nor gap: the output keeps the
+;    padding it had before the glyphs.
+; 4. The AI tooltip's embedded hotstring rows draw the same badge.
+; 5. The screen-reader notice names the category first.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -71,13 +76,21 @@ _HCG_ResolverAnswersTheVectors() {
 	}
 }
 
-_HCG_RowLabelAnswersTheVectors() {
-	for Vector in _HCG_Vectors()["row_label_vectors"]
-		AssertEqual(Vector["expected"], TooltipRowLabel(Vector["glyph"], Vector["trigger_label"]), Vector["id"])
+_HCG_BadgeAnswersTheVectors() {
+	Document := _HCG_Vectors()
+	Layout := Document["badge_layout"]
+	AssertTrue(Document["badge_vectors"].Length > 0, "sanity: the corpus holds badge vectors")
+	for Vector in Document["badge_vectors"] {
+		Badge := TooltipGlyphBadge(Vector["glyph_w"], Vector["glyph_h"], Layout["glyph_badge_pad_x"],
+			Layout["glyph_badge_border"], Layout["glyph_badge_gap"])
+		AssertEqual(Vector["expected"]["w"], Badge.W, Vector["id"] . ": frame width")
+		AssertEqual(Vector["expected"]["h"], Badge.H, Vector["id"] . ": frame height")
+		AssertEqual(Vector["expected"]["zone"], Badge.Zone, Vector["id"] . ": output offset")
+	}
 }
 
 Test("preview category glyph: the resolver answers the cross-driver vectors", _HCG_ResolverAnswersTheVectors)
-Test("preview category glyph: the row label answers the cross-driver vectors", _HCG_RowLabelAnswersTheVectors)
+Test("preview category glyph: the badge geometry answers the cross-driver vectors", _HCG_BadgeAnswersTheVectors)
 
 
 
@@ -118,64 +131,227 @@ _HCG_WithMagicKeyRows(Shown, Body) {
 	}
 }
 
-; The texts of every control of a built, never shown tooltip Gui, which is then
+; Runs Body with the tooltip's padding, label and badge style read from
+; constants.toml: this headless harness does not run UiStyle_LoadSharedConst.
+; The globals are restored afterwards.
+; @param Body {Func}
+_HCG_WithBadgeStyle(Body) {
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_GLYPH_BADGE_HEX, _TOOLTIP_GLYPH_BADGE_PAD_X
+	global _TOOLTIP_GLYPH_BADGE_BORDER, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X, _SharedDir
+	Saved := [_TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_GLYPH_BADGE_HEX, _TOOLTIP_GLYPH_BADGE_PAD_X,
+		_TOOLTIP_GLYPH_BADGE_BORDER, _TOOLTIP_GLYPH_BADGE_GAP, _TOOLTIP_PADDING_X]
+	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
+	_TOOLTIP_LABEL_COLOR_HEX := _UiStyleRequireHex(Constants, "colors", "label_hex")
+	_TOOLTIP_GLYPH_BADGE_HEX := UiStyle_GreyHex(_UiStyleRequire(Constants, "colors", "glyph_badge_white"))
+	_TOOLTIP_GLYPH_BADGE_PAD_X := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_pad_x"))
+	_TOOLTIP_GLYPH_BADGE_BORDER := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_border"))
+	_TOOLTIP_GLYPH_BADGE_GAP := Integer(_UiStyleRequire(Constants, "layout", "glyph_badge_gap"))
+	_TOOLTIP_PADDING_X := Integer(_UiStyleRequire(Constants, "layout", "pad_x"))
+	try Body()
+	finally {
+		_TOOLTIP_LABEL_COLOR_HEX := Saved[1]
+		_TOOLTIP_GLYPH_BADGE_HEX := Saved[2]
+		_TOOLTIP_GLYPH_BADGE_PAD_X := Saved[3]
+		_TOOLTIP_GLYPH_BADGE_BORDER := Saved[4]
+		_TOOLTIP_GLYPH_BADGE_GAP := Saved[5]
+		_TOOLTIP_PADDING_X := Saved[6]
+	}
+}
+
+; The text and rectangle of every control of a Gui.
+; @param G {Gui}
+; @returns {Array} Of { Text, X, Y, W, H }.
+_HCG_Controls(G) {
+	Controls := []
+	for Ctrl in G {
+		Ctrl.GetPos(&X, &Y, &W, &H)
+		Controls.Push({ Text: Ctrl.Text, X: X, Y: Y, W: W, H: H })
+	}
+	return Controls
+}
+
+; The controls of a built, never shown hotstring tooltip Gui, which is then
 ; retired the way the renderer retires one.
 ; @param Rows {Array}
-; @returns {Array}
-_HCG_DrawnTexts(Rows) {
-	global _TOOLTIP_LABEL_COLOR_HEX, _SharedDir
-	; This headless harness does not run UiStyle_LoadSharedConst: seed the label
-	; colour from the constants.toml it reads, as the label control is drawn in it.
-	Saved := _TOOLTIP_LABEL_COLOR_HEX
-	_TOOLTIP_LABEL_COLOR_HEX := _UiStyleRequireHex(
-		ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml"), "colors", "label_hex")
-	Texts := []
+; @returns {Array} As _HCG_Controls.
+_HCG_DrawnControls(Rows) {
+	Controls := []
+	_HCG_WithBadgeStyle(() => (
+		Built := _TooltipBuildGui(Rows),
+		Surface := _TooltipCreateDetachedSurface(Built, 1),
+		_HCG_CollectAndRetire(Built, Surface, Controls)))
+	return Controls
+}
+
+; Copies a built Gui's controls into Into, then retires its surface.
+_HCG_CollectAndRetire(Built, Surface, Into) {
 	try {
-		Built := _TooltipBuildGui(Rows)
-		Surface := _TooltipCreateDetachedSurface(Built, 1)
-		try {
-			for Ctrl in Built.Gui
-				Texts.Push(Ctrl.Text)
-		} finally _TooltipDisposeRetired(Surface)
-	} finally _TOOLTIP_LABEL_COLOR_HEX := Saved
-	return Texts
+		for Control in _HCG_Controls(Built.Gui)
+			Into.Push(Control)
+	} finally _TooltipDisposeRetired(Surface)
 }
 
-; Whether an array holds a value.
-_HCG_Has(Values, Wanted) {
-	for Value in Values
-		if (Value == Wanted)
-			return true
-	return false
+; The controls the AI tooltip draws for its embedded hotstring rows
+; (llm.trigger.while_hotstring_tooltip = "both"), in a Gui destroyed afterwards.
+; @param Rows {Array}
+; @returns {Array} As _HCG_Controls.
+_HCG_SharedHeaderControls(Rows) {
+	Controls := []
+	_HCG_WithBadgeStyle(() => _HCG_DrawSharedHeader(Rows, Controls))
+	return Controls
 }
 
-_HCG_TheRowDrawsTheCategoryGlyph() {
+_HCG_DrawSharedHeader(Rows, Into) {
+	G := Gui("-Caption +E0x80")
+	try {
+		Header := _LLM_TooltipMeasureHeader(Rows)
+		_TooltipDrawSharedHotstringRows(G, Rows, Header, Header.W)
+		for Control in _HCG_Controls(G)
+			Into.Push(Control)
+	} finally G.Destroy()
+}
+
+; The first control whose text is Wanted, or 0.
+_HCG_Find(Controls, Wanted) {
+	for Control in Controls
+		if (Control.Text == Wanted)
+			return Control
+	return 0
+}
+
+; Asserts the row draws its glyph first, in a frame that ends before the output,
+; and the trigger label alone after the output.
+; @param Controls {Array} As _HCG_Controls.
+; @param Glyph {String}
+; @param Output {String}
+; @param Where {String} The surface, for the messages.
+_HCG_AssertBadgeFirst(Controls, Glyph, Output, Where) {
+	GlyphCtrl := _HCG_Find(Controls, Glyph)
+	OutputCtrl := _HCG_Find(Controls, Output)
+	LabelCtrl := _HCG_Find(Controls, ScriptInformation["MagicKey"])
+	AssertTrue(IsObject(GlyphCtrl), Where . ": the glyph has a control of its own, not one shared with the trigger label")
+	AssertTrue(IsObject(OutputCtrl), Where . ": sanity: the output is drawn")
+	AssertTrue(IsObject(LabelCtrl), Where . ": the trigger label is drawn alone")
+	AssertTrue(GlyphCtrl.X + GlyphCtrl.W <= OutputCtrl.X,
+		Where . ": the glyph is drawn before the output, at the left of the row")
+	for Control in Controls
+		if (Control.Text != "" && Control != GlyphCtrl)
+			AssertTrue(Control.X > GlyphCtrl.X, Where . ": nothing is drawn left of the glyph, « " . Control.Text . " » is")
+	Frame := 0
+	for Control in Controls
+		if (Control.Text == "" && Control.X < GlyphCtrl.X && Control.Y < GlyphCtrl.Y
+				&& Control.X + Control.W > GlyphCtrl.X + GlyphCtrl.W
+				&& Control.Y + Control.H > GlyphCtrl.Y + GlyphCtrl.H
+				&& Control.X + Control.W < OutputCtrl.X)
+			Frame := Control
+	AssertTrue(IsObject(Frame),
+		Where . ": a frame rings the glyph on every side and ends before the output, with a gap")
+	AssertTrue(LabelCtrl.X > OutputCtrl.X, Where . ": the trigger label stays right of the output")
+}
+
+; Asserts the row draws no badge and no gap: the output starts at the padding.
+_HCG_AssertNoBadge(Controls, Glyph, Output, PaddingX, Where) {
+	AssertFalse(IsObject(_HCG_Find(Controls, Glyph)), Where . ": no glyph is drawn")
+	OutputCtrl := _HCG_Find(Controls, Output)
+	AssertTrue(IsObject(OutputCtrl), Where . ": sanity: the output is drawn")
+	AssertEqual(PaddingX, OutputCtrl.X, Where . ": the output keeps the row's padding, with no gap left")
+	AssertTrue(IsObject(_HCG_Find(Controls, ScriptInformation["MagicKey"])),
+		Where . ": the bare trigger label is drawn")
+}
+
+_HCG_TheRowDrawsTheGlyphFirstInAFrame() {
 	Expected := HotstringsResolve("magickey", "text_expansion_symbols").Glyph
 	AssertTrue(Expected != "", "sanity: the magic-key category declares a glyph, or this case proves nothing")
+	AssertTrue(Expected != Chr(0x2713), "sanity: the glyph differs from the output it annotates")
 	_HCG_WithMagicKeyRows(true, (Rows) => (
 		AssertEqual(Expected, Rows[1].Glyph, "the row carries its category's glyph"),
-		AssertTrue(_HCG_Has(_HCG_DrawnTexts(Rows), Expected . " " . ScriptInformation["MagicKey"]),
-			"the tooltip draws the glyph beside the trigger label, in the label's control")))
+		_HCG_AssertBadgeFirst(_HCG_DrawnControls(Rows), Expected, Rows[1].Text, "hotstring tooltip")))
 }
 
-_HCG_TheSwitchHidesTheGlyph() {
+_HCG_TheSwitchHidesTheBadgeAndItsGap() {
+	Expected := HotstringsResolve("magickey", "text_expansion_symbols").Glyph
+	PaddingX := 0
+	; The frame's left edge, with the glyph shown, is the row's padding in the
+	; Gui's own units: the output must start there once the glyph is hidden.
+	_HCG_WithMagicKeyRows(true, (Rows) => (
+		Controls := _HCG_DrawnControls(Rows),
+		PaddingX := _HCG_LeftmostX(Controls)))
+	AssertTrue(PaddingX > 0, "sanity: the padding is measured")
 	_HCG_WithMagicKeyRows(false, (Rows) => (
 		AssertEqual("", Rows[1].Glyph, "the glyph switch off leaves the row without a glyph"),
-		AssertTrue(_HCG_Has(_HCG_DrawnTexts(Rows), ScriptInformation["MagicKey"]),
-			"the glyph switch off draws the bare trigger label")))
+		_HCG_AssertNoBadge(_HCG_DrawnControls(Rows), Expected, Rows[1].Text, PaddingX, "hotstring tooltip")))
 }
 
-_HCG_TheNoticeNamesTheCategory() {
+; The left edge of the leftmost control that is not a full-width band.
+_HCG_LeftmostX(Controls) {
+	Left := 0
+	for Control in Controls
+		if (Control.X > 0 && (Left == 0 || Control.X < Left))
+			Left := Control.X
+	return Left
+}
+
+Test("preview category glyph: the row draws the glyph first, in a frame before the output", _HCG_TheRowDrawsTheGlyphFirstInAFrame)
+Test("preview category glyph: the switch off draws no badge and leaves no gap", _HCG_TheSwitchHidesTheBadgeAndItsGap)
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 3/ The AI tooltip's preview =======
+; ===========================================
+; ===========================================
+
+_HCG_TheSharedHeaderDrawsTheSameBadge() {
+	Expected := HotstringsResolve("magickey", "text_expansion_symbols").Glyph
+	PaddingX := 0
+	_HCG_WithMagicKeyRows(true, (Rows) => (
+		Controls := _HCG_SharedHeaderControls(Rows),
+		_HCG_AssertBadgeFirst(Controls, Expected, Rows[1].Text, "AI tooltip"),
+		PaddingX := _HCG_LeftmostX(Controls)))
+	_HCG_WithMagicKeyRows(false, (Rows) =>
+		_HCG_AssertNoBadge(_HCG_SharedHeaderControls(Rows), Expected, Rows[1].Text, PaddingX, "AI tooltip"))
+}
+
+; The header geometry moves the text by the badge column and grows a row only
+; when its badge is taller than its text.
+_HCG_TheSharedHeaderLayoutMakesRoomForTheBadge() {
+	Header := _LLM_TooltipHeaderLayout([{ W: 90, H: 18 }, { W: 140, H: 18 }],
+		[{ W: 12, H: 14 }, { W: 0, H: 0 }], { PadX: 14, PadY: 7, LabelGap: 16 },
+		{ W: 18, H: 20, Zone: 26 }, [Chr(0x2726), ""])
+	AssertEqual(14 + 26, Header.TextX, "the output starts after the badge and its gap")
+	AssertEqual(14 + 26 + 140 + 16 + 12 + 14, Header.W, "the panel widens by the badge column")
+	AssertEqual(20, Header.ContentH[1], "a row whose badge is taller than its text grows to the badge")
+	AssertEqual(18, Header.ContentH[2], "a row without a glyph keeps its text height")
+	Bare := _LLM_TooltipHeaderLayout([{ W: 90, H: 18 }], [{ W: 12, H: 14 }], { PadX: 14, PadY: 7, LabelGap: 16 })
+	AssertEqual(14, Bare.TextX, "without a glyph the output keeps the padding")
+	AssertEqual(14 + 90 + 16 + 12 + 14, Bare.W, "and the panel its old width")
+}
+
+Test("preview category glyph: the AI tooltip's hotstring rows draw the same badge", _HCG_TheSharedHeaderDrawsTheSameBadge)
+Test("preview category glyph: the AI tooltip's header makes room for the badge", _HCG_TheSharedHeaderLayoutMakesRoomForTheBadge)
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 4/ The screen reader =======
+; ====================================
+; ====================================
+
+_HCG_TheNoticeNamesTheCategoryFirst() {
 	Name := t(HotstringsResolve("magickey", "text_expansion_symbols").GlyphNameKey)
 	AssertTrue(Name != "", "sanity: the glyph has a name")
 	_HCG_WithMagicKeyRows(true, (Rows) =>
-		AssertEqual(Chr(0x2713) . ", " . Name, _TooltipAnnouncementText(Rows, 0),
-			"the screen reader hears the category the glyph stands for"))
+		AssertEqual(Name . ", " . Chr(0x2713), _TooltipAnnouncementText(Rows, 0),
+			"the screen reader hears the category first, as the badge comes first"))
 	_HCG_WithMagicKeyRows(false, (Rows) =>
 		AssertEqual(Chr(0x2713), _TooltipAnnouncementText(Rows, 0),
 			"a hidden glyph is not announced"))
 }
 
-Test("preview category glyph: the preview row draws its category's glyph beside the trigger", _HCG_TheRowDrawsTheCategoryGlyph)
-Test("preview category glyph: the switch off draws the bare trigger label", _HCG_TheSwitchHidesTheGlyph)
-Test("preview category glyph: the screen-reader notice names the category", _HCG_TheNoticeNamesTheCategory)
+Test("preview category glyph: the screen-reader notice names the category first", _HCG_TheNoticeNamesTheCategoryFirst)

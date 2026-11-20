@@ -96,6 +96,16 @@ hint_spacing = 4
 # the shortcut column of the AI tooltip (layout units).
 label_gap = 16
 
+# The framed badge a hotstring preview row draws its category glyph in, the
+# first cell of the row, before the output: the frame says the glyph is an
+# annotation and not part of what the expansion types. Space between the glyph
+# and the frame on each side, the frame's thickness, and the gap between the
+# frame and the output text (layout units). The geometry rule is
+# _shared/hotstrings/engine/category_glyph.lua badge_geometry.
+glyph_badge_pad_x = 3
+glyph_badge_border = 1
+glyph_badge_gap = 8
+
 # Widest the prediction block of the AI tooltip grows, shortcut column included
 # (layout units). A longer line is cut with an ellipsis in front of the column:
 # past this the panel would run off the screen with its chords. Accepting a
@@ -207,6 +217,14 @@ label_white = 0.45
 label_alpha = 1.0
 # AHK hex alias for Gui.SetFont color option.
 label_hex = "#AAAAAA"
+
+# The category glyph of a hotstring preview row and the frame of its badge, in
+# the trigger label's grey family. Text and its frame, so 4.5:1 on the plain
+# background and on every tint at [tint] lightness and saturation, whatever the
+# hue (test-tooltip-style-single-source.cjs). A dimmed row dims it as its label.
+# AHK turns it into the grey it paints, as text_white: label_hex, so the glyph
+# and the trigger label share one font on Windows.
+glyph_badge_white = 0.667
 
 # Dimmed / non-firing alternate rows.
 dim_white = 0.55
