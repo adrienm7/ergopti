@@ -188,11 +188,11 @@ _MUR_GreyedAndHiddenRows() {
 	static KEY := "_test_unavailable_menu", MF_BYPOSITION := 0x400, GREYED := 0x3
 	Root := _MR_GetManifestRoot()
 	Assert(Root is Map, "the shared menu manifest must load")
-	Reason := "platform_reason.shortcuts_restore_is_composed_on_macos"
+	Reason := "platform_reason.llm_mlx_is_apple_silicon"
 	Root[KEY] := [
 		Map("type", "command", "id", "ported", "i18n", "common.restore_recommended"),
 		Map("type", "command", "id", "not_yet", "i18n", "common.clear_to_system",
-			"platforms", ["hs", "linux"], "unavailable", "grey", "reason_key", Reason),
+			"platforms", ["hs"], "unavailable", "grey", "reason_key", Reason),
 		Map("type", "command", "id", "not_here", "i18n", "menu.gestures.enable",
 			"platforms", ["hs"], "unavailable", "hide")]
 	try {

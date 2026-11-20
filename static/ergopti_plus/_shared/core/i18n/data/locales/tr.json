@@ -4208,7 +4208,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows'ta yok: o sürücü her dil satırına bir bayrak simgesi çizer; ortak bir menü satırı ise etiket, işaret, eylem ve alt menü taşır, simge değil. Bu satırı orada bildirmek, bayrakları ortak bir tanım karşılığında vermek olurdu.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Yalnızca Linux: bu sürücü çekirdekten ham tuş kodları okur ve bunları hangi fiziksel düzenin ürettiğini bilmesi gerekir; bu yüzden çözümlemede kullanacağı tabloyu seçer. macOS sisteme giriş kaynaklarını sorar, Windows bir klavye düzeni kurar; ikisinde de seçilecek bir çözümleme tablosu yoktur.",
 	"platform_reason.compose_input_method_is_linux": "Yalnızca Linux: Compose dizileri ~/.XCompose dosyasından gelir; GTK 3 bir giriş yöntemi olmadan bu dosyanın yalnızca bir kısmını okur. macOS ve Windows her karakteri kendi düzenleriyle yazar.",
-	"platform_reason.shortcuts_restore_is_composed_on_macos": "Henüz macOS’ta yok: orada tuş kombinasyonları Karabiner ayarlarında tutulur ve bunları diğer kısayol ayarlarıyla birlikte yalnızca Yapılandırma menüsündeki geri yükleme geri getirir.",
 	"menu.llm.generation.temperature": "Sıcaklık",
 	"menu.llm.generation.context_length": "Bağlam uzunluğu",
 	"numeric_prompt.window_title": "Değer",

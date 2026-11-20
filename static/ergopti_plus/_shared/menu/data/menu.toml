@@ -1193,25 +1193,18 @@ submenu_off_reason_key = "menu.category_off_reason"
 # The Shortcuts scope's restore and clear, right after its switch like every
 # category's (the first group: switch, restore, clear, separator). Windows and
 # Linux register both on their scope owners, which back up config.toml and
-# publish the whole scope in one transaction. macOS keeps the key combinations
-# in the Karabiner settings, which only the Configuration rows compose with the
-# shortcut preferences so far: not yet ported there, so macOS draws both rows
-# greyed with that reason.
+# publish the whole scope in one transaction. macOS composes its shortcut
+# preferences with the key combinations its remap file keeps for Karabiner,
+# as the Configuration rows do (menu/ui/transactions/global_scope.lua).
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
 type = "---"

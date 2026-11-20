@@ -189,15 +189,25 @@ function M.layout_participant(synchronous, layout, defer)
 	return participant
 end
 
---- Creates the global owner from the menu's scope owners.
+--- Creates the owner of one composite scope from the menu's scope owners: the
+--- Configuration menu's « global », or a category whose rows live in two files,
+--- such as « shortcuts », whose chords the remap file keeps (tap_hold.toml,
+--- deployed into the Karabiner rules) beside its config.toml rows.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), layout ({ rows, live } for
 ---   the keyboard-layout participant, or nil), backup_path(scope),
 ---   defer(fn) and refresh(committed, report), which also receives
----   every refusal, with the typed failure point of its report.
+---   every refusal, with the typed failure point of its report; scope is the
+---   manifest's composite scope id, « global » when absent.
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
+	local scope_id = options.scope or "global"
+	local declaration = Manifest.scopes()[scope_id]
+	assert(type(declaration) == "table" and type(declaration.includes) == "table",
+		"a composed scope needs a composite manifest scope: " .. tostring(scope_id))
+	local included = {}
+	for _, id in ipairs(declaration.includes) do included[id] = true end
 	for _, name in ipairs({ "backup_path", "defer", "refresh" }) do
 		assert(type(options[name]) == "function", "the global scope needs " .. name)
 	end
@@ -221,13 +231,22 @@ function M.new(options)
 		end
 		local remap = options.remap
 		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
-			registry.tap_holds = remap_participant(remap, ConfigKeys.KEY.TAP_HOLDS, options.backup_path, options.defer)
-			local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
-			registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
+			if included[ConfigKeys.KEY.TAP_HOLDS] then
+				registry.tap_holds = remap_participant(remap, ConfigKeys.KEY.TAP_HOLDS, options.backup_path, options.defer)
+			end
+			if included.shortcuts then
+				local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
+				registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
+			elseif included.key_combinations then
+				-- The Shortcuts scope itself: its chords are the key-combination
+				-- part it includes, applied before its own config.toml rows.
+				registry.key_combinations = remap_participant(remap, "key_combinations", options.backup_path,
+					options.defer)
+			end
 		end
 		return registry
 	end
-	local composition = Composition.new({ manifest = Manifest, scope = "global", logger = Logger, log = LOG,
+	local composition = Composition.new({ manifest = Manifest, scope = scope_id, logger = Logger, log = LOG,
 		participants = participants })
 	local owner = { pending = composition.pending, retry_restore = composition.retry_restore }
 	--- Applies one mode to every available category, at once for both modes:
@@ -239,10 +258,10 @@ function M.new(options)
 			local settled = false
 			composition.retry_restore(function(ok) settled = ok == true end)
 			if not settled then
-				Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
+				Logger.error(LOG, "Scope %s %s refused: an earlier rollback is still pending.", scope_id, tostring(mode))
 				-- Said like every other refusal: a click that changes nothing and
 				-- says nothing reads as a dead menu.
-				options.refresh(false, { scope = "global", mode = mode, point = "acquire",
+				options.refresh(false, { scope = scope_id, mode = mode, point = "acquire",
 					kind = "rollback_pending", detail = "an earlier rollback is still pending" })
 				return false
 			end

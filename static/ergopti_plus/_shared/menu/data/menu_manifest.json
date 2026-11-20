@@ -1388,24 +1388,12 @@
 		{
 			"type": "command",
 			"id": "scope_restore",
-			"i18n": "common.restore_recommended",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.shortcuts_restore_is_composed_on_macos"
+			"i18n": "common.restore_recommended"
 		},
 		{
 			"type": "command",
 			"id": "scope_clear",
-			"i18n": "common.clear_to_system",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.shortcuts_restore_is_composed_on_macos"
+			"i18n": "common.clear_to_system"
 		},
 		{
 			"type": "---"

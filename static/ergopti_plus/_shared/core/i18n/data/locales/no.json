@@ -4208,7 +4208,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driveren tegner et flaggikon på hver språkrad, og en delt menyrad bærer en etikett, en hake, en handling og en undermeny — ikke et ikon. Å erklære raden der ville byttet bort flaggene mot en delt beskrivelse.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Kun Linux: denne driveren leser rå tastekoder fra kjernen og må vite hvilket fysisk oppsett som lagde dem, så den velger tabellen den dekoder med. macOS spør systemet om inndatakildene sine og Windows installerer et tastaturoppsett; ingen av dem har en dekodingstabell å velge.",
 	"platform_reason.compose_input_method_is_linux": "Bare Linux: Compose-sekvenser kommer fra ~/.XCompose, som GTK 3 bare leser delvis uten en inndatametode. macOS og Windows skriver hvert tegn via sine egne oppsett.",
-	"platform_reason.shortcuts_restore_is_composed_on_macos": "Ikke på macOS ennå: der lagres tastekombinasjonene i Karabiner-innstillingene, og bare gjenopprettingen i menyen Konfigurasjon henter dem tilbake sammen med de andre snarveisinnstillingene.",
 	"menu.llm.generation.temperature": "Temperatur",
 	"menu.llm.generation.context_length": "Kontekstlengde",
 	"numeric_prompt.window_title": "Verdi",

@@ -1586,6 +1586,40 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return global_scope.apply(mode)
 	end
+	local shortcuts_composed_scope = nil
+	--- « Restaurer » and « Tout effacer » of the Shortcuts submenu: its
+	--- config.toml rows and its chords, which the remap file keeps and deploys
+	--- into the Karabiner rules, as one composition (the Configuration menu's
+	--- own Shortcuts step), at once and without a question.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean accepted True once the composition started.
+	local function apply_shortcuts_scope(mode)
+		if read_only_reason ~= nil then return false end
+		if not shortcuts_composed_scope then
+			shortcuts_composed_scope = require("menu.ui.transactions.global_scope").new({
+				scope = "shortcuts",
+				owners = { shortcuts = function() return preference_scope_owner("shortcuts") end },
+				remap = karabiner,
+				backup_path = function(scope)
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("TapHoldConfigPath") .. ".shortcuts-" .. scope .. "-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				defer = function(continuation)
+					return DeferredWork.after(0, continuation, "menu.shortcuts_scope") == true
+				end,
+				refresh = function(committed, report)
+					if committed == true then
+						Logger.info(LOG, "Scope shortcuts %s committed.", tostring(report and report.mode))
+					end
+					Builder.invalidate_cache()
+					updateMenu()
+					if committed ~= true then show_reset_failure(report) end
+				end,
+			})
+		end
+		return shortcuts_composed_scope.apply(mode)
+	end
 	local function live_pause()
 		if type(core_mods.shortcuts_mod) ~= "table"
 			or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
@@ -1629,6 +1663,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		commit_program_parameter = program_parameter_owner.apply,
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
+		apply_shortcuts_scope = apply_shortcuts_scope,
 		apply_script_chords_scope = apply_script_chords_scope,
 		apply_keyboard_group_scope = apply_keyboard_group_scope,
 		base_dir                 = base_dir,

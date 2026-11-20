@@ -8,8 +8,8 @@
  * if everything else were finished (see test-platform-restrictions-explained.cjs).
  * A text that says "for now", "yet" or "not implemented" is a promise to do the
  * work, written into 21 languages, and it goes stale the day the work is done.
- * This gate refuses such wording in the English catalogue. The texts that still
- * carry it are frozen below until their rewrite; the ledger only shrinks.
+ * This gate refuses such wording in the English catalogue. A text that still
+ * carried it was frozen below until its rewrite; the ledger only shrinks.
  * ==============================================================================
  */
 
@@ -25,8 +25,9 @@ const CATALOGUE = path.join(ROOT, 'static/ergopti_plus/_shared/core/i18n/data/lo
 const SCHEDULED =
 	/\b(for now|yet|not (coded|implemented|built|supported)|todo|planned|later|temporar\w*|soon|currently|at the moment)\b/i;
 
-// Texts still to rewrite (cross-OS parity audit, stale reason texts).
-const KNOWN_SCHEDULED = new Set(['platform_reason.shortcuts_restore_is_composed_on_macos']);
+// Texts still to rewrite (cross-OS parity audit, stale reason texts). Empty
+// since 2026-11-20; a new entry needs the maintainer's decision.
+const KNOWN_SCHEDULED = new Set([]);
 
 const english = JSON.parse(fs.readFileSync(CATALOGUE, 'utf8'));
 const errors = [];

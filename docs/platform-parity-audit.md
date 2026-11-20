@@ -119,10 +119,14 @@ offered) and `not_yet` 5, the only cells the reasons themselves call a gap:
 token streaming on Windows (`token_streaming_unvalidated_on_windows`), the
 shortcut restore on macOS (`shortcuts_restore_is_composed_on_macos`) and
 Ctrl+★ save on macOS and Linux (`ctrl_magic_save_is_windows`, TODO BND-1). The
-per-reason list, with each technical text, is in the table. Token streaming on
-Windows was closed on 2026-11-20: Ollama streams there as on macOS and Linux,
-each partial offered as the parser reads it and a failed stream's row withdrawn
-before its retry (`test_engine_state.ahk`, streaming-parity).
+per-reason list, with each technical text, is in the table. The first two were
+closed on 2026-11-20. Ollama streams on Windows as on macOS and Linux, each
+partial offered as the parser reads it and a failed stream's row withdrawn
+before its retry (`test_engine_state.ahk`, streaming-parity). The macOS
+Shortcuts submenu restores and clears its scope through the composition the
+Configuration menu runs, its key combinations (the remap file Karabiner
+applies) before its config.toml rows (`test_global_scope.lua` and
+`test_scope_rows.lua`, shortcuts-scope-macos).
 
 Building the owners found three declared features no driver code reads. They
 were recorded under `[unowned]` in `platform_parity.toml` (a ratchet: an entry

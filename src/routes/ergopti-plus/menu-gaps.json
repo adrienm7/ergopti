@@ -330,33 +330,6 @@
 		}
 	},
 	{
-		"path": "shortcuts_menu.scope_restore",
-		"visibility": "grey",
-		"labels": { "fr": "↺ Restaurer les valeurs conseillées", "en": "↺ Restore recommended values" },
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": {
-			"macos": {
-				"en": "Not on macOS yet: its key combinations are kept in the Karabiner settings, and only the Configuration menu's restore brings them back together with the other shortcut settings.",
-				"fr": "Pas encore sous macOS : ses combinaisons de touches sont gardées dans les réglages de Karabiner, et seule la restauration du menu Configuration les rétablit avec les autres réglages des raccourcis."
-			}
-		}
-	},
-	{
-		"path": "shortcuts_menu.scope_clear",
-		"visibility": "grey",
-		"labels": {
-			"fr": "✕ Tout effacer (comportement du système)",
-			"en": "✕ Clear all (system behaviour)"
-		},
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": {
-			"macos": {
-				"en": "Not on macOS yet: its key combinations are kept in the Karabiner settings, and only the Configuration menu's restore brings them back together with the other shortcut settings.",
-				"fr": "Pas encore sous macOS : ses combinaisons de touches sont gardées dans les réglages de Karabiner, et seule la restauration du menu Configuration les rétablit avec les autres réglages des raccourcis."
-			}
-		}
-	},
-	{
 		"path": "shortcuts_menu.edit_chatgpt_url",
 		"visibility": "hide",
 		"labels": { "fr": "   ↳ Modifier l'URL ChatGPT…", "en": "   ↳ Edit ChatGPT URL…" },

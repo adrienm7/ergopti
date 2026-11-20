@@ -9,7 +9,7 @@ local MANIFEST = [[{
  "checked": [{"type":"group","id":"parent","i18n":"menu.llm.title","checked_when":["enabled"]}],
  "plain": [{"type":"group","id":"parent","i18n":"menu.global.language"}],
  "compound": [{"type":"group","id":"parent","i18n":"menu.llm.title","checked_when":["enabled","ready"]}],
- "disabled": [{"type":"group","id":"parent","i18n":"menu.llm.title","disabled_when":["ready"],"disabled_reason_key":"platform_reason.shortcuts_restore_is_composed_on_macos"}],
+ "disabled": [{"type":"group","id":"parent","i18n":"menu.llm.title","disabled_when":["ready"],"disabled_reason_key":"platform_reason.llm_mlx_is_apple_silicon"}],
  "foreign": [{"type":"group","id":"parent","i18n":"menu.llm.title","platforms":["ahk"]}],
  "duplicate": [{"type":"group","id":"parent","i18n":"menu.llm.title"},{"type":"group","id":"parent","i18n":"menu.global.language"}],
  "wrong": [{"type":"command","id":"parent","i18n":"menu.llm.title"}]
@@ -123,7 +123,7 @@ function M.register(helpers, driver)
 			with_parent(driver, "en", function(menu, child)
 				local row = assert(menu.group_row("disabled", "parent", child, { ready = function() return false end }))
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_eq(row.disabled_reason_key, "platform_reason.shortcuts_restore_is_composed_on_macos")
+				helpers.assert_eq(row.disabled_reason_key, "platform_reason.llm_mlx_is_apple_silicon")
 				helpers.assert_true(rawequal(row.submenu, child))
 			end)
 		end)

@@ -318,9 +318,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       (the port spec and a fail-closed vector replayed on the three drivers) and SFC-05 (the RoboForm AHK case
       asserts the application axis). The generated
       [platform parity table](docs/platform-parity-table.md) now gives every feature, action, layer entry and menu
-      row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Left:
-  - the two `not_yet` reasons of the table (three cells): `token_streaming_unvalidated_on_windows`,
-    `shortcuts_restore_is_composed_on_macos` (the only real parity gaps the reasons declare);
+      row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Its Windows and macOS
+      `not_yet` reasons are closed: Ollama token streaming on Windows (streaming-parity, `test_engine_state.ahk`) and
+      the macOS Shortcuts restore and clear (shortcuts-scope-macos, `test_global_scope.lua`). Left:
   - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);
   - the next campaigns in the report's order: logger engines, the managed Ollama runtime drift, tray adapters,
     update and download windows, pickers and prompts, metrics views, small native units, layout tool pages.

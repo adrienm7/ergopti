@@ -171,4 +171,87 @@ helpers.describe("macOS global scope", function()
 	end)
 end)
 
+--- The trace without the inverse releases a committed composition finalizes.
+local function applied(trace)
+	local kept = {}
+	for _, entry in ipairs(trace) do
+		if not entry:find(":release", 1, true) then kept[#kept + 1] = entry end
+	end
+	return kept
+end
+
+--- Builds the Shortcuts submenu's composed owner over doubles.
+local function build_shortcuts(trace, options)
+	options = options or {}
+	local observed = { refreshes = {}, deferred = {} }
+	local owner = scoped_owner(trace, "shortcuts", options.refuse == "shortcuts")
+	local composed = require("menu.ui.transactions.global_scope").new({
+		scope = "shortcuts",
+		owners = { shortcuts = function() return owner end },
+		remap = options.remap,
+		backup_path = function(scope) return "/remap.toml.shortcuts-" .. scope end,
+		defer = function(continuation)
+			observed.deferred[#observed.deferred + 1] = continuation
+			return true
+		end,
+		refresh = function(committed, report) observed.refreshes[#observed.refreshes + 1] = { committed, report } end,
+	})
+	return composed, observed
+end
+
+-- The Shortcuts submenu's restore and clear were greyed on macOS: its key
+-- combinations live in the remap file Karabiner applies, and only the
+-- Configuration menu composed them with the shortcut preferences.
+helpers.describe("macOS Shortcuts scope composition", function()
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("applies the key combinations, then the shortcut preferences: " .. mode
+			.. " (shortcuts-scope-macos)", function()
+			local trace = {}
+			local remap = remap_double(trace, true)
+			local composed, observed = build_shortcuts(trace, { remap = remap })
+			helpers.assert_eq(composed.apply(mode), true)
+			helpers.assert_eq(trace, { "remap:key_combinations:" .. mode }, "the chords go first, through the remap engine")
+			helpers.assert_eq(remap.requests[1].backup_path, "/remap.toml.shortcuts-key_combinations")
+			remap.settle(true)
+			helpers.assert_eq(#trace, 1, "the preferences never run on the Karabiner terminal's stack")
+			table.remove(observed.deferred, 1)()
+			helpers.assert_eq(applied(trace), { "remap:key_combinations:" .. mode, "shortcuts:" .. mode },
+				"no other category is touched")
+			helpers.assert_eq(observed.refreshes[1][1], true)
+			helpers.assert_eq(observed.refreshes[1][2].scope, "shortcuts")
+			helpers.assert_eq(observed.refreshes[1][2].skipped, {})
+		end)
+	end
+
+	helpers.it("reverts the key combinations when the preferences refuse (shortcuts-scope-macos)", function()
+		local trace = {}
+		local remap = remap_double(trace, true)
+		local composed, observed = build_shortcuts(trace, { remap = remap, refuse = "shortcuts" })
+		helpers.assert_eq(composed.apply("recommended"), true)
+		remap.settle(true)
+		table.remove(observed.deferred, 1)()
+		helpers.assert_eq(trace[2], "shortcuts:recommended")
+		helpers.assert_eq(trace[3], "remap:restore:before", "the committed chords return to their snapshot")
+		table.remove(observed.deferred, 1)()
+		helpers.assert_eq(observed.refreshes[1][1], false)
+		helpers.assert_eq(observed.refreshes[1][2].failed, "shortcuts")
+		helpers.assert_eq(observed.refreshes[1][2].reverted, true)
+	end)
+
+	helpers.it("names the key combinations skipped while the remap engine is off (shortcuts-scope-macos)", function()
+		local trace = {}
+		local composed, observed = build_shortcuts(trace, { remap = remap_double(trace, false) })
+		helpers.assert_eq(composed.apply("clear"), true)
+		helpers.assert_eq(applied(trace), { "shortcuts:clear" })
+		helpers.assert_eq(observed.refreshes[1][2].skipped, { "key_combinations" })
+	end)
+
+	helpers.it("refuses a scope that composes nothing", function()
+		local ok, err = pcall(require("menu.ui.transactions.global_scope").new, { scope = "gestures", owners = {},
+			backup_path = function() end, defer = function() end, refresh = function() end })
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("composite manifest scope", 1, true) ~= nil, tostring(err))
+	end)
+end)
+
 return true

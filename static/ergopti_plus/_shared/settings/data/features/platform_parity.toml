@@ -207,10 +207,6 @@ technical = "French Microsoft Office on Windows uses Ctrl+G for bold, so the act
 kind = "os_concept"
 technical = "These checks measure AutoHotkey's synthetic key sending and its low-level keyboard hook, which only the Windows driver runs."
 
-[reasons."platform_reason.shortcuts_restore_is_composed_on_macos"]
-kind = "not_yet"
-technical = "macOS keeps its key combinations in Karabiner settings, and no restore yet rebuilds them together with the other shortcut settings outside the Configuration menu's restore."
-
 [reasons."platform_reason.alt_gr_is_kana_remap"]
 kind = "os_concept"
 technical = "KbdEdit and MSKLC layouts can reassign AltGr to VK_KANA, a Windows keyboard-driver virtual key with no macOS or Linux counterpart."

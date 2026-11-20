@@ -929,6 +929,18 @@ function M.build(ctx)
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUTS_TOGGLE] = toggle_shortcuts
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_SHORTCUTS] = cmd_edit_shortcuts
+	-- The scope's restore and clear: the shortcut preferences and the key
+	-- combinations Karabiner applies, as one composition. A pause does not
+	-- refuse them: a pause stops typing, not configuration (EDD-1).
+	for command, mode in pairs({
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = "recommended",
+		[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = "clear",
+	}) do
+		sc_ctx.commands[command] = function()
+			if type(ctx.apply_shortcuts_scope) ~= "function" then return false end
+			return ctx.apply_shortcuts_scope(mode) == true
+		end
+	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.engine.physical_editor_menu").new({
