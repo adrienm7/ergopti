@@ -74,6 +74,9 @@ global _HSE_TerminalReplaying := false
 ; The literal expansion an immediate Backspace may still undo (HSE_UndoExpansion),
 ; "" when none: set when a literal expansion commits, taken by the very next key.
 global HSE_Undoable := ""
+; The restored characters the undo gives the last-sent ring: as many as the
+; catalogue's previous-character gates read (GetLastSentCharacterAt(-4)).
+global _HSE_UNDO_LSC_UNITS := 4
 
 /** Known terminal executables need no cross-process caption to select pacing. */
 _HSE_OutputHostNeedsTitle(Exe) {
@@ -401,7 +404,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 				; expansion and fed afterwards, which would void the record anyway.
 				if TrailingText == "" && Owner.Get("UndoTriggerUnits", 0)
 					_HSE_RememberUndoRecord(Owner["UndoTriggerUnits"], PreviousBuffer,
-						Effect, Owner["Hwnd"], "terminal")
+						PreviousBoundary, Effect, Owner["Hwnd"], "terminal")
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -910,7 +913,7 @@ _HSE_CommitNotepadOwner(Owner) {
 	if Owner["IsPrivate"]
 		_PrefixPrivateResidue := true
 	if Owner.Get("UndoTriggerUnits", 0)
-		_HSE_RememberUndoRecord(Owner["UndoTriggerUnits"], PreviousBuffer, Effect,
+		_HSE_RememberUndoRecord(Owner["UndoTriggerUnits"], PreviousBuffer, PreviousBoundary, Effect,
 			Owner["Hwnd"], "notepad")
 	Owner["Effect"] := Effect
 	Owner["CommitBuffer"] := HSE_Buffer
@@ -1844,11 +1847,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					_BufferCrit := Critical("On")
 					try {
 							BufferBeforeFire := HSE_Buffer
+							BoundaryBeforeFire := HSE_StartIsWordBoundary
 							ExpansionEffect := HSE_ApplyExpansion(
 									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
-							_HSE_RememberUndo(Spec, BufferBeforeFire, ExpansionEffect, CascadeUnits, OutputHost)
+							_HSE_RememberUndo(Spec, BufferBeforeFire, BoundaryBeforeFire, ExpansionEffect,
+									CascadeUnits, OutputHost)
 					} finally {
 							Critical(_BufferCrit)
 					}
@@ -1917,25 +1922,28 @@ _HSE_UndoRoute(Host) {
 ; Keeps the atomic expansion's undo record (see _HSE_RememberUndoRecord).
 ; @param Spec {Object} The matched Spec.
 ; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
+; @param BoundaryBefore {Boolean} HSE_StartIsWordBoundary before it.
 ; @param Effect {Object} The committed canonical effect of HSE_ApplyExpansion.
 ; @param CascadeUnits {Integer} Typed units a cascade erased beyond the trigger.
 ; @param OutputHost {Map} The receipt of the window the burst went to.
-_HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
+_HSE_RememberUndo(Spec, BufferBefore, BoundaryBefore, Effect, CascadeUnits, OutputHost) {
 		_HSE_RememberUndoRecord(_HSE_UndoTriggerUnits(Spec, CascadeUnits), BufferBefore,
-				Effect, OutputHost["Hwnd"], "atomic")
+				BoundaryBefore, Effect, OutputHost["Hwnd"], "atomic")
 }
 
 ; Keeps a committed literal expansion for an immediate Backspace. The atomic
 ; burst commits on its keystroke; the Notepad and terminal owners commit when
 ; their output is verified, and their undo goes out through the same owner. The
 ; typed trigger is read from the buffer the fire erased, so a case-conformed or
-; cascaded trigger comes back as typed.
+; cascaded trigger comes back as typed. The buffer before the trigger and its
+; word start come back with it (_HSE_ApplyRestoredBuffer).
 ; @param TriggerUnits {Integer} The trigger's typed units, 0 for no undo.
 ; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
+; @param BoundaryBefore {Boolean} HSE_StartIsWordBoundary before it.
 ; @param Effect {Object} The committed canonical effect.
 ; @param Hwnd {Integer} The window the expansion went to.
 ; @param Route {String} The owned output: "atomic", "notepad" or "terminal".
-_HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
+_HSE_RememberUndoRecord(TriggerUnits, BufferBefore, BoundaryBefore, Effect, Hwnd, Route) {
 		global HSE_Undoable, HSE_Buffer, _PrefixInputContextGeneration, _PrefixFocusedControlToken
 		global ScriptInformation
 		HSE_Undoable := ""
@@ -1958,9 +1966,9 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 				; then the terminator typed after the output (decision of 2026-11-19).
 				Restored: HSE_BackspaceRestoredText(Trigger, MagicKey, Effect.EndCharText),
 				CommittedTick: A_TickCount,
-				; A terminator typed back ends the word: the next key starts one.
-				BoundaryAfter: Effect.EndCharText != "" and _HSE_CharOpensWord(
-						SubStr(Effect.EndCharText, -_TextTailCodeUnits(Effect.EndCharText, 1)), _HSE_WordBoundarySet()),
+				; What the buffer held before the trigger, and its word start.
+				BufferBeforeTrigger: SubStr(BufferBefore, 1, Start - 1),
+				BoundaryBefore: BoundaryBefore ? true : false,
 				Typed: Effect.InsertedText,
 				IsPrivate: Effect.IsPrivate,
 				BufferAfter: HSE_Buffer,
@@ -1974,9 +1982,11 @@ _HSE_RememberUndoRecord(TriggerUnits, BufferBefore, Effect, Hwnd, Route) {
 ; Puts the trigger back for a Backspace pressed right after an expansion. The
 ; physical Backspace has already reached the application and removed the last
 ; step of what the expansion typed, so the burst erases what is left of it and
-; types the trigger, outside the buffers so it cannot fire again at once (Linux's
-; undo). The trigger comes back without a final magic key and followed by the
-; terminator the expansion typed back (HSE_BackspaceRestoredText). Only within
+; types the trigger. The trigger comes back without a final magic key and
+; followed by the terminator the expansion typed back (HSE_BackspaceRestoredText),
+; and the buffer reads the line again, so the trigger key typed next expands at
+; once: « adn★ », Backspace, « ★ » gives « ADN » again (decision of 2026-11-20),
+; as on macOS and Linux. Only within
 ; hotstrings.backspace_restore_window_ms of the expansion and while
 ; hotstrings.backspace_restore_enabled is on: otherwise the Backspace stays the
 ; application's and deletes the last character. A step is what the focused host
@@ -2021,7 +2031,8 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		; The repeat key's lone ★ gives nothing back: the physical Backspace
 		; already removed the repeated character, which is the whole undo.
 		if (Remaining == 1 and Undo.Restored == "") {
-				_HSE_ResetUndoContext(false)
+				_HSE_ResetUndoContext(true)
+				_HSE_ApplyRestoredBuffer(Undo)
 				_HSE_LogUndoRestored(Undo)
 				return true
 		}
@@ -2051,7 +2062,9 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 		}
-		_HSE_ResetUndoContext(Sent and Undo.BoundaryAfter)
+		_HSE_ResetUndoContext(Sent)
+		if Sent
+				_HSE_ApplyRestoredBuffer(Undo)
 		if !Sent {
 				LoggerError("HSE", "Undo: restoring the trigger failed ({1}); the context is reset.",
 						SendError != "" ? SendError : "send refused")
@@ -2061,18 +2074,47 @@ HSE_UndoExpansion(Undo, FocusToken := unset, NativeSendFn := unset, SchedulerFn 
 		return true
 }
 
-; The restored text is not in the buffers and the caret follows it. Without a
-; terminator typed back the next key starts no known word, so a word-start rule
-; cannot fire inside the trigger; a word-opening terminator typed back (Space,
-; punctuation, Enter) ends it, so the next key starts a word. A failed or
-; partial send leaves the line unknown, which the same reset says.
-; @param KnownBoundary {Boolean} Whether the restored text ends at a word boundary.
+; Starts a new input context for the undo: the preview, the last sent
+; characters and the AI context no longer describe the line. A failed or
+; partial send leaves it unknown; a restore that went out then gives the
+; hotstring buffer the restored line (_HSE_ApplyRestoredBuffer).
+; @param KnownBoundary {Boolean} Whether the caret's left context is known.
 _HSE_ResetUndoContext(KnownBoundary) {
 		global _PrefixFocusedControlToken
 		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, KnownBoundary ? true : false)
 		_LSCResetFrom([])
 		if IsSet(LLM_Bridge_OnUnknownEdit)
 				try LLM_Bridge_OnUnknownEdit("Backspace undo")
+}
+
+; Gives the hotstring buffer what the line reads after the undo: the buffer
+; before the trigger, then the restored text, from the word start the trigger
+; was typed at. A restored terminator ends the word, and deleting it leaves the
+; trigger for the next terminator to fire; a word-start rule typed after a
+; trigger restored without one continues that word (« pk★ », Backspace,
+; « adn » and Space stays « pkadn »). The caller holds the context current.
+; @param Undo {Object} The record, already taken.
+_HSE_ApplyRestoredBuffer(Undo) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		PreviousCritical := Critical("On")
+		try {
+				HSE_Buffer := Undo.BufferBeforeTrigger . Undo.Restored
+				HSE_StartIsWordBoundary := Undo.BoundaryBefore
+				HSE_StartIsLineStart := false
+				HSE_FinalNoOpPending := false
+				_HSE_TrimBufferToCapacity()
+				_PrefixSetBuffer(_PrefixWordTail(HSE_Buffer))
+		} finally Critical(PreviousCritical)
+		; The restored characters are the last ones sent, stamped now: the time
+		; gate of a trigger typed again (« ★ » after « adn ») measures from them,
+		; as it measures from the letters when the trigger is typed.
+		Tail := _TextTailWithinUnits(HSE_Buffer, _HSE_UNDO_LSC_UNITS)
+		Position := 1
+		while Position <= StrLen(Tail) {
+				Units := (Ord(SubStr(Tail, Position, 1)) >= 0xD800 and Ord(SubStr(Tail, Position, 1)) <= 0xDBFF) ? 2 : 1
+				UpdateLastSentCharacter(SubStr(Tail, Position, Units))
+				Position += Units
+		}
 }
 
 ; Sends the undo through Notepad's verified editor. The physical Backspace may
@@ -2107,7 +2149,19 @@ _HSE_CommitUndoNotepadOwner(Owner, Undo) {
 		if Owner["CompletionClaimed"] || Owner["Committed"] || !_HSE_NotepadOwnerIsCurrent(Owner)
 				throw Error("The Notepad undo commit lost its owner or its context.")
 		Owner["Committed"] := true
+		_HSE_ApplyRestoredBuffer(Undo)
 		return _HSE_LogUndoRestored.Bind(Undo)
+}
+
+; The undo's terminal commit: the paced burst went out, and the line reads the
+; restored text while nothing changed the reset context since the undo began.
+; @param Undo {Object} The record, already taken.
+; @param Owner {Map} The undo's terminal owner.
+_HSE_CommitUndoTerminalOwner(Undo, Owner, *) {
+		global HSE_Buffer, _PrefixInputContextGeneration
+		if (_PrefixInputContextGeneration == Owner["InputGeneration"] and HSE_Buffer == Owner["BufferSnapshot"])
+				_HSE_ApplyRestoredBuffer(Undo)
+		_HSE_LogUndoRestored(Undo)
 }
 
 _HSE_LogUndoRestored(Undo) {
@@ -2151,13 +2205,13 @@ _HSE_UndoThroughOwner(Undo, Erased, Left, Host, NativeSendFn := unset, Scheduler
 			Owner["DelayMs"] := TimingsGet("debounce", "terminal_hotstring_key_delay_ms")
 			Owner["EmitFn"] := Hook ? (Payload) => Hook("SendTerminalResult", Payload, false) : 0
 			Owner["DelayFn"] := 0
-			Owner["CommitFn"] := (*) => _HSE_LogUndoRestored(Undo)
+			Owner["CommitFn"] := _HSE_CommitUndoTerminalOwner.Bind(Undo)
 		}
 		; From here the owner holds both releases, as for the expansion.
 		PrefixWatcherSuppress(true)
 		Owner["SyntheticOwner"] := 0
 		try Owner["SyntheticOwner"] := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
-		_HSE_ResetUndoContext(Undo.BoundaryAfter)
+		_HSE_ResetUndoContext(true)
 		Owner["BufferSnapshot"] := HSE_Buffer
 		Owner["RegistryGeneration"] := HSE_RegistryGeneration
 		Owner["DecisionGeneration"] := HSE_RuntimeDecisionGeneration

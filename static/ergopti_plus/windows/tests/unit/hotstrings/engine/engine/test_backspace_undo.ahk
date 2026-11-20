@@ -7,7 +7,10 @@
 ; back, as on Linux and macOS (decision of 2026-11-06, backspace-undo). The
 ; physical Backspace has already removed the last character the expansion
 ; typed, so the restore erases the rest and types the trigger. Before, Windows
-; only shortened its buffers by one character and left the replacement.
+; only shortened its buffers by one character and left the replacement. The
+; buffer then holds the restored text, so the trigger key typed again expands
+; at once (decision of 2026-11-20); before, the undo emptied it and « adn★ »,
+; Backspace, « ★ » typed a star.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -69,8 +72,8 @@ _BSU_BackspaceRestoresTheTrigger() {
 		AssertEqual(Sent + 1, _Stub_RecordedSends.Length, "one burst restores it")
 		AssertEqual("{BackSpace 3}{Text}adn ", _BSU_LastBurst(),
 			"the Space is already gone: the rest of the replacement is erased, then the trigger and its Space typed")
-		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
-		AssertTrue(HSE_StartIsWordBoundary, "and the Space typed back ends the word")
+		AssertEqual("adn ", HSE_Buffer, "the buffer holds the restored trigger and its Space")
+		AssertTrue(HSE_StartIsWordBoundary, "from the word start adn was typed at")
 	} finally HSE_TestReset()
 }
 Test("hotstrings: an immediate Backspace restores the trigger and its Space (backspace-undo)",
@@ -299,7 +302,8 @@ _BSU_AssertMagicKeyUndo() {
 	AssertTrue(HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 100), "the Backspace undoes the expansion")
 	AssertEqual("{BackSpace 3}{Text}td", _BSU_LastBurst(),
 		"the physical Backspace took the 6: the rest of 2026 goes and td comes back alone")
-	AssertFalse(HSE_StartIsWordBoundary, "td is still the word being typed")
+	AssertEqual("td", HSE_Buffer, "the buffer holds the restored word")
+	AssertTrue(HSE_StartIsWordBoundary, "which starts where td was typed")
 }
 Test("hotstrings: a magic-key trigger comes back without the magic key (backspace-restore)",
 	_BSU_WithSettings.Bind(true, 500, _BSU_AssertMagicKeyUndo))
@@ -317,7 +321,7 @@ _BSU_AssertTerminatorUndo() {
 		AssertTrue(HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 100), "the Backspace undoes the expansion")
 		AssertEqual("{BackSpace 3}{Text}" . Expected, _BSU_LastBurst(),
 			"the output goes after the terminator the Backspace took, then trigger and terminator")
-		AssertTrue(HSE_StartIsWordBoundary, "the terminator typed back ends the word")
+		AssertEqual(Expected, HSE_Buffer, "the buffer holds the trigger and its terminator")
 	}
 }
 Test("hotstrings: a Backspace gives trigger and terminator back, not the output (backspace-restore)",
@@ -376,14 +380,14 @@ _BSU_AssertKeyBetween() {
 Test("hotstrings: another key between the expansion and Backspace ends the undo (backspace-restore)",
 	_BSU_WithSettings.Bind(true, 500, _BSU_AssertKeyBetween))
 
-; One corpus vector through the dispatcher's own undo.
+; One corpus vector through the dispatcher's own undo: what it types back, the
+; buffer it leaves and, for the keys typed next, the buffer they leave, which
+; reads like the line since the buffer follows it.
 _BSU_ReplayVector(Vector, Replay, KeyBetween) {
-	global HSE_Undoable
+	global HSE_Undoable, HSE_Buffer
 	Undo := _BSU_Fire(Replay == "" ? "*C" : "C", Vector["trigger"], Vector["output"], Replay)
-	if !Vector["enabled"] {
+	if !Vector["enabled"]
 		AssertEqual("", Undo, Vector["id"] . ": off, the expansion keeps no undo")
-		return
-	}
 	if KeyBetween {
 		_PrefixTakeUndoOnKeyDown(0x1B)
 		AssertEqual("", HSE_Undoable, Vector["id"] . ": the other key ends the undo")
@@ -391,12 +395,20 @@ _BSU_ReplayVector(Vector, Replay, KeyBetween) {
 	}
 	HSE_Undoable := ""
 	Sent := _Stub_RecordedSends.Length
-	Restored := HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + Vector["elapsed_ms"])
+	Restored := IsObject(Undo) and HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + Vector["elapsed_ms"])
 	AssertEqual(Vector["undoes"] ? true : false, Restored ? true : false, Vector["id"] . ": undoes")
 	if Vector["undoes"]
 		AssertEqual(Vector["screen_after"], _BSU_TypedBack(_BSU_LastBurst()), Vector["id"] . ": the text typed back")
-	else
+	else {
 		AssertEqual(Sent, _Stub_RecordedSends.Length, Vector["id"] . ": a plain Backspace sends nothing")
+		_PrefixCommitBackspace()
+	}
+	if Vector.Has("buffer_after")
+		AssertEqual(Vector["buffer_after"], HSE_Buffer, Vector["id"] . ": the buffer holds what the Backspace left")
+	if Vector.Has("then") {
+		_BSU_Keys(Vector["then"])
+		AssertEqual(Vector["screen_then"], HSE_Buffer, Vector["id"] . ": the keys typed next act on the restored text")
+	}
 }
 
 ; The shared corpus, replayed through the AutoHotkey rule and, for every vector
@@ -408,6 +420,7 @@ _BSU_ReplaysTheSharedCorpus() {
 	Vectors := JsonParse(FileRead(Path, "UTF-8"))["vectors"]
 	AssertTrue(Vectors.Length >= 10, "the corpus lists its vectors")
 	Replayed := 0
+	TypedNext := 0
 	for Vector in Vectors {
 		Terminator := Vector.Has("terminator") ? Vector["terminator"] : ""
 		Consumed := Vector.Has("terminator_consumed") and Vector["terminator_consumed"]
@@ -425,10 +438,131 @@ _BSU_ReplaysTheSharedCorpus() {
 		if (Consumed or Vector["trigger"] == Vector["magic_key"])
 			continue
 		Replayed += 1
+		if Vector.Has("then")
+			TypedNext += 1
 		_BSU_WithSettings(Vector["enabled"], Vector["window_ms"],
 			_BSU_ReplayVector.Bind(Vector, Replay, KeyBetween))
 	}
 	AssertTrue(Replayed >= 8, "most vectors go through the dispatcher")
+	AssertTrue(TypedNext >= 5, "the keys of the vectors that list them are typed")
 }
 Test("hotstrings: the Backspace undo replays the shared backspace_restore_vectors corpus (backspace-restore-vectors)",
 	_BSU_ReplaysTheSharedCorpus)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 4/ The restored trigger expands again =======
+; =====================================================
+; =====================================================
+
+; Types Text through the production feed and dispatches what it fires.
+; @returns {Integer} How many expansions fired.
+_BSU_Type(Text) {
+	global HSE_LastEndChar
+	Fired := 0
+	Loop Parse Text {
+		Match := HSE_FeedChar(A_LoopField)
+		; The watcher asks the repeat when nothing matched (_OnPrefixChar).
+		if !IsObject(Match) and A_LoopField == "★"
+			Match := HSE_TryRepeatKey(A_LoopField)
+		if IsObject(Match) and HSE_DispatchMatch(Match, HSE_LastEndChar)
+			Fired += 1
+	}
+	return Fired
+}
+
+; A Backspace as the watcher takes it: the undo of an expansion the previous
+; key fired, or else the plain Backspace that shortens the buffers.
+; @returns {Boolean} Whether it undid an expansion.
+_BSU_Backspace() {
+	global HSE_Undoable
+	Undo := HSE_Undoable
+	HSE_Undoable := ""
+	if IsObject(Undo) and HSE_UndoExpansion(Undo, 1, , , Undo.CommittedTick + 100)
+		return true
+	_PrefixCommitBackspace()
+	return false
+}
+
+; Types a corpus `then` list: characters, or "{BS}" for a Backspace.
+_BSU_Keys(Keys) {
+	for Key in Keys {
+		if Key == "{BS}"
+			_BSU_Backspace()
+		else
+			_BSU_Type(Key)
+	}
+}
+
+; « adn★ Backspace ★ doit donner ADN si adn★ donne ADN », twice over.
+_BSU_AssertMagicTriggerExpandsAgain() {
+	global HSE_Buffer
+	_BSU_Fire("*", "adn★", "ADN", "")
+	AssertTrue(_BSU_Backspace(), "control: the Backspace undoes adn★")
+	AssertEqual("adn", HSE_Buffer, "the buffer holds the restored trigger")
+	AssertEqual(1, _BSU_Type("★"), "the magic key expands it at once")
+	AssertEqual("ADN", HSE_Buffer, "into ADN")
+	AssertTrue(_BSU_Backspace(), "the second expansion undoes too")
+	AssertEqual(1, _BSU_Type("★"), "and expands once more")
+	AssertEqual("ADN", HSE_Buffer)
+}
+Test("hotstrings: adn★, Backspace, ★ expands adn★ again (backspace-restore-again)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertMagicTriggerExpandsAgain))
+
+; The repeat key's undo leaves po in the buffer, so ★ repeats the o again.
+_BSU_AssertRepeatAgain() {
+	global HSE_Buffer
+	HSE_FeedReset(true)
+	_BSU_Type("po")
+	UpdateLastSentCharacter("o")
+	AssertEqual(1, _BSU_Type("★"), "control: po★ repeats the o")
+	AssertTrue(_BSU_Backspace(), "control: the Backspace undoes the repeat")
+	AssertEqual("po", HSE_Buffer, "the buffer holds po again")
+	AssertEqual(1, _BSU_Type("★"), "the magic key repeats the o once more")
+	AssertEqual("poo", HSE_Buffer)
+}
+Test("hotstrings: po★, Backspace, ★ repeats the o again (backspace-restore-again)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertRepeatAgain))
+
+; Deleting the restored Space leaves adn, which the next Space fires as typing
+; it would; a word-only rule still fires after the restored Space.
+_BSU_AssertTerminatorTriggerFiresAgain() {
+	global HSE_Buffer
+	_BSU_Fire("C", "adn", "ADN", " ")
+	AssertTrue(_BSU_Backspace(), "control: the Backspace undoes adn and Space")
+	AssertFalse(_BSU_Backspace(), "the next Backspace is a plain one")
+	AssertEqual("adn", HSE_Buffer, "it leaves adn in the buffer")
+	AssertEqual(1, _BSU_Type(" "), "Space fires adn again")
+	_BSU_Fire("C", "adn", "ADN", " ")
+	_BSU_Backspace()
+	AssertEqual(1, _BSU_Type("adn "), "a word-only trigger fires after the restored Space")
+}
+Test("hotstrings: a trigger whose restored terminator was deleted fires again (backspace-restore-again)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertTerminatorTriggerFiresAgain))
+
+; « pk★ », Backspace, « adn » and Space stays « pkadn »: adn continues pk.
+_BSU_AssertNoWordStartInsideTheRestore() {
+	global HSE_Buffer
+	_BSU_Fire("*", "pk★", "PK", "")
+	CreateHotstring("C", "adn", "ADN")
+	AssertTrue(_BSU_Backspace(), "control: the Backspace undoes pk★")
+	AssertEqual("pk", HSE_Buffer, "the buffer holds pk")
+	AssertEqual(0, _BSU_Type("adn "), "adn continues the word pk, so the word-only rule stays silent")
+}
+Test("hotstrings: no word starts inside a trigger restored without a terminator (backspace-restore-again)",
+	_BSU_WithSettings.Bind(true, 500, _BSU_AssertNoWordStartInsideTheRestore))
+
+; Off, each Backspace deletes one character and the buffer follows it.
+_BSU_AssertOffBufferFollows() {
+	global HSE_Buffer
+	_BSU_Fire("C", "adn", "ADN", " ")
+	_BSU_Keys(["{BS}", "{BS}", "{BS}", "{BS}"])
+	AssertEqual("", HSE_Buffer, "four plain Backspaces empty the buffer with the line")
+	AssertEqual(1, _BSU_Type("adn "), "adn and Space expand again")
+}
+Test("hotstrings: with the option off the buffer follows each Backspace (backspace-restore-again)",
+	_BSU_WithSettings.Bind(false, 500, _BSU_AssertOffBufferFollows))

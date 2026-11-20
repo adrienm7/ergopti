@@ -1796,7 +1796,7 @@ _HNPU_BackspaceRestoresThroughTheEditor(Mode) {
 		AssertEqual("ab ", Request.Text, "the trigger comes back with the Space that fired it")
 		AssertEqual(1, Request.Opts["erase_before"], "the Space is already gone: the rest of the output is erased")
 		AssertEqual("Z", Request.Opts["deleted_text"], "and named exactly")
-		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
+		AssertEqual("", HSE_Buffer, "the line is unknown until the editor verifies the restoration")
 		AssertEqual(1, _PrefixWatcherSuppressed, "the pending undo holds the suppression")
 		; The editor refuses before any change while the Backspace has not reached
 		; the document: the same request is asked again, until the settle window ends.
@@ -1823,7 +1823,8 @@ _HNPU_BackspaceRestoresThroughTheEditor(Mode) {
 			_HNPU_Settle(State["Requests"][State["Requests"].Length], true)
 		} else
 			AssertTrue(State["Requests"].Length < 100, "the retries stop at the settle window")
-		AssertEqual("", HSE_Buffer, "settled or refused, the line stays unknown")
+		AssertEqual(Mode == "never" ? "" : "xxab ", HSE_Buffer,
+			Mode == "never" ? "refused, the line stays unknown" : "verified, the buffer holds the restored trigger")
 		AssertEqual(0, _PrefixWatcherSuppressed, "completion releases the suppression")
 		AssertEqual(1, _HSE_FireLogQueue.Length, "the undo is no second fire")
 		AssertEqual("", HSE_Undoable, "and keeps no undo of its own")

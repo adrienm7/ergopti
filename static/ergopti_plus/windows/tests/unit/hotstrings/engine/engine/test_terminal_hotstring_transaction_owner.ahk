@@ -611,7 +611,7 @@ _THTO_UndoRestoresThroughTheCapture() {
 		_SendHook := (Name, Payload, *) => (Payloads.Push(Name . "|" . Payload), true)
 		_THTO_Runner := 0
 		AssertTrue(HSE_UndoExpansion(Undo, 1, , _THTO_Schedule), "the immediate Backspace owns its effect")
-		AssertEqual("", HSE_Buffer, "the restored trigger stays out of the buffer")
+		AssertEqual("", HSE_Buffer, "the line is unknown until the restoration commits")
 		AssertEqual(0, Payloads.Length, "nothing is typed before the capture's own turn")
 		AssertTrue(HasMethod(_THTO_Runner, "Call"), "the restoration is scheduled on the terminal owner")
 		_THTO_Runner.Call()
@@ -623,7 +623,7 @@ _THTO_UndoRestoresThroughTheCapture() {
 			"the last letter is already gone: six paced Backspaces, then the trigger")
 		AssertEqual(2, _THTO_NativeState["CommitCalls"].Length, "the expansion's and the undo's captures commit")
 		AssertEqual(0, _PrefixWatcherSuppressed, "the owner released the suppression")
-		AssertEqual("", HSE_Buffer, "the line stays unknown")
+		AssertEqual("xgboost", HSE_Buffer, "the committed restoration gives the buffer the trigger back")
 		AssertEqual(1, _HSE_FireLogQueue.Length, "the undo is no second fire")
 		AssertEqual("", HSE_Undoable, "and keeps no undo of its own")
 	} finally {
