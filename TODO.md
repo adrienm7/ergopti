@@ -126,21 +126,22 @@ baseline as violations go.
       the maintainer's decision of 2026-11-19 in docs/memory/maintainer-decisions.md), read by the screen-reader
       notice and hidden by `hotstrings.preview_category_glyphs`. Left: a look at the glyph in a real bubble on
       each OS (the unit tests check the drawn label's text and font, not its pixels).
-- [ ] **Dyslexia and reading, what is left.** Every site page is measured at 200 % zoom with the WCAG 1.4.12
+- [ ] **Dyslexia and reading, what is left.** Every site page and every Studio frame it holds (the Comparer, the
+      editor, the Optimiser, the model browser and the release notes) is measured at 200 % zoom with the WCAG 1.4.12
       spacing and at the site's 200 % text with wide spacing (`tools/test/browser/site-reading.cjs`, in the site
-      accessibility gate, ratchet `site-reading-baseline.json`, empty): no clipped, overlapping or justified text and
-      no prose line over 80 characters, nothing slid under the sticky header
-      ([sixth pass](docs/audits/accessibility/README.md#reading-wcag-148-1410-1412)), and no page scrolls sideways
-      on a 320 or 375 px phone at 200 % text or 200 % zoom
-      ([eighth pass](docs/audits/accessibility/README.md#no-sideways-scroll-at-320-and-375-px-wcag-1410)). The
-      home, accessibility,
-      layout presentation, Linux installation and Ergopti+ overview pages had a plain-language review
-      ([seventh pass](docs/audits/accessibility/README.md#seventh-pass-header-offset-media-and-plain-language-2026-11-19-paris-time)).
-      Left: the same review of the other pages (layout use, information and benchmarks, the Ergopti+ hotstrings, AI,
-      features, configuration and FAQ pages); the Studio frames are not measured. The app's windows load
-      `a11y_prefs.js` and take a host's seeded `window.__ergopti_reading`, but no driver has the setting yet nor
-      ships the font: what each host needs is in the
-      [tenth pass](docs/audits/accessibility/README.md#reading-preferences-in-the-app-windows).
+      accessibility gate, ratchet `site-reading-baseline.json` per page, mode, frame and check, empty): no clipped,
+      overlapping or justified text, no prose line over 80 characters, nothing slid under the sticky header, no
+      sideways scroll on a 320 or 375 px phone, and no sentence of 30 words or more in a page's running text
+      (`long-sentence`, WCAG 3.1.5; the 64 left on the other pages were cut)
+      ([eleventh pass](docs/audits/accessibility/README.md#eleventh-pass-reading-in-the-frames-plain-language-and-help-text-2026-11-20-paris-time)).
+      The app's windows take the reader's font and spacing from the Configuration menu on the three OS
+      (`script.reading_font`, `script.reading_spacing`): Windows seeds them beside each locale seed and loads the
+      font from `_shared/ui/fonts/`, macOS and Linux inline it (`_shared/core/ui/engine/webview/reading_preferences.lua`);
+      proof `test-reading-preferences-seed.cjs`, `reading_preferences_contract.lua` on both Lua runners and
+      `test_reading_preferences.ahk`. Left: the names of five one-unit keys of the editor's navigation block, still
+      cut by a pixel or two under the 1.4.12 spacing (`PENDING_FRAME_ELEMENTS` in `site-reading.cjs`); a font
+      change reaches only the windows opened after it; a look at the dyslexia font in a real window on each OS; the
+      plain-language review of the Studio's own strings (the 21 locales' catalogue, not measured).
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
       (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
@@ -173,15 +174,20 @@ baseline as violations go.
       `tools/test/test-error-messages-say-how-to-recover.cjs`
       ([audit](docs/audits/accessibility/README.md#error-messages-wcag-333)); the `layout_editor.error.*` codes
       are done too: 8 more end with their step and the 32 others are classified, each with its reason, so a new
-      code fails the test until it has one or the other.
+      code fails the test until it has one or the other. Every card of the typing dashboard says what it counts
+      behind its « i » (the AI and hotstring cards had `title` attributes only;
+      `npm run test:metrics-cards-explained`), and the Studio's 37 metrics all have their definition. Left: the
+      tray settings, whose rows carry no help line of their own, were not reviewed for one.
 - [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
       ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
       (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
       to a running screen reader); on Windows the native windows' fonts follow the text size, and the WPM widget
       and the Spotlight overlay reach a running screen reader (fourth pass); on macOS and Linux the WPM widgets,
       the spotlight overlay and the `hs.alert` banners reach a running screen reader, and the Linux previews
-      follow the GNOME text scale (fifth pass). Left: the Swift update panel's XCTest, not yet run in CI. The
-      spoken results are the « Accessibility » items of the three TODO-tests files.
+      follow the GNOME text scale (fifth pass). Left: the Swift update panel's XCTest, not yet run in CI: it is
+      in the full `swift test` of the macOS Build stage's launcher-native cell, which the dev runs since 2026-11-17
+      skipped because earlier macOS unit stages failed (run 44753533322: menu_input, ui and modules). The spoken
+      results are the « Accessibility » items of the three TODO-tests files.
 
 ## Ergopti Studio
 

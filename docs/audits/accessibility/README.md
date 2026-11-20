@@ -1083,8 +1083,9 @@ Every app window loads `a11y_prefs.js` first in its head. A host may seed
 preferences: `font`, `spacing`, `motion`, `text`, `contrast`) next to
 `window._i18n_locale`; the seed wins over storage and is sanitized
 (`test-site-accessibility-ratchet.cjs`). theme.css then applies the
-hyperlegible font stack, the WCAG 1.4.12 spacing and reduced motion. No
-driver writes the seed yet: there is no setting for it in
+hyperlegible font stack, the WCAG 1.4.12 spacing and reduced motion. Until
+the eleventh pass (« Reading preferences in the app windows, done »), no
+driver wrote the seed: there was no setting for it in
 `_shared/settings/data/features/manifest.toml` (its `[sections.ui]` is
 macOS only). What each host needs:
 
@@ -1176,6 +1177,110 @@ fit it; the heat board's keys are images read in their table, no longer
 stops; the editor's « + level » buttons sit inside its levels tab list; the
 board's arrow keys have no visible hint (a new string in 21 locales); the
 fingering map's scroll box is a stop of its own beside the map.
+
+## Eleventh pass, reading in the frames, plain language and help text (2026-11-20, Paris time)
+
+### The Studio frames in the reading gate (WCAG 1.4.8, 1.4.10, 1.4.12)
+
+The reading gate (`site-reading.cjs`, run by
+`site-accessibility.playwright.cjs`) now measures every same-origin frame of
+a page as well as the page: the Comparer, the editor and the Optimiser of
+the Studio pages and the benchmarks, the model browser of the AI page and
+the release notes of the configuration page. A frame reads the same stored
+settings (it loads `a11y_prefs.js`) and gets the same style sheet; it has
+no site header, so « header-cover » is left to the page. Rows are counted
+per page, mode, frame and check (`route | mode | frame | check`); the
+baseline stays empty.
+
+The clip check compared a box's client size, in the box's own CSS pixels,
+with text rectangles in the window's. The shared theme's larger text zooms
+the body (`theme.css`), so in a frame every text past half a box read as
+cut; the box is now scaled by its rectangle over its own size.
+
+| Frame, before the fixes                    | Rows |
+| ------------------------------------------ | ---: |
+| layout_editor, text-clipped (zoom, text)   |   81 |
+| layout_editor, reflow (text-320, text-375) |   49 |
+| layout_optimizer, reflow                   |   25 |
+| layout_optimizer, line-length              |    4 |
+| layout_editor, line-length                 |    2 |
+| layout_analysis, Studio Comparer           |    4 |
+| layout_analysis, benchmarks page           |   59 |
+| model_browser, text-clipped and overlap    |  268 |
+| changelog, text-clipped                    |    1 |
+
+The Studio page counts come from the base build with the frames measured
+and the old clip box; the model browser, benchmarks and changelog rows from
+the same gate with the corrected box. Fixed at their cause: grid minimums
+became `min(N, 100%)`, toolbars, tool tabs, drop-down labels, tab lists and
+n-gram rows wrap, the analysis panel's tables wrap their cells below 300 px
+of panel, long names (layout tabs, chart and leader names, model names, the
+layouts summary, key names) wrap instead of being cut by an ellipsis,
+`fitLegends` fits a key's legend to its height as well as its width, prose
+is held to 60ch, and the release header wraps. The editor's « Import a
+fingering » showed the browser's own file control beside its button (the
+rule that hid it was scoped to the Comparer's root); it moved to
+`fingering_editor.css`. Left, named with its reason in
+`PENDING_FRAME_ELEMENTS`: the names of five one-unit keys of the editor's
+navigation block, which still pass their key's edge by a pixel or two under
+the WCAG 1.4.12 spacing.
+
+### Plain language, the other pages (WCAG 3.1.5)
+
+The default reading mode counts every sentence of 30 words or more in the
+running text of a page (`long-sentence`: p, li, dd, blockquote, figcaption
+of main; a sentence ends at a full stop, a question or exclamation mark or
+an ellipsis before a capital, a digit or a quote). The Studio frames are
+left out: their words are the 21 locales' catalogue. On the pages before
+this pass it found 64: the layout presentation (9) and installation (9),
+the benchmarks (9), the information pages (25), the Ergopti+ features and
+configuration pages (1 each), the legacy Ergopti+ page (9) and the
+accessibility statement (1). Each was cut or lost its filler, without a
+rewrite, and two typos went with them; the diffs are the evidence. The
+layout use page renders its text in the browser and had none.
+
+### Help text of the typing dashboard (WCAG 3.3.5)
+
+Every card of the typing dashboard says what it counts behind its « i »,
+except the AI and hotstring cards: their figures were explained by `title`
+attributes, which neither the keyboard nor a touch screen reaches, and their
+unit was written in English. Both have their « i » now, in 21 locales, in
+the cards' own labels. `test-metrics-cards-explained.cjs` (`npm run
+test:metrics-cards-explained`) requires help text on every card and fails
+on the page before. The Studio's 37 metrics all have their definition
+(`layout_analysis.info.<id>`).
+
+### Reading preferences in the app windows, done
+
+The fonts moved from `static/fonts/` to `_shared/ui/fonts/`, beside the
+pages: the site serves them from there and every driver package ships them
+(`test-studio-reading-preferences.cjs` asks the Windows bundle builder for
+each file). The Configuration menu offers `script.reading_font` (default,
+hyperlegible, dyslexic) and `script.reading_spacing` (default, wide) on the
+three drivers, kept in config.toml like the other script rows. Every
+Windows window seeds `window.__ergopti_reading` (13 seed sites,
+`ReadingPrefs_SeedScript`) and the font loads by URL from the virtual host.
+macOS (`builder.lua`, whose page cache key includes the choices) and Linux
+(`webkit_host.lua`) add the shared fragment of
+`_shared/core/ui/engine/webview/reading_preferences.lua`: the seed and the
+chosen font's faces as `data:` URLs, which the document policy allows. The
+physical shortcuts window now links theme.css. Gates:
+`test-reading-preferences-seed.cjs`, which fails on the previous tree with
+« script.reading_font is not a feature »; the shared Lua contract with each
+builder's real page; `test_reading_preferences.ahk`. Left: a change reaches
+only the windows opened after it; OpenDyslexic was not looked at in a real
+WKWebView or WebKitGTK window; Reduce Motion reaching WKWebView is still
+unverified.
+
+### Gates and host
+
+`node tools/test/browser/site-accessibility.playwright.cjs build ""
+--reading-only` on a fresh build: 0 reading elements on every page and
+frame. `test-site-accessibility-ratchet`, `test-studio-reading-preferences`,
+`test-metrics-cards-explained`, `studio-keyboard.playwright.cjs`, the
+semantic markup gates, the locale gates, format and convention lints.
+`npm run test:js` and `verify-change` refuse this host (Node 22.16, pinned
+22.22.2).
 
 ## What remains
 
