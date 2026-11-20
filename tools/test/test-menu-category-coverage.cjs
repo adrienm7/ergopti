@@ -1557,8 +1557,8 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 			'replace genuine callee',
 			mutateSource(
 				helper,
-				'Authority := SharedStartupTrayProjection(_I18nLocale)',
-				'Authority := OtherStartupProjection(_I18nLocale)'
+				'Authority := SharedStartupTrayProjection(Locale)',
+				'Authority := OtherStartupProjection(Locale)'
 			)
 		],
 		['discard typed result', mutateSource(helper, 'return Prepared', 'return []')],
@@ -1605,7 +1605,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 					...startup.sources,
 					[helper]:
 						startup.sources[helper] +
-						'\n_TrayBootstrapProjectedRows(Surface, Commands) { return [] }\n'
+						'\n_TrayBootstrapProjectedRows(Surface, Commands, Locale := unset) { return [] }\n'
 				}
 			}
 		],

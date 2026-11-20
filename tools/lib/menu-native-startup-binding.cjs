@@ -137,7 +137,9 @@ const inertPublication = `
 `;
 const typedProjection = String.raw`
   global _I18nLocale
-  Authority := SharedStartupTrayProjection(_I18nLocale)
+  if !IsSet(Locale)
+    Locale := _I18nLocale
+  Authority := SharedStartupTrayProjection(Locale)
   if !(Authority is Map) || Authority.Count != 5
     || Authority.Get("authority", "") != "compiled-startup"
     || !RegExMatch(Authority.Get("source_sha256", ""), "^[0-9a-f]{64}$")
@@ -193,8 +195,6 @@ const coldEntry = `
   _InstallSafeBootstrapTray()
   global _TrayStartupCommands := TrayStartupCommands(
     () => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand)
-  if FileExist(ConfigurationFile)
-    _InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 `;
 
 /**
@@ -429,7 +429,7 @@ function nativeStartupRows(inputs, platform) {
 		matches(entry, coldEntry, 0).length !== 1 ||
 		matches(entry, '_InstallSafeBootstrapTray()', 0).length !== 1 ||
 		matches(entry, '_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))', 0)
-			.length !== 2 ||
+			.length !== 1 ||
 		!exactBody(
 			bootstrap,
 			'_InstallNativeStartupTray(RequestFn, MenuObj := 0, RegisterFn := 0) {',
@@ -440,7 +440,11 @@ function nativeStartupRows(inputs, platform) {
 			'_InstallSafeBootstrapTray(Label := unset, MenuObj := 0) {',
 			inertPublication
 		) ||
-		!exactBody(bootstrap, '_TrayBootstrapProjectedRows(Surface, Commands) {', typedProjection) ||
+		!exactBody(
+			bootstrap,
+			'_TrayBootstrapProjectedRows(Surface, Commands, Locale := unset) {',
+			typedProjection
+		) ||
 		!exactBody(adapter, '_TrayBootstrapNoOp(*) {', 'return 0') ||
 		!exactBody(safe, 'class MenuStartupSafeCommand {', safeClass)
 	)

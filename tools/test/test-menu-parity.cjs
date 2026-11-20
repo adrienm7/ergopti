@@ -3440,8 +3440,8 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			'replace genuine callee',
 			mutateSource(
 				helper,
-				'Authority := SharedStartupTrayProjection(_I18nLocale)',
-				'Authority := OtherStartupProjection(_I18nLocale)'
+				'Authority := SharedStartupTrayProjection(Locale)',
+				'Authority := OtherStartupProjection(Locale)'
 			)
 		],
 		['discard typed result', mutateSource(helper, 'return Prepared', 'return []')],
@@ -3488,7 +3488,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 					...startup.sources,
 					[helper]:
 						startup.sources[helper] +
-						'\n_TrayBootstrapProjectedRows(Surface, Commands) { return [] }\n'
+						'\n_TrayBootstrapProjectedRows(Surface, Commands, Locale := unset) { return [] }\n'
 				}
 			}
 		],
