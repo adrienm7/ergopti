@@ -1503,6 +1503,13 @@ release_list_body_bytes = 8388608
 # its signature) before it refuses the transfer. LX: modules/updater/manager.lua.
 update_asset_download_bytes = 268435456
 
+# Largest managed Ollama runtime seal the Linux driver reads (one SHA-256 per
+# runtime file, about 100 bytes each: a few hundred files fit in 128 KiB);
+# a larger file is not a seal.
+# LX: ai/engine/ollama/runtime_seal.lua.
+ollama_runtime_seal_bytes = 131072
+
+
 # What the digest tool may print for one file, beyond the file's own path: the
 # hexadecimal digest and its separators. LX: core/fs/adapters/file_digest.lua.
 file_digest_output_bytes = 1024

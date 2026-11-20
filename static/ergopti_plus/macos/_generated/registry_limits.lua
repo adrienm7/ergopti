@@ -25,6 +25,7 @@ local VALUES = {
 	number_row_level_text_bytes = 1024,
 	release_list_body_bytes = 8388608,
 	update_asset_download_bytes = 268435456,
+	ollama_runtime_seal_bytes = 131072,
 	file_digest_output_bytes = 1024,
 	crash_report_head_bytes = 65536,
 	input_source_id_bytes = 1024,

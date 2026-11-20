@@ -35,10 +35,12 @@ local available, native = pcall(require, "luv")
 if not available then native = nil end
 
 -- The seal's name in the release folder (runtimes/ollama/<release>/).
+local Timings = require("core.timing.engine.timings")
+
 M.NAME = "ollama.sha256.json"
 local SCHEMA = 1
 -- A seal names a few hundred files at most; anything larger is not one.
-local MAX_SEAL_BYTES = 1048576
+local MAX_SEAL_BYTES = Timings.count("limits", "ollama_runtime_seal_bytes")
 local PRIVATE_FILE_MODE = 384
 
 
