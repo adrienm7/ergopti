@@ -187,6 +187,7 @@ function M.build_world(options)
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function() world.hides = world.hides + 1; return true end,
 		hide_forced_silent = function() world.hides = world.hides + 1; return true end,
 	}

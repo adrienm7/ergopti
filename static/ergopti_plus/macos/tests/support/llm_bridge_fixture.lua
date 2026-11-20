@@ -80,6 +80,7 @@ local function make_tooltip(fixture)
 		set_chain_start = return_true,
 		mark_chain_complete = return_true,
 		tint = return_empty_table,
+		glyph = function() return nil, nil end,
 		set_accent_color = return_true,
 	}
 end

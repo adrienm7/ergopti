@@ -118,6 +118,7 @@ local function render_provider_row(provider_result)
 			set_on_show_callback = function() end,
 			set_timeout = function() end,
 			tint = function() return {} end,
+			glyph = function() return nil, nil end,
 			show_stacked = function(rows)
 				text = rows and rows[1] and rows[1].text
 				return true

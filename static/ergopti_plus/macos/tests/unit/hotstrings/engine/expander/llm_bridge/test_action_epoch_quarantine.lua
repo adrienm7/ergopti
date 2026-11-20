@@ -86,6 +86,7 @@ local function load_fixture(reset_result)
 		hide_forced_silent = function() effects.hide = effects.hide + 1; return true end,
 		is_visible = function() return false end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 		set_colorization_enabled = function() end,
 		set_accent_color = function() end,
 	}

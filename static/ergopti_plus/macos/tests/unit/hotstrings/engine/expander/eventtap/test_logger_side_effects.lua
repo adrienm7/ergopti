@@ -140,6 +140,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		}, { __index = function() return noop end })
 		package.loaded["core.ui.ui.tooltip"] = setmetatable({
 			tint = function() return {} end,
+			glyph = function() return nil, nil end,
 			is_visible = function() return false end,
 			is_hotstring_visible = function() return false end,
 			has_visible_hotstring_lease = function() return false end,

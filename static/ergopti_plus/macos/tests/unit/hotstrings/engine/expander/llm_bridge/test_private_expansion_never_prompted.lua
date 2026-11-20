@@ -112,6 +112,7 @@ local function build_world()
 		is_visible = function() return false end,
 		is_hotstring_visible = function() return false end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 	}, { __index = function() return noop end })
 	package.loaded["core.ui.adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
 

@@ -50,6 +50,7 @@ local function install_collaborators(effects)
 		set_colorization_enabled = function() end,
 		set_accent_color = function() end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		show_stacked = function(rows)
 			effects.rows = rows
 			return true

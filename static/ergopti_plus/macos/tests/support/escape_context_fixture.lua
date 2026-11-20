@@ -95,6 +95,7 @@ local function load_fixture(options, lifetime)
 		hide_forced = function() hides = hides + 1; return true end,
 		hide_forced_silent = function() hides = hides + 1; return true end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = tooltip
 

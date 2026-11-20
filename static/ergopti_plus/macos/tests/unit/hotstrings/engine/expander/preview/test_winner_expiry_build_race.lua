@@ -119,6 +119,7 @@ local function run_scenario()
 		set_on_show_callback = function() end,
 		set_timeout = function() end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		show_stacked = function(rows)
 			effects.renders = effects.renders + 1
 			effects.rows = rows

@@ -234,6 +234,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 			set_on_show_callback = function() end,
 			set_timeout = function() end,
 			tint = function() return {} end,
+			glyph = function() return nil, nil end,
 			show_stacked = function() shown = shown + 1; return true end,
 		}
 

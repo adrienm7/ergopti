@@ -464,6 +464,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			set_timeout       = function() end,
 			is_visible        = function() return false end,
 			tint              = function(_) return nil end,
+			glyph             = function(_) return nil, nil end,
 			set_colorization_enabled = function() end,
 			set_accent_color  = function() end,
 			set_accept_callback  = function() end,

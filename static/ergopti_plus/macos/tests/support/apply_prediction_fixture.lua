@@ -186,6 +186,7 @@ function M.run(options)
 		set_timeout = noop,
 		is_visible = function() return false end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 		set_colorization_enabled = noop,
 		set_accent_color = noop,
 		set_accept_callback = function(callback) tooltip_accept_callback = callback end,
