@@ -457,9 +457,9 @@
 		},
 		{
 			"os": "macos",
-			"tool": "`mkdir`, `mkfifo`, `mktemp`, `mv`, `cp`, `rm`, `chmod`, `ls`, `find`",
-			"programs": ["mkdir", "mkfifo", "mktemp", "mv", "cp", "rm", "chmod", "ls", "find"],
-			"used_for": "File operations and searches of the layout installer, the app picker, the field run, and the atomic writer's metadata copy (`cp -p`) and ACL read (`ls -led`) (`macos/core/fs/adapters/file_system.lua`, `macos/modules/keymap/layout_install.lua`, `macos/diagnostics/engine/field_check/session.lua`)",
+			"tool": "`mkdir`, `mkfifo`, `mktemp`, `mv`, `cp`, `rm`, `rmdir`, `chmod`, `ls`, `find`",
+			"programs": ["mkdir", "mkfifo", "mktemp", "mv", "cp", "rm", "rmdir", "chmod", "ls", "find"],
+			"used_for": "File operations and searches of the layout installer and remover, the app picker, the field run, and the atomic writer's metadata copy (`cp -p`) and ACL read (`ls -led`) (`macos/core/fs/adapters/file_system.lua`, `macos/modules/keymap/layout_install.lua`, `macos/diagnostics/engine/field_check/session.lua`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "POSIX; `cp -p` keeps ACLs and extended attributes",
