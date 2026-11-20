@@ -47,6 +47,20 @@ _HsCacheTestSharedDir() {
 	return DriversDir . "\_shared"
 }
 
+; The inline entries one section of a shared catalogue file holds, counted from
+; the file's text rather than through the cache builder the test compares them with.
+_HsCacheSectionEntries(Path, Section) {
+	Count := 0, Inside := false
+	loop parse, FileRead(Path, "UTF-8"), "`n", "`r" {
+		if RegExMatch(A_LoopField, "^\[+([^\[\]]+)\]+\s*$", &Header)
+			Inside := Header[1] == Section
+		else if Inside && InStr(A_LoopField, "= { output = ")
+			Count += 1
+	}
+	Assert(Count > 0, "the shared catalogue must hold entries in " . Section . ": " . Path)
+	return Count
+}
+
 ; Deep-compare two cache rows ([flags, trigger, output, final, repeat, caseSens]).
 _HsCacheRowsEqual(A, B) {
 	if (A.Length != B.Length)
@@ -81,7 +95,9 @@ TestHsCache_BuildExtractsKnownEntry() {
 		Key := "magickey.text_expansion_symbols"
 		Assert(Rows.Has(Key), "cache build must contain the stable " . Key . " section")
 		SymbolRows := Rows[Key]
-		AssertEqual(140, SymbolRows.Length, "every symbol expansion must reach the cache")
+		Source := _SharedDir . "\hotstrings\data\catalogue\magickey.toml"
+		AssertEqual(_HsCacheSectionEntries(Source, "text_expansion_symbols"), SymbolRows.Length,
+			"every symbol expansion must reach the cache")
 		Expected := ["*?C", " -> ★", " ➜ ", false, false, true, ""]
 		Assert(_HsCacheRowsEqual(SymbolRows[1], Expected),
 			"the first symbol retains its flags, literal case and absent priority override")
