@@ -36,7 +36,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the driver", functi
 		helpers.assert_eq(sfbs.extension, { id = "ergopti", name = "Ergopti+" }, "the menu files it under Ergopti+")
 		helpers.assert_eq(rolls.extension, { id = "ergopti", name = "Ergopti+" })
 		helpers.assert_eq(sfbs.count, 34)
-		helpers.assert_eq(rolls.count, 35)
+		helpers.assert_eq(rolls.count, 33)
 		helpers.assert_eq(catalogue.categories.magickey.sections.repeat_corrections.count, 14,
 			"the repeat corrections stay a section of the magic key category")
 		helpers.assert_nil(catalogue.categories.magickey.extension, "the magic key category stays bundled")
@@ -280,7 +280,7 @@ helpers.describe("Ergopti extension hotstrings: no-follow user source discovery"
 				local _, accepted = Config.load_all(); helpers.assert_true(accepted)
 				local category = Config.get_categories().rolls
 				helpers.assert_true(category.path:find("/layouts/registry/ergopti/hotstrings/rolls.toml", 1, true) ~= nil)
-				helpers.assert_eq(category.count, 35)
+				helpers.assert_eq(category.count, 33)
 				helpers.assert_eq(Config.personal_file_sources(), {}, "native no-follow discovery grants no descriptor for the link")
 				engine:reset(); engine:on_char("h")
 				local shipped = engine:on_char("c")
