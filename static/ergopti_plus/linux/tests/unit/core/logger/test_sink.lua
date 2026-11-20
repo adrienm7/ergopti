@@ -211,8 +211,10 @@ local function with_write_receipts(channel, refusal, body)
 			end
 			return true
 		end
-		function file.write()
+		file.text = ""
+		function file.write(_, ...)
 			file.writes = file.writes + 1
+			file.text = file.text .. table.concat({ ... })
 			return receipt("write")
 		end
 		function file.flush()
@@ -274,6 +276,33 @@ helpers.describe("linux-logger-write-receipts", function()
 			end)
 		end
 	end
+	-- LOG-05: a refused main file stayed retired until midnight, and the file
+	-- never said that lines were missing
+	helpers.it("linux-logger-write-receipts: a refused main channel reopens after the retry interval and counts what it missed", function()
+		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
+			local Monotonic = require("core.logger.engine.monotonic")
+			local interval = require("core.timing.engine.timings").ms("logger", "flush_interval_ms")
+			local real_now, clock = Monotonic.now_ms, 1000
+			Monotonic.now_ms = function() return clock end
+			local ok, err = pcall(function()
+				local failed = state.files.main
+				state.emit("2026-11-20 10:00:00:000 [INFO] [probe] first", "info")
+				state.emit("2026-11-20 10:00:00:100 [INFO] [probe] second", "info")
+				helpers.assert_true(state.files.main == failed, "inside the interval the refused channel stays retired")
+				state.failing = false
+				clock = clock + interval
+				state.emit("2026-11-20 10:00:01:000 [INFO] [probe] third", "info")
+				helpers.assert_true(state.files.main ~= failed, "the next line after the interval reopens the file")
+				helpers.assert_true(Sink.is_file_sink_active())
+				helpers.assert_eq(state.files.main.text,
+					"2026-11-20 10:00:01:000 [WARNING] [logger_sink] 2 lines were not written to the log file while it refused writes.\n"
+					.. "2026-11-20 10:00:01:000 [INFO] [probe] third\n")
+				helpers.assert_eq(#state.diagnostics, 1, "the refusal episode is reported once")
+			end)
+			Monotonic.now_ms = real_now
+			if not ok then error(err, 0) end
+		end)
+	end)
 	helpers.it("linux-logger-write-receipts: closed diagnostic output cannot retain a failed owner", function()
 		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
 			state.diagnostics_unavailable = true

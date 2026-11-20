@@ -31,8 +31,10 @@
 ---    test pins it against shell_runner.quote(). The retention purge
 ---    lists the folder in process through core/fs/engine/native_directory.lua, which
 ---    needs no logger.
---- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
----    says so; a broken handle degrades to stdout. The daemon must not die
+--- 6. Never fatal, never silent. A directory that cannot be created degrades to
+---    stdout-only and says so; a refused main or errors handle is retired, then
+---    reopened by a line once [logger] flush_interval_ms has passed, and the
+---    reopened file first counts the lines it missed. The daemon must not die
 ---    because logging failed.
 --- 7. Privacy admission. Canonical rules and the captured account identity are
 ---    admitted before output. A missing policy or identity refuses startup;
@@ -70,6 +72,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 local Redact = require("diagnostics.engine.reports.redact")
 local Json = require("core.text.engine.json")
 local NativeDirectory = require("core.fs.engine.native_directory")
+local Monotonic = require("core.logger.engine.monotonic")
 
 --- Topical routing table generated from _shared/core/logger/data/sub_files.toml:
 --- an array of { name = "<file name>", patterns = { ... } }.
@@ -103,6 +106,23 @@ local function retention_days()
 	return _retention_days
 end
 
+--- How long a refused main or errors channel waits before its next line reopens
+--- it: the registry's [logger] flush_interval_ms, the cadence at which the
+--- Windows logger retries a refused append. Read lazily for the reason above.
+local _retry_interval_ms = nil
+
+--- @return number|nil Milliseconds, or nil when the registry is unreadable (a
+---   refused channel then stays retired until the next rollover or repoint).
+local function retry_interval_ms()
+	if _retry_interval_ms ~= nil then return _retry_interval_ms end
+	local ok, Timings = pcall(require, "core.timing.engine.timings")
+	if not ok or not Timings then return nil end
+	local ok_value, value = pcall(Timings.ms, "logger", "flush_interval_ms")
+	if not ok_value or type(value) ~= "number" or value <= 0 then return nil end
+	_retry_interval_ms = value
+	return _retry_interval_ms
+end
+
 
 
 
@@ -127,6 +147,14 @@ local _errors_handle = nil
 --- handle was refused today: it stays retired until the next rollover, repoint
 --- or reinstall instead of failing again on every line.
 local _topical = {}
+
+--- Lines the main and errors channels could not write since each last accepted
+--- one, keyed by channel; reported in the file by the next line it accepts.
+local _missed = {}
+
+--- Monotonic milliseconds at which each refused channel was retired, keyed by
+--- channel; nil while the channel accepts lines.
+local _retired_at = {}
 
 --- True once M.install() has wired the sink into the shared core.
 local _installed = false
@@ -356,6 +384,10 @@ local function open_handles(date)
 	local failure
 	_errors_handle, failure = require("core.fs.engine.regular_file_writer").open(errors_path, "a")
 	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
+	-- A refused open retires its channel now, so its next retry waits the interval
+	local now = Monotonic.now_ms()
+	_retired_at.main = (not _main_handle) and now or nil
+	_retired_at.errors = (not _errors_handle) and now or nil
 end
 
 --- Whether a basename is a generated daily log for this prefix.
@@ -492,8 +524,9 @@ end
 --- @param handle userdata Owned append handle.
 --- @param line string
 --- @param channel string Technical diagnostic label.
+--- @param quiet boolean|nil True when the refusal was already reported.
 --- @return userdata|nil The retained handle, only after write and flush succeed.
-local function append_line(handle, line, channel)
+local function append_line(handle, line, channel, quiet)
 	local protected, accepted, failure = pcall(function()
 		local written, write_error = handle:write(line, "\n")
 		if not written then return nil, write_error end
@@ -501,13 +534,66 @@ local function append_line(handle, line, channel)
 	end)
 	if protected and accepted ~= nil and accepted ~= false then return handle end
 	pcall(function() handle:close() end)
+	if quiet then return nil end
 	local reason = protected and failure or accepted
 	-- Calling Logger here would recursively invoke this same failed sink.
 	pcall(function()
 		io.stderr:write(_redact("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
-			.. " — channel retired; logging continues through other outputs.\n"))
+			.. " — channel retired until it accepts a line again; logging continues through other outputs.\n"))
 	end)
 	return nil
+end
+
+--- Path of the main or errors file for the date the handles belong to.
+--- @param channel string "main" or "errors".
+--- @return string
+local function channel_path(channel)
+	return _dir .. "/" .. (channel == "main" and MAIN_PREFIX or ERRORS_PREFIX) .. _date .. LOG_EXT
+end
+
+--- Writes one line to the main or errors file. A channel a refusal retired is
+--- reopened by its first line once retry_interval_ms() has passed, and the
+--- lines it missed meanwhile are counted in the file first: it used to stay
+--- retired until midnight, and the file never showed that lines were missing
+--- (logger parity audit LOG-05), where the Windows logger retries on its flush
+--- tick and reports what its queue dropped.
+--- @param handle userdata|nil The channel's handle; nil when retired.
+--- @param channel string "main" or "errors".
+--- @param line string Redacted, formatted line.
+--- @return userdata|nil handle The handle to keep, nil when still refused.
+local function write_channel(handle, channel, line)
+	local missed = _missed[channel] or 0
+	if not handle then
+		local retired_at, interval = _retired_at[channel], retry_interval_ms()
+		local now = Monotonic.now_ms()
+		if retired_at ~= nil and (interval == nil or now - retired_at < interval) then
+			_missed[channel] = missed + 1
+			return nil
+		end
+		local opened, reopened = pcall(require("core.fs.engine.regular_file_writer").open, channel_path(channel), "a")
+		handle = opened and reopened or nil
+		if not handle then
+			_missed[channel] = missed + 1
+			_retired_at[channel] = now
+			return nil
+		end
+		if missed > 0 then
+			local stamp = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d) ")
+				or (os.date("%Y-%m-%d %H:%M:%S") .. ":000")
+			handle = append_line(handle, string.format(
+				"%s [WARNING] [logger_sink] %d %s not written to the log file while it refused writes.",
+				stamp, missed, missed == 1 and "line was" or "lines were"), channel, true)
+			if not handle then
+				_missed[channel] = missed + 1
+				_retired_at[channel] = Monotonic.now_ms()
+				return nil
+			end
+		end
+	end
+	handle = append_line(handle, line, channel, missed > 0)
+	_missed[channel] = handle and 0 or missed + 1
+	_retired_at[channel] = (not handle) and Monotonic.now_ms() or nil
+	return handle
 end
 
 --- Appends the line to every topical file whose patterns match it.
@@ -555,12 +641,9 @@ local function sink(line, variant)
 
 	rollover_if_needed()
 
-	if _main_handle then
-		_main_handle = append_line(_main_handle, line, "main")
-	end
-
-	if _errors_handle and ERROR_VARIANTS[variant] then
-		_errors_handle = append_line(_errors_handle, line, "errors")
+	if _dir then
+		_main_handle = write_channel(_main_handle, "main", line)
+		if ERROR_VARIANTS[variant] then _errors_handle = write_channel(_errors_handle, "errors", line) end
 	end
 
 	if _dir then fan_out(line) end
@@ -707,6 +790,8 @@ function M.repoint()
 	close_topical()
 	_dir, _date = target, date
 	_main_handle, _errors_handle = main, errors_ok and errors or nil
+	_retired_at.main = nil
+	_retired_at.errors = (not _errors_handle) and Monotonic.now_ms() or nil
 	_stdout_only = false
 	if not _errors_handle then report_mirror_refusal(errors_path, errors_ok and errors_failure or errors) end
 	if previous_main then pcall(function() previous_main:close() end) end
@@ -736,6 +821,8 @@ function M.uninstall(logger)
 	_stdout_only = false
 	_redact = nil
 	_config_dir = nil
+	_missed = {}
+	_retired_at = {}
 end
 
 --- Follows the configuration directory the redactor masks. infra.config_paths
