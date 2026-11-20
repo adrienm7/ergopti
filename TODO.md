@@ -514,12 +514,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       for the 1.4 GB archive. Its `revoke` mode rewrites the model in place with the same size mid-download, on a
       trusted token: no byte lands after the edit. What remains per chunk is 14 `install_resolver` ancestor walks
       (about 1.5 ms, one lstat per ancestor each). Time a first real install on the PC.
-- [ ] **A touchpad tap's click meets an unknown field.** A button press is now counted before the click
-      callback withdraws the field's privacy verdict (`keyboard_hook`, pointer-press-before-click), but a
-      tap-to-click is counted on the frame that ends the tap, after the touch's own press already withdrew it:
-      until the focus is read again (the periodic refresh after the settle delay) its click, and any wheel turn
-      or travel just after a click, is not recorded. Count the tap in the context its touch began in, then
-      extend `run_pointer_metrics_live.lua` with a uinput touchpad.
+- [ ] **Wheel turns and travel just after a click meet an unknown field.** A click, a touch's landing included,
+      withdraws the field's privacy verdict until the guard reads the focus again (the settle delay), and the
+      wheel turns and travel of that span are not recorded; macOS withdraws nothing on a click and Windows reads the
+      field again within the click, so both count them. A touch's own clicks are counted where it began since 2026-11-20 (tap-click-touch-context), and so
+      is a second click inside the span only when it is part of that touch: a double-click's or double tap's
+      second click is still lost. Decide whether that span may count under the verdict the click left, then
+      extend the same rule to the wheel and the travel.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen

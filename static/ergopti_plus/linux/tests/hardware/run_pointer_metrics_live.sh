@@ -4,7 +4,8 @@
 # A desktop for run_pointer_metrics_live.lua: an X server, a session bus, the
 # accessibility bus, a window manager and a focused GTK window (the
 # application the metrics rows are filed under). Then the real daemon on a
-# uinput keyboard and a uinput mouse, and the rows it stores.
+# uinput keyboard and a uinput mouse, then on a uinput touchpad, and the rows
+# it stores.
 #
 # Needs root (or the uinput/input groups) for /dev/uinput and the grab, Xvfb,
 # dbus-launch, at-spi2-core, openbox, xkbcomp, python3-gi with Gtk 3, xdotool, sqlite3
@@ -53,7 +54,7 @@ sleep 1
 # The rows are filed under the focused application, and nothing is recorded
 # while the privacy gate cannot tell the field is not a password.
 READY="$(mktemp -u)"
-python3 tests/hardware/atspi_fixture_app.py metrics --lifetime-seconds 150 --ready-file "${READY}" >/dev/null 2>&1 &
+python3 tests/hardware/atspi_fixture_app.py metrics --lifetime-seconds 300 --ready-file "${READY}" >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 for _ in $(seq 1 80); do [ -f "${READY}" ] && break; sleep 0.25; done
 [ -f "${READY}" ] || { echo "ENVIRONMENT: the focused GTK window never became active" >&2; exit 2; }
