@@ -125,7 +125,14 @@ _APNT_Case() {
 		AssertEqual(2, Receipt["windows"])
 		AssertEqual(1, Receipt["confirmed"])
 		AssertEqual(2, Receipt["frames"].Length)
-		AssertEqual(7, Receipt["assets"].Count)
+		; Every file the page names reaches the private mount: without value_check.js
+		; script.js stopped early and no click listener existed.
+		Expected := ["ui\action_picker\index.html", "ui\action_picker\script.js", "ui\action_picker\style.css",
+			"ui\a11y_prefs.js", "ui\theme.css", "ui\i18n.js", "ui\host_bridge.js", "ui\program_parameter.js",
+			"ui\value_check.js", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
+		for Relative in Expected
+			AssertTrue(Receipt["assets"].Has(Relative), "The delivered page needs " . Relative)
+		AssertEqual(Expected.Length, Receipt["assets"].Count)
 		AssertTrue(Receipt["frames"][2]["epoch"] > Receipt["frames"][1]["epoch"])
 		if IsObject(ExportFailure)
 			throw ExportFailure

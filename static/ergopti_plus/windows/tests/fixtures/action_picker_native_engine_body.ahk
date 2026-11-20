@@ -77,11 +77,42 @@ _APNR_Timeout() {
 
 _APNR_Hash(Path) => CryptoSha256Bytes(FSReadBytesStrict(Path))
 
+; Every file the delivered page names (its scripts and stylesheets, read from
+; index.html itself) plus the strings i18n.js fetches. A fixed list once missed
+; value_check.js: script.js stopped at its first top-level read of it, so the
+; page never registered its DOMContentLoaded listeners and a click picked nothing.
+_APNR_PageAssets() {
+	global _APNR_SourceShared
+	Page := "ui\action_picker\index.html"
+	Assets := [Page, "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
+	Html := FileRead(_APNR_SourceShared . "\" . Page, "UTF-8")
+	Position := 1
+	while Position := RegExMatch(Html, '(?:src|href)="([^"]+)"', &Match, Position) {
+		Position += Match.Len
+		Reference := Match[1]
+		_APNR_Require(!InStr(Reference, ":") && !InStr(Reference, "?"),
+			"The delivered page may name only files of the shared tree: " . Reference)
+		Parts := StrSplit("ui\action_picker\" . StrReplace(Reference, "/", "\"), "\")
+		Resolved := []
+		for Part in Parts {
+			if Part == ".."
+				Resolved.Pop()
+			else if Part != "."
+				Resolved.Push(Part)
+		}
+		Relative := ""
+		for Part in Resolved
+			Relative .= (A_Index > 1 ? "\" : "") . Part
+		Assets.Push(Relative)
+	}
+	return Assets
+}
+
 _APNR_CopyAssets() {
 	global _APNR, _SharedDir, _APNR_SourceShared
-	for Relative in ["ui\action_picker\index.html", "ui\action_picker\script.js", "ui\action_picker\style.css",
-		"ui\host_bridge.js", "ui\i18n.js", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"] {
+	for Relative in _APNR_PageAssets() {
 		Source := _APNR_SourceShared . "\" . Relative, Target := _SharedDir . "\" . Relative
+		_APNR_Require(FileExist(Source), "A file the delivered page names is missing: " . Relative)
 		SplitPath(Target, , &Directory)
 		DirCreate(Directory)
 		FileCopy(Source, Target, false)
