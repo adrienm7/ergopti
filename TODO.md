@@ -259,17 +259,19 @@ waits for the maintainer's review).
       show every level (« Level shown »), the exports name what they leave out, and the editor keeps the seven
       levels through save and reload: Mod3 and Mod4 are held custom modifiers of the source, on Caps Lock and the
       ISO key left of Enter, the key right of left Shift and AltGr (`docs/design/layout-analysis.md`, « Layout file
-      formats »; `tools/test/test-layout-editor-levels.cjs`). Left, the same on Windows, macOS and Linux: the
-      drivers' emulation holds Mod3 on the ISO key left of Enter and Mod4 on the key right of left Shift only, since
-      it does not hold a custom modifier on Caps Lock or AltGr (`modifier_key_not_emulated`, `source_compiler.js`
-      `MODIFIER_KEYS`), and types no dead key on an emulated layer (`dead_key_not_emulated`: Neo's Mod3 and Mod4
-      dead keys); each is listed in the emulation table, never dropped. The native files: no `.keylayout` holds a
-      custom modifier (macOS relies on the emulation); XKB holds Mod3 on Caps Lock as its fifth level and lists Mod4
-      (`custom_modifier_not_in_xkb`); the Neo XKB and KLC exports are refused for reasons older than the levels
-      (`unbound_stateful_actions`, Caps Lock on the Roya or AltGr columns), as is the DLL package
-      (`kbd_unit_invalid` on a dead-key result). Making Caps Lock and AltGr holdable by the emulation means each
-      driver's hook taking them as plain keys (the AHK, Hammerspoon and evdev paths) while their own Caps Lock and
-      AltGr roles stay off.
+      formats »; `tools/test/test-layout-editor-levels.cjs`). Since 2026-11-20 the drivers' emulation holds them
+      on Caps Lock and AltGr too, Caps Lock never toggling and AltGr selecting no system level (Windows: suppressed
+      SC03A and SC138, AltGr's fake LCtrl ignored; Linux: the hook's `onHeldModifierKey` keeps the grabbed key from
+      XKB; macOS: right Option's flagsChanged edges deleted and its Option flag cleared), and types the dead keys of
+      an emulated level, composing with the native base and Shift levels (`neo2_vectors.json`, replayed by the web,
+      Lua and AutoHotkey engines). macOS cannot hold Mod3 on Caps Lock, which an event tap never sees held
+      (`platform_reason.caps_lock_level_not_held_on_macos`): only a generated Karabiner rule could, still to do.
+      Left, the native files: no `.keylayout` holds a custom modifier (macOS relies on the emulation); XKB holds
+      Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB and KLC
+      exports are refused for reasons older than the levels (`unbound_stateful_actions`, Caps Lock on the Roya or
+      AltGr columns), as is the DLL package (`kbd_unit_invalid` on a dead-key result). Not checked on real
+      hardware: a user tap-hold or remap on Caps Lock or AltGr may still take the key before the emulation (the
+      Linux tap-hold engine runs first, an AHK static label is created first).
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and

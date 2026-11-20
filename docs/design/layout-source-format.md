@@ -220,7 +220,8 @@ custom modifier on its keys (Caps Lock and the ISO key left of Enter, the key
 right of left Shift and AltGr), each level a layer it requires
 (`docs/design/layout-analysis.md`, « Layout file formats »). The macOS `.keylayout`
 leaves them out, XKB takes one on its fifth level and the drivers' emulation
-holds them on the keys it sees, each target listing the rest by path. The built-in modifiers are `shift`, `control`, `alt`, `meta`,
+holds them on all four keys, Caps Lock and AltGr included (macOS: all but Caps
+Lock), each target listing the rest by path. The built-in modifiers are `shift`, `control`, `alt`, `meta`,
 their `_left` and `_right` variants, and `caps_lock`, `num_lock`, `scroll_lock`.
 Their separate names avoid collapsing platform-specific shortcut semantics.
 
@@ -497,13 +498,28 @@ report says so. The image is the user's: the generator draws none.
 platform's compiled `.keylayout` leaves out: every custom modifier with the keys
 a driver sees (held or locked), every layer in order with its selectors, whether
 the `.keylayout` holds it (`native`) and the mappings the emulation performs
-(all of an emulated layer's `text`, `key` and `disabled` mappings; a native
-layer's `key` chords), the shortcuts, the tap-holds and the remaps of system
-keys. `not_emulated` lists, with a stable reason, what even the emulation
-cannot perform: dead keys and actions in an emulated layer, layers or chords
+(all of an emulated layer's `text`, `key`, `dead_key` and `disabled` mappings;
+a native layer's `key` chords), the shortcuts, the tap-holds and the remaps of
+system keys. A custom modifier may be held on Caps Lock and AltGr (`CapsLock`,
+`AltRight`): each driver's hook then takes the key as a plain key, so Caps Lock
+does not toggle and AltGr selects no system level (Windows suppresses SC03A
+and SC138 and ignores the LCtrl an AltGr layout adds; Linux keeps the grabbed
+evdev key from XKB, `onHeldModifierKey`; macOS deletes right Option's
+flagsChanged edges and clears the Option flag from the keys under it). macOS
+cannot hold one on Caps Lock: an event tap sees only the lock flag change on a
+press, never the release (`modifier_key_not_holdable_on_macos`,
+`platform_reason.caps_lock_level_not_held_on_macos`). When an emulated layer or
+a tap types a dead key, the table adds `dead_keys` (every dead key it reaches
+and its rules, `inputs` by typed text and `dead_inputs` by dead key),
+`compose_keys` on each native layer (what its keys answer a rule with: their
+text or the `.keylayout`'s dead key) and `compose` on a text mapping whose
+compose identity differs from its text (empty for `compose = false`); a table
+without one is written exactly as before (`ergopti_emulation.json` pins the
+Ergopti layouts). `not_emulated` lists, with a stable reason, what even the
+emulation cannot perform: actions in an emulated layer, layers or chords
 needing a sided modifier other than `alt_right` (no driver reports sides), keys
-the physical-key registry does not have (`ScrollLock`, `F13`, `Pause`) and
-modifier keys (`CapsLock`, which the drivers see as a lock or a flag).
+the physical-key registry does not have (`ScrollLock`, `F13`, `Pause`) and the
+other modifier keys (Shift, Control, left Alt, the Meta keys).
 
 One engine performs it: `_shared/layouts/engine/composer/source_emulation.lua` on macOS
 and Linux, its twin `_shared/ui/layout_composer/source_emulation.js` for the
@@ -520,7 +536,12 @@ first, a press after it or the threshold passing (`tick`) starts the hold of the
 layer or modifier (a built-in one the driver applies to the keys under it), and a
 release before the threshold types the tap. A hold reaching a native layer sends
 each key it does not map with the held modifiers and those its first selector
-requires, since no modifier the user holds selects that layer on the OS. No keystroke is held back or
+requires, since no modifier the user holds selects that layer on the OS. A dead
+key composes as TN2056 does: the next key's text (or the dead key it types)
+answers a rule, which types its text or leads to its next dead key; any other
+key ends it with its terminator, then types as it would. Modifier presses leave
+it pending, its own auto-repeat and release type nothing, and while AltGr holds
+a custom modifier the `alt_right` a driver reports is no level. No keystroke is held back or
 reordered (decided by the coordinator on 2026-11-11 overnight, to review by the
 maintainer: the release-order rule of Windows and Linux would need the drivers
 to delay and replay keys).
@@ -532,8 +553,12 @@ and `web/` (the macOS `.keylayout` and its table: the web emulation types both,
 having no installed layout). The fixture
 `_shared/tests/corpus/layouts/source/emulation_source.toml`, its golden
 `emulation.json` and the typing vectors `emulation_vectors.json` pin the
-compiler and both engines (`npm run test:layout-source-emulation`, and the Lua
-contract `_shared/tests/lua/source_emulation_contract.lua` on both drivers).
+compiler and the engines (`npm run test:layout-source-emulation`, the Lua
+contract `_shared/tests/lua/source_emulation_contract.lua` on both drivers and
+`windows/tests/unit/modules/keymap/test_layout_source_emulation.ahk`); Neo 2
+from the layout library (`neo2_source.toml`, its tables `neo2_emulation.json`
+and `neo2_vectors.json`, a case naming the platforms it holds on) pins Mod3 and
+Mod4 on Caps Lock and AltGr, ¡ ¿ and the Mod4 dead ¨ on the same engines.
 
 ### Drivers: the source through the layout composer host
 
