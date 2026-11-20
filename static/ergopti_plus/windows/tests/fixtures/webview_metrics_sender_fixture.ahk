@@ -46,7 +46,8 @@ class _MVSP_PassiveCoreProbe {
 global _MVSP := {Phase: "arguments", Root: "", Profile: "", Gui: 0, Controller: 0,
 	View: 0, Sender: 0, HostSubscription: 0, ObserverSubscription: 0, BrowserHandle: 0,
 	BrowserPid: 0, BrowserRetired: false, ProfileRetired: false, Closed: false,
-	NativeValid: false, Received: false, AsyncError: 0, Calls: 0, Spawns: 0, Starts: 0, Stops: 0, Receipt: Map()}
+	NativeValid: false, Received: false, AsyncError: 0, Calls: 0, Spawns: 0, Starts: 0, Stops: 0, Receipt: Map(),
+	ControllerAt: 0, NavigatedAt: 0, NavigationSubscription: 0, ProcessSubscription: 0}
 global _ConfigDir := ""
 OnError(_MVSP_Error)
 OnExit(_MVSP_Exit)
@@ -184,6 +185,20 @@ _MVSP_ObserveOther(Sender, Args) {
 	Other.Received := true
 }
 
+; The default page posts its message once loaded, so a navigation that fails, or
+; a browser process that dies, can never deliver it: each fails at once with its
+; WebView2 status instead of waiting for the deadline.
+_MVSP_Navigated(Sender, Args) {
+	global _MVSP
+	_MVSP.NavigatedAt := A_TickCount
+	if !Args.IsSuccess
+		_MVSP_Error(Error("The private document navigation failed (web error status " . Args.WebErrorStatus . ")."))
+}
+
+_MVSP_ProcessFailed(Sender, Args) {
+	_MVSP_Error(Error("A WebView2 process failed before the native message (kind " . Args.ProcessFailedKind . ")."))
+}
+
 _MVSP_Navigation(State, Sender, Args) {
 	_MVSP_Require(Args.IsSuccess, "The actual private document navigation failed.")
 	State.Done := true
@@ -294,7 +309,13 @@ _MVSP_Error(Failure, *) {
 
 _MVSP_Deadline() {
 	global _MVSP
-	FileAppend("Native metrics sender prerequisite deadline at " . _MVSP.Phase . ".`n", "**", "UTF-8-RAW")
+	; Name where the time went: a stall before the page loaded is not one after.
+	Detail := ""
+	if _MVSP.HasOwnProp("ControllerAt") && _MVSP.ControllerAt
+		Detail := " (" . TickElapsed(_MVSP.ControllerAt) . " ms since the controller request; "
+			. (_MVSP.NavigatedAt ? "navigation completed after " . TickElapsed(_MVSP.ControllerAt, _MVSP.NavigatedAt) . " ms"
+			: "navigation never completed") . ")"
+	FileAppend("Native metrics sender prerequisite deadline at " . _MVSP.Phase . Detail . ".`n", "**", "UTF-8-RAW")
 	ExitApp(2)
 }
 
@@ -339,6 +360,7 @@ _MVSP_Main() {
 		_MVSP.Gui.Show("w480 h320 NoActivate")
 		_MVSP.Phase := "controller"
 		SetTimer(_MVSP_Deadline, -30000)
+		_MVSP.ControllerAt := A_TickCount
 		_MVSP.Controller := WebView2.create(_MVSP.Gui.Hwnd, , 0, _MVSP.Profile, "", 0,
 			A_ScriptDir . "\..\..\vendor\64bit\WebView2Loader.dll")
 		_MVSP.View := _MVSP.Controller.CoreWebView2
@@ -370,8 +392,11 @@ _MVSP_Main() {
 		_MVSP.Phase := "native-message"
 		if _MVSP.Mode == "other-core"
 			_MVSP_RunOtherCore()
-		else
+		else {
+			_MVSP.NavigationSubscription := _MVSP.View.NavigationCompleted(_MVSP_Navigated)
+			_MVSP.ProcessSubscription := _MVSP.View.ProcessFailed(_MVSP_ProcessFailed)
 			_MVSP.View.Navigate(_MVSP.Url)
+		}
 		while !_MVSP.Received
 			Sleep(10)
 		if IsObject(_MVSP.AsyncError)
@@ -433,6 +458,8 @@ _MVSP_Close() {
 	SetTimer(_MVSP_Deadline, 0)
 	_MVSP_CloseOther()
 	_MVSP.HostSubscription := 0, _MVSP.ObserverSubscription := 0
+	; The controller's own retirement below ends its browser: not a failure.
+	_MVSP.NavigationSubscription := 0, _MVSP.ProcessSubscription := 0
 	KLWV.windows := Map()
 	if _MVSP.HasOwnProp("Entry")
 		_MVSP.Entry := 0
