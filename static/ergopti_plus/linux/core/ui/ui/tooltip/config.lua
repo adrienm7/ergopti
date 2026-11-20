@@ -60,18 +60,10 @@ local function sections()
 	return _sections
 end
 
---- One required key, or an error naming exactly what is missing.
---- @param section string
---- @param key string
---- @return any
-local function require_key(section, key)
-	local s = sections()[section]
-	if type(s) ~= "table" or s[key] == nil then
-		error(string.format("[tooltip.config] missing key [%s].%s in the shared tooltip constants",
-			section, key))
-	end
-	return s[key]
-end
+--- One required key, or an error naming exactly what is missing, through the
+--- accessor macOS reads its copy of the constants with.
+--- @type fun(section: string, key: string): any
+local require_key = require("core.ui.engine.tooltip.constant_keys").reader(sections, "[tooltip.config]")
 
 --- A per-driver key, falling back to the shared one when the file declares only
 --- a single value for every driver.

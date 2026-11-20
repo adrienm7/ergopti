@@ -265,17 +265,7 @@ local function load_from_shared()
 		error("[tooltip/config] cannot read constants.toml (missing or empty): " .. tostring(toml_path))
 	end
 
-	local function require_key(section, key)
-		local s = c.sections[section]
-		if type(s) ~= "table" then
-			error(string.format("[tooltip/config] missing section [%s] in constants.toml", section))
-		end
-		local v = s[key]
-		if v == nil then
-			error(string.format("[tooltip/config] missing key [%s].%s in constants.toml", section, key))
-		end
-		return v
-	end
+	local require_key = require("core.ui.engine.tooltip.constant_keys").reader(c.sections, "[tooltip/config]")
 
 	local function optional_key(section, key)
 		local s = c.sections[section]

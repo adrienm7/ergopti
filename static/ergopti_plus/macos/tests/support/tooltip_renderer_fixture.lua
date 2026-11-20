@@ -29,7 +29,9 @@ local OWNERS = {
 	"adapters.accessibility_permission",
 	-- The renderer reads the display settings and announces through VoiceOver.
 	"core.ui.adapters.system_accessibility",
-	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
+	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config",
+	-- The configuration reads its constants through this shared accessor.
+	"core.ui.engine.tooltip.constant_keys", "core.ui.ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
 	"platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data", "core.text.engine.table_util",
