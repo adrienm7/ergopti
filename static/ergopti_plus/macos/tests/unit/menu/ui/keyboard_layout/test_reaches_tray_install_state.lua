@@ -156,14 +156,25 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 end)
 
 helpers.describe("Layout native choices retain data identity and declared state", function()
-	helpers.it("retains custom registry record spelling, check and native selector without performing selection", function()
+	-- The custom-layout row left the menu: the input sources list switches the
+	-- same registry layouts, so its record spelling is held there. The selected
+	-- source is checked and disabled; another one keeps its native selector.
+	helpers.it("retains input source record spelling, check and native selector without performing selection", function()
 		with_switch_frame(function(build, fixture)
-			fixture.custom = {layouts = {{id = "private.layout", name = "Custom 100%s && 🦀"}}, active = "private.layout"}
-			local row = switch_row(assert(build()), "Custom 100%s && 🦀")
-			helpers.assert_not_nil(row)
-			helpers.assert_eq(row.checked, true)
-			helpers.assert_nil(row.disabled)
-			helpers.assert_true(type(row.fn) == "function")
+			fixture.records = {
+				{id = "private.layout", name = "Custom 100%s && 🦀", selected = true},
+				{id = "other.layout", name = "Other 50%d && 🐙", selected = false},
+			}
+			local rows = assert(build())
+			local selected = switch_row(rows, "Custom 100%s && 🦀")
+			helpers.assert_not_nil(selected)
+			helpers.assert_eq(selected.checked, true)
+			helpers.assert_eq(selected.disabled, true)
+			local other = switch_row(rows, "Other 50%d && 🐙")
+			helpers.assert_not_nil(other)
+			helpers.assert_true(not other.checked, "an unselected source carries no check")
+			helpers.assert_nil(other.disabled)
+			helpers.assert_true(type(other.fn) == "function")
 			helpers.assert_eq(fixture.effects, 0)
 		end)
 	end)
