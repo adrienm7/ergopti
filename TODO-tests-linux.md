@@ -56,6 +56,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       probe that answered), once with the runtime already installed and once right after its first install. Linux
       probes every 3 s up to what is left of the 30 min install budget, macOS waits at most 30 s: the two figures
       decide one bound for the three.
+- [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, 2026-11-20): on GNOME (Wayland, then X11)
+      without the AppIndicator extension, start the daemon with `--tray`: note what the user sees (no icon, a
+      notification, a window) and the log line after « Tray icon created ». Then enable the extension and, on GNOME and
+      on KDE Plasma, left-click and right-click the icon (both open the menu?) and let Orca read it: « Ergopti+ », then
+      « Ergopti+ (paused) » after a pause.
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

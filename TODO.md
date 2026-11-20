@@ -367,8 +367,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     Windows and Linux; OLL-08 Linux reuse without a re-hash; OLL-09 macOS model delete through `ollama rm`; OLL-10
     the macOS-only model repair; OLL-11 the lifecycle actions outside the parity table; OLL-12 the unused
     `ollama-release.sh`; OLL-13 Linux readiness without listener ownership or the pinned version;
-  - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
-    metrics views, small native units, layout tool pages.
+  - tray adapters, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-tray-adapters/report.md)):
+    TRAY-01 fixed (the Windows cold tray showed French startup rows to every user and an icon named by its file name
+    until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language).
+    Left: TRAY-02 a Windows left click does nothing where macOS and Linux open the menu (maintainer decision);
+    TRAY-03 a Linux desktop without a StatusNotifier host shows no icon and tells nothing (read the watcher, say so
+    in the user's language); TRAY-04 rewrite `TrayMenu.spec.js` on the two real icon states and the option map, with
+    vectors that can fail; TRAY-05 log a missing tray icon file on the three instead of drawing another;
+  - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
+    small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release

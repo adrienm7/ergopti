@@ -374,6 +374,10 @@ owner. Windows is the reference unless a shared contract says otherwise.
 4. **Tray adapters.** `linux/tray/adapters` (AppIndicator, 1,164),
    `macos/tray/adapters` and the Windows tray adapters (named only by the
    pause campaign): the icon state, the menu rebuild and the click routing.
+   **Taken on 2026-11-20** ([report](../2026-11-20-tray-adapters/report.md)):
+   icon states, rows, rebuild, clicks, tooltip and accessible names,
+   localization, missing tray host and teardown; TRAY-01 (the Windows cold
+   tray in the configured locale, named) fixed, TRAY-02 to TRAY-05 open.
 5. **Update and download windows.** `download_window` on macOS and Linux and
    its shared page; `update_check` on the three and its shared page; plus
    `release_notes`, `update_channels.js` and `version_order.js`. About 5,000

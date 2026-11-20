@@ -180,6 +180,7 @@ named file is not a reviewed file.
 | Secure-field detection (focus) | [report](audits/platform-parity/2026-11-19-census/report.md#first-campaign-secure-field-detection) |
 | Logger engines                 | [report](audits/platform-parity/2026-11-20-logger-engines/report.md)                               |
 | Managed Ollama runtime         | [report](audits/platform-parity/2026-11-20-managed-ollama/report.md)                               |
+| Tray adapters                  | [report](audits/platform-parity/2026-11-20-tray-adapters/report.md)                                |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -203,6 +204,18 @@ registry and the inventories were corrected. Left open: OLL-04 to OLL-13,
 among them the free-space check on macOS and Linux, the unlocalized install
 failure classes, the readiness bound (30 s on macOS, the install budget
 elsewhere; a field measure first) and the Linux listener ownership.
+
+The tray-adapters campaign (November 20, 2026) fixed TRAY-01: the Windows
+cold tray appeared before `I18nInit`, so its startup rows were French for
+every user (the module default locale) and a screen reader named the icon by
+the script's file name, the order bug Linux fixed in August. A normal boot
+now publishes the startup commands and the icon's name in the configured
+locale, then shows the icon; a first run shows it beside the wizard in the
+wizard's language. Left open: TRAY-02, a Windows left click does nothing
+(a maintainer decision); TRAY-03, a Linux desktop without a tray host shows
+nothing and says nothing; TRAY-04, the TrayMenu port spec and its vectors
+describe a three-state `setIcon(state)` no adapter has; TRAY-05, a missing
+icon file is replaced silently on the three.
 
 ## Review status at resumption — November 12, 2026
 

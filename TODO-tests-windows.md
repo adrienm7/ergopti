@@ -237,6 +237,12 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       typing (hotstrings, remaps, tap-holds, predictions) runs until the resume, after which each change applies and
       the local servers are searched again. A click that still waits (API entry test, test prediction, local server
       rescan, touchpad auto-configure, programmable hotstrings) shows the paused notice once.
+- [ ] Cold tray in the configured language (TRAY-01, 2026-11-20): with Ergopti set to English and Narrator on, start
+      the driver and right-click the icon as soon as it appears: Suspend, Reload and Quit read in English, never «
+      Suspendre », « Recharger », « Quitter », and Narrator names the icon « Ergopti+ », never `ErgoptiPlus.exe`. On a
+      first run (no `config.toml`), the icon shown beside the wizard reads « ErgoptiPlus — Starting… », is named «
+      Ergopti+ », and a click on it brings the wizard forward. Left-click the icon too and note what it does (TRAY-02:
+      nothing today, where macOS and Linux open the menu).
 - [ ] Boot and menu timings: a toggle must not rebuild 1000 rows; compare base and candidate with interleaved smoke
       boots (summed `process_cpu`); the 2026-11-16 smoke boots gave `Boot complete` between 5.9 and 8.7 s.
 - [ ] Hot-path span lines: at DEBUG, switch the layout once; the field log then holds a `layout.switch` pair beside the
