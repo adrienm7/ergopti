@@ -435,6 +435,30 @@ _A11yT_WpmSurfaceIsNamedForReaders() {
 Test("a11y readers: the WPM surface is named by its value while a screen reader runs (a11y-readers-2026-11-18)",
 	_A11yT_WpmSurfaceIsNamedForReaders)
 
+; The pill and the graph are two windows, and a discarded surface is rebuilt
+; as a new one: a cache of the text alone left the next window nameless at the
+; same speed, and the reader said the Gui title instead (met-08).
+_A11yT_EveryWpmSurfaceIsNamed() {
+	Calls := []
+	NameFn(Hwnd, Text) {
+		Calls.Push(Hwnd)
+		return true
+	}
+	Pill := Gui(), Graph := Gui()
+	try {
+		AssertTrue(_WPMWidget_NameForReaders(Pill, "72", () => true, NameFn), "the pill is named")
+		AssertTrue(_WPMWidget_NameForReaders(Graph, "72", () => true, NameFn),
+			"the graph shown at the same speed is named too (met-08)")
+		AssertFalse(_WPMWidget_NameForReaders(Graph, "72", () => true, NameFn), "and once only")
+		AssertEqual(2, Calls.Length)
+		AssertEqual(Graph.Hwnd, Calls[2], "the name goes to the window shown")
+	} finally {
+		Pill.Destroy(), Graph.Destroy()
+		_WPMWidget_NameForReaders(0, "", () => false)
+	}
+}
+Test("a11y readers: every WPM surface is named at the same speed (met-08)", _A11yT_EveryWpmSurfaceIsNamed)
+
 ; The Spotlight overlay told a screen reader nothing: while one runs, its
 ; circle window announces that the pointer is highlighted.
 _A11yT_SpotlightIsAnnounced() {

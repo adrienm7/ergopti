@@ -139,7 +139,9 @@ _WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
 ; @param NameFn {Func|Integer} Replaces A11ySystem_SetAccessibleName (tests).
 ; @returns {Boolean} Whether a new name was set.
 _WPMWidget_NameForReaders(GuiRef, Value, ScreenReaderFn := 0, NameFn := 0) {
-		; The name last set ("" for none): one widget per driver.
+		; The window and name last set ("" for none). The window is part of it:
+		; the pill and the graph, and a rebuilt surface, are other windows, and a
+		; cache of the text alone left them nameless at the same speed (MET-08).
 		static LastName := ""
 		ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
 		if !ReaderOn {
@@ -149,12 +151,13 @@ _WPMWidget_NameForReaders(GuiRef, Value, ScreenReaderFn := 0, NameFn := 0) {
 		if !IsObject(GuiRef)
 				return false
 		Text := Value . " " . t("menu.metrics.wpm_unit")
-		if (Text == LastName)
+		Named := GuiRef.Hwnd . "`n" . Text
+		if (Named == LastName)
 				return false
 		SetName := IsObject(NameFn) ? NameFn : A11ySystem_SetAccessibleName
 		if !SetName.Call(GuiRef.Hwnd, Text)
 				return false
-		LastName := Text
+		LastName := Named
 		return true
 }
 
