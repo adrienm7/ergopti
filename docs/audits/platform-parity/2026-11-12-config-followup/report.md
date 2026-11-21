@@ -84,6 +84,21 @@ participant, no longer reloads a second time). Regression
 
 Questions for the maintainer are in TODO.md (« Maintainer decisions pending »).
 
+## Absent `[script]` rows (November 21, 2026)
+
+Both questions were decided by the agent, to review by the maintainer
+([decision](../../../memory/maintainer-decisions.md)). An absent `[script]` row
+(`log_level`, `show_error_dialog`, `reading_font`, `reading_spacing`) now clears
+its native alias at the next start on macOS and Linux, as Windows reads an
+absent row, and every menu change writes the row whether the file held it or
+not (`script_config_authority.lua`, Linux `script_scope.edit_setting`). The
+locale is kept apart: its absence means the system language on every driver
+while its manifest default is `fr`, a question left in TODO.md. Regressions
+`script-config-absent-row-resets`, `script-config-locale-kept-when-absent`,
+`script-config-absent-clear-refused` and `script-config-change-rewrite` (shared
+contract, replayed on macOS and Linux). An external edit of config.toml keeps
+today's behaviour on every OS.
+
 ## Open
 
 NFD and NFC paths on macOS need a Mac. Native receiving is unqualified.

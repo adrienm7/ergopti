@@ -717,13 +717,19 @@ Each question names the default kept meanwhile; an answer moves into the item or
 more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
       stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
       first, not in board order. Approve or change.
-- [ ] **Configuration rows outside a reload** ([configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md)).
-      (1) A `[script]` row (locale, log level, error dialog) absent from a restored or hand-edited config.toml on
-      macOS: (a, recommended) reset its `hs.settings` value to the manifest default at the next adopt, as Windows
-      whose file is the only store; (b) keep `hs.settings` as the authority and the file as an optional override
-      (today's behaviour, kept meanwhile). (2) An external edit of config.toml while Linux runs: (a, recommended)
-      rescan the hotstrings only and leave the rest to a reload, as macOS and Windows ignore it (today's
-      behaviour, kept meanwhile); (b) re-read the whole configuration on Linux; (c) ignore it on Linux too.
+- [ ] **Configuration rows outside a reload (decided by the agent on 2026-11-21, to review by the maintainer)**
+      ([configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md),
+      [decision](docs/memory/maintainer-decisions.md)). (1) Option a, on macOS and Linux: a `[script]` row
+      (log level, error window, reading font and spacing) absent from config.toml clears its native value at the
+      next start, and every menu change writes the row; the locale keeps option b (next item). (2) Option a:
+      today's behaviour, no code change. Confirm or change.
+- [ ] **The locale's neutral value.** The manifest declares `script.locale` default `fr`, but every driver reads an
+      absent locale row as the system language, and the sparse writer deletes a chosen `fr` as neutral. On Windows,
+      whose full save writes the locale through `_ConfigSparseUpdates` (`settings/engine/io.ahk`), a French choice
+      on another system language therefore reads as that language after the next reload (read in source, not
+      replayed). The Lua drivers keep the native locale when the row is absent until this is settled: (a) no
+      neutral value for the locale (always written, never deleted), then an absent row clears the native value as
+      the other `[script]` rows do; (b) absence means `fr` on every OS (no system-language detection).
 - [ ] **Agent decisions to review.** Each is implemented as written; confirm or change:
   - a transform whose field changed after its Ctrl+C now puts the saved clipboard back over what the copy's own
     wait left (the selection), instead of keeping it as a possible user copy (decided by the agent on 2026-11-17);

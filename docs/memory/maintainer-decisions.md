@@ -1194,11 +1194,41 @@ A `config.toml` `[script]` row (`locale`, `log_level`, `show_error_dialog`) wins
 over the native store (hs.settings, storage.json) at start, as on Windows:
 `_shared/settings/engine/scope/script_config_authority.lua` writes it into the native alias
 (`infra/script_scope.lua` `adopt_configured`) before the error window, the log
-level and i18n read it, and every menu or wizard change rewrites the row first
-when the file holds one (`rewrite_configured`). There is no migration or
-adoption marker (sole user, clean state): a file without the row leaves the
-native value in force, and nothing is copied between the stores. Only a
-shipped locale code is adopted.
+level and i18n read it. There is no migration or adoption marker (sole user,
+clean state): nothing is copied between the stores. Only a shipped locale code
+is adopted. What an absent row means is settled by the entry below (2026-11-21).
+
+## An absent `[script]` row reads as its default on macOS and Linux, the locale excepted (2026-11-21)
+
+Decided by the agent on 2026-11-21, to review by the maintainer (TODO
+« Configuration rows outside a reload », question 1, option a). A `[script]`
+row that a restored or hand-edited `config.toml` lacks (`log_level`,
+`show_error_dialog`, `reading_font`, `reading_spacing`) clears its native alias
+at the next start, so its owner reads the manifest default, as Windows reads an
+absent row from its only store. Every menu or wizard change writes the row
+through the sparse operation, held or not (`rewrite_configured`, Linux
+`edit_setting`), so the next start reads the same choice; a change to the
+neutral value of an absent row writes nothing. Reasoning: one source of truth
+(the file), no stale native value surviving a restore, no fallback.
+
+The locale is the exception and keeps option b: an absent locale row leaves
+the native value in force and a change rewrites only a row the file holds.
+Every driver reads an absent locale as the system language, while the
+manifest's neutral value is `fr` and the sparse writer deletes a chosen `fr`:
+clearing the alias would turn an explicit French choice on another system
+language into that language. The rule and its exception live in
+`script_config_authority.lua` (`NATIVE_KEPT_WHEN_ABSENT`, `file_owns_absence`);
+the locale's neutral value is a separate maintainer question in TODO.md.
+
+Question 2 (an external edit of `config.toml` while Linux runs), decided by the
+agent on 2026-11-21, to review by the maintainer: option a, today's behaviour.
+The Linux watcher rescans the hotstrings on any `.toml` change and every other
+row waits for a reload, as on macOS (whose watchers drop config.toml) and
+Windows (no watcher). Reasoning: no OS re-reads the whole file live, a full
+live re-read would need a cross-owner transaction on all three drivers, and
+ignoring config.toml on Linux would remove a working hotstring path for no
+parity gain. Nothing changed in code; no platform row is needed, as the menu
+rows are the same on every OS.
 
 ## Decisions without code of 2026-10-31
 
