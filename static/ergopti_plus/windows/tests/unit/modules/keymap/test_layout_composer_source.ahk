@@ -540,6 +540,43 @@ _LCS_ManagerCase() {
 	}
 }
 
+Test("layout editor host: a change refused while a layout reload is pending answers the page (ltp-04-busy-answer)",
+	_LCS_BusyAnswerCase)
+
+; The page waits for one answer per change: a silent refusal left « Install »,
+; « Emulate » or « Apply » pending until the window closed (LTP-04).
+_LCS_BusyAnswerCase() {
+	global _LayMgrWeb_RuntimeRefresh, _LayoutCatalogueLast, LAYOUT_CATALOGUE_FAILURE_BUSY
+	SavedRefresh := _LayMgrWeb_RuntimeRefresh, SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LCH_TempDir()
+	try {
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		_LayMgrWeb_RuntimeRefresh := Map("id", "ergol", "action", "install")
+		Log := []
+		Deps := _LMH_Deps(Dir, Log)
+		Deps["config_dir"] := Dir
+		Deps["apply_nav"] := (Text) => (Log.Push(Map("call", "nav")), Map("saved", true, "applied", true, "errors", []))
+		for Action in ["composer_save", "composer_emulate"] {
+			AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", Action, "source", "s", "keylayout", "k"), Deps),
+				Action . " is refused while the reload is pending")
+			Answer := _LayMgrWeb_Json(_LCH_Pushed(Log, "composerResult"))
+			AssertContains(Answer, '"action":"' . Action . '"', "the refusal answers " . Action)
+			AssertContains(Answer, '"ok":false')
+			AssertContains(Answer, '"code":"' . LAYOUT_CATALOGUE_FAILURE_BUSY . '"')
+			Log.Length := 0
+		}
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "nav_save", "text", "[_meta]`n"), Deps))
+		Nav := _LayMgrWeb_Json(_LCH_Pushed(Log, "navResult"))
+		AssertContains(Nav, '"saved":false', "the navigation layer refusal answers the page")
+		AssertContains(Nav, '"code":"' . LAYOUT_CATALOGUE_FAILURE_BUSY . '"')
+		AssertEqual(0, _LMH_Calls(Log).Length, "nothing was applied")
+	} finally {
+		_LayMgrWeb_RuntimeRefresh := SavedRefresh
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+	}
+}
+
 Test("layout editor host: the layout menu opens no Studio of its own (no-duplicate-studio)",
 	_LCS_MenuCase)
 

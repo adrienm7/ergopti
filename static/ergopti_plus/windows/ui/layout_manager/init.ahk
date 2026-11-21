@@ -576,6 +576,27 @@ _LayMgrWeb_ApplyNav(Text) {
 }
 
 /**
+ * Answers a layout editor change refused while a runtime refresh is pending:
+ * the page waits for exactly one answer per change, so a refusal without one
+ * left « Install », « Emulate » or « Apply » pending until the window closed,
+ * and every later one refused as busy by the page itself (LTP-04). macOS and
+ * Linux answer a busy registry with the same code.
+ * @param {Map} Deps - "push" (FunctionName, Payload).
+ * @param {String} Action - composer_save, composer_emulate or nav_save.
+ */
+_LayMgrWeb_AnswerBusy(Deps, Action) {
+	global LAYOUT_CATALOGUE_FAILURE_BUSY
+	Detail := "a layout change is still being applied"
+	if (Action == "composer_save" || Action == "composer_emulate")
+		_LayMgrWeb_PushPayload(Deps, "composerResult", Map("action", Action, "ok", LayMgrJsonBool_Of(false),
+			"code", LAYOUT_CATALOGUE_FAILURE_BUSY, "detail", Detail))
+	else if (Action == "nav_save")
+		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(false),
+			"applied", LayMgrJsonBool_Of(false),
+			"errors", [Map("code", LAYOUT_CATALOGUE_FAILURE_BUSY, "detail", Detail)]))
+}
+
+/**
  * Answers one action of the layout editor (its own window, editor_window.ahk):
  * source_open, source_save, source_export, source_pick, nav_save,
  * composer_open, composer_save and composer_emulate. The caller checked its
@@ -591,6 +612,7 @@ LayoutManager_HandleEditorAction(Action, Payload, Deps) {
 	global LAYMGR_MUTATIONS, _LayMgrWeb_RuntimeRefresh
 	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
 		LoggerWarn("LayoutManager", "Refused a layout editor change while runtime refresh is pending.")
+		_LayMgrWeb_AnswerBusy(Deps, Action)
 		return false
 	}
 	if (Action == "source_open") {
