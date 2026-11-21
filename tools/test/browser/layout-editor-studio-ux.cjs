@@ -222,10 +222,10 @@ async function exerciseHistoryShortcuts(browser, origin) {
 			keys: button.getAttribute('aria-keyshortcuts')
 		}))
 	);
-	// « Undo: change key … »: the step it takes back, then its shortcut (maintainer, 2026-11-21).
+	// « Undo: move è ↔ y »: the step it takes back, then its shortcut (maintainer, 2026-11-21).
 	assert.match(
 		names[0].label,
-		/^Undo: change key .+ \(.*Z\)$/,
+		/^Undo: move .+ \(.*Z\)$/,
 		`undo names its step and shortcut: ${names[0].label}`
 	);
 	assert.match(names[1].label, /^Redo \(.*Y.*Z\)$/, `redo names its shortcuts: ${names[1].label}`);
