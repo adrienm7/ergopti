@@ -366,6 +366,10 @@ class WebViewHost {
 		;   SkipI18nSeed         — default false; when true the I18nSeed script is
 		;                          NOT injected via AddScriptToExecuteOnDocumentCreated
 		;   CustomHtmlPath       — override the convention "ui/<AppId>/index.html"
+		;   RunsWhilePaused      — default false; true for a configuration window
+		;                          (EDD-1: a pause stops typing, not configuration),
+		;                          whose messages, ready and scripts the pause does
+		;                          not fence (_PauseFenced)
 		; --------------------------------------------------------------------------
 		static TryOpen(AppId, Opts) {
 				; ── Load manifest if not cached ──────────────────────────────────────
@@ -693,7 +697,7 @@ class WebViewHost {
 
 		; ── WebMessageReceived callback (COM) ────────────────────────────────────
 		_OnWebMessage(Handler, Args) {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				try Msg := Args.TryGetWebMessageAsString()
 				if !IsSet(Msg)
@@ -718,7 +722,7 @@ class WebViewHost {
 		}
 
 		_DispatchMessage(CallbackEpoch, Payload) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
 						return
 				; Timer callbacks report failures through the global error owner.
 				this.Opts["OnMessage"](this, Payload)
@@ -730,7 +734,7 @@ class WebViewHost {
 						return
 				; Navigation authorizes init even while paused. User scripts stay
 				; queued; only the admitted ready callback can resume later.
-				if !A_IsSuspended
+				if !this._PauseFenced()
 						this._FlushQueue()
 				this._FireOnReady()
 		}
@@ -756,7 +760,7 @@ class WebViewHost {
 		_ArmReady(Pending) {
 				PreviousCritical := Critical("On")
 				try {
-						if A_IsSuspended || this.ResetDone || this.CloseRequested
+						if this._PauseFenced() || this.ResetDone || this.CloseRequested
 								|| Pending.Epoch != this.Epoch || Pending.Scheduled
 								|| WebViewHost._PendingReady.Get(this, 0) != Pending
 								return false
@@ -776,7 +780,7 @@ class WebViewHost {
 						if this.ResetDone || this.CloseRequested || CallbackEpoch != this.Epoch
 								return
 						Pending := WebViewHost._PendingReady.Get(this, 0)
-						if A_IsSuspended {
+						if this._PauseFenced() {
 								; Only a previously admitted ready event can retain init;
 								; neither a safety flush nor a user command creates one.
 								if !this.ReadyFired || !this.Opts.Has("OnReady")
@@ -815,10 +819,23 @@ class WebViewHost {
 						Item.Host._ArmReady(Item.Receipt)
 		}
 
+		; ── Pause fence ──────────────────────────────────────────────────────────
+		; Whether the pause fences this window: a window that only shows or acts
+		; on typing waits for the resume, a configuration window (RunsWhilePaused,
+		; the Studio) keeps its messages, ready and scripts, as on macOS and Linux
+		; (EDD-1, LTP-03). A host built without options is fenced.
+		_PauseFenced() {
+				if !A_IsSuspended
+						return false
+				if !this.HasOwnProp("Opts") || !(this.Opts is Map)
+						return true
+				return this.Opts.Get("RunsWhilePaused", false) != true
+		}
+
 		; ── Queue-based eval ─────────────────────────────────────────────────────
 		; Evaluates JS in the page, queuing until the page signals ready.
 		Eval(Js) {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				if (this.Ready && this.HasOwnProp("WebView")) {
 						SetTimer(this._RunScript.Bind(this, Js), -1)
@@ -832,7 +849,7 @@ class WebViewHost {
 		_RunScript(Js) {
 				; Suspend leaves native timers armed, including scripts admitted before
 				; the pause. Refuse at delivery as well as at queue admission.
-				if A_IsSuspended || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
 						return
 				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
@@ -849,7 +866,7 @@ class WebViewHost {
 		}
 
 		_SafetyFlush() {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				if (!this.Ready) {
 						try LoggerWarn("WebViewHost", "{1}: page did not signal ready within timeout — flushing.", this.AppId)
@@ -859,7 +876,7 @@ class WebViewHost {
 
 		; ── Window events ────────────────────────────────────────────────────────
 		_OnResize(GuiObj, MinMax, Width, Height) {
-				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
 						try WebView_FitToWindow(this.Controller)
