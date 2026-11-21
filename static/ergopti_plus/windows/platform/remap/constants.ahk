@@ -2035,6 +2035,96 @@ TapHoldUserLCtrlHeld(KeyIsDownFn := 0, RealPressFn := 0) {
 	return RealPressFn.Call("SC01D") == 1
 }
 
+; What LAlt's Backspace tap deletes under the keys held now (lalt.ahk 4.4 to 4.6); true when it typed
+; it, false for the plain Backspace. The shared vectors of
+; _shared/tests/corpus/tap_hold/thumb_backspace_vectors.json pin it, with the
+; Linux engine and the macOS Karabiner rules (THD-4 of 2026-11-21).
+; @param IsDownFn {Func} Physical key state, KS_IsDown by default (test seam).
+; @param UserLCtrlFn {Func} The user's own LCtrl, TapHoldUserLCtrlHeld by default.
+; @param PressFn {Func} Sends one key with its modifiers, TextPressKey by default.
+BackSpaceLogic(ExpectedEpoch := unset, IsDownFn := 0, UserLCtrlFn := 0, PressFn := 0) {
+	if !IsObject(IsDownFn)
+		IsDownFn := KS_IsDown
+	if !IsObject(UserLCtrlFn)
+		UserLCtrlFn := TapHoldUserLCtrlHeld
+	if !IsObject(PressFn)
+		PressFn := TextPressKey
+	Epoch := IsSet(ExpectedEpoch) ? ExpectedEpoch : _TH_SyntheticEpoch
+	; A retired invocation consumes its branch without permitting a plain fallback.
+	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+		return True
+	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
+
+	if (
+		UserLCtrlFn.Call() ; LCtrl physically held
+		and IsDownFn.Call("Shift") ; Shift physically held
+	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("Delete", "Ctrl")
+		return True
+	} else if (
+		IsDownFn.Call("SC11D") ; RCtrl physically held
+		and not RCtrlIsOneShotShift
+		and IsDownFn.Call("Shift") ; Shift physically held
+	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("Delete", "Ctrl")
+		return True
+	} else if (
+		UserLCtrlFn.Call() ; LCtrl physically held
+		and RCtrlIsOneShotShift
+		and IsDownFn.Call("SC11D") ; RCtrl physically held (acting as Shift)
+	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("Right", "Ctrl")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("BackSpace", "Ctrl") ; = ^Delete without triggering Ctrl+Alt+Delete
+		return True
+	} else if (
+		RCtrlIsOneShotShift
+		and IsDownFn.Call("SC11D") ; RCtrl physically held (acting as Shift)
+	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("Right", "")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("BackSpace", "") ; = Delete without triggering Ctrl+Alt+Delete
+		return True
+	} else if IsDownFn.Call("Shift") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("Delete", "")
+		return True
+	} else if UserLCtrlFn.Call() { ; LCtrl physically held
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("BackSpace", "Ctrl")
+		return True
+	} else if (
+		not RCtrlIsOneShotShift
+		and IsDownFn.Call("SC11D") ; RCtrl physically held
+	) {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return True
+		PressFn.Call("BackSpace", "Ctrl")
+		return True
+	}
+	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+		return True
+	return False
+}
+
 ; Hand back the synthetic hold the owner of KeyId took for this press, now.
 ; Its owner then releases nothing more and dispatches no tap.
 ; @param KeyId {String} Tap-hold key id.

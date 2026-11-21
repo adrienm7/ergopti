@@ -363,6 +363,8 @@ _LAltDispatch() {
 
 ; Backspace has modifier-aware special handling, but is still a tap output and
 ; therefore runs inside TapHoldDispatchTap whenever LAlt has a hold behaviour.
+; BackSpaceLogic lives in constants.ahk, which the unit suite loads to replay
+; the shared thumb Backspace vectors.
 _LAltBackspaceTap() {
 	Epoch := _TH_SyntheticEpoch
 	BackSpaceActionWithModifiers := BackSpaceLogic(Epoch)
@@ -372,85 +374,6 @@ _LAltBackspaceTap() {
 		TapHoldEmitKeyTap("BackSpace")
 	}
 }
-
-BackSpaceLogic(ExpectedEpoch := unset) {
-	Epoch := IsSet(ExpectedEpoch) ? ExpectedEpoch : _TH_SyntheticEpoch
-	; A retired invocation consumes its branch without permitting a plain fallback.
-	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-		return True
-	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
-
-	if (
-		TapHoldUserLCtrlHeld() ; LCtrl physically held
-		and KS_IsDown("Shift") ; Shift physically held
-	) {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("Delete", "Ctrl")
-		return True
-	} else if (
-		KS_IsDown("SC11D") ; RCtrl physically held
-		and not RCtrlIsOneShotShift
-		and KS_IsDown("Shift") ; Shift physically held
-	) {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("Delete", "Ctrl")
-		return True
-	} else if (
-		TapHoldUserLCtrlHeld() ; LCtrl physically held
-		and RCtrlIsOneShotShift
-		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
-	) {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		OneShotShiftFix()
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("Right", "Ctrl")
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("BackSpace", "Ctrl") ; = ^Delete without triggering Ctrl+Alt+Delete
-		return True
-	} else if (
-		RCtrlIsOneShotShift
-		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
-	) {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		OneShotShiftFix()
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("Right", "")
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("BackSpace", "") ; = Delete without triggering Ctrl+Alt+Delete
-		return True
-	} else if KS_IsDown("Shift") {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("Delete", "")
-		return True
-	} else if TapHoldUserLCtrlHeld() { ; LCtrl physically held
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("BackSpace", "Ctrl")
-		return True
-	} else if (
-		not RCtrlIsOneShotShift
-		and KS_IsDown("SC11D") ; RCtrl physically held
-	) {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return True
-		TextPressKey("BackSpace", "Ctrl")
-		return True
-	}
-	if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-		return True
-	return False
-}
-
-
 
 
 

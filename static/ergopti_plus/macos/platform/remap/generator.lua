@@ -1298,6 +1298,40 @@ local function apply_pair_press_order(rules, pair_rules)
 	end
 end
 
+-- The thumb key whose Backspace tap deletes what Windows' BackSpaceLogic
+-- (lalt.ahk 4.10) and the Linux engine's lalt_backspace_chords delete under
+-- the keys held: left Command, the twin of their LAlt (maintainer decision
+-- THD-4 of 2026-11-21, _shared/tests/corpus/tap_hold/thumb_backspace_vectors.json).
+local THUMB_BACKSPACE_KEY = { id = "left_command", tap = "backspace" }
+
+-- The right-hand key that is their RCtrl, and the tap that makes it the
+-- one-shot Shift, a Shift to that logic (its plain Ctrl is the control flag).
+local THUMB_BACKSPACE_ONE_SHOT_KEY = { key_code = "right_option", tap = "sticky_shift" }
+
+-- macOS deletes a word with Option, as Windows does with Ctrl.
+local WORD_FORWARD = { { key_code = "delete_forward", modifiers = { "option" } } }
+local CHAR_FORWARD = { { key_code = "delete_forward" } }
+local WORD_BACK    = { { key_code = "delete_or_backspace", modifiers = { "option" } } }
+
+--- The variants of the thumb Backspace tap, in match order: each claims the
+--- modifier flags it reads (Karabiner lifts them around the tap, as Windows'
+--- TextPressKey lifts the held modifiers) and may also require the one-shot
+--- key held. Control and Shift give Option+Forward Delete; Control under the
+--- one-shot key the same; the one-shot key, or Shift, Forward Delete; Control
+--- Option+Backspace. Nothing held keeps the plain Backspace.
+--- @param one_shot boolean Whether the right_option key taps the one-shot Shift.
+--- @return table variants { mandatory = flags, one_shot = boolean, to = events }
+local function thumb_backspace_variants(one_shot)
+	local variants = { { mandatory = { "control", "shift" }, to = WORD_FORWARD } }
+	if one_shot then
+		variants[#variants + 1] = { mandatory = { "control" }, one_shot = true, to = WORD_FORWARD }
+		variants[#variants + 1] = { one_shot = true, to = CHAR_FORWARD }
+	end
+	variants[#variants + 1] = { mandatory = { "shift" }, to = CHAR_FORWARD }
+	variants[#variants + 1] = { mandatory = { "control" }, to = WORD_BACK }
+	return variants
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -1315,8 +1349,11 @@ end
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @param typing_priority boolean|nil False only when reconstructing historical rules.
+--- @param one_shot_key_taps_shift boolean|nil Whether right_option taps the one-shot
+---   Shift, which the thumb Backspace variants read (thumb_backspace_variants).
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority,
+	one_shot_key_taps_shift)
 	hold_action = native_tap_only_hold(key_def.from.key_code, tap_action, hold_action)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
@@ -1369,6 +1406,8 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local key_down_action = hold_action
 	local rollover_hold_var
 	local held_shift_one_shot = false
+	-- Where a tap typed at key_down sits in `to`, for the thumb Backspace variants.
+	local tap_in_to_from, tap_in_to_until
 	if #hold_to == 0 and typing_priority ~= false and HOLD_PAST_THRESHOLD_TAPS[key_def.id] == tap_action.id then
 		-- rctrl.ahk 7.3: the one-shot waits for a quick release, and a long press
 		-- holds Shift from the threshold on (apply_managed_timing_parameters
@@ -1377,7 +1416,9 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		manipulator.to_if_held_down = { { key_code = "left_shift" } }
 	elseif #hold_to == 0 then
 		key_down_action = tap_action
+		tap_in_to_from = #to_events + 1
 		for _, ev in ipairs(marked_tap(tap_to, marked)) do to_events[#to_events + 1] = ev end
+		tap_in_to_until = #to_events
 		if typing_priority ~= false and HELD_SHIFT_ONE_SHOT_TAPS[key_def.id] == tap_action.id then
 			-- lalt.ahk 4.1: the one-shot also holds LShift until the key comes
 			-- up, so a key struck under it is shifted at once. The last entry
@@ -1465,6 +1506,35 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local manipulators = { manipulator }
 	if has_exact_modifier_action(tap_action, hold_action) then
 		manipulators = exact_modifier_manipulators(manipulator)
+	end
+	if typing_priority ~= false and key_def.id == THUMB_BACKSPACE_KEY.id and tap_action.id == THUMB_BACKSPACE_KEY.tap
+		and (manipulator.to_if_alone or tap_in_to_from) then
+		-- The same press, hold and release, each variant typing its own
+		-- deletion in the tap's place; the plain Backspace stays last.
+		local variants = {}
+		for _, variant in ipairs(thumb_backspace_variants(one_shot_key_taps_shift == true)) do
+			local copy = deep_copy(manipulator)
+			copy.from.modifiers = { mandatory = variant.mandatory, optional = { ANY_MODIFIER } }
+			if variant.one_shot then
+				copy.conditions = copy.conditions or {}
+				copy.conditions[#copy.conditions + 1] = {
+					type = "variable_if", name = held_var_name(THUMB_BACKSPACE_ONE_SHOT_KEY.key_code), value = 1,
+				}
+			end
+			local tap = marked_tap(variant.to, marked)
+			if copy.to_if_alone then
+				copy.to_if_alone = deep_copy(tap)
+			else
+				local to = {}
+				for index = 1, tap_in_to_from - 1 do to[#to + 1] = copy.to[index] end
+				for _, ev in ipairs(tap) do to[#to + 1] = deep_copy(ev) end
+				for index = tap_in_to_until + 1, #copy.to do to[#to + 1] = copy.to[index] end
+				copy.to = to
+			end
+			variants[#variants + 1] = copy
+		end
+		for _, variant in ipairs(manipulators) do variants[#variants + 1] = variant end
+		manipulators = variants
 	end
 	-- Fn is the Windows left-Control position (Paste); the macOS Control
 	-- key has its own Cut action and must not inherit these thumb blockers.
@@ -2514,7 +2584,9 @@ function M.build_karabiner_json(
 			if deployed_ms == (per_key_ms or state.tap_hold_timeout_ms) then deployed_ms = per_key_ms end
 		end
 		deployed_tap_timeouts[key_def.id] = deployed_ms or state.tap_hold_timeout_ms
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, deployed_ms)
+		local one_shot_cfg = state.tap_hold_config[THUMB_BACKSPACE_ONE_SHOT_KEY.key_code]
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, deployed_ms, nil,
+			type(one_shot_cfg) == "table" and one_shot_cfg.tap == THUMB_BACKSPACE_ONE_SHOT_KEY.tap)
 		if rule then
 			apply_tap_minimum(rule, Defaults.tap_min_duration_ms)
 			all_rules[#all_rules + 1] = rule
