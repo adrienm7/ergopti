@@ -25,10 +25,10 @@ const plus = path.resolve(__dirname, '../../static/ergopti_plus');
 const linux = path.join(plus, 'linux');
 const sharedUi = path.join(plus, '_shared/ui');
 
-// A page no Linux caller opens: its bridge is registered, nothing shows it.
-const NOT_OPENED_ON_LINUX = {
-	token_prompt: 'webview_manager registers it, but no Linux menu, flow or module opens it'
-};
+// A page no Linux caller opens, with the reason its bridge stays registered.
+// The token page's bridge was retired instead (PCK-18): keep this list empty
+// rather than register a bridge nothing shows.
+const NOT_OPENED_ON_LINUX = {};
 
 const READY_HANDLED = /==\s*"ready"/;
 const READY_POSTED = /\(\s*(?:\{\s*action:\s*)?['"]ready['"]/;

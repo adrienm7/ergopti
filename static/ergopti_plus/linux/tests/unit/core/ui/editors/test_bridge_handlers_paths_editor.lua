@@ -421,41 +421,6 @@ helpers.describe("ui.bridge_handlers", function()
     end)
   end)
 
-  -- ==========================================================================
-  -- 14. token_bridge
-  -- ==========================================================================
-end)
-
-
-
-
-helpers.describe("ui.bridge_handlers", function()
-  helpers.describe("token_bridge", function()
-    local handler = helpers.load_module("core.ui.ui.token_prompt")
-    local state = build_mock_state()
-
-    helpers.it("has correct bridge_name", function()
-      helpers.assert_eq(handler.bridge_name, "token_bridge")
-    end)
-    helpers.it("'ready' returns token settings", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.max_tokens) == "number")
-      helpers.assert_true(type(result.triggers) == "table")
-      helpers.assert_true(result.auto_inject ~= nil)
-    end)
-    helpers.it("handles 'save_settings' action", function()
-      local result = handler.on_message({ action = "save_settings", settings = { max_tokens = 512, temperature = 0.5 } }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
-    end)
-    helpers.it("handles 'test_prompt' action", function()
-      local result = handler.on_message({ action = "test_prompt", prompt = "Hello world" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.requested)
-    end)
-  end)
-
 end)
 
 

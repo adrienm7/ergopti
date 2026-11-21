@@ -810,7 +810,6 @@ return {
 	"tests.unit.ai.engine.settings.test_profile_preferences_canonical_ordered_child_template",
 	"tests.unit.ai.engine.settings.test_profile_registry_lossless",
 	"tests.unit.ai.engine.ollama.test_model_preferences_canonical",
-	"tests.unit.ai.engine.settings.test_token_prompt_setters",
 	"tests.unit.ai.engine.settings.test_trigger_settings",
 	"tests.unit.modules.shortcuts.text_actions.test_case_transforms",
 	"tests.unit.modules.shortcuts.keyboard.test_chatgpt",
