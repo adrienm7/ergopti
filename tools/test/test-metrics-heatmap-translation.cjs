@@ -202,6 +202,10 @@ function mediaFixture() {
 		cancelAnimationFrame() {}
 	});
 	context.window = context;
+	// The host seeds the interface language before the page formats a number
+	// (MET-07); the French expectations below read that seed, never the
+	// machine's locale.
+	context._i18n_locale = 'fr';
 	context.driver_meta = { os: 'mac' };
 	require('./support/theme-tokens.cjs').installThemeTokens(context);
 	for (const file of [

@@ -490,6 +490,7 @@
 			"collision",
 			"command_exited_nonzero",
 			"compiled_keylayout_installed_by_composer_host",
+			"complete",
 			"completion",
 			"compose_conflicts",
 			"connector_automation_refused",

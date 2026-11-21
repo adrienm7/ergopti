@@ -178,6 +178,8 @@ const context = {
 		timers.delete(id);
 	},
 	APP_SELECTION_MODE,
+	// The page's i18n helper lives in state.js, which this bridge test does not load.
+	_t: (key) => key,
 	console
 };
 vm.createContext(context);
