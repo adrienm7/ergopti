@@ -85,7 +85,8 @@ class WPMWidgetConst {
     static MENUBAR_TICK_MS    := 0
     static WINDOW_MS          := 0
     static WPM_MIN_DURATION_MS := 0
-    static IDLE_RESET_MS      := 0
+    ; IDLE_RESET_MS has no placeholder: WPMWidget_LoadSharedConst creates it from
+    ; timings [keystats] wpm_idle_reset_ms, and a read before that raises.
 
     ; ── Windows-only: no counterpart on the other drivers ────────────────────────
     ; Fast cursor-movement poll (ms). The display tick is too coarse to get the
