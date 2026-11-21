@@ -248,6 +248,78 @@ async function checkHeaders(browser, origin, lang) {
 async function exerciseHeaderPopovers(browser, origin) {
 	for (const lang of LANGS) await checkHeaders(browser, origin, lang);
 	await checkPanelRefresh(browser, origin);
+	await checkAnalysersScoring(browser, origin);
+}
+
+/**
+ * (analysers-scoring-keeps-focus) The « Autres analyseurs » table is drawn
+ * again while its layouts are scored, one per idle slice: each redraw once
+ * built a new header, so the focus on an analyser's « i » or sort button fell
+ * to the page and Enter opened nothing (the Studio keyboard walk on CI,
+ * 2026-11-21). The idle slices are held until the « i » has the focus, so
+ * the scoring redraws the table under it every time.
+ */
+async function checkAnalysersScoring(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(
+		`${origin}/ui/layout_analysis/index.html?lang=fr&layouts=ergopti,azerty,bepo,qwerty`
+	);
+	await page.waitForSelector('#la-tab-analysers', { timeout: 120000 });
+	await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+		timeout: 120000
+	});
+	await page.evaluate(() => {
+		const held = [];
+		window.requestIdleCallback = (fn) => held.push(fn);
+		window.__releaseIdle = () => {
+			window.requestIdleCallback = (fn) => setTimeout(fn, 0);
+			held.splice(0).forEach((fn) => setTimeout(fn, 0));
+		};
+	});
+	await page.click('#la-tab-analysers');
+	const info = page.locator('#la-analysers thead .la-info').first();
+	await info.waitFor({ state: 'visible' });
+	const pending = () =>
+		page.evaluate(
+			() =>
+				Array.from(document.querySelectorAll('#la-analysers tbody td')).filter(
+					(cell) => cell.textContent === '…'
+				).length
+		);
+	assert.ok((await pending()) > 0, 'the layouts are still to be scored when the « i » is focused');
+	await info.evaluate((node) => {
+		window.__analyserInfo = node;
+		node.focus();
+	});
+	await page.evaluate(() => window.__releaseIdle());
+	await page.waitForFunction(
+		() =>
+			!Array.from(document.querySelectorAll('#la-analysers tbody td')).some(
+				(cell) => cell.textContent === '…'
+			),
+		null,
+		{ timeout: 120000 }
+	);
+	assert.deepEqual(
+		await page.evaluate(() => ({
+			kept: window.__analyserInfo.isConnected,
+			focused: document.activeElement === window.__analyserInfo
+		})),
+		{ kept: true, focused: true },
+		'the scoring redraws keep the analyser « i » and its focus'
+	);
+	await page.keyboard.press('Enter');
+	assert.equal(
+		await info.getAttribute('aria-expanded'),
+		'true',
+		'Enter on the analyser « i » opens its popover'
+	);
+	await page.keyboard.press('Escape');
+	assert.deepEqual(errors, [], 'the other analysers: no page error');
+	await context.close();
 }
 
 /**

@@ -124,7 +124,9 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			scores: new Map(),
 			sort: null,
 			view: VIEWS[0],
-			job: 0
+			job: 0,
+			// What the header drawn says: its sort and its words (render()).
+			head: null
 		};
 		view.addEventListener('change', () => {
 			state.view = view.value;
@@ -281,7 +283,15 @@ var LAYOUT_ANALYSER_TAB = (function () {
 					}
 				tbody.append(tr);
 			}
-			table.replaceChildren(header(), tbody);
+			// The header stays while it says the same: the scoring draws the table
+			// again every RENDER_MS, and a new header took the focus from its « i »
+			// and sort buttons, so Enter on them opened nothing.
+			const thead = header();
+			const head = JSON.stringify([state.sort, thead.textContent]);
+			if (head !== state.head || !table.tHead) {
+				table.replaceChildren(thead, tbody);
+				state.head = head;
+			} else table.tBodies[0].replaceWith(tbody);
 			const done = state.results.filter((r) => state.scores.has(r.layout.id)).length;
 			status.textContent =
 				done < state.results.length
