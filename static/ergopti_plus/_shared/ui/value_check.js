@@ -166,7 +166,11 @@ function parseEntry(entry, text, fallback) {
 	if (typeof text !== 'string') return entryRefusal('wrong_type', entry);
 	if (entry.type === 'string' || entry.type === 'path') return checkValue(entry, text);
 	const trimmed = text.trim();
-	if (trimmed === '' && fallback !== undefined && (entry.type === 'integer' || entry.type === 'decimal'))
+	if (
+		trimmed === '' &&
+		fallback !== undefined &&
+		(entry.type === 'integer' || entry.type === 'decimal')
+	)
 		return { ok: true, value: fallback, reset: true };
 	if (trimmed === '') return entryRefusal('empty', entry);
 	if (entry.type === 'integer' || entry.type === 'decimal') {
