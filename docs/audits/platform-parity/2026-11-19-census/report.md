@@ -419,7 +419,13 @@ owner. Windows is the reference unless a shared contract says otherwise.
 9. **Layout tool pages.** `layout_analysis`, `layout_composer`,
    `layout_optimizer`, `layout_editor_window` and the `layout_manager` page.
    They are the largest units (35,000 lines), but each has one shared source,
-   so only the host bridges can differ.
+   so only the host bridges can differ. **Taken on 2026-11-21**
+   ([below](#ninth-campaign-layout-tool-pages)): host messages, refusals,
+   keyboard and screen reader, reading preferences, right-to-left, install,
+   remove and emulate, the pause and teardown; LTP-01 to LTP-07 fixed (the
+   Windows layout manager's seed and paused Studio, a refused Studio change
+   answered, six refusals worded, the pages' language, focus and Escape),
+   LTP-08 to LTP-10 open.
 
 Re-campaigns for drift, after the never-campaigned modules or when a module's
 structure step lands:
@@ -529,3 +535,173 @@ for the maintainer; see the
 
 Native receiving: a real Windows Security prompt (for example the one for a
 network share) typed into with a hotstring trigger, on Windows 10 and 11.
+
+## Ninth campaign: layout tool pages
+
+Audited source: `6d92a18c8c` (`dev`). Date: November 21, 2026. The last
+campaign of the order above. The
+[layout manager campaign](../2026-11-12-layout-manager/report.md) read the two
+Lua hosts against Windows before Ergopti Studio existed; this one reads the
+pages the three drivers host today and what crosses their bridges.
+
+### Scope
+
+The layout manager window and Ergopti Studio (« Éditer », « Comparer »,
+« Optimiser » and « Ma frappe ») on the three drivers:
+
+- shared pages: `_shared/ui/layout_manager/` and
+  `_shared/ui/layout_editor_window/`, with what they mount from
+  `layout_editor/`, `layout_analysis/` and `layout_optimizer/` where it
+  crosses the host (`LAYOUT_ANALYSIS_HOST`, the editor's host ports, the
+  optimizer's `host`);
+- shared host rules: `_shared/layouts/engine/manager_bridge.lua`, the composer
+  (`composer/composer.lua`), the source and Studio stores and the failure
+  codes of `layouts/data/defaults.json`;
+- Windows: `ui/layout_manager/init.ahk` (its own WebView2),
+  `editor_window.ahk` (a `WebViewHost`), `composer.ahk` and the `WebViewHost`
+  class of `core/ui/engine/webview/utils.ahk`;
+- macOS: `ui/layout_manager/init.lua` and the page builder
+  (`core/ui/ui/builder.lua`);
+- Linux: `ui/layout_manager/bridge.lua`, `editor_bridge.lua` and the page
+  builder (`core/ui/ui/webkit_host.lua`).
+
+The registries, the install, remove and emulate engines and the menu rows
+were read only where a page message reaches them;
+`test-layout-capability-contract.cjs` pins those paths and the six Studio
+messages per OS. No layout was installed or removed.
+
+Method: source reading of the three bridges against the two pages, message by
+message (21 Studio actions, 9 manager actions): what each host admits and
+answers, with which code, and what the page does with it; then the reading
+preferences, the language, keyboard and screen reader, right-to-left, the
+pause (EDD-1) and teardown. Each finding was replayed on the shared pages
+through the fake DOM of `test-layout-manager-page.cjs`, and on Windows through
+the AHK unit suite with fake ports.
+
+### Checked and kept
+
+- **Messages.** The Studio's 21 actions are the Windows
+  `LAYOUT_EDITOR_WINDOW_ACTIONS` exactly and a subset of the shared
+  `M.ACTIONS`; the manager's 9 are `LAYMGR_ACTIONS`. A manager message in the
+  Studio window, or the reverse, is refused on the three. `initData` carries
+  the same capability flags: Windows offers no `source_pick` (WebView2 opens
+  its own file chooser) and offers `lua_export` only with a matching export
+  step executable, by design.
+- **Install, remove, emulate.** The six Studio messages reach the same
+  operations on the three (capability contract, 58 paths). A Windows « Use »
+  reloads the driver, so no « selected » line follows it where macOS and Linux
+  show one: by design.
+- **Links and stores.** `open_link` and `open_homepage` accept an https URL
+  only, the homepage from the catalogue only. The Studio store, profile,
+  workspace, corpus and export step answers carry the page's request number
+  on the three.
+- **Refusals the page never provokes.** A malformed payload (a save without
+  its text, an export without its bytes) is refused without an answer on the
+  three and the page's promise stays pending. The page never builds one: kept
+  as the layout manager campaign decided.
+- **Tabs.** The Studio's three tabs follow the ARIA tabs pattern; the
+  Comparer's and the Optimiser's own keyboard is pinned by their page tests
+  and `test-studio-semantic-html.cjs`.
+- **Reading preferences.** Both pages load `theme.css` then `a11y_prefs.js`
+  in their head; the Studio's `WebViewHost` and the two Lua builders seed the
+  choice. The Windows layout manager did not (LTP-01).
+- **Teardown.** macOS pushes only to the exact window that sent the message
+  and releases its controller lease on close; Linux revokes every registry
+  callback of a retired page epoch; Windows fences its manager by session
+  epoch and the Studio by `WebViewHost`'s `ResetDone` and `Epoch`, and an
+  export step that outlives its window removes its staged input. A late
+  answer is inert on the three.
+
+### Fixed
+
+| Id     | OS      | Sequence                                                                                  | Before                                                                                                                                                                         | Regression                                                                                                    |
+| ------ | ------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| LTP-01 | Windows | A reading font, wider spacing or English, then « Install or remove layouts… »             | `LayoutManager_Open` navigated its own WebView2 with no boot script: default font and spacing, no language named, where every other window and both Lua builders seed them     | `unseededProblems` (`test-reading-preferences-seed.cjs`); the seed in `test_layout_manager_command_owner.ahk` |
+| LTP-02 | all     | Any locale but French, a screen reader on, in the layout manager or the Studio            | Both pages declared `lang="fr"` and load no `i18n.js` (UPD-12): read with a French voice, the Comparer's numbers falling back on French                                        | `(ltp-02)` (`test-layout-manager-page.cjs`)                                                                   |
+| LTP-03 | Windows | Pause the driver, open Ergopti Studio, save, install or emulate                           | `WebViewHost` dropped every message, deferred the ready and refused every script while suspended: a blank Studio, or saves that waited forever; macOS and Linux answer (EDD-1) | `(ltp-03-studio-paused)` (`test_script_outcomes.ahk`)                                                         |
+| LTP-04 | Windows | Install from the Studio, or apply its navigation layer, while a layout reload is pending  | Refused with a log line only: the page's install stayed pending, then the page refused every later one as `save_busy`; macOS and Linux answer `busy`                           | `(ltp-04-busy-answer)` (`test_layout_composer_source.ahk`)                                                    |
+| LTP-05 | all     | A refused Install, Emulate, Save or Download (full data folder, failed switch, file name) | `invalid`, `write_failed`, `use_failed`, `source_invalid_file`, `uninstall_failed` and `busy` had no text: « Refused (write_failed). »                                         | `(ltp-05)` (`test-layout-manager-page.cjs`), codes read from their owners                                     |
+| LTP-06 | all     | Keyboard or screen reader: « Install », « Use » or « Update » in the layout manager       | Every push rebuilt the list and the focus fell to the document: the user started again from the top                                                                            | `(ltp-06)` (`test-layout-manager-page.cjs`)                                                                   |
+| LTP-07 | all     | Escape in the layout manager                                                              | Nothing: the WebView holds the focus, so no host window sees the key, where Escape closes the Updates window (UPD-03)                                                          | `(ltp-07)` (`test-layout-manager-page.cjs`)                                                                   |
+
+Notes:
+
+- **LTP-01.** `_LayMgrWeb_SeedScript` adds `window._i18n_locale` and
+  `ReadingPrefs_SeedScript()` before the navigation. The seed gate now fails
+  on any Windows window that navigates a page without a locale seed; three
+  windows outside this campaign stay in its shrinking `UNSEEDED_WINDOWS`
+  (LTP-09).
+- **LTP-03.** `WebViewHost` reads the pause through `_PauseFenced`: a window
+  opened with `RunsWhilePaused` (the Studio) keeps its messages, ready and
+  scripts, every other window keeps the `webview-script-pause` fence. What the
+  Studio changes acts on typing only after the resume, through the emulation
+  and layout owners, as on macOS and Linux.
+- **LTP-04.** `_LayMgrWeb_AnswerBusy` answers `composerResult` or `navResult`
+  with `LAYOUT_CATALOGUE_FAILURE_BUSY`, the code the three registries share.
+- **LTP-05.** Six keys in the 21 locales. The gate reads the codes from
+  `composer.lua`, the Windows composer (pinned to `composer.lua`'s), the three
+  registries and the layout defaults, and fails on a new code without a text.
+- **LTP-06.** A redraw gives the focus back to the same button when it can
+  take it, to its row's heading (`tabindex="-1"`) while its buttons are
+  disabled, and to the result line when the row left the list.
+- **LTP-07.** As UPD-03, an Escape another control handled is left alone; the
+  window keeps no unsaved work and an operation in flight goes on.
+
+### Open
+
+- **LTP-08 (low, shared, right-to-left):** neither page sets `dir`, so in
+  Arabic and Hebrew the layout manager's rows and buttons and the Studio's bar
+  and dialogs stay left to right (the keyboards themselves must). Left to
+  PCK-22, which adds `dir` to the shared pages.
+- **LTP-09 (medium, Windows):** the personal information editor, the paths
+  editor and the onboarding wizard also navigate their own page with no locale
+  or reading seed (`UNSEEDED_WINDOWS`). Follow-up: seed them as
+  `_LayMgrWeb_SeedScript` does and empty the list.
+- **LTP-10 (medium, Windows):** the other configuration windows built on
+  `WebViewHost`, the physical shortcuts editor first, still drop their page
+  messages while paused, which EDD-1 forbids (`physical-editor-paused` reads
+  the menu port only). Follow-up: open them with `RunsWhilePaused`, in the
+  pickers and prompts campaign that owns them.
+
+Field points: `TODO-tests-windows.md` « Layouts and Ergopti Studio » (Narrator,
+the reading font, focus, Escape, the paused Studio) and `layout_tool_pages` in
+`TODO-tests-macos.md` and `TODO-tests-linux.md` (VoiceOver or Orca language,
+focus after an operation, Escape), never by installing or removing a layout
+the tester needs.
+
+### Proof
+
+Commits `82ff8723f7` (LTP-01), `c8e7d18f1e` (LTP-03), `4555acc064` (LTP-04),
+`162268304b` (LTP-05), `74cfdd0520` (LTP-02), `7bd9f7d090` (LTP-06),
+`635a48b423` (LTP-07). Red on the old code, each with the fixed files of its
+finding taken back from `6d92a18c8c`:
+
+- LTP-01: `node tools/test/test-reading-preferences-seed.cjs` fails,
+  `windows/ui/layout_manager/init.ahk: navigates a page without the locale and
+reading seeds`.
+- LTP-02, LTP-06, LTP-07: `node tools/test/test-layout-manager-page.cjs`
+  gives 26 passed, 3 failed: `(ltp-02)`, `(ltp-06)`, `(ltp-07)`.
+- LTP-05: with `de.json` from `6d92a18c8c`, `(ltp-05)` fails naming the six
+  codes.
+- LTP-03, LTP-04: `node tools/test/ahk-parallel.cjs --fresh --only="ltp-0"`
+  gives 0 of 2: no script submitted under `Suspend(true)` (expected 1, actual 0) and no `composerResult` pushed.
+
+Green on the fix: `test-layout-capability-contract`, `test-layout-manager-page`
+(30), `test-layout-comparer-page`, `test-layout-optimizer-page`,
+`test-studio-semantic-html`, `test-studio-reading-preferences`,
+`test-reading-preferences-seed`, `test-app-windows-semantic-markup`, the
+locale gates (`test-locale-catalogue-complete`,
+`test-i18n-referenced-keys-resolve`, `test-audit-translations-scope`,
+`test-webview-i18n-cascade`, `check_locales.py`),
+`test-shared-literal-inventory`, `test-linux-feature-parity`, the three
+`test-no-pinned-source-reads` gates (no baseline raised),
+`test-config-key-literals`, `test-field-todo-summary`, the AHK encoding gate,
+the AHK cases matching `ltp-0`, `webview`, `paus`, `layout editor host`,
+`layout manager`, `physical shortcuts`, `reading preferences` and `ui ` (each
+run green), the Studio keyboard walk (`studio-keyboard.playwright.cjs`) and the
+app windows accessibility walk (21 windows, the layout manager among them),
+format and `lint-conventions --fail-on-violations`. No Lua source changed; from
+a `git archive` copy in WSL (as root, so the permission cases fail there), the
+Linux `infra` group ran the field coverage cases green (4 of 4) with one
+unrelated `driver-control-declaration` red, and the `ui` group and the macOS
+modules stopped when the WSL service stopped answering.

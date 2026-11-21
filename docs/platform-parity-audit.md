@@ -184,6 +184,7 @@ named file is not a reviewed file.
 | Update and download windows    | [report](audits/platform-parity/2026-11-21-update-windows/report.md)                               |
 | Metrics views                  | [report](audits/platform-parity/2026-11-21-metrics-views/report.md)                                |
 | Pickers and prompts            | [report](audits/platform-parity/2026-11-21-pickers-prompts/report.md)                              |
+| Layout tool pages              | [report](audits/platform-parity/2026-11-19-census/report.md#ninth-campaign-layout-tool-pages)      |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -277,6 +278,21 @@ application names instead of window titles, and every page sets `dir` from
 the locale (`page_locale.js`) with logical styles, so Arabic and Hebrew lay
 out right to left. Left open: PCK-13, a blank numeric answer resets on macOS
 only (a maintainer choice).
+
+The layout-tool-pages campaign (November 21, 2026), the last of the census
+order, fixed LTP-01 to LTP-07. On Windows, the layout manager seeds the
+interface language and the reading font and spacing as every other window
+does; Ergopti Studio keeps answering its page while the driver is paused
+(EDD-1), through a `RunsWhilePaused` window of `WebViewHost`; and a Studio
+install, emulation or navigation layer refused during a layout reload is
+answered `busy` instead of leaving the page waiting. On the three, six host
+refusals of the Studio have their own text instead of « Refused (code). »,
+both pages name the interface language to a screen reader, the layout
+manager keeps the focus on the layout the user acted on, and Escape closes
+it. Left open: LTP-08, right-to-left on both pages (to PCK-22); LTP-09, three
+other Windows windows without the page seed; LTP-10, the other Windows
+configuration windows on `WebViewHost`, the physical shortcuts editor first,
+still inert while paused.
 
 ## Review status at resumption — November 12, 2026
 

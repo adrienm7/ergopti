@@ -415,6 +415,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     (maintainer decision); MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the
     page (the Linux range reply's `driver_meta` fixed);
   - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
+    and the chart reading font; MET-17 net or gross hotstring counting in the live speed (maintainer decision);
+    MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
+  - layout tool pages, taken on 2026-11-21
+    ([report](docs/audits/platform-parity/2026-11-19-census/report.md#ninth-campaign-layout-tool-pages)): LTP-01 to
+    LTP-07 fixed (the Windows layout manager seeds the language and reading choices; Ergopti Studio answers its page
+    while paused on Windows through `WebViewHost` `RunsWhilePaused`; a Studio change refused during a Windows layout
+    reload is answered `busy`; six host refusals worded in the 21 locales; on the three, both pages name the
+    interface language, the layout manager keeps the focus on the row acted on and closes on Escape); desktop checks
+    are field points. Left: LTP-08 `dir` on both pages (to PCK-22); LTP-09 seed the Windows personal information
+    editor, paths editor and onboarding pages and empty `UNSEEDED_WINDOWS` in `test-reading-preferences-seed.cjs`;
+    LTP-10 open the other Windows configuration windows on `WebViewHost` (physical shortcuts first) with
+    `RunsWhilePaused`;
+  - the next campaigns in the report's order: pickers and prompts, small native units.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
     cause its closed reason proves (field check in `TODO-tests-macos.md`, Swift unchanged);
