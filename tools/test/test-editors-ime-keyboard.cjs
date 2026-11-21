@@ -120,6 +120,53 @@ assert.equal(
 	JSON.stringify([{ action: 'close', session: '' }]),
 	'pck-12: Escape posts the Close button action'
 );
+// pck-19: the model browser holds the keyboard too; Escape posts its close
+const browser = fixture('model_browser');
+browser.posts.length = 0;
+dispatch(browser.document, 'Escape');
+dispatch(browser.document, 'Escape', false, 229);
+assert.equal(browser.posts.length, 0, 'a composing Escape must not close the model browser');
+assert.equal(
+	dispatch(browser.document, 'Escape', false),
+	true,
+	'pck-19: Escape is consumed by the model browser'
+);
+assert.equal(
+	JSON.stringify(browser.posts),
+	JSON.stringify([{ action: 'close' }]),
+	'pck-19: Escape posts the model browser close'
+);
+// pck-19: physical shortcuts closes on Escape, drops an open draft first, and
+// leaves Escape to a native position capture in progress
+const physical = fixture('physical_shortcuts');
+const physicalPosts = () => physical.posts.map((text) => JSON.parse(text).action);
+physical.element('editor').hidden = true;
+dispatch(physical.document, 'Escape');
+assert.deepEqual(physicalPosts(), [], 'a composing Escape must not close physical shortcuts');
+assert.equal(
+	dispatch(physical.document, 'Escape', false),
+	true,
+	'pck-19: Escape is consumed by physical shortcuts'
+);
+assert.deepEqual(physicalPosts(), ['close'], 'pck-19: Escape posts the Close button action');
+physical.posts.length = 0;
+physical.element('editor').hidden = false;
+dispatch(physical.document, 'Escape', false);
+assert.deepEqual(physicalPosts(), ['cancel_position'], 'pck-19: Escape drops an open draft');
+assert.equal(physical.element('editor').hidden, true, 'pck-19: the draft editor closes');
+physical.posts.length = 0;
+const domReady = physical.document.listeners.DOMContentLoaded || [];
+assert.equal(domReady.length, 1, 'physical shortcuts wires its controls on load');
+domReady[0]();
+physical.element('editor').hidden = false;
+for (const fn of physical.element('capture').listeners.click) fn();
+physical.posts.length = 0;
+assert.equal(
+	dispatch(physical.document, 'Escape', false),
+	false,
+	'pck-19: Escape stays with a native position capture in progress'
+);
+assert.deepEqual(physicalPosts(), [], 'a capture in progress closes nothing');
 const hotstring = fixture('hotstring_editor');
 hotstring.context.insertBrAtCursor = () => {};
 assert.equal(

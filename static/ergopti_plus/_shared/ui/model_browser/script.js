@@ -1342,6 +1342,15 @@ function setSort(key) {
 			if (_capabilities.disable === true) postModelAction({ action: 'disable_model' });
 		});
 
+	// Escape closes the window: the page holds the keyboard, so no host window
+	// sees the key (PCK-19). An IME composition keeps its own Escape.
+	document.addEventListener('keydown', function (ev) {
+		if (ev.key !== 'Escape' || ev.isComposing || ev.keyCode === 229) return;
+		if (ev.defaultPrevented) return;
+		ev.preventDefault();
+		postModelAction({ action: 'close' });
+	});
+
 	updateFooter();
 	if (window._i18n_strings) render();
 })();

@@ -19,6 +19,8 @@ let selection = 0;
 let pending = false;
 let writable = true;
 let captureAvailable = false;
+// A native position capture is waiting for its key, which may be Escape.
+let capturing = false;
 const modifierNames = ['ctrl', 'alt', 'shift', 'super'];
 const node = (id) => document.getElementById(id);
 
@@ -51,6 +53,7 @@ function busy(value) {
 }
 
 function changed() {
+	capturing = false;
 	post({ action: 'cancel_position' });
 	selection += 1;
 	token = null;
@@ -171,6 +174,7 @@ function selected(data) {
 
 // Only the still-owned native request fills the manual draft; page keys cannot mint it.
 function captured(data) {
+	capturing = false;
 	if (data.request_id !== selection || node('editor').hidden || !writable) return;
 	node('position').value = data.code;
 	for (const name of modifierNames) node('mod-' + name).checked = data.mods[name] === true;
@@ -200,7 +204,15 @@ function result(data) {
 	status('saved');
 }
 
+// Drops the open draft, as its Cancel button does.
+function cancelDraft() {
+	changed();
+	node('editor').hidden = true;
+	busy(false);
+}
+
 function refused(reason) {
+	capturing = false;
 	busy(false);
 	status(reason || 'save_failed');
 }
@@ -212,13 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (node('editor').hidden) edit(null);
 		else changed();
 		post({ action: 'capture_position', request: { request_id: selection } });
+		capturing = true;
 	});
 	node('position').addEventListener('change', changed);
-	node('cancel').addEventListener('click', () => {
-		changed();
-		node('editor').hidden = true;
-		busy(false);
-	});
+	node('cancel').addEventListener('click', cancelDraft);
 	node('choose').addEventListener('click', () => {
 		if (pending || !writable) return;
 		if (!node('position').value || node('position').selectedOptions[0]?.disabled) {
@@ -246,4 +255,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 	node('close').addEventListener('click', () => post({ action: 'close' }));
 	post({ action: 'ready' });
+});
+
+// Escape cancels an open draft, as its Cancel button does, else closes the
+// window: the page holds the keyboard, so no host window sees the key
+// (PCK-19). A position capture in progress owns the keyboard, Escape included,
+// and an IME composition keeps its own Escape.
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+	if (event.defaultPrevented || capturing) return;
+	event.preventDefault();
+	if (node('editor').hidden) post({ action: 'close' });
+	else cancelDraft();
 });

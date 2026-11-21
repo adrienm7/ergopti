@@ -414,6 +414,12 @@ helpers.describe("ui.bridge_handlers", function()
         fixture.send({ action = "download_model", backend = "ollama", name = available.name })
         helpers.assert_eq(download.runtime_name, available.runtime_name)
         helpers.assert_eq(download.label, available.name)
+        -- pck-19: the page's Escape posts close, and the window closes.
+        fixture.send({ action = "close" })
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false,
+          "pck-19: the model browser closes on the page's close")
+        helpers.assert_true(fixture.manager.show("model_browser"))
+        fixture.handshake()
       end, debug.traceback)
       local closed = fixture.close()
       assert(ok, failure)

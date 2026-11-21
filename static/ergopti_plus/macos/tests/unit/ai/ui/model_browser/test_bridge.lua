@@ -198,6 +198,26 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_eq(#state.errors, 0)
 	end)
 
+	-- The web view holds the keyboard, so the page's Escape is the only one.
+	helpers.it("pck-19: the page's close closes the model browser", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+		package.loaded["ai.ui.model_browser"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
+		local browser = require("ai.ui.model_browser")
+		helpers.assert_true(browser.open({
+			build_payload = function() return { backend = "mlx", models = {} } end,
+			on_action = function() return true end,
+		}))
+		bridge()({ body = "ready" })
+		helpers.assert_not_nil(browser.window(), "the browser is open")
+		local deletes = state.deletes
+		bridge()({ body = { action = "close", session = 1 } })
+		helpers.assert_nil(browser.window(), "pck-19: the page's close closes the window")
+		helpers.assert_eq(state.deletes, deletes + 1, "the web view is released")
+		helpers.assert_eq(#state.errors, 0)
+	end)
+
 	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
 		local bridge, state = install_hs_stubs()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }

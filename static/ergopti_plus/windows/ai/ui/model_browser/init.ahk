@@ -820,6 +820,8 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
 			try Controller.Fill()
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
 			WebView_TakeFocus(Controller)
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
@@ -1493,6 +1495,7 @@ _LLM_MBW_OnPageReady(ExpectedEpoch) {
  *   {"action":"group_action"|"row_action","id":"…", …}  — a tool of the payload
  *   {"action":"disable_model"}                         — no model
  *   {"action":"open_url","url":"…"}                    — open the model page
+ *   {"action":"close"}                                 — the page's Escape
  */
 _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	global _LLM_MBW_SessionEpoch
@@ -1521,6 +1524,12 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	Action := Payload.Has("action") ? Payload["action"] : ""
 	if !(Action is String)
 		return
+	; The page's Escape (PCK-19): closing writes nothing, so no config block
+	; applies. Deferred out of this COM callback, as every teardown is.
+	if (Action == "close") {
+		SetTimer(_LLM_MBW_SessionCall.Bind(ExpectedEpoch, _LLM_MBW_OnClose), -1)
+		return
+	}
 	; Every page action writes config.toml, as the tray rows it replaces did.
 	if (Action != "open_url") {
 		BlockReason := _LLM_Menu_ConfigBlockReason()

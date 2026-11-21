@@ -353,6 +353,10 @@ function M.on_message(payload, state, context)
 	if not frame or frame.state ~= state or type(context) ~= "table" or context.document_owner ~= frame.document
 		or not projection_current(frame) then return nil end
 
+	-- The page's Escape (PCK-19): closing writes nothing, so no config block applies.
+	if payload.action == "close" then
+		return { closed = close_owned(context) }
+	end
 	local blocked = require("ai.ui.menu.config_guard").reason()
 	if blocked ~= nil and payload.action ~= "open_url" then
 		Logger.warn(LOG, "Model selector action '%s' refused: %s.", tostring(payload.action), blocked)

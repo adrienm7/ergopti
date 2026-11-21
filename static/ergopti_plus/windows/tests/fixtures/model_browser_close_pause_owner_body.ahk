@@ -412,6 +412,22 @@ _MBPO_Run() {
 		_MBPO_NativeRefused()
 		return
 	}
+	if _MBPO.Mode == "page-close" {
+		; The page's Escape (PCK-19) posts close: the real SDK entry retires
+		; the exact host and writes nothing.
+		_MBPO.Args := _MBPO_Message('{"action":"close"}')
+		_MBPO.CommandIssued := true
+		_LLM_MBW_OnWebMessage(_MBPO.Epoch, 0, _MBPO.Args)
+		_MBPO_Observe()
+		Hash := CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile))
+		_MBPO_Receipt(Hash)
+		_MBPO_Require(_MBPO.Args.Reads == 1 && _MBPO.DestroyCalls == 1
+			&& !DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
+			"pck-19: the page's close must retire and destroy its exact native host.")
+		_MBPO_Require(_MBPO.WriterEntries == 0 && Hash == _MBPO.OriginalHash,
+			"pck-19: closing writes no configuration.")
+		return
+	}
 	_MBPO.Args := _MBPO_Message('{"action":"select_model","name":' . JsonStringLiteral(_MBPO.ModelB) . "}")
 	if _MBPO.Mode == "paused-entry"
 		Suspend(true)
@@ -464,7 +480,7 @@ _MBPO_Main() {
 		DestroyCalls: 0, PauseObserved: false, WriterEntries: 0, WriterConfirmed: 0,
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
 		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0, InitialBackend: "", BackendPickReturns: 0}
-	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
+	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "page-close" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
 		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced"
 		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen"

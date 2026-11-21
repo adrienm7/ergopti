@@ -284,6 +284,9 @@ local function create_ucc()
 				if ui_builder.open_http_url(body.url) then
 					Logger.info(LOG, "Opened model source URL.")
 				end
+			elseif body.action == "close" then
+				-- The page's Escape (PCK-19): the web view holds the keyboard.
+				M.close()
 			end
 		end)
 	end, debug.traceback)

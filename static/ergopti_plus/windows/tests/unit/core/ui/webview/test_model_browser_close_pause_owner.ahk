@@ -337,6 +337,9 @@ for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", 
 	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
 		_MBPT_Case.Bind(_MBPT_Mode))
 
+Test("Model browser page close: the page's Escape closes the window and writes nothing (pck-19)",
+	_MBPT_Case.Bind("page-close"))
+
 for _MBBK_Mode in ["native-backend-current", "native-backend-api"]
 	Test("Native model browser activation: " . _MBBK_Mode . " activates the selected Ollama catalogue model (model-browser-native-backend)",
 		_MBPT_Case.Bind(_MBBK_Mode))
