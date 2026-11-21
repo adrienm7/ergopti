@@ -28,12 +28,20 @@ _OWOC_BootError(Failure, Mode) {
 ; window, host, shared environment owner, SDK create and Promise await are real.
 class _OWOC_Core {
 	__New() {
-		this.Settings := {}
+		this.Settings := {}, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) => {Callback: Callback}
 	NavigationCompleted(Callback) => {Callback: Callback}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	Navigate(Url) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-09).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_OWOC_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The wizard seeds its page's locale and reading choices before navigating.")
+		_OWOC_Require(this.Navigations == 0, "The seed precedes the navigation.")
+	}
+	Navigate(Url) {
+		this.Navigations += 1
+	}
 }
 class _OWOC_Controller {
 	__New(Hwnd) {

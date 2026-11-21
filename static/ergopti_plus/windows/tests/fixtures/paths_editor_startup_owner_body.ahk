@@ -59,7 +59,12 @@ class _PWSO_View {
 		return { Callback: Callback }
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	AddScriptToExecuteOnDocumentCreated(*) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-09).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_PWSO_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The paths editor seeds its page's locale and reading choices before navigating.")
+		_PWSO_Require(this.Navigations == 0, "The seed precedes the navigation.")
+	}
 	Navigate(Url) {
 		this.Navigations += 1
 	}

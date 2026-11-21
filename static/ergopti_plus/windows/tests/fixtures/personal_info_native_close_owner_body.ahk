@@ -7,6 +7,8 @@ _PINS_Require(Condition, Message := "") {
 		throw Error(Message)
 }
 t(Key) => Key
+; The interface language I18nInit sets in the driver.
+global _I18nLocale := "en"
 LoggerSuccess(*) => 0
 LoggerError(*) {
 	global _PINS
@@ -85,6 +87,12 @@ class _PINS_View {
 		return {Callback: Callback}
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-09).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_PINS_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The personal information editor seeds its page's locale and reading choices before navigating.")
+		_PINS_Require(this.Navigations == 0, "The seed precedes the navigation.")
+	}
 	Navigate(Url) {
 		this.Navigations += 1
 	}
