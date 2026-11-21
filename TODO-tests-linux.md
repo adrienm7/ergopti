@@ -66,30 +66,30 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       « Ergopti+ (paused) » after a pause.
 - [ ] <!-- field-point: update_windows --> Updates and download windows (UPD-02 to UPD-09, 2026-11-21), on a
       standalone install offered a newer release, Orca on: About > Check for updates; Orca reads « Checking for
-      updates… » then the answer without a focus move, and Escape closes the window. Click Update, then Cancel in the
-      download window: it reads « Update download cancelled », never « Ollama download cancelled »; note whether the
-      menu still offers the update (UPD-08: it does not today). Click Update again and close the download window
-      while it downloads: note whether the release installs once downloaded (UPD-05: the log says « native install
-      refused » today) and whether the bar ever moves from 0 % (UPD-07).
-- [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, MET-09, MET-10, MET-12, 2026-11-21), Orca on, interface in
+      updates… » then the answer without a focus move, and Escape closes the window. Click Update: the bar moves with
+      the download (UPD-07); Cancel reads « Update download cancelled », never « Ollama download cancelled », and the
+      menu still offers « Update now » (UPD-08). Click Update again and close the download window while it
+      downloads: the release installs once downloaded and the daemon restarts on it, the notice saying so only once
+      the restart is armed (UPD-05, UPD-09). With the network down, the failed check names its cause when curl proves
+      one (UPD-06).
 - [ ] <!-- field-point: layout_tool_pages --> Layout manager and Ergopti Studio (LTP-02, LTP-06, LTP-07,
       2026-11-21), Orca on, interface in English: Layout > « Install or remove layouts… » and Ergopti Studio are read
       in English, not with a French voice. Tab to « Use » or « Update » on a layout already installed and press
       Space: after the answer the focus is still on that row (its button, or its name while the operation runs).
       Escape closes the layout manager. Do not install or remove a layout you need.
-- [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, 2026-11-21), Orca on, interface in
-      English: in the typing dashboard change the dates: Orca reads « Reading the selected period… » and the loader
-      says the same; with `db.sqlite` made unreadable (`chmod 000`, then put it back) a new date range says at once
-      that it could not be read instead of spinning for 2 min (MET-05, MET-06). Numbers read `12,345` and `1.2M`
-      (MET-07). In the apps dashboard, a notice of an incomplete read clears on the next complete answer without
-      closing the window (MET-04). With an AZERTY keymap, then with the Ergopti emulation on, the heatmap names
-      the keys as they type (A on the Q key), also after a date change (MET-09). Type in another window with the
-      dashboard open: the character, bigram and word tables follow within a few seconds, and typing does not
-      stutter at each refresh (MET-10). Hovering a card definition reads it in English (MET-12).
-      closing the window (MET-04). A past range with no typing reads « No data » on every card (MET-13); Tab reaches
-      the activity calendar's « Chart values » and Orca reads each day and its count (MET-16); Reset pressed while a
-      flush is still being written says in the status line that it failed (MET-19).
-      closing the window (MET-04).
+- [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, MET-09, MET-10, MET-12, MET-13,
+      MET-16, MET-19, 2026-11-21), Orca on, interface in English: in the typing dashboard change the dates: Orca
+      reads « Reading the selected period… » and the loader says the same; with `db.sqlite` made unreadable
+      (`chmod 000`, then put it back) a new date range says at once that it could not be read instead of spinning
+      for 2 min (MET-05, MET-06). Numbers read `12,345` and `1.2M` (MET-07). In the apps dashboard, a notice of an
+      incomplete read clears on the next complete answer without closing the window (MET-04). With an AZERTY
+      keymap, then with the Ergopti emulation on, the heatmap names the keys as they type (A on the Q key), also
+      after a date change (MET-09). Type in another window with the dashboard open: the character, bigram and word
+      tables follow within a few seconds, and typing does not stutter at each refresh (MET-10). Hovering a card
+      definition reads it in English (MET-12). A past range with no typing reads « No data » on every card
+      (MET-13); Tab reaches the activity calendar's « Chart values » and Orca reads each day and its count
+      (MET-16); Reset pressed while a flush is still being written says in the status line that it failed
+      (MET-19).
 - [ ] <!-- field-point: small_native_units --> Daily note (SNU-08, SNU-09, 2026-11-21): make
       `~/.local/share/ergopti/notes` read-only (`chmod 500`, then put it back) and take a note: the notification says
       it failed and the log holds « Daily note refused: today's note could not be created as a regular file. ». With
@@ -101,12 +101,6 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca
       reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the configured language, and the log
       holds one error naming the file, not one per pause; resume: the logo comes back. Put the file back.
-      updates… » then the answer without a focus move, and Escape closes the window. Click Update: the bar moves with
-      the download (UPD-07); Cancel reads « Update download cancelled », never « Ollama download cancelled », and the
-      menu still offers « Update now » (UPD-08). Click Update again and close the download window while it
-      downloads: the release installs once downloaded and the daemon restarts on it, the notice saying so only once
-      the restart is armed (UPD-05, UPD-09). With the network down, the failed check names its cause when curl proves
-      one (UPD-06).
 - [ ] <!-- field-point: pickers_prompts --> Pickers and prompts (PCK-03, PCK-04, PCK-06, PCK-09, 2026-11-21), Orca
       on: AI > Generation > Context length > Other value…, type « 250,5 » then Save: the window stays open and Orca
       reads « Enter a whole number of characters from 80 to 4000. »; type « 1800 »: it saves and closes. Temperature
