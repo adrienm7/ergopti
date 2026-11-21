@@ -231,7 +231,6 @@ WebView_AvailRamMb() {
 global WEBVIEW_MIN_RUNTIME_VERSION := "87.0.664.8"
 ; The runtime's EdgeUpdate client, where Microsoft documents its version.
 global WEBVIEW_RUNTIME_CLIENT := "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-global _WebView_RuntimeRefusalShown := false
 
 ; The installed Evergreen runtime's version, per machine then per user.
 ; @returns {String} "" when none is installed.
@@ -245,28 +244,66 @@ WebView_RuntimeVersion() {
 	return ""
 }
 
-; Refuses a runtime below the minimum, saying so once per run: the pages would
-; break on a missing interface. No runtime at all is not a refusal: creating the
-; web view fails as before and each window falls back on its own.
+; True for a runtime below the minimum: the pages would break on a missing
+; interface. No runtime at all is not decided here: creating the web view
+; fails and the window refuses with the WebView2-required message.
 ; @param VersionFn {Func} Test seam, WebView_RuntimeVersion by default.
-; @param NoticeFn {Func} Test seam taking the text, a tooltip by default.
 ; @returns {Boolean} True when the runtime is too old.
-WebView_RuntimeIsRefused(VersionFn := 0, NoticeFn := 0) {
-	global WEBVIEW_MIN_RUNTIME_VERSION, _WebView_RuntimeRefusalShown
+WebView_RuntimeIsRefused(VersionFn := 0) {
+	global WEBVIEW_MIN_RUNTIME_VERSION
 	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
-	if (Version == "" || VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) >= 0)
-		return false
-	if !_WebView_RuntimeRefusalShown {
-		_WebView_RuntimeRefusalShown := true
-		LoggerError("WebView", "The WebView2 Runtime {1} is below the minimum {2}: native windows only.",
-			Version, WEBVIEW_MIN_RUNTIME_VERSION)
-		Text := StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
-		if HasMethod(NoticeFn, "Call")
-			NoticeFn.Call(Text)
-		else
-			TooltipShow({ Text: Text, DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
-	}
-	return true
+	return Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0
+}
+
+/**
+ * Says why no WebView page can open on this machine. Every WebView window asks
+ * before it builds anything: there is no native form to open instead
+ * (maintainer decision 2026-11-21).
+ * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
+ * @returns {String} "" when WebView2 can be tried, else the reason, for the log.
+ */
+WebView_UnavailableReason(VersionFn := 0) {
+	global _VendorDir, WEBVIEW_MIN_RUNTIME_VERSION
+	if !IsSet(WebView2)
+		return "the WebView2 binding is not loaded"
+	if !IsSet(_VendorDir) || !FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+		return "WebView2Loader.dll is missing"
+	if WebView_RuntimeIsRefused(VersionFn)
+		return "the WebView2 Runtime is below " . WEBVIEW_MIN_RUNTIME_VERSION
+	return ""
+}
+
+/**
+ * Admits a WebView window, or refuses it with the WebView2 message.
+ * @param {String} Surface English name of the window, for the log.
+ * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
+ * @returns {Boolean} True when the window may try WebView2.
+ */
+WebView_RequireAvailable(Surface, VersionFn := 0) {
+	Reason := WebView_UnavailableReason(VersionFn)
+	return Reason == "" ? true : WebView_RefuseUnavailable(Surface, Reason, VersionFn)
+}
+
+/**
+ * Refuses a WebView window that could not open: logs the reason at ERROR and
+ * tells the user once, in the one localized message that says how to recover
+ * (update a runtime that is too old, else install or repair WebView2).
+ * No window has a native substitute (maintainer decisions 2026-11-11 and
+ * 2026-11-21).
+ * @param {String} Surface English name of the window, for the log.
+ * @param {String} Reason What failed, for the log.
+ * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
+ * @returns {Boolean} Always false: nothing opened.
+ */
+WebView_RefuseUnavailable(Surface, Reason, VersionFn := 0) {
+	global WEBVIEW_MIN_RUNTIME_VERSION
+	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
+	Text := (Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0)
+		? StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
+		: t("webview.required")
+	Ui_MsgBox(Text, t("common.error_title"), "Iconx")
+	return false
 }
 
 ; True when a WebView window should use its native fallback: the runtime is too
@@ -284,20 +321,6 @@ WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
 	if Avail < 0
 		return false
 	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
-}
-
-/**
- * Refuses a WebView-only window that could not open: logs the reason at ERROR
- * and tells the user, once per refused request, that WebView2 is required.
- * The personal editors have no native form (maintainer decision 2026-11-11).
- * @param {String} Surface English name of the window, for the log.
- * @param {String} Reason What failed, for the log.
- * @returns {Boolean} Always false: nothing opened.
- */
-WebView_RefuseUnavailable(Surface, Reason) {
-	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
-	Ui_MsgBox(t("webview.required"), t("common.error_title"), "Iconx")
-	return false
 }
 
 

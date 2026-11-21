@@ -1157,7 +1157,7 @@
 	"remap.category.special": "विशेष",
 	"remap.category.sticky_combinations": "स्थिर संयोजन",
 	"remap.category.sticky_modifiers": "स्थिर संशोधक",
-	"webview.runtime_too_old": "WebView2 Runtime बहुत पुराना है ({2}): Ergopti+ को {1} या नया संस्करण चाहिए। इसे अपडेट करने तक विंडो अपने सरल रूप में खुलेंगी।",
+	"webview.runtime_too_old": "WebView2 Runtime बहुत पुराना है ({2}): Ergopti+ को {1} या नया संस्करण चाहिए। जब तक आप इसे https://go.microsoft.com/fwlink/p/?LinkId=2124703 से अपडेट नहीं करते, यह विंडो नहीं खुलेगी।",
 	"webview.required": "इस विंडो को Microsoft WebView2 Runtime चाहिए, जो इस कंप्यूटर पर शुरू नहीं हो सका। इसे https://go.microsoft.com/fwlink/p/?LinkId=2124703 से इंस्टॉल करें, फिर विंडो दोबारा खोलें।",
 	"healthcheck.field.model": "मॉडल",
 	"healthcheck.field.cpu": "प्रोसेसर",

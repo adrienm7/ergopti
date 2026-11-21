@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Specjalne",
 	"remap.category.sticky_combinations": "Trwałe kombinacje",
 	"remap.category.sticky_modifiers": "Trwałe modyfikatory",
-	"webview.runtime_too_old": "Środowisko WebView2 Runtime jest za stare ({2}): Ergopti+ wymaga wersji {1} lub nowszej. Okna otwierają się w prostej formie, dopóki go nie zaktualizujesz.",
+	"webview.runtime_too_old": "Środowisko WebView2 Runtime jest za stare ({2}): Ergopti+ wymaga wersji {1} lub nowszej. To okno nie otworzy się, dopóki nie zaktualizujesz go ze strony https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "To okno wymaga środowiska Microsoft WebView2 Runtime, którego nie udało się uruchomić na tym komputerze. Zainstaluj je ze strony https://go.microsoft.com/fwlink/p/?LinkId=2124703, a następnie otwórz okno ponownie.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Procesor",

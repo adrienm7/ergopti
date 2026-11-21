@@ -1157,7 +1157,7 @@
 	"remap.category.special": "特殊",
 	"remap.category.sticky_combinations": "粘滞组合键",
 	"remap.category.sticky_modifiers": "粘滞修饰键",
-	"webview.runtime_too_old": "WebView2 运行时过旧（{2}）：Ergopti+ 需要 {1} 或更高版本。在更新之前，窗口以简易形式打开。",
+	"webview.runtime_too_old": "WebView2 运行时过旧（{2}）：Ergopti+ 需要 {1} 或更高版本。请从 https://go.microsoft.com/fwlink/p/?LinkId=2124703 更新，在此之前该窗口无法打开。",
 	"webview.required": "此窗口需要 Microsoft WebView2 运行时，但它无法在这台计算机上启动。请从 https://go.microsoft.com/fwlink/p/?LinkId=2124703 安装，然后重新打开该窗口。",
 	"healthcheck.field.model": "型号",
 	"healthcheck.field.cpu": "处理器",

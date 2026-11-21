@@ -1157,7 +1157,7 @@
 	"remap.category.special": "מיוחד",
 	"remap.category.sticky_combinations": "צירופים דביקים",
 	"remap.category.sticky_modifiers": "מקשי שינוי דביקים",
-	"webview.runtime_too_old": "WebView2 Runtime ישן מדי ({2}): Ergopti+ דורש גרסה {1} ומעלה. החלונות ייפתחו בצורתם הפשוטה עד שתעדכן אותו.",
+	"webview.runtime_too_old": "WebView2 Runtime ישן מדי ({2}): Ergopti+ דורש גרסה {1} ומעלה. חלון זה לא ייפתח עד שתעדכן אותו מ-https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "חלון זה דורש את Microsoft WebView2 Runtime, שלא ניתן היה להפעיל במחשב זה. התקן אותו מ-https://go.microsoft.com/fwlink/p/?LinkId=2124703 ולאחר מכן פתח את החלון שוב.",
 	"healthcheck.field.model": "דגם",
 	"healthcheck.field.cpu": "מעבד",

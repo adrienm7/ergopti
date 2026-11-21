@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Speciel",
 	"remap.category.sticky_combinations": "Klæbende kombinationer",
 	"remap.category.sticky_modifiers": "Klæbende modifikatorer",
-	"webview.runtime_too_old": "WebView2 Runtime er for gammel ({2}): Ergopti+ kræver {1} eller nyere. Vinduerne åbner i deres enkle form, indtil du opdaterer den.",
+	"webview.runtime_too_old": "WebView2 Runtime er for gammel ({2}): Ergopti+ kræver {1} eller nyere. Dette vindue åbner ikke, før du opdaterer den fra https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "Dette vindue kræver Microsoft WebView2 Runtime, som ikke kunne starte på denne computer. Installer den fra https://go.microsoft.com/fwlink/p/?LinkId=2124703, og åbn derefter vinduet igen.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Processor",

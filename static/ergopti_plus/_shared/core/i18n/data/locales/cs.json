@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Speciální",
 	"remap.category.sticky_combinations": "Lepivé kombinace",
 	"remap.category.sticky_modifiers": "Lepivé modifikátory",
-	"webview.runtime_too_old": "Modul WebView2 Runtime je příliš starý ({2}): Ergopti+ vyžaduje verzi {1} nebo novější. Jeho okna se otevírají v jednoduché podobě, dokud modul neaktualizujete.",
+	"webview.runtime_too_old": "Modul WebView2 Runtime je příliš starý ({2}): Ergopti+ vyžaduje verzi {1} nebo novější. Toto okno se neotevře, dokud jej neaktualizujete z https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "Toto okno vyžaduje modul Microsoft WebView2 Runtime, který se na tomto počítači nepodařilo spustit. Nainstalujte jej z https://go.microsoft.com/fwlink/p/?LinkId=2124703 a poté okno otevřete znovu.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Procesor",

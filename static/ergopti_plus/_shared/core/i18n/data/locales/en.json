@@ -1152,7 +1152,7 @@
 	"remap.category.special": "Special",
 	"remap.category.sticky_combinations": "Sticky key combinations",
 	"remap.category.sticky_modifiers": "Sticky modifiers",
-	"webview.runtime_too_old": "The WebView2 Runtime is too old ({2}): Ergopti+ needs {1} or newer. Its windows open in their simple form until you update it.",
+	"webview.runtime_too_old": "The WebView2 Runtime is too old ({2}): Ergopti+ needs {1} or newer. This window cannot open until you update it from https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "This window needs the Microsoft WebView2 Runtime, which could not start on this computer. Install it from https://go.microsoft.com/fwlink/p/?LinkId=2124703, then open the window again.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Processor",

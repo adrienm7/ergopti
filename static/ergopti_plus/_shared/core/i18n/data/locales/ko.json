@@ -1157,7 +1157,7 @@
 	"remap.category.special": "특수",
 	"remap.category.sticky_combinations": "고정 조합",
 	"remap.category.sticky_modifiers": "고정 보조 키",
-	"webview.runtime_too_old": "WebView2 런타임이 너무 오래되었습니다({2}). Ergopti+에는 {1} 이상이 필요합니다. 업데이트할 때까지 창이 간단한 형태로 열립니다.",
+	"webview.runtime_too_old": "WebView2 런타임이 너무 오래되었습니다({2}). Ergopti+에는 {1} 이상이 필요합니다. https://go.microsoft.com/fwlink/p/?LinkId=2124703 에서 업데이트할 때까지 이 창을 열 수 없습니다.",
 	"webview.required": "이 창에는 Microsoft WebView2 런타임이 필요하지만 이 컴퓨터에서 시작할 수 없었습니다. https://go.microsoft.com/fwlink/p/?LinkId=2124703 에서 설치한 후 창을 다시 여세요.",
 	"healthcheck.field.model": "모델",
 	"healthcheck.field.cpu": "프로세서",

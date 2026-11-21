@@ -1157,7 +1157,7 @@
 	"remap.category.special": "特殊",
 	"remap.category.sticky_combinations": "固定の組み合わせ",
 	"remap.category.sticky_modifiers": "固定の修飾キー",
-	"webview.runtime_too_old": "WebView2 ランタイムが古すぎます ({2})。Ergopti+ には {1} 以降が必要です。更新するまで、ウィンドウは簡易表示で開きます。",
+	"webview.runtime_too_old": "WebView2 ランタイムが古すぎます ({2})。Ergopti+ には {1} 以降が必要です。https://go.microsoft.com/fwlink/p/?LinkId=2124703 から更新するまで、このウィンドウは開けません。",
 	"webview.required": "このウィンドウには Microsoft WebView2 ランタイムが必要ですが、このコンピューターで起動できませんでした。https://go.microsoft.com/fwlink/p/?LinkId=2124703 からインストールしてから、ウィンドウをもう一度開いてください。",
 	"healthcheck.field.model": "モデル",
 	"healthcheck.field.cpu": "プロセッサ",

@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Özel",
 	"remap.category.sticky_combinations": "Yapışkan kombinasyonlar",
 	"remap.category.sticky_modifiers": "Yapışkan değiştiriciler",
-	"webview.runtime_too_old": "WebView2 Runtime çok eski ({2}): Ergopti+ için {1} veya daha yenisi gerekir. Güncelleyene kadar pencereler basit biçimleriyle açılır.",
+	"webview.runtime_too_old": "WebView2 Runtime çok eski ({2}): Ergopti+ için {1} veya daha yenisi gerekir. https://go.microsoft.com/fwlink/p/?LinkId=2124703 adresinden güncelleyene kadar bu pencere açılmaz.",
 	"webview.required": "Bu pencere için Microsoft WebView2 Runtime gerekir ancak bu bilgisayarda başlatılamadı. https://go.microsoft.com/fwlink/p/?LinkId=2124703 adresinden yükleyin, ardından pencereyi yeniden açın.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "İşlemci",

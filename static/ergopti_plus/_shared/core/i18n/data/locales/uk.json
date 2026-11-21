@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Особливе",
 	"remap.category.sticky_combinations": "Залипаючі комбінації",
 	"remap.category.sticky_modifiers": "Залипаючі модифікатори",
-	"webview.runtime_too_old": "Середовище WebView2 Runtime застаріле ({2}): Ergopti+ потрібна версія {1} або новіша. Вікна відкриваються у простому вигляді, доки ви його не оновите.",
+	"webview.runtime_too_old": "Середовище WebView2 Runtime застаріле ({2}): Ergopti+ потрібна версія {1} або новіша. Це вікно не відкриється, доки ви не оновите його з https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "Для цього вікна потрібне середовище Microsoft WebView2 Runtime, яке не вдалося запустити на цьому комп’ютері. Установіть його з https://go.microsoft.com/fwlink/p/?LinkId=2124703, а потім відкрийте вікно знову.",
 	"healthcheck.field.model": "Модель",
 	"healthcheck.field.cpu": "Процесор",

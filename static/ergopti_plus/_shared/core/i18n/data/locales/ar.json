@@ -1157,7 +1157,7 @@
 	"remap.category.special": "خاص",
 	"remap.category.sticky_combinations": "تركيبات ثابتة",
 	"remap.category.sticky_modifiers": "مفاتيح تعديل ثابتة",
-	"webview.runtime_too_old": "إصدار WebView2 Runtime قديم جدًا ({2}): يحتاج Ergopti+ إلى الإصدار {1} أو أحدث. تُفتح نوافذه بشكلها البسيط إلى أن تحدّثه.",
+	"webview.runtime_too_old": "إصدار WebView2 Runtime قديم جدًا ({2}): يحتاج Ergopti+ إلى الإصدار {1} أو أحدث. لا تُفتح هذه النافذة قبل تحديثه من https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "تحتاج هذه النافذة إلى Microsoft WebView2 Runtime، الذي تعذّر تشغيله على هذا الكمبيوتر. ثبّته من https://go.microsoft.com/fwlink/p/?LinkId=2124703 ثم افتح النافذة مجددًا.",
 	"healthcheck.field.model": "الطراز",
 	"healthcheck.field.cpu": "المعالج",

@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Speciaal",
 	"remap.category.sticky_combinations": "Plakkende combinaties",
 	"remap.category.sticky_modifiers": "Plakkende modificatietoetsen",
-	"webview.runtime_too_old": "De WebView2-runtime is te oud ({2}): Ergopti+ heeft {1} of nieuwer nodig. De vensters openen in hun eenvoudige vorm totdat je deze bijwerkt.",
+	"webview.runtime_too_old": "De WebView2-runtime is te oud ({2}): Ergopti+ heeft {1} of nieuwer nodig. Dit venster opent pas nadat je deze bijwerkt via https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "Dit venster heeft de Microsoft WebView2-runtime nodig, die op deze computer niet kon starten. Installeer deze via https://go.microsoft.com/fwlink/p/?LinkId=2124703 en open het venster daarna opnieuw.",
 	"healthcheck.field.model": "Model",
 	"healthcheck.field.cpu": "Processor",

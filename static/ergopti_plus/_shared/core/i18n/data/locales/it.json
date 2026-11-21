@@ -1157,7 +1157,7 @@
 	"remap.category.special": "Speciale",
 	"remap.category.sticky_combinations": "Combinazioni persistenti",
 	"remap.category.sticky_modifiers": "Modificatori persistenti",
-	"webview.runtime_too_old": "Il runtime WebView2 è troppo vecchio ({2}): Ergopti+ richiede la versione {1} o successiva. Le finestre si aprono nella forma semplice finché non lo aggiorni.",
+	"webview.runtime_too_old": "Il runtime WebView2 è troppo vecchio ({2}): Ergopti+ richiede la versione {1} o successiva. Questa finestra non si apre finché non lo aggiorni da https://go.microsoft.com/fwlink/p/?LinkId=2124703.",
 	"webview.required": "Questa finestra richiede il runtime Microsoft WebView2, che non è stato possibile avviare su questo computer. Installalo da https://go.microsoft.com/fwlink/p/?LinkId=2124703, poi riapri la finestra.",
 	"healthcheck.field.model": "Modello",
 	"healthcheck.field.cpu": "Processore",
