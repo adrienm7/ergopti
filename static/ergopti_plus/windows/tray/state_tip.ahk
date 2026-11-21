@@ -67,8 +67,8 @@ TrayApplyStateIcon(Suspended, Path, ExistFn := 0, SetIconFn := 0, LogFn := 0) {
 	_TrayMissingStateIcons()[State] := Path
 	if !Logged.Has(Path) {
 		Logged[Path] := true
-		Log := IsObject(LogFn) ? LogFn : _TrayLogMissingIcon
-		Log.Call(Path)
+		LogMissing := IsObject(LogFn) ? LogFn : _TrayLogMissingIcon
+		LogMissing.Call(Path)
 	}
 	try {
 		if Suspended
