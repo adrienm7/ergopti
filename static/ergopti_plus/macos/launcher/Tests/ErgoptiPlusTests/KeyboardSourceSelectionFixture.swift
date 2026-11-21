@@ -237,7 +237,8 @@ final class KeyboardSourceSelectionFixtureTests: XCTestCase {
 		XCTAssertFalse(fixture.contains(selectCall),
 			"The fixture selects through the launcher's plain headless role, never in the XCTest process")
 		XCTAssertTrue(fixture.contains("child.arguments = [kInputSourceSelectionFlag, identifier]"))
-		for file in ["KeyboardSourceProbeTests.swift", "KeyboardCharacterMappingTests.swift"] {
+		for file in ["KeyboardSourceProbeTests.swift", "KeyboardCharacterMappingTests.swift",
+			"NumberRowSourceProbeTests.swift"] {
 			let source = try String(contentsOf: directory.appendingPathComponent(file), encoding: .utf8)
 			XCTAssertFalse(source.contains(selectCall),
 				"\(file) must select through KeyboardSourceSelectionFixture, which waits for the change")

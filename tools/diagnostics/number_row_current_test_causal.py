@@ -16,13 +16,14 @@ NETWORK_SHA = "8968ced164b7505591c224cfb0b080e7f3964a4e39b7a2b8b752ea6e416a6654"
 TEST_PATH = (
     "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"
 )
-# Independently reviewed fixture v2; neither a transcript nor an approval may
-# select another test image or move the permitted causal assertion.
-CURRENT_TEST_SHA = "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a96f7"
-CURRENT_TEST_BLOB = "e1879c6e7985d044c41dd0dc5af6329cb0b37be6"
-CURRENT_ASSERTION_LINE = 435
+# Independently reviewed fixture v3 (maintainer review, 2026-11-21); neither a
+# transcript nor an approval may select another test image or move the
+# permitted causal assertion.
+CURRENT_TEST_SHA = "769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca"
+CURRENT_TEST_BLOB = "7b09f33223047361ed1d6bbfd2c6465574e8aa2b"
+CURRENT_ASSERTION_LINE = 339
 ROSTER_PATH = "tools/diagnostics/fixtures/number-row-current-test/build-inputs.json.raw"
-ROSTER_SHA = "3c6216840a55ad0c7add3f7e86a0ac0d940f14a7fa89d1535d4dc5547d9d8a96"
+ROSTER_SHA = "9b3bff6696ccb4b96bd66ff50a0ce0069182a05bdc9c04f1ca94a5aa12ee63df"
 LAUNCHER = "static/ergopti_plus/macos/launcher/"
 TARGET_ROOTS = (
     LAUNCHER + "Sources/CPOSIXCompatibility/",

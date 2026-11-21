@@ -18,8 +18,8 @@ import number_row_current_test_causal as subject
 import number_row_current_network_causal as network
 import number_row_native_causal as core
 
-TEST_SHA = "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a96f7"
-TEST_BLOB = "e1879c6e7985d044c41dd0dc5af6329cb0b37be6"
+TEST_SHA = "769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca"
+TEST_BLOB = "7b09f33223047361ed1d6bbfd2c6465574e8aa2b"
 BASE = REPOSITORY / "tools/diagnostics/fixtures/number-row-native-causal"
 NETWORK = REPOSITORY / "tools/diagnostics/fixtures/number-row-current-network"
 BASE_SHA = "47b2dc03e558db6418234ab6c69a279cc91fd9c29bc587505e13ea0989764549"
@@ -34,7 +34,7 @@ def controlled_log():
         lines.append(f"Test Case '{identity}' started.")
         if method == core.TARGET:
             lines.append(
-                f"CONTROLLED/NumberRowSourceProbeTests.swift:435: error: {identity} : "
+                f"CONTROLLED/NumberRowSourceProbeTests.swift:339: error: {identity} : "
                 "XCTAssertThrowsError failed: did not throw error"
             )
         result = "failed" if method == core.TARGET else "passed"
@@ -87,7 +87,7 @@ class CurrentFixtureControls(unittest.TestCase):
             "sha256": TEST_SHA,
             "source_review_sha256": "d" * 64,
             "causal_method": core.TARGET,
-            "causal_assertion_line": 435,
+            "causal_assertion_line": 339,
         }
 
     def evaluate(self, log=None, **changes):
@@ -128,7 +128,7 @@ class CurrentFixtureControls(unittest.TestCase):
         received = {
             "schema": 1,
             "role": "independently-reviewed-complete-current-carbon-local-inputs",
-            "roster_sha256": "3c6216840a55ad0c7add3f7e86a0ac0d940f14a7fa89d1535d4dc5547d9d8a96",
+            "roster_sha256": "9b3bff6696ccb4b96bd66ff50a0ce0069182a05bdc9c04f1ca94a5aa12ee63df",
             "published_source_commit": "c" * 40,
             "source_review_sha256": "e" * 64,
             "test_source_approval_sha256": test_sha,
@@ -195,9 +195,9 @@ class CurrentFixtureControls(unittest.TestCase):
                 subject.verify_current_mutation(core, self.original, bad, self.tests)
 
     def test_old_or_foreign_assertion_line_refuses(self):
-        for line in (321, 434, 436):
+        for line in (435, 338, 340):
             with self.subTest(line=line), self.assertRaises(ValueError):
-                self.evaluate(self.log.replace(".swift:435:", f".swift:{line}:"))
+                self.evaluate(self.log.replace(".swift:339:", f".swift:{line}:"))
 
     def test_extra_assertion_or_compiler_error_refuses(self):
         for suffix in ("error: CONTROLLED compiler refusal\n", "XCTAssertEqual failed\n"):
@@ -384,7 +384,7 @@ class CurrentFixtureControls(unittest.TestCase):
             subject.git_inputs(REPOSITORY, head, paths + ["CONTROLLED-uncommitted.swift"])
 
     def test_positive_receiving_uses_unchanged_positive_receiver(self):
-        assertion = next(line for line in self.log.splitlines(True) if ".swift:435:" in line)
+        assertion = next(line for line in self.log.splitlines(True) if ".swift:339:" in line)
         positive_log = (
             self.log.replace(assertion, "")
             .replace("failed at", "passed at")
@@ -422,7 +422,7 @@ class CurrentFixtureControls(unittest.TestCase):
                 subject.evaluate_positive(core, self.tests, bad, 0, 0, self.tis, 0)
 
     def test_compiler_source_context_does_not_refuse_either_leg(self):
-        assertion = next(line for line in self.log.splitlines(True) if ".swift:435:" in line)
+        assertion = next(line for line in self.log.splitlines(True) if ".swift:339:" in line)
         positive = (
             self.log.replace(assertion, "")
             .replace("failed at", "passed at")
@@ -456,7 +456,7 @@ class CurrentFixtureControls(unittest.TestCase):
                             self.assertIs(self.evaluate(log)["expected_red_received"], True)
 
     def test_real_diagnostics_still_refuse_both_legs_with_source_context(self):
-        assertion = next(line for line in self.log.splitlines(True) if ".swift:435:" in line)
+        assertion = next(line for line in self.log.splitlines(True) if ".swift:339:" in line)
         positive = (
             self.log.replace(assertion, "")
             .replace("failed at", "passed at")
