@@ -27,7 +27,8 @@ local function fixture(extra)
 	local source={current=function()return w.authorized end,publish=function()end,app_capture=function()end,app_current=function()end,compensate=function()return true end}
 	local resolver={plan=function()return{asset=w.asset,parent=RELEASE,directory=RELEASE..'/ollama',
 		runtime='/data/runtimes/ollama',uid=1000}end,current=function()return w.ancestry end}
-	w.asset={name='independent-pinned-fixture',version='0.40.6',sha256=SHA}
+	w.asset={name='independent-pinned-fixture',version='0.40.6',sha256=SHA,bytes=40}
+	w.parent=RELEASE;w.free=1000;w.margin=60
 	w.files={RELEASE..'/ollama/bin/ollama',RELEASE..'/ollama/lib/ollama/libggml.so'}
 	w.descriptor={files=function()return w.files end};w.file_owner={}
 	w.listening={};w.owner_ok=true;w.removed={};w.finite={}
@@ -46,10 +47,14 @@ local function fixture(extra)
 	local timer={after=function()end,now_ms=function()return 0 end}
 	local timings={ms=function(section,key)
 		return assert(({['llm:dependency_bootstrap_timeout_ms']=100,['llm:local_server_probe_timeout_ms']=25,['ui:ollama_deps_poll_ms']=10})[section..':'..key])
+	end,count=function(section,key)
+		assert(section=='limits' and key=='ollama_install_free_space_margin_bytes','the margin comes from the registry')
+		return w.margin
 	end}
+	local free_space={free_bytes=function(path)w.free_path=path;if w.on_free then w.on_free()end;return w.free,w.free_reason end}
 	w.factory={}
 	w.controller=Compose.new({source=source,resolver=resolver,installed=installed,file_factory=w.factory,admission=admission,
-		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,environment=function()return w.env end,
+		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,free_space=free_space,environment=function()return w.env end,
 		serve_environment=w.serve_environment or ManagedEnvironment.load(),network=extra and extra.network,
 		listeners=listeners,seal=seal,retention=retention})
 	w.budget={remaining_ms=function()return w.left end}
@@ -66,6 +71,27 @@ test('binary installation consumes exact phase/file owners and budget',function(
 	eq(w.admission.consent,true);eq(w.admission.f,w.factory)
 end)
 test('stale installation admission dispatches no phase',function()local w=fixture();w.authorized=false;local o=w.controller.ports.install({},w.budget,w.authorizer,function()end);eq(o:is_settled(),true);eq(w.phase_options,nil)end)
+-- OLL-04: the pinned archive and the registry margin must fit before the download.
+test('an install volume without room for the archive and its margin dispatches no phase (ollama-install-free-space)',function()
+	local w=fixture();w.free=99
+	local result;local o=w.controller.ports.install({},w.budget,w.authorizer,function(r)result=r end)
+	eq(o:is_settled(),true);eq(w.phase_options,nil);eq(w.admission,nil);eq(w.free_path,w.parent)
+	eq(result.ok,false);eq(result.error,'install_disk_full free=99 required=100')
+end)
+test('room for the archive and its margin installs (ollama-install-free-space)',function()
+	local w=fixture();w.free=100
+	eq(w.controller.ports.install({},w.budget,w.authorizer,function()end),w.op);eq(w.free_path,w.parent)
+end)
+test('an unreadable install volume refuses the install (ollama-install-free-space)',function()
+	local w=fixture();w.free,w.free_reason=nil,'native_statfs_refused'
+	local result;w.controller.ports.install({},w.budget,w.authorizer,function(r)result=r end)
+	eq(w.phase_options,nil);eq(result.error,'install_free_space_unavailable native_statfs_refused')
+end)
+test('a source withdrawn while the volume is read dispatches no phase (ollama-install-free-space)',function()
+	local w=fixture();w.on_free=function()w.authorized=false end
+	local result;w.controller.ports.install({},w.budget,w.authorizer,function(r)result=r end)
+	eq(w.phase_options,nil);eq(w.admission,nil);eq(result.error,'runtime_source_changed')
+end)
 test('owned serve explicit no-deadline port keeps configured loopback host',function()
 	local w=fixture();eq(w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end),w.op)
 	eq(w.service.opts.timeout_ms,false);eq(w.service.opts.authorized,w.authorizer);eq(w.service.opts.capture_tail,true)
@@ -86,8 +112,8 @@ test('composition refuses a missing or invalid serve environment',function()
 		local ok=pcall(function()local w={serve_environment=rows};Compose.new({source={current=function()return true end,publish=function()end,app_capture=function()end,app_current=function()end},
 			resolver={plan=function()end,current=function()end},installed={capture=function()end},file_factory={},admission={new=function()end},
 			install_phase={start=function()end},process={start_service=function()end},http={get_owned=function()end},
-			owned_timer={after=function()end,now_ms=function()return 0 end},timings={ms=function()return 1 end},
-			environment=function()return{}end,serve_environment=w.serve_environment,
+			owned_timer={after=function()end,now_ms=function()return 0 end},timings={ms=function()return 1 end,count=function()return 1 end},
+			free_space={free_bytes=function()return 1 end},environment=function()return{}end,serve_environment=w.serve_environment,
 			listeners={listening=function()end,owned=function()end},seal=Seal,retention={stale=function()end,remove=function()end}})end)
 		eq(ok,false)
 	end

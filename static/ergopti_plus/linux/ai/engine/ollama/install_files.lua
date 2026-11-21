@@ -72,6 +72,44 @@ end
 
 
 
+--- The bytes free for the user on the volume that will hold path, read from its
+--- nearest existing ancestor: the install folders may not exist yet (OLL-04).
+--- @param backend table|nil Native libuv binding, or an explicit test backend.
+--- @param path string Absolute install parent.
+--- @return number|nil free_bytes
+--- @return string|nil reason
+function M.free_bytes(backend, path)
+	local fs = backend or native
+	if not fs or type(fs.fs_statfs) ~= "function" or type(fs.fs_lstat) ~= "function" then
+		return nil, "native_filesystem_unavailable"
+	end
+	if not absolute(path) then return nil, "install_directory_invalid" end
+	local current = path
+	while true do
+		local called, value, _, code = pcall(fs.fs_lstat, current)
+		if not called then return nil, "native_stat_refused" end
+		if type(value) == "table" then
+			if value.type ~= "directory" then return nil, "install_parent_not_directory" end
+			break
+		end
+		if code ~= "ENOENT" then return nil, "native_stat_refused" end
+		if current == "/" then return nil, "native_stat_refused" end
+		current = NativePath.dirname(current)
+		if current == "" then current = "/" end
+		if not current then return nil, "install_parent_invalid" end
+	end
+	local called, value = pcall(fs.fs_statfs, current)
+	if not called or type(value) ~= "table" or type(value.bavail) ~= "number" or type(value.bsize) ~= "number"
+		or value.bavail < 0 or value.bsize <= 0 then
+		return nil, "native_statfs_refused"
+	end
+	return value.bavail * value.bsize
+end
+
+
+
+
+
 -- ========================================
 -- ========================================
 -- ======= 2/ Private Native Owner =========

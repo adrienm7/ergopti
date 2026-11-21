@@ -208,10 +208,12 @@ function M.new(ports, policy)
 			local pending=entry.result_listeners;entry.result_listeners={}
 			for _,callback in ipairs(pending) do notify(callback,request.result) end
 		end
-		fail = function(reason)
+		-- install_failure: the installer's own reason and native detail, the evidence
+		-- line _shared/ai/engine/ollama/install_errors.lua classifies (OLL-05).
+		fail = function(reason, install_failure)
 			if entry.promoted then return end
 			if not failing then
-				failing=true; request.result={ok=false,error=reason or 'runtime_refused'}
+				failing=true; request.result={ok=false,error=reason or 'runtime_refused',install_failure=install_failure}
 				announce_result()
 			end
 			entry.stage='cleanup'; clean()
@@ -395,7 +397,12 @@ function M.new(ports, policy)
 					if held and op_settled(held) then
 						if held.delivered and type(held.result)=='table' and held.result.ok==true then
 							entry.installed=true; resolved()
-						else fail('runtime_install_failed') end
+						else
+							local result=held.delivered and type(held.result)=='table' and held.result or {}
+							local evidence=type(result.error)=='string' and result.error or 'install_receipt_missing'
+							if type(result.detail)=='string' and result.detail~='' then evidence=evidence .. ' ' .. result.detail end
+							fail('runtime_install_failed', evidence)
+						end
 					end
 				elseif entry.stage=='verify' then
 					local held=entry.verify

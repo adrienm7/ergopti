@@ -52,6 +52,7 @@ function M.new(engine, profiles)
 		archive_factory = require("infra.archive_output"),
 		admission = require("ai.engine.ollama.install_admission"),
 		install_phase = require("ai.engine.ollama.install_phase"), process = process,
+		free_space = { free_bytes = function(path) return require("ai.engine.ollama.install_files").free_bytes(native, path) end },
 		http = require("core.network.adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
 		listeners = require("ai.engine.ollama.listener_owner"),

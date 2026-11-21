@@ -342,6 +342,7 @@ return {
 	"tests.unit.core.fs.test_user_private_group",
 	"tests.unit.ai.engine.ollama.test_install_authorization",
 	"tests.unit.ai.engine.ollama.test_archive_installer",
+	"tests.unit.ai.engine.ollama.test_install_errors",
 	"tests.unit.ai.engine.ollama.test_install_files",
 	"tests.unit.ai.engine.ollama.test_install_admission",
 	"tests.unit.ai.engine.ollama.test_install_phase",

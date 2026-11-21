@@ -14,7 +14,9 @@ helpers.describe("Retained Ollama runtime composition", function()
   local archive, budget, files, result = {}, {}, {}, {}
   local function yes() return true end
   Compose.new({ source = { current = yes, publish = yes, app_capture = yes, app_current = yes },
-   timings = { ms = function() return 100 end }, resolver = { plan = function() return { asset = asset } end, current = yes },
+   timings = { ms = function() return 100 end, count = function() return 0 end },
+   free_space = { free_bytes = function() return 3 end },
+   resolver = { plan = function() return { asset = asset, parent = "/home/user/.local/share/ergopti" } end, current = yes },
    installed = { capture = function() return {} end }, file_factory = {}, archive_factory = archive,
    admission = { new = function() return files end }, install_phase = { start = function(ports, options)
     assert(ports.archive_factory == archive and ports.files == files and options.asset == asset and options.budget == budget)

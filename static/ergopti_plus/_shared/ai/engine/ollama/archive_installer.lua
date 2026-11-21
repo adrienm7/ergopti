@@ -17,6 +17,25 @@ local function successful(result)
 	return type(result) == "table" and result.ok == true and result.exit_code == 0
 end
 
+--- The native text of a failed transfer or extraction, kept beside the closed
+--- reason so _shared/ai/engine/ollama/install_errors.lua can tell a full disk
+--- or an unreachable host apart (OLL-05).
+--- @param result any The failed step's receipt.
+--- @return string|nil detail
+local function failure_detail(result)
+	if type(result) ~= "table" then return nil end
+	local parts = {}
+	for _, field in ipairs({ "error", "stderr" }) do
+		local value = rawget(result, field)
+		if type(value) == "string" and value ~= "" then parts[#parts + 1] = value end
+	end
+	local receipt = rawget(result, "failure_receipt")
+	if type(receipt) == "table" and type(rawget(receipt, "curl_exit")) == "number" then
+		parts[#parts + 1] = "curl_exit=" .. string.format("%d", receipt.curl_exit)
+	end
+	return #parts > 0 and table.concat(parts, " ") or nil
+end
+
 local function valid_asset(asset)
 	if type(asset) ~= "table" or type(asset.url) ~= "string" or type(asset.version) ~= "string"
 		or not asset.version:match("^%d+%.%d+%.%d+$") or type(asset.name) ~= "string"
@@ -111,10 +130,10 @@ function M.start(ports, options, callback)
 		if not called then operation.cleanup_error = "install_unknown_retirement_debt" end
 	end
 
-	finish = function(error_reason)
+	finish = function(error_reason, detail)
 		if terminal then return end
 		terminal = true
-		operation.result = { ok = error_reason == nil, error = error_reason }
+		operation.result = { ok = error_reason == nil, error = error_reason, detail = detail }
 		if pinned and brand and error_reason ~= nil then pcall(artifact.cancel_transfer, brand) end
 		if active and type(active.operation) == "table" and type(active.operation.cancel) == "function" then
 			pcall(active.operation.cancel, active.operation)
@@ -231,7 +250,7 @@ function M.start(ports, options, callback)
 			end,
 			admit = function(result, completion)
 				if type(result) ~= "table" or result.ok ~= true or result.status ~= 200 or type(completion) ~= "table" then
-					return false, "archive_download_failed"
+					return false, "archive_download_failed", failure_detail(result)
 				end
 				completed_target = completion; return true
 			end,
@@ -277,7 +296,10 @@ function M.start(ports, options, callback)
 				return wrapped
 			end,
 			admit = function(result)
-				return files.admit_retained_extraction(result, function() return artifact.install_current(install_token) and current() end)
+				local admitted, reason = files.admit_retained_extraction(result,
+					function() return artifact.install_current(install_token) and current() end)
+				if admitted then return true end
+				return false, reason, failure_detail(result)
 			end,
 		}
 	else
@@ -293,7 +315,9 @@ function M.start(ports, options, callback)
 			}, delivered)
 		end,
 		admit = function(result)
-			if type(result) ~= "table" or result.ok ~= true or result.status ~= 200 then return false, "archive_download_failed" end
+			if type(result) ~= "table" or result.ok ~= true or result.status ~= 200 then
+				return false, "archive_download_failed", failure_detail(result)
+			end
 			return files.admit_size(asset)
 		end,
 	}
@@ -311,7 +335,11 @@ function M.start(ports, options, callback)
 			if not program then return nil, args end
 			return process(program, args, timeout, delivered)
 		end,
-		admit = files.admit_extraction,
+		admit = function(result)
+			local admitted, reason = files.admit_extraction(result)
+			if admitted then return true end
+			return false, reason, failure_detail(result)
+		end,
 	}
 	end
 	steps[#steps + 1] = {
@@ -376,8 +404,10 @@ function M.start(ports, options, callback)
 					elseif capability.started ~= true then finish("install_dispatch_refused")
 					elseif not receipt.delivered then finish("install_receipt_missing")
 					else
-						local admitted, accepted, reason = pcall(receipt.step.admit, receipt.result, receipt.completion)
-						if not admitted or accepted ~= true then finish(reason or "install_receipt_refused") end
+						local admitted, accepted, reason, detail = pcall(receipt.step.admit, receipt.result, receipt.completion)
+						if not admitted or accepted ~= true then
+							finish(reason or "install_receipt_refused", admitted and detail or nil)
+						end
 					end
 				end
 			end

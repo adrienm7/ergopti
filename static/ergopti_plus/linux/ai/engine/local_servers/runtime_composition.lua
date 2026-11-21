@@ -12,6 +12,7 @@ local Receipt=require('ai.engine.settings.enable_admission_core')
 local Json=require('core.text.engine.json')
 local Logger=require('core.logger.engine.shim')
 local LOG='ai.engine.local_servers.runtime_composition'
+local InstallErrors=require('ai.engine.ollama.install_errors')
 local M={}
 local function empty(reason, done)
 	local op={started=false,result={ok=false,error=reason}}
@@ -26,6 +27,7 @@ local function current(fn)
 end
 --- deps: source, resolver, installed, file_factory, admission, install_phase,
 --- process (single finite/service bridge), http, owned_timer, timings, environment,
+--- free_space ({free_bytes(path)}: the bytes free for the user on the volume of path),
 --- serve_environment (rows of the shared managed_ollama_environment.json),
 --- optional network ({policy,lookup,timeout_ms,origins,relay}: the shared proxy policy,
 --- the owned system proxy lookup, its bound, the route_origins.json "ollama"
@@ -48,6 +50,11 @@ function M.new(deps)
 	local bootstrap=d.timings.ms('llm','dependency_bootstrap_timeout_ms')
 	local probe_timeout=d.timings.ms('llm','local_server_probe_timeout_ms')
 	local poll=d.timings.ms('ui','ollama_deps_poll_ms')
+	-- The free-space rule of _shared/ai/engine/ollama/install_errors.lua, checked
+	-- before the download starts: the pinned archive plus the registry margin (OLL-04).
+	local space=d.free_space
+	assert(type(space)=='table' and type(space.free_bytes)=='function', 'install free-space port unavailable')
+	local margin=d.timings.count('limits','ollama_install_free_space_margin_bytes')
 	local phase_start,serve_start,http_get=d.install_phase.start,d.process.start_service,d.http.get_owned
 	local get_plan,resolve_current=d.resolver.plan,d.resolver.current
 	local installed_capture=d.installed.capture
@@ -157,6 +164,14 @@ function M.new(deps)
 		if not current(authorized) or type(plan)~='table' or type(plan.asset)~='table' then
 			return empty('runtime_asset_unavailable',done)
 		end
+		local read,free,free_reason=pcall(space.free_bytes,plan.parent)
+		if not read or type(free)~='number' then
+			return empty('install_free_space_unavailable ' .. tostring(read and free_reason or free),done)
+		end
+		if not InstallErrors.fits(plan.asset.bytes,margin,free) then
+			return empty(string.format('install_disk_full free=%d required=%d',free,plan.asset.bytes+margin),done)
+		end
+		if not current(authorized) then return empty('runtime_source_changed',done) end
 		local files,reason=admission_new(d.resolver,d.file_factory,authorized,true)
 		if not files then return empty(reason or 'runtime_file_admission_unavailable',done) end
 		-- The phase owns reservation, budget subscription and every native stage.

@@ -3931,9 +3931,13 @@ function M.enable(on_changed)
 					-- The model selector page greys Ollama after a failed repair.
 					require("ai.engine.ollama.install_state").note_repair(result)
 					if type(result) ~= "table" or result.ok ~= false or result.error == "runtime_cancelled" then return end
-					Logger.error(LOG, "Local Ollama repair refused; its native cleanup owner remains retained until acknowledgment: %s.", tostring(result.error))
+					-- An install failure names its class (disk, network, checksum...): the
+					-- shared classes of _shared/ai/data/ollama_install_errors.json (OLL-05).
+					local message_key, install_class = require("ai.engine.ollama.install_error_messages").for_result(result)
+					Logger.error(LOG, "Local Ollama repair refused; its native cleanup owner remains retained until acknowledgment: %s (install class %s: %s).",
+						tostring(result.error), tostring(install_class), tostring(result.install_failure))
 					if owner.source.diagnostic_current(handle) then
-						local delivered = require("platform.system.notifier").send(I18n.get("ollama.runtime_repair_failed"), {
+						local delivered = require("platform.system.notifier").send(I18n.get(message_key), {
 							title = I18n.get("ollama.fail_title"), level = "error",
 						})
 						if delivered ~= true then Logger.warn(LOG, "The local Ollama failure notice was not delivered.") end
