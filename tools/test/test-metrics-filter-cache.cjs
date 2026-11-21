@@ -4590,7 +4590,7 @@ test('apps category speed chart retains slow observed typing', () => {
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
 		cpm_by_category_chart: { getContext: () => 'categories' },
-		'render-error-banner': {}
+		'render-error-banner': { remove() {} }
 	};
 	context.document.getElementById = (id) => elements[id] || null;
 	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
@@ -4777,7 +4777,7 @@ test('apps radial top eight use the same focus ranking as the top-app bars', () 
 		'kpi-switches': {},
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
-		'render-error-banner': {},
+		'render-error-banner': { remove() {} },
 		radial_top8_chart: { getContext: () => 'radial' },
 		apps_bar_chart: { getContext: () => 'bar' }
 	};
@@ -4828,7 +4828,7 @@ test('apps error ranking admits a qualifying application with no corrections', (
 		'kpi-switches': {},
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
-		'render-error-banner': {},
+		'render-error-banner': { remove() {} },
 		'kpi-tx-error-app': {},
 		'kpi-tx-error-app-detail': {}
 	};
@@ -4859,7 +4859,7 @@ test('apps recovery ranking admits qualifying zero-delay corrections', () => {
 		'kpi-switches': {},
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
-		'render-error-banner': {},
+		'render-error-banner': { remove() {} },
 		'kpi-tx-recovery-app': {},
 		'kpi-tx-recovery-app-detail': {}
 	};
@@ -5016,7 +5016,7 @@ test('apps muted duration is not presented as a focus-time percentage', () => {
 		'kpi-switches': {},
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
-		'render-error-banner': {},
+		'render-error-banner': { remove() {} },
 		'kpi-sys-mute-detail': {}
 	};
 	context.document.getElementById = (id) => elements[id] || null;
@@ -5258,7 +5258,7 @@ test('apps focus latency displays measured zero and distinguishes absence', () =
 		'kpi-switches': {},
 		'kpi-unlocks': {},
 		'kpi-wifi': {},
-		'render-error-banner': {},
+		'render-error-banner': { remove() {} },
 		'apps-tbody': tbody,
 		'kpi-tx-focus-lat': {},
 		// The drill-down binds its backdrop click once, on first opening.

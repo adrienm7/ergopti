@@ -45,6 +45,11 @@ function loadMetricsPage(app, host, afterScript) {
 				child.parentNode = this;
 				this.children.unshift(child);
 			},
+			remove() {
+				const parent = this.parentNode;
+				if (parent) parent.children = parent.children.filter((child) => child !== this);
+				this.parentNode = null;
+			},
 			setAttribute(name, value) {
 				this[name] = value;
 			},
@@ -98,8 +103,9 @@ function loadMetricsPage(app, host, afterScript) {
 		querySelectorAll() {
 			return [];
 		},
+		// The page's own nodes, then those its scripts appended to the body (a banner).
 		getElementById(id) {
-			return elements.get(id) || null;
+			return elements.get(id) || document.body.children.find((child) => child.id === id) || null;
 		},
 		createElement: element
 	};

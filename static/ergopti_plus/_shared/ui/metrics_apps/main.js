@@ -397,6 +397,7 @@ function updateCharts(appsArray, aggregatedData) {
 }
 
 function renderDashboard() {
+	let failed = false;
 	try {
 		const aggData = getAggregatedData();
 		// Cache so toolbar toggles (heatmap mode, future filters) can re-render
@@ -1194,6 +1195,7 @@ function renderDashboard() {
 			if (tbody) tbody.appendChild(tr);
 		});
 	} catch (err) {
+		failed = true;
 		safeLog('error', 'Error rendering dashboard', err);
 		// Surface the exception visibly — the WebView has no devtools so otherwise it's silent.
 		let banner = document.getElementById('render-error-banner');
@@ -1205,10 +1207,16 @@ function renderDashboard() {
 			banner.setAttribute('role', 'alert');
 			document.body.appendChild(banner);
 		}
+		// The reader gets the cause; the stack goes to the log above.
 		banner.textContent = _t('ui_apps.render_error').replace(
 			'{detail}',
-			String(err && err.stack ? err.stack : err)
+			err instanceof Error ? err.message : String(err)
 		);
+	} finally {
+		// A good render, the empty period's included, retires the alert an
+		// earlier failure left on screen (MET-14).
+		const stale = failed ? null : document.getElementById('render-error-banner');
+		if (stale) stale.remove();
 	}
 }
 
