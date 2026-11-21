@@ -85,6 +85,7 @@ class WPMWidgetConst {
     static MENUBAR_TICK_MS    := 0
     static WINDOW_MS          := 0
     static WPM_MIN_DURATION_MS := 0
+    static IDLE_RESET_MS      := 0
 
     ; ── Windows-only: no counterpart on the other drivers ────────────────────────
     ; Fast cursor-movement poll (ms). The display tick is too coarse to get the
@@ -357,7 +358,10 @@ WPMWidget_Calc() {
     } finally {
         Critical(RingCritical)
     }
-    if (count < 2)
+    ; After timings [keystats] wpm_idle_reset_ms without a character the speed
+    ; reads 0, as on macOS and Linux (MET-01): the decaying 15 s window alone
+    ; kept the tray readout showing a falling number for 15 s after a burst.
+    if (count < 2 || _WPMWidget_TickDelta(now, latest) > WPMWidgetConst.IDLE_RESET_MS)
         return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
     ; last keystroke the window grows and WPM decays naturally to 0.

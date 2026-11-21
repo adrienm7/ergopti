@@ -87,10 +87,12 @@ _WPMR_Timings() {
 		TimingsLoadShared(_SharedDir)
 		WindowMs := TimingsGet("keystats", "wpm_window_ms")
 		MinimumMs := TimingsGet("keystats", "wpm_min_duration_ms")
+		IdleResetMs := TimingsGet("keystats", "wpm_idle_reset_ms")
 		AssertTrue(WindowMs is Integer && MinimumMs is Integer && WindowMs > MinimumMs && MinimumMs > 0)
+		AssertTrue(IdleResetMs is Integer && IdleResetMs > 0 && IdleResetMs < WindowMs)
 		Digest := CryptoSha256Bytes(Raw)
 		AssertEqual(Digest, CryptoSha256Bytes(FSReadBytesStrict(Path)), "The actual shared timing source must remain unchanged")
-		return {Window: WindowMs, Minimum: MinimumMs, Digest: Digest}
+		return {Window: WindowMs, Minimum: MinimumMs, IdleReset: IdleResetMs, Digest: Digest}
 	} finally {
 		_TimingsCache := Saved.Timings, _ParseTomlCache := Saved.Parse
 		_TomlReadFailures := Saved.Failures, _TomlUnreadableFiles := Saved.Unreadable
@@ -133,7 +135,8 @@ _WPMR_Case(Mode) {
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)) . " timings=" . Timings.Digest
 			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\wpm_tick_rollover_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum)], _WPMR_Complete.Bind(State))
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum),
+			String(Timings.IdleReset)], _WPMR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private WPM child must start")
 		Started := A_TickCount
 		while State.Calls == 0 && TickElapsed(Started) < 15000 {
@@ -181,5 +184,6 @@ _WPMR_Case(Mode) {
 		throw ExportFailure
 }
 
-for _WPMR_Mode in ["full64-expired-after-dword-period", "full64-across-dword-boundary", "expired-and-minimum"]
+for _WPMR_Mode in ["full64-expired-after-dword-period", "full64-across-dword-boundary", "expired-and-minimum",
+		"idle-reset-after-burst", "idle-reset-boundary"]
 	Test("WPM clock: " . _WPMR_Mode . " respects admitted event ages (wpm-tick-rollover-owner)", _WPMR_Case.Bind(_WPMR_Mode))

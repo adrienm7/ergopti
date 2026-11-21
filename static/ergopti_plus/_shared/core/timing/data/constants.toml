@@ -656,7 +656,8 @@ wpm_window_ms = 15000
 wpm_min_duration_ms = 2000
 
 # Silence after which the live WPM reads 0 rather than the speed of the last
-# burst. HS: keystats/init.lua get_live_stats(); Linux: keystats.lua.
+# burst. HS: keystats/init.lua get_live_stats(); Linux: keystats.lua;
+# AHK: ui/wpm/wpm_config.ahk (WPMWidgetConst.IDLE_RESET_MS).
 wpm_idle_reset_ms = 5000
 
 # System load poll interval (CPU / RAM sampling).

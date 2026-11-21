@@ -232,6 +232,7 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.MENUBAR_TICK_MS     := _WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms", Missing)
 		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keystats", "wpm_window_ms", Missing)
 		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keystats", "wpm_min_duration_ms", Missing)
+		WPMWidgetConst.IDLE_RESET_MS       := _WPMWidget_NeedTiming("keystats", "wpm_idle_reset_ms", Missing)
 
 		if Missing.Length {
 				Names := ""

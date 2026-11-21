@@ -137,6 +137,7 @@ _WPMZ_Canon() {
 		AssertTrue(Visual is Map && Visual.Has("colors") && Visual.Has("transparency") && Visual.Has("graph"))
 		Values := Map(
 			"WINDOW_MS", WindowMs, "WPM_MIN_DURATION_MS", MinimumMs,
+			"IDLE_RESET_MS", TimingsGet("keystats", "wpm_idle_reset_ms"),
 			"COLOR_HOLD_MS", TimingsGet("ui", "wpm_color_hold_ms"),
 			"IDLE_HIDE_MS", TimingsGet("ui", "wpm_widget_idle_hide_ms"),
 			"GRAPH_HISTORY", Integer(Visual["graph"]["history_samples"]),
