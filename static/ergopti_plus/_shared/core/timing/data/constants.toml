@@ -1123,7 +1123,7 @@ notification_ttl_ms = 5000
 notification_send_timeout_ms = 5000
 
 # Linux: how long after the tray icon appears the daemon checks that a panel
-# shows it (TRAY-03, tray/engine/host_check.lua). A login starts the daemon and
+# shows it (TRAY-03, tray/host_check.lua). A login starts the daemon and
 # the panel together, and GNOME's AppIndicator extension registers its
 # StatusNotifierWatcher only once the shell has loaded: checking at once would
 # tell a user whose tray works that it is missing.

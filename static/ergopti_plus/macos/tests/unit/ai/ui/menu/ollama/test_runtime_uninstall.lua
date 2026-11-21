@@ -1,4 +1,4 @@
---- tests/unit/ai/ui/menu/ollama/test_ollama_runtime_uninstall.lua
+--- tests/unit/ai/ui/menu/ollama/test_runtime_uninstall.lua
 
 --- ==============================================================================
 --- MODULE: macOS Managed Ollama Uninstall

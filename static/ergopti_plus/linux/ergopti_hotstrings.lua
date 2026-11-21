@@ -2979,7 +2979,7 @@ local function main()
 			-- libayatana creates its icon whether or not a panel shows it: GNOME
 			-- without its AppIndicator extension showed nothing and said nothing
 			-- (TRAY-03). The check reads the session once the panel had its time.
-			require("tray.engine.host_check").schedule({
+			require("tray.host_check").schedule({
 				probe = require("tray.adapters.status_notifier_host").probe,
 				i18n = require("core.i18n.engine.i18n"), logger = Logger, tray = tray_menu, notifier = notifier,
 				timings = require("core.timing.engine.timings"),

@@ -13,7 +13,7 @@
 ---    watcher it falls back to a GtkStatusIcon, which no Wayland session and no
 ---    recent GNOME embeds. The daemon logged « Tray icon created » and the user
 ---    had no icon and no menu, with nothing said (TRAY-03). This probe is what
----    tray/engine/host_check.lua decides from.
+---    tray/host_check.lua decides from.
 --- 2. Bounded and read-only: two synchronous session-bus calls bounded by
 ---    [ui] tray_host_bus_timeout_ms, never an auto-start of the watcher, and one
 ---    X selection read.

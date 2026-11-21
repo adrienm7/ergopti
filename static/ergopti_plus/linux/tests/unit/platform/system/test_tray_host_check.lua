@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local HostCheck = helpers.load_module("tray.engine.host_check")
+local HostCheck = helpers.load_module("tray.host_check")
 
 --- The deps of one check, recording what the user was told.
 --- @param facts table|nil What the probe reads, nil for a probe failure.
@@ -140,7 +140,7 @@ helpers.describe("tray host check: the user is told, in their language (tray-03)
 	helpers.it("a --tray launch schedules the check once the icon is up", function()
 		local source = helpers.read_module_source("ergopti_hotstrings")
 		local start = source:find("if not tray_menu.start() then", 1, true)
-		local check = source:find('require("tray.engine.host_check").schedule({', 1, true)
+		local check = source:find('require("tray.host_check").schedule({', 1, true)
 		helpers.assert_true(start ~= nil and check ~= nil and start < check,
 			"the host check follows the icon's creation")
 		helpers.assert_true(source:find('probe = require("tray.adapters.status_notifier_host").probe', check, true) ~= nil,

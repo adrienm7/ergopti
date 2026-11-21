@@ -1,4 +1,4 @@
---- tray/engine/host_check.lua
+--- tray/host_check.lua
 
 --- ==============================================================================
 --- MODULE: Tray Host Check (Linux)
@@ -25,7 +25,7 @@
 
 local M = {}
 
-local LOG = "tray.engine.host_check"
+local LOG = "tray.host_check"
 
 
 

@@ -194,7 +194,7 @@ function M.run(options)
 			-- The desktop toolkit is present: its refusal has its own cases
 			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }
-		elseif name == "tray.engine.host_check" then
+		elseif name == "tray.host_check" then
 			-- The tray host check is only scheduled at startup (its own cases:
 			-- tests/unit/platform/system/test_tray_host_check.lua).
 			return { schedule = function(deps)
