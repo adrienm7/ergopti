@@ -282,10 +282,25 @@ waits for the maintainer's review).
 - [ ] **Ideas from the other analysers, weights to decide (2026-11-19).** `pinky_ring` (pinky–ring pairs on any
       row), the penalty floors (`floors` of `score_weights.json`) and the ranking's « Difference to QWERTY / AZERTY »
       view are in the engine and the Comparer, at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
-      « Global score »); `sfb_distance` was weighed by the maintainer on 2026-11-19. Pending decisions: whether
+      « Global score »); `sfb_distance` was weighed by the maintainer on 2026-11-19, and the graded costs (SFB by
+      rows, skipgrams and row jumps by fingers, travel by finger) were decided on 2026-11-21 and ship with the
+      agent's scale (docs/audits/layout-analysers/graded-costs-ranking.md). Pending decisions: whether
       `pinky_ring` gets a weight once it is seen to rank layouts differently from `half_scissors`; any non-zero
-      floor (Cyanophage: SFB 0.3 %, hand balance 1 point). The Comparer's score settings edit each floor with its
-      help, and its export file (`ergopti-score-settings`, version 2) requires them.
+      floor (Cyanophage: SFB 0.3 %, hand balance 1 point). The Comparer's score settings edit each floor and grade
+      with its help, and its export file (`ergopti-score-settings`, version 3) requires them.
+- [ ] **Graded costs scale (proposed by the agent on 2026-11-21, to review by the maintainer).** Shipped as the
+      default after the ranking-impact report (docs/audits/layout-analysers/graded-costs-ranking.md: Spearman 0.996
+      to 0.998 against the flat model on four corpora, Ergopti+ 3rd on `fr_don_quichotte`, 6th on
+      `fr_wikipedia_1m`): `sfb` rows 1 / 1 / 2 (same row, one row, two rows or more); `row_jump` 2.5 with fingers
+      1 / 0.5 / 0.25 (adjacent, one apart, index–pinky); travel by finger index 1, middle 1.1, ring 1.3, pinky 1.7,
+      thumb 1; skipgrams on two fingers 0.1 / 0.05 / 0.01 of `sfs`. The skipgrams were read as an alternation whose
+      first and last keys are two fingers of one hand (the middle key on the other hand), since a same-finger
+      skipgram has one finger; they cost each layout 5 to 6 points. Every value is editable in « Réglages du
+      score ».
+  1. **(recommended) Keep the scale and the skipgram reading.**
+  2. Count the skipgrams on two fingers only across two rows or more (a skip-scissor), so home-row alternations
+     cost nothing.
+  3. Drop the skipgrams on two fingers (grades 0) and keep the other grades.
 - [ ] **Longer skipgrams (2026-11-19).** genkey's gaps 1 to 9 and Oxeylyzer's 1 to 3 need skipgram tables in the
       corpus format. Measured: gaps 2–3 add 1.26 MB to the 9.2 MB of corpus files (about +40 % per text corpus,
       57 KB on Don Quichotte's 148 KB), gaps 2–9 5.93 MB (about +185 %); the 12 count-table corpora have no text to

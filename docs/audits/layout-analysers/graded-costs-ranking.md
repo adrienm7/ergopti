@@ -69,6 +69,57 @@ texts of the other kinds (`fr_wikipedia_1m`, `en_don_quixote`,
   with many two-row SFBs or adjacent-finger row jumps (Lela, Austenmak, AdNW,
   Sertain) fall.
 
+## Golden values of the switch
+
+The default grades also choose the ways of typing (as the default weights
+do), so the switch moved some metrics of the layouts that have several ways
+to type a character. `library_golden.json` was recorded again: 3,195 values
+of 178 layout-corpus pairs changed, every one of them a layout with a second
+way to type a character; the 34 metric vectors are unchanged.
+
+- `corpus_nemolivier` (53): bepo, ergol, ergopti, ergopti_ansi, ergopti_plus,
+  ergopti_plus_ansi, adnw, bone, koy, mine, qwertz, optimot, xpert,
+  hands_down_neu, uciea, noted, inrolly, qwerty_spanish, antibracket,
+  neo2_new, spanish_dvorak, stndc, hands_down_xkcd, zhjayscpg_2023_fr,
+  azerty_latin9, azerty_mac, azerty_us, ergol_iso, bepolar,
+  colemak_french_touch, erglace, beopy_1dfh, beopy, ergaie, erglace_jf,
+  erglace_nuke, kazerty, handsdown_neu, dvorak_classic, colemak_dh_wide_iso,
+  drix, qwerty_german, bone_eszett_home, hands_down_extreme_ergodox,
+  blickensderfer_5, hd_vibranium, nordrassil, hands_down_chromium,
+  hands_down_vibranium_vx, hands_down_vibranium_vfj, hands_down_alt_x_ortho,
+  poqdea_es, gelatin.
+- `fr_don_quichotte` (88): bepo, ergol, ergopti, ergopti_ansi, ergopti_plus,
+  ergopti_plus_ansi, engram, adnw, bone, koy, mine, qwertz, optimot, gust,
+  xpert, graphite, capewell, hands_down_neu, engrammer, uciea, ahei, noted,
+  inrolly, antibracket, bvofrak, neo2_new, spanish_dvorak, stndc, tallus,
+  colemak_dhv_genkey, hands_down_xkcd, azerty_afnor, azerty_latin9,
+  azerty_mac, azerty_us, ergol_iso, dvorak_fr, bepolar, colemak_french_touch,
+  erglace, beopy_1dfh, beopy, ergaie, erglace_jf, erglace_nuke, kazerty,
+  handsdown_neu, carbyne_cyanophage, really, northstar, nerps_cyanophage,
+  irst, northstar_cyanophage, dvorak_classic, colemak_dh_wide_iso, drix,
+  qwerty_german, bone_eszett_home, hands_down_extreme_ergodox,
+  blickensderfer_5, ingulish, maltron, rsthd, dsthk, aptmak, caster,
+  hd_vibranium, hd_promethium, sunlight, nordrassil, night, dusk, stern,
+  racket, seasalt, coastland, north, handsdown_gold, handsdown_dash,
+  pfouyhai, hands_down_chromium, hands_down_cesium, hands_down_vibranium_vx,
+  hands_down_vibranium_vfj, hands_down_alt_x_ortho, poqdea_es, gelatin,
+  modified_upd.
+- The thumb-letter layouts on their thumb board, `corpus_nemolivier` (13):
+  hands_down_extreme_ergodox, hd_vibranium, hd_promethium, snth, sunlight,
+  night, dusk, racket, seasalt, north, handsdown_dash,
+  hands_down_vibranium_vx, hands_down_vibranium_vfj.
+- The same, `fr_don_quichotte` (24): maltron, rsthd, dsthk, aptmak, caster,
+  hd_vibranium, hd_promethium, snth, sunlight, nordrassil, night, dusk,
+  stern, racket, seasalt, coastland, north, handsdown_gold, handsdown_dash,
+  pfouyhai, hands_down_chromium, hands_down_cesium, hands_down_vibranium_vx,
+  hands_down_vibranium_vfj.
+
+Every layout's score changes with the scale: the last table below lists each
+one, flat and graded, on the four corpora. The engine test's hand-worked
+values that follow the defaults were recomputed with the scale: the pair
+matrix of « qz ex ea 4d ej » (Q→Z −559.707, 4→D −100, E→X −40), the word
+efforts of « qz » and « ea » and the dead-key path of « fé » (384.982).
+
 ## Results
 
 ### fr_don_quichotte
