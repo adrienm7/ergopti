@@ -1256,11 +1256,10 @@
 		-->
 		<script>
 			(function () {
-				function apply_prefetch(blob) {
-					if (!blob) return;
-					// A partial rebuild snapshot is labelled until a complete one lands.
-					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
-					const manifest = blob.metrics_manifest || {};
+				// What every answer says about its own read, applied to each one: the
+				// Linux poll merges only a changed manifest, yet a read that turns
+				// incomplete, or complete again, must show it at once (MET-04).
+				function apply_read_state(blob) {
 					// The host shows what it read but never caches an incomplete read.
 					if (
 						window.metrics_freshness &&
@@ -1273,6 +1272,14 @@
 					}
 					// The KPIs this host cannot measure, each with its reason key.
 					window.metricsUnmeasured = (blob.driver_meta && blob.driver_meta.unmeasured) || {};
+				}
+
+				function apply_prefetch(blob) {
+					if (!blob) return;
+					// A partial rebuild snapshot is labelled until a complete one lands.
+					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
+					const manifest = blob.metrics_manifest || {};
+					apply_read_state(blob);
 					const categories = blob.user_categories || {};
 					const icons = blob.app_icons || {};
 					if (typeof window.bootstrapMetricsAppsData === 'function') {
@@ -1305,6 +1312,7 @@
 							last_categories_json = JSON.stringify(response.user_categories || {});
 							apply_prefetch(response);
 						} else {
+							apply_read_state(response);
 							// A score edit changes metadata without changing the manifest.
 							// Omission is a manifest-only update; explicit {} clears overrides.
 							if (Object.prototype.hasOwnProperty.call(response, 'user_categories')) {

@@ -25,7 +25,7 @@ const PAGE = path.resolve(
 	'../../static/ergopti_plus/_shared/ui/metrics_apps/index.html'
 );
 const html = fs.readFileSync(PAGE, 'utf8');
-const start = html.indexOf('(function () {\n\t\t\t\tfunction apply_prefetch');
+const start = html.lastIndexOf('(function () {', html.indexOf('function apply_prefetch(blob)'));
 const end = html.indexOf('})();', start);
 if (start === -1 || end === -1) {
 	console.error('\x1b[31m[ERROR] the apps page bootstrap script was not found.\x1b[0m');
@@ -79,6 +79,40 @@ answer({ '2026-09-24': { firefox: { chars: 25 } } });
 if (calls.bootstrap !== 1 || calls.live !== 1) {
 	failures.push(
 		`a changed answer must merge once without re-bootstrapping (bootstrap ${calls.bootstrap}, live ${calls.live})`
+	);
+}
+
+// MET-04: every answer carries the state of its own read. The notice of an
+// incomplete read, and what the host cannot measure, follow the latest answer
+// even when its manifest is the one already drawn.
+const incomplete = [];
+window.metrics_freshness = {
+	mark_incomplete(source, flag) {
+		incomplete.push(`${source}:${flag}`);
+	}
+};
+const read = (flag, unmeasured) =>
+	window.__hostBridgeResponse('metrics_apps_bridge', false, {
+		metrics_manifest: { '2026-09-24': { firefox: { chars: 25 } } },
+		metrics_manifest_incomplete: flag,
+		driver_meta: { unmeasured }
+	});
+read(true, {});
+if (Object.keys(window.metricsUnmeasured || {}).length !== 0) {
+	failures.push('met-04: a later answer that measures everything must clear the unmeasured cards');
+}
+read(false, { space_switches: 'platform_reason.desktop_changes_need_workspace_interface' });
+if (incomplete.join(',') !== 'manifest:true,manifest:false') {
+	failures.push(
+		`met-04: later answers set the incomplete notice as [${incomplete.join(', ')}], expected [manifest:true, manifest:false]`
+	);
+}
+if (!window.metricsUnmeasured || !window.metricsUnmeasured.space_switches) {
+	failures.push('met-04: a later answer must replace what the host cannot measure');
+}
+if (calls.bootstrap !== 1 || calls.live !== 1) {
+	failures.push(
+		'met-04: the read state alone must neither re-bootstrap nor merge the same manifest'
 	);
 }
 
