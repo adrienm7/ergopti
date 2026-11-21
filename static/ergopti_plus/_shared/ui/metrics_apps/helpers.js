@@ -402,7 +402,10 @@ const CHART_TEXT_ALTERNATIVE = {
 				.map((point, index) => [labels[index], value(point)])
 				.filter(([, v]) => typeof v === 'number' && v !== 0)
 				.slice(0, 24)
-				.map(([label, v]) => `${label} ${Number(v.toFixed(1)).toLocaleString()}`);
+				.map(
+					([label, v]) =>
+						`${label} ${Number(v.toFixed(1)).toLocaleString(window._i18n_locale || undefined)}`
+				);
 			return `${dataset.label ? dataset.label + ': ' : ''}${points.join(', ')}`;
 		});
 		canvas.setAttribute('role', 'img');

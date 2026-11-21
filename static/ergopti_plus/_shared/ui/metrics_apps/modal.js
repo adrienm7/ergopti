@@ -241,8 +241,10 @@ document.addEventListener('keydown', (event) => {
 	if (event.key === 'Escape') window.closeAppDrilldown();
 });
 
+// Integers in the interface language the host seeded, as the dates are; it
+// was French for every locale (MET-07).
 function format_int(n) {
-	return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0));
+	return new Intl.NumberFormat(window._i18n_locale || undefined).format(Math.round(n || 0));
 }
 
 document.addEventListener('DOMContentLoaded', initDashboard);

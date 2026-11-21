@@ -9,8 +9,9 @@
  * DOM writes — all functions return HTML strings or plain values.
  *
  * FEATURES & RATIONALE:
- * 1. Universal Number Formatting: Space-separated thousands, M/Md abbreviation,
- *    hover tooltip showing exact value for abbreviated numbers.
+ * 1. Universal Number Formatting: the interface language's grouping and
+ *    decimal mark, a compact form from a million on, and a hover tooltip
+ *    showing the exact value of a grouped or abbreviated number.
  * 2. Modifier Colors: Each modifier key (Cmd/Ctrl/Option/Shift/Fn) gets a
  *    distinct color to aid at-a-glance pattern recognition.
  * 3. Control Key Red Styling: Escape, arrows, Backspace, Fn keys are rendered
@@ -59,7 +60,32 @@ var escape_html = escapeHtml;
 // ======================================
 
 /**
- * Formats a number with French locale conventions (plain text, no HTML).
+ * The page's own locale for numbers: the interface language the host seeded
+ * (window._i18n_locale), the one the dates already follow. Every number was
+ * formatted in French (thin-space thousands, decimal comma, « Md ») whatever
+ * the interface language (MET-07).
+ * @returns {string|undefined} A BCP 47 tag, or undefined before any seed.
+ */
+function number_locale() {
+	return typeof window !== 'undefined' && window._i18n_locale ? window._i18n_locale : undefined;
+}
+
+/**
+ * Formats a value in the interface language: exact below a million, compact
+ * (one decimal, « 1.2M », « 1,2 M », « 1,2 Md »…) from a million on.
+ * @param {number} value - A finite number.
+ * @returns {{text: string, abbreviated: boolean}}
+ */
+function format_number_parts(value) {
+	const abbreviated = Math.abs(value) >= 1_000_000;
+	const options = abbreviated
+		? { notation: 'compact', maximumFractionDigits: 1 }
+		: { maximumFractionDigits: 20 };
+	return { text: new Intl.NumberFormat(number_locale(), options).format(value), abbreviated };
+}
+
+/**
+ * Formats a number in the interface language (plain text, no HTML).
  * Identical logic to format_number() but returns a plain string safe for use
  * in Chart.js tooltip callbacks, which render text verbatim and must not
  * receive HTML tags.
@@ -69,73 +95,36 @@ var escape_html = escapeHtml;
 function format_number_plain(num) {
 	if (num === null || num === undefined || isNaN(num)) return '0';
 	const parsed = typeof num === 'string' ? parseFloat(num) : num;
-	const is_neg = parsed < 0;
-	const abs_val = Math.abs(parsed);
-	const prefix = is_neg ? '-' : '';
-
-	if (abs_val >= 1_000_000_000) {
-		return (
-			prefix + (abs_val / 1_000_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0Md'
-		);
-	}
-	if (abs_val >= 1_000_000) {
-		return (
-			prefix + (abs_val / 1_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0M'
-		);
-	}
-
-	const str = abs_val.toString();
-	const parts = str.split('.');
-	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-	return prefix + parts.join(',');
+	return format_number_parts(parsed).text;
 }
 
 /**
  * Wraps an abbreviated display value in a tooltip showing the exact number.
- * @param {string} display - The abbreviated text (e.g. "1,2 M").
+ * @param {string} display - The abbreviated text (e.g. "1.2M").
  * @param {number} exact   - The exact numeric value.
  * @returns {string} HTML span with tooltip.
  */
 function wrap_exact_tooltip(display, exact) {
-	// Use toLocaleString with 'fr-FR' for native French number formatting in the tooltip
-	const exact_str = Number(exact).toLocaleString('fr-FR', { maximumFractionDigits: 20 });
+	const exact_str = new Intl.NumberFormat(number_locale(), { maximumFractionDigits: 20 }).format(
+		Number(exact)
+	);
 	return `<data class="num-tooltip" value="${Number(exact)}" title="${exact_str}">${display}</data>`;
 }
 
 /**
- * Formats a number with French locale conventions: space-separated thousands,
- * comma decimal point, M/Md abbreviation for large values, exact-value tooltip.
+ * Formats a number in the interface language: its thousands separator and
+ * decimal mark, a compact form from a million on, and the exact value in a
+ * tooltip whenever the display is grouped or abbreviated.
  * @param {number|string} num - The number to format.
  * @returns {string} HTML string with formatted number (may contain a tooltip span).
  */
 function format_number(num) {
 	if (num === null || num === undefined || isNaN(num)) return '0';
 	const parsed = typeof num === 'string' ? parseFloat(num) : num;
-	const is_neg = parsed < 0;
-	const abs_val = Math.abs(parsed);
-	const prefix = is_neg ? '-' : '';
-
-	if (abs_val >= 1_000_000_000) {
-		const abbr =
-			(abs_val / 1_000_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0Md';
-		return wrap_exact_tooltip(prefix + abbr, parsed);
-	}
-	if (abs_val >= 1_000_000) {
-		const abbr = (abs_val / 1_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0M';
-		return wrap_exact_tooltip(prefix + abbr, parsed);
-	}
-
-	// Apply space as thousands separator
-	const str = abs_val.toString();
-	const parts = str.split('.');
-	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-	const formatted = parts.join(',');
-
-	// Tooltip only when a thousands separator was actually inserted
-	if (abs_val >= 1000) {
-		return wrap_exact_tooltip(prefix + formatted, parsed);
-	}
-	return prefix + formatted;
+	const { text } = format_number_parts(parsed);
+	// Tooltip only when the display groups or abbreviates the digits
+	if (Math.abs(parsed) >= 1000) return wrap_exact_tooltip(text, parsed);
+	return text;
 }
 
 /**

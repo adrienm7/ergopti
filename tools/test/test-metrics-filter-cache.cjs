@@ -4252,10 +4252,11 @@ for (const host of ['windows', 'macos', 'linux']) {
 		const details = page.elements.get('global_details').innerHTML;
 		assert.match(details, />-3<\/strong>/);
 		assert.doesNotMatch(details, />--3<\/strong>/);
-		assert.equal(vm.runInContext('format_number_plain(-1234.5)', page.context), '-1\u00a0234,5');
-		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u00a0234,5<\/data>/);
+		// Intl groups French digits with the narrow no-break space (met-07)
+		assert.equal(vm.runInContext('format_number_plain(-1234.5)', page.context), '-1\u202f234,5');
+		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u202f234,5<\/data>/);
 		assert.equal(vm.runInContext('format_number_plain(-1200000)', page.context), '-1,2\u00a0M');
-		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u00a0234,5');
+		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u202f234,5');
 	});
 }
 for (const host of ['windows', 'macos', 'linux']) {
@@ -4271,7 +4272,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		page.context.render_current_tab();
 		page.timers.at(-1)();
 		const html = page.elements.get('metrics_table_body').innerHTML;
-		assert.ok(html.includes('title="1\u202f234,5">1\u00a0234,5</data> ms'), html);
+		assert.ok(html.includes('title="1\u202f234,5">1\u202f234,5</data> ms'), html);
 		assert.match(
 			vm.runInContext('format_number(1000000.1234)', page.context),
 			/title="1\u202f000\u202f000,1234"/
