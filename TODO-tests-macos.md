@@ -70,6 +70,13 @@ Field run, no person needed (read the next report):
       2 min says so above the table, which keeps the previous period (MET-06). A past range with no typing reads
       « No data » on every card (MET-13); Tab reaches the activity calendar's « Chart values » and VoiceOver reads each
       day and its count (MET-16); a failed Reset says so in the status line (MET-19).
+      2 min says so above the table, which keeps the previous period (MET-06).
+- [ ] <!-- field-point: small_native_units --> **Keep-awake and Karabiner dialogs (SNU-04 to SNU-06,
+      2026-11-21):** start keep-awake, pause Ergopti after 1 min, resume: the log holds « Keep-awake stopped by the
+      driver's pause or shutdown. » and the typing dashboard counts that minute of keep-awake time. With the network
+      down, accept the Karabiner driver update offer: the result reads « The driver could not be downloaded or did
+      not pass its checks… try again from the menu », with no `vhid_update_…` code. If the old-rules cleanup fails,
+      its message ends « The log has the details. » with no technical reason in it.
 - [ ] <!-- field-point: rerun_2026_11_02 --> Rerun of the 2026-11-02 report, without touching the Mac: no keystats rotation warning around midnight, no
       `event_taps` run-loop lateness with the main thread held over 1 s, `menu.rebuild` and its
       `menu_item.shortcuts` / `menu_keyboard_layout.sources` phases, `diagnostics` phase A under 5 ms, `idle_cost`

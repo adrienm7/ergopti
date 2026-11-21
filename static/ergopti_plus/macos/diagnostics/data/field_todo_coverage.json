@@ -953,6 +953,12 @@
 			"title": "Missing menu-bar logo: the warning sign, its VoiceOver name and one logged error (TRAY-05)",
 			"checks": [],
 			"not_testable": "Needs a copy of the app with a logo file moved away, a pause and VoiceOver: the field run must not damage the installed app and reads no screen reader."
+		},
+		{
+			"id": "small_native_units",
+			"title": "Keep-awake credited across a pause and the Karabiner dialogs’ failure texts (SNU-04 to SNU-06)",
+			"checks": [],
+			"not_testable": "Needs a person to pause the driver during keep-awake and to accept the Karabiner driver update with the network down: the field report neither toggles keep-awake nor installs drivers."
 		}
 	]
 }

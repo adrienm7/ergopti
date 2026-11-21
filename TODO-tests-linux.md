@@ -89,6 +89,13 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       closing the window (MET-04). A past range with no typing reads « No data » on every card (MET-13); Tab reaches
       the activity calendar's « Chart values » and Orca reads each day and its count (MET-16); Reset pressed while a
       flush is still being written says in the status line that it failed (MET-19).
+      closing the window (MET-04).
+- [ ] <!-- field-point: small_native_units --> Daily note (SNU-08, SNU-09, 2026-11-21): make
+      `~/.local/share/ergopti/notes` read-only (`chmod 500`, then put it back) and take a note: the notification says
+      it failed and the log holds « Daily note refused: today's note could not be created as a regular file. ». With
+      no text/plain handler on a launcher that fails (`xdg-mime default broken.desktop text/plain`, then restore it),
+      the log holds « the desktop text editor could not be launched ». The configuration file's
+      `shortcuts.take_note` folder and dated rows show the reason that says where the Linux note goes.
 - [ ] <!-- field-point: tray_icon_missing --> Missing tray logo (TRAY-05, 2026-11-21): on a desktop with a tray host,
       in a copy of the install, move `_shared/tray/data/ergopti_tray_paused.png` away and start the daemon with
       `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca
