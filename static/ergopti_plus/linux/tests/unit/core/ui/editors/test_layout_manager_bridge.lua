@@ -461,16 +461,23 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		helpers.assert_eq(StudioNgrams.FINAL_FIELD, "final")
 		helpers.assert_eq(payload.final, { chars = { a = 10, b = 2 }, bigrams = { ab = 5 },
 			trigrams = { abc = 1 }, total = 12 }, "the final text counts the hotstrings and the AI")
+		-- The one answer of a read without a saved read.
+		local function read_once(deps)
+			local results = {}
+			StudioNgrams.read(deps, function(result) results[#results + 1] = result end)
+			helpers.assert_eq(#results, 1, "a read without a saved read answers once")
+			return results[1]
+		end
 		local function read(exists, dict, complete)
-			return StudioNgrams.read({ path = "/db.sqlite", exists = function() return exists end,
+			return read_once({ path = "/db.sqlite", exists = function() return exists end,
 				read = function() return dict, complete end })
 		end
 		helpers.assert_eq(read(false, {}, true), { ok = false, code = "keystats_absent" })
 		helpers.assert_eq(read(true, { c = {} }, false), { ok = false, code = "keystats_unreadable" },
 			"a partial read is never offered as the user's data")
-		helpers.assert_eq(StudioNgrams.read({ path = "/db.sqlite", exists = function() return true end,
+		helpers.assert_eq(read_once({ path = "/db.sqlite", exists = function() return true end,
 			read = function() error("database is locked") end }), { ok = false, code = "keystats_unreadable" })
-		helpers.assert_eq(StudioNgrams.read({ path = nil, exists = function() return true end,
+		helpers.assert_eq(read_once({ path = nil, exists = function() return true end,
 			read = function() return {}, true end }), { ok = false, code = "keystats_absent" })
 		helpers.assert_true(read(true, { c = {}, bg = {}, tg = {} }, true).ok)
 	end)
@@ -481,20 +488,26 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		local deps = { path = "/db.sqlite", exists = function() return true end,
 			stamp = function() return rev end,
 			read = function() reads = reads + 1; return { c = { e = { c = reads } } }, true end }
-		local first = StudioNgrams.read(deps)
+		local function read_once()
+			local results = {}
+			StudioNgrams.read(deps, function(result) results[#results + 1] = result end)
+			helpers.assert_eq(#results, 1)
+			return results[1]
+		end
+		local first = read_once()
 		helpers.assert_eq(first.ngrams.chars, { e = 1 })
 		helpers.assert_true(first.cached == false)
-		local second = StudioNgrams.read(deps)
+		local second = read_once()
 		helpers.assert_true(second.cached == true, "an unchanged revision is not read again")
 		helpers.assert_eq(reads, 1)
 		rev = "8"
-		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 2 }, "a new ingest is read")
+		helpers.assert_eq(read_once().ngrams.chars, { e = 2 }, "a new ingest is read")
 		deps.stamp = function() return nil end
-		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 3 }, "no revision, no cache")
-		helpers.assert_eq(StudioNgrams.read(deps).ngrams.chars, { e = 4 })
+		helpers.assert_eq(read_once().ngrams.chars, { e = 3 }, "no revision, no cache")
+		helpers.assert_eq(read_once().ngrams.chars, { e = 4 })
 		deps.stamp = function() return "8" end
 		deps.exists = function() return false end
-		helpers.assert_eq(StudioNgrams.read(deps).code, "keystats_absent", "a removed store is never answered from the cache")
+		helpers.assert_eq(read_once().code, "keystats_absent", "a removed store is never answered from the cache")
 		StudioNgrams.reset_cache()
 	end)
 
@@ -509,9 +522,21 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 		daemon_state.keystats_reader = {
 			read_studio_ngrams = function(path)
 				read_paths[#read_paths + 1] = path
-				return { c = { e = { c = 7 } }, bg = {}, tg = {} }, true
+				return { c = { e = { c = 7 + #read_paths - 1 } }, bg = {}, tg = {} }, true
 			end,
 		}
+		-- The saved read lives in memory here; the private file ports have their own test.
+		local saved_files, queued = {}, {}
+		daemon_state.studio_snapshot = { ports = function()
+			return {
+				read = function(path)
+					if saved_files[path] == nil then return nil, "absent" end
+					return saved_files[path], "ok"
+				end,
+				write = function(path, text) saved_files[path] = text; return true end,
+			}
+		end }
+		daemon_state.event_loop = { defer = function(work) queued[#queued + 1] = work; return true end }
 		local saved_fs = package.loaded["core.fs.adapters.file_system"]
 		StudioNgrams.reset_cache()
 		local ok, err = pcall(function()
@@ -533,9 +558,26 @@ helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
 				helpers.assert_contains(state.pushes[#state.pushes].js, '"chars":{"e":7}')
 				helpers.assert_eq(#read_paths, 1, "an unchanged revision answers from the cache")
+				local saved_path = StudioNgrams.snapshot_path("/home/u/.config/ergopti/metrics.sqlite")
+				helpers.assert_eq(StudioNgrams.decode_snapshot(saved_files[saved_path]).stamp, "7",
+					"the read is saved beside the store with its revision (studio-saved-read-first)")
 				revision = 8
+				local pushes = #state.pushes
 				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				helpers.assert_eq(#state.pushes, pushes + 1, "the saved read is pushed at once")
+				helpers.assert_contains(state.pushes[#state.pushes].js, '"chars":{"e":7}')
+				helpers.assert_eq(#read_paths, 1, "the store is read after the saved read reached the page")
+				helpers.assert_eq(#queued, 1)
+				queued[1]()
 				helpers.assert_eq(#read_paths, 2, "a new ingest is read again")
+				helpers.assert_contains(state.pushes[#state.pushes].js, '"chars":{"e":8}')
+				helpers.assert_eq(StudioNgrams.decode_snapshot(saved_files[saved_path]).stamp, "8")
+				-- A restart on the unchanged store: the saved read is the whole answer.
+				StudioNgrams.reset_cache()
+				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
+				helpers.assert_contains(state.pushes[#state.pushes].js, '"chars":{"e":8}')
+				helpers.assert_eq(#read_paths, 2, "the saved read of the unchanged store is not read again")
+				helpers.assert_eq(#queued, 1)
 				FileSystem.exists = function() return false end
 				helpers.assert_true(Editor.on_message({ action = "keystats_ngrams" }, daemon_state).handled)
 				helpers.assert_contains(state.pushes[#state.pushes].js, '"code":"keystats_absent"')

@@ -280,7 +280,7 @@ local function new_window(spec)
 			-- Deferred, so the page's message returns before the read.
 			read_keystats = spec.editor_window and function(on_done)
 				DeferredWork.after(0, function()
-					on_done(require("metrics.engine.view.studio_ngrams").read({
+					require("metrics.engine.view.studio_ngrams").read({
 						path = require("modules.keystats.log_manager").get_sqlite_path(),
 						exists = function(path) return FileSystem.path_status(path) ~= "absent" end,
 						read = require("modules.keystats.sqlite_reader").read_studio_ngrams,
@@ -289,7 +289,12 @@ local function new_window(spec)
 							local rev = require("modules.keystats.export").get_db_rev()
 							return rev > 0 and tostring(rev) or nil
 						end,
-					}))
+						-- The last complete read, saved beside db.sqlite (atomic write).
+						snapshot = require("modules.keystats.studio_snapshot").ports(),
+						log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+						-- The saved read reaches the page before the main thread reads the store.
+						defer = function(work) DeferredWork.after(0, work, "layout_manager.read_keystats_fresh") end,
+					}, on_done)
 				end, "layout_manager.read_keystats")
 			end or nil,
 			emulate = _emulation_applier and function(id, on_done)

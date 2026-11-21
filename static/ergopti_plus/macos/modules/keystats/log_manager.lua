@@ -2453,7 +2453,15 @@ _advance_maintenance = function(db, settled)
 			.. " AND json_extract(metadata_json, '$.utc')=" .. _sq(request.tombstone.metadata.utc) .. " LIMIT 1") do
 			found = true
 		end
-		if found or settled then _finish_maintenance(request, found) end
+		if found then
+			-- Ergopti Studio shows its saved read at once: it must not show what was purged.
+			local retired = require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path)
+			if not retired then
+				Logger.error(LOG, "Metrics purge applied, but the saved Ergopti Studio read could not be removed.")
+			end
+			return _finish_maintenance(request, retired)
+		end
+		if settled then _finish_maintenance(request, false) end
 		return
 	end
 	if not settled then return end
@@ -3060,6 +3068,11 @@ local function _init(core_state)
 	_paths = paths
 	_adopt_legacy_cache(_paths)
 	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
+	-- A rebuilt cache counts meta.rev from zero again: a saved Studio read of the
+	-- previous one could carry a revision the new one reaches with other counts.
+	if cache_was_fresh and not require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path) then
+		Logger.error(LOG, "The saved Ergopti Studio read of the previous SQLite cache could not be removed.")
+	end
 
 	-- Initialise submodules.
 	SqliteWriter.init({ paths = _paths, device_obj = _device_obj, device_id = _device_id })

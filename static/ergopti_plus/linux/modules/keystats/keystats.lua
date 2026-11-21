@@ -2004,15 +2004,28 @@ local function persisted_manifest()
 end
 
 --- Drops the cached projection so the next read rebuilds from the database.
----
---- The dashboard's reset control asks for exactly this: it clears the filters
---- and expects the next payload to be a clean rebuild. Linux answered nothing
---- at all, so the button reset the page and left the backend serving the same
---- cached manifest it had before — the one visible symptom being that a reset
---- changed nothing.
-function M.clear_cache()
+--- @return boolean True once it is dropped; false while a flush owes the store.
+function M.forget_manifest()
 	if M.has_flush_debt() or _flush_stopping then return false end
 	_manifest_cache = { revision = nil, manifest = nil }
+	return true
+end
+
+--- The dashboard's reset control: the cached projection, and Ergopti Studio's
+--- saved « My typing » read, derived from the same store (Windows retires both
+--- on the same reset).
+---
+--- The reset clears the filters and expects the next payload to be a clean
+--- rebuild. Linux answered nothing at all, so the button reset the page and
+--- left the backend serving the same cached manifest it had before — the one
+--- visible symptom being that a reset changed nothing.
+--- @return boolean True once neither remains.
+function M.clear_cache()
+	if not M.forget_manifest() then return false end
+	if _sqlite_path ~= nil and not require("modules.keystats.studio_snapshot").retire(_sqlite_path) then
+		Logger.error(LOG, "The saved Ergopti Studio read could not be retired; caches were not fully purged.")
+		return false
+	end
 	Logger.info(LOG, "Dashboard cache cleared at the user's request.")
 	return true
 end
@@ -2069,8 +2082,8 @@ function M.set_app_category(app_name, category, score, receipt)
 	if not AppCategoryFile.save(model, source) then return false end
 	-- The cached manifest was built before the edit, and the page re-reads
 	-- immediately after it. Without this the user sees their change reverted and
-	-- tries again.
-	M.clear_cache()
+	-- tries again. The Studio's saved read holds no category: it stays.
+	M.forget_manifest()
 	Logger.debug(LOG, "Category for '%s': %s (score %s).", app_name, category, tostring(score))
 	return true
 end
@@ -3866,7 +3879,13 @@ function _maintenance.advance()
 					if event == request.tombstone then table.remove(_pending_system_events, index); break end
 				end
 			end
-			return _maintenance.finish(request, _last_flush_committed == true)
+			if _last_flush_committed ~= true then return _maintenance.finish(request, false) end
+			-- Ergopti Studio shows its saved read at once: it must not show what was purged.
+			if not require("modules.keystats.studio_snapshot").retire(_sqlite_path) then
+				Logger.error(LOG, "Metrics purge applied, but the saved Ergopti Studio read could not be removed.")
+				return _maintenance.finish(request, false)
+			end
+			return _maintenance.finish(request, true)
 		end
 		local Maintenance = require("metrics.engine.maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)

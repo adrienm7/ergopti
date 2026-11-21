@@ -502,7 +502,8 @@ end
 ---   editor »; nil when none is pending); the page receives it as studioTab once
 ---   it is ready, so an open Studio left on another tab comes back to the editor.
 --- deps.read_keystats(on_done) optionally reads the user's keystats n-grams for
----   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
+---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }), once
+---   or twice: the saved read at once, then the fresh one when the store changed.
 ---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.run_script(text) optionally runs a built-in corpus's generated tables in

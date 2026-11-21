@@ -411,6 +411,63 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 		helpers.assert_contains(host, 'read = require("modules.keystats.sqlite_reader").read_studio_ngrams,')
 		helpers.assert_contains(host, 'path = require("modules.keystats.log_manager").get_sqlite_path(),')
 		helpers.assert_contains(host, 'local rev = require("modules.keystats.export").get_db_rev()')
+		-- The saved read reaches the page first; the store is read on a later turn.
+		helpers.assert_contains(host, 'snapshot = require("modules.keystats.studio_snapshot").ports(),')
+		helpers.assert_contains(host, 'defer = function(work) DeferredWork.after(0, work, "layout_manager.read_keystats_fresh") end,')
+		helpers.assert_contains(host, "}, on_done)")
+	end)
+
+	helpers.it("the saved read goes through the atomic file port and is retired by name (studio-saved-read-first)", function()
+		local saved_fs, saved_snapshot = package.loaded["core.fs.adapters.file_system"], package.loaded["modules.keystats.studio_snapshot"]
+		local files, deleted = {}, {}
+		package.loaded["core.fs.adapters.file_system"] = {
+			read_with_status = function(path)
+				if files[path] == nil then return nil, "absent" end
+				return files[path], "ok"
+			end,
+			write = function(path, text) files[path] = text; return true end,
+			delete = function(path) deleted[#deleted + 1] = path; files[path] = nil; return true end,
+		}
+		package.loaded["modules.keystats.studio_snapshot"] = nil
+		local ok, err = pcall(function()
+			local Snapshot = require("modules.keystats.studio_snapshot")
+			local StudioNgrams = require("metrics.engine.view.studio_ngrams")
+			local ports = Snapshot.ports()
+			local path = StudioNgrams.snapshot_path("/Users/u/Library/Caches/ergopti/dev/db.sqlite")
+			helpers.assert_eq(path, "/Users/u/Library/Caches/ergopti/dev/" .. StudioNgrams.SNAPSHOT.file,
+				"the saved read sits beside db.sqlite")
+			helpers.assert_eq(select(2, ports.read(path)), "absent")
+			helpers.assert_true(ports.write(path, "x"))
+			helpers.assert_eq({ ports.read(path) }, { "x", "ok" })
+			helpers.assert_true(Snapshot.retire("/Users/u/Library/Caches/ergopti/dev/db.sqlite"))
+			helpers.assert_eq(deleted, { path })
+			helpers.assert_true(Snapshot.retire(nil), "no store, nothing saved")
+		end)
+		package.loaded["core.fs.adapters.file_system"] = saved_fs
+		package.loaded["modules.keystats.studio_snapshot"] = saved_snapshot
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("the metrics purge, the dashboard reset and a rebuilt cache retire the saved read (studio-saved-read-purge)", function()
+		local manager = assert(helpers.read_module_source("modules.keystats.log_manager"))
+		local advance = manager:match("_advance_maintenance = function%(db, settled%)(.-)\nend\n")
+		helpers.assert_true(advance ~= nil, "_advance_maintenance must be found")
+		local found = advance:find("if found then", 1, true)
+		local retire = advance:find('require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path)', 1, true)
+		local finish = advance:find("return _finish_maintenance(request, retired)", 1, true)
+		helpers.assert_true(found ~= nil and retire ~= nil and finish ~= nil and found < retire and retire < finish,
+			"a committed purge reports success only once the saved read is gone")
+		local fresh = manager:find("local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil", 1, true)
+		local rebuilt = manager:find('if cache_was_fresh and not require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path) then', 1, true)
+		helpers.assert_true(fresh ~= nil and rebuilt ~= nil and fresh < rebuilt,
+			"a rebuilt cache, whose revision starts again, drops the previous saved read")
+		local dashboard = assert(helpers.read_module_source("ui.metrics_typing"))
+		local reset = dashboard:match("local function reset_caches%(generation, webview%)(.-)\nend\n")
+		helpers.assert_true(reset ~= nil, "reset_caches must be found")
+		local removed = reset:find("local removed = Snapshot.remove()", 1, true)
+		local studio = reset:find('removed = require("modules.keystats.studio_snapshot").retire(_get_log_manager().get_sqlite_path())', 1, true)
+		helpers.assert_true(removed ~= nil and studio ~= nil and removed < studio,
+			"the dashboard reset retires the Studio's saved read with its own cache")
 	end)
 end)
 

@@ -212,6 +212,10 @@ local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
 	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
+	-- Ergopti Studio's saved « My typing » read is derived from the same store.
+	if removed then
+		removed = require("modules.keystats.studio_snapshot").retire(_get_log_manager().get_sqlite_path())
+	end
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
 		Projection.reset()

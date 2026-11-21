@@ -158,6 +158,10 @@ local function new_handler(spec)
 		if nav_layer_save and type(nav_layer_save.apply_text) ~= "function" then nav_layer_save = nil end
 		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
 		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
+		local studio_snapshot = dependency(state, "studio_snapshot", "modules.keystats.studio_snapshot")
+		if studio_snapshot and type(studio_snapshot.ports) ~= "function" then studio_snapshot = nil end
+		local event_loop = dependency(state, "event_loop", "core.events.loop")
+		if event_loop and type(event_loop.defer) ~= "function" then event_loop = nil end
 		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		local keystats_writer = dependency(state, "keystats_writer", "modules.keystats.sqlite_writer")
 		if keystats_writer and type(keystats_writer.get_revision) ~= "function" then keystats_writer = nil end
@@ -257,7 +261,7 @@ local function new_handler(spec)
 			-- store, read only, for this window alone (metrics/engine/view/studio_ngrams.lua).
 			read_keystats = spec.editor_window and keystats_reader and function(done)
 				if not current() then return false end
-				local result = require("metrics.engine.view.studio_ngrams").read({
+				require("metrics.engine.view.studio_ngrams").read({
 					path = config_paths and config_paths.metrics_path() or nil,
 					exists = FileSystem.exists,
 					read = keystats_reader.read_studio_ngrams,
@@ -266,8 +270,18 @@ local function new_handler(spec)
 						local rev = keystats_writer.get_revision()
 						return rev ~= nil and tostring(rev) or nil
 					end or nil,
-				})
-				if current() then done(result) end
+					-- The last complete read, saved beside metrics.sqlite, private like it.
+					snapshot = studio_snapshot and studio_snapshot.ports() or nil,
+					log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+					-- The saved read reaches the page before the daemon reads the store.
+					defer = event_loop and function(work)
+						if not event_loop.defer(function() if current() then work() end end) then
+							error("the fresh Ergopti Studio read could not be queued", 0)
+						end
+					end or nil,
+				}, function(result)
+					if current() then done(result) end
+				end)
 			end or nil,
 			-- « Emulate without installing »: the composed layout becomes the emulated
 			-- one, as the menu's « Layout to emulate » stores it, and the emulation
