@@ -776,20 +776,24 @@ Each question names the default kept meanwhile; an answer moves into the item or
       translated.
   1. **(recommended) Translate them** through `t()` and `locales/en.js`, dropping each `lang="fr"` as it goes.
   2. Keep them French on the English page.
-- [ ] **Undo with no timer (decided by the agent on 2026-11-17, to review by the maintainer).** The Studio's restores
-      offer « Undo » until the section is edited again or another restore replaces it, not for a few seconds (WCAG
-      2.2.1, no time limits). Kept meanwhile: no timer.
-  1. **(recommended) Keep it without a timer.**
-  2. Hide the offer after a delay, paused while it has the focus or the pointer.
 - [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
-      Utilisation page is split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and
-      `/ergopti/installation` (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on
-      installation. No `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations).
+      Utilisation page is split into « Essayer » and `/ergopti/installation` (downloads, OS guides, printable
+      layouts); `/utilisation` without an anchor lands on installation. « Essayer » is now Ergopti Studio's tab
+      (`/studio/essayer`, maintainer 2026-11-21, `docs/memory/maintainer-decisions.md`): `/ergopti/utilisation`
+      redirects to it with `layout=ergopti`, anchors kept. No `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations).
       Ergopti+ sub-pages: présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités
       (tap-holds, raccourcis, trackpad, métriques), configuration (réglages, vie privée), installation (démarrer,
       télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
       shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
       disc of the logos) is new. Approve or change.
+- [ ] **Text replacements of the former « Essayer » page (decided by the agent on 2026-11-21, to review by the
+      maintainer).** `/ergopti/utilisation` also typed Ergopti+'s ★ text replacements and listed them by category;
+      the Studio's « Essayer » tab types the layout only (its dead keys and levels, any library layout), so the
+      list and the ★ replacements went with the page. Kept meanwhile: removed.
+  1. **(recommended) List the replacements on `/ergopti-plus/hotstrings`**, where Ergopti+'s hotstrings are
+     presented, read from the same catalogues.
+  2. Type the ★ replacements in the Studio's « Essayer » tab when Ergopti+ is chosen.
+  3. Leave them out: the app shows its own hotstrings.
 - [ ] **Row jumps in the global score? (decided by the agent on 2026-11-17, to review by the maintainer)** The new
       `row_jump` metric (two keys of one hand two rows or more apart, any fingers) is shown in the Comparer, the
       heatmap and the worst pairs, but has no weight: the study gives it none, and it overlaps SFBs and scissors.

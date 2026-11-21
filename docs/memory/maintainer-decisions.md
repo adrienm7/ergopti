@@ -174,6 +174,48 @@ so the native menu loop still never opens before input is ready. The right
 click stays AutoHotkey's own. Do not set `A_TrayMenu.Default` for this: a
 default item runs an action, it does not open the menu.
 
+## Ergopti Studio undoes every edit, Word-like (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (TODO « Undo with no timer »): the
+restores' « Undo » offer keeps no timer (WCAG 2.2.1), and beyond it every edit
+of Ergopti Studio is one step of a history that Undo takes back and Redo
+replays, in order: the layout editor (keys, levels, tap-holds, fingering,
+renames, a layout opened in the tab), the Comparer's score settings and
+ticked layouts, the Optimiser's settings. Restores, presets and imports are
+steps. One module owns it, `_shared/ui/edit_history.js`: named steps
+(`edit_history.step.*`, 21 locales), a bound in `[ui] studio_history_steps`
+of the timing registry (pinned, a page script cannot read it), Redo cleared
+by a new edit after an undo, and a throw on any inconsistent use (nothing to
+undo, a nameless step, an edit recorded while a step is taken back, a page
+that does not take back the state it was given). Ctrl+Z, Ctrl+Y and
+Ctrl+Shift+Z, with Cmd on macOS, act outside text fields, which keep their own
+Ctrl+Z; the Undo and Redo buttons name the step (« Undo: change key A »). The
+editor keeps one history per tab (the layout it opens on starts it); the
+Comparer and the Optimiser one per page. Agent choices inside the decision:
+the Comparer's own layouts (Rename, Duplicate, Remove, kept in the host's
+store) keep their own « Undo », and an import's step unticks the layout
+rather than deleting it; the Optimiser's place tab, download format and
+pasted text (whose field has its own undo) are not steps.
+
+## Ergopti Studio's « Essayer » tab replaces the site's page (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (TODO « Site placements »): Ergopti
+Studio has an « Essayer » tab (`/studio/essayer`, frame
+`_shared/ui/layout_try/`) where the visitor picks a layout of the Studio's
+library (the Comparer's, Ergopti by default or the one of `?layout=`) and
+types in a text area; the browser types that layout by its physical keys,
+its four levels and its dead keys, keyboard and screen-reader accessible.
+`/ergopti/utilisation` redirects to `/studio/essayer?layout=ergopti`, its
+anchors (`#input-text`, `#keyboard_emulation`) handed on to the frame; the
+Disposition Ergopti's « Essayer » link and the Studio tab bar open it. No
+compatibility beyond the redirect. Agent choices inside the decision: the
+former emulator (`src/lib/keyboard/KeyboardEmulation.js`) knew only Ergopti's
+visualisation file and its six dead keys, so its text-area behaviour (typing
+at the caret, Tab leaving the field, Backspace, a waiting dead key) moved to
+`layout_try/typing.js`, which reads any library layout; the former page's
+Ergopti+ extras (the ★ text replacements and its replacement list) went with
+the page, an open question in TODO.md.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
