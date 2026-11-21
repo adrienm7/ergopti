@@ -5,7 +5,10 @@
 // driver's language, and whose modal alerts stall the launcher's main queue.
 // A found update is only offered: Sparkle downloads it after the user picks
 // Install, and every other answer (Later, Skip, closing the window) leaves it
-// on the server. Each reply is answered once; dismissUpdateInstallation drops
+// on the server. Once Install is picked, closing the download window only
+// hides it: the update goes on and its next step shows again, as on Windows
+// and Linux; only Cancel stops it (UPD-05, decided by the agent on
+// 2026-11-21, to review by the maintainer). Each reply is answered once; dismissUpdateInstallation drops
 // the pending ones without answering, as Sparkle requires. Sparkle's installer
 // progress agent, shown after the launcher quits to install, is a separate
 // process no user driver reaches (project memory:
@@ -21,7 +24,10 @@ protocol UpdatePromptPresenting: AnyObject {
 	/// when the user closed the window. Replaces any prompt or progress window.
 	func present(_ prompt: UpdatePrompt, activate: Bool, onChoice: @escaping (Int?) -> Void)
 	/// Shows or updates the progress window; a nil fraction is indeterminate.
-	func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?)
+	/// onCancel runs on the Cancel button, onClose when the user closes the
+	/// window with its close box; a nil onClose closes it with no effect.
+	func showProgress(_ text: UpdateProgressText, fraction: Double?,
+					  onCancel: (() -> Void)?, onClose: (() -> Void)?)
 	/// Brings the current window to the front.
 	func bringToFront()
 	/// Closes every window without reporting a choice.
@@ -39,6 +45,8 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 	private var cancellation: (() -> Void)?
 	private var expectedBytes: UInt64 = 0
 	private var receivedBytes: UInt64 = 0
+	/// The user closed the download window: the download goes on unseen.
+	private var downloadHidden = false
 
 	/// - Parameters:
 	///   - textsProvider: Resolves the catalog for each window, so a language
@@ -103,9 +111,9 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 	func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
 		self.cancellation = cancellation
 		guard let texts = resolveTexts() else { return }
-		presenter.showProgress(texts.checking(), fraction: nil) { [weak self] in
-			self?.cancelOperation()
-		}
+		// Closing the checking window cancels the check: nothing was consented yet.
+		let cancel: () -> Void = { [weak self] in self?.cancelOperation() }
+		presenter.showProgress(texts.checking(), fraction: nil, onCancel: cancel, onClose: cancel)
 	}
 
 	func showUpdateFound(with appcastItem: SUAppcastItem,
@@ -184,6 +192,7 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 		self.cancellation = cancellation
 		expectedBytes = 0
 		receivedBytes = 0
+		downloadHidden = false
 		showDownloadProgress()
 	}
 
@@ -199,17 +208,20 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 	}
 
 	private func showDownloadProgress() {
-		guard let texts = resolveTexts() else { return }
+		guard !downloadHidden, let texts = resolveTexts() else { return }
 		let fraction = expectedBytes > 0 ? min(1.0, Double(receivedBytes) / Double(expectedBytes)) : nil
-		presenter.showProgress(texts.downloading(), fraction: fraction) { [weak self] in
+		presenter.showProgress(texts.downloading(), fraction: fraction, onCancel: { [weak self] in
 			self?.cancelOperation()
-		}
+		}, onClose: { [weak self] in
+			self?.downloadHidden = true
+		})
 	}
 
 	func showDownloadDidStartExtractingUpdate() {
 		// Cancelling is only valid until extraction starts: replace the download
 		// window, whose Cancel button and close box would no longer cancel.
 		cancellation = nil
+		downloadHidden = false
 		presenter.closeAll()
 		showInstallProgress(fraction: nil)
 	}
@@ -220,7 +232,7 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 
 	private func showInstallProgress(fraction: Double?) {
 		guard let texts = resolveTexts() else { return }
-		presenter.showProgress(texts.installing(), fraction: fraction, onCancel: nil)
+		presenter.showProgress(texts.installing(), fraction: fraction, onCancel: nil, onClose: nil)
 	}
 
 	func showReady(toInstallAndRelaunch reply: @escaping @Sendable (SPUUserUpdateChoice) -> Void) {
@@ -247,6 +259,11 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 	}
 
 	func showUpdateInFocus() {
+		// A hidden download comes back where it stands.
+		if downloadHidden {
+			downloadHidden = false
+			showDownloadProgress()
+		}
 		presenter.bringToFront()
 	}
 
@@ -255,6 +272,7 @@ final class CatalogUpdateUserDriver: NSObject, SPUUserDriver {
 		pendingReadyReply = nil
 		pendingAcknowledgement = nil
 		cancellation = nil
+		downloadHidden = false
 		presenter.closeAll()
 	}
 }

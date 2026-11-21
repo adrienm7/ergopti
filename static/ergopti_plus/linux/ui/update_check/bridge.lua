@@ -181,14 +181,12 @@ function M.download_offered(updater, release, ctx)
 			local native_install = updater.install_update_async
 			if type(native_install) == "function" then
 				owner.installing = true
-				local window_admit = DownloadWindow.install_admission_current
+				-- The offer's own consent admits the install, never the window: a
+				-- closed or unopened download window leaves the update to finish, as
+				-- on Windows; only its Cancel stops it (UPD-05, decided by the agent
+				-- on 2026-11-21, to review by the maintainer).
 				local function admit_install()
-					if type(window_admit) ~= "function" or session_id == nil or not current()
-						or serial ~= _offer_serial or attempt ~= owner.attempt or not owner.installing then return false end
-					local checked, admitted = pcall(window_admit, session_id)
-					return checked and admitted == true and current() and serial == _offer_serial
-						and attempt == owner.attempt and owner.installing
-						and package.loaded["ui.download_window.bridge"] == DownloadWindow
+					return current() and serial == _offer_serial and attempt == owner.attempt and owner.installing
 				end
 				local constructing, admitted, seen, early = true, false, false, nil
 				local function install_completed(installed, detail, receipt)
@@ -233,7 +231,7 @@ function M.download_offered(updater, release, ctx)
 		end,
 		on_diagnostics = ctx.on_open_today_log, can_open_diagnostics = diagnostics_available,
 	})
-	if session_id == nil then Logger.warn(LOG, "The download window could not open; the update downloads without it.") end
+	if session_id == nil then Logger.warn(LOG, "The download window could not open; the update downloads and installs without it.") end
 	Logger.start(LOG, "Downloading the update %s…", tag)
 	return dispatch(false)
 end

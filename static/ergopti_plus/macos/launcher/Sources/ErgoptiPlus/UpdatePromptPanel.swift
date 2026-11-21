@@ -4,8 +4,8 @@
 // launcher's main queue, which supervises the embedded Hammerspoon process
 // (a Sparkle modal once stalled that supervision in CI). One panel at
 // a time: a prompt with its buttons, or a progress bar. Closing a prompt with
-// its close button reports "no choice"; closing it programmatically reports
-// nothing.
+// its close button reports "no choice", and a progress window reports its
+// onClose; closing either programmatically reports nothing.
 
 import AppKit
 
@@ -68,7 +68,8 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		show(title: prompt.title, rows: [heading, body, buttons], activate: activate)
 	}
 
-	func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?) {
+	func showProgress(_ text: UpdateProgressText, fraction: Double?,
+					  onCancel: (() -> Void)?, onClose: (() -> Void)?) {
 		if let indicator = progressIndicator, let message = progressMessage, let panel {
 			panel.title = WindowTitles.compose(text.title)
 			let changed = message.stringValue != text.message
@@ -83,6 +84,7 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 					.priority: NSAccessibilityPriorityLevel.medium.rawValue,
 				])
 			}
+			onUserClose = onClose
 			return
 		}
 		closeAll()
@@ -106,8 +108,10 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 			}
 			actions.append(action)
 			rows.append(NSButton(title: cancelTitle, target: action, action: #selector(UpdatePromptAction.fire(_:))))
-			onUserClose = onCancel
 		}
+		// The close box is not Cancel: a download goes on when its window is
+		// closed (UPD-05); the caller says what closing means.
+		onUserClose = onClose
 		progressIndicator = indicator
 		progressMessage = message
 		show(title: text.title, rows: rows, activate: false)

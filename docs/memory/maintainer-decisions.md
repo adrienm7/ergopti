@@ -5,6 +5,30 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Closing an update's window does not stop the update (2026-11-21)
+
+Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
+`docs/audits/platform-parity/2026-11-21-update-windows/report.md`, the
+maintainer asleep), with Windows as the reference: once the user consented to
+an update (Update, Install), closing the window that shows its download only
+hides it. The download goes on, the install follows, and only the window's
+Cancel button stops it, on the three OS:
+
+- Linux: the install is admitted by the offer's own consent
+  (`ui/update_check/bridge.lua` `admit_install`), never by the download
+  window's document, which a close retires; an update whose window could not
+  open installs too. `download_window/bridge.lua` no longer exports an install
+  admission.
+- macOS: the Sparkle download panel's close box hides it
+  (`CatalogUpdateUserDriver` `downloadHidden`); the extraction, the ready
+  prompt, or the menu's update row shows the update again. Closing the
+  checking panel still cancels the check: nothing was consented yet.
+- Windows: no window owns the install; this is the behaviour the two others
+  now follow.
+
+No compatibility path was kept (the maintainer asked for clean breaks, Linux
+has no users).
+
 ## Modifiers + ★ send the same modifiers + S on the three OS (2026-11-20)
 
 Decided by the maintainer on 2026-11-20 (TODO BND-1, BND-2: « ★ en accès
