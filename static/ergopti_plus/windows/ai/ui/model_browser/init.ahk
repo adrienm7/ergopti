@@ -720,6 +720,8 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 	if IsSet(_LLM_MBW_Gui) {
 		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
 		WMPresentWindow(Window)
+		if IsSet(_LLM_MBW_Controller)
+			WebView_TakeFocus(_LLM_MBW_Controller)
 		; A page still loading gets its catalogue from _LLM_MBW_OnPageReady, as
 		; LLM_ModelBrowser_Refresh assumes: injecting here would only queue a
 		; payload the ready handler rebuilds, and a failure to build it would send
@@ -818,6 +820,7 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
 			try Controller.Fill()
+			WebView_TakeFocus(Controller)
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
 			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))

@@ -1264,6 +1264,7 @@ KLWV_OnNavigationCompleted(which, Epoch, *) {
 				if !(Source == NavigationUrl)
 						return false
 				Controller.IsVisible := true
+				WebView_TakeFocus(Controller)
 				try LoggerInfo("Keystats", "Dashboard {1} page ready in {2} ms.",
 						which, Round(BootClockWallMs() - Entry["open_started"], 2))
 		}
@@ -1301,6 +1302,7 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 						return false
 				if Source == NavigationUrl
 						Controller.IsVisible := true
+						WebView_TakeFocus(Controller)
 		}
 		if !_KLWV_OwnsNavigation(which, entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
 				return false

@@ -169,6 +169,7 @@ _PiEdWeb_TryOpen(&FailureReason := "") {
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
 		try Controller.Fill()
+		WebView_TakeFocus(Controller)
 		try LoggerSuccess("PersonalInfo", "Personal info editor shown via WebView2.")
 	} catch as Err {
 		try LoggerError("PersonalInfo", "WebView2 create failed: {1}.", Err.Message)

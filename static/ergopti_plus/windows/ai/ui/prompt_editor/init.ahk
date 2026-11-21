@@ -170,8 +170,11 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 		if !_PromptEdWeb_StartupCurrent(Window)
 			return true
 		try _PromptEdWeb_PushInit(Context.EditId, Context.Epoch)
-		if _PromptEdWeb_StartupCurrent(Window)
+		if _PromptEdWeb_StartupCurrent(Window) {
 			WMPresentWindow(Window)
+			if IsSet(_PromptEdWeb_Controller)
+				WebView_TakeFocus(_PromptEdWeb_Controller)
+		}
 		return true
 	}
 	PreviousCritical := Critical("On")
@@ -283,6 +286,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
 			try Controller.Fill()
+			WebView_TakeFocus(Controller)
 			if _PromptEdWeb_StartupCurrent(g)
 				try LoggerSuccess("PromptEditor", "Prompt editor shown via WebView2 (edit={1}).", _PromptEdWeb_IsEdit)
 			return true

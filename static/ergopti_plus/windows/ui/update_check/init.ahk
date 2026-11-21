@@ -607,6 +607,7 @@ _UpdateCheck_Open() {
 		if !_UpdateCheck_StartupCurrent(Host)
 			return false
 		try Host.controller.Fill()
+		WebView_TakeFocus(Host.controller)
 		if !_UpdateCheck_StartupCurrent(Host)
 			return false
 		LoggerSuccess("UpdateCheck", "Update-check window opened.")

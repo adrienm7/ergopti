@@ -248,6 +248,7 @@ _Onboarding_TryWeb() {
 
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
 	try _OnbWeb_Controller.Fill()
+	WebView_TakeFocus(_OnbWeb_Controller)
 
 	try LoggerSuccess("Onboarding", "Wizard shown via WebView2 — rendering shared frontend at {1}.", _OnbWeb_HtmlUrl())
 

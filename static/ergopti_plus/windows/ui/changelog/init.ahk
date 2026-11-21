@@ -328,6 +328,7 @@ _CLW_BuildWindow(Channel, Request) {
 
 	; Fill the WebView2 to cover the entire window client area.
 	try _CLW_Controller.Fill()
+	WebView_TakeFocus(_CLW_Controller)
 
 	; Safety flush in case the "ready" message from JS never fires.
 	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))

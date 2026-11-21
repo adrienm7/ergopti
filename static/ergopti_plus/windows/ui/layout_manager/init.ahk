@@ -942,6 +942,7 @@ LayoutManager_Open(*) {
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false
 	Controller.Fill()
+	WebView_TakeFocus(Controller)
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false
 	LoggerSuccess("LayoutManager", "Layout manager opened.")

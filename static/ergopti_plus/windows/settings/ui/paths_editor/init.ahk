@@ -187,6 +187,7 @@ _PathsEdWeb_TryOpen() {
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
 		try Controller.Fill()
+		WebView_TakeFocus(Controller)
 		if _PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			try LoggerSuccess("PathsEditor", "Config-folder editor shown via WebView2.")
 		return true

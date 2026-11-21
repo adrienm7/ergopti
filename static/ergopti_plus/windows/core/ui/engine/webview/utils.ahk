@@ -87,6 +87,30 @@ WebView_FitToWindow(Controller) {
 	Controller.Fill()
 }
 
+; COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC: the host, not Tab, moves the focus.
+global WEBVIEW_MOVE_FOCUS_PROGRAMMATIC := 0
+
+/**
+ * Hands the keyboard to the page of a window that has just opened.
+ *
+ * Showing the host window focuses the host, not the browser: the page's own
+ * focus() then lands in a document that holds no keyboard focus, so the first
+ * keystrokes and Escape reach the host window until the user clicks
+ * (PCK-16). macOS and Linux focus their web views on open.
+ * A window shown without activation never calls this.
+ * @param Controller {WebView2.Controller} The controller of the opened window.
+ * @returns {Boolean} Whether the controller took the focus; a refusal is logged.
+ */
+WebView_TakeFocus(Controller) {
+	global WEBVIEW_MOVE_FOCUS_PROGRAMMATIC
+	try Controller.MoveFocus(WEBVIEW_MOVE_FOCUS_PROGRAMMATIC)
+	catch as Err {
+		LoggerError("WebView", "The page could not take the keyboard focus: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
 ; exactly one and it is reused forever), so it is leak-free by construction.
@@ -375,8 +399,11 @@ class WebViewHost {
 						}
 				} finally Critical(PreviousCritical)
 				if Reused {
-						if Existing.Gui != 0 && !Existing.CloseRequested
+						if Existing.Gui != 0 && !Existing.CloseRequested {
 								WMPresentWindow(Existing.Gui)
+								if Existing.HasOwnProp("Controller") && !Existing.Opts.Get("NoActivate", false)
+										WebView_TakeFocus(Existing.Controller)
+						}
 						return Existing
 				}
 
@@ -525,6 +552,15 @@ class WebViewHost {
 		}
 
 		/**
+		 * Whether the WebView2 binding and its loader are present.
+		 * @param {string} Loader - Absolute path to WebView2Loader.dll.
+		 * @returns {boolean}
+		 */
+		_RuntimeAvailable(Loader) {
+				return IsSet(WebView2) && FileExist(Loader)
+		}
+
+		/**
 		 * Acquires a controller while the native parent remains owned by the build.
 		 */
 		_CreateController(PlaceholderHwnd, Loader) {
@@ -560,7 +596,7 @@ class WebViewHost {
 
 				; ── WebView2 create ──────────────────────────────────────────────────
 				loader := _VendorDir . "\64bit\WebView2Loader.dll"
-				if !IsSet(WebView2) || !FileExist(loader) {
+				if !this._RuntimeAvailable(loader) {
 						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
 						return false
 				}
@@ -635,6 +671,11 @@ class WebViewHost {
 						return false
 				; The window may already be larger than the placeholder (a maximized app).
 				try WebView_FitToWindow(this.Controller)
+				if this.CloseRequested
+						return false
+				; An activated window hands its keyboard to the page (PCK-16).
+				if !Opts.Get("NoActivate", false)
+						WebView_TakeFocus(this.Controller)
 				if this.CloseRequested
 						return false
 

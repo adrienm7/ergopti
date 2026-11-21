@@ -835,6 +835,7 @@ HealthCheck_ShowWindow() {
 				try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
 				try _HC_WebView.Navigate(PageUrl)
 				try _HC_Controller.Fill()
+				WebView_TakeFocus(_HC_Controller)
 				if _HC_CloseDuringOpen
 					_HealthCheck_CloseGui(G, false)
 				LoggerInfo("Healthcheck", "Diagnostics controller prepared in {1} ms (reused={2}).",

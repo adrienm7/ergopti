@@ -362,6 +362,7 @@ OllamaWV_Create(kind, subtitle) {
 
 	; Fit the WebView to fill the Gui
 	try _OllamaWV_Controller.Fill()
+	WebView_TakeFocus(_OllamaWV_Controller)
 
 	; The "ready" message from JS triggers OllamaWV_OnWebMessage which
 	; flushes the queue. As a safety net, also flush after 2 s in case
