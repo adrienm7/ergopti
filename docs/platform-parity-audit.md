@@ -185,6 +185,7 @@ named file is not a reviewed file.
 | Metrics views                  | [report](audits/platform-parity/2026-11-21-metrics-views/report.md)                                |
 | Pickers and prompts            | [report](audits/platform-parity/2026-11-21-pickers-prompts/report.md)                              |
 | Layout tool pages              | [report](audits/platform-parity/2026-11-19-census/report.md#ninth-campaign-layout-tool-pages)      |
+| Small native units             | [report](audits/platform-parity/2026-11-21-small-native-units/report.md)                           |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -293,6 +294,20 @@ it. Left open: LTP-08, right-to-left on both pages (to PCK-22); LTP-09, three
 other Windows windows without the page seed; LTP-10, the other Windows
 configuration windows on `WebViewHost`, the physical shortcuts editor first,
 still inert while paused.
+
+The small-native-units campaign (November 21, 2026) fixed SNU-01 to SNU-09.
+The Windows keep-awake reads the shared `[keep_awake]` timings, credits a
+finished session to the day's `awake_ms` as maintainer decision KMD-3 defines
+it on the three drivers (it always read 0), and logs its start and stop; the
+macOS keep-awake credits a session the pause or a quit ends. The macOS
+Karabiner driver update and old-rules cleanup dialogs say each failure's cause
+in the user's language instead of a raw reason code; the Windows layout editor
+answers the shared export refusal code when its export executable fails; the
+Linux daily note logs its refusals, and the note's Windows-only folder and
+dated settings carry a reason that says where the Linux note goes. Left open:
+SNU-10 to SNU-15, among them the shipped `D:\Bureau` default note folder on
+Windows (a maintainer decision), a Windows session still running at exit, and
+how each driver tells the end of a session.
 
 ## Review status at resumption — November 12, 2026
 

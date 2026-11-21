@@ -416,6 +416,12 @@ owner. Windows is the reference unless a shared contract says otherwise.
    `macos/ui/virtual_hid_update.lua`, `macos/ui/legacy_rules_cleanup.lua`,
    `macos/native/SystemSwitcherState.swift` and `linux/modules/take_note.lua`.
    Most are OS-specific: check each one's reason text, not a counterpart.
+   **Taken on 2026-11-21** ([report](../2026-11-21-small-native-units/report.md)):
+   behaviour, errors and user messages, logging, shared timings, privacy and
+   teardown; SNU-01 to SNU-09 fixed (the Windows keep-awake timings, its
+   `awake_ms` credit and logs, the macOS credit across a pause, the Karabiner
+   dialogs' localized causes, the Windows export refusal code, the Linux note
+   reason and refusal logs), SNU-10 to SNU-15 open.
 9. **Layout tool pages.** `layout_analysis`, `layout_composer`,
    `layout_optimizer`, `layout_editor_window` and the `layout_manager` page.
    They are the largest units (35,000 lines), but each has one shared source,
