@@ -7,7 +7,7 @@
 ; notification firing on every pause. Ergopti_OnSuspendEnter calls
 ; StopActivitySimulation() unconditionally on every AltGr+Enter / menu /
 ; gesture pause so keep-awake can never outlive a suspend -- but
-; StopActivitySimulation used to fire its TrayTip("keepawake.stopped")
+; StopActivitySimulation used to fire its stopped TrayTip
 ; unconditionally too, so pausing showed the toast even when keep-awake
 ; (Win+M) had never been turned on.
 ;
@@ -35,7 +35,7 @@ _KASNG_CheckGuardedNotification() {
 	CapturePos := InStr(Body, "WasActive := ActivitySimulation")
 	MutatePos  := InStr(Body, "ActivitySimulation := False")
 	GuardPos   := InStr(Body, "if WasActive")
-	NotifyPos  := InStr(Body, "keepawake.stopped")
+	NotifyPos  := InStr(Body, "shortcuts.keep_awake_ended")
 
 	Assert(CapturePos > 0,
 		"StopActivitySimulation must capture the prior ActivitySimulation state before clearing it (keepawake-stop-notify-gate)")
@@ -44,7 +44,7 @@ _KASNG_CheckGuardedNotification() {
 	Assert(GuardPos > 0,
 		"StopActivitySimulation must guard its 'stopped' notification on the captured prior state (keepawake-stop-notify-gate)")
 	Assert(NotifyPos > GuardPos,
-		"The 'keepawake.stopped' notification must sit inside the WasActive guard, not fire unconditionally")
+		"The 'shortcuts.keep_awake_ended' notification must sit inside the WasActive guard, not fire unconditionally")
 }
 
 

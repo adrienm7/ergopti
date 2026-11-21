@@ -714,6 +714,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_shortcuts.ahk
 #Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
+#Include unit/modules/shortcuts/test_keepawake_end_notice.ahk
 #Include unit/modules/shortcuts/test_keepawake_pause_gate.ahk
 #Include unit/modules/shortcuts/test_keepawake_restored_on_resume.ahk
 #Include unit/modules/shortcuts/test_keepawake_session_parity.ahk

@@ -63,6 +63,23 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## The end of a keep-awake session is told once, on the three OS (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (SNU-12 in the small native units
+campaign, `2026-11-21-small-native-units`): every end of a running keep-awake
+session while the driver keeps running (the toggle, the user's activity, a
+pause) shows one short notice with one shared key,
+`shortcuts.keep_awake_ended` (21 locales), through a transient surface with no
+window to close: a Windows tray balloon (`StopActivitySimulation`), a macOS
+2 s alert banner (`show_awake_ended` in `modules/shortcuts/actions/system.lua`,
+which also speaks it to VoiceOver), a Linux desktop notification
+(`modules/keep_awake.lua`). A session that was not running shows nothing, and
+the driver's exit stays silent (macOS `stop_awake`, Linux `M.stop` with
+`quiet`; Windows does not stop it at exit, SNU-11). Linux has no activity
+cause: its logind inhibitor does not move the pointer. The retired keys
+`keepawake.stopped` and `shortcuts.keep_awake_off` must not come back. The
+three suites replay `_shared/tests/corpus/shortcuts/keep_awake_end_notice_vectors.json`.
+
 ## The take-note folder ships empty, meaning the Desktop (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (SNU-10 in the small native units

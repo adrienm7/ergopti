@@ -66,7 +66,7 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		f.finish()
 		helpers.assert_true(settled)
 		helpers.assert_eq(f.owner.is_active(), false)
-		helpers.assert_eq(f.notices[2], "shortcuts.keep_awake_off")
+		helpers.assert_eq(f.notices[2], "shortcuts.keep_awake_ended")
 		helpers.assert_true(f.owner.stop())
 	end)
 
@@ -251,5 +251,55 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		package.loaded["modules.keep_awake"] = previous
 		manager.set_program_paused(false)
 		if not ok then error(err, 0) end
+	end)
+end)
+
+-- SNU-12 (decided by the maintainer on 2026-11-21): every end of a running
+-- session shows one short notice with the key the three OS share, a pause
+-- while off shows none, and the daemon's own exit stays silent. Before, Linux
+-- said « disabled » at its exit too, under a key of its own.
+helpers.describe("keep-awake end notice (snu-12-2026-11-21)", function()
+	helpers.it("replays the shared end notice vectors", function()
+		local json = require("core.text.engine.json")
+		local path = helpers.driver_root() .. "/../_shared/tests/corpus/shortcuts/keep_awake_end_notice_vectors.json"
+		local file = assert(io.open(path, "r"), "keep-awake end notice vectors not found")
+		local data = assert(json.decode(file:read("*a")))
+		file:close()
+		local replayed = 0
+		for _, case in ipairs(data.cases) do
+			local applies = false
+			for _, driver in ipairs(case.drivers) do applies = applies or driver == "linux" end
+			if applies then
+				local f = fixture()
+				if case.active then
+					helpers.assert_true(f.owner.toggle())
+					f.options.on_output("ERGOPTI_INHIBITED\n", "stdout")
+					helpers.assert_true(f.owner.is_active(), case.id .. ": the session runs")
+				end
+				f.notices = {}
+				if case.cause == "toggle" then
+					f.owner.toggle()
+				elseif case.cause == "pause" then
+					f.owner.set_paused(true)
+				elseif case.cause == "exit" then
+					f.owner.stop({ quiet = true })
+				else
+					error("unknown keep-awake end cause: " .. tostring(case.cause))
+				end
+				if case.active then f.finish() end
+				helpers.assert_eq(#f.notices, case.notices, case.id .. ": notices shown at the end")
+				for _, key in ipairs(f.notices) do
+					helpers.assert_eq(key, data.key, case.id .. ": the notice is the shared end key")
+				end
+				replayed = replayed + 1
+			end
+		end
+		helpers.assert_eq(replayed, 4, "every Linux case of the shared vectors is replayed")
+	end)
+
+	helpers.it("the daemon's exit releases the inhibitor without the end notice", function()
+		local source = helpers.read_module_source("modules.keep_awake")
+		helpers.assert_true(source ~= nil and source:find("_owner.stop({ quiet = true })", 1, true) ~= nil,
+			"M.stop, the daemon's exit path, must end the session quietly")
 	end)
 end)

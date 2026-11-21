@@ -168,6 +168,20 @@ local function close_awake_alert()
 	end
 end
 
+--- Tells the end of a running session once, whatever ended it: the toggle,
+--- the user's activity or a pause (maintainer decision SNU-12, 2026-11-21;
+--- the shared key replayed from keep_awake_end_notice_vectors.json).
+local function show_awake_ended()
+	-- Close the persistent banner first, THEN show the transient one, so the
+	-- close cannot swallow it (it still would on the no-handle path, which
+	-- falls back to closeAll).
+	close_awake_alert()
+	-- A transient banner of 2 s: it has no window to close.
+	local ok_alert = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_ended"), 2.0)
+	-- An alert banner has no accessibility element: VoiceOver hears it here.
+	if ok_alert then SystemA11y.announce_event(i18n.get("shortcuts.keep_awake_ended")) end
+end
+
 
 --- Cancels the exact pending cursor-return timer without dropping cleanup debt.
 --- The generation fence makes a refused native stop harmless until retry.
@@ -472,7 +486,7 @@ local function auto_disable_awake(expected_started_at)
 
 	cancel_awake_tick_timer()
 
-	close_awake_alert()
+	show_awake_ended()
 
 	credit_awake_session()
 
@@ -499,13 +513,7 @@ function M.toggle_awake()
 		credit_awake_session()
 
 		Logger.info(LOG, "Keep-awake disabled.")
-		-- Close the persistent banner first, THEN show the transient "off" toast so
-		-- the close cannot swallow the toast we just displayed (it still would on
-		-- the no-handle path, which falls back to closeAll).
-		close_awake_alert()
-		local ok_off_alert = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
-		-- An alert banner has no accessibility element: VoiceOver hears it here.
-		if ok_off_alert then SystemA11y.announce_event(i18n.get("shortcuts.keep_awake_off")) end
+		show_awake_ended()
 		return watcher_settled and return_timer_settled and tick_timer_settled
 	else
 		-- A prior activate-then-throw may have left an inert exact timer awaiting
@@ -517,8 +525,8 @@ function M.toggle_awake()
 			return false
 		end
 		-- Watch for any real keyboard or touchpad activity (key press, scroll,
-		-- swipe, tap, pinch, rotate...). We cut silently (no alert) since the user
-		-- is clearly back — the visual noise would be worse than the keep-awake itself.
+		-- swipe, tap, pinch, rotate...). The cut shows the same short end banner as
+		-- the toggle, as on Windows (maintainer decision SNU-12, 2026-11-21).
 		local ev = eventtap.event.types
 		local watch_types = {
 			ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown,
@@ -663,7 +671,11 @@ function M.pause_awake()
 		awake_pause_snapshot = awake_active == true
 	end
 	if awake_pause_snapshot ~= true then return true end
-	return M.stop_awake() == true
+	-- A retried pause whose session already ended has no end left to tell.
+	local was_active = awake_active == true
+	local settled = M.stop_awake() == true
+	if was_active then show_awake_ended() end
+	return settled
 end
 
 --- Restores only a keep-awake session captured by pause_awake().

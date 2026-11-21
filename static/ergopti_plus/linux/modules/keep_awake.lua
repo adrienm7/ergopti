@@ -70,7 +70,9 @@ function M.new(ports)
 		current = nil
 		Logger.info(LOG, "Session idle inhibitor released.")
 		if session.active then
-			notify("shortcuts.keep_awake_off")
+			-- One short notice for every end but the daemon's own exit, the same
+			-- key on the three OS (maintainer decision SNU-12, 2026-11-21).
+			if not session.quiet then notify("shortcuts.keep_awake_ended") end
 			local recorded, credited = pcall(record_session, math.max(0, now_ms() - session.active_since_ms))
 			if not recorded or credited ~= true then
 				Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(credited))
@@ -83,11 +85,13 @@ function M.new(ports)
 	end
 
 	--- Cancels the current inhibitor and retains every unsettled native owner.
+	--- @param options table|nil `quiet = true` ends it without the end notice.
 	--- @return boolean settled
-	function owner.stop()
+	function owner.stop(options)
 		local session = current
 		if not session then return true end
 		session.stopping = true
+		if options and options.quiet then session.quiet = true end
 		if session.timer and scheduler.cancel(session.timer) == true then session.timer = nil end
 		session.input:cancel()
 		session.operation:cancel()
@@ -210,9 +214,10 @@ function M.toggle()
 	return _owner.toggle()
 end
 
---- Releases the daemon's inhibitor before its event loop stops.
+--- Releases the daemon's inhibitor before its event loop stops, silently:
+--- the driver is leaving, as on macOS.
 --- @return boolean settled
-function M.stop() return not _owner or _owner.stop() end
+function M.stop() return not _owner or _owner.stop({ quiet = true }) end
 
 --- Follows the driver's pause: the daemon's inhibitor stops with it and comes
 --- back on resume when it ran at the pause.

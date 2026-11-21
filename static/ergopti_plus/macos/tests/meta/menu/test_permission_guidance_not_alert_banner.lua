@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 -- Keep-awake confirms a toggle for a moment; it explains nothing.
 local ALLOWED_BANNER_KEYS = {
 	["shortcuts.keep_awake_on"] = true,
-	["shortcuts.keep_awake_off"] = true,
+	["shortcuts.keep_awake_ended"] = true,
 }
 
 

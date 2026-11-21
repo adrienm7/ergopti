@@ -158,8 +158,10 @@ StopActivitySimulation(Notify := true) {
 				LoggerInfo("shortcuts", "Keep-awake stopped.")
 				AwakeCreditSession(AwakeStartedTick)
 		}
+		; One short notice for every end (toggle, user activity, pause), the same
+		; key on the three OS (maintainer decision SNU-12, 21 November 2026).
 		if WasActive and Notify
-				try NotifierSend(t("keepawake.stopped"), Map("title", t("keepawake.title")))
+				try NotifierSend(t("shortcuts.keep_awake_ended"), Map("title", t("keepawake.title")))
 		return HookStopped
 }
 
