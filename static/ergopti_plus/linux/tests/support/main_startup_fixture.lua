@@ -146,7 +146,7 @@ function M.run(options)
 		if tostring(message):find("Daemon ready (", 1, true) then record("daemon.ready"); native_callback("daemon.ready") end
 	end, flush_repeats = noop }
 	if options.terminal_logger_throws then env.Logger.error = function() error("controlled terminal logger failure", 0) end end
-	env.tray_menu = { setIcon = function() ui("tray") end,
+	env.tray_menu = { start = function() ui("tray"); return true end,
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
 	env.TapHold = { is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
@@ -194,6 +194,16 @@ function M.run(options)
 			-- The desktop toolkit is present: its refusal has its own cases
 			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }
+		elseif name == "tray.engine.host_check" then
+			-- The tray host check is only scheduled at startup (its own cases:
+			-- tests/unit/platform/system/test_tray_host_check.lua).
+			return { schedule = function(deps)
+				record("tray.host_check"); observed.tray_host_check = deps; return true
+			end }
+		elseif name == "tray.adapters.status_notifier_host" then
+			return { probe = function() return nil, "controlled session" end }
+		elseif name == "core.timing.engine.timings" then
+			return require(name)
 		elseif name == "core.lifecycle.engine.driver_control" then
 			-- The local reload control starts once the daemon is ready.
 			return { start = function(control_options)

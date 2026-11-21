@@ -147,4 +147,17 @@ helpers.describe("tray host check: the user is told, in their language (tray-03)
 			"it reads the real session")
 	end)
 
+	helpers.it("the actual Main schedules the check once the tray is up", function()
+		local state = require("tests.support.main_startup_fixture").run()
+		local tray, scheduled
+		for index, event in ipairs(state.events) do
+			if event == "tray.returned" then tray = index end
+			if event == "tray.host_check" then scheduled = index end
+		end
+		helpers.assert_true(tray ~= nil and scheduled ~= nil and tray < scheduled,
+			"the check is scheduled after the icon is created: " .. table.concat(state.events, ","))
+		helpers.assert_eq(type(state.tray_host_check.probe), "function", "the check reads the session")
+		helpers.assert_eq(type(state.tray_host_check.after), "function", "the check waits on the daemon's timer")
+	end)
+
 end)
