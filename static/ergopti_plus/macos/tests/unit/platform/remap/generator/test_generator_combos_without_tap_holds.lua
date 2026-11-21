@@ -68,8 +68,11 @@ local TAP_HOLDS_ON_PINS = {
 	-- the pairs' press order (2026-11-12): a key-down of a first key shared by
 	-- several pairs records the rivals already held, and each such pair waits
 	-- for no rival held before its own first key. Then for the script chord
-	-- sequence (script-chord-sequence).
-	recommended = { rules = 28, digest = "e82aeb532d6b1931" },
+	-- sequence (script-chord-sequence). Then for the maintainer decisions of
+	-- 2026-11-21: left Command's Backspace tap gains its modifier variants
+	-- (THD-4) and the pair taps under the layer left Command holds lift it
+	-- around their action (THD-1).
+	recommended = { rules = 28, digest = "1fac3e4662bedc89" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

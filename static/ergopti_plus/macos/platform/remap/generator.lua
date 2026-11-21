@@ -827,6 +827,11 @@ local function physical_kc_ledger_event(key_code, release)
 	}
 end
 
+-- The manipulators whose own mandatory flags are their whole condition (the
+-- thumb Backspace variants): their exact-modifier split keeps those flags in
+-- its last variant, which would otherwise match with none of them held.
+local KEEPS_OWN_FLAGS = setmetatable({}, { __mode = "k" })
+
 --- Reports whether any given action is told apart from another only by its
 --- modifiers (actions.json `exact_modifiers`): Hammerspoon binds its trigger
 --- as an exact-match hotkey, so one added modifier runs another action.
@@ -882,8 +887,10 @@ end
 --- a flag two held keys both press (CapsLock and Fn both holding Cmd) stays
 --- down once: no rule can remove it.
 --- @param manipulator table Manipulator; never mutated.
+--- @param keep_own boolean|nil Whether the last variant keeps the rule's own
+---   mandatory flags (KEEPS_OWN_FLAGS).
 --- @return table manipulators Replacement list, in match order.
-local function exact_modifier_manipulators(manipulator)
+local function exact_modifier_manipulators(manipulator, keep_own)
 	local from = manipulator.from
 	if not accepts_any_held_modifier(from.modifiers) then return { manipulator } end
 	local own = type(from.modifiers.mandatory) == "table" and from.modifiers.mandatory or {}
@@ -927,7 +934,12 @@ local function exact_modifier_manipulators(manipulator)
 			variants[#variants + 1] = variant({ mandatory = mandatory, optional = { CAPS_LOCK_MODIFIER } })
 		end
 	end
-	variants[#variants + 1] = variant({ mandatory = { ANY_MODIFIER } })
+	-- Two flags or more besides the rule's own: a mandatory "any" claims them
+	-- all. It no longer requires the rule's own flags, which a pair's holder
+	-- keeps down anyway; a rule whose own flags are its whole condition (the
+	-- thumb Backspace variants) keeps them mandatory and lets the others through.
+	variants[#variants + 1] = variant(keep_own and #own > 0
+		and { mandatory = deep_copy(own), optional = { ANY_MODIFIER } } or { mandatory = { ANY_MODIFIER } })
 	return variants
 end
 
@@ -992,7 +1004,8 @@ local function rewrite_control_output(rules)
 		local manipulators = {}
 		for _, manipulator in ipairs(rule.manipulators or {}) do
 			local prepared = deep_copy(manipulator)
-			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared) or { manipulator }
+			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared, KEEPS_OWN_FLAGS[manipulator])
+				or { manipulator }
 			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
 		end
 		rule.manipulators = manipulators
@@ -1324,7 +1337,10 @@ local WORD_BACK    = { { key_code = "delete_or_backspace", modifiers = { "option
 local function thumb_backspace_variants(one_shot)
 	local variants = { { mandatory = { "control", "shift" }, to = WORD_FORWARD } }
 	if one_shot then
+		-- The one-shot key holds Shift, claimed with it; without its hold
+		-- (Shift only past its threshold) it still deletes forward.
 		variants[#variants + 1] = { mandatory = { "control" }, one_shot = true, to = WORD_FORWARD }
+		variants[#variants + 1] = { mandatory = { "shift" }, one_shot = true, to = CHAR_FORWARD }
 		variants[#variants + 1] = { one_shot = true, to = CHAR_FORWARD }
 	end
 	variants[#variants + 1] = { mandatory = { "shift" }, to = CHAR_FORWARD }
@@ -1531,6 +1547,7 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 				for index = tap_in_to_until + 1, #copy.to do to[#to + 1] = copy.to[index] end
 				copy.to = to
 			end
+			KEEPS_OWN_FLAGS[copy] = true
 			variants[#variants + 1] = copy
 		end
 		for _, variant in ipairs(manipulators) do variants[#variants + 1] = variant end
