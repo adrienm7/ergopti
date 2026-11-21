@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Default: {1}",
 	"dialog.action_picker.vision_model_required": "Required for this provider",
 	"dialog.app_picker.active_suffix": " (active)",
+	"dialog.app_picker.column_application": "Application",
+	"dialog.app_picker.column_process": "Process",
 	"dialog.app_picker.prompt": "Select applications:",
 	"dialog.app_picker.running_count": "{n} running application(s).",
 	"dialog.app_picker.selection_unverified": "The selected application cannot be verified, or another entry has priority. No binding was saved.",

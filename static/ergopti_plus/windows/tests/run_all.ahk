@@ -1817,6 +1817,7 @@ _LogBootProgress("keystats modules + tests included")
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/hotstrings/engine/catalogue/test_activate_hotstrings_sleep_gate.ahk
 #Include meta/core/ui/windows/test_app_picker_t_variable_shadows_i18n.ahk
+#Include meta/core/ui/windows/test_list_view_headers_localized.ahk
 #Include meta/core/lifecycle/engine/test_appstate_orphaned_parallel_state.ahk
 #Include meta/modules/keystats/context/test_av_no_blocking_registry_walk.ahk
 #Include meta/core/ui/tooltip/test_border_gdi_cleanup_broken_nesting.ahk

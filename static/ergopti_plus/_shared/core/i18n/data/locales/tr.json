@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Varsayılan: {1}",
 	"dialog.action_picker.vision_model_required": "Bu sağlayıcı için gerekli",
 	"dialog.app_picker.active_suffix": " (etkin)",
+	"dialog.app_picker.column_application": "Uygulama",
+	"dialog.app_picker.column_process": "İşlem",
 	"dialog.app_picker.prompt": "Uygulamaları seçin:",
 	"dialog.app_picker.running_count": "{n} çalışan uygulama.",
 	"dialog.app_picker.selection_unverified": "Seçilen uygulama doğrulanamıyor veya başka bir kayıt öncelikli. Hiçbir atama kaydedilmedi.",

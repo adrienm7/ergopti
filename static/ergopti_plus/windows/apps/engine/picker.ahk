@@ -315,7 +315,8 @@ AppPicker_Show(opts) {
 
 		; ListView with checkboxes. ProcessName column is the canonical key;
 		; DisplayName is friendlier for the user (window title fallback).
-		lv := g.AddListView("Checked w480 r18 Grid -Multi", ["Application", "Processus"])
+		lv := g.AddListView("Checked w480 r18 Grid -Multi",
+				[t("dialog.app_picker.column_application"), t("dialog.app_picker.column_process")])
 		lv.ModifyCol(1, 320)
 		lv.ModifyCol(2, 160)
 		for row in rows {

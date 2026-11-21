@@ -248,6 +248,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["cs", "da", "de", "fr", "it", "ja", "nl", "no", "pl", "pt", "sv", "uk"]
 		},
+		"dialog.app_picker.column_application": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
 		"dialog.action_picker.program_provider_label": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "es", "fr", "it", "nl", "pt"]

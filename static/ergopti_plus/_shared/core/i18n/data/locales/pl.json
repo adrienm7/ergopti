@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Domyślnie: {1}",
 	"dialog.action_picker.vision_model_required": "Wymagane dla tego dostawcy",
 	"dialog.app_picker.active_suffix": " (aktywna)",
+	"dialog.app_picker.column_application": "Aplikacja",
+	"dialog.app_picker.column_process": "Proces",
 	"dialog.app_picker.prompt": "Wybierz aplikacje:",
 	"dialog.app_picker.running_count": "{n} działająca(-e) aplikacja(-e).",
 	"dialog.app_picker.selection_unverified": "Nie można zweryfikować wybranej aplikacji lub inny wpis ma pierwszeństwo. Nie zapisano przypisania.",

@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "默认：{1}",
 	"dialog.action_picker.vision_model_required": "此提供方必填",
 	"dialog.app_picker.active_suffix": " (运行中)",
+	"dialog.app_picker.column_application": "应用",
+	"dialog.app_picker.column_process": "进程",
 	"dialog.app_picker.prompt": "选择应用程序：",
 	"dialog.app_picker.running_count": "{n} 个运行中的应用。",
 	"dialog.app_picker.selection_unverified": "无法验证所选应用，或其他条目具有更高优先级。未保存绑定。",

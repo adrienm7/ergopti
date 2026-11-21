@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "افتراضي: {1}",
 	"dialog.action_picker.vision_model_required": "مطلوب لهذا المزوّد",
 	"dialog.app_picker.active_suffix": " (نشط)",
+	"dialog.app_picker.column_application": "التطبيق",
+	"dialog.app_picker.column_process": "العملية",
 	"dialog.app_picker.prompt": "اختر التطبيقات:",
 	"dialog.app_picker.running_count": "{n} تطبيق(ات) قيد التشغيل.",
 	"dialog.app_picker.selection_unverified": "تعذر التحقق من التطبيق المحدد أو توجد أولوية لإدخال آخر. لم يُحفظ أي تعيين.",

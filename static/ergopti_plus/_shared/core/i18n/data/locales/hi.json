@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "डिफ़ॉल्ट: {1}",
 	"dialog.action_picker.vision_model_required": "इस प्रदाता के लिए आवश्यक",
 	"dialog.app_picker.active_suffix": " (सक्रिय)",
+	"dialog.app_picker.column_application": "अनुप्रयोग",
+	"dialog.app_picker.column_process": "प्रोसेस",
 	"dialog.app_picker.prompt": "अनुप्रयोग चुनें:",
 	"dialog.app_picker.running_count": "{n} चल रहा है अनुप्रयोग।",
 	"dialog.app_picker.selection_unverified": "चुने गए ऐप की पुष्टि नहीं हो सकी या किसी अन्य प्रविष्टि को प्राथमिकता है। कोई बाइंडिंग सहेजी नहीं गई।",

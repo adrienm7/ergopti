@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Výchozí: {1}",
 	"dialog.action_picker.vision_model_required": "Pro tohoto poskytovatele povinné",
 	"dialog.app_picker.active_suffix": " (aktivní)",
+	"dialog.app_picker.column_application": "Aplikace",
+	"dialog.app_picker.column_process": "Proces",
 	"dialog.app_picker.prompt": "Vyberte aplikace:",
 	"dialog.app_picker.running_count": "{n} spuštěná/spuštěných aplikace/í.",
 	"dialog.app_picker.selection_unverified": "Vybranou aplikaci nelze ověřit nebo má jiná položka přednost. Žádné přiřazení nebylo uloženo.",

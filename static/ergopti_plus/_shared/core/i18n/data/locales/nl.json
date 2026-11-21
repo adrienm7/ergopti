@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Standaard: {1}",
 	"dialog.action_picker.vision_model_required": "Verplicht voor deze aanbieder",
 	"dialog.app_picker.active_suffix": " (actief)",
+	"dialog.app_picker.column_application": "Toepassing",
+	"dialog.app_picker.column_process": "Proces",
 	"dialog.app_picker.prompt": "Selecteer toepassingen:",
 	"dialog.app_picker.running_count": "{n} actieve toepassing(en).",
 	"dialog.app_picker.selection_unverified": "De geselecteerde toepassing kan niet worden gecontroleerd of een ander item heeft voorrang. Er is geen binding opgeslagen.",

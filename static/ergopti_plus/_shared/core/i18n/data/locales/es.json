@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Predeterminado: {1}",
 	"dialog.action_picker.vision_model_required": "Obligatorio para este proveedor",
 	"dialog.app_picker.active_suffix": " (activa)",
+	"dialog.app_picker.column_application": "Aplicación",
+	"dialog.app_picker.column_process": "Proceso",
 	"dialog.app_picker.prompt": "Seleccione las aplicaciones:",
 	"dialog.app_picker.running_count": "{n} aplicación(es) en ejecución.",
 	"dialog.app_picker.selection_unverified": "No se puede verificar la aplicación seleccionada o hay otra entrada con prioridad. No se guardó ninguna asignación.",

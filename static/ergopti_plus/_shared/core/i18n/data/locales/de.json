@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Standard: {1}",
 	"dialog.action_picker.vision_model_required": "Für diesen Anbieter erforderlich",
 	"dialog.app_picker.active_suffix": " (aktiv)",
+	"dialog.app_picker.column_application": "Anwendung",
+	"dialog.app_picker.column_process": "Prozess",
 	"dialog.app_picker.prompt": "Anwendungen auswählen:",
 	"dialog.app_picker.running_count": "{n} laufende Anwendung(en).",
 	"dialog.app_picker.selection_unverified": "Die ausgewählte Anwendung kann nicht überprüft werden oder ein anderer Eintrag hat Vorrang. Es wurde keine Belegung gespeichert.",

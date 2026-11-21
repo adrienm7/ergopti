@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Par défaut : {1}",
 	"dialog.action_picker.vision_model_required": "Obligatoire pour ce fournisseur",
 	"dialog.app_picker.active_suffix": " (en cours)",
+	"dialog.app_picker.column_application": "Application",
+	"dialog.app_picker.column_process": "Processus",
 	"dialog.app_picker.prompt": "Sélectionnez les applications :",
 	"dialog.app_picker.running_count": "{n} application(s) en cours.",
 	"dialog.app_picker.selection_unverified": "L’application sélectionnée ne peut pas être vérifiée ou une autre entrée est prioritaire. Aucun raccourci n’a été enregistré.",

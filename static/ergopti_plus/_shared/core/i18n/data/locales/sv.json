@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Standard: {1}",
 	"dialog.action_picker.vision_model_required": "Krävs för denna leverantör",
 	"dialog.app_picker.active_suffix": " (aktiv)",
+	"dialog.app_picker.column_application": "Program",
+	"dialog.app_picker.column_process": "Processnamn",
 	"dialog.app_picker.prompt": "Välj program:",
 	"dialog.app_picker.running_count": "{n} program som körs.",
 	"dialog.app_picker.selection_unverified": "Det valda programmet kan inte verifieras eller en annan post har företräde. Ingen bindning sparades.",

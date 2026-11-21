@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "Типово: {1}",
 	"dialog.action_picker.vision_model_required": "Обов’язково для цього постачальника",
 	"dialog.app_picker.active_suffix": " (активна)",
+	"dialog.app_picker.column_application": "Програма",
+	"dialog.app_picker.column_process": "Процес",
 	"dialog.app_picker.prompt": "Виберіть програми:",
 	"dialog.app_picker.running_count": "{n} запущених програм.",
 	"dialog.app_picker.selection_unverified": "Не вдалося перевірити вибрану програму або інший запис має пріоритет. Призначення не збережено.",

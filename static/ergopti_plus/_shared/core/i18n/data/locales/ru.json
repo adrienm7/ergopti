@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "По умолчанию: {1}",
 	"dialog.action_picker.vision_model_required": "Обязательно для этого поставщика",
 	"dialog.app_picker.active_suffix": " (активно)",
+	"dialog.app_picker.column_application": "Приложение",
+	"dialog.app_picker.column_process": "Процесс",
 	"dialog.app_picker.prompt": "Выберите приложения:",
 	"dialog.app_picker.running_count": "{n} запущенных приложений.",
 	"dialog.app_picker.selection_unverified": "Не удалось проверить выбранное приложение, либо другая запись имеет приоритет. Назначение не сохранено.",

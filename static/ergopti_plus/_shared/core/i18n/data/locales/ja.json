@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "既定：{1}",
 	"dialog.action_picker.vision_model_required": "この提供元では必須",
 	"dialog.app_picker.active_suffix": "（アクティブ）",
+	"dialog.app_picker.column_application": "アプリケーション",
+	"dialog.app_picker.column_process": "プロセス",
 	"dialog.app_picker.prompt": "アプリケーションを選択:",
 	"dialog.app_picker.running_count": "{n}個のアプリケーションが実行中。",
 	"dialog.app_picker.selection_unverified": "選択したアプリを確認できないか、別の項目が優先されています。割り当ては保存されませんでした。",

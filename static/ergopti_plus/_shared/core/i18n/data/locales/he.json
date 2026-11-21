@@ -714,6 +714,8 @@
 	"dialog.action_picker.vision_model_default": "ברירת מחדל: {1}",
 	"dialog.action_picker.vision_model_required": "נדרש עבור ספק זה",
 	"dialog.app_picker.active_suffix": " (פעיל)",
+	"dialog.app_picker.column_application": "יישום",
+	"dialog.app_picker.column_process": "תהליך",
 	"dialog.app_picker.prompt": "בחר יישומים:",
 	"dialog.app_picker.running_count": "{n} יישום(ים) רצים.",
 	"dialog.app_picker.selection_unverified": "לא ניתן לאמת את היישום שנבחר או שלרשומה אחרת יש עדיפות. ההקצאה לא נשמרה.",
