@@ -261,7 +261,7 @@ _JOKN_SharedRootFollowsItsText() {
 	; Every owner of the registry decodes it through the shared root, the composed
 	; layout's source emulation too: it only reads the registry to name its scan
 	; codes, and its session is built from the layout's own model.
-	for Owner in ["WPMWidget_TypingBurstIndex", "MagicEditorPhysicalCatalogue", "LayoutEmulationRows",
+	for Owner in ["WPMWidget_TypingBurstIndex", "StarSlotPhysicalCatalogue", "LayoutEmulationRows",
 			"KeymapLayers_LoadContext", "_KLE_SourceBoot"]
 		AssertTrue(InStr(_DriverFuncBody(Owner), "JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))"),
 			Owner . " must read the physical-key registry through its shared root")

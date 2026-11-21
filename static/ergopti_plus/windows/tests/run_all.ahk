@@ -352,6 +352,8 @@ TestQualificationRegisterParser(JsonParse)
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
 ; management) follows it and calls into the loaders/state it declares.
+; The locale cache shows the magic key through the shared display rule.
+#Include ../hotstrings/engine/magic_key_rules.ahk
 #Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/gesture_emit_actions.ahk
 #Include ../_generated/action_catalogue.ahk
@@ -879,9 +881,8 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_keylayout_emulation.ahk
 #Include unit/modules/keymap/test_keylayout_altgr_characterization.ahk
 #Include unit/modules/keymap/test_keylayout_canonical_source.ahk
-#Include unit/hotstrings/engine/magic_key/test_source_menu.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk
-#Include unit/modules/shortcuts/test_magic_key_save.ahk
+#Include unit/hotstrings/test_magic_key_rules.ahk
 #Include unit/modules/keymap/test_layout_catalogue.ahk
 #Include unit/modules/keymap/test_layout_registry_download_custody.ahk
 #Include unit/modules/keymap/test_layout_registry_late_poll.ahk
@@ -1761,14 +1762,13 @@ _LogBootProgress("keystats modules + tests included")
 ; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
 #Include ../infra/chord.ahk
 #Include ../platform/input/hotkey_registrar.ahk
-#Include ../../_shared/shortcuts/data/magic_editor.ahk
-#Include ../../_shared/shortcuts/data/magic_key_save.ahk
-#Include ../infra/magic_editor.ahk
+#Include ../../_shared/shortcuts/data/star_slot.ahk
+#Include ../infra/star_slot.ahk
 #Include meta/platform/remap/key_combinations/test_chord_notation.ahk
 #Include unit/platform/input/test_hotkey_registrar_transactions.ahk
 #Include unit/platform/input/test_hotkey_registrar_aliases.ahk
 #Include unit/platform/input/test_hotkey_registrar_modifier_keys.ahk
-#Include unit/hotstrings/engine/magic_key/test_magic_editor.ahk
+#Include unit/hotstrings/engine/magic_key/test_star_slot.ahk
 #Include unit/platform/remap/key_combinations/test_keyboard_slot_win_space.ahk
 #Include unit/platform/remap/key_combinations/test_keyboard_slot_neutral_roles.ahk
 #Include unit/ai/actions/test_trigger_shortcut_retired.ahk

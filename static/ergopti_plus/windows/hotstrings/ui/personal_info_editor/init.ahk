@@ -332,7 +332,8 @@ _PiEdWeb_Save(Values, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 ; trigger hint shown beside its label.
 _PiEdWeb_InitDataJs(EditorSource := unset) {
 	global PersonalInformation, PersonalInformationLetters, ScriptInformation
-	Star := ScriptInformation.Has("MagicKey") ? ScriptInformation["MagicKey"] : Chr(0x2605)
+	; The trigger hint shows the magic key as every UI does, « ★ (ù) ».
+	Star := MagicKeyShown(ScriptInformation["MagicKey"])
 
 	; Reverse map: personal-info key -> trigger letter.
 	if IsSet(EditorSource) {

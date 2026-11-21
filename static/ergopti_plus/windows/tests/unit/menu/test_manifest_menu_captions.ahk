@@ -261,7 +261,8 @@ _MTF_CaptionRows(Key, Legacy, Root, Corpus, Language) {
 			Rows := _HS_MagicKeyRows()
 			AssertTrue(Rows is Array, "the actual Windows Magic provider returns row data")
 			AssertEqual(Rows.Length, 1, "Windows retains one Magic editor row and no reset")
-			Expected := Language = "en" ? "Magic key: " . Character : "Touche magique : " . Character
+			; « ★ (§) » for another character, never that character alone (2026-11-21).
+			Expected := (Language = "en" ? "Magic key: " : "Touche magique : ") . MagicKeyShown(Character)
 			AssertEqual(Rows[1]["label"], Expected, "actual native provider caption follows the independent image")
 			AssertTrue(Rows[1].Get("action", false) is Func, "actual Magic editor callback remains bound")
 			Built := Menu()

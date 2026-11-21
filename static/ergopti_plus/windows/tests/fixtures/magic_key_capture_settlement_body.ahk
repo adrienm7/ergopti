@@ -3,8 +3,8 @@
 ; No native InputHook or synthetic input is armed in this child. The passive
 ; hook reproduces native completion semantics: Stop retains completed input and
 ; reason. Actual hidden/visible GUI Close, real suspend/resume and the genuine
-; singleton owner decide whether either genuine editor may persist that result.
-if A_Args.Length != 7 || !Map("character", true, "source", true).Has(A_Args[1])
+; singleton owner decide whether the genuine editor may persist that result.
+if A_Args.Length != 2 || A_Args[1] != "character"
 	ExitApp(2)
 _MESC_Modes := Map("live", true, "cancel", true, "completed-close", true, "completed-paused-resumed", true,
 	"completed-close-successor", true, "stop-refusal", true, "stop-reentrant", true,
@@ -12,10 +12,8 @@ _MESC_Modes := Map("live", true, "cancel", true, "completed-close", true, "compl
 if !_MESC_Modes.Has(A_Args[2])
 	ExitApp(2)
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
-global HOTKEY_MODIFIER_VKS := Map()
-global _MESC := { Editor: A_Args[1], Mode: A_Args[2], Code: A_Args[3], Scan: A_Args[4], Scans: StrSplit(A_Args[5], ","),
-	Poll: Integer(A_Args[6]), Timeout: Integer(A_Args[7]), Windows: [], Hooks: [], Down: Map(), State: 0,
-	Calls: 0, Value: "", Errors: 0, Warnings: 0, Interrupts: 0, Failure: 0, Window: 0, Timer: 0, CloseAcks: 0 }
+global _MESC := { Editor: A_Args[1], Mode: A_Args[2],
+	Windows: [], Hooks: [], Calls: 0, Value: "", Errors: 0, Warnings: 0, Interrupts: 0, Failure: 0, Window: 0, Timer: 0, CloseAcks: 0 }
 OnExit(_MESC_Exit)
 
 _MESC_Require(Condition, Message) {
@@ -26,6 +24,10 @@ _MESC_Require(Condition, Message) {
 t(Key) {
 	return Key
 }
+
+; The prompt names the layout's default through the shared display rule.
+global ScriptInformation := Map("MagicKeyDefault", "a")
+MagicKeyShown(Char) => Char
 
 Gui_Create(Options, Title) {
 	global _MESC
@@ -61,10 +63,6 @@ ModifyMagicKey(Window, Value) {
 	_MESC_Record("character", Value)
 }
 
-ModifyMagicKeySource(Value) {
-	_MESC_Record("source", Value)
-}
-
 _MESC_Record(Editor, Value) {
 	global _MESC
 	_MESC_Require(Editor == _MESC.Editor, "The actual editor must call its own persistence route.")
@@ -72,56 +70,14 @@ _MESC_Record(Editor, Value) {
 	_MESC.Value := Value
 }
 
-TimingsGet(Section, Key) {
-	global _MESC
-	_MESC_Require(Section == "ui", "Only the actual editor's UI timing lookup is bound.")
-	if Key == "magic_key_capture_poll_ms"
-		return _MESC.Poll
-	_MESC_Require(Key == "magic_key_capture_timeout_ms", "The fixture must not invent another timing.")
-	return _MESC.Timeout
-}
-
-TimingsGetSec(Section, Key) {
-	return TimingsGet(Section, Key) / 1000.0
-}
-
-LayoutRegistry_Keycodes() {
-	return "fixture-selected-lookup"
-}
-
-LayoutRegistry_KeyCode(Scan, Keycodes) {
-	global _MESC
-	_MESC_Require(Scan == _MESC.Scan && Keycodes == "fixture-selected-lookup",
-		"The source editor must resolve the actual manifest-admitted physical scan.")
-	return _MESC.Code
-}
-
-_MESC_IsDown(Scan) {
-	global _MESC
-	return _MESC.Down.Has(Scan)
-}
-
-_MESC_CreateSourceState() {
-	global _MESC
-	; The parent supplies the actual production candidate roster. Only physical
-	; key state is passive; the genuine poll chooses Scan and stops its hook.
-	State := { Scans: _MESC.Scans.Clone(), IsDown: _MESC_IsDown, Held: Map(), Scan: "", Refused: false }
-	_MESC.State := State
-	return State
-}
-
 class _MESC_Hook {
-	__New(Source, Mode) {
+	__New(Mode) {
 		global _MESC
-		this.Source := Source, this.Mode := Mode
-		this.State := Source ? _MESC.State : 0
+		this.Mode := Mode
 		this.Window := _MESC.Window
 		this.Input := "", this.EndKey := "", this.EndReason := "", this.InProgress := false
 		this.Starts := 0, this.Stops := 0
-		this.TerminalStop := Source ? 2 : 1
-	}
-	KeyOpt(Keys, Options) {
-		_MESC_Require(Keys == "{All}" && Options == "NS", "The source editor must keep its actual suppressive capture options.")
+		this.TerminalStop := 1
 	}
 	Start() {
 		this.Starts += 1
@@ -144,29 +100,17 @@ class _MESC_Hook {
 	}
 	Wait() {
 		global _MESC
-		if this.Source {
-			if this.Mode == "cancel" || this.Mode == "successor"
-				this.Stop()
-			else {
-				_MESC.Down[_MESC.Scan] := true
-				try _MagicKeySourceCapturePoll(this.State, this)
-				finally _MESC.Down.Delete(_MESC.Scan)
-				_MESC_Require(this.State.Scan == _MESC.Scan && this.EndReason == "Stopped",
-					"The real source poll must choose and finish its actual candidate.")
-			}
-		} else {
-			this.InProgress := false
-			this.EndReason := "EndKey"
-			this.EndKey := this.Mode == "cancel" || this.Mode == "successor" ? "Escape" : "a"
-			if this.Mode == "scalar-pair"
-				this.Input := _MESC_RawUnit(0xD83D), this.EndKey := _MESC_RawUnit(0xDE00)
-			else if this.Mode == "invalid-high-BMP"
-				this.Input := _MESC_RawUnit(0xD83D)
-			else if this.Mode == "invalid-low"
-				this.EndKey := _MESC_RawUnit(0xDE00)
-			else if this.Mode == "invalid-max"
-				this.Input := _MESC_RawUnit(0xD83D) . _MESC_RawUnit(0xD83D), this.EndKey := "", this.EndReason := "Max"
-		}
+		this.InProgress := false
+		this.EndReason := "EndKey"
+		this.EndKey := this.Mode == "cancel" || this.Mode == "successor" ? "Escape" : "a"
+		if this.Mode == "scalar-pair"
+			this.Input := _MESC_RawUnit(0xD83D), this.EndKey := _MESC_RawUnit(0xDE00)
+		else if this.Mode == "invalid-high-BMP"
+			this.Input := _MESC_RawUnit(0xD83D)
+		else if this.Mode == "invalid-low"
+			this.EndKey := _MESC_RawUnit(0xDE00)
+		else if this.Mode == "invalid-max"
+			this.Input := _MESC_RawUnit(0xD83D) . _MESC_RawUnit(0xD83D), this.EndKey := "", this.EndReason := "Max"
 		if this.Mode != "completed-close" && this.Mode != "completed-paused-resumed" && this.Mode != "completed-close-successor"
 			return
 		_MESC.Timer := _MESC_Interrupt.Bind(this)
@@ -182,14 +126,9 @@ class _MESC_Hook {
 
 _MESC_CreateHook(Options, EndKeys := "") {
 	global _MESC
-	Source := _MESC.Editor == "source"
-	if Source
-		_MESC_Require(Options == "L0 I T" . (_MESC.Timeout / 1000.0) && EndKeys == "",
-			"Only the real physical source constructor boundary is bound.")
-	else
-		_MESC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "Only the real character constructor boundary is bound.")
+	_MESC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "Only the real character constructor boundary is bound.")
 	Mode := _MESC.Hooks.Length == 0 ? _MESC.Mode : "successor"
-	Hook := _MESC_Hook(Source, Mode)
+	Hook := _MESC_Hook(Mode)
 	_MESC.Hooks.Push(Hook)
 	return Hook
 }
@@ -242,10 +181,7 @@ _MESC_OpenSuccessor() {
 
 _MESC_Open() {
 	global _MESC
-	if _MESC.Editor == "character"
-		MagicKeyEditor()
-	else
-		MagicKeySourceCapture()
+	MagicKeyEditor()
 }
 
 _MESC_Exit(Reason, Code) {
@@ -291,7 +227,7 @@ try {
 	_MESC_Require(_MESC_Original.Starts == 1 && _MESC.Calls == _MESC_Expected,
 		"Only an uninterrupted completed editor may reach its real persistence route.")
 	if _MESC_Expected
-		_MESC_Require(_MESC.Value == (_MESC.Editor == "character" ? (_MESC.Mode == "scalar-pair" ? Chr(0x1F600) : "a") : _MESC.Code), "A live capture must retain its exact value.")
+		_MESC_Require(_MESC.Value == (_MESC.Mode == "scalar-pair" ? Chr(0x1F600) : "a"), "A live capture must retain its exact value.")
 	if _MESC.Mode == "stop-refusal" || _MESC.Mode == "completed-close-successor" || _MESC.Mode == "stop-reentrant" {
 		_MESC_Retained := _MESC.Mode == "stop-refusal" ? _MESC_Original : _MESC.Hooks[2]
 		_MESC_Require(_MagicKeyEditorInputHook == _MESC_Retained && _MagicKeyEditorStopDebt && _MESC.Errors == 1,

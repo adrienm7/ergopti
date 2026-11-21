@@ -163,7 +163,7 @@ _MBPT_ChildSource(Directory) {
 	Owners := Map()
 	for Symbol in ["HotPath_Now", "t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
 		"LLM_DisplayIndentValues", "LLM_Option_TryNormalize", "_TrayRootErrorIsSilent",
-		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MagicEditorPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
+		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "StarSlotPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
 		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
 		"AppPicker_SelectionsEqual", "UpdateChannels_Ids", "UpdateSchedule_Timing",
 		"Updater_LoadChannel", "LLM_ModelBrowser_Show", "LLM_AuxInvalidate", "OllamaWV_Close", "LLM_Deps_Cancel",

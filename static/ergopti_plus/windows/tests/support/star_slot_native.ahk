@@ -1,4 +1,4 @@
-﻿; tests/support/magic_editor_native.ahk
+﻿; tests/support/star_slot_native.ahk
 
 ; ==============================================================================
 ; MODULE: Private Physical Shortcut Native Probe

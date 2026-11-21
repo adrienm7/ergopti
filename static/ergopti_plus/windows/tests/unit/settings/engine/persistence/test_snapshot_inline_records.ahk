@@ -320,10 +320,10 @@ Test("configuration snapshot: source guard retains observed generation without p
 
 _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	Snapshot := ConfigTomlReadSnapshot(Path)
-	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "ctrl_magic_save", 0, "ergopti_alt_gr", 1),
+	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "emulate_bottom_row", 0, "ergopti_alt_gr", 1),
 		"hotstrings", Map("autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"french_autocorrection", Map("accents", Map("enabled", 1)))), Snapshot.Document)
-	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "ctrl_magic_save", 0, "ergopti_alt_gr", 1),
+	_FMS_AssertExactTree(Map("layout", Map("number_row_reorder_edges", 0, "emulate_bottom_row", 0, "ergopti_alt_gr", 1),
 		"hotstrings.autocorrection", Map("names", Map("enabled", 0, "time_activation_seconds", 0.125)),
 		"hotstrings.french_autocorrection", Map("accents", Map("enabled", 1))), Snapshot.Cache)
 	Rows := Map()
@@ -331,7 +331,7 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 		Rows[Row.Section . "`n" . Row.Key] := Row
 	AssertEqual(5, Rows.Count)
 	AssertEqual("-0", Rows["layout`nnumber_row_reorder_edges"].Raw)
-	AssertEqual("-0", Rows["layout`nctrl_magic_save"].Raw)
+	AssertEqual("-0", Rows["layout`nemulate_bottom_row"].Raw)
 	AssertEqual("1", Rows["layout`nergopti_alt_gr"].Raw)
 	AssertEqual("-0", Rows["hotstrings.autocorrection`nnames"].ChildRaw["enabled"])
 	AssertEqual("1", Rows["hotstrings.french_autocorrection`naccents"].ChildRaw["enabled"])
@@ -341,14 +341,14 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertEqual(2, Migrated, "only actual bare one leaves carry legacy Boolean intent")
 	AssertEqual(3, Outdated.Count, "signed-zero integers cannot invent legacy Boolean intent")
 	AssertFalse(Target["layout"]["number_row_reorder_edges"])
-	AssertFalse(Target["layout"]["ctrl_magic_save"])
+	AssertFalse(Target["layout"]["emulate_bottom_row"])
 	AssertTrue(Target["layout"]["ergopti_alt_gr"])
 	AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
 	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])
 	AssertTrue(Target["hotstrings"]["french_autocorrection"]["accents"]["enabled"])
 }
 _FMS_InlineRawTokensNeverInventMigrationIntent() {
-	_FMS_WithSource("inline_spelling", 'layout = { number_row_reorder_edges = -0, ctrl_magic_save = -0, ergopti_alt_gr = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
+	_FMS_WithSource("inline_spelling", 'layout = { number_row_reorder_edges = -0, emulate_bottom_row = -0, ergopti_alt_gr = 1 }`nhotstrings = { autocorrection = { names = { enabled = -0, time_activation_seconds = 0.125 } }, french_autocorrection = { accents = { enabled = 1 } } }`n',
 		_FMS_InlineLiteralSpellingsKeepBooleanIntent)
 }
 Test("configuration snapshot: exact inline child spellings retain legacy Boolean admission (config-semantic-snapshot)",

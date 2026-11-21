@@ -37,7 +37,7 @@ _LSD_DeclaredCase() {
 	Assert(Declared.Count >= 3, "the three Ergopti emulation features must remain declared, got " . Declared.Count)
 	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_variant"]
 		Assert(Declared.Has(Path), Path . " must be declared as superseded by an emulated layout")
-	for Path in ["layout.ctrl_magic_save", "layout.emulated_layout", "layout.direct_access_digits"]
+	for Path in ["layout.emulate_bottom_row", "layout.emulated_layout", "layout.direct_access_digits"]
 		AssertFalse(Declared.Has(Path), Path . " works whatever the layout and must not be declared")
 	NumberRow := ManifestFindEntryByPath("layout.direct_access_digits")
 	AssertEqual("enum", NumberRow["type"], "number-row policy cannot use boolean supersession")
@@ -54,15 +54,15 @@ Test("layout supersession: the master gate turns off the declared features it is
 	_LSD_GateCase)
 
 _LSD_GateCase() {
-	Target := Map("layout", Map("ergopti_base", true, "ctrl_magic_save", true, "emulated_layout", "ergol"))
-	Only := [Map("section", "layout", "id", "ctrl_magic_save", "superseded_reason_key", "x")]
+	Target := Map("layout", Map("ergopti_base", true, "emulate_bottom_row", true, "emulated_layout", "ergol"))
+	Only := [Map("section", "layout", "id", "emulate_bottom_row", "superseded_reason_key", "x")]
 	AssertEqual(1, _MG_SupersedeForEmulatedLayout(Target, Only))
-	AssertFalse(Target["layout"]["ctrl_magic_save"], "the declared feature is turned off")
+	AssertFalse(Target["layout"]["emulate_bottom_row"], "the declared feature is turned off")
 	AssertTrue(Target["layout"]["ergopti_base"], "an undeclared feature is left alone")
 	Target["layout"]["emulated_layout"] := ""
-	Target["layout"]["ctrl_magic_save"] := true
+	Target["layout"]["emulate_bottom_row"] := true
 	AssertEqual(0, _MG_SupersedeForEmulatedLayout(Target, Only), "nothing is superseded without an emulated layout")
-	AssertTrue(Target["layout"]["ctrl_magic_save"])
+	AssertTrue(Target["layout"]["emulate_bottom_row"])
 }
 
 
@@ -85,7 +85,7 @@ _LSD_ReasonCase() {
 	NotEmulating := Map("layout", Map("emulated_layout", ""))
 	AssertEqual(Entry["superseded_reason_key"], LayoutSupersededReason(Entry, Emulating))
 	AssertEqual("", LayoutSupersededReason(Entry, NotEmulating), "no reason without an emulated layout")
-	Other := ManifestFindEntryByPath("layout.ctrl_magic_save")
+	Other := ManifestFindEntryByPath("layout.emulate_bottom_row")
 	AssertEqual("", LayoutSupersededReason(Other, Emulating), "a feature that works on any layout keeps its row")
 	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.direct_access_digits"]
 		AssertEqual("", LayoutSupersededReason(ManifestFindEntryByPath(Path), Emulating),

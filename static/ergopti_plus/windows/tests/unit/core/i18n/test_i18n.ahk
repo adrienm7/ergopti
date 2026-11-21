@@ -282,15 +282,20 @@ _I18nLazyCacheStoresRawStar() {
 	ScriptInformation["MagicKey"] := "@@"   ; distinct key so we can tell them apart
 	TsvPath := A_Temp . "\i18n_test_locale.tsv"
 	Path := _I18nTmpJson('{"hint": "Press ' . Chr(0x2605) . ' now"}')
-	_I18nLoadFile(Path)
-	AssertEqual("Press @@ now", _I18nCache["hint"], "in-memory cache must carry the substituted MagicKey")
-	Raw := FileRead(TsvPath, "UTF-8")
-	AssertTrue(InStr(Raw, Chr(0x2605)) > 0, "the .tsv must store the RAW ★ placeholder")
-	AssertFalse(InStr(Raw, "@@") > 0, "the .tsv must NOT bake in the MagicKey (stays cache-independent)")
-	FileDelete(Path)
-	FileDelete(TsvPath)
-	ScriptInformation["MagicKey"] := Saved
-	_I18nTestReset()
+	try {
+		_I18nLoadFile(Path)
+		; The magic key shows as « ★ (@@) » (2026-11-21), never the configured key alone.
+		AssertEqual("Press " . Chr(0x2605) . " (@@) now", _I18nCache["hint"],
+			"in-memory cache must carry the magic key's display")
+		Raw := FileRead(TsvPath, "UTF-8")
+		AssertTrue(InStr(Raw, Chr(0x2605)) > 0, "the .tsv must store the RAW ★ placeholder")
+		AssertFalse(InStr(Raw, "@@") > 0, "the .tsv must NOT bake in the MagicKey (stays cache-independent)")
+	} finally {
+		try FileDelete(Path)
+		try FileDelete(TsvPath)
+		ScriptInformation["MagicKey"] := Saved
+		_I18nTestReset()
+	}
 }
 Test("i18n cache: .tsv stores the raw ★ placeholder, not the MagicKey", _I18nLazyCacheStoresRawStar)
 

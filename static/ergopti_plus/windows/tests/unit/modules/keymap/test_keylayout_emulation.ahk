@@ -277,7 +277,6 @@ _KLT_OptionsVectorsCase() {
 			State["initialized"] := false
 			MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
 			ScriptInformation["MagicKeySourceScan"] := Settings.Get("magic_key", "")
-			ScriptInformation["MagicKeySourceOverridesEmulation"] := Settings.Has("magic_key")
 			_KLT_Load(Vector["layout"])
 			KeylayoutEmulation_ResetDeadKey()
 			Replayed += 1
@@ -298,7 +297,6 @@ _KLT_OptionsVectorsCase() {
 		for Key, Value in Saved[4]
 			State[Key] := Value
 		ScriptInformation["MagicKeySourceScan"] := Saved[5]
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[6]
 	}
 	AssertEqual(5, Skipped.Length, "only the OS-dependent number-row orderings stay with the Lua replay: " . _KLT_Join(Skipped))
 	AssertEqual(Vectors.Length - 5, Replayed, "every other options vector is replayed")
@@ -749,53 +747,24 @@ _KLT_PendingDisabledRowCase() {
 	}
 }
 
-Test("magic key: the configured key wins over the layout's declaration and the OS layout (layout-magic-key)",
-	_KLT_MagicKeySourceOrderCase)
+Test("magic key: only the emulated layout's declared key is remapped, never a chosen or detected one (magic-key-character)",
+	_KLT_MagicKeySourceCase)
 
-; The resolution order of LayoutRegistry_MagicKeySource, with a detection that
-; records whether it was consulted at all.
-_KLT_MagicKeySourceOrderCase() {
-	Probe := { Calls: 0, Answer: "SC024" }
-	Shipped := { Calls: 0 }
-	Resolve(Changes) {
-		Inputs := Map("chosen", false, "configured", "auto", "declared", "", "emulated", false,
-			"keycodes", LayoutRegistry_Keycodes(), "detect", () => (Probe.Calls += 1, Probe.Answer),
-			"shipped", () => (Shipped.Calls += 1, "KeyC"))
-		for Key, Value in Changes
-			Inputs[Key] := Value
-		return LayoutRegistry_MagicKeySource(Inputs)
-	}
-	; [hotstrings] magic_key_source names the key by its KeyboardEvent.code, the
-	; spelling every driver shares: KeyN is SC031 on Windows.
-	Chosen := Resolve(Map("chosen", true, "configured", "KeyN", "declared", "KeyC"))
-	AssertEqual("SC031", Chosen["scan"], "the user's key wins over the layout's declaration")
-	AssertEqual("user", Chosen["origin"])
-	AssertFalse(Chosen["follows_os_layout"])
-	AssertTrue(Chosen["overrides_emulation"], "a chosen key is the magic key on any layout")
-	AssertEqual(0, Probe.Calls, "a configured key is never replaced by a detection")
-	AssertEqual(0, Shipped.Calls, "nor read from the shipped layout")
-	Declared := Resolve(Map("declared", "Semicolon", "emulated", true))
+; The magic key is a configured character (2026-11-21): the old chain also took
+; a user-chosen key, a key detected on the OS layout or the shipped C position.
+_KLT_MagicKeySourceCase() {
+	Keycodes := LayoutRegistry_Keycodes()
+	Declared := LayoutRegistry_MagicKeySource(Map("declared", "Semicolon", "keycodes", Keycodes))
 	AssertEqual("SC027", Declared["scan"], "the declared KeyboardEvent.code reaches its scan code")
 	AssertEqual("layout", Declared["origin"])
-	AssertTrue(Declared["overrides_emulation"], "the declaring layout yields its key to the magic key")
-	AssertEqual(0, Probe.Calls)
-	Emulated := Resolve(Map("emulated", true))
-	AssertEqual("SC02E", Emulated["scan"], "an emulated layout without declaration keeps the shipped key")
-	AssertEqual(1, Shipped.Calls, "the shipped key is read only when nothing else names one")
-	AssertFalse(Emulated["follows_os_layout"], "and never follows the OS layout it replaces")
-	AssertFalse(Emulated["overrides_emulation"], "a layout declaring no magic key keeps its own character")
-	AssertEqual(0, Probe.Calls, "the OS layout an emulation replaces is never probed")
-	Detected := Resolve(Map())
-	AssertEqual("SC024", Detected["scan"], "the user's own layout is probed for the source character")
-	AssertEqual("detected", Detected["origin"])
-	AssertTrue(Detected["follows_os_layout"])
-	Probe.Answer := ""
-	Missing := Resolve(Map())
-	AssertEqual("SC02E", Missing["scan"], "a character on no key keeps the shipped key")
-	AssertTrue(Missing["follows_os_layout"], "another OS layout may still carry the character")
-	AssertThrows(() => Resolve(Map("declared", "MouseLeft")), "a code no layout key has is refused")
-	AssertEqual("KeyC", LayoutRegistry_ShippedMagicKey(),
-		"the last-resort key is the one the shipped Ergopti layout declares: SC02E, the former default")
+	None := LayoutRegistry_MagicKeySource(Map("declared", "", "keycodes", Keycodes))
+	AssertEqual("", None["scan"], "without a declaring emulated layout no key is remapped")
+	AssertEqual("none", None["origin"])
+	AssertThrows(() => LayoutRegistry_MagicKeySource(Map("declared", "MouseLeft", "keycodes", Keycodes)),
+		"a code no layout key has is refused")
+	AssertEqual("SC027", LayoutRegistry_MagicKeyHotkeys("SC027")[1], "the plain press of the declared key alone")
+	AssertEqual(1, LayoutRegistry_MagicKeyHotkeys("SC027").Length, "no save chord, no Win chord")
+	AssertEqual(0, LayoutRegistry_MagicKeyHotkeys("").Length, "no key, no hotkey")
 }
 
 Test("magic key: the active layout's declaration comes from its extension (layout-magic-key)",
@@ -817,7 +786,7 @@ _KLT_MagicKeyDeclarationCase() {
 	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("bepo", true, "ergopti", () => Record),
 		"a layout not installed yet declares nothing")
 	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", false, "ergopti", () => Record),
-		"a layout left selected with the base layer off types nothing: the OS layout is probed")
+		"a layout left selected with the base layer off types nothing")
 	AssertEqual("ergopti", LayoutRegistry_ActiveLayoutExtension("", true, "ergopti", () => Record))
 	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("", false, "ergopti", () => Record),
 		"the user's own OS layout declares nothing")
@@ -828,7 +797,7 @@ _KLT_MagicKeyDeclarationCase() {
 		"a damaged record is logged and declares nothing")
 }
 
-Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
+Test("magic key: only a declared key takes an emulated layout's unshifted level (layout-magic-key)",
 	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
 ; Evaluates the actual registered criterion with a modeled physical press.
@@ -854,7 +823,7 @@ _KLT_MagicKeyYieldCase() {
 	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, ScriptInformation
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
-		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
+		ScriptInformation["MagicKeySourceScan"]]
 	try {
 		Replace := Map("enabled", true)
 		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
@@ -871,11 +840,10 @@ _KLT_MagicKeyYieldCase() {
 			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
 			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0, 0,
 			(Scan, Callback, Criterion) => Capture.Rows["#" . Scan] := Criterion)
-		ScriptInformation["MagicKeySourceScan"] := "SC02E"
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := false
+		ScriptInformation["MagicKeySourceScan"] := ""
 		AssertTrue(Capture.Rows["SC02E"].Call(), "Ergo-L declares no magic key: its '-' stays on that key")
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := true
-		AssertFalse(Capture.Rows["SC02E"].Call(), "a declared or chosen key's unshifted level is the remap's")
+		ScriptInformation["MagicKeySourceScan"] := "SC02E"
+		AssertFalse(Capture.Rows["SC02E"].Call(), "a declared key's unshifted level is the remap's")
 		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
 		AssertTrue(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"]),
 			"AltGr keeps the emulated layout's character")
@@ -883,7 +851,7 @@ _KLT_MagicKeyYieldCase() {
 			"released AltGr leaves the magic-key suffix to its current owner")
 		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
 		ScriptInformation["MagicKeySourceScan"] := "SC027"
-		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the chosen key, not a fixed position")
+		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the declared key, not a fixed position")
 		AssertFalse(Capture.Rows["SC027"].Call())
 		Replace["enabled"] := false
 		AssertTrue(Capture.Rows["SC027"].Call(), "without the remap the emulation keeps the key")
@@ -899,7 +867,6 @@ _KLT_MagicKeyYieldCase() {
 		for Key, Value in Saved[5]
 			State[Key] := Value
 		ScriptInformation["MagicKeySourceScan"] := Saved[6]
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[7]
 	}
 }
 
@@ -956,7 +923,7 @@ Test("master gates: a selected registry layout supersedes the Ergopti emulation 
 _KLT_SupersedeCase() {
 	global Features, TapHold
 	Selected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
-		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "ergol")
+		"direct_access_digits", "digits", "emulate_bottom_row", true, "emulated_layout", "ergol")
 	_KLT_WithLayoutFeatures(Selected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertFalse(Features["layout"]["ergopti_base"], "the Ergopti base layer stands down"),
@@ -964,11 +931,11 @@ _KLT_SupersedeCase() {
 		AssertFalse(ErgoptiLayout_PlusIsActive(Features), "the Ergopti+ changes stand down"),
 		AssertTrue(Features["layout"]["direct_access_digits"], "the independent digit override keeps its choice"),
 		AssertEqual("digits", Features["layout"]["direct_access_digits"], "the typed intent remains digits rather than a truthy native/symbols string"),
-		AssertTrue(Features["layout"]["ctrl_magic_save"], "a feature that works on any layout is kept"),
+		AssertTrue(Features["layout"]["emulate_bottom_row"], "a feature that works on any layout is kept"),
 		AssertEqual("ergol", Features["layout"]["emulated_layout"], "the selection itself is kept")
 	))
 	NoneSelected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
-		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "")
+		"direct_access_digits", "digits", "emulate_bottom_row", true, "emulated_layout", "")
 	_KLT_WithLayoutFeatures(NoneSelected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertTrue(Features["layout"]["ergopti_base"], "without a registry layout the Ergopti emulation stays"),

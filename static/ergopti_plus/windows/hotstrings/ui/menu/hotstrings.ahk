@@ -129,7 +129,7 @@ _HS_MagicKeyRows() {
 		Snapshot.Push([Row, Fields])
 	}
 	Rows := MenuRenderer_TemplateRows("hotstrings_magic_trigger_frame", Map("magic_key_change", MagicKeyEditor),
-		Map("magic_key_value", () => ScriptInformation["MagicKey"], "magic_key_ready", () => true), Map())
+		Map("magic_key_value", () => MagicKeyShown(ScriptInformation["MagicKey"]), "magic_key_ready", () => true), Map())
 	if !(Rows is Array) || _MR_GetManifestRoot() != Root || Root.Get("hotstrings_magic_trigger_frame", false) != Frame
 		return []
 	if Frame.Length != Snapshot.Length

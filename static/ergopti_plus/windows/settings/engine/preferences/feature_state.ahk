@@ -22,34 +22,21 @@
 ; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\..\core\lifecycle\engine\value_check.ahk
+; The magic key's layout default (a dedupe-safe include: the entry names it too).
+#Include %A_LineFile%\..\..\..\..\hotstrings\engine\magic_key_rules.ahk
 
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
 		"MagicKey", _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_TRIGGER_CHAR),
-		; The physical key remapped to ★, as the shared [hotstrings]
-		; magic_key_source names it on every driver: a KeyboardEvent.code, or the
-		; manifest default "auto" that leaves the key to the layout.
-		"MagicKeySource", _FeatureStateRequireManifestDefault(
-			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE),
-		; Its scan code, resolved once at boot by LayoutRegistry_MagicKeySource
+		; The magic key's default for the layout that types (ReadScriptConfig):
+		; what an absent trigger_char means, and what the editor names as default.
+		"MagicKeyDefault", _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_TRIGGER_CHAR),
+		; The scan code of the key the emulated layout declares as its magic key,
+		; "" for none; resolved once at boot by LayoutRegistry_MagicKeySource
 		; (ErgoptiPlus.ahk) before any hotkey registers on it.
 		"MagicKeySourceScan", "",
-		; The character whose key the boot looks for on the OS layout when no key
-		; is chosen and no emulated layout declares one.
-		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
-			ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR),
-		; Whether config.toml names the source key: the user's choice then wins
-		; over the active layout's declared key and over any detection.
-		"MagicKeySourceChosen", false,
-		; Whether the boot took the source key from the OS layout, so a switch of
-		; OS layout can move it (LayoutRemapSignature); decided at boot.
-		"MagicKeySourceFollowsOsLayout", false,
-		; Whether an emulated layout yields the magic key's unshifted level to it:
-		; only for a key the user chose or the active layout declares, so an
-		; emulated layout declaring none keeps its own character; decided at boot.
-		"MagicKeySourceOverridesEmulation", false,
 		; Manual override for the AltGr-as-Kana / custom-remap detection. The
 		; manifest default is "auto": HotstringEngineInit() detects the family via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [script]) wins when
@@ -249,25 +236,15 @@ IsCategoryGated(Category) {
 }
 
 ReadScriptConfig(Cache) {
-		Cache := _FeatureStateAdmitBootCache(Cache, Map("hotstrings", true, "script", true))
-		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
+		Cache := _FeatureStateAdmitBootCache(Cache, Map("hotstrings", true, "script", true, "layout", true))
+		; The magic key is a configured character, [hotstrings] trigger_char. Its
+		; default follows the OS layout (MagicKeyLayoutDefaultFor): ù on AZERTY,
+		; ; on QWERTY, the manifest's elsewhere and under an emulated layout.
+		ScriptInformation["MagicKeyDefault"] := MagicKeyLayoutDefaultFor(_FeatureStateEmulates(Cache),
+			KS_ResolveKeyboardLayout())
 		Raw := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.TRIGGER_CHAR)
-		if Raw != "_"
-				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
-		; Source key for the J→★ remap, named by its KeyboardEvent.code so the one
-		; value means the same physical key on every driver. A value that names
-		; no candidate is outdated configuration: the loader reports it and the
-		; cleanup offers it, so it reads as the automatic key here, never as a
-		; boot failure.
-		RawSource := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE)
-		ScriptInformation["MagicKeySource"] := _FeatureStateMagicKeySource(RawSource)
-		ScriptInformation["MagicKeySourceChosen"] := ScriptInformation["MagicKeySource"]
-			!== _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-		RawChar := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.MAGIC_KEY_SOURCE_CHAR)
-		if RawChar != "_"
-				ScriptInformation["MagicKeySourceChar"] :=
-					_FeatureStateValidateCodePoint(RawChar,
-						ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE_CHAR)
+		ScriptInformation["MagicKey"] := Raw != "_" ? _FeatureStateValidateTriggerChar(Raw)
+				: ScriptInformation["MagicKeyDefault"]
 		; AltGr-as-Kana manual override. Default "auto" defers to the reverse
 		; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
 		; respective mode. Lives in [script] so the user can lock it once per
@@ -407,27 +384,12 @@ _FeatureStateValidateKanaOverride(Value) {
 		ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
 }
 
-; The configured magic-key source in its manifest spelling, or the manifest
-; default for an absent or outdated value. Membership follows the loader's enum
-; rule (TomlConfigValueMatchesManifest compares with AHK's case-insensitive =),
-; so a value the loader applies is never read here as another key.
-_FeatureStateMagicKeySource(Raw) {
-	Default := _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	if Raw == "_"
-		return Default
-	Entry := ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	if !(Entry is Map) || !Entry.Has("enum_values")
-		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
-	if Raw is String {
-		for Allowed in Entry["enum_values"] {
-			if Allowed = Raw
-				return Allowed
-		}
-	}
-	; An outdated or mistyped stored value is reported, never dropped silently.
-	try LoggerWarn("Config", "hotstrings.magic_key_source '{1}' is not one of its manifest values — using {2}.",
-		IsObject(Raw) ? Type(Raw) : String(Raw), Default)
-	return Default
+; Whether config.toml makes an emulated layout type: the built-in Ergopti
+; emulation's base layer or a selected registry layout.
+_FeatureStateEmulates(Cache) {
+	Base := _FeatureStateIniGet(Cache, "layout", ConfigLeaf.ERGOPTI_BASE)
+	Selected := _FeatureStateIniGet(Cache, "layout", ConfigLeaf.EMULATED_LAYOUT)
+	return (Base == true) || ((Selected is String) && Selected != "" && Selected != "_")
 }
 
 _FeatureStateValidateCodePoint(Value, Path) {

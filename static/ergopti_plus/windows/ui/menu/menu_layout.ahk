@@ -224,8 +224,7 @@ _LAY_LayoutFeatureBaseRows() {
 ; List provider: the independent Ergopti AltGr layer (ergopti_alt_gr).
 ; Built-in variant intent belongs to the existing emulation picker; it has no row.
 ; The rows that work on any layout are declared on their own in the manifest's
-; « any layout » section: direct_access_digits, and ctrl_magic_save after the
-; magic-key replace option it depends on.
+; « any layout » section: direct_access_digits.
 ;
 ; Named, never « the section minus a list »: a row added to the section later
 ; fell into that remainder, and the pause switch and its two pickers were drawn
@@ -264,7 +263,7 @@ _LAY_NumberRowRuntime() {
 		return Map("owner", IsSet(Features) ? Features : 0,
 			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? KLE_Model : Hkl,
 			"native_owner", IsSet(_LayoutPollRetry) ? _LayoutPollRetry : 0,
-			"generation", MagicEditorState()["configuration_generation"],
+			"generation", StarSlotState()["configuration_generation"],
 			"lifecycle", IsSet(_TrayRootLifecycleEpoch) ? _TrayRootLifecycleEpoch : -1,
 			"hkl", Hkl, "platform", "ahk", "mode", Mode,
 			"master", IsCategoryGated("Layout") ? true : false,

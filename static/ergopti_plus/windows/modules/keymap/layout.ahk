@@ -269,34 +269,9 @@ _RemapChordEmit(Variant, SendStr, KeyChar, *) {
 		_RemapEmit(SendStr, KeyChar)
 }
 
-; One modifiers + magic key save hotkey ([layout] ctrl_magic_save). A keyboard
-; slot set on the chord keeps it. The Win variant joins the physical Win broker
-; as the key's layout fallback, so the magic editor and every Win slot on the
-; key keep their priority; the other chords take InputLevel 3, over the "^★"
-; and "!★" bindings RemapKey installs and its "*" wildcard.
-; @param Save {Map} One "save" entry of LayoutRegistry_MagicKeyHotkeys.
-_MagicKeySaveRegister(Save) {
-	Scan := ScriptInformation["MagicKeySourceScan"]
-	if Save["win_only"] {
-		MagicEditorRecordLayoutFallback(Scan, _MagicKeySaveEmit.Bind("", Save["send"]), _RemapWinCriterion(Scan))
-		return
-	}
-	Variant := SubStr(Save["hotkey"], 1, StrLen(Save["hotkey"]) - StrLen(Scan)) . StrUpper(Scan)
-	Hotkey(Save["hotkey"], _MagicKeySaveEmit.Bind(Variant, Save["send"]), "I3")
-}
-
-; Sends a save chord, unless a keyboard slot owns its variant.
-; @param Variant {String} The native spec a slot may own, "" for the Win variant.
-; @param Send {String} The chord sent, "^+s".
-_MagicKeySaveEmit(Variant, Send, *) {
-	if Variant != "" && KeyboardShortcutRunLayoutChord(Variant)
-		return
-	SendFinalResult(Send)
-}
-
 ; The Win layout-fallback admission of a remapped key, one identity per scan: a
-; later producer of the same key (the modifiers + magic key save) passes it to
-; MagicEditorRecordLayoutFallback to replace the earlier callback.
+; later producer of the same key passes it to StarSlotRecordLayoutFallback to
+; replace the earlier callback.
 _RemapWinCriterion(ScanCode) {
 	static WinCriteria := Map()
 	if !WinCriteria.Has(ScanCode)
@@ -343,7 +318,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; on this fallback without withdrawing independent shortcut assignments.
 	; The magic-key producer may register this scan again: retain one context
 	; identity so its later callback replaces the earlier layout fallback.
-	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
+	StarSlotRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
 		: _RemapEmit.Bind("#" Character, Character), _RemapWinCriterion(ScanCode))
 }
 
@@ -951,26 +926,13 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 	}
 }
 
-; The physical magic key's hotkeys (LayoutRegistry_MagicKeyHotkeys): the layout's
-; own magic-key position takes every level of the source character, a key the
-; user chose only its plain press.
-_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],
-	ScriptInformation["MagicKeySourceChosen"], Features["layout"][ConfigLeaf.CTRL_MAGIC_SAVE])
+; The magic key's remap (LayoutRegistry_MagicKeyHotkeys): the plain press of
+; the key the emulated layout declares types the configured magic key; Shift,
+; AltGr and every chord find the emulated layout's hotkeys.
 if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
-	for _MagicKeyHotkey in _MagicKeyHotkeys {
-		switch _MagicKeyHotkey["kind"] {
-			case "remap":
-				RemapKey(_MagicKeyHotkey["hotkey"], ScriptInformation["MagicKeySourceChar"],
-					ScriptInformation["MagicKey"])
-			case "magic":
-				; The plain press alone: Shift, AltGr and every chord find the
-				; emulated layout's hotkeys, or none and the OS layout.
-				Hotkey(_MagicKeyHotkey["hotkey"], _RemapEmit.Bind("{Text}" . ScriptInformation["MagicKey"],
-					ScriptInformation["MagicKey"]), "I2")
-			case "save":
-				_MagicKeySaveRegister(_MagicKeyHotkey)
-		}
-	}
+	for _MagicKeyHotkey in LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"])
+		Hotkey(_MagicKeyHotkey, _RemapEmit.Bind("{Text}" . ScriptInformation["MagicKey"],
+			ScriptInformation["MagicKey"]), "I2")
 }
 
 

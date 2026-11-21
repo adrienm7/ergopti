@@ -1,63 +1,40 @@
 ﻿; tests/unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk
 
 ; ==============================================================================
-; MODULE: Physical Magic Key Hotkey Tests (Windows)
+; MODULE: Magic Key Hotkey Tests (Windows)
 ; DESCRIPTION:
-; The magic key's hotkeys were registered one way for every source key: RemapKey
-; on the key's scan code with the source character ("j"), which binds every
-; level of it (*SC → {Blind}j, ^SC, !SC, #SC), plus Ctrl+★ → Ctrl+S. The
-; editor action belongs to an ordinary user-owned slot. The layout's own
-; magic-key position has J on Shift. A key the user chose from the Layout menu is some other key
-; of their layout: with Semicolon chosen, Shift+; typed "J", and with KeyV chosen
-; Ctrl+V sent Ctrl+J, or Ctrl+S with ctrl_magic_save on. These cases pin the
-; plan layout.ahk registers.
+; The magic key is a configured character (maintainer's decision of
+; 2026-11-21). The only key layout.ahk remaps is the one the emulated layout
+; declares, and only its plain press: the old plan bound every level of it
+; through RemapKey with a source character, plus a modifiers + ★ → modifiers +
+; S save on every chord, and a key the user chose from the Layout menu.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-Test("magic key source: a chosen key gives the magic key its plain press only (magic-key-source)",
-	_MKH_ChosenKeyCase)
-
-_MKH_ChosenKeyCase() {
-	for CtrlSave in [false, true] {
-		Hotkeys := LayoutRegistry_MagicKeyHotkeys("SC027", true, CtrlSave)
-		AssertEqual(1, Hotkeys.Length, "one hotkey, whatever ctrl_magic_save says")
-		AssertEqual("magic", Hotkeys[1]["kind"],
-			"no RemapKey: its *SC027 → {Blind}j made Shift+; type J")
-		AssertEqual("SC027", Hotkeys[1]["hotkey"],
-			"the plain press, neither a wildcard nor a chord: Shift, AltGr and Ctrl keep the layout's")
-	}
-}
-
-Test("magic key source: the layout's own key keeps its levels and Ctrl+S without an editor chord (magic-key-source)",
-	_MKH_LayoutKeyCase)
-
-_MKH_LayoutKeyCase() {
-	AssertEqual("remap SC02E, save ^SC02E, save !SC02E, save ^+SC02E, save !+SC02E, save #SC02E, "
-		. "save ^#SC02E, save !#SC02E, save ^!#SC02E, save +#SC02E, save ^+#SC02E, save !+#SC02E, save ^!+#SC02E",
-		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, true)),
-		"every shortcut chord saves; ★ alone, Shift and Ctrl+Alt (AltGr) stay the layout's")
-	AssertEqual("remap SC02E",
-		_MKH_Describe(LayoutRegistry_MagicKeyHotkeys("SC02E", false, false)))
-}
-
-_MKH_Describe(Hotkeys) {
-	Text := ""
-	for Index, Entry in Hotkeys
-		Text .= (Index > 1 ? ", " : "") . Entry["kind"] . " " . Entry["hotkey"]
-	return Text
-}
-
-Test("magic key source: layout.ahk registers the magic key through its plan (magic-key-source)",
+Test("magic key: layout.ahk registers only the declared key's plain press (magic-key-character)",
 	_MKH_RegistrationCase)
 
 _MKH_RegistrationCase() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
-	Assert(InStr(Code, 'LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"],') > 0,
+	Assert(InStr(Code, 'LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"])') > 0,
 		"the magic key's hotkeys come from LayoutRegistry_MagicKeyHotkeys")
-	Assert(InStr(Code, 'ScriptInformation["MagicKeySourceChosen"]') > 0,
-		"the plan knows whether the user chose the key")
-	Assert(!RegExMatch(Code, "(?:RemapKey|Hotkey)\([^)\n]*MagicKeySourceScan"),
-		"no hotkey is bound to the source scan code outside the plan")
+	Assert(!RegExMatch(Code, "(?:RemapKey)\([^)\n]*MagicKeySource"),
+		"the declared key is no RemapKey: Shift, AltGr and the chords stay the emulated layout's")
+	Assert(!InStr(Code, "_MagicKeySave") && !InStr(Code, "CTRL_MAGIC_SAVE"),
+		"no modifiers + ★ → modifiers + S save is registered")
+	Assert(!InStr(Code, "MagicKeySourceChosen") && !InStr(Code, "MagicKeySourceChar"),
+		"no key chosen by the user nor detected on the OS layout")
+}
+
+Test("magic key: the boot resolves the source from the emulated layout's declaration alone (magic-key-character)",
+	_MKH_BootCase)
+
+_MKH_BootCase() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Code := _StripFullLineComments(FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8"))
+	AssertFalse(InStr(Code, "LayoutRegistry_DetectMagicKeyScan"), "the OS layout is never probed for a source character")
+	AssertFalse(InStr(Code, "LayoutRegistry_ShippedMagicKey"), "the shipped position is no fallback")
+	AssertFalse(InStr(Code, "magic_key_save.ahk"), "the save rule is not included")
 }

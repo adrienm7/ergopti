@@ -2673,7 +2673,7 @@ KeyboardSlotPhysicalScan(Slot) {
 		if !(Slot is String) || !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 				return ""
 		Scan := StrUpper(Match[1])
-		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+		for Key in StarSlotPhysicalCatalogue()["keys"] {
 				if StrUpper(Key["ahk"]) == Scan
 						return Scan
 		}
@@ -2724,7 +2724,7 @@ KeyboardSlotCatalogueIds() {
 		Slots := _KeyboardSlotOrdinarySet()
 		if !(Slots is Map)
 				return 0
-		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+		for Key in StarSlotPhysicalCatalogue()["keys"] {
 				Scan := StrUpper(Key["ahk"])
 				Slots["meta_" . Scan] := true
 				Slots["meta_" . StrLower(Scan)] := true
@@ -2810,7 +2810,7 @@ KeyboardSlotLayoutScan(SlotId) {
 		Char := SlotRoleChordKey(Native["key"])
 		if StrLen(Char) != 1 || !(RemappedList.Has(Char) || Char == "'")
 				return ""
-		return MagicEditorNormalizeScan(RetrieveScancode(Char))
+		return StarSlotNormalizeScan(RetrieveScancode(Char))
 }
 
 /**
@@ -2869,9 +2869,9 @@ KeyboardShortcutsBindAll() {
 		LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
 		Bound := 0
 		for Slot, Action in KeyboardShortcutAssignments {
-				if Slot == MagicEditorSlot()["id"]
+				if Slot == StarSlot()["id"]
 						continue
-				if MagicEditorRecordOrdinaryPhysical(Slot, Action)
+				if StarSlotRecordOrdinaryPhysical(Slot, Action)
 						continue
 				if Action == "none"
 						continue
@@ -2881,7 +2881,7 @@ KeyboardShortcutsBindAll() {
 				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
 				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
 				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
-						MagicEditorRecordOrdinaryScan(Scan, Slot, Action)
+						StarSlotRecordOrdinaryScan(Scan, Slot, Action)
 						Bound++
 						continue
 				}
@@ -2907,7 +2907,7 @@ KeyboardShortcutsBindAll() {
 						continue
 				}
 				LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", Slot, Action)
-				MagicEditorRecordOrdinaryHandle(Slot, Handle)
+				StarSlotRecordOrdinaryHandle(Slot, Handle)
 				KeyboardShortcutRecordHandle(Slot, Action, Handle)
 				Bound++
 		}
@@ -2997,7 +2997,7 @@ KeyboardShortcutsFollowAiSwitch(SetEnabledFn := 0) {
 		SetEnabled := HasMethod(SetEnabledFn, "Call") ? SetEnabledFn : HotkeyRegistrarSetEnabled
 		Settled := true
 		for SlotId, Handle in _KeyboardShortcutAiHandles() {
-				if MagicEditorOwnsOrdinarySlot(SlotId)
+				if StarSlotOwnsOrdinarySlot(SlotId)
 						continue
 				Wanted := !AiActionBlocked(KeyboardShortcutAssignments.Get(SlotId, "none"))
 				Accepted := false
@@ -3017,7 +3017,7 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
 		if !GestureAssignConfiguredAction(&KeyboardShortcutAssignments,
 				"keyboard", ConfigKey.SHORTCUTS_KEYBOARD, SlotId, ActionName)
 				return false
-		MagicEditorConfigurationChanged()
+		StarSlotConfigurationChanged()
 		return ReloadPreservingSuspend()
 }
 
@@ -3026,8 +3026,8 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 }
 
 _FormatSlotLabel(SlotId) {
-		if SlotId == MagicEditorSlot()["id"]
-				return MagicEditorSlotLabel()
+		if SlotId == StarSlot()["id"]
+				return StarSlotLabel()
 		Native := SlotRoleNative(SlotId)
 		if !Native.Has("modifiers")
 				return SlotId
@@ -3065,15 +3065,13 @@ _KeyboardSlotFamilyLabel(Prefix) {
 		return Label
 }
 
-; The heading or the Add row of one keyboard-slot group: the contextual
-; group's own title, a modifier group's template filled with its modifiers
+; The heading or the Add row of one keyboard-slot group: the group's template
+; filled with its modifiers
 ; (« Raccourcis Ctrl + Maj », « [+ Ajouter un raccourci Win + …] »).
 ; @param GroupInfo {Map} An entry of KEYBOARD_SLOT_GROUPS.
 ; @param Field {String} "group_key" or "add_key".
 ; @returns {String}
 _KeyboardSlotGroupText(GroupInfo, Field) {
-		if GroupInfo["prefix"] == "magic_"
-				return t(GroupInfo[Field])
 		return KeyNameFill(GroupInfo[Field], _KeyboardSlotFamilyLabel(GroupInfo["prefix"]))
 }
 
@@ -3081,7 +3079,6 @@ _KeyboardSlotGroupText(GroupInfo, Field) {
 ; the translated labels: a static initialised with t() would freeze the language
 ; at first call, and the menu is rebuilt on a language switch expecting the new one
 global KEYBOARD_SLOT_GROUPS := [
-		Map("prefix", "magic_", "group_key", "menu.shortcuts.group_contextual", "add_key", "menu.shortcuts.add_contextual"),
 		Map("prefix", "alt_", "group_key", "menu.shortcuts.alt_group", "add_key", "menu.shortcuts.alt_add"),
 		Map("prefix", "primary_", "group_key", "menu.shortcuts.ctrl_group", "add_key", "menu.shortcuts.ctrl_add"),
 		Map("prefix", "primary_shift_", "group_key", "menu.shortcuts.ctrl_shift_group", "add_key", "menu.shortcuts.ctrl_shift_add"),
@@ -3104,10 +3101,6 @@ KeyboardSlotRows() {
 		Rows := []
 		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
-				if Prefix == "magic_" {
-						Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", MagicEditorSlotRows()))
-						continue
-				}
 				; The group opens with its restore and clear, declared by
 				; keyboard_group_scope_controls like on the two other drivers.
 				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
@@ -3119,6 +3112,13 @@ KeyboardSlotRows() {
 				for Slot, Action in KeyboardShortcutAssignments {
 						if KeyboardSlotGroupOf(Slot) != Prefix or (Action == "none")
 								continue
+						; The ★ key's slot is an ordinary Win row that also says why
+						; its chord is inactive (no key types ★ directly, paused…).
+						if Slot == StarSlot()["id"] {
+								for Row in StarSlotRows()
+										Items.Push(Row)
+								continue
+						}
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
 								"label", LabelValue(_FormatSlotLabel(Slot), ActionLabel),
@@ -3181,7 +3181,7 @@ KeyboardSlotGroupScopeRows(Prefix, Mode) {
 				throw ValueError("Unknown keyboard group scope mode.", -1, Mode)
 		Bindable := false
 		for GroupInfo in KEYBOARD_SLOT_GROUPS
-				Bindable := Bindable || (GroupInfo["prefix"] == Prefix && Prefix != "magic_")
+				Bindable := Bindable || (GroupInfo["prefix"] == Prefix)
 		if !Bindable
 				throw ValueError("Unknown keyboard slot group.", -1, Prefix)
 		Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)

@@ -26,7 +26,7 @@ _MKC_CaptureCommitsScalarAndStopsOnClose() {
     TextOnly := InStr(Body, 'if Capture.Kind == "text"')
     Persist := InStr(Body, 'ModifyMagicKey(0, Capture.Text)')
     Assert(Prepare > 0 && Create > Prepare && Decode > Create && TextOnly > Decode && Persist > TextOnly,
-        "MagicEditor must prepare scalar membership before GUI creation and persist only decoded complete text")
+        "StarSlot must prepare scalar membership before GUI creation and persist only decoded complete text")
     Assert(InStr(Body, 'ModifyMagicKey(0, IH.Input)') = 0,
         "an incomplete raw input buffer must never reach persistence")
     Assert(InStr(CloseBody, "_MagicKeyEditorStopOwned(IH)") > 0,

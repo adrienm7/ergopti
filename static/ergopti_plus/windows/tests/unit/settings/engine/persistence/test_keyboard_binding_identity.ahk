@@ -111,7 +111,7 @@ Test("Config binding identity: keyboard rejects derived and inherited callback A
 ; stayed unread and unoffered forever. One published slot domain now serves
 ; all three (keyboard-slot-publication).
 _CKBI_CurrentSlots() {
-	return ["primary_k", "primary_shift_space", "alt_9", "meta_period", "meta_sc029", "meta_SC03A", "magic_editor"]
+	return ["primary_k", "primary_shift_space", "alt_9", "meta_period", "meta_sc029", "meta_SC03A", "meta_star"]
 }
 _CKBI_ForeignSlots() {
 	return ["primary_f1", "CTRL_K", "ctrl_alt_k", "meta_SC0FF", "super_space"]
@@ -144,10 +144,8 @@ TestConfigKeyboardBindingIdentity_OwnerAndLoaderAgree() {
 		for Slot in _CKBI_ForeignSlots()
 			AssertFalse(KeyboardShortcutAssignments.Has(Slot), Slot . ": an unused key never becomes a live hotkey")
 		Offered := []
-		for Group in KEYBOARD_SLOT_GROUPS {
-			if Group["prefix"] != "magic_"
-				Offered.Push(Group["prefix"])
-		}
+		for Group in KEYBOARD_SLOT_GROUPS
+			Offered.Push(Group["prefix"])
 		AssertEqual(_CUK_Join(KeyboardSlotDeclaration()["groups"]), _CUK_Join(Offered),
 			"the tray's chord groups are exactly the published slot groups")
 	} finally {

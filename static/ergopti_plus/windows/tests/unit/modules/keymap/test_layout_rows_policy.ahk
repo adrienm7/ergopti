@@ -220,7 +220,7 @@ _LRPW_ChildSource() {
 	Definition := _DriverFuncBody("RemapKey")
 	AssertTrue(Definition != "", "the real built-in registrar must be exercised")
 	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
-		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition . "`n"
+		"#Include " . _DriverDir . "\infra\star_slot.ahk`n" . Definition . "`n"
 		. _DriverFuncBody("_RemapWinCriterion") . "`n"
 		. _DriverFuncBody("_RemapChordEmit") . "`nKeyboardShortcutRunLayoutChord(*) => false`n")
 }
@@ -305,16 +305,14 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
 
 
-_LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSource := "") {
+_LRPCM_ChildSource(BodyName := "layout_row_declared_magic_body.ahk", AdditionalSource := "") {
 	global _DriverDir
 	Source := _NRP_LayoutSource()
-	Start := InStr(Source, "_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(")
+	Start := InStr(Source, 'if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {`n`tfor _MagicKeyHotkey in')
 	Finish := InStr(Source, "`nRegisterShiftLayer()", , Start)
 	AssertTrue(Start > 0 && Finish > Start, "the genuine magic producer must be bounded before Shift registration")
-	Extra := "#Include " . _DriverDir . "\infra\magic_editor.ahk`n"
-		. "#Include " . _DriverDir . "\..\_shared\shortcuts\data\magic_key_save.ahk`n"
-	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapChordEmit", "LayoutRegistry_MagicKeyHotkeys",
-			"_MagicKeySaveRegister", "_MagicKeySaveEmit"] {
+	Extra := "#Include " . _DriverDir . "\infra\star_slot.ahk`n"
+	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapChordEmit", "LayoutRegistry_MagicKeyHotkeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine magic dependency must exist: " . Name)
 		Extra .= Definition . "`n"
@@ -326,8 +324,8 @@ _LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSou
 }
 
 for _LRPCM_Row in ["number", "top", "home", "bottom"]
-	Test("layout rows: chosen magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-chosen-magic-scope)",
-		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-chosen-magic"))
+	Test("layout rows: declared magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-declared-magic-scope)",
+		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-declared-magic"))
 
 
 _LRPN_ChildSource() {
@@ -366,7 +364,7 @@ for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
 	for _LRPN_Emulated in [false, true]
 		for _LRPN_Caps in [false, true]
 			Test("built-in number row: " . _LRPN_Scan . " " . (_LRPN_Emulated ? "emulated" : "native")
-				. " row caps " . (_LRPN_Caps ? "on" : "off") . " retains chosen magic and releases (builtin-number-row-magic-owner)",
+				. " row caps " . (_LRPN_Caps ? "on" : "off") . " retains declared magic and releases (builtin-number-row-magic-owner)",
 				_LRPS_LevelCustody.Bind(0, false, _LRPN_ChildSource,
 					[_LRPN_Scan, _LRPN_Emulated ? "on" : "off", _LRPN_Caps ? "on" : "off", _StaticDir, _DriverDir],
 					"PASS builtin-number-row-magic-owner"))

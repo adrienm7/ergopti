@@ -521,13 +521,9 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 	Assert(Trim(Code) != "", "the complete actual keymap module must be readable and nonempty")
 	Assert(!InStr(Code, "OpenPersonalEditor()"),
 		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
-	for Chosen in [false, true] {
-		for CtrlSave in [false, true] {
-			for Entry in LayoutRegistry_MagicKeyHotkeys("SC02E", Chosen, CtrlSave)
-				Assert(Entry["kind"] != "editor",
-					"neither chosen nor layout-owned physical magic sources may reserve an editor chord")
-		}
-	}
+	AssertEqual("SC02E", LayoutRegistry_MagicKeyHotkeys("SC02E")[1] . "",
+		"the declared magic key reserves its plain press alone, never an editor chord")
+	AssertEqual(1, LayoutRegistry_MagicKeyHotkeys("SC02E").Length)
 	Personal := _StripFullLineComments(_DriverFuncBody("_HS_PersonalRows"))
 	Assert(Personal != "", "the actual personal-hotstring provider must be readable")
 	Assert(!InStr(Personal, '"menu.hotstrings.shortcut_prefix"'),
@@ -538,11 +534,11 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 		"an empty configuration must never install the editor recommendation")
 	AssertEqual("open_downloads", ManifestRecommendedFor("shortcuts.keyboard.meta_d"),
 		"Win+D remains available for personal assignments instead of a fixed recommendation")
-	AssertEqual("open_hotstrings_editor", ManifestDefaultFor("shortcuts.keyboard.magic_editor"),
-		"the physical conditional slot owns the editor recommendation")
-	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.magic_editor"))
-	AssertEqual("none", ManifestValueFor("shortcuts.keyboard.magic_editor", "cleared"),
-		"clearing the ordinary contextual owner persists explicit none")
+	AssertEqual("open_hotstrings_editor", ManifestDefaultFor("shortcuts.keyboard.meta_star"),
+		"the ★ key's Win slot owns the editor recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.meta_star"))
+	AssertEqual("none", ManifestValueFor("shortcuts.keyboard.meta_star", "cleared"),
+		"clearing the ★ key's slot persists explicit none")
 }
 Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
 	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)

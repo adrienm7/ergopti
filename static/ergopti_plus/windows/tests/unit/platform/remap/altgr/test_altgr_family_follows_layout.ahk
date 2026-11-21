@@ -13,7 +13,7 @@
 ; criteria pick the new family's variants at the next press, the one boot
 ; registration that read the family (the Kana script chords) decides per
 ; press, and the layout poll reloads only for the registrations that truly
-; depend on the layout (LayoutRemapSignature).
+; depend on the layout (LayoutRemapNeedsReload).
 ; The cases switch back and forth between a standard AltGr layout (AZERTY), a
 ; layout whose right Alt is a plain Alt (QWERTY) and a Kana-style layout (the
 ; maintainer's own), through the modules' seams; no layout is activated, no key
@@ -254,34 +254,14 @@ _AFFL_OnlyARegistrationChangeReloads() {
 Test("layout poll: a switch between AltGr families never reloads; a layout the registrations do not fit does (altgr-family-live-2026-09-27)",
 	_AFFL_OnlyARegistrationChangeReloads)
 
-; A fake of what the registrations read from each layout: MagicScans per HKL.
-_AFFL_RemapPort(Emulated, MagicScans) {
-	return Map(
-		"emulated", () => Emulated,
-		"magic_char", () => "j",
-		"magic_scan", (Hkl, Char) => MagicScans.Get(Hkl, 0))
+_AFFL_OnlyTheStarSlotReloads() {
+	; No registration reads the layout but the ★ key's Win slot, which binds the
+	; key typing ★ there: an uninitialized slot never asks for a reload.
+	for _, Hkl in [0x040C040C, 0x04090409, 0xF0CF040C]
+		AssertFalse(LayoutRemapNeedsReload(Hkl), Format("layout 0x{:X} needs no reload", Hkl))
 }
-
-_AFFL_SignatureNamesTheLayoutRegistrations() {
-	global _AFFL_AZERTY, _AFFL_QWERTY, _AFFL_KANA
-	Bepo := 0xF0CF040C
-	Magic := Map(_AFFL_AZERTY, 0x24, _AFFL_QWERTY, 0x24, _AFFL_KANA, 0x2E, Bepo, 0x13)
-	Sig := (Hkl, Emulated) => LayoutRemapSignature(Hkl, _AFFL_RemapPort(Emulated, Magic))
-	; The Ergopti emulation on (the shipped default): no registration reads the
-	; layout, the digit row included (it follows the foreground layout live).
-	for _, Hkl in [_AFFL_QWERTY, _AFFL_KANA, Bepo, 0]
-		AssertEqual(Sig(_AFFL_AZERTY, true), Sig(Hkl, true),
-			Format("with the emulation on, layout 0x{:X} registers what AZERTY does", Hkl))
-	; Without the emulation, only the magic key's source key can differ.
-	AssertEqual(Sig(_AFFL_AZERTY, false), Sig(_AFFL_QWERTY, false),
-		"the magic key's source on the same key registers the same hotkey")
-	AssertTrue(Sig(_AFFL_AZERTY, false) != Sig(_AFFL_KANA, false),
-		"the magic key's source on another key must reload")
-	AssertTrue(InStr(Sig(0, false), "magic=default") > 0,
-		"no layout read (HKL 0) keeps the default magic key, as the boot scan does")
-}
-Test("layout poll: the remap signature names what the boot registrations read from a layout (altgr-family-live-2026-09-27)",
-	_AFFL_SignatureNamesTheLayoutRegistrations)
+Test("layout poll: only the ★ key's Win slot reads the layout at load (magic-key-character)",
+	_AFFL_OnlyTheStarSlotReloads)
 
 
 

@@ -6,8 +6,8 @@
 ; Loads UI string translations from the shared JSON locale files in
 ; ``_shared/core/i18n/data/locales/<code>.json`` (through a self-healing .tsv fast-cache)
 ; and exposes a single ``t(key)`` accessor returning the localised string for a
-; dot-notation key, with the ``★`` placeholder substituted by the configured
-; MagicKey. Mirror of ``macos/core/i18n/engine/locale.lua``: this is the string-LOADING +
+; dot-notation key, with the ``★`` marker shown as the configured magic key's
+; display, « ★ (ù) » (hotstrings/engine/magic_key_rules.ahk). Mirror of ``macos/core/i18n/engine/locale.lua``: this is the string-LOADING +
 ; access layer; locale MANAGEMENT (selection, system detection, persistence,
 ; language menu) lives in the sibling ``core/i18n/engine/i18n.ahk``.
 ;
@@ -18,7 +18,7 @@
 ;    the EN/FR fallbacks are warmed off the critical path. Each locale is served
 ;    from a flat .tsv regenerated whenever the .json is newer (~23x faster than
 ;    re-parsing the JSON for the identical key/value set).
-; 3. ★ substitution at parse time so the cache stays MagicKey-independent.
+; 3. ★ display at parse time so the cache stays MagicKey-independent.
 ; ==============================================================================
 
 
@@ -121,6 +121,7 @@ _I18nUnescapeTSV(s) {
 ; post-processing the JSON path applies. A tight Loop Parse keeps this ~23x faster
 ; than the recursive-descent JsonParse for the identical key/value set.
 _I18nParseTSV(Content, MagicKey, Status := unset) {
+	Marker := MagicKeyMarker()
 	global _I18N_TSV_SENTINEL
 	if IsSet(Status) && IsObject(Status)
 		Status.Templates := Map()
@@ -147,10 +148,10 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
-		if InStr(v, "★") {
+		if InStr(v, Marker) {
 			if IsSet(Status) && IsObject(Status)
 				Status.Templates[k] := v
-			v := StrReplace(v, "★", MagicKey)
+			v := MagicKeyShownText(v, MagicKey, k)
 		}
 		m[k] := v
 	}
@@ -270,10 +271,11 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	}
 	Out := Map()
 	Templates := Map()
+	Marker := MagicKeyMarker()
 	for Key, Val in Parsed {
-		if InStr(Val, "★") {
+		if InStr(Val, Marker) {
 			Templates[Key] := Val
-			Out[Key] := StrReplace(Val, "★", MagicKey)
+			Out[Key] := MagicKeyShownText(Val, MagicKey, Key)
 		} else
 			Out[Key] := Val
 	}
@@ -292,7 +294,7 @@ _I18nLoadFile(FilePath) {
 	global _I18nActiveCacheIdentity
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"]
-		: "★"
+		: MagicKeyMarker()
 	BeforeHash := _I18nSourceHash(FilePath)
 	; A source edit already proved by exact bytes also invalidates a TSV whose
 	; timestamp happens to survive that edit. Reload must not bless the old model
@@ -326,7 +328,7 @@ I18nActiveCacheCanReuse() {
 	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nLocale, ScriptInformation
 	Identity := _I18nActiveCacheIdentity
 	MagicKey := IsSet(ScriptInformation) && ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"] : "★"
+		? ScriptInformation["MagicKey"] : MagicKeyMarker()
 	if !_I18nCacheLoaded || !IsObject(Identity) || Identity.Cache != _I18nCache
 			|| Identity.Locale != _I18nLocale
 			|| Identity.Path != _I18nLocalePath(_I18nLocale)
@@ -336,7 +338,7 @@ I18nActiveCacheCanReuse() {
 		return false
 	if Identity.MagicKey != MagicKey {
 		for Key, Template in Identity.Templates
-			_I18nCache[Key] := StrReplace(Template, "★", MagicKey)
+			_I18nCache[Key] := MagicKeyShownText(Template, MagicKey, Key)
 		Identity.MagicKey := MagicKey
 		try LoggerDebug("i18n", "Retained locale cache refreshed {1} magic-key template(s).", Identity.Templates.Count)
 	}
@@ -350,7 +352,7 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 		return
 	global ScriptInformation
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"] : "★"
+		? ScriptInformation["MagicKey"] : MagicKeyMarker()
 	PerfCount("i18n.fallback_loads." . Code)
 	R := _I18nLoadLocaleMap(_I18nLocalePath(Code), MagicKey)
 	Cache := R.Cache

@@ -34,13 +34,21 @@ Test("WindowTitle reproduces every captured prefixed caption (window-title-capti
 
 _WTC_AssertLocales(Corpus) {
 	Checked := 0
+	; Every captured caption that had a prefixed warning form: those receivers
+	; composed the title the way WindowTitle does.
+	Locales := 0
 	for Locale, Entry in Corpus["locales"] {
-		Caption := Entry["captions"]["magic_key_source_notice"]
-		Bare := Caption["original_bare_caption"]
-		AssertEqual(Caption["original_native_caption"], WindowTitle(Bare), Locale . ": native caption")
-		AssertEqual(Caption["original_warning_native_caption"], WindowTitle("⚠ " . Bare),
-			Locale . ": warning caption")
-		Checked += 1
+		Locales += 1
+		for Receiver, Caption in Entry["captions"] {
+			if IsObject(Caption["original_warning_native_caption"])
+				continue
+			Bare := Caption["original_bare_caption"]
+			AssertEqual(Caption["original_native_caption"], WindowTitle(Bare), Locale . " " . Receiver . ": native caption")
+			AssertEqual(Caption["original_warning_native_caption"], WindowTitle("⚠ " . Bare),
+				Locale . " " . Receiver . ": warning caption")
+			Checked += 1
+		}
 	}
-	AssertEqual(21, Checked, "every captured locale is replayed")
+	AssertEqual(21, Locales, "every captured locale is read")
+	AssertTrue(Checked >= 21, "each locale replays at least one prefixed caption")
 }

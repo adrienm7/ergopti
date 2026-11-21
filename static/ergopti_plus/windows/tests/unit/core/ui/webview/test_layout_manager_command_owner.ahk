@@ -77,7 +77,7 @@ _LMCT_BaseChildSource() {
 	Seen := Map()
 	for Symbol in ["NavLayerSave_SaveAndApply", "KeymapLayers_LoadContext", "WebView_SharedEnvironment",
 		"Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
-		"Keylayout_Parse", "LayoutRegistry_Keycodes", "MagicEditorRecordLayoutFallback",
+		"Keylayout_Parse", "LayoutRegistry_Keycodes", "StarSlotRecordLayoutFallback",
 		"KeylayoutEmulation_LayerIsActive", "NumberRowEffectiveMode", "GetForegroundKeyboardLayout",
 		"LayoutRowsPolicyEmulates", "MasterGateDesiredTapHold", "TapHoldHoldLayer", "NavLayer_BuildTable", "WMPresentWindow",
 		"TimingsGet", "ReadingPrefs_SeedScript"] {

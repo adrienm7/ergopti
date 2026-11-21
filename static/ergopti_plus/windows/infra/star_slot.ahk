@@ -1,11 +1,14 @@
-﻿; infra/magic_editor.ahk
+﻿; infra/star_slot.ahk
 
 ; ==============================================================================
-; MODULE: Physical Magic Editor Shortcut
+; MODULE: The ★ Key's Win Slot and the Physical Win Broker
 ; DESCRIPTION:
-; Windows probes acknowledged plain physical evidence for the shared policy.
-; Native brokers acquire one Win chord per physical source and preserve existing
-; remap, ordinary assignment and legacy shortcut owners behind that one variant.
+; Windows probes acknowledged plain physical evidence for the shared ★ key
+; slot (_shared/shortcuts/data/star_slot.ahk): Win+★ (meta_star) on the key
+; that types the real ★ at its base level, whose default opens the hotstrings
+; editor (maintainer's decision of 2026-11-21). The native broker acquires one
+; Win chord per physical key and preserves existing remap, ordinary assignment
+; and legacy shortcut owners behind that one variant.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
@@ -22,7 +25,7 @@
 ; ====================================
 
 /** Reads the actual physical registry once, including non-typing key positions. */
-MagicEditorPhysicalCatalogue(SharedRoot := unset) {
+StarSlotPhysicalCatalogue(SharedRoot := unset) {
 	global _SharedDir
 	static Catalogues := Map()
 	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
@@ -33,7 +36,7 @@ MagicEditorPhysicalCatalogue(SharedRoot := unset) {
 	RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
 	Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 	if !(Registry is Map) || !(Registry.Get("keys", 0) is Map)
-		throw TypeError("The physical magic editor requires the actual key registry.")
+		throw TypeError("The ★ key slot requires the actual key registry.")
 	Keys := []
 	for Code, Key in Registry["keys"] {
 		if Key["kind"] != "key"
@@ -50,25 +53,24 @@ MagicEditorPhysicalCatalogue(SharedRoot := unset) {
 /**
  * Probes all catalogued keys through native or acknowledged effective tap owners.
  * @param {Integer} Hkl Exact foreground keyboard layout, zero when unavailable.
- * @param {String} Trigger Actual trigger, never the historical source character.
  * @param {Integer} Generation Current physical-source owner epoch.
  * @param {Map} Keycodes Actual layout keycode registry, injected in native tests.
  * @param {Func|Integer} TextFn Neutral native probe, optional test seam.
  * @param {Func|Integer} EffectiveFn Effective tap owner projection (Code, Scan, Native).
- * @returns {Map} Detached native evidence for MagicEditorSelectSource.
+ * @returns {Map} Detached native evidence for StarSlotSelectSource.
  */
-MagicEditorProbeSource(Hkl, Trigger, Generation, Keycodes := unset, TextFn := 0, EffectiveFn := 0) {
-	if !_MagicEditorGeneration(Generation) || !(Hkl is Integer) || !(Trigger is String) || Trigger == ""
-		throw TypeError("Magic editor native probing requires exact source inputs.")
+StarSlotProbeSource(Hkl, Generation, Keycodes := unset, TextFn := 0, EffectiveFn := 0) {
+	if !_StarSlotGeneration(Generation) || !(Hkl is Integer)
+		throw TypeError("The ★ key slot's native probing requires exact source inputs.")
 	if !IsSet(Keycodes)
-		Keycodes := MagicEditorPhysicalCatalogue()
+		Keycodes := StarSlotPhysicalCatalogue()
 	if !(Keycodes is Map) || !(Keycodes.Get("keys", 0) is Array)
-		throw TypeError("Magic editor native probing requires the physical registry.")
+		throw TypeError("The ★ key slot's native probing requires the physical registry.")
 	Receipt := Map("generation", Generation, "status", Hkl ? "ready" : "unavailable",
 		"candidates", [], "hkl", Hkl)
 	if !Hkl
 		return Receipt
-	Probe := HasMethod(TextFn, "Call") ? TextFn : _MagicEditorNativeText
+	Probe := HasMethod(TextFn, "Call") ? TextFn : _StarSlotNativeText
 	for Key in Keycodes["keys"] {
 		Scan := Key["ahk"]
 		if !RegExMatch(Scan, "i)^SC([0-9a-f]{3})$", &Match)
@@ -82,19 +84,19 @@ MagicEditorProbeSource(Hkl, Trigger, Generation, Keycodes := unset, TextFn := 0,
 		if Output.Count == 0
 			continue
 		Receipt["candidates"].Push(Map("code", Key["code"], "native_code", NativeCode,
-			"identity", _MagicEditorScanIdentity(NativeCode), "text", Output.Text,
+			"identity", _StarSlotScanIdentity(NativeCode), "text", Output.Text,
 			"direct", Output.Count > 0, "dead", Output.Count < 0))
 	}
 	return Receipt
 }
 
 /** Reads neutral Win32 output without touching Shift, CapsLock or dead state. */
-_MagicEditorNativeText(Scan, Hkl) {
+_StarSlotNativeText(Scan, Hkl) {
 	return KS_KeyTextNoStateChange(KS_ScancodeToVk(Scan, Hkl), Scan, Hkl, false, false)
 }
 
 /** Returns one canonical physical Win-chord identity, independent of its VK. */
-_MagicEditorScanIdentity(Scan) {
+_StarSlotScanIdentity(Scan) {
 	return "win:" . Format("SC{:03X}", Scan)
 }
 
@@ -109,7 +111,7 @@ _MagicEditorScanIdentity(Scan) {
 ; ====================================
 
 /** Returns the sole broker lifecycle owner, initialized by the boot cohort. */
-MagicEditorState() {
+StarSlotState() {
 	static State := Map("initialized", false, "layouts", Map(), "legacy", Map(),
 		"ordinary_handles", Map(), "ordinary_physical", Map(), "native_handles", Map(), "ordinary_restore", Map(), "configuration_generation", 0,
 		"source_generation", 0, "source_signature", "", "hkl", 0, "decision", 0, "ordinary_claim", 0)
@@ -117,8 +119,8 @@ MagicEditorState() {
 }
 
 /** Retains the exact ordinary registrar handle for an acknowledged collision handoff. */
-MagicEditorRecordOrdinaryHandle(Slot, Handle) {
-	State := MagicEditorState()
+StarSlotRecordOrdinaryHandle(Slot, Handle) {
+	State := StarSlotState()
 	if State["initialized"]
 		throw Error("Ordinary keyboard registration cannot mutate an initialized Win broker.")
 	if SubStr(Slot, 1, 5) == "meta_" && Handle != ""
@@ -133,11 +135,11 @@ MagicEditorRecordOrdinaryHandle(Slot, Handle) {
  * @param {Func} Callback Existing native layout owner callback.
  * @param {Func|Integer} Criterion Existing layout admission predicate, zero if global.
  */
-MagicEditorRecordLayoutFallback(Scan, Callback, Criterion := 0, Keycodes := unset) {
-	State := MagicEditorState()
+StarSlotRecordLayoutFallback(Scan, Callback, Criterion := 0, Keycodes := unset) {
+	State := StarSlotState()
 	if State["initialized"] || !HasMethod(Callback, "Call")
 		throw Error("A layout fallback requires an unstarted Win broker and its actual callback.")
-	Scan := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	Scan := StarSlotNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : StarSlotPhysicalCatalogue())
 	if !State["layouts"].Has(Scan)
 		State["layouts"][Scan] := []
 	for Existing in State["layouts"][Scan] {
@@ -150,7 +152,7 @@ MagicEditorRecordLayoutFallback(Scan, Callback, Criterion := 0, Keycodes := unse
 }
 
 /** Normalizes native scan aliases before one physical owner is indexed. */
-MagicEditorNormalizeScan(Scan, Keycodes := unset) {
+StarSlotNormalizeScan(Scan, Keycodes := unset) {
 	if !(Scan is String) || !RegExMatch(Scan, "i)^SC([0-9a-f]{1,3})$", &Match)
 		throw ValueError("A physical shortcut requires an actual native scan identity.")
 	Numeric := Integer("0x" . Match[1])
@@ -174,11 +176,11 @@ MagicEditorNormalizeScan(Scan, Keycodes := unset) {
  * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
  * @returns {Boolean} Whether this exact existing slot is physical.
  */
-MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
+StarSlotRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
 	if !RegExMatch(Slot, "i)^meta_(SC[0-9a-f]{3})$", &Match)
 		return false
-	State := MagicEditorState(), Scan := MagicEditorNormalizeScan(Match[1]), Known := false
-	Catalogue := IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue()
+	State := StarSlotState(), Scan := StarSlotNormalizeScan(Match[1]), Known := false
+	Catalogue := IsSet(Keycodes) ? Keycodes : StarSlotPhysicalCatalogue()
 	for Key in Catalogue["keys"] {
 		if StrUpper(Key["ahk"]) == Scan {
 			Known := true
@@ -199,35 +201,35 @@ MagicEditorRecordOrdinaryPhysical(Slot, Action, Keycodes := unset) {
  * @param {String} Action Its validated action.
  * @param {Map} Keycodes Actual physical catalogue, optional fixture root seam.
  */
-MagicEditorRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
-	State := MagicEditorState()
+StarSlotRecordOrdinaryScan(Scan, Slot, Action, Keycodes := unset) {
+	State := StarSlotState()
 	if State["initialized"]
 		throw Error("An ordinary Win slot requires an unstarted broker.")
-	Canonical := MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())
+	Canonical := StarSlotNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : StarSlotPhysicalCatalogue())
 	; Two slots can name one key (Win+4 and Win+' on AZERTY); only one can answer.
 	if State["ordinary_physical"].Has(Canonical)
-		LoggerWarn("MagicEditor", "Win slot '{1}' replaces '{2}' on the key {3}: both name the same key.",
+		LoggerWarn("StarSlot", "Win slot '{1}' replaces '{2}' on the key {3}: both name the same key.",
 			Slot, State["ordinary_physical"][Canonical]["slot"], Canonical)
 	State["ordinary_physical"][Canonical] := Map("slot", Slot, "action", Action)
 }
 
 /** Retains an effective legacy feature's Win callback without a parallel variant. */
-MagicEditorRecordLegacy(Scan, Callback, Keycodes := unset) {
-	State := MagicEditorState()
+StarSlotRecordLegacy(Scan, Callback, Keycodes := unset) {
+	State := StarSlotState()
 	if State["initialized"] || !HasMethod(Callback, "Call")
 		throw Error("A legacy Win shortcut requires an unstarted broker and its actual callback.")
-	State["legacy"][MagicEditorNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : MagicEditorPhysicalCatalogue())] := Callback
+	State["legacy"][StarSlotNormalizeScan(Scan, IsSet(Keycodes) ? Keycodes : StarSlotPhysicalCatalogue())] := Callback
 	return true
 }
 
 /** Invalidates queued contextual delivery after an acknowledged ordinary write. */
-MagicEditorConfigurationChanged() {
-	State := MagicEditorState()
+StarSlotConfigurationChanged() {
+	State := StarSlotState()
 	State["configuration_generation"] += 1
 }
 
 /** Returns current admission, including the actual suppressive-input owners. */
-_MagicEditorAdmission() {
+_StarSlotAdmission() {
 	global LayerEnabled
 	return Map("master", IsCategoryGated("Shortcuts") ? true : false,
 		"paused", A_IsSuspended ? true : false,
@@ -240,7 +242,7 @@ _MagicEditorAdmission() {
  *   tables do not change between the keys of a probe, so each is read once, when
  *   a key first needs it, instead of once per catalogue key.
  */
-_MagicEditorEffectivePlain(Probe, Code, Scan, Native) {
+_StarSlotEffectivePlain(Probe, Code, Scan, Native) {
 	global Features, ScriptInformation, KLE_Model, KLE_KeyCodes, KLE_LevelIndex, KEYLAYOUT_NEUTRAL_STATE, TapHold
 	Numeric := Integer("0x" . SubStr(Scan, 3))
 	TapId := TapHoldResolveKeyIdFromVkSc(0, Numeric)
@@ -297,25 +299,13 @@ _MagicEditorEffectivePlain(Probe, Code, Scan, Native) {
 	return Native
 }
 
-/** Builds actual current source evidence, honoring an effective explicit source owner. */
-_MagicEditorCurrentSource(Generation, Keycodes, Hkl) {
-	global Features, ScriptInformation
-	Source := MagicEditorProbeSource(Hkl, ScriptInformation["MagicKey"], Generation, Keycodes,
-		0, _MagicEditorEffectivePlain.Bind(Map()))
-	if ScriptInformation["MagicKeySourceChosen"] && Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
-		Chosen := StrUpper(ScriptInformation["MagicKeySourceScan"])
-		Owned := []
-		for Candidate in Source["candidates"] {
-			if Format("SC{:03X}", Candidate["native_code"]) == Chosen
-				Owned.Push(Candidate)
-		}
-		Source["candidates"] := Owned
-	}
-	return Source
+/** Builds actual current source evidence through the effective plain owners. */
+_StarSlotCurrentSource(Generation, Keycodes, Hkl) {
+	return StarSlotProbeSource(Hkl, Generation, Keycodes, 0, _StarSlotEffectivePlain.Bind(Map()))
 }
 
 /** Resolves only present ordinary Win settings against one exact native source. */
-_MagicEditorExplicitClaim(Source, Hkl) {
+_StarSlotExplicitClaim(Source, Hkl) {
 	global _IniCache, KeyboardShortcutAssignments
 	if !(Source is Map) || !IsSet(_IniCache) || !_IniCache.Has(ConfigKey.SHORTCUTS_KEYBOARD)
 		return 0
@@ -347,21 +337,20 @@ _MagicEditorExplicitClaim(Source, Hkl) {
 }
 
 /** Captures the actual immutable recipe that proved this physical source. */
-_MagicEditorSourceSignature() {
+_StarSlotSourceSignature() {
 	global Features, ScriptInformation, KLE_Id
 	Layout := Features["layout"]
 	return ScriptInformation["MagicKey"] . "|" . ScriptInformation["MagicKeySourceScan"]
-		. "|" . ScriptInformation["MagicKeySourceChosen"] . "|" . ScriptInformation["MagicKeySourceOverridesEmulation"]
 		. "|" . Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 		. "|" . Layout[ConfigLeaf.ERGOPTI_BASE] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
 		. "|" . Layout[ConfigLeaf.EMULATED_LAYOUT] . "|" . KLE_Id
 }
 
 /** Rejects source changes and an actual tap-hold owner before stale delivery. */
-_MagicEditorSourceIsCurrent() {
+_StarSlotSourceIsCurrent() {
 	global TapHold
-	State := MagicEditorState()
-	if KS_ResolveKeyboardLayout() != State["hkl"] || _MagicEditorSourceSignature() !== State["source_signature"]
+	State := StarSlotState()
+	if KS_ResolveKeyboardLayout() != State["hkl"] || _StarSlotSourceSignature() !== State["source_signature"]
 		return false
 	Decision := State["decision"]
 	if (Decision is Map) && (Decision["source"] is Map) {
@@ -373,25 +362,25 @@ _MagicEditorSourceIsCurrent() {
 }
 
 /** Returns live delivery gates with the exact source and configuration epochs. */
-_MagicEditorDeliveryState() {
-	State := MagicEditorState()
-	Admission := _MagicEditorAdmission()
-	Admission["source_generation"] := _MagicEditorSourceIsCurrent() ? State["source_generation"] : -1
+_StarSlotDeliveryState() {
+	State := StarSlotState()
+	Admission := _StarSlotAdmission()
+	Admission["source_generation"] := _StarSlotSourceIsCurrent() ? State["source_generation"] : -1
 	Admission["configuration_generation"] := State["configuration_generation"]
-	Admission["action"] := _MagicEditorArmedAction(MagicEditorSlot()["id"])
+	Admission["action"] := _StarSlotArmedAction(StarSlot()["id"])
 	return Admission
 }
 
 /** Returns a slot's action as armed now: an AI action is not while the AI is off. */
-_MagicEditorArmedAction(Slot) {
+_StarSlotArmedAction(Slot) {
 	global KeyboardShortcutAssignments
 	Action := KeyboardShortcutAssignments.Get(Slot, "none")
 	return AiActionBlocked(Action) ? "none" : Action
 }
 
 /** Whether the broker took this ordinary slot, whose native hotkey it keeps disabled. */
-MagicEditorOwnsOrdinarySlot(Slot) {
-	State := MagicEditorState()
+StarSlotOwnsOrdinarySlot(Slot) {
+	State := StarSlotState()
 	Claim := State["ordinary_claim"]
 	if !State["initialized"] || !(Claim is Map)
 		return false
@@ -403,28 +392,28 @@ MagicEditorOwnsOrdinarySlot(Slot) {
 }
 
 /** Selects the live callback owner without running it from a native criterion. */
-_MagicEditorBrokerWinner(Scan) {
-	State := MagicEditorState()
+_StarSlotBrokerWinner(Scan) {
+	State := StarSlotState()
 	if !State["initialized"] || A_IsSuspended
 		return 0
-	Admission := _MagicEditorAdmission()
+	Admission := _StarSlotAdmission()
 	if Admission["master"] && !Admission["inhibited"] && State["ordinary_physical"].Has(Scan) {
 		Physical := State["ordinary_physical"][Scan]
-		if _MagicEditorArmedAction(Physical["slot"]) != "none"
+		if _StarSlotArmedAction(Physical["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Physical["slot"])
 	}
 	Decision := State["decision"]
 	SourceScan := (Decision is Map) && (Decision["source"] is Map)
 		? Format("SC{:03X}", Decision["source"]["native_code"]) : ""
 	if Scan == SourceScan && Admission["master"] && !Admission["inhibited"]
-			&& _MagicEditorSourceIsCurrent() {
+			&& _StarSlotSourceIsCurrent() {
 		Claim := State["ordinary_claim"]
-		if (Claim is Map) && _MagicEditorArmedAction(Claim["slot"]) != "none"
+		if (Claim is Map) && _StarSlotArmedAction(Claim["slot"]) != "none"
 			return Map("kind", "ordinary", "slot", Claim["slot"])
 	}
 	if Admission["master"] && !Admission["inhibited"] && State["legacy"].Has(Scan)
 		return Map("kind", "legacy", "callback", State["legacy"][Scan])
-	if Scan == SourceScan && MagicEditorCanDeliver(Decision, _MagicEditorDeliveryState())
+	if Scan == SourceScan && StarSlotCanDeliver(Decision, _StarSlotDeliveryState())
 		return Map("kind", "contextual", "decision", Decision)
 	for Fallback in State["layouts"].Get(Scan, []) {
 		if !HasMethod(Fallback["criterion"], "Call") || Fallback["criterion"].Call()
@@ -434,26 +423,26 @@ _MagicEditorBrokerWinner(Scan) {
 }
 
 /** Native admission consumes input only while one live owner needs this variant. */
-_MagicEditorBrokerCriterion(Scan, ConfigurationGeneration, SourceGeneration, *) {
-	State := MagicEditorState()
+_StarSlotBrokerCriterion(Scan, ConfigurationGeneration, SourceGeneration, *) {
+	State := StarSlotState()
 	if State["configuration_generation"] != ConfigurationGeneration || State["source_generation"] != SourceGeneration
 		return false
-	return _MagicEditorBrokerWinner(Scan) is Map
+	return _StarSlotBrokerWinner(Scan) is Map
 }
 
 /** Dispatches once through the same live arbitration used by the criterion. */
-_MagicEditorBrokerDispatch(Scan, ConfigurationGeneration, SourceGeneration, *) {
-	State := MagicEditorState()
+_StarSlotBrokerDispatch(Scan, ConfigurationGeneration, SourceGeneration, *) {
+	State := StarSlotState()
 	if State["configuration_generation"] != ConfigurationGeneration || State["source_generation"] != SourceGeneration
 		return
-	Winner := _MagicEditorBrokerWinner(Scan)
+	Winner := _StarSlotBrokerWinner(Scan)
 	if !(Winner is Map)
 		return
 	switch Winner["kind"] {
 		case "ordinary": RunKeyboardShortcutAction(Winner["slot"])
 		case "contextual":
-			if MagicEditorCanDeliver(Winner["decision"], _MagicEditorDeliveryState())
-				RunKeyboardShortcutAction(MagicEditorSlot()["id"])
+			if StarSlotCanDeliver(Winner["decision"], _StarSlotDeliveryState())
+				RunKeyboardShortcutAction(StarSlot()["id"])
 		default: Winner["callback"].Call()
 	}
 }
@@ -464,23 +453,23 @@ _MagicEditorBrokerDispatch(Scan, ConfigurationGeneration, SourceGeneration, *) {
  * ordinary settings remain under their existing lease and WAL persistence owner.
  * @returns {Integer} Number of owned physical Win variants.
  */
-MagicEditorStart() {
+StarSlotStart() {
 	global ScriptInformation, KeyboardShortcutAssignments, GESTURE_ACTIONS
-	State := MagicEditorState()
+	State := StarSlotState()
 	if State["initialized"]
 		throw Error("The physical Win broker is already initialized.")
 	if State["native_handles"].Count || State["ordinary_restore"].Count
 		throw Error("The physical Win broker still owns unsettled cohort compensation.")
-	LoggerStart("MagicEditor", "Acquiring the shared physical shortcut cohort…")
+	LoggerStart("StarSlot", "Acquiring the shared physical shortcut cohort…")
 	State["hkl"] := KS_ResolveKeyboardLayout()
 	State["source_generation"] += 1
-	State["source_signature"] := _MagicEditorSourceSignature()
-	Keycodes := MagicEditorPhysicalCatalogue(), Known := Map()
+	State["source_signature"] := _StarSlotSourceSignature()
+	Keycodes := StarSlotPhysicalCatalogue(), Known := Map()
 	for Key in Keycodes["keys"]
 		Known[Key["code"]] := true
-	Source := _MagicEditorCurrentSource(State["source_generation"], Keycodes, State["hkl"])
-	Selected := MagicEditorSelectSource(Source, ScriptInformation["MagicKey"], Known)
-	State["ordinary_claim"] := _MagicEditorExplicitClaim(Selected["source"], State["hkl"])
+	Source := _StarSlotCurrentSource(State["source_generation"], Keycodes, State["hkl"])
+	Selected := StarSlotSelectSource(Source, Known)
+	State["ordinary_claim"] := _StarSlotExplicitClaim(Selected["source"], State["hkl"])
 	Claims := Map()
 	if Selected["source"] is Map {
 		Identity := Selected["source"]["identity"]
@@ -490,12 +479,12 @@ MagicEditorStart() {
 		else if State["legacy"].Has(Scan)
 			Claims[Identity] := Map("legacy", true)
 	}
-	Slot := MagicEditorSlot()
-	State["decision"] := MagicEditorResolve(Map("default_action", ManifestDefaultFor(Slot["path"]),
+	Slot := StarSlot()
+	State["decision"] := StarSlotResolve(Map("default_action", ManifestDefaultFor(Slot["path"]),
 		"stored_action", KeyboardShortcutAssignments.Get(Slot["id"], ManifestDefaultFor(Slot["path"])),
 		"is_action", (Id) => GESTURE_ACTIONS.Has(Id), "source", Source,
-		"trigger", ScriptInformation["MagicKey"], "known_codes", Known, "explicit_claims", Claims,
-		"configuration_generation", State["configuration_generation"], "admission", _MagicEditorAdmission()))
+		"known_codes", Known, "explicit_claims", Claims,
+		"configuration_generation", State["configuration_generation"], "admission", _StarSlotAdmission()))
 	Scans := Map()
 	for Scan in State["layouts"]
 		Scans[Scan] := true
@@ -515,17 +504,17 @@ MagicEditorStart() {
 				OrdinaryHandles.Push(State["ordinary_handles"][SlotId])
 		}
 	}
-	MagicEditorAcquireCohort(Scans, OrdinaryHandles, State["native_handles"], Map(
+	StarSlotAcquireCohort(Scans, OrdinaryHandles, State["native_handles"], Map(
 		"reserve", (Scan) => HotkeyRegistrarReservePhysicalBroker("Cmd+" . Scan,
-			_MagicEditorBrokerDispatch.Bind(Scan, State["configuration_generation"], State["source_generation"]),
+			_StarSlotBrokerDispatch.Bind(Scan, State["configuration_generation"], State["source_generation"]),
 			"keyboard-win-broker", HotkeyRegistrarResolvedNativeDescriptor("#" . Scan),
-			_MagicEditorBrokerCriterion.Bind(Scan, State["configuration_generation"], State["source_generation"])),
+			_StarSlotBrokerCriterion.Bind(Scan, State["configuration_generation"], State["source_generation"])),
 		"activate", _HotkeyRegistrarActivate, "retire", HotkeyRegistrarUnbind,
 		"set_enabled", HotkeyRegistrarSetEnabled), State["ordinary_restore"])
 	; Every native On is acknowledged while admission is still false. Publish
 	; authority once, only after the full cohort and the personal handoff exist.
 	State["initialized"] := true
-	LoggerSuccess("MagicEditor", "Physical shortcut cohort acquired ({1} variant(s), contextual action: {2}).",
+	LoggerSuccess("StarSlot", "Physical shortcut cohort acquired ({1} variant(s), contextual action: {2}).",
 		State["native_handles"].Count, State["decision"]["action"])
 	return State["native_handles"].Count
 }
@@ -539,9 +528,9 @@ MagicEditorStart() {
  * @param {Map} RestoreDebt Retained exact personal handles awaiting restoration.
  * @returns {Boolean} True only after every native acquisition is acknowledged.
  */
-MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports, RestoreDebt := unset) {
+StarSlotAcquireCohort(Scans, OrdinaryHandles, Handles, Ports, RestoreDebt := unset) {
 	if !IsSet(RestoreDebt)
-		RestoreDebt := MagicEditorState()["ordinary_restore"]
+		RestoreDebt := StarSlotState()["ordinary_restore"]
 	if !(Handles is Map) || !(RestoreDebt is Map)
 		throw TypeError("The physical broker requires explicit native and personal custody maps.")
 	if Handles.Count || RestoreDebt.Count
@@ -571,7 +560,7 @@ MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports, RestoreDebt := 
 				throw Error("The physical Win broker refused native activation: " . Scan)
 		}
 	} catch as Err {
-		Resolution := MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports)
+		Resolution := StarSlotSettleCohortDebt(Handles, RestoreDebt, Ports)
 		if Resolution["status"] != "settled"
 			throw Error(Err.Message . " Unacknowledged compensation: " . Resolution["detail"])
 		throw Err
@@ -590,7 +579,7 @@ MagicEditorAcquireCohort(Scans, OrdinaryHandles, Handles, Ports, RestoreDebt := 
  * @param {Map} Ports Matching retire and set_enabled native owners.
  * @returns {Map} Settled or retained receipt with fixed operation/handle details.
  */
-MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports) {
+StarSlotSettleCohortDebt(Handles, RestoreDebt, Ports) {
 	if !(Handles is Map) || !(RestoreDebt is Map) || !(Ports is Map)
 		throw TypeError("Cohort compensation requires its exact custody and native ports.")
 	for Name in ["retire", "set_enabled"] {
@@ -631,29 +620,26 @@ MagicEditorSettleCohortDebt(Handles, RestoreDebt, Ports) {
 }
 
 /** Reloads the physical cohort on an actual native input-source switch. */
-MagicEditorNeedsLayoutReload(Hkl) {
-	State := MagicEditorState()
+StarSlotNeedsLayoutReload(Hkl) {
+	State := StarSlotState()
 	return State["initialized"] && Hkl != State["hkl"]
 }
 
-/** Returns a translated editable slot label with its actual physical chord. */
-MagicEditorSlotLabel() {
-	Decision := MagicEditorState()["decision"]
-	Label := t("menu.shortcuts.keyboard.magic_editor")
-	if (Decision is Map) && (Decision["source"] is Map)
-		Label .= " (Win + " . Decision["source"]["text"] . ")"
-	return Label
+/** Returns the slot's chord as its modifier group names its rows (« Win + ★ »). */
+StarSlotLabel() {
+	global STAR_SLOT_MARKER
+	return KeyNameLabel("win") . " + " . STAR_SLOT_MARKER
 }
 
 /** Draws the ordinary action picker even when its native chord is unavailable. */
-MagicEditorSlotRows() {
+StarSlotRows() {
 	global KeyboardShortcutAssignments, GESTURE_ACTIONS
-	Slot := MagicEditorSlot()
+	Slot := StarSlot()
 	Action := KeyboardShortcutAssignments.Get(Slot["id"], ManifestDefaultFor(Slot["path"]))
-	Label := LabelValue(MagicEditorSlotLabel(), GESTURE_ACTIONS.Has(Action)
+	Label := LabelValue(StarSlotLabel(), GESTURE_ACTIONS.Has(Action)
 		? GestureActionDisplayLabel(Action, Slot["binding_id"]) : t("dialog.action_picker.disabled"))
-	Decision := MagicEditorState()["decision"]
+	Decision := StarSlotState()["decision"]
 	if (Decision is Map) && Decision["reason"] != ""
-		Label .= " — " . t("menu.shortcuts.keyboard.magic_editor_reason." . Decision["reason"])
+		Label .= " — " . t("menu.shortcuts.keyboard.star_slot_reason." . Decision["reason"])
 	return [Map("label", Label, "action", (*) => ShowKeyboardShortcutPicker(Slot["id"]))]
 }

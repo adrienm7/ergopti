@@ -131,7 +131,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../../core/crypto/crypto.ahk
 #Include ../../modules/keymap/keylayout/layout_registry.ahk
-#Include ../../infra/magic_editor.ahk
+#Include ../../infra/star_slot.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()

@@ -41,7 +41,7 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 ; These two test-local hooks have exact finally/exit owners, outside the product
 ; registry whose exclusive one-shot/dead-key admission is under test.
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
-global ScriptInformation := Map("MagicKey", Chr(0x2605))
+global ScriptInformation := Map("MagicKey", Chr(0x2605), "MagicKeyDefault", Chr(0x2605))
 ; The one-shot capture reads its timeout from the remap owner; no fallback exists.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 global OneShotShiftEnabled := false, InDeadKeySequence := false
@@ -106,6 +106,9 @@ LoggerWarn(*) {
 	global _UNC
 	_UNC.Logs += 1
 }
+
+; The editor prompt names the default through the shared display rule.
+MagicKeyShown(Char) => Char
 
 t(Key) {
 	return Key
@@ -226,7 +229,7 @@ _UNC_Inject() {
 				_UNC.Target := _MagicKeyEditorInputHook
 				_UNC_Require(SIHO_Count() == 0 && _MagicKeyEditorGui == _UNC.Gui
 					&& _UNC.Target is InputHook && _UNC.Target.InProgress && _UNC.Target.MinSendLevel == 1,
-					"The genuine MagicEditor singleton must own the actual native I1 capture.")
+					"The genuine StarSlot singleton must own the actual native I1 capture.")
 			} else {
 				for Token, Record in _SIHO_Owners {
 					_UNC.Token := Token, _UNC.Target := Record["hook"]
@@ -646,7 +649,7 @@ _UNC_RunEditor() {
 		case "punctuation":
 			_UNC.Units := [0x2E], Expected := [0x2E]
 		default:
-			throw Error("Unknown native MagicEditor scalar vector.")
+			throw Error("Unknown native StarSlot scalar vector.")
 	}
 	_UNC.ArmedAt := DllCall("GetTickCount64", "UInt64")
 	SetTimer(_UNC_Inject, -1)

@@ -19,12 +19,11 @@
 ; is tested headlessly too: a refused reload is retried with a doubling wait, a
 ; few times per layout, and never when its refusal would be forced through.
 ;
-; Only a layout the boot registrations do not fit reloads: without the Ergopti
-; emulation, the magic key's source key is registered at load on the key that
-; types its character on one layout (LayoutRemapSignature). The AltGr family
-; (infra/altgr_family.ahk) and the digit-row swap (DigitRowIsSwapped) follow the
-; foreground layout live instead, so with the emulation on (the default) no
-; switch reloads, as with Windows' per-window input methods.
+; Only a layout the boot registrations do not fit reloads: the ★ key's Win
+; slot binds, at load, the key that types ★ on one layout
+; (LayoutRemapNeedsReload). The AltGr family (infra/altgr_family.ahk) and the
+; digit-row swap (DigitRowIsSwapped) follow the foreground layout live, as with
+; Windows' per-window input methods.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -279,59 +278,12 @@ _LayoutPollRestore(PreviousHkl) {
 ; ===============================================
 ; ===============================================
 
-; What the boot registrations read from keyboard layout Hkl, as one comparable
-; string: while the Ergopti emulation is off, the key the magic-key scan finds
-; for the magic key's source character (ErgoptiPlus.ahk), or the default one
-; when it finds none. That key's hotkeys are registered at load on that scan
-; code, so a switch that moves it still reloads. The AltGr family, the
+; Whether a switch to layout Hkl needs a reload: only the ★ key's Win slot
+; reads the layout at load (the key that types ★ there); the AltGr family, the
 ; digit-row swap and the accented-letter shortcuts follow the foreground layout
-; live instead.
-; @param Hkl {Integer} Keyboard layout handle; 0 (none read) probes nothing.
-; @param Port {Map} Test seam, _LayoutRemapPort() by default: "emulated"(),
-;        "magic_char"() and "magic_scan"(Hkl, Char), 0 when not found.
-; @returns {String}
-LayoutRemapSignature(Hkl, Port := 0) {
-	if !(Port is Map)
-		Port := _LayoutRemapPort()
-	if Port["emulated"].Call()
-		return "magic=emulated"
-	Scan := (Hkl != 0) ? Port["magic_scan"].Call(Hkl, Port["magic_char"].Call()) : 0
-	return "magic=" . (Scan ? Format("SC{:03X}", Scan) : "default")
-}
-
-; Whether a switch to layout Hkl needs a reload: the boot registrations were
-; built for _LAYOUT_REMAP_HKL and do not fit Hkl.
+; live, and the magic key is a character no layout moves.
 ; @param Hkl {Integer} The foreground layout.
-; @param Port {Map} As for LayoutRemapSignature.
 ; @returns {Boolean}
-LayoutRemapNeedsReload(Hkl, Port := 0) {
-	global _LAYOUT_REMAP_HKL
-	if !(Port is Map) && MagicEditorNeedsLayoutReload(Hkl)
-		return true
-	return LayoutRemapSignature(Hkl, Port) != LayoutRemapSignature(_LAYOUT_REMAP_HKL, Port)
-}
-
-_LayoutRemapPort() {
-	static Port := Map(
-		"emulated", _LayoutRemapEmulated,
-		"magic_char", _LayoutRemapMagicChar,
-		"magic_scan", _LayoutRemapMagicScan)
-	return Port
-}
-
-; Whether no boot registration follows the OS layout: the Ergopti emulation
-; types every key itself, and a magic key the user chose, the active layout
-; declared or an emulated layout fixed never moves with the OS layout.
-_LayoutRemapEmulated() {
-	global Features, ScriptInformation
-	return Features["layout"][ConfigLeaf.ERGOPTI_BASE] || !ScriptInformation["MagicKeySourceFollowsOsLayout"]
-}
-
-_LayoutRemapMagicChar() {
-	global ScriptInformation
-	return ScriptInformation["MagicKeySourceChar"]
-}
-
-_LayoutRemapMagicScan(Hkl, Char) {
-	return KS_ScanScancodeForChar(Hkl, Char)["scan"]
+LayoutRemapNeedsReload(Hkl) {
+	return StarSlotNeedsLayoutReload(Hkl)
 }

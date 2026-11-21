@@ -727,7 +727,7 @@ _ScopeObsoleteGlobal(Mode) {
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
 			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
-				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
+				. '[shortcuts.keyboard]`nmeta_star = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'
 			Actual := FSReadUtf8Exact(Fixture.path)

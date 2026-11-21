@@ -82,8 +82,6 @@ TryMenuLabelFromManifestEntry(Entry) {
 }
 
 TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
-		global ScriptInformation
-
 		Candidates := _MenuLabelCandidateKeys(DescKey, Path)
 		Label := ""
 		for Cand in Candidates {
@@ -102,9 +100,8 @@ TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
 				}
 		}
 
-		if (Label != "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
-				Label := StrReplace(Label, "★", ScriptInformation["MagicKey"])
-		}
+		; The locale cache already shows the magic key as « ★ (ù) » (locale.ahk):
+		; a second substitution would replace the marker of that display again.
 		return Label
 }
 

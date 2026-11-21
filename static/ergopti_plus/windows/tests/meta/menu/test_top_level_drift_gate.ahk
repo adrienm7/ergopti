@@ -367,7 +367,6 @@ _DG_DeclaredBuilderExpected(Id) {
 			'"layout_emulation",       (*) => _LAY_EmulationChoiceRows(),',
 			'"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),',
 			'"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),',
-			'"magic_key_source",       (*) => MagicKeySourceMenuRows(),',
 			'"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),',
 			'"active_layouts",         (*) => _LAY_ActiveLayoutRows(),',
 			'"layout_system_install",  (*) => SystemLayout_MenuRows(),',

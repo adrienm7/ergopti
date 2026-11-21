@@ -576,116 +576,31 @@ LayoutRegistry_ActiveLayoutExtension(SelectedId, ErgoptiBase, ErgoptiId, ReadIns
 }
 
 /**
- * The scan code of the key that types a character on the OS layout, probed with
- * no modifier through ToUnicodeEx (platform/input/key_state.ahk). VkKeyScanExW is not
- * used: it fails on layouts such as bépo where the character sits behind a
- * driver-level remapping the API cannot see.
- * @param {Integer} Hkl - Keyboard layout handle, 0 when none could be read.
- * @param {String} Char - Source character.
- * @param {Func} ScanFn - KS_ScanScancodeForChar implementation.
- * @returns {String} "SCnnn", or "" when the layout or the character is not found.
- */
-LayoutRegistry_DetectMagicKeyScan(Hkl, Char, ScanFn := KS_ScanScancodeForChar) {
-	if Hkl == 0 {
-		LoggerWarn("LayoutRegistry", "Magic-key source detection skipped: no keyboard layout could be read.")
-		return ""
-	}
-	Found := ScanFn.Call(Hkl, Char)
-	if Found["scan"] == 0 {
-		LoggerWarn("LayoutRegistry", "Magic-key source: '{1}' is on no base key of layout HKL=0x{2:X}.", Char, Hkl)
-		return ""
-	}
-	Scan := Format("SC{:03X}", Found["scan"])
-	LoggerInfo("LayoutRegistry", "Magic-key source detected on the OS layout: '{1}' at {2} (VK=0x{3:X}, HKL=0x{4:X}).",
-		Char, Scan, Found["vk"], Hkl)
-	return Scan
-}
-
-/**
- * The physical magic key the built-in Ergopti layout declares, read from the
- * registry the driver ships rather than from a discovered pack, so a user's own
- * copy of the extension cannot take the last-resort key away.
- * @returns {String} KeyboardEvent.code.
- * @throws {Error} When the shipped manifest declares no magic key.
- */
-LayoutRegistry_ShippedMagicKey() {
-	global ERGOPTI_LAYOUT_ID
-	Code := LayoutRegistry_DeclaredMagicKey(ERGOPTI_LAYOUT_ID, [], LayoutRegistry_BundledDir())
-	if Code == ""
-		throw Error("The shipped '" . ERGOPTI_LAYOUT_ID . "' layout extension declares no magic key.")
-	return Code
-}
-
-/**
- * Chooses the physical key that types the magic key. The key the user
- * configured always wins; then the key the active layout declares; then, with
- * no layout emulated, the key that types the source character on the OS
- * layout; then the key the shipped Ergopti layout declares. A detection never
- * replaces a choice, and an emulated layout is never probed through the OS
- * layout it replaces.
- * @param {Map} Inputs - "chosen" (whether the user configured a key),
- *   "configured" (that KeyboardEvent.code, from [hotstrings] magic_key_source),
- *   "declared" (KeyboardEvent.code or ""), "emulated" (whether a layout is
- *   emulated), "keycodes" (parsed mac_keycodes.json), "detect" (callable
- *   returning the scan code probed on the OS layout, or "") and "shipped"
- *   (callable returning the KeyboardEvent.code of the last resort).
- * @returns {Map} "scan", "origin" (user, layout, detected or default),
- *   "follows_os_layout", whether an OS layout switch can move the key, and
- *   "overrides_emulation", whether an emulated layout yields that key's
- *   unshifted level to the magic key: only for a key the user chose or the
- *   active layout declares. An emulated layout that declares none (Ergo-L)
- *   keeps its own character there, the magic key being an Ergopti feature.
+ * Chooses the physical key that types the magic key: only the key the active
+ * emulated layout declares ([extension.magic_key], the built-in Ergopti
+ * emulation included). The magic key is a configured character (maintainer's
+ * decision of 2026-11-21): without an emulated layout that declares one, no
+ * key is remapped and the OS layout types whatever the user configured.
+ * @param {Map} Inputs - "declared" (KeyboardEvent.code or "") and "keycodes"
+ *   (parsed mac_keycodes.json).
+ * @returns {Map} "scan" ("" for none) and "origin" ("layout" or "none").
  */
 LayoutRegistry_MagicKeySource(Inputs) {
-	if Inputs["chosen"]
-		return Map("scan", LayoutRegistry_KeyScan(Inputs["configured"], Inputs["keycodes"]),
-			"origin", "user", "follows_os_layout", false, "overrides_emulation", true)
 	if Inputs["declared"] != ""
-		return Map("scan", LayoutRegistry_KeyScan(Inputs["declared"], Inputs["keycodes"]),
-			"origin", "layout", "follows_os_layout", false, "overrides_emulation", true)
-	if Inputs["emulated"]
-		return Map("scan", LayoutRegistry_KeyScan(Inputs["shipped"].Call(), Inputs["keycodes"]),
-			"origin", "default", "follows_os_layout", false, "overrides_emulation", false)
-	Detected := Inputs["detect"].Call()
-	if Detected != ""
-		return Map("scan", Detected, "origin", "detected", "follows_os_layout", true,
-			"overrides_emulation", false)
-	return Map("scan", LayoutRegistry_KeyScan(Inputs["shipped"].Call(), Inputs["keycodes"]),
-		"origin", "default", "follows_os_layout", true, "overrides_emulation", false)
+		return Map("scan", LayoutRegistry_KeyScan(Inputs["declared"], Inputs["keycodes"]), "origin", "layout")
+	return Map("scan", "", "origin", "none")
 }
 
 /**
- * The hotkeys that make the physical magic key type the magic key
- * (modules/keymap/layout.ahk registers them). The key a layout declares,
- * detected or shipped, is the layout's own magic-key position: its other levels
- * follow the source character (Shift types its capital, Ctrl and Alt its
- * shortcuts), and with [layout] ctrl_magic_save on every shortcut chord sends
- * its modifiers + S by the shared rule (_shared/shortcuts/data/magic_key_save.ahk):
- * Ctrl+★ → Ctrl+S, Ctrl+Shift+★ → Ctrl+Shift+S, Alt+★ → Alt+S, Win+Shift+★ →
- * Win+Shift+S, while Ctrl+Alt (AltGr) keeps the layout's AltGr character. Editor
- * shortcuts belong to the ordinary user-owned keyboard slots, never the physical
- * magic-key owner. A key the user chose is a key of the layout they type on:
- * only its plain press becomes the magic key, and every level and chord stays
- * the layout's, as on macOS and Linux
- * (_shared/layouts/engine/layers/magic_key_source.lua).
- * @param {String} Scan - "SCnnn" of the physical magic key.
- * @param {Boolean} Chosen - Whether the user chose it ([hotstrings] magic_key_source).
- * @param {Boolean} CtrlSave - Whether [layout] ctrl_magic_save is on.
- * @returns {Array} Maps of "kind" ("remap": every level through RemapKey,
- *   "magic": the plain press alone, "save": the chord's modifiers + S) and
- *   "hotkey"; a "save" also carries "send" and "win_only" (the Win variant,
- *   which the physical Win broker owns).
+ * The hotkeys that make the declared magic key type the magic key
+ * (modules/keymap/layout.ahk registers them): its plain press alone, so Shift,
+ * AltGr and every chord keep the emulated layout's levels. Editor shortcuts
+ * belong to the ordinary keyboard slots, never this owner.
+ * @param {String} Scan - "SCnnn" of the declared magic key, "" for none.
+ * @returns {Array} The hotkey names, none without a declared key.
  */
-LayoutRegistry_MagicKeyHotkeys(Scan, Chosen, CtrlSave) {
-	if Chosen
-		return [Map("kind", "magic", "hotkey", Scan)]
-	Hotkeys := [Map("kind", "remap", "hotkey", Scan)]
-	if CtrlSave {
-		for Save in MagicKeySaveWindowsHotkeys(Scan)
-			Hotkeys.Push(Map("kind", "save", "hotkey", Save["hotkey"], "send", Save["send"],
-				"win_only", Save["win_only"]))
-	}
-	return Hotkeys
+LayoutRegistry_MagicKeyHotkeys(Scan) {
+	return Scan == "" ? [] : [Scan]
 }
 
 /**

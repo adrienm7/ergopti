@@ -301,15 +301,15 @@ _KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 }
 
 ; The magic key is an Ergopti feature tied to the layout that declares it: when
-; the active layout declares its key (the built-in Ergopti emulation) or the
-; user chose one, that key's unshifted level belongs to the magic-key remap
+; the active layout declares its key (the built-in Ergopti emulation), that
+; key's unshifted level belongs to the magic-key remap
 ; (modules/keymap/layout.ahk), as the independent digit row belongs to its own
 ; override. An emulated layout that declares none, such as Ergo-L, keeps its
 ; own character there. Shift, AltGr and the shortcut chords always keep the
 ; emulated layout's characters.
 _KLE_MagicKeyOwnsKey(Sc) {
 	global Features, ScriptInformation
-	return ScriptInformation["MagicKeySourceOverridesEmulation"]
+	return ScriptInformation["MagicKeySourceScan"] != ""
 		&& Sc == ScriptInformation["MagicKeySourceScan"]
 		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 }
@@ -943,7 +943,7 @@ _KLE_PendingDeadKeyCriterion(*) {
  * @throws {Error} On a second registration.
  */
 KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
-		BrokerFn := MagicEditorRecordLayoutFallback) {
+		BrokerFn := StarSlotRecordLayoutFallback) {
 	return _KLE_AltGrBindingOwner("register", KeycodeTable, HotkeyFn, HotIfFn, ForegroundFn, BrokerFn)
 }
 
@@ -972,7 +972,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 		_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
 		_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
 		LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
-		_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+		_KLE_BindingDeclaration, StarSlotRecordLayoutFallback,
 		Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
 
 	OwnersCurrent() {
@@ -982,7 +982,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 			_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
 			_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
 			LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
-			_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+			_KLE_BindingDeclaration, StarSlotRecordLayoutFallback,
 			Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
 		for BindingIndex, BindingOwnerFunction in Owners
 			if !(BindingOwnerFunction is Func) || BindingOwnerFunction != Current[BindingIndex]
@@ -1120,7 +1120,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 	try {
 		; Injected ports retain their old controlled behavior without source issuance.
 		if !OwnersCurrent() || Args[2] != Hotkey || Args[3] != HotIf
-				|| !(Args[4] is Integer) || Args[4] != 0 || Args[5] != MagicEditorRecordLayoutFallback {
+				|| !(Args[4] is Integer) || Args[4] != 0 || Args[5] != StarSlotRecordLayoutFallback {
 			Phase := "failed"
 			return NativeCall.Call(_KLE_RegisterBindings, Args*)
 		}
@@ -1186,7 +1186,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 
 	; The effectful body is lexical: no public alternate registration can bypass ownership.
 	_KLE_RegisterBindings(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
-			BrokerFn := MagicEditorRecordLayoutFallback) {
+			BrokerFn := StarSlotRecordLayoutFallback) {
 		local Count
 		static WinCriteria := Map()
 		global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS

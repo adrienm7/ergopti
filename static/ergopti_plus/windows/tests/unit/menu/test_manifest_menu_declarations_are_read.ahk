@@ -44,7 +44,7 @@ Test("manifest_menu: accented_letters_group carries the letter rows", () => (
 	; version of this test asserted only Length == 4 and a probe that renamed a
 	; row passed it.
 	AssertEqual(
-		"e_grave,e_circ,e_acute,a_grave",
+		"e_grave,e_circ,e_acute,a_grave,star",
 		_MM_RowValues("accented_letters_group", "id"),
 		"the accented-letters submenu is built from these ids, in this order"
 	)

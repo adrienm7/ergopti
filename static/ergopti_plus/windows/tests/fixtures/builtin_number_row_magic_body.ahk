@@ -5,11 +5,10 @@
 global _SharedDir := A_Args[3], _StaticDir := A_Args[8], _DriverDir := A_Args[9]
 global _LRPN_Scan := A_Args[5], _LRPN_Row := A_Args[6] == "on", _LRPN_Caps := A_Args[7] == "on"
 global Features := Map("layout", Map("ergopti_base", true, "ergopti_variant", "ergopti", "emulated_layout", "",
-	"ctrl_magic_save", false, "direct_access_digits", "native", "emulate_number_row", _LRPN_Row,
+	"direct_access_digits", "native", "emulate_number_row", _LRPN_Row,
 	"emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true),
 	"hotstrings", Map("magic_key", Map("replace", Map("enabled", true))))
-global ScriptInformation := Map("MagicKeySourceChosen", true, "MagicKeySourceScan", _LRPN_Scan,
-	"MagicKeySourceOverridesEmulation", true, "MagicKeySourceChar", "q", "MagicKey", Chr(0x2605))
+global ScriptInformation := Map("MagicKeySourceScan", _LRPN_Scan, "MagicKey", Chr(0x2605))
 global CategoryEnabled := Map("Layout", true), LayerEnabled := false, KLE_Model := 0, KLE_Id := ""
 global _LRPN_Current := 0, _LRPN_Entries := Map(), _LRPN_Emits := [], _LRPN_Registrations := 0
 

@@ -790,10 +790,10 @@ _NRP_RowScopes() {
 		AssertTrue(Criteria["+SC010"].Call(), "on its Shift level too")
 		AssertFalse(Criteria["*SC01E"].Call(), "a home-row key stays with the emulation")
 		Magic := ScriptInformation["MagicKeySourceScan"]
-		if LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+		if Magic != "" && LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 			AssertFalse(Criteria[StrUpper(Magic)].Call(StrUpper(Magic)), "the magic key keeps its plain press")
-			AssertEqual(ScriptInformation["MagicKeySourceChosen"], Criteria["*" . StrUpper(Magic)].Call("*" . StrUpper(Magic)),
-				"only a chosen source's modified presses follow the native row")
+			AssertTrue(Criteria["*" . StrUpper(Magic)].Call("*" . StrUpper(Magic)),
+				"the declared key's modified presses follow the native row")
 		}
 		Layout["ergopti_base"] := false
 		_NRP_UseLayout(Layout)
@@ -1023,7 +1023,7 @@ _NRP_MenuFixture(Path, Mode := "native") {
 _NRP_MenuNativeOwners() {
 	global Features, CategoryEnabled, LayerEnabled, ConfigurationFile, _TrayRootLifecycleEpoch, _LayoutPollRetry
 	Saved := [Features, CategoryEnabled, LayerEnabled, ConfigurationFile,
-		MasterGateState().Clone(), _TrayRootLifecycleEpoch, A_IsSuspended, MagicEditorState()["configuration_generation"], _LayoutPollRetry]
+		MasterGateState().Clone(), _TrayRootLifecycleEpoch, A_IsSuspended, StarSlotState()["configuration_generation"], _LayoutPollRetry]
 	Dir := _KLT_TempDir()
 	ConfigurationFile := Dir . "config.toml"
 	try {
@@ -1078,7 +1078,7 @@ _NRP_MenuNativeOwners() {
 				case "pause": Suspend(true)
 				case "master": CategoryEnabled["Layout"] := false
 				case "configuration":
-					MagicEditorConfigurationChanged()
+					StarSlotConfigurationChanged()
 				case "lifecycle": _TrayRootLifecycleEpoch += 1
 				case "native-source":
 					Hkl := GetForegroundKeyboardLayout()
@@ -1114,7 +1114,7 @@ _NRP_MenuNativeOwners() {
 		for Key, Value in Saved[5]
 			State[Key] := Value
 		_TrayRootLifecycleEpoch := Saved[6]
-		MagicEditorState()["configuration_generation"] := Saved[8]
+		StarSlotState()["configuration_generation"] := Saved[8]
 		_LayoutPollRetry := Saved[9]
 		DirDelete(Dir, true)
 	}

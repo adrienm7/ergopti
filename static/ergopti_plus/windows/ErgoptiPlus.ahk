@@ -410,9 +410,8 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include platform/focus/window_info.ahk
 #Include core/process/adapters/uia_worker.ahk
 #Include platform/input/hotkey_registrar.ahk
-#Include ../_shared/shortcuts/data/magic_editor.ahk
-#Include ../_shared/shortcuts/data/magic_key_save.ahk
-#Include infra/magic_editor.ahk
+#Include ../_shared/shortcuts/data/star_slot.ahk
+#Include infra/star_slot.ahk
 #Include platform/system/notifier.ahk
 #Include platform/system/accessibility.ahk
 #Include core/ui/engine/font_scale.ahk
@@ -1329,36 +1328,19 @@ global _DriverMenuReady := false
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
 BootProfile_StageBegin("magic key source")
-; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
-; key the user chose in [hotstrings] magic_key_source always wins; then the key
-; the active layout's extension declares — the emulated registry layout, or the
-; built-in Ergopti emulation; then, with no layout emulated, the key that types
-; MagicKeySourceChar ("j" by default) on the user's own OS layout — on bépo not
-; the SC02E Ergopti/QWERTY position; then the key the shipped Ergopti layout
-; declares. A layout is emulated only while the base layer is on
-; (_KLE_BaseCriterion): a layout left selected in the manager with the base
-; layer off types nothing, so the OS layout is still probed.
-;
-; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
-; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
-; thread, then the system default), so the scan and the AltGr family describe
-; one layout and the layout poll, seeded with the same HKL, reloads when the
-; user switched — only when the key follows the OS layout at all.
+; The key the active emulated layout declares as its magic key
+; (LayoutRegistry_MagicKeySource): the emulated registry layout's, or the
+; built-in Ergopti emulation's. A layout is emulated only while the base layer
+; is on (_KLE_BaseCriterion). Without one no key is remapped: the magic key is
+; the configured character, typed by whatever key types it.
 _MagicKeySource := LayoutRegistry_MagicKeySource(Map(
-	"chosen", ScriptInformation["MagicKeySourceChosen"],
-	"configured", ScriptInformation["MagicKeySource"],
 	"declared", LayoutRegistry_DeclaredMagicKey(
 		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
 			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
 			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
 		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"][ConfigLeaf.ERGOPTI_BASE],
-	"keycodes", LayoutRegistry_Keycodes(),
-	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
-	"shipped", LayoutRegistry_ShippedMagicKey))
+	"keycodes", LayoutRegistry_Keycodes()))
 ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
-ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
-ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
 LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
@@ -1487,7 +1469,7 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
 ; After the layout: a slot's letter is the key that types it under the emulation,
-; which RemappedList only knows from here. Before MagicEditorStart: a Win slot on
+; which RemappedList only knows from here. Before StarSlotStart: a Win slot on
 ; a remapped key joins the physical broker, which acquires its keys once.
 KeyboardShortcutsBindAll()
 ; [shortcuts.caps_word], read before the first activation arms its listeners.
@@ -1496,7 +1478,7 @@ BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
 #Include hotstrings/hotstrings.ahk
-MagicEditorStart()
+StarSlotStart()
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
 ; in-process refactor. A_InputLevel is still 2 from the #InputLevel 2 above.

@@ -41,7 +41,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../settings/engine/migration/transition.ahk
 #Include ../settings/engine/migration/transition_runtime.ahk
 #Include ../settings/engine/migration/migrate.ahk
-#Include ../infra/magic_editor.ahk
+#Include ../infra/star_slot.ahk
 #Include ../settings/engine/io.ahk
 #Include ../settings/engine/scope/scope.ahk
 #Include ../infra/metrics/metrics_filters.ahk

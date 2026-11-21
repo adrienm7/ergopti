@@ -113,7 +113,7 @@ _FMS_LegacyBooleans(Path) {
 	AssertFalse(Target["layout"]["ergopti_base"])
 }
 _FMS_LegacyBooleanCompatibility() {
-	_FMS_WithSource("legacy", 'layout.number_row_reorder_edges = 1`nlayout.ergopti_base = 0`nlayout.ctrl_magic_save = "true"`nlayout.ergopti_alt_gr = 2`n',
+	_FMS_WithSource("legacy", 'layout.number_row_reorder_edges = 1`nlayout.ergopti_base = 0`nlayout.emulate_bottom_row = "true"`nlayout.ergopti_alt_gr = 2`n',
 		_FMS_LegacyBooleans)
 }
 Test("configuration snapshot: legacy Boolean intent and outdated values stay governed (config-semantic-snapshot)",

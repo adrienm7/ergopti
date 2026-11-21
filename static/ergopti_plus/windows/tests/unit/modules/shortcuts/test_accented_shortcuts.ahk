@@ -94,6 +94,41 @@ Test("accented shortcuts: a chord resolves to the configured letter (accented-sh
 			"after a switch to QWERTY the same key is a digit again")
 	)))
 
+; A layout whose KeyC types the real star at its base level (Ergopti+).
+_ACS_StarScanCode(Char, Hkl) => Char == Chr(0x2605) ? 0x2E : 0
+
+; The key that types the real star joins the accented letters (2026-11-21):
+; with « s », Ctrl+star saves. Before, only é è ê à had a letter picker.
+Test("accented shortcuts: the key typing the real star maps its chords to its letter (star-letter-shortcut)", () => (
+	Config := _ACS_DefaultConfig(),
+	Config["star"] := Map("enabled", true, "letter", "s"),
+	_ACS_WithShortcuts(Config, () => _ACS_StarCase())))
+
+_ACS_StarCase() {
+	global KeyboardShortcutAssignments
+	Keys := AccentedShortcutKeysForLayout(3, _ACS_StarScanCode)
+	AssertEqual("star", Keys.Get(0x2E, ""), "the star key is a direct key of its own")
+	AssertEqual("s", AccentedShortcutResolve("^SC02E", Keys), "Ctrl+star is Ctrl+S")
+	AssertEqual("s", AccentedShortcutResolve("!+SC02E", Keys), "every configured chord follows")
+	Had := IsSet(KeyboardShortcutAssignments), Saved := Had ? KeyboardShortcutAssignments : 0
+	try {
+		KeyboardShortcutAssignments := Map("meta_star", "open_hotstrings_editor")
+		AssertEqual("", AccentedShortcutResolve("#SC02E", Keys), "Win+star stays the star slot's")
+		AssertEqual("s", AccentedShortcutResolve("^SC02E", Keys), "the slot takes only the Win chords")
+		KeyboardShortcutAssignments := Map("meta_star", "none")
+		AssertEqual("s", AccentedShortcutResolve("#SC02E", Keys), "a cleared star slot leaves Win+star to the letter")
+	} finally {
+		if Had
+			KeyboardShortcutAssignments := Saved
+	}
+	AssertEqual(0, AccentedShortcutKeysForLayout(1, _ACS_AzertyScanCode).Get(0x2E, 0),
+		"AZERTY types no star: the configured magic key never becomes the star key")
+}
+
+Test("accented shortcuts: the star letter is off by default (star-letter-shortcut)", () => (
+	AssertFalse(ManifestDefaultFor("shortcuts.star.enabled"), "off in an empty configuration"),
+	AssertEqual("s", ManifestDefaultFor("shortcuts.star.letter"))))
+
 Test("accented shortcuts: registration covers every chord but AltGr (accented-shortcuts-any-layout)", () =>
 	_ACS_WithShortcuts(_ACS_DefaultConfig(), () => _ACS_RegistrationCase()))
 
@@ -178,7 +213,7 @@ _ACS_LayoutSectionsCase() {
 	Assert(_ACS_TokenIndex(Tokens, "layout_emulation") > Emulation
 		&& _ACS_TokenIndex(Tokens, "layout_emulation") < AnyLayout, "the emulated layout has its own section")
 	for Row in ["layout_features_base", "layout_features_altgr", "layout_emulated_rows", "number_row_policy",
-			"accented_letters", "magic_key_source", "layout.ctrl_magic_save"]
+			"accented_letters"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " tunes the active layout")
 	AssertEqual(0, _ACS_CountLayoutToken(Tokens, "hotstrings.magic_key.replace"),
 		"the removed replacement switch must not reappear in the Layout menu")
@@ -196,7 +231,7 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 	SavedState := State.Clone()
 	try {
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", true,
-			"ergopti_variant", "ergopti_plus", "ctrl_magic_save", false,
+			"ergopti_variant", "ergopti_plus",
 			"direct_access_digits", "digits", "emulated_layout", "",
 				; Rows of the same section layout_switching owns: a provider listing the
 				; section's remainder drew them here as raw ids.

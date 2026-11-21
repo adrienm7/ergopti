@@ -70,7 +70,7 @@ _AMSG_Vectors := [
 	["save fixture cleanup", _CBRF_SaveFixtureRestoresPendingCaller, _CBRF_SaveDeclinesWhileFlagged],
 	["API removal cancellation", _WAR_RemovalRetainsSource.Bind("no"), _LLM_Menu_RemoveActiveApiEntry],
 	["model deletion cancellation", _LDCO_ConfirmationRetainsOwner.Bind("no"), _LLM_Menu_PromptDeleteCachedModel],
-	["native editor cohort", _MET_CohortRefusal.Bind(""), MagicEditorAcquireCohort]
+	["native editor cohort", _MET_CohortRefusal.Bind(""), StarSlotAcquireCohort]
 ]
 for _AMSG_Vector in _AMSG_Vectors {
 	Test("no-throw sentinel: " . _AMSG_Vector[1] . " healthy control (empty-message-owner)",

@@ -8,7 +8,7 @@ global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", true,
 	"emulate_home_row", true, "emulate_bottom_row", true),
 	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC039")
+global ScriptInformation := Map("MagicKeySourceScan", "SC039")
 global RemappedList := Map(), KeyboardShortcutAssignments := Map(), LayerEnabled := false
 global _LRPW_Emits := []
 
@@ -45,33 +45,35 @@ _LRPW_Run() {
 	; rather than a test registering the expected predicate on its behalf.
 	RemapKey(Scan, "z")
 	RemapKey(Scan, "y")
-	State := MagicEditorState()
+	State := StarSlotState()
 	_LRPW_Require(State["layouts"][Scan].Length == 1, "a later remap must replace its original broker context")
 	Slot := "meta_" . StrLower(Scan)
 	if _LRPW_Mode == "ordinary" {
 		KeyboardShortcutAssignments[Slot] := "copy"
-		_LRPW_Require(MagicEditorRecordOrdinaryPhysical(Slot, "copy"), "the explicit physical assignment must join")
+		_LRPW_Require(StarSlotRecordOrdinaryPhysical(Slot, "copy"), "the explicit physical assignment must join")
 	}
 	if _LRPW_Mode == "legacy"
-		MagicEditorRecordLegacy(Scan, (*) => _LRPW_Emits.Push("legacy"))
+		StarSlotRecordLegacy(Scan, (*) => _LRPW_Emits.Push("legacy"))
 	State["initialized"] := true
+	; The declared magic key owns its plain press alone (2026-11-21): its Win
+	; chord follows the native row like any other key of it.
 	ExpectedKind := _LRPW_Mode == "ordinary" ? "ordinary" : _LRPW_Mode == "legacy" ? "legacy"
-		: (_LRPW_Mode == "on" || _LRPW_Mode == "magic-source") ? "layout" : ""
-	Winner := _MagicEditorBrokerWinner(Scan)
+		: _LRPW_Mode == "on" ? "layout" : ""
+	Winner := _StarSlotBrokerWinner(Scan)
 	_LRPW_Require((Winner is Map ? Winner["kind"] : "") == ExpectedKind,
 		"row and magic policy must select only the admitted Win owner")
-	_LRPW_Require(_MagicEditorBrokerCriterion(Scan, 0, 0) == (ExpectedKind != ""),
+	_LRPW_Require(_StarSlotBrokerCriterion(Scan, 0, 0) == (ExpectedKind != ""),
 		"native consumption must agree with the actual winner")
-	_MagicEditorBrokerDispatch(Scan, 0, 0)
+	_StarSlotBrokerDispatch(Scan, 0, 0)
 	_LRPW_Require(_LRPW_Emits.Length == (ExpectedKind == "" ? 0 : 1), "dispatch must emit only once for an admitted owner")
 	if ExpectedKind != ""
 		_LRPW_Require(_LRPW_Emits[1] == (ExpectedKind == "ordinary" ? Slot : ExpectedKind == "legacy" ? "legacy" : "#y"),
 			"the exact independent owner or mapped Win chord must survive")
 	if _LRPW_Mode == "on" {
 		Features["layout"]["emulate_" . _LRPW_Row . "_row"] := false
-		_LRPW_Require(!(_MagicEditorBrokerWinner(Scan) is Map), "disabling the row must revoke the registered fallback immediately")
+		_LRPW_Require(!(_StarSlotBrokerWinner(Scan) is Map), "disabling the row must revoke the registered fallback immediately")
 		Features["layout"]["emulate_" . _LRPW_Row . "_row"] := true
-		_LRPW_Require(_MagicEditorBrokerWinner(Scan) is Map, "reenabling the row must restore its existing fallback")
+		_LRPW_Require(_StarSlotBrokerWinner(Scan) is Map, "reenabling the row must restore its existing fallback")
 	}
 }
 

@@ -222,7 +222,6 @@ _MI_StageLayout() {
 		"layout_emulation",       (*) => _LAY_EmulationChoiceRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
-		ConfigLeaf.MAGIC_KEY_SOURCE,       (*) => MagicKeySourceMenuRows(),
 		"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),
 		"active_layouts",         (*) => _LAY_ActiveLayoutRows(),
 		"layout_system_install",  (*) => SystemLayout_MenuRows(),

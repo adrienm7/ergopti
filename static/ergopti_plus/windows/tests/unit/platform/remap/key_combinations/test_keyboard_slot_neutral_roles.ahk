@@ -80,13 +80,11 @@ _KSNR_FamiliesAndKeysMatch() {
 	Corpus := _KSNR_Corpus()
 	_KSNR_AssertList(Corpus["families"]["windows"], SlotRoleFamilyPrefixes(), "families")
 	_KSNR_AssertList(Corpus["families"]["windows"], KeyboardSlotDeclaration()["groups"], "the declared groups")
-	; The menu lists its groups in the role table's order, the magic row first.
+	; The menu lists its groups in the role table's order, the ★ slot among Win's.
 	Listed := []
 	global KEYBOARD_SLOT_GROUPS
-	for Group in KEYBOARD_SLOT_GROUPS {
-		if Group["prefix"] != "magic_"
-			Listed.Push(Group["prefix"])
-	}
+	for Group in KEYBOARD_SLOT_GROUPS
+		Listed.Push(Group["prefix"])
 	_KSNR_AssertList(Corpus["families"]["windows"], Listed, "the menu groups")
 	Keys := KeyboardSlotDeclaration()["keys"]
 	for Extra in Corpus["extra_keys"]["windows"] {
@@ -179,7 +177,7 @@ _KSNR_EmulatedLetterKeepsItsKey() {
 		AssertEqual("SC030", KeyboardSlotLayoutScan("primary_b"), "whatever the scan's spelling")
 		AssertEqual("", KeyboardSlotLayoutScan("meta_c"), "the host layout answers a letter the emulation leaves")
 		AssertEqual("", KeyboardSlotLayoutScan("meta_space"), "a named key is no letter")
-		AssertEqual("", KeyboardSlotLayoutScan("magic_editor"), "the contextual slot names no chord")
+		AssertEqual("", KeyboardSlotLayoutScan("meta_star"), "the ★ slot's key is the broker's, not a role key")
 		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_b", "SC030"))
 		AssertEqual("^SC030", HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"]), "the Ctrl slot binds that key")
 		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_c", ""))
@@ -206,7 +204,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 	HadAssignments := IsSet(KeyboardShortcutAssignments)
 	if HadAssignments
 		SavedAssignments := KeyboardShortcutAssignments
-	State := MagicEditorState()
+	State := StarSlotState()
 	SavedPhysical := State["ordinary_physical"], SavedInitialized := State["initialized"]
 	Expected := Format("SC{:03X}", GetKeySC("s"))
 	RemappedList := Map()
@@ -216,7 +214,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 		AssertEqual(Expected, KeyboardSlotWinScan("meta_s"), "a letter the emulation leaves still binds its key")
 		AssertEqual("", KeyboardSlotWinScan("meta_sc029"), "a key spelled by its scan keeps that spelling")
 		AssertEqual("", KeyboardSlotWinScan("meta_capslock"), "so does Caps Lock")
-		AssertEqual("", KeyboardSlotWinScan("magic_editor"), "the contextual slot names no chord")
+		AssertEqual("", KeyboardSlotWinScan("meta_star"), "the ★ slot's key is the broker's, not a role key")
 		KeyboardShortcutsBindAll()
 		AssertTrue(State["ordinary_physical"].Has(Expected), "the Win slot joins the physical broker on its key")
 		AssertEqual("meta_s", State["ordinary_physical"][Expected]["slot"], "the broker runs that slot")
@@ -281,7 +279,7 @@ _KSNR_SlotsBindBetweenLayoutAndBroker() {
 	Src := _DriverSourceNoComments()
 	Layout := RegExMatch(Src, "m)^#Include\s.*\blayout\.ahk$")
 	Bind := InStr(Src, "KeyboardShortcutsBindAll()" . "`n")
-	Broker := InStr(Src, "MagicEditorStart()" . "`n")
+	Broker := InStr(Src, "StarSlotStart()" . "`n")
 	AssertTrue(Layout > 0 && Bind > Layout, "the slots bind once the layout tables exist")
 	AssertTrue(Broker > Bind, "the slots join the broker before it acquires its keys")
 }

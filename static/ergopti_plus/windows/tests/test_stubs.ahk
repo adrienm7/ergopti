@@ -75,14 +75,9 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; The physical magic key as the boot resolves it (feature_state.ahk and
-    ; LayoutRegistry_MagicKeySource): automatic, not chosen, on the shipped key.
-    "MagicKeySource", "auto",
+    ; The key the built-in Ergopti emulation declares as its magic key, as the
+    ; boot resolves it (LayoutRegistry_MagicKeySource).
     "MagicKeySourceScan", "SC02E",
-    "MagicKeySourceChar", "j",
-    "MagicKeySourceChosen", false,
-    "MagicKeySourceFollowsOsLayout", false,
-    "MagicKeySourceOverridesEmulation", false,
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",
@@ -129,6 +124,7 @@ global Features := Map(
         "e_circ",   Map("enabled", true, "letter", "x"),
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
+        "star",     Map("enabled", false, "letter", "s"),
         ; The number-row tap keys: an action id per key, "none" when unassigned.
         "tap_keys", Map(
             "number_row_left",    "screen_capture",
