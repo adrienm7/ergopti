@@ -1384,6 +1384,37 @@ MsgBox(Text := "", Title := "", Options := "") {
 	return IsObject(Responder) ? Responder(Text, Title, Options) : ""
 }
 
+; A real InputBox is a native window: a test path that reached one showed it on
+; the desktop and waited for a person. The stub answers Cancel, like the user
+; closing it, unless a test answers in the user's place.
+InputBox(Prompt := "", Title := "", Options := "", Default := "") {
+	TestInputBoxCount(true)
+	Responder := TestInputBoxResponder()
+	return IsObject(Responder) ? Responder(Prompt, Title, Options, Default) : {Result: "Cancel", Value: ""}
+}
+
+; Lets one test answer the stubbed InputBox. Always clear it (pass "") in the
+; test's finally block.
+; @param {Func|String} Responder Called with (Prompt, Title, Options, Default),
+;     returning {Result, Value}; "" clears.
+; @returns {Func|String} The responder in force.
+TestInputBoxResponder(Responder?) {
+	static Current := ""
+	if IsSet(Responder)
+		Current := Responder
+	return Current
+}
+
+; Counts the input dialogs the stub above absorbed.
+; @param {Boolean} Record True to count one more dialog.
+; @returns {Integer} Dialogs absorbed so far.
+TestInputBoxCount(Record := false) {
+	static Count := 0
+	if Record
+		Count += 1
+	return Count
+}
+
 ; Lets one test answer the stubbed MsgBox in place of the user, for code that
 ; acts on the reply. Always clear it (pass "") in the test's finally block.
 ; @param {Func|String} Responder Called with (Text, Title, Options); "" clears.

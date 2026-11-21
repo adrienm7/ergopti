@@ -449,6 +449,7 @@ InstallSendNoOps()
 #Include unit/core/ui/windows/test_native_dialog_titles.ahk
 #Include unit/core/ui/windows/test_input_box_single_instance.ahk
 #Include unit/core/ui/windows/test_app_picker_names.ahk
+#Include unit/core/ui/windows/test_suite_dialog_stubs.ahk
 #Include unit/core/ui/windows/test_native_file_filter_behavior.ahk
 #Include unit/core/ui/windows/test_native_folder_orchestration.ahk
 #Include unit/core/ui/windows/test_native_file_filter_diagnostics.ahk
