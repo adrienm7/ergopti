@@ -301,3 +301,6 @@ Hands needed:
       instead of the logo, VoiceOver reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the
       configured language, and the log holds one error naming the file, not one per pause; resume: the logo comes
       back. Put the file back.
+- [ ] Screen-reader switch of the previews (2026-11-21): with VoiceOver on, Hotstrings > Preview bubbles >
+      « Read previews to the screen reader » ticked by default: a preview and a finished AI prediction are said;
+      untick it: both still draw and nothing is said; tick it again: said again, without a restart.

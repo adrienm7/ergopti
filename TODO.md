@@ -776,6 +776,11 @@ Each question names the default kept meanwhile; an answer moves into the item or
       translated.
   1. **(recommended) Translate them** through `t()` and `locales/en.js`, dropping each `lang="fr"` as it goes.
   2. Keep them French on the English page.
+- [ ] **Undo with no timer (decided by the agent on 2026-11-17, to review by the maintainer).** The Studio's restores
+      offer « Undo » until the section is edited again or another restore replaces it, not for a few seconds (WCAG
+      2.2.1, no time limits). Kept meanwhile: no timer.
+  1. **(recommended) Keep it without a timer.**
+  2. Hide the offer after a delay, paused while it has the focus or the pointer.
 - [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
       Utilisation page is split into « Essayer » and `/ergopti/installation` (downloads, OS guides, printable
       layouts); `/utilisation` without an anchor lands on installation. « Essayer » is now Ergopti Studio's tab
@@ -806,12 +811,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
       and corner mark); ISO ticks for split and ortholinear boards.
-- [ ] **Accessibility choices of the second pass (decided by the agent on 2026-11-17, to review by the
-      maintainer).** The legacy `/ergopti-plus-old` page is kept and fixed, not retired, since the new Ergopti+ page
-      links to it (« Ancienne version de cette page »); the system's « increase contrast » (`prefers-contrast:
-more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
-      stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
-      first, not in board order. Approve or change.
 - [ ] **Configuration rows outside a reload (decided by the agent on 2026-11-21, to review by the maintainer)**
       ([configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md),
       [decision](docs/memory/maintainer-decisions.md)). (1) Option a, on macOS and Linux: a `[script]` row

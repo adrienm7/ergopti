@@ -349,3 +349,6 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Testers: Netskope tester's download retry, T1-T4 ([matrix](docs/tooling/windows-exe-flagged-by-proxy.md));
       number-row, key-combination (c89d74eb) and priority-100 (cf29c35e5f) testers with their exact setup.
 - [ ] `/retest` on AppImage/appimage.github.io#10422 from PowerShell, then read the bot's screenshot (98d41e630b).
+- [ ] Screen-reader switch of the previews (2026-11-21): with Narrator and NVDA on, Hotstrings > Preview bubbles >
+      « Read previews to the screen reader » ticked by default: a preview and a finished AI prediction are said;
+      untick it: both still draw and nothing is said; tick it again: said again, without a restart.

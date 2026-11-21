@@ -216,6 +216,51 @@ at the caret, Tab leaving the field, Backspace, a waiting dead key) moved to
 Ergopti+ extras (the ★ text replacements and its replacement list) went with
 the page, an open question in TODO.md.
 
+## The site reads in English where Ergopti+ does (2026-11-21)
+
+The maintainer chose to translate now. The ten Ergopti+ sections that were
+French only, the accessibility statement (`/accessibilite`) and its settings
+dialog (`A11ySettings.svelte`) go through the Ergopti+ `t()` dictionary
+(`src/routes/ergopti-plus/locales/en.js`, keyed by the French source); none of
+them carries a section-level `lang="fr"` any more (French example words keep
+their own). The statement restores the Ergopti+ language choice and offers its
+toggle; the dialog follows it with `lang={i18n.lang}` inside the French site
+header. `tools/test/test-ergopti-plus-languages.cjs`
+and `tools/test/test-site-languages.cjs` fail when a French-only section comes
+back under the English page, so a new section is written through `t()` from the
+start. The rest of the site keeps no locale system; the 21 locales stay the
+apps' own.
+
+## The legacy Ergopti+ page is retired (2026-11-21)
+
+The maintainer removed `/ergopti-plus-old` and the « Ancienne version de cette
+page » link. The old address is a prerendered 308 redirect to `/ergopti-plus`
+(`src/routes/ergopti-plus-old/+page.js`, the `/editeur` pattern), exercised by
+`site-structure.playwright.cjs`'s redirects; it is no site page in
+`tools/ci/site-artifact.cjs`. Do not restore the old content.
+
+## A switch for the screen-reader notices of the previews (2026-11-21)
+
+The maintainer asked for a menu row that can silence the tooltip notices. The
+hotstring previews and the finished AI predictions are still said only while
+a screen reader runs (Windows `SPI_GETSCREENREADER`, VoiceOver, Orca), and
+`hotstrings.preview_announcements` (default on, three OS, labels in the 21
+locales) turns them off. It is the preview menu's last row, in its own
+section after the colours and glyphs (`menu.preview_announce_control`). Each
+announce path reads it: Windows `_TooltipAnnouncePresented` through
+`HSE_PreviewSwitchCurrent`, macOS `renderer.announce` through the tooltip
+config's `announcements_enabled`, Linux `graphics_renderer.describe_window`,
+which keeps the tooltip role instead of the notification Orca speaks. The other
+spoken surfaces (the WPM widget, the spotlight, the banners) follow the screen
+reader alone.
+
+## High contrast and the heatmap order stay as built (2026-11-21)
+
+The maintainer kept the second accessibility pass's other choices: the
+heatmap table lists keys by value, largest first, not in board order, and the
+system's « increase contrast » (`prefers-contrast: more`) does not switch the
+Studio frames to the black-and-yellow theme, which stays the site setting's.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
