@@ -54,6 +54,34 @@ helpers.describe("Ollama pull failure logging", function()
 		end)
 	end)
 
+	-- OLL-14: a pull that filled the disk showed the generic download failure.
+	helpers.it("a pull that fills the disk names the full disk (ollama-pull-disk-full)", function()
+		with_fixture({}, function(f)
+			local cancels = 0
+			helpers.assert_true(f.manager.pull_model("granite4:350m-h", "granite4:350m-h",
+				function() return true end, function() cancels = cancels + 1; return true end,
+				{ is_current = function() return true end }))
+			f.pulls[1].on_done(1, "OLLAMA_PULL_STATUS downloading\nOLLAMA_PULL_ERROR no_space\nOLLAMA_PULL_OUTCOME error_row\n", "")
+			helpers.assert_eq(#f.pulls, 1, "a full disk is not pulled again")
+			helpers.assert_eq(cancels, 1)
+			local record = f.notification_records[#f.notification_records]
+			helpers.assert_not_nil(record, "the failure is announced")
+			helpers.assert_eq(record[2], "ollama.pull_error.disk_full", "the notice names the full disk")
+		end)
+	end)
+
+	helpers.it("another pull class keeps the generic download failure (ollama-pull-disk-full)", function()
+		with_fixture({}, function(f)
+			helpers.assert_true(f.manager.pull_model("granite4:350m-h", "granite4:350m-h",
+				function() return true end, function() return true end,
+				{ is_current = function() return true end }))
+			f.pulls[1].on_done(1, "OLLAMA_PULL_STATUS downloading\nOLLAMA_PULL_ERROR max_retries\nOLLAMA_PULL_OUTCOME error_row\n", "")
+			local record = f.notification_records[#f.notification_records]
+			helpers.assert_not_nil(record, "the failure is announced")
+			helpers.assert_eq(record[2], "ollama.download_error")
+		end)
+	end)
+
 	-- Field run 2026-11-01: the log kept "OLLAMA_PULL_OUTCOME error_row", the
 	-- worker's closing summary, and lost the class printed just before it.
 	helpers.it("logs the error class and the stage of a managed pull, not its closing outcome (ollama-pull-class-logged)", function()

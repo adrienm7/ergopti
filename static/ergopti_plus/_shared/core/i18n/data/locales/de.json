@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "Ollama konnte nicht installiert werden: Ergopti darf nicht in seinen Installationsordner schreiben. Prüfen Sie die Berechtigungen dieses Ordners und versuchen Sie es erneut. Es wurde nichts installiert.",
 	"ollama.install_error.cancelled": "Die Installation von Ollama wurde abgebrochen. Es wurde nichts installiert.",
 	"ollama.install_error.unknown": "Ollama konnte aus einem Grund, den Ergopti nicht erkennt, nicht installiert werden. Es wurde nichts installiert. Versuchen Sie es erneut; schlägt es wieder fehl, senden Sie den Diagnosebericht.",
+	"ollama.pull_error.disk_full": "%s konnte nicht heruntergeladen werden: Auf dem Datenträger ist nicht genug freier Speicher für das Modell. Geben Sie Speicherplatz frei und versuchen Sie es erneut.",
 	"ollama.error_installer_refused": "Der Ollama-Installer von Ergopti hat seine eigene Anfrage abgelehnt; es wurde nichts installiert. Starten Sie Ergopti neu und wählen Sie erneut das Ollama-Backend; falls es weiterhin auftritt, senden Sie den Diagnosebericht.",
 	"ollama.error_runtime_refused": "Ergopti konnte seine festgelegte Ollama-Laufzeit nicht prüfen (Release-Katalog oder Integritätsprüfung); es wurde nichts installiert. Senden Sie den Diagnosebericht.",
 	"ollama.error_dev_catalogue_missing": "Diese Entwickler-App hat ihr festgelegtes Ollama noch nicht aus den Quellen des Klons gebaut; es wurde nichts installiert. Führen Sie tools/dev/run-macos-dev-app.sh erneut aus und lesen Sie den angezeigten Grund (Go und die Xcode-Werkzeuge sind erforderlich).",

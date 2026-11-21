@@ -18,7 +18,7 @@ M.UNKNOWN = "unknown"
 
 --- Admits the decoded data file; a malformed one is a broken install.
 --- @param data table Decoded ollama_install_errors.json.
---- @return table classifier { classify(evidence), message_key(class) }.
+--- @return table classifier { classify(evidence), message_key(class), pull_failure(pull_class) }.
 function M.new(data)
 	if type(data) ~= "table" or data.schema_version ~= 1 or type(data.messages) ~= "table"
 		or type(data.classes) ~= "table" or #data.classes == 0 then
@@ -43,6 +43,25 @@ function M.new(data)
 		end
 		messages[class] = key
 	end
+	-- A full disk is one cause whether the runtime or a model fills it (OLL-14).
+	if type(data.pull) ~= "table" or type(data.pull_messages) ~= "table" then
+		error("ollama_install_errors.json names no pull classes", 2)
+	end
+	local pull_messages = {}
+	for class, key in pairs(data.pull_messages) do
+		if type(class) ~= "string" or not messages[class] or type(key) ~= "string"
+			or not key:match("^ollama%.pull_error%.[a-z_]+$") then
+			error("ollama_install_errors.json pull message of " .. tostring(class) .. " is malformed", 2)
+		end
+		pull_messages[class] = key
+	end
+	local pulls = {}
+	for pull_class, class in pairs(data.pull) do
+		if type(pull_class) ~= "string" or pull_class == "" or type(class) ~= "string" or not pull_messages[class] then
+			error("ollama_install_errors.json pull class " .. tostring(pull_class) .. " is malformed", 2)
+		end
+		pulls[pull_class] = class
+	end
 	local classifier = {}
 
 	--- Names the class of one failure, first matching row wins.
@@ -64,6 +83,18 @@ function M.new(data)
 		local key = messages[class]
 		if not key then error("unknown Ollama install error class " .. tostring(class), 2) end
 		return key
+	end
+
+	--- The install class and message of a failed model pull, when its pull
+	--- class is one (a full disk); any other pull keeps its generic failure.
+	--- @param pull_class string A class of ollama_pull_errors.json.
+	--- @return string|nil class
+	--- @return string|nil key The locale key, its %s the model tag.
+	function classifier.pull_failure(pull_class)
+		if type(pull_class) ~= "string" then error("pull class must be a string", 2) end
+		local class = pulls[pull_class]
+		if not class then return nil, nil end
+		return class, pull_messages[class]
 	end
 
 	return classifier

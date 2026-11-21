@@ -13,6 +13,11 @@
 			"class": "no_space"
 		},
 		{
+			"id": "disk_full_windows",
+			"message": "write C:\\Users\\user\\.ollama\\models\\blobs\\sha256-a-partial: There is not enough space on the disk.",
+			"class": "no_space"
+		},
+		{
 			"id": "permission",
 			"message": "open /models/blobs: permission denied",
 			"class": "permission_denied"

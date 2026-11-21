@@ -300,9 +300,16 @@ function dispatch(request)
 				return
 			end
 			local message = translated("download_window.done_success")
+			local pull_class = not succeeded and M.error_class(request.remote_error) or nil
+			local install_key = pull_class
+				and (require("ai.engine.ollama.install_error_messages").for_pull(pull_class)) or nil
 			if digest_mismatch then
 				Logger.error(LOG, "The Ollama pull of '%s' failed its digest check again.", request.tag)
 				message = string.format(translated("ollama.digest_mismatch"), request.tag)
+			elseif install_key then
+				-- A full disk names its cause, as the runtime install does (OLL-14).
+				Logger.error(LOG, "The Ollama pull of '%s' failed as %s: %s.", request.tag, pull_class, request.remote_error)
+				message = string.format(translated(install_key), request.tag)
 			elseif not succeeded then
 				message = failure_message(request)
 			end

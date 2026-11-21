@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "Ollama kunde inte installeras: Ergopti får inte skriva i sin installationsmapp. Kontrollera mappens behörigheter och försök igen. Inget installerades.",
 	"ollama.install_error.cancelled": "Installationen av Ollama avbröts. Inget installerades.",
 	"ollama.install_error.unknown": "Ollama kunde inte installeras av en anledning som Ergopti inte känner igen. Inget installerades. Försök igen; om det misslyckas igen, skicka diagnosrapporten.",
+	"ollama.pull_error.disk_full": "%s kunde inte laddas ned: disken har inte tillräckligt med ledigt utrymme för modellen. Frigör diskutrymme och försök igen.",
 	"ollama.error_installer_refused": "Ergoptis Ollama-installerare vägrade sin egen begäran, så inget installerades. Starta om Ergopti och välj Ollama-backend igen; om det kvarstår, skicka diagnostikrapporten.",
 	"ollama.error_runtime_refused": "Ergopti kunde inte verifiera sin fastlåsta Ollama-version (versionskatalog eller integritetskontroll), så inget installerades. Skicka diagnostikrapporten.",
 	"ollama.error_dev_catalogue_missing": "Den här utvecklarappen har ännu inte byggt sin fastlåsta Ollama från klonens källkod, så inget installerades. Kör tools/dev/run-macos-dev-app.sh igen och läs orsaken som visas (Go och Xcode-verktygen krävs).",

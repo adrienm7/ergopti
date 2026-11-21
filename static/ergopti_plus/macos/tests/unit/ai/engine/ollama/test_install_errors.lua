@@ -59,6 +59,14 @@ helpers.describe("Managed Ollama install errors (ollama-install-errors)", functi
 			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.unpacked_bytes, case.margin_bytes, case.free_bytes),
 				case.fits, case.id)
 		end
+		-- OLL-14: a model pull that filled the disk shows the full disk.
+		helpers.assert_true(#vectors.pull_cases > 0, "the corpus names its pull cases")
+		local Messages = require("ai.engine.ollama.install_error_messages")
+		for _, case in ipairs(vectors.pull_cases) do
+			local key, class = Messages.for_pull(case.pull_class)
+			helpers.assert_eq(class, case.class, case.id)
+			helpers.assert_eq(key, case.class and ("ollama.pull_error." .. case.class) or nil, case.id)
+		end
 	end)
 
 	helpers.it("a network outage names the network, not the diagnostics report", function()

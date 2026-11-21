@@ -1813,6 +1813,9 @@ function M.new(deps, presets, ram_getter)
 				-- (field run 2026-10-31: a fresh 366 MB layer failed its check).
 				local digest_mismatch = pull_output:find("OLLAMA_PULL_ERROR digest_mismatch", 1, true) ~= nil
 				local digest_retried = type(opts) == "table" and opts.digest_mismatch_retried == true
+				-- A pull that filled the disk names it, as the runtime install does (OLL-14).
+				local install_key = managed_error ~= nil
+					and (require("ai.engine.ollama.install_error_messages").for_pull(managed_error)) or nil
 
 				if network_report then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
@@ -1842,6 +1845,10 @@ function M.new(deps, presets, ram_getter)
 				elseif digest_mismatch then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
 						string.format(i18n.get("ollama.digest_mismatch"), target_model), "error")
+					complete_progress_ui(owner, false, target_model)
+				elseif install_key then
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						string.format(i18n.get(install_key), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
 				elseif pac_fallback then
 					-- Both causes: the PAC could not be used, then the direct try failed too.

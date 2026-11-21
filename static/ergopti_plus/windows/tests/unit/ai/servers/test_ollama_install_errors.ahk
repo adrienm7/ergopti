@@ -37,6 +37,16 @@ _OIE_ReplaysTheCorpus() {
 	AssertThrows(() => LLM_OllamaInstallFits("", 0, 0, 1), "a missing asset size is refused, not guessed")
 	AssertThrows(() => LLM_OllamaInstallFits(1, "", 0, 1), "a missing unpacked size is refused, not guessed")
 	AssertThrows(() => LLM_OllamaInstallErrorKey("no_such_class"), "an unknown class has no message")
+	; OLL-14: a model pull that filled the disk shows the full disk, as macOS and Linux do.
+	AssertTrue(Corpus["pull_cases"].Length > 0, "the corpus names its pull cases")
+	for Vector in Corpus["pull_cases"] {
+		Class := LLM_OllamaPullInstallClass(Vector["pull_class"])
+		AssertEqual(Vector.Get("class", ""), Class, Vector["id"])
+		if Class != ""
+			AssertEqual("ollama.pull_error." . Class, LLM_OllamaPullInstallKey(Class), Vector["id"])
+	}
+	AssertEqual("", LLM_OllamaPullInstallClass(""), "no pull class is no install class")
+	AssertThrows(() => LLM_OllamaPullInstallKey("network"), "a class without a pull message has none")
 }
 Test("managed install errors: every shared vector has its class (ollama-install-error-vectors)", _OIE_ReplaysTheCorpus)
 
@@ -46,7 +56,10 @@ _OIE_RefusesMalformedData() {
 		for Text in ['{"schema_version":2,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["x","unknown"]]}',
 				'{"schema_version":1,"messages":{},"classes":[["x","unknown"]]}',
 				'{"schema_version":1,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["X","unknown"]]}',
-				'{"schema_version":1,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["x","network"]]}'] {
+				'{"schema_version":1,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["x","network"]]}',
+				'{"schema_version":1,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["x","unknown"]]}',
+				'{"schema_version":1,"messages":{"unknown":"ollama.install_error.unknown"},"classes":[["x","unknown"]],'
+				. '"pull":{"no_space":"disk_full"},"pull_messages":{"unknown":"ollama.pull_error.unknown"}}'] {
 			if FileExist(Path)
 				FileDelete(Path)
 			FileAppend(Text, Path, "UTF-8-RAW")

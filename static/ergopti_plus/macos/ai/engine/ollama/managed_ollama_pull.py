@@ -468,6 +468,7 @@ STATUS_WORDS = {
 ERROR_CLASSES = (
     ("digest mismatch", "digest_mismatch"),
     ("no space left", "no_space"),
+    ("not enough space on the disk", "no_space"),
     ("permission denied", "permission_denied"),
     ("context canceled", "cancelled"),
     ("max retries", "max_retries"),

@@ -31,6 +31,7 @@ local MODULES = {
 	"ui.download_window.javascript",
 	"ai.ui.menu.requirement_operation_registry",
 	"ai.ui.menu.models.manager_ollama",
+	"ai.engine.ollama.install_error_messages",
 }
 
 local function with_fixture(options, callback)
@@ -208,12 +209,15 @@ local function with_fixture(options, callback)
 		urlevent = { openURL = noop },
 	}
 	package.loaded["ai.ui.menu.models.manager_ollama"] = nil
+	-- A failed pull reads the shared install classes (OLL-14) through
+	-- core.fs.engine.paths, whose hs.fs this fixture omits: the real data file.
+	package.loaded["ai.engine.ollama.install_error_messages"] = nil
+	package.loaded["core.fs.engine.paths"] = { shared = function(relative)
+		return helpers.driver_root() .. "../_shared" .. (relative and ("/" .. relative) or "")
+	end }
 	local real_window, native_window
 	if options.real_window then
 		helpers.provide_timings()
-		package.loaded["core.fs.engine.paths"] = { shared = function()
-			return helpers.driver_root() .. "../_shared"
-		end }
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.download_window.javascript"] = nil
 		package.loaded["core.ui.ui.builder"] = {

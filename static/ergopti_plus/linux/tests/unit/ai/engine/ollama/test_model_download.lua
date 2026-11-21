@@ -802,6 +802,37 @@ helpers.describe("Ollama model download: shared pull error classes (OLL-01)", fu
 		if not ok then error(err, 0) end
 	end)
 
+	-- OLL-14: a pull that filled the disk showed the generic « Download failed ».
+	helpers.it("ollama-pull-disk-full: a pull that fills the disk names the full disk", function()
+		local I18n = require("core.i18n.engine.i18n")
+		for _, text in ipairs({ "write /models/blobs/sha256-a-partial: no space left on device",
+			"write C:\\models\\blobs\\sha256-a-partial: There is not enough space on the disk." }) do
+			local Download, transport, window = load_fixture()
+			local ok, err = xpcall(function()
+				helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+				transport.starts[1].on_chunk(error_frame(text))
+				transport.starts[1].on_done({ ok = true })
+				helpers.assert_eq(window.completions[1][2], false)
+				helpers.assert_eq(window.completions[1][3], string.format(I18n.get("ollama.pull_error.disk_full"), "qwen:2b"), text)
+				helpers.assert_true(window.completions[1][3] ~= I18n.get("menu.llm.download_failed"), "not the generic failure")
+			end, debug.traceback)
+			restore()
+			if not ok then error(err, 0) end
+		end
+	end)
+
+	helpers.it("ollama-pull-disk-full: another pull error keeps the generic failure", function()
+		local Download, transport, window = load_fixture()
+		local ok, err = xpcall(function()
+			helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen 2B"))
+			transport.starts[1].on_chunk(error_frame("pull model manifest: read: connection reset by peer"))
+			transport.starts[1].on_done({ ok = true })
+			helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get("menu.llm.download_failed"))
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	-- OLL-02: the ceiling is the shared registry's, which Windows reads too.
 	helpers.it("ollama-model-pull-ceiling: the pull ceiling comes from the timing registry", function()
 		local Download, transport = load_fixture()

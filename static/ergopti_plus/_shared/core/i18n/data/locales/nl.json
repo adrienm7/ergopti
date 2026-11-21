@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "Ollama kon niet worden geïnstalleerd: Ergopti mag niet schrijven in zijn installatiemap. Controleer de rechten van die map en probeer het opnieuw. Er is niets geïnstalleerd.",
 	"ollama.install_error.cancelled": "De installatie van Ollama is geannuleerd. Er is niets geïnstalleerd.",
 	"ollama.install_error.unknown": "Ollama kon niet worden geïnstalleerd om een reden die Ergopti niet herkent. Er is niets geïnstalleerd. Probeer het opnieuw; mislukt het weer, stuur dan het diagnoserapport.",
+	"ollama.pull_error.disk_full": "%s kon niet worden gedownload: de schijf heeft niet genoeg vrije ruimte voor het model. Maak schijfruimte vrij en probeer het opnieuw.",
 	"ollama.error_installer_refused": "Het Ollama-installatieprogramma van Ergopti weigerde zijn eigen verzoek; er is niets geïnstalleerd. Start Ergopti opnieuw en kies opnieuw de Ollama-backend; als het blijft gebeuren, stuur dan het diagnoserapport.",
 	"ollama.error_runtime_refused": "Ergopti kon zijn vastgezette Ollama-runtime niet verifiëren (releasecatalogus of integriteitscontrole); er is niets geïnstalleerd. Stuur het diagnoserapport.",
 	"ollama.error_dev_catalogue_missing": "Deze ontwikkelaarsapp heeft zijn vastgezette Ollama nog niet uit de bronnen van de kloon gebouwd, dus er is niets geïnstalleerd. Voer tools/dev/run-macos-dev-app.sh opnieuw uit en lees de reden die het toont (Go en de Xcode-tools zijn nodig).",

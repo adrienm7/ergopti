@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "Não foi possível instalar o Ollama: o Ergopti não tem permissão para escrever na sua pasta de instalação. Verifique as permissões dessa pasta e tente novamente. Nada foi instalado.",
 	"ollama.install_error.cancelled": "A instalação do Ollama foi cancelada. Nada foi instalado.",
 	"ollama.install_error.unknown": "Não foi possível instalar o Ollama por um motivo que o Ergopti não reconhece. Nada foi instalado. Tente novamente; se voltar a falhar, envie o relatório de diagnóstico.",
+	"ollama.pull_error.disk_full": "Não foi possível transferir %s: o disco não tem espaço livre suficiente para o modelo. Liberte espaço em disco e tente novamente.",
 	"ollama.error_installer_refused": "O instalador do Ollama do Ergopti recusou o seu próprio pedido, por isso nada foi instalado. Reinicie o Ergopti e escolha novamente o motor Ollama; se persistir, envie o relatório de diagnóstico.",
 	"ollama.error_runtime_refused": "O Ergopti não conseguiu verificar a sua versão fixada do Ollama (catálogo de versões ou verificação de integridade), por isso nada foi instalado. Envie o relatório de diagnóstico.",
 	"ollama.error_dev_catalogue_missing": "Esta app de desenvolvimento ainda não compilou o seu Ollama fixado a partir das fontes do clone, por isso nada foi instalado. Execute novamente tools/dev/run-macos-dev-app.sh e leia o motivo indicado (são necessários o Go e as ferramentas do Xcode).",

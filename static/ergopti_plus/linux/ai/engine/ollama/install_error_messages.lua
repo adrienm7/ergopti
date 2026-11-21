@@ -6,7 +6,8 @@
 --- Reads _shared/ai/data/ollama_install_errors.json once and names the message
 --- of a failed runtime repair: an install failure shows its class's own words
 --- (a full disk, an unreachable host, a corrupted download), any other repair
---- failure the generic ollama.runtime_repair_failed (OLL-04, OLL-05).
+--- failure the generic ollama.runtime_repair_failed (OLL-04, OLL-05). A model
+--- pull that filled the disk names it too (OLL-14).
 --- ==============================================================================
 
 local M = {}
@@ -41,6 +42,16 @@ function M.for_result(result)
 	local classifier = M.classifier()
 	local class = classifier.classify(result.install_failure)
 	return classifier.message_key(class), class
+end
+
+--- The locale key and install class of a failed model pull whose class is an
+--- install class too (a full disk, OLL-14).
+--- @param pull_class string A class of _shared/ai/data/ollama_pull_errors.json.
+--- @return string|nil key Its %s is the model tag; nil keeps the generic pull failure.
+--- @return string|nil class
+function M.for_pull(pull_class)
+	local class, key = M.classifier().pull_failure(pull_class)
+	return key, class
 end
 
 return M

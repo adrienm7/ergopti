@@ -7,7 +7,8 @@
 --- of a failed managed runtime install from the evidence line
 --- ai/engine/ollama/managed_ollama_runtime.py prints (OLLAMA_INSTALL_FAILURE):
 --- a full disk, an unreachable host and a corrupted download each show their
---- own cause, not « send the diagnostics report » (OLL-04, OLL-05).
+--- own cause, not « send the diagnostics report » (OLL-04, OLL-05). A model
+--- pull that filled the disk names it too (OLL-14).
 --- ==============================================================================
 
 local M = {}
@@ -41,6 +42,16 @@ function M.for_evidence(evidence)
 	local classifier = M.classifier()
 	local class = classifier.classify(evidence)
 	return classifier.message_key(class), class
+end
+
+--- The locale key and install class of a failed model pull whose class is an
+--- install class too (a full disk, OLL-14).
+--- @param pull_class string The class the pull worker printed (OLLAMA_PULL_ERROR).
+--- @return string|nil key Its %s is the model tag; nil keeps the generic pull failure.
+--- @return string|nil class
+function M.for_pull(pull_class)
+	local class, key = M.classifier().pull_failure(pull_class)
+	return key, class
 end
 
 return M

@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"_comment": "OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). `cases`: one install failure's evidence line, as the driver named in `os` writes it, and the class _shared/ai/data/ollama_install_errors.json gives it; every driver replays every case, since the rule is one. `free_space`: the pinned asset's bytes, its unpacked bytes, the registry margin and the free bytes of the install volume, and whether the download may start. Replayed by windows/tests/unit/ai/servers/test_ollama_install_errors.ahk, linux/tests/unit/ai/engine/ollama/test_install_errors.lua and macos/tests/unit/ai/engine/ollama/test_install_errors.lua, the macOS free-space rule by tools/test/macos_managed_ollama_install_errors_test.py.",
+	"_comment": "OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). `cases`: one install failure's evidence line, as the driver named in `os` writes it, and the class _shared/ai/data/ollama_install_errors.json gives it; every driver replays every case, since the rule is one. `free_space`: the pinned asset's bytes, its unpacked bytes, the registry margin and the free bytes of the install volume, and whether the download may start. `pull_cases`: a failed model pull's class (ollama_pull_errors.json) and the install class whose pull message it shows; a case without `class` keeps the generic pull failure (OLL-14). Replayed by windows/tests/unit/ai/servers/test_ollama_install_errors.ahk, linux/tests/unit/ai/engine/ollama/test_install_errors.lua and macos/tests/unit/ai/engine/ollama/test_install_errors.lua, the macOS free-space rule by tools/test/macos_managed_ollama_install_errors_test.py.",
 	"cases": [
 		{
 			"id": "windows_disk_full_write",
@@ -249,6 +249,29 @@
 			"margin_bytes": 1073741824,
 			"free_bytes": 0,
 			"fits": false
+		}
+	],
+	"pull_cases": [
+		{
+			"id": "pull_no_space",
+			"pull_class": "no_space",
+			"class": "disk_full"
+		},
+		{
+			"id": "pull_connection",
+			"pull_class": "connection"
+		},
+		{
+			"id": "pull_permission",
+			"pull_class": "permission_denied"
+		},
+		{
+			"id": "pull_digest_mismatch",
+			"pull_class": "digest_mismatch"
+		},
+		{
+			"id": "pull_other",
+			"pull_class": "other"
 		}
 	]
 }

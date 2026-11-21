@@ -693,6 +693,57 @@ _G4B_OtherPullErrorNotRetried() {
 }
 Test("managed bootstrap: another pull error is not retried (ollama-digest-mismatch)", _G4B_OtherPullErrorNotRetried)
 
+; OLL-14: a first-model pull that filled the disk showed « Local Ollama could not
+; be prepared »; it names the full disk and the model.
+_G4B_PullDiskFullNamesTheDisk(Output) {
+	global _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, Output], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.Pulls, "a full disk is not pulled again")
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(StrReplace(t("ollama.pull_error.disk_full"), "%s", F.Model), _LLM_Deps_FailureMessage,
+			"the failure names the full disk and the model")
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+}
+for _G4B_DiskOutput in ["pulling manifest`nError: write C:\models\blobs\sha256-a-partial: There is not enough space on the disk.`n",
+		"pulling manifest`nError: write /models/blobs/sha256-a-partial: no space left on device`n"]
+	Test("managed bootstrap: a pull that fills the disk names the disk " . A_Index . " (ollama-pull-disk-full)",
+		_G4B_PullDiskFullNamesTheDisk.Bind(_G4B_DiskOutput))
+
+; The menu pull of an installed runtime shows the same words.
+_G4B_MenuPullFailKey(Output) {
+	F := _G4B_Fixture()
+	Keys := []
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready)
+		F.Flow.DefineProp("_MenuPullFail",
+			{Call: (Self, Operation, Key := "ollama.runtime_repair_failed") => (Keys.Push(Key), false)})
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, Output]]
+		F.Flow.PullModel(F.Model, (*) => 0)
+		AssertEqual(1, Keys.Length, "the menu pull fails once")
+		return Keys[1]
+	} finally F.Close()
+}
+_G4B_MenuPullDiskFull() {
+	AssertEqual("ollama.pull_error.disk_full",
+		_G4B_MenuPullFailKey("pulling manifest`nError: write /models/blobs/sha256-a-partial: no space left on device`n"))
+	AssertEqual("ollama.runtime_repair_failed",
+		_G4B_MenuPullFailKey("pulling manifest`nError: pull model manifest: read: connection reset by peer`n"),
+		"another pull class keeps the generic failure")
+}
+Test("managed bootstrap: a menu pull that fills the disk names the disk (ollama-pull-disk-full)", _G4B_MenuPullDiskFull)
+
 _G4B_MenuDigestRetry(Script, ExpectedPulls, ExpectedPublished) {
 	F := _G4B_Fixture()
 	Published := 0

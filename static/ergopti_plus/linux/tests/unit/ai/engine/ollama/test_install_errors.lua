@@ -41,6 +41,18 @@ helpers.describe("Managed Ollama install errors (Linux)", function()
 		end
 	end)
 
+	-- OLL-14: a model pull that filled the disk shows the full disk, as Windows and macOS do.
+	helpers.it("ollama-install-error-vectors: the install class of every shared pull vector", function()
+		local cases = corpus().pull_cases
+		helpers.assert_true(#cases > 0, "the corpus names its pull cases")
+		for _, case in ipairs(cases) do
+			local key, class = Messages.for_pull(case.pull_class)
+			helpers.assert_eq(class, case.class, case.id)
+			helpers.assert_eq(key, case.class and ("ollama.pull_error." .. case.class) or nil, case.id)
+		end
+		helpers.assert_true(not pcall(Messages.for_pull, nil), "a missing pull class is refused")
+	end)
+
 	helpers.it("ollama-install-error-vectors: the free-space rule of every shared vector", function()
 		for _, case in ipairs(corpus().free_space) do
 			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.unpacked_bytes, case.margin_bytes, case.free_bytes),

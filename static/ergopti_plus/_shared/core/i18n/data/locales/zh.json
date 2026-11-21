@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "无法安装 Ollama：Ergopti 没有写入其安装文件夹的权限。请检查该文件夹的权限，然后重试。未安装任何内容。",
 	"ollama.install_error.cancelled": "Ollama 安装已取消。未安装任何内容。",
 	"ollama.install_error.unknown": "Ollama 因 Ergopti 无法识别的原因未能安装。未安装任何内容。请重试；如果再次失败，请发送诊断报告。",
+	"ollama.pull_error.disk_full": "无法下载 %s：磁盘没有足够的可用空间来存放该模型。请释放一些磁盘空间，然后重试。",
 	"ollama.error_installer_refused": "Ergopti 的 Ollama 安装程序拒绝了自身的请求，因此未安装任何内容。请重新启动 Ergopti 并再次选择 Ollama 后端；如果问题仍然存在，请发送诊断报告。",
 	"ollama.error_runtime_refused": "Ergopti 无法验证其固定版本的 Ollama（发布目录或完整性检查），因此未安装任何内容。请发送诊断报告。",
 	"ollama.error_dev_catalogue_missing": "此开发者应用尚未从克隆的源代码构建其固定版本的 Ollama，因此未安装任何内容。请重新运行 tools/dev/run-macos-dev-app.sh 并查看其显示的原因（需要 Go 和 Xcode 工具）。",

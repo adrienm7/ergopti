@@ -40,6 +40,17 @@ LLM_OllamaInstallErrors(Path := "") {
 		if !(Key is String) || !RegExMatch(Key, "^ollama\.install_error\.[a-z_]+$")
 			throw ValueError("ollama_install_errors.json message of " . Class . " is malformed.")
 	}
+	; A full disk is one cause whether the runtime or a model fills it (OLL-14).
+	if !(Data.Get("pull", 0) is Map) || !(Data.Get("pull_messages", 0) is Map)
+		throw ValueError("ollama_install_errors.json names no pull classes.")
+	for Class, Key in Data["pull_messages"] {
+		if !Messages.Has(Class) || !(Key is String) || !RegExMatch(Key, "^ollama\.pull_error\.[a-z_]+$")
+			throw ValueError("ollama_install_errors.json pull message of " . Class . " is malformed.")
+	}
+	for PullClass, Class in Data["pull"] {
+		if PullClass == "" || !(Class is String) || !Data["pull_messages"].Has(Class)
+			throw ValueError("ollama_install_errors.json pull class " . PullClass . " is malformed.")
+	}
 	for Index, Row in Data["classes"] {
 		if !(Row is Array) || Row.Length != 2 || !(Row[1] is String) || Row[1] == ""
 				|| !(Row[1] == StrLower(Row[1])) || !(Row[2] is String) || !Messages.Has(Row[2])
@@ -78,6 +89,32 @@ LLM_OllamaInstallErrorKey(Class) {
 	Messages := LLM_OllamaInstallErrors()["messages"]
 	if !Messages.Has(Class)
 		throw ValueError("Unknown Ollama install error class.", -1, Class)
+	return Messages[Class]
+}
+
+/**
+ * The install class of a failed model pull whose pull class is one too (a full
+ * disk, OLL-14); any other pull keeps its generic failure.
+ * @param {String} PullClass A class of ollama_pull_errors.json, "" for none.
+ * @param {Map} Data Optional decoded data file.
+ * @returns {String} The install class, "" when the pull class is none.
+ */
+LLM_OllamaPullInstallClass(PullClass, Data := 0) {
+	if !(PullClass is String)
+		throw TypeError("A pull class must be a string.")
+	Pulls := (IsObject(Data) ? Data : LLM_OllamaInstallErrors())["pull"]
+	return Pulls.Has(PullClass) ? Pulls[PullClass] : ""
+}
+
+/**
+ * The locale key a failed pull of an install class shows; its %s is the model.
+ * @param {String} Class A class LLM_OllamaPullInstallClass returned.
+ * @returns {String}
+ */
+LLM_OllamaPullInstallKey(Class) {
+	Messages := LLM_OllamaInstallErrors()["pull_messages"]
+	if !Messages.Has(Class)
+		throw ValueError("No pull message for this Ollama install error class.", -1, Class)
 	return Messages[Class]
 }
 

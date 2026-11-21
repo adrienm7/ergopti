@@ -43,6 +43,7 @@ global LLM_OLLAMA_PULL_CAPTURE_BYTES := 67108864
 ; of macos/ai/engine/ollama/managed_ollama_pull.py ERROR_CLASSES. The transport classes
 ; come before "manifest": Ollama prefixes a failed fetch with "pull model manifest".
 global LLM_OLLAMA_PULL_ERROR_CLASSES := [["digest mismatch", "digest_mismatch"], ["no space left", "no_space"],
+	["not enough space on the disk", "no_space"],
 	["permission denied", "permission_denied"], ["context canceled", "cancelled"],
 	["max retries", "max_retries"], ["deadline exceeded", "timeout"], ["timeout", "timeout"],
 	["certificate", "certificate"], ["tls", "certificate"], ["no such host", "dns"],
@@ -986,6 +987,10 @@ class OllamaManagedBootstrap {
 			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
 			if ErrorClass != "digest_mismatch" {
 				LoggerError("LLM.managed", "Managed menu model download exited {1} (class '{2}').", ExitCode, ErrorClass)
+				; A full disk names its cause, as the runtime install does (OLL-14).
+				InstallClass := LLM_OllamaPullInstallClass(ErrorClass)
+				if InstallClass != ""
+					return this._MenuPullFail(Operation, LLM_OllamaPullInstallKey(InstallClass))
 				return this._MenuPullFail(Operation)
 			}
 			if Operation.Get("digest_retried", false)
@@ -1086,8 +1091,13 @@ class OllamaManagedBootstrap {
 			return this._Fail("model_pull_proxy_login", LLM_OllamaPullRefusalKey(Stdout))
 		if !(ExitCode is Integer) || ExitCode != 0 {
 			ErrorClass := LLM_OllamaPullErrorClass(Stdout)
-			if ErrorClass != "digest_mismatch"
+			if ErrorClass != "digest_mismatch" {
+				; A full disk names its cause, as the runtime install does (OLL-14).
+				InstallClass := LLM_OllamaPullInstallClass(ErrorClass)
+				if InstallClass != ""
+					return this._Fail("model_pull_" . ErrorClass, LLM_OllamaPullInstallKey(InstallClass), this.Model)
 				return this._Fail(ErrorClass == "" ? "model_pull" : "model_pull_" . ErrorClass)
+			}
 			if this.PullDigestRetried
 				return this._Fail("model_pull_digest_mismatch", "ollama.digest_mismatch", this.Model)
 			this.PullDigestRetried := true

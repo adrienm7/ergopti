@@ -2789,6 +2789,7 @@
 	"ollama.install_error.permission": "Ollama yüklenemedi: Ergopti’nin kurulum klasörüne yazma izni yok. Bu klasörün izinlerini denetleyip yeniden deneyin. Hiçbir şey yüklenmedi.",
 	"ollama.install_error.cancelled": "Ollama kurulumu iptal edildi. Hiçbir şey yüklenmedi.",
 	"ollama.install_error.unknown": "Ollama, Ergopti’nin tanımadığı bir nedenle yüklenemedi. Hiçbir şey yüklenmedi. Yeniden deneyin; yine başarısız olursa tanılama raporunu gönderin.",
+	"ollama.pull_error.disk_full": "%s indirilemedi: diskte model için yeterli boş alan yok. Diskte yer açıp yeniden deneyin.",
 	"ollama.error_installer_refused": "Ergopti'nin Ollama yükleyicisi kendi isteğini reddetti, bu yüzden hiçbir şey yüklenmedi. Ergopti'yi yeniden başlatın ve Ollama motorunu yeniden seçin; sorun sürerse tanılama raporunu gönderin.",
 	"ollama.error_runtime_refused": "Ergopti sabitlenmiş Ollama sürümünü doğrulayamadı (sürüm kataloğu veya bütünlük denetimi), bu yüzden hiçbir şey yüklenmedi. Tanılama raporunu gönderin.",
 	"ollama.error_dev_catalogue_missing": "Bu geliştirici uygulaması sabitlenmiş Ollama'sını henüz klonun kaynaklarından derlemedi, bu yüzden hiçbir şey yüklenmedi. tools/dev/run-macos-dev-app.sh komutunu yeniden çalıştırın ve gösterdiği nedeni okuyun (Go ve Xcode araçları gereklidir).",
