@@ -26,6 +26,9 @@
  * 4. The score settings' section icons and edges took the chart hues (2.2:1
  *    to 2.97:1 in light): each section now takes its theme.css « Marks »
  *    token, at least 3:1 on every surface of both themes.
+ * 5. The apps dashboard's neutral productivity score was the tertiary grey,
+ *    2.8:1 on its tinted card in light: it takes the muted metrics text and
+ *    must reach 4.5:1 on its badge, on the card, on the page, in both themes.
  * The dataviz palette validator's run (colour-blind separation included) is
  * recorded in docs/audits/accessibility/README.md.
  * ==============================================================================
@@ -323,6 +326,28 @@ for (const dark of [false, true]) {
 	}
 }
 
+// 6/ The apps dashboard's neutral productivity score (a11y-score-badge-2026-11-21)
+// The badge of a score near zero was the system tertiary grey, 2.8:1 on the
+// tinted productivity card in light; axe could measure it once the card's
+// layout left the badge unobscured (Chromium on Linux).
+const APPS_CSS = fs.readFileSync(shared('ui', 'metrics_apps', 'style.css'), 'utf8');
+const APPS_DARK = APPS_CSS.slice(APPS_CSS.indexOf('@media (prefers-color-scheme: dark)'));
+for (const dark of [false, true]) {
+	const mode = dark ? 'dark' : 'light';
+	const light = block(APPS_CSS, ':root');
+	const own = dark ? block(APPS_DARK, ':root') : light;
+	const metrics = dark
+		? block(metricsLook, ":root[data-theme='dark']")
+		: block(metricsLook, ':root');
+	const pageGround = channels(resolve(token(metrics, 'theme-metrics-bg')));
+	const tint = token(own, 'hs-bg').match(/^rgba\(var\(--kpi-hs-rgb\),\s*([\d.]+)\)$/);
+	assert.ok(tint, mode + ': the productivity card is a wash of its hue');
+	const card = paint(`rgba(${token(own, 'kpi-hs-rgb')}, ${tint[1]})`, pageGround);
+	const badge = paint(token(own, 'score-neutral-bg'), card);
+	const text = channels(resolve(token(own, 'score-neutral-color'), own + light));
+	readable(text, badge, mode + ': neutral productivity score');
+}
+
 console.log(
-	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window, section marks)'
+	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window, section marks, neutral score)'
 );

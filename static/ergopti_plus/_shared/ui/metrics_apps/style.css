@@ -50,7 +50,8 @@
 	/* Score badge colors */
 	--score-pos-color: var(--theme-green);
 	--score-neg-color: var(--theme-red);
-	--score-neutral-color: var(--theme-hue-86868b);
+	/* The muted text grey: #86868b read 2.8:1 on the tinted productivity card. */
+	--score-neutral-color: var(--text-muted);
 	--score-pos-bg: rgba(52, 199, 89, 0.08);
 	--score-neg-bg: rgba(255, 59, 48, 0.08);
 	--score-neutral-bg: rgba(0, 0, 0, 0.04);
