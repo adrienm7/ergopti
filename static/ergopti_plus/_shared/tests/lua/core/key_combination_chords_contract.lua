@@ -84,6 +84,26 @@ function M.register(h)
    h.assert_eq(pcall(Policy.plan_chord_copy, source, { entries = entries, is_action = function() return true end,
     is_chord_action = true, settings = { simultaneous_threshold_ms = 100, combo_symmetric = false } }), false)
   end)
+  local copy_file = assert(io.open(root .. "/tests/corpus/tap_hold/key_combination_chord_copy.json", "rb"))
+  local copy_corpus = require("core.text.engine.json").decode(copy_file:read("*a")); copy_file:close()
+  assert(#copy_corpus.cases >= 5, "the chord copy corpus lost its cases")
+  local copy_entries = {}
+  for _, pair_id in ipairs(copy_corpus.pairs) do copy_entries[#copy_entries + 1] = { id = pair_id } end
+  for _, case in ipairs(copy_corpus.cases) do
+   h.it("(kcd-1-copy-each-order) chord copy corpus: " .. case.name, function()
+    local candidate = Policy.plan_chord_copy(case.source, { entries = copy_entries, tap_section = Policy.TAP_SECTION,
+     settings = { simultaneous_threshold_ms = 100, combo_symmetric = false },
+     is_action = function(action) return action == "copy" or action == "paste" or action == "one_shot_shift" end,
+     is_chord_action = function(action) return Policy.CHORD_REFUSED_EVERYWHERE[action] ~= true end })
+    local got = {}
+    for _, row in ipairs(candidate.rows) do
+     h.assert_eq(row.key, "combo"); got[row.section] = row.delete and "<delete>" or row.value
+    end
+    local want = {}
+    for _, row in ipairs(case.rows) do want[row.section] = row.delete and "<delete>" or row.value end
+    h.assert_eq(got, want, case.name)
+   end)
+  end
   h.it("neutral document and already copied slots require no owned row", function()
    local empty = plan(""); h.assert_eq(empty.changes, 0); h.assert_eq(empty.settings.combo_symmetric, false)
    h.assert_eq(empty.settings.simultaneous_threshold_ms, 100)

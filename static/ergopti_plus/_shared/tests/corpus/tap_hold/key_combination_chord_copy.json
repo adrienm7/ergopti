@@ -1,0 +1,39 @@
+{
+	"pairs": ["caps_lock_then_tab", "tab_then_caps_lock", "space_then_tab", "tab_then_space"],
+	"cases": [
+		{
+			"name": "symmetry copies each order's own tap",
+			"source": "[shortcuts.key_combination_taps]\ncaps_lock_then_tab = \"copy\"\ntab_then_caps_lock = \"paste\"\n[mod_combos]\nsymmetric = true\n",
+			"rows": [
+				{ "section": "mod_combos.config.caps_lock_then_tab", "value": "copy" },
+				{ "section": "mod_combos.config.tab_then_caps_lock", "value": "paste" }
+			]
+		},
+		{
+			"name": "without symmetry each order copies its own tap",
+			"source": "[shortcuts.key_combination_taps]\ncaps_lock_then_tab = \"copy\"\ntab_then_caps_lock = \"paste\"\n[mod_combos]\nsymmetric = false\n",
+			"rows": [
+				{ "section": "mod_combos.config.caps_lock_then_tab", "value": "copy" },
+				{ "section": "mod_combos.config.tab_then_caps_lock", "value": "paste" }
+			]
+		},
+		{
+			"name": "symmetry empties the reverse order's chord when its tap is empty",
+			"source": "[shortcuts.key_combination_taps]\ncaps_lock_then_tab = \"copy\"\n[mod_combos]\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = \"paste\"\n",
+			"rows": [
+				{ "section": "mod_combos.config.caps_lock_then_tab", "value": "copy" },
+				{ "section": "mod_combos.config.tab_then_caps_lock", "delete": true }
+			]
+		},
+		{
+			"name": "symmetry fills the later order when the earlier already matches",
+			"source": "[shortcuts.key_combination_taps]\ncaps_lock_then_tab = \"copy\"\ntab_then_caps_lock = \"paste\"\n[mod_combos]\nsymmetric = true\n[mod_combos.config.caps_lock_then_tab]\ncombo = \"copy\"\n",
+			"rows": [{ "section": "mod_combos.config.tab_then_caps_lock", "value": "paste" }]
+		},
+		{
+			"name": "a tap no chord runs keeps its chord and an equal chord is left alone",
+			"source": "[shortcuts.key_combination_taps]\nspace_then_tab = \"one_shot_shift\"\ntab_then_space = \"paste\"\n[mod_combos]\nsymmetric = true\n[mod_combos.config.space_then_tab]\ncombo = \"copy\"\n[mod_combos.config.tab_then_space]\ncombo = \"paste\"\n",
+			"rows": []
+		}
+	]
+}

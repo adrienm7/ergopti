@@ -142,19 +142,17 @@ _KCCE_ChordCopyPlansFromTheTaps() {
 Test("key combination chords: the bulk copy plans each chord from its pair's tap (copy-tap-to-combo)",
 	_KCCE_ChordCopyPlansFromTheTaps)
 
-; Under symmetry both orders share the earlier order's chord slot: only that
-; order's tap is copied, and the later order gets no slot of its own.
+; Under symmetry each order still writes its own chord, as macOS and Linux do
+; (decision KCD-1 of 2026-11-21): only the earlier order's chord runs, and the
+; later one's shows again once symmetry is turned off.
 _KCCE_ChordCopyFollowsSymmetry() {
-	Owner := _KeyCombinationChordOwnerPairFor("caps_lock_then_tab", true)
-	AssertTrue(Owner == "caps_lock_then_tab" || Owner == "tab_then_caps_lock", "the owner is one of the two orders")
-	Other := Owner == "caps_lock_then_tab" ? "tab_then_caps_lock" : "caps_lock_then_tab"
 	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(true))
-	Row := Rows.Get("mod_combos.config." . Owner, 0)
-	AssertTrue(IsObject(Row) && Row.Value == (Owner == "caps_lock_then_tab" ? "copy" : "paste"),
-		"the shared slot takes its owner order's tap")
-	AssertFalse(Rows.Has("mod_combos.config." . Other), "the other order gets no slot of its own")
+	for PairId, Tap in Map("caps_lock_then_tab", "copy", "tab_then_caps_lock", "paste") {
+		Row := Rows.Get("mod_combos.config." . PairId, 0)
+		AssertTrue(IsObject(Row) && Row.Value == Tap, PairId . " takes its own tap under symmetry")
+	}
 }
-Test("key combination chords: the bulk copy follows the chord symmetry (copy-tap-to-combo)",
+Test("key combination chords: the bulk copy writes each order's own chord under symmetry (kcd-1-copy-each-order)",
 	_KCCE_ChordCopyFollowsSymmetry)
 
 ; The command commits like every chord writer: a held lease reports false with no

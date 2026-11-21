@@ -1749,10 +1749,13 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 
 ; The rows that copy every pair's tap slot into its chord slot, planned from one
 ; decoded configuration as macOS and Linux plan their bulk copy: the chord takes
-; the tap's action and an empty tap empties the chord. Under symmetry a chord
-; slot belongs to the earlier order of its pair, so only that order's tap is
-; copied. A pair that cannot hold a chord on the layout in force is skipped, and
-; so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
+; the tap's action and an empty tap empties the chord. Each order writes its own
+; chord, symmetry or not, as the shared plan_chord_copy does: only the earlier
+; order's chord runs under symmetry, and the later one's shows again once
+; symmetry is turned off (decision KCD-1 of 2026-11-21). The shared vectors of
+; _shared/tests/corpus/tap_hold/key_combination_chord_copy.json pin both
+; planners. A pair that cannot hold a chord on the layout in force is skipped,
+; and so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
 ; which is logged with its pair.
 ; @param Snapshot {Object} A ConfigTomlDecodeSnapshot result.
 ; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
@@ -1761,7 +1764,6 @@ KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
 	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
 	Cache := Snapshot.Cache
 	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, false)
-	ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
 	Allowed := HasMethod(AllowedFn, "Call") ? AllowedFn : KeyCombinationChordPairIsAllowed
 	Rows := []
 	Ids := KeyCombinationKeyIds()
@@ -1770,7 +1772,7 @@ KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
 			if (First == Second)
 				continue
 			PairId := KeyCombinationPairId(First, Second)
-			if (_KeyCombinationChordOwnerPairFor(PairId, Symmetric) != PairId) || !Allowed.Call(PairId)
+			if !Allowed.Call(PairId)
 				continue
 			Tap := Taps.Get(PairId, KEY_COMBINATION_NONE)
 			if KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Tap) {
