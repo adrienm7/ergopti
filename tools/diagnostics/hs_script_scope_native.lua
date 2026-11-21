@@ -75,6 +75,7 @@ function M.run(receipt_path, destination, nonce)
 		local declared = false
 		for _, level in pairs(Logger.LEVELS) do declared = declared or level == value.log_level end
 		assert(declared and type(value.error_dialog) == "boolean", "Native runtime getters are not declared scalars")
+		-- config-key-literal-ok: the field names of the participant's view table
 		for _, key in ipairs({ "reading_font", "reading_spacing" }) do
 			assert(type(value[key]) == "string" and #value[key] > 0 and #value[key] <= 64, "Native reading getter is not a declared scalar")
 		end
