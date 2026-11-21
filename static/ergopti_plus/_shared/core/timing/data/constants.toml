@@ -545,6 +545,12 @@ return_delay_ms = 200
 # mouse. AHK: modules/shortcuts/win.ahk AwakeCheckMouseMoved.
 mouse_check_poll_ms = 150
 
+# Linux: how often the session idle inhibitor checks that systemd-inhibit still
+# runs, and how long it waits for the command's ready line before it reports
+# keep-awake as refused. LX: modules/keep_awake.lua.
+inhibitor_poll_ms = 1000
+inhibitor_ready_timeout_ms = 5000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keystats

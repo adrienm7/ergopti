@@ -12,8 +12,9 @@ local helpers = require("tests.helpers")
 local KeepAwake = require("modules.keep_awake")
 
 --- A controlled process and scheduler with independently delivered settlement.
+--- @param timings table|nil Timings port in place of the shared registry.
 --- @return table fixture
-local function fixture()
+local function fixture(timings)
 	local f = { notices = {}, launches = 0, running = true, settled = false, present = true, now = 0, sessions = {} }
 	local op = { started = true }
 	function op:is_running() return f.running end
@@ -33,12 +34,13 @@ local function fixture()
 			return op
 		end,
 		scheduler = {
-			every = function(_, fn) f.poll = fn; return { armed = true } end,
+			every = function(seconds, fn) f.poll_seconds, f.poll = seconds, fn; return { armed = true } end,
 			cancel = function() return not f.refuse_timer end,
 		},
 		notify = function(key) f.notices[#f.notices + 1] = key end,
 		now_ms = function() return f.now end,
 		record_session = function(duration_ms) f.sessions[#f.sessions + 1] = duration_ms; return true end,
+		timings = timings,
 	})
 	function f.finish() f.settled, f.running = true, false; f.on_settled() end
 	return f
@@ -125,6 +127,28 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		helpers.assert_eq(f.owner.is_active(), false)
 		f.finish()
 		for _, key in ipairs(f.notices) do helpers.assert_eq(key, "notify.keep_awake_failed") end
+	end)
+
+	-- SNU-14: the poll (1 s) and the ready bound (5 s) were driver literals.
+	helpers.it("(snu-14) the inhibitor's poll and ready bound are the shared [keep_awake] timings", function()
+		local reads = {}
+		local values = { inhibitor_poll_ms = 250, inhibitor_ready_timeout_ms = 750 }
+		local function read(section, key)
+			helpers.assert_eq(section, "keep_awake")
+			reads[key] = true
+			return assert(values[key], key)
+		end
+		local f = fixture({ ms = read, sec = function(section, key) return read(section, key) / 1000 end })
+		helpers.assert_true(f.owner.toggle())
+		helpers.assert_eq(f.poll_seconds, 0.25, "the poll follows the registry")
+		f.poll()
+		f.poll()
+		helpers.assert_true(not f.cancelled, "still within the registry's ready bound")
+		f.poll()
+		helpers.assert_true(f.cancelled, "the ready bound is the registry's")
+		helpers.assert_eq(f.notices, { "notify.keep_awake_failed" })
+		helpers.assert_true(reads.inhibitor_poll_ms and reads.inhibitor_ready_timeout_ms)
+		f.finish()
 	end)
 
 	helpers.it("linux-keep-awake: a refused timer retirement retains the owner after process exit", function()

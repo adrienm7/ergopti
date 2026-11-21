@@ -14,8 +14,6 @@ local Logger = require("core.logger.engine.shim")
 local i18n = require("core.i18n.engine.i18n")
 local LOG = "modules.keep_awake"
 local READY = "ERGOPTI_INHIBITED\n"
-local POLL_SECONDS = 1
-local STARTUP_SECONDS = 5
 local _owner
 
 --- Holds an unwritten pipe until cancellation. OwnedProcess owns its closure.
@@ -41,10 +39,16 @@ local function hold_pipe()
 end
 
 --- Constructs one explicitly owned inhibitor; dependencies are native by default.
---- @param ports table|nil Native process, scheduler and pipe ports for tests.
+--- @param ports table|nil Native process, scheduler, pipe and timings ports for tests.
 --- @return table owner
 function M.new(ports)
 	ports = ports or {}
+	-- The poll and the ready bound are the shared registry's [keep_awake].
+	local timings = ports.timings or require("core.timing.engine.timings")
+	-- The wait is counted in whole milliseconds: summed seconds drift.
+	local poll_ms = timings.ms("keep_awake", "inhibitor_poll_ms")
+	local poll_seconds = timings.sec("keep_awake", "inhibitor_poll_ms")
+	local ready_timeout_ms = timings.ms("keep_awake", "inhibitor_ready_timeout_ms")
 	local start = ports.start or require("core.process.adapters.owned_process").start
 	local scheduler = ports.scheduler or require("core.events.timer_scheduler")
 	local pipe = ports.pipe or hold_pipe
@@ -115,7 +119,7 @@ function M.new(ports)
 			notify("notify.keep_awake_failed")
 			return false
 		end
-		local session = { input = pipe(), output = "", waited = 0 }
+		local session = { input = pipe(), output = "", waited_ms = 0 }
 		current = session
 		local operation = start("systemd-inhibit", {
 			"--what=idle", "--mode=block", "--who=Ergopti", "--why=" .. i18n.get("sg_actions.activity_simulation"),
@@ -148,11 +152,11 @@ function M.new(ports)
 			if current then owner.stop() end
 			return false
 		end
-		session.timer = scheduler.every(POLL_SECONDS, function()
+		session.timer = scheduler.every(poll_seconds, function()
 			if current ~= session then return end
 			if session.stopping then owner.stop(); return end
-			session.waited = session.waited + POLL_SECONDS
-			if not operation:is_running() or (not session.active and session.waited >= STARTUP_SECONDS) then
+			session.waited_ms = session.waited_ms + poll_ms
+			if not operation:is_running() or (not session.active and session.waited_ms >= ready_timeout_ms) then
 				Logger.error(LOG, "Keep-awake lost or refused: the session idle inhibitor is unavailable.")
 				notify("notify.keep_awake_failed")
 				owner.stop()
