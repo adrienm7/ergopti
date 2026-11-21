@@ -249,7 +249,10 @@ function assertModelOfferAffinity(source, managedSource) {
 		source,
 		/_LLM_LocalModelOfferPublished\(Receipt, Callback := 0, \*\) \{\s+if !_LLM_LocalModelOfferCurrent\(Receipt\)\s+return false/
 	);
-	assert.match(managedSource, /PullModel\(Model, OnDone := 0, CurrentFn := 0\)/);
+	// A repair (OLL-10) pulls a model the user already consented to; it is the
+	// only pull that skips the download consent.
+	assert.match(managedSource, /PullModel\(Model, OnDone := 0, CurrentFn := 0, Repair := false\)/);
+	assert.match(managedSource, /if !Repair && !this\._Consent\("model", Tag\) \{/);
 	assert.match(managedSource, /"source_current", CurrentFn/);
 	assert.match(managedSource, /SourceCurrent := Operation\.Get\("source_current", 0\)/);
 	assert.match(
@@ -267,8 +270,13 @@ function assertModelOfferAffinity(source, managedSource) {
 	assert.match(pull, /this\.MenuPull := Operation\s+if !this\._MenuPullCurrent\(Operation\)/);
 	assert.match(
 		pull,
-		/if !this\._Consent\("model", Tag\)[\s\S]+if !this\._MenuPullCurrent\(Operation\)[\s\S]+Done := ObjBindMethod/
+		/if !Repair && !this\._Consent\("model", Tag\)[\s\S]+if !this\._MenuPullCurrent\(Operation\)[\s\S]+return this\._MenuPullDispatch\(Operation\)/
 	);
+	const dispatch = managedSource.slice(
+		managedSource.indexOf('	_MenuPullDispatch('),
+		managedSource.indexOf('	_PollMenuPullPercent(')
+	);
+	assert.match(dispatch, /Done := ObjBindMethod\(this, "_MenuPulled", Operation\)/);
 	const completed = managedSource.slice(managedSource.indexOf('\t_MenuPullModels('));
 	assert.match(
 		completed,
