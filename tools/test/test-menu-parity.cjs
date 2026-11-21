@@ -974,6 +974,7 @@ const OPENS_SUBMENU = {
 	],
 	// Native prediction modifier providers consume the shared child records.
 	llm_navigation: 'llm_navigation_rows',
+	llm_ollama_runtime: 'llm_ollama_runtime_rows',
 	llm_trigger: [
 		{
 			menu: 'llm_trigger_provider_boundary',
@@ -4179,7 +4180,10 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 			'local context_alias = ctx; context_alias.llm = nil',
 			'local ticket_alias = parent; ticket_alias.enabled = false',
 			'local shadowed = function(llm) return llm end',
-			'local nested = function() local llm = nil end'
+			'local nested = function() local llm = nil end',
+			// OLL-11 handed the whole engine to the uninstall sequence's owner.
+			'require("ai.engine.ollama.runtime_uninstall_ports").uninstall(llm, false)',
+			'local function hand_over() Foreign.consume(llm) end'
 		])
 			replacements.push([
 				producerFile,
@@ -5855,7 +5859,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // (debug_tests_menu, 7ba86d9506) render through the shared renderer.
 // hs 24 → 25, linux 23 → 24: the « Rangées émulées » group (layout_emulated_rows_group)
 // renders its four rows through the shared renderer on both.
-const RENDERED_THROUGH_SHARED = { hs: 25, linux: 24 };
+const RENDERED_THROUGH_SHARED = { hs: 25, linux: 25 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),

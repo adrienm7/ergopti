@@ -941,7 +941,16 @@ local function _build_llm(ctx)
 			local remove_models = ask_yes_no(i18n_safe("ollama.uninstall.models_title"),
 				plain_markup(i18n_safe("ollama.uninstall.models_body")),
 				i18n_safe("ollama.uninstall.remove_models_button"), i18n_safe("ollama.uninstall.keep_models_button")) == true
-			require("ai.engine.ollama.runtime_uninstall_ports").uninstall(llm, remove_models,
+			-- The sequence receives only the four engine functions it calls, not
+			-- the engine itself: the native AI parent route admits the engine
+			-- handle in its reviewed owners alone (tools/lib/menu-native-llm-parent-binding.cjs).
+			local engine = {
+				runtime_pending = llm.runtime_pending,
+				get_cached_models_status = llm.get_cached_models_status,
+				delete_model = llm.delete_model,
+				stop_runtime = llm.stop_runtime,
+			}
+			require("ai.engine.ollama.runtime_uninstall_ports").uninstall(engine, remove_models,
 				require("platform.focus.application_notifier").send, i18n_safe,
 				nil, function()
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
