@@ -250,7 +250,8 @@ local function build_init_data(state)
 		config_dir = current_dir ~= default_dir and current_dir or "",
 		-- The consent text names the metrics store.
 		metrics_path = config_paths.metrics_path(),
-		system_layout = type(state.layout) == "string" and state.layout or "",
+		-- The trigger the wizard proposes: the default the session layout gave.
+		magic_key_default = require("hotstrings.engine.magic_key").default(),
 		locales = require("_generated.locale_table"),
 		current = values,
 	}

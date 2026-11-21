@@ -209,7 +209,8 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(type(result.data.capabilities.number_row_live), "string",
 				"outside an X11 session the page is told why the number-row order cannot be applied")
 			helpers.assert_eq(result.data.locale, "en")
-			helpers.assert_eq(result.data.system_layout, "qwerty")
+			helpers.assert_eq(result.data.magic_key_default, require("hotstrings.engine.magic_key").default(),
+				"the wizard proposes the default the session layout gave")
 			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")
 			helpers.assert_eq(result.data.current, {}, "an absent config.toml leaves every page neutral")
 			helpers.assert_true(#result.data.locales >= 21)
@@ -689,21 +690,30 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
 		end)
 
-		-- The page exposes Linux trigger selection, but forged common characters
-		-- must not turn an ordinary word into a destructive hotstring trigger.
-		-- Keep the malformed bytes in the subject, with readable labels in the
-		-- human output and structured UTF-8 timing frames.
+		-- Any one character is a trigger (maintainer's decision of 2026-11-21):
+		-- the AZERTY and QWERTY layout defaults are written as answered.
+		helpers.it("(onboarding-linux-trigger) accepts the layout defaults and any one character", function()
+			for _, char in ipairs({ "ù", ";", "e" }) do
+				local state, _, captured = onboarding_state()
+				local result = finish(state, { locale = "en", config_dir = "", operations = {
+					{ path = "hotstrings.trigger_char", value = char },
+				} })
+				helpers.assert_true(result.done, char)
+				helpers.assert_eq(captured.errors, {})
+				helpers.assert_eq(captured.writes[1].updates, { { section = "hotstrings", key = "trigger_char", value = char } })
+			end
+		end)
+
+		-- A malformed answer is refused with its translated reason. Keep the
+		-- malformed bytes in the subject, with readable labels in the human
+		-- output and structured UTF-8 timing frames.
 		for _, case in ipairs({
-			{ ";", "dialog.magic_key.error_common", "semicolon" },
-			{ "ù", "dialog.magic_key.error_common", "accented letter" },
-			{ "e", "dialog.magic_key.error_common", "ASCII letter" },
-			{ "א", "dialog.magic_key.error_common", "Hebrew letter" },
 			{ "ab", "dialog.magic_key.error_length", "multiple characters" },
 			{ "\255", "dialog.magic_key.error_length", "invalid leading byte" },
 			{ "\192\175", "dialog.magic_key.error_length", "overlong sequence" },
 			{ "", "dialog.magic_key.error_empty", "empty input" },
 		}) do
-			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. case[3], function()
+			helpers.it("(onboarding-linux-trigger) refuses malformed answer " .. case[2] .. " " .. case[3], function()
 				local state, values, captured = onboarding_state()
 				local previous = values.config_dir
 				local changes = 0

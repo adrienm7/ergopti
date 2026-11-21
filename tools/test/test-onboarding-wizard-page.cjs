@@ -1030,10 +1030,10 @@ function cataloguePaths(driver) {
 	}
 	assert.deepEqual(
 		described.magic_key.options.map((option) => option.value),
-		['★'],
-		'Linux offers only the preset its runtime accepts'
+		['★', 'ù', ';'],
+		'Linux offers the AZERTY and QWERTY layout defaults like the other OS'
 	);
-	assert.equal(described.magic_key.validation, 'safe_magic_key');
+	assert.equal(described.magic_key.validation, 'magic_key');
 	assert.ok(
 		!operations.some((op) => op.path === 'hotstrings.trigger_char'),
 		'the default trigger is sparse until the user changes it'
@@ -1282,7 +1282,7 @@ function assertSeparated(row, where) {
 	const builtIns = pageOf(page, 'shortcuts').groups[0].items.filter((item) =>
 		item.path.startsWith('shortcuts.keys.')
 	);
-	assert.ok(builtIns.length >= 2, 'macOS recommends its fixed ChatGPT and Cmd+* switches');
+	assert.ok(builtIns.length >= 1, 'macOS recommends its fixed ChatGPT switch');
 	const slots = pageOf(page, 'shortcuts').groups[0].items.filter((item) =>
 		item.path.startsWith('shortcuts.keyboard.')
 	);
@@ -1499,14 +1499,27 @@ function assertSeparated(row, where) {
 	assert.equal(checked, 3, 'each driver asks for a trigger its owner can validate');
 })();
 
-(function magicKeyFollowsTheSystemLayoutAndRefusesAnEmptyCustomValue() {
-	const page = openWizard({ platform: 'macos', system_layout: 'French - PC' });
+(function magicKeyFollowsTheDriverLayoutDefaultAndRefusesAnEmptyCustomValue() {
+	// The host passes the default its layout gave (magic_key.json); a layout
+	// name alone never decides it.
+	const named = openWizard({ platform: 'macos', system_layout: 'French - PC' });
+	named.platform = 'macos';
+	goToPage(named, 'hotstrings');
+	answer(named, true);
+	const proposed = named.el('page-magic-options').children.find((row) => row.children[0].checked)
+		.children[0].value;
+	assert.equal(proposed, '★', 'a layout name without a resolved default proposes ★');
+	assert.ok(
+		!finish(named).answers.operations.some((op) => op.path === 'hotstrings.trigger_char'),
+		'an untouched trigger stays sparse so the layout default applies'
+	);
+	const page = openWizard({ platform: 'macos', magic_key_default: 'ù' });
 	page.platform = 'macos';
 	goToPage(page, 'hotstrings');
 	answer(page, true);
 	const options = page.el('page-magic-options');
 	const checked = options.children.find((row) => row.children[0].checked);
-	assert.equal(checked.children[0].value, 'ù', 'French layouts propose ù');
+	assert.equal(checked.children[0].value, 'ù', 'an AZERTY layout default proposes ù');
 	const custom = options.children[options.children.length - 1];
 	custom.children[0].checked = true;
 	custom.children[0].dispatch('change');
@@ -1591,21 +1604,21 @@ function assertSeparated(row, where) {
 	}
 })();
 
-(function linuxTriggerChoiceKeepsRuntimePolicyAndCustomAnswer() {
-	for (const system_layout of ['French - PC', 'US', 'Ergopti']) {
-		const page = openWizard({ platform: 'linux', system_layout });
+(function linuxTriggerChoiceProposesTheLayoutDefaultAndKeepsACustomAnswer() {
+	for (const magic_key_default of ['ù', ';', '★']) {
+		const page = openWizard({ platform: 'linux', magic_key_default });
 		page.platform = 'linux';
 		goToPage(page, 'hotstrings');
 		answer(page, true);
 		const rows = page.el('page-magic-options').children;
 		assert.deepEqual(
 			rows.slice(0, -1).map((row) => row.children[0].value),
-			['★']
+			['★', 'ù', ';']
 		);
 		assert.equal(
 			rows.find((row) => row.children[0].checked).children[0].value,
-			'★',
-			`${system_layout}: Linux never proposes a common character`
+			magic_key_default,
+			`${magic_key_default}: Linux proposes the layout default like the other OS`
 		);
 		const custom = rows[rows.length - 1].children[0];
 		custom.checked = true;
@@ -1632,7 +1645,9 @@ function assertSeparated(row, where) {
 	);
 })();
 
-(function linuxRerunPreservesAnOutdatedTriggerUntilExplicitChoice() {
+(function linuxRerunKeepsAStoredLayoutDefaultUntilExplicitChoice() {
+	// ; and ù are ordinary Linux triggers since 2026-11-21: a re-run checks
+	// the stored one and writes nothing until the user picks another.
 	for (const stale of [';', 'ù']) {
 		for (const replace of [false, true]) {
 			const page = openWizard({ platform: 'linux', current: { 'hotstrings.trigger_char': stale } });
@@ -1640,9 +1655,10 @@ function assertSeparated(row, where) {
 			goToPage(page, 'hotstrings');
 			answer(page, true);
 			assert.equal(
-				page.el('page-magic-options').querySelector('magic-input').value,
+				page.el('page-magic-options').children.find((row) => row.children[0].checked).children[0]
+					.value,
 				stale,
-				'an outdated stored scalar is shown without changing it'
+				'the stored trigger is the checked option'
 			);
 			if (replace) {
 				const star = page.el('page-magic-options').children[0].children[0];
@@ -1779,16 +1795,16 @@ function assertSeparated(row, where) {
 		const described = projected.platforms[driver].pages.find((page) => page.id === 'hotstrings');
 		assert.deepEqual(
 			described.magic_key.options.map((option) => option.value),
-			driver === 'linux' ? ['★'] : ['★', 'ù', ';']
+			['★', 'ù', ';']
 		);
-		assert.equal(described.magic_key.validation, driver === 'linux' ? 'safe_magic_key' : undefined);
+		assert.equal(described.magic_key.validation, driver === 'linux' ? 'magic_key' : undefined);
 	}
 	for (const platforms of [[], ['unknown'], ['linux', 'linux'], 'linux']) {
 		const malformed = JSON.parse(JSON.stringify(choice));
 		malformed.options[0].platforms = platforms;
 		assert.throws(() => buildWith(malformed), /option platforms must be a nonempty known subset/);
 	}
-	for (const validation of ['safe_magic_key', { linux: 'anything' }, { hs: 'safe_magic_key' }]) {
+	for (const validation of ['magic_key', { linux: 'safe_magic_key' }, { hs: 'magic_key' }]) {
 		const malformed = JSON.parse(JSON.stringify(choice));
 		malformed.validation = validation;
 		assert.throws(() => buildWith(malformed), /validation|unsupported/);

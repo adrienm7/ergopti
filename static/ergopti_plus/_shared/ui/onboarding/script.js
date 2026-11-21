@@ -25,6 +25,8 @@ var STEP_LANGUAGE = 'language';
 var STEP_CONFIG = 'config';
 
 // Radio value of the custom trigger-character row.
+// The default trigger the driver resolved from its layout, "" when none was passed.
+var _magicKeyDefault = '';
 var CUSTOM_MAGIC_VALUE = '__custom__';
 
 // Locale strings injected by the host (initData / applyStrings).
@@ -346,25 +348,15 @@ function _asks(page) {
 }
 
 /**
- * The trigger character a page proposes when the configuration names none:
- * the Ergopti key when the Ergopti layout is used, ù on French layouts, ;
- * elsewhere.
+ * The trigger character a page proposes when the configuration names none: the
+ * default the driver resolved from its layout (_shared/hotstrings/data/magic_key.json:
+ * ù on AZERTY, ; on QWERTY, ★ elsewhere), which the host passes as
+ * magic_key_default. The page never guesses it from a layout name.
  * @param {object} choice The page's magic_key descriptor.
  * @returns {string}
  */
 function _contextMagicKey(choice) {
-	var layoutPage = _pageState.keyboard_layout;
-	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
-	var emulated = layoutPage && layoutPage.controls ? layoutPage.controls.emulated_layout : null;
-	var emulatesErgopti = typeof emulated === 'string' && emulated.indexOf('ergopti') === 0;
-	if ((layoutPage && layoutPage.answer && emulatesErgopti) || system.indexOf('ergopti') !== -1)
-		return choice.recommended;
-	var candidate = system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1 ? 'ù' : ';';
-	return choice.options.some(function (option) {
-		return option.value === candidate;
-	})
-		? candidate
-		: choice.recommended;
+	return _magicKeyDefault || choice.recommended;
 }
 
 /**
@@ -454,11 +446,9 @@ function _operations() {
 			}
 		});
 		// An outdated stored value is preserved until the trigger itself is
-		// edited; a display recommendation never grants permission to replace it.
-		if (
-			page.magic_key &&
-			(state.magicChanged || !Object.prototype.hasOwnProperty.call(_current, page.magic_key.path))
-		) {
+		// edited, and an untouched choice stays sparse: the driver's layout
+		// default then applies, as the page proposed it.
+		if (page.magic_key && state.magicChanged) {
 			var chosen = _magicValue(page);
 			if (chosen !== _currentValue(page.magic_key)) {
 				operations.push({ path: page.magic_key.path, value: chosen });
@@ -1076,7 +1066,7 @@ window.initData = function (data) {
 	}
 	if (Array.isArray(data.locales) && data.locales.length > 0) LOCALES = data.locales;
 	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
-	window.SYSTEM_LAYOUT = data.system_layout || '';
+	_magicKeyDefault = typeof data.magic_key_default === 'string' ? data.magic_key_default : '';
 	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
 	_emptyConfigDir = data.empty_config_dir;
 	_loadedDir = _configDir;
