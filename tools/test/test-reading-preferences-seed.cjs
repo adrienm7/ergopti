@@ -11,9 +11,10 @@
  * 1. the two features carry a11y_prefs.js's own value lists, default first,
  *    on Windows, macOS and Linux, and the Configuration menu offers both as
  *    choice rows on the three;
- * 2. every Windows source that seeds a page's locale (`_i18n_locale=`) seeds
- *    the reading choices as often (ReadingPrefs_SeedScript), so no window is
- *    left out;
+ * 2. every Windows locale seed (`_i18n_locale=`) is followed, on its line or
+ *    the continuation line, by the reading seed (ReadingPrefs_SeedScript), so
+ *    no window is left out; a host may also call it elsewhere, in the reuse
+ *    key that retires a warm window when a reading choice changes (MET-03);
  * 3. the macOS and Linux page builders, the only places those drivers seed
  *    a page, add the shared reading fragment, and both script scopes bind
  *    the two choices to their shared owners.
@@ -85,11 +86,13 @@ function declarationProblems(features, menu, values) {
 function windowsProblems(files) {
 	const problems = [];
 	for (const [file, source] of files) {
-		const locales = source.split('_i18n_locale=').length - 1;
-		// Calls only: the function's own definition is no seed.
-		const readings = (source.match(/ReadingPrefs_SeedScript\(\)(?!\s*\{)/g) || []).length;
-		if (locales !== readings)
-			problems.push(`${file}: ${locales} locale seed(s), ${readings} reading seed(s)`);
+		// The boot script's statement: the locale seed's line and the next one.
+		const seeds = source.match(/_i18n_locale=[^\n]*(?:\n[^\n]*)?/g) || [];
+		const unpaired = seeds.filter((seed) => !seed.includes('ReadingPrefs_SeedScript()')).length;
+		if (unpaired)
+			problems.push(
+				`${file}: ${unpaired} of ${seeds.length} locale seed(s) without the reading seed`
+			);
 	}
 	return problems;
 }
@@ -167,7 +170,7 @@ assert.equal(
 );
 const seeded = windows.find(([, source]) => source.includes('ReadingPrefs_SeedScript()'));
 assert.equal(
-	windowsProblems([[seeded[0], seeded[1].replace('ReadingPrefs_SeedScript()', '""')]]).length,
+	windowsProblems([[seeded[0], seeded[1].replaceAll('ReadingPrefs_SeedScript()', '""')]]).length,
 	1,
 	'a Windows window that stops seeding the choices is found'
 );
