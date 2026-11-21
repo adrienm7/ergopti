@@ -1497,6 +1497,24 @@ local function mapping_fires(m)
 	return allowed
 end
 
+--- Whether a mapping's group is on: the candidate filter of the typed path.
+--- The delay is not a filter: it is asked of the winner only (mapping_delay_ok).
+--- @param m table The mapping entry.
+--- @return boolean
+local function mapping_group_on(m)
+	return not (m.group and CoreState.groups[m.group] and not CoreState.groups[m.group].enabled)
+end
+
+--- The typed path's delay gate, asked of a mapping once it won: an expired
+--- winner fires nothing, and no shorter or lower rule fires in its place, as on
+--- Windows (HSE_TimeGateExpired), Linux (within_delay) and the shared engine
+--- (maintainer decision HCD-1, 2026-11-21). Only the repeat fallback remains.
+--- @param m table The winning mapping.
+--- @return boolean
+local function mapping_delay_ok(m)
+	return CoreState.mapping_delay_remaining(m, _tc_dt, _tc_complex_mult) == true
+end
+
 --- Runs trigger matching against the current buffer. Module-level function
 --- instead of a per-keystroke closure — saves one closure allocation + one
 --- inner closure allocation (mapping_fires) on every single keyDown event.
@@ -1623,13 +1641,14 @@ local function run_trigger_checks()
 		-- When ★ is pressed, it is an explicit validation of the displayed
 		-- tooltip — bypass the typing-speed delay so a slow typist never
 		-- gets a repeat-key instead of the intended expansion.
-		local skip_delay = star_validated
+		local gate = (not star_validated) and mapping_delay_ok or nil
 		for _, m in ipairs(term_bucket) do
-			if not m.auto and m.tlen > min_len and (skip_delay or mapping_fires(m)) then
-				local fired, reason = Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+			if not m.auto and m.tlen > min_len and mapping_group_on(m) then
+				local fired, reason = Expander.try_terminator_expand(m, chars, char_len, is_ignored, nil, gate)
 				if fired then return true end
-				-- A final entry that changes nothing masks the lower candidates.
-				if reason == "noop_final" then return false, "noop_final" end
+				-- A final entry that changes nothing, or an expired winner, masks
+				-- the lower candidates.
+				if reason == "noop_final" or reason == "expired" then return false, reason end
 			end
 		end
 		return false
@@ -1652,9 +1671,7 @@ local function run_trigger_checks()
 	local auto_len = 0
 	if chars_is_terminator and auto_bucket then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m))
-				and Expander.would_fire(m, CoreState.buffer)
-			then
+			if m.auto and mapping_group_on(m) and Expander.would_fire(m, CoreState.buffer) then
 				-- The bucket is sorted longest-first, so the first that would fire is
 				-- the longest.
 				auto_len = m.tlen
@@ -1667,21 +1684,24 @@ local function run_trigger_checks()
 	if end_fired then return true end
 	if end_reason == "noop_final" then return false end
 
-	if auto_bucket then
+	local expired = end_reason == "expired"
+	if auto_bucket and not expired then
 		for _, m in ipairs(auto_bucket) do
-			if m.auto and ((star_validated and m.has_magic) or mapping_fires(m)) then
-				local fired, reason = Expander.try_auto_expand(m, char_len, is_ignored)
+			if m.auto and mapping_group_on(m) then
+				local fired, reason = Expander.try_auto_expand(m, char_len, is_ignored, nil, mapping_delay_ok)
 				if fired then return true end
 				-- A final entry that changes nothing masks the lower candidates of
 				-- this keystroke, end-char ones included.
 				if reason == "noop_final" then return false end
+				-- An expired winner fires nothing else: only the repeat remains.
+				if reason == "expired" then expired = true; break end
 			end
 		end
 	end
 
 	-- The auto path declined after all (a no-op replacement, say), so the end-char
 	-- candidates it out-ranked are back in play.
-	if auto_len > 0 and run_end_char_checks(0) then return true end
+	if not expired and auto_len > 0 and run_end_char_checks(0) then return true end
 
 	local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
 	if (star_allowed == 0 or _tc_dt <= star_allowed)

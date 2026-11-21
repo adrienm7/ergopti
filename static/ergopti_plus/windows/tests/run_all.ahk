@@ -1977,6 +1977,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/hotstrings/engine/engine/test_stale_cache_survives_reset_and_pause.ahk
 #Include unit/hotstrings/engine/engine/test_time_activation_fails_open_on_missing_prev_char.ahk
 #Include unit/hotstrings/engine/engine/test_end_character_vectors.ahk
+#Include unit/hotstrings/engine/engine/test_expired_winner_vectors.ahk
 #Include unit/core/text/toml/test_uridecode_multibyte_utf8_corruption.ahk
 
 ; -- Audit finding regression tests (batch-wired) --

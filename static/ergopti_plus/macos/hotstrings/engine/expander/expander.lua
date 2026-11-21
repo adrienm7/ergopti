@@ -1037,8 +1037,7 @@ end
 --- @param reference_byte number Byte index of the reference character.
 --- @param stable_bytes number Length of the untouched typed prefix.
 --- @return boolean
-local function cascade_step_allowed(m, reference_byte, stable_bytes)
-	if not mapping_group_active(m) then return false end
+local function cascade_delay_allowed(m, reference_byte, stable_bytes)
 	local elapsed = reference_byte <= stable_bytes and (_state.cascade_elapsed or 0) or 0
 	local allowed = _state.mapping_delay_remaining(m, elapsed, _state.cascade_complex_mult or 1)
 	return allowed == true
@@ -1056,6 +1055,11 @@ end
 --- (select_match, then its refusals) end it. Filtering the bucket on "is a link"
 --- before matching stepped over such a winner and fired a lower rule that the
 --- same typed text could never reach.
+---
+--- The delay is asked of the winner only, as on Windows, Linux and the shared
+--- engine (maintainer decision HCD-1, 2026-11-21): an expired winner ends the
+--- chain, it never lets a shorter or lower rule whose delay still allows it be
+--- the link.
 --- @param vbuf string The buffer the previous step produced.
 --- @param tail string|nil The terminator carried at the end of `vbuf`.
 --- @param stable_bytes number Length of the untouched typed prefix.
@@ -1071,10 +1075,11 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 		local reference = last > 1 and last_cp_start(vbuf:sub(1, last - 1)) or 0
 		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
 		for _, m in ipairs(bucket or {}) do
-			if m.auto and cascade_step_allowed(m, reference, stable_bytes) then
+			if m.auto and mapping_group_active(m) then
 				local eff_plain, typed, _, is_noop = M.would_fire(m, vbuf)
 				if eff_plain then
-					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain }
+					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain,
+						reference = reference }
 					break
 				end
 				if is_noop and m.final_result then
@@ -1094,11 +1099,11 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 		if prev then
 			local bucket = _registry.mappings_for_tail(body:sub(prev))
 			for _, m in ipairs(bucket or {}) do
-				if not m.auto and m.tlen > min_len and cascade_step_allowed(m, prev, stable_bytes) then
+				if not m.auto and m.tlen > min_len and mapping_group_active(m) then
 					local match = resolve_terminator_match(m, vbuf, tail, false)
 					if match and match.eff_plain then
 						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
-							is_end = true }
+							is_end = true, reference = prev }
 						break
 					end
 					-- A final entry that changes nothing masks the lower candidates.
@@ -1111,6 +1116,7 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 	-- the user typed always lands after the final text.
 	local winner = end_step or (not tail and auto_step) or nil
 	if winner and not is_cascade_link(winner.mapping) then return nil end
+	if winner and not cascade_delay_allowed(winner.mapping, winner.reference, stable_bytes) then return nil end
 	return winner
 end
 
@@ -1187,8 +1193,12 @@ end
 --- @param char_len number Logical codepoint count of the current trigger event.
 --- @param is_ignored boolean Whether the physical event is already on screen.
 --- @param match_buffer string|nil Immutable buffer used for matching/splicing.
+--- @param delay_gate function|nil Asked of the mapping once it matched: false
+---        refuses it as an expired winner (reason "expired"), which the caller
+---        treats as the end of this keystroke's expansions (HCD-1).
 --- @return boolean True when the expansion committed.
-function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
+--- @return string|nil reason "noop_final" or "expired" when the winner stops the scan.
+function M.try_auto_expand(m, char_len, is_ignored, match_buffer, delay_gate)
 	if not require_state("try_auto_expand") then return false end
 	local active_buffer = type(match_buffer) == "string" and match_buffer or _state.buffer
 
@@ -1227,6 +1237,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	end
 
 	if final_end_outranks(m, active_buffer) then return false end
+	if delay_gate and not delay_gate(m) then return false, "expired" end
 
 	local repl_text = eff_plain
 	-- 1-based byte index where the matched trigger starts, used below to splice the
@@ -1324,8 +1335,11 @@ end
 --- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
 --- @param explicit_magic boolean|nil True when the configured magic action owns
 ---        this event, allowing bare French punctuation on another input source.
+--- @param delay_gate function|nil Asked of the mapping once it matched: false
+---        refuses it as an expired winner (reason "expired", HCD-1).
 --- @return boolean True when the expansion fired.
-function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
+--- @return string|nil reason "noop_final" or "expired" when the winner stops the scan.
+function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic, delay_gate)
 	if not require_state("try_terminator_expand") then return false end
 	local match = resolve_terminator_match(m, _state.buffer, chars, explicit_magic)
 	if not match then return false end
@@ -1354,6 +1368,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		end
 		return false
 	end
+	if delay_gate and not delay_gate(m) then return false, "expired" end
 
 	-- No "suggestion shown" event is recorded here. llm_bridge.update_preview
 	-- already calls log_hotstring_suggested(nil, trigger, replacement, type) at

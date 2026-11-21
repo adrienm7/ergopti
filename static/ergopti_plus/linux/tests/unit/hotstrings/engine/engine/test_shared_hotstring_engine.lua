@@ -636,6 +636,48 @@ end)
 
 
 
+--- The shared expired-winner vectors (HCD-1), replayed through the engine and
+--- the daemon's gate: the engine reports its winner alone, so an expired one
+--- leaves nothing for a lower rule to fire.
+local function _expired_winner_vectors()
+	local this = debug.getinfo(1, "S").source:gsub("^@", "")
+	local linux_root = this:match("^(.*[/\\])tests[/\\]")
+	local handle = assert(io.open(linux_root .. "../_shared/tests/corpus/hotstrings/expired_winner_vectors.json", "r"))
+	local raw = handle:read("*a")
+	handle:close()
+	return require("core.text.engine.json").decode(raw).vectors
+end
+
+helpers.describe("shared hotstring engine — expired-winner corpus (hcd-1-expired-winner)", function()
+	for _, vector in ipairs(_expired_winner_vectors()) do
+		helpers.it(vector.id .. " (hcd-1-expired-winner)", function()
+			local mappings, delays = {}, {}
+			for _, m in ipairs(vector.mappings) do
+				mappings[#mappings + 1] = { trigger = m.trigger, replacement = m.replacement,
+					auto_expand = m.auto_expand == true, is_case_sensitive = true,
+					is_case_sensitive_strict = true }
+				delays[m.trigger] = m.delay_s
+			end
+			local e = engine_mod.new()
+			e:load_mappings(mappings)
+			local result
+			for index, key in ipairs(vector.typed) do
+				result = e:on_char(key.char, { typed_at_ms = key.down_ms, is_terminator = key.char == " " })
+				if index < #vector.typed then helpers.assert_nil(result, "only the expander may complete") end
+			end
+			helpers.assert_not_nil(result, "the typed text completes a winner")
+			helpers.assert_eq(vector.expected.winner, result.trigger, "the engine reports its winner")
+			local allowed = require("hotstrings.engine.expansion_delay").allows(
+				result, delays[result.trigger], 0, false, false, nil)
+			local expected_fires = type(vector.expected.fires) == "string" and vector.expected.fires or nil
+			helpers.assert_eq(expected_fires ~= nil, allowed == true, "whether the winner fires")
+		end)
+	end
+end)
+
+
+
+
 -- ==========================================================
 -- ==========================================================
 -- ======= 6/ The Start-Of-Buffer Word Boundary =============
