@@ -711,8 +711,11 @@ body:has(> main.layout-analysis) {
 	hyphens: auto;
 	line-height: 1.25;
 	max-width: 12em;
-	/* The table scrolls sideways rather than squeeze a header past two lines. */
-	min-width: 10em;
+	/* The table scrolls sideways rather than squeeze a header past two lines.
+	   The « i » and the cell's padding take their share of the column: at
+	   10em a wide sans-serif (Linux's) put « Roulements vers l’intérieur » and
+	   « Caractères non pris en charge » on three lines. */
+	min-width: 12em;
 	vertical-align: bottom;
 	white-space: normal;
 }

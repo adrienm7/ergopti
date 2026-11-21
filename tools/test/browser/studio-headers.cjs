@@ -13,7 +13,7 @@
  * WHAT IS CHECKED:
  * 1. A metric whose name ends with its acronym is headed by it (« SFB »),
  *    its sort button named in full; every metric header wraps on two lines
- *    at most and has one « i » button.
+ *    at most, also in a wide font, and has one « i » button.
  * 2. From the keyboard alone, the « i » of a header opens its popover: the
  *    metric's full name (the dialog's name), its definition, its formula
  *    with the numbers written the page's way; Escape closes it and gives
@@ -105,6 +105,16 @@ async function checkFingeringKeys(page, lang) {
 	await page.keyboard.press('Escape');
 }
 
+/** How many lines each metric header's text takes. */
+function headerLines(page) {
+	return page.$$eval('#la-table thead th.la-th-metric .la-sort', (buttons) =>
+		buttons.map((button) => ({
+			key: button.dataset.sort,
+			lines: button.getBoundingClientRect().height / parseFloat(getComputedStyle(button).lineHeight)
+		}))
+	);
+}
+
 /** One language: the headers, then the popovers of three of them. */
 async function checkHeaders(browser, origin, lang) {
 	const strings = stringsOf(lang);
@@ -150,6 +160,19 @@ async function checkHeaders(browser, origin, lang) {
 			`${lang}: ${header.key} wraps on two lines at most (${header.lines.toFixed(2)})`
 		);
 	}
+	// The runner's own sans-serif differs by OS: Linux's DejaVu Sans wrapped
+	// a French header on three lines that Windows' Segoe UI kept on two. The
+	// widest common one (Verdana, or DejaVu Sans where it is missing) must
+	// hold too, whatever OS runs this.
+	const wide = await page.addStyleTag({
+		content: "#la-table thead { font-family: Verdana, 'DejaVu Sans', sans-serif; }"
+	});
+	for (const header of await headerLines(page))
+		assert.ok(
+			header.lines <= TWO_LINES,
+			`${lang}: ${header.key} wraps on two lines at most in a wide font (${header.lines.toFixed(2)})`
+		);
+	await wide.evaluate((style) => style.remove());
 	const sfb = await openFromKeyboard(page, 'sfb');
 	assert.equal(
 		sfb.name,
