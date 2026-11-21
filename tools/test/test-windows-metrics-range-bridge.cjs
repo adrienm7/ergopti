@@ -533,7 +533,7 @@ for (const [existing, mutation] of [
 ])
 	assert.throws(() => snapshotReceiptCustody(existing, mutation), /snapshot receiving preserves/);
 
-require('./support/typing-snapshot-reopen-runtime.cjs')(html, data)
+require('./support/typing-snapshot-reopen-runtime.cjs')(html)
 	.then(() => {
 		console.log('Windows metrics selected-range bridge contract: OK');
 	})

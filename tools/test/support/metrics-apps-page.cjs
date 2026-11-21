@@ -18,10 +18,12 @@ const { scriptElements } = require('../lib/html-scan.cjs');
 
 /**
  * Loads the real page declarations; timers, network and canvas remain browser ports.
- * @param {string} host Host transport to expose.
+ * @param {string} host Host transport to expose: macos, linux, windows or edge.
  * @param {function(string, object): void} [afterScript] Read-only observer after each real script.
+ * @param {{hash?: string, fetch?: function(string): Promise<object>}} [ports] Browser ports
+ *     the Edge sidecar bootstrap reads while the page loads.
  */
-function loadMetricsPage(app, host, afterScript) {
+function loadMetricsPage(app, host, afterScript, ports = {}) {
 	const page = path.join(uiRoot, app, 'index.html');
 	const bridge = `${app}_bridge`;
 	const listeners = [];
@@ -116,7 +118,7 @@ function loadMetricsPage(app, host, afterScript) {
 		addEventListener(name, callback) {
 			listeners.push({ name, callback });
 		},
-		location: { href: 'about:blank', hash: '', search: '', protocol: 'about:' },
+		location: { href: 'about:blank', hash: ports.hash ?? '', search: '', protocol: 'about:' },
 		navigator: { language: 'fr-FR', userAgent: 'metrics-page-test' },
 		console: Object.fromEntries(
 			['log', 'info', 'debug', 'warn', 'error'].map((level) => [
@@ -143,9 +145,11 @@ function loadMetricsPage(app, host, afterScript) {
 		getComputedStyle() {
 			return { getPropertyValue: (name) => themeProperties().get(name) ?? '' };
 		},
-		fetch() {
-			return Promise.resolve({ ok: false });
-		},
+		fetch:
+			ports.fetch ??
+			function fetch() {
+				return Promise.resolve({ ok: false });
+			},
 		webkit: {
 			messageHandlers: {
 				[bridge]: {
@@ -165,6 +169,8 @@ function loadMetricsPage(app, host, afterScript) {
 	});
 	context.window = context;
 	context.self = context;
+	// Edge --app= has neither the WebKit handlers nor WebView2: only its sidecar fetch.
+	if (host === 'edge') delete context.webkit;
 	if (host === 'linux') context.__ergopti_host_capabilities = { document_bridge: true };
 	if (host === 'windows')
 		context.chrome = {
@@ -204,9 +210,13 @@ function loadMetricsAppsPage(host = 'macos', afterScript) {
 	return loadMetricsPage('metrics_apps', host, afterScript);
 }
 
-/** Loads the real typing page; node values and classes come from its HTML. */
-function loadMetricsTypingPage(host = 'macos') {
-	const page = loadMetricsPage('metrics_typing', host);
+/**
+ * Loads the real typing page; node values and classes come from its HTML.
+ * @param {string} [host] Host transport to expose.
+ * @param {{hash?: string, fetch?: function(string): Promise<object>}} [ports] Browser ports.
+ */
+function loadMetricsTypingPage(host = 'macos', ports = {}) {
+	const page = loadMetricsPage('metrics_typing', host, undefined, ports);
 	for (const match of page.html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
 		// Chart drawing remains an optional browser boundary. The SVG calendar
 		// and all text controls are actual production renderers, not replacements.
