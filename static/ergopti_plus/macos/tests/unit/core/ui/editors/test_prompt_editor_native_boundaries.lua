@@ -185,7 +185,7 @@ helpers.describe("prompt editor native boundaries", function()
 				local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
 				state.bridges[1].callback({ body = {
 					action = "save", edit_id = context.edit_id, epoch = context.epoch,
-					name = "Mine", prompt = "Prompt",
+					name = "Mine", prompt = "Prompt", batch = false,
 				} })
 				helpers.assert_eq(#alerts, 0, "the alert never runs inside the page's callback")
 				for _, callback in ipairs(deferred) do callback() end
@@ -194,6 +194,37 @@ helpers.describe("prompt editor native boundaries", function()
 			end)
 		end)
 	end
+
+	helpers.it("pck-10: refuses the scalar fields Windows and Linux refuse, and saves none of them", function()
+		with_editor(function(editor, state, hs_stub)
+			local saved = {}
+			helpers.assert_true(editor.open({ id = "A" }, function(profile)
+				saved[#saved + 1] = profile
+				return true
+			end))
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
+			local function post(fields)
+				local body = { action = "save", edit_id = context.edit_id, epoch = context.epoch }
+				for key, value in pairs(fields) do body[key] = value end
+				state.bridges[1].callback({ body = body })
+			end
+			post({ name = "  ", prompt = "Prompt", batch = false })
+			post({ prompt = "Prompt", batch = false })
+			post({ name = "Mine", prompt = " \n ", batch = false })
+			post({ name = "Mine", batch = false })
+			post({ name = "Mine", prompt = "Prompt", batch = "yes" })
+			post({ name = "Mine", prompt = "Prompt" })
+			helpers.assert_eq(#saved, 0, "no invalid field reaches the profile writer")
+			helpers.assert_eq(state.deletes, 0, "the editor stays open for a valid save")
+			post({ name = "  Mine  ", prompt = "Prompt\n", batch = true })
+			helpers.assert_eq(#saved, 1)
+			helpers.assert_eq(saved[1].label, "Mine", "the name is trimmed, as on Windows and Linux")
+			helpers.assert_eq(saved[1].raw_prompt, "Prompt\n", "a raw prompt is the verbatim text, as on Linux")
+			helpers.assert_eq(saved[1].batch, true)
+		end)
+	end)
 
 	helpers.it("(prompt-editor-cleanup-owner) retires bridge and presentation before a failed close", function()
 		with_editor(function(editor, state, hs_stub)
@@ -207,7 +238,7 @@ helpers.describe("prompt editor native boundaries", function()
 			view.options.on_navigation("didFinishNavigation")
 			state.bridges[1].callback({ body = {
 				action = "save", edit_id = context.edit_id, epoch = context.epoch,
-				name = "retired", prompt = "retired",
+				name = "retired", prompt = "retired", batch = false,
 			} })
 			helpers.assert_eq(saves, 0, "an ambiguous native window owns cleanup, never persistence")
 			helpers.assert_eq(#view.scripts, 1, "late navigation must not initialize a retired native window")

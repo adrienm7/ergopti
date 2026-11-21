@@ -78,7 +78,8 @@ local function with_editor(scenario)
 			function h.message(view)
 				view.navigation_callback("didFinishNavigation")
 				local payload = hs.json.decode(view.scripts[#view.scripts]:match("^init%((.*)%)$"))
-				return { body = { action = "save", edit_id = payload.edit_id, epoch = payload.epoch, prompt = "draft" } }
+				return { body = { action = "save", edit_id = payload.edit_id, epoch = payload.epoch,
+					name = "Draft", prompt = "draft", batch = false } }
 			end
 			scenario(editor, h)
 		end)

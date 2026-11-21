@@ -22,6 +22,7 @@ local hs         = hs
 local ui_builder = require("core.ui.ui.builder")
 local Logger     = require("core.logger.engine.logger")
 local i18n       = require("core.i18n.engine.i18n")
+local TextUtils  = require("core.text.engine.utils_core")
 local Paths      = require("core.fs.engine.paths")
 
 local LOG = "prompt_editor"
@@ -278,15 +279,23 @@ function M.open(existing, on_save)
 			close_window(window)
 		elseif body.action == "save" then
 			if active.saving then return end
+			-- The scalar contract Windows and Linux enforce: a name and a prompt
+			-- that are not blank and a Boolean batch, or nothing is saved. A
+			-- missing field never becomes a default profile name or an empty prompt.
+			local label = type(body.name) == "string" and TextUtils.trim(body.name) or ""
+			if label == "" or type(body.prompt) ~= "string" or TextUtils.trim(body.prompt) == ""
+				or type(body.batch) ~= "boolean" then
+				Logger.warn(LOG, "Prompt editor save refused invalid scalar fields.")
+				return
+			end
 			local callback = active.on_save
 			active.saving = true
 			local callback_ok, callback_result = Logger.callback(
 				LOG, "Prompt editor save", callback, {
 					id = active.profile_id,
-					label = type(body.name) == "string" and body.name
-						or i18n.get("prompt_editor.default_label"),
-					batch = body.batch == true,
-					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
+					label = label,
+					batch = body.batch,
+					raw_prompt = body.prompt,
 				})
 			active.saving = false
 			if not callback_ok or callback_result == false then
