@@ -152,9 +152,16 @@ _TapHoldLayerIsSuspended() {
 ; (TapHoldPressIsOwned) for the whole gesture, so its auto-repeat is swallowed.
 ; @param KeyId {String} Canonical tap-hold key id of the layer key.
 ; @param KeyName {String} Key name the release wait watches.
+; @param CancelTapFn {Func} When given (a key combination's own layer hold),
+;        takes (KeyId, GuardMs) and returns the reason another key's activity
+;        cancels the tap, "" for none, as TapHoldOwnImmediateModifier asks it:
+;        a layer key struck under the hold makes the press a hold, as the
+;        shared pair policy decides (maintainer decision THD-3 of 2026-11-21).
+;        The keys' own hotkeys leave it out: TapHoldDispatchTap asks the same
+;        tracker before their tap.
 TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0,
-	IsSuspendedFn := 0, Owner := 0) {
+	IsSuspendedFn := 0, Owner := 0, CancelTapFn := 0) {
 	if !IsObject(Owner)
 		Owner := TapHoldNewOwner()
 	if !TapHoldOwnerCurrent(Owner)
@@ -208,10 +215,17 @@ TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 
 		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
 		Suspended := IsSuspendedFn.Call()
+		Tap := Released and ReleaseProved and !Suspended and !A_IsSuspended
+			and TapHoldOwnerCurrent(Owner) and ElapsedMs <= TapThresholdSec * 1000
+		if (Tap && IsObject(CancelTapFn)) {
+			GuardMs := TapThresholdSec * 1100
+			if (GuardMs < 250)
+				GuardMs := 250
+			Tap := CancelTapFn.Call(KeyId, GuardMs) == ""
+		}
 		return Map(
 			"activated", true,
-			"tap", Released and ReleaseProved and !Suspended and !A_IsSuspended
-				and TapHoldOwnerCurrent(Owner) and ElapsedMs <= TapThresholdSec * 1000,
+			"tap", Tap,
 			"elapsed_ms", ElapsedMs)
 	} finally {
 		_TapHoldEndPressClaim(KeyId)

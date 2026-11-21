@@ -466,7 +466,7 @@ _KeyCombinationPorts() {
 		"own_modifier", (Second, ModKey, Seconds) => TapHoldOwnImmediateModifier(
 			Second, _KeyCombinationScanNames[Second], ModKey, Seconds),
 		"own_layer", (Second, Seconds) => TapHoldOwnImmediateLayer(
-			Second, _KeyCombinationScanNames[Second], Seconds),
+			Second, _KeyCombinationScanNames[Second], Seconds, 0, 0, 0, 0, 0, 0, 0, TapHoldShouldCancelTap),
 		"run_tap", _KeyCombinationRunTap,
 		"take_first", _KeyCombinationTakeFirstKey)
 	return Ports
