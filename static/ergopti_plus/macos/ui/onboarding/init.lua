@@ -467,13 +467,9 @@ local function inject_init_data(owner, view, config_path)
 		end
 	end
 
-	-- The active input source ("U.S.", "French", "Ergopti") lets the hotstrings
-	-- page propose a trigger character the user can type.
-	local system_layout = ""
-	pcall(function()
-		local v = hs.keycodes.currentLayout()
-		if type(v) == "string" then system_layout = v end
-	end)
+	-- The hotstrings page proposes the layout's own magic key default (ù on
+	-- AZERTY, ; on QWERTY, ★ elsewhere), the value an untouched trigger keeps.
+	local magic_key_default = require("hotstrings.engine.magic_key_display").layout_default()
 
 	if not publication_is_current(owner, view) or _config_path ~= config_path then return end
 	local values = current_values(config_path)
@@ -511,7 +507,7 @@ local function inject_init_data(owner, view, config_path)
 		empty_config_dir   = empty_config_dir,
 		-- Empty when the folder is the OS default.
 		config_dir         = config_dir,
-		system_layout      = system_layout,
+		magic_key_default  = magic_key_default,
 		current            = values,
 		metrics_path       = metrics_path,
 	}, config_path)
