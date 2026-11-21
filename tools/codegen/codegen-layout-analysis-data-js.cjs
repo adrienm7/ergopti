@@ -1228,7 +1228,8 @@ function checkThumbKeys(model) {
  * KeyboardEvent code, docs/design/layout-analysis.md « ErgoDox keys ») that
  * could be mistaken for a physical key or measured nowhere: none is a code of
  * the drivers' registry (physical_keys.json) or of a row-staggered keyboard,
- * each is on a board, and each one a thumb presses is a thumb key.
+ * each is on a board, and each one a thumb presses is a thumb key or an idle
+ * thumb key (idle_thumb_keys, under the left thumb, never typed on).
  * @param {object} model - analysis_model.json.
  * @throws {Error} On a broken board-only key.
  */
@@ -1243,8 +1244,22 @@ function checkBoardOnlyKeys(model) {
 		const on = Object.values(boards).filter((board) => board.fingers[code] !== undefined);
 		if (on.length === 0) throw new Error(`board_only_keys: ${code} is on no board`);
 		for (const board of on)
-			if (['lt', 'rt'].includes(board.fingers[code]) && !model.thumb_keys.includes(code))
+			if (
+				['lt', 'rt'].includes(board.fingers[code]) &&
+				!model.thumb_keys.includes(code) &&
+				!model.idle_thumb_keys.includes(code)
+			)
 				throw new Error(`board_only_keys: ${code} is pressed by a thumb but no thumb key`);
+	}
+	// An idle thumb key is a board-only key under a left thumb, no thumb key:
+	// the left thumb types on one key (maintainer, 2026-11-21).
+	if (!Array.isArray(model.idle_thumb_keys)) throw new Error('idle_thumb_keys: not a list');
+	for (const code of model.idle_thumb_keys) {
+		if (!model.board_only_keys.includes(code))
+			throw new Error(`idle_thumb_keys: ${code} is no board-only key`);
+		if (model.thumb_keys.includes(code)) throw new Error(`idle_thumb_keys: ${code} is a thumb key`);
+		if (!Object.values(boards).every((board) => [undefined, 'lt'].includes(board.fingers[code])))
+			throw new Error(`idle_thumb_keys: ${code} is not under a left thumb`);
 	}
 	if (new Set(model.board_only_keys).size !== model.board_only_keys.length)
 		throw new Error('board_only_keys: a code twice');

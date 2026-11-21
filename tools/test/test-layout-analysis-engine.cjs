@@ -94,7 +94,9 @@
  *    and trigrams with the fingers count, the space's do not; the shared bar
  *    is the left thumb's; a rest key costs no travel and KanaMode is reached
  *    from the nearest rest; ISO and ANSI have no thumb key (a thumb letter is
- *    missing there), JIS has them on its thumbs.
+ *    missing there), JIS has them on its thumbs; the left thumb types on one
+ *    key (its space's, else the one it rests on): a second is missing, and the
+ *    ErgoDox's other left thumb keys (idle_thumb_keys) type nothing.
  * 18. A layout's own levels: every four-level library layout declared again
  *    with an empty fifth level measures exactly as before; Neo's Mod3 and
  *    Mod4 type their characters and press their own keys (the other hand's,
@@ -3924,14 +3926,87 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		rows: Object.assign({}, qwerty.rows, { KeyT: [null, null, null, null] }, rows)
 	});
 	const text = E.ngramsFromText('t t t t t');
-	// The left thumb types t and the space (NonConvert and the Corne's Space):
-	// every pair is two keys of one thumb, an SFB.
-	const sameThumb = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+	// The right thumb types t and the space (KanaMode and Convert): every pair
+	// is two keys of one thumb, an SFB.
+	const sameThumbRows = {
+		KanaMode: ['t', 'T', null, null],
+		Convert: [' ', ' ', null, null],
+		Space: [null, null, null, null]
+	};
+	const sameThumb = E.analyse(thumbLayout(sameThumbRows), text, { keyboard: 'corne' });
+	check(
+		near(sameThumb.metrics.sfb, 100),
+		`thumb keys: t and the space on the right thumb are not all SFBs (${sameThumb.metrics.sfb} %)`
+	);
+	// (left-thumb-one-key, maintainer 2026-11-21) The left thumb types on one
+	// key: its second is Alt (Cmd on macOS), the others further away. With
+	// the space on the Corne's Space, NonConvert is the left thumb's second
+	// key: t there is on a key the board lacks, never a thumb SFB.
+	const leftTwice = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
 		keyboard: 'corne'
 	});
 	check(
-		near(sameThumb.metrics.sfb, 100),
-		`thumb keys: t and the space on the left thumb are not all SFBs (${sameThumb.metrics.sfb} %)`
+		leftTwice.incomplete &&
+			leftTwice.coverage.missingRequired.includes('t') &&
+			leftTwice.coverage.missingKeys.includes('NonConvert') &&
+			leftTwice.metrics.sfb === 0,
+		`left thumb one key: t on NonConvert beside the space bar is typed ` +
+			`(missing keys ${leftTwice.coverage.missingKeys}, ${leftTwice.metrics.sfb} % SFB)`
+	);
+	// The same layout on the Kinesis, whose space is the right thumb's: NonConvert
+	// is the left thumb's only key, and t is typed.
+	const leftOnKinesis = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+		keyboard: 'kinesis_advantage'
+	});
+	check(
+		!leftOnKinesis.incomplete && !leftOnKinesis.coverage.missingKeys.includes('NonConvert'),
+		`left thumb one key: t on the Kinesis's NonConvert is missing (${leftOnKinesis.coverage.missingKeys})`
+	);
+	// The space on NonConvert and t on the Corne's Space: the space's key is the
+	// one, t is missing.
+	const spaceOnRest = E.analyse(
+		thumbLayout({ NonConvert: [' ', ' ', null, null], Space: ['t', 'T', null, null] }),
+		text,
+		{ keyboard: 'corne' }
+	);
+	check(
+		spaceOnRest.incomplete &&
+			spaceOnRest.coverage.missingKeys.includes('Space') &&
+			!spaceOnRest.coverage.missingKeys.includes('NonConvert'),
+		`left thumb one key: the space on NonConvert leaves t on Space typed (${spaceOnRest.coverage.missingKeys})`
+	);
+	// The ErgoDox's other left thumb keys (idle_thumb_keys) type nothing, even
+	// alone: they are not on the board, nor are they thumb keys the optimizer fills.
+	const ergodox = E.keyboard('ergodox');
+	const idle = sandbox.LAYOUT_ANALYSIS_DATA.model.idle_thumb_keys || [];
+	check(
+		idle.length === 4 &&
+			idle.every((code) => !ergodox.index.has(code) && !E.thumbKeys().includes(code)) &&
+			ergodox.leftThumbCodes.join() === 'Space,NonConvert',
+		`left thumb one key: the ErgoDox left thumb types on ${ergodox.leftThumbCodes}`
+	);
+	const idleAlone = E.analyse(
+		thumbLayout({
+			LeftThumbMiddle: ['t', 'T', null, null],
+			Convert: [' ', ' ', null, null],
+			Space: [null, null, null, null]
+		}),
+		text,
+		{ keyboard: 'ergodox' }
+	);
+	check(
+		idleAlone.incomplete && idleAlone.coverage.missingKeys.includes('LeftThumbMiddle'),
+		`left thumb one key: t on the ErgoDox's LeftThumbMiddle is typed (${idleAlone.coverage.missingKeys})`
+	);
+	// The incremental objective agrees with analyse() on a dropped key.
+	check(
+		near(
+			E.scoreSession(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
+				keyboard: 'corne'
+			}).total,
+			leftTwice.score.total
+		),
+		'left thumb one key: scoreSession and analyse() disagree on the dropped key'
 	);
 	// The space on the right thumb instead: no pair of one thumb, none counted.
 	const twoThumbs = E.analyse(
@@ -3948,9 +4023,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		`thumb keys: t and the space on two thumbs make ${twoThumbs.metrics.sfb} % SFB`
 	);
 	// The incremental objective counts the thumb SFB as analyse() does.
-	const session = E.scoreSession(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
-		keyboard: 'corne'
-	});
+	const session = E.scoreSession(thumbLayout(sameThumbRows), text, { keyboard: 'corne' });
 	check(
 		near(session.total, sameThumb.score.total),
 		`thumb keys: scoreSession ${session.total} is not analyse()'s ${sameThumb.score.total}`
@@ -4040,8 +4113,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		`thumb pairs: « ft f » counts ${ftf.coverage.bigrams} bigrams and ` +
 			`${ftf.coverage.trigrams} trigrams (hand changes ${ftf.metrics.hand_change} %)`
 	);
-	// (thumb-sfb) t and the space on one thumb (NonConvert and the Corne's
-	// Space, 1 key across and 0.25 up: 19.636 mm, thumb factor 1): each of the
+	// (thumb-sfb) t and the space on one thumb (KanaMode and Convert, 1 key
+	// across and 0.25 up: 19.636 mm, thumb factor 1): each of the
 	// 8 bigrams of « t t t t t », t then space and space then t, is an SFB
 	// with its travel, sfb_distance = 100 × 19.636 = 1963.629 mm.
 	const thumbMm = Math.hypot(1, 0.25) * 19.05;
@@ -4054,7 +4127,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			`over ${sameThumb.coverage.bigrams} bigrams`
 	);
 	check(
-		sameThumb.keys.NonConvert.sfb === 100 && sameThumb.keys.Space.sfb === 100,
+		sameThumb.keys.KanaMode.sfb === 100 && sameThumb.keys.Convert.sfb === 100,
 		'thumb SFB: both thumb keys carry the SFB'
 	);
 	// Two letters on two keys of the right thumb (e on Convert, n on KanaMode,
@@ -4085,9 +4158,9 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		'thumb travel: a rest key costs 0 mm, KanaMode its 19.05 mm from the nearest rest'
 	);
 	// (thumb-shared-bar) The shared space bar is the left thumb's (the
-	// fingering's Space), as before: on JIS, t on NonConvert and the space on
-	// the bar are one thumb (an SFB, 2.75 keys between their centres), t on
-	// Convert and the bar two (no pair counted).
+	// fingering's Space), as before: on JIS, t on NonConvert beside the space
+	// on the bar is the left thumb's second key, so missing (2026-11-21), t on
+	// Convert and the bar two thumbs (no pair counted).
 	const leftOnJis = E.analyse(thumbLayout({ NonConvert: ['t', 'T', null, null] }), text, {
 		keyboard: 'jis'
 	});
@@ -4095,10 +4168,11 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		keyboard: 'jis'
 	});
 	check(
-		leftOnJis.metrics.sfb === 100 &&
-			near(leftOnJis.metrics.sfb_distance, 100 * 2.75 * 19.05) &&
+		leftOnJis.incomplete &&
+			leftOnJis.coverage.missingKeys.includes('NonConvert') &&
+			!rightOnJis.incomplete &&
 			rightOnJis.coverage.bigrams === 0,
-		`thumb shared bar: JIS left thumb ${leftOnJis.metrics.sfb} % SFB, ` +
+		`thumb shared bar: JIS left thumb missing ${leftOnJis.coverage.missingKeys}, ` +
 			`right thumb ${rightOnJis.coverage.bigrams} bigrams`
 	);
 	// The incremental objective follows every rule, thumb letters included.

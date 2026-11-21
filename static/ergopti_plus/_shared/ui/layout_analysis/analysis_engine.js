@@ -444,6 +444,10 @@ var LAYOUT_ANALYSIS = (function () {
 		// A board names its own outer columns (the ErgoDox's two pinky columns).
 		const outer = new Set(board3d && board3d.outer_keys ? board3d.outer_keys : model.outer_keys);
 		const modifierCodes = new Set(heldCodes(model));
+		// The ErgoDox's left thumb keys beyond the one it types on (Alt, or Cmd on
+		// macOS, and keys further away: idle_thumb_keys) are no typing keys: a
+		// layout's characters there are on a key the board lacks.
+		const idle = new Set(model.idle_thumb_keys);
 		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
 			id: keyboardId,
@@ -465,6 +469,7 @@ var LAYOUT_ANALYSIS = (function () {
 			outer: []
 		};
 		for (const [code, fingerId] of Object.entries(fingering)) {
+			if (idle.has(code)) continue;
 			// A board key: its centre already, no row stagger to remove.
 			const g = board3d
 				? board3d.keys[code] && {
@@ -556,6 +561,14 @@ var LAYOUT_ANALYSIS = (function () {
 		board.outOfPairs = Uint8Array.from(board.codes, (code, k) =>
 			isThumbFinger(board.finger[k]) && !thumbCodes.has(code) ? 1 : 0
 		);
+		// The left thumb's typing keys (the space bar, NonConvert), of which a
+		// layout types on one (leftThumbKey), and the one it rests on first.
+		board.leftThumbCodes = board.codes.filter(
+			(code, k) => board.finger[k] === LEFT_THUMB && !modifierCodes.has(code)
+		);
+		board.leftThumbRest =
+			model.thumb_rest_keys.find((code) => board.leftThumbCodes.includes(code)) ||
+			board.codes[board.homeOf[LEFT_THUMB]];
 		board.modifiers = {
 			shiftForLeft: board.index.get(model.modifier_keys.shift_for_left_hand),
 			shiftForRight: board.index.get(model.modifier_keys.shift_for_right_hand),
@@ -2088,34 +2101,78 @@ var LAYOUT_ANALYSIS = (function () {
 			keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base)
 				? keyboard('iso_angle', profile)
 				: keyboard(keyboardId, profile);
-		return withSpaceThumbKeys(board, layout);
+		return layoutBoard(board, layout);
 	}
 
-	const spaceBoardCache = new WeakMap();
+	const layoutBoardCache = new WeakMap();
 
 	/**
-	 * The board a layout is measured on once the thumb keys it types its space
-	 * on leave the pair metrics, as the space bar does: the board itself when
-	 * the layout types no space on a thumb key (every ISO and ANSI layout), else
-	 * one copy per set of such keys, so a score session keeps one board.
+	 * The one key the left thumb types on for a layout (maintainer, 2026-11-21:
+	 * its second key is Alt, or Cmd on macOS, and the others are further away):
+	 * the left thumb key the layout types its space on, else the one it rests
+	 * on (NonConvert, then the space bar) when the layout uses it, else the
+	 * first left thumb key the layout puts a character on.
 	 * @param {object} board - From keyboard().
 	 * @param {object} layout - Library shape, checked.
-	 * @returns {object} The board, or its copy with those keys in outOfPairs.
+	 * @returns {string} A code of board.leftThumbCodes, or the rest key.
 	 */
-	function withSpaceThumbKeys(board, layout) {
+	function leftThumbKey(board, layout) {
+		const cells = (code) => layout.rows[code] || [];
+		const used = board.leftThumbCodes.filter((code) => cells(code).some((cell) => cell !== null));
+		return (
+			used.find((code) => cells(code).some((cell) => cell === ' ')) ||
+			(used.length === 0 || used.includes(board.leftThumbRest) ? board.leftThumbRest : used[0])
+		);
+	}
+
+	/**
+	 * The left thumb keys of a board a layout types nothing on: every one but
+	 * its leftThumbKey. The optimizer moves no character onto them.
+	 * @param {object} layoutInput - Library shape.
+	 * @param {string} keyboardId - A key of model.keyboards.
+	 * @param {object} [profile] - A fingering profile.
+	 * @returns {string[]} KeyboardEvent or board-only codes.
+	 */
+	function spareThumbKeys(layoutInput, keyboardId, profile) {
+		const layout = layoutFromRows(layoutInput);
+		const board = keyboard(keyboardId, profile);
+		const kept = leftThumbKey(board, layout);
+		return board.leftThumbCodes.filter((code) => code !== kept);
+	}
+
+	/**
+	 * The board a layout is measured on: without the left thumb keys beyond
+	 * its one (leftThumbKey) that it puts characters on, which become keys the
+	 * board lacks (their characters unsupported), and with the thumb keys it
+	 * types its space on out of the pair metrics, as the space bar is. The
+	 * board itself when neither applies (every ISO and ANSI layout), else one
+	 * copy per such set of keys, so a score session keeps one board.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {object} The board, or its copy.
+	 */
+	function layoutBoard(board, layout) {
+		const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
+		const kept = leftThumbKey(board, layout);
+		const dropped = board.leftThumbCodes.filter((code) => code !== kept && typed(code));
 		const spaceKeys = data()
 			.model.thumb_keys.filter(
-				(code) => board.index.has(code) && (layout.rows[code] || []).some((cell) => cell === ' ')
+				(code) =>
+					board.index.has(code) &&
+					!dropped.includes(code) &&
+					(layout.rows[code] || []).some((cell) => cell === ' ')
 			)
 			.map((code) => board.index.get(code));
-		if (spaceKeys.length === 0) return board;
-		let copies = spaceBoardCache.get(board);
-		if (!copies) spaceBoardCache.set(board, (copies = new Map()));
-		const key = spaceKeys.join(',');
+		if (spaceKeys.length === 0 && dropped.length === 0) return board;
+		let copies = layoutBoardCache.get(board);
+		if (!copies) layoutBoardCache.set(board, (copies = new Map()));
+		const key = `${spaceKeys.join(',')}|${dropped.join(',')}`;
 		if (!copies.has(key)) {
 			const outOfPairs = Uint8Array.from(board.outOfPairs);
 			for (const k of spaceKeys) outOfPairs[k] = 1;
-			copies.set(key, Object.assign({}, board, { outOfPairs }));
+			const index = new Map(board.index);
+			for (const code of dropped) index.delete(code);
+			copies.set(key, Object.assign({}, board, { outOfPairs, index }));
 		}
 		return copies.get(key);
 	}
@@ -7412,6 +7469,7 @@ var LAYOUT_ANALYSIS = (function () {
 		layoutFromComposerSource,
 		typingCodes,
 		thumbKeys: thumbKeyCodes,
+		spareThumbKeys,
 		keyboardFormats,
 		defaultKeyboardFormat,
 		formatHiddenKeys,

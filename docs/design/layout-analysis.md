@@ -466,6 +466,19 @@ board's missing number row.
   on the thumb its author gives it, never on the shared space bar: on a
   split board Space is the left thumb's (the right one's on the Kinesis), so
   the space bar beside a thumb letter would put both on one thumb.
+- **The left thumb types on one key** (maintainer, 2026-11-21: on a real
+  keyboard its second key is Alt, or Cmd on macOS, and the others are
+  further away and uncomfortable): the key a layout types its space on when
+  it is the left thumb's, else the one it rests on (NonConvert, then the
+  space bar) when the layout uses it, else the one it uses
+  (`leftThumbKey`). Its other keys are no typing keys for that layout:
+  `boardFor` takes them off the board, so a character there is on a key the
+  board lacks (`missingKeys`, unsupported; a letter makes the layout
+  incomplete), and the optimizer moves nothing onto them
+  (`spareThumbKeys`). The right thumb keeps Convert, KanaMode and AltGr. So
+  a layout with the space on a split board's Space and a letter on
+  NonConvert loses that letter, and on JIS the bar's space and a NonConvert
+  letter no longer make a thumb SFB: a left thumb SFB cannot happen.
 - NonConvert and Convert are rest keys (`thumb_rest_keys`): a thumb rests on
   the one a layout uses. A thumb key's reach is its distance to the nearest
   of its thumb's home key and rest keys, so a rest key costs no travel and
@@ -485,14 +498,15 @@ board's missing number row.
   SFB**, counted among the bigrams with its travel in `sfb_distance` (the
   thumbs' `same_finger_factor` is 1, as an index's): a letter and the space
   on the same thumb (« e » then space, space then « e »), or two thumb
-  letters of one thumb. A trigram with the space stays out of the trigram
+  letters of one thumb; since the left thumb types on one key, only the
+  right thumb's. A trigram with the space stays out of the trigram
   metrics.
 - Which thumb presses the space: a layout that types it on a thumb key, that
   key's thumb; the shared bar (`Space`), the thumb the fingering gives it,
   the left one on every board but the Kinesis (the convention since
   2026-11-14, kept). So on JIS a letter on NonConvert beside a space on the
-  bar is a thumb SFB (2.75 keys between their centres), one on Convert is
-  not. Travel is measured between key centres, as everywhere.
+  bar is the left thumb's second key, missing; one on Convert is typed and
+  makes no thumb pair. Travel is measured between key centres, as everywhere.
 - The optimizer never moves a character onto a thumb key unless its
   `thumbKeys` option names a keyboard that has them
   ([layout-optimizer.md](layout-optimizer.md)).
@@ -543,9 +557,17 @@ until then, so every layout's ErgoDox values changed with this convention.
   its own hand's letter (a left-hand character takes ShiftRight), so the two
   uses never meet. The drawings skip the modifiers, so the place shows the
   character. The other boards keep their Shift keys as modifiers only.
-- The 7 board-only thumb keys are also `thumb_keys` (pairs, reach from the
-  nearest rest key, the optimizer's `thumbKeys`), present on the ErgoDox
-  only. In a thumb-letter file a thumb key keeps its own code when it is a
+- The 3 right board-only thumb keys are also `thumb_keys` (pairs, reach
+  from the nearest rest key, the optimizer's `thumbKeys`), present on the
+  ErgoDox only. Its 4 left ones (`LeftThumbUpperOuter`,
+  `LeftThumbUpperInner`, `LeftThumbMiddle`, `LeftThumbLower`) are
+  `idle_thumb_keys` (maintainer, 2026-11-21): the reader still reads a
+  file's characters there and the KLA writer writes them back, but
+  `keyboard()` leaves them off the board, so they type nothing and are not
+  drawn. This moved only Maks Ex, Adextre and Enne P 111 69 on the ErgoDox
+  (their characters there are unsupported); every other value of the 783
+  layouts on the eleven keyboards and both French corpora is bit for bit
+  the same. In a thumb-letter file a thumb key keeps its own code when it is a
   thumb code (67 NonConvert, 74 Convert, 73 KanaMode) or a board-only thumb
   key; the other typed keys of that thumb take its thumb codes left free,
   big keys first, as before. The left 2-unit outer key (66) holds the

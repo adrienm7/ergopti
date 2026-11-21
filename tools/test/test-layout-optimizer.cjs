@@ -513,10 +513,11 @@ check(
 const THUMBS = E.thumbKeys();
 const onThumbs = (layout) =>
 	THUMBS.filter((code) => (layout.rows[code] || []).some((cell) => cell !== null));
-// Three on every thumb board, then the ErgoDox's seven board-only ones.
+// Three on every thumb board, then the ErgoDox's three right board-only ones:
+// its other left thumb keys type nothing (maintainer, 2026-11-21).
 check(
-	THUMBS.length === 10 && THUMBS.slice(0, 3).join() === 'NonConvert,Convert,KanaMode',
-	`the model has the three thumb keys and the ErgoDox's seven, not ${THUMBS.join(' ')}`
+	THUMBS.length === 6 && THUMBS.slice(0, 3).join() === 'NonConvert,Convert,KanaMode',
+	`the model has the three thumb keys and the ErgoDox's three, not ${THUMBS.join(' ')}`
 );
 const noThumbs = search(azerty, {}, { start: 'random' });
 check(
@@ -530,6 +531,16 @@ check(
 			onThumbs(layout).every((code) => E.keyboard('corne').index.has(code))
 		),
 	'thumbKeys: corne lets letters onto the Corne thumb keys, and only those'
+);
+// (left-thumb-one-key, maintainer 2026-11-21) The left thumb types on one key:
+// AZERTY's space is on the Corne's Space, so NonConvert is never a place;
+// Hands Down Gold rests its left thumb on NonConvert, which stays one.
+check(
+	everyLayout(corneThumbs, (layout) => !onThumbs(layout).includes('NonConvert')) &&
+		O.problem(E, library.get('hands_down_gold'), { thumbKeys: 'corne' }).slots.some(
+			(slot) => slot.code === 'NonConvert'
+		),
+	'thumbKeys: a letter moves onto the left thumb’s second key'
 );
 check(
 	refusal(() => O.problem(E, azerty, { thumbKeys: 'iso' })) === 'thumb_keys_absent',
@@ -562,9 +573,9 @@ check(
 // engine score, with the AltGr levels and the dead key's layer moving too,
 // and the search it drives returns the same layout as the full objective.
 // On the Corne, letters move onto the thumb keys: their pairs with the
-// fingers count, and a letter beside the space on one thumb is an SFB, both
-// with the space on the board's Space key (AZERTY) and on a thumb key of
-// its own (Hands Down Gold's Convert).
+// fingers count, and a letter beside the space on one thumb is an SFB, with
+// the space on the board's Space key (AZERTY: the right thumb's keys only)
+// and on a thumb key of its own (Hands Down Gold's Convert).
 const ON_CORNE = Object.assign({}, ANALYSIS, { keyboard: 'corne' });
 for (const [start, options, analysis] of [
 	[azerty, {}, ANALYSIS],

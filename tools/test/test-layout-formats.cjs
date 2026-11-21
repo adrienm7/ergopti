@@ -1627,14 +1627,19 @@ async function checkLinks() {
 	);
 	// The reader's thumb codes are the model's: the three every thumb board
 	// has, then the ErgoDox's board-only thumb keys (its upper pairs and small
-	// columns), each on the ErgoDox board under a thumb.
+	// columns), each on the ErgoDox board under a thumb, but for its idle left
+	// thumb keys (idle_thumb_keys, maintainer 2026-11-21): the reader still
+	// reads a file's characters there, the analysis types none of them.
 	const codes = ['NonConvert', 'Convert', 'KanaMode'];
-	const ergodoxThumbs = (DATA.model.board_only_keys || []).filter((code) =>
-		['lt', 'rt'].includes(DATA.boards.ergodox.fingers[code])
+	const idle = DATA.model.idle_thumb_keys || [];
+	const ergodoxThumbs = (DATA.model.board_only_keys || []).filter(
+		(code) => ['lt', 'rt'].includes(DATA.boards.ergodox.fingers[code]) && !idle.includes(code)
 	);
 	check(
 		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes.concat(ergodoxThumbs)) &&
-			ergodoxThumbs.length === 7 &&
+			ergodoxThumbs.length === 3 &&
+			idle.length === 4 &&
+			idle.every((code) => DATA.boards.ergodox.fingers[code] === 'lt') &&
 			JSON.stringify(DATA.model.thumb_rest_keys) === JSON.stringify(codes.slice(0, 2)),
 		`thumb keys: the model's ${DATA.model.thumb_keys} are not the KLA reader's ${codes} and the ErgoDox's ${ergodoxThumbs}`
 	);

@@ -327,7 +327,11 @@ var LAYOUT_OPTIMIZER = (function () {
 		const thumbPlaces = new Set();
 		if (opts.thumbKeys !== null) {
 			const board = engine.keyboard(opts.thumbKeys);
-			for (const code of thumbCodes) if (board.index.has(code)) thumbPlaces.add(code);
+			// The left thumb types on one key (the start's space key, else the one
+			// it rests on): its other keys are no places.
+			const spare = new Set(engine.spareThumbKeys(layout, opts.thumbKeys));
+			for (const code of thumbCodes)
+				if (board.index.has(code) && !spare.has(code)) thumbPlaces.add(code);
 			if (thumbPlaces.size === 0)
 				throw new OptimizerError(
 					'thumb_keys_absent',
