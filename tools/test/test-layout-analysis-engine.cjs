@@ -1449,7 +1449,8 @@ for (const layout of library) {
 	// travel (Q and Z 40.691 mm apart, × 1.7 for the pinky: 69.174 mm),
 	// −2 × 5 × 20 − 0.26 × 20 × 69.174 = −559.707; 4→D a full scissor, a row
 	// jump on adjacent fingers (2.5 × 1) and an outward roll (−3 × 20 − 2.5 ×
-	// 20 + 0.5 × 20 = −100), E→A an outward roll (+10), E→X one and a row jump
+	// 20 + 0.5 × 20 = −100), E→A an outward roll and a one-row jump of fingers
+	// one apart (10 − 2.5 × 0.5 × 0.5 × 20 = −2.5), E→X one and a row jump
 	// on adjacent fingers (10 − 50 = −40), E→J a hand change (0).
 	const matrix = E.bigramMatrix(qwerty, tables, { keyboard: 'iso' });
 	check(matrix.bigrams === 5, `bigram matrix: ${matrix.bigrams} bigrams, expected 5`);
@@ -1457,7 +1458,7 @@ for (const layout of library) {
 	const expected = {
 		'KeyQ+KeyZ': [['sfb'], -559.7068296797407],
 		'Digit4+KeyD': [['roll_out', 'row_jump', 'scissors'], -100],
-		'KeyE+KeyA': [['roll_out', 'row_jump'], 10],
+		'KeyE+KeyA': [['roll_out', 'row_jump'], -2.5],
 		'KeyE+KeyX': [['roll_out', 'row_jump'], -40],
 		'KeyE+KeyJ': [['hand_change'], 0]
 	};
@@ -1532,7 +1533,8 @@ for (const layout of library) {
 	// and Z 40.691 mm apart, × 1.7 for the pinky) with a mean travel of
 	// (19.636 + 21.299) / 2 mm (Q and Z from the pinky's home), × 1.7 for the
 	// pinky; « ea » is a roll from the top row to home (19.636 / 2 mm of the
-	// middle finger, × 1.1, no event).
+	// middle finger, × 1.1) and a one-row jump of fingers one apart (2.5 × 0.5
+	// × 0.5 × 100 = 62.5).
 	const efforts = E.wordEfforts(qwerty, { qz: 1, ea: 3, qé: 2 }, { keyboard: 'iso' });
 	const board = E.keyboard('iso');
 	const reach = (code) => board.reach[board.index.get(code)];
@@ -1551,7 +1553,7 @@ for (const layout of library) {
 		near(qz.effort, 1000 + 1798.5341483987033 + (1.7 * (reach('KeyQ') + reach('KeyZ'))) / 2),
 		`word effort: qz ${qz.effort}`
 	);
-	check(near(ea.effort, (1.1 * reach('KeyE')) / 2), `word effort: ea ${ea.effort}`);
+	check(near(ea.effort, (1.1 * reach('KeyE')) / 2 + 62.5), `word effort: ea ${ea.effort}`);
 	check(efforts.words[0].word === 'qz', 'word effort: the hardest first');
 	check(
 		efforts.unsupported.length === 1 && efforts.unsupported[0].word === 'qé',
@@ -3584,7 +3586,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	// defaults: an engine whose score_weights give pinky_ring 5 (and one more
 	// point to sfb_distance) types « b »
 	// after « a » (left pinky, KeyA) on the right index (KeyU) instead of the
-	// ring (KeyW), whose pair now costs 5 − 1 (inward roll) points a point.
+	// ring on the same row (KeyS, no row jump), whose pair now costs 5 − 1
+	// (inward roll) points a point.
 	const weighted = {};
 	vm.createContext(weighted);
 	for (const file of [LEGEND_PATH, DATA_PATH])
@@ -3595,11 +3598,11 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	);
 	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), weighted, { filename: ENGINE_PATH });
 	const W = vm.runInContext('LAYOUT_ANALYSIS', weighted);
-	const choice = toy('toy_pinky_ring', { KeyA: 'a', KeyW: 'b', KeyU: 'b' });
+	const choice = toy('toy_pinky_ring', { KeyA: 'a', KeyS: 'b', KeyU: 'b' });
 	const before = E.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
 	const after = W.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
 	check(
-		firstStep(before, 'b') === 'KeyW' && firstStep(after, 'b') === 'KeyU',
+		firstStep(before, 'b') === 'KeyS' && firstStep(after, 'b') === 'KeyU',
 		`ideas: « ab » types b on ${firstStep(before, 'b')}, then ${firstStep(after, 'b')} with pinky_ring 5`
 	);
 	// typing.cost: the travel of « ed » (1963.63 mm per 100 bigrams, over 2
