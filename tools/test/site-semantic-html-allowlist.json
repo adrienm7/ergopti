@@ -302,69 +302,6 @@
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
 		},
 		{
-			"file": "src/routes/ergopti-plus-old/confort.svelte",
-			"element": "span (none)",
-			"count": 1,
-			"kind": "language",
-			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "span (none)",
-			"count": 1,
-			"kind": "styling-hook",
-			"reason": "Tightens the line height of the name inside the h1; no element means a line height."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "span.nowrap",
-			"count": 2,
-			"kind": "styling-hook",
-			"reason": "Keeps a word and the punctuation after it on one line (white-space: nowrap)."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "span.path1",
-			"count": 6,
-			"kind": "icon-layer",
-			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "span.path2",
-			"count": 6,
-			"kind": "icon-layer",
-			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "div.main",
-			"count": 1,
-			"kind": "layout",
-			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/introduction_ergopti_plus.svelte",
-			"element": "div.encadre",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The framed box of a summary in the main flow; it is part of the text, not tangential to it, so not an aside."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/menu.svelte",
-			"element": "span (none)",
-			"count": 1,
-			"kind": "language",
-			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
-		},
-		{
-			"file": "src/routes/ergopti-plus-old/roulements.svelte",
-			"element": "span (none)",
-			"count": 1,
-			"kind": "language",
-			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
-		},
-		{
 			"file": "src/routes/ergopti-plus/+layout.svelte",
 			"element": "div.ep-shell",
 			"count": 1,

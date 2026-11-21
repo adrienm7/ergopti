@@ -90,9 +90,6 @@ sub-pages does not refetch them. Each sub-page renders only its own sections.
 				<p class="ep-version" aria-live="polite">
 					{#if ui.release}Ergopti+ {ui.release.tag}{/if}
 				</p>
-				<p class="legacy-link">
-					<a href={resolve('/ergopti-plus-old')}>{t('Ancienne version de cette page →')}</a>
-				</p>
 			</header>
 			<SubNav label={t('Pages d’Ergopti+')} {items} />
 
@@ -121,23 +118,6 @@ sub-pages does not refetch them. Each sub-page renders only its own sections.
 		color: rgba(255, 255, 255, 0.7);
 		font-size: 0.85rem;
 		margin: 0;
-	}
-
-	.legacy-link {
-		margin: 0;
-		text-align: right;
-	}
-
-	.legacy-link a {
-		color: rgba(255, 255, 255, 0.35);
-		font-size: 0.78rem;
-		text-decoration: none;
-		transition: color 0.25s ease;
-	}
-
-	.legacy-link a:hover {
-		color: rgba(255, 255, 255, 0.7);
-		text-decoration: underline;
 	}
 
 	.ep-endspace {

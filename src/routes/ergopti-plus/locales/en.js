@@ -31,7 +31,6 @@ export default {
 	'Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.':
 		'This supplementary catalogue covers reviewed behaviors. It is not an exhaustive inventory or a guarantee of operation in every application.',
 	// ── Top bar ────────────────────────────────────────────────────────────
-	'Ancienne version de cette page →': 'Previous version of this page →',
 
 	// ── <head> ─────────────────────────────────────────────────────────────
 	'Ergopti+ — la frappe augmentée, gratuite et locale':

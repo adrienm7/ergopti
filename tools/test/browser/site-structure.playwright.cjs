@@ -57,7 +57,6 @@ const REFERENCE_KEYBOARD = Object.freeze({
 		'/',
 		'/ergopti-plus',
 		'/ergopti-plus/installation',
-		'/ergopti-plus-old',
 		'/studio',
 		'/studio/comparer',
 		'/studio/optimiser',
@@ -79,6 +78,7 @@ const ERGOPTI_PLUS_SECTIONS = Object.freeze({
 // Former addresses and where each must land, anchors included.
 const REDIRECTS = Object.freeze([
 	['/editeur', '/studio'],
+	['/ergopti-plus-old', '/ergopti-plus'],
 	['/benchmarks', '/ergopti/benchmarks'],
 	['/informations', '/ergopti/informations'],
 	['/informations#changelog', '/ergopti/informations#changelog'],

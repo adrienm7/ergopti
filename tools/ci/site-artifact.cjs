@@ -29,8 +29,8 @@ const LIMITS = Object.freeze({
 });
 
 // Real pages of the site, in browsing order; the former addresses (/editeur,
-// /benchmarks, /utilisation, /ergopti/utilisation, /informations) are redirects that
-// site-structure.playwright.cjs exercises.
+// /benchmarks, /utilisation, /ergopti/utilisation, /informations, /ergopti-plus-old)
+// are redirects that site-structure.playwright.cjs exercises.
 const SITE_ROUTES = Object.freeze([
 	'/',
 	'/ergopti',
@@ -46,7 +46,6 @@ const SITE_ROUTES = Object.freeze([
 	'/ergopti-plus/configuration',
 	'/ergopti-plus/installation',
 	'/ergopti-plus/faq',
-	'/ergopti-plus-old',
 	'/studio',
 	'/studio/comparer',
 	'/studio/essayer'
