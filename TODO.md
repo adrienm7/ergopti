@@ -366,9 +366,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     30 min install budget) and OLL-03 (stale owners) fixed. Left: OLL-04 free-space check on macOS and Linux and an
     `ollama.no_space` message; OLL-05 the install's network and checksum classes (macOS markers never printed);
     OLL-06 one readiness bound once the cold start is measured (field checks); OLL-07 old runtime versions left on
-    Windows and Linux; OLL-08 Linux reuse without a re-hash; OLL-09 macOS model delete through `ollama rm`; OLL-10
-    the macOS-only model repair; OLL-11 the lifecycle actions outside the parity table; OLL-12 the unused
-    `ollama-release.sh`; OLL-13 Linux readiness without listener ownership or the pinned version;
+    Windows and Linux; OLL-08 Linux reuse without a re-hash; OLL-09 macOS model delete through `ollama rm`; OLL-12
+    the unused `ollama-release.sh`; OLL-13 Linux readiness without listener ownership or the pinned version;
   - tray adapters, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-tray-adapters/report.md)):
     TRAY-01 fixed (the Windows cold tray showed French startup rows to every user and an icon named by its file name
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language).
@@ -391,10 +390,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     30 min install budget), OLL-03 (stale owners), OLL-07 (Windows and Linux remove the earlier runtime once the
     pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
     `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13
-    (Linux admits readiness only from its own process group's socket with the pinned version) fixed. Left: OLL-04
+    (Linux admits readiness only from its own process group's socket with the pinned version), OLL-10 (Windows and
+    Linux pull a model Ollama cannot load once more, one shared rule and its vectors) and OLL-11 (the lifecycle
+    actions are rows of « Ollama d’Ergopti » on the three, with an uninstall that keeps or deletes the models)
+    fixed. Left: OLL-04
     free-space check on macOS and Linux and an `ollama.no_space` message; OLL-05 the install's network and checksum
     classes (macOS markers never printed); OLL-06 one readiness bound once the cold start is measured (field
-    checks); OLL-10 the macOS-only model repair; OLL-11 the lifecycle actions outside the parity table;
+    checks);
   - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
     metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
