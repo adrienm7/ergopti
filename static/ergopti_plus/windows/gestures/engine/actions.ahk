@@ -1068,7 +1068,7 @@ _GestureToggleUIPage(which) {
 						return { Hwnd: () => _GestureGuiHwnd(_PathsEdWeb_Gui), Open: () => FilePathsEditor() }
 				case "hotstrings_settings":
 						return {
-								Hwnd: () => _GestureGuiHwnd(_HCWWeb_Gui) || _GestureGuiHwnd(_HCWGui),
+								Hwnd: () => _GestureGuiHwnd(_HCWWeb_Gui),
 								Open: () => OpenHotstringsConfigWindow(),
 						}
 				case MenuCommand.LAYOUT_MANAGER:

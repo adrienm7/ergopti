@@ -19,9 +19,8 @@
 ; choke point. Same invariant, sibling forgotten — which is why this asserts the
 ; property for the bulk writers as a group rather than for the one that broke.
 ;
-; SCOPE: source-level. The config window builds a native Gui at top level and is
-; deliberately outside the headless include graph — see
-; test_config_window_republishes_baked_fields.ahk for the same constraint.
+; SCOPE: source-level: the handlers drive real config files and a WebView2 page.
+; The WebView page is the window's only form (maintainer decision 2026-11-21).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,14 +35,14 @@
 ; ==================================================================
 ; ==================================================================
 
-; The native config window's catalogue-wide handlers: one clears every override,
-; the other forces every colour to grey. Both bypass _HCW_SetOverride /
+; The config window's catalogue-wide handlers: one clears every override, the
+; other forces every colour to grey. Both bypass _HCW_SetOverride /
 ; _HCW_ClearOverride by design (they call the storage primitives directly), so
 ; the republish they skip has to be asserted here.
 _HCWBR_BulkWriters() {
 	return [
-		{ Name: "_HCW_ResetAll", Reconcile: "_HCW_ReconcileNativeReset" },
-		{ Name: "_HCW_SetAllGrey", Reconcile: "_HCW_ReconcileNativeCurrent" }
+		{ Name: "_HCWWeb_ResetAll", Reconcile: "_HCWWeb_ReconcileReset" },
+		{ Name: "_HCWWeb_SetAllGrey", Reconcile: "_HCWWeb_ReconcileState" }
 	]
 }
 
@@ -65,7 +64,7 @@ _HCWBR_BakedFields() {
 ; ==================================================================
 
 ; Conditional on purpose: it pins the baked/derived split from both sides. A bulk
-; writer that touches delay or priority must republish; _HCW_SetAllGrey writes
+; writer that touches delay or priority must republish; _HCWWeb_SetAllGrey writes
 ; only colour and therefore must stay free to skip the rebuild.
 _HCWBR_TransitiveWriteBody(FuncName, Body) {
 	if (InStr(Body, "_HCW_BuildResetAllWrites(") == 0)

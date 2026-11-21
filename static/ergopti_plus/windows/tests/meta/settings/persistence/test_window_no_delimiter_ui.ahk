@@ -19,8 +19,7 @@
 ; the guard fails. A positive cross-check asserts the tray submenu still owns the
 ; feature, so the test also fails if delimiter management is deleted outright.
 ;
-; Meta-static (scans source text) because hotstrings_config_window.ahk builds a
-; native Gui at top level and is NOT in the headless run_all include graph.
+; Meta-static (scans source text): the claim is an absence across the driver.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -3,15 +3,14 @@
 ; ==============================================================================
 ; MODULE: Hotstrings Config Window — Mutations
 ; DESCRIPTION:
-; Write-path functions for the hotstrings config window. Contains all handlers
-; that mutate state: debounce-armed numeric writes, color/tooltip change
-; handlers, reset-all and set-all-grey bulk operations, the window-close flush,
-; source-aware override dispatch (SetOverride / ClearOverride / Resolve /
-; ReadTomlMeta), and the personal TOML [_meta] atomic patcher.
+; Write path of the hotstring settings window, driven by its WebView page:
+; the strict write batch, the reset-all plan, source-aware override dispatch
+; (SetOverride / ClearOverride / Resolve / ReadTomlMeta), and the personal TOML
+; [_meta] atomic patcher.
 ;
 ; RATIONALE:
-; Extracted from init.ahk so the write path is isolated in one file and the
-; read/UI path lives in hcw_helpers.ahk. Every function here ultimately calls
+; The write path is isolated in one file and the read path lives in
+; hcw_helpers.ahk. Every function here ultimately calls
 ; either HotstringsSetOverride / HotstringsClearOverride (for common and
 ; extension entries) or _HCW_PatchTomlMeta (for personal TOML files).
 ; ==============================================================================
@@ -27,8 +26,7 @@
 ; re-registration, which is exactly what the tray-menu delay editors already do.
 ;
 ; Color and show_tooltip are deliberately absent: they ARE derived at read, and
-; a ~1.3 s re-registration on every color pick would be a serious regression in
-; a window whose numeric edits already fire on a debounce.
+; a ~1.3 s re-registration on every color pick would be a serious regression.
 global HCW_REBUILD_ON_WRITE_FIELDS := Map("delay", true, "priority", true)
 
 
@@ -74,7 +72,7 @@ _HCW_RunWriteBatch(WriteFns, ReconcileFn := 0, SuccessFn := 0, FailureFn := 0) {
 	return Outcome
 }
 
-; Outcome callbacks are UI/backstop work reached from Gui, timer, and COM event
+; Outcome callbacks are UI/backstop work reached from timer and COM event
 ; threads. A notifier or stale control must not turn an already-contained write
 ; refusal into an unhandled driver exception.
 _HCW_RunOutcomeCallback(CallbackFn, Outcome, Label) {
@@ -98,315 +96,9 @@ _HCW_ReportWriteFailure(Outcome) {
 		"the hotstrings configuration change", 0, "", StateUnchanged)
 }
 
-_HCW_ReconcileNativeCurrent(Outcome) {
-	_HCW_LoadCurrent()
-}
-
-_HCW_ReconcileNativeReset(Outcome) {
-	; A partial bulk failure can still have durably changed a baked delay or
-	; priority. Rebuild before showing canonical state so tooltip and engine agree.
-	if Outcome["succeeded"] > 0
-		_HCW_RepublishIfBakedField("delay")
-	if !Outcome["ok"]
-		_HCW_LoadCurrent()
-}
-
-; Owner is the window whose reset button started the batch. A rebuild inside
-; the batch can let the user close it and reopen another window; that newer
-; window shows the cleared state already and is not this reset's to retire.
-_HCW_CompleteNativeReset(Owner, Outcome) {
-	global _HCWGui, _HCWWidgets, _HCW_RetiredNativeResets
-	PreviousCritical := Critical("On")
-	try {
-		if (Owner != 0 && _HCWGui == Owner) {
-			; Retain exact cleanup custody before WM_DESTROY can admit B.
-			Host := {window: _HCWGui, hwnd: _HCWGui.Hwnd, widgets: _HCWWidgets, closing: false}
-			_HCW_RetiredNativeResets.Push(Host)
-			_HCWGui := 0
-			_HCWWidgets := 0
-		}
-	} finally Critical(PreviousCritical)
-	_HCW_RetryRetiredNativeResets()
-	NotifierSend(t("hs_config.notify_reset_all"), Map("title", t("hs_config.btn_reset_all")))
-}
-
-; A refused retirement never restores A over a successor. Its independent
-; record remains available to the next real public opening.
-_HCW_RetryRetiredNativeResets() {
-	global _HCW_RetiredNativeResets
-	PreviousCritical := Critical("On")
-	try Pending := _HCW_RetiredNativeResets.Clone()
-	finally Critical(PreviousCritical)
-	for Host in Pending {
-		PreviousCritical := Critical("On")
-		try {
-			if Host.closing
-				continue
-			Host.closing := true
-		} finally Critical(PreviousCritical)
-		Settled := false
-		try {
-			Window := Host.window
-			; A retained old form cannot continue accepting edits or native focus.
-			try Window.Hide()
-			Window.Destroy()
-			if Host.hwnd && WMHandleExists(Host.hwnd) {
-				Remaining := GuiFromHwnd(Host.hwnd)
-				if !IsObject(Remaining) || Remaining == Window
-					throw Error("The retired hotstrings reset window has not closed.")
-			}
-			Host.window := 0, Host.widgets := 0
-			Settled := true
-		} catch Any as Failure {
-			try LoggerWarn("HotstringsConfigWindow", "Native reset retirement remains pending (error_type={1}).", Type(Failure))
-		} finally {
-			PreviousCritical := Critical("On")
-			try {
-				Host.closing := false
-				if Settled {
-					Count := _HCW_RetiredNativeResets.Length
-					Loop Count {
-						Index := Count - A_Index + 1
-						if _HCW_RetiredNativeResets[Index] == Host
-							_HCW_RetiredNativeResets.RemoveAt(Index)
-					}
-				}
-			} finally Critical(PreviousCritical)
-		}
-	}
-}
-
-
-
-
-; ============================================================
-; ============================================================
-; ======= 1/ Mutation handlers ===============================
-; ============================================================
-; ============================================================
-
-_HCW_OnDelayChanged() {
-	global _HCWWidgets
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	if !NumberTryParseInputInteger(_HCWWidgets.DelayEdit.Value, &Ms) {
-		; A partial/invalid edit supersedes its own pending numeric candidate.
-		_HCW_CancelNumericWrite(Entry, Sec, "delay")
-		return
-	}
-	if (Ms < 0) {
-		Ms := 0
-	}
-	; Coalesce a burst of digits into a single write — see _HCW_ArmNumericWrite.
-	_HCW_ArmNumericWrite("delay", Entry, Sec, Ms / 1000)
-}
-
-_HCW_OnPriorityChanged() {
-	global _HCWWidgets
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	if !NumberTryParseInputInteger(_HCWWidgets.PriorityEdit.Value, &Prio) {
-		_HCW_CancelNumericWrite(Entry, Sec, "priority")
-		return
-	}
-	if (Prio < 0) {
-		Prio := 0
-	} else if (Prio > 100) {
-		Prio := 100
-	}
-	; Coalesce a burst of digits into a single write — see _HCW_ArmNumericWrite.
-	_HCW_ArmNumericWrite("priority", Entry, Sec, Prio)
-}
-
-; Replace only an edit for the same entry/section/field. Delay and priority have
-; independent controls, so one global replaceable slot loses whichever field
-; was typed first when both change inside the same debounce window.
-_HCW_NumericWriteMatches(Pending, Entry, Sec, Field) {
-	; Catalogue rebuilds replace Entry objects even when they describe the same
-	; logical source. Key is the stable identity shared by common, personal, and
-	; extension entries; object identity would strand old timer payloads.
-	return Pending.Entry.Key == Entry.Key && Pending.Sec == Sec
-		&& Pending.Field == Field
-}
-
-_HCW_QueueNumericWrite(PendingWrites, Pending, ReplaceExisting := true) {
-	for Index, Existing in PendingWrites {
-		if _HCW_NumericWriteMatches(
-			Existing, Pending.Entry, Pending.Sec, Pending.Field) {
-			if ReplaceExisting
-				PendingWrites[Index] := Pending
-			return PendingWrites.Length
-		}
-	}
-	PendingWrites.Push(Pending)
-	return PendingWrites.Length
-}
-
-; Reinsert only writers that refused or raised. If a newer edit arrived while
-; the old batch yielded to I/O, preserve that newer queued value rather than
-; overwriting it with the failed snapshot.
-_HCW_RequeueFailedNumericWrites(PendingWrites, Outcome) {
-	global _HCW_PendingNumericWrites
-	Requeued := 0
-	for _, Index in Outcome.Get("failed_indices", []) {
-		if (Index < 1 || Index > PendingWrites.Length)
-			continue
-		Before := _HCW_PendingNumericWrites.Length
-		_HCW_QueueNumericWrite(
-			_HCW_PendingNumericWrites, PendingWrites[Index], false)
-		if (_HCW_PendingNumericWrites.Length > Before)
-			Requeued += 1
-	}
-	return Requeued
-}
-
-; Remove only the pending value invalidated by a per-field reset. The reverse
-; walk is safe if a malformed/re-entrant caller managed to enqueue duplicates.
-_HCW_RemoveNumericWrite(PendingWrites, Entry, Sec, Field) {
-	Removed := 0
-	Index := PendingWrites.Length
-	while (Index >= 1) {
-		Pending := PendingWrites[Index]
-		if _HCW_NumericWriteMatches(Pending, Entry, Sec, Field) {
-			PendingWrites.RemoveAt(Index)
-			Removed += 1
-		}
-		Index -= 1
-	}
-	return Removed
-}
-
-_HCW_CancelNumericWrite(Entry, Sec, Field) {
-	global _HCW_PendingNumericWrites
-	Removed := _HCW_RemoveNumericWrite(_HCW_PendingNumericWrites, Entry, Sec, Field)
-	if (_HCW_PendingNumericWrites.Length == 0)
-		SetTimer(_HCW_FlushNumericWrite, 0)
-	return Removed
-}
-
-; Reset All invalidates every queued candidate. Disarm without flushing: writing
-; a value immediately before clearing it is redundant, and a refusal of that
-; obsolete write must not prevent the reset from reaching its real writes.
-_HCW_CancelAllNumericWrites() {
-	global _HCW_PendingNumericWrites
-	Removed := (_HCW_PendingNumericWrites is Array)
-		? _HCW_PendingNumericWrites.Length : 0
-	_HCW_PendingNumericWrites := []
-	SetTimer(_HCW_FlushNumericWrite, 0)
-	return Removed
-}
-
-; Convert the captured values into one aggregate persistence batch. Keeping
-; this transformation explicit makes the queue contract behaviour-testable:
-; every distinct queued field must produce exactly one writer invocation.
-_HCW_RunNumericWriteBatch(PendingWrites, WriterFn, ReconcileFn := 0, FailureFn := 0) {
-	Writes := []
-	for _, Pending in PendingWrites {
-		Writes.Push(WriterFn.Bind(
-			Pending.Entry, Pending.Sec, Pending.Field, Pending.Value))
-	}
-	return _HCW_RunWriteBatch(Writes, ReconcileFn, 0, FailureFn)
-}
-
-; Arm (or re-arm) the shared debounce timer. Repeated digits in one field
-; coalesce, while edits to another field remain queued. The clamped value and
-; current selection are captured so navigation cannot retarget the write.
-_HCW_ArmNumericWrite(Field, Entry, Sec, Value) {
-	global _HCW_PendingNumericWrites, _HCW_NUMERIC_DEBOUNCE_MS
-	_HCW_QueueNumericWrite(_HCW_PendingNumericWrites,
-		{ Field: Field, Entry: Entry, Sec: Sec, Value: Value })
-	SetTimer(_HCW_FlushNumericWrite, -_HCW_NUMERIC_DEBOUNCE_MS)
-}
-
-; Fired once the numeric-edit burst settles. Drain snapshots until the queue is
-; stable: file I/O may yield, and a new Change event can enqueue another value
-; while an earlier snapshot is being persisted. A nested timer/transition sees
-; the active owner and blocks instead of declaring that incomplete drain done.
-_HCW_FlushNumericWrite(RefreshOnSuccess := true, WriterFn := 0,
-	RefreshFn := 0, FailureFn := 0) {
-	global _HCW_PendingNumericWrites, _HCW_NumericDrainActive
-	if _HCW_NumericDrainActive
-		return false
-	if !(_HCW_PendingNumericWrites is Array)
-		_HCW_PendingNumericWrites := []
-	if (_HCW_PendingNumericWrites.Length == 0)
-		return true
-	if !HasMethod(WriterFn, "Bind")
-		WriterFn := _HCW_SetOverride
-	if !HasMethod(RefreshFn, "Call")
-		RefreshFn := _HCW_LoadCurrent
-	if !HasMethod(FailureFn, "Call")
-		FailureFn := _HCW_ReportWriteFailure.Bind()
-
-	_HCW_NumericDrainActive := true
-	WroteAny := false
-	try {
-		loop {
-			PendingWrites := _HCW_PendingNumericWrites
-			if (PendingWrites.Length == 0)
-				break
-			; Clear before I/O so re-entrant input lands in a fresh queue that the
-			; next loop iteration observes.
-			_HCW_PendingNumericWrites := []
-			SetTimer(_HCW_FlushNumericWrite, 0)
-			Outcome := _HCW_RunNumericWriteBatch(
-				PendingWrites, WriterFn, 0, FailureFn)
-			if !Outcome["ok"] {
-				_HCW_RequeueFailedNumericWrites(PendingWrites, Outcome)
-				return false
-			}
-			WroteAny := true
-		}
-		if (RefreshOnSuccess && WroteAny)
-			RefreshFn.Call()
-		return true
-	} finally {
-		_HCW_NumericDrainActive := false
-	}
-}
-
-_HCW_OnColorChanged() {
-	global _HCWWidgets, _HCW_CurrentColorOptions
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	Idx := _HCWWidgets.ColorDD.Value
-	if (Idx < 1) {
-		return
-	}
-	Hex := _HCW_CurrentColorOptions[Idx].Hex
-	WriteFn := (Hex == "")
-		? _HCW_ClearOverride.Bind(Entry, Sec, "color")
-		: _HCW_SetOverride.Bind(Entry, Sec, "color", Hex)
-	Outcome := _HCW_RunWriteBatch([WriteFn], _HCW_ReconcileNativeCurrent.Bind(),
-		0, _HCW_ReportWriteFailure.Bind())
-	return Outcome["ok"]
-}
-
-_HCW_OnTooltipChanged() {
-	global _HCWWidgets
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	Val := (_HCWWidgets.TooltipChk.Value == 1)
-	Outcome := _HCW_RunWriteBatch([
-		_HCW_SetOverride.Bind(Entry, Sec, "show_tooltip", Val)
-	], _HCW_ReconcileNativeCurrent.Bind(), 0, _HCW_ReportWriteFailure.Bind())
-	return Outcome["ok"]
-}
-
-_HCW_ClearField(Field) {
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	; A timer armed by the value being reset must not restore it after the clear.
-	_HCW_CancelNumericWrite(Entry, Sec, Field)
-	Outcome := _HCW_RunWriteBatch([
-		_HCW_ClearOverride.Bind(Entry, Sec, Field)
-	], _HCW_ReconcileNativeCurrent.Bind(), 0, _HCW_ReportWriteFailure.Bind())
-	return Outcome["ok"]
-}
-
-; Build backend-neutral reset operations once for both native and WebView
-; presentations. Personal TOML requires one write per supported field, while
-; the override store clears all fields through its empty-field operation.
+; Build the reset-all operations. Personal TOML requires one write per
+; supported field, while the override store clears all fields through its
+; empty-field operation.
 _HCW_BuildResetAllPlan(CategoryList, SectionsFn := 0, PersonalFields := 0) {
 	if !HasMethod(SectionsFn, "Call")
 		SectionsFn := _HCW_GetSections
@@ -450,84 +142,13 @@ _HCW_BuildResetAllWrites(CategoryList) {
 	return Writes
 }
 
-_HCW_ResetAll() {
-	global _HCW_CATEGORY_LIST, _HCWGui, _HCWWidgets
-	; The reset supersedes every pending numeric candidate. Cancel before the
-	; loop so no timer can restore a cleared value and no obsolete write failure
-	; can block the reset itself.
-	_HCW_CancelAllNumericWrites()
-	Writes := _HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)
-	Outcome := _HCW_RunWriteBatch(Writes, _HCW_ReconcileNativeReset.Bind(),
-		_HCW_CompleteNativeReset.Bind(_HCWGui), _HCW_ReportWriteFailure.Bind())
-	return Outcome["ok"]
-}
-
-; Force every category/extension to grey at file level; clear per-section colour
-; overrides for a consistent cascade. Personal file TOMLs are patched atomically.
-_HCW_SetAllGrey() {
-	global _HCW_CATEGORY_LIST
-	Grey := _HCW_PaletteHex("gray")
-	Writes := []
-	for _, E in _HCW_CATEGORY_LIST {
-		if E.IsPersonal {
-			Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, "", "color", Grey))
-			for _, Sec in _HCW_GetSections(E) {
-				Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, Sec.Name, "color", ""))
-			}
-		} else if E.IsExtension {
-			Writes.Push(HotstringsSetOverride.Bind("ext." . E.ExtId, "", "color", Grey))
-			for _, Sec in _HCW_GetSections(E) {
-				Writes.Push(HotstringsClearOverride.Bind("ext." . E.ExtId, Sec.Name, "color"))
-			}
-		} else {
-			Writes.Push(HotstringsSetOverride.Bind(E.Key, "", "color", Grey))
-			for _, Sec in _HCW_GetSections(E) {
-				Writes.Push(HotstringsClearOverride.Bind(E.Key, Sec.Name, "color"))
-			}
-		}
-	}
-	Outcome := _HCW_RunWriteBatch(Writes, _HCW_ReconcileNativeCurrent.Bind(),
-		0, _HCW_ReportWriteFailure.Bind())
-	return Outcome["ok"]
-}
-
-_HCW_OnClose(ExpectedWindow := unset, *) {
-	global _HCWGui, _HCWWidgets, _HCW_LastSelection
-	if IsSet(ExpectedWindow) && !_HCW_NativeResetCloseCurrent(ExpectedWindow)
-		return 1
-	; Commit any numeric edit still inside the debounce window before teardown.
-	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false))
-		return 1
-	PreviousCritical := Critical("On")
-	try {
-		if IsSet(ExpectedWindow) && !_HCW_NativeResetCloseCurrent(ExpectedWindow)
-			return 1
-		RetiredWindow := _HCWGui, RetiredWidgets := _HCWWidgets, RetiredSelection := _HCW_LastSelection
-		_HCWGui := 0
-		_HCWWidgets := 0
-		_HCW_LastSelection := 0
-	} finally Critical(PreviousCritical)
-	return 0
-}
-
-; A retained A cannot clear B. An unrecorded Gui in its first Show still uses
-; the original native Close behavior before its singleton has been published.
-_HCW_NativeResetCloseCurrent(Window) {
-	global _HCWGui, _HCW_RetiredNativeResets
-	if IsObject(_HCWGui) && _HCWGui != Window
-		return false
-	for Host in _HCW_RetiredNativeResets
-		if Host.window == Window
-			return false
-	return true
-}
 
 
 
 
 ; ============================================================
 ; ============================================================
-; ======= 2/ Source-aware read/write dispatch ================
+; ======= 1/ Source-aware read/write dispatch ================
 ; ============================================================
 ; ============================================================
 
@@ -656,7 +277,7 @@ _HCW_ReadTomlMeta(Path, Sec) {
 
 ; ============================================================
 ; ============================================================
-; ======= 3/ Personal TOML [_meta] patcher ==================
+; ======= 2/ Personal TOML [_meta] patcher ==================
 ; ============================================================
 ; ============================================================
 

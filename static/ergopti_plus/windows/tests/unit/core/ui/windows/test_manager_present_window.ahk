@@ -244,7 +244,6 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 		"_Onboarding_TryWeb", "WMPresentWindow(_ob_gui)",
 		"_HCWWeb_TryOpen", "WMPresentWindow(_HCWWeb_Gui)",
 		"_HsEdWeb_TryOpen", "WMPresentWindow(Window)",
-		"OpenHotstringsConfigWindow", "WMPresentWindow(_HCWGui)",
 		"KLWV_Focus", 'WMPresentWindow(KLWV.windows[which]["gui"])'
 	)
 	CapturedGlobals := Map("_LLM_ModelBrowser_ShowWeb", "_LLM_MBW_Gui",

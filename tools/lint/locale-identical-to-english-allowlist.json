@@ -521,10 +521,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["es"]
 		},
-		"hs_config.label_file": {
-			"reason": "loanword-or-cognate",
-			"locales": ["it"]
-		},
 		"hs_config.unit_ms": {
 			"reason": "unit-or-abbreviation",
 			"locales": [

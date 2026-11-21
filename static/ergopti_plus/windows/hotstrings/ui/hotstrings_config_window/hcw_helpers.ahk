@@ -3,39 +3,16 @@
 ; ==============================================================================
 ; MODULE: Hotstrings Config Window — Helpers
 ; DESCRIPTION:
-; Read-only helpers and UI builders for the hotstrings config window. Contains
-; globals, locale string initialisation, category/group list builders, sort and
-; format utilities, the public window entry point, change handlers that only
-; read and dispatch, selection getters, section scanner, status path builder,
-; TOML default and user-override readers, and color dropdown helpers.
+; Read-only data layer of the hotstring settings window, whose only form is the
+; shared WebView page (webview.ahk; maintainer decision 2026-11-21). Contains
+; locale string initialisation, category/group list builders, the public window
+; entry point, the section scanner, and the TOML default and user-override
+; readers the page state is built from.
 ;
 ; RATIONALE:
-; Extracted from init.ahk so the read path (querying, formatting, populating
-; controls) stays separate from the write path (mutations live in
-; hcw_mutations.ahk). Callers that only need to inspect state import only this
-; file; the thin shim (init.ahk) includes both.
+; The read path stays separate from the write path (hcw_mutations.ahk); the thin
+; shim (init.ahk) includes both.
 ; ==============================================================================
-
-#Include %A_LineFile%\..\..\..\..\core\ui\engine\font_scale.ahk
-
-global _HCWGui      := 0
-global _HCWWidgets  := 0
-global _HCW_LastSelection := 0
-global _HCW_RetiredNativeResets := []
-
-; Debounce window for the numeric Edit fields (delay / priority). Their "Change"
-; event fires on every keystroke, but persisting on every digit rewrites the
-; override file (and, for personal entries, re-reads + re-serialises the whole
-; TOML) per character. We coalesce a burst of edits into a single write fired
-; once the user pauses typing. Negative value = one-shot SetTimer.
-global _HCW_NUMERIC_DEBOUNCE_MS := 250
-; Pending debounced numeric writes captured at arm time:
-; [{ Field, Entry, Sec, Value }, ...]. Repeated edits replace only the matching
-; entry/section/field item; distinct fields remain queued for the shared flush.
-; The captured selection ensures each value lands on the entry the user was
-; actually editing even if selection changes before the timer fires.
-global _HCW_PendingNumericWrites := []
-global _HCW_NumericDrainActive := false
 
 ; Unified entry list — rebuilt each time the window opens.
 ; Shape: { Key, Label, Path, IsPersonal, IsExtension, ExtId, ExtName, Group }
@@ -66,12 +43,11 @@ global _HCW_VIRTUAL_CATS := ["llm_prediction"]
 ; Locale-dependent labels — populated lazily at window-open time.
 global _HCW_CATEGORY_LABELS := Map()
 global _HCW_COLOR_PRESETS   := []
-global _HCW_FILE_LEVEL_LABEL := ""
 
 ; Populate all locale-dependent labels. Called at window-open time so that
 ; i18n is fully initialised and the correct locale is active.
 _HCW_InitLocaleStrings() {
-	global _HCW_CATEGORY_LABELS, _HCW_COLOR_PRESETS, _HCW_FILE_LEVEL_LABEL
+	global _HCW_CATEGORY_LABELS, _HCW_COLOR_PRESETS
 	_HCW_CATEGORY_LABELS := Map(
 		"magickey",           t("hs_config.cat_magickey"),
 		"autocorrection",     t("hs_config.cat_autocorrection"),
@@ -90,7 +66,6 @@ _HCW_InitLocaleStrings() {
 	_HCW_COLOR_PRESETS := [Map("Label", t("hs_config.color_inherit"), "Hex", "")]
 	for Row in NativeThemeHotstringPalette()
 		_HCW_COLOR_PRESETS.Push(Map("Label", t(Row["I18n"]), "Hex", Row["Hex"]))
-	_HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 }
 
 ; One colour of the shared palette by its name; a missing name is a broken generator.
@@ -289,23 +264,6 @@ _HCW_SortByKey(Arr, KeyName) {
 	return Arr
 }
 
-; Format a millisecond count with a space thousands separator, e.g. "2 000 ms".
-_HCW_FmtMs(Ms) {
-	Str := Format("{:d}", Round(Ms))
-	Out := ""
-	Count := 0
-	Pos := StrLen(Str)
-	while Pos >= 1 {
-		if (Count > 0 and Mod(Count, 3) == 0) {
-			Out := " " . Out
-		}
-		Out := SubStr(Str, Pos, 1) . Out
-		Pos--
-		Count++
-	}
-	return Out . " ms"
-}
-
 
 
 
@@ -315,278 +273,12 @@ _HCW_FmtMs(Ms) {
 ; ============================================================
 ; ============================================================
 
-_HCW_FindItemIndexByProperty(Items, Property, Value, FallbackIndex := 1) {
-	for Index, Item in Items {
-		if (Item.%Property% == Value)
-			return Index
-	}
-	if (Items.Length == 0 || FallbackIndex == 0)
-		return 0
-	return Min(Max(FallbackIndex, 1), Items.Length)
-}
-
-_HCW_CaptureSelection() {
-	Entry := _HCW_SelectedEntry()
-	return {
-		GroupKey: _HCW_SelectedGroupKey(),
-		EntryKey: Entry.Key,
-		SectionName: _HCW_SelectedSection(Entry)
-	}
-}
-
-; Gate a user-visible transition on its pending-draft drain. A false result is
-; an expected persistence refusal already reported by the drain; an exception
-; is contained here because GUI callbacks otherwise escape into the driver.
-_HCW_DrainBeforeTransition(DrainFn, RestoreFn := 0) {
-	DrainOk := false
-	try {
-		Result := HasMethod(DrainFn, "Call") ? DrainFn.Call() : false
-		DrainOk := (Result is Integer) && Result == 1
-	} catch as Err {
-		try LoggerError("HotstringsConfigWindow",
-			"Draft drain raised before a UI transition: {1}.", Err.Message)
-		try ConfigReportPersistenceFailure("the hotstrings configuration draft")
-	}
-	if DrainOk
-		return true
-	if HasMethod(RestoreFn, "Call") {
-		try RestoreFn.Call()
-		catch as Err {
-			try LoggerError("HotstringsConfigWindow",
-				"Selection restore failed after a refused draft drain: {1}.", Err.Message)
-		}
-	}
-	return false
-}
-
-_HCW_RestoreSelectionControl(Level, Selection) {
-	global _HCWWidgets, _HCW_GROUP_LIST
-	if !IsObject(Selection)
-		return false
-	if (Level == "group") {
-		Index := _HCW_FindItemIndexByProperty(
-			_HCW_GROUP_LIST, "Key", Selection.GroupKey)
-		_HCWWidgets.GroupDD.Choose(Index)
-		return true
-	}
-	Files := _HCW_FilesForGroup(Selection.GroupKey)
-	if (Level == "file") {
-		Index := _HCW_FindItemIndexByProperty(
-			Files, "Key", Selection.EntryKey)
-		_HCWWidgets.FileDD.Choose(Index)
-		return true
-	}
-	EntryIndex := _HCW_FindItemIndexByProperty(
-		Files, "Key", Selection.EntryKey)
-	Sections := _HCW_GetSections(Files[EntryIndex])
-	SectionIndex := _HCW_FindItemIndexByProperty(
-		Sections, "Name", Selection.SectionName, 0)
-	_HCWWidgets.SecDD.Choose(SectionIndex > 0 ? SectionIndex + 1 : 1)
-	return true
-}
-
-; Rebuild every selector from the fresh catalogue, restoring the user's place
-; by stable keys rather than by stale dropdown indexes. If the selected source
-; disappeared, fall back to the always-populated common group.
-_HCW_RefreshExistingControls(Selection) {
-	global _HCWWidgets, _HCW_GROUP_LIST, _HCW_FILE_LEVEL_LABEL
-	GroupIndex := _HCW_FindItemIndexByProperty(
-		_HCW_GROUP_LIST, "Key", Selection.GroupKey)
-	GroupKey := _HCW_GROUP_LIST[GroupIndex].Key
-	Files := _HCW_FilesForGroup(GroupKey)
-	if (Files.Length == 0) {
-		GroupIndex := _HCW_FindItemIndexByProperty(
-			_HCW_GROUP_LIST, "Key", "common")
-		GroupKey := _HCW_GROUP_LIST[GroupIndex].Key
-		Files := _HCW_FilesForGroup(GroupKey)
-	}
-
-	_HCWWidgets.GroupDD.Delete()
-	_HCWWidgets.GroupDD.Add(_HCW_GroupItems())
-	_HCWWidgets.GroupDD.Choose(GroupIndex)
-
-	FileItems := []
-	for _, Entry in Files
-		FileItems.Push(Entry.Label)
-	_HCWWidgets.FileDD.Delete()
-	_HCWWidgets.FileDD.Add(FileItems)
-	FileIndex := _HCW_FindItemIndexByProperty(
-		Files, "Key", Selection.EntryKey)
-	_HCWWidgets.FileDD.Choose(FileIndex)
-
-	Entry := Files[FileIndex]
-	Sections := _HCW_GetSections(Entry)
-	SectionItems := [_HCW_FILE_LEVEL_LABEL]
-	for _, Sec in Sections
-		SectionItems.Push(Sec.Title . "  —  " . Sec.Name)
-	_HCWWidgets.SecDD.Delete()
-	_HCWWidgets.SecDD.Add(SectionItems)
-	SectionIndex := 1
-	if (Selection.SectionName != "") {
-		FoundSection := _HCW_FindItemIndexByProperty(
-			Sections, "Name", Selection.SectionName, 0)
-		if (FoundSection > 0)
-			SectionIndex := FoundSection + 1
-	}
-	_HCWWidgets.SecDD.Choose(SectionIndex)
-	_HCW_LoadCurrent()
-	return true
-}
-
+; Opens the hotstring settings window. The shared WebView page is its only form
+; (maintainer decision 2026-11-21): without WebView2 the user is told once that
+; WebView2 is required and nothing opens.
+; @returns {Boolean} False when WebView2 refused the opening.
 OpenHotstringsConfigWindow() {
-	global _HCWGui, _HCWWidgets
-	_HCW_RetryRetiredNativeResets()
-	; Prefer the shared WebView2 frontend (identical UI to macOS). It falls back
-	; to the native Gui below only when the WebView2 runtime is unavailable.
-	if _HCWWeb_TryOpen()
-		return
-	_HCW_InitLocaleStrings()
-	if _HCWGui {
-		Selection := _HCW_CaptureSelection()
-		_HCW_BuildCategoryList()
-		_HCW_BuildGroupList()
-		_HCW_RefreshExistingControls(Selection)
-		WMPresentWindow(_HCWGui)
-		return
-	}
-	_HCW_BuildCategoryList()
-	_HCW_BuildGroupList()
-
-	G := Gui_Create("+Resize +MinSize580x320", t("hs_config.window_title"))
-	Gui_SetFont(G, "s10", "Segoe UI")
-	G.MarginX := 14
-	G.MarginY := 12
-
-	; ----- Top action row (reset all first, then grey, no close here) ------
-	; Auto-sized + harmonised so both buttons share the widest label — keeps
-	; the pair aligned across locales whose verbs vary (e.g. German "Alles
-	; zurücksetzen" is much wider than English "Reset all").
-	BtnReset := G.Add("Button", "h28",         t("hs_config.btn_reset_all"))
-	BtnGrey  := G.Add("Button", "x+6 yp h28",  t("hs_config.btn_all_gray"))
-	Gui_HarmoniseButtonWidths([BtnReset, BtnGrey])
-	BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
-	BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
-
-	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule (SS_SUNKEN)
-
-	; ----- Group selector (full-width row) ---------------------------------
-	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_group"))
-	GroupDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", _HCW_GroupItems())
-
-	; ----- File selector (full-width row) ----------------------------------
-	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_file"))
-	FileDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
-
-	; ----- Section selector (full-width row) -------------------------------
-	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_section"))
-	SecDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
-
-	; ----- Current path hint (below selectors) ----------------------------
-	Status := G.Add("Text", "xm y+6 w526 h18", "")
-
-	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule (SS_SUNKEN)
-
-	; ----- Delay row -------------------------------------------------------
-	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_delay"))
-	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
-	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
-	G.Add("Text", "x+4 yp+3 w24", t("hs_config.unit_ms"))
-	DelayDefault := G.Add("Text", "x+6 yp w300 Right", "")
-	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
-
-	; ----- Priority row ----------------------------------------------------
-	; Higher priority wins a same-trigger collision (cascade: individual >
-	; section > file > source default 10/30/50). Editing here writes the
-	; section/file override to the shared override file (or personal [_meta]),
-	; and the empty w24 spacer keeps the default hint aligned with the delay row.
-	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_priority"))
-	PriorityEdit := G.Add("Edit", "x+6 yp-3 w80 Number +Limit3")
-	PriorityUpDown := G.Add("UpDown", "Range0-100", 0)
-	G.Add("Text", "x+4 yp+3 w24", "")
-	PriorityDefault := G.Add("Text", "x+6 yp w300 Right", "")
-	PriorityReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
-
-	; ----- Color row -------------------------------------------------------
-	; The swatch is an empty Text painted with the colour: a filled Progress, as
-	; it used to be, was read as a progress bar at 100 % by a screen reader. The
-	; colour's name is in the drop-down before it.
-	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
-	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
-	InitSwatchHex := _HCW_HexNoHash(GLOBAL_DEFAULT_COLOR)
-	ColorSwatch := G.Add("Text", "x+8 yp+1 w22 h22 +Border Background" . InitSwatchHex, "")
-	ColorDefault := G.Add("Text", "x+10 yp+2 w194 Right", "")
-	ColorReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
-
-	; ----- Tooltip toggle row (same group as delay/color, no HR before) ---
-	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
-	TooltipReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
-
-	; A « ↺ » reads as a symbol to a screen reader: each button is named by
-	; what it restores.
-	for Pair in [[DelayReset, "hs_config.label_delay"], [PriorityReset, "hs_config.label_priority"],
-			[ColorReset, "hs_config.label_color"], [TooltipReset, "hs_config.label_tooltip"]]
-		A11ySystem_SetAccessibleName(Pair[1].Hwnd, StrReplace(t("hs_config.btn_reset_field"), "{1}", t(Pair[2])))
-
-	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule before the close button
-
-	; ----- Close button (bottom, after HR) --------------------------------
-	; Auto-sized to the localised label (with the 90 px floor) then centred
-	; horizontally inside the 526 px content column. Computing X after the
-	; harmonise step ensures the button stays centred regardless of locale.
-	BtnClose := G.Add("Button", "xm y+14 h28", t("hs_config.btn_close"))
-	Gui_HarmoniseButtonWidths([BtnClose])
-	BtnClose.GetPos(, , &_closeW, )
-	BtnClose.Move(14 + (526 - _closeW) // 2)
-	BtnClose.OnEvent("Click", (*) => _HCW_RequestHide())
-
-	_HCWWidgets := {
-		Gui:          G,
-		GroupDD:      GroupDD,
-		FileDD:       FileDD,
-		SecDD:        SecDD,
-		DelayEdit:    DelayEdit,
-		DelayReset:   DelayReset,
-		DelayDefault: DelayDefault,
-		PriorityEdit:    PriorityEdit,
-		PriorityReset:   PriorityReset,
-		PriorityDefault: PriorityDefault,
-		ColorDD:      ColorDD,
-		ColorSwatch:  ColorSwatch,
-		ColorReset:   ColorReset,
-		ColorDefault: ColorDefault,
-		TooltipChk:   TooltipChk,
-		TooltipReset: TooltipReset,
-		Status:       Status,
-	}
-
-	GroupDD.Choose(1)
-
-	GroupDD.OnEvent("Change",   (*) => _HCW_OnGroupChanged())
-	FileDD.OnEvent("Change",    (*) => _HCW_OnFileChanged())
-	SecDD.OnEvent("Change",     (*) => _HCW_OnSectionChanged())
-	DelayEdit.OnEvent("Change", (*) => _HCW_OnDelayChanged())
-	DelayReset.OnEvent("Click", (*) => _HCW_ClearField("delay"))
-	PriorityEdit.OnEvent("Change", (*) => _HCW_OnPriorityChanged())
-	PriorityReset.OnEvent("Click", (*) => _HCW_ClearField("priority"))
-	ColorDD.OnEvent("Change",      (*) => _HCW_OnColorChanged())
-	ColorReset.OnEvent("Click",    (*) => _HCW_ClearField("color"))
-	TooltipChk.OnEvent("Click",    (*) => _HCW_OnTooltipChanged())
-	TooltipReset.OnEvent("Click",  (*) => _HCW_ClearField("show_tooltip"))
-	G.OnEvent("Close",             _HCW_OnClose)
-
-	_HCW_OnGroupChanged()    ; populate file + section dropdowns and first load
-
-	G.Show()
-	_HCWGui := G
-}
-
-
-_HCW_RequestHide() {
-	global _HCWGui
-	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false))
-		return false
-	_HCWGui.Hide()
-	return true
+	return _HCWWeb_TryOpen()
 }
 
 
@@ -594,228 +286,9 @@ _HCW_RequestHide() {
 
 ; ============================================================
 ; ============================================================
-; ======= 2/ Change handlers =================================
+; ======= 2/ Section and override readers ====================
 ; ============================================================
 ; ============================================================
-
-; Rebuild the file dropdown whenever the group selection changes.
-_HCW_OnGroupChanged() {
-	global _HCWWidgets, _HCW_LastSelection
-	; Persist any pending numeric edit before the selection moves, otherwise the
-	; debounced write would target the previous entry or be silently dropped.
-	Selection := _HCW_LastSelection
-	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
-		_HCW_RestoreSelectionControl.Bind("group", Selection))
-		return false
-	GroupKey := _HCW_SelectedGroupKey()
-	Files := _HCW_FilesForGroup(GroupKey)
-	Items := []
-	for _, E in Files {
-		Items.Push(E.Label)
-	}
-	_HCWWidgets.FileDD.Delete()
-	_HCWWidgets.FileDD.Add(Items)
-	if Items.Length > 0 {
-		_HCWWidgets.FileDD.Choose(1)
-	}
-	return _HCW_OnFileChanged()
-}
-
-; Rebuild the section dropdown whenever the file selection changes.
-_HCW_OnFileChanged() {
-	global _HCWWidgets, _HCW_FILE_LEVEL_LABEL, _HCW_LastSelection
-	; Commit any pending numeric edit to its captured entry before re-selecting.
-	Selection := _HCW_LastSelection
-	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
-		_HCW_RestoreSelectionControl.Bind("file", Selection))
-		return false
-	Entry := _HCW_SelectedEntry()
-	Items := [_HCW_FILE_LEVEL_LABEL]
-	Sections := _HCW_GetSections(Entry)
-	for _, Sec in Sections {
-		Items.Push(Sec.Title . "  —  " . Sec.Name)
-	}
-	_HCWWidgets.SecDD.Delete()
-	_HCWWidgets.SecDD.Add(Items)
-	_HCWWidgets.SecDD.Choose(1)
-	_HCW_LoadCurrent()
-	return true
-}
-
-; Refresh the controls when the section selection changes. Commits any pending
-; numeric edit to its captured entry first so a debounced write is never lost
-; when the user jumps to another section before the timer fires.
-_HCW_OnSectionChanged() {
-	global _HCW_LastSelection
-	Selection := _HCW_LastSelection
-	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
-		_HCW_RestoreSelectionControl.Bind("section", Selection))
-		return false
-	_HCW_LoadCurrent()
-	return true
-}
-
-; Pull the current selection and refresh the delay/color controls.
-_HCW_LoadCurrent() {
-	global _HCWWidgets, _HCW_LastSelection
-	Entry := _HCW_SelectedEntry()
-	Sec := _HCW_SelectedSection(Entry)
-	Resolved := _HCW_Resolve(Entry, Sec)
-	Defaults := _HCW_TomlDefaults(Entry, Sec)
-	Override := _HCW_UserOverride(Entry, Sec)
-
-	FallbackDelayMs := _HCW_FallbackDelayMs(Entry)
-	DelayMs := (Resolved.Delay != "") ? Round(Resolved.Delay * 1000) : FallbackDelayMs
-
-	; Fall back to the category baseline when the TOML has no [_meta] delay,
-	; so the hint never shows "0 ms".
-	DelayDefMs := (Defaults.Delay != "") ? Round(Defaults.Delay * 1000) : FallbackDelayMs
-	DelayOverridden := (Override.HasOwnProp("Delay") and Override.Delay != "")
-
-	_HCWWidgets.DelayEdit.Value := DelayMs
-
-	DefHint := t("hs_config.default_prefix") . _HCW_FmtMs(DelayDefMs)
-	if DelayOverridden {
-		DefHint .= "    •  " . t("hs_config.override_active")
-		_HCWWidgets.DelayReset.Enabled := true
-	} else {
-		_HCWWidgets.DelayReset.Enabled := false
-	}
-	_HCWWidgets.DelayDefault.Value := DefHint
-
-	; Priority — the resolver always returns a non-empty value (it folds in the
-	; source default), so the edit shows the effective priority. The default hint
-	; falls back to the source tier when neither TOML nor override sets one.
-	PrioDefVal := (Defaults.HasOwnProp("Priority") and Defaults.Priority != "")
-		? Defaults.Priority
-		: _HCW_FallbackPriority(Entry)
-	PrioVal := (Resolved.HasOwnProp("Priority") and Resolved.Priority != "")
-		? Resolved.Priority
-		: PrioDefVal
-	PrioOverridden := (Override.HasOwnProp("Priority") and Override.Priority != "")
-
-	_HCWWidgets.PriorityEdit.Value := PrioVal
-
-	PrioHint := t("hs_config.default_prefix") . PrioDefVal
-	if PrioOverridden {
-		PrioHint .= "    •  " . t("hs_config.override_active")
-		_HCWWidgets.PriorityReset.Enabled := true
-	} else {
-		_HCWWidgets.PriorityReset.Enabled := false
-	}
-	_HCWWidgets.PriorityDefault.Value := PrioHint
-
-	; Color — find the preset whose hex matches, or inject the current hex on top.
-	; Rebuild the dropdown first, then re-query the index so the position is
-	; always derived from the current option list rather than a pre-rebuild snapshot.
-	ColorHex := Resolved.Color
-	if (ColorHex != "" and !_HCW_HexInPresets(ColorHex))
-		_HCW_RebuildColorDropdown(ColorHex)
-	else
-		_HCW_RebuildColorDropdown("")
-	Idx := _HCW_ColorIndexFor(ColorHex)
-	if (Idx == 0)
-		Idx := 1
-	_HCWWidgets.ColorDD.Choose(Idx)
-	; ``Resolved.Color`` is now guaranteed non-empty by the resolver — when
-	; nothing is set anywhere, it returns the global default. Repaint BOTH
-	; the bar (cXXXXXX) and the background so the swatch fills with the
-	; selected color end-to-end.
-	SwatchHex := _HCW_HexNoHash(ColorHex)
-	_HCWWidgets.ColorSwatch.Opt("+Background" . SwatchHex)
-	_HCWWidgets.ColorSwatch.Redraw()
-
-	ColorOverridden := (Override.HasOwnProp("Color") and Override.Color != "")
-	DefColor := (Defaults.Color != "") ? Defaults.Color : t("hs_config.none")
-	Hint := t("hs_config.default_prefix") . DefColor
-	if ColorOverridden {
-		Hint .= "    •  " . t("hs_config.override_active")
-		_HCWWidgets.ColorReset.Enabled := true
-	} else {
-		_HCWWidgets.ColorReset.Enabled := false
-	}
-	_HCWWidgets.ColorDefault.Value := Hint
-
-	; Tooltip toggle — resolved ShowTooltip (true = checked).
-	TooltipResolved := Resolved.HasOwnProp("ShowTooltip") ? Resolved.ShowTooltip : true
-	_HCWWidgets.TooltipChk.Value := TooltipResolved ? 1 : 0
-	TooltipOverridden := (Override.HasOwnProp("ShowTooltip") and Override.ShowTooltip != "")
-	_HCWWidgets.TooltipReset.Enabled := TooltipOverridden
-
-	_HCWWidgets.Status.Value := _HCW_StatusPath(Entry, Sec)
-	_HCW_LastSelection := {
-		GroupKey: _HCW_SelectedGroupKey(),
-		EntryKey: Entry.Key,
-		SectionName: Sec
-	}
-}
-
-
-
-
-; ============================================================
-; ============================================================
-; ======= 3/ Selection helpers ===============================
-; ============================================================
-; ============================================================
-
-; Returns the key string of the currently selected group.
-_HCW_SelectedGroupKey() {
-	global _HCWWidgets, _HCW_GROUP_LIST
-	Idx := _HCWWidgets.GroupDD.Value
-	if (Idx < 1 or Idx > _HCW_GROUP_LIST.Length) {
-		return "common"
-	}
-	return _HCW_GROUP_LIST[Idx].Key
-}
-
-; Returns the subset of _HCW_CATEGORY_LIST matching the given group key.
-_HCW_FilesForGroup(GroupKey) {
-	global _HCW_CATEGORY_LIST
-	Out := []
-	for _, E in _HCW_CATEGORY_LIST {
-		if (E.Group == GroupKey) {
-			Out.Push(E)
-		}
-	}
-	return Out
-}
-
-; Returns the full entry object for the currently selected group + file pair.
-_HCW_SelectedEntry() {
-	GroupKey := _HCW_SelectedGroupKey()
-	Files := _HCW_FilesForGroup(GroupKey)
-	Idx := _HCWWidgets.FileDD.Value
-	if (Idx < 1 or Idx > Files.Length) {
-		if Files.Length > 0 {
-			return Files[1]
-		}
-		return { Key: "", Label: "", Path: "", IsPersonal: false, IsExtension: false, ExtId: "", ExtName: "", Group: "" }
-	}
-	return Files[Idx]
-}
-
-_HCW_SelectedSection(Entry) {
-	global _HCWWidgets
-	Idx := _HCWWidgets.SecDD.Value
-	if (Idx <= 1) {
-		return ""
-	}
-	Sections := _HCW_GetSections(Entry)
-	if (Idx - 1 > Sections.Length) {
-		return ""
-	}
-	return Sections[Idx - 1].Name
-}
-
-_HCW_GroupItems() {
-	global _HCW_GROUP_LIST
-	Out := []
-	for _, G in _HCW_GROUP_LIST {
-		Out.Push(G.Label)
-	}
-	return Out
-}
 
 ; Extract the locale-appropriate string from a TOML inline table body like:
 ;   fr = "texte", en = "text"
@@ -963,33 +436,6 @@ _HCW_GetSections(Entry, ReadFn := ReadTomlFile) {
 	return Sections
 }
 
-; Build the repo-relative path string shown in the status bar.
-; For common categories: hotstrings/<name>.toml
-; For personal files: path relative to the repo root (PersonalHotstringsDir ancestor)
-; For extensions: extensions/<ext_id>/hotstrings/<stem>.toml
-; A section name is appended when one is selected.
-_HCW_StatusPath(Entry, Sec) {
-	if Entry.IsPersonal {
-		; Make path relative to the repo root by stripping the static/ ancestor prefix
-		Path := Entry.Path
-		SplitPath(A_ScriptDir, , &DriversDir)
-		SplitPath(DriversDir, , &StaticDir)
-		SplitPath(StaticDir, , &RepoDir)
-		Rel := StrReplace(Path, RepoDir . "\", "")
-		Rel := StrReplace(Rel, "\", "/")
-	} else if Entry.IsExtension {
-		SplitPath(Entry.Path, &FileName)
-		Stem := RegExReplace(FileName, "\.toml$", "")
-		Rel := "extensions/" . Entry.ExtId . "/hotstrings/" . Stem . ".toml"
-	} else {
-		Rel := "hotstrings/engine/catalogue/" . StrLower(Entry.Key) . ".toml"
-	}
-	if (Sec != "") {
-		Rel .= "  [" . Sec . "]"
-	}
-	return Rel
-}
-
 
 _HCW_FallbackDelayMs(Entry) {
 	global UI_LLM_TIMEOUT_SEC
@@ -1093,80 +539,4 @@ _HCW_UserOverride(Entry, Section) {
 		}
 	}
 	return Out
-}
-
-
-
-
-; ============================================================
-; ============================================================
-; ======= 4/ Color dropdown helpers ==========================
-; ============================================================
-; ============================================================
-
-global _HCW_CurrentColorOptions := []
-
-_HCW_ColorLabels() {
-	global _HCW_COLOR_PRESETS
-	Out := []
-	for _, P in _HCW_COLOR_PRESETS {
-		Out.Push(P["Label"])
-	}
-	return Out
-}
-
-; Rebuild the color dropdown items, optionally injecting an extra "current"
-; entry on top when the active hex is not already part of the preset list.
-_HCW_RebuildColorDropdown(InjectHex) {
-	global _HCWWidgets, _HCW_COLOR_PRESETS, _HCW_CurrentColorOptions
-	Options := []
-	if (InjectHex != "" and !_HCW_HexInPresets(InjectHex)) {
-		Options.Push({ Label: InjectHex, Hex: InjectHex })
-	}
-	for _, P in _HCW_COLOR_PRESETS {
-		Options.Push({ Label: P["Label"], Hex: P["Hex"] })
-	}
-	_HCW_CurrentColorOptions := Options
-
-	Items := []
-	for _, O in Options {
-		Items.Push(O.Label)
-	}
-	_HCWWidgets.ColorDD.Delete()
-	_HCWWidgets.ColorDD.Add(Items)
-}
-
-_HCW_ColorIndexFor(Hex) {
-	global _HCW_CurrentColorOptions
-	if !IsObject(_HCW_CurrentColorOptions) {
-		return 0
-	}
-	Lower := StrLower(Hex)
-	for Idx, O in _HCW_CurrentColorOptions {
-		if (StrLower(O.Hex) == Lower) {
-			return Idx
-		}
-	}
-	return 0
-}
-
-_HCW_HexInPresets(Hex) {
-	global _HCW_COLOR_PRESETS
-	Lower := StrLower(Hex)
-	for _, P in _HCW_COLOR_PRESETS {
-		if (StrLower(P["Hex"]) == Lower) {
-			return true
-		}
-	}
-	return false
-}
-
-_HCW_HexNoHash(Hex) {
-	if (Hex == "") {
-		return "CCCCCC"
-	}
-	if (SubStr(Hex, 1, 1) == "#") {
-		return SubStr(Hex, 2)
-	}
-	return Hex
 }

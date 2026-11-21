@@ -151,22 +151,6 @@ _NKWT_AppPicker() {
 }
 Test("a11y keyboard walk: the application picker (a11y-keyboard-2026-11-18)", _NKWT_AppPicker)
 
-; The WebView2 windows fall back to these native ones when the runtime's
-; loader is missing; the walk opens the fallback the same way.
-_NKWT_WithoutWebView(Open) {
-	global _VendorDir
-	Saved := _VendorDir
-	_VendorDir := A_Temp . "\ergopti_a11y_walk_no_webview_" . A_TickCount
-	AssertFalse(FileExist(_VendorDir), "the WebView2 loader is genuinely missing for the native fallback")
-	try Open.Call()
-	finally _VendorDir := Saved
-}
-
-_NKWT_HotstringSettings() {
-	_NKWT_AssertWindowsWalk("hotstring settings", () => _NKWT_WithoutWebView(OpenHotstringsConfigWindow))
-}
-Test("a11y keyboard walk: the hotstring settings window (a11y-keyboard-2026-11-18)", _NKWT_HotstringSettings)
-
 _NKWT_KeyboardSlotPicker() {
 	_NKWT_AssertWindowsWalk("keyboard shortcut slot picker", () => ShowKeyboardSlotPicker("primary_"))
 }

@@ -20,12 +20,10 @@
 ; of which republished.
 ;
 ; The guard is placed on _HCW_SetOverride / _HCW_ClearOverride because they are
-; the choke point BOTH config-window front-ends go through (the native Gui and
-; the WebView bridge), so neither can regress independently.
+; the choke point every config-window write goes through (the WebView bridge is
+; the only front end since maintainer decision 2026-11-21).
 ;
-; SCOPE: source-level. The config window builds a native Gui at top level and is
-; deliberately outside the headless include graph — loading it hangs CI. See
-; test_window_delay_write_per_keystroke.ahk for the same constraint.
+; SCOPE: source-level: the writers rewrite real configuration files.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -107,13 +105,6 @@ _CWRB_WrittenFields() {
 		'_HCW_(?:SetOverride|ClearOverride)(?:\.Bind)?\((?:[^,]*,){2}\s*"([a-z_]+)"', &M, Pos)) {
 		Pos := FoundPos + M.Len
 		Fields[M[1]] := true
-	}
-	; _HCW_ArmNumericWrite takes the field FIRST; the override writers take it
-	; third. One pattern cannot anchor both, so pick up the leading-arg shape too.
-	Pos := 1
-	while (FoundPos := RegExMatch(Src, '_HCW_ArmNumericWrite\("([a-z_]+)"', &M2, Pos)) {
-		Pos := FoundPos + M2.Len
-		Fields[M2[1]] := true
 	}
 	return Fields
 }

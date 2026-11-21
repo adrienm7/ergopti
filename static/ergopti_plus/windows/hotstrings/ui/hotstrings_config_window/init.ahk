@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Thin shim that composes the hotstrings config window from its two focused
 ; sub-modules. All implementation lives in:
-;   - hcw_helpers.ahk   read-only helpers, UI builders, selection getters
+;   - hcw_helpers.ahk   read-only data layer and the public entry point
 ;   - hcw_mutations.ahk write-path handlers, override dispatch, TOML patcher
 ; ==============================================================================
 

@@ -44,21 +44,6 @@ _A11yS_FieldsAreLabelled() {
 }
 Test("a11y sources: the unlabelled native fields have a label (a11y-native-2026-11-17)", _A11yS_FieldsAreLabelled)
 
-_A11yS_HotstringWindowControlsAreNamed() {
-	Src := _DriverFileSource("hcw_helpers.ahk")
-	Assert(!InStr(Src, 'G.Add("Progress"'), "the colour swatch must not be a progress bar")
-	Resets := 0, Pos := 1
-	while Pos := RegExMatch(Src, '(\w+) := G\.Add\("Button", "[^"]*", "↺"\)', &M, Pos) {
-		Resets += 1
-		Assert(RegExMatch(Src, "\[" . M[1] . ', "hs_config\.label_'), M[1] . " must be named by what it restores")
-		Pos += StrLen(M[0])
-	}
-	AssertEqual(4, Resets, "the four « ↺ » buttons must still be found")
-	Assert(InStr(Src, "A11ySystem_SetAccessibleName(Pair[1].Hwnd"), "the names must reach the controls")
-}
-Test("a11y sources: the hotstring window's symbol buttons are named (a11y-native-2026-11-17)",
-	_A11yS_HotstringWindowControlsAreNamed)
-
 ; A size given straight to SetFont ignores « Make text bigger »; every native
 ; window goes through Gui_SetFont (a11y-text-scale-2026-11-18). The tooltips
 ; scale their sizes through the style globals, the WPM pill keeps the canon's

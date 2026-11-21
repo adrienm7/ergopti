@@ -47,7 +47,7 @@ _HCWT_LocaleOwner() {
 _HCWT_ChildSource() {
 	global _DriverDir, _SharedDir
 	Includes := "#Include " . _HCWT_LocaleOwner() . "`n", Owners := Map()
-	for Symbol in ["JsonStringLiteral", "OpenHotstringsConfigWindow", "_HCW_RetryRetiredNativeResets", "_HCWWeb_TryOpen", "HotstringsLanguagePacks",
+	for Symbol in ["JsonStringLiteral", "OpenHotstringsConfigWindow", "_HCW_RunWriteBatch", "_HCWWeb_TryOpen", "HotstringsLanguagePacks",
 		"ReadTomlFile", "TOML_StripInlineComment", "CryptoSha256Bytes", "FSReadBytesStrict", "PerfCount", "ReadingPrefs_SeedScript"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The config child requires its complete genuine owner: " . Symbol)

@@ -6,10 +6,9 @@
 ; Renders the per-group hotstring delay / color / priority / tooltip editor on
 ; Windows via WebView2, loading the shared frontend at
 ; _shared/ui/hotstrings_config_window/ so the AHK and Hammerspoon drivers show an
-; identical UI. It reuses the data layer of the native window (ui/
-; hotstrings_config_window/init.ahk) — _HCW_BuildCategoryList, _HCW_Resolve,
-; _HCW_TomlDefaults, _HCW_UserOverride, _HCW_SetOverride / _HCW_ClearOverride and
-; _HCW_PatchTomlMeta — and only swaps the presentation tier for a webview.
+; identical UI. Its data layer lives in hcw_helpers.ahk and hcw_mutations.ahk —
+; _HCW_BuildCategoryList, _HCW_Resolve, _HCW_TomlDefaults, _HCW_UserOverride,
+; _HCW_SetOverride / _HCW_ClearOverride and _HCW_PatchTomlMeta.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
@@ -24,8 +23,10 @@
 ; 4. Safe teardown — subscription handles are released BEFORE Controller.Close()
 ;    (their __Delete unsubscribes on the live controller; reversing the order
 ;    raises a COM error that, uncaught in the Close thread, quits the script).
-; 5. Singleton + graceful fallback — a second open focuses the existing window;
-;    when WebView2 is unavailable the caller falls back to the native Gui.
+; 5. Singleton, WebView only — a second open focuses the existing window; when
+;    WebView2 is unavailable or fails, the opening is refused with the shared
+;    WebView2 message and no native window is built (maintainer decision
+;    2026-11-21).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -68,25 +69,18 @@ global HCWWEB_HOST_ACCESS_ALLOW := 1
 global HCWWEB_WIDTH  := 740
 global HCWWEB_HEIGHT := 660
 
-; Grey applied by the "set all grey" bulk action — kept in sync with the native
-; _HCW_SetAllGrey and the macOS host.
+; Grey applied by the "set all grey" bulk action — kept in sync with the macOS host.
 global HCWWEB_GREY := _HCW_PaletteHex("gray")
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-_HCWWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
-; Attempts to show the config window in a WebView2 window. Returns true on success
-; (the caller must NOT also build the native Gui), false to fall back.
+; Shows the config window in a WebView2 window. Returns false only when this
+; opening was refused with the shared WebView2 message; a superseded opening
+; returns true because its successor owns the window.
 _HCWWeb_TryOpen() {
 	global _HCWWeb_Gui, _HCWWeb_Controller, _HCWWeb_WebView
 	global _HCWWeb_MsgSub, _HCWWeb_NavSub, _HCWWeb_ResetDone, _HCWWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
-	if !_HCWWeb_Available()
+	if !WebView_RequireAvailable("hotstring settings")
 		return false
 
 	; Refresh only the captured singleton. Any data/page callout may close it.
@@ -128,7 +122,7 @@ _HCWWeb_TryOpen() {
 		return true
 
 	g := Gui_Create("+Resize +MinSize560x320", t("hs_config.window_title"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false
+	Installed := false, FactoryFailed := false, FailureReason := "", ResetForRefusal := false
 	try {
 		if !_HCWWeb_OpeningCurrent(SessionEpoch)
 			return true
@@ -164,10 +158,7 @@ _HCWWeb_TryOpen() {
 		} catch as Err {
 			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try LoggerError("HotstringsConfigWindow", "WebView2 create failed: {1} — falling back to native Gui.", Err.Message)
-			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
-				return true
-			FactoryFailed := true
+			FactoryFailed := true, FailureReason := Err.Message
 		}
 		if !FactoryFailed {
 			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
@@ -243,7 +234,7 @@ _HCWWeb_TryOpen() {
 		if !Installed {
 			; Revoke only this opening before private unsubscribe/Close/Destroy
 			; can pump callbacks. A stale frame never Reset()s its successor.
-			ResetForFallback := _HCWWeb_Reset(SessionEpoch, g)
+			ResetForRefusal := _HCWWeb_Reset(SessionEpoch, g)
 			try MsgSub := unset
 			try NavSub := unset
 			if IsSet(Controller) {
@@ -254,9 +245,11 @@ _HCWWeb_TryOpen() {
 			try g.Destroy()
 		}
 	}
-	; Only now have all private cleanup callouts completed. A later session
-	; cannot lend its authority to this failed opening's native fallback.
-	return !(FactoryFailed && ResetForFallback && _HCWWeb_FallbackCurrent(SessionEpoch + 1))
+	; Only now have all private cleanup callouts completed. Only this exact
+	; still-current failed opening tells the user; a later session is its own.
+	if FactoryFailed && ResetForRefusal && _HCWWeb_RefusalCurrent(SessionEpoch + 1)
+		return WebView_RefuseUnavailable("hotstring settings", FailureReason)
+	return true
 }
 
 
@@ -316,8 +309,8 @@ _HCWWeb_StartupCurrent(SessionEpoch, Window) {
 	return _HCWWeb_SessionCurrent(SessionEpoch) && !_HCWWeb_ResetDone && _HCWWeb_Gui == Window
 }
 
-; Only a failed opening's exact retired epoch may admit the native fallback.
-_HCWWeb_FallbackCurrent(SessionEpoch) {
+; Only a failed opening's exact retired epoch may tell the user it was refused.
+_HCWWeb_RefusalCurrent(SessionEpoch) {
 	global _HCWWeb_Gui, _HCWWeb_ResetDone
 	return _HCWWeb_SessionCurrent(SessionEpoch) && _HCWWeb_ResetDone && _HCWWeb_Gui == 0
 }
@@ -410,20 +403,16 @@ _HCWWeb_ReportResetSuccess(Outcome) {
 	NotifierSend(t("hs_config.notify_reset_all"), Map("title", t("hs_config.btn_reset_all")))
 }
 
-; Clear every override across all categories (common / personal / extension),
-; matching the native _HCW_ResetAll loop minus the Gui teardown.
+; Clear every override across all categories (common / personal / extension).
 _HCWWeb_ResetAll() {
 	global _HCW_CATEGORY_LIST
-	; Match the native action: Reset All supersedes pending numeric candidates,
-	; so cancel them without first performing writes that the loop will erase.
-	_HCW_CancelAllNumericWrites()
 	Writes := _HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)
 	return _HCW_RunWriteBatch(Writes, _HCWWeb_ReconcileReset.Bind(),
 		_HCWWeb_ReportResetSuccess.Bind())
 }
 
 ; Force every category/extension to grey at file level and clear per-section
-; colour overrides so the grey cascades down. Mirrors the native _HCW_SetAllGrey.
+; colour overrides so the grey cascades down.
 _HCWWeb_SetAllGrey() {
 	global _HCW_CATEGORY_LIST, HCWWEB_GREY
 	Writes := []

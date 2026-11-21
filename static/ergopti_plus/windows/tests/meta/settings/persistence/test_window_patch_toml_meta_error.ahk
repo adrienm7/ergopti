@@ -7,11 +7,11 @@
 ; and atomic publication moved into shared personal TOML helpers. The HCW
 ; wrapper must delegate, and the terminal atomic boundary must still catch and
 ; log injected writer/replacement failures instead of swallowing them. It also
-; guards the direct HCW mutation-handler class: native and WebView handlers must
-; not close a bulk-reset surface or announce success after any persistence
-; backend refuses a write. Close/navigation drainage is guarded separately.
-; A refused write must still reconcile the controls with canonical state so the
-; rejected candidate does not remain visible.
+; guards the HCW mutation-handler class: the WebView handlers must not announce
+; success after any persistence backend refuses a write, and a refused write
+; must still reconcile the page with canonical state so the rejected candidate
+; does not remain visible. The native window and its numeric debounce were
+; removed with the native fallback (maintainer decision 2026-11-21).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -334,7 +334,7 @@ _PTME_WriteBatchFailureSuppressesSuccessEffects() {
 	AssertEqual(1, _PTME_BatchRefreshes,
 		"a failed write must reconcile the UI once with canonical durable state")
 	AssertEqual(0, _PTME_BatchCloses,
-		"a failed bulk action must keep the native window open")
+		"a failed bulk action must not run its success effects")
 	AssertEqual(0, _PTME_BatchSuccessNotices,
 		"a failed bulk action must never announce success")
 	AssertEqual(1, _PTME_BatchFailureNotices,
@@ -369,7 +369,7 @@ _PTME_WriteBatchSuccessRunsTerminalEffectsOnce() {
 	AssertEqual(1, _PTME_BatchRefreshes,
 		"the UI must refresh once after the complete batch succeeds")
 	AssertEqual(1, _PTME_BatchCloses,
-		"the native reset success path must close once")
+		"the reset success path must run once")
 	AssertEqual(1, _PTME_BatchSuccessNotices,
 		"the complete batch must announce success once")
 	AssertEqual(0, _PTME_BatchFailureNotices,
@@ -381,197 +381,6 @@ _PTME_WriteBatchSuccessRunsTerminalEffectsOnce() {
 }
 Test("hotstrings_config_window: all-success batch runs terminal effects exactly once",
 	_PTME_WriteBatchSuccessRunsTerminalEffectsOnce)
-
-
-global _PTME_NumericWrites := []
-
-_PTME_RecordNumericWrite(Entry, Sec, Field, Value) {
-	global _PTME_NumericWrites
-	_PTME_NumericWrites.Push({ Entry: Entry, Sec: Sec, Field: Field, Value: Value })
-	return true
-}
-
-_PTME_NumericQueuePreservesEveryDistinctField() {
-	global _PTME_NumericWrites
-	Entry := { Key: "magickey" }
-	Pending := []
-	_HCW_QueueNumericWrite(Pending,
-		{ Entry: Entry, Sec: "quotes", Field: "delay", Value: 0.4 })
-	_HCW_QueueNumericWrite(Pending,
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "delay", Value: 0.5 })
-	_HCW_QueueNumericWrite(Pending,
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "priority", Value: 9 })
-	AssertEqual(2, Pending.Length,
-		"retyping one logical entry after its catalogue object is rebuilt must coalesce without evicting another field")
-	_PTME_NumericWrites := []
-	Outcome := _HCW_RunNumericWriteBatch(Pending, _PTME_RecordNumericWrite)
-	AssertTrue(Outcome["ok"])
-	AssertEqual(2, Outcome["attempted"])
-	AssertEqual(2, _PTME_NumericWrites.Length,
-		"delay then priority inside one debounce window must produce two writes")
-	AssertEqual("delay", _PTME_NumericWrites[1].Field)
-	AssertEqual(0.5, _PTME_NumericWrites[1].Value,
-		"the repeated delay edit must keep its latest value")
-	AssertEqual("priority", _PTME_NumericWrites[2].Field)
-	AssertEqual(9, _PTME_NumericWrites[2].Value)
-}
-Test("hotstrings_config_window: numeric debounce preserves distinct fields",
-	_PTME_NumericQueuePreservesEveryDistinctField)
-
-_PTME_NumericResetRemovesOnlyItsMatchingWrite() {
-	Entry := { Key: "magickey" }
-	OtherEntry := { Key: "autocorrection" }
-	Pending := [
-		{ Entry: Entry, Sec: "quotes", Field: "delay", Value: 0.5 },
-		{ Entry: Entry, Sec: "quotes", Field: "priority", Value: 9 },
-		{ Entry: Entry, Sec: "brackets", Field: "delay", Value: 0.7 },
-		{ Entry: OtherEntry, Sec: "quotes", Field: "delay", Value: 0.8 }
-	]
-	Removed := _HCW_RemoveNumericWrite(Pending,
-		{ Key: "magickey" }, "quotes", "delay")
-	AssertEqual(1, Removed)
-	AssertEqual(3, Pending.Length)
-	AssertEqual("priority", Pending[1].Field,
-		"resetting delay must preserve the queued priority edit")
-	AssertEqual("brackets", Pending[2].Sec,
-		"resetting one section must preserve another section's queued delay")
-	AssertTrue(Pending[3].Entry == OtherEntry,
-		"resetting one entry must preserve another entry's queued delay")
-}
-Test("hotstrings_config_window: field reset cancels only its matching debounce",
-	_PTME_NumericResetRemovesOnlyItsMatchingWrite)
-
-_PTME_FailedNumericDraftsRequeueWithoutOverwritingNewerInput() {
-	global _HCW_PendingNumericWrites
-	Entry := { Key: "magickey" }
-	Snapshot := [
-		{ Entry: Entry, Sec: "quotes", Field: "delay", Value: 0.5 },
-		{ Entry: Entry, Sec: "quotes", Field: "priority", Value: 9 }
-	]
-	_HCW_PendingNumericWrites := [
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "priority", Value: 12 }
-	]
-	Outcome := Map("failed_indices", [1, 2])
-	Requeued := _HCW_RequeueFailedNumericWrites(Snapshot, Outcome)
-	AssertEqual(1, Requeued,
-		"only the missing failed draft should be reinserted")
-	AssertEqual(2, _HCW_PendingNumericWrites.Length)
-	AssertEqual(12, _HCW_PendingNumericWrites[1].Value,
-		"a failed older priority write must not overwrite input typed during its I/O")
-	AssertEqual("delay", _HCW_PendingNumericWrites[2].Field)
-	AssertEqual(0.5, _HCW_PendingNumericWrites[2].Value)
-}
-Test("hotstrings_config_window: refused numeric drafts remain retryable (hcw-transition-drain-behavior)",
-	_PTME_FailedNumericDraftsRequeueWithoutOverwritingNewerInput)
-
-global _PTME_ReentrantDrainWrites := []
-
-_PTME_ReentrantNumericWriter(Entry, Sec, Field, Value) {
-	global _PTME_ReentrantDrainWrites, _HCW_PendingNumericWrites
-	_PTME_ReentrantDrainWrites.Push(Field . ":" . Value)
-	if (_PTME_ReentrantDrainWrites.Length == 1) {
-		_HCW_QueueNumericWrite(_HCW_PendingNumericWrites, {
-			Entry: { Key: Entry.Key }, Sec: Sec, Field: "priority", Value: 17
-		})
-	}
-	return true
-}
-
-_PTME_NoOpOutcome(Outcome) {
-}
-
-_PTME_NumericDrainRepeatsUntilReentrantQueueIsEmpty() {
-	global _PTME_ReentrantDrainWrites, _HCW_PendingNumericWrites
-	global _HCW_NumericDrainActive
-	Entry := { Key: "magickey" }
-	_PTME_ReentrantDrainWrites := []
-	_HCW_NumericDrainActive := false
-	_HCW_PendingNumericWrites := [
-		{ Entry: Entry, Sec: "quotes", Field: "delay", Value: 0.5 }
-	]
-	Ok := _HCW_FlushNumericWrite(false,
-		_PTME_ReentrantNumericWriter, 0, _PTME_NoOpOutcome)
-	AssertTrue(Ok)
-	AssertEqual(2, _PTME_ReentrantDrainWrites.Length,
-		"a transition drain must persist a draft enqueued while its first writer yields")
-	AssertEqual("delay:0.5", _PTME_ReentrantDrainWrites[1])
-	AssertEqual("priority:17", _PTME_ReentrantDrainWrites[2])
-	AssertEqual(0, _HCW_PendingNumericWrites.Length,
-		"a successful transition cannot leave a newer timer payload behind")
-	AssertFalse(_HCW_NumericDrainActive,
-		"the drain owner flag must be restored on every terminal path")
-}
-Test("hotstrings_config_window: drain reaches a reentrant stable queue (hcw-transition-drain-reentrant)",
-	_PTME_NumericDrainRepeatsUntilReentrantQueueIsEmpty)
-
-_PTME_NumericDrainOwnerBlocksNestedCompletion() {
-	global _HCW_NumericDrainActive, _HCW_PendingNumericWrites
-	_HCW_NumericDrainActive := true
-	_HCW_PendingNumericWrites := [
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "delay", Value: 0.5 }
-	]
-	try {
-		Ok := _HCW_FlushNumericWrite(false)
-		AssertFalse(Ok,
-			"a nested close/navigation callback must not declare an active drain complete")
-		AssertEqual(1, _HCW_PendingNumericWrites.Length,
-			"the active drain owner must retain exclusive ownership of its queued draft")
-	} finally {
-		_HCW_NumericDrainActive := false
-		_HCW_PendingNumericWrites := []
-	}
-}
-Test("hotstrings_config_window: nested drain cannot complete its owner's transition (hcw-transition-drain-reentrant)",
-	_PTME_NumericDrainOwnerBlocksNestedCompletion)
-
-global _PTME_DrainEvents := []
-
-_PTME_DrainResult(Result) {
-	global _PTME_DrainEvents
-	_PTME_DrainEvents.Push("drain")
-	return Result
-}
-
-_PTME_DrainRestore() {
-	global _PTME_DrainEvents
-	_PTME_DrainEvents.Push("restore")
-}
-
-_PTME_TransitionGateBlocksAndRestoresOnRefusal() {
-	global _PTME_DrainEvents
-	_PTME_DrainEvents := []
-	Allowed := _HCW_DrainBeforeTransition(
-		_PTME_DrainResult.Bind(false), _PTME_DrainRestore)
-	AssertFalse(Allowed)
-	AssertEqual(2, _PTME_DrainEvents.Length)
-	AssertEqual("drain", _PTME_DrainEvents[1])
-	AssertEqual("restore", _PTME_DrainEvents[2])
-
-	_PTME_DrainEvents := []
-	Allowed := _HCW_DrainBeforeTransition(
-		_PTME_DrainResult.Bind(true), _PTME_DrainRestore)
-	AssertTrue(Allowed)
-	AssertEqual(1, _PTME_DrainEvents.Length,
-		"a durable draft must continue without rolling the selection back")
-	AssertEqual("drain", _PTME_DrainEvents[1])
-}
-Test("hotstrings_config_window: transition gate blocks on refused draft (hcw-transition-drain-behavior)",
-	_PTME_TransitionGateBlocksAndRestoresOnRefusal)
-
-_PTME_ResetCancellationDropsEveryPendingWrite() {
-	global _HCW_PendingNumericWrites
-	_HCW_PendingNumericWrites := [
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "delay", Value: 0.5 },
-		{ Entry: { Key: "magickey" }, Sec: "quotes", Field: "priority", Value: 9 }
-	]
-	Removed := _HCW_CancelAllNumericWrites()
-	AssertEqual(2, Removed,
-		"Reset All must invalidate the complete debounce queue without persisting it")
-	AssertEqual(0, _HCW_PendingNumericWrites.Length,
-		"no timer payload may survive to restore an override after Reset All")
-}
-Test("hotstrings_config_window: reset cancels pending numeric writes without flushing",
-	_PTME_ResetCancellationDropsEveryPendingWrite)
 
 _PTME_ResetSections(Entry) {
 	return [{ Name: "alpha" }]
@@ -611,15 +420,6 @@ Test("hotstrings_config_window: reset plan clears every personal metadata field 
 	_PTME_ResetPlanCoversPersonalAndOverrideBackends)
 
 _PTME_ExistingEditorsRefreshBeforeTheyAreShown() {
-	Native := _DriverFuncBody("OpenHotstringsConfigWindow")
-	CapturePos := InStr(Native, "_HCW_CaptureSelection()")
-	BuildPos := InStr(Native, "_HCW_BuildCategoryList()")
-	RefreshPos := InStr(Native, "_HCW_RefreshExistingControls(")
-	ShowPos := InStr(Native, "WMPresentWindow(_HCWGui)")
-	Assert(CapturePos > 0 and BuildPos > CapturePos and RefreshPos > BuildPos
-		and ShowPos > RefreshPos,
-		"the native singleton must capture stable keys, rebuild its catalogue, repopulate controls, and only then show — stale dropdown indexes can otherwise retarget an edit to another file")
-
 	Web := _DriverFuncBody("_HCWWeb_TryOpen")
 	WebBuildPos := InStr(Web, "_HCW_BuildCategoryList()")
 	WebPushPos := InStr(Web, "_HCWWeb_PushState()")
@@ -628,78 +428,13 @@ _PTME_ExistingEditorsRefreshBeforeTheyAreShown() {
 		and ActivatePos > WebPushPos,
 		"the WebView singleton must rebuild and push canonical state before activation")
 }
-Test("hotstrings_config_window: live singletons refresh before reopen (hcw-singleton-refresh)",
+Test("hotstrings_config_window: the live singleton refreshes before reopen (hcw-singleton-refresh)",
 	_PTME_ExistingEditorsRefreshBeforeTheyAreShown)
 
-_PTME_StableSelectionSurvivesCatalogueInsertion() {
-	Before := [{ Key: "personal:b" }, { Key: "personal:c" }]
-	SelectedKey := Before[2].Key
-	After := [
-		{ Key: "personal:a" },
-		{ Key: "personal:b" },
-		{ Key: "personal:c" }
-	]
-	Restored := _HCW_FindItemIndexByProperty(After, "Key", SelectedKey)
-	AssertEqual(3, Restored,
-		"adding a file before the selected entry must preserve its logical key instead of reusing the old index and targeting another file")
-	Sections := [{ Name: "alpha" }, { Name: "gamma" }, { Name: "omega" }]
-	AssertEqual(3,
-		_HCW_FindItemIndexByProperty(Sections, "Name", "omega", 0),
-		"section restoration must use its stable name")
-	AssertEqual(0,
-		_HCW_FindItemIndexByProperty(Sections, "Name", "deleted", 0),
-		"a deleted section must be reported missing so the UI can fall back to file level")
-}
-Test("hotstrings_config_window: singleton selection follows stable keys (hcw-singleton-stable-selection)",
-	_PTME_StableSelectionSurvivesCatalogueInsertion)
-
-_PTME_EveryNativeTransitionConsumesTheDraftDrain() {
-	CloseButtonBody := _DriverFuncBody("OpenHotstringsConfigWindow")
-	Assert(InStr(CloseButtonBody,
-		'BtnClose.OnEvent("Click", (*) => _HCW_RequestHide())') > 0,
-		"the Close button must use the same persistence gate as X/Alt+F4 instead of hiding directly")
-	for Name in ["_HCW_RequestHide", "_HCW_OnClose", "_HCW_OnGroupChanged",
-		"_HCW_OnFileChanged", "_HCW_OnSectionChanged"] {
-		Body := _DriverFuncBody(Name)
-		Assert(InStr(Body, "_HCW_DrainBeforeTransition(") > 0,
-			Name . " must consume the draft drain result before continuing")
-	}
-	for Name in ["_HCW_OnGroupChanged", "_HCW_OnFileChanged", "_HCW_OnSectionChanged"] {
-		Body := _DriverFuncBody(Name)
-		SnapshotPos := InStr(Body, "Selection := _HCW_LastSelection")
-		RestorePos := InStr(Body, "_HCW_RestoreSelectionControl.Bind(")
-		Assert(SnapshotPos > 0 and RestorePos > SnapshotPos
-			and InStr(Body, ", Selection)") > RestorePos,
-			Name . " must bind the prior stable selection before I/O instead of reading a mutable global during rollback")
-	}
-	CloseBody := _DriverFuncBody("_HCW_OnClose")
-	GuardPos := InStr(CloseBody, "if !_HCW_DrainBeforeTransition(")
-	ClearPos := InStr(CloseBody, "_HCWGui := 0")
-	Assert(GuardPos > 0 and ClearPos > GuardPos,
-		"X/Alt+F4 must keep the live editor context until the draft is durable")
-	FlushBody := _DriverFuncBody("_HCW_FlushNumericWrite")
-	Assert(InStr(FlushBody, "_HCW_RequeueFailedNumericWrites(") > 0,
-		"a refused drain must requeue the failed draft instead of deleting its only copy")
-	Assert(InStr(FlushBody, "loop {") > 0
-		and InStr(FlushBody, "_HCW_NumericDrainActive") > 0,
-		"a successful drain must own and repeat snapshots until re-entrant input leaves the queue stable")
-}
-Test("hotstrings_config_window: every native transition gates on draft persistence (hcw-transition-drain)",
-	_PTME_EveryNativeTransitionConsumesTheDraftDrain)
-
-
-
-; Enumerate the whole class so fixing one native handler cannot leave its
-; WebView twin, debounce callback or sibling control silently dropping `false`.
+; Enumerate the whole class so fixing one handler cannot leave a sibling
+; silently dropping `false`.
 _PTME_EveryMutationEntrypointUsesTheOutcomeGate() {
 	OutcomeGateSites := [
-		{ Name: "_HCW_FlushNumericWrite", Gate: "_HCW_RunNumericWriteBatch(" },
-		{ Name: "_HCW_RunNumericWriteBatch", Gate: "_HCW_RunWriteBatch(" },
-		{ Name: "_HCW_OnColorChanged", Gate: "_HCW_RunWriteBatch(" },
-		{ Name: "_HCW_OnTooltipChanged", Gate: "_HCW_RunWriteBatch(" },
-		{ Name: "_HCW_ClearField", Gate: "_HCW_RunWriteBatch(" },
-		{ Name: "_HCW_ResetAll", Gate: "_HCW_RunWriteBatch(" },
-		{ Name: "_HCW_SetAllGrey", Gate: "_HCW_RunWriteBatch(" },
 		{ Name: "_HCWWeb_Dispatch", Gate: "_HCW_RunWriteBatch(" },
 		{ Name: "_HCWWeb_ResetAll", Gate: "_HCW_RunWriteBatch(" },
 		{ Name: "_HCWWeb_SetAllGrey", Gate: "_HCW_RunWriteBatch(" }
@@ -711,35 +446,6 @@ _PTME_EveryMutationEntrypointUsesTheOutcomeGate() {
 		Assert(!RegExMatch(Body, "i)\bif\s*\(?\s*(?:false|0)\b"),
 			Site.Name . " must not satisfy the outcome contract through dead `if false` code")
 	}
-	NativeCurrentPattern := "s)_HCW_RunWriteBatch\(.*?"
-		. "_HCW_ReconcileNativeCurrent\.Bind\(\)\s*,\s*0\s*,\s*"
-		. "_HCW_ReportWriteFailure\.Bind\(\)\s*\)"
-	for Name in ["_HCW_OnColorChanged", "_HCW_OnTooltipChanged",
-		"_HCW_ClearField", "_HCW_SetAllGrey"] {
-		Assert(RegExMatch(_DriverFuncBody(Name), NativeCurrentPattern),
-			Name . " must wire canonical refresh as reconciliation, no success effect, and the failure reporter in the terminal-failure slot")
-	}
-	FlushBody := _DriverFuncBody("_HCW_FlushNumericWrite")
-	Assert(InStr(FlushBody, "WriterFn := _HCW_SetOverride") > 0,
-		"_HCW_FlushNumericWrite must default production writes to _HCW_SetOverride")
-	Assert(InStr(FlushBody, "FailureFn := _HCW_ReportWriteFailure.Bind()") > 0,
-		"_HCW_FlushNumericWrite must default terminal failures to the shared reporter")
-	NumericFlushPattern := "s)_HCW_RunNumericWriteBatch\(\s*"
-		. "PendingWrites\s*,\s*WriterFn\s*,\s*0\s*,\s*FailureFn\s*\)"
-	Assert(RegExMatch(FlushBody, NumericFlushPattern),
-		"_HCW_FlushNumericWrite must propagate its writer and failure reporter without a success-side refresh")
-	FailureGatePos := InStr(FlushBody, 'if !Outcome["ok"]')
-	RefreshPos := InStr(FlushBody, "RefreshFn.Call()")
-	RequeuePos := InStr(FlushBody, "_HCW_RequeueFailedNumericWrites(")
-	Assert(FailureGatePos > 0 and RequeuePos > FailureGatePos
-		and RefreshPos > RequeuePos,
-		"numeric flush must requeue refused drafts before returning and refresh only after the stable success path")
-	NativeResetPattern := "s)_HCW_RunWriteBatch\(.*?"
-		. "_HCW_ReconcileNativeReset\.Bind\(\)\s*,\s*"
-		. "_HCW_CompleteNativeReset\.Bind\(_HCWGui\)\s*,\s*"
-		. "_HCW_ReportWriteFailure\.Bind\(\)\s*\)"
-	Assert(RegExMatch(_DriverFuncBody("_HCW_ResetAll"), NativeResetPattern),
-		"_HCW_ResetAll must close and announce success only from the success slot, with failure reporting in the failure slot")
 	WebDispatchPattern := "s)_HCW_RunWriteBatch\(.*?"
 		. "_HCWWeb_ReconcileState\.Bind\(\)\s*,\s*0\s*,\s*"
 		. "_HCW_ReportWriteFailure\.Bind\(\)\s*\)"
@@ -754,39 +460,21 @@ _PTME_EveryMutationEntrypointUsesTheOutcomeGate() {
 		. "_HCWWeb_ReconcileState\.Bind\(\)\s*\)"
 	Assert(RegExMatch(_DriverFuncBody("_HCWWeb_SetAllGrey"), WebGreyPattern),
 		"_HCWWeb_SetAllGrey must reconcile once and leave terminal failure reporting to its dispatcher")
-	UserFacingEntrypoints := [
-		"_HCW_FlushNumericWrite",
-		"_HCW_OnColorChanged",
-		"_HCW_OnTooltipChanged",
-		"_HCW_ClearField",
-		"_HCW_ResetAll",
-		"_HCW_SetAllGrey",
-		"_HCWWeb_Dispatch"
-	]
-	for Name in UserFacingEntrypoints {
-		Body := _DriverFuncBody(Name)
-		Assert(InStr(Body, "_HCW_ReportWriteFailure") > 0,
-			Name . " must provide an explicit user-visible failure path")
-	}
+	Assert(InStr(_DriverFuncBody("_HCWWeb_Dispatch"), "_HCW_ReportWriteFailure") > 0,
+		"_HCWWeb_Dispatch must provide an explicit user-visible failure path")
 }
-Test("hotstrings_config_window: every native and WebView mutation entrypoint gates its outcome",
+Test("hotstrings_config_window: every WebView mutation entrypoint gates its outcome",
 	_PTME_EveryMutationEntrypointUsesTheOutcomeGate)
 
 _PTME_NoMutationSiteDropsAResultOrRunsBareSuccessEffects() {
 	Sites := [
-		"_HCW_FlushNumericWrite",
-		"_HCW_OnColorChanged",
-		"_HCW_OnTooltipChanged",
-		"_HCW_ClearField",
-		"_HCW_ResetAll",
-		"_HCW_SetAllGrey",
 		"_HCW_SetOverride",
 		"_HCW_ClearOverride",
 		"_HCWWeb_Dispatch",
 		"_HCWWeb_ResetAll",
 		"_HCWWeb_SetAllGrey"
 	]
-	BareWrite := "m)^[ \t]*(?:_HCW_(?:FlushNumericWrite|SetOverride|ClearOverride|PatchTomlMeta)"
+	BareWrite := "m)^[ \t]*(?:_HCW_(?:SetOverride|ClearOverride|PatchTomlMeta)"
 		. "|_HCWWeb_(?:ResetAll|SetAllGrey)|Hotstrings(?:SetOverride|ClearOverride))\s*\("
 	BareSuccessEffect := "m)^[ \t]*(?:try[ \t]+)?(?:TrayTip|NotifierSend)\s*\("
 	for Name in Sites {
@@ -799,11 +487,6 @@ _PTME_NoMutationSiteDropsAResultOrRunsBareSuccessEffects() {
 		Assert(!RegExMatch(SearchBody, BareSuccessEffect),
 			Name . " must put success notification behind the successful outcome callback")
 	}
-	ResetBody := _DriverFuncBody("_HCW_ResetAll")
-	Assert(InStr(ResetBody, "_HCWGui.Destroy(") == 0,
-		"_HCW_ResetAll must move Gui destruction into the success callback so a failed write keeps the editor open")
-	Assert(InStr(ResetBody, "_HCWGui := 0") == 0,
-		"_HCW_ResetAll must not clear the live Gui handle before the complete batch succeeds")
 }
 Test("hotstrings_config_window: no mutation site drops a result or runs bare success effects",
 	_PTME_NoMutationSiteDropsAResultOrRunsBareSuccessEffects)

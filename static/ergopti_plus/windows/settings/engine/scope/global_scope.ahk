@@ -24,8 +24,6 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 	if Plan.presets.Length != 1 || Plan.presets[1].scope != ConfigLeaf.TAP_HOLDS
 			|| Plan.presets[1].preset != "tap_hold" || Plan.presets[1].mode != Mode
 		throw Error("The global scope declares an unsupported separate-file owner.")
-	if !_HCW_FlushNumericWrite(false)
-		return Map("status", "refused", "scope", "global", "mode", Mode, "detail", "pending_numeric_write")
 	Hotstrings := HotstringsScopeFiles(Selected, Mode)
 	; The restore brings the recommended layer into a folder without layers.toml
 	; (TapHoldScopeOwner), for the folder the caller names.

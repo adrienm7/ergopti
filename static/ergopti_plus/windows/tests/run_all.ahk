@@ -1164,6 +1164,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/ui/webview/test_webview_unavailable_refusal.ahk
 #Include unit/core/ui/webview/test_model_browser_webview_only.ahk
 #Include unit/core/ui/webview/test_prompt_editor_webview_only.ahk
+#Include unit/core/ui/webview/test_hotstrings_config_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/core/text/toml/test_uridecode_literal_unicode.ahk
 #Include meta/core/ui/webview/test_script_observer.ahk
@@ -1844,7 +1845,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/ui/tooltip/test_measure_gdi_ownership.ahk
 #Include meta/platform/remap/keys/test_capslock_led_single_owner.ahk
 #Include meta/settings/persistence/test_shortcuts_array_escape.ahk
-#Include meta/settings/persistence/test_window_delay_write_per_keystroke.ahk
 #Include meta/settings/persistence/test_window_republishes_baked_fields.ahk
 #Include meta/settings/persistence/test_window_no_delimiter_ui.ahk
 #Include meta/core/network/test_curl_payload_pii_temp_leak.ahk
@@ -2206,7 +2206,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/key_combinations/test_scan_code_shadows_key_name.ahk
 #Include meta/core/ui/windows/test_spotlight_gdiplus_free_library.ahk
 #Include meta/modules/shortcuts/test_case_transform_synthetic_mark.ahk
-#Include meta/gestures/test_color_dropdown_recompute_index.ahk
 #Include meta/gestures/test_color_picker_hotkey_nonblocking.ahk
 #Include meta/hotstrings/engine/magic_key/test_no_regex_inject.ahk
 #Include meta/core/logger/test_fanout_batched.ahk
@@ -2280,7 +2279,6 @@ _LogBootProgress("keystats modules + tests included")
 ;    path, first-call-vs-definition match, elapsed- vs deadline-form poll, a
 ;    comment tripping a substring guard), not real code regressions — fixed. --
 #Include meta/platform/input/dispatch/test_bypass_dispatch_arity.ahk
-#Include meta/hotstrings/engine/catalogue/test_hcw_reset_all_teardown.ahk
 #Include meta/diagnostics/ui/test_healthcheck_sysinfo_git_nonblocking.ahk
 #Include meta/modules/keystats/test_keystats_pause_metrics.ahk
 #Include meta/core/process/test_processentry32w_size.ahk

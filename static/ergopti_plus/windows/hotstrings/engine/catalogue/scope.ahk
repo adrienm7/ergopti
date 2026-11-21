@@ -17,8 +17,6 @@ HotstringsScopeApply(Mode, Options := unset) {
 	if !IsSet(Options)
 		Options := Map()
 	ManifestScopePlan("hotstrings", Mode)
-	if !_HCW_FlushNumericWrite(false)
-		return Map("status", "refused", "scope", "hotstrings", "mode", Mode, "detail", "pending_numeric_write")
 	Owner := HotstringsScopeFiles(Options, Mode)
 	Operations() {
 		global ConfigurationFile
