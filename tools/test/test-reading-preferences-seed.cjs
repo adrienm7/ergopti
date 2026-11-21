@@ -15,6 +15,8 @@
  *    the continuation line, by the reading seed (ReadingPrefs_SeedScript), so
  *    no window is left out; a host may also call it elsewhere, in the reuse
  *    key that retires a warm window when a reading choice changes (MET-03);
+ *    and every Windows window that navigates a page of its own seeds it, but
+ *    for the shrinking UNSEEDED_WINDOWS list (LTP-01);
  * 3. the macOS and Linux page builders, the only places those drivers seed
  *    a page, add the shared reading fragment, and both script scopes bind
  *    the two choices to their shared owners.
@@ -97,6 +99,33 @@ function windowsProblems(files) {
 	return problems;
 }
 
+// The Windows windows that navigate a page of their own with no locale seed,
+// read by no campaign yet. The list only shrinks: a window that gains its seed
+// must leave it, and a new window without one fails (LTP-01, the layout
+// manager, was such a window).
+const UNSEEDED_WINDOWS = Object.freeze([
+	'windows/hotstrings/ui/personal_info_editor/init.ahk',
+	'windows/settings/ui/paths_editor/init.ahk',
+	'windows/ui/onboarding/webview.ahk'
+]);
+
+/** Problems of the Windows windows that navigate a page without seeding it. */
+function unseededProblems(files, allowed = UNSEEDED_WINDOWS) {
+	const problems = [];
+	for (const [file, source] of files) {
+		const navigates = /\.Navigate\(/.test(source);
+		const seeded = source.includes('_i18n_locale=');
+		if (navigates && !seeded && !allowed.includes(file))
+			problems.push(`${file}: navigates a page without the locale and reading seeds`);
+		if (allowed.includes(file) && (!navigates || seeded))
+			problems.push(`${file}: no longer an unseeded window, remove it from UNSEEDED_WINDOWS`);
+	}
+	for (const file of allowed)
+		if (!files.some(([name]) => name === file))
+			problems.push(`${file}: listed in UNSEEDED_WINDOWS but gone`);
+	return problems;
+}
+
 /** Problems of the Lua builders and scopes. */
 function luaProblems(builders, scopes) {
 	const problems = [];
@@ -151,6 +180,7 @@ assert.ok(
 );
 assert.deepEqual(declarationProblems(featureList, menu, values), []);
 assert.deepEqual(windowsProblems(windows), []);
+assert.deepEqual(unseededProblems(windows), []);
 assert.deepEqual(luaProblems(builders, scopes), []);
 
 // Each check fails on the shape it forbids.
@@ -173,6 +203,18 @@ assert.equal(
 	windowsProblems([[seeded[0], seeded[1].replaceAll('ReadingPrefs_SeedScript()', '""')]]).length,
 	1,
 	'a Windows window that stops seeding the choices is found'
+);
+const manager = windows.find(([file]) => file === 'windows/ui/layout_manager/init.ahk');
+assert.ok(manager, 'the layout manager host is read');
+assert.equal(
+	unseededProblems([[manager[0], manager[1].replaceAll('_i18n_locale=', '_i18n_unset=')]]).length,
+	4,
+	'a window that navigates without its seed is found (and the listed ones are gone)'
+);
+assert.deepEqual(
+	unseededProblems([[manager[0], manager[1].replaceAll('_i18n_locale=', '_i18n_unset=')]], []),
+	[`${manager[0]}: navigates a page without the locale and reading seeds`],
+	'the layout manager without its seed is named (LTP-01)'
 );
 assert.equal(
 	luaProblems([[builders[0][0], builders[0][1].replace(/Reading\.head_fragment\(/g, 'Other(')]], [])

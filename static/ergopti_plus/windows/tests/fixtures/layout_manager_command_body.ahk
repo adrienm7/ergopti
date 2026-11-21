@@ -18,6 +18,8 @@ _LMCS_Require(Condition, Message) {
 
 t(Key) => Key
 WindowTitle(Label := "") => Label
+; The interface language I18nInit sets in the driver.
+global _I18nLocale := "en"
 
 ; The paused notice is a presentation port: the child records each one instead
 ; of showing a balloon (paused-refusal-notice).
@@ -76,11 +78,18 @@ class _LMCS_Subscription {
 class _LMCS_View {
 	__New() {
 		this.Settings := {}, this.Callbacks := Map(), this.Active := 0
-		this.Scripts := [], this.Init := [], this.States := [], this.Navigations := 0
+		this.Scripts := [], this.Init := [], this.States := [], this.Navigations := 0, this.Seeds := 0
 	}
 	WebMessageReceived(Callback) => _LMCS_Subscription(this, "message", Callback)
 	NavigationCompleted(Callback) => _LMCS_Subscription(this, "navigation", Callback)
 	SetVirtualHostNameToFolderMapping(*) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMCS_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMCS_Require(this.Navigations == 0, "The seed precedes the navigation.")
+		this.Seeds += 1
+	}
 	Navigate(Url) {
 		this.Navigations += 1
 	}

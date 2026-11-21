@@ -80,7 +80,7 @@ _LMCT_BaseChildSource() {
 		"Keylayout_Parse", "LayoutRegistry_Keycodes", "MagicEditorRecordLayoutFallback",
 		"KeylayoutEmulation_LayerIsActive", "NumberRowEffectiveMode", "GetForegroundKeyboardLayout",
 		"LayoutRowsPolicyEmulates", "MasterGateDesiredTapHold", "TapHoldHoldLayer", "NavLayer_BuildTable", "WMPresentWindow",
-		"TimingsGet"] {
+		"TimingsGet", "ReadingPrefs_SeedScript"] {
 		OwnerRoot := (Symbol == "LLM_DisplayIndentValues" || Symbol == "LayoutRowsPolicyEmulates")
 			? _DriverDir . "\..\_shared" : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
@@ -90,7 +90,8 @@ _LMCT_BaseChildSource() {
 			Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(19, Seen.Count, "The whole save, resume/menu and real data-policy owners must be nonempty and distinct")
+	; The page seed's owner too (LTP-01).
+	AssertEqual(20, Seen.Count, "The whole save, resume/menu, page seed and real data-policy owners must be nonempty and distinct")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	AssertTrue(FileExist(PromiseOwner))
 	return Code . "#Include " . PromiseOwner . "`n"

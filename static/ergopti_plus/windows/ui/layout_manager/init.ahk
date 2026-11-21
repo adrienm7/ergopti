@@ -822,6 +822,18 @@ _LayMgrWeb_DefaultDeps() {
 ; ===================================
 ; ===================================
 
+/**
+ * The statement the page runs before its own scripts: the interface language
+ * its root names and the reader's font and spacing, as every other window's
+ * host and the macOS and Linux page builders seed them. This window had
+ * neither, so it kept the default font and read as French (LTP-01).
+ * @returns {String}
+ */
+_LayMgrWeb_SeedScript() {
+	global _I18nLocale
+	return "window._i18n_locale=" . JsonStringLiteral(_I18nLocale) . ";" . ReadingPrefs_SeedScript()
+}
+
 _LayMgrWeb_Available() {
 	global _VendorDir
 	return IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
@@ -936,6 +948,9 @@ LayoutManager_Open(*) {
 	if !_LayMgrWeb_Subscribe(Host, "navigation", _LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
 		return false
 	View.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	View.AddScriptToExecuteOnDocumentCreated(_LayMgrWeb_SeedScript())
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false
 	View.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
