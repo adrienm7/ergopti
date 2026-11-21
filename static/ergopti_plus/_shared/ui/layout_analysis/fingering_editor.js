@@ -53,6 +53,9 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	// keyboard id → its checked profile; a keyboard absent here uses the defaults.
 	let profiles = {};
 	const listeners = [];
+	// Told of every change the user made ({before, after} as stored), for the
+	// Studio's undo history (edit_history.js); a load or a restore is not one.
+	const editListeners = [];
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -112,8 +115,18 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		}
 	}
 
-	/** Keeps the profiles, if asked, and tells everyone which keyboard changed. */
-	function commit(next, persist, keyboardId) {
+	/** What is stored, as a copy the caller may keep (null: the defaults). */
+	function snapshot() {
+		const value = stored();
+		return value ? JSON.parse(JSON.stringify(value)) : null;
+	}
+
+	/**
+	 * Keeps the profiles, if asked, and tells everyone which keyboard changed;
+	 * a kept change the user made (not quiet) is told to the edit listeners.
+	 */
+	function commit(next, persist, keyboardId, quiet) {
+		const before = snapshot();
 		profiles = next;
 		if (persist) {
 			const store = host();
@@ -124,6 +137,26 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			else writeLocal(stored());
 		}
 		for (const listener of listeners) listener(keyboardId);
+		if (persist && !quiet) {
+			const after = snapshot();
+			if (JSON.stringify(before) !== JSON.stringify(after))
+				for (const listener of editListeners) listener({ before, after });
+		}
+	}
+
+	/**
+	 * Puts stored profiles back (an undo or a redo of the Studio's history),
+	 * checked and kept, without telling it as a new edit.
+	 * @param {object|null} saved - A snapshot() value.
+	 */
+	function restore(saved) {
+		commit(checkedSet(saved), true, null, true);
+	}
+
+	/** Calls a listener with {before, after} after each change the user makes. */
+	function onEdit(listener) {
+		if (typeof listener !== 'function') throw new Error('layout_analysis: onEdit needs a function');
+		editListeners.push(listener);
 	}
 
 	/** Makes `next` (or the defaults, for null) the profile of one keyboard. */
@@ -480,5 +513,5 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		else start();
 	}
 
-	return { current, onChange, mount };
+	return { current, onChange, onEdit, snapshot, restore, mount };
 })();

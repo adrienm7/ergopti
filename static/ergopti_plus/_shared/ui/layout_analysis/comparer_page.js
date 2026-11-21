@@ -1065,6 +1065,8 @@
 			} catch {
 				// A private window or a full quota: the page keeps working unsaved.
 			}
+			// Every change of the score settings or the layout list passes here.
+			if (historyStarted) history.record();
 		}
 
 		// ==========================
@@ -1190,6 +1192,111 @@
 		}
 		if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined && !linked.corpus)
 			state.corpus = HOST.corpora[0].id;
+
+		// ==================================
+		// ======= 2b/ Undo history =========
+		// ==================================
+
+		// Every change of the score settings (weights, floors, ideal load, shortcut
+		// letters, keyboard forms, presets, fingering, corpus, keyboard, format) and
+		// of the layout list (the ticked layouts and their « + ») is one step of
+		// the page's history (maintainer, 2026-11-21, edit_history.js). The own
+		// layouts' Rename, Duplicate and Remove keep their own store and « Undo ».
+		const HISTORY_PARTS = [
+			['layouts', ['selected', 'selectionChosen', 'plus']],
+			['weights', ['weights', 'floors']],
+			['ideal_load', ['idealLoad']],
+			['shortcut_letters', ['shortcuts']],
+			['keyboard_forms', ['formWeights']],
+			['corpus', ['corpus']],
+			['text_mode', ['textMode']],
+			['keyboard', ['keyboard']],
+			['format', ['format']],
+			['presets', ['presets']],
+			['fingering', ['fingering']]
+		];
+		// Each part's step name, a literal key (test-studio-edit-history.cjs).
+		const HISTORY_STEPS = {
+			layouts: 'edit_history.step.layouts',
+			weights: 'edit_history.step.weights',
+			ideal_load: 'edit_history.step.ideal_load',
+			shortcut_letters: 'edit_history.step.shortcut_letters',
+			keyboard_forms: 'edit_history.step.keyboard_forms',
+			corpus: 'edit_history.step.corpus',
+			text_mode: 'edit_history.step.text_mode',
+			keyboard: 'edit_history.step.keyboard',
+			format: 'edit_history.step.format',
+			presets: 'edit_history.step.presets',
+			fingering: 'edit_history.step.fingering'
+		};
+		let historyStarted = false;
+		let historyControls = null;
+		const history = window.ERGOPTI_EDIT_HISTORY.track({
+			capture: () => ({
+				selected: Array.from(state.selected).sort(),
+				selectionChosen: state.selectionChosen,
+				plus: Array.from(state.plus).sort(),
+				weights: state.weights,
+				floors: state.floors,
+				idealLoad: state.idealLoad,
+				shortcuts: state.shortcuts,
+				formWeights: state.formWeights,
+				corpus: state.corpus,
+				textMode: state.textMode,
+				keyboard: state.keyboard,
+				format: state.format,
+				presets: state.presets,
+				fingering: FINGERING.snapshot()
+			}),
+			apply: applyHistory,
+			describe: (before, after) => {
+				const changed = HISTORY_PARTS.filter(([, fields]) =>
+					fields.some((field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]))
+				);
+				return {
+					key: changed.length === 1 ? HISTORY_STEPS[changed[0][0]] : 'edit_history.step.settings'
+				};
+			},
+			onChange: () => {
+				if (historyControls) historyControls.refresh();
+			}
+		});
+
+		/**
+		 * Puts a captured state of the history back: the score settings, the
+		 * fingering, the corpus, keyboard and format, and the ticked layouts.
+		 * @param {object} next - A capture of the history.
+		 */
+		function applyHistory(next) {
+			for (const part of [
+				'weights',
+				'floors',
+				'idealLoad',
+				'shortcuts',
+				'formWeights',
+				'corpus',
+				'textMode',
+				'keyboard',
+				'presets',
+				'selectionChosen'
+			])
+				state[part] = next[part];
+			state.selected = new Set(next.selected);
+			state.plus = new Set(next.plus);
+			// The ticked layouts are the visitor's own once they move through the history.
+			state.linkedSelection = false;
+			if (JSON.stringify(FINGERING.snapshot()) !== JSON.stringify(next.fingering))
+				FINGERING.restore(next.fingering);
+			$('la-corpus').value = state.corpus;
+			$('la-text-mode').value = state.textMode;
+			$('la-keyboard').value = state.keyboard;
+			showCorpusInfo();
+			showTextMode();
+			fingeringView.draw();
+			setFormat(next.format);
+			fillLayouts();
+			applyScoreSettings();
+		}
 
 		/**
 		 * The corpus, keyboard and keyboard format a link asks for
@@ -4958,6 +5065,7 @@
 				return false;
 			}
 			const before = currentConfig();
+			history.label({ key: 'edit_history.step.preset', values: { name } });
 			Object.assign(state, settings);
 			applyScoreSettings();
 			presetStatus(t('layout_analysis.presets.applied', { name }), () => {
@@ -5198,6 +5306,7 @@
 					);
 					return;
 				}
+				history.label({ key: 'edit_history.step.import', values: { name: file.name } });
 				Object.assign(state, settings);
 				applyScoreSettings();
 				configStatus(t('layout_analysis.config.imported', { name: file.name }), false);
@@ -5207,6 +5316,10 @@
 			$('la-config-status').before(undo.node);
 			reset.addEventListener('click', () => {
 				const before = JSON.stringify(parts.map((part) => state[part]));
+				history.label({
+					key: 'edit_history.step.restore',
+					values: { name: t('layout_analysis.config.title') }
+				});
 				state.weights = E.defaultWeights();
 				state.floors = E.defaultFloors();
 				state.idealLoad = Object.assign({}, E.defaultIdealLoad());
@@ -5686,6 +5799,7 @@
 				else imported.push(layout);
 				own.add(id);
 				state.selected.add(id);
+				history.label({ key: 'edit_history.step.import', values: { name: layout.name } });
 				const format = formatName(result.format);
 				report.textContent =
 					result.unmapped.length === 0
@@ -5983,6 +6097,7 @@
 				button.after(undo.node);
 				button.addEventListener('click', () => {
 					const before = JSON.stringify(state[part]);
+					history.label({ key: 'edit_history.step.restore', values: { name: t(nameKey) } });
 					state[part] = defaults();
 					refill();
 					if (before === JSON.stringify(state[part])) {
@@ -6121,6 +6236,7 @@
 			state.format = id;
 			$('la-format').value = id;
 			window.LAYOUT_ANALYSIS_FILES.saveFormat(id);
+			if (historyStarted) history.record();
 			analyse();
 		}
 
@@ -6276,7 +6392,22 @@
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			window.LAYOUT_ANALYSIS_FILES.onEditorLayouts(useEditorLayouts);
 			FINGERING.onChange(() => analyse());
+			// A fingering change is a step: analyse() saves nothing by itself.
+			FINGERING.onEdit(() => {
+				if (historyStarted) history.record();
+			});
 			bind();
+			historyControls = window.ERGOPTI_EDIT_HISTORY.controls(history, t, 'la');
+			$('la-share').before(historyControls.node);
+			window.ERGOPTI_EDIT_HISTORY.bindKeys(document, historyControls.run, () => {
+				const focused = document.activeElement;
+				const inside =
+					!focused || focused === document.body || focused === document.documentElement;
+				return (inside || root.contains(focused)) && root.getClientRects().length > 0;
+			});
+			document.addEventListener('i18n:applied', historyControls.refresh);
+			history.start();
+			historyStarted = true;
 			analyse();
 			if (opts.reportHeight) reportHeight();
 			// The host's personal layouts (app data folder, site IndexedDB).

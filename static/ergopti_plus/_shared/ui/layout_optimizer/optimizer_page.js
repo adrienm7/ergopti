@@ -2526,7 +2526,118 @@
 				changeMax: $('lo-change-max').value,
 				exportFormat: $('lo-get-format').value
 			});
+			// Every change of a setting passes here (the fields, the switches, the boards).
+			if (historyStarted) history.record();
 		}
+
+		// ================================
+		// ======= 7b/ Undo history =======
+		// ================================
+
+		// Every change of the settings is one step of the page's history
+		// (maintainer, 2026-11-21, edit_history.js): the corpus, the start, the
+		// keyboard, what may move, the fixed keys and zones, the search and the
+		// change penalty. The place tab shown and the download format are views,
+		// and the user's text keeps its own field's undo.
+		const HISTORY_PARTS = [
+			['corpus', ['corpus']],
+			['start', ['start', 'startMode']],
+			['keyboard', ['keyboard']],
+			['moves', ['switches']],
+			['pins', ['pinnedCodes', 'qwertyPins', 'shortcutMode', 'zones']],
+			['search', ['seconds', 'iterations', 'restarts', 'seed', 'accuracy', 'method']],
+			['change_penalty', ['changeWeight', 'changeLimit', 'changeMax']]
+		];
+		// Each part's step name, a literal key (test-studio-edit-history.cjs).
+		const HISTORY_STEPS = {
+			corpus: 'edit_history.step.corpus',
+			start: 'edit_history.step.start',
+			keyboard: 'edit_history.step.keyboard',
+			moves: 'edit_history.step.moves',
+			pins: 'edit_history.step.pins',
+			search: 'edit_history.step.search',
+			change_penalty: 'edit_history.step.change_penalty'
+		};
+		let historyStarted = false;
+		let historyControls = null;
+
+		/** The settings a step of the history holds. */
+		function historyState() {
+			const switches = {};
+			for (const id of SWITCHES.concat(THUMB_SWITCH)) switches[id] = $(`lo-switch-${id}`).checked;
+			const zones = {};
+			for (const char of [...state.zones.keys()].sort())
+				zones[char] = [...state.zones.get(char)].sort();
+			return {
+				corpus: $('lo-corpus').value,
+				start: $('lo-start').value,
+				startMode: root.querySelector('input[name="lo-start-mode"]:checked').value,
+				keyboard: $('lo-keyboard').value,
+				switches,
+				pinnedCodes: [...state.pinnedCodes].sort(),
+				qwertyPins: [...state.qwertyPins].sort(),
+				shortcutMode: state.shortcutMode,
+				zones,
+				seconds: $('lo-seconds').value,
+				iterations: $('lo-iterations').value,
+				restarts: $('lo-restarts').value,
+				seed: $('lo-seed').value,
+				accuracy: $('lo-accuracy').value,
+				method: $('lo-method').value,
+				changeWeight: $('lo-change-weight').value,
+				changeLimit: $('lo-change-limit').checked,
+				changeMax: $('lo-change-max').value
+			};
+		}
+
+		/**
+		 * Puts the settings of a step back, in the fields and the state, and
+		 * redraws what follows them.
+		 * @param {object} next - A historyState() value.
+		 */
+		function applyHistoryState(next) {
+			for (const id of ['corpus', 'start', 'keyboard', 'seconds', 'iterations', 'restarts', 'seed'])
+				$(`lo-${id}`).value = next[id];
+			$('lo-accuracy').value = next.accuracy;
+			$('lo-method').value = next.method;
+			$('lo-change-weight').value = next.changeWeight;
+			$('lo-change-limit').checked = next.changeLimit;
+			$('lo-change-max').value = next.changeMax;
+			root.querySelector(`input[name="lo-start-mode"][value="${next.startMode}"]`).checked = true;
+			for (const id of SWITCHES.concat(THUMB_SWITCH))
+				$(`lo-switch-${id}`).checked = next.switches[id];
+			state.savedStart = null;
+			state.pinnedCodes = new Set(next.pinnedCodes);
+			state.qwertyPins = new Set(next.qwertyPins);
+			state.shortcutMode = next.shortcutMode;
+			root.querySelector(`input[name="lo-shortcut-mode"][value="${next.shortcutMode}"]`).checked =
+				true;
+			state.zones = new Map(
+				Object.entries(next.zones).map(([char, codes]) => [char, new Set(codes)])
+			);
+			syncCorpus();
+			syncSwitches();
+			syncMethod();
+			syncChange();
+			drawSettings();
+			drawPinBoards();
+		}
+
+		const history = window.ERGOPTI_EDIT_HISTORY.track({
+			capture: historyState,
+			apply: applyHistoryState,
+			describe: (before, after) => {
+				const changed = HISTORY_PARTS.filter(([, fields]) =>
+					fields.some((field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]))
+				);
+				return {
+					key: changed.length === 1 ? HISTORY_STEPS[changed[0][0]] : 'edit_history.step.settings'
+				};
+			},
+			onChange: () => {
+				if (historyControls) historyControls.refresh();
+			}
+		});
 
 		/** Puts back the saved choices; a value this page no longer knows is skipped. */
 		function restore() {
@@ -2688,6 +2799,7 @@
 			drawGet();
 			if (state.chart) drawChart();
 			drawShelf();
+			if (historyControls) historyControls.refresh();
 		}
 
 		// Saving waits until the saved choices are back, or the defaults would replace them.
@@ -2709,6 +2821,15 @@
 		// Every field and switch saves on change; the boards save as they redraw.
 		root.addEventListener('change', save);
 		drawPinBoards();
+		historyControls = window.ERGOPTI_EDIT_HISTORY.controls(history, t, 'lo');
+		root.querySelector('.lo-header').append(historyControls.node);
+		window.ERGOPTI_EDIT_HISTORY.bindKeys(document, historyControls.run, () => {
+			const focused = document.activeElement;
+			const inside = !focused || focused === document.body || focused === document.documentElement;
+			return (inside || root.contains(focused)) && root.getClientRects().length > 0;
+		});
+		history.start();
+		historyStarted = true;
 		// « Optimize this layout » of the site's editor: its id waits in this tab's storage.
 		const handed = FILES.takeOptimizerHandoff();
 		if (handed) {

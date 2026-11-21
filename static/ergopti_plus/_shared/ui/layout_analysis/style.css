@@ -219,6 +219,20 @@ body:has(> main.layout-analysis) {
 	margin: 0;
 }
 
+/* Undo and Redo (edit_history.js), before « Share »; a button with nothing to
+   take back stays focusable (aria-disabled) so its name is still heard. */
+.la-history {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.la-history-button[aria-disabled='true'] {
+	cursor: default;
+	opacity: 0.55;
+}
+
 /* A card: one group of controls or one figure on the surface colour. */
 .la-card,
 .la-figure {

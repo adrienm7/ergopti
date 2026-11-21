@@ -222,7 +222,12 @@ async function exerciseHistoryShortcuts(browser, origin) {
 			keys: button.getAttribute('aria-keyshortcuts')
 		}))
 	);
-	assert.match(names[0].label, /^Undo \(.*Z\)$/, `undo names its shortcut: ${names[0].label}`);
+	// « Undo: change key … »: the step it takes back, then its shortcut (maintainer, 2026-11-21).
+	assert.match(
+		names[0].label,
+		/^Undo: change key .+ \(.*Z\)$/,
+		`undo names its step and shortcut: ${names[0].label}`
+	);
 	assert.match(names[1].label, /^Redo \(.*Y.*Z\)$/, `redo names its shortcuts: ${names[1].label}`);
 	// The website states no OS: the name gives the Ctrl and the Cmd spellings
 	// both, rather than guessing one from the browser.

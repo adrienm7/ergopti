@@ -61,6 +61,7 @@ const SCRIPTS = [
 	// The fingering profiles the score reads, and what they need.
 	'../layout_analysis/info_popover.js',
 	'../layout_analysis/undo_offer.js',
+	'../edit_history.js',
 	'../layout_analysis/fingering_editor.js',
 	'../layout_analysis/corpus_files.js',
 	// The Comparer's score settings, the one source of the score (no weights of its own).

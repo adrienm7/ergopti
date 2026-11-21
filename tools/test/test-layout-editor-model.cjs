@@ -40,6 +40,7 @@ const PAGE_SCRIPTS = [
 	'layout_editor/_generated/kbd_dll_writer.js',
 	'layout_editor/_generated/kbd_setup_stub.js',
 	'layout_editor/source_io.js',
+	'edit_history.js',
 	'layout_editor/editor_model.js'
 ];
 
@@ -231,13 +232,17 @@ test('typing follows dead keys, chains, terminators and ligatures', () => {
 test('history undoes and redoes whole snapshots', () => {
 	const first = IO.create('a', 'A');
 	const history = M.createHistory(first);
-	const second = history.push(M.setMapping(first, 'base', 'KeyA', { text: 'a' }, null));
+	const step = { key: 'edit_history.step.change_key', values: { key: 'A' } };
+	const second = history.push(M.setMapping(first, 'base', 'KeyA', { text: 'a' }, null), step);
 	assert.equal(history.canUndo(), true);
+	assert.equal(history.undoLabel(), step, 'Undo names the step it takes back');
 	assert.equal(history.undo(), first);
+	assert.equal(history.redoLabel(), step, 'Redo names the step it replays');
 	assert.equal(history.redo(), second);
 	history.undo();
-	history.push(M.setMapping(first, 'base', 'KeyB', { text: 'b' }, null));
-	assert.equal(history.canRedo(), false);
+	history.push(M.setMapping(first, 'base', 'KeyB', { text: 'b' }, null), step);
+	assert.equal(history.canRedo(), false, 'a new edit after an undo clears the redo steps');
+	assert.throws(() => history.push(first), /locale key/, 'a step without a name is refused');
 });
 
 test('an imported .keylayout exports byte for byte until it is edited', () => {

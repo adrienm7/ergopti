@@ -216,6 +216,12 @@ const SOURCE_PINS = [
 	})),
 	{
 		section: 'ui',
+		key: 'studio_history_steps',
+		file: '_shared/ui/edit_history.js',
+		pattern: /\bconst HISTORY_LIMIT = (\d+);/g
+	},
+	{
+		section: 'ui',
 		key: 'metrics_typing_dispatch_delay_ms',
 		file: '_shared/ui/metrics_typing/data.js',
 		pattern: /\bconst DISPATCH_DELAY_MS = (\d+);/g

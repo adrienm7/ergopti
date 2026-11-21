@@ -143,20 +143,21 @@ var LayoutEditorPage = (function () {
 	// the buttons' names, and the keys each OS's users press for them. Ctrl and Cmd
 	// both work on every OS (a Mac keyboard on Windows, a PC keyboard on a Mac).
 	const HISTORY_SHORTCUTS = {
-		undo: { chords: [{ mods: ['primary'], key: 'KeyZ' }], aria: 'Control+Z Meta+Z' },
+		undo: {
+			chords: [{ mods: ['primary'], key: 'KeyZ' }],
+			aria: ERGOPTI_EDIT_HISTORY.SHORTCUTS.undo
+		},
 		redo: {
 			chords: [
 				{ mods: ['primary'], key: 'KeyY' },
 				{ mods: ['primary', 'shift'], key: 'KeyZ' }
 			],
-			aria: 'Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z'
+			aria: ERGOPTI_EDIT_HISTORY.SHORTCUTS.redo
 		}
 	};
 	// The spellings a page without a host OS names those shortcuts in: the Ctrl
 	// one (Windows and Linux) and the Cmd one (macOS).
 	const NEUTRAL_SHORTCUT_OSES = Object.freeze(['windows', 'macos']);
-	// The fields whose own Ctrl+Z undoes their text: the editor leaves it to them.
-	const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number']);
 
 	// ============================
 	// ======= 2/ Helpers =========
@@ -374,28 +375,14 @@ var LayoutEditorPage = (function () {
 	}
 
 	/**
-	 * Whether a key press belongs to a text field (its own undo history).
-	 * @param {EventTarget} target - The focused element.
-	 * @returns {boolean}
+	 * The name of a history step: a locale key of edit_history.step.* and its
+	 * values, translated when the Undo and Redo buttons are drawn.
+	 * @param {string} key
+	 * @param {object} [values]
+	 * @returns {{key: string, values?: object}}
 	 */
-	function inTextField(target) {
-		if (!target || target.nodeType !== 1) return false;
-		if (target.isContentEditable || target.tagName === 'TEXTAREA') return true;
-		return target.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(target.type);
-	}
-
-	/**
-	 * The history action of a key press: Ctrl or Cmd with Z undoes, with Y or
-	 * Shift+Z redoes, by the character typed (Ctrl+Z on AZERTY is the key
-	 * marked Z).
-	 * @param {KeyboardEvent} event
-	 * @returns {'undo'|'redo'|null}
-	 */
-	function historyAction(event) {
-		if (!(event.ctrlKey || event.metaKey) || event.altKey) return null;
-		const key = String(event.key).toLowerCase();
-		if (key === 'z') return event.shiftKey ? 'redo' : 'undo';
-		return key === 'y' && !event.shiftKey ? 'redo' : null;
+	function step(key, values) {
+		return values ? { key, values } : { key };
 	}
 
 	/** The translated refusal of an edit or a file. */
@@ -556,19 +543,24 @@ var LayoutEditorPage = (function () {
 		/**
 		 * Applies an edit as one step of the history.
 		 * @param {function(object): object} edit - The next document from the current one.
+		 * @param {{key: string, values?: object}|function(object): {key: string, values?: object}} label -
+		 *   What the step does (« change key A »), the name the Undo and Redo
+		 *   buttons say, or a function reading it on the document before the edit.
 		 * @param {function(object): string} [name] - The edit in a few characters
 		 *   (« é ↔ a »), read on the document before it; the score chip names the
 		 *   change of score after it.
 		 */
-		function apply(edit, name) {
+		function apply(edit, label, name) {
 			try {
 				const before = doc();
 				const text = name ? name(before) : null;
-				state.history.push(edit(before));
+				const named = typeof label === 'function' ? label(before) : label;
+				state.history.push(edit(before), named);
 				// Kept with the document it made: an undo, a redo or another edit drops it.
 				state.lastEdit = text ? { doc: doc(), text } : null;
 				state.dirty = true;
 				state.message = null;
+				state.historySaid = null;
 			} catch (error) {
 				state.message = { kind: 'error', text: problemText(error) };
 			}
@@ -613,6 +605,7 @@ var LayoutEditorPage = (function () {
 					}
 					return next;
 				},
+				(d) => step('edit_history.step.move_keys', { keys: moveName('base', codes, false)(d) }),
 				moveName('base', codes, false)
 			);
 		}
@@ -701,11 +694,17 @@ var LayoutEditorPage = (function () {
 			return lineages.get(state.history);
 		}
 
-		function replace(next, lost) {
+		/**
+		 * Shows another document in this tab. A layout the user opens is a step
+		 * that Undo takes back (maintainer, 2026-11-21); the one the editor opens
+		 * on (opening: true) starts the history.
+		 */
+		function replace(next, lost, opening) {
 			// The edit belongs to the document being replaced: commit it there first.
 			commitFocused();
 			replacements += 1;
-			state.history.reset(next);
+			if (opening) state.history.reset(next);
+			else state.history.push(next, step('edit_history.step.open', { name: next.layout.name }));
 			// Another layout: its first analysis shows no change against the one replaced.
 			lineages.set(state.history, ++lineageCount);
 			resetView(next, lost);
@@ -743,6 +742,7 @@ var LayoutEditorPage = (function () {
 			state.dirty = tab.dirty;
 			state.starting = false;
 			state.confirm = null;
+			state.historySaid = null;
 			resetView(doc(), null);
 		}
 
@@ -792,7 +792,10 @@ var LayoutEditorPage = (function () {
 						keepActive();
 						showTab(index);
 					}
-					apply((d) => LayoutEditorModel.setLayout(d, { name: clean }));
+					apply(
+						(d) => LayoutEditorModel.setLayout(d, { name: clean }),
+						step('edit_history.step.rename')
+					);
 				} else render();
 				const tab = root.querySelector(`.le-layout-tab[data-tab="${index}"]`);
 				if (tab) tab.focus();
@@ -1586,7 +1589,10 @@ var LayoutEditorPage = (function () {
 			const hold = state.navHold;
 			if (!hold) return notify('error', problemText({ code: 'nav_hold_key_missing', path: '' }));
 			try {
-				state.history.push(LayoutSourceIO.withNavLayer(doc(), text, [hold], data));
+				state.history.push(
+					LayoutSourceIO.withNavLayer(doc(), text, [hold], data),
+					step('edit_history.step.navigation', { name })
+				);
 				state.layer = LayoutSourceIO.NAV_LAYER;
 				state.dirty = true;
 				notify('ok', tl('status.nav_imported', { name }));
@@ -1633,7 +1639,7 @@ var LayoutEditorPage = (function () {
 		}
 
 		function adoptConverted(converted) {
-			state.history.push(converted.doc);
+			state.history.push(converted.doc, step('edit_history.step.convert'));
 			state.lost = converted.lost;
 			state.approximate = false;
 			state.layer = 'base';
@@ -1663,12 +1669,19 @@ var LayoutEditorPage = (function () {
 		// ======= 5/ Toolbar =========
 		// ============================
 
-		/** Undoes or redoes the shown tab's last edit; nothing to undo does nothing. */
+		/**
+		 * Undoes or redoes the shown tab's last edit; nothing to undo does
+		 * nothing. The polite line says which step was taken back or replayed.
+		 */
 		function runHistory(action) {
 			const history = state.history;
 			if (action === 'undo' ? !history.canUndo() : !history.canRedo()) return;
+			commitFocused();
+			const label = action === 'undo' ? history.undoLabel() : history.redoLabel();
 			if (action === 'undo') history.undo();
 			else history.redo();
+			state.dirty = true;
+			state.historySaid = { action, label };
 			render();
 		}
 
@@ -1690,7 +1703,12 @@ var LayoutEditorPage = (function () {
 					})
 				)
 				.join(', ');
-			const name = tl('btn.with_shortcut', { action: tl(`btn.${action}`), keys });
+			// « Undo: change key A (Ctrl+Z) »: the step it would take back (maintainer, 2026-11-21).
+			const label = action === 'undo' ? state.history.undoLabel() : state.history.redoLabel();
+			const name = tl('btn.with_shortcut', {
+				action: ERGOPTI_EDIT_HISTORY.buttonName(t, action, label),
+				keys
+			});
 			return {
 				disabled: action === 'undo' ? !state.history.canUndo() : !state.history.canRedo(),
 				title: name,
@@ -1740,7 +1758,20 @@ var LayoutEditorPage = (function () {
 				]),
 				el('li', { class: 'le-toolbar-group' }, [
 					button('le-undo', tl('btn.undo'), () => runHistory('undo'), historyButton('undo')),
-					button('le-redo', tl('btn.redo'), () => runHistory('redo'), historyButton('redo'))
+					button('le-redo', tl('btn.redo'), () => runHistory('redo'), historyButton('redo')),
+					el('p', {
+						class: 'le-history-status theme-sr-only',
+						id: 'le-history-status',
+						role: 'status',
+						text: state.historySaid
+							? t(
+									state.historySaid.action === 'undo'
+										? 'edit_history.undone'
+										: 'edit_history.redone',
+									{ step: t(state.historySaid.label.key, state.historySaid.label.values) }
+								)
+							: ''
+					})
 				]),
 				el('li', {
 					class: `le-doc-state${state.dirty ? ' dirty' : ''}`,
@@ -1867,7 +1898,12 @@ var LayoutEditorPage = (function () {
 						id,
 						value: layout[name] || '',
 						onchange: (event) =>
-							apply((d) => LayoutEditorModel.setLayout(d, { [name]: event.target.value }))
+							apply(
+								(d) => LayoutEditorModel.setLayout(d, { [name]: event.target.value }),
+								name === 'name'
+									? step('edit_history.step.rename')
+									: step('edit_history.step.details')
+							)
 					})
 				]);
 			return el('section', { class: 'le-panel le-meta', id: 'le-meta' }, [
@@ -1882,7 +1918,10 @@ var LayoutEditorPage = (function () {
 							id: 'le-description',
 							value: layout.description || '',
 							onchange: (event) =>
-								apply((d) => LayoutEditorModel.setLayout(d, { description: event.target.value }))
+								apply(
+									(d) => LayoutEditorModel.setLayout(d, { description: event.target.value }),
+									step('edit_history.step.details')
+								)
 						})
 					]),
 					el('label', { class: 'le-field' }, [
@@ -1895,7 +1934,10 @@ var LayoutEditorPage = (function () {
 							(value) => {
 								// The board follows the keyboard the layout is now for.
 								state.board = null;
-								apply((d) => LayoutEditorModel.setKeyboard(d, value));
+								apply(
+									(d) => LayoutEditorModel.setKeyboard(d, value),
+									step('edit_history.step.keyboard')
+								);
 							},
 							{ id: 'le-keyboard', disabled: LayoutSourceIO.isPreserved(doc()) }
 						)
@@ -2168,7 +2210,10 @@ var LayoutEditorPage = (function () {
 					'aria-label': tl('layer.level_missing', { layer: label }),
 					text: `+ ${label}`,
 					onclick: () => {
-						apply((d) => LayoutEditorModel.addLayer(d, level.id, level.required, []));
+						apply(
+							(d) => LayoutEditorModel.addLayer(d, level.id, level.required, []),
+							step('edit_history.step.add_level', { level: label })
+						);
 						if (doc().layers.some((l) => l.id === level.id)) showLayer(level.id);
 					}
 				});
@@ -2307,7 +2352,10 @@ var LayoutEditorPage = (function () {
 							.filter((c) => c.checked)
 							.map((c) => c.value);
 						const id = idInput.value.trim();
-						apply((d) => LayoutEditorModel.addLayer(d, id, required, []));
+						apply(
+							(d) => LayoutEditorModel.addLayer(d, id, required, []),
+							step('edit_history.step.add_level', { level: id })
+						);
 						if (doc().layers.some((l) => l.id === id)) showLayer(id);
 					}
 				})
@@ -2321,7 +2369,10 @@ var LayoutEditorPage = (function () {
 			);
 			const moveAll = (keep) => () => {
 				const from = state.layer;
-				apply((d) => LayoutEditorModel.transferLayer(d, from, moveTarget.value, keep));
+				apply(
+					(d) => LayoutEditorModel.transferLayer(d, from, moveTarget.value, keep),
+					step('edit_history.step.move_level', { level: from })
+				);
 			};
 			const current =
 				state.layer && others.length
@@ -2350,7 +2401,10 @@ var LayoutEditorPage = (function () {
 										text: tl('layer.remove', { id: state.layer }),
 										onclick: () => {
 											const removed = state.layer;
-											apply((d) => LayoutEditorModel.removeLayer(d, removed));
+											apply(
+												(d) => LayoutEditorModel.removeLayer(d, removed),
+												step('edit_history.step.remove_level', { level: removed })
+											);
 											if (!doc().layers.some((l) => l.id === removed)) showLayer('base');
 										}
 									})
@@ -2510,8 +2564,16 @@ var LayoutEditorPage = (function () {
 		}
 
 		function pasteMapping(code) {
-			apply((d) =>
-				LayoutEditorModel.setMapping(d, state.layer, code, state.clipboard, state.platform || null)
+			apply(
+				(d) =>
+					LayoutEditorModel.setMapping(
+						d,
+						state.layer,
+						code,
+						state.clipboard,
+						state.platform || null
+					),
+				step('edit_history.step.change_key', { key: keyName(code) })
 			);
 		}
 
@@ -2676,7 +2738,10 @@ var LayoutEditorPage = (function () {
 								if (picking) {
 									state.pickingShortcutKey = null;
 									if (key.code !== picking)
-										return apply((d) => LayoutEditorModel.setShortcutKey(d, picking, key.code));
+										return apply(
+											(d) => LayoutEditorModel.setShortcutKey(d, picking, key.code),
+											step('edit_history.step.shortcut', { key: keyName(picking) })
+										);
 									return render();
 								}
 								state.selected = key.code;
@@ -2705,14 +2770,16 @@ var LayoutEditorPage = (function () {
 								// A character dragged from the palette or the name search maps the key to it.
 								const char = event.dataTransfer.getData(CHAR_DRAG_TYPE);
 								if (char)
-									return apply((d) =>
-										LayoutEditorModel.setMapping(
-											d,
-											state.layer,
-											key.code,
-											{ text: char },
-											state.platform || null
-										)
+									return apply(
+										(d) =>
+											LayoutEditorModel.setMapping(
+												d,
+												state.layer,
+												key.code,
+												{ text: char },
+												state.platform || null
+											),
+										step('edit_history.step.change_key', { key: keyName(key.code) })
 									);
 								const from = event.dataTransfer.getData('text/plain');
 								if (!from) return;
@@ -2727,6 +2794,10 @@ var LayoutEditorPage = (function () {
 											state.platform || null,
 											keep
 										),
+									(d) =>
+										step('edit_history.step.move_keys', {
+											keys: moveName(state.layer, [from, key.code], keep)(d)
+										}),
 									moveName(state.layer, [from, key.code], keep)
 								);
 							}
@@ -2957,6 +3028,7 @@ var LayoutEditorPage = (function () {
 											built(),
 											state.platform || null
 										),
+							step('edit_history.step.change_key', { key: keyName(code) }),
 							(d) => `${keyChar(d, state.layer, code)} → ${legend(built(), d) || keyName(code)}`
 						)
 				}),
@@ -3008,6 +3080,10 @@ var LayoutEditorPage = (function () {
 									state.platform || null,
 									false
 								),
+							(d) =>
+								step('edit_history.step.move_keys', {
+									keys: moveName(state.layer, [code, target.value], false)(d)
+								}),
 							moveName(state.layer, [code, target.value], false)
 						)
 				})
@@ -3398,7 +3474,10 @@ var LayoutEditorPage = (function () {
 							if (typed === undefined) return;
 							properties.virtual_key = typed;
 						}
-						apply((d) => LayoutEditorModel.setKeyProperties(d, code, properties));
+						apply(
+							(d) => LayoutEditorModel.setKeyProperties(d, code, properties),
+							step('edit_history.step.key_properties', { key: keyName(code) })
+						);
 					}
 				})
 			]);
@@ -3420,7 +3499,10 @@ var LayoutEditorPage = (function () {
 					options,
 					current === null ? '__none' : current,
 					(value) =>
-						apply((d) => LayoutEditorModel.setRemap(d, code, value === '__none' ? null : value)),
+						apply(
+							(d) => LayoutEditorModel.setRemap(d, code, value === '__none' ? null : value),
+							step('edit_history.step.remap', { key: keyName(code) })
+						),
 					{ id: 'le-remap' }
 				)
 			]);
@@ -3490,7 +3572,10 @@ var LayoutEditorPage = (function () {
 				),
 				actsAs || '',
 				(value) =>
-					apply((d) => LayoutEditorModel.setShortcutKey(d, code, value === '' ? null : value)),
+					apply(
+						(d) => LayoutEditorModel.setShortcutKey(d, code, value === '' ? null : value),
+						step('edit_history.step.shortcut', { key: keyName(code) })
+					),
 				{ id: 'le-shortcut-key' }
 			);
 			const picking = state.pickingShortcutKey === code;
@@ -3534,7 +3619,11 @@ var LayoutEditorPage = (function () {
 								type: 'button',
 								class: 'danger le-shortcut-remove',
 								text: tl('btn.remove'),
-								onclick: () => apply((d) => LayoutEditorModel.removeShortcut(d, s.key, s.modifiers))
+								onclick: () =>
+									apply(
+										(d) => LayoutEditorModel.removeShortcut(d, s.key, s.modifiers),
+										step('edit_history.step.shortcut', { key: keyName(s.key) })
+									)
 							})
 						])
 					)
@@ -3579,17 +3668,20 @@ var LayoutEditorPage = (function () {
 						const chord = { send_key: form.send_key, send_modifiers: form.send_modifiers.slice() };
 						state.shortcutDraft = null;
 						state.shortcutForm = null;
-						apply((d) => {
-							const base = replaced
-								? LayoutEditorModel.removeShortcut(d, code, replaced.modifiers)
-								: d;
-							return LayoutEditorModel.setShortcut(base, {
-								key: code,
-								modifiers,
-								send_key: chord.send_key,
-								send_modifiers: chord.send_modifiers
-							});
-						});
+						apply(
+							(d) => {
+								const base = replaced
+									? LayoutEditorModel.removeShortcut(d, code, replaced.modifiers)
+									: d;
+								return LayoutEditorModel.setShortcut(base, {
+									key: code,
+									modifiers,
+									send_key: chord.send_key,
+									send_modifiers: chord.send_modifiers
+								});
+							},
+							step('edit_history.step.shortcut', { key: keyName(code) })
+						);
 					}
 				}),
 				draft
@@ -3660,7 +3752,10 @@ var LayoutEditorPage = (function () {
 							threshold_ms: thresholdMs
 						};
 						next[kind === 'layer' ? 'hold_layer' : 'hold_modifier'] = id;
-						apply((d) => LayoutEditorModel.setTapHold(d, next));
+						apply(
+							(d) => LayoutEditorModel.setTapHold(d, next),
+							step('edit_history.step.tap_hold', { key: keyName(code) })
+						);
 					}
 				}),
 				entry
@@ -3669,7 +3764,11 @@ var LayoutEditorPage = (function () {
 							class: 'danger',
 							id: 'le-tap-hold-remove',
 							text: tl('btn.remove'),
-							onclick: () => apply((d) => LayoutEditorModel.removeTapHold(d, code))
+							onclick: () =>
+								apply(
+									(d) => LayoutEditorModel.removeTapHold(d, code),
+									step('edit_history.step.tap_hold', { key: keyName(code) })
+								)
 						})
 					: null
 			]);
@@ -3929,7 +4028,10 @@ var LayoutEditorPage = (function () {
 						const chosen = state.fillSources.find((entry) => entry.id === source.value);
 						const layerId = state.layer;
 						ask(tl('fill.confirm', { layer: layerId }), () =>
-							apply((d) => LayoutSourceIO.fillLayer(d, chosen, level.value, layerId))
+							apply(
+								(d) => LayoutSourceIO.fillLayer(d, chosen, level.value, layerId),
+								step('edit_history.step.fill_level', { level: layerId })
+							)
 						);
 					}
 				})
@@ -3994,7 +4096,10 @@ var LayoutEditorPage = (function () {
 							klcFields.map(([field, input]) => [field, input.value.trim()])
 						);
 						const empty = Object.values(values).every((value) => value === '');
-						apply((d) => LayoutEditorModel.setExport(d, 'windows', empty ? null : values));
+						apply(
+							(d) => LayoutEditorModel.setExport(d, 'windows', empty ? null : values),
+							step('edit_history.step.export')
+						);
 					}
 				}),
 				el('p', { class: 'le-note', text: tl('windows.note') }),
@@ -4004,8 +4109,10 @@ var LayoutEditorPage = (function () {
 					id: 'le-win-flags-apply',
 					text: tl('btn.apply'),
 					onclick: () =>
-						apply((d) =>
-							LayoutEditorModel.setWindowsFlags(d, flags.value.split(/[\s,]+/).filter(Boolean))
+						apply(
+							(d) =>
+								LayoutEditorModel.setWindowsFlags(d, flags.value.split(/[\s,]+/).filter(Boolean)),
+							step('edit_history.step.export')
 						)
 				}),
 				el(
@@ -4019,7 +4126,10 @@ var LayoutEditorPage = (function () {
 								class: 'danger',
 								text: tl('btn.remove'),
 								onclick: () =>
-									apply((d) => LayoutEditorModel.removeNls(d, entry.key, entry.modifiers))
+									apply(
+										(d) => LayoutEditorModel.removeNls(d, entry.key, entry.modifiers),
+										step('edit_history.step.export')
+									)
 							})
 						])
 					)
@@ -4042,7 +4152,7 @@ var LayoutEditorPage = (function () {
 							function: fn.value.trim()
 						};
 						if (parameter.value) entry.parameter_key = parameter.value;
-						apply((d) => LayoutEditorModel.setNls(d, entry));
+						apply((d) => LayoutEditorModel.setNls(d, entry), step('edit_history.step.export'));
 					}
 				})
 			]);
@@ -4077,7 +4187,11 @@ var LayoutEditorPage = (function () {
 								type: 'button',
 								class: 'danger',
 								text: tl('btn.remove'),
-								onclick: () => apply((d) => LayoutEditorModel.removeModifier(d, m.id))
+								onclick: () =>
+									apply(
+										(d) => LayoutEditorModel.removeModifier(d, m.id),
+										step('edit_history.step.modifier', { name: m.id })
+									)
 							})
 						])
 					)
@@ -4090,13 +4204,15 @@ var LayoutEditorPage = (function () {
 					id: 'le-mod-add',
 					text: tl('btn.add'),
 					onclick: () =>
-						apply((d) =>
-							LayoutEditorModel.setModifier(
-								d,
-								id.value.trim(),
-								mode.value,
-								keys.value.split(/[\s,]+/).filter(Boolean)
-							)
+						apply(
+							(d) =>
+								LayoutEditorModel.setModifier(
+									d,
+									id.value.trim(),
+									mode.value,
+									keys.value.split(/[\s,]+/).filter(Boolean)
+								),
+							step('edit_history.step.modifier', { name: id.value.trim() })
 						)
 				})
 			]);
@@ -4145,7 +4261,10 @@ var LayoutEditorPage = (function () {
 					text: tl('btn.add'),
 					onclick: () => {
 						const newId = id.value.trim();
-						apply((d) => LayoutEditorModel.setDeadKey(d, newId, '', terminator.value));
+						apply(
+							(d) => LayoutEditorModel.setDeadKey(d, newId, '', terminator.value),
+							step('edit_history.step.dead_key', { name: newId })
+						);
 						if ((doc().dead_keys || []).some((d) => d.id === newId)) {
 							state.deadKey = newId;
 							render();
@@ -4178,7 +4297,10 @@ var LayoutEditorPage = (function () {
 										class: 'danger',
 										text: tl('btn.remove'),
 										onclick: () =>
-											apply((d) => LayoutEditorModel.setDeadRule(d, current.id, rule.input, null))
+											apply(
+												(d) => LayoutEditorModel.setDeadRule(d, current.id, rule.input, null),
+												step('edit_history.step.dead_key', { name: current.id })
+											)
 									})
 								)
 							])
@@ -4192,13 +4314,15 @@ var LayoutEditorPage = (function () {
 						id: 'le-rule-add',
 						text: tl('dead.add_rule'),
 						onclick: () =>
-							apply((d) =>
-								LayoutEditorModel.setDeadRule(
-									d,
-									current.id,
-									input.value,
-									chain.value ? { next: chain.value } : { text: output.value }
-								)
+							apply(
+								(d) =>
+									LayoutEditorModel.setDeadRule(
+										d,
+										current.id,
+										input.value,
+										chain.value ? { next: chain.value } : { text: output.value }
+									),
+								step('edit_history.step.dead_key', { name: current.id })
 							)
 					}),
 					el('button', {
@@ -4207,7 +4331,10 @@ var LayoutEditorPage = (function () {
 						id: 'le-dead-remove',
 						text: tl('dead.remove', { id: current.id }),
 						onclick: () => {
-							apply((d) => LayoutEditorModel.removeDeadKey(d, current.id));
+							apply(
+								(d) => LayoutEditorModel.removeDeadKey(d, current.id),
+								step('edit_history.step.dead_key', { name: current.id })
+							);
 							if (!(doc().dead_keys || []).some((d) => d.id === current.id)) {
 								state.deadKey = null;
 								render();
@@ -4883,7 +5010,8 @@ var LayoutEditorPage = (function () {
 		 * @returns {{node: Element, selector: string|null}|null}
 		 */
 		function focusAnchor(node) {
-			if (!node || node === root || !root.contains(node) || inTextField(node)) return null;
+			if (!node || node === root || !root.contains(node) || ERGOPTI_EDIT_HISTORY.inTextField(node))
+				return null;
 			if (node.id) return { node, selector: `#${CSS.escape(node.id)}` };
 			const hook = FOCUS_HOOKS.find((name) => node.hasAttribute(name));
 			return {
@@ -5246,6 +5374,19 @@ var LayoutEditorPage = (function () {
 				state.heat = heat;
 				applyHeat();
 			});
+			// A fingering change made in the panel is a step of the shown tab's
+			// history: the document stays, Undo puts the fingering back. The app's
+			// Studio window also holds the Comparer, whose own history keeps the
+			// changes made there.
+			window.LAYOUT_ANALYSIS_FINGERING.onEdit(({ before, after }) => {
+				if (root.getClientRects().length === 0) return;
+				state.history.push(doc(), step('edit_history.step.fingering'), {
+					undo: () => window.LAYOUT_ANALYSIS_FINGERING.restore(before),
+					redo: () => window.LAYOUT_ANALYSIS_FINGERING.restore(after)
+				});
+				state.historySaid = null;
+				render();
+			});
 		}
 
 		/**
@@ -5326,7 +5467,7 @@ var LayoutEditorPage = (function () {
 		function openStart() {
 			if (typeof host.initial === 'string') {
 				const parsed = LayoutSourceIO.parse(host.initial);
-				if (parsed.ok) replace(parsed.doc);
+				if (parsed.ok) replace(parsed.doc, null, true);
 				else state.message = { kind: 'error', text: problemText(parsed.error) };
 			} else if (typeof host.startFrom === 'string') {
 				// With nothing to open, a host may start on a copy of a start source (the
@@ -5345,7 +5486,7 @@ var LayoutEditorPage = (function () {
 							`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
 							tl('start.copy_name', { name: entry.name })
 						);
-						replace(started.doc, started.lost.length ? started.lost : null);
+						replace(started.doc, started.lost.length ? started.lost : null, true);
 						openedStart = { doc: doc(), name: entry.name };
 					} catch (error) {
 						state.message = { kind: 'error', text: problemText(error) };
@@ -5358,14 +5499,10 @@ var LayoutEditorPage = (function () {
 		// Ctrl/Cmd+Z and Ctrl/Cmd+Y (or Shift+Z) anywhere in the editor shown, but in a
 		// text field, which keeps its own undo. The document listens, so a press with
 		// nothing focused (after a click on the page) works too.
-		document.addEventListener('keydown', (event) => {
-			const action = historyAction(event);
-			if (!action || event.defaultPrevented || inTextField(event.target)) return;
-			const target = event.target;
-			const inside = target === document.body || target === document.documentElement;
-			if (!(inside || root.contains(target)) || root.getClientRects().length === 0) return;
-			event.preventDefault();
-			runHistory(action);
+		ERGOPTI_EDIT_HISTORY.bindKeys(document, runHistory, () => {
+			const target = document.activeElement;
+			const inside = !target || target === document.body || target === document.documentElement;
+			return (inside || root.contains(target)) && root.getClientRects().length > 0;
 		});
 
 		wireDrop();

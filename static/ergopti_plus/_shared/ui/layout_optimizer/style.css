@@ -82,6 +82,20 @@ body:has(> main.layout-optimizer) {
 	max-width: 60ch;
 }
 
+/* Undo and Redo (edit_history.js) under the introduction; a button with
+   nothing to take back stays focusable (aria-disabled) so its name is heard. */
+.lo-history {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lo-space-2);
+	margin-top: var(--lo-space-3);
+}
+
+.lo-history-button[aria-disabled='true'] {
+	cursor: default;
+	opacity: 0.55;
+}
+
 .lo-lead {
 	font-size: 1.02em;
 }

@@ -140,12 +140,6 @@ module.exports = [
 			ctx.keysOf('layer_editor.key.', Object.values(ctx.literal(LAYER_MODEL, 'NAMED_KEYS')))
 	},
 	{
-		prefix: 'layout_editor.btn.',
-		files: [PAGE],
-		source: 'the actions historyButton is called with in editor_page.js',
-		keys: () => ctx.keysOf('layout_editor.btn.', ctx.callArguments(PAGE, 'historyButton'))
-	},
-	{
 		prefix: 'layout_editor.caps.',
 		files: [PAGE],
 		source: 'LayoutEditorModel.CAPS_MODES',

@@ -60,6 +60,7 @@ const SCRIPTS = [
 	'info_popover.js',
 	// The « Undo » line of the restore buttons and the fingering reset.
 	'undo_offer.js',
+	'../edit_history.js',
 	'fingering_editor.js',
 	'../layout_composer/_generated/composer_data.js',
 	'../layout_composer/composer_model.js',

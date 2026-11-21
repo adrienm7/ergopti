@@ -709,6 +709,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-webview-host-pause-census.cjs"],
 			"repro": "npm run test:webview-host-pause-census"
+		},
+		{
+			"id": "studio-edit-history",
+			"ordinal": 719,
+			"name": "Ergopti Studio's undo history walks its named steps in order, a new edit after an undo clears Redo, it keeps the registry's number of steps, fails fast on an inconsistent use, answers Ctrl or Cmd with Z, Y and Shift+Z outside text fields, and names its steps in all 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-studio-edit-history.cjs"],
+			"repro": "npm run test:studio-edit-history"
 		}
 	]
 }

@@ -31,7 +31,6 @@ var LayoutEditorModel = (function () {
 	// ======= 1/ Constants =======
 	// ============================
 
-	const HISTORY_LIMIT = 200;
 	const PLATFORMS = ['windows', 'macos', 'linux'];
 	const MAPPING_KINDS = ['text', 'dead_key', 'action', 'key', 'disabled'];
 	const CAPS_MODES = ['unaffected', 'shift', 'separate'];
@@ -590,43 +589,12 @@ var LayoutEditorModel = (function () {
 	// ======= 6/ History ==========
 	// =============================
 
-	/** Undo and redo over document snapshots. */
+	/**
+	 * Undo and redo over document snapshots, each step named (the Studio's
+	 * one history, _shared/ui/edit_history.js, bounded by its HISTORY_LIMIT).
+	 */
 	function createHistory(doc) {
-		const past = [];
-		const future = [];
-		let present = doc;
-		return {
-			current: () => present,
-			push(next) {
-				past.push(present);
-				if (past.length > HISTORY_LIMIT) past.shift();
-				future.length = 0;
-				present = next;
-				return present;
-			},
-			reset(next) {
-				past.length = 0;
-				future.length = 0;
-				present = next;
-				return present;
-			},
-			canUndo: () => past.length > 0,
-			canRedo: () => future.length > 0,
-			undo() {
-				if (past.length) {
-					future.push(present);
-					present = past.pop();
-				}
-				return present;
-			},
-			redo() {
-				if (future.length) {
-					past.push(present);
-					present = future.pop();
-				}
-				return present;
-			}
-		};
+		return ERGOPTI_EDIT_HISTORY.create(doc);
 	}
 
 	return {

@@ -1265,6 +1265,12 @@ token_prompt_focus_retry_second_ms = 150
 # (infra/suppressive_inputhook_ownership.ahk).
 custom_modifier_settle_poll_ms = 1
 
+# Web: the edits Ergopti Studio's undo history keeps per editor tab, Comparer and
+# Optimiser (a count, not a delay); the oldest step goes once a new one passes
+# it. Pinned to HISTORY_LIMIT of _shared/ui/edit_history.js, which a page script
+# cannot read from here, by tools/test/test-keystats-timings-single-source.cjs.
+studio_history_steps = 200
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Logger
