@@ -22,7 +22,7 @@ _HCWV_OwnWindows() {
 _HCWV_Case() {
 	global _LOGGER_TEST_SINK, _HCWWeb_Gui
 	PreviousSink := _LOGGER_TEST_SINK
-	Logs := [], Shown := [], Result := "unset"
+	Logs := [], Shown := [], Result := "unset", Created := 0
 	AssertTrue(WebView_UnavailableReason() != "", "The suite runs without a usable WebView2")
 	ShownBefore := TestMsgBoxCount()
 	Before := Map()
@@ -37,15 +37,14 @@ _HCWV_Case() {
 	} finally {
 		LoggerSetTestSink(PreviousSink)
 		TestMsgBoxResponder("")
-		; Retire anything a regression built so it cannot linger on the desktop.
+		; Count what the opening built, then retire it so a regression cannot
+		; linger on the desktop.
 		for Hwnd in _HCWV_OwnWindows()
-			if !Before.Has(Hwnd)
+			if !Before.Has(Hwnd) {
+				Created += 1
 				try WinClose("ahk_id " . Hwnd)
+			}
 	}
-	Created := 0
-	for Hwnd in _HCWV_OwnWindows()
-		if !Before.Has(Hwnd)
-			Created += 1
 	AssertEqual(0, Created, "No native settings window may be built without WebView2")
 	AssertTrue((Result is Integer) && Result == 0, "A refused opening must report that nothing opened")
 	AssertFalse(IsObject(_HCWWeb_Gui), "The WebView host must not publish a window")
