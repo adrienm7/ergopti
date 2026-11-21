@@ -17,15 +17,17 @@
 #
 # Usage:
 #   sni_host.py --ready-file F --timeout S [--expect-label TEXT]...
-#               [--expect-icon-file] [--exit-after-check]
+#               [--expect-icon-file] [--exit-after-check] [--hold]
 # Writes F once the watcher owns its name (so the caller starts the app only
-# then), and prints one JSON report on stdout. Exit 0 = every expectation held,
+# then), and prints one JSON report on stdout; with --hold, only once SIGTERM
+# ends the session it keeps hosting. Exit 0 = every expectation held,
 # 1 = an expectation failed, 2 = the environment could not host the test.
 
 import argparse
 import json
 import os
 import re
+import signal
 import sys
 import time
 
@@ -102,6 +104,9 @@ def main():
     # A check row whose click must flip its toggle-state in place: every row
     # keeps its dbusmenu id, so the tray updated that row, not the whole menu.
     parser.add_argument("--toggle-label")
+    # Stays the session's watcher after the check, as a panel does, and
+    # prints the report on SIGTERM.
+    parser.add_argument("--hold", action="store_true")
     args = parser.parse_args()
 
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -462,13 +467,36 @@ def main():
         bus, "org.kde.StatusNotifierWatcher", Gio.BusNameOwnerFlags.NONE, on_acquired, on_lost
     )
 
+    timed_out = []
+
     def on_timeout():
+        timed_out.append(True)
         report["failures"].append(f"no tray item registered within {args.timeout:.0f} s")
         loop.quit()
         return False
 
-    GLib.timeout_add(int(args.timeout * 1000), on_timeout)
+    timeout_source = GLib.timeout_add(int(args.timeout * 1000), on_timeout)
+    # A real panel outlives its first look at the menu. With --hold the watcher
+    # name stays owned until SIGTERM, so the daemon's later tray host check
+    # (TRAY-03) still finds a host; the report waits for that end.
+    held = GLib.MainLoop()
+    terminated = []
+
+    def on_term():
+        if loop.is_running():
+            report["failures"].append("stopped before the tray was inspected")
+            loop.quit()
+        terminated.append(True)
+        held.quit()
+        return False
+
+    if args.hold:
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, on_term)
     loop.run()
+    if args.hold and not terminated:
+        if not timed_out:
+            GLib.source_remove(timeout_source)
+        held.run()
     print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
     sys.exit(1 if report["failures"] else 0)
 

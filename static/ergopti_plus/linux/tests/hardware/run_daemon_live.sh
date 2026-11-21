@@ -142,7 +142,10 @@ for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
-python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
+# The host stays the session's watcher until the daemon has exited, as a panel
+# does: the daemon checks 15 s after its icon that something hosts it (TRAY-03),
+# and a host gone by then makes it open a « no tray » window over the editor.
+python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 --hold \
 	--expect-icon-file --min-labels 5 --forbid-raw-keys --expect-label "Tap-Holds" > "${REPORT}" &
 HOST=$!
 for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done
@@ -157,6 +160,7 @@ if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
 fi
 PATH="${SECRET_TOOL_SHIM}:${PATH}" luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
+kill -TERM "${HOST}" 2>/dev/null
 wait "${HOST}"
 TRAY=$?
 echo "--- the tray the daemon showed ---"
