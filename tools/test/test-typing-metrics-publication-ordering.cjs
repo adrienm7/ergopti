@@ -56,6 +56,8 @@ function fixture() {
 			timers.delete(id);
 		},
 		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized', NONE: 'none' },
+		// The i18n helper of state.js, which this fixture replaces: keys read as themselves
+		_t: (key) => key,
 		document: {
 			getElementById(id) {
 				if (!elements.has(id)) elements.set(id, { value: '2026-09-01', innerHTML: '' });
