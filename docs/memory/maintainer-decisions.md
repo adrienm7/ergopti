@@ -261,6 +261,137 @@ heatmap table lists keys by value, largest first, not in board order, and the
 system's « increase contrast » (`prefers-contrast: more`) does not switch the
 Studio frames to the black-and-yellow theme, which stays the site setting's.
 
+## A pair's tap under the navigation layer lifts it, then restores it (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (THD-1,
+`docs/audits/platform-parity/2026-11-10-tap-holds/report.md`), with Linux as
+the reference: a key combination's tap struck while its first key holds the
+navigation layer runs out of the layer, and the layer comes back after the
+action while that key still holds it. Windows `_KeyCombinationRunTap` turned
+the layer off until the layer key was pressed again; macOS left
+`layer_active` set. Now: Linux `combination_lift` / `combination_restore`;
+Windows `_KeyCombinationRunOutOfLayer` (it lowers `LayerEnabled` but keeps
+`_TH_LayerOwner`, so a release during the action still closes the owner, and
+never restores a closed owner); macOS `tap_out_of_layer` in the Karabiner
+generator (F19 and `layer_active` 0, the action, F20 and `layer_active` 1,
+each gated on the layer being on before the list; a repeating tap-only pair
+restores at its second key's release, gated on its own lift variable and the
+first key still held). Regressions: `pair-tap-layer-restored` (AHK and macOS).
+
+## A key combination's own tap takes the strict threshold (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (THD-2): a key combination's own tap
+is judged on the second key's strict tap-hold threshold on the three OS, the
+shared pair policy that macOS and Linux follow. Windows gave it the lone tap
+window (`tap_holds.lone_modifier_tap_max_ms`) whenever the pair's hold was a
+modifier, because `TapHoldOwnImmediateModifier` grants that window to a key
+pressed alone; `KeyCombinationFire` now refuses a pair tap whose
+`elapsed_ms` passes the threshold, for a modifier hold and a layer hold alike.
+The lone window keeps applying to a key pressed alone. Regression:
+`thd-2-strict-pair-tap` (`test_key_combinations.ahk`).
+
+## A layer key under a pair's layer hold cancels its tap (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (THD-3): a key struck under a key
+combination whose hold is the navigation layer cancels the pair's tap on every
+OS, as the shared pair policy (`_shared/tap_hold/engine/key_combinations.lua`,
+`activity`) and Karabiner's `to_if_alone` already did. Windows
+`TapHoldOwnImmediateLayer` judged that tap on its release time alone (a
+defect); it now takes an optional `CancelTapFn`, which the pair's `own_layer`
+port fills with `TapHoldShouldCancelTap`, as `TapHoldOwnImmediateModifier`
+does. The keys' own layer hotkeys keep asking the tracker in
+`TapHoldDispatchTap`. Regression: `pair-layer-hold-activity`.
+
+## The macOS thumb Backspace follows BackSpaceLogic (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (THD-4): left Command tapping
+Backspace deletes what Windows' `BackSpaceLogic` (now in
+`platform/remap/constants.ahk`) and the Linux engine's `lalt_backspace_chords`
+delete under the keys held: Forward Delete under Shift or the one-shot right
+Option (sticky_shift); a word back under Control; a word forward under
+Control and Shift, or Control with the one-shot key. macOS deletes a word with
+Option (Option+Backspace, Option+Forward Delete), where Windows uses Ctrl. The
+Karabiner generator gives that tap one manipulator per variant
+(`thumb_backspace_variants`), claiming the flags it reads so they are lifted
+around the deletion, as TextPressKey lifts them; the variants are marked
+`KEEPS_OWN_FLAGS` so the control-output rewrite's exact-modifier split keeps
+their flags. `_shared/tests/corpus/tap_hold/thumb_backspace_vectors.json` pins
+the three drivers; add any new variant there first.
+
+## The left thumb types on one key (2026-11-21)
+
+Decided by the maintainer on 2026-11-21: on a real keyboard the left thumb has
+no useful second key (it is Alt, or Cmd on macOS; the other keys are further
+away and uncomfortable). This settles the agent's 2026-11-19 « left thumb's
+second key »: NonConvert stays the left thumb's own key, and no second left
+thumb key is a typing key, on any board, the ErgoDox included.
+
+- The ErgoDox's four other left thumb keys (`LeftThumbUpperOuter`,
+  `LeftThumbUpperInner`, `LeftThumbMiddle`, `LeftThumbLower`) are
+  `idle_thumb_keys` in `analysis_model.json`: no thumb keys, left off every
+  board by `keyboard()`, so a layout's characters there are unsupported. The
+  KLA reader and writer still read and write them.
+- On every board a layout's left thumb types on one key (`leftThumbKey` in
+  `analysis_engine.js`): the left thumb key it types its space on, else the
+  one it rests on (NonConvert, then the space bar) when it uses it, else the
+  one it uses. `boardFor` takes its other left thumb keys off the board
+  (missing keys, unsupported characters) and the optimizer offers no place
+  there (`spareThumbKeys`). A left thumb SFB can no longer happen; the right
+  thumb keeps Convert, KanaMode and AltGr.
+- The layouts that need two left thumb keys besides the space (Cahi, Chia,
+  Uhia, Ucieatron, SNTH's KLAnext file) stay out of the library for good.
+
+Why: scoring a key the thumb cannot comfortably reach would reward layouts
+nobody can type. Proof: of 17,226 layout × keyboard × corpus rows (783
+layouts, eleven keyboards, both French corpora) only three ErgoDox layouts
+moved (Nemolivier, then Don Quichotte): Maks Ex −25.74 → −24.16 and
+−21.41 → −18.77, Adextre 12.67 → 12.19 and 13.16 → 13.11, Enne P 111 69
+−75.33 → −75.47 and −78.52 → −78.66. `test-layout-analysis-engine.cjs`
+section 17 (`left-thumb-one-key`) and `test-layout-optimizer.cjs` pin the
+rule. Do not re-add a left thumb key as a typing key.
+
+## Hotstring cascade parity: HCD-1, HCD-2, HCD-4, HCD-5 (2026-11-21)
+
+Decided by the maintainer on 2026-11-21, from
+`docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md`:
+
+- HCD-1, an expired winner fires nothing. The matcher picks its winner by
+  length then priority first, and only then asks that winner's expansion delay;
+  an expired winner fires nothing and no shorter or lower rule whose delay still
+  allows it fires in its place, on the three OS. Only the magic key's
+  fallbacks (repeat, @-combo) remain. macOS changed: its typed path
+  (`run_trigger_checks`) and its cascade (`pick_cascade_step`) filter the
+  candidates on their group only and ask the delay of the winner
+  (`delay_gate` of `try_auto_expand` / `try_terminator_expand`). Pinned by
+  `_shared/tests/corpus/hotstrings/expired_winner_vectors.json` on the three OS.
+- HCD-2, a bare `:` or `;` ends a trigger on the three OS; the no-break space
+  the Ergopti layout types before them is still looked past and replaced. Why:
+  the user is responsible for the hotstrings they create. Windows
+  (`hotstring_match` in `matcher/match.ahk`) and the shared engine
+  (`select_match`) changed; macOS already did so.
+  `test-hotstring-bare-colon-catalogue.cjs` proves on the shipped catalogues
+  that no end-character rule rewrites text a bare colon follows: none holds a
+  digit or a colon, and the only ones a URL scheme or a drive letter reaches
+  (`r`, `ssh`, `vscode`) only re-case it, which a case-insensitive URL scheme
+  or drive letter tolerates; a new such rule fails the gate until reviewed.
+  Pinned by `_shared/tests/corpus/hotstrings/end_character_vectors.json`.
+- HCD-4, the personal `@` tags and combos wait the dynamic category's
+  expansion delay on the three OS, as Linux did since `e64e7faa6`: Windows
+  gives the registered tags and the fire-time combo `_DynamicHotstringDelay()`,
+  macOS asks `dynamic_rule_within_delay("personal_info", ctx.elapsed)` at the
+  magic key; an expired tag fires nothing.
+- HCD-5, a personal tag follows the typed case, one field per letter, the way
+  a word hotstring follows mot / Mot / MOT: a lower letter types its field as
+  stored, an upper letter in capitals (`@abc` « aaa bbb ccc », `@aBc`
+  « aaa BBB ccc », `@ABC` all capitals, `@Np` « NOM Prénom »). A letter alias
+  is case-insensitive; a named tag (`@iban`, `@IBAN`) types its value as
+  stored, since it names a field, not a letter. One rule:
+  `_shared/hotstrings/engine/personal_info/tags.lua` `cased_value` and its
+  Windows twin `PersonalInfoTagCasedValue`, replayed by
+  `_shared/tests/corpus/personal_info/tag_case_vectors.json`. This replaces
+  Linux's exact-case one-letter rules (Linux and Windows now register one rule
+  per typed case) and the case folding of Windows and macOS.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
@@ -567,7 +698,7 @@ exemple si e et espace sur le même pouce »):
 - Two consecutive presses of two different keys of one thumb are a thumb SFB,
   with its travel (the thumbs' `same_finger_factor` is 1): a letter and the
   space on the same thumb (« e » then space, space then « e »), or two thumb
-  letters of one thumb.
+  letters of one thumb (the right one's, since 2026-11-21).
 - The space's thumb: a layout that types it on a thumb key uses that key's
   thumb; the shared bar keeps the fingering's thumb (`Space` → `lt`, the
   left one; the right one on the Kinesis), the convention since 2026-11-14.
@@ -578,8 +709,9 @@ the tests: the 660 library layouts without a character on a thumb key keep
 every metric and score, bit for bit, on both French corpora and eleven
 keyboards; `test-layout-analysis-engine.cjs` section 17 pins the rules on
 tiny texts, and `test-layout-optimizer.cjs` checks the incremental objective
-with letters on the Corne's thumbs. Whether the left thumb gets a second key
-is still open in `TODO.md`.
+with letters on the Corne's thumbs. The left thumb types on one key since
+2026-11-21 (« The left thumb types on one key »), so a thumb SFB is now the
+right thumb's only.
 
 ## Windows layout DLLs come from CI and the website (2026-11-17)
 

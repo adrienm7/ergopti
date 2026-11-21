@@ -79,6 +79,16 @@ had no unit test of the undo at all: `test_backspace_undo.lua` is the first.
 
 ## Decisions pending (behaviour left unchanged)
 
+Decided by the maintainer on 2026-11-21 and implemented on the three OS
+(`docs/memory/maintainer-decisions.md`, « Hotstring cascade parity »): HCD-1,
+an expired winner fires nothing, macOS follows (`expired_winner_vectors.json`);
+HCD-2, a bare `:` or `;` ends a trigger everywhere, Windows and the shared
+engine follow (`end_character_vectors.json`,
+`test-hotstring-bare-colon-catalogue.cjs`); HCD-4, the personal tags wait the
+dynamic category's delay, Windows and macOS follow; HCD-5, a personal tag
+follows the typed case letter by letter (`tag_case_vectors.json`). The entries
+below record the state the audit found. HCD-3 stays as decided on 2026-11-13.
+
 - **HCD-1, an expired best candidate.** Windows (`HSE_TimeGateExpired` in
   `_OnPrefixChar`, then only the repeat fallback) and Linux (`within_delay`
   after `engine:on_char`, then only the repeat) drop the winner whose

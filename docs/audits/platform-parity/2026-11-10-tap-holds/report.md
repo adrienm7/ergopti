@@ -44,6 +44,15 @@ Continued on November 11, 2026 (source `2c94b824`), from the remaining rows belo
 
 ## Decisions pending (behaviour left unchanged)
 
+Decided by the maintainer on 2026-11-21 and implemented on the three OS
+(`docs/memory/maintainer-decisions.md`): THD-1, a pair's tap lifts the layer
+and restores it (Windows and macOS follow Linux); THD-2, a pair's own tap takes
+the strict threshold (Windows drops the lone tap window for it); THD-3, a layer
+key under a layer-hold pair cancels its tap (Windows follows the shared
+policy); THD-4, the macOS thumb Backspace gives the `BackSpaceLogic` variants
+(`thumb_backspace_vectors.json`). The entries below record the state the audit
+found.
+
 - **THD-1, a pair tap under the navigation layer.** Windows `_KeyCombinationRunTap`
   calls `DisableLayer()` and the layer stays off until the layer key is pressed
   again; Linux lifts the first key's layer around the action and restores it;

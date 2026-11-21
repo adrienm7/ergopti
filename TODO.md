@@ -200,7 +200,8 @@ waits for the maintainer's review).
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
       model »): 73 of the 91 files left out for its keys came in, the library holds 783 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
-      board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (`docs/design/layout-analysis.md`,
+      board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (the ErgoDox's extra left thumb keys are idle since
+      2026-11-21) (`docs/design/layout-analysis.md`,
       « ErgoDox keys »). Still in `not_imported`: KLA's four standard-board files need Tab, Caps Lock, Enter or a
       bottom modifier as character keys on ISO and ANSI (TypeMatrix's q and a, the ANSI BvoFRak's q, Arensito's à,
       AOEYK's \), which would also offer them to the optimizer; KLAnext's Einbinder Orthogonal, VCKB, VCKB2 and Yp Hina
@@ -727,11 +728,6 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-- [ ] **The left thumb's second key (decided by the agent on 2026-11-19, to review by the maintainer).** The
-      thumbs' own keys are NonConvert (left thumb), Convert and KanaMode (right), as on JIS; their effort and pairs
-      were settled on 2026-11-19 (docs/memory/maintainer-decisions.md). Kept meanwhile: one key for the left thumb,
-      so the layouts that need two there (Cahi, Chia, SNTH) stay out of the library. Choose whether the left thumb
-      gets a second key.
 - [ ] **Renew the reviewed number-row test image (prepared by the agent on 2026-11-19, to review by the
       maintainer).** `number_row_current_test_causal.py` says no transcript or approval may select another test
       image, and its approval record needs a published source commit and a source review hash, so the agent did not
@@ -938,9 +934,3 @@ Each question names the default kept meanwhile; an answer moves into the item or
   - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
     1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
     2. Leave each OS's menu as it is.
-- [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
-      ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
-      the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
-      cascade ([report](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): HCD-1 an expired best
-      candidate (macOS falls to a lower rule), HCD-2 a bare `:` or `;` ends a trigger on macOS only, HCD-4 the delay
-      on `@` tags, HCD-5 an uppercase one-letter tag (privacy). Each report names the default kept meanwhile.
