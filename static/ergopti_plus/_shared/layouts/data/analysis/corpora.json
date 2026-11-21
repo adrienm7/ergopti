@@ -210,6 +210,30 @@
 			"restore_dead_key_pairs": false
 		},
 		{
+			"id": "fr_hemon_chapdelaine",
+			"title": "Maria Chapdelaine (Louis Hémon)",
+			"language": "fr",
+			"kind": "literature",
+			"file": "static/corpus/original/fr/hemon_maria_chapdelaine.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_renard_poil_de_carotte",
+			"title": "Poil de Carotte (Jules Renard)",
+			"language": "fr",
+			"kind": "literature",
+			"file": "static/corpus/original/fr/renard_poil_de_carotte.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_philippe_bubu",
+			"title": "Bubu de Montparnasse (Charles-Louis Philippe)",
+			"language": "fr",
+			"kind": "literature",
+			"file": "static/corpus/original/fr/philippe_bubu_de_montparnasse.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
 			"id": "en_austen_pride",
 			"title": "Pride and Prejudice (Jane Austen)",
 			"language": "en",

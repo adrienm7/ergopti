@@ -305,7 +305,10 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_books_words.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_flaubert_bovary.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_carroll_alice.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_doyle_sherlock.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_doyle_sherlock.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_hemon_chapdelaine.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_renard_poil_de_carotte.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_philippe_bubu.js'
 		]
 	},
 	{

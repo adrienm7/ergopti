@@ -1,5 +1,5 @@
 {
-	"_description": "The Project Gutenberg ebooks of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>.",
+	"_description": "The Project Gutenberg ebooks and Wikisource works of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>. wikisource_texts: each French Wikisource work's page revisions, in reading order; the importer reads each revision's parse output (https://fr.wikisource.org/w/api.php?action=parse&oldid=<revid>, or <revid>.json from --archive-dir), keeps its paragraphs by one extraction rule and writes output only if the SHA-256 of the text is sha256 (the parser's HTML carries render ids, so the text is pinned, not the download). Its register entry is under the work's page URL https://fr.wikisource.org/wiki/<work>.",
 	"schema_version": 1,
 	"texts": [
 		{
@@ -66,6 +66,293 @@
 			"output": "original/fr/flaubert_madame_bovary.txt",
 			"gutenberg_id": 14155,
 			"sha256": "93f0a2259dbaf5fde6e7b96adc22346d52f80eb1e9319336c8381a045efe40cd"
+		}
+	],
+	"wikisource_texts": [
+		{
+			"output": "original/fr/hemon_maria_chapdelaine.txt",
+			"work": "Maria Chapdelaine",
+			"pages": [
+				{
+					"title": "Maria Chapdelaine/1",
+					"revid": 6316809
+				},
+				{
+					"title": "Maria Chapdelaine/2",
+					"revid": 6316810
+				},
+				{
+					"title": "Maria Chapdelaine/3",
+					"revid": 6316811
+				},
+				{
+					"title": "Maria Chapdelaine/4",
+					"revid": 6316813
+				},
+				{
+					"title": "Maria Chapdelaine/5",
+					"revid": 6316814
+				},
+				{
+					"title": "Maria Chapdelaine/6",
+					"revid": 6316815
+				},
+				{
+					"title": "Maria Chapdelaine/7",
+					"revid": 6316820
+				},
+				{
+					"title": "Maria Chapdelaine/8",
+					"revid": 6316821
+				},
+				{
+					"title": "Maria Chapdelaine/9",
+					"revid": 6316822
+				},
+				{
+					"title": "Maria Chapdelaine/10",
+					"revid": 6316825
+				},
+				{
+					"title": "Maria Chapdelaine/11",
+					"revid": 6316826
+				},
+				{
+					"title": "Maria Chapdelaine/12",
+					"revid": 6316827
+				},
+				{
+					"title": "Maria Chapdelaine/13",
+					"revid": 6316829
+				},
+				{
+					"title": "Maria Chapdelaine/14",
+					"revid": 6316830
+				},
+				{
+					"title": "Maria Chapdelaine/15",
+					"revid": 6316831
+				},
+				{
+					"title": "Maria Chapdelaine/16",
+					"revid": 6316835
+				}
+			],
+			"sha256": "35723e4d27a1b11dbd72f3c170a59d9044d68b7e3f323c71bf0ef464e1c96892"
+		},
+		{
+			"output": "original/fr/renard_poil_de_carotte.txt",
+			"work": "Poil de Carotte",
+			"pages": [
+				{
+					"title": "Poil de Carotte/01",
+					"revid": 14865048
+				},
+				{
+					"title": "Poil de Carotte/02",
+					"revid": 14865049
+				},
+				{
+					"title": "Poil de Carotte/03",
+					"revid": 5672369
+				},
+				{
+					"title": "Poil de Carotte/04",
+					"revid": 5672370
+				},
+				{
+					"title": "Poil de Carotte/05",
+					"revid": 5672371
+				},
+				{
+					"title": "Poil de Carotte/06",
+					"revid": 5672372
+				},
+				{
+					"title": "Poil de Carotte/07",
+					"revid": 12002345
+				},
+				{
+					"title": "Poil de Carotte/08",
+					"revid": 5672374
+				},
+				{
+					"title": "Poil de Carotte/09",
+					"revid": 5672375
+				},
+				{
+					"title": "Poil de Carotte/10",
+					"revid": 5672376
+				},
+				{
+					"title": "Poil de Carotte/11",
+					"revid": 5672377
+				},
+				{
+					"title": "Poil de Carotte/12",
+					"revid": 5672378
+				},
+				{
+					"title": "Poil de Carotte/13",
+					"revid": 5672379
+				},
+				{
+					"title": "Poil de Carotte/14",
+					"revid": 5672380
+				},
+				{
+					"title": "Poil de Carotte/15",
+					"revid": 5672381
+				},
+				{
+					"title": "Poil de Carotte/16",
+					"revid": 5672382
+				},
+				{
+					"title": "Poil de Carotte/17",
+					"revid": 5672383
+				},
+				{
+					"title": "Poil de Carotte/18",
+					"revid": 5672384
+				},
+				{
+					"title": "Poil de Carotte/19",
+					"revid": 5672385
+				},
+				{
+					"title": "Poil de Carotte/20",
+					"revid": 5672386
+				},
+				{
+					"title": "Poil de Carotte/21",
+					"revid": 5672387
+				},
+				{
+					"title": "Poil de Carotte/22",
+					"revid": 5672388
+				},
+				{
+					"title": "Poil de Carotte/23",
+					"revid": 5672389
+				},
+				{
+					"title": "Poil de Carotte/24",
+					"revid": 5672390
+				},
+				{
+					"title": "Poil de Carotte/25",
+					"revid": 5672391
+				},
+				{
+					"title": "Poil de Carotte/26",
+					"revid": 5672392
+				},
+				{
+					"title": "Poil de Carotte/27",
+					"revid": 10886799
+				},
+				{
+					"title": "Poil de Carotte/28",
+					"revid": 5672394
+				},
+				{
+					"title": "Poil de Carotte/29",
+					"revid": 5672395
+				},
+				{
+					"title": "Poil de Carotte/30",
+					"revid": 5672396
+				},
+				{
+					"title": "Poil de Carotte/31",
+					"revid": 5672397
+				},
+				{
+					"title": "Poil de Carotte/32",
+					"revid": 5672398
+				},
+				{
+					"title": "Poil de Carotte/33",
+					"revid": 14621499
+				},
+				{
+					"title": "Poil de Carotte/34",
+					"revid": 5672400
+				},
+				{
+					"title": "Poil de Carotte/35",
+					"revid": 5672401
+				},
+				{
+					"title": "Poil de Carotte/36",
+					"revid": 5672402
+				},
+				{
+					"title": "Poil de Carotte/37",
+					"revid": 5672403
+				},
+				{
+					"title": "Poil de Carotte/38",
+					"revid": 5672404
+				},
+				{
+					"title": "Poil de Carotte/39",
+					"revid": 5672405
+				},
+				{
+					"title": "Poil de Carotte/40",
+					"revid": 5672406
+				},
+				{
+					"title": "Poil de Carotte/41",
+					"revid": 5672407
+				},
+				{
+					"title": "Poil de Carotte/42",
+					"revid": 5672408
+				},
+				{
+					"title": "Poil de Carotte/43",
+					"revid": 5672409
+				},
+				{
+					"title": "Poil de Carotte/44",
+					"revid": 5672410
+				},
+				{
+					"title": "Poil de Carotte/45",
+					"revid": 5672411
+				},
+				{
+					"title": "Poil de Carotte/46",
+					"revid": 5672412
+				},
+				{
+					"title": "Poil de Carotte/47",
+					"revid": 5672413
+				},
+				{
+					"title": "Poil de Carotte/48",
+					"revid": 10019839
+				},
+				{
+					"title": "Poil de Carotte/49",
+					"revid": 5672415
+				}
+			],
+			"sha256": "32ed85f37d5893f87192c422c7d898b8c22ba03bbae282ff050578d276b36e8b"
+		},
+		{
+			"output": "original/fr/philippe_bubu_de_montparnasse.txt",
+			"work": "Bubu de Montparnasse",
+			"pages": [
+				{
+					"title": "Bubu de Montparnasse/Texte entier",
+					"revid": 14177577
+				}
+			],
+			"sha256": "385ecce868eca7835620bb9feff2117ea6b127c69596b0c79c9629b857b4fab4"
 		}
 	]
 }

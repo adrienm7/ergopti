@@ -330,6 +330,15 @@
 			"status": "ship",
 			"note": "Gustave Flaubert died in 1880 and the novel was published in 1857: in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
+		"original/fr/hemon_maria_chapdelaine.txt": {
+			"title": "Maria Chapdelaine (Louis Hémon, 1914)",
+			"source": "Wikisource en français, « Maria Chapdelaine » (J.-A. LeFebvre, Montréal, 1916), chapters 1 to 16, read through the MediaWiki API (2026-11-21) by tools/build/import-corpus-texts.cjs; the two prefaces are left out",
+			"url": "https://fr.wikisource.org/wiki/Maria_Chapdelaine",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Louis Hémon; Wikisource contributors (CC BY-SA 4.0), the pages and revisions read are listed in the note",
+			"status": "ship",
+			"note": "Shipped under CC BY-SA 4.0 by the maintainer's choice (2026-11-21, docs/memory/maintainer-decisions.md, « Corpora »): Wikisource publishes its pages under that licence, the stricter reading of a transcription of a public-domain work. The work itself is in the public domain: Louis Hémon died in 1913 and the novel was published in 1914 (serial in Le Temps) and 1916 (book): in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). Not among the Project Gutenberg corpora; Wikidata records no Project Gutenberg ebook for the edition or the work (Q59688419, Q1369094; Gutenberg's own catalogue answered HTTP 503 on 2026-11-21). Pages and revisions read (text_sources.json, wikisource_texts): Maria Chapdelaine/1 to /16, revisions 6316809 to 6316835; each page's authors are in its history at https://fr.wikisource.org/. Only the paragraphs of each page are kept (no header, navigation, caption or footnote); the codegen ships its n-gram tables, never the text."
+		},
 		"original/fr/hugo_les_miserables_1.txt": {
 			"title": "Les Misérables, tome I : Fantine (Victor Hugo, 1862)",
 			"source": "Project Gutenberg ebook 17489 (produced by www.ebooksgratuits.com and Chuck Greif)",
@@ -356,6 +365,24 @@
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
 			"status": "ship",
 			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14), kept after review because the project is not commercial. The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container (an anti-bot challenge answers automated clients); third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
+		},
+		"original/fr/philippe_bubu_de_montparnasse.txt": {
+			"title": "Bubu de Montparnasse (Charles-Louis Philippe, 1901)",
+			"source": "Wikisource en français, « Bubu de Montparnasse/Texte entier », read through the MediaWiki API (2026-11-21) by tools/build/import-corpus-texts.cjs",
+			"url": "https://fr.wikisource.org/wiki/Bubu_de_Montparnasse",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Charles-Louis Philippe; Wikisource contributors (CC BY-SA 4.0), the page and revision read are named in the note",
+			"status": "ship",
+			"note": "Shipped under CC BY-SA 4.0 by the maintainer's choice (2026-11-21, docs/memory/maintainer-decisions.md, « Corpora »): Wikisource publishes its pages under that licence, the stricter reading of a transcription of a public-domain work. The work itself is in the public domain: Charles-Louis Philippe died in 1909 and the novel was published in 1901: in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). Not among the Project Gutenberg corpora; Wikidata records no Project Gutenberg ebook for it (Gutenberg's own catalogue answered HTTP 503 on 2026-11-21). Page and revision read (text_sources.json, wikisource_texts): Bubu de Montparnasse/Texte entier, revision 14177577, which holds the ten chapters of both parts; its authors and those of the transcluded pages are in their histories at https://fr.wikisource.org/. Only the paragraphs are kept (no header, navigation, caption, footnote or hidden verse indent); the codegen ships its n-gram tables, never the text."
+		},
+		"original/fr/renard_poil_de_carotte.txt": {
+			"title": "Poil de Carotte (Jules Renard, 1894)",
+			"source": "Wikisource en français, « Poil de Carotte » (Flammarion edition illustrated by F. Vallotton), its 49 chapters, read through the MediaWiki API (2026-11-21) by tools/build/import-corpus-texts.cjs",
+			"url": "https://fr.wikisource.org/wiki/Poil_de_Carotte",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Jules Renard; Wikisource contributors (CC BY-SA 4.0), the pages and revisions read are listed in the note",
+			"status": "ship",
+			"note": "Shipped under CC BY-SA 4.0 by the maintainer's choice (2026-11-21, docs/memory/maintainer-decisions.md, « Corpora »): Wikisource publishes its pages under that licence, the stricter reading of a transcription of a public-domain work. The work itself is in the public domain: Jules Renard died in 1910 and the book was published in 1894: in the public domain in the United States (published before 1931) and in the European Union and France (author dead more than 70 years). Not among the Project Gutenberg corpora; Wikidata records no Project Gutenberg ebook for the edition or the work (Q131840645, Q128918; Gutenberg's own catalogue answered HTTP 503 on 2026-11-21). Pages and revisions read (text_sources.json, wikisource_texts): Poil de Carotte/01 to /49, chapter by chapter, so the title page and the publisher's list of the « Texte entier » page are left out; each page's authors are in its history at https://fr.wikisource.org/. Only the paragraphs are kept (no header, navigation, caption or footnote; the illustrations are not used); the codegen ships its n-gram tables, never the text."
 		},
 		"original/fr/tatoeba_fra_30k.tsv": {
 			"title": "Tatoeba — 30,000 French sentences",

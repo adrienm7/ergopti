@@ -890,9 +890,17 @@ Shipped as of 2026-11-14:
   indentation kept), which reproduces the French and English books byte for
   byte. Each register note records why the book is in the public domain in
   the United States (published before 1931) and in the European Union and
-  France (author dead more than 70 years). No Wikisource text and no e-mail or
-  chat corpus: both wait for the maintainer (TODO.md, « Maintainer decisions
-  pending »).
+  France (author dead more than 70 years).
+- French Wikisource works Project Gutenberg's corpora lack, shipped under
+  CC BY-SA 4.0 by the maintainer's choice (2026-11-21), « Wikisource
+  contributors » credited: _Maria Chapdelaine_ (Hémon), _Poil de Carotte_
+  (Renard) and _Bubu de Montparnasse_ (Charles-Louis Philippe). The same
+  importer reads the page revisions listed in `wikisource_texts` (MediaWiki
+  `action=parse&oldid`, one request per 1.5 s) and keeps only their
+  paragraphs (`wikisourceText`: no header, navigation, caption, footnote,
+  style or hidden verse indent). The parser's HTML carries render ids, so the
+  pin is the SHA-256 of the text written, and the register note names the
+  pages and revisions read.
 - Tatoeba: the first 30,000 French and English sentences of the « detailed »
   exports, CC BY 2.0 FR. Each line keeps its sentence id and author, as the
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the

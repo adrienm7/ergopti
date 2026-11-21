@@ -4,12 +4,15 @@
  * ==============================================================================
  * MODULE: Corpus Text Sources Test
  * DESCRIPTION:
- * Pins the Project Gutenberg texts of static/corpus/original and their importer,
- * tools/build/import-corpus-texts.cjs: every register entry sourced from a
- * Project Gutenberg ebook page has a pinned source (or is one of the recorded
- * exceptions), each source traces to its register entry and a shipped corpus,
- * the text on disk keeps no Project Gutenberg header, footer or name, and the
- * stripping rule gives hand-written results on small ebooks.
+ * Pins the Project Gutenberg and Wikisource texts of static/corpus/original and
+ * their importer, tools/build/import-corpus-texts.cjs: every register entry
+ * sourced from a Project Gutenberg ebook page has a pinned source (or is one
+ * of the recorded exceptions), each source traces to its register entry and a
+ * shipped corpus, the text on disk keeps no Project Gutenberg header, footer or
+ * name, and the stripping rule gives hand-written results on small ebooks. A
+ * Wikisource work lists its page revisions, its committed text is its pinned
+ * one, its register entry is CC BY-SA 4.0 with Wikisource contributors
+ * credited, and the extraction rule gives hand-written results on small pages.
  * ==============================================================================
  */
 
@@ -84,6 +87,70 @@ let checks = 0;
 	checks++;
 }
 
+// Every Wikisource work has its page revisions, its pin (the committed text is
+// the pinned one), its CC BY-SA register entry and its shipped corpus.
+{
+	const crypto = require('node:crypto');
+	const sources = JSON.parse(fs.readFileSync(path.join(CORPUS, 'text_sources.json'), 'utf8'));
+	const register = JSON.parse(fs.readFileSync(path.join(CORPUS, 'register.json'), 'utf8')).files;
+	const shipped = new Set(
+		JSON.parse(fs.readFileSync(CORPORA, 'utf8')).corpora.map((corpus) => corpus.file)
+	);
+	assert(sources.wikisource_texts.length >= 3, 'the Wikisource works are imported');
+	const gutenberg = new Set(sources.texts.map((source) => source.output));
+	for (const source of sources.wikisource_texts) {
+		assert(!gutenberg.has(source.output), `${source.output} has one source`);
+		assert(source.pages.length > 0, `${source.output}: its pages are listed`);
+		for (const page of source.pages) {
+			assert(page.title.startsWith(`${source.work}/`), `${page.title} is a page of ${source.work}`);
+			assert(Number.isSafeInteger(page.revid) && page.revid > 0, `${page.title}: a revision`);
+		}
+		const entry = register[source.output];
+		assert(entry, `${source.output} has a register entry`);
+		assert.equal(entry.url, Import.workPage(source.work), `${source.output}: register URL`);
+		assert.equal(entry.licence, 'CC BY-SA 4.0', `${source.output}: Wikisource's licence`);
+		assert(/Wikisource contributors/.test(entry.attribution), `${source.output}: credited`);
+		assert.equal(entry.status, 'ship', `${source.output} ships`);
+		assert(shipped.has(`static/corpus/${source.output}`), `${source.output} is a corpus`);
+		const text = fs.readFileSync(path.join(CORPUS, source.output));
+		assert.equal(
+			crypto.createHash('sha256').update(text).digest('hex'),
+			source.sha256,
+			`${source.output}: the committed text is the pinned one`
+		);
+	}
+	assert.equal(
+		Import.workPage('Poil de Carotte'),
+		'https://fr.wikisource.org/wiki/Poil_de_Carotte'
+	);
+	assert.equal(
+		Import.revisionParse(5672369),
+		'https://fr.wikisource.org/w/api.php?action=parse&oldid=5672369&prop=text&format=json&formatversion=2'
+	);
+	checks++;
+}
+
+// The Wikisource rule: paragraphs only; styles, footnote calls, hidden verse
+// indents and zero-width characters go; entities decode; spaces fold, the
+// non-breaking ones stay.
+{
+	const html = [
+		'<div class="ws-noexport"><div>Header</div></div>',
+		'<p><style>.x{font-weight:normal}</style>Il dit​&#160;: «&#160;Oui&#160;»<sup id="r" class="reference"><a>[1]</a></sup>',
+		'et &amp; <i>puis</i></p>',
+		'<div class="caption">Une légende</div>',
+		'<p><span style="visibility:hidden; color:transparent;">____</span>Un vers,<br />un autre.</p>',
+		'<p> <span class="pagenum ws-pagenum" id="2"></span> </p>',
+		'<ol class="references"><li>Une note</li></ol>'
+	].join('\n');
+	assert.deepEqual(Import.wikisourceText(html), [
+		'Il dit : « Oui » et & puis',
+		'Un vers, un autre.'
+	]);
+	assert.throws(() => Import.wikisourceText('<p>&bogus;</p>'), /unknown entity &bogus;/);
+	checks++;
+}
+
 // The stripping rule: the work between the markers, LF, trimmed edges, kept indentation.
 {
 	const ebook = [
@@ -117,5 +184,5 @@ let checks = 0;
 }
 
 console.log(
-	`[OK] corpus text sources: ${checks} checks (pins, register, shipped corpora, stripping rule)`
+	`[OK] corpus text sources: ${checks} checks (pins, register, shipped corpora, stripping and Wikisource rules)`
 );
