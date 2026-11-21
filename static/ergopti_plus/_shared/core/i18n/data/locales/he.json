@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "לא ניתן להתחיל את בדיקת העדכונים. בדוק את היומנים לפרטים נוספים.",
 	"updater.installed_restarting": "העדכון {1} הותקן — ErgoptiPlus מופעל מחדש בגרסה החדשה.",
 	"updater.install_error_download": "הורדת חבילת העדכון נכשלה. בדוק את חיבור האינטרנט שלך ונסה שוב.",
+	"updater.download_cancelled": "הורדת העדכון בוטלה",
 	"updater.install_error_no_asset": "גרסה זו אינה כוללת קובץ הפעלה ל-Windows. פתח את עמוד הגרסה להורדה ידנית.",
 	"updater.install_local_source": "פועל ממקור מקומי — התקנה אוטומטית זמינה רק לבניות release.",
 	"updater.local_source": "פועל ממקור מקומי — בדיקת עדכונים זמינה רק לבניות הפצה.",

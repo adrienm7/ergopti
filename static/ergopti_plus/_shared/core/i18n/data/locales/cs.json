@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "Nelze spustit kontrolu aktualizací. Podrobnosti najdete v logu.",
 	"updater.installed_restarting": "Aktualizace {1} nainstalována — ErgoptiPlus se restartuje na novou verzi.",
 	"updater.install_error_download": "Stažení aktualizačního balíčku selhalo. Zkontrolujte připojení k internetu a zkuste to znovu.",
+	"updater.download_cancelled": "Stahování aktualizace bylo zrušeno",
 	"updater.install_error_no_asset": "Toto vydání neobsahuje spustitelný soubor pro Windows. Otevřete stránku vydání pro ruční stažení.",
 	"updater.install_local_source": "Spuštěno z lokálního zdroje — automatická instalace je dostupná pouze pro release sestavení.",
 	"updater.local_source": "Běží z lokálního zdroje — kontrola aktualizací je k dispozici jen pro vydané sestavení.",

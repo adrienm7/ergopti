@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "Güncelleme denetimi başlatılamadı. Ayrıntılar için günlüklere bakın.",
 	"updater.installed_restarting": "{1} güncellemesi yüklendi — ErgoptiPlus yeni sürümle yeniden başlatılıyor.",
 	"updater.install_error_download": "Güncelleme paketi indirilemedi. İnternet bağlantınızı kontrol edip yeniden deneyin.",
+	"updater.download_cancelled": "Güncelleme indirmesi iptal edildi",
 	"updater.install_error_no_asset": "Bu sürüm bir Windows yürütülebilir dosyası içermiyor. Manuel olarak indirmek için sürüm sayfasını açın.",
 	"updater.install_local_source": "Yerel kaynaktan çalıştırılıyor — otomatik yükleme yalnızca release derlemeleri için kullanılabilir.",
 	"updater.local_source": "Yerel kaynaktan çalışıyor — güncelleme denetimi yalnızca yayın sürümlerinde kullanılabilir.",

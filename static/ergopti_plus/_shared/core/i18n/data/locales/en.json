@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "Could not start the update check. Check the logs for details.",
 	"updater.installed_restarting": "Update {1} installed — ErgoptiPlus is restarting on the new version.",
 	"updater.install_error_download": "Failed to download the update package. Check your internet connection and try again.",
+	"updater.download_cancelled": "Update download cancelled",
 	"updater.install_error_no_asset": "The release does not include a Windows executable to install. Open the release page to download manually.",
 	"updater.install_local_source": "Running from local source — automatic install is only available for release builds.",
 	"updater.local_source": "Running from local source — update checking is only available for release builds.",

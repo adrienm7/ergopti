@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "Søgningen efter opdateringer kunne ikke startes. Tjek loggene for detaljer.",
 	"updater.installed_restarting": "Opdatering {1} installeret — ErgoptiPlus genstarter med den nye version.",
 	"updater.install_error_download": "Det lykkedes ikke at hente opdateringspakken. Tjek din internetforbindelse, og prøv igen.",
+	"updater.download_cancelled": "Download af opdateringen annulleret",
 	"updater.install_error_no_asset": "Denne udgivelse indeholder ikke en Windows-eksekverbar fil. Åbn udgivelsessiden for at hente den manuelt.",
 	"updater.install_local_source": "Kører fra lokal kilde — automatisk installation er kun tilgængelig for release-builds.",
 	"updater.local_source": "Kører fra lokal kilde — kontrol af opdateringer er kun tilgængelig for udgivelsesbuilds.",

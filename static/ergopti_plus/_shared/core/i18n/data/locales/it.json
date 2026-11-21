@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "Impossibile avviare la verifica degli aggiornamenti. Consulta i log per i dettagli.",
 	"updater.installed_restarting": "Aggiornamento {1} installato: ErgoptiPlus si riavvia con la nuova versione.",
 	"updater.install_error_download": "Download del pacchetto di aggiornamento non riuscito. Verifica la connessione a Internet e riprova.",
+	"updater.download_cancelled": "Download dell’aggiornamento annullato",
 	"updater.install_error_no_asset": "Questa release non include un eseguibile Windows. Apri la pagina della release per scaricarlo manualmente.",
 	"updater.install_local_source": "Esecuzione da sorgente locale — l'installazione automatica è disponibile solo per le build di release.",
 	"updater.local_source": "Esecuzione da sorgente locale — la verifica degli aggiornamenti è disponibile solo per le build di release.",

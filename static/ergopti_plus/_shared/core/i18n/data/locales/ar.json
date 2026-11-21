@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "تعذّر بدء التحقق من التحديثات. راجع السجلات للاطّلاع على التفاصيل.",
 	"updater.installed_restarting": "تم تثبيت التحديث {1} — يُعاد تشغيل ErgoptiPlus على الإصدار الجديد.",
 	"updater.install_error_download": "فشل تنزيل حزمة التحديث. تحقّق من اتصالك بالإنترنت وأعد المحاولة.",
+	"updater.download_cancelled": "تم إلغاء تنزيل التحديث",
 	"updater.install_error_no_asset": "لا تتضمّن هذه النسخة ملفاً تنفيذياً لنظام Windows. افتح صفحة النسخة لتنزيلها يدوياً.",
 	"updater.install_local_source": "يتم التشغيل من مصدر محلي — التثبيت التلقائي متاح فقط لإصدارات الـ release.",
 	"updater.local_source": "يتم التشغيل من مصدر محلي — التحقق من التحديثات متاح فقط لإصدارات الإطلاق.",

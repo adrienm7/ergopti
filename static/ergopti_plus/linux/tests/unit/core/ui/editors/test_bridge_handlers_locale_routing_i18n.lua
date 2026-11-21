@@ -556,6 +556,42 @@ helpers.describe("ui.bridge_handlers", function()
       package.loaded["core.ui.ui.webview_manager"] = previous_manager
       handler._reset()
     end)
+
+    -- UPD-02: a cancelled app update read « Ollama download cancelled »
+    helpers.it("upd-02: a cancel leaves the line of the download's own kind", function()
+      local previous_manager = package.loaded["core.ui.ui.webview_manager"]
+      local I18n = require("core.i18n.engine.i18n")
+      local cases = {
+        { kind = "app_update", key = "updater.download_cancelled" },
+        { kind = "ollama_model", key = "ollama.download_cancelled" },
+      }
+      for _, case in ipairs(cases) do
+        local evaluated = {}
+        local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+        native_document.on_effect = function(code) evaluated[#evaluated + 1] = code end
+        local original_handler = handler
+        handler = native_document.proxy()
+        local ok, err = xpcall(function()
+          handler._reset()
+          local session_id = handler.show({ kind = case.kind, label = "Cancel fixture",
+            on_cancel = function() return true end })
+          helpers.assert_true(handler.on_message("ready").pushed)
+          helpers.assert_true(handler.on_message({ action = "cancel", session = session_id }).cancelled)
+          local expected = I18n.get(case.key)
+          helpers.assert_true(type(expected) == "string" and expected ~= case.key, "the locale has " .. case.key)
+          helpers.assert_true(evaluated[#evaluated]:find(expected, 1, true) ~= nil,
+            case.kind .. " cancel reads: " .. tostring(evaluated[#evaluated]))
+          if case.kind == "app_update" then
+            helpers.assert_true(evaluated[#evaluated]:find(I18n.get("ollama.download_cancelled"), 1, true) == nil,
+              "an app update never reads as an Ollama download")
+          end
+        end, debug.traceback)
+        handler._reset()
+        native_document.close(); handler = original_handler
+        package.loaded["core.ui.ui.webview_manager"] = previous_manager
+        if not ok then error(err) end
+      end
+    end)
   end)
 
   -- ==========================================================================

@@ -23,8 +23,12 @@ local _failure_serial = 0
 local _contract = nil
 
 -- The page's kinds (_shared/ui/download_window/script.js) a Linux producer
--- uses: its heading and layout
-local KINDS = { ollama_model = true, app_update = true }
+-- uses: its heading and layout, and the line a cancel leaves in the window
+-- (UPD-02: an app update cancelled read « Ollama download cancelled »)
+local KINDS = {
+	ollama_model = { cancelled = "ollama.download_cancelled" },
+	app_update   = { cancelled = "updater.download_cancelled" },
+}
 
 local function manager()
 	local ok, module = pcall(require, "core.ui.ui.webview_manager")
@@ -147,7 +151,7 @@ local function cancel_from_presentation(session, document_owner, state)
 	end
 	local completed, visible = pcall(function()
 		session.cancelled = true
-		M.complete(session.id, false, translated("ollama.download_cancelled"))
+		M.complete(session.id, false, translated(KINDS[session.kind].cancelled))
 		return presentation_current(session, document_owner)
 	end)
 	session.cancelling = false -- Finally, including presentation/translation refusal.

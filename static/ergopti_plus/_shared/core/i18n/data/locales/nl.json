@@ -4120,6 +4120,7 @@
 	"updater.check_request_failed": "De controle op updates kan niet worden gestart. Raadpleeg de logboeken voor details.",
 	"updater.installed_restarting": "Update {1} geïnstalleerd — ErgoptiPlus start opnieuw met de nieuwe versie.",
 	"updater.install_error_download": "Het downloaden van het updatepakket is mislukt. Controleer uw internetverbinding en probeer het opnieuw.",
+	"updater.download_cancelled": "Downloaden van de update geannuleerd",
 	"updater.install_error_no_asset": "Deze release bevat geen Windows-uitvoerbaar bestand. Open de releasepagina om handmatig te downloaden.",
 	"updater.install_local_source": "Uitgevoerd vanaf lokale bron — automatische installatie is alleen beschikbaar voor release-builds.",
 	"updater.local_source": "Wordt uitgevoerd vanaf lokale bron — controleren op updates is alleen beschikbaar voor release-builds.",
