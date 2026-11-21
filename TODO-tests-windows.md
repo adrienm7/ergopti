@@ -243,6 +243,9 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       first run (no `config.toml`), the icon shown beside the wizard reads « ErgoptiPlus — Starting… », is named «
       Ergopti+ », and a click on it brings the wizard forward. Left-click the icon too and note what it does (TRAY-02:
       nothing today, where macOS and Linux open the menu).
+- [ ] Update download window (UPD-05, UPD-07, 2026-11-21): Update from the Updates window opens the download
+      window, whose bar follows the bytes received; its Cancel stops the update, its close box does not (the update
+      installs once verified).
 - [ ] Updates window (UPD-01, UPD-03, UPD-04, 2026-11-21): with Narrator on, About > Check for updates: Narrator
       reads « Checking for updates on the … channel » then the answer without a focus move, and Escape closes the
       window while the page has the focus. On a test build fed by a local release mirror whose `.sha256` does not

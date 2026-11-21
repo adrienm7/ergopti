@@ -720,3 +720,54 @@ OllamaWV_OnWebMessage(sender, args) {
 OllamaWV_JSStr(s) {
 	return JsonStringLiteral(s)
 }
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 6/ Update Download Presenter =======
+; ============================================
+; ============================================
+
+; The progress of an ErgoptiPlus update download in this shared window (kind
+; app_update), the presenter root boot hands the updater (UPD-07). The window's
+; close box only hides it and the update goes on (UPD-05); its Cancel cancels.
+; A window another download already shows is left to it.
+class UpdateDownloadProgressWindow {
+	static Epoch := -1
+
+	static Show(Tag, OnCancel) {
+		global _OllamaWV_Epoch
+		if OllamaWV_IsAlive()
+			return false
+		OllamaWV_Show("app_update", "", OnCancel)
+		OllamaWV_SetModel("ErgoptiPlus " . Tag)
+		this.Epoch := _OllamaWV_Epoch
+		return true
+	}
+
+	; Only the window this presenter opened, and still open, receives its updates.
+	static Current() {
+		global _OllamaWV_Epoch
+		return this.Epoch == _OllamaWV_Epoch && OllamaWV_IsAlive()
+	}
+
+	static Update(Percent) {
+		if this.Current()
+			OllamaWV_Update(Percent)
+	}
+
+	static Done(Succeeded, Message) {
+		if this.Current()
+			OllamaWV_Done(Succeeded, Message)
+		this.Epoch := -1
+	}
+
+	static Close() {
+		if this.Current()
+			OllamaWV_Close()
+		this.Epoch := -1
+	}
+}

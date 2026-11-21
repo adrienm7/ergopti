@@ -313,6 +313,32 @@ helpers.describe("update-check window bridge (Linux)", function()
 		end)
 	end
 
+	-- UPD-07: the download window stayed at 0 % « Starting… » until the end
+	helpers.it("upd-07: the update download's progress reaches its window", function()
+		scenario(available, function(bridge, context)
+			local updates = {}
+			package.loaded["ui.download_window.bridge"].update = function(id, percent, detail)
+				updates[#updates + 1] = { id, percent, detail }
+				return true
+			end
+			context.release.size = 1024
+			context.updater.download_update = function(_, callback, on_progress)
+				on_progress(256); on_progress(300); on_progress(512)
+				callback("/tmp/update.tar.gz", nil)
+				on_progress(1024)
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(updates, {
+				{ 7, 25, I18n.get("menu.about.update_downloading") },
+				{ 7, 29, I18n.get("menu.about.update_downloading") },
+				{ 7, 50, I18n.get("menu.about.update_downloading") },
+			}, "each new percentage, and nothing once the attempt ended")
+		end)
+	end)
+
 	-- UPD-10: a refused signature read as an integrity check
 	helpers.it("upd-10: the window names a refused signature, with no network receipt", function()
 		scenario(available, function(bridge, context)

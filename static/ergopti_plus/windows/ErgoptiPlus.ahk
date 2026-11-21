@@ -862,6 +862,8 @@ ManagedNetworkFailureWindows_Init()
 ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
 	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
+; An update download's progress and Cancel, in the shared download window
+Updater_ConfigureDownloadProgressPresenter(UpdateDownloadProgressWindow)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
 		bootScriptName := A_ScriptFullPath

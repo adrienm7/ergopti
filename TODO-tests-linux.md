@@ -64,7 +64,7 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       KDE Plasma and on an X11 panel with only an XEmbed tray (i3bar, an old XFCE panel), nothing is said either. On
       GNOME and KDE, left-click and right-click the icon (both open the menu?) and let Orca read it: « Ergopti+ », then
       « Ergopti+ (paused) » after a pause.
-- [ ] <!-- field-point: update_windows --> Updates and download windows (UPD-02 to UPD-05, 2026-11-21), on a
+- [ ] <!-- field-point: update_windows --> Updates and download windows (UPD-02 to UPD-09, 2026-11-21), on a
       standalone install offered a newer release, Orca on: About > Check for updates; Orca reads « Checking for
       updates… » then the answer without a focus move, and Escape closes the window. Click Update, then Cancel in the
       download window: it reads « Update download cancelled », never « Ollama download cancelled »; note whether the
@@ -76,6 +76,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca
       reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the configured language, and the log
       holds one error naming the file, not one per pause; resume: the logo comes back. Put the file back.
+      updates… » then the answer without a focus move, and Escape closes the window. Click Update: the bar moves with
+      the download (UPD-07); Cancel reads « Update download cancelled », never « Ollama download cancelled », and the
+      menu still offers « Update now » (UPD-08). Click Update again and close the download window while it
+      downloads: the release installs once downloaded and the daemon restarts on it, the notice saying so only once
+      the restart is armed (UPD-05, UPD-09). With the network down, the failed check names its cause when curl proves
+      one (UPD-06).
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

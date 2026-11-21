@@ -1022,6 +1022,8 @@ local function admit_metadata(url, headers, body, options)
 		etag_expected_url = options.etag_expected_url, etag_expected_value = options.etag_expected_value,
 		output_path = options.output_path,
 		output_target = output_target,
+		-- Told the bytes an owned archive output received, for its progress (UPD-07)
+		on_progress = output_target ~= nil and type(options.on_progress) == "function" and options.on_progress or nil,
 		max_download_bytes = options.max_download_bytes,
 		receive_idle_timeout_ms = options.receive_idle_timeout_ms,
 		proxy_selection = options.proxy_selection,
@@ -1274,6 +1276,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 	if request_options.output_target then
 		request.output_bytes, request.max_download_bytes = 0, request_options.max_download_bytes
+		request.on_progress = request_options.on_progress
 		if not bind_output_target(request, request_options.output_target) then
 			finish(request, { ok = false, status = 0, body = "", error = "archive output binding refused" })
 			return false
@@ -1510,6 +1513,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 				terminate_group(request)
 				finish(request, { ok = false, status = 0, body = "", error = "archive output refused",
 					failure_receipt = request.output_sink:failure() })
+			elseif request.on_progress then
+				local ok, progress_err = pcall(request.on_progress, request.output_bytes)
+				if not ok then Logger.error(LOG, "HTTP progress callback raised: %s.", ErrorDescription.describe(progress_err)) end
 			end
 		elseif request.buffered then
 			request.stdout_text = request.stdout_text .. chunk

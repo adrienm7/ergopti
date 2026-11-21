@@ -1167,6 +1167,8 @@ local function _process_release_response(body, channel, check_only)
 		signature_url = signature_url ~= "" and signature_url or nil,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
+		-- Declared by GitHub, for the download's progress only (UPD-07)
+		size         = Parser.parse_asset_size(body, LINUX_ASSET_NAME),
 	}
 
 	_state = "available"
@@ -1643,7 +1645,7 @@ local function capture_operation(operation)
  if type(methods.is_settled) ~= "function" or type(methods.on_settled) ~= "function" or type(methods.cancel) ~= "function" then return nil end
  return methods
 end
-local function start_native_download(release, download_url, callback, failure_state, execution)
+local function start_native_download(release, download_url, callback, failure_state, execution, on_progress)
  if native_transfer or native_install or native_channel_intent then return false end
  local selected = release_snapshot(release)
  if not selected or selected.download_url ~= download_url or (execution ~= nil and type(execution) ~= "function") then return false end
@@ -1762,7 +1764,7 @@ local function start_native_download(release, download_url, callback, failure_st
    end,
    parse_checksum = parse_checksum, owner = REQUEST_OWNER, headers = { ["User-Agent"] = USER_AGENT },
    max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES,
-   signature = get_signature_gate() })
+   signature = get_signature_gate(), on_progress = on_progress })
  end)
  local started, operation
  if initialized and type(flow) == "table" and type(rawget(flow, "start")) == "function" then
@@ -1794,15 +1796,17 @@ local function start_native_download(release, download_url, callback, failure_st
  return record.operation ~= nil and not record.unknown -- Exact owned transaction admission, not HTTP success.
 end
 
-local function start_download(release, download_url, callback, failure_state, execution)
- return start_native_download(release, download_url, callback, failure_state, execution)
+local function start_download(release, download_url, callback, failure_state, execution, on_progress)
+ if on_progress ~= nil and type(on_progress) ~= "function" then return false end
+ return start_native_download(release, download_url, callback, failure_state, execution, on_progress)
 end
 
 --- Downloads and verifies the canonical update archive asynchronously.
 --- @param url string|nil Must match the cached release URL when provided.
 --- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
+--- @param on_progress function|nil Told the archive bytes received so far (UPD-07).
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_update(url, callback)
+function M.download_update(url, callback, on_progress)
  if native_channel_intent then return false end
 	local release = _cached_release
 	local download_url = url or (release and release.download_url)
@@ -1819,7 +1823,7 @@ function M.download_update(url, callback)
 	end
 	-- A failed or cancelled download keeps the offer, so the menu still says
 	-- « Update now », as a Versions download does (UPD-08)
-	return start_download(release, download_url, callback, "available")
+	return start_download(release, download_url, callback, "available", nil, on_progress)
 end
 
 --- Downloads and verifies the archive of a release the user chose in the
@@ -1828,7 +1832,7 @@ end
 --- @param release table M.release_record() result.
 --- @param callback function|nil Receives verified path, error, failing stage.
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_release(release, callback, native_execution)
+function M.download_release(release, callback, native_execution, on_progress)
  if native_channel_intent then return false end
 	if type(release) ~= "table" or type(release.tag) ~= "string" or release.tag == ""
 		or type(release.download_url) ~= "string" or release.download_url == ""
@@ -1843,7 +1847,7 @@ function M.download_release(release, callback, native_execution)
 		return false
 	end
 	Logger.info(LOG, "Downloading the chosen release %s.", release.tag)
-	return start_download(release, release.download_url, callback, _state, native_execution)
+	return start_download(release, release.download_url, callback, _state, native_execution, on_progress)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.

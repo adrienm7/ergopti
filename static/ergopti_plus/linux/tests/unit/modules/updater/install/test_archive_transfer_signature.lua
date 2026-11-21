@@ -7,7 +7,7 @@
 local Transfer = require("modules.updater.archive_transfer")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
-local function fixture(signature, without_url, required)
+local function fixture(signature, without_url, required, progress)
  local h = { now = 0.25, active = true, children = {}, archives = 0, adoptions = 0,
   callbacks = {}, reservations = 0, bound = 0 }
  local artifact, target = {}, {}
@@ -40,6 +40,7 @@ local function fixture(signature, without_url, required)
    archive_idle_timeout_ms = 60000 } },
   headers = { Accept = "application/octet-stream" },
   signature = signature,
+  on_progress = progress,
   parse_checksum = function(body) assert(body == "literal-checksum-record"); return string.rep("a", 64) end,
   http = {
    get_owned = function(url, _, options, done)
@@ -55,6 +56,7 @@ local function fixture(signature, without_url, required)
    download_output_owned = function(url, _, output, options, done)
     assert(url == "https://release.invalid/archive" and rawequal(output, target) and options.authorized() == true)
     assert(options.absolute_deadline_ms == 300000.25)
+    h.download_progress = options.on_progress
     h.archives = h.archives + 1
     return child("archive", done)
    end,
@@ -183,7 +185,25 @@ test("upd-10: each stage names its own reason, a feed release its signature", fu
  local I18n = require("core.i18n.engine.i18n")
  assert(I18n.get(R.signature) ~= R.signature, "the refused signature has its localized line")
 end)
-assert(#tests == 8, "signature transfer case floor")
+test("upd-07: the archive download carries the progress observer", function()
+ local told = {}
+ local h = fixture(nil, nil, nil, function(bytes) told[#told + 1] = bytes end)
+ h.children.checksum:reply({ ok = true, body = "literal-checksum-record" }); h.children.checksum:ack()
+ assert(h.archives == 1 and type(h.download_progress) == "function", "the transport is told who observes its bytes")
+ h.download_progress(2048)
+ assert(#told == 1 and told[1] == 2048)
+ local refused = pcall(fixture, nil, nil, nil, "not a function")
+ assert(not refused, "a progress observer that is not a function is refused")
+end)
+test("upd-07: the declared asset size feeds the progress, never a forged one", function()
+ local Parser = require("updater.engine.release_parser")
+ local body = '{"assets":[{"name":"other","size":1},{"name":"bundle.tar.gz","size":4096}]}'
+ assert(Parser.parse_asset_size(body, "bundle.tar.gz") == 4096)
+ assert(Parser.parse_asset_size('{"assets":[{"name":"bundle.tar.gz","size":-1}]}', "bundle.tar.gz") == nil)
+ assert(Parser.parse_asset_size('{"assets":[{"name":"bundle.tar.gz","size":"4096"}]}', "bundle.tar.gz") == nil)
+ assert(Parser.parse_asset_size(body, "missing") == nil)
+end)
+assert(#tests == 10, "signature transfer case floor")
 
 local helpers = require("tests.helpers")
 helpers.describe("Archive Transfer Signature", function()

@@ -24,7 +24,8 @@ Cancel button stops it, on the three OS:
   prompt, or the menu's update row shows the update again. Closing the
   checking panel still cancels the check: nothing was consented yet.
 - Windows: no window owns the install; this is the behaviour the two others
-  now follow.
+  now follow. Its download window (UPD-07, `UpdateDownloadProgressWindow`)
+  keeps the rule: its close box only closes it, its Cancel cancels.
 
 No compatibility path was kept (the maintainer asked for clean breaks, Linux
 has no users).

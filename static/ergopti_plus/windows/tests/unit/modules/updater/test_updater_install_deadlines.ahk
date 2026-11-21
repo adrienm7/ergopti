@@ -516,3 +516,130 @@ _UNT64_QuiescentReloadPrecedesTimeout() {
 }
 Test("updater-native64: quiescence precedes timeout and respects reload refusal",
 	_UNT64_QuiescentReloadPrecedesTimeout)
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= UPD-07: Download Progress =======
+; =========================================
+; =========================================
+
+; A presenter that records what the updater asks of its window.
+class _UpdaterTestProgressWindow {
+	__New(ShowResult := true) {
+		this.ShowResult := ShowResult
+		this.Calls := []
+		this.OnCancel := 0
+	}
+	Show(Tag, OnCancel) {
+		this.Calls.Push("show:" . Tag)
+		this.OnCancel := OnCancel
+		return this.ShowResult
+	}
+	Update(Percent) => this.Calls.Push("update:" . Percent)
+	Done(Succeeded, Message) => this.Calls.Push("done:" . (Succeeded ? "ok" : "failed"))
+	Close() => this.Calls.Push("close")
+}
+
+; The parent-owned capture the staging worker writes, reporting set byte counts.
+class _UpdaterTestProgressCapture {
+	__New() => this.Bytes := 0
+	ObserveBody(Worker, ExpectedSize) => this.Bytes
+}
+
+; Runs a scenario with the progress globals saved and restored.
+_TUDP_With(Scenario) {
+	global _UpdaterDownloadProgressPresenter, _UpdaterDownloadProgress, _UpdaterDownloadArtifacts
+	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadWorker
+	Saved := [_UpdaterDownloadProgressPresenter, _UpdaterDownloadProgress, _UpdaterDownloadArtifacts,
+		_UpdaterSelfUpdateEpoch, _UpdaterDownloadWorker]
+	Window := _UpdaterTestProgressWindow()
+	_UpdaterDownloadProgressPresenter := Window
+	try Scenario.Call(Window)
+	finally {
+		_UpdaterDownloadProgressPresenter := Saved[1], _UpdaterDownloadProgress := Saved[2]
+		_UpdaterDownloadArtifacts := Saved[3], _UpdaterSelfUpdateEpoch := Saved[4], _UpdaterDownloadWorker := Saved[5]
+	}
+}
+
+_TUDP_Percent() {
+	AssertEqual(-1, _Updater_DownloadProgressPercent(0, 1000), "nothing received is no progress yet")
+	AssertEqual(-1, _Updater_DownloadProgressPercent(10, 0), "no authenticated size is no percentage")
+	AssertEqual(25, _Updater_DownloadProgressPercent(250, 1000))
+	AssertEqual(99, _Updater_DownloadProgressPercent(1000, 1000), "100 % waits for the verification")
+}
+Test("Updater: an update download's percentage is capped until verified (upd-07)", _TUDP_Percent)
+
+; UPD-07: the staging worker reported nothing before its last line.
+_TUDP_Publishes() {
+	_TUDP_With(_TUDP_PublishesCase)
+}
+_TUDP_PublishesCase(Window) {
+	global _UpdaterDownloadProgress, _UpdaterDownloadArtifacts, _UpdaterSelfUpdateEpoch
+	_UpdaterSelfUpdateEpoch := 41
+	Capture := _UpdaterTestProgressCapture()
+	_UpdaterDownloadArtifacts := {CurlCapture: Capture, AuthenticatedSize: 1000}
+	AssertTrue(_Updater_ShowDownloadProgress("v9.9.9", 41), "the window opens with the transaction")
+	Capture.Bytes := 250
+	AssertTrue(_Updater_PublishDownloadProgress())
+	AssertFalse(_Updater_PublishDownloadProgress(), "an unchanged percentage is not sent again")
+	Capture.Bytes := 640
+	AssertTrue(_Updater_PublishDownloadProgress())
+	_UpdaterSelfUpdateEpoch := 42
+	Capture.Bytes := 900
+	AssertFalse(_Updater_PublishDownloadProgress(), "a retired transaction publishes nothing")
+	AssertEqual("show:v9.9.9,update:25,update:64", _TUDP_Join(Window.Calls))
+}
+Test("Updater: the staging bytes reach the download window as a percentage (upd-07)", _TUDP_Publishes)
+
+; UPD-07: Windows had no user cancel; UPD-05: closing the window must not be one.
+_TUDP_Cancel() {
+	_TUDP_With(_TUDP_CancelCase)
+}
+_TUDP_CancelCase(Window) {
+	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
+	_UpdaterSelfUpdateEpoch := 51
+	_UpdaterDownloadArtifacts := 0
+	_Updater_ShowDownloadProgress("v9.9.9", 51)
+	AssertTrue(HasMethod(Window.OnCancel, "Call"), "the window receives the transaction's Cancel")
+	AssertFalse(Window.OnCancel.Call(), "a Cancel without a running transaction cancels nothing")
+	; Any end of the transaction closes the window it opened, once
+	_Updater_CancelSelfUpdateTransaction("test teardown", false)
+	AssertEqual("show:v9.9.9,close", _TUDP_Join(Window.Calls))
+	AssertFalse(_Updater_FinishDownloadProgress(51, false), "a finished progress ends once")
+}
+Test("Updater: the download window's Cancel is bound to its transaction (upd-07)", _TUDP_Cancel)
+
+_TUDP_Finish() {
+	_TUDP_With(_TUDP_FinishCase)
+}
+_TUDP_FinishCase(Window) {
+	_Updater_ShowDownloadProgress("v9.9.9", 61)
+	AssertFalse(_Updater_FinishDownloadProgress(60, true), "another transaction cannot finish this progress")
+	AssertTrue(_Updater_FinishDownloadProgress(61, true))
+	AssertEqual("show:v9.9.9,done:ok", _TUDP_Join(Window.Calls))
+}
+Test("Updater: a verified download says so in its window (upd-07)", _TUDP_Finish)
+
+_TUDP_Configure() {
+	global _UpdaterDownloadProgressPresenter
+	Saved := _UpdaterDownloadProgressPresenter
+	try {
+		_UpdaterDownloadProgressPresenter := 0
+		AssertThrows(() => Updater_ConfigureDownloadProgressPresenter({}), "a presenter without its methods is refused")
+		Updater_ConfigureDownloadProgressPresenter(_UpdaterTestProgressWindow())
+		AssertThrows(() => Updater_ConfigureDownloadProgressPresenter(_UpdaterTestProgressWindow()),
+			"a second configuration is refused")
+	} finally _UpdaterDownloadProgressPresenter := Saved
+}
+Test("Updater: the download window is configured once (upd-07)", _TUDP_Configure)
+
+_TUDP_Join(Items) {
+	Text := ""
+	for Item in Items
+		Text .= (A_Index > 1 ? "," : "") . Item
+	return Text
+}

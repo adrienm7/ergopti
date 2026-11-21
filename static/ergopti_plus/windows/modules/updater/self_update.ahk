@@ -896,6 +896,11 @@ global _UpdaterLifecycleRecoveryPending := false
 global _UpdaterLifecycleRecoveryNoticeShown := false
 global _UpdaterLifecycleRecoveryNoticeRequested := false
 global _UpdaterLifecycleRecoveryAttemptCount := 0
+; The window that shows an update download's progress and its Cancel (UPD-07),
+; configured once by root boot: the shared download window, kind app_update.
+global _UpdaterDownloadProgressPresenter := 0
+; The progress of the running transaction: { Epoch, Percent, Shown }, or 0.
+global _UpdaterDownloadProgress := 0
 
 ; The four-event handshake is timer-polled on the AHK side. Every wait is a
 ; zero-time probe; only the exact native PowerShell worker performs blocking waits
@@ -2479,6 +2484,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 				if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
 					throw Error("Curl capture transaction is no longer current.")
 				_UpdaterDownloadArtifacts.CurlCapture := Capture
+				; The authenticated length is the progress's denominator (UPD-07)
+				_UpdaterDownloadArtifacts.AuthenticatedSize := AuthenticatedSize
 			} finally Critical(PreviousCritical)
 			SplitPath(NewExe, , &CaptureParent)
 			Capture.Acquire(CaptureParent)
@@ -2552,6 +2559,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		return
 	}
 	SetTimer(_Updater_MonitorStagingWorker, UPDATER_ASYNC_POLL_MS)
+	_Updater_ShowDownloadProgress(Tag, StagingEpoch)
 }
 
 ; Cancels the subprocess while native Suspend is active. ShellRunner deliberately
@@ -2563,9 +2571,106 @@ _Updater_MonitorStagingWorker(*) {
 		SetTimer(_Updater_MonitorStagingWorker, 0)
 		return
 	}
-	if !A_IsSuspended
+	if !A_IsSuspended {
+		_Updater_PublishDownloadProgress()
 		return _Updater_EnforceDownloadDeadline()
+	}
 	_Updater_CancelSelfUpdateForSuspend()
+}
+
+; Hands the updater the window of its download's progress, once, at boot.
+; @param Presenter {Object} Show(Tag, OnCancel) -> Boolean, Update(Percent),
+;   Done(Succeeded, Message) and Close(). Its close box must not cancel: the
+;   update goes on without its window (UPD-05); only OnCancel stops it.
+Updater_ConfigureDownloadProgressPresenter(Presenter) {
+	global _UpdaterDownloadProgressPresenter
+	if IsObject(_UpdaterDownloadProgressPresenter)
+		throw Error("The update download progress window was configured twice")
+	for Name in ["Show", "Update", "Done", "Close"]
+		if !HasMethod(Presenter, Name)
+			throw TypeError("Invalid update download progress window: no " . Name)
+	_UpdaterDownloadProgressPresenter := Presenter
+}
+
+; The whole percentage of an authenticated download, capped at 99 until it is
+; verified; -1 when nothing is known yet.
+_Updater_DownloadProgressPercent(Received, Total) {
+	if !(Received is Integer) || !(Total is Integer) || Total <= 0 || Received <= 0
+		return -1
+	return Min(99, Floor(Received * 100 / Total))
+}
+
+; Opens the progress window of one transaction (UPD-07).
+_Updater_ShowDownloadProgress(Tag, StagingEpoch) {
+	global _UpdaterDownloadProgressPresenter, _UpdaterDownloadProgress
+	_UpdaterDownloadProgress := {Epoch: StagingEpoch, Percent: -1, Shown: false}
+	Presenter := _UpdaterDownloadProgressPresenter
+	if !IsObject(Presenter) {
+		try LoggerError("Updater", "No update download window is configured; {1} downloads without its progress.", Tag)
+		return false
+	}
+	Shown := false
+	try Shown := Presenter.Show(Tag, _Updater_CancelDownloadFromWindow.Bind(StagingEpoch)) == true
+	catch as Err
+		try LoggerError("Updater", "The update download window could not open: {1}.", Err.Message)
+	if !Shown
+		try LoggerInfo("Updater", "The download window is busy; {1} downloads with its progress in the tray only.", Tag)
+	_UpdaterDownloadProgress.Shown := Shown
+	return Shown
+}
+
+; Publishes the bytes the staging worker received, read from the parent-owned
+; capture it writes (ObserveBody), as a new whole percentage only.
+_Updater_PublishDownloadProgress() {
+	global _UpdaterDownloadProgress, _UpdaterDownloadProgressPresenter, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadWorker, _UpdaterSelfUpdateEpoch
+	Progress := _UpdaterDownloadProgress
+	Artifacts := _UpdaterDownloadArtifacts
+	if !IsObject(Progress) || !Progress.Shown || Progress.Epoch != _UpdaterSelfUpdateEpoch
+		|| !IsObject(Artifacts) || !Artifacts.HasOwnProp("CurlCapture") || !Artifacts.HasOwnProp("AuthenticatedSize")
+		return false
+	Received := 0
+	try Received := Artifacts.CurlCapture.ObserveBody(_UpdaterDownloadWorker, Artifacts.AuthenticatedSize)
+	catch as Err {
+		try LoggerWarn("Updater", "The update download progress could not be read: {1}.", Err.Message)
+		return false
+	}
+	Percent := _Updater_DownloadProgressPercent(Received, Artifacts.AuthenticatedSize)
+	if (Percent < 0 || Percent == Progress.Percent)
+		return false
+	Progress.Percent := Percent
+	try _UpdaterDownloadProgressPresenter.Update(Percent)
+	catch as Err
+		try LoggerWarn("Updater", "The update download progress could not be shown: {1}.", Err.Message)
+	return true
+}
+
+; Ends one transaction's progress: a verified download says so, any other end
+; closes its window.
+_Updater_FinishDownloadProgress(StagingEpoch, Verified) {
+	global _UpdaterDownloadProgress, _UpdaterDownloadProgressPresenter
+	Progress := _UpdaterDownloadProgress
+	if !IsObject(Progress) || Progress.Epoch != StagingEpoch
+		return false
+	_UpdaterDownloadProgress := 0
+	if !Progress.Shown
+		return false
+	try {
+		if Verified
+			_UpdaterDownloadProgressPresenter.Done(true, t("menu.about.update_installing"))
+		else
+			_UpdaterDownloadProgressPresenter.Close()
+	} catch as Err
+		try LoggerWarn("Updater", "The update download window could not be closed: {1}.", Err.Message)
+	return true
+}
+
+; The window's Cancel: the only user action that stops an update download.
+_Updater_CancelDownloadFromWindow(StagingEpoch) {
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return false
+	return _Updater_CancelSelfUpdateTransaction("Update download cancelled from its window.", true, false,
+		StagingEpoch, true)
 }
 
 _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
@@ -2629,7 +2734,7 @@ _Updater_ReleaseDownloadRetirement(Owner) {
 	} finally Critical(PreviousCritical)
 }
 
-_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
+_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0, ByUser := false) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
@@ -2642,6 +2747,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	Observation := 0
 	HadTransaction := false
 	Retirement := 0
+	CancelledEpoch := 0
 	PreviousCritical := Critical("On")
 	try {
 		if IsObject(_UpdaterDownloadRetirement)
@@ -2672,6 +2778,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		_UpdaterExitInvocation := 0
 		_Updater_RetireManagedFailure()
 		_UpdaterDownloadInProgress := false
+		CancelledEpoch := _UpdaterSelfUpdateEpoch
 		_UpdaterSelfUpdateEpoch += 1
 	} finally {
 		Critical(PreviousCritical)
@@ -2679,6 +2786,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	try {
 		if IsObject(Worker)
 			try Worker.terminate()
+		_Updater_FinishDownloadProgress(CancelledEpoch, false)
 		if (Owner is Map)
 			_Updater_CloseSwapOwner(Owner, true)
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, true)
@@ -2690,7 +2798,12 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	if SurfacePausedRequest and IsObject(Request)
 		_Updater_RequestMayPublish(Request, true, 0, true)
 	if HadTransaction {
-		try LoggerError("Updater", LogMessage)
+		; A user's Cancel is no error
+		if ByUser {
+			try LoggerInfo("Updater", LogMessage)
+		} else {
+			try LoggerError("Updater", LogMessage)
+		}
 		if _Updater_InstallObservationValid(Observation)
 			_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
 				Observation.Observer, Observation.Epoch)
@@ -2808,6 +2921,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		return
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
+	_Updater_FinishDownloadProgress(StagingEpoch, ExitCode == 0 && Stdout == "READY")
 	global _UpdaterDownloadArtifacts
 	Observation := FailureOwner is Map
 		? {Observer: FailureOwner.Get("install_observer", 0), Epoch: FailureOwner.Get("install_observer_epoch", -1)}

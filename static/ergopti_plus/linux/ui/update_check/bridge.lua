@@ -223,9 +223,20 @@ function M.download_offered(updater, release, ctx)
 				finish_attempt(updater.install_update(archive) == true, archive, err, stage, failure_receipt)
 			end
 		end
+		-- The download's progress reaches its window (UPD-07): a percentage of the
+		-- size GitHub declares, or only « Downloading… » without one
+		local last_percent = nil
+		local function progress(bytes)
+			if session_id == nil or attempt ~= owner.attempt or owner.terminal or type(bytes) ~= "number" then return end
+			local size = tonumber(release.size)
+			local percent = size and size > 0 and math.floor(math.min(bytes / size, 1) * 100) or nil
+			if percent ~= nil and percent == last_percent then return end
+			last_percent = percent
+			DownloadWindow.update(session_id, percent, I18n.get("menu.about.update_downloading"))
+		end
 		local started
-		if retry then started = updater.download_release(release, done)
-		else started = updater.download_update(url, done) end
+		if retry then started = updater.download_release(release, done, nil, progress)
+		else started = updater.download_update(url, done, progress) end
 		if started ~= true and not owner.terminal then done(nil, "update dispatch refused", "download") end
 		return started == true
 	end

@@ -35,6 +35,9 @@ function M.new(ports)
  if signature and (type(signature.decide) ~= "function" or type(signature.max_body_bytes) ~= "number") then return nil end
  local sealed_size = method(ports.artifact, "sealed_size")
  if signature and type(sealed_size) ~= "function" then return nil end
+ -- Optional: told the archive bytes received so far, for the window's progress (UPD-07)
+ local on_progress = ports.on_progress
+ if on_progress ~= nil and type(on_progress) ~= "function" then return nil end
  local clock, source, parse = ports.clock, ports.current, ports.parse_checksum
  local owner, max_archive, max_checksum = ports.owner, ports.max_download_bytes, ports.max_checksum_bytes
  local headers = {}
@@ -272,7 +275,8 @@ function M.new(ports)
       authorized = current, absolute_deadline_ms = archive_deadline,
       timeout_ms = math.max(1, math.floor(archive_deadline - clock())),
       receive_idle_timeout_ms = archive_idle_ms,
-      max_download_bytes = max_archive, follow_redirects = true, https_only = true }, done)
+      max_download_bytes = max_archive, follow_redirects = true, https_only = true,
+      on_progress = on_progress }, done)
     end, function(downloaded, completion)
      if type(downloaded) ~= "table" or downloaded.ok ~= true or type(completion) ~= "table" then
       fail(type(downloaded) == "table" and downloaded.error or "archive request failed", "download",
