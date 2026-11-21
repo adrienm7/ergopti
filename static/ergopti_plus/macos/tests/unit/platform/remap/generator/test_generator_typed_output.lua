@@ -283,6 +283,21 @@ helpers.with_fresh_modules({
 		return posted
 	end
 
+	--- The keys a combo typed: every posted key but the navigation layer's own
+	--- F19 / F20 sentinels, which a pair tap under the layer its first key
+	--- holds sends around its action (THD-1 of 2026-11-21, tap_out_of_layer).
+	--- @param engine table Model engine.
+	--- @return table key_codes In posting order.
+	local function keys_typed(engine)
+		local typed = {}
+		for _, emission in ipairs(engine:emissions()) do
+			local key = emission.key_code
+			local layer_signal = key == "key_80" or (key == "key_90" and emission.event.modifiers == nil)
+			if key ~= nil and not layer_signal then typed[#typed + 1] = key end
+		end
+		return typed
+	end
+
 	--- Gives every tap-hold key the same two slots.
 	--- @param slots table { tap, hold }.
 	--- @return table tap_holds Key id → slots.
@@ -437,12 +452,12 @@ helpers.with_fresh_modules({
 						-- CapsWord's AltGr+CapsLock rule runs before every combo by design.
 						if is_combo_rule(engine:down(second), first) then
 							if within_timeout then covered = covered + 1 end
-							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+							helpers.assert_eq(table.concat(keys_typed(engine), ","), "delete_forward",
 								combo_def.id .. ": a combo with no hold must type its tap when its second key goes down")
 							helpers.assert_true(engine:held().delete_forward == true,
 								combo_def.id .. ": a combo with no hold must keep its tap down while held, so it auto-repeats")
 							engine:up(second, within_timeout)
-							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+							helpers.assert_eq(table.concat(keys_typed(engine), ","), "delete_forward",
 								combo_def.id .. ": a combo with no hold must type nothing more on release")
 						end
 					end
@@ -465,7 +480,7 @@ helpers.with_fresh_modules({
 						engine:down("a")
 						engine:up(second, true)
 						engine:up("a", true)
-						helpers.assert_eq(keys_posted(engine)[1], "delete_forward",
+						helpers.assert_eq(keys_typed(engine)[1], "delete_forward",
 							combo_def.id .. ": a combo tap followed by an overlapping key must still be typed")
 					end
 				end
