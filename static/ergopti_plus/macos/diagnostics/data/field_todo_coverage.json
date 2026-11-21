@@ -811,6 +811,12 @@
 			"not_testable": "Needs a person with VoiceOver at the Updates window, and a network whose proxy or firewall refuses api.github.com: the field report neither listens to VoiceOver nor changes the network."
 		},
 		{
+			"id": "metrics_views",
+			"title": "Metrics dashboards: the range status read by VoiceOver and numbers in the interface language (MET-06, MET-07)",
+			"checks": [],
+			"not_testable": "Needs a person with VoiceOver at the dashboards and a range read that fails: the field report neither listens to VoiceOver nor damages the metrics store."
+		},
+		{
 			"id": "config_nfd_paths",
 			"title": "Configuration paths in NFD and NFC",
 			"checks": [],

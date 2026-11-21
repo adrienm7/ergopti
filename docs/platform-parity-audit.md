@@ -182,6 +182,7 @@ named file is not a reviewed file.
 | Managed Ollama runtime         | [report](audits/platform-parity/2026-11-20-managed-ollama/report.md)                               |
 | Tray adapters                  | [report](audits/platform-parity/2026-11-20-tray-adapters/report.md)                                |
 | Update and download windows    | [report](audits/platform-parity/2026-11-21-update-windows/report.md)                               |
+| Metrics views                  | [report](audits/platform-parity/2026-11-21-metrics-views/report.md)                                |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -229,6 +230,22 @@ maintainer choice between cancel and install); UPD-06, macOS and Linux name
 no network cause for a failed check where Windows names the proxy or the
 certificate; UPD-07, no update progress on Windows and Linux; UPD-08 to
 UPD-12, smaller wording, receipt and offer gaps.
+
+The metrics-views campaign (November 21, 2026) fixed MET-01 to MET-08. On
+Windows, the WPM readouts read 0 after the shared idle reset instead of
+decaying for 15 s, accepted AI text no longer feeds them where the metrics
+filter refuses the window, a hidden dashboard or diagnostics host is retired
+when the reading font or spacing changes, and every WPM surface is named for a
+screen reader. On Linux, the apps dashboard applies each answer's
+incomplete-read notice and unmeasured cards, and a failed typing range read
+ends its request at once instead of after the 120 s watchdog. On the three,
+the typing dashboard says in a status region, in the interface language, that
+a range read runs, failed or took too long, and both dashboards format numbers
+in the interface language instead of French. Left open: MET-09 to MET-19,
+among them the Linux heatmap's QWERTY names and frozen n-gram tables, the
+macOS empty and incomplete states, 61 French metric definitions in the
+pages' `title` attributes, and the hotstring counting of the macOS live speed
+(a maintainer decision).
 
 ## Review status at resumption — November 12, 2026
 

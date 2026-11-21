@@ -143,6 +143,12 @@
 			"not_testable": "Needs a standalone install offered a newer release, a person who cancels and then closes the download window, and Orca: the field report never downloads or installs an update."
 		},
 		{
+			"id": "metrics_views",
+			"title": "Metrics dashboards: a failed range read, the range status read by Orca, numbers in the interface language and the apps incomplete notice (MET-04 to MET-07)",
+			"checks": [],
+			"not_testable": "Needs a person with Orca at the dashboards and a metrics store made unreadable then restored: the field report neither listens to a screen reader nor damages the metrics store."
+		},
+		{
 			"id": "tray_icon_missing",
 			"title": "Missing tray logo: the warning sign, its Orca name and one logged error (TRAY-05)",
 			"checks": [],

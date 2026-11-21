@@ -385,8 +385,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     restart only once armed, a refused signature is named everywhere, the macOS Versions install keeps its failure
     receipt and removes its stage, and the download page has no English fallback. Left: UPD-13 macOS names no proxy,
     offline or certificate cause (hs.http proves none; route the check through the launcher's managed HTTP worker);
-  - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
-    pages.
+  - metrics views, taken on 2026-11-21 ([report](docs/audits/platform-parity/2026-11-21-metrics-views/report.md)):
+    MET-01 to MET-08 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
+    names of every WPM surface; Linux apps read state and range failure; the range status and numbers in the
+    interface language on the three). Left: MET-09 Linux heatmap key names from the live XKB keymap; MET-10 Linux
+    n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as the others do;
+    MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision », « Acceptées ») to
+    i18n keys, with the hard-coded-strings gate extended to the pages' HTML; MET-13 « Computing… » forever on an
+    empty range; MET-14 the apps render-error alert; MET-15 banners after a late locale; MET-16 calendar day values
+    and the chart reading font; MET-17 net or gross hotstring counting in the live speed (maintainer decision);
+    MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
+  - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
     TRAY-03 (a Linux desktop with no tray host is told, in the user's language, what to install), TRAY-04
     (`TrayMenu.spec.js` 2.0.0 states the real `setIcon({ image })` contract and its vectors read the result on the

@@ -227,6 +227,15 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       buttons read « Restore default: Delay (ms) » and so on, the colour swatch is not read as a progress bar. 8. Fields named by their label: the Win + G link editor (« Link: »), the Releases window's channel picker
       (« Update channel ») and notes (« Changelog »), the input check's field.
 
+- [ ] Metrics views and WPM readouts (MET-01 to MET-03, MET-06 to MET-08, 2026-11-21): 1. With the tray
+      readout on, type a burst then stop: the readout falls to nothing about 5 s after the last key, not 15 s
+      (MET-01). 2. Accept an AI suggestion in an app listed in the metrics exclusions and in a private browser
+      window: the pill and the tray readout stay off; in an ordinary window they turn the AI colour (MET-02). 3. Open the typing dashboard and the diagnostics, close both, change Configuration > reading font or spacing,
+      reopen them: both show the new font (MET-03). 4. Interface in English: the dashboards read `12,345` and `1.2M`
+      and a date change reads « Reading the selected period… » with Narrator (MET-06, MET-07). 5. Narrator on, the
+      WPM widget in compact then graph mode at the same speed: Narrator names both « N WPM », never « ErgoptiPlus WPM
+      Graph » (MET-08).
+
 ### Pause, startup, updates and network
 
 - [ ] EDD-1, a pause stops typing, not configuration: paused, save once from each editor (prompt, paths, hotstrings

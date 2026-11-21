@@ -393,7 +393,14 @@ owner. Windows is the reference unless a shared contract says otherwise.
    `physical_shortcuts`: their shared pages and the Linux and macOS hosts.
 7. **Metrics views.** `metrics_apps`, `metrics_typing`, the Linux flush bridge
    and the shared `metrics_*` helpers. The metrics campaigns read the
-   producers and the store, not these views.
+   producers and the store, not these views. **Taken on 2026-11-21**
+   ([report](../2026-11-21-metrics-views/report.md)): the two dashboards and
+   the WPM widget, their sources, privacy, periods, empty and error states,
+   locales, keyboard and screen reader, reading preferences, refresh and
+   teardown; MET-01 to MET-08 fixed (the Windows idle reset, AI output
+   privacy, warm hosts and surface names; the Linux apps read state and range
+   failure; the range status and the numbers in the interface language on the
+   three), MET-09 to MET-19 open.
 8. **Small native and single-file units.** `linux/native/archive_output`,
    `windows/native/ergopti_lua_export.c`, `linux/modules/keep_awake.lua`,
    `macos/ui/virtual_hid_update.lua`, `macos/ui/legacy_rules_cleanup.lua`,

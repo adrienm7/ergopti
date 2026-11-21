@@ -71,6 +71,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       menu still offers the update (UPD-08: it does not today). Click Update again and close the download window
       while it downloads: note whether the release installs once downloaded (UPD-05: the log says « native install
       refused » today) and whether the bar ever moves from 0 % (UPD-07).
+- [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, 2026-11-21), Orca on, interface in
+      English: in the typing dashboard change the dates: Orca reads « Reading the selected period… » and the loader
+      says the same; with `db.sqlite` made unreadable (`chmod 000`, then put it back) a new date range says at once
+      that it could not be read instead of spinning for 2 min (MET-05, MET-06). Numbers read `12,345` and `1.2M`
+      (MET-07). In the apps dashboard, a notice of an incomplete read clears on the next complete answer without
+      closing the window (MET-04).
 - [ ] <!-- field-point: tray_icon_missing --> Missing tray logo (TRAY-05, 2026-11-21): on a desktop with a tray host,
       in a copy of the install, move `_shared/tray/data/ergopti_tray_paused.png` away and start the daemon with
       `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca

@@ -43,6 +43,11 @@ red step with its `proves` line in `static/ergopti_plus/macos/diagnostics/data/f
 
 Field run, no person needed (read the next report):
 
+- [ ] <!-- field-point: metrics_views --> **Metrics dashboards (MET-06, MET-07, 2026-11-21):** with VoiceOver on and
+      the interface in English, open Metrics > typing dashboard and change the dates: VoiceOver reads « Reading the
+      selected period… » without a focus move and the table loader says the same (no French text); numbers read
+      `12,345` and `1.2M` (in French `12 345` and `1,2 M`), in the apps dashboard too. A read that fails or takes over
+      2 min says so above the table, which keeps the previous period (MET-06).
 - [ ] <!-- field-point: rerun_2026_11_02 --> Rerun of the 2026-11-02 report, without touching the Mac: no keystats rotation warning around midnight, no
       `event_taps` run-loop lateness with the main thread held over 1 s, `menu.rebuild` and its
       `menu_item.shortcuts` / `menu_keyboard_layout.sources` phases, `diagnostics` phase A under 5 ms, `idle_cost`
