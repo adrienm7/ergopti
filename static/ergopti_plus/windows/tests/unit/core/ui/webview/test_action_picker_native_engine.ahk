@@ -128,7 +128,7 @@ _APNT_Case() {
 		; Every file the page names reaches the private mount: without value_check.js
 		; script.js stopped early and no click listener existed.
 		Expected := ["ui\action_picker\index.html", "ui\action_picker\script.js", "ui\action_picker\style.css",
-			"ui\a11y_prefs.js", "ui\theme.css", "ui\i18n.js", "ui\host_bridge.js", "ui\program_parameter.js",
+			"ui\a11y_prefs.js", "ui\page_locale.js", "ui\theme.css", "ui\i18n.js", "ui\host_bridge.js", "ui\program_parameter.js",
 			"ui\value_check.js", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
 		for Relative in Expected
 			AssertTrue(Receipt["assets"].Has(Relative), "The delivered page needs " . Relative)
