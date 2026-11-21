@@ -125,8 +125,12 @@ Notes:
 
 ## Open
 
-- **TRAY-02 (low, Windows; maintainer decision):** a primary click does
-  nothing on Windows. AutoHotkey opens the menu on a right-click only;
+- **TRAY-02 (low, Windows; maintainer decision, fixed 2026-11-21):** a
+  primary click did nothing on Windows. The maintainer chose the macOS and
+  Linux behaviour: `TrayStartupClick.OnTrayMessage` now opens the tray menu on
+  `WM_LBUTTONUP` once ready and queues it like a right click during boot
+  (`tests/unit/menu/test_tray_primary_click_opens_menu.ahk`; the decision is in
+  `docs/memory/maintainer-decisions.md`). The finding as audited: AutoHotkey opens the menu on a right-click only;
   `A_TrayMenu.Default` is never set and no owner handles `WM_LBUTTONUP`
   (`startup_click.ahk` reads `WM_RBUTTONUP` and `WM_CONTEXTMENU` alone), so a
   left click and a double-click are inert. macOS opens the menu on any click,

@@ -372,8 +372,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   - tray adapters, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-tray-adapters/report.md)):
     TRAY-01 fixed (the Windows cold tray showed French startup rows to every user and an icon named by its file name
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language).
-    Left: TRAY-02 a Windows left click does nothing where macOS and Linux open the menu (maintainer decision);
-    TRAY-03 a Linux desktop without a StatusNotifier host shows no icon and tells nothing (read the watcher, say so
+    Left: TRAY-03 a Linux desktop without a StatusNotifier host shows no icon and tells nothing (read the watcher, say so
     in the user's language); TRAY-04 rewrite `TrayMenu.spec.js` on the two real icon states and the option map, with
     vectors that can fail; TRAY-05 log a missing tray icon file on the three instead of drawing another;
   - update and download windows, taken on 2026-11-21
@@ -468,8 +467,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     TRAY-03 (a Linux desktop with no tray host is told, in the user's language, what to install), TRAY-04
     (`TrayMenu.spec.js` 2.0.0 states the real `setIcon({ image })` contract and its vectors read the result on the
     three drivers) and TRAY-05 (a missing tray icon file is logged once and drawn as a warning sign whose name says
-    so, never as the other state) fixed; their desktop checks are field points. Left: TRAY-02 a Windows left click
-    does nothing where macOS and Linux open the menu (maintainer decision);
+    so, never as the other state) fixed; their desktop checks are field points;
   - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
     small native units, layout tool pages.
     30 min install budget), OLL-03 (stale owners), OLL-04 (one free-space rule before the download on the three, the

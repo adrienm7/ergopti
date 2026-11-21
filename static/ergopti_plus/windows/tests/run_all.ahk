@@ -531,6 +531,7 @@ InstallSendNoOps()
 #Include unit/menu/test_tray_root_lifecycle_retained.ahk
 #Include unit/menu/test_tray_bootstrap_publication_transaction.ahk
 #Include unit/menu/test_tray_startup_click_waits_for_input.ahk
+#Include unit/menu/test_tray_primary_click_opens_menu.ahk
 #Include unit/core/lifecycle/engine/test_boot_menu_wait_clock.ahk
 #Include unit/ai/menu/test_build_coordinator.ahk
 #Include unit/hotstrings/engine/catalogue/test_count_policy.ahk

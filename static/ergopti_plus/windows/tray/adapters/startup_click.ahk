@@ -80,9 +80,19 @@ class TrayStartupClick {
 
 	OnTrayMessage(wParam, lParam, msg, hwnd) {
 		Notification := lParam & 0xFFFF
+		; WM_LBUTTONUP: AutoHotkey opens its tray menu on the right button only, so
+		; a primary click opens the same menu here, as on macOS and Linux
+		; (maintainer decision TRAY-02, 21 November 2026).
+		Primary := Notification == 0x202
 		; Leave balloon events and other native actions to their existing owners.
-		if (Notification != 0x205 && Notification != 0x7B) || this.ReadyFn.Call()
+		if !Primary && Notification != 0x205 && Notification != 0x7B
 			return
+		if this.ReadyFn.Call() {
+			if !Primary
+				return
+			this.ShowFn.Call()
+			return 0
+		}
 		if HasMethod(this.EarlyOwnerFn, "Call") && this.EarlyOwnerFn.Call()
 			return 0
 		if HasMethod(this.EarlyNativeFn, "Call") && this.EarlyNativeFn.Call() {
@@ -100,7 +110,11 @@ class TrayStartupClick {
 			this.RequestCount += 1
 			try LoggerInfo("BootProfile", Format("Early click admitted to the native tray: notification_lag={1} ms.",
 				TickElapsed(DllCall("GetMessageTime", "UInt"))))
-			return
+			if !Primary
+				return
+			; The native tray has no primary-click menu to admit this click to.
+			this.ShowFn.Call()
+			return 0
 		}
 		if !this.Pending
 			this.RequestedAt := A_TickCount

@@ -63,6 +63,20 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## A left click on the Windows tray opens its menu (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (TRAY-02 in
+`docs/audits/platform-parity/2026-11-20-tray-adapters/report.md`): a primary
+click on the Windows tray icon opens the same menu as the right click, as
+macOS (any click) and Linux (libayatana's primary click) already do.
+AutoHotkey opens its tray menu on the right button only, so the early-click
+owner `TrayStartupClick.OnTrayMessage` (`windows/tray/adapters/startup_click.ahk`)
+answers `WM_LBUTTONUP` itself: once ready it presents `A_TrayMenu` and consumes
+the notification; during boot it queues the click exactly like a right click,
+so the native menu loop still never opens before input is ready. The right
+click stays AutoHotkey's own. Do not set `A_TrayMenu.Default` for this: a
+default item runs an action, it does not open the menu.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
