@@ -235,7 +235,8 @@ function M.on_message(payload, state, context)
 	end
 
 	if action ~= "save" and action ~= "cancel" then
-		Logger.debug(LOG, "Unknown action: %s", tostring(action))
+		-- The page sends none: a defect, logged as on Windows and macOS (PCK-20).
+		Logger.warn(LOG, "Ignoring unknown prompt editor action '%s'.", tostring(action))
 		return nil
 	end
 	if not message_matches(payload, session, context) then
@@ -269,7 +270,8 @@ function M.on_message(payload, state, context)
 		-- Raw prompts are the active verbatim text; the hidden template stays intact.
 		candidate.raw_prompt = payload.prompt
 	else
-		candidate.system_single = prompt
+		-- Kept byte for byte, as on Windows and macOS (PCK-20).
+		candidate.system_single = payload.prompt
 	end
 	local ok_save, accepted = pcall(session.on_save, candidate)
 	session.saving = false

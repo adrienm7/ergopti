@@ -1006,6 +1006,7 @@ _LogBootProgress("loading menu_llm/persist")
 ; its deferred context fence can be exercised without creating a Gui/WebView.
 #Include ../ai/ui/prompt_editor/init.ahk
 #Include unit/ai/profiles/test_prompt_editor_context_epoch.ahk
+#Include unit/ai/profiles/test_prompt_editor_save_vectors.ahk
 ; Changelog host is likewise definitions-only until Changelog_Open is called.
 ; Load it so the request/window epoch can be exercised with deterministic fakes.
 #Include ../ui/changelog/init.ahk

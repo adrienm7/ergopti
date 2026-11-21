@@ -316,3 +316,62 @@ helpers.describe("prompt editor save error ownership", function()
 		end)
 	end)
 end)
+
+
+
+
+--- PCK-20: the shared save vectors, as Windows and macOS read them. The prompt
+--- is kept byte for byte in both modes; Linux trimmed a non-raw one.
+helpers.describe("prompt editor: the shared save vectors (pck-20)", function()
+	local json = require("core.text.engine.json")
+	local function corpus()
+		local path = helpers.driver_root() .. "/../_shared/tests/corpus/llm/prompt_editor_save_vectors.json"
+		local fh = assert(io.open(path, "rb"), "cannot open the prompt editor save vectors")
+		local raw = fh:read("*a")
+		fh:close()
+		return assert(json.decode(raw), "the prompt editor save vectors are not valid JSON")
+	end
+
+	for _, vector in ipairs(corpus().save) do
+		helpers.it("pck-20 " .. vector.id .. " saves what the three drivers save", function()
+			with_editor(function(f)
+				local saved = nil
+				local template, context = f.open(function(candidate) saved = candidate; return true end)
+				local payload = { action = "save", edit_id = template.edit_id, epoch = template.epoch }
+				for key, value in pairs(vector.payload) do payload[key] = value end
+				local result = f.save(payload, context)
+				helpers.assert_eq(result.saved, vector.accepted, vector.id .. ": admission")
+				if not vector.accepted then
+					helpers.assert_nil(saved, vector.id .. ": nothing reaches the saver")
+					return
+				end
+				helpers.assert_eq(saved.label, vector.name, vector.id .. ": the name")
+				helpers.assert_eq(saved.raw_prompt or saved.system_single, vector.prompt,
+					vector.id .. ": the prompt is kept byte for byte")
+				helpers.assert_eq(saved.batch, vector.batch, vector.id .. ": batch")
+			end)
+		end)
+	end
+
+	helpers.it("pck-20: an unknown page action is logged as a warning and saves nothing", function()
+		local logger = require("core.logger.engine.shim")
+		local original, lines = logger.warn, {}
+		logger.warn = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			with_editor(function(f)
+				local saved = false
+				local template, context = f.open(function() saved = true; return true end)
+				for _, action in ipairs(corpus().unknown_actions.actions) do
+					local payload = { action = action, edit_id = template.edit_id, epoch = template.epoch,
+						name = "A", prompt = "x", batch = false }
+					helpers.assert_nil(f.save(payload, context), action .. ": no answer")
+					helpers.assert_true(#lines > 0 and lines[#lines]:find("'" .. action .. "'", 1, true) ~= nil,
+						"pck-20: the unknown action is named in a warning: " .. action)
+				end
+				helpers.assert_eq(saved, false, "an unknown action saves nothing")
+			end)
+		end)
+		logger.warn = original
+		if not ok then error(err, 0) end
+	end)
+end)

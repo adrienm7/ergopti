@@ -263,6 +263,14 @@ function M.open(existing, on_save)
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) ~= "table" then return end
+		if body.action ~= "save" and body.action ~= "cancel" then
+			-- "ready" is lifecycle-only here; anything else is a page defect,
+			-- logged as on Windows and Linux (PCK-20).
+			if body.action ~= "ready" then
+				Logger.warn(LOG, "Ignoring unknown prompt editor action '%s'.", tostring(body.action))
+			end
+			return
+		end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
 		if window.rollback_pending or active.settled then

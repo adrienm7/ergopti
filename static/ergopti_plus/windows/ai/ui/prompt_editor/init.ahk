@@ -286,9 +286,11 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
 			try Controller.Fill()
-			WebView_TakeFocus(Controller)
-			if _PromptEdWeb_StartupCurrent(g)
-				try LoggerSuccess("PromptEditor", "Prompt editor shown via WebView2 (edit={1}).", _PromptEdWeb_IsEdit)
+			if _PromptEdWeb_StartupCurrent(g) {
+				WebView_TakeFocus(Controller)
+				if _PromptEdWeb_StartupCurrent(g)
+					try LoggerSuccess("PromptEditor", "Prompt editor shown via WebView2 (edit={1}).", _PromptEdWeb_IsEdit)
+			}
 			return true
 		}
 	} finally {
@@ -484,8 +486,12 @@ _PromptEdWeb_HandlePayload(Payload, Action := "") {
 	; "ready" exists for the Linux host, which has none.
 	if (Action == "ready")
 		return
-	if (Action != "cancel" && Action != "save")
+	if (Action != "cancel" && Action != "save") {
+		; The page sends none: a defect is logged, as on macOS and Linux (PCK-20).
+		try LoggerWarn("PromptEditor", "Ignoring unknown prompt editor action '{1}'.",
+			(Action is String) ? Action : Type(Action))
 		return
+	}
 
 	if !_PromptEdWeb_ReadPayloadContext(Payload, &EditId, &Epoch) {
 		try LoggerWarn("PromptEditor", "Ignoring '{1}' without a valid editor context.", Action)
@@ -699,10 +705,12 @@ _PromptEdWeb_ReadSavePayload(Payload, &Name, &Batch, &Prompt) {
 			|| (CandidateBatch != 0 && CandidateBatch != 1)
 		return false
 
-	Name   := Trim(CandidateName)
-	Prompt := Trim(CandidatePrompt)
-	if (Name == "" || Prompt == "")
+	; The name is trimmed of Lua %s whitespace and the prompt kept byte for
+	; byte, as on macOS and Linux (PCK-20, prompt_editor_save_vectors.json).
+	Name := _LLM_Tone_TrimSpace(CandidateName)
+	if (Name == "" || _LLM_Tone_TrimSpace(CandidatePrompt) == "")
 		return false
+	Prompt := CandidatePrompt
 	Batch := CandidateBatch == 1
 	return true
 }
