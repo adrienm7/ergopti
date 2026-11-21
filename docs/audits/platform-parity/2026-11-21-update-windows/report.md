@@ -98,77 +98,80 @@ Notes:
   left alone. The download window keeps no Escape: there it would cancel a
   download.
 
+### Fixed in the follow-up
+
+The follow-up of the same day closed UPD-05 to UPD-12. UPD-05 is a decision
+the agent took with Windows as the reference while the maintainer was asleep;
+it is recorded in [maintainer-decisions.md](../../../memory/maintainer-decisions.md)
+for the maintainer to review.
+
+| Id     | OS             | Sequence                                                         | Reference                                                                | Before                                                                                                                                                                                                      | Regression                                                                                                                                                                                                                                        |
+| ------ | -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UPD-05 | Linux, macOS   | Update, then close the download window while it downloads        | Windows installs whatever window is open; closing a window is not Cancel | Linux refused the verified archive (« native install refused ») because the closed window retired the document the install admission needed; macOS cancelled the update when its download panel closed      | `upd-05: an update whose download window was closed still installs` and `… never opened still installs` (`test_update_check_async_admission.lua`); `testClosingTheDownloadWindowKeepsTheUpdateGoing` (Swift, not run here)                        |
+| UPD-06 | all            | A manual check behind a refusing proxy, offline, or rate limited | Windows names the managed-network cause of its receipt                   | macOS and Linux said « Could not reach GitHub » for every failure; no window named a rate limit; Windows replaced it with « diagnostics do not establish the cause » for an unknown cause                   | `failure_reasons` of `check_session_vectors.json`, replayed by `check_session_contract.lua` (macOS, Linux) and `test_updater_check_session_vectors.ahk`; `upd-06: names …` (`test_updater_check_only_fallback.lua`, `test_update_auto_check.lua`) |
+| UPD-07 | Windows, Linux | Update, then watch the download                                  | Sparkle shows a fraction and a Cancel button                             | The Windows staging worker reported nothing before its last line and had no user cancel; the Linux window stayed at 0 % « Starting… » until the end                                                         | `Updater: the staging bytes reach the download window as a percentage (upd-07)` and three siblings (`test_updater_install_deadlines.ahk`); `upd-07: …` (`test_update_check_bridge.lua`, `test_archive_transfer_signature.lua`)                    |
+| UPD-08 | Linux          | Update, then Cancel, or a failed download                        | The Versions path keeps the offer                                        | `download_update` returned to `idle`, so the menu dropped « Update now » until the next check                                                                                                               | `upd-08: a failed update download keeps the offer it failed on` (`test_production_dispatch_refusal.lua`)                                                                                                                                          |
+| UPD-09 | Linux          | An installed update whose restart is refused                     | The Versions window keeps a pending restart and says so                  | « installed, restarting » was notified and shown before the restart was tried, whatever it answered                                                                                                         | `upd-09: the completion hook notifies only after the restart answered` (`test_updater_restart.lua`), `upd-09: the window reports the restart only once it is armed` (`test_update_check_bridge.lua`)                                              |
+| UPD-10 | all            | A release whose signature is refused                             | A digest refusal is named as one                                         | Windows said « unexpected error » (API) or « Could not install the update » (feed); Sparkle's signature error fell to `updater.install_error`; Linux and the macOS Versions window said « integrity check » | `AssetSignature: a refused signature is named as one (upd-10)` (`test_asset_signature.ahk`); `upd-10: …` (Linux and macOS suites); `testErrorsNeverShowSparkleText` (Swift, not run here)                                                         |
+| UPD-11 | macOS          | A Versions-window install whose download fails                   | The Linux and Windows Versions windows classify their receipts           | `done(nil, stage, detail)` passed no receipt, so a proxy or offline failure read « download failed »; the failed stage folder stayed beside the app                                                         | `upd-11: …` (`test_release_installer.lua`, the staging script under `/bin/sh` with fake tools)                                                                                                                                                    |
+| UPD-12 | shared         | A locale without a download label; a page drawn while loading    | Every other page label hides when its key is missing                     | `update()` fell back to « 📁 Files: », « 📦 Size: », « ⚡ Speed: »; `lang` stayed `fr` until DOMContentLoaded                                                                                               | `upd-12` cases of `test-download-window-session.cjs` and `test-webview-i18n-cascade.cjs`                                                                                                                                                          |
+
+Notes:
+
+- **UPD-05.** The Linux install is admitted by the offer's own consent
+  (`ui/update_check/bridge.lua` `admit_install`); `download_window/bridge.lua`
+  no longer exports `install_admission_current`. The macOS close box hides
+  the Sparkle download (`downloadHidden`) until its next step or the menu's
+  update row; closing the checking panel still cancels the check. The new
+  Windows download window (UPD-07) keeps the rule.
+- **UPD-06.** One rule, `check_result.failure_key` and its AHK twin
+  `UpdateCheck_FailureKey`: an exhausted rate limit
+  (`update_check.error_rate_limited`, 21 locales), else a network cause the
+  managed-network contract classified from the fetch's native receipt (an
+  unknown cause proves nothing), else the reason's own key. `check_session`
+  admits only those keys. Linux carries its curl receipt and the API page's
+  rate limit; Windows records the rate limit on its request. macOS names the
+  rate limit only: hs.http answers a transport failure with status -1 and a
+  localized sentence, which the contract may not interpret (UPD-13 below).
+- **UPD-07.** Windows reads the bytes its staging worker wrote into the
+  parent-owned capture (`ObserveBody`) at each monitor tick and shows them in
+  the shared download window, kind `app_update`
+  (`UpdateDownloadProgressWindow`, configured at boot); its Cancel ends the
+  transaction. Linux tells the bytes its curl archive output received
+  (`on_progress`) against the size GitHub declares for the asset
+  (`release_parser.parse_asset_size`), never trusted for a check.
+- **UPD-09.** A refused restart is notified and shown as
+  `updater.installed_restart_refused` (21 locales) and logged; the old daemon
+  keeps running.
+- **UPD-10.** A refused signature has its own stage (Linux archive transfer,
+  macOS `release_stage.sh` exit 27), its own shared reason
+  (`release_install.download_reason`, `RELEASE_INSTALL_REASONS.signature`) and
+  its own words: `updater.install_error_signature` and
+  `changelog_window.install_error_signature` (21 locales).
+- **UPD-11.** `release_stage.sh` prints one closed fact for a failed download
+  (`FAILED curl:<exit>` or `FAILED native:<reason>`), which
+  `release_installer.failure_receipt` maps to the managed-network fields it
+  proves and no more; an EXIT trap removes the stage it created unless an app
+  is READY.
+
 ## Open
 
-- **UPD-05 (high, Linux):** closing the download window during an update
-  throws the download away. Closing it retires its document
-  (`webview_manager.lua` `retire_document_entry`), and the install admission
-  (`download_window/bridge.lua` `install_admission_current`, then
-  `owner_current` and `document_current`) needs that document, so once the
-  verified archive is there the native install is refused (« native install
-  refused ») and the user is told the install failed. The download itself goes
-  on (`on_window_closed`: « background download ownership and explicit
-  cancellation remain independent »), and nothing reopens the window. When the
-  window cannot open at all, `download_offered` logs « the update downloads
-  without it » and the install is always refused (`session_id == nil`). Windows
-  installs whatever window is open; macOS treats closing the Sparkle panel as a
-  cancel. Follow-up, a maintainer choice: close cancels (macOS), or the update
-  installs without its window (Windows and the comment), with a test that
-  closes the window before the archive is verified.
-- **UPD-06 (medium, macOS and Linux):** a failed check names no network
-  cause. Windows turns the transport's receipt into the shared
-  `managed_network.json` cause (`network.failure.proxy`, `offline`,
-  `certificate`, `host_blocked`) and adds its actions
-  (`update_check/init.ahk`, `_UpdateCheck_ShowManagedFailure`). The Lua session
-  knows four reasons only (`check_result.REASONS`): a proxy, TLS or offline
-  failure is « Could not reach GitHub » (`manager.lua` `publish_failure`,
-  `auto_check.lua` `fail`), though both Lua Versions windows already classify
-  receipts with `core.network.engine.failure`. A rate limit is named in no
-  Updates window (only in the Versions window, `error_rate_limited`).
-  Follow-up: carry the fetch receipt into `CheckResult.failure` and let
-  `check_session` admit a canonical message key, as Windows does.
-- **UPD-07 (medium, Windows and Linux):** an update download shows no
-  progress. The Windows staging worker reports nothing before its last line
-  (`$ProgressPreference = "SilentlyContinue"`), and only the tray row says it
-  downloads; there is no user cancel (only a pause, the deadline or exit). The
-  Linux download window stays at 0 % « Starting… » until the end: nothing calls
-  `DownloadWindow.update` for `app_update`. Sparkle shows a fraction and a
-  Cancel button.
-- **UPD-08 (medium, Linux):** a failed or cancelled update download drops the
-  offer. `download_update` returns the updater to `idle`
-  (`start_download(..., "idle")`), and the menu offers « Update now » only in
-  `available` (`menu_about.lua`); the next check brings it back. The Versions
-  path keeps it (`download_release`: « a failure keeps the menu's update
-  row »). Existing tests pin `idle` after a refused dispatch
-  (`test_production_dispatch_refusal.lua`), so the fix re-pins them.
-- **UPD-09 (low, Linux):** « installed, restarting » is said before the
-  restart is tried. `on_update_finished` notifies
-  `updater.installed_restarting` and ignores what
-  `restart_on_installed_release` returns, so a refused restart leaves the user
-  on the old daemon with a notice that says otherwise; only the Versions window
-  keeps a pending restart row.
-- **UPD-10 (low, the three):** no driver names a refused signature. Windows
-  says `changelog_window.install_error_unexpected` for an API release
-  (`self_update.ahk`), Sparkle's error falls to `updater.install_error`
-  (`UpdatePromptTexts.swift`), Linux reports it as `install_error_verify` like
-  a digest. Enforcement is off, so only a feed release meets it today.
-- **UPD-11 (low, macOS):** the Versions install loses its failure receipt.
-  `release_installer.lua` calls `done(nil, stage, detail)` with three
-  arguments, so `release_install.lua` classifies `{}`: a full disk or a proxy
-  refusal (`release_stage.sh` exit 10) reads as `install_error_download`; and
-  a failed stage leaves its `.ergopti-release-install-` folder beside the app.
-- **UPD-12 (low, shared):** the download page hard-codes some text. `update()`
-  falls back to English (« 📁 Files: %s », « 📦 Size: », « ⚡ Speed: ») when a
-  key is missing, and `index.html` says `lang="fr"` (the Updates page says
-  `lang="en"`) until i18n applies. The keys exist in the 21 locales, so only a
-  broken locale shows it.
+- **UPD-13 (low, macOS):** a failed check behind a refusing proxy, offline or
+  with a refused certificate still reads « Could not reach GitHub » on macOS.
+  hs.http reports no native evidence (status -1 and a localized sentence), so
+  the managed-network contract has nothing to classify. Follow-up: run the
+  manual check through the launcher's managed HTTP worker, whose closed
+  reasons (`offline`, `certificate`, `proxy`) `release_installer.failure_receipt`
+  already maps.
 
 Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
 `TODO-tests-linux.md` (field point `update_windows` on macOS and Linux):
 Escape and the screen reader at the Updates window on the three (UPD-03,
 UPD-04), a digest refused through a local release mirror on Windows (UPD-01),
-a proxy that refuses the API on macOS (UPD-06), and a cancelled then a closed
-Linux update download (UPD-02, UPD-05, UPD-07, UPD-08).
+the Windows download window's bar, Cancel and close box (UPD-05, UPD-07), the
+macOS download panel closed and a Versions install with the network down
+(UPD-05, UPD-11), and a cancelled then a closed Linux update download (UPD-02,
+UPD-05, UPD-07 to UPD-09).
 
 ## Proof
 
@@ -203,3 +206,41 @@ WAYLAND_DISPLAY`, `luajit tests/run.lua --only=upd-02`): 1 passed, 0 failed;
 - **Not run here.** The macOS suites (no macOS Lua changed); the full Linux
   suite (only the new case ran); a real download, install or Sparkle session;
   `npm run test:js` and `verify-change` (they refuse this checkout's Node pin).
+
+Follow-up commits (UPD-05 to UPD-12): `453047e0fb` (UPD-05), `433fd7b751`
+and `90874ec994` (UPD-06), `fc6dcec533` (UPD-07), `677cb83b66` (UPD-08), `1005b168c7` (UPD-09),
+`69dcd8eab2` (UPD-10), `7f3cbef3cf` (UPD-11), `0dada9f703` (UPD-12).
+
+- **Red on the old code.** Each regression was run against the owner it
+  pins restored from the commit before its fix: UPD-05 (2 cases), UPD-08 (2),
+  UPD-09 (4) and UPD-10 (3) fail in the Linux suite; UPD-06 fails 3 Linux
+  cases with the old `manager.lua`; UPD-11 fails 3 macOS cases with the old
+  `release_installer.lua` and `release_stage.sh`; UPD-10 fails the AHK case
+  with the old `self_update.ahk`; UPD-12 fails both page tests with the old
+  `i18n.js` and `download_window/script.js`.
+- **Green on the new code.** AHK through `ahk-parallel --fresh`: `Updater`
+  434 of 434, `update check` 25 of 25, `AssetSignature` 11 of 11, `upd-07`
+  5 of 5, `webview` 222 of 222, `boot` 547 of 547; `ErgoptiPlus.ahk` passes
+  `/validate`. Linux under WSL from a `git archive` copy (`unset DISPLAY
+WAYLAND_DISPLAY`): every `upd-` case green, and the full suite 24,211 passed
+  and 178 failed, none in the updater, the update check, the download window,
+  curl or the locales: root defeats the `eacces` and read-only fixtures, the
+  archive copy lacks `tools/`, `ergopti/` and `TODO-tests-linux.md`, the
+  pointer cases need a display, and the rest (`model-cancel-settlement`,
+  `native-locale-catalog`) fail on the campaign's base commit too or pass alone
+  (`route_message`, `api-selection-errors`). macOS Lua 5.4 under WSL:
+  `--module=modules` and `--module=ui` with only such environment failures
+  left, `--only=release-` 68 of 68 as an unprivileged user.
+- **Gates.** `test-update-check-dialog.cjs`, `test-app-windows-semantic-markup.cjs`,
+  the locale gates, `test-shared-literal-inventory.cjs`,
+  `test-linux-feature-parity.cjs` (the `linux-control` behaviour owner
+  re-pinned after review: its undo did not change), the three
+  `test-no-pinned-source-reads*.cjs`, `test-config-key-literals.cjs`,
+  `test-release-install-contract.cjs`, `test-ahk-encoding.cjs`,
+  `field-todo-summary.py --check-doc`, the formatter and
+  `lint-conventions.js --fail-on-violations`.
+- **Not run here.** The Swift tests (`CatalogUpdateUserDriverTests`,
+  `ReleaseArchiveStagingTests`: no macOS host);
+  `test-macos-release-stage-native-receiving.cjs`, red before this follow-up
+  too; a real download, install, restart or Sparkle session; `npm run test:js`
+  and `verify-change` (they refuse this checkout's Node pin).

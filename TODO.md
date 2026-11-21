@@ -378,13 +378,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   - update and download windows, taken on 2026-11-21
     ([report](docs/audits/platform-parity/2026-11-21-update-windows/report.md)): UPD-01 (a refused Windows digest
     named as a failed download), UPD-02 (a cancelled Linux update read « Ollama download cancelled »), UPD-03
-    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed. Left: UPD-05 closing
-    the Linux download window refuses the downloaded update's install (decide cancel or install); UPD-06 carry the
-    fetch receipt into the Lua update check so macOS and Linux name the proxy, offline or certificate cause as
-    Windows does; UPD-07 update download progress on Windows and Linux (and a Windows cancel); UPD-08 a failed Linux
-    update download drops the menu's offer; UPD-09 Linux says « restarting » before trying; UPD-10 a refused
-    signature named on the three; UPD-11 the macOS Versions install passes no failure receipt and leaves its stage
-    folder; UPD-12 the download page's English fallbacks and fixed `lang`;
+    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed, then UPD-05 to
+    UPD-12 in the follow-up: closing an update's window no longer stops it on the three (agent decision, to review by
+    the maintainer, in `docs/memory/maintainer-decisions.md`), a failed check names its rate limit or proven network
+    cause, Windows and Linux show the download's progress with a Cancel, Linux keeps « Update now » and announces a
+    restart only once armed, a refused signature is named everywhere, the macOS Versions install keeps its failure
+    receipt and removes its stage, and the download page has no English fallback. Left: UPD-13 macOS names no proxy,
+    offline or certificate cause (hs.http proves none; route the check through the launcher's managed HTTP worker);
   - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
     pages.
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
