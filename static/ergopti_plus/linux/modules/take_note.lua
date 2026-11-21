@@ -50,8 +50,12 @@ function M.open(launch)
 	local path = folder .. "/Notes_" .. os.date("%d_%m_%Y") .. ".txt"
 	-- The regular-file writer refuses symlinks and non-files. Appending no bytes
 	-- creates an absent note without truncating an existing one.
-	if not Files.append(path, "") then return refuse("notify.take_note_failed") end
+	if not Files.append(path, "") then
+		Logger.error(LOG, "Daily note refused: today's note could not be created as a regular file.")
+		return refuse("notify.take_note_failed")
+	end
 	if launch("gtk-launch -- " .. Shell.quote(handler) .. " " .. Shell.quote(path)) ~= true then
+		Logger.error(LOG, "Daily note refused: the desktop text editor could not be launched.")
 		return refuse("notify.take_note_failed")
 	end
 	Logger.info(LOG, "Opening the daily note in the desktop text editor.")

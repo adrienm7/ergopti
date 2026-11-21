@@ -507,10 +507,10 @@ M.features = {
 		path = "shortcuts.search.search_engine_url_query", section = "shortcuts.search", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.take_note.dated_notes", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.dated_notes", section = "shortcuts.take_note", reason_key = "platform_reason.take_note_settings_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.take_note_settings_are_windows", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.a_grave.enabled", id = "enabled", section = "shortcuts.a_grave", default = false, type = "boolean", description_key = "menu.shortcuts.a_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",

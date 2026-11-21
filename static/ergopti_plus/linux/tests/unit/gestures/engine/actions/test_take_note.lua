@@ -81,6 +81,47 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 		end)
 	end)
 
+	-- SNU-09: the refused write and the failed launch told the user but left no
+	-- log line, where Windows logs every refused note (TakeNote ReportError).
+	helpers.it("linux-take-note: every refused note is logged (snu-09)", function()
+		fixture(function(_, _, notices)
+			local saved_shim, saved_module = package.loaded["core.logger.engine.shim"], package.loaded["modules.take_note"]
+			local errors = {}
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, message) errors[#errors + 1] = message end
+			package.loaded["core.logger.engine.shim"] = logger
+			package.loaded["modules.take_note"] = nil
+			local ok, failure = pcall(function()
+				local TakeNote = require("modules.take_note")
+				local saved_append = Files.append
+				Files.append = function() return false end
+				local refused = TakeNote.open(function() return true end)
+				Files.append = saved_append
+				helpers.assert_eq(refused, false)
+				helpers.assert_eq(TakeNote.open(function() return false end), false)
+				helpers.assert_eq(#notices, 2)
+				helpers.assert_eq(#errors, 2, "each refused note leaves its log line")
+				helpers.assert_true(errors[1]:find("could not be created", 1, true) ~= nil, errors[1])
+				helpers.assert_true(errors[2]:find("could not be launched", 1, true) ~= nil, errors[2])
+			end)
+			package.loaded["core.logger.engine.shim"], package.loaded["modules.take_note"] = saved_shim, saved_module
+			if not ok then error(failure, 0) end
+		end, "editor.desktop")
+	end)
+
+	-- SNU-08: the folder and dated settings this driver ignores carried the
+	-- shortcut chords' reason, which says nothing of where the Linux note goes.
+	helpers.it("linux-take-note: the Windows-only note settings say where the Linux note goes (snu-08)", function()
+		local found = 0
+		for _, entry in ipairs(require("settings.engine.features.manifest_data").features) do
+			if type(entry) == "table" and entry.section == "shortcuts.take_note" then
+				helpers.assert_eq(entry.reason_key, "platform_reason.take_note_settings_are_windows", entry.path)
+				found = found + 1
+			end
+		end
+		helpers.assert_eq(found, 2, "dated_notes and destination_folder")
+	end)
+
 	helpers.it("linux-take-note: refused write does not launch an editor", function()
 		fixture(function(path, launches, notices, launch)
 			local saved = Files.append

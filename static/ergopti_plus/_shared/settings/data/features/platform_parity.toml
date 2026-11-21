@@ -51,6 +51,10 @@ technical = "AutoHotkey Menu objects, Hammerspoon menubar tables and the Linux A
 kind = "driver_storage"
 technical = "Each driver binds actions on the chords its OS leaves free (Win combinations, Ctrl and Cmd, Linux keyboard slots) and stores the choice under a slot id of its own (`meta_*`, `secondary_*`, `primary_*` in shortcuts.keyboard); the same action is assignable on every OS."
 
+[reasons."platform_reason.take_note_settings_are_windows"]
+kind = "not_yet"
+technical = "Only `windows/modules/take_note.ahk` reads `shortcuts.take_note`: `linux/modules/take_note.lua` always opens `Notes_<dd_mm_yyyy>.txt` in the data folder's `notes/` through the text/plain handler, and macOS has no `take_note` action (Quick Note). A folder and a dated choice are possible on Linux but not delivered (small native units audit SNU-08)."
+
 [reasons."platform_reason.action_continuous_swipe_is_macos"]
 kind = "os_api"
 technical = "Only Hammerspoon receives gesture deltas while the fingers move; Windows delivers finished Precision Touchpad gestures as hotkeys and the Linux libinput reader acts on the swipe end, so neither has an axis to feed."

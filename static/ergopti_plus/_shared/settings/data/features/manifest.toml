@@ -2079,7 +2079,7 @@ type = "boolean"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 requires = { windows = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+reason_key = "platform_reason.take_note_settings_are_windows"
 
 [[features.shortcuts.take_note]]
 id = "destination_folder"
@@ -2090,7 +2090,7 @@ type = "string"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 requires = { windows = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+reason_key = "platform_reason.take_note_settings_are_windows"
 
 # ===================================
 # ===== 3.5.1 shortcuts.a_grave =====

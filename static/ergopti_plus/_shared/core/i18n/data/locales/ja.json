@@ -4551,6 +4551,7 @@
 	"platform_reason.hotstrings_master_is_macos_engine": "この名前では macOS のみ：ドライバーが起動・停止する macOS の入力エンジンのマスタースイッチです。Windows はマスターを category_enabled の hotstrings ゲートとして持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.category_gates_are_windows": "Windows のみ：Windows はカテゴリごとに、そのカテゴリ自身のスイッチの手前にマスターゲートを一つ持ちます。macOS は hotstrings のマスターを hotstrings.enabled に持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "このショートカットはそれを割り当てるシステムのものです。各ドライバーは、そのシステムが空けている組み合わせ（Windows では Windows キーの組み合わせ、macOS では Ctrl と Cmd、Linux ではキーボードスロット）に操作を割り当て、選択を独自の名前で保存します。",
+	"platform_reason.take_note_settings_are_windows": "Windows のみ: Windows ではメモがメモ帳で、選んだフォルダーに、名前に日付を付けても付けなくても開きます。Linux ではメモは常に Ergopti のデータフォルダー（notes）にあるその日の日付付きファイルで、デスクトップのテキストエディタで開きます。macOS では代わりにクイックメモを使えます。",
 	"platform_reason.personal_shortcut_switches_are_windows": "Windows のみ：このグループには personal_shortcuts.ahk が登録するスイッチが表示されます。macOS と Linux にはこのような登録の仕組みはありません。",
 	"platform_reason.wrap_symbols_store_is_not_windows": "この名前では macOS と Linux のみ：囲み記号の選択をこのセクションに保存します。Windows は wrap_symbols.toml に保存します。",
 	"platform_reason.ai_menu_bookkeeping_is_windows": "Windows のみ：Windows の AI メニューの内部管理フラグで、選択する設定ではありません。macOS と Linux の AI メニューにはこのような記録はありません。",
