@@ -1980,6 +1980,14 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: swift --version
 
+      # The Sparkle fetch failed once on a hosted runner despite an exact cache
+      # hit; only the resolve is retried (bounded), and the scratch path then
+      # carries the resolved state to every later Swift command.
+      - name: Resolve SwiftPM dependencies
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
+        shell: bash
+        run: bash tools/ci/swiftpm-resolve.sh static/ergopti_plus/macos/launcher "$RUNNER_TEMP/swift-launcher-ci"
+
       - name: Lint remap guardian LaunchAgent
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
@@ -2527,6 +2535,14 @@ jobs:
       - name: Report Swift toolchain
         if: ${{ steps.stage-admission.outcome == 'success' }}
         run: swift --version
+
+      # The Sparkle fetch failed once on a hosted runner despite an exact cache
+      # hit; only the resolve is retried (bounded), and the scratch path then
+      # carries the resolved state to every later Swift command.
+      - name: Resolve SwiftPM dependencies
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        shell: bash
+        run: bash tools/ci/swiftpm-resolve.sh static/ergopti_plus/macos/launcher "$RUNNER_TEMP/swift-launcher-ci"
 
       - name: Build release launcher
         if: ${{ steps.stage-admission.outcome == 'success' }}

@@ -3052,6 +3052,33 @@ console.log(
 		'[OK] The managed native launcher resolve retries at most three times and fails red after the third.'
 	);
 }
+// The launcher-native lot once failed its full XCTest run because SwiftPM
+// refetched Sparkle from github.com despite an exact cache hit. Every lot that
+// builds into the shared scratch path on a push resolves through the bounded
+// retry first; the manual item 36 diagnostic keeps its frozen nine steps.
+{
+	const workflow = pipeline.file('.github/workflows/ci-macos.yml');
+	const resolve =
+		'run: bash tools/ci/swiftpm-resolve.sh static/ergopti_plus/macos/launcher "$RUNNER_TEMP/swift-launcher-ci"';
+	const swift =
+		/\bswift (?:test|build)\b[^\n]*(?:\\\n[^\n]*)*--scratch-path "\$RUNNER_TEMP\/swift-launcher-ci"/g;
+	// The package job runs no role matrix, so its whole job body is the lot.
+	const lots = [
+		['launcher-native', Mac.body(workflow, 'launcher-native')],
+		['package-macos', pipeline.job('package-macos')]
+	];
+	for (const [role, body] of lots) {
+		const step = pipeline.step(body, 'Resolve SwiftPM dependencies');
+		assert.ok(step.includes(resolve), role + ' resolves through the bounded retry');
+		const uses = [...body.matchAll(swift)].map((match) => match.index);
+		assert.ok(uses.length > 0, role + ' builds into the shared scratch path');
+		for (const index of uses)
+			assert.ok(body.indexOf(step) < index, role + ' resolves before its first Swift command');
+	}
+	console.log(
+		'[OK] Every shared-scratch launcher lot resolves SwiftPM through the bounded retry first.'
+	);
+}
 // The new producer reads actual package/evidence files and appends only its own
 // admitted observation. Every failed attempt must preserve the fresh record.
 {

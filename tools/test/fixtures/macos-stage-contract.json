@@ -599,6 +599,11 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 				},
 				{
+					"name": "Resolve SwiftPM dependencies",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"shell": "bash"
+				},
+				{
 					"name": "Lint remap guardian LaunchAgent",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 				},
@@ -806,6 +811,11 @@
 				{
 					"name": "Report Swift toolchain",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
+				},
+				{
+					"name": "Resolve SwiftPM dependencies",
+					"if": "${{ steps.stage-admission.outcome == 'success' }}",
+					"shell": "bash"
 				},
 				{
 					"name": "Build release launcher",
