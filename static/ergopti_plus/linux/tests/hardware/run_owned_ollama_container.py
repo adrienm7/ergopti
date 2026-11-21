@@ -152,6 +152,49 @@ class OwnedOllamaContainer(unittest.TestCase):
             f"exec '{sys.executable}' '{self.stand_in}' \"$@\" --log '{self.owned_log}'\n"
         )
         os.chmod(binary, 0o755)
+        self.seal_runtime(plan, directory)
+
+    def seal_runtime(self, plan, directory):
+        """Writes the seal the install would have written beside the planted tree.
+
+        Every start re-hashes the tree against it and removes an unsealed one
+        (runtime_seal.lua), so the production encoder renders it over the real
+        sha256sum digests and the pinned archive digest of the plan.
+        """
+        files = sorted(str(path) for path in directory.rglob("*") if path.is_file())
+        hashed = subprocess.run(
+            ["sha256sum", "--zero", "--", *files], capture_output=True, check=True
+        ).stdout.decode()
+        digests = {}
+        for row in hashed.split("\0")[:-1]:
+            digest, path = row.split("  ", 1)
+            digests[path] = digest
+        self.assertEqual(sorted(digests), files, hashed)
+        script = (
+            'local Seal = require("ai.engine.ollama.runtime_seal")\n'
+            'local Json = require("core.text.engine.json")\n'
+            'local plan = Json.decode(io.read("*a"))\n'
+            "io.write(assert(Seal.encode(plan.directory, plan.digests, plan.archive_sha256)))\n"
+        )
+        completed = subprocess.run(
+            ["luajit", "-e", script],
+            input=json.dumps(
+                {
+                    "directory": str(directory),
+                    "digests": digests,
+                    "archive_sha256": plan["archive_sha256"],
+                }
+            ),
+            env=self.environment(),
+            cwd=str(self.case),
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        seal = Path(plan["parent"]) / plan["seal"]
+        seal.write_text(completed.stdout)
+        os.chmod(seal, 0o600)
 
     def environment(self, extra=None):
         env = {
@@ -188,7 +231,9 @@ class OwnedOllamaContainer(unittest.TestCase):
     def plan(self, env):
         script = (
             'local r = assert(require("ai.engine.ollama.install_resolver").new())\n'
-            'local p = r.plan(); io.write(require("core.text.engine.json").encode({directory = p.directory}))\n'
+            "local p = r.plan()\n"
+            'io.write(require("core.text.engine.json").encode({directory = p.directory, parent = p.parent,\n'
+            '    archive_sha256 = p.asset.sha256, seal = require("ai.engine.ollama.runtime_seal").NAME}))\n'
         )
         completed = subprocess.run(
             ["luajit", "-e", script],
