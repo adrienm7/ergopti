@@ -147,7 +147,8 @@ function M.init()
 		_locale = saved
 	else
 		_locale = M.detect_system_locale()
-		if saved ~= nil then
+		-- An empty saved value is the neutral one, the system language.
+		if saved ~= nil and saved ~= "" then
 			Logger.warn(LOG, "Persisted locale '%s' is unavailable — using the system locale '%s'.",
 				tostring(saved), _locale)
 		end
@@ -417,7 +418,9 @@ local function set_locale_transaction(code)
 		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
 		return false
 	end
-	if code == _locale then return true end
+	-- Only a choice already saved is a no-op: the system language shown while
+	-- nothing is saved becomes an explicit, written choice (2026-11-21).
+	if code == _locale and Storage.get(SETTINGS_KEY) == code then return true end
 	if not rewrite_configured(code) then return false end
 	Logger.start(LOG, "Switching locale to '%s'…", code)
 	-- Cancel any pending reload from a previous rapid switch. A committed one
@@ -637,6 +640,8 @@ _scope.install({
 	published = { "locale", "backend" },
 	ready = scope_ready,
 	accept = function(value)
+		-- "" is the locale's neutral value: the system language, else English.
+		if value == "" then value = M.detect_system_locale() end
 		if type(value) ~= "string" or not scope_known(value) then return nil end
 		return { locale = value, backend = value }
 	end,

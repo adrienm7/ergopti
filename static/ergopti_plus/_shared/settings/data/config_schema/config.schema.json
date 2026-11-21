@@ -96,8 +96,8 @@
 			"properties": {
 				"locale": {
 					"type": "string",
-					"pattern": "^[a-z]{2}$",
-					"description": "ISO 639-1 two-letter language code."
+					"pattern": "^([a-z]{2})?$",
+					"description": "ISO 639-1 two-letter language code; empty (the neutral value) means the system language, else English."
 				},
 				"log_level": {
 					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]

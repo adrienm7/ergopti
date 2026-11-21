@@ -13,7 +13,7 @@
 			"platforms": ["ahk", "hs", "linux"],
 			"enum_values": ["auto", true, false]
 		},
-		{ "path": "script.locale", "default": "fr", "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "script.locale", "default": "", "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "script.show_error_dialog", "default": true, "platforms": ["ahk"] },
 		{ "path": "metrics.keep_days", "default": 30, "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "llm.display.opacity", "default": 0.5, "platforms": ["ahk", "hs", "linux"] },

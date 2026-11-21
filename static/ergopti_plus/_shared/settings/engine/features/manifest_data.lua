@@ -63,7 +63,7 @@ M.sections = {
 
 M.features = {
 	{
-		path = "script.locale", id = "locale", section = "script", default = "fr", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs", "linux" }, recommended = "fr", family = "setting",
+		path = "script.locale", id = "locale", section = "script", default = "", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "setting",
 	},
 	{
 		path = "script.log_level", id = "log_level", section = "script", default = "INFO", type = "enum", description_key = "menu.script.log_level", platforms = { "ahk", "hs", "linux" }, recommended = "INFO", family = "setting", enum_values = { "DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR" },

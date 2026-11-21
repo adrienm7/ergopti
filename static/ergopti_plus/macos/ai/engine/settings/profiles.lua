@@ -23,10 +23,8 @@ local M = {}
 
 local Logger   = require("core.logger.engine.logger")
 local i18n     = require("core.i18n.engine.i18n")
-local Manifest = require("menu.engine.manifest_reader")
 local Selector = require("ai.engine.settings.profile_selector")
 local Storage  = require("core.fs.adapters.storage")
-local ConfigKeys = require("settings.engine.keys")
 local LOG      = "llm.profiles"
 
 
@@ -178,7 +176,7 @@ end
 --- The language a prompt's {language} placeholder names: the interface locale.
 --- @return string language
 function M.prompt_language()
-	return i18n.get_locale() or Manifest.default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
+	return i18n.get_locale() or require("core.text.engine.identifiers").locales.system_fallback
 end
 
 --- Resolves the appropriate system prompt, injecting live session values.

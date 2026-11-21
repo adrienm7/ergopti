@@ -274,7 +274,9 @@ end
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
 	if not require("settings.engine.scope.script_scope").retry_locale() or not _scope.admit_change() then return false end
-	if code == _locale then return true end
+	-- Only a choice already saved is a no-op: the system language shown while
+	-- nothing is saved becomes an explicit, written choice (2026-11-21).
+	if code == _locale and _load_persisted_locale() == code then return true end
 	return M.persist_locale(code)
 end
 
@@ -388,6 +390,8 @@ _scope.install({
 	published = { "locale", "backend" },
 	ready = scope_ready,
 	accept = function(value)
+		-- "" is the locale's neutral value: the system language, else English.
+		if value == "" then value = M.detect_system_locale(M.list_locales()) end
 		if type(value) ~= "string" or not scope_known(value) then return nil end
 		return { locale = value, backend = value }
 	end,

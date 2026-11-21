@@ -63,6 +63,33 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## The locale's neutral value is the absent row (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (TODO « The locale's neutral
+value »): an explicitly chosen locale is always written to config.toml and
+never deleted as neutral, French included; an absent locale row means the
+system language when a shipped catalogue matches it, else English
+(`identifiers.json` `locales.system_fallback`), on the three OS. One
+representation keeps one source of truth: the manifest's `script.locale`
+default is `""`, the neutral value, which the sparse writer turns into the
+absent row; any shipped code differs from it, so it is written. Consequences:
+
+- Lua drivers: an absent or empty locale row clears the native value at start,
+  like every other `[script]` row, and a change writes the row even when the
+  file lacks it (`script_config_authority.lua`). Choosing the language shown
+  while nothing is saved writes it (`set_locale` compares with the saved
+  value, not the active one).
+- Windows: `I18nConfiguredLocale()` is the row the file holds (`""` when
+  absent). A full save writes it, never the detected language, so a detected
+  language is never frozen into the file, and `I18nSetLocale` writes a choice
+  equal to the detected language.
+- Callers that needed a last-resort language read `locales.system_fallback`,
+  never the manifest default.
+
+Tests: `test_locale_neutral_value.ahk` and the `locale-neutral-2026-11-21`
+cases of `_shared/tests/lua/settings/script_config_authority_contract.lua`
+(macOS and Linux).
+
 ## The live speed counts the produced text (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (MET-17 in
@@ -1357,14 +1384,10 @@ through the sparse operation, held or not (`rewrite_configured`, Linux
 neutral value of an absent row writes nothing. Reasoning: one source of truth
 (the file), no stale native value surviving a restore, no fallback.
 
-The locale is the exception and keeps option b: an absent locale row leaves
-the native value in force and a change rewrites only a row the file holds.
-Every driver reads an absent locale as the system language, while the
-manifest's neutral value is `fr` and the sparse writer deletes a chosen `fr`:
-clearing the alias would turn an explicit French choice on another system
-language into that language. The rule and its exception live in
-`script_config_authority.lua` (`NATIVE_KEPT_WHEN_ABSENT`, `file_owns_absence`);
-the locale's neutral value is a separate maintainer question in TODO.md.
+The locale follows the same rule since the maintainer settled its neutral
+value on 2026-11-21 (« The locale's neutral value is the absent row » above):
+the former exception (`NATIVE_KEPT_WHEN_ABSENT`) is gone from
+`script_config_authority.lua`.
 
 Question 2 (an external edit of `config.toml` while Linux runs), decided by the
 agent on 2026-11-21, to review by the maintainer: option a, today's behaviour.

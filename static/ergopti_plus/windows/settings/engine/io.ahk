@@ -1628,7 +1628,8 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 				; The version the boot migration reads (settings/engine/migration/migrate.ahk).
 				Updates.Push({ Section: ConfigLeaf._META, Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
-		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
+		; The configured locale, "" (the neutral, absent row) when none was chosen.
+		Updates.Push({ Section: "script", Key: "locale", Value: I18nConfiguredLocale() })
 		Updates.Push({ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
 		Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {

@@ -47,7 +47,7 @@ global FEATURES_MANIFEST := Map(
         "gestures.sensitivities", Map("description_key", "menu.gestures.sensitivities", "platforms", ["ahk", "hs", "linux"], "subsections", [])
     ),
     "features", [
-        Map("path", "script.locale", "id", "locale", "section", "script", "default", "fr", "type", "string", "description_key", "menu.script.locale", "platforms", ["ahk", "hs", "linux"], "recommended", "fr", "family", "setting"),
+        Map("path", "script.locale", "id", "locale", "section", "script", "default", "", "type", "string", "description_key", "menu.script.locale", "platforms", ["ahk", "hs", "linux"], "recommended", "", "family", "setting"),
         Map("path", "script.log_level", "id", "log_level", "section", "script", "default", "INFO", "type", "enum", "description_key", "menu.script.log_level", "platforms", ["ahk", "hs", "linux"], "recommended", "INFO", "family", "setting", "enum_values", ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]),
         Map("path", "script.show_error_dialog", "id", "show_error_dialog", "section", "script", "default", true, "type", "boolean", "description_key", "menu.debug.show_error_dialog", "platforms", ["ahk", "hs", "linux"], "recommended", true, "family", "setting"),
         Map("path", "script.reading_font", "id", "reading_font", "section", "script", "default", "default", "type", "enum", "description_key", "menu.configuration.reading_font", "platforms", ["ahk", "hs", "linux"], "recommended", "default", "family", "setting", "enum_values", ["default", "hyperlegible", "dyslexic"]),

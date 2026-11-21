@@ -5,7 +5,7 @@
 # on first boot. After that, the user owns the copy.
 
 [script]
-locale = "fr"
+locale = ""
 log_level = "INFO"
 show_error_dialog = true
 reading_font = "default"

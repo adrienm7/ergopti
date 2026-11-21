@@ -15,10 +15,11 @@
 ---    reads the manifest default, as Windows reads an absent row. A restored or
 ---    hand-edited file therefore never keeps a stale native value. A menu or
 ---    wizard change writes the row, held or not, through the sparse operation,
----    so the next start reads the same choice. The locale is the one exception
----    (NATIVE_KEPT_WHEN_ABSENT): its absence means the system language, not its
----    manifest default, so it keeps the native value and a change rewrites only
----    a row the file holds. No migration: nothing is copied between the stores.
+---    so the next start reads the same choice. The locale follows the same rule
+---    (maintainer decision of 2026-11-21): its neutral value is "", the absent
+---    row, which every driver reads as the system language, else English; a
+---    chosen locale, French included, is always written. An empty configured
+---    value reads as absent. No migration: nothing is copied between the stores.
 --- 2. Declared values only: a configured value the manifest refuses for this
 ---    platform is reported through config_outdated and not adopted.
 --- 3. Fail fast: an unreadable or malformed config.toml adopts nothing and says
@@ -33,23 +34,15 @@ local Outdated = require("settings.engine.migration.outdated")
 local TableUtil = require("core.text.engine.table_util")
 local Writer = require("core.text.engine.toml_codec.writer")
 
---- The rows whose absence from config.toml leaves the native value in force.
---- Every driver reads an absent locale as the system language, while the
---- manifest's neutral value is "fr" and the sparse writer deletes a chosen
---- "fr" as neutral: clearing the alias of an absent locale row would turn an
---- explicit French choice on another system language into that language. The
---- locale's neutral value is a maintainer decision (TODO.md).
-local NATIVE_KEPT_WHEN_ABSENT = {
-	[ConfigKeys.KEY.SCRIPT_LOCALE] = true,
-}
-
 --- Whether config.toml owns a row's absence: an absent row clears its native
 --- alias at start, and a change writes the row even when the file lacks it.
+--- Every `[script]` row does since the locale's neutral value became the
+--- absent row (maintainer decision of 2026-11-21).
 --- @param path string Canonical script path.
 --- @return boolean owned
 function M.file_owns_absence(path)
 	assert(type(path) == "string" and path:match("^script%.") ~= nil, "not a script row: " .. tostring(path))
-	return NATIVE_KEPT_WHEN_ABSENT[path] ~= true
+	return true
 end
 
 
@@ -171,6 +164,8 @@ function M.adopt(options)
 	local adopted, cleared = {}, {}
 	for _, path in ipairs(TableUtil.sorted_keys(options.aliases, TableUtil.by_text)) do
 		local value = source_value(document, path)
+		-- An empty row is the neutral, absent value (the locale's system language).
+		if value == "" then value = nil end
 		if value == nil and clear_absent(options, path, Logger, LOG) == true then cleared[path] = true end
 		if present_owned[path] == true then value = nil end
 		local entry, available
@@ -206,8 +201,8 @@ end
 -- =================================
 
 --- Returns the sparse operation a change needs, or nil when the file already
---- reads as the new value: a held equal row, an absent row the file does not
---- own (the locale), or an absent row whose new value is the neutral default.
+--- reads as the new value: a held equal row, or an absent row whose new value
+--- is the neutral default.
 --- @param options table { manifest, key, value }.
 --- @param document table Decoded configuration.
 --- @return table|nil operation

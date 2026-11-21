@@ -56,6 +56,8 @@ return function(helpers, driver)
 			local i18n, backend = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			if driver == "macos" then i18n.set_locale_injector(backend.set_locale) end
 			i18n.init()
+			-- A French system language: the neutral locale "" reads as French.
+			i18n.detect_system_locale = function() return "fr" end
 			local logger = require(driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger")
 			if driver == "linux" then assert(logger.apply()) else logger.set_level("DEBUG") end
 			local dialog = require(driver == "linux" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
@@ -113,7 +115,7 @@ return function(helpers, driver)
 					helpers.assert_eq(ctx.i18n.get_locale(), "fr")
 					helpers.assert_eq(ctx.backend.current_locale(), "fr")
 					helpers.assert_eq(ctx.dialog.is_enabled(), true)
-					helpers.assert_eq(ctx.store.get(locale_alias), "fr")
+					helpers.assert_eq(ctx.store.get(locale_alias), "", "the neutral locale is stored as such")
 					helpers.assert_eq(ctx.store.get(log_alias), "INFO")
 					helpers.assert_eq(ctx.store.get("script.show_error_dialog"), true)
 					helpers.assert_eq(owner.revert(), true)
@@ -135,8 +137,11 @@ return function(helpers, driver)
 				locale.init()
 				if driver == "linux" then helpers.assert_eq(logger.apply(), true)
 				else logger.set_level(ctx.store.get(log_alias)) end
-				helpers.assert_eq(locale.get_locale(), "fr")
-				helpers.assert_eq(ctx.backend.current_locale(), "fr")
+				-- The locale's neutral value is the system language (2026-11-21).
+				local neutral = driver == "linux" and locale.detect_system_locale(locale.list_locales())
+					or locale.detect_system_locale()
+				helpers.assert_eq(locale.get_locale(), neutral)
+				helpers.assert_eq(ctx.backend.current_locale(), neutral)
 				if driver == "linux" then helpers.assert_eq(logger.current(), "INFO")
 				else helpers.assert_eq(logger.current_level, 20) end
 				helpers.assert_eq(dialog.is_enabled(), true)

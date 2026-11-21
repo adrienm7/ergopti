@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Replays, on each Lua driver, the rule that config.toml's [script] rows win
 --- over the saved native values at start, that a row the file lacks clears its
---- saved value (the locale excepted), and that a change writes the row so the
+--- saved value (the locale included), and that a change writes the row so the
 --- next start keeps it. Real manifest reader, real TOML writer and a real file;
 --- only the native store is an in-memory table.
 --- ==============================================================================
@@ -106,16 +106,35 @@ function M.run(helpers, options)
 			helpers.assert_eq(next(cleared), nil)
 		end)
 
-		-- Every driver reads an absent locale as the system language, while the
-		-- sparse writer deletes a chosen "fr" as neutral: clearing it would lose
-		-- an explicit French choice (script-config-locale-kept-when-absent).
-		helpers.it("keeps the saved locale without a row (script-config-locale-kept-when-absent)", function()
+		-- The maintainer's decision of 2026-11-21: the locale's neutral value is
+		-- the absent row, the system language, else English. An absent or empty
+		-- row clears the saved locale like any other row; before, the native
+		-- value outlived a restored file (locale-neutral-2026-11-21).
+		helpers.it("clears the saved locale without a row or with an empty one (locale-neutral-2026-11-21)", function()
+			for _, content in ipairs({ "[hotstrings]\nenabled = true\n", '[script]\nlocale = ""\n' }) do
+				local path = scratch(content)
+				local native = store({ [locale_alias] = "de" })
+				local _, _, cleared = adopt(path, native)
+				os.remove(path)
+				helpers.assert_eq(native.values[locale_alias], nil, "the start reads the system language again")
+				helpers.assert_eq(cleared["script.locale"], true)
+			end
+		end)
+
+		-- A chosen French locale differs from the neutral value: it is written
+		-- even on a file that lacks the row, never deleted, and wins at start.
+		helpers.it("writes and keeps a chosen French locale (locale-neutral-2026-11-21)", function()
+			helpers.assert_eq(manifest.default_for("script.locale"), "", "the neutral value is the absent row")
 			local path = scratch("[hotstrings]\nenabled = true\n")
+			local committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.locale", value = "fr" })
+			local after = read(path)
+			helpers.assert_true(committed)
+			helpers.assert_true(after:find('locale = "fr"', 1, true) ~= nil, "a chosen French locale is written")
 			local native = store({ [locale_alias] = "de" })
 			adopt(path, native)
 			os.remove(path)
-			helpers.assert_eq(native.writes(), 0, "the locale is not copied between the stores")
-			helpers.assert_eq(native.values[locale_alias], "de")
+			helpers.assert_eq(native.values[locale_alias], "fr", "and wins at the next start")
 		end)
 
 		helpers.it("logs a start whose alias cannot be cleared (script-config-absent-clear-refused)", function()
@@ -170,7 +189,7 @@ function M.run(helpers, options)
 			helpers.assert_true(#logger.logged > 0 and logger.logged[1]:find("^error:") ~= nil, "and says so")
 		end)
 
-		helpers.it("rewrites a held row, and writes an absent one unless it is the locale (script-config-change-rewrite)", function()
+		helpers.it("rewrites a held row, and writes an absent one (script-config-change-rewrite)", function()
 			local path = scratch('[script]\nlocale = "fr"\n\n\n\n\n\n[hotstrings]\nenabled = true\n')
 			local committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
 				manifest = manifest, key = "script.locale", value = "en" })
@@ -205,12 +224,8 @@ function M.run(helpers, options)
 			after = read(path)
 			os.remove(path)
 			helpers.assert_true(committed)
-			helpers.assert_eq(after, bare, "an absent locale row is not written")
+			helpers.assert_true(after:find('locale = "en"', 1, true) ~= nil, "an absent locale row is written too")
 			path = scratch(nil)
-			committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
-				manifest = manifest, key = "script.locale", value = "en" })
-			helpers.assert_true(committed)
-			helpers.assert_eq(read(path), nil, "an absent file is not created for the locale")
 			local owned_committed = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
 				manifest = manifest, key = "script.log_level", value = "ERROR" })
 			helpers.assert_eq(owned_committed, false, "an owned change without a file has no receipt and is refused")

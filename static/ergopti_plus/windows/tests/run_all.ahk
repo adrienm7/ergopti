@@ -641,6 +641,7 @@ InstallSendNoOps()
 #Include unit/platform/remap/tap_hold/test_tap_hold_migration.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
 #Include unit/core/i18n/test_i18n.ahk
+#Include unit/core/i18n/test_locale_neutral_value.ahk
 #Include unit/core/i18n/test_probe_is_silent.ahk
 #Include unit/platform/focus/test_window_utils.ahk
 #Include unit/core/network/test_external_url_policy.ahk

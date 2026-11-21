@@ -869,7 +869,8 @@ local function prompt_language()
 	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 	if type(locale) == "string" and locale ~= "" then return locale end
-	return require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.SCRIPT_LOCALE)
+	-- The absent locale's own fallback (the manifest default is "", the system language).
+	return require("core.text.engine.identifiers").locales.system_fallback
 end
 
 --- The profile's name as the menu shows it, for the suggestions' info bar:

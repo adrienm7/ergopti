@@ -26,7 +26,8 @@ _I18nTestReset() {
 	global _I18nCacheEn, _I18nCacheEnLoaded
 	global _I18nCacheFr, _I18nCacheFrLoaded
 	global _I18nFallbacksWarmed
-	global _I18nActiveCacheIdentity
+	global _I18nActiveCacheIdentity, _I18nConfiguredLocale
+	_I18nConfiguredLocale := ""
 	_I18nCache        := Map()
 	_I18nCacheLoaded  := false
 	_I18nCacheEn      := Map()

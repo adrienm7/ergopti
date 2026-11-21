@@ -374,11 +374,15 @@ platforms = ["ahk", "hs", "linux"]
 # ===== 3.1 script =====
 # ======================
 
+# Empty, the neutral value, is the absent row: the system language when a
+# catalogue matches it, else English (identifiers.json locales.system_fallback),
+# on the three OS. A chosen locale, French included, differs from it, so it is
+# always written and never deleted as neutral (maintainer decision, 2026-11-21).
 [[features.script]]
 id = "locale"
 requires = { macos = [], linux = [], windows = [] }
-default = "fr"
-recommended = "fr"
+default = ""
+recommended = ""
 family = "setting"
 type = "string"
 description_key = "menu.script.locale"

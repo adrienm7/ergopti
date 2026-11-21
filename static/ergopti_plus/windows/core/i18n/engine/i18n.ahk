@@ -70,6 +70,12 @@ global _I18nSortedLocalesCache := false
 ; Map of locale code → boolean indicating if flag.png exists.
 global _I18nFlagExistsCache := Map()
 
+; The locale config.toml holds, "" when the row is absent (the system language,
+; else English). The active locale can be detected; only this one is a choice,
+; and a full save writes this one, never a detected language (maintainer
+; decision of 2026-11-21: a chosen locale is always written, French included).
+global _I18nConfiguredLocale := ""
+
 
 
 
@@ -127,8 +133,9 @@ _I18nDetectSystemLocale(LocaleProbe := 0) {
 ; is already available in Cache. Safe to call multiple times — subsequent calls
 ; are ignored if the locale has not changed.
 I18nInit(Cache, LocaleProbe := 0) {
-	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
-	
+	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache, _I18nConfiguredLocale
+	_I18nConfiguredLocale := ""
+
 	if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
 		_I18nFlagExistsCache := Map()
 
@@ -146,6 +153,7 @@ I18nInit(Cache, LocaleProbe := 0) {
 		}
 		if IsKnown {
 			_I18nLocale := NewLocale
+			_I18nConfiguredLocale := NewLocale
 		} else {
 			; Unknown code in config: pick the Windows UI language rather than
 			; silently defaulting to French — the user clearly wanted something
@@ -203,14 +211,21 @@ I18nWarmFallbacks() {
 ; stale intermediate language from landing when the user switches quickly.
 I18nSetLocale(Code, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed, ConfigurationFile, _I18nReloadDebounceMs
-	if _I18nLocale == Code
+	global _I18nConfiguredLocale
+	; Only a choice already written is a no-op: the system language shown while
+	; the row is absent becomes an explicit, written choice.
+	if _I18nConfiguredLocale == Code
 		return true
 	Updates := [{ Section: "script", Key: "locale", Value: Code }]
 	if !ConfigCommitUpdates(ConfigurationFile, Updates,
 		"the locale switch to '" . Code . "'", WriterFn, NotifyFn)
 		return false
+	Unchanged := _I18nLocale == Code
 	PreviousCritical := Critical("On")
 	try {
+		_I18nConfiguredLocale := Code
+		if Unchanged
+			return true
 		_I18nLocale           := Code
 		_I18nCacheLoaded      := false
 		_I18nFallbacksWarmed  := false
@@ -258,6 +273,13 @@ _I18nReloadRefused(Locale, Reason) {
 I18nGetLocale() {
 	global _I18nLocale
 	return _I18nLocale
+}
+
+; Return the locale config.toml holds, "" when the row is absent: what a full
+; save writes, so a detected system language is never frozen into the file.
+I18nConfiguredLocale() {
+	global _I18nConfiguredLocale
+	return _I18nConfiguredLocale
 }
 
 ; Returns a menu callback bound to a specific locale code. Calling this helper
