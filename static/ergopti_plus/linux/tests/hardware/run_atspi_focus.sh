@@ -41,6 +41,15 @@ READY_TIMEOUT_SECONDS=20
 python3 tests/hardware/wait_a11y_bus.py "${READY_TIMEOUT_SECONDS}" || { kill ${PIDS} 2>/dev/null; exit 2; }
 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
+# A window mapped before openbox owns the screen is taken over by openbox's
+# own start, which leaves no window active: the second fixture announced
+# itself ready, then both read inactive and every probe answered inconclusive
+# (dev run 44897912820). The windows open once openbox publishes EWMH support.
+python3 tests/hardware/x11_window_manager.py ready || {
+	echo "ENVIRONMENT: openbox did not announce _NET_ACTIVE_WINDOW" >&2
+	kill ${PIDS} 2>/dev/null
+	exit 2
+}
 WORK="$(mktemp -d)"
 
 FAILURES=0

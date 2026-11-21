@@ -99,5 +99,20 @@ class WaitTest(unittest.TestCase):
         self.assertEqual(len(calls), 3)
 
 
+class AtspiFocusHarnessTest(unittest.TestCase):
+    """run_atspi_focus.sh opens its windows only once openbox owns the screen."""
+
+    def test_the_first_fixture_opens_after_the_window_manager_is_ready(self):
+        # Both fixture windows read inactive after the second announced itself
+        # ready: openbox's start took over windows mapped before it (dev run
+        # 44897912820, desktop-webview).
+        script = pathlib.Path(__file__).with_name("run_atspi_focus.sh").read_text(encoding="utf-8")
+        start = script.index("\nopenbox ")
+        wait = script.index("x11_window_manager.py ready")
+        first_window = script.index("\nopen_fixture editor")
+        self.assertLess(start, wait, "the wait follows the window manager's start")
+        self.assertLess(wait, first_window, "no fixture opens before the window manager is ready")
+
+
 if __name__ == "__main__":
     unittest.main()
