@@ -43,6 +43,7 @@ const STUDIO_ROOTS = Object.freeze(
 		'layout_editor',
 		'layout_editor_window',
 		'layout_optimizer',
+		'layout_try',
 		'layout_manager',
 		'layout_composer',
 		'layer_editor'

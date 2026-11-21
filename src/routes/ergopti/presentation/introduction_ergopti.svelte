@@ -96,8 +96,8 @@
 	<tiny-space></tiny-space>
 
 	<div style="text-align:center;">
-		<a class="button-link alt-button" href={resolve('/ergopti/utilisation')}>
-			➜ Essayer en ligne / Installation
+		<a class="button-link alt-button" href={resolve('/studio/essayer') + '?layout=ergopti'}>
+			➜ Essayer en ligne
 		</a>
 	</div>
 

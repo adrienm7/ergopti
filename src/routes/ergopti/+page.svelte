@@ -15,7 +15,7 @@ sub-pages that hold the details (siteNavigation.js lists them).
 	import Ergopti from '#lib/components/Ergopti.svelte';
 	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
 	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
-	import { LAYOUT_PAGES } from '#lib/js/siteNavigation.js';
+	import { LAYOUT_PAGES, resolveWithQuery } from '#lib/js/siteNavigation.js';
 </script>
 
 <svelte:head>
@@ -41,7 +41,12 @@ sub-pages that hold the details (siteNavigation.js lists them).
 	<ul class="overview-pages">
 		{#each LAYOUT_PAGES.slice(1) as entry (entry.route)}
 			<li>
-				<a href={resolve(entry.route)}>
+				<a
+					href={resolveWithQuery(
+						entry.query ? entry.route + '?' + entry.query : entry.route,
+						resolve
+					)}
+				>
 					<strong>{entry.label}</strong>
 					<p>{entry.summary}</p>
 				</a>

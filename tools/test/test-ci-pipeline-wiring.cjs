@@ -3268,6 +3268,7 @@ function commonProblems(files) {
 		['Test shared layout optimizer page', 'npm run test:browser:layout-optimizer'],
 		['Test the Studio keyboard walk', 'npm run test:browser:studio-keyboard'],
 		['Test the Studio undo and redo history', 'npm run test:browser:studio-history'],
+		['Test the Studio typing try', 'npm run test:browser:studio-try'],
 		['Test the app windows accessibility', 'npm run test:browser:app-accessibility']
 	])
 		exactStep(browser, name, command);

@@ -5,7 +5,7 @@
 		{
 			"id": "js-0002",
 			"ordinal": 14,
-			"name": "web text decoding and icon demo preserve literal input with bounded parsing",
+			"name": "the layout data loader, the reference keyboard, the icon demo and the Studio « Essayer » typist keep literal input literal",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-web-text-admission.cjs"],
 			"repro": "npm run test:web-text-admission"
@@ -717,6 +717,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-studio-edit-history.cjs"],
 			"repro": "npm run test:studio-edit-history"
+		},
+		{
+			"id": "studio-try",
+			"ordinal": 720,
+			"name": "Ergopti Studio's « Essayer » tab types a library layout's levels and dead keys, takes ?layout= and the former page's anchors, is listed by the Studio and the Disposition Ergopti, receives the redirect of /ergopti/utilisation, and names its strings in all 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-studio-try.cjs"],
+			"repro": "npm run test:studio-try"
 		}
 	]
 }

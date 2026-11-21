@@ -29,12 +29,13 @@ const { scriptElements, startTags } = require('./lib/html-scan.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const UI = path.join(REPO_ROOT, 'static', 'ergopti_plus', '_shared', 'ui');
-// The Studio's pages: the three the site frames, the app's Studio window and
+// The Studio's pages: the four the site frames, the app's Studio window and
 // the layout manager window it opens.
 const PAGES = Object.freeze([
 	'layout_analysis/index.html',
 	'layout_editor/index.html',
 	'layout_optimizer/index.html',
+	'layout_try/index.html',
 	'layout_editor_window/index.html',
 	'layout_manager/index.html'
 ]);

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The run-time key families of the shared pages: the diagnostics window
  * (model.js, checks.js, script.js and its native Windows fallback core.ahk),
- * the layout manager, and the metrics charts. The diagnostics families read
+ * the layout manager, the metrics charts and the Studio's « Essayer » tab. The diagnostics families read
  * the diagnostics schema the page renders from; the others read the constant
  * tables and loops of the page script itself, since those are the only
  * source of the ids the page appends.
@@ -29,6 +29,8 @@ const APPS_CHARTS = ROOT + '_shared/ui/metrics_apps/charts.js';
 const TYPING_CHARTS = ROOT + '_shared/ui/metrics_typing/charts.js';
 const CATALOGUE_AHK = ROOT + 'windows/modules/keymap/keylayout/layout_catalogue.ahk';
 const CATALOGUE_LUA = ROOT + '_shared/layouts/engine/composer/catalogue.lua';
+const TRY_PAGE = ROOT + '_shared/ui/layout_try/try_page.js';
+const TRY_TYPING = ROOT + '_shared/ui/layout_try/typing.js';
 
 // ==========================================
 // ==========================================
@@ -328,5 +330,22 @@ module.exports = [
 		files: [TYPING_CHARTS],
 		source: 'the month indexes months_fr maps in metrics_typing/charts.js',
 		keys: () => ctx.keysOf('ui_typing.month_', mappedIndexes(TYPING_CHARTS, 'months_fr'))
+	},
+	{
+		prefix: 'layout_try.level.',
+		files: [TRY_PAGE],
+		source: 'the four library levels of layout_try/typing.js (LEVELS)',
+		keys: () => ctx.keysOf('layout_try.level.', ctx.literal(TRY_TYPING, 'LEVELS'))
+	},
+	{
+		prefix: 'layout_analysis.filter.origin_',
+		files: [TRY_PAGE],
+		source:
+			'the library origins the « Essayer » list groups (ORIGINS), but « library », its own key',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.filter.origin_',
+				ctx.literal(TRY_PAGE, 'ORIGINS').filter((origin) => origin !== 'library')
+			)
 	}
 ];

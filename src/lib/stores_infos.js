@@ -33,15 +33,6 @@ export const reference = writable({
 	controls: 'yes'
 });
 
-export const emulation = writable({
-	emplacement: 'keyboard_emulation',
-	plus: 'yes',
-	type: 'iso',
-	layer: 'Primary',
-	color: 'yes',
-	controls: 'no'
-});
-
 export const frequences = writable({
 	emplacement: 'keyboard_frequences',
 	plus: 'no',

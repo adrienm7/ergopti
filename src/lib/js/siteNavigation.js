@@ -43,7 +43,11 @@ export const PRODUCTS = Object.freeze([
 	})
 ]);
 
-/** Sub-pages of the Disposition Ergopti section; the first one is the overview. */
+/**
+ * Sub-pages of the Disposition Ergopti section; the first one is the overview.
+ * « Essayer » is Ergopti Studio's tab, opened on Ergopti (query, maintainer
+ * 2026-11-21).
+ */
 export const LAYOUT_PAGES = Object.freeze([
 	Object.freeze({ route: '/ergopti', label: 'Aperçu', summary: '' }),
 	Object.freeze({
@@ -52,9 +56,10 @@ export const LAYOUT_PAGES = Object.freeze([
 		summary: 'La disposition et ses principes : distances, SFBs, alternance, roulements, symboles.'
 	}),
 	Object.freeze({
-		route: '/ergopti/utilisation',
+		route: '/studio/essayer',
+		query: 'layout=ergopti',
 		label: 'Essayer',
-		summary: 'Taper avec la disposition dans le navigateur et parcourir ses remplacements de texte.'
+		summary: 'Taper avec la disposition dans le navigateur, dans Ergopti Studio.'
 	}),
 	Object.freeze({
 		route: '/ergopti/installation',
@@ -113,7 +118,10 @@ export const ERGOPTI_PLUS_PAGES = Object.freeze([
 	})
 ]);
 
-/** Tabs of Ergopti Studio: the editor, the layout comparison and the layout optimizer. */
+/**
+ * Tabs of Ergopti Studio: the editor, the layout comparison, the layout
+ * optimizer and the typing try (maintainer, 2026-11-21).
+ */
 export const STUDIO_PAGES = Object.freeze([
 	// Each tab's icon: the app window's (layout_editor_window/index.html), a
 	// 24 × 24 stroke path, decorative beside the tab's text.
@@ -131,6 +139,12 @@ export const STUDIO_PAGES = Object.freeze([
 		route: '/studio/optimiser',
 		label: 'Optimiser',
 		icon: 'M11 3l1.8 4.7L17.5 9.5l-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8zM18 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z'
+	}),
+	Object.freeze({
+		route: '/studio/essayer',
+		label: 'Essayer',
+		// A keyboard: its frame, two rows of keys and the space bar.
+		icon: 'M3 7h18v10H3zM6 10h1M9 10h1M12 10h1M15 10h1M18 10h1M8 14h8'
 	})
 ]);
 
@@ -166,11 +180,28 @@ export const LEGACY_PAGES = Object.freeze({
 	'/utilisation': Object.freeze({
 		target: '/ergopti/installation',
 		anchors: Object.freeze({
-			keyboard_emulation: '/ergopti/utilisation',
-			'input-text': '/ergopti/utilisation'
+			keyboard_emulation: '/studio/essayer?layout=ergopti',
+			'input-text': '/studio/essayer?layout=ergopti'
 		})
+	}),
+	// The former « Essayer » page: Ergopti Studio's tab, on Ergopti (maintainer,
+	// 2026-11-21); its anchors name the tab's text area and keyboard.
+	'/ergopti/utilisation': Object.freeze({
+		target: '/studio/essayer?layout=ergopti',
+		anchors: Object.freeze({})
 	})
 });
+
+/**
+ * A site address with its query: the route resolved (base path), the query kept.
+ * @param {string} target - A route, with or without a query (« /studio/essayer?layout=ergopti »).
+ * @param {function(string): string} resolveRoute - $app/paths resolve.
+ * @returns {string}
+ */
+export function resolveWithQuery(target, resolveRoute) {
+	const at = target.indexOf('?');
+	return at < 0 ? resolveRoute(target) : resolveRoute(target.slice(0, at)) + target.slice(at);
+}
 
 /** Every anchor of the former home page now lives on the layout presentation. */
 export const LEGACY_HOME_ANCHOR_TARGET = '/ergopti/presentation';

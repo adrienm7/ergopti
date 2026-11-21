@@ -1,0 +1,178 @@
+/* _shared/ui/layout_try/style.css */
+
+/* =========================================================================== */
+/* Layout Try — the « Essayer » tab of Ergopti Studio: the layout list, the     */
+/* text area the layout types into and the keyboard of the level held. Light   */
+/* and dark through theme.css; the keys wrap at phone width.                   */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Tokens & Base ====== */
+/* =============================== */
+/* =============================== */
+
+.layout-try,
+.layout-try *,
+.layout-try *::before,
+.layout-try *::after {
+	box-sizing: border-box;
+}
+
+/* The site's standalone page only: a host that mounts the page styles its own body. */
+body:has(> main.layout-try) {
+	background: var(--theme-bg);
+	color: var(--theme-text);
+	margin: 0;
+}
+
+.layout-try {
+	--lt-space-1: 4px;
+	--lt-space-2: 8px;
+	--lt-space-3: 12px;
+	--lt-space-4: 16px;
+	--lt-space-5: 24px;
+	font:
+		14px/1.5 system-ui,
+		sans-serif;
+	margin: 0 auto;
+	max-width: 960px;
+	padding: var(--lt-space-5) var(--lt-space-4);
+}
+
+.layout-try h1 {
+	font-size: 1.6em;
+	line-height: 1.25;
+	margin: 0 0 var(--lt-space-2);
+}
+
+.layout-try h2 {
+	font-size: 1.1em;
+	margin: 0 0 var(--lt-space-3);
+}
+
+.lt-muted {
+	color: var(--theme-sub);
+}
+
+.lt-error {
+	color: var(--theme-bad-text);
+	font-weight: 600;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 2/ Fields ============= */
+/* =============================== */
+/* =============================== */
+
+.lt-field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--lt-space-1);
+	margin: var(--lt-space-4) 0 0;
+}
+
+.lt-field label {
+	font-weight: 600;
+}
+
+.lt-field select {
+	font: inherit;
+	max-width: 100%;
+	min-height: 2.2em;
+}
+
+.lt-typing textarea {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	color: var(--theme-text);
+	font:
+		1.25em/1.5 system-ui,
+		sans-serif;
+	min-height: 8em;
+	padding: var(--lt-space-3);
+	resize: vertical;
+	width: 100%;
+}
+
+.lt-typing textarea:focus-visible {
+	outline: 3px solid var(--theme-accent);
+	outline-offset: 2px;
+}
+
+.lt-status {
+	font-weight: 600;
+	min-height: 1.5em;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 3/ Keyboard =========== */
+/* =============================== */
+/* =============================== */
+
+.lt-keyboard {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 12px;
+	margin-top: var(--lt-space-4);
+	padding: var(--lt-space-4);
+}
+
+.lt-board,
+.lt-row {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.lt-board {
+	display: flex;
+	flex-direction: column;
+	gap: var(--lt-space-1);
+}
+
+.lt-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--lt-space-1);
+}
+
+/* Each row starts a little further right, as on a staggered keyboard. */
+.lt-board > li:nth-child(2) .lt-row {
+	padding-left: 1.2em;
+}
+
+.lt-board > li:nth-child(3) .lt-row {
+	padding-left: 1.6em;
+}
+
+.lt-board > li:nth-child(4) .lt-row {
+	padding-left: 0.6em;
+}
+
+.lt-key kbd {
+	align-items: center;
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	display: flex;
+	font:
+		1.1em/1 system-ui,
+		sans-serif;
+	height: 2.4em;
+	justify-content: center;
+	min-width: 2.4em;
+	padding: 0 var(--lt-space-1);
+}
+
+.lt-key.lt-absent kbd {
+	opacity: 0.4;
+}
+
+.lt-key.lt-pressed kbd {
+	border-color: var(--theme-accent);
+	box-shadow: 0 0 0 2px var(--theme-accent);
+}

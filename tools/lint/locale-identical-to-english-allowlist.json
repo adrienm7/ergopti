@@ -4168,6 +4168,77 @@
 				"uk",
 				"zh"
 			]
+		},
+		"layout_try.layout_label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "it", "pt", "sv"]
+		},
+		"layout_try.level.altgr": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_try.level.base": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "pt"]
+		},
+		"layout_try.level.shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_try.level.shift_altgr": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
 		}
 	}
 }

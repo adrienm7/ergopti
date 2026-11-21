@@ -5,7 +5,7 @@
 MODULE: Ergopti Studio Section Layout
 DESCRIPTION:
 Ergopti Studio is an app-like workspace: under the site header, a slim tab
-bar (« Éditer », « Comparer », « Optimiser », from siteNavigation.js) and the framed tool,
+bar (« Éditer », « Comparer », « Optimiser », « Essayer », from siteNavigation.js) and the framed tool,
 which takes the full width and the rest of the viewport height and scrolls
 inside itself. The site page around it does not scroll. The editor's
 « Compare with other layouts » opens the « Comparer » tab, which takes the

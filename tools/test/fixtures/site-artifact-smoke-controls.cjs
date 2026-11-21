@@ -164,9 +164,14 @@ async function run() {
 				return disposed;
 			},
 			url: () => url,
-			// The fake page embeds no frame: settleFrames has nothing to wait for.
+			// The fake page embeds no frame: settleFrames has nothing to wait for,
+			// and the emulator's frame answers as the page itself.
 			mainFrame: () => null,
 			frames: () => [],
+			frameLocator(selector) {
+				assert.equal(selector, smoke.EMULATION_FRAME);
+				return { locator: (inner) => this.locator(inner) };
+			},
 			async evaluate() {
 				return reload && navigated ? 18 : 17;
 			},
@@ -215,7 +220,7 @@ async function run() {
 							return name === 'data-emulation-state' ? emulationState : emulationBusy;
 						}
 						if (selector === smoke.NAVIGATION_LINK)
-							return foreignNavigation ? '/foreign' : 'ergopti/utilisation';
+							return foreignNavigation ? '/foreign' : 'studio/essayer?layout=ergopti';
 						if (wrongDownload) return '#';
 						// Release binaries are absolute; local documents render relative
 						// to the two-level installation page, as SvelteKit writes them.
@@ -269,7 +274,7 @@ async function run() {
 			const page = pagePort();
 			await page.goto('http://127.0.0.1:1' + base + smoke.NAVIGATION_FROM);
 			await smoke.exerciseNavigation(page, 'http://127.0.0.1:1', base);
-			assert.equal(page.url(), 'http://127.0.0.1:1' + base + smoke.EMULATION_ROUTE);
+			assert.equal(page.url(), 'http://127.0.0.1:1' + base + smoke.EMULATION_TARGET);
 		}
 		for (const options of [{ foreignNavigation: true }, { reload: true }]) {
 			const page = pagePort(options);

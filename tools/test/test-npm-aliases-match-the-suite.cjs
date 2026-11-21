@@ -113,6 +113,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium drives the Studio's undo and redo (buttons, keys, names) in
 	// its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
 	'tools/test/browser/studio-history.playwright.cjs',
+	// Real Chromium types in the Studio's « Essayer » tab (keys, dead keys, AltGr,
+	// layout=) in its own step of Core / js; test-ci-pipeline-wiring.cjs pins it.
+	'tools/test/browser/studio-try.playwright.cjs',
 	// Real Chromium scans and walks the app's own WebView windows with a fake host
 	// in its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
 	'tools/test/browser/app-windows-accessibility.playwright.cjs',

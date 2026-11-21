@@ -11,12 +11,15 @@ const artifact = require('../../ci/site-artifact.cjs');
 const { SITE_ROUTES } = artifact;
 
 // Site structure (src/lib/js/siteNavigation.js): the Disposition Ergopti pages
-// carry the reference keyboard; its « Essayer » sub-page carries the emulator;
-// each product's installation page carries its downloads.
+// carry the reference keyboard; their « Essayer » link opens Ergopti Studio's
+// « Essayer » tab on Ergopti, whose frame carries the emulator (maintainer,
+// 2026-11-21); each product's installation page carries its downloads.
 const LAYOUT_SECTION = '/ergopti';
 const NAVIGATION_FROM = '/ergopti';
-const EMULATION_ROUTE = '/ergopti/utilisation';
-const NAVIGATION_LINK = 'nav.subnav a[href$="ergopti/utilisation"]';
+const EMULATION_ROUTE = '/studio/essayer';
+const EMULATION_TARGET = EMULATION_ROUTE + '?layout=ergopti';
+const EMULATION_FRAME = 'main iframe.studio-frame';
+const NAVIGATION_LINK = 'nav.subnav a[href$="studio/essayer?layout=ergopti"]';
 const LAYOUT_DOWNLOADS_ROUTE = '/ergopti/installation';
 const PLUS_DOWNLOADS_ROUTE = '/ergopti-plus/installation';
 
@@ -162,7 +165,7 @@ function authoredExternalFixture(url) {
 
 /** Genuine client navigation must preserve the document and use this artifact's target prefix. */
 async function exerciseNavigation(page, origin, basePath) {
-	const target = origin + basePath + EMULATION_ROUTE;
+	const target = origin + basePath + EMULATION_TARGET;
 	const link = page.locator(NAVIGATION_LINK).first();
 	await link.waitFor({ state: 'visible' });
 	assert.equal(new URL(await link.getAttribute('href'), page.url()).href, target);
@@ -183,11 +186,12 @@ async function exerciseNavigation(page, origin, basePath) {
 	await exerciseEmulationReadiness(page);
 }
 
-/** Observe the mounted emulator's declared completion before retiring its document. */
+/** Observe the framed emulator's declared completion before retiring its document. */
 async function exerciseEmulationReadiness(page) {
-	const input = page.locator('#input-text');
+	const frame = page.frameLocator(EMULATION_FRAME);
+	const input = frame.locator('#input-text');
 	await input.waitFor({ state: 'visible' });
-	await page
+	await frame
 		.locator('#input-text[data-emulation-state="ready"]:not(:disabled)[aria-busy="false"]')
 		.waitFor({ state: 'visible' });
 	assert.equal(await input.getAttribute('data-emulation-state'), 'ready');
@@ -446,6 +450,8 @@ module.exports = {
 	NAVIGATION_FROM,
 	NAVIGATION_LINK,
 	EMULATION_ROUTE,
+	EMULATION_TARGET,
+	EMULATION_FRAME,
 	LAYOUT_DOWNLOADS_ROUTE,
 	PLUS_DOWNLOADS_ROUTE,
 	isLayoutRoute,

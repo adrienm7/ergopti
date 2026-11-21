@@ -36,11 +36,13 @@ const HOME_CARDS = Object.freeze([
 	['ergopti-plus', 'Ergopti+', '/ergopti-plus'],
 	['studio', 'Ergopti Studio', '/studio']
 ]);
-// Ergopti Studio tabs: the editor, the layout comparison and the layout optimizer.
+// Ergopti Studio tabs: the editor, the layout comparison, the layout optimizer
+// and the typing try (maintainer, 2026-11-21).
 const STUDIO_TABS = Object.freeze([
 	['/studio', 'Éditer'],
 	['/studio/comparer', 'Comparer'],
-	['/studio/optimiser', 'Optimiser']
+	['/studio/optimiser', 'Optimiser'],
+	['/studio/essayer', 'Essayer']
 ]);
 // Where the layout version selector must and must not be.
 const VERSION_SELECTOR = Object.freeze({
@@ -58,7 +60,8 @@ const REFERENCE_KEYBOARD = Object.freeze({
 		'/ergopti-plus-old',
 		'/studio',
 		'/studio/comparer',
-		'/studio/optimiser'
+		'/studio/optimiser',
+		'/studio/essayer'
 	]
 });
 // Each Ergopti+ page renders exactly these sections, so a page never pays
@@ -82,7 +85,10 @@ const REDIRECTS = Object.freeze([
 	['/informations/#changelog', '/ergopti/informations#changelog'],
 	['/utilisation', '/ergopti/installation'],
 	['/utilisation#linux', '/ergopti/installation#linux'],
-	['/utilisation#keyboard_emulation', '/ergopti/utilisation#keyboard_emulation'],
+	['/utilisation#keyboard_emulation', '/studio/essayer?layout=ergopti#keyboard_emulation'],
+	// The former « Essayer » page is the Studio's tab on Ergopti (maintainer, 2026-11-21).
+	['/ergopti/utilisation', '/studio/essayer?layout=ergopti'],
+	['/ergopti/utilisation#input-text', '/studio/essayer?layout=ergopti#input-text'],
 	['/#keyboard_frequences', '/ergopti/presentation#keyboard_frequences'],
 	['/ergopti-plus#ep-ia', '/ergopti-plus/ia#ep-ia'],
 	['/ergopti-plus#ep-telecharger', '/ergopti-plus/installation#ep-telecharger'],

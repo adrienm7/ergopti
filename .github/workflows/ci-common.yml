@@ -354,6 +354,9 @@ jobs:
       - name: Test the Studio undo and redo history
         run: npm run test:browser:studio-history
 
+      - name: Test the Studio typing try
+        run: npm run test:browser:studio-try
+
       - name: Test the app windows accessibility
         run: npm run test:browser:app-accessibility
 

@@ -35,7 +35,8 @@
 			<p class="encart-introduction">
 				Téléchargez la Disposition <Ergopti></Ergopti> pour Windows, macOS ou Linux. Pour la tester sans
 				rien installer,
-				<a href={resolve('/ergopti/utilisation')} class="link">essayez-la en ligne</a>.
+				<a href={resolve('/studio/essayer') + '?layout=ergopti'} class="link">essayez-la en ligne</a
+				>.
 			</p>
 		</bloc-introduction>
 	</svelte:fragment>

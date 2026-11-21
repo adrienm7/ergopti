@@ -218,13 +218,6 @@
 			"reason": "The label text of a sub-navigation link, a flex item next to its icon."
 		},
 		{
-			"file": "src/lib/keyboard/KeyboardEmulation.svelte",
-			"element": "div.main",
-			"count": 1,
-			"kind": "layout",
-			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
-		},
-		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonColor.svelte",
 			"element": "span.color-text-gradient",
 			"count": 2,
@@ -1931,27 +1924,6 @@
 			"count": 7,
 			"kind": "language",
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
-		},
-		{
-			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
-			"element": "div (none)",
-			"count": 2,
-			"kind": "layout",
-			"reason": "Clips the h2 for its reveal animation, and wraps the match sections."
-		},
-		{
-			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
-			"element": "div.main",
-			"count": 1,
-			"kind": "layout",
-			"reason": "Width wrapper with the site column padding (.main); not a landmark, the page already has its main."
-		},
-		{
-			"file": "src/routes/ergopti/utilisation/introduction_utilisation.svelte",
-			"element": "span (none)",
-			"count": 2,
-			"kind": "decorative",
-			"reason": "The aria-hidden sort arrows of the table headers; aria-sort says the order."
 		},
 		{
 			"file": "src/routes/studio/+layout.svelte",

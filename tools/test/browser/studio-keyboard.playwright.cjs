@@ -57,7 +57,8 @@ const TYPES = {
 	'.toml': 'text/plain'
 };
 const UI = '/ergopti_plus/_shared/ui/';
-// The pages the site frames under /studio, /studio/comparer and /studio/optimiser.
+// The pages the site frames under /studio, /studio/comparer, /studio/optimiser
+// and /studio/essayer.
 const PAGES = Object.freeze([
 	{
 		name: 'editor',
@@ -81,6 +82,13 @@ const PAGES = Object.freeze([
 		path: UI + 'layout_optimizer/index.html',
 		ready: '.layout-optimizer h1',
 		tabs: '.lo-tabs'
+	},
+	{
+		name: 'Essayer',
+		path: UI + 'layout_try/index.html',
+		ready: '#input-text[data-emulation-state="ready"]',
+		// The layout list, the text area and « Clear »: a page of three controls, no tabs.
+		minStops: 3
 	}
 ]);
 const VIEWPORT = { width: 1280, height: 900 };
@@ -340,7 +348,10 @@ async function main() {
 			const { context, page, errors } = await open(browser, origin, target);
 			try {
 				const stops = await check(page, target.name);
-				assert.ok(stops >= 5, target.name + ' must offer its controls to the keyboard');
+				assert.ok(
+					stops >= (target.minStops || 5),
+					target.name + ' must offer its controls to the keyboard'
+				);
 				if (target.name === 'Comparer') {
 					await page.evaluate(() =>
 						document.querySelectorAll('#la-details details, #la-settings').forEach((node) => {
@@ -363,7 +374,7 @@ async function main() {
 					} finally {
 						await swept.context.close();
 					}
-				} else await sweepTabs(page, target);
+				} else if (target.tabs) await sweepTabs(page, target);
 				assert.deepEqual(errors, [], target.name + ': no page error and no outside request');
 			} finally {
 				await context.close();
