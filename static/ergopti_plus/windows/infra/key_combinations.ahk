@@ -531,7 +531,11 @@ KeyCombinationFire(Second, Ports := 0) {
 	}
 	; The hold is taken at key-down, as every tap-hold of this driver takes
 	; it; a release inside the second key's threshold makes the press a tap.
-	if (Result["tap"] && Tap != KEY_COMBINATION_NONE) {
+	; The pair's own tap takes the strict threshold, never the lone tap window
+	; the modifier owner grants a key pressed alone: the shared policy macOS
+	; and Linux follow (maintainer decision THD-2, 2026-11-21).
+	PairTap := Result["tap"] && Result["elapsed_ms"] <= Seconds * 1000
+	if (PairTap && Tap != KEY_COMBINATION_NONE) {
 		; The original owner has already retired; deny only a newly emitted tap.
 		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"

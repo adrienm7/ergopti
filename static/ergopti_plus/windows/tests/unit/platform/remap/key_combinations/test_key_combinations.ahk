@@ -91,12 +91,13 @@ _KCT_Keys(Down, Calls := 0) {
 
 ; Recording ports for KeyCombinationFire. OwnerTap is the "tap" the hold owner
 ; reports once the second key is up.
-_KCT_Ports(Events, OwnerTap := false) {
+_KCT_Ports(Events, OwnerTap := false, OwnerElapsedMs := 50) {
 	return Map(
 		"own_modifier", (Second, ModKey, Seconds) => (
 			Events.Push("modifier:" . Second . ":" . (ModKey is Array ? "combination" : ModKey)),
-			Map("tap", OwnerTap, "activated", true)),
-		"own_layer", (Second, Seconds) => (Events.Push("layer:" . Second), Map("tap", OwnerTap, "activated", true)),
+			Map("tap", OwnerTap, "activated", true, "elapsed_ms", OwnerElapsedMs)),
+		"own_layer", (Second, Seconds) => (Events.Push("layer:" . Second),
+			Map("tap", OwnerTap, "activated", true, "elapsed_ms", OwnerElapsedMs)),
 		"run_tap", (First, Second, ActionId) => Events.Push("tap:" . First . ">" . Second . ":" . ActionId),
 		"take_first", (First, Second) => Events.Push("take:" . First))
 }
@@ -383,6 +384,40 @@ _KCT_BothSlotsSplitOnTheRelease() {
 }
 Test("key combinations: a pair with both slots is a tap on a quick release, a hold otherwise (key-combinations-2026-10-01)",
 	_KCT_BothSlotsSplitOnTheRelease)
+
+; The pair's own tap takes the strict threshold (maintainer decision THD-2,
+; 2026-11-21): a modifier owner that granted the lone tap window, because the
+; key alone may tap up to it, still makes the pair a hold past the threshold.
+_KCT_PairTapIsStrict() {
+	global TapHold
+	PastThreshold() {
+		Events := []
+		Late := Round(TapHoldDuration(TapHold, "caps_lock") * 1000) + 1
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("hold", KeyCombinationFire("caps_lock", _KCT_Ports(Events, true, Late)),
+			"a release past the threshold is no pair tap, whatever the lone window")
+		AssertEqual(2, Events.Length, "no tap runs")
+	}
+	AtThreshold() {
+		Events := []
+		Edge := Round(TapHoldDuration(TapHold, "caps_lock") * 1000)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("tap", KeyCombinationFire("caps_lock", _KCT_Ports(Events, true, Edge)),
+			"the threshold itself is still a tap")
+	}
+	LayerPast() {
+		Events := []
+		Late := Round(TapHoldDuration(TapHold, "space") * 1000) + 1
+		AssertTrue(KeyCombinationOwns("space", _KCT_Keys(["tab"])))
+		AssertEqual("hold", KeyCombinationFire("space", _KCT_Ports(Events, true, Late)),
+			"a layer hold pair is strict too")
+	}
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map("left_alt_then_caps_lock", "shift"), PastThreshold)
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map("left_alt_then_caps_lock", "shift"), AtThreshold)
+	_KCT_With(Map("tab_then_space", "caps_word"), Map("tab_then_space", "nav"), LayerPast)
+}
+Test("key combinations: a pair's own tap takes the strict threshold, not the lone window (thd-2-strict-pair-tap)",
+	_KCT_PairTapIsStrict)
 
 ; The actions run for real through the catalogue, as the three former
 ; dispatchers ran them: against the stubs of the suite.
@@ -1327,7 +1362,7 @@ _KCT_CategoryAtOwnerReturn(Hold, Revoke, OwnerTap := true) {
 		global _KeyCombinationTaken, _KeyCombinationHandled
 		Events := []
 		Ports := _KCT_Ports(Events)
-		Outcome := Map("tap", OwnerTap, "activated", true, "released", true)
+		Outcome := Map("tap", OwnerTap, "activated", true, "released", true, "elapsed_ms", 50)
 		Modifier(Second, ModKey, Seconds) {
 			Events.Push("modifier-return:" . Second)
 			if Revoke
@@ -1349,7 +1384,7 @@ _KCT_CategoryAtOwnerReturn(Hold, Revoke, OwnerTap := true) {
 		AssertEqual((Hold == "nav" ? "layer-return:" : "modifier-return:") . "caps_lock", Events[2])
 		AssertTrue(Outcome["tap"] == OwnerTap && Outcome["activated"] && Outcome["released"],
 			"the acknowledged owner result is not rewritten into failed retirement")
-		AssertEqual(3, Outcome.Count, "no ownership or debt fields are manufactured")
+		AssertEqual(4, Outcome.Count, "no ownership or debt fields are manufactured")
 		AssertEqual("left_alt", _KeyCombinationTaken["caps_lock"])
 		AssertTrue(_KeyCombinationHandled.Has("caps_lock"))
 	}
@@ -1381,7 +1416,7 @@ _KCT_CategoryAtNativeEnrollment(Hold, Revoke) {
 		global _KeyCombinationTaken, _KeyCombinationHandled
 		Events := []
 		Calls := []
-		Outcome := Map("tap", false, "activated", true, "released", true)
+		Outcome := Map("tap", false, "activated", true, "released", true, "elapsed_ms", 50)
 		Observe(Line) {
 			Expected := Hold == "nav" ? "[TapHoldLoader] Invalid time_activation_seconds "
 				: "[TapHoldLoader] Resolved hold_modifier "
@@ -1429,7 +1464,7 @@ _KCT_CategoryAtNativeEnrollment(Hold, Revoke) {
 		AssertTrue(Handled.Has("caps_lock"), "the original first-key effect stays accounted for")
 		AssertFalse(Outcome["tap"])
 		AssertTrue(Outcome["activated"] && Outcome["released"])
-		AssertEqual(3, Outcome.Count, "refusal does not manufacture or alter owner debt")
+		AssertEqual(4, Outcome.Count, "refusal does not manufacture or alter owner debt")
 	}
 	Run() => _KCT_With(Map("left_alt_then_caps_lock", "caps_word"),
 		Map("left_alt_then_caps_lock", Hold), Body)
@@ -1605,7 +1640,7 @@ _KCT_AssignmentChangesAtOwnerReturn(Hold, OwnerTap) {
 		global KeyCombinationTaps
 		Events := []
 		Ports := _KCT_Ports(Events)
-		Outcome := Map("tap", OwnerTap, "activated", true, "released", true)
+		Outcome := Map("tap", OwnerTap, "activated", true, "released", true, "elapsed_ms", 50)
 		Modifier(Second, ModKey, Seconds) {
 			Events.Push("modifier-return:" . Second)
 			KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
@@ -1626,7 +1661,7 @@ _KCT_AssignmentChangesAtOwnerReturn(Hold, OwnerTap) {
 		AssertEqual((Hold == "nav" ? "layer-return:" : "modifier-return:") . "caps_lock", Events[2])
 		AssertTrue(Outcome["tap"] == OwnerTap && Outcome["activated"] && Outcome["released"],
 			"the original acknowledged native result and retirement remain untouched")
-		AssertEqual(3, Outcome.Count)
+		AssertEqual(4, Outcome.Count)
 	}
 	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map("left_alt_then_caps_lock", Hold), Body)
 }
