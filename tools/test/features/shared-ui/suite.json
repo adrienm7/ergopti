@@ -696,7 +696,7 @@
 		},
 		{
 			"id": "page-direction",
-			"ordinal": 719,
+			"ordinal": 720,
 			"name": "every app window sets its root lang and dir from the locale, so Arabic and Hebrew lay out right to left, and no window rule names a physical left or right",
 			"cmd": "node",
 			"args": ["tools/test/test-page-direction.cjs"],
@@ -704,7 +704,7 @@
 		},
 		{
 			"id": "webview-host-pause-census",
-			"ordinal": 719,
+			"ordinal": 721,
 			"name": "every Windows window built on WebViewHost is placed in the pause census, and each configuration window among them answers its page while the driver is paused",
 			"cmd": "node",
 			"args": ["tools/test/test-webview-host-pause-census.cjs"],
@@ -712,7 +712,7 @@
 		},
 		{
 			"id": "studio-edit-history",
-			"ordinal": 719,
+			"ordinal": 722,
 			"name": "Ergopti Studio's undo history walks its named steps in order, a new edit after an undo clears Redo, it keeps the registry's number of steps, fails fast on an inconsistent use, answers Ctrl or Cmd with Z, Y and Shift+Z outside text fields, and names its steps in all 21 locales",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-edit-history.cjs"],
@@ -720,7 +720,7 @@
 		},
 		{
 			"id": "studio-try",
-			"ordinal": 720,
+			"ordinal": 723,
 			"name": "Ergopti Studio's « Essayer » tab types a library layout's levels and dead keys, takes ?layout= and the former page's anchors, is listed by the Studio and the Disposition Ergopti, receives the redirect of /ergopti/utilisation, and names its strings in all 21 locales",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-try.cjs"],
