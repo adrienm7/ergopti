@@ -307,9 +307,54 @@ assert(M.SWAP_READY_TICKS, "The release swap script names no boot-ready wait")
 M.BOOT_READY_CAPABILITY = M.SWAP_SCRIPT:match('%[ ! %-f "%$app(/Contents/Resources/[^"]+)" %]')
 assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready capability")
 
---- Downloads and verifies one release into a fresh staging folder.
+-- The managed-network receipt of each closed fact the staging script prints
+-- when its download fails (« FAILED native:<reason> », the launcher's
+-- ManagedBootstrapDownload reasons). Only what the reason proves is claimed:
+-- a file or connect failure names no errno, so it stays an unknown cause.
+local NATIVE_RECEIPTS = {
+	offline = { backend = "urlsession", stage = "connect", failure_provenance = "verified",
+		network_status = "disconnected" },
+	certificate = { backend = "urlsession", stage = "tls", failure_provenance = "verified",
+		tls_verification = "enforced", tls_status = "untrusted_certificate" },
+	proxy = { backend = "urlsession", stage = "proxy_resolve", failure_provenance = "verified",
+		proxy_resolution_status = "unavailable" },
+	connect = { backend = "urlsession", stage = "connect", failure_provenance = "unknown" },
+	http = { backend = "urlsession", stage = "http", failure_provenance = "unknown" },
+	file_create = { backend = "native_fs", stage = "file_create", failure_provenance = "unknown" },
+	file_write = { backend = "native_fs", stage = "file_write", failure_provenance = "unknown" },
+	file_publish = { backend = "native_fs", stage = "file_rename", failure_provenance = "unknown" },
+	cleanup = { backend = "native_fs", stage = "file_remove", failure_provenance = "unknown" },
+}
+
+-- The curl exit codes whose stage is proven (proxy name resolution, peer
+-- certificate), as the Linux curl receipts read them.
+local CURL_STAGES = { [5] = "proxy_resolve", [60] = "tls" }
+
+--- The failure receipt of the staging script's output: the closed fact it
+--- printed, or an empty receipt (an unknown cause) when it printed none.
+--- @param stdout string|nil The script's standard output.
+--- @return table receipt Fields of _shared/core/network/data/managed_network.json.
+function M.failure_receipt(stdout)
+	local fact = type(stdout) == "string" and stdout:match("^FAILED ([%w_:]+)\n$") or nil
+	local reason = fact and fact:match("^native:([%w_]+)$")
+	if reason and NATIVE_RECEIPTS[reason] then
+		local receipt = {}
+		for key, value in pairs(NATIVE_RECEIPTS[reason]) do receipt[key] = value end
+		return receipt
+	end
+	local exit_code = fact and tonumber(fact:match("^curl:(%d+)$"))
+	if exit_code then
+		local stage = CURL_STAGES[exit_code]
+		return { backend = "curl", stage = stage or "connect", failure_provenance = stage and "verified" or "unknown",
+			curl_exit = exit_code, tls_verification = "enforced" }
+	end
+	return {}
+end
+
+--- Downloads and verifies one release into a fresh staging folder; the
+--- staging script removes that folder on any failure.
 --- @param asset table M.find_asset() result.
---- @param done function fn(staged_app|nil, stage "download"|"verify"|"signature", detail).
+--- @param done function fn(staged_app|nil, stage "download"|"verify"|"signature", detail, failure_receipt|nil).
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
@@ -376,8 +421,10 @@ function M.stage(asset, done)
 		local stage = code == M.EXIT_SIGNATURE and "signature"
 			or (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
-		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
-		done(nil, stage, detail)
+		Logger.error(LOG, "Release %s refused at the %s; its stage %s is removed (%s).", asset.tag, stage, stage_dir, detail)
+		-- The failure's own receipt names its cause (proxy, offline, certificate)
+		-- in the Versions window, never an empty one (UPD-11)
+		done(nil, stage, detail, stage == "download" and M.failure_receipt(stdout) or nil)
 	end, nil, environment)
 	return type(handle) == "table" and handle.start() == true
 end

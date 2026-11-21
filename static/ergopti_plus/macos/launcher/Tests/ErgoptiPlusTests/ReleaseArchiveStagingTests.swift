@@ -238,6 +238,7 @@ final class ReleaseArchiveStagingTests: XCTestCase {
 			digest: String(repeating: "0", count: 64), running: app, expectedVersion: version, root: root)
 		XCTAssertEqual(badDigest.status, 21)
 		XCTAssertFalse(manager.fileExists(atPath: rejected.appendingPathComponent("app").path))
+		XCTAssertFalse(manager.fileExists(atPath: rejected.path), "upd-11: a refused stage removes its own folder")
 		XCTAssertFalse(badDigest.stdout.contains("READY"))
 		let (badVersion, _, _) = try stage(payload: payload, format: "tar.xz",
 			digest: checksum, running: app, expectedVersion: "9.9.9", root: root)
