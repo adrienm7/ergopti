@@ -1,0 +1,99 @@
+{
+	"contract": "_shared/metrics/data/studio_ngrams.json",
+	"description": "The saved Ergopti Studio « My typing » read every driver keeps in its keystats cache folder: one header line (the contract's snapshot format, a space, then the store stamp the read was made at), then the payload JSON. Windows (KLR_StudioSnapshotRead, KLR_StudioSnapshotWrite) and macOS and Linux (metrics/engine/view/studio_ngrams.lua, decode_snapshot and encode_snapshot) replay these vectors. format and schema must equal the contract's, so a change of either fails every driver until the vectors follow. A read vector with a stamp is accepted with that stamp and its body as the payload; one without is refused (fail fast: a corrupt or mismatched saved read is never shown). A write vector without text is refused; with text, it is the file written.",
+	"format": "ergopti-studio-ngrams 1",
+	"schema": 2,
+	"reads": [
+		{
+			"id": "accepted",
+			"text": "ergopti-studio-ngrams 1 rev-7\n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1},\"total\":1}",
+			"stamp": "rev-7"
+		},
+		{
+			"id": "accepted_schema_last",
+			"text": "ergopti-studio-ngrams 1 4f2a\n{\"source\":\"keystats\",\"chars\":{\"e\":2},\"schema\":2}",
+			"stamp": "4f2a"
+		},
+		{
+			"id": "refused_empty_file",
+			"text": ""
+		},
+		{
+			"id": "refused_without_header",
+			"text": "{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_header_without_payload",
+			"text": "ergopti-studio-ngrams 1 rev-7"
+		},
+		{
+			"id": "refused_header_without_stamp",
+			"text": "ergopti-studio-ngrams 1\n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_empty_stamp",
+			"text": "ergopti-studio-ngrams 1 \n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_crlf_header",
+			"text": "ergopti-studio-ngrams 1 rev-7\r\n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_other_format",
+			"text": "ergopti-studio-ngrams 2 rev-7\n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_payload_not_an_object",
+			"text": "ergopti-studio-ngrams 1 rev-7\n[2,\"keystats\"]"
+		},
+		{
+			"id": "refused_truncated_payload",
+			"text": "ergopti-studio-ngrams 1 rev-7\n{\"schema\":2,\"source\":\"keystats\",\"chars\":{\"a\":1"
+		},
+		{
+			"id": "refused_other_schema",
+			"text": "ergopti-studio-ngrams 1 rev-7\n{\"schema\":1,\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_without_schema",
+			"text": "ergopti-studio-ngrams 1 rev-7\n{\"source\":\"keystats\",\"chars\":{\"a\":1}}"
+		},
+		{
+			"id": "refused_other_source",
+			"text": "ergopti-studio-ngrams 1 rev-7\n{\"schema\":2,\"source\":\"corpus\",\"chars\":{\"a\":1}}"
+		}
+	],
+	"writes": [
+		{
+			"id": "written",
+			"stamp": "rev-9",
+			"json": "{\"schema\":2,\"source\":\"keystats\"}",
+			"text": "ergopti-studio-ngrams 1 rev-9\n{\"schema\":2,\"source\":\"keystats\"}"
+		},
+		{
+			"id": "refused_empty_stamp",
+			"stamp": "",
+			"json": "{\"schema\":2,\"source\":\"keystats\"}"
+		},
+		{
+			"id": "refused_stamp_with_line_feed",
+			"stamp": "rev\n9",
+			"json": "{\"schema\":2,\"source\":\"keystats\"}"
+		},
+		{
+			"id": "refused_stamp_with_carriage_return",
+			"stamp": "rev\r9",
+			"json": "{\"schema\":2,\"source\":\"keystats\"}"
+		},
+		{
+			"id": "refused_other_schema",
+			"stamp": "rev-9",
+			"json": "{\"schema\":1,\"source\":\"keystats\"}"
+		},
+		{
+			"id": "refused_payload_not_an_object",
+			"stamp": "rev-9",
+			"json": "[2]"
+		}
+	]
+}

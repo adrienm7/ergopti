@@ -364,7 +364,7 @@ _KLRSource_StudioWindowAnswers() {
 	DirCreate(Dir)
 	try {
 		Outcome := Map("status", "ok", "stage", Dir . "\stage.json")
-		FileAppend('{"schema":1,"chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
 		Stamp := Map("value", "rev-1")
 		Deps := Map(
 			"metrics_dir", Dir . "\absent",
@@ -381,7 +381,7 @@ _KLRSource_StudioWindowAnswers() {
 		AssertEqual(0, Requests.Length, "an absent store starts no worker")
 		Deps["metrics_dir"] := Dir
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"e":7}}}', Pushed[2])
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"e":7}}}', Pushed[2])
 		AssertEqual(Dir, Requests[1])
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual(Pushed[2], Pushed[3], "an unchanged store answers from the cached projection")
@@ -425,21 +425,21 @@ _KLRSource_StudioSavedReadFirst() {
 	DirCreate(Dir . "\by_device\pc")
 	try {
 		FileAppend("-- ledger", Dir . "\by_device\pc\data.sql", "UTF-8-RAW")
-		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-old", '{"schema":1,"chars":{"a":1}}'))
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-old", '{"schema":2,"source":"keystats","chars":{"a":1}}'))
 		Stamp := Map("value", "rev-new")
 		Pushed := [], Terminals := []
 		Deps := _KLRSource_StudioSnapshotDeps(Dir, Stamp, Pushed, Terminals, Map("value", 0))
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual(1, Pushed.Length, "the saved read is pushed before the worker ends")
-		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"a":1}}}', Pushed[1])
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"a":1}}}', Pushed[1])
 		AssertEqual(1, Terminals.Length, "a changed store still starts the worker")
-		FileAppend('{"schema":1,"chars":{"a":2}}', Dir . "\stage.json", "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"a":2}}', Dir . "\stage.json", "UTF-8-RAW")
 		Terminals[1].Call("ok", Dir . "\stage.json")
-		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"a":2}}}', Pushed[2],
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"a":2}}}', Pushed[2],
 			"the fresh read follows")
 		Saved := KLR_StudioSnapshotRead(Dir)
 		AssertEqual("rev-new", Saved["stamp"], "the fresh read is saved with its stamp")
-		AssertEqual('{"schema":1,"chars":{"a":2}}', Saved["json"])
+		AssertEqual('{"schema":2,"source":"keystats","chars":{"a":2}}', Saved["json"])
 		; A restart on the unchanged store: the saved read is the answer, no worker.
 		_LayEdWin_StudioCache := 0
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
@@ -464,7 +464,7 @@ _KLRSource_StudioSavedReadFollowsContract() {
 		Path := KLR_StudioSnapshotPath(Dir)
 		AssertEqual(Snapshot["file"], SubStr(Path, StrLen(Path) - StrLen(Snapshot["file"]) + 1),
 			"the saved read is the file the contract names")
-		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-9", '{"schema":1}'))
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-9", '{"schema":2,"source":"keystats"}'))
 		Text := FileRead(Path, "UTF-8")
 		AssertEqual(Snapshot["format"] . " rev-9`n", SubStr(Text, 1, InStr(Text, "`n")),
 			"its header line is the contract's format, then the store stamp")
@@ -482,16 +482,16 @@ _KLRSource_StudioBrokenSavedRead() {
 	Dir := A_Temp . "\ergopti_studio_broken_" . A_TickCount
 	DirCreate(Dir . "\cache")
 	try {
-		FileAppend('{"schema":1}', KLR_StudioSnapshotPath(Dir), "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats"}', KLR_StudioSnapshotPath(Dir), "UTF-8-RAW")
 		AssertThrows(() => KLR_StudioSnapshotRead(Dir), "a file without its header is refused")
 		Pushed := [], Terminals := []
 		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Map("value", 0))
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual(0, Pushed.Length, "a broken saved read is not shown")
 		AssertEqual(1, Terminals.Length)
-		FileAppend('{"schema":1,"chars":{"b":3}}', Dir . "\stage.json", "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"b":3}}', Dir . "\stage.json", "UTF-8-RAW")
 		Terminals[1].Call("ok", Dir . "\stage.json")
-		AssertEqual('{"schema":1,"chars":{"b":3}}', KLR_StudioSnapshotRead(Dir)["json"])
+		AssertEqual('{"schema":2,"source":"keystats","chars":{"b":3}}', KLR_StudioSnapshotRead(Dir)["json"])
 		AssertTrue(KLR_StudioSnapshotRetire(Dir), "the saved read can be retired")
 		AssertEqual(0, KLR_StudioSnapshotRead(Dir), "no saved read is left")
 		AssertTrue(KLR_StudioSnapshotRetire(Dir), "retiring an absent read succeeds")
@@ -502,6 +502,36 @@ _KLRSource_StudioBrokenSavedRead() {
 }
 Test("Keystats reader: a saved Ergopti Studio read out of its format is ignored and replaced (studio-saved-read-first)",
 	_KLRSource_StudioBrokenSavedRead)
+
+; (studio-saved-read-vectors) The saved read is one format for the three
+; drivers: macOS and Linux replay the same vectors
+; (_shared/tests/lua/metrics/studio_ngrams_snapshot_contract.lua).
+_KLRSource_StudioSnapshotVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\metrics\studio_ngrams_snapshot_vectors.json"))
+	Contract := KLR_StudioContract()
+	AssertEqual(Contract["snapshot"]["format"], Corpus["format"], "the vectors follow the contract's format")
+	AssertEqual(Contract["schema"], Corpus["schema"], "and its schema")
+	Assert(Corpus["reads"].Length >= 10, "the corpus lists its read vectors")
+	for Vector in Corpus["reads"] {
+		Text := Vector["text"]
+		if Vector.Has("stamp") {
+			Saved := KLR_StudioSnapshotDecode(Text)
+			AssertEqual(Vector["stamp"], Saved["stamp"], Vector["id"])
+			AssertEqual(SubStr(Text, InStr(Text, "`n") + 1), Saved["json"], Vector["id"] . " (payload)")
+		} else
+			AssertThrows(() => KLR_StudioSnapshotDecode(Text), Vector["id"])
+	}
+	for Vector in Corpus["writes"] {
+		Stamp := Vector["stamp"], Json := Vector["json"]
+		if Vector.Has("text")
+			AssertEqual(Vector["text"], KLR_StudioSnapshotEncode(Stamp, Json), Vector["id"])
+		else
+			AssertThrows(() => KLR_StudioSnapshotEncode(Stamp, Json), Vector["id"])
+	}
+}
+Test("Keystats reader: the saved Ergopti Studio read follows the shared vectors (studio-saved-read-vectors)",
+	_KLRSource_StudioSnapshotVectors)
 
 ; (studio-saved-read-purge) A metrics purge that overlapped the worker's read:
 ; that read may hold what the purge deleted, so it is neither pushed nor saved,
@@ -517,7 +547,7 @@ _KLRSource_StudioPurgeOverlap() {
 		Pushed := [], Terminals := []
 		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Generation)
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		FileAppend('{"schema":1,"chars":{"p":9}}', Dir . "\stage.json", "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"p":9}}', Dir . "\stage.json", "UTF-8-RAW")
 		Generation["value"] := 6
 		Terminals[1].Call("ok", Dir . "\stage.json")
 		AssertEqual(0, Pushed.Length, "the overlapped read is not shown")
@@ -569,7 +599,7 @@ _KLRSource_StudioStampFollowsTheStore() {
 		; image and the saved Studio read must not make the read look stale.
 		DirCreate(Dir . "\cache")
 		FileAppend("image", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
-		AssertTrue(KLR_StudioSnapshotWrite(Dir, First, '{"schema":1}'))
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, First, '{"schema":2,"source":"keystats"}'))
 		AssertEqual(First, KLR_StudioStoreStamp(Dir), "the cache folder is not part of the stamp")
 		; Loop Files normalizes a full path (8.3 names such as a CI runner's
 		; RUNNER~1, separators): the cache stays out however the folder is spelled.

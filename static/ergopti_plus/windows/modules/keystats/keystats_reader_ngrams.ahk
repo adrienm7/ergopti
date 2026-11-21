@@ -306,14 +306,62 @@ KLR_StudioSnapshotRead(MetricsDir) {
 		Text := FSRead(Path)
 		if !(Text is String)
 				throw Error("The saved Ergopti Studio read cannot be read: " . Path)
+		try return KLR_StudioSnapshotDecode(Text)
+		catch as Err
+				throw Error(Err.Message . " " . Path)
+}
+
+/**
+ * Whether a projection JSON is one of the contract's: its top-level schema and
+ * source. A token is at most three characters, so neither key can be one.
+ * @param Json {String} The projection JSON object.
+ * @returns {Boolean}
+ */
+_KLR_StudioSnapshotFits(Json) {
+		Contract := KLR_StudioContract()
+		if !RegExMatch(Json, '"schema":(\d+)[,}]', &Schema) || (Integer(Schema[1]) != Contract["schema"])
+				return false
+		Source := '"source":' . JsonStringLiteral(Contract["source"])
+		At := InStr(Json, Source, true)
+		return At && InStr(",}", SubStr(Json, At + StrLen(Source), 1)) ? true : false
+}
+
+/**
+ * Reads one saved Studio read's text, failing fast on any other: a corrupt or
+ * mismatched read is never shown (the vectors of
+ * _shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json).
+ * @param Text {String} The file's content.
+ * @returns {Map} Map("stamp", String, "json", String).
+ * @throws {Error} When the text is not that format, schema or source.
+ */
+KLR_StudioSnapshotDecode(Text) {
 		LineEnd := InStr(Text, "`n")
 		Header := LineEnd ? SubStr(Text, 1, LineEnd - 1) : ""
 		Json := LineEnd ? SubStr(Text, LineEnd + 1) : ""
 		Prefix := _KLR_StudioSnapshotFormat()["header"]
-		if (SubStr(Header, 1, StrLen(Prefix)) !== Prefix) || (StrLen(Header) = StrLen(Prefix))
+		if (SubStr(Header, 1, StrLen(Prefix)) !== Prefix) || (StrLen(Header) = StrLen(Prefix)) || InStr(Header, "`r")
 				|| (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
-				throw Error("The saved Ergopti Studio read is not in its format: " . Path)
+				throw Error("The saved Ergopti Studio read is not in its format.")
+		if !_KLR_StudioSnapshotFits(Json)
+				throw Error("The saved Ergopti Studio read is not of this schema or source.")
 		return Map("stamp", SubStr(Header, StrLen(Prefix) + 1), "json", Json)
+}
+
+/**
+ * The text of one saved Studio read: the header line, then the projection JSON.
+ * @param Stamp {String} KLR_StudioStoreStamp at the read's request, never "".
+ * @param Json {String} The projection JSON object.
+ * @returns {String}
+ * @throws {ValueError} Without a stamp, or for another JSON than a projection.
+ */
+KLR_StudioSnapshotEncode(Stamp, Json) {
+		if !(Stamp is String) || (Stamp == "") || InStr(Stamp, "`n") || InStr(Stamp, "`r")
+				throw ValueError("A saved Ergopti Studio read needs its store stamp.")
+		if !(Json is String) || (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
+				throw ValueError("A saved Ergopti Studio read is one JSON object.")
+		if !_KLR_StudioSnapshotFits(Json)
+				throw ValueError("A saved Ergopti Studio read is one payload of the contract.")
+		return _KLR_StudioSnapshotFormat()["header"] . Stamp . "`n" . Json
 }
 
 /**
@@ -325,13 +373,10 @@ KLR_StudioSnapshotRead(MetricsDir) {
  * @returns {Boolean} Whether the file now holds this read.
  */
 KLR_StudioSnapshotWrite(MetricsDir, Stamp, Json) {
-		if !(Stamp is String) || (Stamp == "") || InStr(Stamp, "`n")
-				throw ValueError("A saved Ergopti Studio read needs its store stamp.")
-		if !(Json is String) || (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
-				throw ValueError("A saved Ergopti Studio read is one JSON object.")
+		Text := KLR_StudioSnapshotEncode(Stamp, Json)
 		if !KLR_CacheEnsureDir(RTrim(MetricsDir, "\/") . "\")
 				return false
-		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), _KLR_StudioSnapshotFormat()["header"] . Stamp . "`n" . Json)
+		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), Text)
 }
 
 /**
