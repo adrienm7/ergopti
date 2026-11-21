@@ -599,7 +599,9 @@ InstallSendNoOps()
 #Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
 #Include ../ui/wpm/wpm_category_color.ahk
+#Include ../ui/wpm/wpm_produced_text.ahk
 #Include unit/ui/wpm/test_wpm_color_resolution.ahk
+#Include unit/ui/wpm/test_wpm_produced_text.ahk
 #Include unit/ui/wpm/test_wpm_gdiplus_ownership.ahk
 #Include unit/ui/wpm/test_wpm_drag_admission.ahk
 #Include unit/ui/wpm/test_wpm_region_target.ahk

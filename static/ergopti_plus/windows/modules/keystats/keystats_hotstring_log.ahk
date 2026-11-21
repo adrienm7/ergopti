@@ -159,6 +159,9 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", categ
 	; can resolve the correct color and skip coloring for neutral groups.
 	; Counted from the real replacement: the widget measures keystrokes saved,
 	; and a private expansion saved exactly as many as a public one.
+	; The live speed counts the produced text: the erased trigger leaves the
+	; window first (maintainer decision MET-17, 21 November 2026, as on macOS).
+	try WPMWidget_Retract(StrLen(trigger))
 	repl_len := StrLen(replacement)
 	Loop repl_len
 		try WPMWidget_Push(true, false, false, category, section)

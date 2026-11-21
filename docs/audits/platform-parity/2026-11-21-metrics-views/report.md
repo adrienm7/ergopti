@@ -257,6 +257,15 @@ Notes:
   screen-reader reach. The Chart.js text now follows the reading font and
   spacing (see the follow-ups below).
 - **MET-17 (decision, macOS):** the live speed counts an expansion differently.
+  screen-reader reach; the Chart.js text ignores the reading font
+  (`Chart.defaults.font` is never set).
+- **MET-17 (decision, macOS; fixed 2026-11-21):** the maintainer chose the
+  macOS rule, the produced text. Linux `LiveWpm.retract` and Windows
+  `WPMRing_Retract` take back the erased characters before the output, replayed
+  from `_shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json`
+  (`test_keystats.lua`, `test_wpm_produced_text.ahk`); the decision is in
+  `docs/memory/maintainer-decisions.md`. As audited: the live speed counted an
+  expansion differently.
   macOS removes one stamp per deleted trigger character before adding the
   output (net text); Windows and Linux add the whole output and keep the typed
   trigger (gross). Windows is the reference, so macOS reads lower after each

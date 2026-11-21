@@ -511,6 +511,8 @@ _LLM_Bridge_CommitInjectedText(Transaction) {
 	; a secure field the readouts stay silent, as for typed and hotstring text
 	; and as Linux record_synthetic_output does (MET-02).
 	if Transaction.MetricsRecorded && IsSet(WPMWidget_Push) {
+		; A rewrite's erased text leaves the live speed first (MET-17).
+		try WPMWidget_Retract(StrLen(Transaction.DeletedText))
 		Loop StrLen(Transaction.Text)
 			try WPMWidget_Push(false, true)
 	}

@@ -63,6 +63,25 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## The live speed counts the produced text (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (MET-17 in
+`docs/audits/platform-parity/2026-11-21-metrics-views/report.md`): after a
+hotstring or an AI rewrite, the live WPM (the pill and the tray or menu bar
+readout) counts the text that reached the page, as macOS did: the producer's
+erased characters (the trigger, the rewritten text) first take back the newest
+samples at or before its time, then its output is added. Windows and Linux
+used to keep the trigger and add the whole output, so the readout ran faster
+than the page. Owners: macOS `notify_synthetic` (`modules/keystats/init.lua`,
+the reference), Linux `LiveWpm.retract` (`_shared/metrics/engine/wpm/live_wpm.lua`)
+from `record_hotstring` and `record_synthetic_output`, Windows `WPMRing_Retract`
+(`ui/wpm/wpm_produced_text.ahk`) through `WPMWidget_Retract` from
+`KL_LogHotstring`, the `_HotstringDispatch` fallback and the AI commit.
+Windows and Linux replay
+`_shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json`. The
+dashboards' saved-keystrokes figures are unchanged: they measure savings, not
+speed.
+
 ## The end of a keep-awake session is told once, on the three OS (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (SNU-12 in the small native units

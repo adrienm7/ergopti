@@ -314,6 +314,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 						try KL_LogHotstring(Trigger, repl_str, "endchar", "", Category, Section, IsPrivate)
 				} else if IsSet(WPMWidget_Push) {
 						repl_len := HasMethod(Replacement) ? 1 : StrLen(repl_str)
+						try WPMWidget_Retract(StrLen(Trigger))
 						Loop repl_len
 								try WPMWidget_Push(true, false, false, Category, Section)
 				}

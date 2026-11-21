@@ -883,6 +883,7 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
 global _Stub_AppendLogRows := []      ; recorded KL_AppendLog entries (Map each)
 global _Stub_RoiHotstringCalls := []  ; recorded KL_Roi_OnHotstring calls
 global _Stub_WpmPushCalls := []       ; recorded WPMWidget_Push calls
+global _Stub_WpmRetractCalls := []    ; recorded WPMWidget_Retract calls
 global _Stub_FlushBufferCalls := 0    ; how many times the typing buffer was flushed
 global _Stub_AppendLogAccept := true
 global _Stub_AppendLogRejectSuspend := false
@@ -940,10 +941,17 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
         is_private: is_private ? true : false })
 }
 
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "", NowTick := unset) {
     global _Stub_WpmPushCalls
     _Stub_WpmPushCalls.Push({ is_hs: is_hs, is_ai: is_ai, is_ac: is_ac,
         category: category, section: section })
+}
+
+; Records the count and how many samples preceded it, so a test can read that a
+; producer took back what it erased before its output (MET-17).
+WPMWidget_Retract(Count, NowTick := unset) {
+    global _Stub_WpmPushCalls, _Stub_WpmRetractCalls
+    _Stub_WpmRetractCalls.Push({ count: Count, pushes_before: _Stub_WpmPushCalls.Length })
 }
 
 class Keystats {

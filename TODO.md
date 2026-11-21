@@ -438,6 +438,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     (maintainer decision); SNU-12 how each driver tells the end of a session (maintainer decision); the Linux
     note's folder and dated choice (`not_yet`);
   - the next campaigns in the report's order: pickers and prompts, layout tool pages.
+    and the chart reading font; MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
+  - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
     cause its closed reason proves (field check in `TODO-tests-macos.md`, Swift unchanged);

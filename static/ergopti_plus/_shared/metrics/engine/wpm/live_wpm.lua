@@ -8,7 +8,9 @@
 --- FEATURES & RATIONALE:
 --- 1. Effective speed. Every character that reaches the page counts — typed,
 ---    expanded or generated — because the readout answers "how fast is text
----    appearing", which is what a hotstring or a completion speeds up.
+---    appearing", which is what a hotstring or a completion speeds up. The
+---    characters a producer erased (a trigger, rewritten text) are taken back
+---    first, so the count is the produced text (MET-17).
 --- 2. Zero after a pause. A burst's speed is not the user's speed ten seconds
 ---    later; after timings [keystats] wpm_idle_reset_ms without a character
 ---    the readout reads 0.
@@ -87,6 +89,26 @@ function M.record(tracker, count, now_ms)
 	for _ = 1, count do tracker.stamps[#tracker.stamps + 1] = now_ms end
 	tracker.last_active_ms = now_ms
 	prune(tracker, now_ms)
+end
+
+--- Takes back `count` characters a producer erased at `now_ms` (a hotstring's
+--- trigger, the text an AI rewrite replaced): the newest stamps at or before
+--- that time leave the window, so the speed counts the text on the page, not
+--- the keys pressed (maintainer decision MET-17, 2026-11-21, macOS's rule).
+--- @param tracker table
+--- @param count integer
+--- @param now_ms number
+function M.retract(tracker, count, now_ms)
+	count = math.floor(tonumber(count) or 0)
+	local stamps = tracker.stamps
+	local index = #stamps
+	while count > 0 and index > 0 do
+		if stamps[index] <= now_ms then
+			table.remove(stamps, index)
+			count = count - 1
+		end
+		index = index - 1
+	end
 end
 
 --- Records a text key independently of the effective character count.

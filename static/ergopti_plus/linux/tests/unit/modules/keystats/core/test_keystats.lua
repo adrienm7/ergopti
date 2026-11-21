@@ -797,6 +797,43 @@ helpers.describe("physical-backspace-corrections", function()
     helpers.assert_eq(live_wpm(corrected), expected,
       "a held Backspace must not read as a burst of fast typing")
   end)
+  -- MET-17 (decided by the maintainer on 2026-11-21): the live speed counts the
+  -- produced text, as macOS does; Linux added the whole output and kept the
+  -- erased trigger, so a hotstring read faster than the text on the page.
+  it("(met-17-2026-11-21) the live speed replays the shared produced-text vectors", function()
+    local path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json"
+    local file = assert(io.open(path, "r"), "live WPM produced-text vectors not found")
+    local data = assert(require("core.text.engine.json").decode(file:read("*a")))
+    file:close()
+    local base = 1000
+    local producers = {
+      hotstring = function(at, count, deletes)
+        keystats.record_hotstring("owned-produced", string.rep("t", deletes), string.rep("x", count),
+          at, "test", deletes)
+      end,
+      llm = function(at, count, deletes)
+        keystats.record_synthetic_output("owned-produced", string.rep("x", count), "llm", at, deletes, 0)
+      end,
+    }
+    for name, produce in pairs(producers) do
+      for _, case in ipairs(data.cases) do
+        require("modules.keystats.sqlite_writer").close_db()
+        keystats = helpers.load_module("modules.keystats.keystats")
+        keystats.init({ sqlite_path = fresh_db() })
+        require("tests.support.metrics_consent_fixture").enable(keystats)
+        keystats.reset_session()
+        for _, step in ipairs(case.steps) do
+          if step.typed then
+            keystats.on_keydown("a", base + step.at, "owned-produced")
+          else
+            produce(base + step.at, step.produced, step.deletes)
+          end
+        end
+        helpers.assert_eq(keystats.get_live_stats(base + case.read_at).wpm, case.wpm,
+          name .. " " .. case.id .. ": the readout counts the produced text")
+      end
+    end
+  end)
   it("physical-backspace-corrections: corrections leave the session speed and n-grams unchanged", function()
     keystats.init({ sqlite_path = fresh_db() })
     require("tests.support.metrics_consent_fixture").enable(keystats)

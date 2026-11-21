@@ -1,0 +1,64 @@
+{
+	"schema_version": 1,
+	"_comment": "MET-17, decided by the maintainer on 2026-11-21 (docs/memory/maintainer-decisions.md): the live speed (the WPM pill and the tray or menu bar readout) counts the text produced, as macOS does. A producer's output first takes back the characters it erased (a hotstring's trigger, the text an AI rewrite replaced), the newest ones at or before its time, then adds its own characters. Times are milliseconds from the case's start; `typed` is one keystroke, `produced` a producer's output of that many characters after `deletes` erased ones. `count` is the characters left in the window at `read_at`, `wpm` the readout under the shared timings (characters / 5 over max(read_at - oldest, wpm_min_duration_ms)), `gross_wpm` what the readout showed before on Windows and Linux. macOS is the reference this file transcribes (modules/keystats/init.lua notify_synthetic, remove_effective_timestamp_at_or_before); its live buffers have no clock seam, so it does not replay it.",
+	"drivers": ["windows", "linux"],
+	"not_replayed": {
+		"macos": "The reference implementation: notify_synthetic removes one effective stamp per deleted character at or before the operation, then inserts the output; its buffers read hs.timer.absoluteTime with no clock seam."
+	},
+	"cases": [
+		{
+			"id": "hotstring-counts-its-replacement",
+			"steps": [
+				{ "at": 0, "typed": 1 },
+				{ "at": 100, "typed": 1 },
+				{ "at": 200, "typed": 1 },
+				{ "at": 300, "typed": 1 },
+				{ "at": 400, "produced": 10, "deletes": 3 }
+			],
+			"read_at": 1000,
+			"count": 11,
+			"wpm": 66,
+			"gross_wpm": 84
+		},
+		{
+			"id": "ai-rewrite-takes-back-the-replaced-text",
+			"steps": [
+				{ "at": 0, "typed": 1 },
+				{ "at": 100, "typed": 1 },
+				{ "at": 200, "typed": 1 },
+				{ "at": 300, "typed": 1 },
+				{ "at": 400, "typed": 1 },
+				{ "at": 500, "typed": 1 },
+				{ "at": 600, "produced": 3, "deletes": 5 }
+			],
+			"read_at": 1000,
+			"count": 4,
+			"wpm": 24,
+			"gross_wpm": 54
+		},
+		{
+			"id": "erasing-more-than-the-window-holds-stops-at-empty",
+			"steps": [
+				{ "at": 0, "typed": 1 },
+				{ "at": 100, "typed": 1 },
+				{ "at": 200, "produced": 5, "deletes": 4 }
+			],
+			"read_at": 1000,
+			"count": 5,
+			"wpm": 30,
+			"gross_wpm": 42
+		},
+		{
+			"id": "output-without-deletes-adds-only",
+			"steps": [
+				{ "at": 0, "typed": 1 },
+				{ "at": 100, "typed": 1 },
+				{ "at": 200, "produced": 3, "deletes": 0 }
+			],
+			"read_at": 1000,
+			"count": 5,
+			"wpm": 30,
+			"gross_wpm": 30
+		}
+	]
+}

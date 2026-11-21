@@ -1492,9 +1492,8 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 		app.hs_triggers = app.hs_triggers + 1
 		app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
 	end
-	append_synthetic_events(app_id, replacement, "hotstring",
-		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
-		is_private, clock)
+	local erased = deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or "")
+	append_synthetic_events(app_id, replacement, "hotstring", erased, is_private, clock)
 	-- This public delimiter already exists in the physical input journal. Keep
 	-- its replay in the ordered stream without changing the logical replacement.
 	if type(replay_terminator) == "string" and replay_terminator ~= "" then
@@ -1503,7 +1502,11 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	if type(timestamp_ms) == "number" then
 		-- The group names the colour the readouts take; a private expansion
 		-- still colours them — the colour says a hotstring fired, not what it typed.
-		LiveWpm.record(_live, char_count(replacement), timestamp_ms)
+		-- The live speed counts the produced text: the erased trigger leaves it
+		-- and the replayed delimiter comes back (MET-17, as on macOS).
+		local replayed = type(replay_terminator) == "string" and char_count(replay_terminator) or 0
+		LiveWpm.retract(_live, erased, timestamp_ms)
+		LiveWpm.record(_live, char_count(replacement) + replayed, timestamp_ms)
 		LiveWpm.mark_source(_live, "hotstring", h_type, timestamp_ms)
 	end
 	if is_private then
@@ -1817,6 +1820,7 @@ function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, 
 	end
 	append_synthetic_events(app_id, text, kind, deletes, false, clock)
 	if type(timestamp_ms) == "number" then
+		LiveWpm.retract(_live, deletes, timestamp_ms)
 		LiveWpm.record(_live, char_count(text), timestamp_ms)
 		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
 	end

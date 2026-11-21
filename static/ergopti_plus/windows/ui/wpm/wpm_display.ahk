@@ -268,7 +268,8 @@ _WPMWidget_SourceHeld(Now, Last) {
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+;   NowTick: the sample's tick, A_TickCount when unset (tests replay a clock).
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "", NowTick := unset) {
 	; WPM pushes can originate from the deferred fire-log timer, which native
 	; Suspend does not disarm. Guard before the ring/timestamp mutations so a
 	; stale callback cannot repaint pre-pause activity after resume.
@@ -280,7 +281,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	if (is_hs and _WPMWidget_NeutralCategory(category))
 		is_hs := false
 	cap := WPMWidgetConst.RING_CAP
-	now_t := A_TickCount
+	now_t := IsSet(NowTick) ? NowTick : A_TickCount
 	entry := Map("t", now_t, "hs", is_hs, "ai", is_ai, "ac", is_ac)
 	; Pair the second pause check with every ring/timestamp mutation. Helpers above
 	; may yield, while this region contains no Send/Sleep/I/O/logger call and stays
@@ -323,9 +324,30 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 }
 
 
+; Takes back Count characters a producer erased (a hotstring's trigger, the
+; text an AI rewrite replaced): the newest samples at or before NowTick leave
+; the window, so the live speed counts the produced text, not the keys pressed
+; (maintainer decision MET-17, 21 November 2026, macOS's rule; vectors in
+; _shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json).
+; @param Count {Integer} Characters the producer erased.
+; @param NowTick {Integer} The producer's tick; A_TickCount when unset.
+WPMWidget_Retract(Count, NowTick := unset) {
+	if A_IsSuspended || !(Count is Integer) || Count <= 0
+		return
+	now_t := IsSet(NowTick) ? NowTick : A_TickCount
+	RingCritical := Critical("On")
+	try {
+		WPMRing_Retract(WPMWidget._ring, WPMWidget._ring_head, WPMWidgetConst.RING_CAP, Count, now_t)
+	} finally {
+		Critical(RingCritical)
+	}
+}
+
+
 ; Compute current WPM from the ring buffer.
-WPMWidget_Calc() {
-    now      := A_TickCount
+; @param NowTick {Integer} The reading's tick; A_TickCount when unset.
+WPMWidget_Calc(NowTick := unset) {
+    now      := IsSet(NowTick) ? NowTick : A_TickCount
     count    := 0
     has_hs   := false
     has_ai   := false
@@ -342,7 +364,8 @@ WPMWidget_Calc() {
             ; A producer may run after this frame sampled now. Such a future
             ; row is not yet part of this calculation; malformed ticks refuse.
             if (!(EventTick is Integer) || EventTick < 0 || EventTick > now
-                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS)
+                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS
+                    || ev.Has("retracted"))
                 continue
             count++
             if ev["hs"]
