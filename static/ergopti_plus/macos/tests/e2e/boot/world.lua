@@ -869,6 +869,31 @@ local function install_private_folder_commands(hs, home)
 	end
 end
 
+local PNG_SIGNATURE = "\137PNG\r\n\26\n"
+
+--- hs.image.imageFromPath of the modelled Mac: a PNG decodes to an image of
+--- its IHDR size, and a missing, foreign or truncated file answers nil, as
+--- NSImage does, so a broken shipped logo still fails the boot.
+--- @param path string
+--- @return table|nil image An image double with size() and setSize().
+function M.image_from_path(path)
+	local file = type(path) == "string" and io.open(path, "rb") or nil
+	if file == nil then return nil end
+	local header = file:read(24)
+	file:close()
+	if type(header) ~= "string" or #header < 24 or header:sub(1, 8) ~= PNG_SIGNATURE
+		or header:sub(13, 16) ~= "IHDR" then
+		return nil
+	end
+	local width, height = string.unpack(">I4>I4", header, 17)
+	if width == 0 or height == 0 then return nil end
+	local size = { w = width, h = height }
+	return handle({
+		size = function() return { w = size.w, h = size.h } end,
+		setSize = function(self, new_size) size = { w = new_size.w, h = new_size.h }; return self end,
+	})
+end
+
 --- Completes the hs stub where the boot needs a native answer it lacks.
 --- @param hs table The hs stub.
 --- @param env table launcher_environment().
@@ -976,6 +1001,9 @@ local function install_natives(hs, env, arch, machine_root)
 		webview.delete = function() return nil end
 		return webview
 	end
+	-- The shared stub decodes no image, which the menu bar reads as an
+	-- undecodable shipped logo (TRAY-05).
+	hs.image.imageFromPath = M.image_from_path
 	-- A modal answers with M.dialog_choice(buttons), the first button unless a
 	-- scenario chose otherwise for the dialog it is about to raise.
 	hs.dialog.blockAlert = function(message, informative, first, second)
