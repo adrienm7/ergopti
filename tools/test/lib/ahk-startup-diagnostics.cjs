@@ -149,7 +149,7 @@ function createStartupDiagnostics(parent, context, sources, execution = null) {
 			assert.equal(finished, false, 'startup diagnostics already finalized');
 			requireDirectory();
 			assert.match(fixture, /^[a-z0-9_-]+$/);
-			assert.ok(['cold', 'warm'].includes(phase));
+			assert.ok(['cold', 'warm', 'confirm'].includes(phase));
 			assert.match(nonce, /^[a-f0-9]{32}$/);
 			assert.ok(
 				!record.invocations.some((row) => row.fixture === fixture && row.phase === phase),

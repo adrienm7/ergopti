@@ -34,6 +34,9 @@ async function observe(source, root, scenario) {
 	const anchor = fs.realpathSync(owned);
 	const diagnostics = [];
 	let warmCalls = 0;
+	let confirmCalls = 0;
+	let initialProbe;
+	const boots = new Map();
 	let retiredMetricsCalls = 0;
 	let configTypesCalls = 0;
 	let initialReceipt;
@@ -186,8 +189,13 @@ async function observe(source, root, scenario) {
 										'\n'
 								);
 							}
-							const warm = fixture === 'fresh-config' && initialReceipt !== undefined;
+							// The warm boot reuses the first boot's folder; a confirmation boot
+							// of the same fixture starts from its own copy.
+							const warm = fixture === 'fresh-config' && initialProbe === probe;
 							if (warm) warmCalls++;
+							if (path.basename(path.dirname(probe)) === 'confirmation') confirmCalls++;
+							const boot = (boots.get(fixture) ?? 0) + 1;
+							boots.set(fixture, boot);
 							const pid = ++launchPid;
 							const result = { pid, status: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
 							if (warm && scenario === 'early-exit') return result;
@@ -228,7 +236,9 @@ async function observe(source, root, scenario) {
 							// against the costliest other menu row (shortcuts_menu here,
 							// none for render-unreferenced). The ready boot keeps the dev
 							// CI shape of 2026-11-21: 82 ms of wall time against 73 ms of
-							// other builds, while its rows cost what they should.
+							// other builds, while its rows cost what they should. A stalled
+							// render keeps the dev CI shape of run 44911375064: one stall on
+							// extension-master-off's first boot, none on its second.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
 							const build = (list, ms, cycles, rows) =>
@@ -257,7 +267,11 @@ async function observe(source, root, scenario) {
 									: render(15) +
 											(scenario === 'slow-render'
 												? build('hotstrings_menu', 3200, 3200000000, 100)
-												: build('hotstrings_menu', 82, 20000000, 100)) +
+												: scenario === 'stalled-render' &&
+													  fixture === 'extension-master-off' &&
+													  boot === 1
+													? build('hotstrings_menu', 83, 210473816, 112)
+													: build('hotstrings_menu', 82, 20000000, 100)) +
 											otherMenus +
 											resume +
 											// The boot's first counter record and the owner records the smoke judges.
@@ -278,7 +292,8 @@ async function observe(source, root, scenario) {
 								menu_ready: true,
 								logs_flushed: true
 							};
-							if (!warm && fixture === 'fresh-config') {
+							if (initialProbe === undefined && fixture === 'fresh-config') {
+								initialProbe = probe;
 								initialReceipt = { ...receipt };
 								initialNonce = receipt.nonce;
 							}
@@ -311,7 +326,8 @@ async function observe(source, root, scenario) {
 								settled: 1,
 								pending: false
 							};
-							if (!warm && fixture === 'fresh-config') initialFullSave = { ...fullSave };
+							if (initialFullSave === undefined && fixture === 'fresh-config')
+								initialFullSave = { ...fullSave };
 							if (warm && scenario === 'save-pid') fullSave.pid = initialFullSave.pid;
 							if (warm && scenario === 'save-nonce') fullSave.nonce = 'f'.repeat(32);
 							if (warm && ['save-uncommitted', 'save-abandoned'].includes(scenario))
@@ -359,6 +375,7 @@ async function observe(source, root, scenario) {
 		return {
 			status,
 			warmCalls,
+			confirmCalls,
 			retiredMetricsCalls,
 			configTypesCalls,
 			diagnostics,
@@ -741,6 +758,7 @@ async function check(source, root = ROOT) {
 		'ai-deferral-missing',
 		'ai-resume-missing',
 		'slow-render',
+		'stalled-render',
 		'render-unreferenced',
 		'work-unnamed',
 		'work-doubled',
@@ -763,8 +781,9 @@ async function check(source, root = ROOT) {
 	]) {
 		const result = await observe(source, root, scenario);
 		observations.push({ scenario, ...result });
-		assert.equal(result.retained.length, scenario === 'ready' ? 0 : 1);
-		if (scenario !== 'ready') {
+		const passing = ['ready', 'stalled-render'].includes(scenario);
+		assert.equal(result.retained.length, passing ? 0 : 1);
+		if (!passing) {
 			const receipt = result.retained[0];
 			assert.equal(receipt.qualified, false);
 			assert.ok(receipt.invocations.length >= 1, 'failed startup retains actual invocation frames');
@@ -781,7 +800,7 @@ async function check(source, root = ROOT) {
 		}
 		assert.equal(
 			result.status,
-			scenario === 'ready' ? 0 : 1,
+			passing ? 0 : 1,
 			scenario + ': the actual smoke admission must require fresh complete readiness'
 		);
 		assert.equal(
@@ -800,10 +819,21 @@ async function check(source, root = ROOT) {
 		);
 		if (scenario.startsWith('save-'))
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*full-save receipt/);
+		// Only a render over its bound boots its fixture a second time.
+		assert.equal(
+			result.confirmCalls,
+			['slow-render', 'stalled-render'].includes(scenario) ? 1 : 0,
+			scenario + ': the confirmation boot runs exactly when a render is over its bound'
+		);
 		if (scenario === 'slow-render')
 			assert.match(
 				result.diagnostics.join('\n'),
-				/fresh-config: a Hotstrings menu row cost 26\.67 times a row of shortcuts_menu, the costliest other menu of the boot \(3200000000 cycles for 100 rows in 3200 ms;/
+				/fresh-config: a Hotstrings menu row cost 26\.67 times a row of shortcuts_menu, the costliest other menu of the boot \(3200000000 cycles for 100 rows in 3200 ms;.*; a second boot of the fixture: a Hotstrings menu row cost 26\.67 times/
+			);
+		if (scenario === 'stalled-render')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/extension-master-off: a one-off stall, not the menu's cost: a Hotstrings menu row cost 1\.57 times a row of shortcuts_menu.*a second boot of the fixture stayed within its bound/
 			);
 		if (scenario === 'render-unreferenced')
 			assert.match(
@@ -841,13 +871,13 @@ async function check(source, root = ROOT) {
 				result.diagnostics.join('\n'),
 				/suspend-marker: the resume did not activate the AI hotkeys its pause deferred/
 			);
-		if (scenario.startsWith('retired-') || scenario === 'ready')
+		if (scenario.startsWith('retired-') || passing)
 			assert.equal(
 				result.retiredMetricsCalls,
 				1,
 				'the actual retired-Metrics boot must execute once'
 			);
-		if (scenario.startsWith('types-') || scenario === 'ready')
+		if (scenario.startsWith('types-') || passing)
 			assert.equal(
 				result.configTypesCalls,
 				scenario.startsWith('types-cold-') ? 1 : 2,

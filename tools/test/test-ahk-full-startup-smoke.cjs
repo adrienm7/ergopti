@@ -222,22 +222,38 @@ function deferredMenuBuilds(configRoot) {
  * 2026-11-21 at 0.11 to 0.24 for the default fixtures and 0.32 for the
  * realistic one; a render that reparses the personal file per metadata
  * question measured 10.9.
+ *
+ * A thread's cycles still count what ran on it during the build: a timer
+ * that interrupted it, the kernel's work for its first file reads. Dev CI
+ * of 2026-11-21 (run 44911375064) logged such a stall of about 190 million
+ * cycles on one build per boot, whichever menu it fell on: layout_menu at
+ * 7.0 million cycles a row in cold boots against 1.2 in warm ones,
+ * shortcuts_menu at 2.9 against 0.7 once, and the Hotstrings menu of
+ * extension-master-off at 1.52 of a layout_menu row, against 0.10 to 0.16
+ * for the same fixture in every other run. The caller boots the fixture a
+ * second time before it fails: a cost of the menu's own code repeats there.
  * @param {string} fixture
  * @param {string} configRoot
- * @returns {string} The problem, or '' when every build is within its bound.
+ * @returns {{problem: string, overBound: boolean}} The problem ('' when every
+ *     build is within its bound), and whether it is a cost over the bound
+ *     rather than a boot that cannot be judged.
  */
 function hotstringsRenderProblem(fixture, configRoot) {
 	const builds = deferredMenuBuilds(configRoot).filter((build) => build.rows > 0);
 	const others = builds.filter((build) => build.list !== 'hotstrings_menu');
 	if (others.length === 0)
-		return 'the boot built no other submenu to judge the Hotstrings menu against';
+		return {
+			problem: 'the boot built no other submenu to judge the Hotstrings menu against',
+			overBound: false
+		};
 	const reference = others.reduce((costliest, build) =>
 		build.cycles / build.rows > costliest.cycles / costliest.rows ? build : costliest
 	);
 	const referenceCost = reference.cycles / reference.rows;
 	// The smoke opens the whole tray, so every boot builds the Hotstrings menu.
 	const hotstrings = builds.filter((build) => build.list === 'hotstrings_menu');
-	if (hotstrings.length === 0) return 'the boot logged no Hotstrings menu build with its cost';
+	if (hotstrings.length === 0)
+		return { problem: 'the boot logged no Hotstrings menu build with its cost', overBound: false };
 	for (const build of hotstrings) {
 		const ratio = build.cycles / build.rows / referenceCost;
 		console.log(
@@ -245,13 +261,15 @@ function hotstringsRenderProblem(fixture, configRoot) {
 				`(${build.rows} rows in ${build.ms} ms)`
 		);
 		if (ratio > 1)
-			return (
-				`a Hotstrings menu row cost ${ratio.toFixed(2)} times a row of ${reference.list}, the ` +
-				`costliest other menu of the boot (${build.cycles} cycles for ${build.rows} rows in ` +
-				`${build.ms} ms; ${reference.cycles} cycles for ${reference.rows} rows)`
-			);
+			return {
+				problem:
+					`a Hotstrings menu row cost ${ratio.toFixed(2)} times a row of ${reference.list}, the ` +
+					`costliest other menu of the boot (${build.cycles} cycles for ${build.rows} rows in ` +
+					`${build.ms} ms; ${reference.cycles} cycles for ${reference.rows} rows)`,
+				overBound: true
+			};
 	}
-	return '';
+	return { problem: '', overBound: false };
 }
 
 // boot-work-owners-2026-11-18: the boot's repeated work, judged by owner instead
@@ -897,20 +915,25 @@ async function main() {
 			const marker = path.join(configRoot, 'suspend_restore.marker');
 			if (markerBearing) fs.writeFileSync(marker, '1\n', 'utf8');
 			prepareStartupPersonalInclude(code.windows, path.join(configRoot, 'config'));
+			// The fixture as it stands before its first boot: a Hotstrings menu cost
+			// over its bound is measured again by booting this copy.
+			const confirmationRoot = path.join(scratch, 'confirmation', fixture);
+			fs.cpSync(configRoot, confirmationRoot, { recursive: true });
+			const bootEnv = (root, nonce) => ({
+				...process.env,
+				LOCALAPPDATA: root,
+				ERGOPTI_STARTUP_SMOKE_DIR: root,
+				ERGOPTI_STARTUP_SMOKE_NONCE: nonce,
+				ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : '',
+				ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : '',
+				// A refused file's session accepts no full save, by design.
+				ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY: fixture === TOO_OLD_FIXTURE ? '1' : ''
+			});
 			const nonce = crypto.randomBytes(16).toString('hex');
 			const result = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 				cwd: code.windows,
 				timeout: 120000,
-				env: {
-					...process.env,
-					LOCALAPPDATA: configRoot,
-					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
-					ERGOPTI_STARTUP_SMOKE_NONCE: nonce,
-					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : '',
-					ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : '',
-					// A refused file's session accepts no full save, by design.
-					ERGOPTI_STARTUP_SMOKE_EXPECT_READ_ONLY: fixture === TOO_OLD_FIXTURE ? '1' : ''
-				}
+				env: bootEnv(configRoot, nonce)
 			});
 			stage = `${fixture}/cold-verdict`;
 			if (result.error || result.status !== 0)
@@ -1026,8 +1049,45 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
-			const render = hotstringsRenderProblem(fixture, configRoot);
-			if (render) return fail(`${fixture}: ${render}`);
+			const { problem: render, overBound } = hotstringsRenderProblem(fixture, configRoot);
+			if (render && !overBound) return fail(`${fixture}: ${render}`);
+			if (render) {
+				// A cost the Hotstrings menu's own code adds comes back in every boot;
+				// a stall the runner put on one build does not. The same fixture boots
+				// again from its seed and only its second measurement is the verdict.
+				stage = `${fixture}/confirmation`;
+				prepareStartupPersonalInclude(code.windows, path.join(confirmationRoot, 'config'));
+				const confirmationNonce = crypto.randomBytes(16).toString('hex');
+				const again = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
+					cwd: code.windows,
+					timeout: 120000,
+					env: bootEnv(confirmationRoot, confirmationNonce)
+				});
+				diagnostics.capture(fixture, 'confirm', confirmationRoot, confirmationNonce, again);
+				prepareStartupPersonalInclude(code.windows, path.join(configRoot, 'config'));
+				if (again.error || again.status !== 0)
+					return fail(
+						`${fixture}: ${render}; its confirmation boot exited ${again.status} (${again.error?.code || 'no error'})`
+					);
+				const confirmationReady = startupReceiptProblem(
+					confirmationRoot,
+					again.pid,
+					confirmationNonce,
+					ahk
+				);
+				if (confirmationReady)
+					return fail(`${fixture}: ${render}; its confirmation boot: ${confirmationReady}`);
+				const { problem: repeated } = hotstringsRenderProblem(
+					`${fixture}/confirmation`,
+					confirmationRoot
+				);
+				if (repeated)
+					return fail(`${fixture}: ${render}; a second boot of the fixture: ${repeated}`);
+				console.log(
+					`${fixture}: a one-off stall, not the menu's cost: ${render}; a second boot of the fixture stayed within its bound`
+				);
+				stage = `${fixture}/cold-verdict`;
+			}
 			const counters = bootCounterProblem(configRoot);
 			if (counters) return fail(`${fixture}: ${counters}`);
 			const work = bootWorkProblem(fixture, configRoot);
