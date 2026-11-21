@@ -582,7 +582,7 @@ function compute_manifest_metrics() {
 	]) {
 		const info = document.getElementById(id);
 		if (info && typeof INFO_SVG === 'string') {
-			info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t(key)}</small>`;
+			info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t(key)}</small>`;
 		}
 	}
 
@@ -828,11 +828,11 @@ function recompute_speed_kpi() {
 	wpm_val_elem.innerHTML =
 		`<span class="stat-value-line">` +
 		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
-		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${formula_tooltip}</small></button>` +
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${formula_tooltip}</small></button>` +
 		`</span>` +
 		`<span class="stat-value-line" style="font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
-		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${formula_tooltip}</small></button>` +
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${formula_tooltip}</small></button>` +
 		`</span>`;
 
 	const global_details = document.getElementById('global_details');
@@ -1189,9 +1189,9 @@ function render_rep_table() {
 						: `<span style="color:var(--text-muted)">\u2014</span>`;
 				return `<tr>
 				<td>${key_html}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.total)}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.manual)}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${star_html}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.total)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.manual)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${star_html}</td>
 			</tr>`;
 			})
 			.join('');
@@ -1200,9 +1200,9 @@ function render_rep_table() {
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
 				<th><button type="button" class="th-sort" onclick="sort_rep_table('key')">${h_key}</button></th>
-				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('total')">${h_total}</button></th>
-				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('manual')">${h_manual}</button></th>
-				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_rep_table('star')">${h_star}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('total')">${h_total}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('manual')">${h_manual}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('star')">${h_star}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1548,7 +1548,7 @@ function render_sfb_table() {
 				const pair_html = `<kbd class="seq-chips">${format_seq_chips(d.pair)}</kbd>`;
 				return `<tr>
 				<td>${pair_html}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.count)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.count)}</td>
 				<td style="color:var(--text-muted);">${escape_html(doigt_str)}</td>
 				<td style="text-align:center;">${escape_html(main_str)}</td>
 			</tr>`;
@@ -1559,7 +1559,7 @@ function render_sfb_table() {
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
 				<th><button type="button" class="th-sort" onclick="sort_sfb_table('pair')">${h_pair}</button></th>
-				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_sfb_table('count')">${h_count}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_sfb_table('count')">${h_count}</button></th>
 				<th><button type="button" class="th-sort" onclick="sort_sfb_table('finger')">${h_finger}</button></th>
 				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_sfb_table('hand')">${h_hand}</button></th>
 			</tr></thead>
@@ -1780,7 +1780,7 @@ function render_distance_kpi() {
 		dist_val_el.innerHTML =
 			`<span>${unit_str}</span>` +
 			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-dist-color);">${INFO_SVG}` +
-			`<small class="tooltiptext" style="text-align:left;">${FINGER_DISTANCE_TOOLTIP_HTML}</small>` +
+			`<small class="tooltiptext" style="text-align:start;">${FINGER_DISTANCE_TOOLTIP_HTML}</small>` +
 			`</button>`;
 	}
 
@@ -1851,10 +1851,10 @@ function render_dist_table() {
 						<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">
 							<div style="height:100%;width:${bar_width}%;background:${bar_color};"></div>
 						</div>
-						<span style="min-width:42px;text-align:right;">${pct_str}</span>
+						<span style="min-width:42px;text-align:end;">${pct_str}</span>
 					</div>
 				</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${km_str}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${km_str}</td>
 			</tr>`;
 			})
 			.join('');
@@ -1865,7 +1865,7 @@ function render_dist_table() {
 				<th><button type="button" class="th-sort" onclick="sort_dist_table('label')">${h_name}</button></th>
 				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_dist_table('hand')">${h_hand}</button></th>
 				<th><button type="button" class="th-sort" onclick="sort_dist_table('usage_pct')">${h_usage}</button></th>
-				<th style="text-align:right"><button type="button" class="th-sort" onclick="sort_dist_table('km')">${h_km}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_dist_table('km')">${h_km}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -2089,7 +2089,7 @@ function render_ergo_bigram_kpi() {
 	// Info tooltip — concise glossary so users can self-serve the meaning.
 	const info = document.getElementById('ergo_bigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_bigram')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_ergo_bigram')}</small>`;
 	}
 
 	// Build a sortable detail table — the 12 worst pairs from each "bad" group
@@ -2129,7 +2129,7 @@ function render_ergo_bigram_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
 				`<td style="text-align:center;color:var(--text-muted);">${d.kind}</td></tr>`
 		)
 		.join('');
@@ -2137,7 +2137,7 @@ function render_ergo_bigram_table() {
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
 		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('pair')">Bigramme${arrow('pair')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('count')">Occurrences${arrow('count')}</button></th>` +
 		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -2278,7 +2278,7 @@ function render_ergo_trigram_kpi() {
 
 	const info = document.getElementById('ergo_trigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_trigram')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_ergo_trigram')}</small>`;
 	}
 
 	const top_n = (arr, n) => arr.sort((a, b) => b.count - a.count).slice(0, n);
@@ -2314,7 +2314,7 @@ function render_ergo_trigram_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.seq)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
 				`<td style="text-align:center;color:var(--text-muted);">${d.kind}</td></tr>`
 		)
 		.join('');
@@ -2322,7 +2322,7 @@ function render_ergo_trigram_table() {
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
 		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('seq')">Trigramme${arrow('seq')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('count')">Occurrences${arrow('count')}</button></th>` +
 		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -2424,7 +2424,7 @@ function render_errors_kpi() {
 
 	const info = document.getElementById('errors_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_errors')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_errors')}</small>`;
 	}
 
 	_err_data = rows;
@@ -2454,9 +2454,9 @@ function render_errors_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:right;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
+				`<td style="text-align:end;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');
@@ -2464,9 +2464,9 @@ function render_errors_table() {
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
 		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_errors_table('pair')">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('count')">${_t('ui_typing.errors_table_occ')}${arrow('count')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('errors')">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_errors_table('rate')">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('count')">${_t('ui_typing.errors_table_occ')}${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('errors')">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('rate')">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2590,7 +2590,7 @@ function render_roi_kpi() {
 
 	const info = document.getElementById('roi_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_roi')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_roi')}</small>`;
 	}
 }
 
@@ -2657,7 +2657,7 @@ function render_lexical_kpi() {
 
 	const info = document.getElementById('lexical_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_lexical')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_lexical')}</small>`;
 	}
 
 	// Histogram of word lengths — horizontal bars normalised to the max bucket.
@@ -2675,13 +2675,13 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-muted);width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
 				`</tr>`
 		);
 	}
@@ -2791,7 +2791,7 @@ function render_rhythm_kpi() {
 
 	const info = document.getElementById('rhythm_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_rhythm')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_rhythm')}</small>`;
 	}
 
 	const container = document.getElementById('rhythm_distribution_container');
@@ -2810,13 +2810,13 @@ function render_rhythm_kpi() {
 			const label = `${k === '500+' ? '> 500' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-muted);width:78px;">${label}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);width:78px;">${label}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(56, 189, 248);"></div>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
 				`</tr>`
 			);
 		})
@@ -2883,7 +2883,7 @@ function render_sessions_kpi() {
 
 	const info = document.getElementById('sessions_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_sessions')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_sessions')}</small>`;
 	}
 }
 
@@ -3012,7 +3012,7 @@ function render_records_kpi() {
 
 	const info = document.getElementById('records_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_records')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_records')}</small>`;
 	}
 }
 
@@ -3096,7 +3096,7 @@ function render_charmix_kpi() {
 
 	const info = document.getElementById('charmix_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_charmix')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_charmix')}</small>`;
 	}
 
 	// Stacked horizontal bar — segments proportional to each category's share,
@@ -3284,7 +3284,7 @@ function render_apps_kpi() {
 
 	const info = document.getElementById('apps_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_apps')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_apps')}</small>`;
 	}
 
 	render_apps_table();
@@ -3326,11 +3326,11 @@ function render_apps_table() {
 				`<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">` +
 				`<div style="height:100%;width:${bar_pct}%;background:rgb(232, 121, 249);"></div>` +
 				`</div>` +
-				`<span style="min-width:64px;text-align:right;">${format_number(d.chars)}</span>` +
+				`<span style="min-width:64px;text-align:end;">${format_number(d.chars)}</span>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-muted);">${fmt_dur(d.time_ms)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);">${fmt_dur(d.time_ms)}</td>` +
 				`</tr>`
 			);
 		})
@@ -3340,8 +3340,8 @@ function render_apps_table() {
 		`<table class="ekpi-table"><thead><tr>` +
 		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('name')">${_t('ui_typing.col_app')}${arrow('name')}</button></th>` +
 		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('chars')">${_t('ui_typing.col_chars')}${arrow('chars')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_apps_table('cpm')">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</button></th>` +
-		`<th style="cursor:pointer;text-align:right;"><button type="button" class="th-sort" onclick="sort_apps_table('time_ms')">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_apps_table('cpm')">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_apps_table('time_ms')">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -3491,7 +3491,7 @@ function render_wellness_kpi() {
 
 	const info = document.getElementById('wellness_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_wellness')}</small>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_wellness')}</small>`;
 	}
 
 	// Cumulative finger load: horizontal bar showing each finger's share of
@@ -3533,10 +3533,10 @@ function render_wellness_kpi() {
 			`<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">` +
 			`<div style="height:100%;width:${bar_pct}%;background:${hand_color};"></div>` +
 			`</div>` +
-			`<span style="min-width:48px;text-align:right;${text_color}">${pct.toFixed(1)}%</span>` +
+			`<span style="min-width:48px;text-align:end;${text_color}">${pct.toFixed(1)}%</span>` +
 			`</div>` +
 			`</td>` +
-			`<td style="text-align:right;font-variant-numeric:tabular-nums;width:80px;">${format_number(n)}</td>` +
+			`<td style="text-align:end;font-variant-numeric:tabular-nums;width:80px;">${format_number(n)}</td>` +
 			`</tr>`
 		);
 	}).join('');

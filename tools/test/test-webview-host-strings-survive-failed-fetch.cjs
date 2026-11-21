@@ -107,6 +107,9 @@ async function runLoader(opts) {
 		Promise
 	};
 	vm.createContext(context);
+	// Every page loads page_locale.js first; i18n.js sets the locale through it.
+	const pageLocale = path.join(SHARED, 'ui', 'page_locale.js');
+	vm.runInContext(fs.readFileSync(pageLocale, 'utf8'), context, { filename: pageLocale });
 	vm.runInContext(fs.readFileSync(I18N_JS, 'utf8'), context, { filename: I18N_JS });
 	for (const call of opts.calls || []) call(win);
 	await wait(REFUSAL_DELAY_MS * 8);

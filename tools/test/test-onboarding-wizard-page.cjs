@@ -280,7 +280,8 @@ function loadPage() {
 		title: '',
 		getElementById: (id) => elements.get(id) || null,
 		createElement: (tag) => makeElement(tag, ''),
-		addEventListener() {}
+		addEventListener() {},
+		documentElement: { lang: 'en', dir: '' }
 	};
 	const window = {
 		webkit: {
@@ -291,6 +292,8 @@ function loadPage() {
 	};
 	const context = vm.createContext({ console, window, document, JSON });
 	vm.runInContext(hostBridge, context);
+	// The page loads page_locale.js in its head; the wizard sets its locale through it.
+	vm.runInContext(fs.readFileSync(path.join(SHARED, 'ui/page_locale.js'), 'utf8'), context);
 	vm.runInContext(catalogueScript, context);
 	vm.runInContext(source, context);
 	return {
@@ -1943,6 +1946,7 @@ function assertSeparated(row, where) {
 		locale('fr')['onboarding.welcome.title'],
 		'title follows the previewed locale'
 	);
+	assert.equal(page.document.documentElement.lang, 'fr', 'the root speaks the previewed locale');
 	assert.equal(
 		page.el('language-title').textContent,
 		locale('fr')['onboarding.welcome.heading'],
@@ -1966,6 +1970,19 @@ function assertSeparated(row, where) {
 	assert.deepEqual(page.messages.splice(0), [{ action: 'localeSelected', locale: 'fr' }]);
 	page.window.applyStrings({ locale: 'fr', strings: locale('de') });
 	assert.equal(page.document.title, locale('de')['onboarding.welcome.title']);
+})();
+
+// pck-22: an Arabic or Hebrew wizard lays out right to left, an English one
+// left to right.
+(function wizardFollowsTheLocaleDirection() {
+	const page = openWizard({ locale: 'he', strings: locale('he') });
+	assert.equal(
+		page.document.documentElement.dir,
+		'rtl',
+		'pck-22: a Hebrew wizard lays out right to left'
+	);
+	const en = openWizard();
+	assert.equal(en.document.documentElement.dir, 'ltr', 'an English wizard lays out left to right');
 })();
 
 (function everyLocaleNamesTheProductOnce() {

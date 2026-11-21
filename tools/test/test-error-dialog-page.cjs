@@ -288,8 +288,9 @@ const ERROR = {
 		)
 	)
 		fail('Report must stay the primary button');
-	if (!/#btn-close\s*\{[^}]*margin-right:\s*auto/.test(css))
-		fail('Close must stand alone on the left (margin-right: auto)');
+	// The logical side, so a right-to-left window mirrors it (PCK-22).
+	if (!/#btn-close\s*\{[^}]*margin-inline-end:\s*auto/.test(css))
+		fail('Close must stand alone at the start (margin-inline-end: auto)');
 }
 
 if (failures.length > 0) {

@@ -36,7 +36,7 @@ h1 {
 
 #instruction {
 	background: rgba(100, 100, 100, 0.15);
-	border-left: 3px solid var(--theme-hue-5eb1ff);
+	border-inline-start: 3px solid var(--theme-hue-5eb1ff);
 	border-radius: 4px;
 	color: var(--theme-grey-ccc);
 	font-size: 13px;

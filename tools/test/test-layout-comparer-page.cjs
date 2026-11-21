@@ -46,6 +46,7 @@ const PREFIX = 'layout_analysis.';
 const SCRIPTS = [
 	// The website's accessibility settings, before the page paints.
 	'../a11y_prefs.js',
+	'../page_locale.js',
 	// The theme the site's visitor chose (theme_choice.js), before the first paint.
 	'../theme_choice.js',
 	'../i18n.js',

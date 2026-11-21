@@ -1172,7 +1172,7 @@ function renderDashboard() {
 
 			// #51 SFB max for this app on the period
 			const tdSfb = document.createElement('td');
-			tdSfb.style.textAlign = 'right';
+			tdSfb.style.textAlign = 'end';
 			const _sfbApp = aggData.apps[app.name] || {};
 			tdSfb.textContent =
 				(_sfbApp.same_finger_streak_max || 0) > 0 ? String(_sfbApp.same_finger_streak_max) : '—';
@@ -1180,7 +1180,7 @@ function renderDashboard() {
 
 			// #52 Modifier hold mean ms for this app
 			const tdHold = document.createElement('td');
-			tdHold.style.textAlign = 'right';
+			tdHold.style.textAlign = 'end';
 			const _hSum = _sfbApp.kc_hold_sum_ms || 0;
 			const _hCnt = _sfbApp.kc_hold_count || 0;
 			tdHold.textContent =

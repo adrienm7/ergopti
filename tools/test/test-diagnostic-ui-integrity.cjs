@@ -103,6 +103,7 @@ const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) 
 const needed = [
 	// The reading preferences come first, before the first paint.
 	'../a11y_prefs.js',
+	'../page_locale.js',
 	'../dom_utils.js',
 	'../host_bridge.js',
 	'../i18n.js',

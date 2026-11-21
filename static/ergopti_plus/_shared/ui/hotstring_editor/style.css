@@ -225,7 +225,7 @@ body {
 	font-weight: 600;
 	overflow: hidden;
 	padding: 1px 4px;
-	text-align: left;
+	text-align: start;
 	text-overflow: ellipsis;
 	user-select: text;
 	white-space: nowrap;
@@ -718,7 +718,7 @@ body {
 	color: var(--hint);
 	font-size: 10px;
 	line-height: 1.35;
-	padding-left: 20px;
+	padding-inline-start: 20px;
 }
 
 /* ============================= */
@@ -798,7 +798,7 @@ body {
 	font-family: 'SF Mono', Menlo, monospace;
 	font-size: 11px;
 	font-weight: 500;
-	margin-left: 2px;
+	margin-inline-start: 2px;
 	padding: 1px 3px 1px 5px;
 	vertical-align: baseline;
 }
@@ -878,7 +878,7 @@ body {
 	line-height: 1;
 	padding: 0;
 	padding-bottom: 2px;
-	padding-left: 2px;
+	padding-inline-start: 2px;
 	transition:
 		filter 0.1s,
 		border-color 0.15s;

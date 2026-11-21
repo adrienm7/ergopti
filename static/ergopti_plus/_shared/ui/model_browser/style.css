@@ -106,7 +106,7 @@ thead th {
 	overflow-wrap: anywhere;
 	padding: 9px 10px;
 	position: sticky;
-	text-align: left;
+	text-align: start;
 	text-transform: uppercase;
 	top: 0;
 	user-select: none;
@@ -139,7 +139,7 @@ thead th.sorted-desc::after {
 	width: 230px;
 }
 .col-num {
-	text-align: right;
+	text-align: end;
 	width: 88px;
 }
 
@@ -154,7 +154,7 @@ tbody td {
 tbody td.num {
 	color: var(--text-dim);
 	font-variant-numeric: tabular-nums;
-	text-align: right;
+	text-align: end;
 }
 
 tbody td.center {
@@ -185,7 +185,7 @@ tbody tr.active .name-cell::after {
 	color: var(--accent);
 	content: '●';
 	font-size: 10px;
-	margin-left: 7px;
+	margin-inline-start: 7px;
 	vertical-align: middle;
 }
 
@@ -316,7 +316,7 @@ tbody tr.group th {
 	color: var(--text);
 	font-size: 12px;
 	padding: 8px 10px;
-	text-align: left;
+	text-align: start;
 }
 
 /* The whole header opens and closes its group; only its controls keep their cursor. */
@@ -388,7 +388,7 @@ tbody tr.group .group-count,
 tbody tr.group .group-active {
 	color: var(--text-dim);
 	font-weight: 400;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
 tbody tr.group .group-active {
@@ -411,7 +411,7 @@ tbody tr.unavailable {
 tbody tr.group .reason {
 	color: var(--text-dim);
 	font-weight: 400;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
 tbody tr.unavailable,
@@ -476,7 +476,7 @@ thead .sort-btn:focus-visible,
 	color: var(--text);
 	cursor: pointer;
 	font-size: 12px;
-	margin-right: 4px;
+	margin-inline-end: 4px;
 	padding: 3px 9px;
 }
 
@@ -496,7 +496,7 @@ thead .sort-btn:focus-visible,
 .install-note {
 	color: var(--theme-hue-f87171);
 	font-size: 12px;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
 .act.danger:hover {

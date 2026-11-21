@@ -105,7 +105,7 @@ body {
 }
 
 #release-notes blockquote {
-	border-left: 3px solid var(--theme-grey-ccc);
+	border-inline-start: 3px solid var(--theme-grey-ccc);
 	color: var(--theme-grey-555);
 	margin: 0.4em 0;
 	padding: 0.2em 0.8em;
@@ -138,7 +138,7 @@ body {
 #release-notes td {
 	border: 1px solid var(--theme-grey-ddd);
 	padding: 0.25em 0.6em;
-	text-align: left;
+	text-align: start;
 }
 
 #release-notes th {

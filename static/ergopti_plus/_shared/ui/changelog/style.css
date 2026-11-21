@@ -39,7 +39,7 @@ body {
 
 #sidebar {
 	background: var(--theme-hue-111113);
-	border-right: 1px solid var(--theme-gray5-dark);
+	border-inline-end: 1px solid var(--theme-gray5-dark);
 	display: flex;
 	flex-direction: column;
 	flex-shrink: 0;
@@ -110,13 +110,13 @@ body {
 .release-item {
 	background: transparent;
 	border: 0;
-	border-left: 3px solid transparent;
+	border-inline-start: 3px solid transparent;
 	color: inherit;
 	cursor: pointer;
 	display: block;
 	font: inherit;
 	padding: 9px 14px;
-	text-align: left;
+	text-align: start;
 	transition: background 0.1s;
 	width: 100%;
 }
@@ -132,7 +132,7 @@ body {
 
 .release-item.selected {
 	background: var(--theme-hue-1e2a38);
-	border-left-color: var(--theme-hue-4da6ff);
+	border-inline-start-color: var(--theme-hue-4da6ff);
 }
 
 .release-item.prerelease .release-item-tag {
@@ -183,7 +183,7 @@ body {
 	background: rgba(255, 214, 10, 0.12);
 	border: 1px solid rgba(255, 214, 10, 0.4);
 	color: var(--theme-yellow-dark);
-	margin-left: 4px;
+	margin-inline-start: 4px;
 }
 
 .release-item.installed .release-item-tag {
@@ -477,7 +477,7 @@ body {
 }
 
 #release-body blockquote {
-	border-left: 3px solid var(--theme-hue-4da6ff);
+	border-inline-start: 3px solid var(--theme-hue-4da6ff);
 	color: var(--theme-grey-888);
 	font-size: 13px;
 	font-style: italic;
@@ -537,7 +537,7 @@ body {
 #release-body td {
 	border: 1px solid var(--theme-gray5-dark);
 	padding: 7px 12px;
-	text-align: left;
+	text-align: start;
 }
 
 #release-body th {

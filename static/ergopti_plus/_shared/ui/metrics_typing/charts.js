@@ -383,7 +383,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 					? `${ui_thresh_ms / 60000}${NBSP}min`
 					: `${ui_thresh_ms / 1000}${NBSP}s`;
 		const tip = _t('ui_typing.tooltip_precision_formula').replace('{thresh}', thresh_label);
-		info_el.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:left;">${tip}</small>`;
+		info_el.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${tip}</small>`;
 	}
 
 	// Precision formula

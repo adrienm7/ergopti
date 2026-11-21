@@ -135,6 +135,14 @@ async function run(elements, locale_files, active, extend) {
 	const { ctx, fetched, win } = make_context(elements, locale_files, active);
 	if (extend) extend(ctx);
 	vm.createContext(ctx);
+	// Every page loads page_locale.js first; i18n.js sets the locale through it.
+	vm.runInContext(
+		fs.readFileSync(path.join(path.dirname(I18N_JS), 'page_locale.js'), 'utf8'),
+		ctx,
+		{
+			filename: 'page_locale.js'
+		}
+	);
 	vm.runInContext(src, ctx, { filename: 'i18n.js' });
 	// The cascade is at most chain-length deep; drain more turns than it can use.
 	for (let i = 0; i < 12; i++) await Promise.resolve();

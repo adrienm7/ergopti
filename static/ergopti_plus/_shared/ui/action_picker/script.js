@@ -375,7 +375,7 @@ function buildHeadingRow(i, e) {
 	const face = searching ? heading : document.createElement('button');
 	const look = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
 	heading.className = searching ? 'heading-row ' + look + ' static' : 'heading-row';
-	face.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
+	face.style.paddingInlineStart = 8 + (lvl - 1) * 16 + 'px';
 
 	// The caret is drawn by the stylesheet; the heading's own words are of the
 	// host's language, isolated from the layout's direction.
@@ -411,7 +411,7 @@ function buildActionRow(e, depth) {
 	row.setAttribute('role', 'option');
 	row.setAttribute('aria-selected', 'false');
 	row.dataset.id = e.id;
-	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
+	row.style.paddingInlineStart = 12 + (depth || 0) * 16 + 'px';
 
 	// The tick of the current action is drawn by the stylesheet; its words are
 	// for a screen reader, so the current action is not told by a glyph alone.
@@ -502,7 +502,7 @@ function buildToc() {
 		item.appendChild(a);
 		a.type = 'button';
 		a.className = 'toc-item lvl' + lvl;
-		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
+		a.style.paddingInlineStart = 10 + (lvl - 1) * 16 + 'px';
 		a.textContent = e.text;
 		a.addEventListener('click', function () {
 			tocGoto(i);

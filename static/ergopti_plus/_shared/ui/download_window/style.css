@@ -174,7 +174,7 @@ body.mode-bootstrap .btn-row {
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
 	font-weight: 600;
-	margin-left: auto; /* Pushed completely to the right */
+	margin-inline-start: auto; /* Pushed to the end of the line */
 }
 
 #stats {
@@ -223,7 +223,7 @@ body.is-error #step-line {
 	margin-bottom: 10px;
 	min-height: 14px;
 	overflow: hidden;
-	text-align: left;
+	text-align: start;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -310,7 +310,7 @@ button {
 	background: rgba(100, 100, 100, 0.15);
 	border-color: rgba(150, 150, 150, 0.35);
 	color: var(--theme-grey-aaa);
-	margin-left: auto; /* Pushed completely to the right */
+	margin-inline-start: auto; /* Pushed to the end of the line */
 }
 
 #btn-term:hover {
@@ -337,7 +337,7 @@ button {
 	display: none;
 	font-size: 13px;
 	font-weight: 600;
-	margin-left: 12px;
+	margin-inline-start: 12px;
 	margin-top: 0;
 }
 

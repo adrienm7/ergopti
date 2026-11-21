@@ -196,7 +196,7 @@ body {
 	font: inherit;
 	gap: 6px;
 	padding: 8px;
-	text-align: left;
+	text-align: start;
 	user-select: none;
 	width: 100%;
 }
@@ -376,7 +376,7 @@ body {
 	font: inherit;
 	overflow: hidden;
 	padding: 7px 10px;
-	text-align: left;
+	text-align: start;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	width: 100%;
@@ -441,7 +441,7 @@ body {
 	color: var(--accent);
 	cursor: pointer;
 	font: inherit;
-	margin-left: auto;
+	margin-inline-start: auto;
 	padding: 6px 16px;
 }
 #btn-edit-current[hidden] {

@@ -199,12 +199,13 @@
 	}
 
 	// The page speaks the active locale: screen readers pick their voice and
-	// browsers their hyphenation from the root lang (WCAG 3.1.1). The pages are
-	// written lang="fr", which was wrong in every other locale; it is set as
-	// this script runs, in the head, not at DOMContentLoaded, so no text the
-	// body draws first is read in French (UPD-12).
+	// browsers their hyphenation from the root lang (WCAG 3.1.1), and Arabic and
+	// Hebrew lay out right to left (PCK-22). The pages are written lang="fr",
+	// which was wrong in every other locale; page_locale.js sets both as this
+	// script runs, in the head, not at DOMContentLoaded, so no text the body
+	// draws first is read in French (UPD-12).
 	var active_code = window._i18n_locale || 'fr';
-	document.documentElement.lang = active_code;
+	window.setPageLocale(active_code);
 
 	function load() {
 		// The Studio pages on the site (editor, comparer, optimizer) name the

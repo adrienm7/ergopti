@@ -223,7 +223,7 @@ th,
 td {
 	border: 1px solid var(--border);
 	padding: 0.3em 0.65em;
-	text-align: left;
+	text-align: start;
 	vertical-align: top;
 }
 
@@ -240,7 +240,7 @@ table.items thead th {
 
 .row-action {
 	font-size: 0.9em;
-	margin-left: 6px;
+	margin-inline-start: 6px;
 	padding: 1px 8px;
 }
 

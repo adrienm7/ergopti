@@ -128,10 +128,11 @@ function init(data) {
 		node(id).textContent = strings[id];
 	}
 	document.title = strings.title;
-	// The strings come in the user's language: the root says which, as
-	// i18n.js does for the other windows (WCAG 3.1.1). Every host seeds it.
+	// The strings come in the user's language: the root says which, and its
+	// direction, as for the other windows (WCAG 3.1.1, PCK-22). Every host
+	// seeds it.
 	if (typeof window._i18n_locale === 'string' && window._i18n_locale)
-		document.documentElement.lang = window._i18n_locale;
+		window.setPageLocale(window._i18n_locale);
 	else
 		console.error('physical shortcuts: no window._i18n_locale seeded; the page language stays en');
 	node('position').replaceChildren();

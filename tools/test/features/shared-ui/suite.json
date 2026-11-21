@@ -693,6 +693,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-levels.cjs"],
 			"repro": "npm run test:layout-editor-levels"
+		},
+		{
+			"id": "page-direction",
+			"ordinal": 719,
+			"name": "every app window sets its root lang and dir from the locale, so Arabic and Hebrew lay out right to left, and no window rule names a physical left or right",
+			"cmd": "node",
+			"args": ["tools/test/test-page-direction.cjs"],
+			"repro": "node tools/test/test-page-direction.cjs"
 		}
 	]
 }

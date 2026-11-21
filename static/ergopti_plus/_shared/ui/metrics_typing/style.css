@@ -199,7 +199,7 @@ body {
 	ul.app-list
 ) {
 	margin: 0;
-	padding-left: 0;
+	padding-inline-start: 0;
 }
 
 :where(ul.stat-details, ul.app-list) {
@@ -300,7 +300,7 @@ h1 {
 .filters-bar label {
 	font-size: 14px;
 	font-weight: 500;
-	margin-right: 5px;
+	margin-inline-end: 5px;
 }
 
 /* Date inputs and selects share --filter-h with .filter-btn for uniform height */
@@ -406,7 +406,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	display: flex;
 	flex-direction: column;
 	padding: 20px;
-	text-align: left;
+	text-align: start;
 }
 
 .stat-card.card-hs {
@@ -768,7 +768,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	font-weight: 600;
 	padding: 7px 10px;
 	position: sticky;
-	text-align: left;
+	text-align: start;
 	top: 0;
 	user-select: none;
 	white-space: nowrap;
@@ -951,7 +951,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 table {
 	border-collapse: collapse;
-	text-align: left;
+	text-align: start;
 	width: 100%;
 }
 
@@ -1221,8 +1221,8 @@ td.col-rep {
 	font-size: 11px;
 	font-variant-numeric: tabular-nums;
 	min-width: 2.2em;
-	padding-right: 6px;
-	text-align: right;
+	padding-inline-end: 6px;
+	text-align: end;
 }
 
 /* Thin vertical separator between the line number and the sequence chip */
@@ -1230,7 +1230,7 @@ td.col-rep {
 	background: var(--border);
 	flex-shrink: 0;
 	height: 18px;
-	margin-right: 8px;
+	margin-inline-end: 8px;
 	width: 1px;
 }
 
@@ -1241,7 +1241,7 @@ td.col-rep {
 /* =========================== */
 
 .info-icon {
-	margin-right: 4px;
+	margin-inline-end: 4px;
 	opacity: 0.7;
 	vertical-align: text-bottom;
 }
@@ -1270,7 +1270,7 @@ td.col-rep {
 	padding: 8px 10px;
 	pointer-events: none;
 	position: absolute;
-	text-align: left;
+	text-align: start;
 	transform: none;
 	transition: opacity 0.2s;
 	/* Hidden by its opacity, not its visibility: the text stays the name of
@@ -1304,7 +1304,7 @@ th .tooltip .tooltiptext {
 }
 
 .stat-inline-tooltip .info-icon {
-	margin-right: 0;
+	margin-inline-end: 0;
 	opacity: 0.8;
 }
 
@@ -1435,7 +1435,7 @@ th .tooltip .tooltiptext {
 
 .app-item input {
 	cursor: pointer;
-	margin-right: 10px;
+	margin-inline-end: 10px;
 }
 
 .app-icon-wrapper {
@@ -1444,7 +1444,7 @@ th .tooltip .tooltiptext {
 	flex-shrink: 0;
 	height: 28px;
 	justify-content: center;
-	margin-right: 10px;
+	margin-inline-end: 10px;
 	width: 28px;
 }
 
@@ -1568,7 +1568,7 @@ th .tooltip .tooltiptext {
 	border-top: 3px solid var(--accent);
 	display: inline-block;
 	height: 20px;
-	margin-right: 10px;
+	margin-inline-end: 10px;
 	vertical-align: middle;
 	width: 20px;
 }

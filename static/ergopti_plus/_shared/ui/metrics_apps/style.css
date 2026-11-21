@@ -146,7 +146,7 @@ h1 {
 
 /* The refresh button pushes the actions after it to the bar's end. */
 .push-end {
-	margin-left: auto;
+	margin-inline-start: auto;
 }
 
 /* A filter row: its name, then its toggle buttons. The legend floats so the
@@ -430,7 +430,7 @@ h1 {
 	cursor: pointer;
 	font: inherit;
 	padding: 0;
-	text-align: left;
+	text-align: start;
 }
 .app-name-btn {
 	font-weight: bold;
@@ -497,7 +497,7 @@ h1 {
 }
 .context-list dd {
 	margin: 0;
-	text-align: right;
+	text-align: end;
 }
 .context-list strong {
 	color: var(--strong-color);
@@ -519,7 +519,7 @@ h1 {
 	padding: 0;
 }
 .goal-row .goal-progress {
-	margin-left: auto;
+	margin-inline-start: auto;
 }
 .goal-bar {
 	appearance: none;
@@ -696,7 +696,7 @@ th {
 	border-bottom: 1px solid var(--border);
 	font-weight: 600;
 	padding: 12px;
-	text-align: left;
+	text-align: start;
 }
 
 td {

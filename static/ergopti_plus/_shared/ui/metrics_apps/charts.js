@@ -611,8 +611,8 @@ function renderTopWindowsTable(aggData) {
 			(r) => `<tr>
 		<td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</td>
 		<td>${escapeHtml(r.app)}</td>
-		<td style="text-align:right;">${format_int(r.c)}</td>
-		<td style="text-align:right;">${formatDuration(r.ms)}</td>
+		<td style="text-align:end;">${format_int(r.c)}</td>
+		<td style="text-align:end;">${formatDuration(r.ms)}</td>
 	</tr>`
 		)
 		.join('');
@@ -639,8 +639,8 @@ function renderTopSessionsTable(aggData) {
 			(r) => `<tr>
 		<td>${escapeHtml(formatDisplayDate(r.date))}</td>
 		<td>${escapeHtml(r.app)}</td>
-		<td style="text-align:right;">${formatDuration(r.ms)}</td>
-		<td style="text-align:right;">${format_int(r.chars)}</td>
+		<td style="text-align:end;">${formatDuration(r.ms)}</td>
+		<td style="text-align:end;">${format_int(r.chars)}</td>
 	</tr>`
 		)
 		.join('');
@@ -665,10 +665,10 @@ function renderTopDaysTable(aggData) {
 		.map(
 			(d) => `<tr>
 		<td>${escapeHtml(formatDisplayDate(d.date))}</td>
-		<td style="text-align:right;">${format_int(d.chars || 0)}</td>
-		<td style="text-align:right;">${formatDuration(d.time_ms || 0)}</td>
-		<td style="text-align:right;">${escapeHtml(d.switches || 0)}</td>
-		<td style="text-align:right;">${d.sessions || 0}</td>
+		<td style="text-align:end;">${format_int(d.chars || 0)}</td>
+		<td style="text-align:end;">${formatDuration(d.time_ms || 0)}</td>
+		<td style="text-align:end;">${escapeHtml(d.switches || 0)}</td>
+		<td style="text-align:end;">${d.sessions || 0}</td>
 	</tr>`
 		)
 		.join('');
@@ -699,8 +699,8 @@ function renderAppPairsTable(aggData) {
 			return `<tr>
 			<td>${escapeHtml(e.src)}</td>
 			<td>${escapeHtml(e.dst)}</td>
-			<td style="text-align:right;">${e.count}</td>
-			<td style="text-align:right;color:var(--text-muted);">${pct.toFixed(1)} %</td>
+			<td style="text-align:end;">${e.count}</td>
+			<td style="text-align:end;color:var(--text-muted);">${pct.toFixed(1)} %</td>
 		</tr>`;
 		})
 		.join('');

@@ -1327,14 +1327,14 @@ function render_kc_heatmap(kc_data_arr) {
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:start;">` +
 			tip_html +
 			`</div>`;
 	});
 
 	container.innerHTML =
 		`<figure style="display:inline-block;position:relative;margin:0;">` +
-		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
+		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:start;">` +
 		`${_t('ui_typing.heatmap_keys_title')}</figcaption>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="kc_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
 		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
@@ -1665,10 +1665,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
 					`<tr style="color:${ThemeTokens.color('grey-888')};">` +
 					`<td style="padding:1px 6px 1px 0;">${escapeHtml(_t('ui_typing.sfb_pairs_col_pair'))}</td>` +
-					`<td style="padding:1px 4px;text-align:right;">${escapeHtml(_t('ui_typing.sfb_pairs_col_count'))}</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_key'))}</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">${escapeHtml(_t('ui_typing.sfb_pairs_col_rate'))}</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_total'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;">${escapeHtml(_t('ui_typing.sfb_pairs_col_count'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_key'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;" title="${_t('ui_typing.tooltip_sfb_rate')}">${escapeHtml(_t('ui_typing.sfb_pairs_col_rate'))}</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:end;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_total'))}</td>` +
 					`</tr>`
 			);
 
@@ -1696,10 +1696,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				tip_lines.push(
 					`<tr>` +
 						`<td style="padding:1px 6px 1px 0;${row_color}">${pair_str}</td>` +
-						`<td style="padding:1px 4px;text-align:right;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
-						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
-						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
-						`<td style="padding:1px 0 1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:end;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
+						`<td style="padding:1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
+						`<td style="padding:1px 0 1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
 						`</tr>`
 				);
 			});
@@ -1768,7 +1768,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		tooltips +=
 			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:start;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
 			`</div>`;
@@ -1776,7 +1776,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	container.innerHTML =
 		`<figure style="display:inline-block;position:relative;margin:0;">` +
-		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
+		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:start;">` +
 		`${_t('ui_typing.heatmap_sfb_title')}</figcaption>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="sfb_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
 		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +

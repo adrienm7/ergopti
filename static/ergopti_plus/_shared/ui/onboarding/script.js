@@ -1028,6 +1028,8 @@ window.applyStrings = function (payload) {
 	if (payload && typeof payload.strings === 'object' && typeof payload.locale === 'string') {
 		if (payload.locale !== _selectedLocale) return;
 		strings = payload.strings;
+		// The previewed language lays the wizard out in its own direction (PCK-22).
+		window.setPageLocale(payload.locale);
 	} else {
 		strings = payload || {};
 	}
@@ -1068,7 +1070,10 @@ window.initData = function (data) {
 			return page.id;
 		})
 	);
-	if (typeof data.locale === 'string') _selectedLocale = data.locale;
+	if (typeof data.locale === 'string') {
+		_selectedLocale = data.locale;
+		window.setPageLocale(data.locale);
+	}
 	if (Array.isArray(data.locales) && data.locales.length > 0) LOCALES = data.locales;
 	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
 	window.SYSTEM_LAYOUT = data.system_layout || '';

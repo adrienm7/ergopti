@@ -56,7 +56,9 @@ const sandbox = {
 		createElement: element,
 		readyState: 'complete',
 		querySelectorAll: () => [],
-		documentElement: {}
+		documentElement: {},
+		// The page reads Escape on the document (PCK-12).
+		addEventListener() {}
 	},
 	console,
 	TextDecoder,
@@ -72,6 +74,8 @@ const sandbox = {
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(shared, 'ui/host_bridge.js'), 'utf8'), sandbox);
+// The page loads page_locale.js before i18n.js, which sets its locale through it.
+vm.runInContext(fs.readFileSync(path.join(shared, 'ui/page_locale.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(shared, 'ui/i18n.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(page, 'script.js'), 'utf8'), sandbox);
 assert.equal(messages[0], 'ready');

@@ -34,7 +34,7 @@ fieldset {
 fieldset label {
 	display: inline-flex;
 	gap: 4px;
-	margin-right: 12px;
+	margin-inline-end: 12px;
 }
 #capture-reason,
 #manual-hint {

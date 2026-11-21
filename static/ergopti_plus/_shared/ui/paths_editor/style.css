@@ -185,7 +185,7 @@ input[type='text'].is-default {
 	color: var(--theme-hue-0062cc);
 	font-size: 10px;
 	font-weight: 500;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 2px 6px;
 	white-space: nowrap;
 }
@@ -196,7 +196,7 @@ input[type='text'].is-default {
 	color: var(--theme-hue-7a4b00);
 	font-size: 10px;
 	font-weight: 500;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 2px 6px;
 	white-space: nowrap;
 }
@@ -217,7 +217,7 @@ input[type='text'].is-default {
 }
 
 .btns .reset {
-	margin-right: auto;
+	margin-inline-end: auto;
 }
 
 button {
