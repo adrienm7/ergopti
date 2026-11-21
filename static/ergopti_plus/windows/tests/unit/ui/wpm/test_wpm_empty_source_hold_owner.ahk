@@ -56,7 +56,7 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 		"_WPMWidget_Collecting",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
 		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex",
-		"WPMWidget_BurstEnded", "WPMWidget_PointerEndsBurst", "_WPMWidget_NameForReaders"]
+		"WPMWidget_BurstEnded", "WPMWidget_PointerEndsBurst", "WPMWidget_ShouldShow", "_WPMWidget_NameForReaders"]
 	; The tick names its surface for a running screen reader. Some programs set
 	; the system's screen-reader flag on a desktop without one: these vectors
 	; prove the hold, so the flag reads as off here, whatever the host says.

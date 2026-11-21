@@ -806,15 +806,11 @@ WPMWidget_Tick() {
     while (WPMWidget._graph_hist.Length > WPMWidgetConst.GRAPH_HISTORY)
         WPMWidget._graph_hist.RemoveAt(1)
 
-    ; Hide after IDLE_HIDE_MS of keyboard inactivity.
-    keyboard_idle := !(last_input is Integer) || last_input < 0 || last_input > now
-        || (last_input > 0 && _WPMWidget_TickDelta(now, last_input) > WPMWidgetConst.IDLE_HIDE_MS)
-    ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
-    ; A_TimeIdleMouse is built into AHK and requires no hook install.
-    mouse_active  := WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)
-    should_show   := _WPMWidget_TooltipUp()
-        || (!keyboard_idle && !mouse_active && !WPMWidget_BurstEnded(last_input, last_break)
-            && ((wpm > 0) || has_hs || has_ai || has_ac))
+    ; The shared rule: during a typing burst, the first text key included, or
+    ; while a preview is up. A_TimeIdleMouse is built into AHK and requires no
+    ; hook install.
+    should_show := WPMWidget_ShouldShow(_WPMWidget_TooltipUp(), now, last_input, last_break,
+        WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if !should_show {
         if gui_ref

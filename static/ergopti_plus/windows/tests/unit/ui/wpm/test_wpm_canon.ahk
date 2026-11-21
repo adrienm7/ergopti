@@ -163,3 +163,27 @@ Test("WPM canon: any physical pointer input hides the widget, the next key shows
 #Include test_wpm_empty_source_hold_owner.ahk
 
 #Include test_wpm_calc_sample_future_owner.ahk
+
+; The pill shows from the first text key of a burst, reading « 0 » while the
+; speed needs two, as the shared widget_visible does on macOS and Linux. The
+; tick also required a speed above zero or a source colour, so the pill waited
+; for a second key after each idle (MET-18, met18-first-key).
+_WPMC_FirstTextKeyShowsThePill() {
+	AssertTrue(WPMWidget_LoadSharedConst())
+	Idle := WPMWidgetConst.IDLE_HIDE_MS
+	AssertTrue(Idle > 0, "the idle delay comes from the canon")
+	AssertTrue(WPMWidget_ShouldShow(false, 1000, 1000, 0, false), "the first text key shows the pill")
+	AssertFalse(WPMWidget_ShouldShow(false, 1000, 0, 0, false), "no text yet keeps it hidden")
+	AssertFalse(WPMWidget_ShouldShow(false, 1000 + Idle + 1, 1000, 0, false), "the idle delay hides it")
+	AssertTrue(WPMWidget_ShouldShow(false, 1000 + Idle, 1000, 0, false), "it stays up to the idle delay")
+	AssertFalse(WPMWidget_ShouldShow(false, 1000, 1000, 1000, false), "a burst end at the key hides it")
+	AssertFalse(WPMWidget_ShouldShow(false, 1000, 1000, 0, true), "a pointer use after the key hides it")
+	AssertFalse(WPMWidget_ShouldShow(false, 1000, 2000, 0, false), "a future key tick is refused")
+	AssertTrue(WPMWidget_ShouldShow(true, 1000, 0, 0, true), "a preview shows it whatever the burst")
+	Tick := _DriverFuncBody("WPMWidget_Tick")
+	AssertTrue(InStr(Tick, "should_show := WPMWidget_ShouldShow(") > 0,
+		"the tick decides through the shared rule")
+	AssertEqual(0, InStr(Tick, "wpm > 0"), "the speed never gates the pill")
+}
+Test("WPM canon: the first text key shows the pill at 0 (met18-first-key)",
+	_WPMC_FirstTextKeyShowsThePill)

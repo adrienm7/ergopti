@@ -145,6 +145,27 @@ WPMWidget_BurstEnded(LastInput, LastBreak) {
 		return !(LastInput is Integer) || LastBreak >= LastInput
 }
 
+; Whether the floating widget shows, the rule of the shared
+; Model.widget_visible (TWD-2): during a typing burst only, so the last text
+; is newer than the last burst end and the last pointer use and within the
+; idle delay; a preview is the only exception. The speed is not read: the
+; first text key shows « 0 » as on macOS and Linux, where the pill waited for
+; a second key while the speed needs two (MET-18).
+; @param TooltipUp {Boolean} A hotstring preview is shown.
+; @param Now {Integer} A_TickCount.
+; @param LastInput {Integer} Tick of the last text, 0 when none.
+; @param LastBreak {Integer} Tick of the last burst end, 0 when none.
+; @param PointerEnds {Boolean} From WPMWidget_PointerEndsBurst.
+; @returns {Boolean}
+WPMWidget_ShouldShow(TooltipUp, Now, LastInput, LastBreak, PointerEnds) {
+		if TooltipUp
+				return true
+		if !(LastInput is Integer) || LastInput <= 0 || LastInput > Now
+				return false
+		return TickElapsed64(LastInput, Now) <= WPMWidgetConst.IDLE_HIDE_MS
+				&& !PointerEnds && !WPMWidget_BurstEnded(LastInput, LastBreak)
+}
+
 ; Reads _shared/metrics/data/wpm_widget/constants.toml — the canon macOS and Linux
 ; draw from too — and the timings registry into WPMWidgetConst. No key carries
 ; a copied default: one missing key keeps the widget off and names itself.
