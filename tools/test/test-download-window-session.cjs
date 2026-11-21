@@ -174,6 +174,47 @@ context.window.chrome = {
 };
 vm.runInContext("setKind('mlx_model', 'Windows', ''); done(false, '', '')", context);
 assert.deepEqual(actions(), names, 'real WebView2 bridge must preserve legacy string messages');
+// UPD-12: a missing label hides its figure; no English text fills the gap.
+const errorsLogged = [];
+context.console = { error: (line) => errorsLogged.push(String(line)), log() {}, warn() {} };
+context.window._i18n_strings = {};
+vm.runInContext(
+	"setKind('app_update', 'U', '', 3); update(5, '1 MB / 9 MB', '2 MB/s', '', '1/2')",
+	context
+);
+const shown = [
+	elements.get('stats-details').innerHTML || '',
+	elements.get('file-count').textContent || ''
+].join(' ');
+assert.doesNotMatch(shown, /Files|Size|Speed/, 'upd-12: no English fallback label is drawn');
+assert.equal(
+	elements.get('stats-details').style.display,
+	'none',
+	'upd-12: unlabelled figures stay hidden'
+);
+assert.equal(
+	elements.get('file-count').style.display,
+	'none',
+	'upd-12: an unlabelled file count stays hidden'
+);
+assert.ok(
+	['download_window.size_label', 'download_window.speed_label', 'download_window.file_count'].every(
+		(key) => errorsLogged.some((line) => line.includes(key))
+	),
+	'upd-12: each missing label is logged by its key'
+);
+context.window._i18n_strings = {
+	'download_window.size_label': 'Taille : ',
+	'download_window.speed_label': 'Vitesse : ',
+	'download_window.file_count': 'Fichiers : %s'
+};
+vm.runInContext("update(6, '1 MB / 9 MB', '2 MB/s', '', '1/2')", context);
+assert.match(
+	elements.get('stats-details').innerHTML,
+	/^Taille : <b>1 MB \/ 9 MB<\/b>.*Vitesse : <b>2 MB\/s<\/b>$/
+);
+assert.equal(elements.get('file-count').textContent, 'Fichiers : 1/2');
+
 console.log(
 	'Download session bridge: tagged actions, stale snapshots, validation and legacy hosts passed.'
 );

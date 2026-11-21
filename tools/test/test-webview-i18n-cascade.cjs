@@ -283,7 +283,26 @@ function check(label, cond, detail) {
 		);
 	}
 
-	// ── 7. The chain the code declares must be shipped ────────────────────────
+	// ── 7. The root lang follows the locale before the page is parsed ─────────
+	//
+	// UPD-12: lang was set at DOMContentLoaded, so the body a page drew while
+	// loading (the download window's first progress) was announced as French.
+	{
+		let langWhileLoading = null;
+		await run(els(), { en: EN, fr: FR }, 'de', (ctx) => {
+			ctx.document.readyState = 'loading';
+			ctx.document.addEventListener = () => {
+				langWhileLoading = ctx.document.documentElement.lang;
+			};
+		});
+		check(
+			'lang-before-dom-ready',
+			langWhileLoading === 'de',
+			`the root lang read "${langWhileLoading}" while the page loaded, not the active locale "de" (upd-12)`
+		);
+	}
+
+	// ── 8. The chain the code declares must be shipped ────────────────────────
 	//
 	// A cascade naming a locale that is not on disk is a cascade to nothing.
 	for (const code of ['en', 'fr']) {

@@ -27,6 +27,18 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
 }
 
+/**
+ * Reads a label the page cannot show without: a missing key is logged and
+ * gives null, so its caller hides the figure rather than show a raw key.
+ * @param {string} key - Locale key.
+ * @returns {string|null}
+ */
+function label(key) {
+	const text = _t(key);
+	if (!text) console.error('Missing i18n key: ' + key);
+	return text;
+}
+
 const postBridgeMessage = makeHostBridge('dl_bridge');
 let bridgeSession;
 
@@ -264,11 +276,9 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	document.getElementById('pct').textContent = cappedPercentage + ' %'; // Line 1: Fichiers (next to percentage, pushed right by CSS)
 
 	const fileCountEl = document.getElementById('file-count');
-	if (fileCount) {
-		fileCountEl.textContent = (_t('download_window.file_count') || '📁 Files: %s').replace(
-			'%s',
-			fileCount
-		);
+	const fileCountLabel = fileCount ? label('download_window.file_count') : null;
+	if (fileCountLabel) {
+		fileCountEl.textContent = fileCountLabel.replace('%s', fileCount);
 		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
@@ -277,12 +287,12 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
-	if (downloadedSize)
-		detailsParts.push(
-			(_t('download_window.size_label') || '📦 Size: ') + `<b>${downloadedSize}</b>`
-		);
-	if (speed)
-		detailsParts.push((_t('download_window.speed_label') || '⚡ Speed: ') + `<b>${speed}</b>`);
+	// A missing key hides its figure, never an English label in a page of
+	// another language (UPD-12)
+	const sizeLabel = downloadedSize ? label('download_window.size_label') : null;
+	if (sizeLabel) detailsParts.push(sizeLabel + `<b>${downloadedSize}</b>`);
+	const speedLabel = speed ? label('download_window.speed_label') : null;
+	if (speedLabel) detailsParts.push(speedLabel + `<b>${speed}</b>`);
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(

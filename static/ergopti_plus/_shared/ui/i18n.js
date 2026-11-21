@@ -198,13 +198,16 @@
 			});
 	}
 
-	function load() {
-		var code = window._i18n_locale || 'fr';
+	// The page speaks the active locale: screen readers pick their voice and
+	// browsers their hyphenation from the root lang (WCAG 3.1.1). The pages are
+	// written lang="fr", which was wrong in every other locale; it is set as
+	// this script runs, in the head, not at DOMContentLoaded, so no text the
+	// body draws first is read in French (UPD-12).
+	var active_code = window._i18n_locale || 'fr';
+	document.documentElement.lang = active_code;
 
-		// The page speaks the active locale: screen readers pick their voice and
-		// browsers their hyphenation from the root lang (WCAG 3.1.1). The pages
-		// are written lang="fr", which was wrong in every other locale.
-		document.documentElement.lang = code;
+	function load() {
+		var code = active_code;
 
 		// The chain always starts with the active locale, and never repeats it:
 		// with _i18n_locale === "en" the chain is en → fr, not en → en → fr.
