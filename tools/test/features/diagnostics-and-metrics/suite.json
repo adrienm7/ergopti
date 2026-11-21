@@ -510,7 +510,7 @@
 		{
 			"id": "metrics-view-states",
 			"ordinal": 719,
-			"name": "metrics dashboards show their empty, error and value states (MET-13, MET-14)",
+			"name": "metrics dashboards show their empty, error and value states (MET-13, MET-14, MET-16)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-view-states.cjs"],
 			"repro": "npm run test:metrics-view-states"

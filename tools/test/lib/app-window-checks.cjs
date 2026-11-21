@@ -377,6 +377,15 @@ function imageProblems() {
 		if (!named(node)) problems.push(`${describe(node)} is neither aria-hidden nor a named image`);
 		else if (tag !== 'canvas' && role !== 'img' && tag === 'svg')
 			problems.push(`${describe(node)} is named but not role="img"`);
+		// Marks with their own hover titles hold values a pointer alone reads:
+		// inside role="img" a screen reader hears only the image's name. The
+		// drawing names a control that takes the focus and lists them (MET-16).
+		if ([...node.querySelectorAll('title')].some((title) => title.parentElement !== node)) {
+			const target = node.getAttribute('data-keyboard-equivalent');
+			const control = target && document.querySelector(target);
+			if (!control || control.tabIndex < 0 || !exposed(control))
+				problems.push(`${describe(node)} has values in hover titles only`);
+		}
 	}
 	return problems;
 }

@@ -18,6 +18,10 @@
 // 3. Loaded by both metrics dashboards. The typing dashboard defers Chart.js,
 //    so the plugin registers once the document is parsed when Chart is not
 //    there yet; a page without Chart.js then is an error, never silence.
+// 4. Drawings too. A calendar or heatmap the page writes as SVG markup shows
+//    its values in <title> tooltips, out of reach of the keyboard and of a
+//    screen reader inside its role="img" (MET-16); markup() gives it the same
+//    disclosure, written beside it.
 // ==============================================================================
 
 (function () {
@@ -113,7 +117,47 @@
 		Chart.register(PLUGIN);
 	}
 
-	window.ErgoptiChartValues = { plugin: PLUGIN, valuesOf: valuesOf };
+	/** Escapes text for markup a page writes through innerHTML. */
+	function escapeText(text) {
+		return String(text).replace(/[&<>"]/g, function (character) {
+			return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character];
+		});
+	}
+
+	/**
+	 * The disclosure of a drawing written as markup: the drawing's tag takes
+	 * `attribute`, `html` follows the drawing.
+	 * @param {string} id - Id of the disclosure's summary, unique on the page.
+	 * @param {string[]} items - Every value, in the words of its tooltip.
+	 * @returns {{attribute: string, html: string}}
+	 */
+	function markup(id, items) {
+		if (!/^[a-z][a-z0-9_-]*$/.test(id))
+			throw new Error('metrics_chart_values.js: invalid id ' + id);
+		var strings = window._i18n_strings || {};
+		var list = items
+			.map(function (text) {
+				return '<li>' + escapeText(text) + '</li>';
+			})
+			.join('');
+		return {
+			attribute: ' data-keyboard-equivalent="#' + id + '"',
+			html:
+				'<details class="' +
+				CLASS +
+				'"><summary id="' +
+				id +
+				'" data-i18n="' +
+				SUMMARY_KEY +
+				'">' +
+				escapeText(strings[SUMMARY_KEY] || '') +
+				'</summary><ul>' +
+				list +
+				'</ul></details>'
+		};
+	}
+
+	window.ErgoptiChartValues = { plugin: PLUGIN, valuesOf: valuesOf, markup: markup };
 	if (typeof Chart !== 'undefined') register();
 	else document.addEventListener('DOMContentLoaded', register);
 })();

@@ -1069,6 +1069,7 @@ function _render_activity_calendar() {
 		});
 
 	let cells = '';
+	const tips = [];
 	let month_labels = '';
 	let last_month = -1;
 	const cursor = new Date(start);
@@ -1082,6 +1083,7 @@ function _render_activity_calendar() {
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
 		const tip = `${localized_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
+		tips.push(tip);
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
@@ -1132,17 +1134,19 @@ function _render_activity_calendar() {
 		}
 	});
 
+	// Each day's words, for the keyboard and a screen reader (MET-16).
+	const values = window.ErgoptiChartValues.markup('activity_calendar_values', tips);
 	container.innerHTML =
 		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
 		`<figcaption id="activity_calendar_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
 		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</small></h3>` +
 		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</p>` +
 		`</figcaption>` +
-		`<svg width="${svg_w}" height="${svg_h}" role="img" aria-labelledby="activity_calendar_caption" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<svg width="${svg_w}" height="${svg_h}" role="img" aria-labelledby="activity_calendar_caption"${values.attribute} xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		weekday_labels +
 		month_labels +
 		cells +
-		`</svg></figure>`;
+		`</svg>${values.html}</figure>`;
 }
 
 // ===================================================
@@ -1229,12 +1233,14 @@ function _render_hour_weekday_heatmap() {
 	];
 
 	let cells = '';
+	const tips = [];
 	for (let dow = 0; dow < 7; dow++) {
 		for (let h = 0; h < 24; h++) {
 			const x = PAD_LEFT + h * (CELL_W + GAP);
 			const y = PAD_TOP + dow * (CELL_H + GAP);
 			const n = matrix[dow][h];
 			const tip = `${days_fr[dow]} ${String(h).padStart(2, '0')}h — ${n === 0 ? _t('ui_typing.heatmap_hour_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.heatmap_hour_chars_abbrev')}`;
+			tips.push(tip);
 			cells += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" rx="2" fill="${heat_color(n)}"><title>${tip}</title></rect>`;
 		}
 	}
@@ -1255,15 +1261,17 @@ function _render_hour_weekday_heatmap() {
 	let total_chars = 0;
 	for (let i = 0; i < 7; i++) for (let j = 0; j < 24; j++) total_chars += matrix[i][j];
 
+	// Each hour's words, for the keyboard and a screen reader (MET-16).
+	const values = window.ErgoptiChartValues.markup('hour_weekday_values', tips);
 	container.innerHTML =
 		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
 		`<figcaption id="hour_weekday_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
 		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</small></h3>` +
 		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</p>` +
 		`</figcaption>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="hour_weekday_caption" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="hour_weekday_caption"${values.attribute} xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		day_labels +
 		hour_labels.join('') +
 		cells +
-		`</svg></figure>`;
+		`</svg>${values.html}</figure>`;
 }

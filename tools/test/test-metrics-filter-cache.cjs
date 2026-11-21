@@ -465,6 +465,8 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 		vm.runInContext(read('metrics_calendar.js'), context);
 		vm.runInContext(read('metrics_manifest_keys.js'), context);
+		// The page loads it before its charts, which write their values through it.
+		vm.runInContext(read('metrics_chart_values.js'), context);
 		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
 			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -511,6 +513,7 @@ assert.equal(passed, 13, 'the twelve existing controls and the date sink chain m
 {
 	test('metrics top days escape actual aggregate switch labels', () => {
 		const context = appsFixture().context;
+		vm.runInContext(read('metrics_chart_values.js'), context);
 		vm.runInContext(read('metrics_apps/charts.js'), context);
 		vm.runInContext(read('metrics_apps/modal.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
@@ -4484,6 +4487,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 test('apps daily charts retain sub-minute focus and category time', () => {
 	const fixture = appsFixture();
 	const context = fixture.context;
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	const canvases = {
 		daily_trio_chart: { getContext: () => 'trio' },
@@ -4549,6 +4553,7 @@ test('apps overview charts retain sub-minute durations', () => {
 test('apps hourly speed chart retains slow observed typing', () => {
 	const fixture = appsFixture();
 	const context = fixture.context;
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	context.document.getElementById = (id) =>
 		id === 'cpm_by_hour_chart' ? { getContext: () => 'hourly' } : null;
@@ -4584,6 +4589,7 @@ test('apps category speed chart retains slow observed typing', () => {
 	const context = fixture.context;
 	vm.runInContext(read('dom_utils.js'), context);
 	vm.runInContext(read('metrics_apps/modal.js'), context);
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	const elements = {
 		'kpi-switches': {},
@@ -4631,6 +4637,7 @@ test('apps category speed chart retains slow observed typing', () => {
 test('apps daily active-ratio chart retains small observed ratios', () => {
 	const fixture = appsFixture();
 	const context = fixture.context;
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	context.document.getElementById = (id) =>
 		id === 'daily_active_ratio_chart' ? { getContext: () => 'ratio' } : null;
@@ -4771,7 +4778,12 @@ for (const host of ['windows', 'macos', 'linux']) {
 test('apps radial top eight use the same focus ranking as the top-app bars', () => {
 	const fixture = appsFixture(true);
 	const context = fixture.context;
-	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+	for (const name of [
+		'dom_utils.js',
+		'metrics_chart_values.js',
+		'metrics_apps/modal.js',
+		'metrics_apps/charts.js'
+	])
 		vm.runInContext(read(name), context);
 	const elements = {
 		'kpi-switches': {},
@@ -4822,7 +4834,12 @@ test('apps radial top eight use the same focus ranking as the top-app bars', () 
 test('apps error ranking admits a qualifying application with no corrections', () => {
 	const fixture = appsFixture(true);
 	const context = fixture.context;
-	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+	for (const name of [
+		'dom_utils.js',
+		'metrics_chart_values.js',
+		'metrics_apps/modal.js',
+		'metrics_apps/charts.js'
+	])
 		vm.runInContext(read(name), context);
 	const elements = {
 		'kpi-switches': {},
@@ -4853,7 +4870,12 @@ test('apps error ranking admits a qualifying application with no corrections', (
 test('apps recovery ranking admits qualifying zero-delay corrections', () => {
 	const fixture = appsFixture(true);
 	const context = fixture.context;
-	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+	for (const name of [
+		'dom_utils.js',
+		'metrics_chart_values.js',
+		'metrics_apps/modal.js',
+		'metrics_apps/charts.js'
+	])
 		vm.runInContext(read(name), context);
 	const elements = {
 		'kpi-switches': {},
@@ -4884,6 +4906,7 @@ test('apps recovery ranking admits qualifying zero-delay corrections', () => {
 test('apps burst histogram labels the open-ended class above 500', () => {
 	const fixture = appsFixture();
 	const context = fixture.context;
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	context.document.getElementById = (id) =>
 		id === 'burst_histogram_chart' ? { getContext: () => 'bursts' } : null;
@@ -4910,6 +4933,7 @@ test('apps transition diagram keeps prototype-named applications on both sides',
 	const fixture = appsFixture();
 	const context = fixture.context;
 	vm.runInContext(read('dom_utils.js'), context);
+	vm.runInContext(read('metrics_chart_values.js'), context);
 	vm.runInContext(read('metrics_apps/charts.js'), context);
 	const container = {};
 	context.document.getElementById = (id) => (id === 'sankey_container' ? container : null);
@@ -5010,7 +5034,12 @@ for (const host of ['windows', 'macos', 'linux']) {
 test('apps muted duration is not presented as a focus-time percentage', () => {
 	const fixture = appsFixture(true);
 	const context = fixture.context;
-	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+	for (const name of [
+		'dom_utils.js',
+		'metrics_chart_values.js',
+		'metrics_apps/modal.js',
+		'metrics_apps/charts.js'
+	])
 		vm.runInContext(read(name), context);
 	const elements = {
 		'kpi-switches': {},
@@ -5246,7 +5275,12 @@ test('linux rhythm displays a measured zero inter-key delay', () => {
 test('apps focus latency displays measured zero and distinguishes absence', () => {
 	const fixture = appsFixture(true);
 	const context = fixture.context;
-	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+	for (const name of [
+		'dom_utils.js',
+		'metrics_chart_values.js',
+		'metrics_apps/modal.js',
+		'metrics_apps/charts.js'
+	])
 		vm.runInContext(read(name), context);
 	const tbody = {
 		children: [],

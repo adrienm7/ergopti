@@ -521,6 +521,9 @@ async function selfCheck(chromium) {
 			<ul><li><button id="delegated">Inside</button></li></ul>
 			<button id="real">Real</button>
 			<img src="data:," id="noalt"><svg id="bare" viewBox="0 0 1 1"></svg><svg aria-hidden="true"></svg>
+			<svg id="hovered" role="img" aria-label="Days"><rect width="1" height="1"><title>Monday — 3</title></rect></svg>
+			<svg id="listed" role="img" aria-label="Days" data-keyboard-equivalent="#days"><rect width="1" height="1"><title>Monday — 3</title></rect></svg>
+			<details><summary id="days">Chart values</summary><ul><li>Monday — 3</li></ul></details>
 			<canvas id="chart" width="4" height="4"></canvas>
 			<section role="dialog" aria-modal="true" aria-label="Hidden" hidden><button>Hidden</button></section>
 			<section id="shown" role="dialog" aria-modal="true" aria-label="Shown" hidden><button>Close</button></section>
@@ -562,9 +565,10 @@ async function selfCheck(chromium) {
 			[
 				'img#noalt has no alt',
 				'svg#bare is neither aria-hidden nor a named image',
+				'svg#hovered has values in hover titles only',
 				'canvas#chart is neither aria-hidden nor a named image'
 			],
-			'Images without a text alternative, a hidden svg passing'
+			'Images without a text alternative or with values on hover only, a hidden svg and a listed drawing passing'
 		);
 		await page.evaluate(() => {
 			const dialog = document.getElementById('sticky');

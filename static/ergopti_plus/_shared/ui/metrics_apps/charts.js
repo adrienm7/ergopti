@@ -20,6 +20,21 @@ function chartSummary(titleKey, entries) {
 	return escapeHtml(top.length ? `${_t(titleKey)}: ${top.join('; ')}` : _t(titleKey));
 }
 
+/**
+ * Every value of a drawn chart for the keyboard and a screen reader: the
+ * summary above names five, the hover titles were the only way to the rest
+ * (MET-16). The drawing's tag takes `attribute`, `html` follows it.
+ * @param {string} id - Id of the values' disclosure, unique on the page.
+ * @param {{value: number, text: string}[]} entries - One per drawn mark.
+ * @returns {{attribute: string, html: string}}
+ */
+function chartValues(id, entries) {
+	return window.ErgoptiChartValues.markup(
+		id,
+		entries.map((entry) => entry.text)
+	);
+}
+
 // Active mode for the hour×weekday heatmap; flipped by setHourWeekdayMode().
 let _hourWeekdayMode = 'chars'; // "chars" | "time"
 
@@ -108,12 +123,14 @@ function renderHourWeekdayHeatmap(aggData) {
 		}
 	});
 
+	const values = chartValues('hour_weekday_values', entries);
 	container.innerHTML =
-		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_hour_weekday', entries)}" width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_hour_weekday', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		labels_x +
 		labels_y +
 		cells +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 }
 
 /**
@@ -192,11 +209,13 @@ function renderRibbon(aggData) {
 		});
 	});
 
+	const values = chartValues('ribbon_values', entries);
 	container.innerHTML =
-		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_day_strip', entries)}" width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_day_strip', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		header +
 		rows +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 
 	if (legend) {
 		legend.innerHTML = [...cats_seen]
@@ -295,7 +314,8 @@ function renderSankey(aggData) {
 		value: e.count,
 		text: `${e.src} → ${e.dst} (${e.count})`
 	}));
-	container.innerHTML = `<svg role="img" aria-label="${chartSummary('ui_apps.chart_app_switches', entries)}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+	const values = chartValues('sankey_values', entries);
+	container.innerHTML = `<svg role="img" aria-label="${chartSummary('ui_apps.chart_app_switches', entries)}"${values.attribute} width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>${values.html}`;
 }
 
 let radialTop8Chart = null;
@@ -363,9 +383,11 @@ function renderDayTimeline(aggData) {
 		});
 	}
 
+	const values = chartValues('day_timeline_values', entries);
 	container.innerHTML =
 		`<p class="chart-caption">${escapeHtml(_t('ui_apps.col_day'))} : ${escapeHtml(formatDisplayDate(targetDay))}</p>` +
-		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_annotated_strip', entries)}" width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_annotated_strip', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
+		values.html;
 }
 
 /**
@@ -558,8 +580,10 @@ function renderSessionBoxplots(aggData) {
 		entries.push({ value: r.time_ms || r.med, text: tip });
 		svg += `<rect x="${LABEL_LEFT}" y="${y - 16}" width="${TRACK_W}" height="32" fill="transparent"><title>${escapeHtml(tip)}</title></rect>`;
 	});
+	const values = chartValues('session_boxplot_values', entries);
 	container.innerHTML =
-		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_session_durations', entries)}" width="${W}" height="${SVG_H}" viewBox="0 0 ${W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_session_durations', entries)}"${values.attribute} width="${W}" height="${SVG_H}" viewBox="0 0 ${W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
+		values.html +
 		`<p class="chart-caption below">${_t('ui_apps.boxplot_scale').replace('{max}', formatDuration(max_ms))}</p>`;
 }
 
@@ -1178,12 +1202,14 @@ function renderActivityCalendar() {
 		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${escapeHtml(`${dt} — ${v_txt}`)}</title></rect>`;
 	});
 
+	const values = chartValues('activity_calendar_values', entries);
 	container.innerHTML =
-		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_activity_cal', entries)}" width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_activity_cal', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		month_labels +
 		wd_labels +
 		rects +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 }
 
 // =====================================================
