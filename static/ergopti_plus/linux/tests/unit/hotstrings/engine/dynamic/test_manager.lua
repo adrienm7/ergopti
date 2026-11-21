@@ -589,7 +589,7 @@ assert(next(manager.get_info()) == nil)
       helpers.assert_eq(injected[1], { "Durand", "Élodie" }, "exact İ remains distinct from the invalid decomposed key")
     end)
 
-    helpers.it("independent: final sigma simple stays exact while a combo resolves uppercase", function()
+    helpers.it("independent: an upper final sigma types its field in capitals, alone or in a combo (hcd-5-tag-case)", function()
       local path = os.tmpname()
       local file = assert(io.open(path, "w"))
       file:write('[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n[letters]\nn = "last_name"\n"ς" = "first_name"\n'); file:close()
@@ -600,17 +600,18 @@ assert(next(manager.get_info()) == nil)
         inject = function(_, value) single = value; return { ok = true } end,
         inject_fields = function(_, result) values = result; return { ok = true } end,
       }
-      local missing = dh.preview("@Σ\\", true)
-      local missing_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@Σ\\", "\\")
+      local upper = dh.preview("@Σ\\", true)
+      local upper_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@Σ\\", "\\")
       local exact = dh.preview("@ς\\", true)
       local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@ς\\", "\\")
       local rows = dh.preview_candidates("@nΣ")
       local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
       package.loaded["hotstrings.engine.injector"] = previous; os.remove(path)
-      helpers.assert_nil(missing); helpers.assert_eq(missing_fired, false)
+      -- HCD-5 (2026-11-21): the typed case sets the field's case.
+      helpers.assert_eq(upper, "ANNA"); helpers.assert_true(upper_fired)
       helpers.assert_eq(exact, "Anna"); helpers.assert_true(exact_fired); helpers.assert_eq(single, "Anna")
-      helpers.assert_eq(rows[1].parts, { "Demos", "Anna" }); helpers.assert_true(fired)
-      helpers.assert_eq(values, { "Demos", "Anna" })
+      helpers.assert_eq(rows[1].parts, { "Demos", "ANNA" }); helpers.assert_true(fired)
+      helpers.assert_eq(values, { "Demos", "ANNA" })
     end)
 
     helpers.it("resolves uppercase Greek final-sigma aliases and refuses conflicts", function()

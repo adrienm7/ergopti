@@ -764,8 +764,8 @@ function M.preview_candidates(buffer, start_is_boundary)
 	-- Builtin personal combinations have the same precedence at preview and fire.
 	rows = {}
 
-	local parts = {}
-	for index, field in ipairs(fields) do parts[index] = _info[field] end
+	-- The values the fire path types, cased by the typed letters (HCD-5).
+	local parts = M.resolve_combo_values(tag)
 
 	rows[#rows + 1] = {
 		trigger  = "@" .. tag .. _trigger_char,
