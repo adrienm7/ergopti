@@ -286,6 +286,33 @@ helpers.describe("update-check window bridge (Linux)", function()
 		end)
 	end)
 
+	-- UPD-09: the window said « installed, restarting » before the restart
+	-- was tried, and kept saying it when the restart was refused.
+	for _, armed in ipairs({ true, false }) do
+		helpers.it("upd-09: the window reports the restart only once it is armed (armed=" .. tostring(armed) .. ")", function()
+			scenario(available, function(bridge, context)
+				local order = {}
+				context.ctx.on_update_finished = function()
+					order[#order + 1] = "restart"
+					return armed
+				end
+				local complete = package.loaded["ui.download_window.bridge"].complete
+				package.loaded["ui.download_window.bridge"].complete = function(id, ok, message)
+					order[#order + 1] = "window"
+					return complete(id, ok, message)
+				end
+				bridge.open(context.ctx)
+				bridge.on_message({ action = "update" })
+				helpers.assert_eq(order, { "restart", "window" }, "the restart is tried before the window says it")
+				local I18n = require("core.i18n.engine.i18n")
+				local key = armed and "updater.installed_restarting" or "updater.installed_restart_refused"
+				helpers.assert_eq(context.completed[1][3], (I18n.get(key):gsub("{1}", "v0.0.0-dev.150")))
+				helpers.assert_true(I18n.get("updater.installed_restart_refused") ~= "updater.installed_restart_refused",
+					"the refused restart has its own localized line")
+			end)
+		end)
+	end
+
 	helpers.it("refuses to install a release the updater no longer offers", function()
 		scenario(function(channel)
 			local answer = available(channel)

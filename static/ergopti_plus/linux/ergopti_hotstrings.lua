@@ -3110,7 +3110,9 @@ local function main()
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
-			-- An update downloaded and installed: the daemon restarts on it.
+			-- An update downloaded and installed: the daemon restarts on it. Only an
+			-- armed restart is announced as one; a refused one leaves the old daemon
+			-- running and says so (UPD-09). Returns whether the restart was armed.
 			on_update_finished = function(installed, tag, stage)
 				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.window_title") or nil
 				if not installed then
@@ -3119,13 +3121,14 @@ local function main()
 							or "updater.install_error"), { title = title, level = "error" })
 					end
 					if rebuild_tray_menu then rebuild_tray_menu() end
-					return
+					return false
 				end
+				local restarted = restart_on_installed_release(script_actions.is_paused()) == true
 				if notifier and title then
-					notifier.send(i18n_mod.get("updater.installed_restarting")
-						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = "info" })
+					notifier.send(i18n_mod.get(restarted and "updater.installed_restarting" or "updater.installed_restart_refused")
+						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = restarted and "info" or "warning" })
 				end
-				restart_on_installed_release(script_actions.is_paused())
+				return restarted
 			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
 			-- field is the settings window. Opening it is honest; a native prompt

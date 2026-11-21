@@ -616,6 +616,34 @@ helpers.describe("Main restart pause wiring", function()
 		end
 	end)
 
+	-- UPD-09: the hook told « installed, restarting » and then ignored what the
+	-- restart answered, so a refused restart left that notice up.
+	for _, armed in ipairs({ true, false }) do
+		helpers.it("upd-09: the completion hook notifies only after the restart answered (armed=" .. tostring(armed) .. ")", function()
+			local source = main_source()
+			local marker = "on_update_finished = function(installed, tag, stage)"
+			local first = assert(source:find(marker, 1, true))
+			local last = assert(source:find("\n\t\t\tend,\n", first, true))
+			local text = "return function(installed, tag, stage)" .. source:sub(first + #marker, last + 6)
+			local order = {}
+			local environment = setmetatable({
+				ok_i18n = true, i18n_mod = { get = function(key) return key .. " {1}" end },
+				notifier = { send = function(body, opts) order[#order + 1] = { body = body, level = opts.level } end },
+				script_actions = { is_paused = function() return false end },
+				restart_on_installed_release = function() order[#order + 1] = "restart"; return armed end,
+			}, { __index = _G })
+			local chunk
+			if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+			else chunk = assert(load(text, "update completion hook", "t", environment)) end
+			local hook = chunk()
+			helpers.assert_eq(hook(true, "v9.9.9", "install"), armed, "the hook answers whether the restart was armed")
+			helpers.assert_eq(order[1], "restart", "the restart is tried before anything is told")
+			helpers.assert_eq(order[2].body, (armed and "updater.installed_restarting" or "updater.installed_restart_refused")
+				.. " v9.9.9")
+			helpers.assert_eq(order[2].level, armed and "info" or "warning")
+		end)
+	end
+
 	helpers.it("captures current pause at all three complete-restart callsites", function()
 		local source = main_source()
 		local _, update_calls = source:gsub("restart_on_installed_release%(script_actions%.is_paused%(%)%)", "")

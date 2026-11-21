@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Could not install the update. Check the logs for details.",
 	"updater.check_request_failed": "Could not start the update check. Check the logs for details.",
 	"updater.installed_restarting": "Update {1} installed — ErgoptiPlus is restarting on the new version.",
+	"updater.installed_restart_refused": "Update {1} is installed, but ErgoptiPlus could not restart on it: the previous version is still running. Quit ErgoptiPlus and start it again to finish the update.",
 	"updater.install_error_download": "Failed to download the update package. Check your internet connection and try again.",
 	"updater.download_cancelled": "Update download cancelled",
 	"updater.install_error_no_asset": "The release does not include a Windows executable to install. Open the release page to download manually.",

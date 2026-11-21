@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Oppdateringen kunne ikke installeres. Se loggene for detaljer.",
 	"updater.check_request_failed": "Søket etter oppdateringer kunne ikke startes. Se loggene for detaljer.",
 	"updater.installed_restarting": "Oppdatering {1} installert — ErgoptiPlus starter på nytt med den nye versjonen.",
+	"updater.installed_restart_refused": "Oppdatering {1} er installert, men ErgoptiPlus kunne ikke starte på nytt med den: den forrige versjonen kjører fortsatt. Avslutt ErgoptiPlus og start det igjen for å fullføre oppdateringen.",
 	"updater.install_error_download": "Nedlasting av oppdateringspakken mislyktes. Sjekk internettforbindelsen og prøv igjen.",
 	"updater.download_cancelled": "Nedlasting av oppdateringen avbrutt",
 	"updater.install_error_no_asset": "Denne utgivelsen inneholder ingen Windows-kjørbar fil. Åpne utgivelsessiden for å laste ned manuelt.",

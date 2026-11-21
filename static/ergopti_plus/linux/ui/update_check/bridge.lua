@@ -140,10 +140,12 @@ function M.download_offered(updater, release, ctx)
 		return closed and accepted == true and current()
 	end
 	local completion_hook = ctx.on_update_finished
+	--- Hands the outcome to the menu hook; true only when it armed the restart.
 	local function finished(installed, stage)
-		if type(completion_hook) ~= "function" then return end
-		local ok = pcall(completion_hook, installed, tag, stage)
+		if type(completion_hook) ~= "function" then return false end
+		local ok, restarted = pcall(completion_hook, installed, tag, stage)
 		if not ok then Logger.error(LOG, "The bound update-completion hook raised.") end
+		return ok and restarted == true
 	end
 	local function dispatch(retry)
 		if not current() or owner.active or (retry and not can_retry()) then return false end
@@ -160,15 +162,20 @@ function M.download_offered(updater, release, ctx)
 			if installed then Logger.success(LOG, "Update %s installed.", tag)
 			else Logger.error(LOG, "Update %s failed at the %s: %s.", tag,
 				archive and "install" or (stage or "download"), tostring(err)) end
+			-- The restart is tried before the window says it happens (UPD-09)
+			local restarted = finished(installed, archive and "install" or (stage or "download"))
+			if installed and not restarted then
+				Logger.error(LOG, "Update %s is installed but the restart on it was refused; the old daemon keeps running.", tag)
+			end
 			if session_id ~= nil then
 				DownloadWindow.complete(session_id, installed, installed
-					and I18n.get("updater.installed_restarting"):gsub("{1}", function() return tag end)
+					and I18n.get(restarted and "updater.installed_restarting" or "updater.installed_restart_refused")
+						:gsub("{1}", function() return tag end)
 					or (stage == "verify"
 						and I18n.get("changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
 						or I18n.get(archive and "updater.install_error" or "updater.install_error_download")),
 					archive == nil and stage ~= "verify" and failure_receipt or nil)
 			end
-			finished(installed, archive and "install" or (stage or "download"))
 		end
 		local function done(archive, err, stage, failure_receipt)
 			if serial ~= _offer_serial or attempt ~= owner.attempt or owner.terminal or owner.cancelled then return end

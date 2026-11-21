@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Det gick inte att installera uppdateringen. Se loggarna för detaljer.",
 	"updater.check_request_failed": "Det gick inte att starta sökningen efter uppdateringar. Se loggarna för detaljer.",
 	"updater.installed_restarting": "Uppdatering {1} installerad — ErgoptiPlus startar om med den nya versionen.",
+	"updater.installed_restart_refused": "Uppdatering {1} är installerad, men ErgoptiPlus kunde inte starta om med den: den tidigare versionen körs fortfarande. Avsluta ErgoptiPlus och starta det igen för att slutföra uppdateringen.",
 	"updater.install_error_download": "Det gick inte att hämta uppdateringspaketet. Kontrollera din internetanslutning och försök igen.",
 	"updater.download_cancelled": "Nedladdningen av uppdateringen avbröts",
 	"updater.install_error_no_asset": "Den här versionen innehåller ingen Windows-körbar fil. Öppna versionsidan för att hämta manuellt.",

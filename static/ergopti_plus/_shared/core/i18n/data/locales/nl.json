@@ -4123,6 +4123,7 @@
 	"updater.install_error": "De update kan niet worden geïnstalleerd. Raadpleeg de logboeken voor details.",
 	"updater.check_request_failed": "De controle op updates kan niet worden gestart. Raadpleeg de logboeken voor details.",
 	"updater.installed_restarting": "Update {1} geïnstalleerd — ErgoptiPlus start opnieuw met de nieuwe versie.",
+	"updater.installed_restart_refused": "Update {1} is geïnstalleerd, maar ErgoptiPlus kon er niet mee opnieuw starten: de vorige versie draait nog. Sluit ErgoptiPlus af en start het opnieuw om de update af te ronden.",
 	"updater.install_error_download": "Het downloaden van het updatepakket is mislukt. Controleer uw internetverbinding en probeer het opnieuw.",
 	"updater.download_cancelled": "Downloaden van de update geannuleerd",
 	"updater.install_error_no_asset": "Deze release bevat geen Windows-uitvoerbaar bestand. Open de releasepagina om handmatig te downloaden.",

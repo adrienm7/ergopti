@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Güncelleme yüklenemedi. Ayrıntılar için günlüklere bakın.",
 	"updater.check_request_failed": "Güncelleme denetimi başlatılamadı. Ayrıntılar için günlüklere bakın.",
 	"updater.installed_restarting": "{1} güncellemesi yüklendi — ErgoptiPlus yeni sürümle yeniden başlatılıyor.",
+	"updater.installed_restart_refused": "{1} güncellemesi yüklendi, ancak ErgoptiPlus bu sürümle yeniden başlatılamadı: önceki sürüm hâlâ çalışıyor. Güncellemeyi tamamlamak için ErgoptiPlus’tan çıkın ve yeniden başlatın.",
 	"updater.install_error_download": "Güncelleme paketi indirilemedi. İnternet bağlantınızı kontrol edip yeniden deneyin.",
 	"updater.download_cancelled": "Güncelleme indirmesi iptal edildi",
 	"updater.install_error_no_asset": "Bu sürüm bir Windows yürütülebilir dosyası içermiyor. Manuel olarak indirmek için sürüm sayfasını açın.",

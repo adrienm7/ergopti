@@ -4123,6 +4123,7 @@
 	"updater.install_error": "تعذّر تثبيت التحديث. راجع السجلات للاطّلاع على التفاصيل.",
 	"updater.check_request_failed": "تعذّر بدء التحقق من التحديثات. راجع السجلات للاطّلاع على التفاصيل.",
 	"updater.installed_restarting": "تم تثبيت التحديث {1} — يُعاد تشغيل ErgoptiPlus على الإصدار الجديد.",
+	"updater.installed_restart_refused": "تم تثبيت التحديث {1}، لكن تعذّرت إعادة تشغيل ErgoptiPlus عليه: يبقى الإصدار السابق قيد التشغيل. أغلق ErgoptiPlus ثم شغّله من جديد لإتمام التحديث.",
 	"updater.install_error_download": "فشل تنزيل حزمة التحديث. تحقّق من اتصالك بالإنترنت وأعد المحاولة.",
 	"updater.download_cancelled": "تم إلغاء تنزيل التحديث",
 	"updater.install_error_no_asset": "لا تتضمّن هذه النسخة ملفاً تنفيذياً لنظام Windows. افتح صفحة النسخة لتنزيلها يدوياً.",

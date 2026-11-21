@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Não foi possível instalar a atualização. Consulte os registos para mais detalhes.",
 	"updater.check_request_failed": "Não foi possível iniciar a verificação de atualizações. Consulte os registos para mais detalhes.",
 	"updater.installed_restarting": "Atualização {1} instalada — o ErgoptiPlus está reiniciando na nova versão.",
+	"updater.installed_restart_refused": "A atualização {1} está instalada, mas o ErgoptiPlus não conseguiu reiniciar nela: a versão anterior continua em execução. Feche o ErgoptiPlus e abra-o novamente para concluir a atualização.",
 	"updater.install_error_download": "Falha ao transferir o pacote de atualização. Verifique a sua ligação à Internet e tente novamente.",
 	"updater.download_cancelled": "Transferência da atualização cancelada",
 	"updater.install_error_no_asset": "Esta versão não inclui um executável para Windows. Abra a página da versão para transferir manualmente.",

@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Das Update konnte nicht installiert werden. Details finden Sie in den Logs.",
 	"updater.check_request_failed": "Die Suche nach Updates konnte nicht gestartet werden. Details finden Sie in den Logs.",
 	"updater.installed_restarting": "Update {1} installiert — ErgoptiPlus startet mit der neuen Version neu.",
+	"updater.installed_restart_refused": "Update {1} ist installiert, aber ErgoptiPlus konnte nicht damit neu starten: Die vorherige Version läuft weiter. Beenden Sie ErgoptiPlus und starten Sie es erneut, um das Update abzuschließen.",
 	"updater.install_error_download": "Das Update-Paket konnte nicht heruntergeladen werden. Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
 	"updater.download_cancelled": "Download des Updates abgebrochen",
 	"updater.install_error_no_asset": "Diese Version enthält keine Windows-Executable. Öffnen Sie die Release-Seite zum manuellen Download.",

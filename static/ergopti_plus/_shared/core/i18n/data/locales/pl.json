@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Nie udało się zainstalować aktualizacji. Szczegóły znajdziesz w logach.",
 	"updater.check_request_failed": "Nie udało się rozpocząć sprawdzania aktualizacji. Szczegóły znajdziesz w logach.",
 	"updater.installed_restarting": "Aktualizacja {1} zainstalowana — ErgoptiPlus uruchamia się ponownie w nowej wersji.",
+	"updater.installed_restart_refused": "Aktualizacja {1} jest zainstalowana, ale ErgoptiPlus nie mógł się ponownie uruchomić w nowej wersji: nadal działa poprzednia wersja. Zamknij ErgoptiPlus i uruchom go ponownie, aby dokończyć aktualizację.",
 	"updater.install_error_download": "Pobieranie pakietu aktualizacji nie powiodło się. Sprawdź połączenie internetowe i spróbuj ponownie.",
 	"updater.download_cancelled": "Pobieranie aktualizacji anulowane",
 	"updater.install_error_no_asset": "Ta wersja nie zawiera pliku wykonywalnego dla Windows. Otwórz stronę wydania, aby pobrać ręcznie.",

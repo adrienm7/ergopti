@@ -4123,6 +4123,7 @@
 	"updater.install_error": "Impossible d’installer la mise à jour. Consultez les journaux pour plus de détails.",
 	"updater.check_request_failed": "Impossible de lancer la recherche de mises à jour. Consultez les journaux pour plus de détails.",
 	"updater.installed_restarting": "Mise à jour {1} installée — ErgoptiPlus redémarre sur la nouvelle version.",
+	"updater.installed_restart_refused": "La mise à jour {1} est installée, mais ErgoptiPlus n’a pas pu redémarrer dessus : la version précédente tourne toujours. Quittez ErgoptiPlus puis relancez-le pour terminer la mise à jour.",
 	"updater.install_error_download": "Le téléchargement de la mise à jour a échoué. Vérifiez votre connexion Internet et réessayez.",
 	"updater.download_cancelled": "Téléchargement de la mise à jour annulé",
 	"updater.install_error_no_asset": "Cette version ne contient pas d’exécutable Windows à installer. Ouvrez la page de la version pour télécharger manuellement.",

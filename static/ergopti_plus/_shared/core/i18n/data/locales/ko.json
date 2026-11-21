@@ -4123,6 +4123,7 @@
 	"updater.install_error": "업데이트를 설치할 수 없습니다. 자세한 내용은 로그를 확인하십시오.",
 	"updater.check_request_failed": "업데이트 확인을 시작할 수 없습니다. 자세한 내용은 로그를 확인하십시오.",
 	"updater.installed_restarting": "업데이트 {1} 설치 완료 — ErgoptiPlus가 새 버전으로 다시 시작합니다.",
+	"updater.installed_restart_refused": "업데이트 {1}이(가) 설치되었지만 ErgoptiPlus를 새 버전으로 다시 시작하지 못했습니다. 이전 버전이 계속 실행 중입니다. 업데이트를 마치려면 ErgoptiPlus를 종료한 뒤 다시 시작하세요.",
 	"updater.install_error_download": "업데이트 패키지를 다운로드하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하십시오.",
 	"updater.download_cancelled": "업데이트 다운로드가 취소되었습니다",
 	"updater.install_error_no_asset": "이 릴리스에는 Windows 실행 파일이 포함되어 있지 않습니다. 릴리스 페이지를 열어 수동으로 다운로드하십시오.",
