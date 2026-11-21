@@ -382,8 +382,14 @@ local function _handle_table(data, state, context)
 				close_session(session, context)
 				return nil
 			end
+			-- A confirmation that names no action is a page defect, refused on the
+			-- three drivers with the picker left open: it never means "none"
+			if type(data.id) ~= "string" or data.id == "" then
+				Logger.warn(LOG, "Refused a confirmation that names no action; the picker stays open.")
+				return nil
+			end
 			session.settling = true
-			local id = type(data.id) == "string" and data.id or "none"
+			local id = data.id
 			-- A value the page's editor collected travels with the pick.
 			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, data)
 			if _active_session ~= session then

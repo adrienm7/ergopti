@@ -24,6 +24,18 @@ TestAPCD_PageReadsTheLocaleText() {
 }
 Test("action picker: the count default reaches the page raw (action-picker-count-default)", TestAPCD_PageReadsTheLocaleText)
 
+TestAPCD_ConfirmNamesAnAction() {
+	for Payload in [Map("action", "confirm"), Map("action", "confirm", "id", ""),
+			Map("action", "confirm", "id", 7)] {
+		AssertFalse(_ActPickWeb_ConfirmedId(Payload, &Id),
+			"pck-07: a confirmation that names no action is refused, never the native passthrough")
+		AssertEqual("", Id)
+	}
+	AssertTrue(_ActPickWeb_ConfirmedId(Map("action", "confirm", "id", "none"), &Id))
+	AssertEqual("none", Id, "the page's own specials pass unchanged")
+}
+Test("action picker: a confirmation names an action, as on macOS and Linux (pck-07)", TestAPCD_ConfirmNamesAnAction)
+
 TestAPCD_EveryLocaleNamesTheMenuTitle() {
 	global _SharedDir
 	Checked := 0

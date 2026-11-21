@@ -97,6 +97,21 @@ helpers.describe("Action picker title-bar close (pck-06)", function()
 	end)
 end)
 
+helpers.describe("Action picker confirmation without an action (pck-07)", function()
+	helpers.it("pck-07: a confirmation that names no action is refused and the picker stays open", function()
+		with_picker(function(f)
+			f.open("Binding")
+			for _, id in ipairs({ false, "", 7 }) do
+				f.message("confirm", id ~= false and id or nil)
+				helpers.assert_eq(#f.seen.picks, 0, "it never means none: " .. tostring(id))
+				helpers.assert_true(f.bridge.is_open())
+			end
+			f.message("confirm", "none")
+			helpers.assert_eq(f.seen.picks, { { "Binding", "none" } }, "the page's own specials pass unchanged")
+		end)
+	end)
+end)
+
 helpers.describe("Action picker exact close successor", function()
 	helpers.it("(picker-private-exception) withholds callback data from the log", function()
 		local logger, lines = require("core.logger.engine.shim"), {}

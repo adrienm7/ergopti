@@ -420,7 +420,8 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	} else if (Action == "cancel") {
 		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Close), -1)
 	} else if (Action == "confirm") {
-		Id := Payload.Has("id") ? Payload["id"] : ""
+		if !_ActPickWeb_ConfirmedId(Payload, &Id)
+			return
 		; A send_* value the page's own editor collected travels with the pick.
 		HasParameter := Payload.Has("parameter") && (Payload["parameter"] is String)
 		Parameter := HasParameter ? Payload["parameter"] : ""
@@ -429,6 +430,22 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm,
 			Id, HasParameter, Parameter, HasProvider, Provider), -1)
 	}
+}
+
+; Reads the action id of a confirmation, as macOS and Linux read it: a missing,
+; empty or non-string id is a page defect, refused with the picker left open.
+; It never maps to "" (the native passthrough) nor to any other action.
+; @param Payload {Map} Decoded page message.
+; @param Id {VarRef} Receives the action id.
+; @returns {Boolean} Whether the confirmation names an action.
+_ActPickWeb_ConfirmedId(Payload, &Id) {
+	Id := ""
+	if !Payload.Has("id") || !(Payload["id"] is String) || Payload["id"] == "" {
+		LoggerWarn("ActionPicker", "Refused a confirmation that names no action; the picker stays open.")
+		return false
+	}
+	Id := Payload["id"]
+	return true
 }
 
 ; Push the init payload once the page has finished loading.

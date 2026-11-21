@@ -204,6 +204,24 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 		end)
 	end)
 
+	helpers.it("pck-07: refuses a confirmation that names no action and stays open", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local confirmed = {}
+			picker.open({ title = "Target", items = {} }, function(id)
+				confirmed[#confirmed + 1] = id
+				return true
+			end)
+			local bridge = state.bridges[1]
+			bridge.callback(native_message(state.views[1], { action = "confirm" }))
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = "" }))
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = 7 }))
+			helpers.assert_eq(#confirmed, 0, "a confirmation without an action never means none")
+			helpers.assert_true(not state.views[1].deleted, "the picker stays open")
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = "none" }))
+			helpers.assert_eq(confirmed, { "none" }, "the page's own specials pass unchanged")
+		end)
+	end)
+
 	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
 		with_editor("ui.action_picker", function(picker, state)
 			local attempts = 0

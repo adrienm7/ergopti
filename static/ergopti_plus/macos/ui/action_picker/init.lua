@@ -291,8 +291,14 @@ function M.open(opts, on_confirm)
 				return
 			end
 			if session.settling then return end
+			-- A confirmation that names no action is a page defect, refused on the
+			-- three drivers with the picker left open: it never means "none"
+			if type(body.id) ~= "string" or body.id == "" then
+				Logger.warn(LOG, "Refused a confirmation that names no action; the picker stays open.")
+				return
+			end
 			session.settling = true
-			local id = type(body.id) == "string" and body.id or "none"
+			local id = body.id
 			-- A value the page's editor collected travels with the pick.
 			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, body)
 			if _active_session ~= session then
