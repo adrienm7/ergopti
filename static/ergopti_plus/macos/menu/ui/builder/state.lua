@@ -375,6 +375,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 			{ fn = "set_preview_category_glyphs",     val = state.preview_category_glyphs },
+			{ fn = "set_preview_announcements",       val = state.preview_announcements },
 			{ fn = "set_trigger_char",                val = state.trigger_char },
 			{ fn = "set_magic_key_source",            val = state.magic_key_source },
 		}) do

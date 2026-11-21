@@ -1577,12 +1577,28 @@ local function _manifest_hotstring_rows(ctx, config)
 				["preview_glyphs_ready"] = function() return true end,
 			})
 			if glyph_row then glyph_rows[#glyph_rows + 1] = glyph_row end
+			-- Whether Orca is told the previews (2026-11-21), its own section.
+			local announce_rows = {}
+			local announce_row = ManifestMenu.check_row("preview_announce_control", require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS, {
+				[require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS] = function()
+					if not toggle_preview("announce") then return false end
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_announcements"), PreviewSettings.get("announce") == true)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_ANNOUNCEMENTS] = function() return PreviewSettings.get("announce") == true end,
+				-- Configuring a preview remains allowed while the Linux engine is paused.
+				["preview_announce_ready"] = function() return true end,
+			})
+			if announce_row then announce_rows[#announce_rows + 1] = announce_row end
 
 			local children = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
 				["parameter_preview_magic"] = function() return magic_rows end,
 				["parameter_preview_presence"] = function() return presence_rows end,
 				["parameter_preview_colored"] = function() return choices end,
 				["parameter_preview_glyphs"] = function() return glyph_rows end,
+				["parameter_preview_announcements"] = function() return announce_rows end,
 			})
 			if not children then return {} end
 			return ManifestMenu.template_rows("hotstrings_preview_parent", {},

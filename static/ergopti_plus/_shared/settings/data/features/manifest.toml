@@ -765,6 +765,20 @@ cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_category_glyphs"
 
+# Whether a running screen reader is told the hotstring previews and the
+# finished AI predictions (the maintainer asked for a switch on 2026-11-21). On
+# by default: nothing is said without a screen reader, and a screen-reader user
+# who finds the notices noisy turns them off here.
+[[features.hotstrings]]
+id = "preview_announcements"
+requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+cleared = false
+type = "boolean"
+description_key = "menu.hotstrings.preview_announcements"
+
 [[features.hotstrings]]
 id = "preview_star_enabled"
 requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }

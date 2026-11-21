@@ -225,6 +225,7 @@ content = ['["\x27]xdotool[ "\x27]']
 "core/fs/adapters/file_manager_folder.lua" = ["gestures.*"]
 "core/ui/ui/tooltip/preview.lua" = [
 	"hotstrings.preview_ai_enabled",
+	"hotstrings.preview_announcements",
 	"hotstrings.preview_autocorrect_enabled",
 	"hotstrings.preview_category_glyphs",
 	"hotstrings.preview_colored_tooltips",

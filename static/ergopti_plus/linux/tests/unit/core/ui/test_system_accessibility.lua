@@ -230,6 +230,39 @@ h.describe("the preview window for AT-SPI (a11y-linux-preview)", function()
 		h.assert_eq(accessible.name, "salut")
 	end)
 
+	h.it("(preview-announcements-2026-11-21) the menu's switch keeps Orca silent with the screen reader on", function()
+		local window, accessible = window_double()
+		h.assert_true(Renderer.announcements_enabled(), "the notices are on by default")
+		Renderer.set_announcements_enabled(false)
+		local ok, err = pcall(function()
+			h.assert_true(Renderer.describe_window(window, Atk, { { text = "salut" } }, true))
+			h.assert_eq(accessible.role, "tool-tip", "switch off: a tooltip Orca does not speak")
+			h.assert_eq(accessible.name, "salut", "the window stays named for a reader who reaches it")
+		end)
+		Renderer.set_announcements_enabled(true)
+		if not ok then error(err, 0) end
+		h.assert_true(Renderer.describe_window(window, Atk, { { text = "salut" } }, true))
+		h.assert_eq(accessible.role, "notification", "switch on: a notification again")
+	end)
+
+	h.it("(preview-announcements-2026-11-21) the preview toggle reaches the renderer the suggestions share", function()
+		local saved = package.loaded["core.ui.ui.tooltip.preview"]
+		local saved_renderer = package.loaded["core.ui.adapters.graphics_renderer"]
+		package.loaded["core.ui.ui.tooltip.preview"] = nil
+		package.loaded["core.ui.adapters.graphics_renderer"] = Renderer
+		local ok, err = pcall(function()
+			local Preview = require("core.ui.ui.tooltip.preview")
+			Preview.set_enabled("announce", false)
+			h.assert_eq(Renderer.announcements_enabled(), false, "the preview's toggle silences the shared renderer")
+			Preview.set_enabled("announce", true)
+			h.assert_eq(Renderer.announcements_enabled(), true)
+		end)
+		Renderer.set_announcements_enabled(true)
+		package.loaded["core.ui.ui.tooltip.preview"] = saved
+		package.loaded["core.ui.adapters.graphics_renderer"] = saved_renderer
+		if not ok then error(err, 0) end
+	end)
+
 	h.it("(a11y-linux-preview) without Atk, or a window that refuses, the preview still draws", function()
 		local window = window_double()
 		h.assert_eq(Renderer.describe_window(window, nil, {}, true), false)

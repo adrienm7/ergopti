@@ -3106,6 +3106,19 @@
 			]
 		}
 	],
+	"preview_announce_control": [
+		{
+			"type": "check",
+			"id": "preview_announcements",
+			"i18n": "menu.hotstrings.tooltip_announcements",
+			"checked_when": [
+				"hotstrings.preview_announcements"
+			],
+			"disabled_when": [
+				"preview_announce_ready"
+			]
+		}
+	],
 	"preview_magic_control": [
 		{
 			"type": "check",
@@ -4426,6 +4439,13 @@
 		{
 			"type": "list",
 			"id": "parameter_preview_glyphs"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "parameter_preview_announcements"
 		}
 	],
 	"hotstrings_delays_frame": [

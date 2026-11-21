@@ -100,6 +100,7 @@ local _enabled = {
 	ai = true,
 	colored = true,
 	glyphs = true,
+	announce = true,
 }
 
 --- Initialises the preview.
@@ -117,8 +118,9 @@ function M.init(opts)
 	end
 end
 
---- Sets one of the five preview toggles.
---- @param name string "star" | "autocorrect" | "ai" | "colored" | "glyphs"
+--- Sets one of the six preview toggles. « announce » is the renderer's: the
+--- suggestions draw through it too, without this module.
+--- @param name string "star" | "autocorrect" | "ai" | "colored" | "glyphs" | "announce"
 --- @param value boolean
 function M.set_enabled(name, value)
 	if _enabled[name] == nil then
@@ -126,6 +128,7 @@ function M.set_enabled(name, value)
 		return
 	end
 	_enabled[name] = value and true or false
+	if name == "announce" then Renderer.set_announcements_enabled(_enabled[name]) end
 	Logger.debug(LOG, "Preview toggle %s: %s.", name, tostring(_enabled[name]))
 end
 

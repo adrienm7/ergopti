@@ -76,6 +76,9 @@ M.settings = {
 	-- The category glyph beside each preview row's trigger label
 	-- (hotstrings.preview_category_glyphs); set by the menu's switch.
 	category_glyphs_enabled = true,
+	-- Whether VoiceOver is told the previews and the finished predictions
+	-- (hotstrings.preview_announcements); set by the menu's switch.
+	announcements_enabled = true,
 }
 
 -- Accent colors per display context — loaded from TOML [accent_colors].
@@ -129,6 +132,13 @@ end
 function M.set_category_glyphs_enabled(enabled)
 	M.settings.category_glyphs_enabled = (enabled == true)
 	Logger.info(LOG, "Category glyphs explicitly set to: " .. tostring(M.settings.category_glyphs_enabled) .. ".")
+end
+
+--- Lets or stops VoiceOver being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled)
+	M.settings.announcements_enabled = (enabled == true)
+	Logger.info(LOG, "Screen-reader announcements explicitly set to: " .. tostring(M.settings.announcements_enabled) .. ".")
 end
 
 --- Applies a table of configuration parameters.

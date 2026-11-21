@@ -384,6 +384,21 @@
 		"reason": null
 	},
 	{
+		"path": "hotstrings.preview_announcements",
+		"family": "setting",
+		"labels": {
+			"fr": "hotstrings.preview_announcements",
+			"en": "hotstrings.preview_announcements"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "hotstrings.preview_star_enabled",
 		"family": "setting",
 		"labels": {

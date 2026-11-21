@@ -121,6 +121,7 @@ local KEY_MAP = {
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
 	preview_category_glyphs              = { sec = "hotstrings"                                        },
+	preview_announcements                = { sec = "hotstrings"                                        },
 	preview_star_enabled                 = { sec = "hotstrings"                                        },
 	trigger_char                         = { sec = "hotstrings"                                        },
 	-- One of the manifest's enum values: take_value reports any other as outdated.

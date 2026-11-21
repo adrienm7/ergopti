@@ -447,14 +447,19 @@ _TooltipAnnouncementText(Items, LlmRecord) {
 }
 
 ; Sends a presented tooltip's text to the running screen reader, on a fresh
-; timer turn: the caller is the keyboard's hot path.
+; timer turn: the caller is the keyboard's hot path. The menu's
+; hotstrings.preview_announcements switch (2026-11-21) silences it while a
+; screen reader runs, as on macOS and Linux.
 ; @param ScreenReaderFn {Func|Integer} Replaces A11ySystem_ScreenReaderOn (tests).
 ; @param AnnounceFn {Func|Integer} Replaces A11ySystem_Announce (tests).
+; @param SwitchFn {Func|Integer} Replaces the preview_announcements switch read (tests).
 ; @returns {String} The text handed to the screen reader, "" when none was.
-_TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0) {
+_TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0, SwitchFn := 0) {
 		global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
 		try {
-			ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
+			SwitchOn := IsObject(SwitchFn) ? SwitchFn.Call()
+				: HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_ANNOUNCEMENTS)
+			ReaderOn := SwitchOn && (IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn())
 			if !ReaderOn {
 				_TooltipLastAnnouncement := ""
 				return ""

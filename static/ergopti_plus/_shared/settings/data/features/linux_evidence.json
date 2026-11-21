@@ -315,6 +315,7 @@
 				"hotstrings.trigger_char",
 				"hotstrings.repeat_key_enabled",
 				"hotstrings.preview_ai_enabled",
+				"hotstrings.preview_announcements",
 				"hotstrings.preview_autocorrect_enabled",
 				"hotstrings.preview_category_glyphs",
 				"hotstrings.preview_colored_tooltips",

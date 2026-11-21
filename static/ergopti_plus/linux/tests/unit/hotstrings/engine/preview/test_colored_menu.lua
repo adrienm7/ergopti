@@ -142,6 +142,10 @@ helpers.describe("declared coloured preview native row", function()
 			-- The category-symbol switch follows the colours, on by default.
 			helpers.assert_eq(rows[6].title, i18n.get("menu.hotstrings.tooltip_glyphs"))
 			helpers.assert_eq(rows[6].checked, true)
+			-- The screen-reader switch follows in its own section, on by default.
+			helpers.assert_eq(rows[7].title, "-")
+			helpers.assert_eq(rows[8].title, i18n.get("menu.hotstrings.tooltip_announcements"))
+			helpers.assert_eq(rows[8].checked, true)
 		end)
 	end)
 	helpers.it("does not refresh or change physical data while the durable lease refuses", function()

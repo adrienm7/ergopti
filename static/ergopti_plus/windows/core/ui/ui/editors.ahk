@@ -842,7 +842,7 @@ ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 /**
  * Flips one preview-bubble switch (hotstrings.preview_star_enabled,
  * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips,
- * preview_category_glyphs).
+ * preview_category_glyphs, preview_announcements).
  * The engine and the prediction path read the switches live, so there is no
  * reload; the bubble on screen is retired because it was promised under the old
  * value (macOS and Linux revoke it the same way).
@@ -866,7 +866,8 @@ ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 		ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED, "menu.hotstrings.notify_bubble_autocorrect",
 		ConfigLeaf.PREVIEW_AI_ENABLED, "menu.hotstrings.notify_bubble_ai",
 		ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, "menu.hotstrings.notify_bubble_colored",
-		ConfigLeaf.PREVIEW_CATEGORY_GLYPHS, "menu.hotstrings.notify_bubble_glyphs")
+		ConfigLeaf.PREVIEW_CATEGORY_GLYPHS, "menu.hotstrings.notify_bubble_glyphs",
+		ConfigLeaf.PREVIEW_ANNOUNCEMENTS, "menu.hotstrings.notify_bubble_announcements")
 	if NoticeKeys.Has(Key)
 		NotifyFeature(t(NoticeKeys[Key]), Candidate)
 	return true

@@ -53,6 +53,9 @@ local TOGGLES = {
 	-- The category symbol beside each row's trigger label (2026-11-19), for a
 	-- reader who cannot tell the tints apart.
 	{ name = "glyphs",      manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_CATEGORY_GLYPHS,     label = "menu.hotstrings.tooltip_glyphs" },
+	-- Whether Orca is told the previews and the finished predictions
+	-- (2026-11-21); nothing is said without a screen reader either way.
+	{ name = "announce",    manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_ANNOUNCEMENTS,       label = "menu.hotstrings.tooltip_announcements" },
 }
 
 -- The manifest path is the canonical config.toml leaf: the two name the same

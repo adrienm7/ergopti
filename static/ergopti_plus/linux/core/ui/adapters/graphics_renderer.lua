@@ -515,18 +515,36 @@ function M.accessible_text(rows)
 	return table.concat(parts, "; ")
 end
 
+-- Whether a running screen reader is told the drawn previews and finished
+-- predictions (hotstrings.preview_announcements, the menu's switch since
+-- 2026-11-21); set through the preview's toggles.
+local _announcements_enabled = true
+
+--- Lets or stops Orca being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled)
+	_announcements_enabled = enabled == true
+end
+
+--- @return boolean
+function M.announcements_enabled()
+	return _announcements_enabled
+end
+
 --- Names the window for AT-SPI. A cairo surface has no text a screen reader
 --- can read: the window carries it as its accessible name. Its role is a
 --- tooltip, or a notification while the desktop's screen reader is on, which
---- Orca speaks when it appears (decided 2026-11-17: the announcement follows
---- the screen-reader setting, no option of its own).
+--- Orca speaks when it appears (decided 2026-11-17). The menu's
+--- hotstrings.preview_announcements switch (2026-11-21) keeps the tooltip role
+--- with the screen reader on, so Orca reads the window only when reached.
 --- @param window userdata|table The GTK window.
 --- @param atk table|nil The Atk namespace; nil leaves the window unnamed.
 --- @param rows table
 --- @param screen_reader boolean
 --- @return boolean described
 function M.describe_window(window, atk, rows, screen_reader)
-	return SystemA11y.name_window(window, atk, screen_reader and "NOTIFICATION" or "TOOL_TIP", M.accessible_text(rows))
+	local notify = screen_reader and _announcements_enabled
+	return SystemA11y.name_window(window, atk, notify and "NOTIFICATION" or "TOOL_TIP", M.accessible_text(rows))
 end
 
 --- The panel colour under the desktop's high-contrast setting: opaque, so

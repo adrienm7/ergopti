@@ -72,6 +72,7 @@ M.DEFAULT_STATE = {
 	preview_ai_enabled            = KM.preview_ai_enabled,
 	preview_colored_tooltips      = KM.preview_colored_tooltips,
 	preview_category_glyphs       = KM.preview_category_glyphs,
+	preview_announcements         = KM.preview_announcements,
 	-- Editor & UI preferences — owned by this menu module.
 	custom_close_on_add           = false,
 	custom_default_section        = nil,

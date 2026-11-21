@@ -43,6 +43,7 @@ trigger_char = "★"
 # which drivers honour it is declared in the manifest's "platforms" field.
 expansion_delay = 0.75
 preview_ai_enabled = true
+preview_announcements = true
 preview_autocorrect_enabled = true
 preview_category_glyphs = true
 preview_colored_tooltips = true

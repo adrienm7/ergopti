@@ -17,6 +17,7 @@ local KEYS = {
 	preview_ai_enabled = true,
 	preview_colored_tooltips = true,
 	preview_category_glyphs = true,
+	preview_announcements = true,
 }
 
 --- Creates a preview mutation owner using the current native and disk owners.

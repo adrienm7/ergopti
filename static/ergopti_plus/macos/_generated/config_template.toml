@@ -33,6 +33,7 @@ preview_ai_enabled = true
 preview_autocorrect_enabled = true
 preview_colored_tooltips = true
 preview_category_glyphs = true
+preview_announcements = true
 preview_star_enabled = true
 
 

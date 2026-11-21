@@ -258,8 +258,9 @@ local function fake_keymap(controls)
 		km.trigger = value
 		return true
 	end
-	local SETTERS = { colored = "set_preview_colored_tooltips", glyphs = "set_preview_category_glyphs" }
-	for _, name in ipairs({ "star", "autocorrect", "colored", "glyphs", "ai" }) do
+	local SETTERS = { colored = "set_preview_colored_tooltips", glyphs = "set_preview_category_glyphs",
+		announce = "set_preview_announcements" }
+	for _, name in ipairs({ "star", "autocorrect", "colored", "glyphs", "announce", "ai" }) do
 		local setter = SETTERS[name] or ("set_preview_" .. name .. "_enabled")
 		km[setter] = function(value)
 			km.previews[name] = value

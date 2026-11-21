@@ -187,7 +187,7 @@ _PSW_DefaultsAreTheManifests() {
 	Saved := HSE_PreviewSwitches
 	HSE_PreviewSwitches := Map()
 	try {
-		AssertEqual(5, HSE_PreviewSwitchKeys().Length)
+		AssertEqual(6, HSE_PreviewSwitchKeys().Length)
 		for Key in HSE_PreviewSwitchKeys() {
 			AssertEqual(true, ManifestDefaultFor("hotstrings." . Key),
 				Key . " ships on, on all three drivers (PAR-24)")
@@ -243,7 +243,7 @@ _PSW_TogglesPersistAndPublish() {
 	}
 }
 
-; The tray draws the five declared rows in the shared order, each ticked from the
+; The tray draws the six declared rows in the shared order, each ticked from the
 ; switch in force and running the toggle for its own key.
 _PSW_MenuRowsFollowTheSwitches() {
 	Toggled := []
@@ -261,9 +261,10 @@ _PSW_MenuRowsFollowTheSwitches() {
 			Switches.Push(Child)
 		}
 	}
-	AssertEqual(5, Labels.Length, "the five switches are offered (PAR-24, category glyphs)")
+	AssertEqual(6, Labels.Length, "the six switches are offered (PAR-24, category glyphs, screen-reader notices)")
 	Expected := ["menu.hotstrings.tooltip_magic", "menu.hotstrings.tooltip_autocorrect",
-		"menu.hotstrings.tooltip_ai", "menu.hotstrings.tooltip_colored", "menu.hotstrings.tooltip_glyphs"]
+		"menu.hotstrings.tooltip_ai", "menu.hotstrings.tooltip_colored", "menu.hotstrings.tooltip_glyphs",
+		"menu.hotstrings.tooltip_announcements"]
 	for Index, Key in Expected
 		AssertEqual(t(Key), Labels[Index], "row " . Index . " follows the shared order")
 	Keys := HSE_PreviewSwitchKeys()
@@ -279,4 +280,4 @@ _PSW_MenuRowsFollowTheSwitches() {
 
 Test("preview switches: defaults come from the manifest and a stray key is refused (PAR-24)", _PSW_DefaultsAreTheManifests)
 Test("preview switches: toggles persist and publish (PAR-24)", _PSW_TogglesPersistAndPublish)
-Test("preview switches: the tray draws the five shared rows (PAR-24)", _PSW_MenuRowsFollowTheSwitches)
+Test("preview switches: the tray draws the six shared rows (PAR-24)", _PSW_MenuRowsFollowTheSwitches)

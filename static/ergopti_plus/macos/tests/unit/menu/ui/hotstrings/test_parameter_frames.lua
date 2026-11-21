@@ -37,7 +37,7 @@ local function with_frame(body, paused)
 						trigger_char = "★", terminator_states = {},
 						preview_star_enabled = true, preview_autocorrect_enabled = false,
 						preview_ai_enabled = true, preview_colored_tooltips = false,
-						preview_category_glyphs = true,
+						preview_category_glyphs = true, preview_announcements = false,
 						custom_terminators = { { key = "custom_test", char = "¤", consume = false } } },
 					paused = paused == true,
 					keymap = {
@@ -120,6 +120,9 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(preview[4].title, "-")
 			helpers.assert_eq(preview[5].title, f.captions("menu.hotstrings.tooltip_colored"))
 			helpers.assert_eq(preview[6].title, f.captions("menu.hotstrings.tooltip_glyphs"))
+			-- The screen-reader switch has its own section (2026-11-21).
+			helpers.assert_eq(preview[7].title, "-")
+			helpers.assert_eq(preview[8].title, f.captions("menu.hotstrings.tooltip_announcements"))
 			local word = children(menu, f.captions(corpus.parents.word_expander))
 			helpers.assert_eq(#word, 11)
 			-- Built-in rows resolve their locale key; a literal catalogue label

@@ -591,7 +591,7 @@ function M.render(blocks, state, start_watchers_callback)
 		M.canvas[2].frame = { x = 0, y = 0, w = canvas_width, h = canvas_height }
 		if not show_canvas_verified(M.canvas, "tooltip canvas") then return false end
 		-- A canvas is invisible to VoiceOver: the prediction is spoken when it runs.
-		SystemA11y.announce(M.announcement_for_blocks(blocks))
+		M.announce(M.announcement_for_blocks(blocks))
 
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 		return true
@@ -607,6 +607,16 @@ function M.render(blocks, state, start_watchers_callback)
 		return false
 	end
 	return true
+end
+
+--- Hands a preview or a finished prediction to VoiceOver, unless the menu's
+--- hotstrings.preview_announcements switch is off (2026-11-21): VoiceOver
+--- itself then says nothing of the previews, as on Windows and Linux.
+--- @param text string|nil
+--- @return boolean announced
+function M.announce(text)
+	if not Config.settings.announcements_enabled then return false end
+	return SystemA11y.announce(text)
 end
 
 --- Safely hides the canvas. Also clears the stable model-info zone so the
@@ -1010,7 +1020,7 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		if not show_canvas_verified(M.stacked_canvas, "stacked tooltip canvas") then return false end
 		-- A canvas is invisible to VoiceOver: the preview is spoken when it runs.
-		SystemA11y.announce(M.announcement_for_stacked(rows))
+		M.announce(M.announcement_for_stacked(rows))
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 		return true
 	end, debug.traceback)

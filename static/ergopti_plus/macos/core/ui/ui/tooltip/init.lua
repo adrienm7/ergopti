@@ -192,6 +192,10 @@ function M.set_colorization_enabled(enabled) Config.set_colorization_enabled(ena
 --- @param enabled boolean
 function M.set_category_glyphs_enabled(enabled) Config.set_category_glyphs_enabled(enabled) end
 
+--- Lets or stops VoiceOver being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled) Config.set_announcements_enabled(enabled) end
+
 local function hide_surface(expected_session, owns)
 	if not owns() then return false end
 	local llm_hidden

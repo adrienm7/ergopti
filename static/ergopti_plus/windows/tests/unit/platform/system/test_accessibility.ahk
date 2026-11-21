@@ -172,6 +172,38 @@ _A11yT_AnnounceOnlyWithScreenReader() {
 }
 Test("a11y tooltip: previews reach a running screen reader once (a11y-native-2026-11-17)", _A11yT_AnnounceOnlyWithScreenReader)
 
+; The menu's hotstrings.preview_announcements switch (2026-11-21) silences the
+; notices while a screen reader runs; the published switch value is what the
+; announce path reads, so a menu toggle takes effect without a reload.
+_A11yT_AnnounceHonoursTheSwitch() {
+	global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick, HSE_PreviewSwitches
+	SavedText := _TooltipLastAnnouncement, SavedTick := _TooltipLastAnnouncementTick
+	SavedSwitches := HSE_PreviewSwitches.Clone()
+	Calls := []
+	Record(Hwnd, Text) {
+		Calls.Push(Text)
+		return true
+	}
+	Items := [{Text: "a11y-switch-" . A_TickCount}]
+	try {
+		AssertTrue(ManifestDefaultFor(ConfigKey.HOTSTRINGS_PREVIEW_ANNOUNCEMENTS) == true,
+			"the notices are on by default")
+		HSE_PreviewSwitchPublish(ConfigLeaf.PREVIEW_ANNOUNCEMENTS, false)
+		AssertEqual("", _TooltipAnnouncePresented(Items, 0, () => true, Record),
+			"the switch off silences a running screen reader")
+		HSE_PreviewSwitchPublish(ConfigLeaf.PREVIEW_ANNOUNCEMENTS, true)
+		AssertEqual(Items[1].Text, _TooltipAnnouncePresented(Items, 0, () => true, Record),
+			"the switch on lets the notice through")
+		Sleep(50)
+		AssertEqual(1, Calls.Length, "only the notice under the switch on is raised")
+	} finally {
+		HSE_PreviewSwitches := SavedSwitches
+		_TooltipLastAnnouncement := SavedText, _TooltipLastAnnouncementTick := SavedTick
+	}
+}
+Test("a11y tooltip: the screen-reader switch silences the notices (preview-announcements-2026-11-21)",
+	_A11yT_AnnounceHonoursTheSwitch)
+
 ; A preview hidden before its announcement turn has nothing left on screen to
 ; read: the notice is skipped, not reported as an error (the resident driver
 ; opened the error window on « Gui has no window », 2026-11-18).

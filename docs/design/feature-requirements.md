@@ -55,6 +55,7 @@ two disagree in either direction.
 | `hotstrings.preview_autocorrect_enabled`                      | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_colored_tooltips`                         | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_category_glyphs`                          | —               | `evdev`, `uinput`, `xdotool`           | —                    |
+| `hotstrings.preview_announcements`                            | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.preview_star_enabled`                             | —               | `evdev`, `uinput`, `xdotool`           | —                    |
 | `hotstrings.autocorrection.names`                             | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.autocorrection.abbreviations`                     | —               | `evdev`, `uinput`                      | —                    |

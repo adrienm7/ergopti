@@ -625,6 +625,17 @@ function M.set_preview_colored_tooltips(v)
 	return true
 end
 
+--- Lets or stops VoiceOver being told the previews and finished predictions
+--- (hotstrings.preview_announcements). Nothing drawn changes, so the visible
+--- preview stays.
+--- @param v boolean
+--- @return boolean applied
+function M.set_preview_announcements(v)
+	tooltip.set_announcements_enabled(v == true)
+	Logger.debug(LOG, "Preview announcements: %s.", v and "on" or "off")
+	return true
+end
+
 --- Shows or hides the category glyph beside each preview row's trigger label.
 --- Delegates to the tooltip module, which owns the flag, after revoking the
 --- visible preview so no bubble keeps the old look.

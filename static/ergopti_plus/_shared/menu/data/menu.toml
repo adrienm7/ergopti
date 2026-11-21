@@ -2700,6 +2700,16 @@ i18n = "menu.hotstrings.tooltip_glyphs"
 checked_when = ["hotstrings.preview_category_glyphs"]
 disabled_when = ["preview_glyphs_ready"]
 
+# Whether a running screen reader is told the previews and the finished AI
+# predictions (2026-11-21): its own section, since it changes what is said,
+# not what is drawn.
+[[menu.preview_announce_control]]
+type = "check"
+id = "preview_announcements"
+i18n = "menu.hotstrings.tooltip_announcements"
+checked_when = ["hotstrings.preview_announcements"]
+disabled_when = ["preview_announce_ready"]
+
 # Preview presence keeps its existing position; native ports supply only the
 # current flag and the acknowledged toggle owner.
 [[menu.preview_magic_control]]
@@ -3878,6 +3888,13 @@ id = "parameter_preview_colored"
 [[menu.hotstrings_preview_frame]]
 type = "list"
 id = "parameter_preview_glyphs"
+
+[[menu.hotstrings_preview_frame]]
+type = "---"
+
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_announcements"
 
 [[menu.hotstrings_delays_frame]]
 type = "list"

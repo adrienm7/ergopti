@@ -150,12 +150,31 @@ function M.build_management(ctx)
 		["preview_glyphs_ready"] = function() return true end,
 	})
 	local glyph_rows = glyph_row and { glyph_row } or {}
+	-- Whether VoiceOver is told the previews (2026-11-21), its own section.
+	local ANNOUNCE = require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS
+	local announce_row = ManifestMenu.check_row("preview_announce_control", ANNOUNCE, {
+		[ANNOUNCE] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(ANNOUNCE) ~= true then
+				return false
+			end
+			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_announcements"), state.preview_announcements)
+			ctx.updateMenu()
+			return true
+		end,
+	}, {
+		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_ANNOUNCEMENTS] = function()
+			return state.preview_announcements == true
+		end,
+		["preview_announce_ready"] = function() return true end,
+	})
+	local announce_rows = announce_row and { announce_row } or {}
 
 	local preview_rows = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
 		["parameter_preview_magic"] = function() return preview_magic_rows end,
 		["parameter_preview_presence"] = function() return preview_presence_rows end,
 		["parameter_preview_colored"] = function() return bubble_sub end,
 		["parameter_preview_glyphs"] = function() return glyph_rows end,
+		["parameter_preview_announcements"] = function() return announce_rows end,
 	})
 	if not preview_rows then return nil end
 	-- The preview and delay rows run while paused: a pause stops typing, not

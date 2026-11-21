@@ -217,9 +217,9 @@ _HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	return Rows is Array ? Rows : []
 }
 
-; Dynamic handler: the preview-bubble switches sub-menu, the same five rows in
+; Dynamic handler: the preview-bubble switches sub-menu, the same six rows in
 ; the same order as macOS and Linux (star, autocorrect, AI, then the tint and the
-; category glyphs after a separator). Each row is declared once in the shared manifest; this driver
+; category glyphs after a separator, then the screen-reader notices after another). Each row is declared once in the shared manifest; this driver
 ; supplies the toggle and the state behind the tick. The switches stay
 ; configurable while the driver is paused, as on the other two.
 ; @param Toggle {Func} Optional seam called with the switch key.
@@ -230,7 +230,8 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 		"preview_magic_ready", (*) => true,
 		"preview_presence_ready", (*) => true,
 		"preview_colored_ready", (*) => true,
-		"preview_glyphs_ready", (*) => true)
+		"preview_glyphs_ready", (*) => true,
+		"preview_announce_ready", (*) => true)
 	for Key in HSE_PreviewSwitchKeys() {
 		Commands[Key] := ((SwitchKey, *) => Toggle.Call(SwitchKey)).Bind(Key)
 		Getters["hotstrings." . Key] := ((SwitchKey, *) => HSE_PreviewSwitchCurrent(SwitchKey)).Bind(Key)
@@ -238,7 +239,8 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 	Magic := MenuRenderer_CheckRow("preview_magic_control", ConfigLeaf.PREVIEW_STAR_ENABLED, Commands, Getters)
 	Colored := MenuRenderer_CheckRow("preview_colored_control", ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, Commands, Getters)
 	Glyphs := MenuRenderer_CheckRow("preview_glyphs_control", ConfigLeaf.PREVIEW_CATEGORY_GLYPHS, Commands, Getters)
-	if !(Magic is Map) || !(Colored is Map) || !(Glyphs is Map)
+	Announce := MenuRenderer_CheckRow("preview_announce_control", ConfigLeaf.PREVIEW_ANNOUNCEMENTS, Commands, Getters)
+	if !(Magic is Map) || !(Colored is Map) || !(Glyphs is Map) || !(Announce is Map)
 		return []
 	Presence := []
 	Declarations := _MR_GetManifestRoot().Get("preview_presence_controls", false)
@@ -254,7 +256,8 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 		"parameter_preview_magic", (*) => [Magic],
 		"parameter_preview_presence", (*) => Presence,
 		"parameter_preview_colored", (*) => [Colored],
-		"parameter_preview_glyphs", (*) => [Glyphs]))
+		"parameter_preview_glyphs", (*) => [Glyphs],
+		"parameter_preview_announcements", (*) => [Announce]))
 	if !(Sub is Array)
 		return []
 	Rows := MenuRenderer_TemplateRows("hotstrings_preview_parent", Map(),

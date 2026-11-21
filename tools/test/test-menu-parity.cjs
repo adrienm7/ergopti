@@ -916,7 +916,8 @@ const OPENS_SUBMENU = {
 		'preview_magic_control',
 		'preview_presence_controls',
 		'preview_colored_control',
-		'preview_glyphs_control'
+		'preview_glyphs_control',
+		'preview_announce_control'
 	],
 	// Custom entries expose this head nested on Windows/macOS and inline on Linux.
 	word_expander_entries: 'word_expander_custom_menu',
