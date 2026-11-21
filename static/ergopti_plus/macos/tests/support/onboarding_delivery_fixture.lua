@@ -12,7 +12,10 @@ local with_window = require("tests.support.dashboard_window_fixture")
 local function with_delivery(callback, native_timers)
 	helpers.with_fresh_modules({ "settings.ui.menu.paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
 		"core.fs.adapters.file_system", "settings.engine.paths", "platform.remap", "core.text.engine.json",
-		"modules.keymap.number_row_live" }, function()
+		"modules.keymap.number_row_live", "hotstrings.engine.magic_key_display" }, function()
+		-- The page proposes the layout's magic key default; this fixture's reads
+		-- are all intercepted, so the layout reads as one without a family.
+		package.loaded["hotstrings.engine.magic_key_display"] = { layout_default = function() return "★" end }
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {
 			available = function() return false, "no_source_layout" end,

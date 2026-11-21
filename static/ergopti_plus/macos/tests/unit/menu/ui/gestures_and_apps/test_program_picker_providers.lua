@@ -114,8 +114,9 @@ local function with_provider(kind, options, body)
 		}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { shortcuts = true },
-			get_keyboard_slot_groups = function() return { { prefix = "primary_", fixed = true } } end,
+			get_keyboard_slot_groups = function() return { { prefix = "primary_" } } end,
 			get_keyboard_group_label = function() return "primary_" end,
+			get_keyboard_group_modifiers_label = function() return "Cmd" end,
 			assigned_keyboard_slots = function() return { { id = "primary_1", action = fixture.action } } end,
 			get_keyboard_action = function() return fixture.action end, set_keyboard_action = set_action,
 			keyboard_binding_id = function(id) return "keyboard__" .. id end,
@@ -142,16 +143,12 @@ local function with_provider(kind, options, body)
 		ctx.commit_program_parameter = owner.apply
 		if kind == "keyboard" then
 			rows = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)
-			-- The ★ key's Ctrl slot, an ordinary row of the Ctrl group (2026-11-21).
+			-- The assigned slot row follows the group's restore, clear and separator.
 			local slot_row
-			for index, group in ipairs(require("modules.shortcuts").get_keyboard_slot_groups()) do
-				if group.prefix == "secondary_" then
-					for _, item in ipairs(rows[index].items) do
-						if type(item.label) == "string" and item.label:find("★", 1, true) then slot_row = item end
-					end
-				end
+			for _, item in ipairs(rows[1].items) do
+				if type(item.label) == "string" and item.label:find("primary_1", 1, true) then slot_row = item end
 			end
-			assert(slot_row, "the Ctrl group lists the ★ key's slot")
+			assert(slot_row, "the group lists its assigned slot")
 			slot_row.action()
 		elseif kind == "tap" then
 			rows = require("ui.menu.menu_tap_keys").provide_rows(ctx)
