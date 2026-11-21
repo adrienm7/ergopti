@@ -481,8 +481,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     (Linux admits readiness only from its own process group's socket with the pinned version), OLL-10 (Windows and
     Linux pull a model Ollama cannot load once more, one shared rule and its vectors) and OLL-11 (the lifecycle
     actions are rows of « Ollama d’Ergopti » on the three, with an uninstall that keeps or deletes the models)
-    fixed. Left: OLL-06 one readiness bound once the cold start is measured (field checks); OLL-14 a pull's
-    `no_space` class still shows the generic pull failure, and the install margin awaits pinned expanded sizes;
+    fixed, then OLL-14 (the free-space check counts the pinned unpacked runtime, and a pull that fills the disk
+    names it on the three). Left: OLL-06 one readiness bound once the cold start is measured (field checks); the
+    unpacked sizes of `ollama_release.json` are provisional (three times the archive): run
+    `node tools/build/pin-ollama-release.cjs --archives <folder> --write` in CI on the five pinned archives and
+    commit its values, then keep its `--check` in the job that downloads them;
   - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
     metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the

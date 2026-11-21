@@ -88,6 +88,8 @@ by `windows/tests/unit/ai/servers/test_ollama_managed_bootstrap.ahk` and
 | OLL-11 | the three | Install, start, repair, delete a model or uninstall Ergopti's Ollama from the tray           | The menu manifest: one row per action, checked by the parity table                                                                                          | The actions were reachable only from the model page and consent dialogs, outside the parity table; no OS uninstalled the managed runtime                                                                                                                                                                  | `(oll-11)` cases in `test_ollama_runtime_uninstall.ahk`, `test_runtime_uninstall.lua` (Linux), `test_ollama_uninstall_vectors.lua` and `test_runtime_uninstall.lua` (macOS); the menu and parity gates     |
 | OLL-04 | the three | Install the runtime on a volume without room for it                                          | One rule: the pinned archive plus `[limits] ollama_install_free_space_margin_bytes` (1 GiB) free before the download, then `ollama.install_error.disk_full` | macOS and Linux started a 174 MB or 1.4 GB download with no check; Windows checked the archive alone, inside its helper, and threw English text that ended as « Local Ollama could not be prepared »; no OS had a localized disk-full message                                                             | `ollama-install-free-space` (Windows: no download, the disk words; Linux: no phase, `install_disk_full`; macOS Python: refused before the download), and the free-space vectors of the corpus on the three |
 | OLL-05 | the three | A failed install: network outage, full disk, corrupted archive, refused folder, cancellation | One shared classification, `_shared/ai/data/ollama_install_errors.json`, and one message per class in the 21 locales                                        | macOS showed « send the diagnostics report » for every install failure, a network outage included (its network and checksum markers were never printed); Windows and Linux showed `ollama.runtime_repair_failed` for every class                                                                          | `ollama-install-error-vectors` on the three, `ollama-install-errors` (each refused Windows step, the PowerShell evidence writer, the macOS checker, the Linux repair result and notice)                    |
+| OLL-14 | the three | Install the runtime on a volume with room for its archive but not for the unpacked runtime   | The archive stays until its extraction ends: archive + `unpacked_bytes` + the margin, the unpacked size pinned beside the archive's size and digest         | `ollama_release.json` named no unpacked size, so the check passed archive + margin and the extraction filled the disk                                                                                                                                                                                     | `(ollama-install-free-space)` on the three, the corpus's `archive_and_margin_fit_unpacked_does_not` vector, the pin tool's synthetic-archive checks                                                        |
+| OLL-14 | the three | A model pull fills the disk                                                                  | The runtime install's `disk_full` class, from `ollama_install_errors.json` `pull`                                                                           | Ollama's `no_space` pull class showed the generic pull failure (« Download failed », « Local Ollama could not be prepared »), and an English Windows message was not even `no_space`                                                                                                                      | `(ollama-pull-disk-full)` on the three, the corpus's `pull_cases`, the Windows pull vector                                                                                                                 |
 
 Notes:
 
@@ -192,9 +194,8 @@ Notes:
   install folder's nearest existing ancestor (Windows `GetDiskFreeSpaceExW`
   after the install consent, Linux `fs_statfs` in `runtime_composition.lua`,
   macOS `os.statvfs` before the download) and refuses, with a logged reason,
-  a volume it cannot read. The pinned metadata names the archive's size only,
-  not the extracted runtime's, so the margin stands for the extraction:
-  Windows still checks the expanded size before extracting
+  a volume it cannot read. Since OLL-14 the rule also counts the pinned
+  unpacked size; Windows still checks the expanded size before extracting
   (`ollama_managed_files.ps1`), and on macOS and Linux a disk that fills
   during the extraction is classed `disk_full` from its own error.
 - **OLL-05.** Each driver writes one evidence line of a failure and the shared
@@ -208,15 +209,30 @@ phase=… reason=… errno=…`, closed words only); Linux the installer's reaso
   as `install_failure`. The macOS `OLLAMA_ERROR_*` markers and their two
   locale keys are gone. The unknown class still asks for the diagnostics
   report.
+- **OLL-14.** The unpacked size is a pin like the archive's size and digest:
+  `unpacked_bytes` of each asset of `ollama_release.json` (Windows and Linux)
+  and of each asset of the macOS catalogue `managed_ollama_release.json`,
+  which its producer `stage-macos-managed-ollama-catalogue.py` now sums from
+  the regular files of the archive it seals. `tools/build/pin-ollama-release.cjs`
+  measures the official archives from their listing (the zip central
+  directory, the tar headers behind gzip or zstd, pax sizes included), with
+  `--check` and `--write`; it is proven on synthetic archives only. The five
+  official values are provisional, three times the archive, until the tool
+  runs on the real archives in CI (TODO). The shared rule is archive +
+  unpacked + margin (`fits` in `install_errors.lua`, `install_errors.ahk` and
+  `managed_ollama_runtime.py`). For a pull, `ollama_install_errors.json` maps
+  the pull class `no_space` to the install class `disk_full`, whose pull
+  message `ollama.pull_error.disk_full` names the model (21 locales); every
+  other pull class keeps its generic failure. `ollama_pull_errors.json` gains
+  Windows' English « not enough space on the disk »; a localized Windows
+  message still reaches the generic failure, since Ollama prints the system's
+  own words. The unmatched class name and the Windows read bound of the data
+  file moved to their shared homes (`unmatched`, `[limits]
+ollama_install_errors_file_bytes`), which brings `test-shared-literal-inventory`
+  back to its baseline.
 
 ## Open
 
-- **OLL-14 (low, the three; residue of OLL-04):** a model pull's `no_space`
-  class (`ollama_pull_errors.json`) still shows the generic pull failure; only
-  the runtime install names a full disk. The pinned release metadata also
-  names no extracted size, so the install margin is a registry value, not a
-  measured one: pin the expanded sizes with the release producer to make the
-  rule exact.
 - **OLL-06 (low; field):** the readiness bound and cadence differ. macOS
   bounds the daemon's readiness by the 30 s admission budget
   (`bootstrap_retry.json`, through `managed_ollama_hint.py`
@@ -395,3 +411,44 @@ ollama-runtime` 320 passed. macOS (Lua 5.4 under WSL, same copy):
 - **Not run here.** The complete Linux `modules` group and macOS suite: the
   shared WSL instance restarted three times during them. `npm run test:js` and
   `verify-change` refuse this checkout's Node pin.
+
+### OLL-14
+
+Commits `d1a2a976d6` (the pin tool and the pinned unpacked sizes),
+`da50746002` (the free-space rule on the three), `b62167cc21` (a pull that
+fills the disk) and `c9cd774ca2` (the unmatched class and the Windows read
+bound in their shared homes). Nothing was installed or downloaded: the
+archives are synthetic, the volume, the transfers and the pulls are fakes.
+
+- **Red on the old code.** Windows, with the old rule and the old pull
+  branches put back in `install_errors.ahk` and `managed_bootstrap.ahk`: 2 of
+  5 `free-space` cases fail (a download starts with room for the archive and
+  the margin only), the free-space vector `one_byte_short` fails, and the 3
+  `pull-disk-full` cases fail (« Ollama local n’a pas pu être préparé »,
+  `ollama.runtime_repair_failed`). Linux and macOS: the new cases call
+  `fits` with four arguments, `for_pull` and `pull_failure`, which the old
+  modules do not have, and the old `install_policy.lua` hands no
+  `unpacked_bytes` to the composition.
+- **Green on the new code.** Windows: `ollama` 565 of 565 through
+  `node tools/test/ahk-parallel.cjs --fresh --only=ollama --wait=300`. Linux
+  (LuaJIT under WSL, from a `git archive` copy, `DISPLAY` and
+  `WAYLAND_DISPLAY` unset): `ollama-install` 124, `ollama-runtime` 338,
+  `ollama-pull` 3, and `ollama` with 1 failure, the root-only
+  `shared-loader-source … eacces` case, red on `dev` too. macOS (Lua 5.4,
+  same copy): `ollama` 284 and `pull` 62 passed, the two
+  `ollama-pull-disk-full` cases among them. Python: `macos_managed_ollama_install_errors_test`
+  9 (one skip), `macos_managed_ollama_catalogue_test` 25,
+  `macos_managed_ollama_publication_test` 24 on Windows;
+  `managed_ollama_runtime_policy_test` 7 on Linux.
+- **Gates.** `test-ollama-release-pin-parity.cjs` (12, the pin tool on a
+  synthetic zip, tgz and tar.zst), `check_locales.py`,
+  `test-locale-catalogue-complete.cjs`, `test-french-punctuation.cjs`,
+  `test-i18n-referenced-keys-resolve.cjs`, `test-shared-literal-inventory.cjs`
+  (at its baseline again), `test-linux-feature-parity.cjs`,
+  `test-timings-registry-liveness.cjs`, `test-owned-runtimes-inventory.cjs`,
+  `test-managed-ollama-handoff.cjs`, `test-config-key-literals.cjs`,
+  `test-no-pinned-source-reads*.cjs`, `lint-conventions.js
+--fail-on-violations` and the formatter.
+- **Not run here.** The pin tool on the real archives (no download here: TODO
+  in CI), the complete Lua suites, `npm run test:js` and `verify-change`
+  (they refuse this checkout's Node pin).
