@@ -152,7 +152,7 @@ function M.build_management(ctx)
 	local glyph_rows = glyph_row and { glyph_row } or {}
 	-- Whether VoiceOver is told the previews (2026-11-21), its own section.
 	local ANNOUNCE = require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS
-	local announce_row = ManifestMenu.check_row("preview_announce_control", ANNOUNCE, {
+	local announce_row = ManifestMenu.check_row("preview_announcements_control", ANNOUNCE, {
 		[ANNOUNCE] = function()
 			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(ANNOUNCE) ~= true then
 				return false

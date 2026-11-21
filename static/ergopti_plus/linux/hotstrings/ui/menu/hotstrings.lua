@@ -1579,7 +1579,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			if glyph_row then glyph_rows[#glyph_rows + 1] = glyph_row end
 			-- Whether Orca is told the previews (2026-11-21), its own section.
 			local announce_rows = {}
-			local announce_row = ManifestMenu.check_row("preview_announce_control", require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS, {
+			local announce_row = ManifestMenu.check_row("preview_announcements_control", require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS, {
 				[require("settings.engine.keys").LEAF.PREVIEW_ANNOUNCEMENTS] = function()
 					if not toggle_preview("announce") then return false end
 					require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_announcements"), PreviewSettings.get("announce") == true)

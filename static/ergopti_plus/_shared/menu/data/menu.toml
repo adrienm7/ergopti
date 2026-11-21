@@ -2703,7 +2703,7 @@ disabled_when = ["preview_glyphs_ready"]
 # Whether a running screen reader is told the previews and the finished AI
 # predictions (2026-11-21): its own section, since it changes what is said,
 # not what is drawn.
-[[menu.preview_announce_control]]
+[[menu.preview_announcements_control]]
 type = "check"
 id = "preview_announcements"
 i18n = "menu.hotstrings.tooltip_announcements"

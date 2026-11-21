@@ -239,7 +239,7 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 	Magic := MenuRenderer_CheckRow("preview_magic_control", ConfigLeaf.PREVIEW_STAR_ENABLED, Commands, Getters)
 	Colored := MenuRenderer_CheckRow("preview_colored_control", ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, Commands, Getters)
 	Glyphs := MenuRenderer_CheckRow("preview_glyphs_control", ConfigLeaf.PREVIEW_CATEGORY_GLYPHS, Commands, Getters)
-	Announce := MenuRenderer_CheckRow("preview_announce_control", ConfigLeaf.PREVIEW_ANNOUNCEMENTS, Commands, Getters)
+	Announce := MenuRenderer_CheckRow("preview_announcements_control", ConfigLeaf.PREVIEW_ANNOUNCEMENTS, Commands, Getters)
 	if !(Magic is Map) || !(Colored is Map) || !(Glyphs is Map) || !(Announce is Map)
 		return []
 	Presence := []

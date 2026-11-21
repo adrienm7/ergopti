@@ -246,7 +246,7 @@ hotstring previews and the finished AI predictions are still said only while
 a screen reader runs (Windows `SPI_GETSCREENREADER`, VoiceOver, Orca), and
 `hotstrings.preview_announcements` (default on, three OS, labels in the 21
 locales) turns them off. It is the preview menu's last row, in its own
-section after the colours and glyphs (`menu.preview_announce_control`). Each
+section after the colours and glyphs (`menu.preview_announcements_control`). Each
 announce path reads it: Windows `_TooltipAnnouncePresented` through
 `HSE_PreviewSwitchCurrent`, macOS `renderer.announce` through the tooltip
 config's `announcements_enabled`, Linux `graphics_renderer.describe_window`,
