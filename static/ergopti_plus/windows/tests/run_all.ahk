@@ -861,6 +861,7 @@ _LLM_Deps_State := "ready"
 #Include unit/hotstrings/engine/engine/test_event_word_reset.ahk
 #Include unit/hotstrings/engine/engine/test_backspace_word_start.ahk
 #Include unit/ai/prediction/test_bridge_buffer_cap.ahk
+#Include unit/ai/prediction/test_ai_output_wpm_privacy.ahk
 #Include unit/ai/navigation/test_pointer_watch_transaction.ahk
 #Include unit/ai/navigation/test_tab_accept_policy.ahk
 #Include unit/ai/navigation/test_accept_injects_exact_text.ahk

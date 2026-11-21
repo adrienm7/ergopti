@@ -477,7 +477,10 @@ _LLM_Bridge_NewInjectionTransaction(Text, Seed, RequestId,
 		ActiveIdx: ActiveIdx,
 		PresentedRecord: PresentedRecord,
 		PresentedLifecycle: PresentedLifecycle,
-		Admission: Admission.Predicate
+		Admission: Admission.Predicate,
+		; Set by the journal commit: whether the metrics privacy filter admitted
+		; this output, which the WPM readouts must follow (MET-02).
+		MetricsRecorded: false
 	}
 }
 
@@ -503,8 +506,11 @@ _LLM_Bridge_CommitInjectedText(Transaction) {
 	PrefixCommit := _PrefixCommitInputContext(Transaction.SourceControl, false)
 	; Feed the WPM widget one sample per accepted character, marked AI, so the
 	; pill turns the AI colour as it does on macOS and Linux. Nothing marked
-	; AI text on this driver, so that colour was never shown.
-	if IsSet(WPMWidget_Push) {
+	; AI text on this driver, so that colour was never shown. Only output the
+	; metrics journal admitted counts: in an excluded app, a private window or
+	; a secure field the readouts stay silent, as for typed and hotstring text
+	; and as Linux record_synthetic_output does (MET-02).
+	if Transaction.MetricsRecorded && IsSet(WPMWidget_Push) {
 		Loop StrLen(Transaction.Text)
 			try WPMWidget_Push(false, true)
 	}
@@ -573,7 +579,7 @@ _LLM_Bridge_InjectionOptions(Transaction) {
 		"deleted_text", Transaction.DeletedText,
 		"admission", Transaction.Admission,
 		"atomic_prepare", _LLM_Bridge_PrepareOutputJournal.Bind(Transaction),
-		"atomic_journal", _LLM_Bridge_CommitOutputJournal,
+		"atomic_journal", _LLM_Bridge_CommitOutputJournal.Bind(Transaction),
 		"atomic_commit", _LLM_Bridge_CommitInjectedText.Bind(Transaction),
 		"commit_failure", _LLM_Bridge_RecoverInjectedState.Bind(Transaction)
 	)
@@ -596,8 +602,13 @@ _LLM_Bridge_PrepareOutputJournal(Transaction) {
 	), Transaction.Admission)
 }
 
-_LLM_Bridge_CommitOutputJournal(Token) {
-	return KL_CommitPreparedLlmOutputJournal(Token)
+; Commits the prepared rows and records whether the privacy filter admitted
+; any: an empty token is a filtered output, never a recorded one.
+_LLM_Bridge_CommitOutputJournal(Transaction, Token) {
+	Committed := KL_CommitPreparedLlmOutputJournal(Token)
+	Entries := (Token is Map) ? Token.Get("entries", "") : ""
+	Transaction.MetricsRecorded := Committed == true && Entries is Array && Entries.Length > 0
+	return Committed
 }
 
 
