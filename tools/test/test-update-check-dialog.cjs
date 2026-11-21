@@ -122,13 +122,17 @@ function makeDocument() {
 		el.hidden = /\bhidden\b/.test(attributes);
 		elements[match[3]] = el;
 	}
+	const listeners = {};
 	return {
 		elements,
+		listeners,
 		body: element('body', 'body'),
 		// a11y_prefs.js writes the reading preferences on the root (none here).
 		documentElement: { setAttribute() {}, removeAttribute() {}, getAttribute: () => null },
 		readyState: 'complete',
-		addEventListener() {},
+		addEventListener(type, handler) {
+			(listeners[type] = listeners[type] || []).push(handler);
+		},
 		createElement: (tag) => element('', tag),
 		getElementById(id) {
 			return elements[id] || null;
@@ -173,7 +177,14 @@ function loadPage(strings) {
 		vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
 	}
 	sandbox.window.i18n_apply(strings);
-	return { sandbox, posted, logged, elements: document.elements, body: document.body };
+	return {
+		sandbox,
+		posted,
+		logged,
+		elements: document.elements,
+		body: document.body,
+		listeners: document.listeners
+	};
 }
 
 /** The label a key renders as, named placeholders filled. */
@@ -600,6 +611,56 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 		sorted(ahkActions) === sorted(luaActions),
 		`UC_PAGE_ACTIONS ${sorted(ahkActions)} and check_session ACTIONS ${sorted(luaActions)} differ`
 	);
+}
+
+// ===================================================
+// ===================================================
+// ======= 7/ Keyboard And Screen Reader (UPD) =======
+// ===================================================
+// ===================================================
+
+{
+	// UPD-03: Escape closed only the Windows native window; on the three
+	// WebViews the page holds the focus and nothing read the key
+	const page = loadPage(en);
+	const keydown = page.listeners.keydown || [];
+	const press = (key, defaultPrevented) => {
+		const event = {
+			key,
+			defaultPrevented: defaultPrevented === true,
+			preventDefault() {
+				this.defaultPrevented = true;
+			}
+		};
+		for (const handler of keydown) handler(event);
+		return event;
+	};
+	page.sandbox.window.receiveUpdateCheck({
+		type: 'state',
+		state: 'checking',
+		channel: 'dev',
+		current: 'v0.0.0-dev.144'
+	});
+	const before = page.posted.length;
+	press('Enter');
+	expect(page.posted.length === before, 'a key other than Escape posts something');
+	press('Escape', true);
+	expect(page.posted.length === before, 'an Escape another control handled still closes');
+	const escape = press('Escape');
+	expect(
+		page.posted.length === before + 1 &&
+			JSON.stringify(page.posted[before]) === JSON.stringify({ action: 'close' }),
+		`Escape posts ${JSON.stringify(page.posted.slice(before))}, not the close action`
+	);
+	expect(escape.defaultPrevented, 'Escape is left to the WebView after closing');
+
+	// UPD-04: only the status line was a live region; the answer that replaces
+	// « checking » was drawn but never announced
+	const html = fs.readFileSync(path.join(PAGE, 'index.html'), 'utf8');
+	for (const id of ['line1', 'line2']) {
+		const tag = (html.match(new RegExp(`<p[^>]*\\bid="${id}"[^>]*>`)) || [''])[0];
+		expect(/\baria-live="polite"/.test(tag), `#${id} is not a polite live region: ${tag}`);
+	}
 }
 
 if (failures.length) {

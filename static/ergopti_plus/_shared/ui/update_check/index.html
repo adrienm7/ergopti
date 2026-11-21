@@ -21,8 +21,9 @@
 		<main id="panel">
 			<h1 class="theme-sr-only" data-i18n="update_check.window_title"></h1>
 			<progress id="spinner" class="spinner" aria-labelledby="line1" hidden></progress>
-			<p id="line1" class="line1"></p>
-			<p id="line2" class="line2"></p>
+			<!-- The answer replaces « checking » in place: announced, not only drawn. -->
+			<p id="line1" class="line1" aria-live="polite"></p>
+			<p id="line2" class="line2" aria-live="polite"></p>
 			<p id="logged" class="logged" hidden></p>
 			<button type="button" id="btn-whats-new" class="link" hidden></button>
 			<ul id="others" class="others" hidden></ul>
