@@ -267,12 +267,16 @@ from its title bar retires its session; a confirmation that names no action
 is refused on the three; the Windows application picker's headers are
 localized; the open_app refusal is told on Linux; the macOS prompt editor
 refuses the fields Windows and Linux refuse; and the cleanup window takes the
-focus on Windows and closes on Escape. Left open: PCK-13, a blank numeric
-answer resets on macOS only (a maintainer choice); PCK-15, a refused Windows
-confirmation closes the picker; PCK-16 and PCK-17, the WebView2 focus on
-open and two numeric boxes at once (field checks); PCK-18 to PCK-22, a dead
-Linux token bridge, Escape on two more pages, prompt editor details, window
-titles in the Windows application picker and no right-to-left layout.
+focus on Windows and closes on Escape. A second pass fixed PCK-15 to PCK-22:
+a refused Windows pick keeps the picker open, the Windows WebView windows take
+the keyboard on open, one Windows input box opens at a time, the dead Linux
+token bridge is retired, the model browser and physical shortcuts close on
+Escape, the prompt editor saves its fields alike on the three
+(`prompt_editor_save_vectors.json`), the Windows application picker shows
+application names instead of window titles, and every page sets `dir` from
+the locale (`page_locale.js`) with logical styles, so Arabic and Hebrew lay
+out right to left. Left open: PCK-13, a blank numeric answer resets on macOS
+only (a maintainer choice).
 
 ## Review status at resumption — November 12, 2026
 

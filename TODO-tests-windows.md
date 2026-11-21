@@ -261,12 +261,15 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 - [ ] Update download window (UPD-05, UPD-07, 2026-11-21): Update from the Updates window opens the download
       window, whose bar follows the bytes received; its Cancel stops the update, its close box does not (the update
       installs once verified).
-- [ ] Pickers and prompts (PCK-08, PCK-11, PCK-16, PCK-17, 2026-11-21): with Ergopti in English, Metrics >
-      exclude applications: the list's headers read « Application » and « Process », never « Processus ». Tray >
+- [ ] Pickers and prompts (PCK-08, PCK-11, PCK-15 to PCK-17, PCK-19, PCK-21, PCK-22, 2026-11-21): with Ergopti in
+      English, Metrics > exclude applications: the list's headers read « Application » and « Process », never
+      « Processus », and a Word document open shows « Microsoft Word », never the document's name (PCK-21). Tray >
       clean unused settings: the window comes to the front with the keyboard, and Escape closes it. Open a shortcut's
-      action picker from the tray and type at once, Narrator on: note whether the search field has the keyboard
-      (PCK-16: the driver never hands WebView2 the focus). Click « Other value… » of the AI temperature twice in a
-      row: note whether two input boxes open (PCK-17).
+      action picker from the tray and type at once, Narrator on: the search field has the keyboard (PCK-16). With
+      `config.toml` read-only, pick an action: the picker stays open for another pick (PCK-15). Click « Other
+      value… » of the AI temperature twice in a row: one input box only, brought forward (PCK-17). The model
+      selector and the physical shortcuts window close on Escape (PCK-19). In Arabic, the action picker and the
+      prompt editor lay out right to left (PCK-22).
 - [ ] Updates window (UPD-01, UPD-03, UPD-04, 2026-11-21): with Narrator on, About > Check for updates: Narrator
       reads « Checking for updates on the … channel » then the answer without a focus move, and Escape closes the
       window while the page has the focus. On a test build fed by a local release mirror whose `.sha256` does not

@@ -432,11 +432,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     numeric prompts, vectors replayed through both), PCK-05 and PCK-12 (Escape on the token and cleanup pages),
     PCK-06 (Linux picker title-bar close), PCK-07 (a confirmation without an id refused on the three), PCK-08
     (Windows application picker headers), PCK-09 (Linux open_app refusal told), PCK-10 (macOS prompt editor
-    validation) and PCK-11 (Windows cleanup window focused) fixed. Left: PCK-13 a blank numeric answer resets on
-    macOS only (decide reset or refuse); PCK-15 a refused Windows confirmation closes the picker; PCK-16 WebView2
-    focus on open and PCK-17 two numeric boxes at once (field checks); PCK-18 retire or wire the Linux token bridge;
-    PCK-19 Escape on the model browser and physical shortcuts pages; PCK-20 prompt editor trim and unknown-action
-    logs; PCK-21 window titles in the Windows application picker; PCK-22 no right-to-left layout for ar and he;
+    validation), PCK-11 (Windows cleanup window focused), PCK-15 (a refused Windows pick keeps the picker open),
+    PCK-16 (Windows WebView windows take the keyboard on open), PCK-17 (one Windows input box at a time), PCK-18
+    (the dead Linux token bridge retired), PCK-19 (Escape on the model browser and physical shortcuts), PCK-20
+    (prompt editor fields saved alike, shared vectors), PCK-21 (Windows application names, no window titles) and
+    PCK-22 (`dir` from the locale on every page, logical CSS) fixed. Left: PCK-13 a blank numeric answer resets on
+    macOS only (decide reset or refuse);
   - the next campaigns in the report's order: metrics views, small native units, layout tool
     pages.
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),

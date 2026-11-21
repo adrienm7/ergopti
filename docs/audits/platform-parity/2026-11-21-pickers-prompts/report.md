@@ -135,6 +135,48 @@ Notes:
   leaves an IME composition alone; the token page gained the same legacy
   composition check.
 
+## Fixed in the second pass
+
+The second pass (November 21, 2026) closed PCK-15 to PCK-22; PCK-13 stays a
+maintainer decision.
+
+| Id     | OS      | Before                                                                                                                                                                                 | Now                                                                                                                                                                                                                                                                 | Regression                                                                                                                                                                                           |
+| ------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PCK-15 | Windows | `_ActPickWeb_Confirm` closed the window before the caller's assignment ran, so a refused pick (a read-only `config.toml`, a dismissed parameter prompt) or a failed one left no picker | The assignment runs while the window is open; `false` or a throw keeps the same session for another pick, any other answer closes it; the native ListBox fallback follows the same rule                                                                             | `action picker: a refused confirmation keeps the picker open … (pck-15)` (`test_action_picker_count_default.ahk`) and the six modes of `test_action_picker_confirmation_failure.ahk`                 |
+| PCK-16 | Windows | No host called `MoveFocus`: the page's `focus()` landed in a document without the keyboard                                                                                             | `WebView_TakeFocus` (`core/ui/engine/webview/utils.ahk`) moves the focus into the controller once its opening still owns the window, on open and on a reopen of the shared host, the prompt editor and the model browser; a window shown `NoActivate` is left alone | `webview focus: …` (`test_webview_take_focus.ahk`): the real `WebViewHost` build over a passive controller, and a census of every production file creating a controller                              |
+| PCK-17 | Windows | `Ui_InputBox` let a second « Other value… » click open a second box on its own thread                                                                                                  | One box at a time: a request while one is open brings it forward and answers `Cancel`                                                                                                                                                                               | `native dialogs: a second input box request opens no second box (pck-17)` (`test_input_box_single_instance.ahk`), with real timed boxes                                                              |
+| PCK-18 | Linux   | `core/ui/ui/token_prompt.lua` answered an LLM settings protocol the Hugging Face token page never posts, and nothing on Linux opened the page                                          | The bridge, its registrations and its setter test are retired; no Linux bridge claims the page                                                                                                                                                                      | `pck-18: no Linux bridge claims the token page it never opens` (`test_webkit_host.lua`); `test-linux-pages-post-ready.cjs` keeps no exemption                                                        |
+| PCK-19 | all     | Escape did nothing on the model browser and physical shortcuts pages                                                                                                                   | The model browser posts `close`, answered by the three hosts before their configuration guard; physical shortcuts drops an open draft, then closes, and leaves Escape to a native position capture                                                                  | the `pck-19` checks of `test-editors-ime-keyboard.cjs`; `pck-19` cases of `test_model_browser_close_pause_owner.ahk`, `test_bridge.lua` (macOS) and `test_bridge_handlers_paths_editor.lua` (Linux)  |
+| PCK-20 | all     | Windows trimmed the prompt and only spaces and tabs from the name, Linux trimmed a non-raw prompt; Windows and macOS dropped an unknown action silently, Linux logged it at DEBUG      | The name is trimmed of Lua `%s` whitespace, the prompt kept byte for byte, an unknown action logged as a warning, on the three                                                                                                                                      | `_shared/tests/corpus/llm/prompt_editor_save_vectors.json`, replayed by `test_prompt_editor_save_vectors.ahk`, `test_prompt_editor_native_boundaries.lua` (macOS) and `test_save_errors.lua` (Linux) |
+| PCK-21 | Windows | `AppPicker_FriendlyName` showed the longest fragment of a window title                                                                                                                 | The executable's `FileDescription` (« Microsoft Word »), else its process name; no title reaches a row                                                                                                                                                              | `app picker: a running application shows its name, never its window title (pck-21)` (`test_app_picker_names.ahk`), with a real window titled like a document                                         |
+| PCK-22 | shared  | No page set `dir`, five set no `lang`, and the styles named physical left and right                                                                                                    | `_shared/ui/page_locale.js` owns `lang` and `dir`, loaded by every page after `a11y_prefs.js`; i18n.js, onboarding and physical shortcuts set the locale through it; the app windows' styles use logical start and end                                              | `test-page-direction.cjs` (registered in the shared-ui suite) and the `pck-22` case of `test-onboarding-wizard-page.cjs`                                                                             |
+
+Notes:
+
+- **PCK-15.** Program discovery still retires before the assignment, as
+  before: a refused pick keeps the picker, whose program providers then
+  answer as unavailable until it is reopened.
+- **PCK-16.** The update prompt's release notes are a pane beside native
+  buttons that keep the default focus, and the error dialog never activates;
+  both keep the host focus. The census test names that exemption by the call
+  that loads the notes. The passive controllers of the startup fixtures
+  answer `MoveFocus`, and the composed fixtures that stub the WebView helpers
+  stub the focus step too.
+- **PCK-18.** No backward compatibility: a future Linux Hugging Face login
+  wires the page's own protocol.
+- **PCK-19.** Physical shortcuts ignores Escape between a capture request and
+  its answer; a capture that observes no position sends no answer, so Escape
+  waits for the next page action there.
+- **PCK-22.** The Studio pages (layout analysis, editor, manager, optimizer
+  and their window) draw physical keyboards and stay out of the logical-style
+  check, as they stay out of the semantic gate. Canvas and SVG drawings keep
+  their coordinates. Re-pinned after review: the script lists of
+  `test-diagnostic-ui-integrity.cjs`, `test-layout-comparer-page.cjs` and
+  `test-layout-optimizer-page.cjs`, the error dialog's margin in
+  `test-error-dialog-page.cjs`, the page harnesses that run i18n.js, and, for
+  PCK-16, the pins of `test-webview-geometry-single-source.cjs` and
+  `test_manager_present_window.ahk`.
+
 ## Open
 
 - **PCK-13 (medium, macOS):** a blank numeric answer means three things.
@@ -143,57 +185,22 @@ Notes:
   range sentence. The shared replay skips blank vectors for that reason. A
   maintainer choice: keep the macOS reset (Windows and Linux reset through a
   preset row) or refuse a blank on macOS too.
-- **PCK-15 (medium, Windows):** a refused confirmation closes the picker.
-  macOS and Linux keep it open when the caller returns false; Windows closes
-  before the callback for every pick but a slot pick (`_ActPickWeb_Confirm`:
-  « Refusal still closes this session; it cannot lend its callback to a new
-  one »). With a read-only `config.toml`, the Windows picker vanishes where
-  macOS lets the user retry.
-- **PCK-16 (medium, Windows, field):** the driver never hands WebView2 the
-  focus (`MoveFocus` is bound in `vendor/WebView2.ahk` only). The pages call
-  `focus()`, but without the controller's focus the keyboard may stay on the
-  host window: typing at once into the action picker, the prompt editor or a
-  numeric field may do nothing until a click. macOS and Linux focus their web
-  views. Needs a real desktop.
-- **PCK-17 (low, Windows, field):** `LLM_Menu_PromptNumeric` releases
-  `Critical` before its InputBox, so a second « Other value… » click probably
-  opens a second box on its own thread. Linux replaces the open prompt on
-  purpose; macOS blocks in `textPrompt`.
-- **PCK-18 (low, Linux):** `core/ui/ui/token_prompt.lua` speaks `ready`,
-  `refresh`, `close` and `payload.action`; the page posts `cancel`,
-  `open_link` and `{type: "validate"}`. Nothing on Linux or Windows opens that
-  page. Retire the bridge, or wire it to the page's protocol when Linux gains
-  a Hugging Face login.
-- **PCK-19 (low, the three):** Escape does nothing on the model browser and
-  physical shortcuts pages. The model browser's protocol has no close action
-  for the page to post; on physical shortcuts, Escape may be the key a
-  position capture waits for. Windows registers native Escape handlers there
-  that the focused WebView never lets fire.
-- **PCK-20 (low, Windows and macOS):** prompt editor details. Windows trims
-  the prompt it saves (`Trim(CandidatePrompt)`), Linux and now macOS keep a
-  raw prompt verbatim; Windows and macOS drop an unknown page action without a
-  log line, Linux logs it.
-- **PCK-21 (low, Windows):** the application picker names a running process
-  by a fragment of its window title (`AppPicker_FriendlyName`), so a document
-  name or a mail subject can show in the list; macOS shows bundle names and
-  Linux application ids. Nothing is logged.
-- **PCK-22 (low, shared):** no page sets `dir="rtl"` for Arabic or Hebrew:
-  the text is translated, the layout stays left to right on the three.
-
-Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
-`TODO-tests-linux.md` (field point `pickers_prompts` on macOS and Linux): the
-masked key prompts, the token page's Escape, the numeric grammar and the
-prompt editor on macOS; the numeric refusal read by Orca, the title-bar close
-and the open_app refusal on Linux; the application picker's headers, the
-cleanup window's focus and Escape, the action picker's first keystroke
-(PCK-16) and two « Other value… » boxes (PCK-17) on Windows.
+  Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
+  `TODO-tests-linux.md` (field point `pickers_prompts` on macOS and Linux): the
+  masked key prompts, the token page's Escape, the numeric grammar and the
+  prompt editor on macOS; the numeric refusal read by Orca, the title-bar close
+  and the open_app refusal on Linux; the application picker's headers and
+  names, the cleanup window's focus and Escape, the action picker's first
+  keystroke (PCK-16), a refused pick (PCK-15) and one « Other value… » box
+  (PCK-17) on Windows; Escape on the model selector (PCK-19) and a right-to-left
+  window (PCK-22) on the three.
 
 ## Proof
 
-Commits `9e682c139e` (PCK-01, PCK-02 on macOS), `6107cccd53` (PCK-01 on the
-token page, PCK-05), `26ee28d221` (PCK-08), `384925ed2f` (PCK-11),
-`8b00630939` (PCK-12), `8e277665f1` (PCK-06), `bce233e6b0` (PCK-07),
-`639449c34a` (PCK-09), `1e3f02a95d` (PCK-10), `295356717a` (PCK-03, PCK-04,
+Commits `deab6dc9fc` (PCK-01, PCK-02 on macOS), `247a119e9e` (PCK-01 on the
+token page, PCK-05), `6d2cbfc1d2` (PCK-08), `809e6326be` (PCK-11),
+`879d94f3fd` (PCK-12), `a2fdd5bd40` (PCK-06), `2b5e43faa0` (PCK-07),
+`25aec63f50` (PCK-09), `141d59b885` (PCK-10), `bc4cfd69d7` (PCK-03, PCK-04,
 PCK-14).
 
 - **Red on the old code.** Each regression ran against the `0d444a5815` copy
@@ -268,3 +275,57 @@ PCK-14).
   alone; it was not traced. Also not run: the full AutoHotkey suite, a real
   window on any OS, `npm run test:js` and `verify-change` (they refuse this
   checkout's Node pin).
+
+### Second pass
+
+- **Red on the old code.** AutoHotkey: each regression ran with the
+  production file it guards swapped for its copy before the fix.
+  `--only=pck-15` gave 1 of 7 (the five refused and failing assignment modes
+  closed the picker, « expected: <0>, actual: <1> »); `--only=pck-16` 2 of 4
+  with the focus calls removed (the shared host and the census of 14 files
+  that never hand over the keyboard); `--only=pck-17` 0 of 1 (the second
+  request waited on a box of its own and read `Timeout`); `--only=pck-19` 0 of
+  1 (`destroy_calls=0`); `--only=pck-20` 0 of 2 (« Notes » kept its line feed,
+  no warning); `--only=pck-21` 1 of 2 (the row read « Quarterly salaries of
+  the private team »). Node: with the old pages, `test-editors-ime-keyboard.cjs`
+  fails « pck-19: Escape is consumed by the model browser » and « … by
+  physical shortcuts », and `test-page-direction.cjs`, run on a `git archive`
+  of the old `_shared/`, fails « pck-22: these pages do not load
+  ../page_locale.js ». Lua, from a `git archive` under WSL (`unset DISPLAY
+WAYLAND_DISPLAY`) with the bridges and hosts of `a1df639ab0`: Linux fails
+  the two `pck-18` registry cases, the `pck-19` close, and three `pck-20`
+  cases (two verbatim prompts, the unknown action); macOS fails `pck-19` and
+  `pck-20`.
+- **Green on the new code.** `ahk-parallel --fresh --wait=300` with
+  `--only=` `pck-` 20 of 20, `startup` 313 of 313, `model browser` 34 of 34,
+  `early` 63 of 63, `action picker` 31 of 31 (after the native engine's asset
+  list named `page_locale.js`), `healthcheck` 159, `prompt` 188, `paths` 124,
+  `onboarding` 119, `cleanup` 363, `keystats` 980, `warm` 109, `changelog` 63,
+  `update check` 25, `layout manager` 15, `ui-focus-not-topmost` 9, `native
+dialog` 3, `program providers` 19, `physical` 180. Linux modules
+  (`test_webkit_host`, `test_bridge_handlers_paths_editor`,
+  `test_save_errors`, `test_profile_roundtrip`,
+  `test_bridge_handlers_webview_manager`, the two model browser download
+  modules): 260 passed, none failed. macOS modules `test_bridge` (model
+  browser), `test_prompt_editor_native_boundaries`, `test_catalogue` and
+  `test_selector_page`: none failed.
+- **Gates.** `test-page-direction.cjs`, `test-app-windows-semantic-markup.cjs`,
+  `test-app-windows-accessibility-ratchet.cjs`, `test-keyboard-operability.cjs`,
+  `test-keyboard-walk.cjs`, `test-editors-ime-keyboard.cjs`, the locale
+  gates (`test-locale-*`, `test-action-labels-have-locale-keys.cjs`),
+  `test-shared-literal-inventory.cjs`, `test-linux-feature-parity.cjs`,
+  `test-no-pinned-source-reads.cjs`, `-lua.cjs` and `-linux.cjs` (no baseline
+  raised), `test-config-key-literals.cjs`, `test-no-hardcoded-ui-strings.cjs`,
+  `test-linux-pages-post-ready.cjs`, `test-webview-geometry-single-source.cjs`,
+  `test-model-browser-host-actions.cjs`, the page harnesses re-pinned above,
+  `test-js-feature-inventory.cjs`, `test-ci-pipeline-wiring.cjs`,
+  `test-ahk-encoding.cjs`, `field-todo-summary.py --check-doc` for Linux and
+  macOS, and `lint-conventions.js --fail-on-violations` with the formatter.
+- **Not run here.** The full suites: one full AutoHotkey run (one worker,
+  19 570 tests) was stopped for the targeted filters above, and the full
+  macOS and Linux runs under WSL were cut by a WSL hangup. Failing for this
+  checkout's environment, not the diff: `test-node-runtime-single-source.cjs`
+  (Node pin), `test-menu-manifest.cjs` (no `node_modules`),
+  `test-ci-release-reruns.cjs`, `test-desktop-ci-evidence.cjs` and
+  `test-ubuntu-ci-acquisition.cjs`. No real window was opened: the first
+  keystroke, the Arabic layout and the Escape keys are field points.

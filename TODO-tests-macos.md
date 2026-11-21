@@ -37,7 +37,8 @@ terminal): coverage table, verdicts and what no run can test in
       2026-11-21):** AI > API > ➕ a provider: the Token step shows dots, never the key, and a key pasted with a
       trailing space works as on Windows (it is kept). The Hugging Face token window shows dots too and closes on
       Escape. Temperature accepts « 0,8 » and refuses « 1e-1 » with « Enter a number from 0 to 1.3. ». In the prompt
-      editor, a prompt that ends with blank lines saves and reopens with them.
+      editor, a prompt that ends with blank lines saves and reopens with them. The model selector and the physical
+      shortcuts window close on Escape (PCK-19); in Hebrew, the action picker lays out right to left (PCK-22).
 - [ ] <!-- field-point: update_windows --> **Updates window (UPD-03, UPD-04, UPD-06, 2026-11-21):** with VoiceOver
       on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a focus move,
       and Escape closes the window. Then on a network whose proxy refuses api.github.com (or with a dead proxy set in

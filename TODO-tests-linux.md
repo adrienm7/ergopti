@@ -99,7 +99,8 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       reads « Enter a whole number of characters from 80 to 4000. »; type « 1800 »: it saves and closes. Temperature
       accepts « 0,7 ». Then open a shortcut's action picker and close it with the title bar's close button: reopening
       it shows the new binding's title (PCK-06). Finally bind open_app and choose a `.desktop` file on the Desktop:
-      an error dialog says no binding was saved, instead of closing silently (PCK-09).
+      an error dialog says no binding was saved, instead of closing silently (PCK-09). The model selector closes on
+      Escape (PCK-19); in Arabic, the action picker lays out right to left and Orca reads it in Arabic (PCK-22).
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift
