@@ -526,7 +526,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 - [ ] **Windows-only typing snapshot reopen check (2026-11-21).** `tools/test/support/typing-snapshot-reopen-runtime.cjs`
       runs only on win32, so CI (Linux) never runs it; locally it fails with `window.build_keycode_layout_for_driver is
-  not a function` because its context loads the page bootstrap without `heatmap_win.js`. Give the harness that file
+not a function` because its context loads the page bootstrap without `heatmap_win.js`. Give the harness that file
       and decide whether the check should also run on the Linux CI runner.
 
 ### Windows
