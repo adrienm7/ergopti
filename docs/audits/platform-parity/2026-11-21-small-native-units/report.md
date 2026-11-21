@@ -76,17 +76,21 @@ Checked and kept:
 
 ## Fixed
 
-| Id     | OS      | Sequence                                                                        | Reference                                                                                    | Before                                                                                                                                                    | Regression                                                                                                                |
-| ------ | ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| SNU-01 | Windows | Tune `[keep_awake] tick_min_ms`, `tick_max_ms` or `return_delay_ms`             | macOS reads the three from the registry                                                      | `win.ahk` kept its own `AWAKE_TICK_MIN_MS`, `AWAKE_TICK_MAX_MS` and `AWAKE_RETURN_MS`, which the registry named as consumers: a tuning changed macOS only | `keep-awake: the jitter tick and cursor return read the shared registry (snu-01)` (`test_keepawake_session_parity.ahk`)   |
-| SNU-02 | Windows | Run keep-awake, stop it, open the typing dashboard                              | macOS and Linux credit every finished session to `awake_ms` (KMD-3)                          | No Windows producer wrote a `passive_period` of kind `awake`: the rebuild summed it, but the day's keep-awake time was always 0                           | `… a finished session is credited to awake_ms (snu-02)`, `… stopped by a pause …` and `… idle keep-awake credits nothing` |
-| SNU-03 | Windows | Run keep-awake, stop it, read the log                                           | macOS logs enabled and disabled, Linux acquired and released                                 | Neither the start nor the stop was logged                                                                                                                 | `keep-awake: the session's start and stop are logged (snu-03)`                                                            |
-| SNU-04 | macOS   | Run keep-awake, pause the driver (or quit), open the typing dashboard           | Windows (SNU-02) and Linux credit a session the pause or the shutdown ends                   | `stop_awake` retired the session without crediting `awake_ms` or logging: only the user's toggle and the activity auto-off credited it                    | `keep-awake credits a session the driver stops (snu-04)` (`test_keep_awake_monotonic_grace.lua`)                          |
-| SNU-05 | macOS   | Accept the Karabiner driver update with the network down or a refused signature | Windows and Linux dialogs say the cause in the user's language and keep the code for the log | « The driver could not be updated (vhid_update_digest_mismatch). »: a code in no language, with nothing to do                                             | `names each refusal's cause in the user's language, never its code (snu-05)` (`test_virtual_hid_update.lua`)              |
-| SNU-06 | macOS   | The old ErgoptiPlus rules cleanup fails, or its regeneration does               | As SNU-05                                                                                    | The bridge's reason (« script-paused », a publication detail, « removal-raised ») sat inside the localized sentence                                       | `reports the precise failure of each stage` (`test_legacy_rules_cleanup.lua`)                                             |
-| SNU-07 | Windows | Download the XKB or KLC files while the export host cannot read a shared module | macOS and Linux answer the defaults' export code (`target_export_refused`) for every refusal | The host's own `lua_export_host` reached the page, which no locale names: « error.generic » with the raw code                                             | `… runs lua_export, bounded (lua-export-run)` (`test_keystats_reader_ngram_sources.ahk`)                                  |
-| SNU-08 | Linux   | Read the parity table or the menu reason of `shortcuts.take_note.*`             | A reason text says what that OS does instead                                                 | The folder and dated settings Linux ignores carried the shortcut chords' reason, which says nothing of the Linux note                                     | `the Windows-only note settings say where the Linux note goes (snu-08)` (`test_take_note.lua`)                            |
-| SNU-09 | Linux   | Take a note with a read-only notes folder, or a text editor that fails to start | Windows logs every refused note (`TakeNote` ReportError)                                     | The user was told; the log had no line                                                                                                                    | `every refused note is logged (snu-09)` (`test_take_note.lua`)                                                            |
+| Id     | OS             | Sequence                                                                        | Reference                                                                                    | Before                                                                                                                                                    | Regression                                                                                                                                                                |
+| ------ | -------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SNU-01 | Windows        | Tune `[keep_awake] tick_min_ms`, `tick_max_ms` or `return_delay_ms`             | macOS reads the three from the registry                                                      | `win.ahk` kept its own `AWAKE_TICK_MIN_MS`, `AWAKE_TICK_MAX_MS` and `AWAKE_RETURN_MS`, which the registry named as consumers: a tuning changed macOS only | `keep-awake: the jitter tick and cursor return read the shared registry (snu-01)` (`test_keepawake_session_parity.ahk`)                                                   |
+| SNU-02 | Windows        | Run keep-awake, stop it, open the typing dashboard                              | macOS and Linux credit every finished session to `awake_ms` (KMD-3)                          | No Windows producer wrote a `passive_period` of kind `awake`: the rebuild summed it, but the day's keep-awake time was always 0                           | `… a finished session is credited to awake_ms (snu-02)`, `… stopped by a pause …` and `… idle keep-awake credits nothing`                                                 |
+| SNU-03 | Windows        | Run keep-awake, stop it, read the log                                           | macOS logs enabled and disabled, Linux acquired and released                                 | Neither the start nor the stop was logged                                                                                                                 | `keep-awake: the session's start and stop are logged (snu-03)`                                                                                                            |
+| SNU-04 | macOS          | Run keep-awake, pause the driver (or quit), open the typing dashboard           | Windows (SNU-02) and Linux credit a session the pause or the shutdown ends                   | `stop_awake` retired the session without crediting `awake_ms` or logging: only the user's toggle and the activity auto-off credited it                    | `keep-awake credits a session the driver stops (snu-04)` (`test_keep_awake_monotonic_grace.lua`)                                                                          |
+| SNU-05 | macOS          | Accept the Karabiner driver update with the network down or a refused signature | Windows and Linux dialogs say the cause in the user's language and keep the code for the log | « The driver could not be updated (vhid_update_digest_mismatch). »: a code in no language, with nothing to do                                             | `names each refusal's cause in the user's language, never its code (snu-05)` (`test_virtual_hid_update.lua`)                                                              |
+| SNU-06 | macOS          | The old ErgoptiPlus rules cleanup fails, or its regeneration does               | As SNU-05                                                                                    | The bridge's reason (« script-paused », a publication detail, « removal-raised ») sat inside the localized sentence                                       | `reports the precise failure of each stage` (`test_legacy_rules_cleanup.lua`)                                                                                             |
+| SNU-07 | Windows        | Download the XKB or KLC files while the export host cannot read a shared module | macOS and Linux answer the defaults' export code (`target_export_refused`) for every refusal | The host's own `lua_export_host` reached the page, which no locale names: « error.generic » with the raw code                                             | `… runs lua_export, bounded (lua-export-run)` (`test_keystats_reader_ngram_sources.ahk`)                                                                                  |
+| SNU-08 | Linux          | Read the parity table or the menu reason of `shortcuts.take_note.*`             | A reason text says what that OS does instead                                                 | The folder and dated settings Linux ignores carried the shortcut chords' reason, which says nothing of the Linux note                                     | `the Windows-only note settings say where the Linux note goes (snu-08)` (`test_take_note.lua`)                                                                            |
+| SNU-09 | Linux          | Take a note with a read-only notes folder, or a text editor that fails to start | Windows logs every refused note (`TakeNote` ReportError)                                     | The user was told; the log had no line                                                                                                                    | `every refused note is logged (snu-09)` (`test_take_note.lua`)                                                                                                            |
+| SNU-11 | Windows        | Run keep-awake, quit the driver, open the typing dashboard                      | macOS (`stop_awake` at teardown) and Linux credit a session the exit ends                    | Only the pause called `StopActivitySimulation`: a session running at exit was never credited                                                              | `keep-awake: an accepted exit credits the running session (snu-11)` (`test_keepawake_session_parity.ahk`)                                                                 |
+| SNU-13 | Windows, macOS | Tune the keep-awake jitter radius                                               | One shared value for both cursor jitters                                                     | 80 px typed in `win.ahk` (`AWAKE_JITTER_PX`) and `system.lua` (`AWAKE_JITTER_X`, `_Y`), with no gate between them                                         | `… the jitter radius reads the shared registry (snu-13)` (AHK) and `keep-awake's jitter radius is the shared registry's (snu-13)` (`test_keep_awake_monotonic_grace.lua`) |
+| SNU-14 | Linux          | Tune the inhibitor's poll or its ready bound                                    | Every other keep-awake timing is a `[keep_awake]` registry entry                             | The 1 s poll and the 5 s ready bound were literals in `keep_awake.lua`                                                                                    | `(snu-14) the inhibitor's poll and ready bound are the shared [keep_awake] timings` (`test_keep_awake.lua`)                                                               |
+| SNU-15 | macOS          | The old-rules cleanup's result dialog raises                                    | `virtual_hid_update.lua` logs a result dialog that raises                                    | The deferred alert ran unprotected: only the scheduler's generic callback line, which does not say which result was lost                                  | `logs a result dialog that raises as its own error (snu-15)` (`test_legacy_rules_cleanup.lua`)                                                                            |
 
 Notes:
 
@@ -97,8 +101,7 @@ Notes:
   measurement no physical edge reports, through the same append, privacy and
   retry path as lock and sleep; `KL_RecordAwakeSession` credits nothing when
   the metrics are off, and a session a pause stops stays pending for the idle
-  tick's drain after the resume instead of logging a delivery failure. A
-  session still running when Windows exits is not credited (SNU-11).
+  tick's drain after the resume instead of logging a delivery failure.
 - **SNU-04.** One `credit_awake_session` serves the toggle, the auto-off and
   `stop_awake`; a refused credit is logged instead of swallowed.
 - **SNU-05.** Four keys replace `karabiner.vhid_update.failed` in the 21
@@ -111,6 +114,23 @@ Notes:
 - **SNU-08.** `platform_reason.take_note_settings_are_windows`, in the 21
   locales, is a `not_yet` reason: a folder and a dated choice are possible on
   Linux but not delivered.
+- **SNU-11.** `Ergopti_OnShutdown` calls `StopActivitySimulation(false)` after
+  `ShutdownTerminal := true`, before `KL_Stop`: no gate can refuse the exit
+  any more, so a refused exit keeps keep-awake running, and the session's row
+  reaches the keystats before their terminal drain. The stop is silent (no
+  toast at exit) and logged. `test_onexit_terminal_order.ahk` lists it among
+  the calls that follow every refusal gate.
+- **SNU-13.** `[keep_awake] jitter_px = 80` is the registry's first entry that
+  is not a duration (read with `TimingsGet` and `Timings.count`, as
+  `retention_days`). Windows reads it through `AwakeJitterPx()` in the
+  movement check and the tick; macOS keeps one `AWAKE_JITTER_PX` for both
+  axes. Linux inhibits idleness and moves nothing, so it has no reader.
+- **SNU-14.** `inhibitor_poll_ms` and `inhibitor_ready_timeout_ms` join
+  `[keep_awake]`; the owner takes a `timings` port, and counts the wait in
+  milliseconds so a fractional poll cannot drift past its bound. The shared
+  literal inventory fell by two Linux durations and one cross-driver name.
+- **SNU-15.** The deferred callback runs the alert under `xpcall` and logs
+  « The legacy-rule cleanup result could not be shown » with the cause.
 
 ## Open
 
@@ -121,40 +141,26 @@ Notes:
   fresh install on another PC writes into a missing folder. Follow-up: default
   to an empty folder that means the desktop, or to the desktop itself, after
   the maintainer confirms.
-- **SNU-11 (low, Windows):** a keep-awake session still running at exit is not
-  credited: only the pause calls `StopActivitySimulation`, and the exit path is
-  refusal-capable, so stopping keep-awake there would leave it off after a
-  refused exit. macOS (`stop_awake` at teardown) and Linux credit it.
-  Follow-up: credit from the keystats' terminal drain without stopping the
-  session.
 - **SNU-12 (low, all, decision):** the end of a session is told differently.
   Windows shows « stopped » when the user's activity cancels it and at a
   pause; macOS stays silent on both (« the user is clearly back ») and shows
   « off » only for the toggle; Linux has no activity cancel (an inhibitor) and
   says « off » at a pause.
-- **SNU-13 (low, Windows and macOS):** the jitter radius, 80 px, is typed in
-  `win.ahk` (`AWAKE_JITTER_PX`) and `system.lua` (`AWAKE_JITTER_X`, `_Y`) with
-  no gate between them; the timing registry holds only durations. Follow-up: a
-  shared keep-awake geometry entry, or a single-source test.
-- **SNU-14 (low, Linux):** the inhibitor's poll (1 s) and ready bound (5 s) are
-  driver literals in `keep_awake.lua`, not registry timings.
-- **SNU-15 (low, macOS):** `legacy_rules_cleanup.lua` shows its deferred report
-  without a protected call, where `virtual_hid_update.lua` logs a dialog that
-  raises; a failing alert there leaves no line.
 
 Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
 `TODO-tests-linux.md` (field point `small_native_units` on macOS and Linux):
 the Windows keep-awake log lines, cursor timings and dashboard minutes across a
-stop and a pause, and the export host's refusal text (SNU-01 to SNU-03,
-SNU-07); the macOS minute credited across a pause and the two Karabiner
+stop, a pause and a quit, and the export host's refusal text (SNU-01 to SNU-03,
+SNU-07, SNU-11); the macOS minute credited across a pause and the two Karabiner
 failure texts (SNU-04 to SNU-06); the Linux refused-note log lines and the
 note settings' reason (SNU-08, SNU-09).
 
 ## Proof
 
-Commits `0453ee295c` (SNU-01 to SNU-03), `511c2eaf9a` (SNU-04), `450dd536fc`
-(SNU-07), `3521d582f5` (SNU-05, SNU-06), `cb1fbe565c` (SNU-08, SNU-09),
-`dc2fa1ce33` (field points).
+Commits `6a2b24f809` (SNU-01 to SNU-03), `be0d0d9f63` (SNU-04), `67549810fc`
+(SNU-07), `e92ca33e10` (SNU-05, SNU-06), `6f2be8b2d8` (SNU-08, SNU-09),
+`bc0d66feae` (field points); then `6e039ce442` (SNU-15), `d69141404e`
+(SNU-14), `da89f772a9` (SNU-13) and `0018cfc107` (SNU-11).
 
 - **Red on the old code.** Each regression was run against the owner it pins
   restored from `6d92a18c8c`, or the old expression inside the new seam:
@@ -174,6 +180,15 @@ Commits `0453ee295c` (SNU-01 to SNU-03), `511c2eaf9a` (SNU-04), `450dd536fc`
   - SNU-08: with the old `manifest_data.lua`, the reason case fails on
     `shortcuts.take_note.dated_notes`; SNU-09: with the old `take_note.lua`,
     « each refused note leaves its log line » fails.
+  - SNU-11, SNU-13: with the old `lifecycle.ahk` and `win.ahk`,
+    `ahk-parallel --only=snu-1` is 0 of 2: « the exit stops keep-awake only
+    once no gate can refuse it » and « a move beyond the shared jitter_px
+    stops the session » (actual 1). With the old `system.lua`, « a move
+    beyond the registry's jitter_px stops the session » fails.
+  - SNU-14: with the old `keep_awake.lua`, the case fails « the poll follows
+    the registry ».
+  - SNU-15: with the old `legacy_rules_cleanup.lua`, the raise escapes the
+    report callback (« the failure stays inside the report callback »).
 - **Green on the new code.** AHK through `ahk-parallel --fresh`: `snu-` 5 of
   5, `keep-awake` 24 of 24, `system` 26 of 26, `neutral slots` 13 of 13,
   `lua-export` 2 of 2; `test-ahk-encoding.cjs`. macOS under WSL (`lua5.4`) from
@@ -185,6 +200,22 @@ Commits `0453ee295c` (SNU-01 to SNU-03), `511c2eaf9a` (SNU-04), `450dd536fc`
   (`luajit`, `unset DISPLAY WAYLAND_DISPLAY`): `linux-take-note` 6 of 6 and the
   coverage case « tags every open line … »; the other failures it printed were
   the copy's missing `layouts/` and `macos/` trees.
+- **Green on the follow-up fixes (SNU-11, SNU-13 to SNU-15).** AHK through
+  `ahk-parallel --fresh`: `keep-awake` 28 of 28, `snu-` 7 of 7, `OnExit` 18 of
+  18, `neutral slots` 13 of 13; `test-ahk-encoding.cjs`. macOS under WSL
+  (`lua5.4`) from a full `git archive` copy: `test_keep_awake_monotonic_grace`
+  13 of 13, `test_legacy_rules_cleanup` 7 of 7, and every module of
+  `tests/unit/modules/shortcuts/system_actions/` plus `test_shortcut_delivery`
+  green except one case run as root (« physical EACCES must leave the file
+  present »: root bypasses the permission, unrelated). Linux under WSL
+  (`luajit`, `unset DISPLAY WAYLAND_DISPLAY`): `keep-awake` 9 of 9, `snu-14`,
+  `awake` 14 of 14. Gates: `test-timings-registry-liveness.cjs` (311 keys),
+  `test-shared-literal-inventory.cjs` (baseline lowered: Linux durations 55 to
+  53, cross-driver names 45 to 44), `codegen-registry-constants.cjs` (no
+  change), `test-keystats-timings-single-source.cjs`,
+  `test-linux-feature-parity.cjs`, `test-logger-lifecycle-pairing.cjs`, the
+  four locale gates, the formatter and `lint-conventions.js
+--fail-on-violations`.
 - **Gates.** The locale gates (`test-locale-catalogue-complete.cjs` with 5,430
   keys, `test-locale-hints-quote-live-labels.cjs`,
   `test-action-labels-have-locale-keys.cjs`,

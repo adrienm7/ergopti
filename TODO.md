@@ -429,15 +429,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     `test-webview-host-pause-census.cjs`. Left: LTP-08 `dir` on both pages (to PCK-22);
   - the next campaigns in the report's order: pickers and prompts, small native units.
   - small native units, taken on 2026-11-21
-    ([report](docs/audits/platform-parity/2026-11-21-small-native-units/report.md)): SNU-01 to SNU-09 fixed (the
-    Windows keep-awake reads the shared timings, credits its session to `awake_ms` and logs it; macOS credits a
-    session the pause or a quit ends; the Karabiner update and old-rules dialogs say their cause in the user's
-    language; the Windows export host answers the shared refusal code; the Linux note logs its refusals and its
-    Windows-only settings say where the Linux note goes). Left: SNU-10 the shipped `D:\Bureau` default note folder
-    on Windows (maintainer decision); SNU-11 a Windows session running at exit is not credited; SNU-12 how each
-    driver tells the end of a session (maintainer decision); SNU-13 the 80 px jitter typed on Windows and macOS;
-    SNU-14 the Linux inhibitor's poll and ready literals; SNU-15 the macOS cleanup report shown unprotected; the
-    Linux note's folder and dated choice (`not_yet`);
+    ([report](docs/audits/platform-parity/2026-11-21-small-native-units/report.md)): SNU-01 to SNU-09, SNU-11 and
+    SNU-13 to SNU-15 fixed (the Windows keep-awake reads the shared timings, credits its session to `awake_ms`,
+    also at an accepted exit, and logs it; macOS credits a session the pause or a quit ends; the jitter radius and
+    the Linux inhibitor's poll and ready bound are `[keep_awake]` registry entries; the Karabiner update and
+    old-rules dialogs say their cause in the user's language and the old-rules report logs a dialog that raises;
+    the Windows export host answers the shared refusal code; the Linux note logs its refusals and its Windows-only
+    settings say where the Linux note goes). Left: SNU-10 the shipped `D:\Bureau` default note folder on Windows
+    (maintainer decision); SNU-12 how each driver tells the end of a session (maintainer decision); the Linux
+    note's folder and dated choice (`not_yet`);
   - the next campaigns in the report's order: pickers and prompts, layout tool pages.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
