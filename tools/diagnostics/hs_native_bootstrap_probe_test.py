@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -670,6 +671,8 @@ class NativeScriptFixture(NativeFixture):
                 ("script.locale", "fr"),
                 ("script.log_level", "INFO"),
                 ("script.show_error_dialog", True),
+                ("script.reading_font", "default"),
+                ("script.reading_spacing", "default"),
             ),
             1,
         ):
@@ -695,7 +698,14 @@ class NativeScriptFixture(NativeFixture):
         if getattr(self, "claim_mutation", None):
             self.claim_mutation(claim)
         probe.publish(Path(context["destination"] + ".settings-claim.json"), claim)
-        before = {"locale": "en", "locale_backend": "en", "log_level": 30, "error_dialog": True}
+        before = {
+            "locale": "en",
+            "locale_backend": "en",
+            "log_level": 30,
+            "error_dialog": True,
+            "reading_font": "default",
+            "reading_spacing": "default",
+        }
         receipt = dict(
             self.owner.identity,
             schema_version=1,
@@ -733,12 +743,35 @@ class NativeScriptFixture(NativeFixture):
 class NativeScriptOwnershipTests(unittest.TestCase):
     """Native execution is not claimed by these supervisor-boundary models."""
 
+    def test_every_bound_native_owner_has_a_diagnostic_getter_and_view(self):
+        # A Script row whose native owner the probe cannot read refuses the whole
+        # native qualification ("Declared native field has no diagnostic getter").
+        here = Path(__file__).resolve().parent
+        scope = (
+            here.parents[1] / "static/ergopti_plus/macos/settings/engine/scope/script_scope.lua"
+        ).read_text(encoding="utf-8")
+        owners = re.search(r"local NATIVE_OWNERS = \{(.*?)\n\}", scope, re.S)
+        self.assertIsNotNone(owners)
+        modules = re.findall(r'= "([a-z0-9_.]+)"', owners.group(1))
+        self.assertGreaterEqual(len(modules), 5)
+        native = (here / "hs_script_scope_native.lua").read_text(encoding="utf-8")
+        bound = dict(re.findall(r'(\w+) = require\("([a-z0-9_.]+)"\)', native))
+        getters = set(re.findall(r"rawequal\(provider, (\w+)\)", native))
+        for module in modules:
+            with self.subTest(module=module):
+                names = [name for name, path in bound.items() if path == module]
+                self.assertEqual(len(names), 1, "probe does not load " + module)
+                self.assertIn(names[0], getters, "probe has no getter for " + module)
+        self.assertEqual(len(getters), len(modules))
+        for field in script_probe.VIEW_FIELDS:
+            self.assertIn('"' + field + '"', native)
+
     def test_script_participant_receipt_requires_exact_native_retirement_and_alias_cleanup(self):
         with tempfile.TemporaryDirectory() as root:
             fixture = NativeScriptFixture(Path(root))
             fixture.leftover = "fr"
             summary = fixture.observe(self, "script_scope")
-            self.assertEqual(summary["measurement"]["alias_count"], 3)
+            self.assertEqual(summary["measurement"]["alias_count"], 5)
             self.assertTrue(summary["measurement"]["participant_inverse"])
             self.assertTrue(summary["process_retired"])
             self.assertTrue(summary["preference_restored"])
@@ -760,6 +793,8 @@ class NativeScriptOwnershipTests(unittest.TestCase):
             lambda r: r.update(participant_reverted=1),
             lambda r: r.update(nonce="b" * 32),
             lambda r: r["runtime_views"]["restored"].update(log_level=99),
+            lambda r: r["runtime_views"]["restored"].update(reading_font="dyslexic"),
+            lambda r: r["runtime_views"]["applied"].pop("reading_spacing"),
             lambda r: r.update(unoffered=True),
         ]
         for mutation in mutations:

@@ -7,7 +7,7 @@ local GLOBAL_KEY = "__ergopti_native_script_scope_probe"
 
 local function same_views(left, right)
 	-- config-key-literal-ok: the field names of the participant's view table
-	for _, key in ipairs({ "locale", "locale_backend", "log_level", "error_dialog" }) do
+	for _, key in ipairs({ "locale", "locale_backend", "log_level", "error_dialog", "reading_font", "reading_spacing" }) do
 		if left[key] ~= right[key] then return false end
 	end
 	return true
@@ -31,6 +31,7 @@ function M.run(receipt_path, destination, nonce)
 	local FileSystem = require("core.fs.adapters.file_system")
 	local Writer = require("core.text.engine.toml_codec.writer")
 	local Scope, Runtime, Manifest, I18n, Locale, Logger, Dialog, Preferences, Checkpoint, Storage
+	local ReadingFont, ReadingSpacing
 	local info = hs.processInfo
 	local identity = {
 		schema_version = 1, contract = "script.scope-native", nonce = nonce,
@@ -65,7 +66,8 @@ function M.run(receipt_path, destination, nonce)
 	end
 	local function views()
 		local value = { locale = I18n.get_locale(), locale_backend = Locale.current_locale(),
-			log_level = Logger.current_level, error_dialog = Dialog.is_enabled() }
+			log_level = Logger.current_level, error_dialog = Dialog.is_enabled(),
+			reading_font = ReadingFont.get(), reading_spacing = ReadingSpacing.get() }
 		assert(type(value.locale) == "string" and #value.locale > 0 and #value.locale <= 64)
 		assert(type(value.locale_backend) == "string" and value.locale == value.locale_backend, "Native locale getters disagree")
 		assert(type(value.log_level) == "number" and value.log_level == value.log_level
@@ -73,6 +75,9 @@ function M.run(receipt_path, destination, nonce)
 		local declared = false
 		for _, level in pairs(Logger.LEVELS) do declared = declared or level == value.log_level end
 		assert(declared and type(value.error_dialog) == "boolean", "Native runtime getters are not declared scalars")
+		for _, key in ipairs({ "reading_font", "reading_spacing" }) do
+			assert(type(value[key]) == "string" and #value[key] > 0 and #value[key] <= 64, "Native reading getter is not a declared scalar")
+		end
 		return value
 	end
 	local function aliases_absent()
@@ -100,6 +105,8 @@ function M.run(receipt_path, destination, nonce)
 		Preferences = require("settings.engine.preferences.preferences")
 		Checkpoint = require("settings.ui.menu.preferences_transaction")
 		Storage = require("core.fs.adapters.storage")
+		ReadingFont = require("core.ui.engine.webview.reading_font")
+		ReadingSpacing = require("core.ui.engine.webview.reading_spacing")
 		assert(current_native(), "Native settings provider differs")
 		local _, source_status = FileSystem.read_with_status(destination)
 		assert(source_status == "absent", "Private Script source must initially be absent")
@@ -166,6 +173,8 @@ function M.run(receipt_path, destination, nonce)
 				assert(result.runtime_views.applied.locale == effective and result.runtime_views.applied.locale_backend == effective)
 			elseif rawequal(provider, Logger) then assert(result.runtime_views.applied.log_level == Logger.LEVELS[effective])
 			elseif rawequal(provider, Dialog) then assert(result.runtime_views.applied.error_dialog == effective)
+			elseif rawequal(provider, ReadingFont) then assert(result.runtime_views.applied.reading_font == effective)
+			elseif rawequal(provider, ReadingSpacing) then assert(result.runtime_views.applied.reading_spacing == effective)
 			else error("Declared native field has no diagnostic getter") end
 		end
 		result.participant_reverted = participant.revert() == true

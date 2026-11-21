@@ -28,7 +28,16 @@ FLAGS = {
     "runtime_restored",
     "complete",
 }
-VIEW_FIELDS = {"locale", "locale_backend", "log_level", "error_dialog"}
+# One consumer view per native field owner the Script scope binds
+# (static/ergopti_plus/macos/settings/engine/scope/script_scope.lua).
+VIEW_FIELDS = {
+    "locale",
+    "locale_backend",
+    "log_level",
+    "error_dialog",
+    "reading_font",
+    "reading_spacing",
+}
 # The installed product a startup-file bootstrap verified before and after its
 # native run: signed runtime identity plus a digest of the module tree it loaded.
 PRODUCT_FIELDS = {"executable", "bundle_id", "version", "codesign_verified", "module_tree_sha256"}
@@ -78,6 +87,11 @@ def view(value):
         or type(value["error_dialog"]) is not bool
     ):
         raise ValueError("The actual native scalar consumer view is invalid")
+    if not all(
+        type(value[key]) is str and scalar(value[key])
+        for key in ("reading_font", "reading_spacing")
+    ):
+        raise ValueError("The actual native reading consumer view is invalid")
 
 
 def validate_receipt(result, nonce, pid, executable, bundle_id):
