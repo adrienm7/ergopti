@@ -1096,6 +1096,7 @@ sections = [
 	"gestures.modes",
 	"gestures.sensitivities",
 	"layout",
+	"category_enabled",
 	"ui",
 	"tap_holds",
 	"shortcuts.keys",

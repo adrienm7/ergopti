@@ -51,7 +51,7 @@ local function remap(definitions, observed)
 			{ id = "copy", label = "Copy fixture", category = "Spécial", holdable = true, tappable = true },
 		},
 		get_enabled = function() return true end,
-		get_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_simultaneous_threshold = function() return 50 end,

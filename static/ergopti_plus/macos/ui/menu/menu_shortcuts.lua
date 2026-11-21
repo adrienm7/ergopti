@@ -968,8 +968,8 @@ function M.build(ctx)
 	-- Ticks the « Combinaisons de touches » title while its own switch is on.
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
 		local karabiner = ctx.karabiner
-		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
-			and karabiner.get_mod_combos_enabled() == true
+		return type(karabiner) == "table" and type(karabiner.get_key_combinations_enabled) == "function"
+			and karabiner.get_key_combinations_enabled() == true
 	end
 
 	-- Each stage is a named phase, as the keyboard layout row's are: one rebuild

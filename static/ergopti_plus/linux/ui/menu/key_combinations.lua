@@ -16,7 +16,7 @@ local M = {}
 --- @param ui table Shared renderer, translator, picker, prompt and feedback ports.
 --- @return table rows Native submenu rows.
 function M.build(ctx,ui)
-	local declaration = Features.find_entry_by_path("category_enabled.key_combinations")
+	local declaration = Features.find_entry_by_path(require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	if type(declaration) ~= "table" or declaration.type ~= "boolean" or declaration.default ~= true then return {} end
 	local th,actions = ctx.tap_holds,ctx.gestures
 	local pairs = require("modules.shortcuts.key_combinations")

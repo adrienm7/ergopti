@@ -34,8 +34,8 @@ local function remap_double(observed)
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		get_tap_holds_enabled = function() return true end,
-		get_mod_combos_enabled = function() return observed.combos end,
-		set_mod_combos_enabled = function(value)
+		get_key_combinations_enabled = function() return observed.combos end,
+		set_key_combinations_enabled = function(value)
 			observed.writes[#observed.writes + 1] = value
 			observed.combos = value
 			return true

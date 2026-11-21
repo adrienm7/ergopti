@@ -155,6 +155,10 @@ function M.file(text)
 		config.mod_combos = combos
 		model.mod_combos = nil
 	end
+	-- The key-combinations master is a config.toml row too.
+	if model.category_enabled ~= nil then
+		config.category_enabled, model.category_enabled = model.category_enabled, nil
+	end
 	local held = {}
 	for id, value in pairs(at(model, { "tap_holds", "config" }, is_table) or {}) do
 		if untranslatable_key(ctx, id) then held[id], model.tap_holds.config[id] = value, nil end
@@ -234,6 +238,7 @@ function M.model_of(document, shapes, config, config_shapes)
 			for leaf, value in pairs(part.tap_holds) do ensure(model, { "tap_holds" })[leaf] = value end
 		end
 		model.mod_combos = part.mod_combos
+		model.category_enabled = part.category_enabled
 		for id, value in pairs(at(config, { "mod_combos", "config" }, config_is_table) or {}) do
 			if ctx.combo_of_pair[id] == nil and not (type(id) == "string" and id:find("_then_", 1, true)) then
 				ensure(model, { "mod_combos", "config" })[id] = value

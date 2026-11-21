@@ -251,8 +251,8 @@ local function make_remap(observations, mode)
 		set_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		set_combo_symmetric = function() return true end,
-		get_mod_combos_enabled = function() return true end,
-		set_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return true end,
+		set_key_combinations_enabled = function() return true end,
 		get_tap_action = function() return "none" end,
 		set_tap_action = function()
 			observations.calls.set_tap_action = observations.calls.set_tap_action + 1

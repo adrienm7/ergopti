@@ -232,3 +232,28 @@ helpers.describe("Obsolete remap Boolean leaf publication contracts", function()
 		end)
 	end
 end)
+
+-- Maintainer decision KCD-6 of 2026-11-21: the key-combinations master is
+-- `[category_enabled] key_combinations` in config.toml on the three OS, read
+-- and written by the remap owner apart from [mod_combos] enabled, the chords.
+helpers.describe("the key-combinations master is a config.toml row (kcd-6-master-leaf)", function()
+	helpers.it("reads and writes [category_enabled] key_combinations beside the chord switch (kcd-6-master-leaf)", function()
+		local source = "[category_enabled]\nkey_combinations = false\n[mod_combos]\nenabled = true\n"
+			.. '[mod_combos.config.esc_tab]\nhold = "ctrl"\n'
+		with_file(source, function(f)
+			local state, status = f.load()
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(state.key_combinations_enabled, false, "the master is read from config.toml")
+			helpers.assert_eq(state.mod_combos_enabled, true, "the chord switch is read on its own")
+			state.key_combinations_enabled = true
+			helpers.assert_true(f.config.save_user_config(state, f.path))
+			local stored = f.decode(f.read())
+			helpers.assert_eq(stored.category_enabled.key_combinations, true, "the master is written to config.toml")
+			helpers.assert_eq(stored.mod_combos.enabled, true, "the chord switch is untouched")
+			helpers.assert_nil(require("core.text.engine.toml_codec").decode(f.read()).category_enabled,
+				"tap_hold.toml never holds the master")
+			helpers.assert_eq(f.load().key_combinations_enabled, true)
+			helpers.assert_eq(f.errors, {})
+		end)
+	end)
+end)

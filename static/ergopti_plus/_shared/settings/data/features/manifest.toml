@@ -4509,17 +4509,17 @@ description_key = "menu.category_enabled.tap_holds"
 
 # The « Combinaisons de touches » switch under Shortcuts: the only gate of the
 # key combinations, which the Shortcuts master no longer reaches (decision of
-# 2026-09-29), each pair keeping its own slots. macOS keeps the same switch as
-# [mod_combos] enabled in tap_hold.toml, beside the rules it gates. Its
+# 2026-09-29), each pair keeping its own slots. It is the master on all three
+# OS, and [mod_combos] enabled covers only the chords (maintainer decision
+# KCD-6 of 2026-11-21). Its
 # neutral value is on: the gate can only narrow what each pair already binds,
 # so it activates nothing alone. An absent key must leave the pairs live, and
 # the sparse writer deletes a value equal to the default, so a default of off
 # would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
-platforms = ["ahk", "linux"]
-requires = { linux = ["evdev", "uinput"], windows = [] }
-reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"

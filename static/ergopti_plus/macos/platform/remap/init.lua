@@ -4180,6 +4180,7 @@ end
 --- @param candidate table Persisted settings candidate.
 local function publish_settings_state(candidate)
 	_state.tap_holds_enabled = candidate.tap_holds_enabled ~= false
+	_state.key_combinations_enabled = candidate.key_combinations_enabled
 	_state.mod_combos_enabled = candidate.mod_combos_enabled
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
@@ -5207,7 +5208,7 @@ end
 --- per-key tap-hold rule except the right-Command one that carries AltGr and
 --- the script-control trigger; every per-key assignment is kept. The
 --- modifier-combo rules never follow it: only their own switch governs them
---- (M.set_mod_combos_enabled).
+--- (M.set_key_combinations_enabled).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
 --- @return boolean committed
@@ -5352,30 +5353,40 @@ function M.set_close_other_instances(value)
 end
 
 --- Returns whether the key combinations are switched on: the persisted
---- [mod_combos] enabled, on while it was never set.
+--- `[category_enabled] key_combinations`, on while it was never set.
 --- @return boolean enabled
-function M.get_mod_combos_enabled()
-	if not require_state("get_mod_combos_enabled") then return false end
+function M.get_key_combinations_enabled()
+	if not require_state("get_key_combinations_enabled") then return false end
 	return Generator.key_combinations_enabled(_state)
 end
 
 --- Switches the key combinations and persists the choice, independent of the
---- Tap-Holds switch. Off stops generating every
---- modifier-combo rule; every pair's assignment is kept. Does NOT regenerate —
---- call M.regenerate() explicitly when ready.
+--- Tap-Holds switch: the master of every pair's tap, hold and chord, as on
+--- Windows and Linux (maintainer decision KCD-6 of 2026-11-21). Off stops
+--- generating every modifier-combo rule; every pair's assignment is kept.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
 --- @return boolean committed
-function M.set_mod_combos_enabled(value)
-	if not require_state("set_mod_combos_enabled") then return false end
+function M.set_key_combinations_enabled(value)
+	if not require_state("set_key_combinations_enabled") then return false end
 	if type(value) ~= "boolean" then
-		Logger.error(LOG, "set_mod_combos_enabled(): value must be a boolean.")
+		Logger.error(LOG, "set_key_combinations_enabled(): value must be a boolean.")
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
-		candidate.mod_combos_enabled = value
-	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_ENABLED)
+		candidate.key_combinations_enabled = value
+	end, nil, require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
+end
+
+--- Returns whether the chords are switched on: the persisted [mod_combos]
+--- enabled, which covers only the chord slots; on while it was never set.
+--- No menu row writes it, as on Windows and Linux.
+--- @return boolean enabled
+function M.get_mod_combos_enabled()
+	if not require_state("get_mod_combos_enabled") then return false end
+	return Generator.chords_enabled(_state)
 end
 
 --- Whether a live bridge can take a settings transaction now: M.init() built
@@ -5592,6 +5603,7 @@ local function clone_persisted_settings(source)
 		or (source.lone_modifier_tap_max_ms ~= nil and type(source.lone_modifier_tap_max_ms) ~= "number")
 		or type(source.simultaneous_threshold_ms) ~= "number"
 		or type(source.combo_symmetric) ~= "boolean"
+		or (source.key_combinations_enabled ~= nil and type(source.key_combinations_enabled) ~= "boolean")
 		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
 		return nil
 	end
@@ -5599,6 +5611,7 @@ local function clone_persisted_settings(source)
 	return {
 		enabled = detached.enabled == true,
 		tap_holds_enabled = detached.tap_holds_enabled ~= false,
+		key_combinations_enabled = detached.key_combinations_enabled,
 		mod_combos_enabled = detached.mod_combos_enabled,
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
@@ -5617,9 +5630,11 @@ end
 	local function snapshot(source)
 		if type(source) ~= "table" or getmetatable(source) ~= nil
 			or type(source.enabled) ~= "boolean" or (source.tap_holds_enabled ~= nil and type(source.tap_holds_enabled) ~= "boolean")
+			or (source.key_combinations_enabled ~= nil and type(source.key_combinations_enabled) ~= "boolean")
 			or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean")
 			or type(source.combo_symmetric) ~= "boolean" then return nil end
 		local result = { enabled = source.enabled, tap_holds_enabled = source.tap_holds_enabled ~= false,
+			key_combinations_enabled = source.key_combinations_enabled ~= false,
 			mod_combos_enabled = source.mod_combos_enabled ~= false, combo_symmetric = source.combo_symmetric }
 		for _, name in ipairs({ "tap_hold_config", "mod_combos_config" }) do
 			local entries = rawget(source, name)
@@ -5872,12 +5887,12 @@ end
 				if (baseline.tap_holds_enabled or definition.from and definition.from.key_code == "right_command")
 					and (metadata.activators[cfg.tap or "none"] == true or metadata.activators[cfg.hold or "none"] == true) then enters = true end
 			end
-			if baseline.mod_combos_enabled then
+			if baseline.key_combinations_enabled then
 				for _, definition in ipairs(metadata.combos) do
 					local cfg = baseline.mod_combos_config[definition.id] or {}
 					if not definition.menu_hidden and (metadata.activators[cfg.tap or "none"] == true
 						or metadata.activators[cfg.hold or "none"] == true
-						or metadata.activators[cfg.combo or "none"] == true
+						or metadata.activators[cfg.combo or "none"] == true and baseline.mod_combos_enabled
 							and not (baseline.combo_symmetric and metadata.symmetric_halves[definition.id])) then enters = true end
 				end
 			end
@@ -5945,6 +5960,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
 		candidate.tap_holds_enabled = restored.tap_holds_enabled
+		candidate.key_combinations_enabled = restored.key_combinations_enabled
 		candidate.mod_combos_enabled = restored.mod_combos_enabled
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
@@ -6116,6 +6132,7 @@ function M.apply_scope(request, on_done)
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
+				candidate.key_combinations_enabled = target.key_combinations_enabled
 				candidate.mod_combos_enabled = target.mod_combos_enabled
 			end
 			candidate.mod_combos_config = target.mod_combos_config
@@ -6164,6 +6181,7 @@ function M.reset_to_defaults(on_done, scope)
 		candidate.lone_modifier_tap_max_ms  = defaults.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		if not includes_combos then return #M.TAP_HOLD_KEYS end
+		candidate.key_combinations_enabled  = defaults.key_combinations_enabled
 		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
@@ -7220,6 +7238,7 @@ function M.init(file_system)
 		runtime                   = runtime,
 		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
+		key_combinations_enabled  = user_cfg.key_combinations_enabled,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,

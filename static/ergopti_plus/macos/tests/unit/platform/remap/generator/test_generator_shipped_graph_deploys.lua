@@ -144,7 +144,7 @@ local function build(env, preset, tap_holds, combinations)
 		and env.Config.build_recommended_state(env.keys, env.combos)
 		or env.Config.build_default_state(env.keys, env.combos)
 	state.tap_holds_enabled = tap_holds
-	state.mod_combos_enabled = combinations
+	state.key_combinations_enabled = combinations
 	return env.Generator.build_karabiner_json(
 		state, env.actions, env.keys, env.combos, env.non_canonical, DATA_DIR, TOKEN)
 end

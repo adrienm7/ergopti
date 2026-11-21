@@ -689,7 +689,7 @@ local function with_pair_picker(body)
 		local native = remap_double()
 		native.AVAILABLE_ACTIONS = SLOT_CATALOGUE
 		native.MOD_COMBOS = { SHIFT_PAIR }
-		native.get_mod_combos_enabled = function() return true end
+		native.get_key_combinations_enabled = function() return true end
 		native.get_combo_combo_action = function() return "enter" end
 		native.get_combo_tap_action = function() return "escape" end
 		native.get_combo_hold_action = function() return "shift" end

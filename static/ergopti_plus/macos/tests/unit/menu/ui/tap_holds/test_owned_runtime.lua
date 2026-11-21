@@ -42,7 +42,7 @@ local function menu_over_double(integration_enabled, extra)
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return integration_enabled end,
 		get_tap_holds_enabled = function() return true end,
-		get_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "tab" end,
 		get_hold_action = function() return "none" end,

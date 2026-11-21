@@ -30,7 +30,7 @@ function M.new(options)
 	local manifest = options.manifest or require("menu.engine.manifest_reader")
 	local function declared()
 		if type(manifest.find_entry_by_path) ~= "function" then return false end
-		local entry = manifest.find_entry_by_path("category_enabled.key_combinations")
+		local entry = manifest.find_entry_by_path(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 		return type(entry) == "table" and entry.type == "boolean" and entry.default == true
 	end
 	local gate_value, frame, published_frame, publication_acked
@@ -147,7 +147,7 @@ function M.new(options)
 		files=options.files or require("core.fs.adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
-				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }
+				return { presets = {}, operations = {manifest.sparse_operation(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS,gate_value)} }
 			end
 			if scope == "key_combinations_chord" then
 				assert(mode == "configured" and type(chord_operations) == "table")

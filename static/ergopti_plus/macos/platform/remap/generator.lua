@@ -103,6 +103,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 	tap_hold_config           = { "tap_holds.enabled", "hotstrings.tap_hold_resets_word" }, -- config-key-literal-ok: a manifest feature selector
 	tap_hold_timeout_ms       = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	lone_modifier_tap_max_ms  = { "tap_holds.lone_modifier_tap_max_ms" }, -- config-key-literal-ok: a manifest feature selector
+	key_combinations_enabled  = { "category_enabled.key_combinations" }, -- config-key-literal-ok: a manifest feature selector
 	mod_combos_enabled        = { "mod_combos.*" },
 	mod_combos_config         = { "mod_combos.*" },
 	simultaneous_threshold_ms = { "mod_combos.simultaneous_threshold_ms" }, -- config-key-literal-ok: a manifest feature selector
@@ -2250,19 +2251,40 @@ end
 
 --- Whether the key-combination rules are generated for a state.
 ---
---- The one place that rule lives: `mod_combos_enabled` is the persisted
---- [mod_combos] enabled flag, the only switch the combinations follow, as on
---- Windows (decision of 2026-09-29). Absent, it is on: a file that never set it
---- keeps the combinations it generated with the Tap-Holds on.
---- @param state table Remap state (mod_combos_enabled).
+--- Reads one optional Boolean switch of a remap state; absent is on.
+--- @param state table Remap state.
+--- @param field string The state field.
+--- @param caller string Named by the error.
 --- @return boolean
-function M.key_combinations_enabled(state)
-	if type(state) ~= "table" then error("key_combinations_enabled needs a remap state", 2) end
-	if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
-	if state.mod_combos_enabled ~= nil then
-		error("mod_combos_enabled must be a boolean or absent, got " .. type(state.mod_combos_enabled), 2)
+local function state_switch(state, field, caller)
+	if type(state) ~= "table" then error(caller .. " needs a remap state", 3) end
+	if type(state[field]) == "boolean" then return state[field] end
+	if state[field] ~= nil then
+		error(field .. " must be a boolean or absent, got " .. type(state[field]), 3)
 	end
 	return true
+end
+
+--- Whether the key-combination rules are generated for a state.
+---
+--- The one place that rule lives: `key_combinations_enabled` is the persisted
+--- `[category_enabled] key_combinations`, the master switch of every pair's
+--- tap, hold and chord, as on Windows and Linux (maintainer decision KCD-6 of
+--- 2026-11-21). Absent, it is on: a file that never set it keeps the
+--- combinations it generated with the Tap-Holds on.
+--- @param state table Remap state (key_combinations_enabled).
+--- @return boolean
+function M.key_combinations_enabled(state)
+	return state_switch(state, "key_combinations_enabled", "key_combinations_enabled")
+end
+
+--- Whether the chord slots are generated for a state: [mod_combos] enabled
+--- covers only the chords, as on Windows and Linux; the pairs' tap and hold
+--- follow the master alone. Absent, it is on.
+--- @param state table Remap state (mod_combos_enabled).
+--- @return boolean
+function M.chords_enabled(state)
+	return state_switch(state, "mod_combos_enabled", "chords_enabled")
 end
 
 -- The CapsWord exits [shortcuts.caps_word] now decides: the word delimiters a
@@ -2443,6 +2465,7 @@ function M.build_karabiner_json(
 	-- Dynamic modifier combo manipulators (after CapsWord, before the navigation
 	-- layer so a user-defined combo involving a layer-remapped key matches the
 	-- combo first).
+	local chords_on = M.chords_enabled(state)
 	for _, combo_def in ipairs(mod_combos) do
 		-- Skip combos handled outside KE (menu_hidden = handled by Hammerspoon directly)
 		if combo_def.menu_hidden then goto continue end
@@ -2458,6 +2481,8 @@ function M.build_karabiner_json(
 		if state.combo_symmetric and is_non_canonical then
 			combo_id = "none"
 		end
+		-- [mod_combos] enabled off: the pairs keep their tap and hold, no chord.
+		if not chords_on then combo_id = "none" end
 		-- A configuration written by hand or by an older build can still name an
 		-- action no chord runs (the one-shot Shift): that chord does nothing, said once.
 		if require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[combo_id] then

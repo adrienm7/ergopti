@@ -89,7 +89,7 @@ local CONFIG_TAP_HOLD_LEAVES = { enabled = true, sticky_timeout_ms = true, lone_
 --- @param segments table Model path segments.
 --- @return boolean
 local function config_owned(segments)
-	return segments[1] == ConfigKeys.KEY.MOD_COMBOS
+	return segments[1] == ConfigKeys.KEY.MOD_COMBOS or segments[1] == ConfigKeys.KEY.CATEGORY_ENABLED
 		or (segments[1] == ConfigKeys.KEY.TAP_HOLDS and CONFIG_TAP_HOLD_LEAVES[segments[2]] == true)
 end
 
@@ -167,6 +167,7 @@ local function overlay_config(model, part, shapes)
 		end
 	end
 	model.mod_combos = copy_part(part[ConfigKeys.KEY.MOD_COMBOS], shapes)
+	model[ConfigKeys.KEY.CATEGORY_ENABLED] = copy_part(part[ConfigKeys.KEY.CATEGORY_ENABLED], shapes)
 end
 
 
@@ -252,12 +253,22 @@ local function boolean_leaf(section, key, default, path, section_name, detail)
 	return default, true
 end
 
---- Reads the combination switch; its absent state keeps combinations on.
+--- Reads the chord switch, [mod_combos] enabled: it covers only the chords
+--- (maintainer decision KCD-6 of 2026-11-21); absent, the chords are on.
 --- @return boolean|nil value
 --- @return boolean outdated
 local function combinations_enabled(section, path)
 	return boolean_leaf(section, "enabled", nil, path, ConfigKeys.KEY.MOD_COMBOS,
-		"a combination switch is boolean; its absent state is used")
+		"a chord switch is boolean; its absent state is used")
+end
+
+--- Reads the key-combinations master switch, `[category_enabled]
+--- key_combinations` as on Windows and Linux; absent, the manifest's default.
+--- @return boolean|nil value
+--- @return boolean outdated
+local function combinations_master(section, path)
+	return boolean_leaf(section, ConfigKeys.LEAF.KEY_COMBINATIONS, nil, path, ConfigKeys.KEY.CATEGORY_ENABLED,
+		"a key-combinations switch is boolean; its absent state is used")
 end
 
 --- Reads the tap-hold switch with its manifest-owned neutral value.
@@ -770,8 +781,10 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 		enabled                   = M.INTEGRATION_ENABLED_DEFAULT,
 		tap_holds_enabled         = recommended and Manifest.recommended_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED)
 			or Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED),
-		-- Absent: the key combinations are on whatever the Tap-Holds switch says
-		-- (Generator.key_combinations_enabled), in the preset as on a fresh install.
+		-- Absent: the key combinations and their chords are on whatever the
+		-- Tap-Holds switch says (Generator.key_combinations_enabled,
+		-- Generator.chords_enabled), in the preset as on a fresh install.
+		key_combinations_enabled  = nil,
 		mod_combos_enabled        = nil,
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
@@ -1003,8 +1016,11 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	-- Absence is neutral even when other explicit remap preferences are present.
 	local tap_holds_enabled = tap_holds_switch(tap_holds, user_config_path)
 
-	-- The key-combinations switch stays absent until the user sets it: absent,
-	-- the combinations are on (Generator.key_combinations_enabled).
+	-- Both switches stay absent until the user sets them: absent, the
+	-- combinations and their chords are on (Generator.key_combinations_enabled).
+	local categories = data[ConfigKeys.KEY.CATEGORY_ENABLED]
+	if categories ~= nil and type(categories) ~= "table" then categories = nil end
+	local key_combinations_enabled = combinations_master(categories or {}, user_config_path)
 	local mod_combos_enabled = combinations_enabled(combos, user_config_path)
 
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
@@ -1014,6 +1030,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		runtime                   = runtime,
 		close_other_instances     = close_other_instances,
 		tap_holds_enabled         = tap_holds_enabled,
+		key_combinations_enabled  = key_combinations_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = combos_config,
@@ -1030,7 +1047,7 @@ local INTENT_LEAVES = {
 	[ConfigKeys.KEY.TAP_HOLDS_ENABLED] = true, [ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS] = true, [ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = true,
 	[ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = true,
 	[ConfigKeys.KEY.MOD_COMBOS_ENABLED] = true, [ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS] = true,
-	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true,
+	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true, [ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS] = true,
 }
 
 --- Validates a save's explicit leaf intent: only owned leaves, each set to true.
@@ -1299,6 +1316,14 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				if next(tap_holds.config) == nil then tap_holds.config = nil end
 			end
 			if next(tap_holds) == nil then document.tap_holds = nil end
+		end
+		-- The key-combinations master, written once set; its neutral value is on.
+		if state.key_combinations_enabled ~= nil
+			or type(document[ConfigKeys.KEY.CATEGORY_ENABLED]) == "table" then
+			local categories = table_at(document, ConfigKeys.KEY.CATEGORY_ENABLED)
+			assign_boolean(categories, ConfigKeys.KEY.CATEGORY_ENABLED, ConfigKeys.LEAF.KEY_COMBINATIONS,
+				state.key_combinations_enabled, nil, combinations_master)
+			if next(categories) == nil then document[ConfigKeys.KEY.CATEGORY_ENABLED] = nil end
 		end
 		if not preserve_array(document.mod_combos, { ConfigKeys.KEY.MOD_COMBOS },
 			state.mod_combos_enabled == nil

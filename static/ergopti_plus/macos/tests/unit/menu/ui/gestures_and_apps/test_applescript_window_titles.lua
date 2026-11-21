@@ -65,7 +65,7 @@ local function remap_owner(world)
 		MOD_COMBOS = {}, NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		get_tap_holds_enabled = function() return true end,
-		get_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "none" end,
 		get_hold_action = function() return "none" end,

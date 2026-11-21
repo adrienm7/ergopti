@@ -18,8 +18,10 @@
 --- 2. Key combinations: the modifier chords, grouped by key, are the
 ---    « Combinaisons de touches » group of the Shortcuts submenu, built here
 ---    (M.build_key_combinations) because this engine runs them. Their own
----    first-row switch is the persisted [mod_combos] enabled. Each pair's
----    three slots open the same shared action picker.
+---    first-row switch is the persisted [category_enabled] key_combinations,
+---    the master of every pair, as on Windows and Linux; [mod_combos] enabled
+---    covers only the chords and has no row. Each pair's three slots open the
+---    same shared action picker.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
 --- 5. Restore recommended / clear run the remap engine's tap_holds scope: a
@@ -1369,8 +1371,8 @@ end
 --- Builds the « Combinaisons de touches » group of the Shortcuts submenu: the
 --- rows `key_combinations_group` declares, answered by this engine's chords.
 ---
---- It opens with its own switch (persisted [mod_combos] enabled; on while the
---- user never set it, whatever the Tap-Holds switch says), then the symmetry
+--- It opens with its own switch (persisted [category_enabled] key_combinations;
+--- on while the user never set it, whatever the Tap-Holds switch says), then the symmetry
 --- check, the chord delay, the tap → chord copy, and
 --- one row per ordered pair of keys with its three slots, left hand then
 --- right hand.
@@ -1402,7 +1404,7 @@ function M.build_key_combinations(ctx)
 		end,
 	}
 
-	local combos_on = karabiner.get_mod_combos_enabled() == true
+	local combos_on = karabiner.get_key_combinations_enabled() == true
 	local commands = {
 		[ConfigKeys.COMMAND.KEY_COMBINATIONS_TOGGLE] = function()
 			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
@@ -1449,12 +1451,12 @@ end
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean committed
 function M.set_key_combinations_enabled(karabiner, enabled, update_menu)
-	if type(karabiner) ~= "table" or type(karabiner.set_mod_combos_enabled) ~= "function" then
+	if type(karabiner) ~= "table" or type(karabiner.set_key_combinations_enabled) ~= "function" then
 		Logger.error(LOG, "Key-combinations switch is unavailable.")
 		return false
 	end
 	Logger.start(LOG, "Switching the key combinations %s…", enabled and "on" or "off")
-	if karabiner.set_mod_combos_enabled(enabled == true) ~= true then
+	if karabiner.set_key_combinations_enabled(enabled == true) ~= true then
 		Logger.error(LOG, "Key-combinations switch did not persist.")
 		return false
 	end

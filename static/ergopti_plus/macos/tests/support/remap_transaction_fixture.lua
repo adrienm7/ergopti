@@ -275,6 +275,10 @@ return function(run, dependencies)
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.
 				key_combinations_enabled = function(state)
+					if type(state.key_combinations_enabled) == "boolean" then return state.key_combinations_enabled end
+					return true
+				end,
+				chords_enabled = function(state)
 					if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
 					return true
 				end,

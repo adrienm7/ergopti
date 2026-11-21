@@ -5,14 +5,18 @@
 --- DESCRIPTION:
 --- The modifier combinations moved from the Tap-Holds submenu to their own
 --- « Combinaisons de touches » group under Shortcuts, with its own switch,
---- persisted as [mod_combos] enabled, the only switch they follow (decision
---- of 2026-09-29). An absent flag is on, whatever the Tap-Holds switch says.
+--- persisted as [category_enabled] key_combinations, the only switch they
+--- follow (decisions of 2026-09-29 and KCD-6 of 2026-11-21). An absent flag is
+--- on, whatever the Tap-Holds switch says. [mod_combos] enabled covers only
+--- the chords.
 ---
 --- ROOT CAUSE ENCODED:
 --- the generator marked every combo rule as a Tap-Holds feature rule, so the
 --- Tap-Holds switch alone decided whether combinations were generated: they
 --- could be neither kept while the per-key rules were off nor dropped while
---- they were on.
+--- they were on. Then macOS read [mod_combos] enabled as the master, so the
+--- chord switch also dropped every pair's tap and hold, unlike Windows and
+--- Linux.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -63,11 +67,13 @@ local COMBO_LABEL = "Esc + Enter"
 
 --- Builds one state with a key and a combination both assigned.
 --- @param tap_holds_enabled boolean|nil Tap-Holds switch.
---- @param mod_combos_enabled boolean|nil Key-combinations switch; nil is absent.
+--- @param key_combinations_enabled boolean|nil Master switch; nil is absent.
+--- @param mod_combos_enabled boolean|nil Chord switch; nil is absent.
 --- @return table state
-local function make_state(tap_holds_enabled, mod_combos_enabled)
+local function make_state(tap_holds_enabled, key_combinations_enabled, mod_combos_enabled)
 	return {
 		tap_holds_enabled = tap_holds_enabled,
+		key_combinations_enabled = key_combinations_enabled,
 		mod_combos_enabled = mod_combos_enabled,
 		tap_hold_config = {
 			return_or_enter = { tap = "none", hold = "cmd" },
@@ -82,17 +88,20 @@ end
 
 --- Which feature rules the generator emits for one state.
 --- @param state table Generator state.
---- @return table found { combos = number, enter_tap_hold = boolean }
+--- @return table found { combos = number, chords = number, enter_tap_hold = boolean }
 local function generated(state)
 	local config, err = Generator.build_karabiner_json(
 		state, ACTIONS, KEYS, COMBOS, {}, "/fake/data_dir/", TOKEN)
 	helpers.assert_nil(err)
-	local found = { combos = 0, enter_tap_hold = false }
+	local found = { combos = 0, chords = 0, enter_tap_hold = false }
 	for _, rule in ipairs(config.profiles[1].complex_modifications.rules) do
 		local description = tostring(rule.description)
-		if description:find(COMBO_LABEL, 1, true) then found.combos = found.combos + 1 end
+		local is_combo = description:find(COMBO_LABEL, 1, true) ~= nil
+		if is_combo then found.combos = found.combos + 1 end
 		for _, manipulator in ipairs(rule.manipulators or {}) do
 			for _, event in ipairs(manipulator.to or {}) do
+				-- The chord is the only slot that types Tab.
+				if is_combo and event.key_code == "tab" then found.chords = found.chords + 1 end
 				local variable = event.set_variable
 				if variable and tostring(variable.name):find("ke_held_return_or_enter", 1, true) then
 					found.enter_tap_hold = true
@@ -110,7 +119,7 @@ helpers.describe("key combinations have their own switch in the generated rules"
 		helpers.assert_eq(found.enter_tap_hold, false, "the per-key rules still go with Tap-Holds")
 	end)
 
-	helpers.it("drops only the combinations when they are off and Tap-Holds are on", function()
+	helpers.it("drops only the combinations when the master is off and Tap-Holds are on", function()
 		local state = make_state(true, false)
 		local found = generated(state)
 		helpers.assert_eq(found.combos, 0, "no combination rule while the combinations are off")
@@ -118,7 +127,7 @@ helpers.describe("key combinations have their own switch in the generated rules"
 		helpers.assert_eq(state.mod_combos_config.esc_ret.combo, "tab", "every stored pair is kept")
 	end)
 
-	helpers.it("reads an absent combinations switch as on, whatever Tap-Holds say (combos-own-switch)", function()
+	helpers.it("reads an absent master as on, whatever Tap-Holds say (combos-own-switch)", function()
 		helpers.assert_true(generated(make_state(true, nil)).combos >= 1, "absent is on with Tap-Holds on")
 		helpers.assert_true(generated(make_state(false, nil)).combos >= 1, "absent is on with Tap-Holds off")
 		for _, tap_holds in ipairs({ true, false }) do
@@ -126,5 +135,23 @@ helpers.describe("key combinations have their own switch in the generated rules"
 			helpers.assert_eq(Generator.key_combinations_enabled(make_state(tap_holds, false)), false)
 			helpers.assert_eq(Generator.key_combinations_enabled(make_state(tap_holds, true)), true)
 		end
+	end)
+end)
+
+helpers.describe("the chord switch covers only the chords (kcd-6-chord-switch)", function()
+	helpers.it("keeps a pair's tap with the chords off and drops only its chord (kcd-6-chord-switch)", function()
+		helpers.assert_true(generated(make_state(true, true, true)).chords >= 1,
+			"the chord is generated while both switches are on")
+		local found = generated(make_state(true, true, false))
+		helpers.assert_true(found.combos >= 1, "the pair's tap rule stays with the chords off")
+		helpers.assert_eq(found.chords, 0, "no chord rule while the chords are off")
+	end)
+
+	helpers.it("lets the master alone decide the pair rules (kcd-6-chord-switch)", function()
+		helpers.assert_eq(generated(make_state(true, false, true)).combos, 0, "master off drops the pairs")
+		helpers.assert_true(Generator.key_combinations_enabled(make_state(true, nil, false)),
+			"the chord switch never reaches the master")
+		helpers.assert_true(Generator.chords_enabled(make_state(true, true, nil)), "an absent chord switch is on")
+		helpers.assert_eq(Generator.chords_enabled(make_state(true, true, false)), false)
 	end)
 end)

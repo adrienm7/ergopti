@@ -707,6 +707,13 @@ on_resume = ""
 
 
 
+[category_enabled]
+key_combinations = true
+
+
+
+
+
 [ui]
 menubar_icon = "v1"
 

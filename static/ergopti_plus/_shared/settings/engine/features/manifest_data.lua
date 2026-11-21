@@ -1098,7 +1098,7 @@ M.features = {
 		path = "category_enabled.tap_holds", section = "category_enabled", platforms = { "ahk" },
 	},
 	{
-		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos",
+		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "network.proxy_override", section = "network", platforms = { "ahk" },

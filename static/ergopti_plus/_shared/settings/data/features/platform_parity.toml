@@ -129,7 +129,7 @@ technical = "Word deletion is Option+Backspace on macOS text fields and Ctrl+Bac
 
 [reasons."platform_reason.key_combinations_are_karabiner_settings_on_macos"]
 kind = "driver_storage"
-technical = "Karabiner-Elements runs the key combinations on macOS, so macOS keeps them and their switch with its Karabiner settings (mod_combos in tap_hold.toml) instead of shortcuts.key_combination_taps."
+technical = "Karabiner-Elements runs the key combinations on macOS, so macOS keeps each pair's tap and hold with its Karabiner settings (mod_combos.config in config.toml) instead of shortcuts.key_combination_taps; the master switch, category_enabled.key_combinations, is the same on the three OS (maintainer decision KCD-6 of 2026-11-21)."
 
 [reasons."platform_reason.action_window_switching_is_not_macos"]
 kind = "os_equivalent"

@@ -15,6 +15,7 @@
 
 class ConfigKey {
 	static CATEGORY_ENABLED := "category_enabled"
+	static CATEGORY_ENABLED_KEY_COMBINATIONS := "category_enabled.key_combinations"
 	static GESTURES := "gestures"
 	static GESTURES_ACTION_PARAMETERS := "gestures.action_parameters"
 	static GESTURES_ENABLED := "gestures.enabled"
@@ -258,6 +259,7 @@ class ConfigLeaf {
 	static INSTANT_ON_WORD_END := "instant_on_word_end"
 	static KEYBOARD := "keyboard"
 	static KEYS := "keys"
+	static KEY_COMBINATIONS := "key_combinations"
 	static LAYOUT := "layout"
 	static LINUX_LEGACY_STORAGE_IMPORTED := "linux_legacy_storage_imported"
 	static LLM := "llm"

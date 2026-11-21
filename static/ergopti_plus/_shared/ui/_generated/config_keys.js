@@ -27,6 +27,7 @@
 	var tables = Object.freeze({
 		KEY: strict('KEY', {
 			CATEGORY_ENABLED: "category_enabled",
+			CATEGORY_ENABLED_KEY_COMBINATIONS: "category_enabled.key_combinations",
 			GESTURES: "gestures",
 			GESTURES_ACTION_PARAMETERS: "gestures.action_parameters",
 			GESTURES_ENABLED: "gestures.enabled",
@@ -269,6 +270,7 @@
 			INSTANT_ON_WORD_END: "instant_on_word_end",
 			KEYBOARD: "keyboard",
 			KEYS: "keys",
+			KEY_COMBINATIONS: "key_combinations",
 			LAYOUT: "layout",
 			LINUX_LEGACY_STORAGE_IMPORTED: "linux_legacy_storage_imported",
 			LLM: "llm",

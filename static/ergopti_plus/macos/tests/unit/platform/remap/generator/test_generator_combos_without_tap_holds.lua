@@ -230,7 +230,7 @@ helpers.with_fresh_modules({
 	local function state_with(tap_holds, combinations, pair, slots)
 		local state = Config.build_default_state(keys, combos)
 		state.tap_holds_enabled = tap_holds
-		state.mod_combos_enabled = combinations
+		state.key_combinations_enabled = combinations
 		if pair then state.mod_combos_config[pair] = slots end
 		return state
 	end
@@ -338,7 +338,7 @@ helpers.with_fresh_modules({
 		helpers.it("a chosen LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)", function()
 			local state = Config.build_recommended_state(keys, combos)
 			state.tap_holds_enabled = false
-			state.mod_combos_enabled = true
+			state.key_combinations_enabled = true
 			state.mod_combos_config.lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
 			local engine = engine_for(rules_of(state))
 			helpers.assert_true(engine:chord({ "left_command", "right_command" }) ~= nil, "a chord rule takes both keys")
@@ -370,7 +370,7 @@ helpers.with_fresh_modules({
 			local recommended = Config.build_recommended_state(keys, combos)
 			recommended.tap_holds_enabled = true
 			local absent = rules_of(recommended)
-			recommended.mod_combos_enabled = true
+			recommended.key_combinations_enabled = true
 			helpers.assert_eq(rules_of(recommended), absent, "an absent switch is on")
 		end)
 
@@ -387,7 +387,7 @@ helpers.with_fresh_modules({
 				for _, combinations in ipairs({ "absent", "on" }) do
 					local state = builders[preset](keys, combos)
 					state.tap_holds_enabled = true
-					state.mod_combos_enabled = combinations == "on" or nil
+					state.key_combinations_enabled = combinations == "on" or nil
 					local rules = rules_of(state)
 					local pin = TAP_HOLDS_ON_PINS[preset]
 					local context = preset .. " preset, key combinations " .. combinations

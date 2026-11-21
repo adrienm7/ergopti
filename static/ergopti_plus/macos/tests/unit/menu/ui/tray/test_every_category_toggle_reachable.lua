@@ -61,7 +61,7 @@ local function remap_double(observed)
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
 		get_tap_holds_enabled = function() return observed.tapholds end,
-		get_mod_combos_enabled = function() return observed.tapholds end,
+		get_key_combinations_enabled = function() return observed.tapholds end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "none" end,
 		get_hold_action = function() return "none" end,
