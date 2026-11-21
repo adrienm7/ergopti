@@ -37,12 +37,20 @@ window.addEventListener('load', function () {
 		setTimeout(focusIfUnclaimed, FOCUS_RETRY_FIRST_MS);
 		setTimeout(focusIfUnclaimed, FOCUS_RETRY_SECOND_MS);
 
-		input.addEventListener('keypress', function (e) {
-			if (e.key === 'Enter') {
+		input.addEventListener('keydown', function (e) {
+			if (e.key === 'Enter' && !e.isComposing) {
+				e.preventDefault();
 				doValidate();
 			}
 		});
 	}
+});
+
+// Escape cancels, as on every other prompt page; a composition keeps its own Escape
+document.addEventListener('keydown', function (e) {
+	if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented) return;
+	e.preventDefault();
+	doCancel();
 });
 
 // Also try to focus immediately
