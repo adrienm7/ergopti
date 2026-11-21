@@ -43,24 +43,25 @@ function M.alias_names()
 	return names
 end
 
---- Makes config.toml's [script] rows win over the saved values at start.
+--- Makes config.toml's [script] rows win over the saved values at start, and
+--- clears the saved value of a row the file lacks (the locale excepted).
 --- Runs once the config path is known and before any alias reader starts.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
-	-- The log level is left to infra.config_overrides: it already writes the
-	-- configured level into this same alias and admits every spelling of a
-	-- logger threshold, and init re-applies the level after it.
-	local adopted = M.alias_names()
-	adopted[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = nil
+	-- A configured log level is left to settings.engine.overrides: it already
+	-- writes it into this same alias and admits every spelling of a logger
+	-- threshold, and init re-applies the level after it. Its absence is ours.
 	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("settings.engine.paths").get("ConfigTomlPath"),
 		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, platform = "hs",
-		aliases = adopted, storage = require("core.fs.adapters.storage"),
+		aliases = M.alias_names(), storage = require("core.fs.adapters.storage"),
+		present_owned = { [ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = true },
 		logger = require("core.logger.engine.logger"), log = "script_scope" })
 end
 
---- Rewrites the config.toml row a menu or wizard change replaces, when the
---- file holds it, so the next start keeps the change. Call before storing it.
+--- Rewrites the config.toml row a menu or wizard change replaces (held or
+--- not, the locale only when held), so the next start keeps the change. Call
+--- before storing it.
 --- @param path string Canonical script path.
 --- @param value any New value.
 --- @return boolean committed

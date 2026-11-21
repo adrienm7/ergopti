@@ -383,8 +383,26 @@ helpers.describe("i18n explicit wizard persistence", function()
 		helpers.assert_eq(observed, { accepted = false, before = true, active = true, config = initial })
 	end)
 
+	-- The row was written only when the file held it, so the next start, which
+	-- clears the saved value of an absent row, would have ticked the window
+	-- again (configuration follow-up, script-config-absent-row-resets).
+	helpers.it("(error-dialog-atomic) writes an absent row so the next start keeps the choice (script-config-absent-row-resets)", function()
+		local initial = '[hotstrings]\nenabled = true\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local dialog = require("diagnostics.ui.error_dialog")
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, active = dialog.is_enabled(),
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed.accepted, true)
+		helpers.assert_eq(observed.stored, false)
+		helpers.assert_true(observed.config:find("[hotstrings]", 1, true) ~= nil, "the rest of the file stays")
+		helpers.assert_true(observed.config:find("show_error_dialog = false", 1, true) ~= nil,
+			"the choice is in config.toml: " .. observed.config)
+	end)
+
 	helpers.it("(error-dialog-atomic) disables an already scheduled report", function()
-		local observed = with_owned_store({}, function()
+		local observed = with_owned_store({ config = "" }, function()
 			local dialog = require("diagnostics.ui.error_dialog")
 			local scheduled
 			dialog.defer = function(fn) scheduled = fn; return true end

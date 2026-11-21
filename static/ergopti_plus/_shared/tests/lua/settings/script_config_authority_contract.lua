@@ -4,9 +4,10 @@
 --- MODULE: Script Config Authority Contract
 --- DESCRIPTION:
 --- Replays, on each Lua driver, the rule that config.toml's [script] rows win
---- over the saved native values at start, and that a change rewrites the row
---- the file holds so the next start keeps it. Real manifest reader, real TOML
---- writer and a real file; only the native store is an in-memory table.
+--- over the saved native values at start, that a row the file lacks clears its
+--- saved value (the locale excepted), and that a change writes the row so the
+--- next start keeps it. Real manifest reader, real TOML writer and a real file;
+--- only the native store is an in-memory table.
 --- ==============================================================================
 
 local M = {}
@@ -41,7 +42,8 @@ local function store(seed)
 	for key, value in pairs(seed) do values[key] = value end
 	return { values = values, writes = function() return writes end,
 		get = function(key) return values[key] end,
-		set = function(key, value) values[key] = value; writes = writes + 1; return true end }
+		set = function(key, value) values[key] = value; writes = writes + 1; return true end,
+		delete = function(key) values[key] = nil; writes = writes + 1; return true end }
 end
 
 local function silent()
@@ -61,6 +63,7 @@ function M.run(helpers, options)
 	local locale_alias = aliases["script.locale"].alias
 	local level_alias = aliases["script.log_level"].alias
 	local dialog_alias = aliases["script.show_error_dialog"].alias
+	local font_alias = aliases["script.reading_font"].alias
 	local function adopt(path, native, logger)
 		return Authority.adopt({ path = path, file_adapter = options.file_adapter, manifest = manifest,
 			platform = platform, aliases = aliases, storage = native, logger = logger or silent(), log = "test" })
@@ -78,18 +81,54 @@ function M.run(helpers, options)
 			helpers.assert_eq(adopted["script.locale"], "en")
 		end)
 
-		helpers.it("leaves the saved values alone without a [script] row: no migration (script-config-no-migration)", function()
+		-- A restored or hand-edited file without a row kept the saved value on
+		-- macOS and Linux, where Windows (the file is its only store) reads the
+		-- default (configuration follow-up, script-config-absent-row-resets).
+		helpers.it("clears the saved value of a row the file lacks (script-config-absent-row-resets)", function()
 			for _, content in ipairs({ false, "[hotstrings]\nenabled = true\n" }) do
 				local path = scratch(content or nil)
-				local native = store({ [locale_alias] = "de", [level_alias] = "INFO" })
-				local adopted = adopt(path, native)
+				local native = store({ [level_alias] = "DEBUG", [dialog_alias] = false, [font_alias] = "dyslexic" })
+				local adopted, _, cleared = adopt(path, native)
 				local after = read(path)
 				os.remove(path)
-				helpers.assert_eq(native.writes(), 0, "nothing is copied between the stores")
-				helpers.assert_eq(native.values[locale_alias], "de")
+				helpers.assert_eq(native.values[level_alias], nil, "the log level reads its default again")
+				helpers.assert_eq(native.values[dialog_alias], nil, "the error window switch reads its default again")
+				helpers.assert_eq(native.values[font_alias], nil, "the reading font reads its default again")
 				helpers.assert_eq(next(adopted), nil)
+				helpers.assert_eq(cleared["script.log_level"], true)
 				helpers.assert_eq(after, content or nil, "the file is never written at start")
 			end
+			local path = scratch("[script]\nshow_error_dialog = false\n")
+			local native = store({ [dialog_alias] = false })
+			local _, _, cleared = adopt(path, native)
+			os.remove(path)
+			helpers.assert_eq(native.writes(), 0, "an already empty or configured alias is not written")
+			helpers.assert_eq(next(cleared), nil)
+		end)
+
+		-- Every driver reads an absent locale as the system language, while the
+		-- sparse writer deletes a chosen "fr" as neutral: clearing it would lose
+		-- an explicit French choice (script-config-locale-kept-when-absent).
+		helpers.it("keeps the saved locale without a row (script-config-locale-kept-when-absent)", function()
+			local path = scratch("[hotstrings]\nenabled = true\n")
+			local native = store({ [locale_alias] = "de" })
+			adopt(path, native)
+			os.remove(path)
+			helpers.assert_eq(native.writes(), 0, "the locale is not copied between the stores")
+			helpers.assert_eq(native.values[locale_alias], "de")
+		end)
+
+		helpers.it("logs a start whose alias cannot be cleared (script-config-absent-clear-refused)", function()
+			local path = scratch("")
+			local native = store({ [dialog_alias] = false })
+			native.delete = function() return false end
+			local logger = silent()
+			local _, _, cleared = adopt(path, native, logger)
+			os.remove(path)
+			helpers.assert_eq(cleared["script.show_error_dialog"], nil)
+			local said = false
+			for _, line in ipairs(logger.logged) do said = said or line:find("^error:.*could not be cleared") ~= nil end
+			helpers.assert_true(said, "the refused clear is logged as an error")
 		end)
 
 		-- Windows' loader admits an enum's case variant (AHK's = compares without
@@ -131,7 +170,7 @@ function M.run(helpers, options)
 			helpers.assert_true(#logger.logged > 0 and logger.logged[1]:find("^error:") ~= nil, "and says so")
 		end)
 
-		helpers.it("rewrites only a row the file holds (script-config-change-rewrite)", function()
+		helpers.it("rewrites a held row, and writes an absent one unless it is the locale (script-config-change-rewrite)", function()
 			local path = scratch('[script]\nlocale = "fr"\n\n\n\n\n\n[hotstrings]\nenabled = true\n')
 			local committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
 				manifest = manifest, key = "script.locale", value = "en" })
@@ -148,14 +187,34 @@ function M.run(helpers, options)
 			committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
 				manifest = manifest, key = "script.log_level", value = "ERROR" })
 			after = read(path)
+			helpers.assert_true(committed)
+			helpers.assert_true(after:find('log_level = "ERROR"', 1, true) ~= nil,
+				"an absent row is written, so the next start keeps the change")
+			native = store({ [level_alias] = "ERROR" })
+			adopt(path, native)
+			helpers.assert_eq(native.values[level_alias], "ERROR", "and the start does not clear it")
+			os.remove(path)
+			path = scratch(bare)
+			committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.show_error_dialog", value = true })
+			after = read(path)
+			helpers.assert_true(committed)
+			helpers.assert_eq(after, bare, "an absent row already reads as the neutral default")
+			committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.locale", value = "en" })
+			after = read(path)
 			os.remove(path)
 			helpers.assert_true(committed)
-			helpers.assert_eq(after, bare, "a file without the row is not touched")
+			helpers.assert_eq(after, bare, "an absent locale row is not written")
 			path = scratch(nil)
 			committed = Authority.rewrite({ path = path, file_adapter = options.file_adapter,
 				manifest = manifest, key = "script.locale", value = "en" })
 			helpers.assert_true(committed)
-			helpers.assert_eq(read(path), nil, "an absent file is not created")
+			helpers.assert_eq(read(path), nil, "an absent file is not created for the locale")
+			local owned_committed = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.log_level", value = "ERROR" })
+			helpers.assert_eq(owned_committed, false, "an owned change without a file has no receipt and is refused")
+			helpers.assert_eq(read(path), nil, "and creates nothing")
 		end)
 	end)
 end

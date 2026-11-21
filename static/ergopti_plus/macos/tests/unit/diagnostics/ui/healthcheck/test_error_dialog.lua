@@ -39,7 +39,7 @@ local function load_dialog(controls)
 	for _, name in ipairs({
 		"diagnostics.ui.error_dialog", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "menu.engine.manifest_reader",
-		"core.lifecycle.engine.shutdown.termination_coordinator",
+		"core.lifecycle.engine.shutdown.termination_coordinator", "settings.engine.scope.script_scope",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -49,7 +49,15 @@ local function load_dialog(controls)
 
 	local context = {
 		timers = {}, scripts = {}, deleted = 0, released = 0, focused = 0, performed = {}, stored = {},
-		errors = {}, warnings = {},
+		errors = {}, warnings = {}, rewritten = {},
+	}
+	-- config.toml owns the row (script_config_authority): a change writes it
+	-- before the store, held or not. The file itself is the authority's test.
+	package.loaded["settings.engine.scope.script_scope"] = {
+		rewrite_configured = function(path, value)
+			context.rewritten[#context.rewritten + 1] = { path = path, value = value }
+			return true
+		end,
 	}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
@@ -380,6 +388,8 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		helpers.assert_eq(#context.timers, 0, "an unticked setting must keep every error quiet")
 		helpers.assert_true(dialog.set_enabled(true))
 		helpers.assert_eq(context.stored["script.show_error_dialog"], true, "the setting must persist")
+		helpers.assert_eq(context.rewritten, { { path = "script.show_error_dialog", value = true } },
+			"and config.toml is written first, so the next start keeps it")
 		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
 		helpers.assert_eq(#context.timers, 1, "ticked again, the error opens a window")
 	end)

@@ -50,7 +50,8 @@ function M.alias_names()
 	return names
 end
 
---- Makes config.toml's [script] rows win over the saved values at start.
+--- Makes config.toml's [script] rows win over the saved values at start, and
+--- clears the saved value of a row the file lacks (the locale excepted).
 --- Runs before the error window, the log level and i18n read their alias.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
@@ -59,8 +60,9 @@ function M.adopt_configured()
 		aliases = M.alias_names(), storage = require("core.fs.adapters.storage"), logger = Logger, log = "settings.engine.scope.script_scope" })
 end
 
---- Rewrites the config.toml row a menu or wizard change replaces, when the
---- file holds it, so the next start keeps the change. Call before storing it.
+--- Rewrites the config.toml row a menu or wizard change replaces (held or
+--- not, the locale only when held), so the next start keeps the change. Call
+--- before storing it.
 --- @param path string Canonical script path.
 --- @param value any New value.
 --- @return boolean committed
@@ -127,7 +129,9 @@ end
 
 function M.retry_locale() return M.retry_edit(ConfigKeys.KEY.SCRIPT_LOCALE) end
 
---- Atomically changes one native alias and any already configured source row.
+--- Atomically changes one native alias and its config.toml row: the row is
+--- written held or not, except the locale's, which is rewritten only when held
+--- (script_config_authority.file_owns_absence).
 --- @param key string Canonical script row.
 --- @param value any Native value admitted by the field owner.
 --- @return boolean committed
@@ -151,7 +155,11 @@ function M.edit_setting(key, value)
 		if type(decoded) ~= "table" then return false, "config.toml is not valid TOML" end
 		local script = decoded.script
 		if script ~= nil and type(script) ~= "table" then return false, "script configuration is not a table" end
-		return Writer.prepare_batch(target, script and script[field] ~= nil and updates or {}, files, source)
+		local held = script and script[field]
+		-- An absent row already reads as the neutral default: deleting it is no change.
+		local writes = held ~= nil or (require("settings.engine.scope.script_config_authority").file_owns_absence(key)
+			and Manifest.sparse_operation(key, value).delete ~= true)
+		return Writer.prepare_batch(target, writes and updates or {}, files, source)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
 		storage_backup_path = storage_backup,
