@@ -138,22 +138,33 @@ function M.new(options)
 			local defaults=declared_settings()
 			if defaults then combos=namespace(combos) else assert(type(combos)=="table") end
 			local delay,symmetric=combos.simultaneous_threshold_ms,combos.symmetric
-			-- A stored delay the shared value schema refuses is reported once, never
-			-- dropped silently; the chords stay off (fail closed, as before), since a
-			-- malformed setting must not become a delay on the original holds.
+			-- A stored delay the shared value schema refuses is reported, never
+			-- dropped silently, and the declared delay applies, as on Windows and
+			-- macOS (maintainer decision KCD-3 of 2026-11-21). A strict candidate,
+			-- a write being validated, still refuses it.
 			if delay~=nil then
 				local ValueCheck=require("settings.engine.value_check")
 				local checked=ValueCheck.check_value(ValueCheck.declaration(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS),delay)
-				if not checked.ok then
+				if not checked.ok and defaults and not strict then
 					require("settings.engine.migration.outdated").report(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,
-						string.format("%s is refused (%s, %s..%s ms); the key chords stay off until it is fixed", tostring(delay),
-							checked.reason, tostring(checked.min), tostring(checked.max)))
+						string.format("%s is refused (%s, %s..%s ms); the declared %s ms applies until it is fixed", tostring(delay),
+							checked.reason, tostring(checked.min), tostring(checked.max), tostring(defaults.simultaneous_threshold_ms)))
+					delay=nil
 				end
 			end
 			if delay==nil and defaults then delay=defaults.simultaneous_threshold_ms end
 			if symmetric==nil and defaults then symmetric=defaults.combo_symmetric end
 			local settings = Shared.chord_settings({ simultaneous_threshold_ms=delay,combo_symmetric=symmetric })
-			assert(combos.enabled==nil or type(combos.enabled)=="boolean")
+			-- The chords' own switch is on unless it says false, as on Windows
+			-- (_KeyCombinationChordBootEnabled) and macOS: a value that is not a
+			-- boolean is reported and the chords stay on (KCD-3).
+			local chords_on=combos.enabled
+			if chords_on~=nil and type(chords_on)~="boolean" then
+				assert(not strict,"chord switch must be an exact boolean")
+				Logger.warn("modules.shortcuts.key_combinations",
+					"[mod_combos] enabled = %s is not a boolean; the key chords stay on until it is fixed.", tostring(chords_on))
+				chords_on=nil
+			end
 			local configured=defaults and namespace(combos.config) or assert(combos.config)
 			assert(type(configured)=="table")
 			local chords,explicit={},false
@@ -175,7 +186,7 @@ function M.new(options)
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
 			assert(defaults or explicit)
-			return {chords=chords,settings=settings,enabled=combos.enabled~=false,defaults=defaults}
+			return {chords=chords,settings=settings,enabled=chords_on~=false,defaults=defaults}
 		end)
 		if strict and combos~=nil and (next(declarations)~=nil or type(combos)=="table" and combos.config~=nil) then
 			assert(normalized,"invalid known chord source")

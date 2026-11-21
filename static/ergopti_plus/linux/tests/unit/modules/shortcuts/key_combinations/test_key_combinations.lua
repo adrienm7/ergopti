@@ -1714,16 +1714,22 @@ helpers.describe("generated Linux defaults received by original native combinati
    if not called then error(detail,0) end
   end)
  end)
+ -- KCD-3 (maintainer decision of 2026-11-21): a refused delay or a switch that
+ -- is not a boolean is reported and the declared value applies, as on Windows
+ -- and macOS; the chords never all turn off for it.
  for _,stored in ipairs({'0','3.5','1001','"100"'}) do
-  helpers.it("reports a refused stored chord delay "..stored.." and keeps the chords off (value-validation)",function()
+  helpers.it("(kcd-3) reports a refused stored chord delay "..stored.." and applies the declared delay",function()
    local Outdated=require("settings.engine.migration.outdated")
    local original,reported=Outdated.report,{}
    Outdated.report=function(path,detail,...) reported[#reported+1]={path,detail};return original(path,detail,...) end
    local ok,err=pcall(with_public,{before_manager=function(s)
      s.bytes='[mod_combos]\nsimultaneous_threshold_ms='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
     end},function(s)
-    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1},"a refused delay never delays the original hold")
-    s.edge("a",58,0,1100)
+    helpers.assert_eq(s.owner.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    s.edge("a",58,1,1100)
+    helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}},"the declared delay runs the chord")
+    s.edge("a",15,0,1101);s.edge("a",58,0,1102)
    end)
    Outdated.report=original
    if not ok then error(err,0) end
@@ -1734,8 +1740,28 @@ helpers.describe("generated Linux defaults received by original native combinati
    helpers.assert_true(found,"the refused delay is reported, never dropped silently")
   end)
  end
+ for _,stored in ipairs({'"false"','0','1'}) do
+  helpers.it("(kcd-3) warns on a non-boolean chord switch "..stored.." and keeps the chords on",function()
+   local Logger=require("core.logger.engine.shim")
+   local original,warned=Logger.warn,{}
+   Logger.warn=function(scope,message,...) warned[#warned+1]=string.format(message,...);return original(scope,message,...) end
+   local ok,err=pcall(with_public,{before_manager=function(s)
+     s.bytes='[mod_combos]\nenabled='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+    end},function(s)
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    s.edge("a",58,1,1050)
+    helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}},"the chords stay on")
+    s.edge("a",15,0,1101);s.edge("a",58,0,1102)
+   end)
+   Logger.warn=original
+   if not ok then error(err,0) end
+   local found=false
+   for _,line in ipairs(warned) do if line:find("not a boolean",1,true) then found=true end end
+   helpers.assert_true(found,"the non-boolean switch is reported, never dropped silently")
+  end)
+ end
  for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
-  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
+  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n'}) do
   helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
    with_public({before_manager=function(s) s.bytes=text end},function(s)
     s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1})
