@@ -9,6 +9,7 @@
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 return function(callback)
 	return Scope.run(function()
@@ -41,8 +42,8 @@ return function(callback)
 				end
 			end
 		end
-		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
-		package.loaded["modules.keystats.sqlite_reader"] = {}
+		-- A present, empty store: a missing one publishes an incomplete history
+		EmptyStore.install()
 		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
 		local logger = package.loaded["core.logger.engine.logger"]

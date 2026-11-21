@@ -6,7 +6,8 @@
 --- Compose the real SQLite reader and incremental projection around a transient
 --- row-query refusal. A successful fingerprint must not certify the incomplete
 --- manifest that another statement produced, including during midnight extension.
---- Apps must also preserve its accepted cache until a complete retry succeeds.
+--- Apps must also preserve its accepted cache until a complete retry succeeds,
+--- while it shows the partial read flagged incomplete (MET-11).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -188,7 +189,7 @@ local function with_apps(callback)
 end
 
 helpers.describe("metrics-apps-manifest-refused-cache", function()
-	helpers.it("retries an incomplete cold read without publishing or certifying its revision", function()
+	helpers.it("retries an incomplete cold read, shown flagged, without saving or certifying its revision", function()
 		with_apps(function(dashboard, state, refresh, observed)
 			local saves, evaluations = observed()
 			local prior_revision = dashboard._manifest_rev
@@ -199,14 +200,14 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_cache, nil)
 			helpers.assert_eq(dashboard._manifest_rev, prior_revision)
 			helpers.assert_eq(select(1, observed()), saves, "an incomplete read cannot replace the disk snapshot")
-			helpers.assert_eq(select(2, observed()), evaluations, "an incomplete read cannot submit fresh WebKit data")
+			helpers.assert_eq(select(2, observed()), evaluations + 1, "the partial read is shown, flagged incomplete")
 			state.refuse = false
 			refresh()
 			helpers.assert_eq(state.reads[2].complete, true)
 			helpers.assert_eq(dashboard._manifest_rev, 1)
 			helpers.assert_eq(dashboard._manifest_cache[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves + 1)
-			helpers.assert_eq(select(2, observed()), evaluations + 1)
+			helpers.assert_eq(select(2, observed()), evaluations + 2)
 		end)
 	end)
 
@@ -223,7 +224,7 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_rev, 1)
 			helpers.assert_eq(prior[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves)
-			helpers.assert_eq(select(2, observed()), evaluations)
+			helpers.assert_eq(select(2, observed()), evaluations + 1, "the partial read is shown, flagged incomplete")
 			state.refuse = false
 			refresh(2)
 			helpers.assert_eq(#state.reads, 3, "a failed revision must not suppress its recovery read")
@@ -231,7 +232,7 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_rev, 2)
 			helpers.assert_eq(dashboard._manifest_cache[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves + 1)
-			helpers.assert_eq(select(2, observed()), evaluations + 1)
+			helpers.assert_eq(select(2, observed()), evaluations + 2)
 		end)
 	end)
 

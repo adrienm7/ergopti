@@ -166,6 +166,25 @@ test('untagged Windows and Linux calls retain their replacement behavior', () =>
 	assert.deepEqual(f.state(), [{ second: 1 }, { edited: 1 }, { second: 1 }]);
 });
 
+test('met-11: an incomplete macOS manifest says so until a complete one lands', () => {
+	const f = fixture();
+	const marks = [];
+	f.context.window.metrics_freshness = {
+		mark_incomplete: (part, incomplete) => marks.push([part, incomplete])
+	};
+	f.bootstrap({}, {}, {}, { ...revision(1, 1), manifest_incomplete: true });
+	f.bootstrap({ stale: 1 }, {}, {}, { ...revision(0, 0), manifest_incomplete: false });
+	f.bootstrap({ full: 1 }, {}, {}, revision(2, 2));
+	assert.deepEqual(
+		marks,
+		[
+			['manifest', true],
+			['manifest', false]
+		],
+		'each admitted manifest states its read, an older one changes nothing'
+	);
+});
+
 test('actual Lua fresh then cache JavaScript executes without rolling back state', () => {
 	const luaInput = `package.path='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;'..package.path
 local json=require('core.text.engine.json')

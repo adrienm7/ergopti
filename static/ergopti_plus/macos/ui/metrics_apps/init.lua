@@ -18,6 +18,12 @@
 ---    overwrites the cache once ready.
 --- 4. Format-stable: emits the legacy manifest shape so the frontend JS
 ---    keeps working without rewrite.
+--- 5. Incomplete reads are shown, never cached. A failed SQLite query, or a
+---    store that does not exist, still publishes what was read with
+---    `manifest_incomplete`, so the page says the history is incomplete, as
+---    Windows and Linux do; neither the manifest cache nor the disk snapshot
+---    keeps it (MET-11). The refusal it replaces left the disk snapshot, or an
+---    empty page, on screen without a notice.
 --- ==============================================================================
 
 local M = {}
@@ -68,6 +74,9 @@ local _closing_webview = nil
 local _focus_owner = nil
 local _usercontent = nil
 local _releasing_controller = false
+-- True while the last published manifest came from an incomplete read; pairs
+-- the warning with the recovery log.
+local _incomplete_reported = false
 
 --- Releases the exact native script callback before its controller is forgotten.
 --- @param controller userdata|table|nil Exact callback owner to release.
@@ -909,7 +918,7 @@ end
 --- @param categories_revision integer Captured category revision.
 --- @return boolean submitted Initial probe admission.
 local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label,
-	manifest_revision, categories_revision)
+	manifest_revision, categories_revision, manifest_incomplete)
 	local function retry()
 		if remaining <= 0 then
 			Logger.error(LOG, "Apps dashboard JavaScript readiness exhausted (%s).", label)
@@ -917,7 +926,7 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 		end
 		if not schedule_continuation(delay, generation, webview, function()
 			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label,
-				manifest_revision, categories_revision)
+				manifest_revision, categories_revision, manifest_incomplete)
 		end, "Apps dashboard bootstrap retry") then
 			close_window_generation(generation, webview, true, "bootstrap retry refusal")
 		end
@@ -925,8 +934,9 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 	local function publish()
 		-- Application names are data keys: JavaScript object literals treat
 		-- __proto__ specially, while JSON.parse preserves the exact own key.
-		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d});",
-			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision)
+		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d%s});",
+			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision,
+			manifest_incomplete == true and ",manifest_incomplete:true" or "")
 		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
 			if applied then
 				Logger.success(LOG, "Apps dashboard %s injected.", label)
@@ -956,27 +966,32 @@ local function load_and_inject(generation, webview)
 	local log_manager   = require("modules.keystats.log_manager")
 	local sqlite_reader = require("modules.keystats.sqlite_reader")
 	local sqlite_path   = log_manager.get_sqlite_path()
+	local manifest, complete = {}, false
 	if not sqlite_path or not fs.attributes(sqlite_path) then
-		Logger.warn(LOG, "db.sqlite not available — dashboard will display empty.")
-		return false
-	end
-
-	local rev = log_manager.get_db_rev()
-	local manifest
-	if M._manifest_cache and M._manifest_rev == rev then
-		Logger.done(LOG, "Manifest cache hit (rev %d).", rev)
-		manifest = M._manifest_cache
+		-- Nothing certifies that no rows exist: an empty history flagged incomplete
+		Logger.debug(LOG, "db.sqlite not available — publishing an empty history flagged incomplete.")
 	else
-		Logger.trace(LOG, "Manifest cache miss (rev %d) — querying SQLite…", rev)
-		local complete
-		manifest, complete = sqlite_reader.read_manifest(sqlite_path)
-		if complete ~= true then
-			Logger.warn(LOG, "Apps dashboard refresh refused because the SQLite projection is incomplete.")
-			return false
+		local rev = log_manager.get_db_rev()
+		if M._manifest_cache and M._manifest_rev == rev then
+			Logger.done(LOG, "Manifest cache hit (rev %d).", rev)
+			manifest, complete = M._manifest_cache, true
+		else
+			Logger.trace(LOG, "Manifest cache miss (rev %d) — querying SQLite…", rev)
+			manifest, complete = sqlite_reader.read_manifest(sqlite_path)
+			complete = complete == true
+			if complete then
+				M._manifest_cache = manifest
+				M._manifest_rev   = rev
+				Logger.done(LOG, "Manifest cached (rev %d).", rev)
+			end
 		end
-		M._manifest_cache = manifest
-		M._manifest_rev   = rev
-		Logger.done(LOG, "Manifest cached (rev %d).", rev)
+	end
+	if not complete and not _incomplete_reported then
+		_incomplete_reported = true
+		Logger.warn(LOG, "Apps dashboard history read incomplete; partial counts shown with a notice, not cached.")
+	elseif complete and _incomplete_reported then
+		_incomplete_reported = false
+		Logger.info(LOG, "Apps dashboard history read complete again; caching resumed.")
 	end
 	if not is_current_window(generation, webview) then return false end
 
@@ -1030,8 +1045,10 @@ local function load_and_inject(generation, webview)
 
 			inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
 				MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision,
-				categories_revision)
+				categories_revision, not complete)
 
+			-- Only a complete read may become the snapshot the next open paints
+			if not complete then return end
 			continue_load("Apps dashboard disk cache save", function()
 				save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json,
 					app_icons = app_icons_json })

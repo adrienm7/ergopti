@@ -27,7 +27,12 @@ const metricsAppsPublications = {
 		return true;
 	},
 
-	/** Publishes independently versioned native data and categories in this document. */
+	/**
+	 * Publishes independently versioned native data and categories in this
+	 * document. `revisions.manifest_incomplete` says the manifest came from an
+	 * incomplete read, so the page says so, as every other host's answer does
+	 * (MET-11).
+	 */
 	data(newManifest, newCategories, newIcons, revisions) {
 		if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions)) {
 			throw new TypeError('Metrics publication requires component revisions');
@@ -40,6 +45,12 @@ const metricsAppsPublications = {
 			appIcons = newIcons || {};
 			appliedManifestRevision = revisions.manifest_revision;
 			changed = true;
+			if (window.metrics_freshness) {
+				window.metrics_freshness.mark_incomplete(
+					'manifest',
+					revisions.manifest_incomplete === true
+				);
+			}
 		}
 		if (revisions.categories_revision > appliedCategoriesRevision) {
 			userCategories = newCategories || {};

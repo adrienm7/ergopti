@@ -11,6 +11,7 @@ local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
 local safe_read = require("tests.support.file_system_write_stub").read_with_status
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
 local VALID = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
@@ -56,10 +57,10 @@ helpers.describe("typing metrics cache reads", function()
 						codes[#codes + 1] = code
 						return self
 					end
-					package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
+					-- A present, empty store: a missing one is an incomplete read
+					EmptyStore.install(function()
 						fresh_reads = fresh_reads + 1
-						return nil
-					end
+					end)
 					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end

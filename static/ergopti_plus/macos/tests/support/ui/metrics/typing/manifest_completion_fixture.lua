@@ -114,7 +114,7 @@ function M.run(options, callback)
 end
 
 --- Runs public full/live publication and reopen around actual paced jobs.
---- @param options table Empty-source controls.
+--- @param options table Empty-source controls; `missing_store` leaves no db.sqlite.
 --- @param callback function Receives publication controls.
 --- @return ... Callback results.
 function M.with_publication(options, callback)
@@ -127,7 +127,7 @@ function M.with_publication(options, callback)
 				install_titles(state, controls)
 				package.loaded["hs.json"].encode, package.loaded["hs.json"].decode = Json.encode, Json.decode
 				package.loaded["hs.fs"].attributes = function(path)
-					if path == "/fixture/db.sqlite" then return { mode = "file" } end
+					if path == "/fixture/db.sqlite" and not options.missing_store then return { mode = "file" } end
 				end
 				package.loaded["hs.sqlite3"] = state.sqlite
 				package.loaded["modules.keystats.sqlite_reader"] = nil
