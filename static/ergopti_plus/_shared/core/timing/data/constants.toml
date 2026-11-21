@@ -1524,6 +1524,14 @@ number_row_level_text_bytes = 1024
 # 8 MiB leaves room for about 65 such releases.
 release_list_body_bytes = 8388608
 
+# Free space the managed Ollama runtime needs beyond its pinned archive before
+# its download starts (_shared/ai/data/ollama_install_errors.json): room for
+# the extracted runtime beside the archive. Windows also checks the expanded
+# size of the downloaded archive before extracting it (ollama_managed_files.ps1).
+# AHK: ai/engine/ollama/managed_bootstrap.ahk. LX: ai/engine/local_servers/runtime_composition.lua.
+# HS: ai/engine/ollama/managed_ollama_runtime.py (reads this file).
+ollama_install_free_space_margin_bytes = 1073741824
+
 # Largest release asset the Linux updater downloads (the AppImage or archive and
 # its signature) before it refuses the transfer. LX: modules/updater/manager.lua.
 update_asset_download_bytes = 268435456

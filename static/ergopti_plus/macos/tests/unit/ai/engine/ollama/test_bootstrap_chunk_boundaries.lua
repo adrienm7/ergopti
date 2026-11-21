@@ -13,7 +13,7 @@ local Fixture = require("tests.support.modules.llm.backends.ai_runtime_selection
 
 helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function()
 	helpers.it("recognizes a failure marker at every byte boundary", function()
-		local marker = "OLLAMA_ERROR_CHECKSUM"
+		local marker = "OLLAMA_INSTALL_FAILURE phase=install reason=checksum"
 		for boundary = 1, #marker - 1 do
 			Fixture.scoped(function()
 				local state = Fixture.new_state()
@@ -25,7 +25,7 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 				helpers.assert_true(task.stream(task, marker:sub(boundary + 1) .. "\r\n", ""))
 				task.done(1, "", "")
 				helpers.assert_eq(result, false)
-				helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.error_checksum"),
+				helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.install_error.checksum"),
 					"checksum cause must survive split at byte " .. boundary)
 			end)()
 		end
@@ -36,9 +36,9 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 		local checker = Fixture.load_ollama_checker(state)
 		helpers.assert_true(Fixture.start_verification(state, checker))
 		local task = state.tasks[1]
-		helpers.assert_true(task.stream(task, "OLLAMA_ERROR_CHECK", "stderr diagnostic\n"))
-		task.done(1, "SUM", "")
-		helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.error_checksum"))
+		helpers.assert_true(task.stream(task, "OLLAMA_INSTALL_FAILURE phase=install reason=check", "stderr diagnostic\n"))
+		task.done(78, "sum", "")
+		helpers.assert_eq(checker.get_failure_message(), require("core.i18n.engine.i18n").get("ollama.install_error.checksum"))
 	end))
 
 	helpers.it("assembles progress markers and diagnostic lines before presentation", Fixture.scoped(function()
@@ -63,6 +63,6 @@ helpers.describe("Ollama bootstrap framing (ollama-bootstrap-chunks)", function(
 		helpers.assert_eq(progress[1], 37)
 		helpers.assert_eq(#logs, 1, "protocol fragments must not appear as diagnostic lines")
 		helpers.assert_eq(logs[1], "Downloading archive")
-		task.done(1, "OLLAMA_ERROR_CHECKSUM\n", "")
+		task.done(78, "OLLAMA_INSTALL_FAILURE phase=install reason=checksum\n", "")
 	end))
 end)

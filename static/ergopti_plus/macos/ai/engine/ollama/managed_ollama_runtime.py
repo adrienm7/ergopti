@@ -2,6 +2,7 @@
 """Native ports for a source-qualified, runtime-only Ollama installation."""
 
 import argparse
+import errno
 import hashlib
 import importlib.util
 import json
@@ -334,6 +335,83 @@ def copy_verified(source, destination, expected_sha256, expected_bytes, deadline
         raise POLICY.RuntimeRefusal("checksum")
 
 
+def free_space_margin():
+    """Return the registry's free-space margin, [limits] of the shared timings.
+
+    _shared/ai/data/ollama_install_errors.json states the rule: the pinned
+    archive plus this margin must be free before the download starts (OLL-04).
+    """
+    import tomllib
+
+    registry = tomllib.loads(
+        (SHARED / "core/timing/data/constants.toml").read_text(encoding="utf-8")
+    )
+    margin = registry["limits"]["ollama_install_free_space_margin_bytes"]
+    if type(margin) is not int or margin < 0:
+        raise POLICY.RuntimeRefusal("registry")
+    return margin
+
+
+def fits(asset_bytes, margin_bytes, free_bytes):
+    """Tell whether the archive may start downloading; the rule of the shared corpus."""
+    for value in (asset_bytes, margin_bytes, free_bytes):
+        if type(value) is not int or value < 0:
+            raise POLICY.RuntimeRefusal("free_space")
+    return free_bytes >= asset_bytes + margin_bytes
+
+
+def free_bytes(path):
+    """Return the bytes free for the user on the volume of path's nearest existing folder."""
+    current = Path(path)
+    while not current.exists():
+        if current.parent == current:
+            raise POLICY.RuntimeRefusal("free_space")
+        current = current.parent
+    status = os.statvfs(current)
+    return status.f_bavail * status.f_frsize
+
+
+def require_free_space(directory, asset_bytes):
+    """Refuse the install before its download when the volume cannot hold it."""
+    available = free_bytes(directory)
+    margin = free_space_margin()
+    if not fits(asset_bytes, margin, available):
+        print(
+            "Managed Ollama runtime needs %d free bytes, %d are free."
+            % (asset_bytes + margin, available),
+            file=sys.stderr,
+        )
+        raise POLICY.RuntimeRefusal("install_disk_full")
+
+
+_EVIDENCE_WORD = re.compile(r"[a-z][a-z0-9_]{0,63}")
+
+
+def install_failure_evidence(error):
+    """Name a failed install with closed words only, never a path or a URL.
+
+    The driver reads the line after OLLAMA_INSTALL_FAILURE and classifies it
+    with _shared/ai/data/ollama_install_errors.json: `phase` is `download`
+    while the archive transfers, `reason` the refusal's fixed word, `errno`
+    the symbolic name of an operating-system error (ENOSPC, EACCES).
+    """
+    phase = getattr(error, "ergopti_install_phase", "install")
+    if isinstance(error, OSError):
+        reason = "oserror"
+    elif isinstance(error, subprocess.TimeoutExpired):
+        reason = "deadline"
+    else:
+        reason = getattr(error, "reason", None)
+        if reason is None and error.args:
+            reason = error.args[0]
+    if type(reason) is not str or _EVIDENCE_WORD.fullmatch(reason) is None:
+        reason = "unavailable"
+    words = ["phase=" + phase, "reason=" + reason]
+    if isinstance(error, OSError) and error.errno in errno.errorcode:
+        words.append("errno=" + errno.errorcode[error.errno])
+    return " ".join(words)
+
+
 def owned_directory():
     home = os.environ.get("HOME", "")
     if not home.startswith("/"):
@@ -558,6 +636,7 @@ def install(
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if target.parent.is_symlink():
         raise POLICY.RuntimeRefusal("runtime")
+    require_free_space(target.parent, asset["bytes"])
     with tempfile.TemporaryDirectory(prefix=".ollama-native-http-", dir=target.parent) as temporary:
         root = Path(temporary)
         archive = root / asset["filename"]
@@ -567,23 +646,28 @@ def install(
             or minimum_bytes_per_second <= 0
         ):
             raise POLICY.RuntimeRefusal("protocol")
-        if local_archive is not None:
-            copy_verified(local_archive, archive, asset["sha256"], asset["bytes"], deadline)
-        else:
-            request = functools.partial(
-                runtime_request,
-                connect_timeout=connect_timeout,
-                minimum_bytes_per_second=minimum_bytes_per_second,
-            )
-            BOOTSTRAP.download(
-                url,
-                archive,
-                asset["sha256"],
-                asset["bytes"],
-                deadline,
-                idle_timeout,
-                request=request,
-            )
+        try:
+            if local_archive is not None:
+                copy_verified(local_archive, archive, asset["sha256"], asset["bytes"], deadline)
+            else:
+                request = functools.partial(
+                    runtime_request,
+                    connect_timeout=connect_timeout,
+                    minimum_bytes_per_second=minimum_bytes_per_second,
+                )
+                BOOTSTRAP.download(
+                    url,
+                    archive,
+                    asset["sha256"],
+                    asset["bytes"],
+                    deadline,
+                    idle_timeout,
+                    request=request,
+                )
+        except BaseException as error:
+            # Names the transfer in the failure evidence (install_failure_evidence).
+            error.ergopti_install_phase = "download"
+            raise
         stage = root / "runtime"
         stage.mkdir(mode=0o700)
         with tarfile.open(archive) as source:
@@ -773,6 +857,9 @@ if __name__ == "__main__":
         TypeError,
         KeyError,
         subprocess.TimeoutExpired,
-    ):
+    ) as error:
+        if arguments.action == "install":
+            # The driver shows the class of this line (ai/engine/ollama/deps_checker.lua).
+            print("OLLAMA_INSTALL_FAILURE " + install_failure_evidence(error), flush=True)
         print("Managed Ollama runtime admission refused.", file=sys.stderr)
         raise SystemExit(78)

@@ -204,11 +204,11 @@ helpers.describe("Ollama downloads only on its selection (ai-runtime-ollama)", f
 		checker = load_ollama_checker(state)
 		package.loaded["ui.download_window"] = window
 		helpers.assert_true(Fixture.start_verification(state, checker))
-		state.tasks[1].done(1, "OLLAMA_INSTALLING\nOLLAMA_ERROR_CHECKSUM\n",
-			"[OLLAMA-DEPS] ERROR: Ollama archive SHA-256 checksum mismatch; refusing extraction.\n")
+		state.tasks[1].done(78, "OLLAMA_INSTALLING\nOLLAMA_INSTALL_FAILURE phase=download reason=integrity\n",
+			"Managed Ollama runtime admission refused.\n")
 		helpers.assert_eq(checker.get_state(), "failed")
 		helpers.assert_eq(checker.get_failure_message(),
-			require("core.i18n.engine.i18n").get("ollama.error_checksum"))
+			require("core.i18n.engine.i18n").get("ollama.install_error.checksum"))
 	end))
 
 	helpers.it("(ollama-install-stream-error) retains a split streamed failure when completion has no bytes", scoped(function()

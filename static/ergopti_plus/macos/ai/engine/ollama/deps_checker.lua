@@ -40,6 +40,7 @@ local PtyProcessGroup = require("ai.engine.bootstrap.pty_process_group")
 local PythonInterpreter = require("ai.adapters.python_interpreter")
 local ExitSignal = require("ai.engine.bootstrap.exit_signal")
 local DevSource = require("core.lifecycle.engine.dev_source")
+local InstallErrorMessages = require("ai.engine.ollama.install_error_messages")
 
 local LOG = "ollama_deps"
 
@@ -59,12 +60,11 @@ local PROGRESS_LABELS = {
 	[MARKER_READY]      = i18n.get("ollama.deps_step_ready"),
 }
 
--- Failure markers the script prints before exiting, mapped to the localized
--- explanation the user sees instead of the English script tail.
-local FAILURE_MESSAGES = {
-	OLLAMA_ERROR_NETWORK  = "ollama.error_network",
-	OLLAMA_ERROR_CHECKSUM = "ollama.error_checksum",
-}
+-- The evidence line ai/engine/ollama/managed_ollama_runtime.py prints before a
+-- failed install exits 78: closed words the shared install-error classes turn
+-- into the localized cause (a full disk, the network, a corrupted download),
+-- _shared/ai/data/ollama_install_errors.json (OLL-05).
+local INSTALL_FAILURE_PATTERN = "^OLLAMA_INSTALL_FAILURE (%S.*)$"
 
 -- Exit codes that carry a closed cause without printing a marker. 64 (EX_USAGE)
 -- is the launcher's managed PTY worker or the managed runtime receiver refusing
@@ -87,7 +87,6 @@ local KNOWN_MARKERS = {
 	[MARKER_STARTING]   = true,
 	[MARKER_READY]      = true,
 }
-for marker, _ in pairs(FAILURE_MESSAGES) do KNOWN_MARKERS[marker] = true end
 
 local FAILURE_TAIL_CHARS    = 280
 -- Output lines a failed bootstrap logs, so the log names where it stopped.
@@ -105,8 +104,8 @@ local _daemon_state         = "pending"
 local _last_daemon_failure_message = nil
 local _native_pty_preflight_owner = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
--- Last failure marker the running script printed, read at its terminal.
-local _observed_failure_marker = nil
+-- Last install failure evidence the running script printed, read at its terminal.
+local _observed_install_failure = nil
 
 -- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
 -- it goes out of scope as soon as the spawning function returns while the
@@ -185,8 +184,9 @@ local function forward_chunk(chunk, is_current, owns_ui)
 	owns_ui = type(owns_ui) == "function" and owns_ui or function() return false end
 	for line in chunk:gmatch("([^\n\r]+)") do
 		local percent = line:match(DOWNLOAD_PROGRESS_PATTERN)
-		if FAILURE_MESSAGES[line] then
-			_observed_failure_marker = line
+		local install_failure = line:match(INSTALL_FAILURE_PATTERN)
+		if install_failure then
+			_observed_install_failure = install_failure
 		elseif percent then
 			if not is_current() then return false end
 			if owns_ui() then pcall(llm_progress.set_progress, tonumber(percent)) end
@@ -828,7 +828,12 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		if exit_code ~= 0 then
 			local signal_name = ExitSignal.name(exit_code)
 			log_failure_evidence(exit_code, signal_name)
-			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+			local install_key, install_class
+			if _observed_install_failure then
+				install_key, install_class = InstallErrorMessages.for_evidence(_observed_install_failure)
+				Logger.error(LOG, "Ollama install failed with class %s: %s.", install_class, _observed_install_failure)
+			end
+			local failure_key = install_key
 				or developer_catalogue_failure(exit_code, diagnostic_tail.lines())
 				or EXIT_FAILURE_MESSAGES[exit_code]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
@@ -1014,7 +1019,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		return consume_stream(table.unpack(args, 1, args.n))
 	end
 
-	_observed_failure_marker = nil
+	_observed_install_failure = nil
 	local task_executable, task_arguments = python_bin,
 		{ "-u", pty_wrapper_path, "/bin/bash", script_path, resolved_bin or "", install_dir or "", python_bin }
 	if native_pty ~= nil then task_executable, task_arguments = native_pty.executable, native_pty.arguments end
