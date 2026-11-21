@@ -32,13 +32,13 @@ try {
 	assert.equal(result.error, undefined, 'The actual controlled Python child must start.');
 	assert.equal(result.signal, null, 'The controls must retire within their original bound.');
 	assert.equal(result.status, 0, result.stderr || result.stdout);
-	assert.match(result.stderr, /\bRan 23 tests in [0-9.]+s\b/);
+	assert.match(result.stderr, /\bRan 24 tests in [0-9.]+s\b/);
 	assert.match(result.stderr, /^OK\r?$/m);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 	process.stdout.write(result.stdout);
 	process.stdout.write(result.stderr);
 	console.log(
-		'Controlled software only: source approval was not issued; native receiving is UNRUN.'
+		'Controlled software only: the committed test approval is checked as data; native receiving is UNRUN.'
 	);
 } finally {
 	// A timed-out child cannot establish that its scratch namespace is unused.

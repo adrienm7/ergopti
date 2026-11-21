@@ -22,6 +22,7 @@ TEST_SHA = "769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca"
 TEST_BLOB = "7b09f33223047361ed1d6bbfd2c6465574e8aa2b"
 BASE = REPOSITORY / "tools/diagnostics/fixtures/number-row-native-causal"
 NETWORK = REPOSITORY / "tools/diagnostics/fixtures/number-row-current-network"
+CURRENT = REPOSITORY / "tools/diagnostics/fixtures/number-row-current-test"
 BASE_SHA = "47b2dc03e558db6418234ab6c69a279cc91fd9c29bc587505e13ea0989764549"
 NETWORK_SHA = "6f313f6afb2f6bee59a9c8e5a728c0d12b8f765dd8af9bff029595faea4aef6c"
 
@@ -274,6 +275,23 @@ class CurrentFixtureControls(unittest.TestCase):
             record = {**self.record, field: value}
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.contract(record)
+
+    def test_committed_approval_binds_the_reviewed_image_and_its_review(self):
+        # The maintainer's 2026-11-21 record must keep admitting the pinned image;
+        # a pin moved without a new review and approval fails here.
+        approval = CURRENT / "test-source-approval.json.raw"
+        review_bytes = (CURRENT / "test-source-review.json.raw").read_bytes()
+        record = json.loads(approval.read_bytes())
+        review = json.loads(review_bytes)
+        self.assertEqual(record["source_review_sha256"], hashlib.sha256(review_bytes).hexdigest())
+        for field in ("published_source_commit", "path", "git_blob", "sha256"):
+            self.assertEqual(record[field], review[field])
+        self.assertEqual(review["decision"], "accepted")
+        self.assertEqual(record["causal_assertion_line"], subject.CURRENT_ASSERTION_LINE)
+        _, approved, composition = self.contract(record)
+        self.assertEqual(approved["approvals"][-1], record)
+        row = next(row for row in composition["paths"] if row["path"] == subject.TEST_PATH)
+        self.assertEqual((row["git_blob"], row["sha256"]), (TEST_BLOB, TEST_SHA))
 
     def test_extra_or_missing_approval_field_refuses(self):
         missing = dict(self.record)

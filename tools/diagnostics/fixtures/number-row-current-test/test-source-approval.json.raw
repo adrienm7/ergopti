@@ -1,0 +1,13 @@
+{
+  "causal_assertion_line": 339,
+  "causal_method": "testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject",
+  "git_blob": "7b09f33223047361ed1d6bbfd2c6465574e8aa2b",
+  "original_git_blob": "3bf755b30f2a8ab1a1669d387ac9289f0746a1e4",
+  "original_sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3",
+  "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift",
+  "published_source_commit": "22e1017c6a041728c8c3480e3851d2e9476d98b7",
+  "role": "independently-reviewed-current-number-row-test",
+  "schema": 1,
+  "sha256": "769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca",
+  "source_review_sha256": "92104346703f86499ec3ead4b8cc93744f0cd6159be4116614e97e74f94feec0"
+}
