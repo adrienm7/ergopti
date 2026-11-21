@@ -25,6 +25,7 @@ local VALUES = {
 	number_row_level_text_bytes = 1024,
 	release_list_body_bytes = 8388608,
 	ollama_install_free_space_margin_bytes = 1073741824,
+	ollama_install_errors_file_bytes = 65536,
 	update_asset_download_bytes = 268435456,
 	ollama_runtime_seal_bytes = 131072,
 	file_digest_output_bytes = 1024,

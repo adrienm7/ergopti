@@ -1398,7 +1398,7 @@ class OllamaManagedBootstrap {
 		try Free := this.Port is Map ? this.Port["free_bytes"].Call(Root) : LLM_OllamaInstallFreeBytes(Root)
 		catch as Err {
 			LoggerError("LLM.managed", "The managed root's free space is unreadable: {1}.", Err.Message)
-			this._Fail("free_space_unreadable", LLM_OllamaInstallErrorKey(LLM_OLLAMA_INSTALL_ERROR_UNKNOWN))
+			this._Fail("free_space_unreadable", LLM_OllamaInstallErrorKey(LLM_OllamaInstallErrors()["unmatched"]))
 			return false
 		}
 		if LLM_OllamaInstallFits(Space["asset_bytes"], Space["unpacked_bytes"], Space["margin_bytes"], Free)

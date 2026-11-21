@@ -1534,6 +1534,10 @@ release_list_body_bytes = 8388608
 # HS: ai/engine/ollama/managed_ollama_runtime.py (reads this file).
 ollama_install_free_space_margin_bytes = 1073741824
 
+# Largest _shared/ai/data/ollama_install_errors.json the Windows driver reads: a
+# few dozen class rows. AHK: ai/engine/ollama/install_errors.ahk.
+ollama_install_errors_file_bytes = 65536
+
 # Largest release asset the Linux updater downloads (the AppImage or archive and
 # its signature) before it refuses the transfer. LX: modules/updater/manager.lua.
 update_asset_download_bytes = 268435456

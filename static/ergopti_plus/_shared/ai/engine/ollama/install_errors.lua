@@ -13,9 +13,6 @@
 
 local M = {}
 
---- The class an install failure shows when no row of the data file matches.
-M.UNKNOWN = "unknown"
-
 --- Admits the decoded data file; a malformed one is a broken install.
 --- @param data table Decoded ollama_install_errors.json.
 --- @return table classifier { classify(evidence), message_key(class), pull_failure(pull_class) }.
@@ -24,8 +21,10 @@ function M.new(data)
 		or type(data.classes) ~= "table" or #data.classes == 0 then
 		error("ollama_install_errors.json is malformed", 2)
 	end
-	if type(data.messages[M.UNKNOWN]) ~= "string" then
-		error("ollama_install_errors.json names no message for its unknown class", 2)
+	-- The class an install failure shows when no row matches.
+	local unmatched = data.unmatched
+	if type(unmatched) ~= "string" or type(data.messages[unmatched]) ~= "string" then
+		error("ollama_install_errors.json names no message for its unmatched class", 2)
 	end
 	local rows = {}
 	for index, row in ipairs(data.classes) do
@@ -66,14 +65,14 @@ function M.new(data)
 
 	--- Names the class of one failure, first matching row wins.
 	--- @param evidence string The driver's evidence line.
-	--- @return string class A class of the data file, "unknown" when no row matches.
+	--- @return string class A class of the data file, the unmatched one when no row matches.
 	function classifier.classify(evidence)
 		if type(evidence) ~= "string" then error("install failure evidence must be a string", 2) end
 		local lowered = evidence:lower()
 		for _, row in ipairs(rows) do
 			if lowered:find(row[1], 1, true) then return row[2] end
 		end
-		return M.UNKNOWN
+		return unmatched
 	end
 
 	--- The locale key a class shows.
