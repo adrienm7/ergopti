@@ -1455,6 +1455,88 @@ check('every host names the shortcut menu file the page counts', () => {
 	);
 });
 
+// =========================================
+// =========================================
+// ======= Localized host refusals =========
+// =========================================
+// =========================================
+
+const TREE = path.resolve(SHARED, '..');
+
+/** Every code of one source matching a pattern, as a sorted list. */
+function codesIn(relative, pattern) {
+	const text = fs.readFileSync(path.join(TREE, relative), 'utf8');
+	return [...text.matchAll(pattern)].map((match) => match[1]).sort();
+}
+
+/**
+ * The refusal codes a host answers the Studio's Install, Emulate, Save,
+ * Download and Apply with: the shared composer's (composer.lua, which the
+ * Windows composer repeats), the layout defaults' composer and source
+ * failures, and the busy code of the three registries.
+ * @returns {string[]}
+ */
+function hostRefusalCodes() {
+	const composer = codesIn(
+		'_shared/layouts/engine/composer/composer.lua',
+		/^M\.FAILURE_\w+ = "([a-z_]+)"/gm
+	);
+	assert.ok(composer.length >= 3, 'composer.lua declares its failure codes');
+	assert.deepEqual(
+		codesIn(
+			'windows/ui/layout_manager/composer.ahk',
+			/^global LAYOUT_COMPOSER_FAILURE_\w+ := "([a-z_]+)"/gm
+		),
+		composer,
+		'the Windows composer answers with the shared composer codes'
+	);
+	const busy = [
+		...codesIn(
+			'windows/modules/keymap/keylayout/layout_catalogue.ahk',
+			/^global LAYOUT_CATALOGUE_FAILURE_BUSY := "([a-z_]+)"/gm
+		),
+		...codesIn('macos/modules/keymap/layout_registry.lua', /^M\.FAILURE_BUSY = "([a-z_]+)"/gm),
+		...codesIn('linux/modules/keymap/layout_registry.lua', /^M\.FAILURE_BUSY = "([a-z_]+)"/gm)
+	];
+	assert.deepEqual(busy, ['busy', 'busy', 'busy'], 'the three registries share the busy code');
+	const defaults = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'layouts/data/defaults.json'), 'utf8')
+	);
+	return [
+		...new Set([
+			...composer,
+			...Object.values(defaults.composer.failures),
+			...Object.values(defaults.source.failures),
+			busy[0]
+		])
+	].sort();
+}
+
+/** The codes of a list without `layout_editor.error.<code>` in one locale. */
+function unwordedCodes(codes, strings) {
+	return codes.filter((code) => {
+		const text = strings['layout_editor.error.' + code];
+		return typeof text !== 'string' || text.trim() === '';
+	});
+}
+
+// A host refusal without its own text read « Refused (write_failed). » in the
+// editor (problemText's error.generic), on the three hosts (LTP-05).
+check('(ltp-05) every refusal a host answers the Studio with has its text in every locale', () => {
+	const codes = hostRefusalCodes();
+	for (const code of ['invalid', 'write_failed', 'use_failed', 'source_invalid_file', 'busy'])
+		assert.ok(codes.includes(code), `${code} is a host refusal`);
+	for (const code of LOCALES)
+		assert.deepEqual(
+			unwordedCodes(codes, locale(code)),
+			[],
+			`${code}.json words every host refusal`
+		);
+	const english = { ...locale('en') };
+	delete english['layout_editor.error.use_failed'];
+	assert.deepEqual(unwordedCodes(codes, english), ['use_failed'], 'a missing text is named');
+});
+
 Promise.all(pending).then(() => {
 	console.log(`\n${passes} passed, ${failures} failed`);
 	if (failures > 0) process.exit(1);
