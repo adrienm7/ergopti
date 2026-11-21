@@ -1200,7 +1200,9 @@ async function exerciseForeignFiles(page) {
 		'the export section says why .kbe is not offered'
 	);
 	// (editor-reads-klanext-and-kbe) A KLAnext ErgoDox file opens and names the
-	// keys the ISO board lacks; a KbdEdit .kbe is recognised and refused with its reason.
+	// keys the board lacks (every ErgoDox letter key has a place since the full
+	// ErgoDox model; KLA's Delete and Command keys do not); a KbdEdit .kbe is
+	// recognised and refused with its reason.
 	assert.match(await page.getAttribute('#le-open-file', 'accept'), /\.kbe/);
 	await page.setInputFiles(
 		'#le-open-file',
@@ -1209,7 +1211,7 @@ async function exerciseForeignFiles(page) {
 	await page.waitForFunction(() =>
 		/ergodox\.json/.test((document.getElementById('le-message') || {}).textContent || '')
 	);
-	assert.match(await page.textContent('#le-message'), /key 39 \(z Z % ‰\) has no place/);
+	assert.match(await page.textContent('#le-message'), /key 65 \(⌦\) has no place/);
 	await page.setInputFiles(
 		'#le-open-file',
 		path.join(ROOT, 'static', 'layouts', 'registry', 'bepo', 'kbdedit', 'French_Standard_BEPO.kbe')
