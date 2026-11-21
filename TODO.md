@@ -870,37 +870,15 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
      starting a new one, a read deadline added), then implement ([CODE]).
   2. Keep one process per query: 30 ms at boot is accepted.
   3. Link `libsqlite3` through FFI, the largest saving, which breaks the driver's rule of never linking SQLite.
-- [ ] **Wikisource texts as corpora: under which licence?** The built-in books come from Project Gutenberg
-      (`static/corpus/text_sources.json`). Wikisource publishes its pages under CC BY-SA 4.0, while the works it
-      transcribes are in the public domain and a faithful transcription arguably adds no new right. Kept meanwhile:
-      no Wikisource text.
-  1. **(recommended) Ship Wikisource texts as CC BY-SA 4.0,** the stricter reading, as the Wikipedia articles already
-     are: only for a public-domain work Project Gutenberg lacks (author dead over 70 years, published before the US
-     cut-off), each register entry naming the pages and revisions read and « Wikisource contributors » ([CODE]).
-  2. Ship them as public domain, crediting Wikisource as the source only.
-  3. No Wikisource: Project Gutenberg only.
-- [ ] **An e-mail or chat corpus?** No candidate is cleared: the Enron mails hold personal data, the Ubuntu IRC logs'
-      licence is unchecked, Wikipedia talk pages (CC BY-SA) sign each message with a user name. Tatoeba's short
-      sentences are the conversational register meanwhile.
-  1. **(recommended) None for now:** Tatoeba stays the conversational register until a source with a clear licence
-     and no personal data is found.
-  2. Check the Ubuntu IRC logs' licence and, if it allows shipping, import a bounded sample with nicknames replaced
-     ([CODE]).
-  3. Wikipedia talk pages under CC BY-SA 4.0 with the signatures stripped ([CODE]).
-- [ ] **Norvig's n-gram counts? (decided by the agent on 2026-11-17, to review by the maintainer)** norvig.com/ngrams
-      gives its code under MIT but no licence for its data files, which it says are « derived from the Google Web
-      Trillion Word Corpus », distributed by the Linguistic Data Consortium under its own licence. Kept meanwhile:
-      not imported; the Leipzig and Google Books tables cover the same need.
-  1. **(recommended) Leave them out:** nothing read allows shipping counts derived from an LDC corpus.
-  2. Ask Peter Norvig under which licence the counts may ship, then import them ([CODE]).
-- [ ] **Tatoeba's full exports as count tables? (decided by the agent on 2026-11-17, to review by the maintainer)**
-      Tatoeba's sentences are CC BY 2.0 FR, whose one condition is to credit each sentence's author; a count table
-      holds no sentence, so its authors could only be credited together. Kept meanwhile: the 30,000-sentence
-      samples, which name each author on its line.
-  1. **(recommended) Import counts of every French and English sentence,** crediting « Tatoeba contributors » with
-     a link to the export that names each author ([CODE]).
-  2. The same, with the export's author list shipped beside each table ([CODE]).
-  3. Keep the samples only.
+- [ ] **A French chat corpus?** The chat corpus shipped on 2026-11-21 is English only (Taskmaster-1's written
+      dialogs, CC BY 4.0); Tatoeba's sentences stay the French conversational register. Candidates, none cleared,
+      none downloaded: CoMeRe (Ortolang, chats and forums; licence per sub-corpus, unchecked; pseudonymised user
+      names), 88milSMS (Montpellier, anonymised SMS; licence unchecked; private messages), the Claire French
+      Dialogue Dataset (OpenLLM-France; mostly CC BY-NC-SA, transcribed speech, not typed). Never Enron or any
+      corpus holding personal data. Kept meanwhile: no French chat corpus.
+  1. **(recommended) Check CoMeRe's per-corpus licences** and import, as a count table, a sub-corpus under a free
+     licence whose user names are already pseudonymised ([CODE]).
+  2. Keep Tatoeba as the French conversational register.
 - [ ] **Key-combination parity decisions KCD-1 to KCD-8 (2026-11-17 pass).** Kept meanwhile: each OS as it is.
   - KCD-1, « Copy tap → combo » under symmetry: Windows writes only the earlier order's chord
     (`KeyCombinationChordCopyRows`), macOS and Linux (shared `plan_chord_copy`) every order's own chord, which

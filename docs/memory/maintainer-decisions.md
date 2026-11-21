@@ -1907,3 +1907,26 @@ chip about 1.7 ms (1.1 to 2.2); the switch-off row itself is unchanged
 A new glyph must come from a block that
 Segoe UI Symbol, the macOS system fonts and DejaVu Sans all draw (Dingbats,
 Geometric Shapes, General Punctuation).
+
+## Wikisource, Norvig, Tatoeba and chat corpora (2026-11-21)
+
+- **Wikisource: yes, as CC BY-SA 4.0.** French Wikisource texts ship under
+  Wikisource's page licence, the stricter reading of a public-domain
+  transcription, crediting the author and « Wikisource contributors », the
+  register note naming the pages and revisions read. Only works the
+  Project Gutenberg corpora lack, in the public domain in the US (published
+  before 1931) and the EU (author dead more than 70 years). They go through
+  `tools/build/import-corpus-texts.cjs` (`wikisource_texts`), which pins the
+  extracted text, not the parser's HTML (it carries render ids).
+- **Norvig's counts and Tatoeba's full exports: both imported** as count
+  tables through `tools/build/import-count-tables.cjs`. Norvig's
+  `count_1w.txt` ships although norvig.com states no licence for its data
+  (derived from Google's Web 1T, LDC2006T13): the register says so and credits
+  Norvig and Brants and Franz. Tatoeba's exports (CC BY 2.0 FR) credit
+  « Tatoeba contributors » together, with a link to the export that names each
+  sentence's author; Tatoeba rewrites them weekly, so their archives are kept
+  to rebuild a table. Do not reopen either licence question.
+- **Chat corpus: free licence, no personal data.** Never Enron or any corpus
+  holding personal data. Taskmaster-1's written self-dialogs (CC BY 4.0,
+  role-play by crowd workers, no worker ids) ship as an English count table;
+  a French chat corpus is still open in TODO.md.
