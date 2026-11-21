@@ -436,13 +436,15 @@ LayoutEditorWindow_LuaExport(Payload, Deps) {
 			LoggerInfo("LayoutEditorWindow", "Export step {1} ended.", Step)
 			return Answer(true, Map("output", Stdout))
 		}
-		; A refusal is one « code<TAB>detail » line on stdout.
+		; A refusal is one « code<TAB>detail » line on stdout. The page names the
+		; layout defaults' export code alone, the one the macOS and Linux hosts
+		; answer: the host's own lua_export_host stays in the log and the detail.
 		Line := Trim(StrSplit(Stdout, "`n")[1], "`r ")
 		Parts := StrSplit(Line, "`t", , 2)
-		Code := (Parts.Length == 2 && RegExMatch(Parts[1], "^[a-z_]+$")) ? Parts[1] : Failure
+		HostCode := Parts.Length == 2 ? Parts[1] : "exit " . ExitCode
 		Detail := Parts.Length == 2 ? Parts[2] : "the export step host exited " . ExitCode
-		LoggerWarn("LayoutEditorWindow", "Export step {1} refused ({2}): {3}.", Step, Code, Detail)
-		return Answer(false, Map("code", Code, "detail", Detail))
+		LoggerWarn("LayoutEditorWindow", "Export step {1} refused ({2}): {3}.", Step, HostCode, Detail)
+		return Answer(false, Map("code", Failure, "detail", Detail))
 	}
 	TimedOut(*) {
 		if State["done"]

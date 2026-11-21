@@ -865,12 +865,22 @@ _KLRSource_LuaExportRuns() {
 		Log["spawned"]["done"].Call(0, "{}", "")
 		AssertEqual(3, Log["pushed"].Length, "a stopped step answers once")
 
+		; SNU-07: the host's own failure reaches the page as the export code the
+		; macOS and Linux hosts answer (layout_editor.error.target_export_refused),
+		; never as lua_export_host, which no locale names.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 11, "step", "xkb",
+			"input", "{}"), Deps))
+		Log["spawned"]["done"].Call(3, "lua_export_host`tmodule layouts.engine.composer.export_step cannot be opened`n", "")
+		AssertContains(Log["pushed"][4], '"code":"target_export_refused"', "the page receives the shared export code")
+		AssertFalse(InStr(Log["pushed"][4], "lua_export_host"), "the host's own code stays out of the page")
+		AssertContains(Log["pushed"][4], "cannot be opened", "the detail keeps the host's cause")
+
 		; A host that does not start is refused at once, its input removed.
 		Log["start_ok"] := false
 		Removed := Log["removed"].Length
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 10, "step", "xkb",
 			"input", "{}"), Deps))
-		AssertContains(Log["pushed"][4], "could not be started")
+		AssertContains(Log["pushed"][5], "could not be started")
 		AssertEqual(Removed + 1, Log["removed"].Length)
 	} finally {
 		DirDelete(Dir, true)
