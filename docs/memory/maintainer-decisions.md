@@ -392,6 +392,42 @@ Decided by the maintainer on 2026-11-21, from
   Linux's exact-case one-letter rules (Linux and Windows now register one rule
   per typed case) and the case folding of Windows and macOS.
 
+## Key combinations: one behaviour on the three OS (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (KCD-1 to KCD-8 of
+`docs/audits/platform-parity/2026-11-17-key-combinations-bindings/report.md`).
+No migration was kept: an old macOS `[mod_combos] enabled = false` now turns
+off only the chords.
+
+- KCD-1: « Copy tap → combo » under symmetry writes each order's own chord on
+  the three OS, the shared `plan_chord_copy` rule; Windows
+  `KeyCombinationChordCopyRows` follows it. Vectors:
+  `_shared/tests/corpus/tap_hold/key_combination_chord_copy.json`.
+- KCD-2: macOS keeps admitting a program launch and the monitor Alt-Tab in a
+  chord (Karabiner runs them). The Windows and Linux chord pickers grey both
+  with `platform_reason.chord_runs_no_program_or_monitor_switch`, read from
+  the `chord_reason_<driver>` fields of `actions.toml`.
+- KCD-3: a refused `[mod_combos]` delay or a non-boolean `enabled` is
+  reported and the declared value applies on Linux, as on Windows and macOS;
+  the chords no longer all turn off.
+- KCD-4: the Linux menu offers the one-shot Shift as a pair's tap; a chord
+  still refuses it everywhere.
+- KCD-5: under symmetry the macOS menu lists every ordered pair with its own
+  tap and hold; only the chord row is shared, with the pair that owns it.
+- KCD-6: `category_enabled.key_combinations` is the master switch on the
+  three OS and `[mod_combos] enabled` covers only the chords.
+- KCD-7: Linux admits a pair or a chord whose keys are on two keyboards. The
+  engine combines the presses of different devices; each key is still
+  released on the keyboard that pressed it, and the grab and privacy rules
+  are unchanged.
+- KCD-8: every menu lays out the pair rows the Windows way: one submenu per
+  first key, then « First + Second : summary », the pair's own menu in the
+  order tap, hold, chord. The summary names each assigned slot in that order,
+  chord included, joined by « / », or « disabled » when none is:
+  `_shared/tap_hold/engine/combination_labels.lua` `summary` and Windows
+  `KeyCombinationPairSummary`, both replaying
+  `_shared/tests/corpus/tap_hold/key_combination_pair_rows.json`.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in

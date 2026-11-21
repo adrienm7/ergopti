@@ -33,7 +33,9 @@ as its own `shortcuts.pause_layer_wheel` step. Regression: `test_layer_wheel_own
 
 ## Open
 
-KCD-1 to KCD-8, BND-1, BND-2 and KCH-1 as listed in TODO.md « Maintainer decisions pending » and « Parity audit ».
+BND-1, BND-2 and KCH-1 as listed in TODO.md « Maintainer decisions pending » and « Parity audit ». KCD-1 to KCD-8
+were decided by the maintainer on November 21, 2026 and delivered (docs/memory/maintainer-decisions.md « Key
+combinations: one behaviour on the three OS »).
 
 ## Refuted
 

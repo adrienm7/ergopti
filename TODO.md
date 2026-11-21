@@ -934,3 +934,9 @@ Each question names the default kept meanwhile; an answer moves into the item or
   - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
     1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
     2. Leave each OS's menu as it is.
+- [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
+      ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
+      the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
+      cascade ([report](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): HCD-1 an expired best
+      candidate (macOS falls to a lower rule), HCD-2 a bare `:` or `;` ends a trigger on macOS only, HCD-4 the delay
+      on `@` tags, HCD-5 an uppercase one-letter tag (privacy). Each report names the default kept meanwhile.
