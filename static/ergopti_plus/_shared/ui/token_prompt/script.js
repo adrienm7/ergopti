@@ -48,7 +48,7 @@ window.addEventListener('load', function () {
 
 // Escape cancels, as on every other prompt page; a composition keeps its own Escape
 document.addEventListener('keydown', function (e) {
-	if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented) return;
+	if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229 || e.defaultPrevented) return;
 	e.preventDefault();
 	doCancel();
 });

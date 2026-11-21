@@ -81,6 +81,14 @@
 			post({ action: action, session: state ? state.session : '' });
 		});
 	});
+	// Escape closes, as the Close button does: the page holds the keyboard, so
+	// no host window sees the key. An IME composition keeps its own Escape.
+	document.addEventListener('keydown', function (event) {
+		if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+		if (event.defaultPrevented) return;
+		event.preventDefault();
+		post({ action: 'close', session: state ? state.session : '' });
+	});
 	var apply = window.i18n_apply;
 	window.i18n_apply = function (strings) {
 		if (typeof apply === 'function') apply(strings);

@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 function fixture(name) {
+	const posts = [];
 	const elements = new Map();
 	function element(id) {
 		if (!elements.has(id))
@@ -47,7 +48,7 @@ function fixture(name) {
 	};
 	const context = vm.createContext({
 		document,
-		makeHostBridge: () => () => {},
+		makeHostBridge: () => (message) => posts.push(message),
 		setTimeout() {},
 		clearTimeout() {}
 	});
@@ -56,7 +57,7 @@ function fixture(name) {
 	context.getSelection = () => null;
 	const script = path.join(__dirname, `../../static/ergopti_plus/_shared/ui/${name}/script.js`);
 	vm.runInContext(fs.readFileSync(script, 'utf8'), context);
-	return { context, element, document };
+	return { context, element, document, posts };
 }
 function dispatch(target, key, isComposing = true, keyCode = 0) {
 	let prevented = false;
@@ -103,6 +104,22 @@ dispatch(prompt.document, 'Escape', false, 229);
 assert.equal(cancelled, 0, 'legacy IME keyCode must also be ignored');
 dispatch(prompt.document, 'Escape', false);
 assert.equal(cancelled, 1, 'ordinary Escape must still close');
+// pck-12: the cleanup page holds the keyboard, so Escape is read there
+const cleanup = fixture('config_cleanup');
+cleanup.posts.length = 0;
+dispatch(cleanup.document, 'Escape');
+dispatch(cleanup.document, 'Escape', false, 229);
+assert.equal(cleanup.posts.length, 0, 'a composing Escape must not close the cleanup window');
+assert.equal(
+	dispatch(cleanup.document, 'Escape', false),
+	true,
+	'pck-12: Escape is consumed by the cleanup page'
+);
+assert.equal(
+	JSON.stringify(cleanup.posts),
+	JSON.stringify([{ action: 'close', session: '' }]),
+	'pck-12: Escape posts the Close button action'
+);
 const hotstring = fixture('hotstring_editor');
 hotstring.context.insertBrAtCursor = () => {};
 assert.equal(
