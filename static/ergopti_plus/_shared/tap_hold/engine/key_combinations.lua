@@ -108,13 +108,15 @@ function M.new(options)
 		activity(token)
 		local chosen, chosen_sequence
 		if enabled then
+			-- The first key may be held on any keyboard, as on Windows and macOS
+			-- (maintainer decision KCD-7 of 2026-11-21): its earliest press on any
+			-- source counts. Each press keeps its own source for its release.
 			for _, pair in ipairs(pairs_by_second[event.key]) do
-				-- Conservative first slice: an ordered pair belongs to one exact
-				-- physical keyboard. Cross-device combinations are not admitted.
-				local first_down = down[event.source .. "\0" .. pair.first]
-				if first_down and not (event.blocked_first or {})[pair.first]
-					and (chosen_sequence == nil or first_down.sequence < chosen_sequence) then
-					chosen, chosen_sequence = pair, first_down.sequence
+				for _, first_down in pairs(down) do
+					if first_down.key == pair.first and not (event.blocked_first or {})[pair.first]
+						and (chosen_sequence == nil or first_down.sequence < chosen_sequence) then
+						chosen, chosen_sequence = pair, first_down.sequence
+					end
 				end
 			end
 		end
