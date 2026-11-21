@@ -73,6 +73,14 @@ _KCT_With(Taps, Holds, Body, GateOn := true) {
 	}
 }
 
+; The kinds of the recorded stub effects, joined by "|".
+_KCT_Kinds(Effects) {
+	Joined := ""
+	for _, Effect in Effects
+		Joined .= (Joined == "" ? "" : "|") . Effect.kind
+	return Joined
+}
+
 ; A physical-keys probe over the key ids of Down, counting its calls.
 _KCT_Keys(Down, Calls := 0) {
 	Held := Map()
@@ -406,11 +414,15 @@ _KCT_ActionsRunThroughTheCatalogue() {
 		AssertEqual(Before + 1, _Stub_OneShotShiftFixCalls, "the first key's one-shot Shift is dropped")
 		_KeyCombinationRunTap("left_alt", "caps_lock", "one_shot_shift")
 		AssertEqual(Before + 1, _Stub_OneShotShiftFixCalls, "a pair that runs the one-shot Shift keeps it")
-		; The navigation layer a first key holds ends before the action, as it
-		; did for LAlt then CapsLock.
+		; The navigation layer a first key holds is lifted for the action and
+		; comes back after it (THD-1, pair-tap-layer-restored).
 		LayerEnabled := true
+		_Stub_SentText := []
 		_KeyCombinationRunTap("left_alt", "caps_lock", "caps_word")
-		AssertFalse(LayerEnabled, "the action runs out of the layer the first key held")
+		AssertEqual("update_capslock_led|toggle_capsword|update_capslock_led", _KCT_Kinds(_Stub_SentText),
+			"the layer is lifted before the action and given back after it")
+		AssertTrue(LayerEnabled, "the layer the first key still holds is back after the action")
+		LayerEnabled := false
 		; A modifier the first key holds synthetically does not stop the action.
 		_TH_OwnedModifiers["caps_lock"] := ["LCtrl", "LShift"]
 		_Stub_SentText := []
@@ -425,6 +437,39 @@ _KCT_ActionsRunThroughTheCatalogue() {
 }
 Test("key combinations: a pair's action runs through the catalogue (key-combinations-2026-10-01)",
 	_KCT_ActionsRunThroughTheCatalogue)
+
+; A pair's tap under the navigation layer lifts the layer for the action and
+; gives it back to the key that still holds it, as the Linux engine does
+; (maintainer decision THD-1 of 2026-11-21). The old code turned the layer off
+; until the layer key was pressed again.
+_KCT_PairTapLiftsAndRestoresTheLayer() {
+	global LayerEnabled, _TH_LayerOwner
+	SavedLayer := LayerEnabled, SavedOwner := _TH_LayerOwner
+	try {
+		Owner := TapHoldNewOwner()
+		AssertTrue(ActivateLayer(Owner), "the first key holds the layer")
+		During := ""
+		Result := _KeyCombinationRunOutOfLayer(() => (During := LayerEnabled, "ran"))
+		AssertEqual("ran", Result, "the action's result is returned")
+		AssertFalse(During, "the action runs out of the layer")
+		AssertTrue(LayerEnabled, "the layer comes back after the action")
+		AssertEqual(Owner, _TH_LayerOwner, "the same key still owns the layer")
+		AssertTrue(DisableLayer(Owner), "the owner's release still proves itself after the action")
+		; Released during the action: the layer stays off.
+		Owner := TapHoldNewOwner()
+		ActivateLayer(Owner)
+		_KeyCombinationRunOutOfLayer(() => DisableLayer(Owner))
+		AssertFalse(LayerEnabled, "a layer released during the action is not given back")
+		AssertTrue(Owner.Closed && Owner.ReleaseOk, "the release during the action closed its owner")
+		; No layer: nothing is lifted, nothing comes back.
+		_KeyCombinationRunOutOfLayer(() => 0)
+		AssertFalse(LayerEnabled, "an action outside the layer leaves it off")
+	} finally {
+		LayerEnabled := SavedLayer, _TH_LayerOwner := SavedOwner
+	}
+}
+Test("key combinations: a pair's tap lifts the navigation layer and restores it (pair-tap-layer-restored)",
+	_KCT_PairTapLiftsAndRestoresTheLayer)
 
 ; The first key of a pair is held, not tapped: its own tap must not follow on
 ; its release. The mark is read once, and only by the press it was made for.

@@ -555,23 +555,53 @@ _KeyCombinationTakeFirstKey(First, Second) {
 
 ; Runs a pair's action as the key combination alone: without the modifier the
 ; first key holds synthetically, which AutoHotkey keeps down around a Send, and
-; out of the navigation layer that key may hold. A one-shot Shift the first or
-; the second key armed on its press is dropped: the key was part of a
-; combination, not a Shift for the next character.
+; out of the navigation layer that key may hold. The layer is lifted for the
+; action only and comes back afterwards while its owner still holds it, as the
+; Linux engine's combination_lift / combination_restore do (maintainer decision
+; THD-1 of 2026-11-21). A one-shot Shift the first or the second key armed on
+; its press is dropped: the key was part of a combination, not a Shift for the
+; next character.
 ; @param First {String} Tap-hold key id of the key held first.
 ; @param Second {String} Tap-hold key id of the key struck under it.
 ; @param ActionId {String} A catalogue action id.
 _KeyCombinationRunTap(First, Second, ActionId) {
-	global TapHold, LayerEnabled, _TH_OwnedModifiers
+	global TapHold, _TH_OwnedModifiers
 	if (ActionId != "one_shot_shift"
 			&& (TapHoldTapAction(TapHold, First) == "one_shot_shift"
 				|| TapHoldTapAction(TapHold, Second) == "one_shot_shift"))
 		OneShotShiftFix()
-	if (IsSet(LayerEnabled) && LayerEnabled)
-		DisableLayer()
 	RunAction := GestureInvokeAction.Bind(ActionId, KeyCombinationBindingId(KeyCombinationPairId(First, Second)))
 	Held := _TH_OwnedModifiers.Has(First) ? _TH_SyntheticKeyList(_TH_OwnedModifiers[First]) : []
-	return _KeyCombinationRunWithKeysUp(Held, 1, RunAction)
+	return _KeyCombinationRunOutOfLayer(_KeyCombinationRunWithKeysUp.Bind(Held, 1, RunAction))
+}
+
+; Runs RunFn with the navigation layer lifted, then gives the layer back to
+; the owner that held it, unless that owner released it meanwhile (its
+; DisableLayer(Owner) closed it) or the driver was suspended. The owner stays
+; recorded while lifted, so a release during the action still proves itself.
+; @param RunFn {Func} The action.
+; @returns {Any} What RunFn returns.
+_KeyCombinationRunOutOfLayer(RunFn) {
+	global LayerEnabled, _TH_LayerOwner
+	if !(IsSet(LayerEnabled) && LayerEnabled)
+		return RunFn.Call()
+	Owner := _TH_LayerOwner
+	LayerEnabled := false
+	UpdateCapsLockLED()
+	try return RunFn.Call()
+	finally _KeyCombinationRestoreLayer(Owner)
+}
+
+; Gives the lifted layer back to Owner when Owner still holds it.
+; @param Owner {Object|Integer} The layer owner recorded at the lift, 0 for none.
+_KeyCombinationRestoreLayer(Owner) {
+	global LayerEnabled, _TH_LayerOwner
+	if A_IsSuspended || LayerEnabled || _TH_LayerOwner != Owner
+		return
+	if IsObject(Owner) && (!TapHoldOwnerCurrent(Owner) || Owner.Closed)
+		return
+	LayerEnabled := true
+	UpdateCapsLockLED()
 }
 
 ; Runs RunFn with every key of Names lifted, each given back afterwards to

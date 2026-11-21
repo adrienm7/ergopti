@@ -1543,6 +1543,89 @@ local function held_key_events(key_code, tap_action, hold_action)
 	return {}
 end
 
+--- Copies an event, gated on a condition of its own (Karabiner v16 filters a
+--- to list on each entry's conditions before posting any of it, so every gate
+--- of one list reads the variables as they were before that list).
+--- @param event table To-event.
+--- @param name string Variable name.
+--- @param value number Value the variable must have.
+--- @return table gated
+local function gated_event(event, name, value)
+	local gated = deep_copy(event)
+	gated.conditions = gated.conditions or {}
+	gated.conditions[#gated.conditions + 1] = { type = "variable_if", name = name, value = value }
+	return gated
+end
+
+--- The events that lift the navigation layer, gated on the layer being on.
+--- @return table events The F19 exit sentinel, then layer_active off.
+local function layer_lift_events()
+	return {
+		gated_event({ key_code = LAYER_EXIT_SENTINEL_NAME }, LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE),
+		gated_event(set_var_event(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_OFF_VALUE),
+			LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE),
+	}
+end
+
+--- The events that give the navigation layer back, each gated on name=value.
+--- The repeat count is kept, as Windows and Linux keep it.
+--- @param name string Variable name of the gate.
+--- @param value number Value of the gate.
+--- @return table events The F20 sentinel, then layer_active on.
+local function layer_restore_events(name, value)
+	return {
+		gated_event({ key_code = LAYER_NAV_SENTINEL_NAME }, name, value),
+		gated_event(set_var_event(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE), name, value),
+	}
+end
+
+--- A pair's tap run out of the navigation layer its first key holds: the layer
+--- is lifted for the action and given back after it, in one to list, as the
+--- Linux engine's combination_lift / combination_restore and Windows'
+--- _KeyCombinationRunOutOfLayer do (maintainer decision THD-1 of 2026-11-21).
+--- Every gate reads layer_active before the list, so a layer already off (the
+--- first key released before a release-judged tap) is neither lifted nor
+--- turned back on.
+--- @param tap_to table The tap's events.
+--- @return table events
+local function tap_out_of_layer(tap_to)
+	local events = layer_lift_events()
+	for _, ev in ipairs(tap_to) do events[#events + 1] = ev end
+	for _, ev in ipairs(layer_restore_events(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE)) do
+		events[#events + 1] = ev
+	end
+	return events
+end
+
+--- The variable a tap-only pair raises while it holds the layer lifted.
+--- @param k2 string The pair's second key.
+--- @return string name Runtime logical name, generation-scoped at deploy.
+local function pair_layer_lifted_var_name(k2)
+	return held_var_name(k2) .. "_pair_layer_lifted"
+end
+
+--- A tap-only pair whose last key stays down to repeat, run out of the layer:
+--- appending the restore would make that key a tap, so the layer stays lifted
+--- while the second key is held and comes back at its release, only when the
+--- pair lifted it and the first key still holds it (Linux restores only for the
+--- same held first key).
+--- @param tap_to table The tap's events.
+--- @param k1 string The pair's first key.
+--- @param k2 string The pair's second key.
+--- @return table to, table to_after_key_up
+local function tap_out_of_layer_while_held(tap_to, k1, k2)
+	local lifted = pair_layer_lifted_var_name(k2)
+	local to = { gated_event(set_var_event(lifted, 1), LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE) }
+	for _, ev in ipairs(layer_lift_events()) do to[#to + 1] = ev end
+	for _, ev in ipairs(tap_to) do to[#to + 1] = ev end
+	local after = {}
+	for _, ev in ipairs(layer_restore_events(lifted, 1)) do
+		after[#after + 1] = gated_event(ev, held_var_name(k1), 1)
+	end
+	after[#after + 1] = set_var_event(lifted, 0)
+	return to, after
+end
+
 --- Builds the variable-based rule for the tap / hold slots of a combo.
 --- Matches k2 physically while k1 is held (via ke_held_k1=1) and splits
 --- output by press duration (to_if_alone for tap, to for hold).
@@ -1565,8 +1648,11 @@ end
 --- @param k1 string First key (holder).
 --- @param k2 string Second key (trigger).
 --- @param k1_mandatory table|nil Modifier key_codes held by k1's hold action.
+--- @param k1_holds_layer boolean Whether k1's own rule holds the navigation
+---   layer, which the tap then runs out of (tap_out_of_layer).
 --- @return table|nil Karabiner rule object, or nil when both slots are empty.
-local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory)
+local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory,
+	k1_holds_layer)
 	if #tap_to == 0 and #hold_to == 0 then return nil end
 
 	-- When k1's hold action holds a modifier (e.g. right_command → right_option),
@@ -1599,7 +1685,7 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 	if #hold_to > 0 and #tap_to > 0 and not same_output(tap_to, hold_to) then
 		-- Both distinct: split by press duration via tap_hold timeout
 		manip.to          = hold_to
-		manip.to_if_alone = tap_to
+		manip.to_if_alone = k1_holds_layer and tap_out_of_layer(tap_to) or tap_to
 		if hold_action.karabiner_to_after_key_up then
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
@@ -1609,9 +1695,13 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 		if hold_action.karabiner_to_after_key_up then
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
+	elseif k1_holds_layer and type(tap_to[#tap_to]) == "table" and tap_to[#tap_to].key_code ~= nil then
+		-- Tap only, its last key kept down to repeat: the layer stays lifted
+		-- while k2 is held and comes back at its release, if k1 still holds it.
+		manip.to, manip.to_after_key_up = tap_out_of_layer_while_held(tap_to, k1, k2)
 	else
 		-- Tap only: nothing to wait for, so it fires at key_down and repeats
-		manip.to = tap_to
+		manip.to = k1_holds_layer and tap_out_of_layer(tap_to) or tap_to
 	end
 
 	-- A chord whose action keeps a key down leaves k1 held without its held
@@ -1872,7 +1962,9 @@ local function build_combo_rules(combo_def, tap_action, hold_action, combo_actio
 		combo_def, tap_action, combo_action, combo_symmetric, k1, k2, held_of)
 	if chord_rule then rules[#rules + 1] = chord_rule end
 
-	local th_rule = build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory)
+	local k1_holds_layer = activates_nav_layer((held_of[k1] or NOTHING_HELD).to)
+	local th_rule = build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory,
+		k1_holds_layer)
 	if th_rule then rules[#rules + 1] = th_rule end
 
 	return rules
