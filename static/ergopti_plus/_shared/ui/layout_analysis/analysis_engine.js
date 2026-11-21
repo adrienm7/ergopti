@@ -136,34 +136,72 @@ var LAYOUT_ANALYSIS = (function () {
 	const RING_ORDER = 1;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
-	// A row jump: two keys of one hand at least this many rows apart (top and
-	// bottom row, number and home row).
-	const ROW_JUMP_ROWS = 2;
+	// A row jump (the maintainer's « skipgram »): two fingers of one hand at
+	// least this many rows apart.
+	const ROW_JUMP_ROWS = 1;
 	/**
 	 * The graded costs (score_weights.json « grades », maintainer 2026-11-21):
-	 * each table scales its metric's weight by the kind of event, in this
-	 * order. An SFB by the rows its finger crosses (same row, one row, two or
-	 * more); a skipgram on two fingers of one hand around a key of the other
-	 * hand, and a row jump, by how far apart the two fingers are (adjacent,
-	 * one finger between, index and pinky); the travel by the finger that
-	 * moves. The definitions are in docs/design/layout-analysis.md, « Graded
-	 * costs ».
+	 * each factor table scales its metric's weight by the kind of event. An
+	 * SFB by the rows its finger crosses (same row, one row, two or more); a
+	 * row jump (two fingers of one hand on different rows) by how far apart
+	 * the fingers are (adjacent, one finger between, index and pinky) times
+	 * the rows it crosses (one, two or more); the travel by the finger that
+	 * moves. Two tables are not factors (GRADE_KINDS): the alternation reward
+	 * on or off, and hand_run's progressive scale (the multiplier of a
+	 * keystroke by the length of the same-hand run it is in, one per length
+	 * up to the last, then a linear growth). The definitions are in
+	 * docs/design/layout-analysis.md, « Graded costs ».
 	 */
 	const GRADES = Object.freeze({
 		sfb: Object.freeze(['same_row', 'one_row', 'two_rows']),
-		sfs: Object.freeze(['adjacent', 'one_apart', 'index_pinky']),
-		row_jump: Object.freeze(['adjacent', 'one_apart', 'index_pinky']),
-		distance: Object.freeze(['pinky', 'ring', 'middle', 'index', 'thumb'])
+		row_jump: Object.freeze(['adjacent', 'one_apart', 'index_pinky', 'one_row', 'two_rows']),
+		distance: Object.freeze(['pinky', 'ring', 'middle', 'index', 'thumb']),
+		alternation: Object.freeze(['rewarded']),
+		hand_run: Object.freeze([
+			'length_1',
+			'length_2',
+			'length_3',
+			'length_4',
+			'length_5',
+			'length_6',
+			'growth'
+		])
 	});
-	// The graded metrics whose events the key stream counts per grade (the
+	// The tables that are not factors: a switch (a boolean: its metric counts
+	// or not) and a run scale (multipliers >= 1 by run length, the last one
+	// for its length, then a growth >= 0 per key beyond it).
+	const GRADE_SWITCH = 'switch';
+	const GRADE_RUN = 'run';
+	const GRADE_KINDS = Object.freeze({ alternation: GRADE_SWITCH, hand_run: GRADE_RUN });
+	// The run scale's growth beyond its last length (the other grades are lengths).
+	const RUN_GROWTH = 'growth';
+	const RUN_LENGTHS = GRADES.hand_run.filter((grade) => grade !== RUN_GROWTH);
+	// Each counted graded metric's axes: an event's cost is the product of its
+	// grade on each axis (an SFB has one, a row jump two: fingers, then rows).
+	const GRADE_AXES = Object.freeze({
+		sfb: [GRADES.sfb],
+		row_jump: [GRADES.row_jump.slice(0, 3), GRADES.row_jump.slice(3)]
+	});
+	// The graded metrics whose events the key stream counts per cell (the
 	// travel's grades are read from the presses of each finger).
-	const COUNTED_GRADES = ['sfb', 'sfs', 'row_jump'];
-	// sfs's grades add the skipgrams on two fingers to its own same-finger
-	// ones, which count whole; every other table splits its metric's events.
-	const GRADE_ADDS = new Set(['sfs']);
-	// The stream counter of each grade: « <metric>_<grade> ».
+	const COUNTED_GRADES = Object.keys(GRADE_AXES);
+	// Each counted metric's cells, every combination of one grade per axis,
+	// the first axis outermost; a cell's name joins its grades with « _ ».
+	const GRADE_CELLS = Object.fromEntries(
+		COUNTED_GRADES.map((metric) => [
+			metric,
+			GRADE_AXES[metric].reduce(
+				(cells, axis) => cells.flatMap((cell) => axis.map((grade) => cell.concat([grade]))),
+				[[]]
+			)
+		])
+	);
+	// The stream counter of each cell: « <metric>_<cell name> ».
 	const GRADE_COUNTERS = Object.fromEntries(
-		COUNTED_GRADES.map((metric) => [metric, GRADES[metric].map((grade) => `${metric}_${grade}`)])
+		COUNTED_GRADES.map((metric) => [
+			metric,
+			GRADE_CELLS[metric].map((cell) => `${metric}_${cell.join('_')}`)
+		])
 	);
 	// The finger grade of two fingers of one hand, by their distance in finger
 	// order (1: adjacent, 3: index and pinky).
@@ -171,6 +209,17 @@ var LAYOUT_ANALYSIS = (function () {
 	// The finger types by finger order, pinky to index (the travel's grades).
 	const FINGER_TYPES = ['pinky', 'ring', 'middle', 'index'];
 	const THUMB_TYPE = 'thumb';
+	// The same-hand run counters (hand_run): every key bigram and trigram of
+	// the stream, the space's included (it ends a run), and those whose keys
+	// are fingers of one hand. Not events of any pair.
+	const RUN_COUNTS = new Set([
+		'run_pairs',
+		'run_same',
+		'run3',
+		'run3_lead',
+		'run3_tail',
+		'run3_all'
+	]);
 	// Ways to type one character kept for the context choice: a symbol on two
 	// keys, on AltGr and behind a dead key all stay; more never occur in the
 	// library and would multiply the cost of the choice.
@@ -202,6 +251,7 @@ var LAYOUT_ANALYSIS = (function () {
 		half_scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		pinky_ring: { unit: '%', better: 'lower', of: 'bigrams' },
 		row_jump: { unit: '%', better: 'lower', of: 'bigrams' },
+		hand_run: { unit: '%', better: 'lower', of: 'keystrokes' },
 		roll_in: { unit: '%', better: 'higher', of: 'bigrams' },
 		roll_out: { unit: '%', better: 'higher', of: 'bigrams' },
 		hand_change: { unit: '%', better: 'none', of: 'bigrams' },
@@ -2319,10 +2369,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const TRIPLE_ROLL_MIXED = 7;
 	const TRIPLE_SFS = 8;
 	const TRIPLE_OUT = 16;
-	// An alternation whose first and last keys are two fingers of one hand:
-	// their sfs grade (FINGER_GAP_GRADE) plus one, in these bits.
-	const TRIPLE_SKIP_SHIFT = 5;
-	const TRIPLE_SKIP_MASK = 3 << TRIPLE_SKIP_SHIFT;
+	// Its first two keys, its last two keys, are fingers of one hand (hand_run).
+	const TRIPLE_RUN_LEAD = 32;
+	const TRIPLE_RUN_TAIL = 64;
 	const tripleKindCache = new WeakMap();
 
 	/**
@@ -2331,9 +2380,28 @@ var LAYOUT_ANALYSIS = (function () {
 	 * out (TRIPLE_OUT); otherwise TRIPLE_SFS when the
 	 * first and last keys are different keys of one finger, and its class: a
 	 * finger repeated in a row, then on one hand a roll in or out or a
-	 * redirect (bad without the index), else alternation or a mixed roll.
+	 * redirect (bad without the index), else alternation or a mixed roll;
+	 * with the run bits of its two links (sameHandFingers).
 	 */
 	function tripleKind(board, k1, k2, k3) {
+		return (
+			tripleClass(board, k1, k2, k3) |
+			(sameHandFingers(board, k1, k2) ? TRIPLE_RUN_LEAD : 0) |
+			(sameHandFingers(board, k2, k3) ? TRIPLE_RUN_TAIL : 0)
+		);
+	}
+
+	/**
+	 * Whether two keys continue a same-hand run: fingers (no thumb, no space)
+	 * of one hand. The space or a thumb key ends a run.
+	 */
+	function sameHandFingers(board, k1, k2) {
+		const out = board.outOfPairs;
+		return !out[k1] && !out[k2] && fingerRows(board, k1, k2) && board.hand[k1] === board.hand[k2];
+	}
+
+	/** tripleKind's class and SFS flag, without the run bits. */
+	function tripleClass(board, k1, k2, k3) {
 		const out = board.outOfPairs;
 		if (out[k1] || out[k2] || out[k3]) return TRIPLE_OUT;
 		const f1 = board.finger[k1];
@@ -2354,34 +2422,28 @@ var LAYOUT_ANALYSIS = (function () {
 				board.order[k3] === INDEX_ORDER;
 			return sfs | (index ? TRIPLE_REDIRECT : TRIPLE_REDIRECT_BAD);
 		}
-		if (h1 !== h2 && h2 !== h3) return sfs | TRIPLE_ALTERNATION | skipBits(board, k1, k3);
-		return sfs | TRIPLE_ROLL_MIXED;
+		return sfs | (h1 !== h2 && h2 !== h3 ? TRIPLE_ALTERNATION : TRIPLE_ROLL_MIXED);
 	}
 
-	/**
-	 * The skipgram grade bits of an alternation's first and last keys: two
-	 * fingers of one hand, no thumb, give their FINGER_GAP_GRADE plus one; the
-	 * same finger (an SFS) or a thumb gives 0.
-	 */
-	function skipBits(board, k1, k3) {
-		const grade = fingerGapGrade(board, k1, k3);
-		return grade < 0 ? 0 : (grade + 1) << TRIPLE_SKIP_SHIFT;
-	}
-
-	/**
-	 * The finger grade (FINGER_GAP_GRADE) of two keys typed by two fingers of
-	 * one hand, neither a thumb; -1 for any other pair.
-	 */
-	function fingerGapGrade(board, k1, k2) {
-		const f1 = board.finger[k1];
-		const f2 = board.finger[k2];
-		if (f1 === f2 || board.hand[k1] !== board.hand[k2] || !fingerRows(board, k1, k2)) return -1;
-		return FINGER_GAP_GRADE[Math.abs(board.order[k1] - board.order[k2])];
-	}
-
-	/** The sfb grade of two keys of one finger: same row, one row, two rows or more. */
+	/** The sfb cell of two keys of one finger: same row, one row, two rows or more. */
 	function sfbRowGrade(board, k1, k2) {
-		return Math.min(Math.abs(board.row[k1] - board.row[k2]), GRADES.sfb.length - 1);
+		return Math.min(Math.abs(board.row[k1] - board.row[k2]), GRADE_CELLS.sfb.length - 1);
+	}
+
+	/**
+	 * The row_jump cell of two fingers of one hand on different rows: their
+	 * finger distance (adjacent, one apart, index and pinky), then their rows
+	 * (one, two or more).
+	 */
+	function rowJumpCell(board, k1, k2) {
+		const rows = GRADE_AXES.row_jump[1].length;
+		const gap = FINGER_GAP_GRADE[Math.abs(board.order[k1] - board.order[k2])];
+		return gap * rows + Math.min(Math.abs(board.row[k1] - board.row[k2]), rows) - 1;
+	}
+
+	/** A cell's factor: the product of its grades in a table (scoreGrades()[metric]). */
+	function cellFactor(metric, cell, table) {
+		return GRADE_CELLS[metric][cell].reduce((product, grade) => product * table[grade], 1);
 	}
 
 	/** A finger's type (GRADES.distance) by its index in the model's fingers. */
@@ -2481,6 +2543,12 @@ var LAYOUT_ANALYSIS = (function () {
 	/** streamCounts() without the per-grade counters. */
 	function streamBaseCounts() {
 		return {
+			run_pairs: 0,
+			run_same: 0,
+			run3: 0,
+			run3_lead: 0,
+			run3_tail: 0,
+			run3_all: 0,
 			chars: 0,
 			unsupported: 0,
 			modifiers: 0,
@@ -2532,7 +2600,6 @@ var LAYOUT_ANALYSIS = (function () {
 		const blame2 = blame ? blame.pair : () => {};
 		const blame3 = blame ? blame.triple : () => {};
 		const sfbGrades = GRADE_COUNTERS.sfb;
-		const sfsGrades = GRADE_COUNTERS.sfs;
 		const rowJumpGrades = GRADE_COUNTERS.row_jump;
 		/** One SFB: its count, its grade's, its travel and its blame. */
 		const sfb = (k1, k2, n) => {
@@ -2561,6 +2628,8 @@ var LAYOUT_ANALYSIS = (function () {
 				c.distance += board.reach[k] * n;
 			},
 			bigram(k1, k2, n) {
+				c.run_pairs += n;
+				if (sameHandFingers(board, k1, k2)) c.run_same += n;
 				if (out[k1] || out[k2]) {
 					// The space and a thumb letter or another key of its thumb: an
 					// SFB, its travel included; any other pair with it is in no metric.
@@ -2587,12 +2656,12 @@ var LAYOUT_ANALYSIS = (function () {
 				}
 				const o1 = board.order[k1];
 				const o2 = board.order[k2];
-				// A row jump: two fingers of one hand two rows or more apart (one
+				// A row jump: two fingers of one hand on different rows (one
 				// finger's jump is an SFB, counted there). A thumb's keys lie below
-				// every row. A full scissor is one too.
+				// every row. A scissor is one too.
 				const rows = fingerRows(board, k1, k2);
 				if (rows && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS) {
-					const grade = rowJumpGrades[FINGER_GAP_GRADE[Math.abs(o1 - o2)]];
+					const grade = rowJumpGrades[rowJumpCell(board, k1, k2)];
 					c.row_jump += n;
 					c[grade] += n;
 					blame2('row_jump', n, k1, k2);
@@ -2629,7 +2698,11 @@ var LAYOUT_ANALYSIS = (function () {
 				const at = (k1 * K + k2) * K + k3;
 				let kind = kinds[at];
 				if (kind === 0) kind = kinds[at] = tripleKind(board, k1, k2, k3);
-				if (kind === TRIPLE_OUT) return;
+				c.run3 += n;
+				if (kind & TRIPLE_RUN_LEAD) c.run3_lead += n;
+				if (kind & TRIPLE_RUN_TAIL) c.run3_tail += n;
+				if (kind & TRIPLE_RUN_LEAD && kind & TRIPLE_RUN_TAIL) c.run3_all += n;
+				if (kind & TRIPLE_OUT) return;
 				c.trigrams += n;
 				if (kind & TRIPLE_SFS) {
 					c.sfs += n;
@@ -2658,13 +2731,6 @@ var LAYOUT_ANALYSIS = (function () {
 					case TRIPLE_ALTERNATION:
 						c.alternation += n;
 						blame3('alternation', n, k1, k2, k3);
-						// Its first and last keys on two fingers of one hand: a
-						// skipgram of sfs's grades, not an SFS.
-						if (kind & TRIPLE_SKIP_MASK) {
-							const grade = sfsGrades[((kind & TRIPLE_SKIP_MASK) >> TRIPLE_SKIP_SHIFT) - 1];
-							c[grade] += n;
-							blame2(grade, n, k1, k3);
-						}
 						break;
 					default:
 						c.roll_mixed += n;
@@ -2675,10 +2741,11 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * The shares the graded costs weigh (GRADES), from the stream counters:
-	 * each counted grade's events in its metric's unit (% of the key bigrams
-	 * or trigrams), and each finger type's part of the travel (mm per typed
-	 * character, the parts adding up to the distance metric). score() turns
-	 * them into the graded values, so new grades re-score without analysing.
+	 * each counted cell's events in its metric's unit (% of the key bigrams
+	 * or trigrams), each finger type's part of the travel (mm per typed
+	 * character, the parts adding up to the distance metric), and the two
+	 * links of a same-hand run (handRunLinks). score() turns them into the
+	 * graded values, so new grades re-score without analysing.
 	 * @param {object} board - From keyboard().
 	 * @param {object} c - The stream counters (streamCounts).
 	 * @param {Float64Array} keyCount - Presses per key, modifiers included.
@@ -2690,10 +2757,11 @@ var LAYOUT_ANALYSIS = (function () {
 		for (const metric of COUNTED_GRADES) {
 			const whole = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
 			parts[metric] = {};
-			GRADES[metric].forEach((grade, i) => {
-				parts[metric][grade] = pct(c[GRADE_COUNTERS[metric][i]], whole);
+			GRADE_CELLS[metric].forEach((cell, i) => {
+				parts[metric][cell.join('_')] = pct(c[GRADE_COUNTERS[metric][i]], whole);
 			});
 		}
+		parts.hand_run = handRunLinks(c);
 		const travel = Object.fromEntries(GRADES.distance.map((type) => [type, 0]));
 		for (let k = 0; k < keyCount.length; k++)
 			travel[fingerType(board.finger[k])] += board.reach[k] * keyCount[k];
@@ -2701,6 +2769,74 @@ var LAYOUT_ANALYSIS = (function () {
 		for (const type of GRADES.distance)
 			parts.distance[type] = c.chars > 0 ? travel[type] / c.chars : 0;
 		return parts;
+	}
+
+	/**
+	 * The links of a same-hand run (hand_run), read from the key stream as a
+	 * second-order chain (the corpus tables hold no n-gram longer than three
+	 * characters): start, the chance a keystroke continues the hand of the one
+	 * before when that one began a run; carry, the chance it continues a run
+	 * already two keys long; keystrokes, the length of the whole stream (a
+	 * run that always carries on is that long). The space and the thumb keys
+	 * end a run. With no trigram to read a start from (a text of one word),
+	 * the bigrams give it.
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @returns {{start: number, carry: number, keystrokes: number}} start and
+	 *   carry in [0, 1].
+	 */
+	function handRunLinks(c) {
+		const opened = c.run3 - c.run3_lead;
+		const start =
+			opened > 0
+				? (c.run3_tail - c.run3_all) / opened
+				: c.run_pairs > 0
+					? c.run_same / c.run_pairs
+					: 0;
+		const carry = c.run3_lead > 0 ? c.run3_all / c.run3_lead : 0;
+		return { start, carry, keystrokes: c.run_pairs + 1 };
+	}
+
+	/** A run length's multiplier on a run scale (scoreGrades().hand_run). */
+	function runMultiplier(scale, length) {
+		const last = RUN_LENGTHS.length;
+		if (length <= last) return scale[RUN_LENGTHS[length - 1]];
+		return scale[RUN_LENGTHS[last - 1]] + scale[RUN_GROWTH] * (length - last);
+	}
+
+	/**
+	 * hand_run: how much more a keystroke weighs, on average, than one of a
+	 * perfect alternation (%): 100 × (the mean multiplier of the run each
+	 * keystroke is in − 1). A run has length 1 with chance 1 − start and
+	 * k >= 2 with chance start × carry^(k − 2) × (1 − carry); a keystroke is in
+	 * a run of length k with chance k P(k) / Σ k P(k), Σ k P(k) = 1 + start /
+	 * (1 − carry). The lengths up to the scale's last are summed, the linear
+	 * growth beyond it in closed form; a run that always carries on is the
+	 * whole stream.
+	 * @param {{start: number, carry: number, keystrokes: number}} links - From
+	 *   handRunLinks().
+	 * @param {object} scale - The run scale (scoreGrades().hand_run).
+	 * @returns {number} %, >= 0.
+	 */
+	function handRunValue(links, scale) {
+		const { start, carry, keystrokes } = links;
+		if (carry >= 1) return 100 * (runMultiplier(scale, keystrokes) - 1);
+		const last = RUN_LENGTHS.length;
+		let weighted = (1 - start) * runMultiplier(scale, 1);
+		for (let k = 2; k <= last; k++)
+			weighted += k * start * carry ** (k - 2) * (1 - carry) * runMultiplier(scale, k);
+		// Beyond the last length, k = last + t: Σ (last + t)(top + growth t) carry^t.
+		const top = runMultiplier(scale, last);
+		const growth = scale[RUN_GROWTH];
+		const q = 1 - carry;
+		const s0 = carry / q;
+		const s1 = carry / (q * q);
+		const s2 = (carry * (1 + carry)) / (q * q * q);
+		weighted +=
+			start *
+			carry ** (last - 2) *
+			q *
+			(last * top * s0 + (last * growth + top) * s1 + growth * s2);
+		return 100 * (weighted / (1 + start / q) - 1);
 	}
 
 	/**
@@ -2772,6 +2908,7 @@ var LAYOUT_ANALYSIS = (function () {
 			half_scissors: pct(c.half_scissors, c.bigrams),
 			pinky_ring: pct(c.pinky_ring, c.bigrams),
 			row_jump: pct(c.row_jump, c.bigrams),
+			hand_run: handRunValue(handRunLinks(c), scoreGrades(opts.grades).hand_run),
 			roll_in: pct(c.roll_in, c.bigrams),
 			roll_out: pct(c.roll_out, c.bigrams),
 			hand_change: pct(c.hand_change, c.bigrams),
@@ -3873,7 +4010,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   with it (the other key of a pair, the two others of a redirect), each
 	 *   [codes, % of the bigrams or trigrams];
 	 * - grades: for each counted graded metric (COUNTED_GRADES), the key's
-	 *   part of each grade's share, shared the same way (the keys' parts add
+	 *   part of each cell's share, shared the same way (the keys' parts add
 	 *   up to result.parts); finger: the type of its finger (GRADES.distance).
 	 * @param {object} board - From keyboard().
 	 * @param {object} m - What analyse() measured: keyCount, allPresses, pressed
@@ -3911,13 +4048,13 @@ var LAYOUT_ANALYSIS = (function () {
 				const whole = id === 'alternation' ? c.trigrams : c.bigrams;
 				gain[id] = pct(m.perKey[id][k], whole) / GAIN_KEYS[id];
 			}
-			// Every graded event is a pair of keys (a skipgram's first and last).
+			// Every graded event is a pair of keys, shared between both.
 			const grades = {};
 			for (const metric of COUNTED_GRADES) {
 				const of = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
 				grades[metric] = {};
-				GRADES[metric].forEach((grade, i) => {
-					grades[metric][grade] = pct(m.perKey[GRADE_COUNTERS[metric][i]][k], of) / 2;
+				GRADE_CELLS[metric].forEach((cell, i) => {
+					grades[metric][cell.join('_')] = pct(m.perKey[GRADE_COUNTERS[metric][i]][k], of) / 2;
 				});
 			}
 			keys[code] = {
@@ -4159,7 +4296,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const plan = planTyping(compiled, board, table, planMode(opts));
 		const K = board.codes.length;
 		const names = Object.keys(streamBaseCounts()).filter(
-			(name) => name !== 'bigrams' && !WEIGHTED_COUNTS.has(name)
+			(name) => name !== 'bigrams' && !WEIGHTED_COUNTS.has(name) && !RUN_COUNTS.has(name)
 		);
 		const gradeOf = scoreGrades(opts.grades);
 		// A pair's class, probed once from the visitor: the counters it raises,
@@ -4177,8 +4314,8 @@ var LAYOUT_ANALYSIS = (function () {
 				travels.set(at, counts.sfb_cost);
 				const factor = {};
 				for (const metric of COUNTED_GRADES)
-					GRADES[metric].forEach((grade, i) => {
-						if (counts[GRADE_COUNTERS[metric][i]] !== 0) factor[metric] = gradeOf[metric][grade];
+					GRADE_COUNTERS[metric].forEach((name, i) => {
+						if (counts[name] !== 0) factor[metric] = cellFactor(metric, i, gradeOf[metric]);
 					});
 				pairGrades.set(at, factor);
 			}
@@ -4736,12 +4873,13 @@ var LAYOUT_ANALYSIS = (function () {
 		const maps = ngramMaps(table);
 		const nc = table.totalChars;
 		const per = (n, total) => (total > 0 ? (100 * n) / total : 0);
-		// A graded metric's events, each count times its default grade.
+		// A graded metric's events, each count times its cell's default factor.
 		const graded = (metric) =>
-			GRADES[metric].reduce(
-				(sum, grade, i) => sum + grades[metric][grade] * c[GRADE_COUNTERS[metric][i]],
+			GRADE_COUNTERS[metric].reduce(
+				(sum, name, i) => sum + cellFactor(metric, i, grades[metric]) * c[name],
 				0
 			);
+		const alternation = grades.alternation.rewarded ? w.alternation : 0;
 		const bigrams =
 			w.sfb * graded('sfb') +
 			w.row_jump * graded('row_jump') +
@@ -4753,13 +4891,13 @@ var LAYOUT_ANALYSIS = (function () {
 			w.roll_in * c.roll_in -
 			w.roll_out * c.roll_out;
 		const trigrams =
-			w.sfs * (c.sfs + graded('sfs')) +
+			w.sfs * c.sfs +
 			SFS_DISTANCE_SHARE * w.sfb_distance * c.sfs_cost +
 			w.redirect * c.redirect +
 			w.redirect_bad * c.redirect_bad -
 			w.roll3_in * c.roll3_in -
 			w.roll3_out * c.roll3_out -
-			w.alternation * c.alternation;
+			alternation * c.alternation;
 		const chars =
 			w.pinky_load * presses.pinky +
 			w.outer_column * presses.outer -
@@ -5029,7 +5167,7 @@ var LAYOUT_ANALYSIS = (function () {
 		let points = 0;
 		if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) points += w.pinky_ring;
 		if (fingerRows(board, k1, k2) && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS)
-			points += w.row_jump * grades.row_jump[GRADES.row_jump[FINGER_GAP_GRADE[Math.abs(o1 - o2)]]];
+			points += w.row_jump * cellFactor('row_jump', rowJumpCell(board, k1, k2), grades.row_jump);
 		if (fingerRows(board, k1, k2) && Math.abs(o1 - o2) === 1) {
 			const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
 			const shorter = longer === k1 ? k2 : k1;
@@ -5072,11 +5210,7 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!index) points += w.redirect_bad;
 			return points;
 		}
-		if (h1 !== h2 && h2 !== h3) {
-			points -= w.alternation;
-			const grade = fingerGapGrade(board, k1, k3);
-			if (grade >= 0) points += w.sfs * data().grades.sfs[GRADES.sfs[grade]];
-		}
+		if (h1 !== h2 && h2 !== h3 && data().grades.alternation.rewarded) points -= w.alternation;
 		return points;
 	}
 
@@ -6570,14 +6704,30 @@ var LAYOUT_ANALYSIS = (function () {
 				if (!grades.includes(grade))
 					throw new Error(`layout_analysis: ${metric} has no grade ${grade}`);
 			for (const grade of grades) {
-				const factor = table[grade];
-				if (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0)
-					throw new Error(
-						`layout_analysis: grade ${grade} of ${metric} must be a finite number >= 0`
-					);
+				const why = gradeRefusal(metric, table[grade], grade);
+				if (why) throw new Error(`layout_analysis: grade ${grade} of ${metric} must be ${why}`);
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * Why a grade's value is refused, by its table's kind (GRADE_KINDS):
+	 * 'a boolean' (a switch), 'a finite number >= 1' (a run multiplier, so a
+	 * run never weighs less than an alternation), 'a finite number >= 0' (a
+	 * factor or the run growth); '' when it is accepted.
+	 * @param {string} metric - A GRADES table.
+	 * @param {*} value - The value.
+	 * @param {string} grade - Its grade.
+	 * @returns {string}
+	 */
+	function gradeRefusal(metric, value, grade) {
+		const kind = GRADE_KINDS[metric];
+		if (kind === GRADE_SWITCH) return typeof value === 'boolean' ? '' : 'a boolean';
+		const least = gradeMinimum(metric, grade);
+		return typeof value === 'number' && Number.isFinite(value) && value >= least
+			? ''
+			: `a finite number >= ${least}`;
 	}
 
 	/** A copy of the default graded costs (score_weights.json), checked. */
@@ -6586,42 +6736,45 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * The flat grades: every event of a split table at 1 and sfs's added
-	 * skipgrams at 0, so each graded metric weighs its plain value. With
-	 * row_jump's weight at 0 they give the single weights' score.
-	 * @returns {object} metric → grade → factor.
+	 * The flat grades: every factor at 1 and the alternation rewarded, so each
+	 * graded metric weighs its plain value (the run scale keeps its defaults:
+	 * it changes nothing while hand_run weighs 0). With row_jump's and
+	 * hand_run's weights at 0 they give the single weights' score.
+	 * @returns {object} metric → grade → value.
 	 */
 	function flatGrades() {
-		const out = {};
-		for (const [metric, grades] of Object.entries(GRADES))
-			out[metric] = Object.fromEntries(
-				grades.map((grade) => [grade, GRADE_ADDS.has(metric) ? 0 : 1])
-			);
+		const out = scoreGrades();
+		for (const [metric, grades] of Object.entries(GRADES)) {
+			if (GRADE_KINDS[metric] === GRADE_RUN) continue;
+			for (const grade of grades)
+				out[metric][grade] = GRADE_KINDS[metric] === GRADE_SWITCH ? true : 1;
+		}
 		return out;
 	}
 
 	/**
-	 * A graded metric's value as the score weighs it: its parts (gradeParts)
-	 * times their grades, plus the metric itself for sfs (GRADE_ADDS). When
-	 * every grade of a split table is the same factor, the value is the metric
-	 * times it, and sfs with all its grades at 0 is itself: the flat model of
-	 * the single weights, to the last bit.
+	 * A graded metric's value as the score weighs it: each cell's part
+	 * (gradeParts) times its factor (the product of its grades; the travel's
+	 * cells are its finger types). When every cell has the same factor, the
+	 * value is the metric times it: the flat model of the single weights, to
+	 * the last bit. A switch counts the metric or nothing; hand_run follows
+	 * its run scale (handRunValue).
 	 * @param {string} id - A GRADES metric.
 	 * @param {number} value - Its metric value.
-	 * @param {object} parts - Its parts (result.parts[id]).
+	 * @param {object} parts - Its parts (result.parts[id]); a switch reads none.
 	 * @param {object} table - Its grades (scoreGrades()[id]).
 	 * @returns {number} The graded value, in the metric's unit.
 	 */
 	function gradedValue(id, value, parts, table) {
-		const grades = GRADES[id];
-		const adds = GRADE_ADDS.has(id);
-		const first = table[grades[0]];
-		if (grades.every((grade) => table[grade] === first)) {
-			if (!adds) return first * value;
-			if (first === 0) return value;
-		}
-		let sum = adds ? value : 0;
-		for (const grade of grades) sum += table[grade] * parts[grade];
+		if (GRADE_KINDS[id] === GRADE_SWITCH) return table[GRADES[id][0]] ? value : 0;
+		if (GRADE_KINDS[id] === GRADE_RUN) return handRunValue(parts, table);
+		const cells = id in GRADE_CELLS ? GRADE_CELLS[id] : GRADES[id].map((grade) => [grade]);
+		const factors = cells.map((cell) => cell.reduce((product, grade) => product * table[grade], 1));
+		if (factors.every((factor) => factor === factors[0])) return factors[0] * value;
+		let sum = 0;
+		cells.forEach((cell, i) => {
+			sum += factors[i] * parts[cell.join('_')];
+		});
 		return sum;
 	}
 
@@ -6645,6 +6798,7 @@ var LAYOUT_ANALYSIS = (function () {
 	function weighedValue(result, id, gradeOf) {
 		const value = result.metrics[id];
 		if (!(id in GRADES)) return value;
+		if (GRADE_KINDS[id] === GRADE_SWITCH) return gradedValue(id, value, null, gradeOf[id]);
 		const parts = result.parts && result.parts[id];
 		if (!parts) throw new Error(`layout_analysis: the score of ${id} needs analyse()'s parts`);
 		return gradedValue(id, value, parts, gradeOf[id]);
@@ -6982,7 +7136,12 @@ var LAYOUT_ANALYSIS = (function () {
 						`layout_analysis: ${id} chooses the ways of typing; analyse again instead of rescore`
 					);
 		}
-		for (const result of results) result.score = score(result, weights, floors, grades);
+		const scale = scoreGrades(grades).hand_run;
+		for (const result of results) {
+			// hand_run's value follows its scale: shown as the score weighs it.
+			result.metrics.hand_run = handRunValue(result.parts.hand_run, scale);
+			result.score = score(result, weights, floors, grades);
+		}
 		return rank(results);
 	}
 
@@ -7196,13 +7355,16 @@ var LAYOUT_ANALYSIS = (function () {
 				if (!(grade in table))
 					throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
 				const factor = table[grade];
-				if (typeof factor !== 'number')
-					throw new AnalysisError('config_weight_type', { key }, `${key} is not a number`);
-				if (!Number.isFinite(factor) || factor < 0)
+				const why = gradeRefusal(metric, factor, grade);
+				// A value of the wrong type, or of the right type out of range.
+				const expected = GRADE_KINDS[metric] === GRADE_SWITCH ? 'boolean' : 'number';
+				if (typeof factor !== expected)
+					throw new AnalysisError('config_weight_type', { key }, `${key} is not a ${expected}`);
+				if (why)
 					throw new AnalysisError(
 						'config_weight_range',
 						{ key, value: factor },
-						`${key} must be a finite number >= 0`
+						`${key} must be ${why}`
 					);
 				out[metric][grade] = factor;
 			}
@@ -7210,9 +7372,26 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
+	/**
+	 * The least value a numeric grade takes (1 for a run multiplier, 0 for a
+	 * factor or the run growth), for a page's input.
+	 * @param {string} metric - A GRADES table that is no switch.
+	 * @param {string} grade - One of its grades.
+	 * @returns {number}
+	 */
+	function gradeMinimum(metric, grade) {
+		if (GRADE_KINDS[metric] === GRADE_SWITCH)
+			throw new Error(`layout_analysis: ${metric} is a switch, not a number`);
+		return GRADE_KINDS[metric] === GRADE_RUN && grade !== RUN_GROWTH ? 1 : 0;
+	}
+
 	return {
 		METRICS,
 		GRADES,
+		GRADE_KINDS,
+		GRADE_SWITCH,
+		GRADE_RUN,
+		gradeMinimum,
 		ACCESS_WEIGHTS,
 		LAYER_IDS,
 		heldCodes,

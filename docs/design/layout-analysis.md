@@ -170,7 +170,7 @@ count}`), `chords` the multi-character outputs used with their counts.
   was weighed on 2026-11-21) are shared over their keys the same way, in
   `cost` and `worst`, but stay out of `KEY_COST_METRICS` and of the points a
   key costs. `grades` holds the key's part of each grade of the counted graded
-  metrics (`sfb`, `sfs`, `row_jump`; [Graded costs](#graded-costs)), shared
+  metrics (`sfb`, `row_jump`; [Graded costs](#graded-costs)), shared
   the same way, and `finger` the type of its finger (the travel's grade).
 
 - `bigramMatrix(layout, ngrams, {keyboard?, profile?, weights?, grades?, typing?})` →
@@ -218,10 +218,14 @@ weights, floors, grades}`; the given weights, floors and grades override the
   action); `defaultFloors()` → a copy of its `floors`; `scoreFloors(floors?)`
   → the floors with the given ones, refusing a floor on a metric that has no
   weight or is not lower-is-better, or one below 0 or not finite.
-- `GRADES` → each graded metric's grades, in order; `defaultGrades()` → a
-  copy of `score_weights.json` « grades »; `scoreGrades(grades?)` → the
-  grades with the given ones (a part of a table keeps its other defaults),
-  refusing an unknown table or grade and a factor below 0 or not finite;
+- `GRADES` → each graded table's grades, in order; `GRADE_KINDS` → the
+  tables that are no factors (`GRADE_SWITCH`: alternation, `GRADE_RUN`:
+  hand_run); `gradeMinimum(table, grade)` → the least value of a numeric
+  grade (1 for a run multiplier, else 0); `defaultGrades()` → a copy of
+  `score_weights.json` « grades »; `scoreGrades(grades?)` → the grades with
+  the given ones (a part of a table keeps its other defaults), refusing an
+  unknown table or grade, a factor below 0 or not finite, a switch that is no
+  boolean and a run multiplier below 1;
   `flatGrades()` → the grades that weigh each graded metric by its plain
   value ([Graded costs](#graded-costs)).
 - `referenceLayout(language?)` → the library id the ranking's relative view
@@ -605,7 +609,8 @@ metric a share of the typed characters.
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                              |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `pinky_ring`       | %     | lower  | Pinky–ring pair: one hand, the pinky and the ring finger, any rows (the same row included; Oxeylyzer's `pinky_ring_bigrams`; Cyanophage's pinky–ring scissor is its part on different rows). A half scissor between them is counted in both. Weight 0 by default.                                                                                                                                                                                                                                         |
-| `row_jump`         | %     | lower  | Row jump: two consecutive keys typed by two different fingers of one hand at least two logical rows apart (top and bottom row, number and home row); one finger's jump is an SFB, counted there (maintainer, 2026-11-21). A full scissor is one too. Graded by its two fingers ([Graded costs](#graded-costs)).                                                                                                                                                                                           |
+| `row_jump`         | %     | lower  | Row jump, the maintainer's « skipgram »: two consecutive keys typed by two different fingers of one hand on different logical rows; one finger's move is an SFB, counted there (maintainer, 2026-11-21). A scissor is one too. Graded by its fingers times its rows ([Graded costs](#graded-costs)).                                                                                                                                                                                                      |
+| `hand_run`         | %     | lower  | Same-hand runs: 100 × (the mean, over the keystrokes, of the multiplier of the same-hand run each is in − 1), by the run scale of `grades.hand_run`; the space and the thumbs end a run, read from the key bigrams and trigrams as a chain ([Graded costs](#graded-costs)).                                                                                                                                                                                                                               |
 | `roll_in`          | %     | higher | Two-key inward roll: one hand, different fingers, toward the index.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `roll_out`         | %     | higher | Two-key outward roll: toward the pinky.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `hand_change`      | %     | none   | Two keys on different hands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -658,39 +663,66 @@ contribution beside the metric. The graded metrics weigh their graded value
 
 ### Graded costs
 
-The maintainer's decision of 2026-11-21 (docs/memory/maintainer-decisions.md):
-four weights become scales. `score_weights.json` « grades » gives each a table
-of factors, each multiplying the metric's weight for one kind of its events,
+The maintainer's decisions of 2026-11-21 (docs/memory/maintainer-decisions.md):
+single weights become scales. `score_weights.json` « grades » gives each a
+table, each factor multiplying the metric's weight for one kind of its events,
 so the weight stays the base and its grades the scale:
 
 - `sfb` by the rows its finger crosses: `same_row` (an index's or pinky's
   lateral move, a thumb's two keys), `one_row` (home to top), `two_rows` (two
   or more: bottom to top). A two-row SFB is worse than a one-row one.
-- `sfs` adds to its same-finger skipgrams (counted whole) the **skipgrams on
-  two fingers**: an alternation whose first and last keys are typed by two
-  fingers of one hand (no thumb), the middle key by the other hand, by how far
-  apart the two fingers are: `adjacent`, `one_apart` (a finger between them:
-  index and ring, middle and pinky), `index_pinky` (barely counted, the
-  comfortable pair). A trigram on one hand is a roll or a redirect and keeps
-  its own class. These skipgrams are in no metric of their own: their shares
-  are `result.parts.sfs`.
-- `row_jump` by its two fingers, with the same three grades: adjacent fingers
-  are the worst. Its default weight is half of `sfb`'s.
+- `row_jump`, the maintainer's « skipgram »: a same-hand bigram on two
+  different fingers whose keys are on different rows. One metric for every
+  row distance, graded on two axes whose product weighs each pair: its
+  fingers (`adjacent`, `one_apart`: a finger between them, `index_pinky`:
+  barely counted) and its rows (`one_row`, `two_rows`: two or more). One
+  finger's move is an SFB, never a row jump, so nothing is counted twice;
+  the same row on two fingers is neither. This one metric replaces the
+  earlier pair « skipgram on one row, `row_jump` on two or more »: one weight
+  (half of `sfb`'s) and one table keep the maintainer's order (SFB 2 rows >
+  SFB 1 row > adjacent fingers > one apart > index and pinky, pinned by
+  `test-layout-analysis-engine.cjs`, section 16b) without a second metric to
+  keep apart from the first. A scissor (adjacent fingers, the longer one
+  lower) is a row jump too, priced on top by `scissors` or `half_scissors`.
+  The same-finger skipgram `sfs` (first and third key of a trigram) keeps its
+  single weight.
 - `distance` by the finger that travels: `pinky`, `ring`, `middle`, `index`,
   `thumb`; a key's move costs less with the index than with the pinky.
+- `alternation.rewarded` (a switch): whether the `alternation` weight rewards
+  the trigrams whose hand changes on every key at all; off, they earn
+  nothing whatever the weight.
+- `hand_run` (a run scale): the multiplier of a keystroke by the length of
+  the same-hand run it is in, `length_1` (a perfect alternation, 1) to
+  `length_6`, then `length_6` plus `growth` per key beyond (by default 1, 1,
+  2, 3, 4, 5 and growth 1: three keys weigh 2, four 3, and so on). The
+  `hand_run` metric is 100 × (the mean multiplier over the keystrokes − 1),
+  in %: 0 when the hands alternate on every key. A run is counted over the
+  key stream, not over words: the space and the thumb keys end it. The
+  corpus tables hold no n-gram longer than three characters, so a run's
+  length is read as a second-order chain from the key bigrams and trigrams
+  (the chance a run starts, the chance it carries on), the scale summed up
+  to its last length and its linear growth in closed form; a run that always
+  carries on is as long as the stream. « vacances » on Ergo-L, typed by the
+  left hand alone, weighs hundreds of % where Ergopti's alternation weighs
+  0 (the engine test). hand_run is a property of the whole stream, so the
+  keys' costs, the word efforts and the ways of typing leave it out (as the
+  finger loads).
 
-`analyse()` returns `parts`: each counted grade's share of its metric's whole
-(% of the key bigrams or trigrams) and each finger type's part of the travel
-(mm per character, adding up to `distance`); `score()` weighs
-`Σ grade × part` (plus the same-finger `sfs` for `sfs`), so a grade edited in
-the Comparer re-scores without analysing. With every split grade at 1, the
-`sfs` grades at 0 and `row_jump` at 0 (`flatGrades()`), the score is the
+`analyse()` returns `parts`: each counted cell's share of its metric's whole
+(% of the key bigrams; a row jump's cells are named « <fingers>\_<rows> »),
+each finger type's part of the travel (mm per character, adding up to
+`distance`) and a same-hand run's chances (`hand_run`: start, carry,
+keystrokes); `score()` weighs `Σ factor × part`, so a grade edited in the
+Comparer re-scores without analysing, and `rescore()` shows `hand_run` again
+by its scale. With every factor at 1, the alternation rewarded and the
+`row_jump` and `hand_run` weights at 0 (`flatGrades()`), the score is the
 single weights' one to the last bit (pinned by
 `test-layout-analysis-engine.cjs`, section 16b). The ways of typing choose by
 the default grades, as by the default weights. The Comparer edits every grade
-in its metric's weight card (« Réglages du score »), and its settings file
-carries them. The proposed scale, its grounding in the other analysers and
-its ranking impact on the library are in
+in its metric's weight card (« Réglages du score »: a number per factor or
+multiplier, a checkbox for the switch, each checked by `scoreGrades`), and its
+settings file carries them. The proposed scale, its grounding in the other
+analysers and its ranking impact on the library are in
 [the graded costs report](../audits/layout-analysers/graded-costs-ranking.md).
 
 ## Ways of typing

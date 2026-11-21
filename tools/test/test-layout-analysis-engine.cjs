@@ -81,11 +81,14 @@
  *    loaded the rows refuse instead of falling back to the ids.
  * 16. Ideas from the other analysers: sfb_distance, pinky_ring, the floors
  *    and the reference layout of the relative view, weighed by hand.
- * 16b. Graded costs: each grade of an SFB's rows, a skipgram's and a row
- *    jump's fingers and the travel's finger weighed by hand; the flat grades
- *    give the single weights' score to the last bit; rescore, scoreSession,
- *    the keys' costs, the word efforts and the pair matrix read them; the
- *    typing choice reads the default ones.
+ * 16b. Graded costs: each grade of an SFB's rows, a row jump's fingers and
+ *    rows and the travel's finger weighed by hand, the maintainer's order of
+ *    badness, the alternation switch; same-hand runs (« vacances » on
+ *    Ergo-L against Ergopti, the run scale worked by hand and its closed
+ *    form against the series); the flat grades give the single weights'
+ *    score to the last bit; rescore, scoreSession, the keys' costs, the word
+ *    efforts and the pair matrix read them; the typing choice reads the
+ *    default ones.
  * 17. Thumb keys: two different keys of one thumb are an SFB with its travel
  *    (analyse and scoreSession alike), two thumbs none; a thumb letter's pairs
  *    and trigrams with the fingers count, the space's do not; the shared bar
@@ -163,14 +166,33 @@ const check = (condition, message) => {
 	if (!condition) errors.push(message);
 };
 const near = (a, b) => Math.abs(a - b) <= TOLERANCE * Math.max(1, Math.abs(b));
-// A metric's value as the score weighs it, worked from analyse()'s parts: a
-// graded metric's parts times their grades (plus the same-finger skipgrams
-// for sfs), any other metric itself.
+// The row_jump grades: its fingers, then its rows (a cell's part is named
+// « <fingers>_<rows> »).
+const ROW_JUMP_FINGERS = ['adjacent', 'one_apart', 'index_pinky'];
+const ROW_JUMP_ROWS = ['one_row', 'two_rows'];
+// A metric's value as the score weighs it, worked from analyse()'s parts: an
+// SFB's rows and the travel's fingers each times their grade, a row jump's
+// cells times its finger grade and its row grade, the alternation only when
+// rewarded, hand_run as analyse() measured it, any other metric itself.
 const weighed = (r, metric, grades) => {
-	if (!(metric in E.GRADES)) return r.metrics[metric];
 	const table = (grades || E.defaultGrades())[metric];
-	const own = metric === 'sfs' ? r.metrics.sfs : 0;
-	return E.GRADES[metric].reduce((sum, grade) => sum + table[grade] * r.parts[metric][grade], own);
+	const parts = r.parts[metric];
+	switch (metric) {
+		case 'sfb':
+		case 'distance':
+			return Object.keys(table).reduce((sum, grade) => sum + table[grade] * parts[grade], 0);
+		case 'row_jump':
+			return ROW_JUMP_FINGERS.reduce(
+				(sum, f) =>
+					sum +
+					ROW_JUMP_ROWS.reduce((s, row) => s + table[f] * table[row] * parts[`${f}_${row}`], 0),
+				0
+			);
+		case 'alternation':
+			return table.rewarded ? r.metrics.alternation : 0;
+		default:
+			return r.metrics[metric];
+	}
 };
 
 const sandbox = {};
@@ -1048,7 +1070,23 @@ for (const id of E.ACCESS_WEIGHTS) {
 			'config_unknown_key',
 			() => {
 				const file = good();
-				file.grades.sfs.same_finger = 1;
+				file.grades.row_jump.three_rows = 1;
+				return file;
+			}
+		],
+		[
+			'config_weight_type',
+			() => {
+				const file = good();
+				file.grades.alternation.rewarded = 1;
+				return file;
+			}
+		],
+		[
+			'config_weight_range',
+			() => {
+				const file = good();
+				file.grades.hand_run.length_3 = 0.5;
 				return file;
 			}
 		],
@@ -1358,16 +1396,17 @@ for (const layout of library) {
 // (row-jump) Worked by hand on QWERTY ISO, whose rows are 1 (digits) to 4
 // (bottom). « qz ex ea 4d ej » has five key bigrams without a thumb (the
 // space is the left thumb's): E→X (left middle then ring, 2 and 4) and 4→D
-// (left index then middle, 1 and 3) jump two rows on two fingers; Q→Z (left
+// (left index then middle, 1 and 3) jump two rows on adjacent fingers, E→A
+// (middle then pinky, 2 and 3) one row on fingers one apart; Q→Z (left
 // pinky, rows 2 and 4) is one finger's jump, an SFB and no row jump
-// (maintainer, 2026-11-21: no double count); E→A is one row, E→J changes
-// hands. Row jumps are 2 of 5 = 40 %, each key of a jump takes half of its
-// 20 %, and the score weighs them by their grades (section 16b).
+// (maintainer, 2026-11-21: no double count); E→J changes hands. Row jumps
+// are 3 of 5 = 60 %, each key of a jump takes half of its 20 %, and the
+// score weighs them by their grades (section 16b).
 {
 	const qwerty = byId.get('qwerty');
 	const tables = E.ngramsFromText('qz ex ea 4d ej');
 	const result = E.analyse(qwerty, tables, { keyboard: 'iso', keyGroups: true });
-	check(near(result.metrics.row_jump, 40), `row jumps: ${result.metrics.row_jump} %, expected 40`);
+	check(near(result.metrics.row_jump, 60), `row jumps: ${result.metrics.row_jump} %, expected 60`);
 	check(E.METRICS.row_jump.better === 'lower', 'row jumps: a penalty');
 	check('row_jump' in result.score.contributions, 'row jumps: part of the score');
 	check(
@@ -1375,18 +1414,19 @@ for (const layout of library) {
 		'row jumps: part of the points a key costs'
 	);
 	check(
-		near(result.parts.row_jump.adjacent, 40) && result.parts.row_jump.one_apart === 0,
-		`row jumps: both jumps are on adjacent fingers ${JSON.stringify(result.parts.row_jump)}`
+		near(result.parts.row_jump.adjacent_two_rows, 40) &&
+			near(result.parts.row_jump.one_apart_one_row, 20),
+		`row jumps: two adjacent two-row jumps and one one-row jump ${JSON.stringify(result.parts.row_jump)}`
 	);
 	const parts = E.keyValues(result, 'row_jump');
 	for (const [code, expected] of Object.entries({
 		KeyQ: 0,
 		KeyZ: 0,
-		KeyE: 10,
+		KeyE: 20,
 		KeyX: 10,
 		Digit4: 10,
 		KeyD: 10,
-		KeyA: 0,
+		KeyA: 10,
 		KeyJ: 0
 	}))
 		check(
@@ -1396,12 +1436,12 @@ for (const layout of library) {
 	const groups = result.topGroups.row_jump.map((g) => `${g.keys.join('+')}:${g.count}:${g.share}`);
 	check(
 		JSON.stringify(groups.slice().sort()) ===
-			JSON.stringify(['Digit4+KeyD:1:20', 'KeyE+KeyX:1:20']),
+			JSON.stringify(['Digit4+KeyD:1:20', 'KeyE+KeyA:1:20', 'KeyE+KeyX:1:20']),
 		`row jumps: the board's jumps are ${JSON.stringify(groups)}`
 	);
-	// One row apart, or the other hand, is no jump.
-	const none = E.analyse(qwerty, E.ngramsFromText('ea ej rf'), { keyboard: 'iso' });
-	check(none.metrics.row_jump === 0, `row jumps: « ea ej rf » has ${none.metrics.row_jump} %`);
+	// The same row, the other hand or one finger is no jump.
+	const none = E.analyse(qwerty, E.ngramsFromText('sd ej rf'), { keyboard: 'iso' });
+	check(none.metrics.row_jump === 0, `row jumps: « sd ej rf » has ${none.metrics.row_jump} %`);
 
 	// (bigram-matrix) The same text, pair by pair: each pair's class from the
 	// one visitor, its share of the five bigrams, and its points with the
@@ -1417,7 +1457,7 @@ for (const layout of library) {
 	const expected = {
 		'KeyQ+KeyZ': [['sfb'], -559.7068296797407],
 		'Digit4+KeyD': [['roll_out', 'row_jump', 'scissors'], -100],
-		'KeyE+KeyA': [['roll_out'], 10],
+		'KeyE+KeyA': [['roll_out', 'row_jump'], 10],
 		'KeyE+KeyX': [['roll_out', 'row_jump'], -40],
 		'KeyE+KeyJ': [['hand_change'], 0]
 	};
@@ -3582,22 +3622,22 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 
 // (graded-costs-2026-11-21) Each grade of score_weights.json « grades »
 // weighed by hand on QWERTY ISO (rows 1, digits, to 4, bottom), the other
-// grades flat (E.flatGrades: split tables at 1, sfs's added skipgrams at 0).
+// grades flat (E.flatGrades: every factor 1, the alternation rewarded).
 {
 	const qwerty = byId.get('qwerty');
 	const w = E.defaultWeights();
 	const flat = E.flatGrades();
 	const graded = (text, grades, weights) =>
 		E.analyse(qwerty, E.ngramsFromText(text), { keyboard: 'iso', grades, weights });
-	const withGrade = (metric, grade, factor) =>
-		Object.assign({}, flat, { [metric]: Object.assign({}, flat[metric], { [grade]: factor }) });
+	const withGrades = (metric, values) =>
+		Object.assign({}, flat, { [metric]: Object.assign({}, flat[metric], values) });
 	// SFB by rows: F→G one finger on one row (index), E→D one row, E→C two rows (middle).
 	for (const [text, grade] of [
 		['fg', 'same_row'],
 		['ed', 'one_row'],
 		['ec', 'two_rows']
 	]) {
-		const r = graded(text, withGrade('sfb', grade, 3));
+		const r = graded(text, withGrades('sfb', { [grade]: 3 }));
 		check(
 			r.parts.sfb[grade] === 100 && r.metrics.sfb === 100,
 			`grades: « ${text} » is a ${grade} SFB ${JSON.stringify(r.parts.sfb)}`
@@ -3608,63 +3648,55 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		);
 		const other = E.GRADES.sfb.find((id) => id !== grade);
 		check(
-			near(graded(text, withGrade('sfb', other, 7)).score.contributions.sfb, -w.sfb * 100),
+			near(graded(text, withGrades('sfb', { [other]: 7 })).score.contributions.sfb, -w.sfb * 100),
 			`grades: « ${text} » ignores the ${other} grade`
 		);
 	}
-	// Skipgrams on two fingers of one hand around the other hand's J: S…D the
-	// ring and middle (adjacent), A…D pinky and middle (one apart), A…F pinky
-	// and index; none is an SFS, and flat they cost nothing.
-	for (const [text, grade] of [
-		['sjd', 'adjacent'],
-		['ajd', 'one_apart'],
-		['ajf', 'index_pinky']
+	// Row jumps (the maintainer's « skipgram »): two fingers of one hand on
+	// different rows, by fingers × rows. E→X middle and ring two rows apart,
+	// W→D ring and middle one row, 4→S index and ring two rows, Q→D pinky and
+	// middle one row, 4→A index and pinky two rows, R→A index and pinky one row.
+	for (const [text, fingers, rows] of [
+		['ex', 'adjacent', 'two_rows'],
+		['wd', 'adjacent', 'one_row'],
+		['4s', 'one_apart', 'two_rows'],
+		['qd', 'one_apart', 'one_row'],
+		['4a', 'index_pinky', 'two_rows'],
+		['ra', 'index_pinky', 'one_row']
 	]) {
-		const r = graded(text, withGrade('sfs', grade, 0.5));
+		const r = graded(text, withGrades('row_jump', { [fingers]: 0.5, [rows]: 0.3 }), {
+			row_jump: 2
+		});
 		check(
-			r.parts.sfs[grade] === 100 && r.metrics.sfs === 0,
-			`grades: « ${text} » is an ${grade} skipgram ${JSON.stringify(r.parts.sfs)}`
+			r.parts.row_jump[`${fingers}_${rows}`] === 100 && r.metrics.row_jump === 100,
+			`grades: « ${text} » is an ${fingers} ${rows} row jump ${JSON.stringify(r.parts.row_jump)}`
 		);
 		check(
-			near(r.score.contributions.sfs, -0.5 * w.sfs * 100),
-			`grades: « ${text} » weighs ${r.score.contributions.sfs}`
-		);
-		check(
-			graded(text, flat).score.contributions.sfs === 0,
-			`grades: « ${text} » costs nothing flat`
-		);
-	}
-	// A skipgram on one hand around a key of the same hand is a roll or a
-	// redirect, rated by its trigram class: « sdf » is no graded skipgram.
-	check(
-		Object.values(graded('sdf', flat).parts.sfs).every((v) => v === 0),
-		'grades: a one-hand trigram is no skipgram of two fingers'
-	);
-	// Row jumps: E→X middle and ring (adjacent), 4→S index and ring (one
-	// apart), 4→A index and pinky; Q→Z, one finger's jump, is an SFB.
-	for (const [text, grade] of [
-		['ex', 'adjacent'],
-		['4s', 'one_apart'],
-		['4a', 'index_pinky']
-	]) {
-		const r = graded(text, withGrade('row_jump', grade, 0.5), { row_jump: 2 });
-		check(
-			r.parts.row_jump[grade] === 100 && r.metrics.row_jump === 100,
-			`grades: « ${text} » is an ${grade} row jump ${JSON.stringify(r.parts.row_jump)}`
-		);
-		check(
-			near(r.score.contributions.row_jump, -0.5 * 2 * 100),
+			near(r.score.contributions.row_jump, -0.5 * 0.3 * 2 * 100),
 			`grades: « ${text} » weighs ${r.score.contributions.row_jump}`
 		);
 	}
+	// One finger two rows apart is a two-row SFB, never a row jump; the same
+	// row on two fingers is neither.
 	const qz = graded('qz', flat);
 	check(
 		qz.metrics.row_jump === 0 && qz.parts.sfb.two_rows === 100,
 		'grades: one finger two rows apart is a two-row SFB, no row jump'
 	);
+	check(graded('sd', flat).metrics.row_jump === 0, 'grades: one row, two fingers, no jump');
+	// The maintainer's order with the shipped scale and weights: a two-row
+	// SFB costs more than a one-row SFB, which costs more than any row jump,
+	// adjacent fingers more than one apart, more than index and pinky.
+	const pointsOf = (text) =>
+		-E.analyse(qwerty, E.ngramsFromText(text), { keyboard: 'iso' }).score.total;
+	const order = ['ec', 'ed', 'ex', '4s', '4a'].map(pointsOf);
+	check(
+		order.every((points, i) => i === 0 || order[i - 1] > points),
+		`grades: SFB 2 rows > SFB 1 row > adjacent > one apart > index–pinky, ${order.map((p) => p.toFixed(1)).join(' > ')}`
+	);
 	// Travel by finger: Q (left pinky) and U (right index); their parts add
 	// up to the distance metric and each is weighed by its finger's grade.
-	const qu = graded('qu', withGrade('distance', 'pinky', 2));
+	const qu = graded('qu', withGrades('distance', { pinky: 2 }));
 	const travel = qu.parts.distance;
 	check(
 		travel.pinky > 0 &&
@@ -3677,13 +3709,30 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		near(qu.score.contributions.distance, -w.distance * (2 * travel.pinky + travel.index)),
 		`grades: the pinky's travel weighs twice, ${qu.score.contributions.distance}`
 	);
-	// Refusals: an unknown table or grade, a negative or non-numeric factor.
+	// The alternation switch: « sjd » alternates (left, right, left); off, it
+	// earns nothing whatever its weight.
+	const sjd = graded('sjd', flat);
+	check(
+		near(sjd.score.contributions.alternation, w.alternation * 100),
+		`grades: « sjd » earns its alternation ${sjd.score.contributions.alternation}`
+	);
+	check(
+		graded('sjd', withGrades('alternation', { rewarded: false })).score.contributions
+			.alternation === 0,
+		'grades: an alternation not rewarded earns nothing'
+	);
+	// Refusals: an unknown table or grade, a negative factor, a value of the
+	// wrong type, a run multiplier under 1.
 	for (const [grades, why] of [
 		[{ lsb: { one_row: 1 } }, 'an unknown table'],
 		[{ sfb: { three_rows: 1 } }, 'an unknown grade'],
 		[{ sfb: { one_row: -1 } }, 'a negative factor'],
 		[{ distance: { pinky: '2' } }, 'a factor that is no number'],
-		[{ sfs: 1 }, 'a table that is no object']
+		[{ sfs: { adjacent: 1 } }, 'the removed skipgram grades'],
+		[{ alternation: { rewarded: 1 } }, 'a switch that is no boolean'],
+		[{ hand_run: { length_3: 0.5 } }, 'a run multiplier under 1'],
+		[{ hand_run: { growth: -1 } }, 'a negative run growth'],
+		[{ row_jump: 1 }, 'a table that is no object']
 	]) {
 		let refused = false;
 		try {
@@ -3694,11 +3743,95 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		check(refused, `grades: ${why} is refused`);
 	}
 
+	// (hand-run-2026-11-21) Same-hand runs, by hand: in « en vacances », on
+	// Ergo-L, « vacances » is typed by the left hand alone. The key stream's
+	// runs read as a chain: a run that starts carries on with chance 6 / 7
+	// (« vacances » and the space after it), so a keystroke weighs far more
+	// than in an alternating word; Ergopti alternates and weighs nothing.
+	const ergol = byId.get('ergol');
+	const ergopti = byId.get('ergopti');
+	const runOf = (layout, text, grades) =>
+		E.analyse(layout, E.ngramsFromText(text), { keyboard: 'iso', grades });
+	const vacances = runOf(ergol, ' vacances ');
+	check(
+		near(vacances.parts.hand_run.carry, 6 / 7) && vacances.parts.hand_run.start === 1,
+		`hand runs: « vacances » on Ergo-L carries on ${JSON.stringify(vacances.parts.hand_run)}`
+	);
+	const alternating = runOf(ergopti, ' vacances ');
+	check(
+		alternating.metrics.hand_run === 0 && vacances.metrics.hand_run > 300,
+		`hand runs: Ergo-L ${vacances.metrics.hand_run} %, Ergopti ${alternating.metrics.hand_run} %`
+	);
+	// At 1 point per %, « vacances » on Ergo-L costs hundreds of points more.
+	const runPoints = (r) => -E.score(r, { hand_run: 1 }).contributions.hand_run;
+	check(
+		runPoints(vacances) > runPoints(alternating) + 300,
+		`hand runs: « vacances » costs ${runPoints(vacances)} on Ergo-L, ${runPoints(alternating)} on Ergopti`
+	);
+	// The scale worked by hand: carry 0 (no run longer than 2) and start ½
+	// give runs of 1 and 2 in equal number, so 2 keystrokes in 3 are in a run
+	// of 2; with length_2 at 4, the mean multiplier is (1 + 2 × 4) / 3 = 3.
+	const scale = E.defaultGrades().hand_run;
+	const links = { start: 0.5, carry: 0, keystrokes: 10 };
+	const half = E.score(
+		{
+			metrics: Object.assign({}, vacances.metrics),
+			parts: Object.assign({}, vacances.parts, { hand_run: links })
+		},
+		{ hand_run: 1 },
+		undefined,
+		{ hand_run: Object.assign({}, scale, { length_2: 4 }) }
+	);
+	check(
+		near(half.contributions.hand_run, -200),
+		`hand runs: the scale gives ${half.contributions.hand_run}`
+	);
+	// A run that always carries on is the whole stream: ten keys weigh
+	// length_6 + 4 × growth.
+	const whole = E.score(
+		{
+			metrics: vacances.metrics,
+			parts: Object.assign({}, vacances.parts, { hand_run: { start: 1, carry: 1, keystrokes: 10 } })
+		},
+		{ hand_run: 1 }
+	);
+	check(
+		near(whole.contributions.hand_run, -100 * (scale.length_6 + 4 * scale.growth - 1)),
+		`hand runs: an endless run weighs ${whole.contributions.hand_run}`
+	);
+	// The linear growth beyond the last length, summed in closed form, matches
+	// the series summed key by key.
+	const series = { start: 0.6, carry: 0.7, keystrokes: 1000 };
+	let weighted = 1 - series.start;
+	let keys = 1 - series.start;
+	for (let k = 2; k < 400; k++) {
+		const p = series.start * series.carry ** (k - 2) * (1 - series.carry);
+		const m = k <= 6 ? scale[`length_${k}`] : scale.length_6 + scale.growth * (k - 6);
+		weighted += k * p * m;
+		keys += k * p;
+	}
+	const closed = E.score(
+		{ metrics: vacances.metrics, parts: Object.assign({}, vacances.parts, { hand_run: series }) },
+		{ hand_run: 1 }
+	);
+	check(
+		near(-closed.contributions.hand_run, 100 * (weighted / keys - 1)),
+		`hand runs: closed form ${-closed.contributions.hand_run}, series ${100 * (weighted / keys - 1)}`
+	);
+	// rescore() follows an edited scale and shows it in the metric.
+	const steeper = E.rescore([runOf(ergol, ' vacances ')], undefined, undefined, {
+		hand_run: Object.assign({}, scale, { growth: 3 })
+	})[0];
+	check(
+		steeper.metrics.hand_run > vacances.metrics.hand_run,
+		`hand runs: a steeper growth shows ${steeper.metrics.hand_run} %`
+	);
+
 	// The flat model is the single weights' score: with E.flatGrades() and
-	// row_jump at 0, the total is the sum of ± weight × metric, to the last
-	// bit, as before the graded costs (2026-11-21).
+	// row_jump and hand_run at 0, the total is the sum of ± weight × metric,
+	// to the last bit, as before the graded costs (2026-11-21).
 	const swann = E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 20000));
-	const flatWeights = Object.assign(E.defaultWeights(), { row_jump: 0 });
+	const flatWeights = Object.assign(E.defaultWeights(), { row_jump: 0, hand_run: 0 });
 	for (const id of ['azerty', 'qwerty', 'bepo', 'ergopti']) {
 		const r = E.analyse(byId.get(id), swann, { grades: flat, weights: flatWeights });
 		let total = 0;
@@ -3713,11 +3846,12 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	// costs, the word efforts and the pair matrix.
 	const custom = E.scoreGrades({
 		sfb: { two_rows: 2 },
-		sfs: { adjacent: 0.1, one_apart: 0.05, index_pinky: 0.01 },
-		row_jump: { one_apart: 0.5, index_pinky: 0.25 },
-		distance: { pinky: 1.7, ring: 1.3 }
+		row_jump: { one_apart: 0.5, index_pinky: 0.1, one_row: 0.5 },
+		distance: { pinky: 1.7, ring: 1.3 },
+		alternation: { rewarded: false },
+		hand_run: { growth: 2 }
 	});
-	const weights = { row_jump: 2.5 };
+	const weights = { row_jump: 2.5, hand_run: 0.1 };
 	const keySum = (costs) => Object.values(costs).reduce((sum, v) => sum + v, 0);
 	for (const id of ['azerty', 'ergopti']) {
 		const full = E.analyse(byId.get(id), swann, { grades: custom, weights });
@@ -3733,8 +3867,8 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			(sum, metric) => sum - full.score.contributions[metric],
 			0
 		);
-		const keys = keySum(E.keyScoreCost(full, weights, undefined, custom));
-		check(near(keys, costs), `grades: ${id} keys cost ${keys}, the score ${costs}`);
+		const keyed = keySum(E.keyScoreCost(full, weights, undefined, custom));
+		check(near(keyed, costs), `grades: ${id} keys cost ${keyed}, the score ${costs}`);
 	}
 	const ecWord = (grades) =>
 		E.wordEfforts(qwerty, { ec: 1 }, { keyboard: 'iso', grades }).words[0].parts.sfb;
@@ -3762,9 +3896,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	);
 	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), steep, { filename: ENGINE_PATH });
 	const S = vm.runInContext('LAYOUT_ANALYSIS', steep);
+	const defaults = E.defaultGrades();
 	for (const [text, added] of [
-		['ec', (3 - E.defaultGrades().sfb.two_rows) * w.sfb * 100],
-		['ex', (1 - w.row_jump) * E.defaultGrades().row_jump.adjacent * 100]
+		['ec', (3 - defaults.sfb.two_rows) * w.sfb * 100],
+		['ex', (1 - w.row_jump) * defaults.row_jump.adjacent * defaults.row_jump.two_rows * 100]
 	]) {
 		const before = E.analyse(qwerty, E.ngramsFromText(text), { keyboard: 'iso' }).typing.cost;
 		const after = S.analyse(qwerty, E.ngramsFromText(text), { keyboard: 'iso' }).typing.cost;

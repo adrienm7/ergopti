@@ -60,6 +60,7 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 	const OWN_FORMULAS = Object.freeze([
 		'distance',
 		'sfb_distance',
+		'hand_run',
 		'finger_imbalance',
 		'hand_imbalance',
 		'char_coverage',

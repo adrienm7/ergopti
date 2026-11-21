@@ -254,6 +254,7 @@
 			'roll3_in',
 			'roll3_out',
 			'alternation',
+			'hand_run',
 			'redirect',
 			'redirect_bad'
 		],
@@ -343,7 +344,7 @@
 			'roll_out',
 			'hand_change'
 		],
-		trigrams: ['roll3_in', 'roll3_out', 'alternation', 'redirect', 'redirect_bad'],
+		trigrams: ['roll3_in', 'roll3_out', 'alternation', 'hand_run', 'redirect', 'redirect_bad'],
 		rows: ['home_row', 'top_row', 'bottom_row', 'number_row', 'distance', 'outer_column'],
 		misc: [
 			'unsupported',
@@ -5469,8 +5470,9 @@
 
 		/**
 		 * A graded metric's grades (E.GRADES), a group named by its legend: one
-		 * labelled number per kind of event, each a factor of the metric's weight,
-		 * re-scoring as it is edited; the help says what the grades weigh.
+		 * labelled control per grade, re-scoring as it is edited (a checkbox for
+		 * a switch, else a number: a factor of the weight or a run multiplier,
+		 * checked by the engine); the help says what the grades weigh.
 		 */
 		function gradeFields(id) {
 			const group = el('fieldset', 'la-grade-group');
@@ -5485,16 +5487,44 @@
 				label.htmlFor = inputId;
 				const input = el('input');
 				input.id = inputId;
+				if (E.GRADE_KINDS[id] === E.GRADE_SWITCH) {
+					input.type = 'checkbox';
+					input.checked = state.grades[id][grade];
+					input.setAttribute('aria-describedby', help.id);
+					input.addEventListener('change', () => {
+						state.grades[id][grade] = input.checked;
+						rescore();
+					});
+					item.append(input, label);
+					list.append(item);
+					continue;
+				}
 				input.type = 'number';
-				input.min = '0';
+				input.min = String(E.gradeMinimum(id, grade));
 				input.step = 'any';
 				input.value = String(state.grades[id][grade]);
-				const unit = el('small', 'la-weight-unit', t('layout_analysis.weights.grade_unit'));
+				const unit = el(
+					'small',
+					'la-weight-unit',
+					t(
+						E.GRADE_KINDS[id] === E.GRADE_RUN
+							? 'layout_analysis.weights.run_unit'
+							: 'layout_analysis.weights.grade_unit'
+					)
+				);
 				unit.id = `${inputId}-unit`;
 				input.setAttribute('aria-describedby', `${unit.id} ${help.id}`);
 				input.addEventListener('input', () => {
 					const value = Number(input.value);
-					if (input.value === '' || !Number.isFinite(value) || value < 0) {
+					// The engine's own check of the grade (scoreGrades) decides.
+					let accepted = input.value !== '';
+					if (accepted)
+						try {
+							E.scoreGrades({ [id]: { [grade]: value } });
+						} catch {
+							accepted = false;
+						}
+					if (!accepted) {
 						input.setAttribute('aria-invalid', 'true');
 						return;
 					}

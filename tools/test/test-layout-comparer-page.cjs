@@ -1076,7 +1076,9 @@ check(
 			/label\.htmlFor = inputId/.test(gradeBody) &&
 			/input\.id = inputId/.test(gradeBody) &&
 			/input\.type = 'number'/.test(gradeBody) &&
-			/input\.min = '0'/.test(gradeBody) &&
+			/input\.min = String\(E\.gradeMinimum\(id, grade\)\)/.test(gradeBody) &&
+			/input\.type = 'checkbox'/.test(gradeBody) &&
+			/E\.scoreGrades\(\{ \[id\]: \{ \[grade\]: value \} \}\)/.test(gradeBody) &&
 			/aria-describedby', `\$\{unit\.id\} \$\{help\.id\}`/.test(gradeBody) &&
 			/setAttribute\('aria-invalid', 'true'\)/.test(gradeBody) &&
 			/state\.grades\[id\]\[grade\] = value;\s*rescore\(\);/.test(gradeBody),

@@ -544,9 +544,10 @@ bad layouts on the reference corpora weighs as the tools above weigh it.
 These weights are **decided by the agent, to review by the maintainer**. The
 Studio lets every user change each weight and restore the defaults; the score
 of every layout is recomputed without re-analysing (`LAYOUT_ANALYSIS.rescore`).
-Since 2026-11-21, `sfb`, `sfs`, `row_jump` and `distance` are graded costs
-(maintainer decision): their scale, grounded in Cyanophage, genkey and
-Oxeylyzer, and its ranking impact are in
+Since 2026-11-21, `sfb`, `row_jump` and `distance` are graded costs, the
+alternation reward has a switch and same-hand runs a progressive scale
+(`hand_run`, maintainer decisions): their scale, grounded in Cyanophage,
+genkey, Oxeylyzer and the Keyboard Layout Optimizer, and its ranking impact are in
 [graded-costs-ranking.md](graded-costs-ranking.md).
 
 ## 12. First results
