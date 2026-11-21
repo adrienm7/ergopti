@@ -167,6 +167,15 @@ function M.boot(opts)
 		invalidate_cache = noop,
 	}
 	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
+	-- The virtual base directory holds no logo: the boot draws a present,
+	-- decodable one, so a missing logo is never logged here (TRAY-05 has its
+	-- own cases in test_menubar_logo_missing.lua).
+	package.loaded["menu.ui.menubar_logo"] = nil
+	local MenubarLogo = require("menu.ui.menubar_logo")
+	package.loaded["menu.ui.menubar_logo"] = setmetatable({
+		file_exists = function() return true end,
+		load_image = function(path) return { path = path }, nil end,
+	}, { __index = MenubarLogo })
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,

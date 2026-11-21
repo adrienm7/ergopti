@@ -12,7 +12,8 @@
 ---    drawn as the title « 🔧 », with nothing in the log (TRAY-05). A missing
 ---    file is now reported to the caller, which logs it once, draws the warning
 ---    sign and says in the tooltip that the file is missing.
---- 2. Pure: the file probe is passed in, so the choice is tested without a disk.
+--- 2. The choice takes its file probe, and the decode is one function here, so
+---    both are tested, and replaced in the menu boot fixtures, without a disk.
 --- ==============================================================================
 
 local M = {}
@@ -70,6 +71,17 @@ function M.file_exists(path)
 	if handle == nil then return false end
 	handle:close()
 	return true
+end
+
+--- Decodes a logo file through hs.image.
+--- @param path string An existing logo file.
+--- @return userdata|nil image The decoded image, nil when it cannot be decoded.
+--- @return string|nil reason Why it could not be decoded.
+function M.load_image(path)
+	local ok, image = pcall(hs.image.imageFromPath, path)
+	if not ok then return nil, tostring(image) end
+	if image == nil then return nil, "hs.image returned nothing" end
+	return image, nil
 end
 
 return M

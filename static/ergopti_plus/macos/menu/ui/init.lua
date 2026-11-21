@@ -363,11 +363,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					missing_logo)
 			end
 		else
-			ok_img, ico = pcall(hs.image.imageFromPath, logo_path)
-			if not (ok_img and ico) and not _missing_logos_reported[logo_path] then
+			local decode_error
+			ico, decode_error = MenubarLogo.load_image(logo_path)
+			ok_img = ico ~= nil
+			if not ok_img and not _missing_logos_reported[logo_path] then
 				_missing_logos_reported[logo_path] = true
 				Logger.error(LOG, "Menu-bar logo '%s' could not be decoded; the warning sign is drawn instead: %s.",
-					logo_path, tostring(ico))
+					logo_path, tostring(decode_error))
 			end
 		end
 

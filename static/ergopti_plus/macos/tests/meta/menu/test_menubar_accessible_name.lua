@@ -32,8 +32,13 @@ helpers.describe("the menu-bar item has an accessible name (a11y-menubar-tooltip
 		local finish = body:find("local function reset_menubar()", start, true)
 		helpers.assert_true(start ~= nil and finish ~= nil, "update_icon must be found whole")
 		local fn = body:sub(start, finish)
-		local keys_at = fn:find('i18n.get(paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip")', 1, true)
+		-- The keys are chosen by menu/ui/menubar_logo.lua, which adds the
+		-- missing-logo twins (TRAY-05); its own suite pins the four keys.
+		local keys_at = fn:find("i18n.get(MenubarLogo.tooltip_key(paused, missing_logo ~= nil))", 1, true)
 		helpers.assert_true(keys_at ~= nil, "the tooltip must come from the shared tray keys, paused or not")
+		local Logo = require("menu.ui.menubar_logo")
+		helpers.assert_eq(Logo.tooltip_key(false, false), "accessibility.tray_tip")
+		helpers.assert_eq(Logo.tooltip_key(true, false), "accessibility.tray_tip_paused")
 		local key_at = fn:find('local icon_key = tostring(variant) .. "|" .. tostring(paused) .. "|" .. tostring(tooltip)', 1, true)
 		helpers.assert_true(key_at ~= nil, "the tooltip text must be part of the unchanged-icon key")
 		local skip_at = fn:find("if custom_text == nil and icon_key == _last_icon_key then return end", 1, true)

@@ -29,7 +29,7 @@ helpers.describe("menubar: the icon is not re-rendered when nothing changed", fu
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the menu source must be readable or this asserts nothing")
 		local at = src:find("local function update_icon(custom_text)", 1, true)
-		local body = src:sub(at, at + 1600)
+		local body = src:sub(at, (src:find("local function reset_menubar", at, true)))
 		helpers.assert_true(body:find("_last_icon_key", 1, true) ~= nil,
 			"a PNG decode plus an off-screen canvas render runs inside the script-control "
 			.. "eventtap on every pause toggle, twice, for an icon determined by two inputs")
