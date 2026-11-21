@@ -81,7 +81,7 @@ helpers.describe("tray host check: the user is told, in their language (tray-03)
 	helpers.it("a session with no host tells the user what to install, three ways", function()
 		local deps, told = deps_for({ watcher = false, host = nil, xembed = false })
 		helpers.assert_eq(HostCheck.check(deps), false)
-		local body = "<" .. HostCheck.BODY_KEY .. ":gnome-shell-extension-appindicator>"
+		local body = "<startup.linux_tray_host_missing_body:gnome-shell-extension-appindicator>"
 		helpers.assert_eq(#told.windows, 1, "the status window says it: a notification can be missed")
 		helpers.assert_eq(told.windows[1].body, body, "the translated body names the extension package")
 		helpers.assert_eq(#told.notices, 1)
@@ -131,9 +131,9 @@ helpers.describe("tray host check: the user is told, in their language (tray-03)
 			local fh = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "r"))
 			local catalogue = Json.decode(fh:read("*a"))
 			fh:close()
-			helpers.assert_eq(type(catalogue[HostCheck.TITLE_KEY]), "string", code)
-			helpers.assert_true(type(catalogue[HostCheck.BODY_KEY]) == "string"
-				and catalogue[HostCheck.BODY_KEY]:find("{1}", 1, true) ~= nil, code .. " " .. HostCheck.BODY_KEY)
+			helpers.assert_eq(type(catalogue["startup.linux_tray_host_missing_title"]), "string", code)
+			helpers.assert_true(type(catalogue["startup.linux_tray_host_missing_body"]) == "string"
+				and catalogue["startup.linux_tray_host_missing_body"]:find("{1}", 1, true) ~= nil, code .. " startup.linux_tray_host_missing_body")
 		end
 	end)
 

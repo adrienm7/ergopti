@@ -27,13 +27,6 @@ local M = {}
 
 local LOG = "tray.engine.host_check"
 
-M.TITLE_KEY = "startup.linux_tray_host_missing_title"
-M.BODY_KEY = "startup.linux_tray_host_missing_body"
-
---- The GNOME Shell extension that hosts StatusNotifierItems, by the package
---- name Debian, Ubuntu, Fedora, Arch and openSUSE all give it.
-M.GNOME_EXTENSION_PACKAGE = "gnome-shell-extension-appindicator"
-
 
 
 
@@ -60,13 +53,15 @@ end
 -- =====================================
 -- =====================================
 
---- A translated text with {1} filled.
+--- A translated text with {1} filled by the GNOME Shell extension that hosts
+--- StatusNotifierItems, named as Debian, Ubuntu, Fedora, Arch and openSUSE all
+--- package it; the product name stays the same in every language.
 --- @param i18n table
 --- @param key string
 --- @return string
 local function text(i18n, key)
 	local value = i18n.get(key)
-	return (value:gsub("{1}", function() return M.GNOME_EXTENSION_PACKAGE end))
+	return (value:gsub("{1}", function() return "gnome-shell-extension-appindicator" end))
 end
 
 --- Runs the check and tells the user when no host shows the icon.
@@ -89,8 +84,8 @@ function M.check(deps)
 		return true
 	end
 	Logger.error(LOG, "No tray host (%s): the icon and its menu are not visible; telling the user.", summary)
-	local title = text(deps.i18n, M.TITLE_KEY)
-	local body = text(deps.i18n, M.BODY_KEY)
+	local title = text(deps.i18n, "startup.linux_tray_host_missing_title")
+	local body = text(deps.i18n, "startup.linux_tray_host_missing_body")
 	local out = deps.print or print
 	out(title)
 	out(body)
