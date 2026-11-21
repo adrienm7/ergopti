@@ -1,0 +1,11 @@
+{
+	"slot_order": ["tap", "hold", "combo"],
+	"empty_action_key": "dialog.action_picker.disabled",
+	"empty_hold_key": "tap_hold.hold.none",
+	"summaries": [
+		{ "tap": null, "hold": null, "summary": null },
+		{ "tap": "Copy", "hold": null, "summary": "Copy" },
+		{ "tap": null, "hold": "Ctrl", "summary": "Ctrl" },
+		{ "tap": "Copy", "hold": "Ctrl", "summary": "Copy / Ctrl" }
+	]
+}

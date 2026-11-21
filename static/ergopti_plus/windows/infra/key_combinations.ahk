@@ -832,12 +832,23 @@ _KeyCombinationPairRow(First, Second) {
 	IsAssigned := KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationChordOf(PairId) != KEY_COMBINATION_NONE
-	ActionLabel := _KeyCombinationTapLabel(PairId)
-	if KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
-		ActionLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE
-			? _KeyCombinationHoldLabel(PairId) : ActionLabel . " / " . _KeyCombinationHoldLabel(PairId)
-	Label := LabelValue(PairLabel, ActionLabel)
+	TapLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationTapLabel(PairId)
+	HoldLabel := KeyCombinationHoldOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationHoldLabel(PairId)
+	Label := LabelValue(PairLabel, KeyCombinationPairSummary(TapLabel, HoldLabel))
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
+}
+
+; A pair's summary: its tap, its hold beside it when it has one, the hold
+; alone when the tap is empty, the picker's « disabled » when neither is set.
+; Linux and macOS draw the same (_shared/tap_hold/engine/key_combination_rows.lua);
+; all replay _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
+; @param TapLabel {String} The tap's label, "" when empty.
+; @param HoldLabel {String} The hold's label, "" when empty.
+; @returns {String}
+KeyCombinationPairSummary(TapLabel, HoldLabel) {
+	if (HoldLabel != "")
+		return TapLabel == "" ? HoldLabel : TapLabel . " / " . HoldLabel
+	return TapLabel == "" ? t("dialog.action_picker.disabled") : TapLabel
 }
 
 _KeyCombinationPairMenuOpener(PairId, PairLabel) {

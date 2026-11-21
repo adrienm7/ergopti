@@ -112,6 +112,7 @@ return {
 	"tests.unit.core.ui.editors.test_physical_shortcut_native_ready",
 	"tests.unit.core.ui.webview.test_native_lifecycle",
 	"tests.unit.menu.shortcuts.test_key_combinations_menu",
+	"tests.unit.menu.shortcuts.test_key_combination_pair_rows",
 	"tests.unit.settings.scope.test_key_combinations_scope_acknowledged_ordered_pair",
 	"tests.unit.settings.scope.test_key_combinations_scope_declared_simultaneous_publication",
 	"tests.unit.core.network.engine.test_http_headers",

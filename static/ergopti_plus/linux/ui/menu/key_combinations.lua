@@ -1,13 +1,14 @@
 --- ui/menu/key_combinations.lua
 
 --- Renders shared ordered slots through the actual native picker and publisher.
---- Same-device chord choices retain the original source and publication owner.
+--- Chord choices retain the original source and publication owner.
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Shared = require("tap_hold.engine.key_combinations")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Features = require("menu.engine.manifest_reader")
 local Codec = require("core.text.engine.toml_codec")
+local PairRows = require("tap_hold.engine.key_combination_rows")
 local M = {}
 
 --- Builds the manifest's ordered-pair group, using a native context's UI ports.
@@ -57,7 +58,7 @@ function M.build(ctx,ui)
 	end
 	local editable = snapshot() ~= nil
 	local function action_label(action)
-		if action==Shared.NONE then return t("tap_hold.tap.none") end
+		if action==Shared.NONE then return t(PairRows.EMPTY_ACTION_KEY) end
 		return ui.action_label(action,actions)
 	end
 	local function hold_option(value)
@@ -105,9 +106,13 @@ function M.build(ctx,ui)
 			return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
 		end)
 	end
+	-- The Windows layout (maintainer decision KCD-8 of 2026-11-21, shared in
+	-- tap_hold.engine.key_combination_rows): one submenu per first key, ticked
+	-- when any of its pairs is set, then one row per pair and its summary.
 	local function hand_rows(hand)
-		local rows={}
+		local groups={}
 		for _,first in ipairs(KeyCatalog.of_hand(keys,hand)) do
+			local rows,any={},false
 			for _,second in ipairs(keys) do
 				if first.id~=second.id then
 					local pair=Shared.pair(first.id,second.id)
@@ -119,7 +124,7 @@ function M.build(ctx,ui)
 					local label=ui.key_label(first).." + "..ui.key_label(second)
 					local tap_label=action_label(tap)
 					local chosen=hold_option(hold)
-					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t("tap_hold.hold.none")
+					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t(PairRows.EMPTY_HOLD_KEY)
 					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
 						commands={[require("settings.engine.keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
@@ -138,11 +143,14 @@ function M.build(ctx,ui)
 						end
 						return slots
 					end})
-					rows[#rows+1]={label=label.."  :  "..tap_label.."  /  "..hold_label,checked=assigned or nil,submenu=sub}
+					any=any or assigned
+					rows[#rows+1]={label=PairRows.pair_label(t,ui.key_label(first),ui.key_label(second),
+						tap~=Shared.NONE and tap_label or nil,hold~=Shared.NONE and hold_label or nil),checked=assigned or nil,submenu=sub}
 				end
 			end
+			groups[#groups+1]={label=ui.key_label(first),checked=any or nil,items=rows}
 		end
-		return rows
+		return groups
 	end
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
 	render.commands[require("settings.engine.keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()

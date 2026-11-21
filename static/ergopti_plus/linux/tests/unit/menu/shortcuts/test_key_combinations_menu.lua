@@ -63,7 +63,7 @@ helpers.describe("bounded actual ordered-pair menu",function()
 	helpers.it("retains every ordered pair and no eager hold-choice subtree",function()
 		with_menu(function(state)
 			local total,pairs=0,0;state.walk(state.rows,function(row)
-				total=total+1;if tostring(row.label or row.title or ""):find("  :  ",1,true) then pairs=pairs+1 end
+				total=total+1;if (row.menu or row.submenu) and tostring(row.label or row.title or ""):find(" + ",1,true) then pairs=pairs+1 end
 			end)
 			helpers.assert_eq(#state.keys,14);helpers.assert_eq(pairs,182)
 			helpers.assert_true(total<1200,"ordered pairs must fit the unchanged whole-tray ceiling")
@@ -235,7 +235,7 @@ local function with_canonical_locale_menu(callback)
 		function state.pair_rows(rows)
 			local result = {}
 			state.walk(rows, function(row)
-				if tostring(row.title or ""):find("  :  ", 1, true) then result[#result + 1] = row end
+				if row.menu and tostring(row.title or ""):find(" + ", 1, true) then result[#result + 1] = row end
 			end)
 			return result
 		end
@@ -271,7 +271,15 @@ local function check_locale_matrix(state, rows, strings)
 				helpers.assert_true(type(first_label) == "string" and first_label ~= "")
 				helpers.assert_true(type(second_label) == "string" and second_label ~= "")
 				local label = first_label .. " + " .. second_label
-				helpers.assert_eq(actual[cursor].title, label .. "  :  " .. strings["tap_hold.tap.none"] .. "  /  " .. strings["tap_hold.hold.none"])
+				-- (kcd-8) the Windows pair row: « First + Second » and its summary
+				-- through common.label_value, the empty word when nothing is set.
+				local expected = strings["common.label_value"]:gsub("{1}", function() return label end)
+					:gsub("{2}", function() return strings["dialog.action_picker.disabled"] end)
+				helpers.assert_eq(actual[cursor].title, expected)
+				helpers.assert_eq(actual[cursor].menu[3].title, (strings["menu.shortcuts.key_combinations_hold_tap"]
+					:gsub("%%s", function() return strings["dialog.action_picker.disabled"] end)), "the tap slot comes first")
+				helpers.assert_eq(actual[cursor].menu[4].title, (strings["menu.shortcuts.key_combinations_hold_hold"]
+					:gsub("%%s", function() return strings["tap_hold.hold.none"] end)), "then the hold slot")
 				helpers.assert_eq(actual[cursor].menu[2].title, "-", "the separator below the clear row is drawn on Linux too")
 				helpers.assert_true(actual[cursor].menu[3].disabled ~= true, "real source receipt admits the tap picker")
 				local picked = state.pick(actual[cursor])
@@ -285,20 +293,36 @@ local function check_locale_matrix(state, rows, strings)
 		local label = row.title
 		helpers.assert_true(label ~= strings["menu.tapholds.symmetric"] and label ~= strings["menu.tapholds.copy_tap_to_combo"], "Linux never exposes unavailable simultaneous controls")
 	end)
-	-- The separator between the left-hand and the right-hand pairs, as on the other drivers.
-	local function is_pair(row) return tostring(row.title or ""):find("  :  ", 1, true) ~= nil end
+	-- (kcd-8) one submenu per first key, as on Windows, named by that key and
+	-- holding its pairs in the catalogue's order of second keys.
+	local KeyNames = require("platform.input.keycodes.key_names")
+	local function is_group(row)
+		if type(row.menu) ~= "table" or tostring(row.title or ""):find(" + ", 1, true) then return false end
+		for _, child in ipairs(row.menu) do
+			if not tostring(child.title or ""):find(" + ", 1, true) then return false end
+		end
+		return #row.menu > 0
+	end
+	local groups = {}
+	for _, row in ipairs(rows) do if is_group(row) then groups[#groups + 1] = row end end
+	helpers.assert_eq(#groups, #EXPECTED_LINUX_KEYS, "one submenu per first key")
+	for index, id in ipairs(EXPECTED_LINUX_KEYS) do
+		helpers.assert_eq(groups[index].title, strings[KeyNames.i18n(id, "linux")], "the submenu is named by its first key")
+		helpers.assert_eq(#groups[index].menu, #EXPECTED_LINUX_KEYS - 1, "one row per second key")
+	end
+	-- The separator between the left-hand and the right-hand first keys, as on the other drivers.
 	local hand_boundaries = 0
 	for index = 2, #rows - 1 do
-		if rows[index].title == "-" and is_pair(rows[index - 1]) and is_pair(rows[index + 1]) then
+		if rows[index].title == "-" and is_group(rows[index - 1]) and is_group(rows[index + 1]) then
 			hand_boundaries = hand_boundaries + 1
 		end
 	end
-	helpers.assert_eq(hand_boundaries, 1, "one separator splits the two hands' pairs")
+	helpers.assert_eq(hand_boundaries, 1, "one separator splits the two hands' first keys")
 	return actual
 end
 
 helpers.describe("actual Linux ordered-pair translations", function()
-	helpers.it("renders the independent complete matrix in all 21 canonical locales without reloading owners", function()
+	helpers.it("(kcd-8) renders the independent complete matrix in all 21 canonical locales without reloading owners", function()
 		with_canonical_locale_menu(function(state)
 			local order = read_locale_data("core/i18n/data/locale_order.json").order
 			helpers.assert_eq(#order, 21)

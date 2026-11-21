@@ -96,7 +96,7 @@ helpers.describe("declared Linux simultaneous publication through original owner
  helpers.it("(linux-chord-caps-word) the chord picker publishes a simultaneous CapsWord",function()
   with_menu(function(s)
    local row=find_menu(s.build(),'caps_lock + tab')
-   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))
    helpers.assert_true(chord.fn());helpers.assert_true(s.pairs.validate_slot("combo",pair,"caps_word"))
    helpers.assert_true(s.picker.confirm('caps_word'))
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,'caps_word')
@@ -199,9 +199,9 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    local rows=s.build();local count,total=0,0
    local function walk(list) for _,row in ipairs(list or {}) do
     total=total+1
-    if tostring(row.title or ''):find('  :  ',1,true) then
+    if row.menu and tostring(row.title or ''):find(' + ',1,true) then
      count=count+1;helpers.assert_eq(#row.menu,5,'clear, its separator, tap, hold and chord')
-     helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))~=nil)
+     helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))~=nil)
     end
     if row.menu then walk(row.menu) end
    end end
@@ -214,7 +214,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
  helpers.it("the real combo picker publishes its exact slot and excludes undispatched native state actions",function()
   with_menu(function(s)
    local row=find_menu(s.build(),'caps_lock + tab')
-   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))
    helpers.assert_true(chord.fn());helpers.assert_eq(s.picker.binding,binding)
    local offers_caps_word=false
    for _,item in ipairs(s.picker.items) do
@@ -232,7 +232,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    local rows=s.build();helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.symmetric'),true).fn())
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.symmetric,true)
    local row=find_menu(s.build(),'caps_lock + tab')
-   helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none'))).fn())
+   helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled'))).fn())
    helpers.assert_eq(s.picker.binding,'combination__tab_then_caps_lock')
    helpers.assert_true(s.picker.confirm('copy'))
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config.tab_then_caps_lock.combo,'copy')
@@ -341,7 +341,7 @@ helpers.describe("unjoined third-slot native receiving is unavailable",function(
     helpers.assert_eq(s.pairs.validate_slot("combo",pair,action),false)
     helpers.assert_eq(s.pairs.capture_action(binding,action),nil)
     local row=find_menu(s.build(),'caps_lock + tab')
-    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))
     helpers.assert_true(chord.fn())
     for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~=action) end
     helpers.assert_eq(s.picker.confirm(action),false)
