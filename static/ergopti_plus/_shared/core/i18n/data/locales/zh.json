@@ -3328,6 +3328,8 @@
 	"startup.linux_gui_stack_title": "Ergopti+ 需要一个桌面组件",
 	"startup.linux_gui_stack_tray_body": "Ergopti+ 的托盘图标需要 {1}，但此系统中没有，因此 Ergopti+ 不会启动。请用发行版的软件包管理器安装 {1}，然后重新启动 Ergopti+。",
 	"startup.linux_gui_stack_windows_body": "Ergopti+ 的窗口（设置、统计、编辑器）需要 {1}，但此系统中没有，因此不会打开。热字符串和托盘图标可以正常使用。请用发行版的软件包管理器安装 {1} 以打开这些窗口。",
+	"startup.linux_tray_host_missing_title": "此桌面上没有 Ergopti+ 的托盘图标",
+	"startup.linux_tray_host_missing_body": "此桌面没有任何面板显示托盘图标，因此看不到 Ergopti+ 的图标和菜单。热字符串仍可正常使用。在 GNOME 上，请安装 {1}，启用 AppIndicator 扩展，然后注销并重新登录。在其他桌面上，请添加一个能显示 StatusNotifierItem 图标的面板或小部件。",
 	"startup.linux_input_access_body": "Ergopti+ 暂时无法读取键盘或写入 /dev/uinput。请注销并重新登录（或重启），使安装程序添加的“input”和“uinput”用户组生效。如果问题仍然存在，请运行：{1}",
 	"startup.linux_input_access_no_device_body": "Ergopti+ 没有找到可读取的键盘。在沙盒或容器中 /dev/input 被隐藏：请在其外启动 Ergopti+，或用 --device 指定键盘。",
 	"startup.linux_input_access_missing_program_body": "由于未安装程序“{1}”，Ergopti+ 无法设置键盘访问。请使用包管理器安装它，然后重新启动 Ergopti+。",

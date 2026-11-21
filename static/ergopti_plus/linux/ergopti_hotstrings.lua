@@ -2973,7 +2973,19 @@ local function main()
 		-- invisible daemon or windows that never open.
 		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
 		if refusal then os.exit(refusal) end
-		if not tray_menu.start() then Logger.error(LOG, "The tray icon could not be created.") end
+		if not tray_menu.start() then
+			Logger.error(LOG, "The tray icon could not be created.")
+		else
+			-- libayatana creates its icon whether or not a panel shows it: GNOME
+			-- without its AppIndicator extension showed nothing and said nothing
+			-- (TRAY-03). The check reads the session once the panel had its time.
+			require("tray.engine.host_check").schedule({
+				probe = require("tray.adapters.status_notifier_host").probe,
+				i18n = require("core.i18n.engine.i18n"), logger = Logger, tray = tray_menu, notifier = notifier,
+				timings = require("core.timing.engine.timings"),
+				after = function(seconds, fn) return TimerScheduler.after(seconds, fn).armed == true end,
+			})
+		end
 		if not privacy_owners.startup_checkpoint() then return end
 
 	if menu_builder then

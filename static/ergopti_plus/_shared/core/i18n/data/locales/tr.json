@@ -3328,6 +3328,8 @@
 	"startup.linux_gui_stack_title": "Ergopti+ bir masaüstü bileşenine ihtiyaç duyuyor",
 	"startup.linux_gui_stack_tray_body": "Ergopti+ sistem tepsisi simgesi {1} gerektirir; bu sistemde bulunmadığı için Ergopti+ başlamaz. {1} paketini dağıtımınızın paket yöneticisiyle kurun, ardından Ergopti+’yı yeniden başlatın.",
 	"startup.linux_gui_stack_windows_body": "Ergopti+ pencereleri (ayarlar, istatistikler, düzenleyiciler) {1} gerektirir; bu sistemde bulunmadığı için kapalı kalırlar. Hotstring’ler ve tepsi simgesi çalışır. Pencereleri açmak için {1} paketini dağıtımınızın paket yöneticisiyle kurun.",
+	"startup.linux_tray_host_missing_title": "Ergopti+ bu masaüstünde tepsi simgesi gösteremiyor",
+	"startup.linux_tray_host_missing_body": "Bu masaüstündeki hiçbir panel tepsi simgelerini göstermiyor, bu yüzden Ergopti+ simgesi ve menüsü görünmüyor. Hotstring’ler çalışmaya devam eder. GNOME’da {1} paketini kurun, AppIndicator uzantısını etkinleştirin, ardından oturumu kapatıp yeniden açın. Başka bir masaüstünde StatusNotifierItem simgelerini gösteren bir panel veya bileşen ekleyin.",
 	"startup.linux_input_access_body": "Ergopti+ klavyeyi henüz okuyamıyor veya /dev/uinput’a yazamıyor. Yükleyicinin eklediği “input” ve “uinput” gruplarının geçerli olması için oturumu kapatıp yeniden açın (veya yeniden başlatın). Sorun sürerse şunu çalıştırın: {1}",
 	"startup.linux_input_access_no_device_body": "Ergopti+ okunacak bir klavye bulamadı. Bir korumalı alanda veya kapta /dev/input gizlidir: Ergopti+’ı bunun dışında başlatın ya da klavyeyi --device ile belirtin.",
 	"startup.linux_input_access_missing_program_body": "Ergopti+ klavye erişimini ayarlayamadı çünkü “{1}” programı yüklü değil. Paket yöneticinizle yükleyin, ardından Ergopti+’yı yeniden başlatın.",

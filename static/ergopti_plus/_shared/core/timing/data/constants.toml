@@ -1120,6 +1120,17 @@ notification_ttl_ms = 5000
 # acknowledges, so only a hung session bus reaches this deadline.
 notification_send_timeout_ms = 5000
 
+# Linux: how long after the tray icon appears the daemon checks that a panel
+# shows it (TRAY-03, tray/engine/host_check.lua). A login starts the daemon and
+# the panel together, and GNOME's AppIndicator extension registers its
+# StatusNotifierWatcher only once the shell has loaded: checking at once would
+# tell a user whose tray works that it is missing.
+tray_host_check_delay_ms = 15000
+
+# Linux: bounds each session-bus call of the tray host check, NameHasOwner and
+# one property read (tray/adapters/status_notifier_host.lua).
+tray_host_bus_timeout_ms = 1000
+
 # Margin past user_quit_deadline_ms a launcher waits for the running instance's
 # controlled exit before it gives up: the macOS launcher answering a quit from
 # outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch

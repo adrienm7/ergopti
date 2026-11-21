@@ -56,10 +56,13 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       probe that answered), once with the runtime already installed and once right after its first install. Linux
       probes every 3 s up to what is left of the 30 min install budget, macOS waits at most 30 s: the two figures
       decide one bound for the three.
-- [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, 2026-11-20): on GNOME (Wayland, then X11)
-      without the AppIndicator extension, start the daemon with `--tray`: note what the user sees (no icon, a
-      notification, a window) and the log line after « Tray icon created ». Then enable the extension and, on GNOME and
-      on KDE Plasma, left-click and right-click the icon (both open the menu?) and let Orca read it: « Ergopti+ », then
+- [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, fixed 2026-11-21): on GNOME (Wayland, then X11)
+      without the AppIndicator extension, start the daemon with `--tray`: about 15 s after « Tray icon created » a
+      window « Ergopti+ has no tray icon on this desktop » and a notification say it in the configured language and
+      name `gnome-shell-extension-appindicator`, and the log holds « No tray host (watcher false, host nil, XEmbed tray
+      false) ». Then enable the extension, log in again: nothing is said and the log holds « Tray host present ». On
+      KDE Plasma and on an X11 panel with only an XEmbed tray (i3bar, an old XFCE panel), nothing is said either. On
+      GNOME and KDE, left-click and right-click the icon (both open the menu?) and let Orca read it: « Ergopti+ », then
       « Ergopti+ (paused) » after a pause.
 - [ ] <!-- field-point: update_windows --> Updates and download windows (UPD-02 to UPD-05, 2026-11-21), on a
       standalone install offered a newer release, Orca on: About > Check for updates; Orca reads « Checking for

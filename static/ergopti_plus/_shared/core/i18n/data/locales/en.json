@@ -3328,6 +3328,8 @@
 	"startup.linux_gui_stack_title": "Ergopti+ needs a desktop component",
 	"startup.linux_gui_stack_tray_body": "The Ergopti+ tray needs {1}, which this system does not provide, so Ergopti+ does not start. Install {1} with your distribution’s package manager, then start Ergopti+ again.",
 	"startup.linux_gui_stack_windows_body": "The Ergopti+ windows (settings, metrics, editors) need {1}, which this system does not provide, so they stay closed. Hotstrings and the tray work. Install {1} with your distribution’s package manager to open the windows.",
+	"startup.linux_tray_host_missing_title": "Ergopti+ has no tray icon on this desktop",
+	"startup.linux_tray_host_missing_body": "No panel on this desktop shows tray icons, so the Ergopti+ icon and its menu are not visible. Hotstrings keep working. On GNOME, install {1}, enable the AppIndicator extension, then log out and back in. On another desktop, add a panel or a widget that shows StatusNotifierItem icons.",
 	"startup.linux_input_access_body": "Ergopti+ cannot read the keyboard or write to /dev/uinput yet. Log out and back in (or restart) so the “input” and “uinput” groups added by the installer take effect. If it persists, run: {1}",
 	"startup.linux_input_access_no_device_body": "Ergopti+ found no keyboard device to read. In a sandbox or a container /dev/input is hidden from it: start Ergopti+ outside it, or name the keyboard with --device.",
 	"startup.linux_input_access_missing_program_body": "Ergopti+ could not set up keyboard access because the program “{1}” is not installed. Install it with your package manager, then start Ergopti+ again.",

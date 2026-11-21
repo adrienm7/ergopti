@@ -257,6 +257,7 @@ return {
 	"tests.unit.platform.system.test_screen_capture",
 	"tests.unit.platform.system.test_tray_indicator",
 	"tests.unit.platform.system.test_tray_menu_adapter",
+	"tests.unit.platform.system.test_tray_host_check",
 	"tests.unit.platform.input.synthetic_input.test_uinput_writer_struct_input_event",
 	"tests.unit.platform.input.synthetic_input.test_keyboard_source_fixture",
 	"tests.unit.platform.input.synthetic_input.test_uinput_writer_constructor_retirement_refusal",

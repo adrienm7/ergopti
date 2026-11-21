@@ -3328,6 +3328,8 @@
 	"startup.linux_gui_stack_title": "Ergopti+ potřebuje součást pracovního prostředí",
 	"startup.linux_gui_stack_tray_body": "Ikona Ergopti+ v oznamovací oblasti potřebuje {1}, který tento systém nemá, a proto se Ergopti+ nespustí. Nainstalujte {1} správcem balíčků své distribuce a spusťte Ergopti+ znovu.",
 	"startup.linux_gui_stack_windows_body": "Okna Ergopti+ (nastavení, statistiky, editory) potřebují {1}, který tento systém nemá, a proto zůstanou zavřená. Hotstringy a ikona v oznamovací oblasti fungují. Okna otevřete po instalaci {1} správcem balíčků své distribuce.",
+	"startup.linux_tray_host_missing_title": "Ergopti+ nemá v tomto prostředí ikonu v oznamovací oblasti",
+	"startup.linux_tray_host_missing_body": "Žádný panel tohoto pracovního prostředí nezobrazuje ikony oznamovací oblasti, takže ikona Ergopti+ a její nabídka nejsou vidět. Hotstringy dál fungují. V GNOME nainstalujte {1}, zapněte rozšíření AppIndicator a pak se odhlaste a znovu přihlaste. V jiném prostředí přidejte panel nebo widget, který zobrazuje ikony StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: {1}",
 	"startup.linux_input_access_no_device_body": "Ergopti+ nenašlo žádnou klávesnici ke čtení. V izolovaném prostředí nebo kontejneru je /dev/input skrytý: spusťte Ergopti+ mimo něj, nebo klávesnici zadejte pomocí --device.",
 	"startup.linux_input_access_missing_program_body": "Ergopti+ nemohl nastavit přístup ke klávesnici, protože program „{1}“ není nainstalován. Nainstalujte jej správcem balíčků a poté Ergopti+ spusťte znovu.",
