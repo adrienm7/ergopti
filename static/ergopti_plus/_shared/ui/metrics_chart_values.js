@@ -3,7 +3,8 @@
 // ==============================================================================
 // MODULE: Metrics chart values
 // DESCRIPTION:
-// Gives the keyboard what a pointer reads on a metrics chart. A Chart.js
+// Gives the keyboard what a pointer reads on a metrics chart, and draws the
+// chart text in the reader's font and spacing. A Chart.js
 // canvas shows its values in tooltips while hovered, which only a mouse can
 // do (WCAG 2.1.1, 1.4.13). This plugin writes, next to every chart, a
 // disclosure listing the same values in the same words, the tooltip's own
@@ -22,6 +23,15 @@
 //    its values in <title> tooltips, out of reach of the keyboard and of a
 //    screen reader inside its role="img" (MET-16); markup() gives it the same
 //    disclosure, written beside it.
+// 5. A canvas draws its own text, out of reach of the reading font and
+//    spacing that a11y_prefs.js writes on the root and theme.css styles. The
+//    chart text takes them from the page body's computed style once it is
+//    parsed: the font family and line height as Chart.js defaults, the
+//    letter and word spacing on each chart's context, in multiples of the
+//    font size as theme.css states them. A reading change reaches a native
+//    window by its reopening (its host retires a warm window, MET-03), so
+//    the values are read once per page. A WebKit too old for the canvas
+//    letterSpacing and wordSpacing properties draws the font without them.
 // ==============================================================================
 
 (function () {
@@ -111,10 +121,50 @@
 		}
 	};
 
+	// The body's spacing until the page is parsed: none.
+	var spacing = { letter: '0em', word: '0em' };
+
+	/** A computed length as a multiple of the font size, for the canvas. */
+	function emOf(length, fontSize) {
+		var pixels = parseFloat(length);
+		return isFinite(pixels) ? pixels / fontSize : 0;
+	}
+
+	/** Takes the reading font and spacing of the parsed page body. */
+	function applyReading() {
+		var style = getComputedStyle(document.body);
+		var fontSize = parseFloat(style.fontSize);
+		if (!(fontSize > 0)) throw new Error('metrics_chart_values.js: the page body has no font size');
+		Chart.defaults.font.family = style.fontFamily;
+		if (style.lineHeight !== 'normal')
+			Chart.defaults.font.lineHeight = emOf(style.lineHeight, fontSize);
+		spacing = {
+			letter: emOf(style.letterSpacing, fontSize) + 'em',
+			word: emOf(style.wordSpacing, fontSize) + 'em'
+		};
+	}
+
+	/** Chart.js measures, then draws, through one context: space both. */
+	function spaceText(chart) {
+		chart.ctx.letterSpacing = spacing.letter;
+		chart.ctx.wordSpacing = spacing.word;
+	}
+
+	var READING_PLUGIN = {
+		id: 'ergoptiChartReading',
+		// A resized canvas resets its context, and a resize always updates.
+		beforeUpdate: spaceText,
+		beforeDraw: spaceText
+	};
+
 	function register() {
 		if (typeof Chart === 'undefined')
 			throw new Error('metrics_chart_values.js: Chart.js is not loaded on this page');
-		Chart.register(PLUGIN);
+		Chart.register(PLUGIN, READING_PLUGIN);
+		// The apps dashboard loads Chart.js in the head, before the body exists.
+		if (document.readyState === 'loading')
+			document.addEventListener('DOMContentLoaded', applyReading);
+		else applyReading();
 	}
 
 	/** Escapes text for markup a page writes through innerHTML. */

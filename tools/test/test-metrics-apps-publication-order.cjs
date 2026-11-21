@@ -548,6 +548,93 @@ test('defensive order control exposes native publishers only after the final ext
 	assert.equal(page.scripts.includes('script.js'), false);
 });
 
+/**
+ * The body's computed style as a browser resolves theme.css for one reading,
+ * at a 16px body: theme.css is the one source of the reading values.
+ */
+function readingStyle(font, spacing) {
+	const css = fs.readFileSync(
+		path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/theme.css'),
+		'utf8'
+	);
+	const rule = (attribute, value) => {
+		const match = new RegExp(
+			`:root\\[data-a11y-${attribute}='${value}'\\] :is\\(body, body \\*\\) \\{([^}]*)\\}`
+		).exec(css);
+		assert.ok(match, `theme.css styles data-a11y-${attribute}='${value}'`);
+		return (name) => new RegExp(`${name}:\\s*([^;]+?)\\s*!important`).exec(match[1])[1];
+	};
+	const size = 16;
+	const style = {
+		fontFamily: 'system-ui, sans-serif',
+		fontSize: `${size}px`,
+		lineHeight: 'normal',
+		letterSpacing: 'normal',
+		wordSpacing: '0px'
+	};
+	if (font) style.fontFamily = rule('font', font)('font-family');
+	if (spacing) {
+		const wide = rule('spacing', spacing);
+		style.lineHeight = `${parseFloat(wide('line-height')) * size}px`;
+		style.letterSpacing = `${parseFloat(wide('letter-spacing')) * size}px`;
+		style.wordSpacing = `${parseFloat(wide('word-spacing')) * size}px`;
+	}
+	return style;
+}
+
+/** Loads the apps page and runs the DOMContentLoaded work of metrics_chart_values.js alone. */
+function chartReadingPage(style) {
+	const owned = [];
+	let last = null;
+	const page = loadMetricsAppsPage('macos', (name, context) => {
+		if (last === null) {
+			const add = context.document.addEventListener;
+			context.document.addEventListener = function (event, callback) {
+				if (event === 'DOMContentLoaded') owned.push({ after: last, callback });
+				return add.call(this, event, callback);
+			};
+		}
+		last = name;
+	});
+	const values = page.scripts.indexOf('../metrics_chart_values.js');
+	assert.ok(values > 0, 'the apps dashboard loads metrics_chart_values.js');
+	const context = page.context;
+	context.getComputedStyle = (node) => {
+		assert.equal(node, context.document.body, 'the chart text reads the page body');
+		return style;
+	};
+	for (const entry of owned) if (entry.after === page.scripts[values - 1]) entry.callback();
+	const plugin = context.Chart.registry.plugins.get('ergoptiChartReading');
+	assert.ok(plugin, 'the reading plugin is registered with Chart.js');
+	const spaced = (hook) => {
+		const chart = { ctx: {} };
+		plugin[hook](chart);
+		return chart.ctx;
+	};
+	return { defaults: context.Chart.defaults.font, spaced };
+}
+
+test('loaded page draws the chart text in the reading font and spacing', () => {
+	const style = readingStyle('dyslexic', 'wide');
+	const page = chartReadingPage(style);
+	assert.equal(page.defaults.family, style.fontFamily, 'the chart font is the reading font');
+	assert.ok(Math.abs(page.defaults.lineHeight - 1.5) < 1e-9, 'the chart lines are spaced');
+	for (const hook of ['beforeUpdate', 'beforeDraw']) {
+		const ctx = page.spaced(hook);
+		assert.ok(Math.abs(parseFloat(ctx.letterSpacing) - 0.12) < 1e-9, `${hook}: letters`);
+		assert.match(ctx.letterSpacing, /em$/, `${hook}: letters follow each label's size`);
+		assert.ok(Math.abs(parseFloat(ctx.wordSpacing) - 0.16) < 1e-9, `${hook}: words`);
+	}
+	const plain = chartReadingPage(readingStyle(null, null));
+	assert.equal(plain.defaults.family, 'system-ui, sans-serif', 'the chart font is the page font');
+	assert.equal(plain.defaults.lineHeight, 1.2, 'no spacing keeps the Chart.js line height');
+	assert.deepEqual(
+		{ ...plain.spaced('beforeDraw') },
+		{ letterSpacing: '0em', wordSpacing: '0em' },
+		'no spacing preference draws unspaced text'
+	);
+});
+
 const only = process.argv.find((value) => value.startsWith('--only='))?.slice(7);
 const indexArg = process.argv.find((value) => value.startsWith('--case-index='));
 const caseIndex = indexArg === undefined ? null : Number(indexArg.slice(13));
