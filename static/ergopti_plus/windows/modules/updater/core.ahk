@@ -2708,6 +2708,9 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
 			? _Updater_RateLimitDetail(Status, RateLimit["remaining"], RateLimit["reset"]) : ""
 		if (Detail != "") {
 			try LoggerWarn("Updater", "GitHub releases for '{1}': {2}.", Url, Detail)
+			; The check's window names the limit if the feed fails too (UPD-06)
+			if IsSet(Request) && IsObject(Request)
+				Request.RateLimited := true
 		} else {
 			try LoggerWarn("Updater", "GitHub refused the releases request (HTTP {1}) for '{2}'.", Status, Url)
 		}

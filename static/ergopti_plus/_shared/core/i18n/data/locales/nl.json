@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Naar dit kanaal overschakelen",
 	"update_check.error_heading": "Het zoeken naar updates is mislukt",
 	"update_check.error_unexpected": "Een onverwachte fout heeft het zoeken onderbroken. Probeer het opnieuw; blijft het mislukken, dan staan de details in het logboek van vandaag.",
+	"update_check.error_rate_limited": "GitHub beperkt de verzoeken van deze verbinding, dus de controle kon niet worden uitgevoerd. Probeer het over een uur opnieuw; de details staan in het logboek van vandaag.",
 	"update_check.error_no_asset": "Versie {tag} bevat geen installatiepakket voor dit systeem.",
 	"update_check.check_only": "Gevonden via de openbare releasefeed. Voor het installeren is de GitHub-API nodig, die nu niet bereikbaar is: probeer het later opnieuw.",
 	"update_check.logged_in": "Details in het logboek van vandaag: {path}",

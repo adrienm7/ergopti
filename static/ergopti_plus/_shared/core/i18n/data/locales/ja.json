@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "このチャンネルに切り替える",
 	"update_check.error_heading": "アップデートの確認に失敗しました",
 	"update_check.error_unexpected": "予期しないエラーにより確認が中断されました。もう一度お試しください。失敗が続く場合、詳細は今日のログにあります。",
+	"update_check.error_rate_limited": "GitHub がこの接続からのリクエストを制限しているため、確認を実行できませんでした。1 時間後にもう一度お試しください。詳細は今日のログにあります。",
 	"update_check.error_no_asset": "リリース {tag} にはこのシステム用のインストールパッケージがありません。",
 	"update_check.check_only": "公開リリースフィードで見つかりました。インストールには GitHub API が必要ですが、現在接続できません。後でもう一度お試しください。",
 	"update_check.logged_in": "詳細は本日のログにあります: {path}",

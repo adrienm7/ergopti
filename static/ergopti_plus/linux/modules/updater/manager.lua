@@ -636,8 +636,10 @@ local function _fetch_releases(channel, callback)
 	local active_key, active_page
 	local cancelled = false
 	local cancel, publish_page
-	-- reason: the updater.check_result reason a failure is shown with
-	local function finish(body, status, err, reason)
+	-- reason: the updater.check_result reason a failure is shown with;
+	-- evidence: what the failed page proved (an exhausted rate limit, its
+	-- native receipt), which the check names (UPD-06)
+	local function finish(body, status, err, reason, evidence)
 		if terminal or _release_fetch_cancel ~= cancel then return end
 		terminal = true
 		-- Native etag_save can advance its file before transport/JSON acceptance.
@@ -646,7 +648,7 @@ local function _fetch_releases(channel, callback)
 		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		_persist_list_cache()
-		callback(body, status, err, reason)
+		callback(body, status, err, reason, evidence)
 	end
 	local function page_current(work)
 		return not terminal and _release_fetch_cancel == cancel and rawequal(active_page, work)
@@ -766,7 +768,9 @@ local function _fetch_releases(channel, callback)
 				elseif status == 403 then
 					Logger.warn(LOG, "GitHub refused the releases request (HTTP 403) for channel %s page %d.", channel, page)
 				end
-				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection")
+				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection",
+					{ rate_limited = limited ~= nil,
+						receipt = result and type(result.failure_receipt) == "table" and result.failure_receipt or nil })
 				return
 			else
 				all_unchanged = false
@@ -1185,6 +1189,30 @@ local function publish_check(callback, available, release, err, result)
 	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
 end
 
+local _network_contract = nil
+
+--- The evidence a failed check names (updater.check_result failure_key): the
+--- API's exhausted rate limit, and the managed-network cause the shared
+--- contract classifies from the fetch's native receipt. No receipt, no cause.
+--- @param evidence table|nil { rate_limited = boolean, receipt = table|nil }
+--- @return table|nil { rate_limited, report }
+function M._check_evidence(evidence)
+	if type(evidence) ~= "table" then return nil end
+	local report = nil
+	if type(evidence.receipt) == "table" and next(evidence.receipt) ~= nil then
+		if not _network_contract then
+			local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
+			local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+			assert(status == "ok", "managed network policy read or close refused")
+			_network_contract = require("core.network.engine.failure").new(Json.decode(source))
+		end
+		local classified, value = pcall(_network_contract.classify, evidence.receipt, {})
+		if classified then report = value
+		else Logger.error(LOG, "The check's failure receipt could not be classified: %s.", tostring(value)) end
+	end
+	return { rate_limited = evidence.rate_limited == true, report = report }
+end
+
 --- Checks the GitHub API for a newer release without blocking the event loop.
 --- @param channel string|nil Registry channel id; defaults to the active channel.
 --- @param callback function|nil Receives available, release, error and the
@@ -1209,7 +1237,8 @@ function M.check_for_updates(channel, callback)
 	_state = "checking"
 	local published = false
 	--- Publishes a check that gave no list.
-	local function publish_failure(status, fetch_error, reason)
+	--- @param evidence table|nil The API attempt's { rate_limited, receipt }.
+	local function publish_failure(status, fetch_error, reason, evidence)
 		_cached_release = known
 		_state = known and "available" or "idle"
 		Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
@@ -1219,7 +1248,7 @@ function M.check_for_updates(channel, callback)
 			Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
 		end
 		publish_check(callback, known ~= nil, known, fetch_error or "empty body",
-			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
+			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body", M._check_evidence(evidence)))
 	end
 	--- Publishes a list: the API's, or the public feed's when check_only.
 	local function publish_list(body, check_only)
@@ -1240,14 +1269,14 @@ function M.check_for_updates(channel, callback)
 		publish_check(callback, available, _cached_release, nil, result)
 	end
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
-		function(body, status, fetch_error, reason)
+		function(body, status, fetch_error, reason, evidence)
 			published = true
 			if body then
 				publish_list(body, false)
 				return
 			end
 			if reason ~= "no_connection" then
-				publish_failure(status, fetch_error, reason)
+				publish_failure(status, fetch_error, reason, evidence)
 				return
 			end
 			-- api.github.com gave no list (blocked, throttled, rate-limited): the
@@ -1262,12 +1291,12 @@ function M.check_for_updates(channel, callback)
 				if list then
 					publish_list(list, true)
 				else
-					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason)
+					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason, evidence)
 				end
 			end)
 			if not started and not feed_published then
 				feed_published = true
-				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason)
+				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason, evidence)
 			end
 		end)
 	if not ok then

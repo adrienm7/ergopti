@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Bu kanala geç",
 	"update_check.error_heading": "Güncelleme denetimi başarısız oldu",
 	"update_check.error_unexpected": "Beklenmeyen bir hata denetimi yarıda kesti. Yeniden deneyin; hata sürerse ayrıntılar bugünkü günlükte.",
+	"update_check.error_rate_limited": "GitHub bu bağlantıdan gelen istekleri sınırlıyor, bu yüzden denetim yapılamadı. Bir saat sonra yeniden deneyin; ayrıntılar bugünün günlüğünde.",
 	"update_check.error_no_asset": "{tag} sürümünde bu sistem için kurulum paketi yok.",
 	"update_check.check_only": "Herkese açık sürüm akışı üzerinden bulundu. Kurulum için şu anda erişilemeyen GitHub API’si gerekir: daha sonra tekrar deneyin.",
 	"update_check.logged_in": "Ayrıntılar bugünün günlüğünde: {path}",

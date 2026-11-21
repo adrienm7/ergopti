@@ -439,11 +439,13 @@ function M.new(opts)
 	end
 
 	--- Reads one list response: the usable body, or nil with the failure reason
-	--- (an updater.check_result reason name) and its English cause.
+	--- (an updater.check_result reason name), its English cause and the
+	--- evidence a failed check names (updater.check_result failure_key).
 	--- @param result table|nil The HTTP port's result.
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
+	--- @return table|nil evidence { rate_limited = true } for an exhausted limit
 	local function read_response(result, request_copy, may_store)
 		local status = type(result) == "table" and tonumber(result.status) or 0
 		if status == 304 and request_copy then
@@ -467,7 +469,7 @@ function M.new(opts)
 		end
 		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
 			header_value(result.headers, "x-ratelimit-reset"))
-		if limited then return nil, "no_connection", limited end
+		if limited then return nil, "no_connection", limited, { rate_limited = true } end
 		return nil, "no_connection",
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
 	end
@@ -617,7 +619,7 @@ function M.new(opts)
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
-		local function fail(reason, detail)
+		local function fail(reason, detail, evidence)
 			if answered or request_generation ~= manual_generation then return end
 			if request_sequence >= published_sequence then
 				published_sequence = request_sequence
@@ -625,7 +627,11 @@ function M.new(opts)
 				if previous then save_record(Schedule.record_check(previous, opts.now(), false)) end
 			end
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
-			answer(CheckResult.failure(base, reason, detail))
+			-- An exhausted rate limit is named in the window (UPD-06). hs.http
+			-- answers a transport failure with status -1 and a localized sentence,
+			-- which names no proxy, offline or certificate cause the managed
+			-- contract may classify, so none is claimed here.
+			answer(CheckResult.failure(base, reason, detail, evidence))
 		end
 		Logger.start(LOG, "Manual update check (channel %s)…", tostring(channel))
 		if type(channel) ~= "string" or Updater.channels().channel(channel) == nil then
@@ -670,14 +676,14 @@ function M.new(opts)
 		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
 			if api_completed or answered or request_generation ~= manual_generation then return end
 			api_completed = true
-			local body, reason, detail = read_response(response, request_copy, request_sequence >= published_sequence)
+			local body, reason, detail, evidence = read_response(response, request_copy, request_sequence >= published_sequence)
 			if body then return answer_from(body) end
-			if reason ~= "no_connection" then return fail(reason, detail) end
+			if reason ~= "no_connection" then return fail(reason, detail, evidence) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
 				tostring(channel), detail)
 			read_feed(opts.manual_http, detail, function(feed_body, feed_detail)
 				if answered or request_generation ~= manual_generation then return end
-				if not feed_body then return fail("no_connection", feed_detail) end
+				if not feed_body then return fail("no_connection", feed_detail, evidence) end
 				answer_from(feed_body)
 			end)
 		end)

@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Passer sur ce canal",
 	"update_check.error_heading": "La recherche de mises à jour a échoué",
 	"update_check.error_unexpected": "Une erreur inattendue a interrompu la recherche. Réessayez ; si l’échec se répète, le détail est dans le journal du jour.",
+	"update_check.error_rate_limited": "GitHub limite les requêtes de cette connexion : la recherche n’a pas pu avoir lieu. Réessayez dans une heure ; le détail est dans le journal du jour.",
 	"update_check.error_no_asset": "La version {tag} ne contient pas de paquet d’installation pour ce système.",
 	"update_check.check_only": "Trouvée via le flux public des versions. L’installation nécessite l’API GitHub, injoignable pour le moment : réessayez plus tard.",
 	"update_check.logged_in": "Détails dans le journal du jour : {path}",

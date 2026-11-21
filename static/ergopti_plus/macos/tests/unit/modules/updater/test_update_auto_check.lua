@@ -645,6 +645,18 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
 	end)
 
+	-- UPD-06: an exhausted rate limit read « Could not reach GitHub »
+	helpers.it("upd-06: names an exhausted rate limit once the feed failed too", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+	end)
+
 	helpers.it("offers a newer release of the checked channel without announcing it", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })

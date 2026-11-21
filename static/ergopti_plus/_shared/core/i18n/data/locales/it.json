@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Passa a questo canale",
 	"update_check.error_heading": "La ricerca di aggiornamenti non è riuscita",
 	"update_check.error_unexpected": "Un errore imprevisto ha interrotto la ricerca. Riprova; se continua a non riuscire, i dettagli sono nel registro di oggi.",
+	"update_check.error_rate_limited": "GitHub sta limitando le richieste da questa connessione, quindi il controllo non è stato possibile. Riprova tra un’ora; i dettagli sono nel registro di oggi.",
 	"update_check.error_no_asset": "La versione {tag} non contiene un pacchetto di installazione per questo sistema.",
 	"update_check.check_only": "Trovata tramite il feed pubblico delle versioni. L’installazione richiede l’API di GitHub, al momento non raggiungibile: riprova più tardi.",
 	"update_check.logged_in": "Dettagli nel registro di oggi: {path}",

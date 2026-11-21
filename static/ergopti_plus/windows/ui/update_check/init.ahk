@@ -54,7 +54,8 @@ global UC_ANSWER_STATES := Map("up_to_date", true, "available", true, "no_releas
 global UC_REASONS := Map(
 	"no_connection", "updater.no_connection",
 	"parse_failed",  "updater.parse_failed",
-	"unexpected",    "update_check.error_unexpected")
+	"unexpected",    "update_check.error_unexpected",
+	"rate_limited",  "update_check.error_rate_limited")
 
 ; Replaces the window for the tests: called with the state instead of showing it
 global _UC_PresentFn := 0
@@ -125,9 +126,10 @@ UpdateCheck_ShowResult(Request, Answer) {
 		Reason := Answer.Get("reason", "")
 		if !UC_REASONS.Has(Reason)
 			throw ValueError("Unknown update-check failure reason: " . Reason)
-		NetworkKey := ManagedNetworkFailureWindows_MessageKey(Answer.Get("network_report", 0))
-		State["reason_key"] := NetworkKey != "" ? NetworkKey : UC_REASONS[Reason]
-		State["detail"] := NetworkKey != "" ? "" : Answer.Get("detail", "")
+		Key := UpdateCheck_FailureKey(Reason, Answer.Get("rate_limited", false) == true,
+			Answer.Get("network_report", 0))
+		State["reason_key"] := Key
+		State["detail"] := Key == UC_REASONS[Reason] ? Answer.Get("detail", "") : ""
 		State["log_path"] := LoggerTodayLogPath()
 	}
 	Release := (Phase == "available") ? Answer["release"] : 0
@@ -154,6 +156,29 @@ UpdateCheck_ShowResult(Request, Answer) {
 	else if IsObject(FailureOwner)
 		ManagedNetworkTerminalFailure.Retire("updater_check", FailureOwner)
 	return Accepted
+}
+
+; The reason key of a failed check, by the rule the Lua drivers share
+; (_shared/updater/engine/check_result.lua failure_key), both replaying
+; check_session_vectors.json failure_reasons (UPD-06): an unreached list names an
+; exhausted rate limit, else a canonical network cause the evidence proves; an
+; unknown cause proves nothing and keeps the reason's own key.
+; @param Reason {String} A UC_REASONS name.
+; @param RateLimited {Boolean} The API answered with an exhausted rate limit.
+; @param Report {Map|Integer} The canonical managed-network report, or 0.
+; @returns {String} key
+UpdateCheck_FailureKey(Reason, RateLimited := false, Report := 0) {
+	global UC_REASONS
+	if !UC_REASONS.Has(Reason)
+		throw ValueError("Unknown update-check failure reason: " . Reason)
+	if (Reason != "no_connection")
+		return UC_REASONS[Reason]
+	if RateLimited
+		return UC_REASONS["rate_limited"]
+	NetworkKey := ManagedNetworkFailureWindows_MessageKey(Report)
+	if (NetworkKey != "" && Report.Get("cause", "") != "unknown")
+		return NetworkKey
+	return UC_REASONS[Reason]
 }
 
 ; Offers a release a manual check found: the window shows it with its Update

@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Switch to this channel",
 	"update_check.error_heading": "The update check failed",
 	"update_check.error_unexpected": "An unexpected error interrupted the check. Try again; if it keeps failing, the details are in today’s log.",
+	"update_check.error_rate_limited": "GitHub is limiting the requests from this connection, so the check could not run. Try again in an hour; the details are in today’s log.",
 	"update_check.error_no_asset": "Release {tag} has no installation package for this system.",
 	"update_check.check_only": "Found through the public release feed. Installing needs the GitHub API, which cannot be reached right now: try again later.",
 	"update_check.logged_in": "Details in today’s log: {path}",

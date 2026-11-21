@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "מעבר לערוץ זה",
 	"update_check.error_heading": "החיפוש אחר עדכונים נכשל",
 	"update_check.error_unexpected": "שגיאה בלתי צפויה קטעה את החיפוש. נסו שוב; אם הכישלון חוזר, הפרטים ביומן של היום.",
+	"update_check.error_rate_limited": "GitHub מגביל את הבקשות מהחיבור הזה, ולכן לא ניתן היה לבצע את הבדיקה. נסו שוב בעוד שעה; הפרטים נמצאים ביומן של היום.",
 	"update_check.error_no_asset": "הגרסה {tag} אינה כוללת חבילת התקנה למערכת זו.",
 	"update_check.check_only": "נמצא דרך הזנת הגרסאות הציבורית. ההתקנה דורשת את ה-API של GitHub, שאינו נגיש כרגע: נסו שוב מאוחר יותר.",
 	"update_check.logged_in": "פרטים ביומן של היום: {path}",

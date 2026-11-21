@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Cambiar a este canal",
 	"update_check.error_heading": "La búsqueda de actualizaciones ha fallado",
 	"update_check.error_unexpected": "Un error inesperado interrumpió la búsqueda. Inténtalo de nuevo; si sigue fallando, los detalles están en el registro de hoy.",
+	"update_check.error_rate_limited": "GitHub está limitando las solicitudes de esta conexión, así que la comprobación no pudo realizarse. Inténtelo de nuevo dentro de una hora; los detalles están en el registro de hoy.",
 	"update_check.error_no_asset": "La versión {tag} no incluye un paquete de instalación para este sistema.",
 	"update_check.check_only": "Encontrada a través del feed público de versiones. La instalación necesita la API de GitHub, que no es accesible ahora: inténtelo más tarde.",
 	"update_check.logged_in": "Detalles en el registro de hoy: {path}",

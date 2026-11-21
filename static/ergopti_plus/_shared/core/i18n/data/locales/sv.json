@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Byt till den här kanalen",
 	"update_check.error_heading": "Sökningen efter uppdateringar misslyckades",
 	"update_check.error_unexpected": "Ett oväntat fel avbröt sökningen. Försök igen; om det fortsätter att misslyckas finns detaljerna i dagens logg.",
+	"update_check.error_rate_limited": "GitHub begränsar förfrågningarna från den här anslutningen, så kontrollen kunde inte köras. Försök igen om en timme; detaljerna finns i dagens logg.",
 	"update_check.error_no_asset": "Version {tag} har inget installationspaket för det här systemet.",
 	"update_check.check_only": "Hittades via det offentliga utgåvefeedet. Installationen kräver GitHub-API:et, som inte kan nås just nu: försök igen senare.",
 	"update_check.logged_in": "Detaljer i dagens logg: {path}",

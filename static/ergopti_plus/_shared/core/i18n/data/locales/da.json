@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Skift til denne kanal",
 	"update_check.error_heading": "Søgningen efter opdateringer mislykkedes",
 	"update_check.error_unexpected": "En uventet fejl afbrød søgningen. Prøv igen; bliver det ved med at fejle, står detaljerne i dagens log.",
+	"update_check.error_rate_limited": "GitHub begrænser forespørgslerne fra denne forbindelse, så kontrollen kunne ikke køre. Prøv igen om en time; detaljerne står i dagens log.",
 	"update_check.error_no_asset": "Version {tag} har ingen installationspakke til dette system.",
 	"update_check.check_only": "Fundet via det offentlige udgivelsesfeed. Installation kræver GitHub-API’en, som ikke kan nås lige nu: prøv igen senere.",
 	"update_check.logged_in": "Detaljer i dagens log: {path}",

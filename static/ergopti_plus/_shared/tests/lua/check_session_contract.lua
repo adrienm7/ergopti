@@ -87,6 +87,27 @@ return function(helpers, json, shared_root)
 		end
 	end)
 
+	helpers.describe("update-check session vectors: the failure's reason (upd-06)", function()
+		local CheckResult = require("updater.engine.check_result")
+		for _, vector in ipairs(corpus.failure_reasons) do
+			helpers.it("upd-06: " .. vector.id, function()
+				local evidence = { rate_limited = vector.rate_limited == true, report = vector.report }
+				local result = CheckResult.failure({ channel = "dev", current = "v0.0.0-dev.144" }, vector.reason,
+					"detail", evidence)
+				helpers.assert_eq(result.reason_key, vector.expect)
+				-- The session admits the key the answer carries
+				local session, _, on_result = session_in("checking")
+				on_result(result)
+				helpers.assert_eq(session.message().reason_key, vector.expect)
+			end)
+		end
+		helpers.it("upd-06: the session refuses a key that is no reason and no network cause", function()
+			local session, _, on_result = session_in("checking")
+			on_result({ state = "error", channel = "dev", current = "v0", others = {}, reason_key = "private.arbitrary" })
+			helpers.assert_eq(session.message().reason_key, CheckResult.REASONS.unexpected)
+		end)
+	end)
+
 	helpers.describe("update-check session vectors: the exhausted rate limit", function()
 		for _, vector in ipairs(corpus.rate_limit) do
 			helpers.it(vector.id, function()

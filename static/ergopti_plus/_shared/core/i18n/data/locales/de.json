@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Zu diesem Kanal wechseln",
 	"update_check.error_heading": "Die Suche nach Aktualisierungen ist fehlgeschlagen",
 	"update_check.error_unexpected": "Ein unerwarteter Fehler hat die Suche unterbrochen. Versuchen Sie es erneut; schlägt es weiter fehl, stehen die Details im heutigen Protokoll.",
+	"update_check.error_rate_limited": "GitHub begrenzt die Anfragen dieser Verbindung, daher konnte die Prüfung nicht laufen. Versuchen Sie es in einer Stunde erneut; die Details stehen im heutigen Protokoll.",
 	"update_check.error_no_asset": "Version {tag} enthält kein Installationspaket für dieses System.",
 	"update_check.check_only": "Über den öffentlichen Release-Feed gefunden. Die Installation benötigt die GitHub-API, die gerade nicht erreichbar ist: Versuchen Sie es später erneut.",
 	"update_check.logged_in": "Details im heutigen Protokoll: {path}",

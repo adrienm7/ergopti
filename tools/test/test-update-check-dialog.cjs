@@ -42,7 +42,17 @@ const REASON_KEYS = [
 	'updater.no_connection',
 	'updater.parse_failed',
 	'update_check.error_unexpected',
-	'update_check.error_no_asset'
+	'update_check.error_no_asset',
+	'update_check.error_rate_limited'
+];
+
+// The managed-network causes a failed check names when its evidence proves one
+// (UPD-06, check_result.failure_key and UpdateCheck_FailureKey)
+const NETWORK_CAUSE_KEYS = [
+	'network.failure.proxy',
+	'network.failure.offline',
+	'network.failure.certificate',
+	'network.failure.host_blocked'
 ];
 
 // Translations that are the English word in that language too
@@ -384,8 +394,8 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 	expect(el['btn-update'].hidden, 'a failure offers an update');
 	expect(el.others.hidden, 'a failure lists other channels it never read');
 
-	// Every reason renders in full
-	for (const key of REASON_KEYS) {
+	// Every reason, and every network cause, renders in full
+	for (const key of [...REASON_KEYS, ...NETWORK_CAUSE_KEYS]) {
 		receive({
 			type: 'state',
 			state: 'error',

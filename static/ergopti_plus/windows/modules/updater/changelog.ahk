@@ -144,8 +144,10 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0, CheckOnly
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return UpdateCheck_Abandon(Request)
+		; The API's exhausted rate limit, when it answered one, names the failure (UPD-06)
 		UpdateCheck_ShowResult(Request, Map("state", "error", "current", Current,
 			"reason", "no_connection", "detail", "GitHub could not be reached",
+			"rate_limited", Request.HasOwnProp("RateLimited") && Request.RateLimited == true,
 			"network_report", Request.HasOwnProp("NetworkFailureReport") ? Request.NetworkFailureReport : 0))
 		return
 	}

@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "切换到此通道",
 	"update_check.error_heading": "检查更新失败",
 	"update_check.error_unexpected": "检查因意外错误而中断。请重试；如果仍然失败，详情见今天的日志。",
+	"update_check.error_rate_limited": "GitHub 正在限制来自此连接的请求，因此无法执行检查。请一小时后重试；详细信息见今天的日志。",
 	"update_check.error_no_asset": "版本 {tag} 没有适用于此系统的安装包。",
 	"update_check.check_only": "通过公开的发布源找到。安装需要 GitHub API，但目前无法连接：请稍后再试。",
 	"update_check.logged_in": "详细信息见今天的日志：{path}",

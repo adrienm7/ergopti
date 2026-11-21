@@ -4103,6 +4103,7 @@
 	"update_check.switch_channel": "Přepnout na tento kanál",
 	"update_check.error_heading": "Hledání aktualizací selhalo",
 	"update_check.error_unexpected": "Hledání přerušila neočekávaná chyba. Zkuste to znovu; pokud to dál selhává, podrobnosti jsou v dnešním protokolu.",
+	"update_check.error_rate_limited": "GitHub omezuje požadavky z tohoto připojení, proto kontrolu nešlo provést. Zkuste to znovu za hodinu; podrobnosti najdete v dnešním protokolu.",
 	"update_check.error_no_asset": "Verze {tag} neobsahuje instalační balíček pro tento systém.",
 	"update_check.check_only": "Nalezeno přes veřejný kanál vydání. Instalace vyžaduje API GitHub, které je teď nedostupné: zkuste to znovu později.",
 	"update_check.logged_in": "Podrobnosti v dnešním protokolu: {path}",
