@@ -73,38 +73,58 @@ end
 --- @param definitions table Native matrix, not a regenerated expectation.
 --- @param catalogue table Canonical physical keys.
 --- @param strings table Raw strings from one locale JSON.
---- @return table Expected ordered group headers and pairs.
+--- The Windows layout every OS follows (maintainer decision KCD-8 of
+--- 2026-11-21): one row per key held first, in catalogue order, then its
+--- pairs in the catalogue order of the key struck, each « pair : summary »
+--- with the empty word of an empty pair.
+--- @return table Expected ordered first-key rows, each followed by its pairs.
 local function expected_rows(definitions, catalogue, strings)
-	local by_id, rows = {}, {}
-	for _, key in ipairs(catalogue) do by_id[key.id] = key end
+	local by_pair, rows = {}, {}
+	for _, definition in ipairs(definitions) do
+		local keys = definition.from.simultaneous
+		if not definition.menu_hidden then by_pair[keys[1].key_code .. ":" .. keys[2].key_code] = definition end
+	end
+	local function label_value(label, value)
+		return (strings["common.label_value"]:gsub("{([12])}", function(slot)
+			return slot == "1" and label or value
+		end))
+	end
 	for _, hand in ipairs({ "left", "right" }) do
-		local group = nil
-		for _, definition in ipairs(definitions) do
-			local first = by_id[definition.from.simultaneous[1].key_code]
-			local second = by_id[definition.from.simultaneous[2].key_code]
-			if first.hand == hand and not definition.menu_hidden then
-				if first.id ~= group then
-					rows[#rows + 1] = { title = "— " .. strings[first.label_key] .. " —" }
-					group = first.id
+		for _, first in ipairs(catalogue) do
+			if first.hand == hand then
+				local pairs_of_first = {}
+				for _, second in ipairs(catalogue) do
+					local definition = by_pair[first.id .. ":" .. second.id]
+					if definition then
+						pairs_of_first[#pairs_of_first + 1] = {
+							title = label_value(strings[first.label_key] .. " + " .. strings[second.label_key],
+								strings["dialog.action_picker.disabled"]),
+							id = definition.id,
+						}
+					end
 				end
-				rows[#rows + 1] = {
-					title = strings[first.label_key] .. " + " .. strings[second.label_key] .. "  :  —",
-					id = definition.id,
-				}
+				if #pairs_of_first > 0 then
+					rows[#rows + 1] = { title = strings[first.label_key] }
+					for _, row in ipairs(pairs_of_first) do rows[#rows + 1] = row end
+				end
 			end
 		end
 	end
 	return rows
 end
 
---- Retains top-level physical rows, excluding the manifest's fixed commands.
+--- Retains the first-key rows, each followed by its pair rows, excluding the
+--- manifest's fixed commands.
 --- @param rows table Actual rendered group.
 --- @return table
 local function physical_rows(rows)
 	local out = {}
 	for _, row in ipairs(rows) do
-		if row.title:sub(1, #"— ") == "— " or row.title:find("  :  ", 1, true) then
+		local children = type(row.menu) == "table" and row.menu or {}
+		if type(children[1]) == "table" and type(children[1].title) == "string"
+			and children[1].title:find(" + ", 1, true) then
 			out[#out + 1] = row
+			for _, child in ipairs(children) do out[#out + 1] = child end
 		end
 	end
 	return out
@@ -126,7 +146,7 @@ helpers.describe("canonical physical combination labels", function()
 				local strings = codec.decode(read(helpers.shared("core/i18n/data/locales/" .. language.code .. ".json")))
 				local expected = expected_rows(definitions, catalogue, strings)
 				local actual = physical_rows(menu.build_key_combinations({ karabiner = facade }))
-				helpers.assert_eq(#expected, 193, "179 visible pairs and 14 physical family headers; three script-control pairs stay hidden")
+				helpers.assert_eq(#expected, 193, "179 visible pairs and 14 first-key rows; three script-control pairs stay hidden")
 				helpers.assert_eq(#actual, #expected, language.code .. " retains cardinality")
 				for index, row in ipairs(expected) do
 					helpers.assert_eq(actual[index].title, row.title, language.code .. " physical row " .. index)
@@ -151,8 +171,8 @@ helpers.describe("canonical physical combination labels", function()
 			locale.set_locale_no_reload("fr")
 			local _, second = menu._build_picker_trees(facade, nil, true)
 			helpers.assert_true(first ~= second, "the same bindings cannot keep old language labels")
-			helpers.assert_eq(first.left[1].label, "— Escape —", "independent English fixture")
-			helpers.assert_eq(second.left[1].label, "— Échap —", "independent French fixture")
+			helpers.assert_eq(first.left[1].label, "Escape", "independent English fixture")
+			helpers.assert_eq(second.left[1].label, "Échap", "independent French fixture")
 		end)
 	end)
 
@@ -178,7 +198,7 @@ helpers.describe("canonical physical combination labels", function()
 				if expectation.id then
 					local pair = rows[index]
 					helpers.assert_eq(pair.title, expectation.title)
-					for slot_index, slot in ipairs({ "combo", "tap", "hold" }) do
+					for slot_index, slot in ipairs({ "tap", "hold", "combo" }) do
 						-- The slot opens the shared action picker; a pick confirms there.
 						local offered, confirm = nil, nil
 						package.loaded["ui.action_picker"] = {

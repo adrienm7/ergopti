@@ -101,7 +101,7 @@ helpers.describe("the key combinations are a group of their own under Shortcuts"
 			helpers.assert_true(has_prefix(all, key), key .. " is in the group")
 		end
 		helpers.assert_true(has_prefix(all, "menu.tapholds.simultaneous_title"), "the chord delay is in the group")
-		helpers.assert_true(has_prefix(all, "key_name.left_shift + key_name.right_shift  :"), "every pair has its row")
+		helpers.assert_true(has_prefix(all, "key_name.left_shift + key_name.right_shift: "), "every pair has its row")
 		for _, key in ipairs({ "menu.shortcuts.key_combinations_chord",
 			"menu.shortcuts.key_combinations_hold_tap", "menu.shortcuts.key_combinations_hold_hold" }) do
 			helpers.assert_true(has_prefix(all, key), "each pair spells out its slot: " .. key)
@@ -128,7 +128,7 @@ end)
 --- @return table|nil
 local function pair_row(rows)
 	for _, row in ipairs(rows or {}) do
-		if type(row.title) == "string" and row.title:find("key_name.left_shift + key_name.right_shift  :", 1, true) == 1 then return row end
+		if type(row.title) == "string" and row.title:find("key_name.left_shift + key_name.right_shift: ", 1, true) == 1 then return row end
 		local found = pair_row(row.menu)
 		if found then return found end
 	end
@@ -153,7 +153,7 @@ helpers.describe("key-combination pairs use the shared declaration", function()
 				local row = pair_row(built)
 				helpers.assert_not_nil(row, "the declared pair must render")
 				helpers.assert_eq(#row.menu, 4, "three native slots and the declared clear command")
-				helpers.assert_true(row.menu[1].title:find("menu.shortcuts.key_combinations_chord", 1, true) == 1,
+				helpers.assert_true(row.menu[1].title:find("menu.shortcuts.key_combinations_hold_tap", 1, true) == 1,
 					"the template placed slots before clear")
 				helpers.assert_eq(row.menu[4].title, "menu.tapholds.nothing_combo", "clear follows the changed declaration")
 			end, debug.traceback)
@@ -174,7 +174,7 @@ helpers.describe("key-combination pairs use the shared declaration", function()
 			helpers.assert_eq(row.menu[1].title, "menu.tapholds.nothing_combo")
 			helpers.assert_eq(row.menu[1].disabled == true, not assigned, "an empty pair has nothing to clear")
 			helpers.assert_eq(row.menu[2].title, "-", "one shared separator precedes the slots")
-			helpers.assert_eq(#row.menu, 5, "clear, separator, chord, tap and hold")
+			helpers.assert_eq(#row.menu, 5, "clear, separator, tap, hold and chord")
 		end)
 	end
 end)

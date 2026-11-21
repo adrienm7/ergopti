@@ -33,4 +33,36 @@ function M.resolve(catalogue, first_id, second_id, translate)
 		label = first_label .. " + " .. second_label, hand = first.hand }
 end
 
+-- A pair's slots in menu order, the Windows layout every OS follows
+-- (maintainer decision KCD-8 of 2026-11-21): tap, hold, then chord.
+M.SLOT_ORDER = { "tap", "hold", "chord" }
+
+-- What joins the assigned slots of a pair's summary.
+M.SUMMARY_SEPARATOR = " / "
+
+--- The summary a pair row shows after its label: the label of each assigned
+--- slot in M.SLOT_ORDER, chord included, or the empty word when none is.
+--- @param labels table `{ tap = string|nil, hold = string|nil, chord = string|nil }`,
+---   nil for an empty slot.
+--- @param empty_label string The localized word of an empty pair.
+--- @return string summary
+function M.summary(labels, empty_label)
+	if type(labels) ~= "table" then error("a pair summary needs its slot labels", 2) end
+	if type(empty_label) ~= "string" or empty_label == "" then
+		error("a pair summary needs a non-empty empty word", 2)
+	end
+	local parts = {}
+	for _, slot in ipairs(M.SLOT_ORDER) do
+		local label = labels[slot]
+		if label ~= nil then
+			if type(label) ~= "string" or label == "" then
+				error("the " .. slot .. " label of a pair summary must be a non-empty string", 2)
+			end
+			parts[#parts + 1] = label
+		end
+	end
+	if #parts == 0 then return empty_label end
+	return table.concat(parts, M.SUMMARY_SEPARATOR)
+end
+
 return M

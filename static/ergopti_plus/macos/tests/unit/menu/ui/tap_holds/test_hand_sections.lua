@@ -705,7 +705,7 @@ local function with_pair_picker(body)
 			updateMenu = function() observed.refreshes = observed.refreshes + 1 end })
 		local function find(list)
 			for _, row in ipairs(list or {}) do
-				if type(row.title) == "string" and row.title:find("key_name.left_shift", 1, true) == 1 then
+				if type(row.title) == "string" and row.title:find("key_name.left_shift + key_name.right_shift", 1, true) == 1 then
 					return row
 				end
 				local nested = find(row.menu)

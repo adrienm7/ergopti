@@ -32,7 +32,7 @@
 local M = {}
 
 local Logger      = require("core.logger.engine.logger")
-local MenuUtils   = require("menu.ui.builder.utils")
+local LabelValue  = require("core.i18n.engine.label_value")
 local ManifestMenu = require("menu.engine.manifest_menu")
 local Paths       = require("core.fs.engine.paths")
 local KeyCatalog  = require("tap_hold.engine.key_catalog")
@@ -634,53 +634,77 @@ end
 -- ==========================================
 -- ==========================================
 
---- Builds a single combo menu item whose combo / tap / hold slots open the
---- shared action picker.
---- Shows "ComboLabel  /  TapLabel  /  HoldLabel" next to the combo label.
+--- The label of one slot of a pair, with the empty words Windows shows: a
+--- tap or a chord with nothing reads as the picker's « disabled », a hold
+--- with nothing as the native key.
+--- @param action_index table id → action def map.
+--- @param slot string "tap", "hold" or "chord".
+--- @param action_id string The slot's action id.
+--- @return string label
+--- @return boolean assigned
+local function pair_slot_label(action_index, slot, action_id)
+	if action_id == NONE_ACTION_ID then
+		return i18n.get(slot == "hold" and "tap_hold.hold.none" or "dialog.action_picker.disabled"), false
+	end
+	return short_action_label(action_index, action_id), true
+end
+
+--- Reads one slot of a pair through the remap facade; a refused read is empty.
+--- @param getter function Facade getter.
+--- @param combo_id string Combo id.
+--- @return string action_id
+local function read_pair_slot(getter, combo_id)
+	local ok, value = pcall(getter, combo_id)
+	if not ok or type(value) ~= "string" then return NONE_ACTION_ID end
+	return value
+end
+
+--- Builds one pair row: « First + Second : summary », the summary naming every
+--- assigned slot, chord included (CombinationLabels.summary), and its menu of
+--- tap, hold and chord slots, each opening the shared action picker — the
+--- Windows layout (maintainer decision KCD-8 of 2026-11-21).
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
---- @param enabled     boolean  Whether the integration is active.
 --- @param combo_def   table    Entry from MOD_COMBOS.
---- @param pair_label  string   Canonical translated physical pair.
+--- @param pair_label  string   Translated physical pair.
+--- @param chord_id    string   The combo id whose chord this pair shows.
 --- @return table hs.menubar menu item.
-local function build_one_combo_item(karabiner, action_index, update_menu, enabled, combo_def, pair_label)
+local function build_one_combo_item(karabiner, action_index, update_menu, combo_def, pair_label, chord_id)
 	local cid = combo_def.id
-
-	local ok_tap,   current_tap   = pcall(karabiner.get_combo_tap_action,   cid)
-	local ok_hold,  current_hold  = pcall(karabiner.get_combo_hold_action,  cid)
-	local ok_combo, current_combo = pcall(karabiner.get_combo_combo_action, cid)
-	if not ok_tap   then current_tap   = "none" end
-	if not ok_hold  then current_hold  = "none" end
-	if not ok_combo then current_combo = "none" end
-
-	local tap_slbl   = short_action_label(action_index, current_tap)
-	local hold_slbl  = short_action_label(action_index, current_hold)
-	local combo_slbl = short_action_label(action_index, current_combo)
-	local is_empty   = (current_tap == "none" and current_hold == "none" and current_combo == "none")
-	local is_active  = not is_empty
-
-	local combo_label = is_empty and NONE_DISPLAY
-		or string.format("%s  /  %s  /  %s", combo_slbl, tap_slbl, hold_slbl)
+	local current = {
+		tap   = read_pair_slot(karabiner.get_combo_tap_action, cid),
+		hold  = read_pair_slot(karabiner.get_combo_hold_action, cid),
+		chord = read_pair_slot(karabiner.get_combo_combo_action, chord_id),
+	}
+	local labels, summary_labels, is_active = {}, {}, false
+	for _, slot in ipairs(CombinationLabels.SLOT_ORDER) do
+		local label, assigned = pair_slot_label(action_index, slot, current[slot])
+		labels[slot] = label
+		if assigned then summary_labels[slot], is_active = label, true end
+	end
+	local summary = CombinationLabels.summary(summary_labels, i18n.get("dialog.action_picker.disabled"))
 
 	-- Each slot opens the shared action picker, titled by the slot and the pair.
-	local function slot_row(caption_key, current_label, slot, presentation_id, getter, setter)
-		return {
-			label  = string.format(i18n.get(caption_key), current_label),
+	local slot_rows = {
+		tap = { caption = "menu.shortcuts.key_combinations_hold_tap", slot = "tap", id = cid,
+			presentation_id = "key_combination_tap_action", getter = "get_combo_tap_action", setter = "set_combo_tap_action" },
+		hold = { caption = "menu.shortcuts.key_combinations_hold_hold", slot = "hold", id = cid,
+			presentation_id = "key_combination_hold_action", getter = "get_combo_hold_action", setter = "set_combo_hold_action" },
+		chord = { caption = "menu.shortcuts.key_combinations_chord", slot = "combo", id = chord_id,
+			presentation_id = "key_combination_chord_action", getter = "get_combo_combo_action", setter = "set_combo_combo_action" },
+	}
+	local slots = {}
+	for _, slot in ipairs(CombinationLabels.SLOT_ORDER) do
+		local spec = slot_rows[slot]
+		slots[#slots + 1] = {
+			label  = string.format(i18n.get(spec.caption), labels[slot]),
 			action = function()
-				return open_slot_picker(karabiner, { slot = slot, id = cid, presentation_id = presentation_id,
-					suffix = pair_label, getter = getter, setter = setter }, update_menu)
+				return open_slot_picker(karabiner, { slot = spec.slot, id = spec.id, presentation_id = spec.presentation_id,
+					suffix = pair_label, getter = spec.getter, setter = spec.setter }, update_menu)
 			end,
 		}
 	end
-	local slots = {
-		slot_row("menu.shortcuts.key_combinations_chord", combo_slbl, "combo",
-			"key_combination_chord_action", "get_combo_combo_action", "set_combo_combo_action"),
-		slot_row("menu.shortcuts.key_combinations_hold_tap", tap_slbl, "tap",
-			"key_combination_tap_action", "get_combo_tap_action", "set_combo_tap_action"),
-		slot_row("menu.shortcuts.key_combinations_hold_hold", hold_slbl, "hold",
-			"key_combination_hold_action", "get_combo_hold_action", "set_combo_hold_action"),
-	}
 
 	local render_ctx = {
 		commands = {
@@ -695,11 +719,10 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		render_ctx, { ["key_combination_slots"] = function() return slots end })
 
 	return {
-		label    = string.format("%s  :  %s", pair_label, combo_label),
-		checked  = is_active or nil,
-		disabled = not enabled or nil,
+		label   = LabelValue.compose(i18n.get, pair_label, summary),
+		checked = is_active or nil,
 		-- This child has already passed through the shared renderer.
-		submenu   = enabled and combo_submenu or nil,
+		submenu = combo_submenu,
 	}
 end
 
@@ -729,8 +752,12 @@ local function report_unplaced_combos(karabiner)
 	end
 end
 
---- Builds one hand's modifier combos, grouped by the first physical key.
---- Items are grayed out when the integration is disabled.
+--- Builds one hand's pair rows the Windows way (maintainer decision KCD-8 of
+--- 2026-11-21): one submenu per key held first, in catalogue order, holding
+--- one row per key struck under it, in catalogue order, ticked while any of
+--- its pairs is assigned. Under symmetry the reverse half of a pair is
+--- hidden: the order that owns the chord runs it for both. Rows are grayed
+--- out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
@@ -739,32 +766,42 @@ end
 --- @param hand        string   "left" or "right": the hand of the key held first.
 --- @return table List of hs.menubar menu item tables.
 local function build_raccourcis_items(karabiner, action_index, update_menu, enabled, hand)
-	local items         = {}
-	local current_group = nil
-	local is_symmetric  = karabiner.get_combo_symmetric()
+	local catalogue = key_catalog()
+	local is_symmetric = karabiner.get_combo_symmetric() == true
 	local non_canonical = karabiner.NON_CANONICAL_COMBOS or {}
-
-	for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
-		-- Skip combos handled elsewhere (e.g. script_control.lua shortcuts)
-		if combo_def.menu_hidden then goto continue end
-		-- In symmetric mode, non-canonical combos (reverse-order duplicates of a
-		-- canonical entry) are hidden: the canonical half configures the chord for
-		-- both press orders, so showing the reverse would confuse the user.
-		if is_symmetric and non_canonical[combo_def.id] then goto continue end
-		if combo_hand(combo_def) ~= hand then goto continue end
-
-		local keys = combo_def.from.simultaneous
-		local labels = CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)
-		if labels.group_id ~= current_group then
-			items[#items + 1] = MenuUtils.build_section_header(labels.group_label)
-			current_group = labels.group_id
+	-- Each listed pair by its two keys, so both orders find each other.
+	local by_keys = {}
+	for _, combo_def in ipairs(karabiner.MOD_COMBOS or {}) do
+		local keys = not combo_def.menu_hidden and type(combo_def.from) == "table" and combo_def.from.simultaneous
+		if type(keys) == "table" and keys[1] and keys[2] then
+			by_keys[tostring(keys[1].key_code) .. "\0" .. tostring(keys[2].key_code)] = combo_def
 		end
-		items[#items + 1] = build_one_combo_item(
-			karabiner, action_index, update_menu, enabled, combo_def, labels.label)
-
-		::continue::
 	end
 
+	local items = {}
+	for _, first in ipairs(KeyCatalog.of_hand(catalogue, hand)) do
+		local rows, any_assigned = {}, false
+		local group_label = nil
+		for _, second in ipairs(catalogue) do
+			local combo_def = second.id ~= first.id and by_keys[first.id .. "\0" .. second.id] or nil
+			if combo_def and is_symmetric and non_canonical[combo_def.id] then combo_def = nil end
+			if combo_def then
+				local labels = CombinationLabels.resolve(catalogue, first.id, second.id, i18n.get)
+				group_label = labels.group_label
+				local row = build_one_combo_item(karabiner, action_index, update_menu, combo_def, labels.label, combo_def.id)
+				any_assigned = any_assigned or row.checked == true
+				rows[#rows + 1] = row
+			end
+		end
+		if #rows > 0 then
+			items[#items + 1] = {
+				label    = group_label,
+				checked  = any_assigned or nil,
+				disabled = not enabled or nil,
+				items    = enabled and rows or nil,
+			}
+		end
+	end
 	return items
 end
 
