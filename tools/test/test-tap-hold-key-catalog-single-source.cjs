@@ -297,9 +297,7 @@ for (const reader of READERS) {
 const macMenu = stripLineComments(read(path.join(SP, 'macos/ui/menu/menu_tap_holds.lua')), '.lua');
 if (
 	!/require\("tap_hold\.engine\.combination_labels"\)/.test(macMenu) ||
-	!macMenu.includes(
-		'CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)'
-	)
+	!macMenu.includes('CombinationLabels.resolve(catalogue, first.id, second.id, i18n.get)')
 ) {
 	errors.push(
 		'the macOS combination provider must resolve both physical keys through the shared label policy'
