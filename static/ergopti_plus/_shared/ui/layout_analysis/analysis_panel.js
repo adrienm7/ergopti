@@ -492,6 +492,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					format: keyboardFormat(),
 					weights: settings.weights,
 					floors: settings.floors,
+					grades: settings.grades,
 					idealLoad: settings.idealLoad,
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
@@ -590,6 +591,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				format: keyboardFormat(),
 				weights: settings.weights,
 				floors: settings.floors,
+				grades: settings.grades,
 				idealLoad: settings.idealLoad,
 				shortcuts: settings.shortcuts,
 				formWeights: settings.formWeights,
@@ -647,6 +649,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					format: keyboardFormat(),
 					weights: settings.weights,
 					floors: settings.floors,
+					grades: settings.grades,
 					idealLoad: settings.idealLoad,
 					shortcuts: settings.shortcuts,
 					formWeights: settings.formWeights,
@@ -875,7 +878,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			if (state.heat === HEAT_OFF) return null;
 			const points =
 				state.heat === HEAT_SCORE
-					? E.keyScoreCost(result, settings.weights, settings.floors)
+					? E.keyScoreCost(result, settings.weights, settings.floors, settings.grades)
 					: null;
 			const used = Object.assign(E.defaultWeights(), settings.weights || {});
 			const typed = (code) => {

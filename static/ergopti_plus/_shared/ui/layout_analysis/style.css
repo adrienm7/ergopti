@@ -1881,6 +1881,39 @@ body:has(> main.layout-analysis) {
 	flex-basis: 100%;
 }
 
+/* A graded metric's grades under its weight: a group as quiet as the floor,
+   one labelled factor per line. */
+.la-grade-group {
+	border: 0;
+	border-top: 1px dashed var(--la-border);
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 6px 0 0;
+	min-width: 0;
+	padding: 6px 0 0;
+}
+
+.la-grade-group legend {
+	float: left;
+	padding: 0;
+	width: 100%;
+}
+
+.la-grade-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-grade-name {
+	flex: 1 1 8em;
+	font-size: 0.9em;
+}
+
 /* Score presets (ux-study item 13): one coloured card per built-in preset,
    the one in use marked in words, then the user's own in a list. */
 .la-presets {

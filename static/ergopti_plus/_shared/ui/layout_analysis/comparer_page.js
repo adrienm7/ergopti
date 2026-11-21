@@ -238,7 +238,16 @@
 	// The score settings' weight groups, each a titled sub-section; every
 	// weight of the score is in exactly one (test-layout-comparer-page.cjs).
 	const WEIGHT_GROUPS = {
-		pairs: ['sfb', 'sfs', 'sfb_distance', 'lsb', 'scissors', 'half_scissors', 'pinky_ring'],
+		pairs: [
+			'sfb',
+			'sfs',
+			'sfb_distance',
+			'lsb',
+			'scissors',
+			'half_scissors',
+			'pinky_ring',
+			'row_jump'
+		],
 		rolls: [
 			'roll_in',
 			'roll_out',
@@ -1038,6 +1047,7 @@
 						selectionChosen: state.linkedSelection ? saved.selectionChosen : state.selectionChosen,
 						weights: state.weights,
 						floors: state.floors,
+						grades: state.grades,
 						idealLoad: state.idealLoad,
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights,
@@ -1496,6 +1506,7 @@
 				format: state.format,
 				weights: state.weights,
 				floors: state.floors,
+				grades: state.grades,
 				idealLoad: state.idealLoad,
 				shortcuts: state.shortcuts,
 				formWeights: state.formWeights,
@@ -1662,7 +1673,7 @@
 
 		/** Re-scores after a weight change, without re-analysis. */
 		function rescore() {
-			state.results = E.rescore(state.results, state.weights, state.floors);
+			state.results = E.rescore(state.results, state.weights, state.floors, state.grades);
 			save();
 			render();
 		}
@@ -2420,7 +2431,7 @@
 					result: E.analyse(byId.get(id), state.tables, analysisOptions())
 				};
 			const result = referenceAnalysis.result;
-			result.score = E.score(result, state.weights, state.floors);
+			result.score = E.score(result, state.weights, state.floors, state.grades);
 			return result;
 		}
 
@@ -3524,9 +3535,9 @@
 		/** Each key's value of a heatmap choice for one result (heatValues), any choice. */
 		function heatValuesOf(result, metric, other) {
 			if (metric === HEAT_SCORE) {
-				const own = E.keyScoreCost(result, state.weights, state.floors);
+				const own = E.keyScoreCost(result, state.weights, state.floors, state.grades);
 				if (!other) return own;
-				const theirs = E.keyScoreCost(other, state.weights, state.floors);
+				const theirs = E.keyScoreCost(other, state.weights, state.floors, state.grades);
 				return Object.fromEntries(Object.keys(own).map((code) => [code, own[code] - theirs[code]]));
 			}
 			return other ? E.keyDiff(result, other, metric) : E.keyValues(result, metric);
@@ -5042,6 +5053,7 @@
 			return E.scoreConfig({
 				weights: state.weights,
 				floors: state.floors,
+				grades: state.grades,
 				idealLoad: state.idealLoad,
 				shortcuts: state.shortcuts,
 				formWeights: state.formWeights
@@ -5253,12 +5265,13 @@
 
 		function wireScoreConfig() {
 			wirePresets();
-			const parts = ['weights', 'floors', 'idealLoad', 'shortcuts', 'formWeights'];
+			const parts = ['weights', 'floors', 'grades', 'idealLoad', 'shortcuts', 'formWeights'];
 			$('la-config-export').addEventListener('click', async () => {
 				const text = `${JSON.stringify(
 					E.scoreConfig({
 						weights: state.weights,
 						floors: state.floors,
+						grades: state.grades,
 						idealLoad: state.idealLoad,
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights
@@ -5322,6 +5335,7 @@
 				});
 				state.weights = E.defaultWeights();
 				state.floors = E.defaultFloors();
+				state.grades = E.defaultGrades();
 				state.idealLoad = Object.assign({}, E.defaultIdealLoad());
 				state.shortcuts = E.defaultShortcuts();
 				state.formWeights = E.defaultFormFactorWeights();
@@ -5447,8 +5461,52 @@
 			control.append(top, field);
 			// A penalty's floor: the part of its value under it costs nothing.
 			if (id in state.floors) control.append(floorField(id, metric));
+			// A graded metric's scale: what each kind of its events weighs.
+			if (id in state.grades) control.append(gradeFields(id));
 			control.append(help);
 			return { control, input };
+		}
+
+		/**
+		 * A graded metric's grades (E.GRADES), a group named by its legend: one
+		 * labelled number per kind of event, each a factor of the metric's weight,
+		 * re-scoring as it is edited; the help says what the grades weigh.
+		 */
+		function gradeFields(id) {
+			const group = el('fieldset', 'la-grade-group');
+			const legend = el('legend', 'la-floor-name', t(`layout_analysis.grade_legend.${id}`));
+			const help = el('p', 'la-weight-help', t(`layout_analysis.grade_help.${id}`));
+			help.id = `la-grades-${id}-help`;
+			const list = el('ul', 'la-grade-list');
+			for (const grade of E.GRADES[id]) {
+				const inputId = `la-grade-${id}-${grade}`;
+				const item = el('li', 'la-weight-field');
+				const label = el('label', 'la-grade-name', t(`layout_analysis.grade.${id}.${grade}`));
+				label.htmlFor = inputId;
+				const input = el('input');
+				input.id = inputId;
+				input.type = 'number';
+				input.min = '0';
+				input.step = 'any';
+				input.value = String(state.grades[id][grade]);
+				const unit = el('small', 'la-weight-unit', t('layout_analysis.weights.grade_unit'));
+				unit.id = `${inputId}-unit`;
+				input.setAttribute('aria-describedby', `${unit.id} ${help.id}`);
+				input.addEventListener('input', () => {
+					const value = Number(input.value);
+					if (input.value === '' || !Number.isFinite(value) || value < 0) {
+						input.setAttribute('aria-invalid', 'true');
+						return;
+					}
+					input.removeAttribute('aria-invalid');
+					state.grades[id][grade] = value;
+					rescore();
+				});
+				item.append(label, input, unit);
+				list.append(item);
+			}
+			group.append(legend, list, help);
+			return group;
 		}
 
 		/** A penalty metric's floor field, in its unit, re-scoring as it is edited. */

@@ -1,5 +1,5 @@
 {
-	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. « floors » gives each penalty metric (lower is better) a floor in its own unit: only the part of its value above the floor costs points (Cyanophage's optimiser), so tiny differences between good layouts do not decide the rank; 0, the default, counts the whole value. A weight of 0 (pinky_ring, added on 2026-11-19) shows a metric without moving the score until the maintainer chooses its weight. The maintainer set sfb 5 and sfb_distance 0.26 (a 1 u SFB keeps costing about 10: 5 + 0.26 × 19.05 mm; 0.5, applied first the same day, made it 14.8) and the access weights altgr_usage 5 and dead_key_usage 3 on 2026-11-19 (docs/memory/maintainer-decisions.md). The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ». « change_penalty » is the optimizer's cost of leaving its start layout, in score points per % of the corpus's characters moved (each weighted by its occurrences, as layoutSimilarity weighs them): its presets, the one a page starts on, the largest weight its slider offers, and the number its « at most N changed characters » starts on (docs/design/layout-optimizer.md, « Change penalty »; decided by the agent on 2026-11-19, to review by the maintainer).",
+	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. « floors » gives each penalty metric (lower is better) a floor in its own unit: only the part of its value above the floor costs points (Cyanophage's optimiser), so tiny differences between good layouts do not decide the rank; 0, the default, counts the whole value. A weight of 0 (pinky_ring, added on 2026-11-19) shows a metric without moving the score until the maintainer chooses its weight. The maintainer set sfb 5 and sfb_distance 0.26 (a 1 u SFB keeps costing about 10: 5 + 0.26 × 19.05 mm; 0.5, applied first the same day, made it 14.8) and the access weights altgr_usage 5 and dead_key_usage 3 on 2026-11-19 (docs/memory/maintainer-decisions.md). « grades » are the graded costs (maintainer, 2026-11-21): each table multiplies its metric's weight by the kind of event, so one weight stays the base and the grades its scale. sfb by the rows the finger crosses (same_row, one_row, two_rows: two or more); sfs adds the skipgrams on two fingers of one hand around a key of the other hand (adjacent fingers, one_apart: a finger between them, index_pinky) to its same-finger skipgrams, which count whole; row_jump (two fingers of one hand two rows or more apart: one finger's jump is an SFB) by the same finger distance; distance by the finger that travels (pinky, ring, middle, index, thumb). Every grade at 1, the sfs ones at 0 and row_jump's weight at 0 give the single weights' score to the last bit (the flat model). The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ». « change_penalty » is the optimizer's cost of leaving its start layout, in score points per % of the corpus's characters moved (each weighted by its occurrences, as layoutSimilarity weighs them): its presets, the one a page starts on, the largest weight its slider offers, and the number its « at most N changed characters » starts on (docs/design/layout-optimizer.md, « Change penalty »; decided by the agent on 2026-11-19, to review by the maintainer).",
 	"schema_version": 1,
 	"weights": {
 		"sfb": 5,
@@ -9,6 +9,7 @@
 		"scissors": 3,
 		"half_scissors": 1,
 		"pinky_ring": 0,
+		"row_jump": 0,
 		"redirect": 1.5,
 		"redirect_bad": 3,
 		"roll_in": 1,
@@ -47,6 +48,7 @@
 		"scissors": 0,
 		"half_scissors": 0,
 		"pinky_ring": 0,
+		"row_jump": 0,
 		"redirect": 0,
 		"redirect_bad": 0,
 		"distance": 0,
@@ -58,5 +60,11 @@
 		"dead_key_usage": 0,
 		"outer_column": 0,
 		"unsupported": 0
+	},
+	"grades": {
+		"sfb": { "same_row": 1, "one_row": 1, "two_rows": 1 },
+		"sfs": { "adjacent": 0, "one_apart": 0, "index_pinky": 0 },
+		"row_jump": { "adjacent": 1, "one_apart": 1, "index_pinky": 1 },
+		"distance": { "pinky": 1, "ring": 1, "middle": 1, "index": 1, "thumb": 1 }
 	}
 }

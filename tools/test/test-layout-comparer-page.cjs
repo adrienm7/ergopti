@@ -1061,6 +1061,96 @@ check(
 				`${file}: ${PREFIX}${key}${slot ? ` with ${slot}` : ''}`
 			);
 	}
+	// Each graded metric's grades (score_weights.json « grades ») sit in its
+	// weight card as a group named by its legend: one labelled number input
+	// per grade, described by its unit and the group's help, all in 21 locales.
+	const gradeStart = page.indexOf('function gradeFields(');
+	const gradeBody = page.slice(gradeStart, page.indexOf('\n\t\t}\n', gradeStart));
+	check(
+		gradeStart > 0 && /if \(id in state\.grades\) control\.append\(gradeFields\(id\)\)/.test(body),
+		'score settings: a graded weight card has no grades'
+	);
+	check(
+		/el\('fieldset'/.test(gradeBody) &&
+			/el\('legend'/.test(gradeBody) &&
+			/label\.htmlFor = inputId/.test(gradeBody) &&
+			/input\.id = inputId/.test(gradeBody) &&
+			/input\.type = 'number'/.test(gradeBody) &&
+			/input\.min = '0'/.test(gradeBody) &&
+			/aria-describedby', `\$\{unit\.id\} \$\{help\.id\}`/.test(gradeBody) &&
+			/setAttribute\('aria-invalid', 'true'\)/.test(gradeBody) &&
+			/state\.grades\[id\]\[grade\] = value;\s*rescore\(\);/.test(gradeBody),
+		'score settings: the grades are not a labelled, described group that re-scores'
+	);
+	const groupsAt = page.indexOf('const WEIGHT_GROUPS = {');
+	const groupsText = page.slice(groupsAt, page.indexOf('\n\t};', groupsAt));
+	for (const id of Object.keys(E.GRADES))
+		check(
+			id in E.defaultWeights() && groupsText.includes(`'${id}'`),
+			`score settings: the grades of ${id} have no weight card to sit in`
+		);
+	for (const file of locales) {
+		const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
+		const gradeKeys = ['weights.grade_unit'].concat(
+			Object.entries(E.GRADES).flatMap(([id, grades]) =>
+				[`grade_legend.${id}`, `grade_help.${id}`].concat(grades.map((g) => `grade.${id}.${g}`))
+			)
+		);
+		for (const key of gradeKeys)
+			check(
+				typeof strings[`${PREFIX}${key}`] === 'string' && strings[`${PREFIX}${key}`].trim() !== '',
+				`${file}: ${PREFIX}${key}`
+			);
+	}
+	// The export, the import, the reset and the saved settings carry the grades.
+	const config = page.slice(page.indexOf('function wireScoreConfig('));
+	check(
+		config.includes(
+			"const parts = ['weights', 'floors', 'grades', 'idealLoad', 'shortcuts', 'formWeights'];"
+		) &&
+			/grades: state\.grades,/.test(config.slice(0, config.indexOf("$('la-config-import')"))) &&
+			config.includes('state.grades = E.defaultGrades();'),
+		'score settings: the export or the reset leaves the grades out'
+	);
+	const saveBody = page.slice(
+		page.indexOf('function save('),
+		page.indexOf('function save(') + 2000
+	);
+	check(/grades: state\.grades,/.test(saveBody), 'score settings: the grades are not saved');
+	// score_settings.js reads them back for every Studio score: kept when the
+	// engine accepts them, the defaults (named in the console) when not.
+	{
+		const warned = [];
+		const settings = {
+			window: {
+				LAYOUT_ANALYSIS: E,
+				LAYOUT_ANALYSIS_FILES: { SETTINGS_KEY: 'settings' },
+				addEventListener() {},
+				dispatchEvent() {}
+			},
+			console: { warn: (text) => warned.push(text) },
+			CustomEvent: function CustomEvent() {}
+		};
+		vm.createContext(settings);
+		vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, 'score_settings.js'), 'utf8'), settings);
+		const S = vm.runInContext('LAYOUT_ANALYSIS_SCORE_SETTINGS', settings);
+		const kept = S.parse({ grades: { sfb: { two_rows: 4 } } }).grades;
+		check(
+			kept.sfb.two_rows === 4 && kept.distance.pinky === E.defaultGrades().distance.pinky,
+			`score settings: saved grades read back as ${JSON.stringify(kept)}`
+		);
+		const refused = S.parse({ grades: { sfb: { two_rows: -1 } } }).grades;
+		check(
+			JSON.stringify(refused) === JSON.stringify(E.defaultGrades()) &&
+				warned.some((text) => /graded costs/.test(text)),
+			'score settings: refused grades are not replaced by the defaults with a warning'
+		);
+		check(
+			JSON.stringify(E.readScoreConfig(S.presetConfig(S.PRESET_IDS[0])).grades) ===
+				JSON.stringify(E.defaultGrades()),
+			'score settings: a preset file lacks the default grades'
+		);
+	}
 	check(
 		/<svg\s+id="la-ideal-hands"[^>]*aria-hidden="true"/.test(page),
 		'score settings: the ideal finger load has no hands picture'
@@ -1199,7 +1289,7 @@ check(
 		vm.runInContext('rankingTable', context)(
 			table,
 			results,
-			['sfb', 'row_jump'],
+			['sfb', 'repeat'],
 			{ key: 'rank', descending: false },
 			() => {},
 			reference
@@ -1230,10 +1320,11 @@ check(
 			rowOf(relative, qwerty.layout.name)[0] === String(qwerty.rank),
 		`relative: QWERTY against itself reads ${JSON.stringify(rowOf(relative, qwerty.layout.name))}`
 	);
-	// A metric shown but not scored has a difference and no verdict.
+	// A metric shown but not scored (a repeat is the same key on any layout)
+	// has a difference and no verdict.
 	check(
 		rowOf(relative, dvorak.layout.name)[4] === pct('0.00'),
-		`relative: row_jump reads ${rowOf(relative, dvorak.layout.name)[4]}`
+		`relative: repeat reads ${rowOf(relative, dvorak.layout.name)[4]}`
 	);
 }
 

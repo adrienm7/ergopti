@@ -166,11 +166,14 @@ count}`), `chords` the multi-character outputs used with their counts.
   about 40 % of a ranking (one layout, as the editor asks, costs nothing
   visible).
 
-  The events shown but not scored (`KEY_INFO_METRICS`: `row_jump`) are shared
-  over their keys the same way, in `cost` and `worst`, but stay out of
-  `KEY_COST_METRICS` and of the points a key costs.
+  The events shown but not scored (`KEY_INFO_METRICS`, empty since `row_jump`
+  was weighed on 2026-11-21) are shared over their keys the same way, in
+  `cost` and `worst`, but stay out of `KEY_COST_METRICS` and of the points a
+  key costs. `grades` holds the key's part of each grade of the counted graded
+  metrics (`sfb`, `sfs`, `row_jump`; [Graded costs](#graded-costs)), shared
+  the same way, and `finger` the type of its finger (the travel's grade).
 
-- `bigramMatrix(layout, ngrams, {keyboard?, profile?, weights?, typing?})` →
+- `bigramMatrix(layout, ngrams, {keyboard?, profile?, weights?, grades?, typing?})` →
   `{keyboard, bigrams, keys, pairs}`: every key pair the layout makes, the key
   bigrams of the stream `analyse()` types (its chosen ways) without a thumb
   key (the ones every bigram metric is a share of). `keys` lists the keys of a
@@ -179,19 +182,22 @@ count}`), `chords` the multi-character outputs used with their counts.
   share of the bigrams (%), the counters the engine's one visitor raises for
   it (`sfb`, `lsb`, `scissors`, `half_scissors`, `row_jump`, `roll_in`,
   `roll_out`, `hand_change`, `repeat`) and its score points, Σ sign × weight ×
-  share over those metrics. The pairs add up to `analyse()`'s bigram metrics
+  grade × share over those metrics (the grade of its kind of SFB or row jump,
+  1 for the others). The pairs add up to `analyse()`'s bigram metrics
   and their part of the score (pinned by `test-layout-analysis-engine.cjs`).
 - `countWords(text, n?, into?)`, `wordTable(counts)`, `wordsFromText(text)`:
   the word table of a text. A word is a run of letters and combining marks
   (Unicode L and M) folded to lower case; an apostrophe, a hyphen, a digit or
   a space ends it, and a one-character word is dropped (no key pair to
   measure). The table keeps the `WORD_TABLE_SIZE` (1,000) most frequent words.
-- `wordEfforts(layout, words, {keyboard?, profile?, weights?, typing?})` →
+- `wordEfforts(layout, words, {keyboard?, profile?, weights?, grades?, typing?})` →
   `{words, unsupported, mean}`: each word typed alone, as `analyse()` types a
   text, and its **effort**: the points the score would take off a text made of
   that word only, Σ weight × value over `WORD_EFFORT_METRICS` (`sfb`, `sfs`,
-  `lsb`, `scissors`, `half_scissors`, `redirect`, `redirect_bad` as shares of
-  the word's own key bigrams or trigrams, and `distance` in mm per character).
+  `lsb`, `scissors`, `half_scissors`, `pinky_ring`, `row_jump`, `redirect`,
+  `redirect_bad` as shares of the word's own key bigrams or trigrams,
+  `distance` in mm per character and `sfb_distance`), a graded metric by its
+  graded value.
   The loads (finger, pinky, outer column) belong to a whole text and are left
   out. `words` is hardest first, each `{word, count, effort, parts}`;
   a word with a character the layout cannot type goes to `unsupported`;
@@ -199,17 +205,25 @@ count}`), `chords` the multi-character outputs used with their counts.
   `effortDistribution(words, bins)` spreads those occurrences over equal
   ranges of effort from 0 to the hardest word's.
 
-- `keyScoreCost(result, weights?)` → `{code: points}`: what each key costs the
-  global score, Σ weight × `cost` over `KEY_COST_METRICS`; the keys' points add
-  up to those metrics' part of the score.
+- `keyScoreCost(result, weights?, floors?, grades?)` → `{code: points}`: what
+  each key costs the global score, Σ weight × `cost` over `KEY_COST_METRICS`, a
+  graded metric by the key's part of each grade (its travel by its finger's
+  grade); the keys' points add up to those metrics' part of the score.
 
-- `score(result, weights?, floors?)` → `{total, contributions, weights,
-floors}`; the given weights and floors override the defaults metric by
-  metric (see [Global score](#global-score)).
+- `score(result, weights?, floors?, grades?)` → `{total, contributions,
+weights, floors, grades}`; the given weights, floors and grades override the
+  defaults metric by metric (see [Global score](#global-score)). A graded
+  metric needs `result.parts` (`analyse()` and `scoreSession()` give them).
 - `defaultWeights()` → a copy of `score_weights.json` (the « restore defaults »
   action); `defaultFloors()` → a copy of its `floors`; `scoreFloors(floors?)`
   → the floors with the given ones, refusing a floor on a metric that has no
   weight or is not lower-is-better, or one below 0 or not finite.
+- `GRADES` → each graded metric's grades, in order; `defaultGrades()` → a
+  copy of `score_weights.json` « grades »; `scoreGrades(grades?)` → the
+  grades with the given ones (a part of a table keeps its other defaults),
+  refusing an unknown table or grade and a factor below 0 or not finite;
+  `flatGrades()` → the grades that weigh each graded metric by its plain
+  value ([Graded costs](#graded-costs)).
 - `referenceLayout(language?)` → the library id the ranking's relative view
   measures against: `reference_layouts.by_language[language]` of
   `analysis_model.json` (`fr`: `azerty`), else its `default` (`qwerty`).
@@ -220,22 +234,25 @@ floors}`; the given weights and floors override the defaults metric by
   Comparer's text modes analyse some layouts on another table); `rankOrder(a,
 b)` → its order, negative when `a` ranks first; a result without a boolean
   `incomplete` is refused.
-- `rescore(results, weights)` → the same results re-scored and re-ranked with
-  new weights, without re-analysis (live weight editing). It refuses an access
+- `rescore(results, weights, floors?, grades?)` → the same results re-scored
+  and re-ranked with new weights, floors or grades, without re-analysis (live
+  weight editing). It refuses an access
   weight (`ACCESS_WEIGHTS`) other than the one the results' ways were chosen by
   (`result.typing.access`): those weights change the typing, so the layouts are
   analysed again ([Ways of typing](#ways-of-typing)).
 - `ACCESS_WEIGHTS` → `['modifier_usage', 'altgr_usage', 'dead_key_usage']`;
   `accessWeights(weights?)` → those three, each default replaced by the given
   weight.
-- `scoreConfig({weights, floors, idealLoad, shortcuts, formWeights})` → the score
-  settings file the Comparer exports (« Import, export and reset » in « Réglages
-  du score »): `{format: "ergopti-score-settings", schema_version: 2, analyser:
-"ergopti", weights, floors, ideal_load, shortcuts, form_weights}`, every weight of the
-  score (a metric is in the score when its weight is above 0; the access
-  weights among them) and every penalty floor. Version 2 (2026-11-19) added the
-  floors: a version 1 file is refused by its version (`config_version`, checked
-  before any entry), never read with guessed floors. The same file is a score
+- `scoreConfig({weights, floors, grades, idealLoad, shortcuts, formWeights})` →
+  the score settings file the Comparer exports (« Import, export and reset » in
+  « Réglages du score »): `{format: "ergopti-score-settings", schema_version: 3,
+analyser: "ergopti", weights, floors, grades, ideal_load, shortcuts,
+form_weights}`, every weight of the score (a metric is in the score when its
+  weight is above 0; the access weights among them), every penalty floor and
+  every grade. Version 2 (2026-11-19) added the floors and version 3
+  (2026-11-21) the graded costs and the `row_jump` weight: an older file is
+  refused by its version (`config_version`, checked before any entry), never
+  read with guessed values. The same file is a score
   preset: the built-in ones (`LAYOUT_ANALYSIS_SCORE_SETTINGS.presetConfig`:
   balanced, pinkies, rolls, code, forgiving, each documented in
   `score_settings.js`) and the user's own, saved under a name with the
@@ -588,7 +605,7 @@ metric a share of the typed characters.
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                              |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `pinky_ring`       | %     | lower  | Pinky–ring pair: one hand, the pinky and the ring finger, any rows (the same row included; Oxeylyzer's `pinky_ring_bigrams`; Cyanophage's pinky–ring scissor is its part on different rows). A half scissor between them is counted in both. Weight 0 by default.                                                                                                                                                                                                                                         |
-| `row_jump`         | %     | none   | Row jump: two consecutive keys of one hand at least two logical rows apart (top and bottom row, number and home row), whatever the fingers (it may also be an SFB or a scissor); informative, not in the global score.                                                                                                                                                                                                                                                                                    |
+| `row_jump`         | %     | lower  | Row jump: two consecutive keys typed by two different fingers of one hand at least two logical rows apart (top and bottom row, number and home row); one finger's jump is an SFB, counted there (maintainer, 2026-11-21). A full scissor is one too. Graded by its two fingers ([Graded costs](#graded-costs)).                                                                                                                                                                                           |
 | `roll_in`          | %     | higher | Two-key inward roll: one hand, different fingers, toward the index.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `roll_out`         | %     | higher | Two-key outward roll: toward the pinky.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `hand_change`      | %     | none   | Two keys on different hands.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -636,7 +653,43 @@ The defaults and their justification are in the study, section « Default
 weights »; the maintainer set `sfb` 5 with `sfb_distance` 0.26 (a 1 u SFB
 keeps costing about 10, 5 + 0.26 × 19.05 mm, and a longer one more), `altgr_usage` 5 and `dead_key_usage` 3
 on 2026-11-19. A weight of 0 removes a metric from the score; the Studio shows each
-contribution beside the metric.
+contribution beside the metric. The graded metrics weigh their graded value
+([Graded costs](#graded-costs)); a floor applies to that value.
+
+### Graded costs
+
+The maintainer's decision of 2026-11-21 (docs/memory/maintainer-decisions.md):
+four weights become scales. `score_weights.json` « grades » gives each a table
+of factors, each multiplying the metric's weight for one kind of its events,
+so the weight stays the base and its grades the scale:
+
+- `sfb` by the rows its finger crosses: `same_row` (an index's or pinky's
+  lateral move, a thumb's two keys), `one_row` (home to top), `two_rows` (two
+  or more: bottom to top). A two-row SFB is worse than a one-row one.
+- `sfs` adds to its same-finger skipgrams (counted whole) the **skipgrams on
+  two fingers**: an alternation whose first and last keys are typed by two
+  fingers of one hand (no thumb), the middle key by the other hand, by how far
+  apart the two fingers are: `adjacent`, `one_apart` (a finger between them:
+  index and ring, middle and pinky), `index_pinky` (barely counted, the
+  comfortable pair). A trigram on one hand is a roll or a redirect and keeps
+  its own class. These skipgrams are in no metric of their own: their shares
+  are `result.parts.sfs`.
+- `row_jump` by its two fingers, with the same three grades: adjacent fingers
+  are the worst. Its default weight is half of `sfb`'s.
+- `distance` by the finger that travels: `pinky`, `ring`, `middle`, `index`,
+  `thumb`; a key's move costs less with the index than with the pinky.
+
+`analyse()` returns `parts`: each counted grade's share of its metric's whole
+(% of the key bigrams or trigrams) and each finger type's part of the travel
+(mm per character, adding up to `distance`); `score()` weighs
+`Σ grade × part` (plus the same-finger `sfs` for `sfs`), so a grade edited in
+the Comparer re-scores without analysing. With every split grade at 1, the
+`sfs` grades at 0 and `row_jump` at 0 (`flatGrades()`), the score is the
+single weights' one to the last bit (pinned by
+`test-layout-analysis-engine.cjs`, section 16b). The ways of typing choose by
+the default grades, as by the default weights. The Comparer edits every grade
+in its metric's weight card (« Réglages du score »), and its settings file
+carries them.
 
 ## Ways of typing
 
@@ -1677,8 +1730,9 @@ confirmed on 2026-11-19 with the thumb letters' pairs and the thumb SFB
 unread outer keys.
 
 Decided by the agent on 2026-11-17, to review by the maintainer: `row_jump`
-(two rows or more, any fingers, logical rows) is shown but not scored, since
-the study gives it no weight; a word's effort is measured on its lower-case
+(two rows or more, logical rows) was shown but not scored, until the
+maintainer's decision of 2026-11-21 counted it on different fingers only and
+weighed it ([Graded costs](#graded-costs)); a word's effort is measured on its lower-case
 form with the score's own weights, typed alone (no space around it); a word
 table keeps 1,000 words.
 

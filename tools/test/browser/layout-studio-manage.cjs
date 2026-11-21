@@ -446,9 +446,9 @@ function topScore(page) {
  * (score-presets) The built-in presets apply every weight at once, the one
  * in use marked in words, with an « Undo »; a penalty floor is edited in its
  * weight's card and moves the score; the current settings saved under a name
- * survive a reload, apply, rename and remove with an « Undo ». The settings
- * file is version 2 with its floors, and a version 1 file is refused by its
- * version.
+ * survive a reload, apply, rename and remove with an « Undo ». A graded
+ * cost is edited in its weight's card. The settings file is version 3 with
+ * its floors and grades, and a version 2 file is refused by its version.
  */
 async function exercisePresets(browser, origin) {
 	const { page, errors, context } = await openComparer(browser, origin);
@@ -521,14 +521,27 @@ async function exercisePresets(browser, origin) {
 		await page.getAttribute('#la-floor-sfb', 'aria-label'),
 		EN['layout_analysis.weights.floor_named'].replace('{metric}', EN['layout_analysis.metric.sfb'])
 	);
-	// The export holds the floors, at version 2.
+	// A grade: the factor of two-row SFBs, in the SFB card, named by its label.
+	const twoRows = await page.inputValue('#la-grade-sfb-two_rows');
+	assert.equal(
+		Number(twoRows),
+		await page.evaluate(() => window.LAYOUT_ANALYSIS.defaultGrades().sfb.two_rows),
+		'the shipped grade'
+	);
+	assert.equal(
+		await page.textContent('label[for="la-grade-sfb-two_rows"]'),
+		EN['layout_analysis.grade.sfb.two_rows']
+	);
+	await page.fill('#la-grade-sfb-two_rows', '4');
+	// The export holds the floors and the grades, at version 3.
 	const [exported] = await Promise.all([
 		page.waitForEvent('download'),
 		page.click('#la-config-export')
 	]);
 	const file = JSON.parse(fs.readFileSync(await exported.path(), 'utf8'));
-	assert.equal(file.schema_version, 2);
+	assert.equal(file.schema_version, 3);
 	assert.equal(file.floors.sfb, 100, 'the floor is exported');
+	assert.equal(file.grades.sfb.two_rows, 4, 'the grade is exported');
 	assert.deepEqual(
 		Object.keys(file.floors).sort(),
 		await page.evaluate(() => Object.keys(window.LAYOUT_ANALYSIS.defaultFloors()).sort()),
@@ -544,6 +557,11 @@ async function exercisePresets(browser, origin) {
 	// Round trip: the defaults, then the exported file brings the floor back.
 	await page.click('#la-config-reset');
 	assert.equal(await page.inputValue('#la-floor-sfb'), '0', 'the reset clears the floor');
+	assert.equal(
+		await page.inputValue('#la-grade-sfb-two_rows'),
+		twoRows,
+		'the reset restores the grade'
+	);
 	await importText('round-trip.json', file);
 	const imported = EN['layout_analysis.config.imported'].replace('{name}', 'round-trip.json');
 	await page.waitForFunction(
@@ -551,7 +569,12 @@ async function exercisePresets(browser, origin) {
 		imported
 	);
 	assert.equal(await page.inputValue('#la-floor-sfb'), '100', 'the import applies the floor');
-	// A version 2 file without its floors is refused whole, its reason localized.
+	assert.equal(
+		await page.inputValue('#la-grade-sfb-two_rows'),
+		'4',
+		'the import applies the grade'
+	);
+	// A version 3 file without its floors is refused whole, its reason localized.
 	const noFloors = JSON.parse(JSON.stringify(file));
 	delete noFloors.floors;
 	noFloors.weights.sfb = 9;
@@ -563,8 +586,8 @@ async function exercisePresets(browser, origin) {
 	);
 	assert.equal(await page.inputValue('#la-weight-sfb'), '5', 'nothing of a refused file applies');
 	assert.equal(await page.inputValue('#la-floor-sfb'), '100');
-	const old = Object.assign({}, file, { schema_version: 1 });
-	delete old.floors;
+	const old = Object.assign({}, file, { schema_version: 2 });
+	delete old.grades;
 	await page.setInputFiles('#la-config-import', {
 		name: 'old.json',
 		mimeType: 'application/json',
@@ -572,7 +595,7 @@ async function exercisePresets(browser, origin) {
 	});
 	// The file is read asynchronously: wait for its refusal.
 	await page.waitForFunction(() =>
-		/version 1; this Studio reads version 2/.test(
+		/version 2; this Studio reads version 3/.test(
 			document.getElementById('la-config-status').textContent
 		)
 	);

@@ -5,7 +5,8 @@
  * MODULE: Layout Analysis Score Settings
  * DESCRIPTION:
  * The one reading of the score settings the Comparer's « Réglages du score »
- * edits: the weights of the global score and the penalty floors, the ideal finger load, the shortcut
+ * edits: the weights of the global score, the penalty floors and the graded
+ * costs, the ideal finger load, the shortcut
  * table (shortcut_left), the compact form factors' weights (compact_fit) and
  * the fingering profile of each keyboard. The Comparer, the editor's analysis
  * panel and the optimizer all score with what this module reads, so a weight
@@ -126,8 +127,8 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 	 * still has and accepts over the defaults, and the ideal load, shortcut
 	 * table and form factor weights when the engine accepts them whole.
 	 * @param {object} saved - What the Comparer stored (any shape).
-	 * @returns {{weights: object, floors: object, idealLoad: object, shortcuts: object,
-	 *   formWeights: object}}
+	 * @returns {{weights: object, floors: object, grades: object, idealLoad: object,
+	 *   shortcuts: object, formWeights: object}}
 	 */
 	function parse(saved) {
 		const value = saved && typeof saved === 'object' ? saved : {};
@@ -137,6 +138,7 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 		return {
 			weights,
 			floors: checkedOr(E.scoreFloors, value.floors, E.defaultFloors, 'penalty floors'),
+			grades: checkedOr(E.scoreGrades, value.grades, E.defaultGrades, 'graded costs'),
 			idealLoad: checkedOr(
 				(load) => Object.assign({}, E.idealLoad(load)),
 				value.idealLoad,
@@ -157,7 +159,7 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 	 * The analyse() options of every Studio score on a keyboard: the saved
 	 * settings and that keyboard's fingering profile (undefined: its defaults).
 	 * @param {string} keyboard - A model keyboard id.
-	 * @returns {{weights, floors, idealLoad, shortcuts, formWeights, profile}}
+	 * @returns {{weights, floors, grades, idealLoad, shortcuts, formWeights, profile}}
 	 */
 	function analysisOptions(keyboard) {
 		return Object.assign(parse(stored()), {
@@ -176,17 +178,24 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 	 * that only shows them.
 	 * @param {string} keyboard - A model keyboard id.
 	 * @returns {{weights: number, idealLoad: boolean, shortcuts: boolean,
-	 *   formWeights: boolean, fingering: boolean}} weights: how many differ.
+	 *   formWeights: boolean, fingering: boolean}} weights: how many weights,
+	 *   floors and grades differ.
 	 */
 	function customised(keyboard) {
 		const now = analysisOptions(keyboard);
 		const weights = E.defaultWeights();
 		const shortcuts = E.defaultShortcuts();
 		const floors = E.defaultFloors();
+		const grades = E.defaultGrades();
 		return {
 			weights:
 				Object.keys(weights).filter((id) => now.weights[id] !== weights[id]).length +
-				Object.keys(floors).filter((id) => now.floors[id] !== floors[id]).length,
+				Object.keys(floors).filter((id) => now.floors[id] !== floors[id]).length +
+				Object.entries(grades).reduce(
+					(sum, [id, table]) =>
+						sum + Object.keys(table).filter((g) => now.grades[id][g] !== table[g]).length,
+					0
+				),
 			idealLoad: !same(now.idealLoad, E.defaultIdealLoad()),
 			shortcuts:
 				!same(now.shortcuts.letters, shortcuts.letters) ||
@@ -198,7 +207,8 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 
 	/**
 	 * A built-in preset as a score settings file (E.scoreConfig, the format of
-	 * « Export »): the defaults, its weights and floors over them.
+	 * « Export »): the defaults, its weights and floors over them (the
+	 * default graded costs).
 	 * @param {string} id - One of PRESETS.
 	 * @returns {object} The file's JSON value.
 	 * @throws {Error} On an unknown preset.
@@ -209,6 +219,7 @@ var LAYOUT_ANALYSIS_SCORE_SETTINGS = (function () {
 		return E.scoreConfig({
 			weights: Object.assign(E.defaultWeights(), preset.weights),
 			floors: Object.assign(E.defaultFloors(), preset.floors),
+			grades: E.defaultGrades(),
 			idealLoad: E.defaultIdealLoad(),
 			shortcuts: E.defaultShortcuts(),
 			formWeights: E.defaultFormFactorWeights()

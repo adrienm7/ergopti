@@ -139,6 +139,38 @@ var LAYOUT_ANALYSIS = (function () {
 	// A row jump: two keys of one hand at least this many rows apart (top and
 	// bottom row, number and home row).
 	const ROW_JUMP_ROWS = 2;
+	/**
+	 * The graded costs (score_weights.json « grades », maintainer 2026-11-21):
+	 * each table scales its metric's weight by the kind of event, in this
+	 * order. An SFB by the rows its finger crosses (same row, one row, two or
+	 * more); a skipgram on two fingers of one hand around a key of the other
+	 * hand, and a row jump, by how far apart the two fingers are (adjacent,
+	 * one finger between, index and pinky); the travel by the finger that
+	 * moves. The definitions are in docs/design/layout-analysis.md, « Graded
+	 * costs ».
+	 */
+	const GRADES = Object.freeze({
+		sfb: Object.freeze(['same_row', 'one_row', 'two_rows']),
+		sfs: Object.freeze(['adjacent', 'one_apart', 'index_pinky']),
+		row_jump: Object.freeze(['adjacent', 'one_apart', 'index_pinky']),
+		distance: Object.freeze(['pinky', 'ring', 'middle', 'index', 'thumb'])
+	});
+	// The graded metrics whose events the key stream counts per grade (the
+	// travel's grades are read from the presses of each finger).
+	const COUNTED_GRADES = ['sfb', 'sfs', 'row_jump'];
+	// sfs's grades add the skipgrams on two fingers to its own same-finger
+	// ones, which count whole; every other table splits its metric's events.
+	const GRADE_ADDS = new Set(['sfs']);
+	// The stream counter of each grade: « <metric>_<grade> ».
+	const GRADE_COUNTERS = Object.fromEntries(
+		COUNTED_GRADES.map((metric) => [metric, GRADES[metric].map((grade) => `${metric}_${grade}`)])
+	);
+	// The finger grade of two fingers of one hand, by their distance in finger
+	// order (1: adjacent, 3: index and pinky).
+	const FINGER_GAP_GRADE = [null, 0, 1, 2];
+	// The finger types by finger order, pinky to index (the travel's grades).
+	const FINGER_TYPES = ['pinky', 'ring', 'middle', 'index'];
+	const THUMB_TYPE = 'thumb';
 	// Ways to type one character kept for the context choice: a symbol on two
 	// keys, on AltGr and behind a dead key all stay; more never occur in the
 	// library and would multiply the cost of the choice.
@@ -169,7 +201,7 @@ var LAYOUT_ANALYSIS = (function () {
 		scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		half_scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		pinky_ring: { unit: '%', better: 'lower', of: 'bigrams' },
-		row_jump: { unit: '%', better: 'none', of: 'bigrams' },
+		row_jump: { unit: '%', better: 'lower', of: 'bigrams' },
 		roll_in: { unit: '%', better: 'higher', of: 'bigrams' },
 		roll_out: { unit: '%', better: 'higher', of: 'bigrams' },
 		hand_change: { unit: '%', better: 'none', of: 'bigrams' },
@@ -2042,9 +2074,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Measures one layout.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, format?: string, weights?: object, idealLoad?: object,
-	 *   profile?: object, keyGroups?: boolean, shortcuts?: object, formWeights?: object}} [options]
-	 *   - The user's shortcut table (shortcuts(): letter usefulness and key ease of
+	 * @param {{keyboard?: string, format?: string, weights?: object, floors?: object,
+	 *   grades?: object, idealLoad?: object, profile?: object, keyGroups?: boolean,
+	 *   shortcuts?: object, formWeights?: object}} [options]
+	 *   - The score's floors and graded costs (as score()); the user's shortcut table (shortcuts(): letter usefulness and key ease of
 	 *   shortcut_left) and compact form factor weights (formFactorWeights(): of
 	 *   compact_fit), the model's when absent; board, keyboard format
 	 *   (keyboard_formats id: compact_fit measures the per-format form factors on
@@ -2055,7 +2088,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   'best' (the default) types each character the way that costs least in
 	 *   its context and uses the multi-character outputs that save keystrokes
 	 *   (planTyping); 'fixed' types each its cheapest way out of context.
-	 * @returns {object} {layout, keyboard, metrics, fingers, fingerShares,
+	 * @returns {object} {layout, keyboard, metrics, parts, fingers, fingerShares,
 	 *   idealLoad, hands, rows, coverage, trigramClasses, keys, typing,
 	 *   simplicity, score}.
 	 */
@@ -2079,6 +2112,10 @@ var LAYOUT_ANALYSIS = (function () {
 		}
 		// The good events each key takes part in (rolls, alternation), never grouped.
 		for (const gain of KEY_GAINS) perKey[gain] = new Float64Array(board.codes.length);
+		// Each graded event's keys, never grouped: the keys' part of each grade.
+		for (const metric of COUNTED_GRADES)
+			for (const name of GRADE_COUNTERS[metric])
+				perKey[name] = new Float64Array(board.codes.length);
 		// A pair's or a trigram's group id holds its keys in increasing order.
 		// Counting every event's groups costs about 40 % on a whole library, so
 		// only the SFB partners the ranking shows are counted unless asked.
@@ -2130,6 +2167,8 @@ var LAYOUT_ANALYSIS = (function () {
 			// The fingering profile measured with (null: the defaults), for the key map.
 			profile: board.profile,
 			metrics,
+			// The shares the graded costs weigh (gradeParts): score() reads them.
+			parts: m.parts,
 			fingers: m.fingers,
 			// Each non-thumb finger's share of the non-thumb presses, and the ideal
 			// load it is measured against: the two sides of finger_imbalance.
@@ -2192,7 +2231,11 @@ var LAYOUT_ANALYSIS = (function () {
 					{
 						pinky: m.fingerLoad[0] + m.fingerLoad[9],
 						outer: m.outer,
-						home: m.home
+						home: m.home,
+						// The travel weighted by the default finger grades.
+						travel:
+							gradedValue('distance', metrics.distance, m.parts.distance, data().grades.distance) *
+							c.chars
 					},
 					plan.access
 				),
@@ -2208,7 +2251,7 @@ var LAYOUT_ANALYSIS = (function () {
 		// One layout analysed in detail: each event's heaviest groups over the board.
 		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
 		result.incomplete = result.coverage.missingRequired.length > 0;
-		result.score = score(result, opts.weights, opts.floors);
+		result.score = score(result, opts.weights, opts.floors, opts.grades);
 		return result;
 	}
 
@@ -2276,6 +2319,10 @@ var LAYOUT_ANALYSIS = (function () {
 	const TRIPLE_ROLL_MIXED = 7;
 	const TRIPLE_SFS = 8;
 	const TRIPLE_OUT = 16;
+	// An alternation whose first and last keys are two fingers of one hand:
+	// their sfs grade (FINGER_GAP_GRADE) plus one, in these bits.
+	const TRIPLE_SKIP_SHIFT = 5;
+	const TRIPLE_SKIP_MASK = 3 << TRIPLE_SKIP_SHIFT;
 	const tripleKindCache = new WeakMap();
 
 	/**
@@ -2307,7 +2354,40 @@ var LAYOUT_ANALYSIS = (function () {
 				board.order[k3] === INDEX_ORDER;
 			return sfs | (index ? TRIPLE_REDIRECT : TRIPLE_REDIRECT_BAD);
 		}
-		return sfs | (h1 !== h2 && h2 !== h3 ? TRIPLE_ALTERNATION : TRIPLE_ROLL_MIXED);
+		if (h1 !== h2 && h2 !== h3) return sfs | TRIPLE_ALTERNATION | skipBits(board, k1, k3);
+		return sfs | TRIPLE_ROLL_MIXED;
+	}
+
+	/**
+	 * The skipgram grade bits of an alternation's first and last keys: two
+	 * fingers of one hand, no thumb, give their FINGER_GAP_GRADE plus one; the
+	 * same finger (an SFS) or a thumb gives 0.
+	 */
+	function skipBits(board, k1, k3) {
+		const grade = fingerGapGrade(board, k1, k3);
+		return grade < 0 ? 0 : (grade + 1) << TRIPLE_SKIP_SHIFT;
+	}
+
+	/**
+	 * The finger grade (FINGER_GAP_GRADE) of two keys typed by two fingers of
+	 * one hand, neither a thumb; -1 for any other pair.
+	 */
+	function fingerGapGrade(board, k1, k2) {
+		const f1 = board.finger[k1];
+		const f2 = board.finger[k2];
+		if (f1 === f2 || board.hand[k1] !== board.hand[k2] || !fingerRows(board, k1, k2)) return -1;
+		return FINGER_GAP_GRADE[Math.abs(board.order[k1] - board.order[k2])];
+	}
+
+	/** The sfb grade of two keys of one finger: same row, one row, two rows or more. */
+	function sfbRowGrade(board, k1, k2) {
+		return Math.min(Math.abs(board.row[k1] - board.row[k2]), GRADES.sfb.length - 1);
+	}
+
+	/** A finger's type (GRADES.distance) by its index in the model's fingers. */
+	function fingerType(f) {
+		if (isThumbFinger(f)) return THUMB_TYPE;
+		return FINGER_TYPES[f < LEFT_THUMB ? f : data().model.fingers.length - 1 - f];
 	}
 
 	/** A board's tripleKind memo, (k1 * K + k2) * K + k3, filled as read. */
@@ -2388,8 +2468,18 @@ var LAYOUT_ANALYSIS = (function () {
 		return !isThumbFinger(board.finger[k1]) && !isThumbFinger(board.finger[k2]);
 	}
 
-	/** The counters the key stream adds to: every one a sum over the n-grams. */
+	/**
+	 * The counters the key stream adds to: every one a sum over the n-grams,
+	 * the graded metrics' events also counted per grade (GRADE_COUNTERS).
+	 */
 	function streamCounts() {
+		const out = streamBaseCounts();
+		for (const metric of COUNTED_GRADES) for (const name of GRADE_COUNTERS[metric]) out[name] = 0;
+		return out;
+	}
+
+	/** streamCounts() without the per-grade counters. */
+	function streamBaseCounts() {
 		return {
 			chars: 0,
 			unsupported: 0,
@@ -2441,6 +2531,18 @@ var LAYOUT_ANALYSIS = (function () {
 		const sameFinger = sameFingerCosts(board);
 		const blame2 = blame ? blame.pair : () => {};
 		const blame3 = blame ? blame.triple : () => {};
+		const sfbGrades = GRADE_COUNTERS.sfb;
+		const sfsGrades = GRADE_COUNTERS.sfs;
+		const rowJumpGrades = GRADE_COUNTERS.row_jump;
+		/** One SFB: its count, its grade's, its travel and its blame. */
+		const sfb = (k1, k2, n) => {
+			const grade = sfbGrades[sfbRowGrade(board, k1, k2)];
+			c.sfb += n;
+			c[grade] += n;
+			c.sfb_cost += n * sameFinger[k1 * K + k2];
+			blame2('sfb', n, k1, k2);
+			blame2(grade, n, k1, k2);
+		};
 		return {
 			char(char, seq, n) {
 				// A multi-character output counts each character it types.
@@ -2464,9 +2566,7 @@ var LAYOUT_ANALYSIS = (function () {
 					// SFB, its travel included; any other pair with it is in no metric.
 					if (thumbSfb(board, k1, k2)) {
 						c.bigrams += n;
-						c.sfb += n;
-						c.sfb_cost += n * sameFinger[k1 * K + k2];
-						blame2('sfb', n, k1, k2);
+						sfb(k1, k2, n);
 					}
 					return;
 				}
@@ -2477,21 +2577,8 @@ var LAYOUT_ANALYSIS = (function () {
 					c.repeat += n;
 					return;
 				}
-				// A row jump, whatever the fingers (an SFB or a scissor may be one
-				// too): shown, not scored. A thumb's keys lie below every row.
-				const rows = fingerRows(board, k1, k2);
-				if (
-					rows &&
-					board.hand[k1] === board.hand[k2] &&
-					Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS
-				) {
-					c.row_jump += n;
-					blame2('row_jump', n, k1, k2);
-				}
 				if (f1 === f2) {
-					c.sfb += n;
-					c.sfb_cost += n * sameFinger[k1 * K + k2];
-					blame2('sfb', n, k1, k2);
+					sfb(k1, k2, n);
 					return;
 				}
 				if (board.hand[k1] !== board.hand[k2]) {
@@ -2500,6 +2587,17 @@ var LAYOUT_ANALYSIS = (function () {
 				}
 				const o1 = board.order[k1];
 				const o2 = board.order[k2];
+				// A row jump: two fingers of one hand two rows or more apart (one
+				// finger's jump is an SFB, counted there). A thumb's keys lie below
+				// every row. A full scissor is one too.
+				const rows = fingerRows(board, k1, k2);
+				if (rows && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS) {
+					const grade = rowJumpGrades[FINGER_GAP_GRADE[Math.abs(o1 - o2)]];
+					c.row_jump += n;
+					c[grade] += n;
+					blame2('row_jump', n, k1, k2);
+					blame2(grade, n, k1, k2);
+				}
 				// A pinky and a ring finger of one hand, whatever their rows.
 				if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) {
 					c.pinky_ring += n;
@@ -2560,12 +2658,49 @@ var LAYOUT_ANALYSIS = (function () {
 					case TRIPLE_ALTERNATION:
 						c.alternation += n;
 						blame3('alternation', n, k1, k2, k3);
+						// Its first and last keys on two fingers of one hand: a
+						// skipgram of sfs's grades, not an SFS.
+						if (kind & TRIPLE_SKIP_MASK) {
+							const grade = sfsGrades[((kind & TRIPLE_SKIP_MASK) >> TRIPLE_SKIP_SHIFT) - 1];
+							c[grade] += n;
+							blame2(grade, n, k1, k3);
+						}
 						break;
 					default:
 						c.roll_mixed += n;
 				}
 			}
 		};
+	}
+
+	/**
+	 * The shares the graded costs weigh (GRADES), from the stream counters:
+	 * each counted grade's events in its metric's unit (% of the key bigrams
+	 * or trigrams), and each finger type's part of the travel (mm per typed
+	 * character, the parts adding up to the distance metric). score() turns
+	 * them into the graded values, so new grades re-score without analysing.
+	 * @param {object} board - From keyboard().
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @param {Float64Array} keyCount - Presses per key, modifiers included.
+	 * @returns {object} metric → grade → share.
+	 */
+	function gradeParts(board, c, keyCount) {
+		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const parts = {};
+		for (const metric of COUNTED_GRADES) {
+			const whole = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
+			parts[metric] = {};
+			GRADES[metric].forEach((grade, i) => {
+				parts[metric][grade] = pct(c[GRADE_COUNTERS[metric][i]], whole);
+			});
+		}
+		const travel = Object.fromEntries(GRADES.distance.map((type) => [type, 0]));
+		for (let k = 0; k < keyCount.length; k++)
+			travel[fingerType(board.finger[k])] += board.reach[k] * keyCount[k];
+		parts.distance = {};
+		for (const type of GRADES.distance)
+			parts.distance[type] = c.chars > 0 ? travel[type] / c.chars : 0;
+		return parts;
 	}
 
 	/**
@@ -2578,7 +2713,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {Float64Array} keyCount - Presses per key.
 	 * @param {object} opts - The analyse() options.
 	 * @param {number} compact - compact_fit, measured by the caller.
-	 * @returns {object} {metrics, fingers, fingerLoad, fingerDistance (each finger's
+	 * @returns {object} {metrics, parts (gradeParts), fingers, fingerLoad, fingerDistance (each finger's
 	 *   part of the travel, mm per character), ideal, pressed, allPresses, left,
 	 *   right, outer, home (presses on the outer column, on the home row),
 	 *   simplicity (the rules)}.
@@ -2676,6 +2811,7 @@ var LAYOUT_ANALYSIS = (function () {
 		metrics.simplicity = rules.value;
 		return {
 			metrics,
+			parts: gradeParts(board, c, keyCount),
 			fingers,
 			fingerLoad,
 			fingerDistance,
@@ -2950,8 +3086,9 @@ var LAYOUT_ANALYSIS = (function () {
 	};
 	const KEY_EVENTS = Object.keys(EVENT_KEYS);
 	const TRIGRAM_EVENTS = new Set(['sfs', 'redirect', 'redirect_bad']);
-	// The scored events (an event shown but not scored, row_jump, is shared
-	// over its keys the same way but stays out of the points a key costs).
+	// The scored events (an event shown but not scored would be shared over
+	// its keys the same way but stay out of the points a key costs; row_jump
+	// was one until it was weighed, 2026-11-21).
 	const SCORED_EVENTS = KEY_EVENTS.filter((event) => METRICS[event].better !== 'none');
 	const KEY_INFO_METRICS = KEY_EVENTS.filter((event) => METRICS[event].better === 'none');
 	// The metrics whose value the keys share exactly (keyReport cost) and the score weighs.
@@ -3246,7 +3383,8 @@ var LAYOUT_ANALYSIS = (function () {
 			return score(
 				streamMetrics(layout, board, compiled, all, keyCount, opts, weightedFit(forms, formValues)),
 				opts.weights,
-				opts.floors
+				opts.floors,
+				opts.grades
 			).total;
 		};
 
@@ -3733,12 +3871,15 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   the metric;
 	 * - worst: for each event metric, the key's WORST_GROUPS heaviest groups
 	 *   with it (the other key of a pair, the two others of a redirect), each
-	 *   [codes, % of the bigrams or trigrams].
+	 *   [codes, % of the bigrams or trigrams];
+	 * - grades: for each counted graded metric (COUNTED_GRADES), the key's
+	 *   part of each grade's share, shared the same way (the keys' parts add
+	 *   up to result.parts); finger: the type of its finger (GRADES.distance).
 	 * @param {object} board - From keyboard().
 	 * @param {object} m - What analyse() measured: keyCount, allPresses, pressed
 	 *   (every press but the thumbs'), fingerLoad, ideal, perKey, groups, counts.
 	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
-	 *   cost, worst}.
+	 *   cost, gain, worst, grades, finger}.
 	 */
 	function keyReport(board, m) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
@@ -3770,6 +3911,15 @@ var LAYOUT_ANALYSIS = (function () {
 				const whole = id === 'alternation' ? c.trigrams : c.bigrams;
 				gain[id] = pct(m.perKey[id][k], whole) / GAIN_KEYS[id];
 			}
+			// Every graded event is a pair of keys (a skipgram's first and last).
+			const grades = {};
+			for (const metric of COUNTED_GRADES) {
+				const of = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
+				grades[metric] = {};
+				GRADES[metric].forEach((grade, i) => {
+					grades[metric][grade] = pct(m.perKey[GRADE_COUNTERS[metric][i]][k], of) / 2;
+				});
+			}
 			keys[code] = {
 				presses: pct(m.keyCount[k], m.allPresses),
 				sfb: share('sfb'),
@@ -3779,7 +3929,9 @@ var LAYOUT_ANALYSIS = (function () {
 				redirect: share('redirect'),
 				cost,
 				gain,
-				worst
+				worst,
+				grades,
+				finger: fingerType(f)
 			};
 		});
 		// One pass per event: each key keeps its WORST_GROUPS heaviest groups (id, n).
@@ -3811,21 +3963,25 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * What each key costs the global score: the points of the score's penalty
-	 * metrics (KEY_COST_METRICS) it causes, with these weights. The keys' costs
-	 * add up to those metrics' part of the score: a metric with a floor shares
+	 * metrics (KEY_COST_METRICS) it causes, with these weights and graded
+	 * costs. The keys' costs add up to those metrics' part of the score: a
+	 * graded metric shares its graded value by each key's part of each grade
+	 * (its travel by its finger's grade), and a metric with a floor shares
 	 * only its part above the floor, in proportion to each key's part.
 	 * @param {object} result - analyse() output.
 	 * @param {object} [weights] - As score(); the defaults when absent.
 	 * @param {object} [floors] - As score(); the defaults when absent.
+	 * @param {object} [grades] - As score(); the defaults when absent.
 	 * @returns {object} code → points lost.
 	 */
-	function keyScoreCost(result, weights, floors) {
+	function keyScoreCost(result, weights, floors, grades) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
 		const floorOf = scoreFloors(floors);
+		const gradeOf = scoreGrades(grades);
 		// Each metric's weight times the share of its value above its floor.
 		const factor = {};
 		for (const id of KEY_COST_METRICS) {
-			const value = result.metrics[id];
+			const value = weighedValue(result, id, gradeOf);
 			const floor = floorOf[id] || 0;
 			factor[id] =
 				(used[id] || 0) * (floor > 0 && value > 0 ? aboveFloor(value, floor) / value : 1);
@@ -3833,7 +3989,12 @@ var LAYOUT_ANALYSIS = (function () {
 		const out = {};
 		for (const [code, key] of Object.entries(result.keys)) {
 			let points = 0;
-			for (const id of KEY_COST_METRICS) points += factor[id] * key.cost[id];
+			for (const id of KEY_COST_METRICS) {
+				let part = key.cost[id];
+				if (id === 'distance') part *= gradeOf.distance[key.finger];
+				else if (id in GRADES) part = gradedValue(id, part, key.grades[id], gradeOf[id]);
+				points += factor[id] * part;
+			}
 			out[code] = points;
 		}
 		return out;
@@ -3978,7 +4139,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * analyse()'s bigram metrics and their part of the score.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 * @param {{keyboard?: string, profile?: object, weights?: object, grades?: object,
+	 *   typing?: string}} [options]
 	 *   - As analyse().
 	 * @returns {{keyboard: string, bigrams: number, keys: string[], pairs:
 	 *   Array<{keys: string[], count: number, share: number, events: string[],
@@ -3996,13 +4158,16 @@ var LAYOUT_ANALYSIS = (function () {
 		const compiled = compileWays(layout, board, null);
 		const plan = planTyping(compiled, board, table, planMode(opts));
 		const K = board.codes.length;
-		const names = Object.keys(streamCounts()).filter(
+		const names = Object.keys(streamBaseCounts()).filter(
 			(name) => name !== 'bigrams' && !WEIGHTED_COUNTS.has(name)
 		);
+		const gradeOf = scoreGrades(opts.grades);
 		// A pair's class, probed once from the visitor: the counters it raises,
-		// and its same-finger travel (sfb_distance's part of it).
+		// its same-finger travel (sfb_distance's part of it) and the grade each
+		// graded event of it is weighed by.
 		const classes = new Map();
 		const travels = new Map();
+		const pairGrades = new Map();
 		const classOf = (k1, k2) => {
 			const at = k1 * K + k2;
 			if (!classes.has(at)) {
@@ -4010,6 +4175,12 @@ var LAYOUT_ANALYSIS = (function () {
 				streamVisitor(board, counts, new Float64Array(K), {}, null).bigram(k1, k2, 1);
 				classes.set(at, counts.bigrams === 0 ? null : names.filter((name) => counts[name] !== 0));
 				travels.set(at, counts.sfb_cost);
+				const factor = {};
+				for (const metric of COUNTED_GRADES)
+					GRADES[metric].forEach((grade, i) => {
+						if (counts[GRADE_COUNTERS[metric][i]] !== 0) factor[metric] = gradeOf[metric][grade];
+					});
+				pairGrades.set(at, factor);
 			}
 			return classes.get(at);
 		};
@@ -4037,8 +4208,9 @@ var LAYOUT_ANALYSIS = (function () {
 			busy[k2] += n;
 			const events = classOf(k1, k2);
 			const share = total > 0 ? (100 * n) / total : 0;
+			const grade = pairGrades.get(at);
 			const points =
-				events.reduce((sum, id) => sum + signed(id) * share, 0) +
+				events.reduce((sum, id) => sum + signed(id) * share * (id in grade ? grade[id] : 1), 0) +
 				signed('sfb_distance') * share * travels.get(at);
 			return { keys: [board.codes[k1], board.codes[k2]], count: n, share, events, points, at };
 		})
@@ -4110,7 +4282,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * a character the layout cannot type is listed apart.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object|Array} words - word → count, or [[word, count], ...].
-	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 * @param {{keyboard?: string, profile?: object, weights?: object, grades?: object,
+	 *   typing?: string}} [options]
 	 *   - As analyse().
 	 * @returns {{words: Array<{word: string, count: number, effort: number,
 	 *   parts: object}>, unsupported: Array<{word: string, count: number}>,
@@ -4127,6 +4300,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const compiled = compileWays(layout, board, null);
 		const mode = planMode(opts);
 		const signed = signedWeights(opts.weights);
+		const gradeOf = scoreGrades(opts.grades);
 		const entries = Array.isArray(words) ? words : Object.entries(words || {});
 		const out = [];
 		const unsupported = [];
@@ -4138,27 +4312,26 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!(count > 0) || !Number.isFinite(count))
 				throw new Error(`layout_analysis: the word ${word} needs a positive count`);
 			const c = streamCounts();
+			const keyCount = new Float64Array(board.codes.length);
 			const plan = planTyping(compiled, board, prepareNgrams(ngramsFromText(word)), mode);
-			walkTyped(
-				board,
-				plan,
-				streamVisitor(board, c, new Float64Array(board.codes.length), {}, null)
-			);
+			walkTyped(board, plan, streamVisitor(board, c, keyCount, {}, null));
 			if (c.unsupported > 0) {
 				unsupported.push({ word, count });
 				continue;
 			}
+			const graded = gradeParts(board, c, keyCount);
 			const parts = {};
 			let effort = 0;
 			for (const id of WORD_EFFORT_METRICS) {
 				const whole = id === 'distance' ? c.chars : TRIGRAM_EVENTS.has(id) ? c.trigrams : c.bigrams;
 				// sfb_distance is no count: its travel has its own two totals.
-				const value =
+				const raw =
 					id === 'sfb_distance'
 						? sfbDistance(c)
 						: whole > 0
 							? ((id === 'distance' ? 1 : 100) * c[id]) / whole
 							: 0;
+				const value = id in GRADES ? gradedValue(id, raw, graded[id], gradeOf[id]) : raw;
 				// A penalty metric's signed weight is negative: the points it takes off.
 				parts[id] = -signed(id) * value;
 				effort += parts[id];
@@ -4551,18 +4724,27 @@ var LAYOUT_ANALYSIS = (function () {
 	 * one where the choices do not interact.
 	 * @param {object} table - From prepareNgrams().
 	 * @param {object} c - analyse()'s counts.
-	 * @param {{pinky: number, outer: number, home: number}} presses - Presses
-	 *   on the pinkies, on the outer column and on the home row.
+	 * @param {{pinky: number, outer: number, home: number, travel: number}} presses -
+	 *   Presses on the pinkies, on the outer column and on the home row, and
+	 *   the travel in mm weighted by the default finger grades.
 	 * @param {object} access - From accessWeights().
 	 * @returns {number} Points (positive: lost).
 	 */
 	function typingCost(table, c, presses, access) {
 		const w = data().weights;
+		const grades = data().grades;
 		const maps = ngramMaps(table);
 		const nc = table.totalChars;
 		const per = (n, total) => (total > 0 ? (100 * n) / total : 0);
+		// A graded metric's events, each count times its default grade.
+		const graded = (metric) =>
+			GRADES[metric].reduce(
+				(sum, grade, i) => sum + grades[metric][grade] * c[GRADE_COUNTERS[metric][i]],
+				0
+			);
 		const bigrams =
-			w.sfb * c.sfb +
+			w.sfb * graded('sfb') +
+			w.row_jump * graded('row_jump') +
 			w.sfb_distance * c.sfb_cost +
 			w.lsb * c.lsb +
 			w.scissors * c.scissors +
@@ -4571,7 +4753,7 @@ var LAYOUT_ANALYSIS = (function () {
 			w.roll_in * c.roll_in -
 			w.roll_out * c.roll_out;
 		const trigrams =
-			w.sfs * c.sfs +
+			w.sfs * (c.sfs + graded('sfs')) +
 			SFS_DISTANCE_SHARE * w.sfb_distance * c.sfs_cost +
 			w.redirect * c.redirect +
 			w.redirect_bad * c.redirect_bad -
@@ -4589,7 +4771,7 @@ var LAYOUT_ANALYSIS = (function () {
 			per(bigrams, maps.bigrams) +
 			per(trigrams, maps.trigrams) +
 			per(chars, nc) +
-			(nc > 0 ? (w.distance * c.distance) / nc : 0)
+			(nc > 0 ? (w.distance * presses.travel) / nc : 0)
 		);
 	}
 
@@ -4835,7 +5017,10 @@ var LAYOUT_ANALYSIS = (function () {
 		const f1 = board.finger[k1];
 		const f2 = board.finger[k2];
 		const out = board.outOfPairs;
-		const sfb = () => w.sfb + w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
+		const grades = data().grades;
+		const sfb = () =>
+			w.sfb * grades.sfb[GRADES.sfb[sfbRowGrade(board, k1, k2)]] +
+			w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
 		if (out[k1] || out[k2] || k1 === k2) return thumbSfb(board, k1, k2) ? sfb() : 0;
 		if (f1 === f2) return sfb();
 		if (board.hand[k1] !== board.hand[k2]) return 0;
@@ -4843,6 +5028,8 @@ var LAYOUT_ANALYSIS = (function () {
 		const o2 = board.order[k2];
 		let points = 0;
 		if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) points += w.pinky_ring;
+		if (fingerRows(board, k1, k2) && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS)
+			points += w.row_jump * grades.row_jump[GRADES.row_jump[FINGER_GAP_GRADE[Math.abs(o1 - o2)]]];
 		if (fingerRows(board, k1, k2) && Math.abs(o1 - o2) === 1) {
 			const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
 			const shorter = longer === k1 ? k2 : k1;
@@ -4885,7 +5072,11 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!index) points += w.redirect_bad;
 			return points;
 		}
-		if (h1 !== h2 && h2 !== h3) points -= w.alternation;
+		if (h1 !== h2 && h2 !== h3) {
+			points -= w.alternation;
+			const grade = fingerGapGrade(board, k1, k3);
+			if (grade >= 0) points += w.sfs * data().grades.sfs[GRADES.sfs[grade]];
+		}
 		return points;
 	}
 
@@ -4893,7 +5084,8 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * What each press and each key pair of a board costs, by the default
-	 * weights of the metrics that add up over keystrokes (score_weights.json):
+	 * weights and graded costs of the metrics that add up over keystrokes
+	 * (score_weights.json):
 	 * in score points times the number of characters (bigrams for a pair),
 	 * so a sum divided by that number is the points it takes. The default
 	 * weights, not the user's: the way a typist types does not follow the
@@ -4914,7 +5106,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const press = new Float64Array(n);
 		for (let k = 0; k < n; k++) {
 			const f = board.finger[k];
-			press[k] = w.distance * board.reach[k];
+			press[k] = w.distance * data().grades.distance[fingerType(f)] * board.reach[k];
 			if (f === LEFT_THUMB || f === RIGHT_THUMB) continue;
 			if (f === 0 || f === 9) press[k] += 100 * w.pinky_load;
 			if (board.outer[k]) press[k] += 100 * w.outer_column;
@@ -6354,6 +6546,86 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The graded costs (GRADES), each default replaced by the given grade of
+	 * the same metric and event.
+	 * @param {object} [given] - metric → grade → factor (a part of a table
+	 *   keeps the other defaults).
+	 * @returns {object} Every table of score_weights.json « grades », a copy.
+	 * @throws {Error} On an unknown table or grade, a table that is not an
+	 *   object, or a negative or non-finite factor.
+	 */
+	function scoreGrades(given) {
+		const defaults = data().grades;
+		const out = {};
+		for (const metric of Object.keys(GRADES)) out[metric] = Object.assign({}, defaults[metric]);
+		for (const [metric, table] of Object.entries(given || {})) {
+			if (!(metric in GRADES)) throw new Error(`layout_analysis: ${metric} has no graded costs`);
+			if (table === null || typeof table !== 'object' || Array.isArray(table))
+				throw new Error(`layout_analysis: the grades of ${metric} are not an object`);
+			Object.assign(out[metric], table);
+		}
+		for (const [metric, grades] of Object.entries(GRADES)) {
+			const table = out[metric];
+			for (const grade of Object.keys(table))
+				if (!grades.includes(grade))
+					throw new Error(`layout_analysis: ${metric} has no grade ${grade}`);
+			for (const grade of grades) {
+				const factor = table[grade];
+				if (typeof factor !== 'number' || !Number.isFinite(factor) || factor < 0)
+					throw new Error(
+						`layout_analysis: grade ${grade} of ${metric} must be a finite number >= 0`
+					);
+			}
+		}
+		return out;
+	}
+
+	/** A copy of the default graded costs (score_weights.json), checked. */
+	function defaultGrades() {
+		return scoreGrades();
+	}
+
+	/**
+	 * The flat grades: every event of a split table at 1 and sfs's added
+	 * skipgrams at 0, so each graded metric weighs its plain value. With
+	 * row_jump's weight at 0 they give the single weights' score.
+	 * @returns {object} metric → grade → factor.
+	 */
+	function flatGrades() {
+		const out = {};
+		for (const [metric, grades] of Object.entries(GRADES))
+			out[metric] = Object.fromEntries(
+				grades.map((grade) => [grade, GRADE_ADDS.has(metric) ? 0 : 1])
+			);
+		return out;
+	}
+
+	/**
+	 * A graded metric's value as the score weighs it: its parts (gradeParts)
+	 * times their grades, plus the metric itself for sfs (GRADE_ADDS). When
+	 * every grade of a split table is the same factor, the value is the metric
+	 * times it, and sfs with all its grades at 0 is itself: the flat model of
+	 * the single weights, to the last bit.
+	 * @param {string} id - A GRADES metric.
+	 * @param {number} value - Its metric value.
+	 * @param {object} parts - Its parts (result.parts[id]).
+	 * @param {object} table - Its grades (scoreGrades()[id]).
+	 * @returns {number} The graded value, in the metric's unit.
+	 */
+	function gradedValue(id, value, parts, table) {
+		const grades = GRADES[id];
+		const adds = GRADE_ADDS.has(id);
+		const first = table[grades[0]];
+		if (grades.every((grade) => table[grade] === first)) {
+			if (!adds) return first * value;
+			if (first === 0) return value;
+		}
+		let sum = adds ? value : 0;
+		for (const grade of grades) sum += table[grade] * parts[grade];
+		return sum;
+	}
+
+	/**
 	 * What a penalty metric's value costs above its floor: the value itself
 	 * under a floor of 0 (every metric is ≥ 0), else the part above the floor.
 	 */
@@ -6362,20 +6634,41 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The value of a scored metric the score weighs: the metric itself, or
+	 * for a graded one (GRADES) its graded value.
+	 * @param {object} result - analyse() output (metrics and parts).
+	 * @param {string} id - A METRICS id.
+	 * @param {object} gradeOf - From scoreGrades().
+	 * @returns {number} In the metric's unit.
+	 * @throws {Error} When a graded metric's parts are missing.
+	 */
+	function weighedValue(result, id, gradeOf) {
+		const value = result.metrics[id];
+		if (!(id in GRADES)) return value;
+		const parts = result.parts && result.parts[id];
+		if (!parts) throw new Error(`layout_analysis: the score of ${id} needs analyse()'s parts`);
+		return gradedValue(id, value, parts, gradeOf[id]);
+	}
+
+	/**
 	 * The global score of an analysis: each metric adds weight × value points
-	 * when higher is better and subtracts them when lower is better; a penalty
-	 * metric counts only its part above its floor (0 by default).
-	 * @param {object} result - analyse() output (or {metrics}).
+	 * when higher is better and subtracts them when lower is better; a graded
+	 * metric (GRADES) weighs its graded value; a penalty metric counts only
+	 * its part above its floor (0 by default).
+	 * @param {object} result - analyse() output (metrics and parts).
 	 * @param {object} [weights] - metric → points per unit; defaults when absent.
 	 * @param {object} [floors] - penalty metric → floor; defaults when absent.
+	 * @param {object} [grades] - metric → grade → factor; defaults when absent.
 	 * @returns {{total: number, contributions: object, weights: object,
-	 *   floors: object}} Score.
+	 *   floors: object, grades: object}} Score.
 	 * @throws {Error} On a weight for an unknown or unscored metric, or a
-	 *   negative or non-finite weight; on a floor scoreFloors() refuses.
+	 *   negative or non-finite weight; on a floor scoreFloors() refuses or
+	 *   grades scoreGrades() refuses.
 	 */
-	function score(result, weights, floors) {
+	function score(result, weights, floors, grades) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
 		const floorOf = scoreFloors(floors);
+		const gradeOf = scoreGrades(grades);
 		const contributions = {};
 		let total = 0;
 		for (const [id, weight] of Object.entries(used)) {
@@ -6384,15 +6677,13 @@ var LAYOUT_ANALYSIS = (function () {
 				throw new Error(`layout_analysis: ${id} is not a scored metric`);
 			if (!(weight >= 0) || !Number.isFinite(weight))
 				throw new Error(`layout_analysis: weight of ${id} must be a finite number >= 0`);
-			const value =
-				metric.better === 'lower'
-					? aboveFloor(result.metrics[id], floorOf[id] || 0)
-					: result.metrics[id];
+			const raw = weighedValue(result, id, gradeOf);
+			const value = metric.better === 'lower' ? aboveFloor(raw, floorOf[id] || 0) : raw;
 			const sign = metric.better === 'higher' ? 1 : -1;
 			contributions[id] = sign * weight * value;
 			total += contributions[id];
 		}
-		return { total, contributions, weights: used, floors: floorOf };
+		return { total, contributions, weights: used, floors: floorOf, grades: gradeOf };
 	}
 
 	/**
@@ -6669,16 +6960,18 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * Re-scores and re-ranks results with new weights or floors (no re-analysis).
+	 * Re-scores and re-ranks results with new weights, floors or graded costs
+	 * (no re-analysis).
 	 * @param {object[]} results - analyse() outputs.
 	 * @param {object} [weights] - As score().
 	 * @param {object} [floors] - As score().
+	 * @param {object} [grades] - As score().
 	 * @returns {object[]} The same results, re-scored and ranked.
 	 * @throws {Error} When an access weight differs from the one a result's
 	 *   ways were chosen by: those weights change the typing, so the layouts
 	 *   must be analysed again.
 	 */
-	function rescore(results, weights, floors) {
+	function rescore(results, weights, floors, grades) {
 		const access = accessWeights(weights);
 		for (const result of results) {
 			const used = result.typing && result.typing.access;
@@ -6689,7 +6982,7 @@ var LAYOUT_ANALYSIS = (function () {
 						`layout_analysis: ${id} chooses the ways of typing; analyse again instead of rescore`
 					);
 		}
-		for (const result of results) result.score = score(result, weights, floors);
+		for (const result of results) result.score = score(result, weights, floors, grades);
 		return rank(results);
 	}
 
@@ -6697,9 +6990,10 @@ var LAYOUT_ANALYSIS = (function () {
 	// format name, the one version this engine reads, and the analyser it is for.
 	// Version 2 (2026-11-19) adds the penalty floors; a version 1 file lacks
 	// them and the two metrics added with them, so it is refused (config_version)
-	// rather than read with guessed values.
+	// rather than read with guessed values. Version 3 (2026-11-21) adds the
+	// graded costs and the row_jump weight and floor, refused the same way.
 	const SCORE_CONFIG_FORMAT = 'ergopti-score-settings';
-	const SCORE_CONFIG_VERSION = 2;
+	const SCORE_CONFIG_VERSION = 3;
 	const SCORE_CONFIG_ANALYSER = 'ergopti';
 	// Its entries, each read by the engine's own check of that setting.
 	const SCORE_CONFIG_KEYS = Object.freeze([
@@ -6708,6 +7002,7 @@ var LAYOUT_ANALYSIS = (function () {
 		'analyser',
 		'weights',
 		'floors',
+		'grades',
 		'ideal_load',
 		'shortcuts',
 		'form_weights'
@@ -6716,10 +7011,10 @@ var LAYOUT_ANALYSIS = (function () {
 	/**
 	 * The score settings as the file the Comparer exports: every weight of the
 	 * global score (a metric is in the score when its weight is above 0, the
-	 * access weights among them), the penalty floors, the ideal finger load, the shortcut table and
-	 * the compact form factors' weights, each checked as an analysis checks it.
-	 * @param {{weights: object, floors: object, idealLoad: object, shortcuts: object,
-	 *   formWeights: object}} settings - The settings in use.
+	 * access weights among them), the penalty floors, the graded costs, the ideal finger load,
+	 * the shortcut table and the compact form factors' weights, each checked as an analysis checks it.
+	 * @param {{weights: object, floors: object, grades: object, idealLoad: object,
+	 *   shortcuts: object, formWeights: object}} settings - The settings in use.
 	 * @returns {object} The file's JSON value.
 	 * @throws {AnalysisError} When a setting is one the import would refuse.
 	 */
@@ -6730,6 +7025,7 @@ var LAYOUT_ANALYSIS = (function () {
 			analyser: SCORE_CONFIG_ANALYSER,
 			weights: Object.assign({}, settings.weights),
 			floors: scoreFloors(settings.floors),
+			grades: scoreGrades(settings.grades),
 			ideal_load: Object.assign({}, settings.idealLoad),
 			shortcuts: {
 				letters: Object.assign({}, settings.shortcuts.letters),
@@ -6745,8 +7041,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Reads a score settings file, whole or not at all: every entry present,
 	 * none unknown, each value checked, so a partial file is never applied.
 	 * @param {*} value - The file's parsed JSON.
-	 * @returns {{weights: object, floors: object, idealLoad: object, shortcuts: object,
-	 *   formWeights: object}} The settings, ready for analyse().
+	 * @returns {{weights: object, floors: object, grades: object, idealLoad: object,
+	 *   shortcuts: object, formWeights: object}} The settings, ready for analyse().
 	 * @throws {AnalysisError} config_not_object, config_unknown_key,
 	 *   config_missing, config_format, config_version, config_analyser,
 	 *   config_weight_type, config_weight_range, or the refusal of the ideal
@@ -6838,20 +7134,85 @@ var LAYOUT_ANALYSIS = (function () {
 				);
 			floors[id] = floor;
 		}
+		const grades = readConfigGrades(value.grades, isObject);
 		for (const key of ['ideal_load', 'shortcuts', 'form_weights'])
 			if (!isObject(value[key]))
 				throw new AnalysisError('config_weight_type', { key }, `${key} is not an object`);
 		return {
 			weights,
 			floors,
+			grades,
 			idealLoad: Object.assign({}, idealLoad(value.ideal_load)),
 			shortcuts: shortcuts(value.shortcuts),
 			formWeights: formFactorWeights(value.form_weights)
 		};
 	}
 
+	/**
+	 * The graded costs of a score settings file: every table and grade of
+	 * GRADES present, none unknown, each a finite number >= 0.
+	 * @param {*} value - The file's « grades ».
+	 * @param {function(*): boolean} isObject - readScoreConfig's object test.
+	 * @returns {object} metric → grade → factor.
+	 * @throws {AnalysisError} config_weight_type, config_unknown_key,
+	 *   config_missing, config_weight_range.
+	 */
+	function readConfigGrades(value, isObject) {
+		if (!isObject(value))
+			throw new AnalysisError('config_weight_type', { key: 'grades' }, 'grades is not an object');
+		for (const metric of Object.keys(value))
+			if (!(metric in GRADES))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key: `grades.${metric}` },
+					`unknown graded metric ${metric}`
+				);
+		const out = {};
+		for (const [metric, ids] of Object.entries(GRADES)) {
+			const tableKey = `grades.${metric}`;
+			if (!(metric in value))
+				throw new AnalysisError(
+					'config_missing',
+					{ key: tableKey },
+					`the score settings lack ${tableKey}`
+				);
+			const table = value[metric];
+			if (!isObject(table))
+				throw new AnalysisError(
+					'config_weight_type',
+					{ key: tableKey },
+					`${tableKey} is not an object`
+				);
+			for (const grade of Object.keys(table))
+				if (!ids.includes(grade))
+					throw new AnalysisError(
+						'config_unknown_key',
+						{ key: `${tableKey}.${grade}` },
+						`unknown grade ${tableKey}.${grade}`
+					);
+			out[metric] = {};
+			for (const grade of ids) {
+				const key = `${tableKey}.${grade}`;
+				if (!(grade in table))
+					throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+				const factor = table[grade];
+				if (typeof factor !== 'number')
+					throw new AnalysisError('config_weight_type', { key }, `${key} is not a number`);
+				if (!Number.isFinite(factor) || factor < 0)
+					throw new AnalysisError(
+						'config_weight_range',
+						{ key, value: factor },
+						`${key} must be a finite number >= 0`
+					);
+				out[metric][grade] = factor;
+			}
+		}
+		return out;
+	}
+
 	return {
 		METRICS,
+		GRADES,
 		ACCESS_WEIGHTS,
 		LAYER_IDS,
 		heldCodes,
@@ -6903,6 +7264,9 @@ var LAYOUT_ANALYSIS = (function () {
 		defaultWeights,
 		defaultFloors,
 		scoreFloors,
+		defaultGrades,
+		flatGrades,
+		scoreGrades,
 		accessWeights,
 		scoreConfig,
 		readScoreConfig,

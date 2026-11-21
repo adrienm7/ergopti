@@ -296,6 +296,30 @@ module.exports = [
 		keys: () => ctx.keysOf('layout_analysis.formula.', formulas())
 	},
 	{
+		prefix: 'layout_analysis.grade.',
+		files: [COMPARER],
+		source: 'each grade of each LAYOUT_ANALYSIS.GRADES table',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.grade.',
+				Object.entries(engine().GRADES).flatMap(([id, grades]) =>
+					grades.map((grade) => `${id}.${grade}`)
+				)
+			)
+	},
+	{
+		prefix: 'layout_analysis.grade_help.',
+		files: [COMPARER],
+		source: 'the tables of LAYOUT_ANALYSIS.GRADES',
+		keys: () => ctx.keysOf('layout_analysis.grade_help.', Object.keys(engine().GRADES))
+	},
+	{
+		prefix: 'layout_analysis.grade_legend.',
+		files: [COMPARER],
+		source: 'the tables of LAYOUT_ANALYSIS.GRADES',
+		keys: () => ctx.keysOf('layout_analysis.grade_legend.', Object.keys(engine().GRADES))
+	},
+	{
 		prefix: 'layout_analysis.image.',
 		files: [IMAGE],
 		source: 'board_image.js FORMATS',
