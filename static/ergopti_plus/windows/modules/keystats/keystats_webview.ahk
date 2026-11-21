@@ -232,7 +232,7 @@ KLWV_Open(which, metrics_dir) {
 			}
 
 			KLWV.metrics_dir := metrics_dir
-			ReuseKey := _SharedDir . "`n" . I18nGetLocale() . "`n" . metrics_dir
+			ReuseKey := KLWV_ReuseKey(metrics_dir)
 			Cached := KLWV_TakeWarmHost(which, ReuseKey)
 
 			; Do NOT build here — on a cold DB the full build takes 30-75 s and
@@ -439,6 +439,18 @@ KLWV_Open(which, metrics_dir) {
 				if KLWV.close_during_open.Has(which)
 						KLWV.close_during_open.Delete(which)
 		}
+}
+
+/**
+ * The configuration a retained host was built with. The boot script that seeds
+ * the locale and the reading font and spacing is added once per host, so each
+ * of them belongs to the key: a reading choice changed since the host was
+ * hidden retires it instead of reopening the old look (MET-03).
+ * @param metrics_dir {String} The metrics store the host reads.
+ * @returns {String}
+ */
+KLWV_ReuseKey(metrics_dir) {
+	return _SharedDir . "`n" . I18nGetLocale() . "`n" . metrics_dir . "`n" . ReadingPrefs_SeedScript()
 }
 
 /** Detach a certified inactive host; configuration changes dispose its old owner. */

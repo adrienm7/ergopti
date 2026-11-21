@@ -678,6 +678,13 @@ global _HC_PendingSerial := 0
 global _HC_CloseDuringOpen := false
 global _HC_Retiring := false
 
+; The configuration the retained window was built with: its boot script, the
+; locale and the reading font and spacing, is added once per host, so a reading
+; choice changed since then retires the host (MET-03).
+_HC_ReuseKeyFor(Locale) {
+	return _SharedDir . "`n" . Locale . "`n" . ReadingPrefs_SeedScript()
+}
+
 _HC_CanReuse(Key) {
 	global _HC_Gui, _HC_Controller, _HC_WebView, _HC_ResetDone, _HC_ReuseKey
 	if _HC_ResetDone || !IsSet(_HC_Gui) || !IsSet(_HC_Controller) || !IsSet(_HC_WebView)
@@ -736,7 +743,7 @@ HealthCheck_ShowWindow() {
 		_HC_OpenStarted := _HealthCheck_NowMs()
 		Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
-		ReuseKey := _SharedDir . "`n" . Locale
+		ReuseKey := _HC_ReuseKeyFor(Locale)
 		Reuse := _HC_CanReuse(ReuseKey)
 		if Reuse
 			_HealthCheck_CloseGui(_HC_Gui, false)

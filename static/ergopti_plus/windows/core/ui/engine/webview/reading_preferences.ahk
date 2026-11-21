@@ -19,7 +19,8 @@
 ; 2. config.toml first, then the live value, then the menu, as the other
 ;    script settings (ErrorDialog_SetEnabled).
 ; 3. A window opened after a change reads it; an open window keeps the look
-;    it was built with until it is opened again.
+;    it was built with until it is opened again. A retained (hidden) host
+;    carries the seed in its reuse key, so a change retires it (MET-03).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

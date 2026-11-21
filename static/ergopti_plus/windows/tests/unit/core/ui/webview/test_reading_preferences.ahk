@@ -95,3 +95,24 @@ _TRP_SaveConsumesTheCommitBody() {
 }
 Test("reading preferences: the menu's save consumes its config.toml refusal (reading-preferences-seed)",
 	_TRP_SaveConsumesTheCommit)
+
+; A retained window host keeps the boot script it was created with, so a reading
+; choice changed after it was hidden must retire it. The reuse keys did not carry
+; the choice: the dashboards and the diagnostics reopened in the old look (met-03).
+_TRP_WarmHostsFollowTheChoice() {
+	Keys := Map()
+	Capture(Name) {
+		Keys[Name] := [KLWV_ReuseKey("store"), _HC_ReuseKeyFor("en")]
+	}
+	_TRP_With(Map(), () => Capture("plain"))
+	_TRP_With(Map(), () => Capture("plain again"))
+	_TRP_With(Map(ConfigLeaf.READING_FONT, "dyslexic"), () => Capture("font"))
+	_TRP_With(Map(ConfigLeaf.READING_SPACING, "wide"), () => Capture("spacing"))
+	AssertEqual(Keys["plain"][1], Keys["plain again"][1], "an unchanged choice keeps the dashboard host")
+	AssertEqual(Keys["plain"][2], Keys["plain again"][2], "and the diagnostics host")
+	for Name in ["font", "spacing"] {
+		AssertFalse(Keys["plain"][1] == Keys[Name][1], "a new " . Name . " retires the dashboard host (met-03)")
+		AssertFalse(Keys["plain"][2] == Keys[Name][2], "a new " . Name . " retires the diagnostics host (met-03)")
+	}
+}
+Test("reading preferences: a retained window host follows a changed choice (met-03)", _TRP_WarmHostsFollowTheChoice)
