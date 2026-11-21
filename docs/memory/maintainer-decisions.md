@@ -464,6 +464,34 @@ OS layout, choose the emulated layout, or adjust the active layout?), a row
 that adjusts no layout goes last, and a row that opens Studio lives in the tray
 root only.
 
+## Layout score: graded costs (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (« Barème proposé + réglable »): the
+Studio's layout score moves from single weights to graded costs, each a table
+of `score_weights.json` « grades » that multiplies its metric's weight.
+
+- An SFB costs by the rows its finger crosses: a two-row SFB (bottom to top)
+  is worse than a one-row one (home to top).
+- Skipgrams cost by the fingers involved: two adjacent fingers more than the
+  1st and 3rd fingers, which cost more than index and pinky (barely counted,
+  comfortable). The engine reads them as an alternation whose first and last
+  keys are two fingers of one hand, added to the same-finger skipgrams.
+- `row_jump` (one hand, two rows or more apart) counts only on different
+  fingers, so it no longer doubles the SFBs; it is worse on adjacent fingers;
+  its weight is half the SFB weight (`sfb` 5, `row_jump` 2.5).
+- The travel costs by finger: one key's move costs less with the index than
+  with the pinky.
+
+The agent proposes the starting scale from Cyanophage, genkey and Oxeylyzer
+and ships it only after the ranking-impact report
+(`docs/audits/layout-analysers/graded-costs-ranking.md`); every grade is
+editable in the Comparer's score settings and round-trips in its settings
+file (version 3). `score_weights.json` is the one source; the flat grades
+(`LAYOUT_ANALYSIS.flatGrades()`, `row_jump` at 0) give the former scores to
+the last bit. Action: a change of scale goes through `score_weights.json`,
+`node tools/codegen/codegen-layout-analysis-data-js.cjs` and a new run of
+`node tools/dev/rank-graded-costs.cjs --all` for the report.
+
 ## Layout score: SFB travel and access weights (2026-11-19)
 
 Decided by the maintainer on 2026-11-19: `sfb` is 5 and `sfb_distance` 0.26

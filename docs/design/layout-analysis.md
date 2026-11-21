@@ -689,7 +689,9 @@ single weights' one to the last bit (pinned by
 `test-layout-analysis-engine.cjs`, section 16b). The ways of typing choose by
 the default grades, as by the default weights. The Comparer edits every grade
 in its metric's weight card (« Réglages du score »), and its settings file
-carries them.
+carries them. The proposed scale, its grounding in the other analysers and
+its ranking impact on the library are in
+[the graded costs report](../audits/layout-analysers/graded-costs-ranking.md).
 
 ## Ways of typing
 
