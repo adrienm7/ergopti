@@ -64,13 +64,20 @@ local function listed_rules(descriptions)
 	return table.concat(lines, "\n")
 end
 
---- Shows one result on the timer scheduler, outside the caller's stack.
+--- Shows one result on the timer scheduler, outside the caller's stack. A
+--- dialog that raises is this module's error line, as in virtual_hid_update:
+--- the scheduler's generic callback line would not say which result was lost.
 --- @param message string Localized result.
 --- @return boolean scheduled
 local function show_report(message)
 	local committed = require("core.timing.engine.deferred_work").after(0, function()
-		require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
-			i18n.get("common.ok"))
+		local shown, err = xpcall(function()
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
+				i18n.get("common.ok"))
+		end, debug.traceback)
+		if not shown then
+			Logger.error(LOG, "The legacy-rule cleanup result could not be shown: %s.", tostring(err))
+		end
 	end, "legacy_rules_cleanup.report")
 	if committed ~= true then
 		Logger.error(LOG, "The legacy-rule cleanup result could not be shown to the user.")

@@ -169,6 +169,30 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 		end)
 	end)
 
+	-- SNU-15: the deferred report ran its alert unprotected, so a dialog that
+	-- raised left only the scheduler's generic callback line.
+	helpers.it("logs a result dialog that raises as its own error (snu-15)", function()
+		helpers.with_fresh_modules(MODULES, function()
+			local h = { answer = "karabiner.legacy_cleanup.remove", outcome_ok = true,
+				outcome = { stage = "regeneration", reason = "ready", removed_count = 1, backup_path = "/b.bak" } }
+			local cleanup = load_cleanup(h)
+			helpers.assert_true(cleanup.open(make_remap(h, PENDING)))
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function()
+				error("alert window refused")
+			end
+			local fired = pcall(fire_deferred, h)
+			helpers.assert_true(fired, "the failure stays inside the report callback")
+			local logged = false
+			for _, entry in ipairs(h.logs) do
+				if entry.level == "error" and entry.message:find("result could not be shown", 1, true)
+					and entry.message:find("alert window refused", 1, true) then
+					logged = true
+				end
+			end
+			helpers.assert_true(logged, "the lost result is this module's error line, with its cause")
+		end)
+	end)
+
 	helpers.it("shows nothing once no rule is pending (karabiner-legacy-cleanup)", function()
 		helpers.with_fresh_modules(MODULES, function()
 			local h = { answer = "karabiner.legacy_cleanup.remove" }
