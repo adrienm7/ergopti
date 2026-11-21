@@ -132,23 +132,22 @@ Test("a11y sources: native window text keeps the system colour (a11y-cvd-2026-11
 ; on a paused driver without a word (TRAY-05): TrayApplyStateIcon logs it and
 ; draws the warning sign, and the port adapter refuses a missing file.
 _A11yS_OnlyTheTrayOwnersDrawTheIcon() {
-	static Owners := ["/tray/adapters/menu.ahk", "/tray/state_tip.ahk"]
-	Offenders := [], Scanned := 0, RunningDraws := 0
+	Offenders := [], Scanned := 0, RunningDraws := 0, Owners := 0
 	for Path in _DriverProductionSourceCensus().Paths {
-		Unix := StrReplace(Path, "\", "/")
-		Owned := false
-		for Part in Owners
-			Owned := Owned || InStr(Unix, Part)
-		if Owned
-			continue
-		Scanned += 1
 		Src := _StripFullLineComments(FileRead(Path, "UTF-8"))
+		; The owners are found by what they define, so the guard pins no path.
+		if RegExMatch(Src, "m)^(?:TrayApplyStateIcon|TrayMenuSetIcon)\([^\n]*\)\s*\{") {
+			Owners += 1
+			continue
+		}
+		Scanned += 1
 		if RegExMatch(Src, "(?<![\w.])TraySetIcon\(")
 			Offenders.Push(Path)
 		StrReplace(Src, "TrayApplyStateIcon(false, IconPath)", , , &Found)
 		RunningDraws += Found
 	}
 	Assert(Scanned > 100, "the census must reach the driver's sources, scanned " . Scanned)
+	AssertEqual(2, Owners, "the state icon owner and the TrayMenu adapter must still be found")
 	AssertEqual(0, Offenders.Length, "the tray icon is drawn by TrayApplyStateIcon or the TrayMenu adapter: "
 		. (Offenders.Length ? Offenders[1] : ""))
 	Body := _DriverFuncBody("UpdateTrayIcon")
