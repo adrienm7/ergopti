@@ -21,16 +21,18 @@ local describe, it = helpers.describe, helpers.it
 local assert_true, assert_eq = helpers.assert_true, helpers.assert_eq
 
 describe("locale.get — '%' trigger char does not break gsub", function()
-	it("substitutes ★ with '%' without raising", function()
+	it("shows ★ with '%' beside it without raising", function()
 		local locale = helpers.load_with_stubs("core.i18n.engine.locale")
 		-- Force French (default) so the value for category.magic_key is loaded.
 		locale.set_locale("fr")
-		-- User has rebound the magic key to "%": the gsub replacement must escape it.
-		locale.set_trigger_provider(function() return "%" end)
+		-- User has rebound the magic key to "%": the display must keep it literal.
+		locale.set_display_provider(function(text, key)
+			return require("hotstrings.engine.magic_key_display").display_text(text, "%", key)
+		end)
 
 		local ok, result = pcall(locale.get, "category.magic_key")
 		assert_true(ok, "locale.get must not raise on a '%' trigger char (got: " .. tostring(result) .. ")")
-		-- The ★ placeholder must be replaced by the literal "%".
-		assert_eq(result, "Touche % et expansion de texte", "★ should be replaced by the literal '%'")
+		-- The ★ shows the literal "%" beside it (2026-11-21: « ★ (%) »).
+		assert_eq(result, "Touche ★ (%) et expansion de texte", "★ should show the literal '%' beside it")
 	end)
 end)

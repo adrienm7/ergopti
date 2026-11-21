@@ -412,14 +412,16 @@ i18n.adopt_saved_locale()
 local gestures           = require("gestures.engine")
 local keymap             = require("hotstrings.engine.expander")
 local ManifestReader     = require("menu.engine.manifest_reader")
--- Wire keymap → locale so trigger-character substitutions (★) use the live char.
+-- Wire keymap → locale so every ★ of a translated string shows the live magic
+-- key as « ★ (ù) », the shared display rule (hotstrings/engine/magic_key_display.lua).
 -- Read from the manifest rather than from the `magic_key` local: that one is
 -- declared ~500 lines below, so naming it here would capture the GLOBAL of the
 -- same name — nil — and every ★ substitution would silently render empty. Same
 -- trap as project-lua-closure-before-local-nil-global.
-locale_mod.set_trigger_provider(function()
-	return keymap.get_trigger_char and keymap.get_trigger_char()
+locale_mod.set_display_provider(function(text, key)
+	local trigger = keymap.get_trigger_char and keymap.get_trigger_char()
 		or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+	return require("hotstrings.engine.magic_key_display").display_text(text, trigger, key)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without

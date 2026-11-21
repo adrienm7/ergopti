@@ -93,10 +93,10 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 		fixture(function(state, shortcuts, dialog, locale, i18n)
 			local held, foreign, reads = dialog.text_prompt, 0, 0
 			local cancel = i18n.get("common.cancel")
-			locale.set_trigger_provider(function()
+			locale.set_display_provider(function(text)
 				reads = reads + 1
 				dialog.text_prompt = function() foreign = foreign + 1; return "Cancel", "foreign input" end
-				return "★"
+				return text
 			end)
 			local options = state.options(false)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), true)
@@ -108,7 +108,7 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 			helpers.assert_eq(options.title, "Original legacy caption")
 			helpers.assert_true(state.focus_calls > 0, "Actual dialog_util reaches its real focus and native entry")
 			dialog.text_prompt = held
-			locale.set_trigger_provider(function() return "★" end)
+			locale.set_display_provider(function(text) return text end)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), true)
 			helpers.assert_eq(#state.calls, 2); helpers.assert_eq(foreign, 0)
 		end)
@@ -130,17 +130,17 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 	helpers.it("withdraws the actual declared receipt during cancel translation before native entry and repairs exactly", function()
 		fixture(function(state, shortcuts, _, locale, _, policy)
 			local held, foreign, reads = policy.native_presentation, 0, 0
-			locale.set_trigger_provider(function()
+			locale.set_display_provider(function(text)
 				reads = reads + 1
 				if reads == 2 then policy.native_presentation = function() foreign = foreign + 1; return {} end end
-				return "★"
+				return text
 			end)
 			local options = state.options(true)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), false)
 			helpers.assert_eq(reads, 3, "Declared title, original cancel and accept labels each translate once")
 			helpers.assert_eq(state.calls, {}); helpers.assert_eq(state.applies, {}); helpers.assert_eq(foreign, 0)
 			policy.native_presentation = held
-			locale.set_trigger_provider(function() return "★" end)
+			locale.set_display_provider(function(text) return text end)
 			helpers.assert_eq(shortcuts.prompt_shortcut(options), true)
 			helpers.assert_eq(#state.calls, 1); helpers.assert_eq(state.applies, {{ { "ctrl" }, "k" }})
 		end)
@@ -148,10 +148,10 @@ helpers.describe("actual shortcut prompt declared-title and legacy dispatch rece
 	helpers.it("holds the original native method through declared cancel translator method replacement", function()
 		fixture(function(state, shortcuts, dialog, locale)
 			local foreign, reads = 0, 0
-			locale.set_trigger_provider(function()
+			locale.set_display_provider(function(text)
 				reads = reads + 1
 				if reads == 2 then dialog.text_prompt = function() foreign = foreign + 1; return "Cancel", "foreign" end end
-				return "★"
+				return text
 			end)
 			helpers.assert_eq(shortcuts.prompt_shortcut(state.options(true)), true)
 			helpers.assert_eq(reads, 3); helpers.assert_eq(foreign, 0)

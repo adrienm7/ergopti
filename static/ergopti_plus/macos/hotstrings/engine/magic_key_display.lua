@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Magic Key Rules (macOS)
 --- DESCRIPTION:
---- The macOS side of the shared magic key rules (_shared/hotstrings/engine/magic_key.lua,
+--- The macOS side of the shared magic key rules (_shared/hotstrings/engine/magic_key_rules.lua,
 --- data in _shared/hotstrings/data/magic_key.json): the layout default of
 --- `hotstrings.trigger_char` and the « ★ (ù) » display every macOS surface shows.
 ---
@@ -18,7 +18,7 @@
 
 local M = {}
 
-local MagicKey   = require("hotstrings.engine.magic_key")
+local MagicKey   = require("hotstrings.engine.magic_key_rules")
 local JsonCodec  = require("core.fs.adapters.json_codec")
 local Paths      = require("core.fs.engine.paths")
 local Manifest   = require("menu.engine.manifest_reader")

@@ -319,7 +319,7 @@ local function run_isolated(options, assertions)
 			},
 			["core.i18n.engine.locale"] = {
 				set_locale = function() end,
-				set_trigger_provider = function() end,
+				set_display_provider = function() end,
 			},
 			["diagnostics.engine.reports.crash_reporter"] = {
 				report = function() return {} end,
