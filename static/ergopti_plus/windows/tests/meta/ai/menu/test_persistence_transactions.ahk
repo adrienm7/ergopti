@@ -27,7 +27,6 @@ _LMPT_EveryPersistentActionUsesDetachedTransaction() {
 		"LLM_Menu_SetN", "LLM_Menu_SetIndent", "LLM_Menu_OnAppPickerSave",
 		"_LLM_Menu_AddOverrideForActiveApp", "_LLM_Menu_ClearOverrideFor",
 		"_LLM_Menu_ToggleAutoProfile", "LLM_Menu_OnUserProfileClick",
-		"LLM_Menu_PromptCreateProfile", "LLM_Menu_PromptEditProfile",
 		"LLM_Menu_CloneActiveBuiltinProfile", "LLM_Menu_PromptNumeric",
 		"_LLM_AssignAndRebuild", "LLM_Menu_PromptOllamaPort",
 		"LLM_Menu_ResetOllamaPort", "LLM_Menu_PromptMaxWords",
@@ -36,6 +35,13 @@ _LMPT_EveryPersistentActionUsesDetachedTransaction() {
 	]
 	for FuncName in Standard
 		_LMPT_AssertTransactionBody(FuncName, "LLM_Menu_CommitMutation(")
+	; Profile create and edit save only from the shared editor page, whose
+	; _PromptEdWeb_PersistProfile is listed above; the entries never persist.
+	for FuncName in ["LLM_Menu_PromptCreateProfile", "LLM_Menu_PromptEditProfile"] {
+		_LMPT_AssertTransactionBody(FuncName, "_PromptEdWeb_TryOpen(")
+		Assert(InStr(_DriverFuncBody(FuncName), "LLM_Menu_CommitMutation(") == 0,
+			FuncName . " must leave persistence to the shared editor's transaction")
+	}
 	for FuncName in ["LLM_Menu_PromptNavModifiers",
 			"LLM_Menu_PromptValModifiers"]
 		_LMPT_AssertTransactionBody(FuncName,

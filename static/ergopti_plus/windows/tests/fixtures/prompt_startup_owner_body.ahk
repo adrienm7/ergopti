@@ -108,12 +108,6 @@ class _PRSO_Controller {
 	}
 }
 
-_PRSO_Input(*) {
-	global _PRSO
-	_PRSO.FallbackInputs += 1
-	throw Error("Business oracle: a consumed prompt opening reached native fallback input.")
-}
-
 _PRSO_Log(Line) {
 	global _PRSO
 	if InStr(Line, "[ERROR]")
@@ -123,7 +117,9 @@ _PRSO_Log(Line) {
 _PRSO_Open(Profile) {
 	global _PRSO
 	_PRSO.PublicCalls += 1
-	LLM_Menu_PromptEditProfile(Profile, Map("input", _PRSO_Input))
+	; A refused opening returns false; none of these admitted openings may.
+	if !LLM_Menu_PromptEditProfile(Profile)
+		_PRSO.Refusals += 1
 }
 
 _PRSO_Create(Hwnd) {
@@ -199,7 +195,7 @@ _PRSO_Observe() {
 	FileAppend("RECEIPT prompt-startup mode=" . _PRSO.Mode . " public_calls=" . _PRSO.PublicCalls
 		. " windows=" . _PRSO.Windows.Length . " controllers=" . _PRSO.Controllers.Length . " environments=" . _PRSO.Environments
 		. " close_sent=" . _PRSO.CloseSent . " boundary_failure=" . IsObject(_PRSO.Failure)
-		. " fallback_inputs=" . _PRSO.FallbackInputs . " old_closed=" . _PRSO.Controllers[1].Closed
+		. " refusals=" . _PRSO.Refusals . " old_closed=" . _PRSO.Controllers[1].Closed
 		. " old_subscriptions=" . _PRSO.Controllers[1].CoreWebView2.Subscriptions
 		. " old_navigations=" . _PRSO.Controllers[1].CoreWebView2.Navigations
 		. " gui=" . IsObject(_PromptEdWeb_Gui) . " controller=" . IsSet(_PromptEdWeb_Controller)
@@ -217,7 +213,7 @@ _PRSO_Check() {
 		_PRSO_CheckSdkFailure()
 		return
 	}
-	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.FallbackInputs == 0 && _PRSO.Environments == 1,
+	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.Refusals == 0 && _PRSO.Environments == 1,
 		"No admission or runtime diagnostic may qualify as prompt cancellation.")
 	_PRSO_Require(FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
 		"Opening and cancellation cannot rewrite the genuine private profile source.")
@@ -273,7 +269,7 @@ _PRSO_Main() {
 	Persistent(true)
 	_PRSO := { Mode: A_Args[1], Windows: [], Hwnds: [], Controllers: [], Profiles: [], Source: "",
 		Pending: 0, Boundary: 0, Failure: 0, Errors: [], PublicCalls: 0, CloseSent: 0,
-		OldEpoch: 0, SuccessorEpoch: 0, FallbackInputs: 0, Environments: 0,
+		OldEpoch: 0, SuccessorEpoch: 0, Refusals: 0, Environments: 0,
 		ActiveSubscriptions: 0, CreatedSubscriptions: 0, ReleasedSubscriptions: 0, SubscriptionCalls: 0,
 		SubscriptionCloseCalls: 0, NativeAliveAtReturn: false, NativeAliveAtClose: false, SubscriptionsAtClose: -1,
 		SubscriptionInFlight: false, ReleasedInFlight: false, NativeCloseObserved: false,
@@ -447,12 +443,12 @@ _PRSO_CheckSdkFailure() {
 		. " caught_any=" . IsObject(_PRSO.SdkCaught) . " calls=" . _PRSO.SubscriptionCalls
 		. " close_observed=" . _PRSO.NativeCloseObserved . " hwnd_at_throw=" . _PRSO.NativeAliveAtReturn
 		. " hwnd_at_close=" . _PRSO.NativeAliveAtClose . " controller_closes=" . _PRSO.Controllers[1].Closed
-		. " errors=" . _PRSO.Errors.Length . " fallback_inputs=" . _PRSO.FallbackInputs . "`n", "*", "UTF-8")
+		. " errors=" . _PRSO.Errors.Length . " refusals=" . _PRSO.Refusals . "`n", "*", "UTF-8")
 	_PRSO_Require(_PRSO.Controllers.Length == 1 && _PRSO.Windows.Length == 1 && _PRSO.Environments == 1
 		&& _PRSO.SubscriptionCalls == 1 && _PRSO.NativeAliveAtReturn && _PRSO.NativeAliveAtClose
 		&& _PRSO.Controllers[1].Closed == 1 && _PRSO.SubscriptionCloseCalls == 1
-		&& _PRSO.ActiveSubscriptions == 0 && _PRSO.CreatedSubscriptions == 0 && _PRSO.FallbackInputs == 0,
-		"The genuine failed SDK call must retire its exact native/controller owner without inventing a wizard fallback")
+		&& _PRSO.ActiveSubscriptions == 0 && _PRSO.CreatedSubscriptions == 0 && _PRSO.Refusals == 0,
+		"The genuine failed SDK call must retire its exact native/controller owner without a WebView refusal")
 	if Current
 		_PRSO_Require(_PRSO.SdkCaught == _PRSO.SdkFailure && _PRSO.Errors.Length == 0 && _PRSO.CloseSent == 0,
 			"A current SDK failure must reach the public prompt caller as the exact original Error")
@@ -503,9 +499,9 @@ _PRSO_CheckInitialRetirement() {
 	_PRSO_Require(_PRSO.Controllers[1].Attempts == 2 && _PRSO.Controllers[1].Closed == 1
 		&& !DllCall("User32\IsWindow", "Ptr", FirstHwnd, "Int") && _PromptEdWeb_RetiredHosts.Length == 0,
 		"Retry must acknowledge and retire the exact previously refused browser host.")
-	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.FallbackInputs == 0
+	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.Refusals == 0
 		&& FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
-		"Neither retirement nor editor admission may rewrite profiles or use fallback input.")
+		"Neither retirement nor editor admission may rewrite profiles or refuse the opening.")
 	if _PRSO.Mode == "retry-current" {
 		_PRSO_Require(_PRSO.Windows.Length == 2 && _PRSO.Controllers.Length == 2
 			&& _PromptEdWeb_Gui == _PRSO.Windows[2] && _PromptEdWeb_ContextEpoch > 0,

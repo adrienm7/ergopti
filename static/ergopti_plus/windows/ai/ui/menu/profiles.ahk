@@ -917,61 +917,11 @@ _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 }
 
 /**
- * Opens the native multiline profile fallback and retains explicit cancellation.
- * InputBox creates a single-line Edit even when its dialog is tall.
- * @param {string} Prompt - Already translated body above the native Edit.
- * @param {string} Title - Brandless caption passed through WindowTitle.
- * @param {string} Options - Width, height and optional timeout, as w520 h320 T5.
- * @param {string} Default - Exact initial prompt text, including line breaks.
- * @returns {object} Result (OK, Cancel or Timeout) and entered Value.
- */
-_LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
-	if Trim(RegExReplace(Options, "i)(?:^|\s)(?:[wh]\d+|t(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)", "")) != ""
-		throw ValueError("The native profile prompt requires only width, height and timeout options.")
-	Width := RegExMatch(Options, "i)(?:^|\s)w(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 520
-	Height := RegExMatch(Options, "i)(?:^|\s)h(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 320
-	Timeout := RegExMatch(Options, "i)(?:^|\s)t(\d+(?:\.\d*)?|\.\d+)(?=\s|$)", &Match) ? Number(Match[1]) : 0
-	if Width < 240 || Height < 180 || Timeout < 0 || Timeout > 2147483
-		throw ValueError("The native profile prompt dimensions or timeout are outside their supported bounds.")
-	Dialog := Gui("", WindowTitle(Title))
-	Receipt := {Result: "Cancel", Value: Default}
-	Finished := false
-	TimeoutFn := Finish.Bind("Timeout")
-	try {
-		Gui_SetFont(Dialog, "s10", "Segoe UI")
-		Dialog.AddText("x12 y12 w" . (Width - 24) . " h36", Prompt)
-		Editor := Dialog.AddEdit("x12 y54 w" . (Width - 24) . " h" . (Height - 106)
-			. " Multi WantReturn VScroll Limit0", Default)
-		Dialog.AddButton("x" . (Width - 204) . " y" . (Height - 40) . " w90 Default", t("button.ok"))
-			.OnEvent("Click", Finish.Bind("OK"))
-		Dialog.AddButton("x+12 yp w90", t("button.cancel")).OnEvent("Click", Finish.Bind("Cancel"))
-		Dialog.OnEvent("Close", Finish.Bind("Cancel"))
-		Dialog.OnEvent("Escape", Finish.Bind("Cancel"))
-		Hwnd := Dialog.Hwnd
-		Dialog.Show("w" . Width . " h" . Height)
-		if !Finished {
-			if Timeout > 0
-				TimerSetCallback(TimeoutFn, -Max(1, Integer(Round(Timeout * 1000))))
-			WinWaitClose("ahk_id " . Hwnd)
-		}
-		return Receipt
-	} finally {
-		TimerSetCallback(TimeoutFn, 0)
-		try Dialog.Destroy()
-	}
-
-	Finish(Status, *) {
-		if Finished
-			return
-		Receipt.Value := Editor.Value
-		Receipt.Result := Status
-		Finished := true
-		Dialog.Destroy()
-	}
-}
-
-/**
- * Opens InputBox dialogs to create a new user profile (label + prompt).
+ * Opens the shared prompt editor to create a new user profile. The WebView
+ * page is the only profile form (maintainer decision 2026-11-21): without
+ * WebView2 the editor tells the user once and nothing opens.
+ * @param {Map|Integer} Port - Optional notify port for the source refusal.
+ * @returns {Boolean} False when nothing opened.
  */
 LLM_Menu_PromptCreateProfile(Port := 0) {
 	InheritedCritical := A_IsCritical
@@ -980,48 +930,12 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 		try return LLM_Menu_PromptCreateProfile(Port)
 		finally Critical(InheritedCritical)
 	}
-	global _LLM_Menu
 	Options := _LLM_Menu_ProfilePorts(Port)
 	Source := _LLM_Menu_CaptureProfileSource()
 	if !(Source is Map)
 		return ConfigReportPersistenceFailure("the custom LLM profile creation", Options.Get("notify", 0),
 			"the opening configuration source is unavailable")
-	InputFn := Options.Get("input", Ui_InputBox)
-	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
-
-	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
-	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(0, Source)
-		return
-
-	; Step 1: label
-	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
-	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
-		return
-
-	; Step 2: system prompt, including native pasted line breaks
-	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
-	if (ib_prompt.Result != "OK")
-		return
-	system_single := ib_prompt.Value
-
-	; Generate a unique ID from the label
-	pid := "user_" . LLM_Menu_Slugify(plabel) . "_" . A_TickCount
-
-	new_profile := Map(
-		"id",            pid,
-		"label",         plabel,
-		"system_single", system_single,
-		"system_multi",  "",
-		"batch",         false
-	)
-
-	return LLM_Menu_CommitMutation("the custom LLM profile creation",
-		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
-		Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
-		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
+	return _PromptEdWeb_TryOpen(0, Source)
 }
 
 _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
@@ -1033,8 +947,12 @@ _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
 }
 
 /**
- * Opens InputBox dialogs to edit an existing user profile in place.
+ * Opens the shared prompt editor on an existing user profile. The page saves
+ * against the configuration image captured here or by the profile chooser.
  * @param {Map} profile - The user profile to edit.
+ * @param {Map|Integer} Port - Optional notify port for the source refusal.
+ * @param {Map|Integer} OpeningSource - Source already captured by the chooser.
+ * @returns {Boolean} False when nothing opened.
  */
 LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	InheritedCritical := A_IsCritical
@@ -1043,48 +961,12 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 		try return LLM_Menu_PromptEditProfile(profile, Port, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
-	global _LLM_Menu
 	Options := _LLM_Menu_ProfilePorts(Port)
 	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
 	if !(Source is Map) || !_LLM_Menu_ProfileSourceBound(Source)
 		return ConfigReportPersistenceFailure("the custom LLM profile edit", Options.Get("notify", 0),
 			"the opening configuration source is unavailable")
-	InputFn := Options.Get("input", Ui_InputBox)
-	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
-	pid := profile.Has("id") ? profile["id"] : ""
-
-	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
-	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(profile, Source)
-		return
-
-	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
-		profile.Has("label") ? profile["label"] : "")
-	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
-		return
-
-	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
-		profile.Has("system_single") ? profile["system_single"] : "")
-	if (ib_prompt.Result != "OK")
-		return
-
-	return LLM_Menu_CommitMutation("the custom LLM profile edit",
-		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
-			new_label, ib_prompt.Value), Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
-		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
-}
-
-_LLM_Menu_EditProfileCandidate(Candidate, ProfileId, Label, Prompt) {
-	for Profile in Candidate[ConfigLeaf.USER_PROFILES] {
-		if (Profile.Has("id") && Profile["id"] == ProfileId) {
-			Profile["label"] := Label
-			Profile["system_single"] := Prompt
-			return true
-		}
-	}
-	return false
+	return _PromptEdWeb_TryOpen(profile, Source)
 }
 
 /**

@@ -122,12 +122,6 @@ _NKWT_AssertWindowsWalk(Name, Open) {
 	}
 }
 
-_NKWT_ProfilePrompt() {
-	_NKWT_AssertWindowsWalk("profile prompt",
-		() => _LLM_Menu_ProfilePromptInput("Prompt", "Profile"))
-}
-Test("a11y keyboard walk: the AI profile prompt (a11y-keyboard-2026-11-18)", _NKWT_ProfilePrompt)
-
 _NKWT_GestureBackendPicker() {
 	Choices := [Map("value", "first", "label", "First"), Map("value", "second", "label", "Second")]
 	_NKWT_AssertWindowsWalk("gesture vision backend picker",

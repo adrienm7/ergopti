@@ -5,9 +5,10 @@
 ; DESCRIPTION:
 ; Renders the LLM prompt-profile editor on Windows via WebView2, loading the
 ; shared frontend at _shared/ui/prompt_editor/ so the AHK and Hammerspoon drivers
-; show an identical rich editor (token chips + autocomplete). Replaces the
-; two-step native InputBox wizard (LLM_Menu_PromptCreateProfile /
-; LLM_Menu_PromptEditProfile), which remain as a fallback when WebView2 is absent.
+; show an identical rich editor (token chips + autocomplete). It is the only
+; profile form behind LLM_Menu_PromptCreateProfile and LLM_Menu_PromptEditProfile:
+; without WebView2 the opening is refused with the shared WebView2 message and
+; no native window is built (maintainer decision 2026-11-21).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
@@ -16,9 +17,9 @@
 ; 2. Create + edit — opened with no profile creates a new user profile; opened
 ;    with an existing profile edits it in place by id. The webview's prompt field
 ;    maps to the Windows profile's system_single, label to label, mode to batch.
-; 3. Persist + refresh — on save the profile is written through the same path the
-;    native wizard used (LLM_Menu_SaveConfig + LLM_Engine_Init + LLM_Menu_Build +
-;    profile-hotkey rebind), so behaviour is identical to the native flow.
+; 3. Persist + refresh — on save the profile goes through the detached LLM menu
+;    transaction against the configuration image captured at opening, then the
+;    menu, engine and profile hotkeys are refreshed.
 ; 4. Safe teardown — subscription handles are released BEFORE Controller.Close()
 ;    (their __Delete unsubscribes on the live controller; reversing the order
 ;    raises a COM error that, uncaught in the Close thread, quits the script).
@@ -92,13 +93,6 @@ global PROMPTED_HOST_ACCESS_ALLOW := 1
 global PROMPTED_WIDTH  := 560
 global PROMPTED_HEIGHT := 500
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-_PromptEdWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
 ; Captures one immutable display identity and its initial form projection.
 _PromptEdWeb_BeginContext(Existing, Source := 0, ExpectedContext := 0) {
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
@@ -130,9 +124,10 @@ _PromptEdWeb_BeginContext(Existing, Source := 0, ExpectedContext := 0) {
 	} finally Critical(PreviousCritical)
 }
 
-; Attempts to show the prompt editor in a WebView2 window. Returns true on success
-; (the caller must NOT also build the native InputBox wizard), false to fall back.
-; Existing is the user profile Map to edit, or 0 for a new profile.
+; Shows the prompt editor in a WebView2 window. Existing is the user profile Map
+; to edit, or 0 for a new profile. Returns false only when this opening was
+; refused with the shared WebView2 message; a superseded or source-refused
+; opening returns true because another owner already answered the user.
 _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	global _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
 	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ResetDone, _VendorDir, _SharedDir
@@ -143,7 +138,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	_PromptEdWeb_RetryRetiredHosts()
 	if ExpectedContext.Serial != _PromptEdWeb_EpochSerial || ExpectedContext.Epoch != _PromptEdWeb_ContextEpoch
 		return true
-	if !_PromptEdWeb_Available()
+	if !WebView_RequireAvailable("prompt editor")
 		return false
 	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
 	if !(Source is Map) || !_LLM_Menu_ProfileSourceBound(Source) {
@@ -185,7 +180,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false, Host := 0
+	Installed := false, FactoryFailed := false, FailureReason := "", ResetForRefusal := false, Host := 0
 	try {
 		if !_PromptEdWeb_OpeningCurrent(Context)
 			return true
@@ -218,10 +213,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 		} catch as Err {
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
-			try LoggerError("PromptEditor", "WebView2 create failed: {1} — falling back to native wizard.", Err.Message)
-			if !_PromptEdWeb_StartupCurrent(g)
-				return true
-			FactoryFailed := true
+			FactoryFailed := true, FailureReason := Err.Message
 		}
 		if !FactoryFailed {
 			if !_PromptEdWeb_StartupCurrent(g)
@@ -295,7 +287,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 		}
 	} finally {
 		if !Installed {
-			ResetForFallback := _PromptEdWeb_Reset(g)
+			ResetForRefusal := _PromptEdWeb_Reset(g)
 			if IsObject(Host) {
 				_PromptEdWeb_RetireSubscriptionHost(Host)
 			} else {
@@ -308,8 +300,11 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			}
 		}
 	}
-	; A failed old profile cannot borrow a later context's fallback authority.
-	return !(FactoryFailed && ResetForFallback && _PromptEdWeb_FallbackCurrent(Context, Source))
+	; Only this exact still-current failed opening tells the user; a failed old
+	; profile cannot answer for a later context.
+	if FactoryFailed && ResetForRefusal && _PromptEdWeb_RefusalCurrent(Context, Source)
+		return WebView_RefuseUnavailable("prompt editor", FailureReason)
+	return true
 }
 
 
@@ -441,7 +436,7 @@ _PromptEdWeb_StartupCurrent(Window) {
 	return !_PromptEdWeb_ResetDone && _PromptEdWeb_Gui == Window
 }
 
-_PromptEdWeb_FallbackCurrent(Context, Source) {
+_PromptEdWeb_RefusalCurrent(Context, Source) {
 	global _PromptEdWeb_Gui, _PromptEdWeb_ResetDone, _PromptEdWeb_EpochSerial
 	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_OpeningSource
 	return _PromptEdWeb_EpochSerial == Context.Epoch && _PromptEdWeb_ContextEpoch == 0

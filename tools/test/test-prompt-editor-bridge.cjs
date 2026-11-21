@@ -18,8 +18,9 @@
  * 3. Field mapping — the Windows profile uses system_single, not raw_prompt, so
  *    the host must map the webview's prompt field onto system_single on save and
  *    feed system_single back into the init payload.
- * 4. Native fallback preserved — the InputBox wizard must remain (gated behind
- *    the webview TryOpen) so a machine without the WebView2 runtime still works.
+ * 4. WebView only — the profile entries open the shared editor and nothing
+ *    else: without WebView2 the opening is refused with the shared message and
+ *    no native InputBox wizard exists (maintainer decision 2026-11-21).
  * 5. Immutable context — init must carry an edit id + epoch that every deferred
  *    save/cancel echoes, and both the page and host must reject stale epochs.
  *
@@ -221,21 +222,27 @@ check(
 	'Save, close and init continuations must reject callbacks from an older display context.'
 );
 
-// 7. Native InputBox fallback preserved, gated behind the webview TryOpen.
+// 7. The shared editor is the only profile form.
 check(
-	'create profile tries the webview first',
-	/_PromptEdWeb_TryOpen\(0,\s*Source\)/.test(menu),
-	'LLM_Menu_PromptCreateProfile must pass the opening source to _PromptEdWeb_TryOpen before the native fallback.'
+	'create profile opens the shared editor',
+	/return _PromptEdWeb_TryOpen\(0,\s*Source\)/.test(menu),
+	'LLM_Menu_PromptCreateProfile must hand its opening source to _PromptEdWeb_TryOpen and return its result.'
 );
 check(
-	'edit profile tries the webview first',
-	/_PromptEdWeb_TryOpen\(profile,\s*Source\)/.test(menu),
-	'LLM_Menu_PromptEditProfile must pass the profile and its opening source to _PromptEdWeb_TryOpen before the native fallback.'
+	'edit profile opens the shared editor',
+	/return _PromptEdWeb_TryOpen\(profile,\s*Source\)/.test(menu),
+	'LLM_Menu_PromptEditProfile must hand the profile and its opening source to _PromptEdWeb_TryOpen and return its result.'
 );
 check(
-	'native InputBox wizard is still present (fallback)',
-	menu.includes('Options.Get("input", Ui_InputBox)') && menu.includes('InputFn.Call('),
-	'The native InputBox wizard must remain as a fallback when WebView2 is absent.'
+	'no native InputBox wizard remains',
+	!/Ui_InputBox|InputFn\.Call\(|_LLM_Menu_ProfilePromptInput/.test(menu),
+	'A missing WebView2 is refused with the shared message; no native profile form may stand in.'
+);
+check(
+	'the editor admits WebView2 before building its window',
+	host.includes('WebView_RequireAvailable("prompt editor")') &&
+		host.includes('WebView_RefuseUnavailable("prompt editor", FailureReason)'),
+	'The host must refuse an unavailable or failed WebView2 with the shared message.'
 );
 
 console.log(`\nResults: ${total_pass} passed, ${total_fail} failed.`);

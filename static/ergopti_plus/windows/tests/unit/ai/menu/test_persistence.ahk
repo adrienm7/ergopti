@@ -536,8 +536,8 @@ Test_LLM_Persist_CustomProfileCrudSurvivesRestart() {
 		_LLM_Persist_AssertProfilesExact(Expected, Restored,
 			"create then restart")
 
-		AssertTrue(_LLM_Menu_EditProfileCandidate(_LLM_Menu, First["id"],
-			"Édité", "Prompt édité`nligne 2"),
+		AssertTrue(_PromptEdWeb_ApplyProfile(_LLM_Menu, First["id"],
+			"Édité", First["batch"], "Prompt édité`nligne 2"),
 			"the production edit mutator must find the restored profile")
 		Expected := LLM_Menu_DeepClone(_LLM_Menu["user_profiles"])
 		Restored := _LLM_Persist_ProfileRoundTrip(Path)

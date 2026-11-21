@@ -3,9 +3,12 @@
 ; ==============================================================================
 ; MODULE: LLM profile opening-image regression tests
 ; DESCRIPTION:
-; Retains real READY configuration images across native modal ports and the actual
-; WebView save context. The production profile collector, codec and borrowed
-; native writer preserve another profile edited before the old action returns.
+; Retains real READY configuration images across the public profile entries, the
+; management dialog and the actual WebView save context. The production profile
+; collector, codec and borrowed native writer preserve another profile edited
+; before the old action returns. The browser page itself cannot run in the suite,
+; so a stand-in for _PromptEdWeb_TryOpen receives the public entry's exact
+; opening source and saves through the genuine _PromptEdWeb_PersistProfile.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -29,90 +32,34 @@ _PFI_External(State) {
 }
 
 
-_PFI_NativeInputTick(Step) {
-	if Step.Submitted || Step.Busy
-		return
-	Step.Busy := true
-	try {
-		for Hwnd in WinGetList("ahk_pid " . ProcessExist()) {
-			if WinGetTitle("ahk_id " . Hwnd) != Step.Title
-				continue
-			Step.Hwnd := Hwnd
-			EditHwnd := ControlGetHwnd("Edit1", "ahk_id " . Hwnd)
-			Step.Multiline := !!(DllCall("User32\GetWindowLongW", "Ptr", EditHwnd, "Int", -16, "UInt") & 4)
-			NativeBox := WinGetClass("ahk_id " . Hwnd) == "#32770"
-			if Step.Cancel {
-				if NativeBox
-					PostMessage(0x111, 2, 0, , "ahk_id " . Hwnd)
-				else
-					PostMessage(0xF5, 0, 0, "Button2", "ahk_id " . Hwnd)
-			} else {
-				if Step.Label
-					ControlSetText("Edited A", "Edit1", "ahk_id " . Hwnd)
-				else {
-					; Select all, then exercise the actual native paste behavior of
-					; the production dialog's Edit control, not SetWindowText.
-					SendMessage(0xB1, 0, -1, "Edit1", "ahk_id " . Hwnd)
-					SendMessage(0x302, 0, 0, "Edit1", "ahk_id " . Hwnd)
-				}
-				Step.Observed := ControlGetText("Edit1", "ahk_id " . Hwnd)
-				if NativeBox
-					PostMessage(0x111, 1, 0, , "ahk_id " . Hwnd)
-				else
-					PostMessage(0xF5, 0, 0, "Button1", "ahk_id " . Hwnd)
-			}
-			Step.Submitted := true
-			return
-		}
-	} catch as Failure {
-		Step.Failure := Failure
-		if Step.Hwnd
-			DllCall("User32\PostMessageW", "Ptr", Step.Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int")
-		Step.Submitted := true
-	} finally Step.Busy := false
-}
-
-_PFI_NativeInput(State, Prompt, Title, Options, Default) {
-	AssertFalse(A_IsCritical, "The public profile wizard must admit native modal automation outside Critical")
-	Step := {Title: WindowTitle(Title), Hwnd: 0, Label: State.Inputs == 1,
-		Cancel: State.Mode == "edit-native-cancel" && State.Inputs == 2,
-		Submitted: false, Busy: false, Failure: 0, Multiline: false, Observed: "", Returned: ""}
-	SavedClipboard := ClipboardAll()
-	Tick := _PFI_NativeInputTick.Bind(Step)
-	try {
-		if !Step.Label && !Step.Cancel {
-			A_Clipboard := State.Mode == "edit-native-single" ? "native single-line prompt"
-				: "first prompt line`r`nsecond prompt line"
-			AssertTrue(ClipWait(1), "The native paste must own actual Unicode clipboard text")
-		}
-		SetTimer(Tick, 10)
-		; T5 bounds automation failure without changing the dialog's text or
-		; control styles. Both dimensions come unchanged from production.
-		NativeInput := Step.Label ? Ui_InputBox : _LLM_Menu_ProfilePromptInput
-		Box := NativeInput.Call(Prompt, Title, Options . " T5", Default)
-		if Step.Failure is Error
-			throw Step.Failure
-		AssertTrue(Step.Submitted && Step.Hwnd != 0, "The real production InputBox must receive native automation")
-		AssertEqual(Step.Cancel ? "Cancel" : "OK", Box.Result)
-		Step.Returned := Box.Value
-		State.NativeCaptures.Push(Step)
-		return Box
-	} finally {
-		SetTimer(Tick, 0)
-		A_Clipboard := SavedClipboard
-	}
-}
-
-_PFI_Input(State, Prompt, Title, Options, Default := "") {
-	State.Inputs += 1
-	AssertTrue(Prompt != "" && Title != "", "The native fallback must reach actual localized input boundaries.")
-	if InStr(State.Mode, "edit-native-") == 1
-		return _PFI_NativeInput(State, Prompt, Title, Options, Default)
-	if InStr(State.Mode, "external") && State.Inputs == 1 && State.ExternalImage == ""
+; Stands in for the browser page only: the genuine context capture and save
+; transaction run with the opening source the public entry handed over.
+_PFI_Page(State, Self, Existing, OpeningSource := 0) {
+	State.Opens += 1
+	AssertFalse(A_IsCritical, "The public profile entry must open the editor outside Critical")
+	AssertTrue(OpeningSource is Map, "The public entry must hand its captured opening source to the editor")
+	Context := _PromptEdWeb_BeginContext(Existing, OpeningSource)
+	AssertTrue(IsObject(Context), "The real WebView context must own the exact opening source")
+	if InStr(State.Mode, "external") && State.ExternalImage == ""
 		_PFI_External(State)
+	; A page closed without saving never reaches the transaction.
 	if InStr(State.Mode, "cancel")
-		return { Result: "Cancel", Value: "never saved" }
-	return { Result: "OK", Value: State.Inputs == 1 ? "Edited A" : "edited-a" }
+		return true
+	return _PromptEdWeb_PersistProfile(Context.EditId, Context.Epoch, "Edited A", false, "edited-a", State.Port)
+}
+
+_PFI_InstallPage(State) {
+	AssertFalse(_PromptEdWeb_TryOpen.HasOwnProp("Call"), "The page stand-in wraps the unmodified editor entry")
+	State.Page := _PFI_Page.Bind(State)
+	_PromptEdWeb_TryOpen.DefineProp("Call", {Call: State.Page})
+}
+
+_PFI_ReleasePage(State) {
+	if !State.HasOwnProp("Page")
+		return
+	AssertTrue(_PromptEdWeb_TryOpen.GetOwnPropDesc("Call").Call == State.Page,
+		"Only this probe's exact page stand-in may be removed")
+	_PromptEdWeb_TryOpen.DeleteProp("Call")
 }
 
 _PFI_Confirm(State, Body, Title, Options) {
@@ -156,7 +103,7 @@ _PFI_Notify(State, Message, Options) {
 }
 
 _PFI_Run(Mode) {
-	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir, Features, LLM_Defaults, _LLM_Menu_ApiPrivateAuthorityGeneration
+	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, Features, LLM_Defaults, _LLM_Menu_ApiPrivateAuthorityGeneration
 	global _PromptEdWeb_OpeningSource, _PromptEdWeb_PersistHook, _PromptEdWeb_ResetDone
 	SavedApiAuthority := _LLM_Menu_ApiPrivateAuthorityGeneration
 	HadDefaults := IsSet(LLM_Defaults)
@@ -166,17 +113,14 @@ _PFI_Run(Mode) {
 	PreviousCritical := Critical("Off")
 	WasSuspended := A_IsSuspended
 	SavedHotkeys := _LLM_Menu_ProfileHotkeyOwner
-	SavedVendor := _VendorDir
 	SavedReset := _PromptEdWeb_ResetDone
-	State := { Mode: Mode, World: 0, Inputs: 0, Confirms: 0, Collects: 0,
-		Notices: [], NoticeLevels: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "", NativeCaptures: [] }
+	State := { Mode: Mode, World: 0, Opens: 0, Confirms: 0, Collects: 0, Port: 0,
+		Notices: [], NoticeLevels: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "" }
 	try {
 		Suspend(false)
 		World := _LSP_World()
 		State.World := World
 		_LLM_Menu_ProfileHotkeyOwner := 0
-		; Genuine missing loader forces the actual native fallback without replacing TryOpen.
-		_VendorDir := World.ConfigPath . "-no-webview-loader"
 		_PFI_InstallMemoryRetirement(State)
 		Profiles := [_PFI_Profile("user_profile_a", "original-a"), _PFI_Profile("user_profile_b", "original-b")]
 		AssertTrue(TOML_ConfigBatchWrite(World.ConfigPath,
@@ -216,12 +160,16 @@ _PFI_Run(Mode) {
 		if Mode == "edit-preopen-api-unknown"
 			_PFI_UnknownApiSelection(State)
 		MenuBefore := _LLM_Menu
-		Port := Map("input", _PFI_Input.Bind(State), "confirm", _PFI_Confirm.Bind(State),
+		Port := Map("confirm", _PFI_Confirm.Bind(State),
 			"notify", _PFI_Notify.Bind(State), "collect", _PFI_Collect.Bind(State),
 			"apply", ObjBindMethod(World, "ApplyCommitted"), "acquire", _LMT_Acquire, "settle", _LMT_Settle)
+		State.Port := Port
 		Result := false
+		; The context fixture's persistence hook would bypass the real transaction.
+		_PromptEdWeb_PersistHook := 0
+		if SubStr(Mode, 1, 4) != "web-"
+			_PFI_InstallPage(State)
 		if SubStr(Mode, 1, 4) == "web-" {
-			_PromptEdWeb_PersistHook := 0
 			Source := _LLM_Menu_CaptureProfileSource()
 			AssertTrue(Source is Map)
 			Context := _PromptEdWeb_BeginContext(Profiles[1], Source)
@@ -251,18 +199,17 @@ _PFI_Run(Mode) {
 		else
 			Result := LLM_Menu_OnUserProfileClick(Profiles[1], Port)
 		if InStr(Mode, "edit-current-") == 1
-			_TestPrint("# profile-canonical mode=" . Mode . " apply_calls=" . World.ApplyCalls . " inputs=" . State.Inputs . " collects=" . State.Collects)
+			_TestPrint("# profile-canonical mode=" . Mode . " apply_calls=" . World.ApplyCalls . " opens=" . State.Opens . " collects=" . State.Collects)
 		Accepted := Mode == "edit-current" || InStr(Mode, "edit-current-") == 1 || Mode == "create-current" || Mode == "delete-current"
 			|| Mode == "web-current" || Mode == "use-current"
 			|| ((Mode == "edit-preopen-external" || Mode == "edit-preopen-nav") && World.ApplyCalls == 1)
-			|| Mode == "edit-native-paste" || Mode == "edit-native-single"
 		Cancelled := InStr(Mode, "cancel") > 0
 		if Mode == "edit-preopen-external" {
 			Observed := TOML_ParseFreshFileTyped(World.ConfigPath)
 			ObservedProfiles := _LLM_Menu_DeserializeUserProfiles(Observed["llm"]["user_profiles"])
 			AssertTrue(ObservedProfiles is Array && ObservedProfiles.Length == 2)
 			Preserved := ObservedProfiles[2]["system_single"] == "external-b-must-survive"
-			_TestPrint("# profile-preopen-source apply_calls=" . World.ApplyCalls . " input_calls=" . State.Inputs
+			_TestPrint("# profile-preopen-source apply_calls=" . World.ApplyCalls . " opens=" . State.Opens
 				. " physical_sibling_preserved=" . Preserved
 				. " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
 			AssertTrue(Preserved, "Opening the editor after replacement cannot bless stale RAM and erase the newer independent profile")
@@ -271,7 +218,7 @@ _PFI_Run(Mode) {
 			Observed := TOML_ParseDocument(FSReadUtf8Exact(World.ConfigPath))
 			NavPreserved := _LLM_Menu_ModifiersArrayToString(State.ExternalNav)
 				== _LLM_Menu_ModifiersArrayToString(Observed["llm"]["navigation"]["nav_modifiers"])
-			_TestPrint("# profile-preopen-navigation apply_calls=" . World.ApplyCalls . " input_calls=" . State.Inputs
+			_TestPrint("# profile-preopen-navigation apply_calls=" . World.ApplyCalls . " opens=" . State.Opens
 				. " physical_nav_preserved=" . NavPreserved . " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
 			AssertTrue(NavPreserved, "Editing a profile cannot erase an independent navigation preference written before opening")
 		}
@@ -313,37 +260,22 @@ _PFI_Run(Mode) {
 				AssertEqual("edited-a", Saved[1]["system_single"])
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
-			if Mode == "edit-native-paste" || Mode == "edit-native-single" {
-				ExpectedPrompt := Mode == "edit-native-single" ? "native single-line prompt"
-					: "first prompt line`nsecond prompt line"
-				AssertEqual(2, State.NativeCaptures.Length)
-				Input := State.NativeCaptures[2]
-				AssertTrue(Input.Multiline, "The actual native prompt Edit must retain multiline paste")
-				SavedPrompt := StrReplace(Saved[1]["system_single"], "`r`n", "`n")
-				_TestPrint("# native-profile-paste mode=" . Mode . " multiline_style=" . Input.Multiline
-					. " paste_control_lines=" . StrSplit(StrReplace(Input.Observed, "`r`n", "`n"), "`n").Length
-					. " returned_lines=" . StrSplit(StrReplace(Input.Returned, "`r`n", "`n"), "`n").Length
-					. " durable_lines=" . StrSplit(SavedPrompt, "`n").Length)
-				AssertEqual(ExpectedPrompt, SavedPrompt, "A real native paste must retain every prompt line through actual durable serialization")
-				AssertEqual(ExpectedPrompt, StrReplace(_LLM_Menu["user_profiles"][1]["system_single"], "`r`n", "`n"))
-				AssertEqual("Edited A", Saved[1]["label"])
-			}
 		}
 		if Mode == "edit-preopen-unrepresentable" || Mode == "edit-preopen-api-unknown" {
-			AssertEqual(0, State.Inputs, "The public editor must refuse before authorizing native inputs from a lossy profile projection")
+			AssertEqual(0, State.Opens, "The public editor must refuse before opening on a lossy profile projection")
 			AssertEqual(0, State.Collects, "No complete profile-array effect may be built from an unrepresentable source")
 			AssertTrue(State.Notices.Length > 0, "The actual public failure must visibly explain the refused source")
 		} else if Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
-			AssertTrue(State.Inputs <= 2, "A refused stale opening may stop before the native inputs")
+			AssertTrue(State.Opens <= 1, "A refused stale opening may stop before the editor opens")
 			if Accepted
-				AssertEqual(2, State.Inputs, "A source-reconciled successful edit must still consume both actual inputs")
+				AssertEqual(1, State.Opens, "A source-reconciled successful edit must still open the editor once")
 		} else if SubStr(Mode, 1, 5) == "edit-" || SubStr(Mode, 1, 7) == "create-"
-			AssertEqual(Cancelled && Mode != "edit-native-cancel" ? 1 : 2, State.Inputs, "Both actual fallback inputs must be exercised except ordinary label cancellation.")
+			AssertEqual(1, State.Opens, "The public entry must open the shared editor exactly once.")
 		if InStr(Mode, "delete")
 			AssertEqual(2, State.Confirms, "Removal must exercise both real confirmation callbacks.")
 		if InStr(Mode, "chooser-edit") {
 			AssertEqual(1, State.Confirms)
-			AssertEqual(2, State.Inputs, "The chooser must carry its original image into the subsequent editor.")
+			AssertEqual(1, State.Opens, "The chooser must carry its original image into the subsequent editor.")
 		}
 		if Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
 			AssertTrue(State.Collects <= 1, "A refused stale image must never retry its full projection automatically")
@@ -354,8 +286,10 @@ _PFI_Run(Mode) {
 		AssertFalse(_ConfigWriteTerminalIsActive(), "Every path must release its exact borrowed configuration lease.")
 	} finally {
 		try {
-			try _PFI_ReleaseMemoryRetirement(State)
-			finally {
+			try {
+				try _PFI_ReleasePage(State)
+				finally _PFI_ReleaseMemoryRetirement(State)
+			} finally {
 				if World is _LSP_World
 					World.Restore()
 			}
@@ -363,8 +297,8 @@ _PFI_Run(Mode) {
 			_PEC_RestoreFixture(PreviousContext)
 			_PromptEdWeb_ResetDone := SavedReset
 			_LLM_Menu_ProfileHotkeyOwner := SavedHotkeys
-			_VendorDir := SavedVendor
 			State.World := 0
+			State.Port := 0
 			_LLM_Menu_ApiPrivateAuthorityGeneration := SavedApiAuthority
 			if HadDefaults
 				LLM_Defaults := SavedDefaults
@@ -408,10 +342,6 @@ _PFI_ColdProfilePolicy() {
 }
 Test("LLM profile policy: cold recommendation is composed before menu startup (llm-profile-policy-composition)",
 	_PFI_ColdProfilePolicy)
-
-for _PFI_NativeMode in ["edit-native-paste", "edit-native-single", "edit-native-cancel"]
-	Test("LLM native profile prompt: " . _PFI_NativeMode . " retains pasted lines (native-profile-paste-owner)",
-		_PFI_Run.Bind(_PFI_NativeMode))
 
 Test("LLM profile opening source: prior external sibling edit survives (llm-profile-preopen-source)",
 	_PFI_Run.Bind("edit-preopen-external"))
@@ -652,26 +582,21 @@ Test("LLM profile opening source: explicit unknown API selection is preserved (l
 
 ; Keep the production profile collector: this public regression first aligns
 ; a real full-state source, then checks that editing LLM leaves other rows alone.
-_PFNL_Input(State, Prompt, Title, Options, Default := "") {
-	State.Inputs += 1
-	AssertTrue(Prompt != "" && Title != "")
-	return {Result: "OK", Value: State.Inputs == 1 ? "Edited A" : "edited-a"}
-}
+; The page stand-in saves through the genuine WebView transaction.
 
 _PFNL_Case(External, Control := "") {
-	global Features, _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir
+	global Features, _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _PromptEdWeb_PersistHook
 	PreviousContext := _PEC_InstallFixture()
+	_PromptEdWeb_PersistHook := 0
 	World := 0
 	WasSuspended := A_IsSuspended
 	PreviousCritical := Critical("Off")
 	SavedHotkeys := _LLM_Menu_ProfileHotkeyOwner
-	SavedVendor := _VendorDir
-	State := {Inputs: 0, Notices: [], NoticeLevels: []}
+	State := {Mode: "edit-nonllm", Opens: 0, Port: 0, ExternalImage: "", Notices: [], NoticeLevels: []}
 	try {
 		Suspend(false)
 		World := _LSP_World()
 		_LLM_Menu_ProfileHotkeyOwner := 0
-		_VendorDir := World.ConfigPath . "-no-webview-loader"
 		Profiles := [_PFI_Profile("user_profile_a", "original-a"), _PFI_Profile("user_profile_b", "original-b")]
 		_LLM_Menu["user_profiles"] := Profiles
 		_LLM_Menu["profile_id"] := "user_profile_a"
@@ -697,7 +622,7 @@ _PFNL_Case(External, Control := "") {
 			AssertTrue(FSWriteDurable(World.ConfigPath, ExternalImage))
 		}
 		AssertTrue(ConfigFullStateCanPersist(), "The real current schema must admit this valid pre-opening external locale")
-		Port := Map("input", _PFNL_Input.Bind(State), "notify", _PFI_Notify.Bind(State),
+		Port := Map("notify", _PFI_Notify.Bind(State),
 			"apply", ObjBindMethod(World, "ApplyCommitted"), "acquire", _LMT_Acquire, "settle", _LMT_Settle)
 		if Control == "memory-rebase" {
 			State.MemoryRoot := Map("future_runtime_metadata", "retained")
@@ -706,6 +631,8 @@ _PFNL_Case(External, Control := "") {
 			Port["collect"] := _ConfigCollectFullSaveUpdates
 		else
 			AssertFalse(Port.Has("collect"), "Only the genuine production profile collector may serialize this public action")
+		State.Port := Port
+		_PFI_InstallPage(State)
 		Result := LLM_Menu_PromptEditProfile(Profiles[1], Port)
 		if Control == "memory-rebase"
 			AssertTrue(Features.Has("fixture_unknown_non_llm") && Features["fixture_unknown_non_llm"] == State.MemoryRoot,
@@ -713,7 +640,7 @@ _PFNL_Case(External, Control := "") {
 		if Control == "broad-collector" {
 			AssertFalse(Result, "An injected complete collector cannot broaden the profile's configuration ownership")
 			AssertEqual(0, World.ApplyCalls)
-			AssertEqual(2, State.Inputs)
+			AssertEqual(1, State.Opens)
 			AssertEqual(InitialImage, FSConfigReadUtf8Exact(World.ConfigPath))
 			AssertTrue(_LLM_Menu == InitialMenu && ManifestValuesEqual(Profiles, _LLM_Menu["user_profiles"]))
 			AssertTrue(State.Notices.Length > 0)
@@ -724,12 +651,12 @@ _PFNL_Case(External, Control := "") {
 		ActualLocale := LocaleRead["found"] ? LocaleRead["value"] : ManifestDefaultFor("script.locale")
 		Preserved := ActualLocale == ExpectedLocale
 		_TestPrint("# profile-nonllm-source external=" . External . " apply_calls=" . World.ApplyCalls
-			. " input_calls=" . State.Inputs . " physical_locale_preserved=" . Preserved)
+			. " opens=" . State.Opens . " physical_locale_preserved=" . Preserved)
 		AssertTrue(Preserved, "A public LLM profile edit cannot overwrite another persisted preference changed before opening")
 		AssertTrue(World.ApplyCalls <= 1)
 		if World.ApplyCalls == 1 {
 			AssertTrue(Result)
-			AssertEqual(2, State.Inputs)
+			AssertEqual(1, State.Opens)
 			Rows := _LLM_Menu_DeserializeUserProfiles(Observed["llm"]["user_profiles"])
 			AssertEqual("edited-a", Rows[1]["system_single"])
 			AssertEqual("original-b", Rows[2]["system_single"])
@@ -742,12 +669,15 @@ _PFNL_Case(External, Control := "") {
 		}
 	} finally {
 		try {
-			if World is _LSP_World
-				World.Restore()
+			try _PFI_ReleasePage(State)
+			finally {
+				if World is _LSP_World
+					World.Restore()
+			}
 		} finally {
 			_PEC_RestoreFixture(PreviousContext)
 			_LLM_Menu_ProfileHotkeyOwner := SavedHotkeys
-			_VendorDir := SavedVendor
+			State.Port := 0
 			Suspend(WasSuspended)
 			Critical(PreviousCritical)
 		}

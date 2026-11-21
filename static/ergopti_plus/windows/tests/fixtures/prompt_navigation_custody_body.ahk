@@ -85,13 +85,10 @@ class _PNAV_Environment {
 	}
 }
 
-_PNAV_Input(*) {
-	throw Error("A genuine admitted prompt opening must not reach the native fallback.")
-}
-
 _PNAV_Open(Index) {
 	global _PNAV, _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_OpeningSource
-	LLM_Menu_PromptEditProfile(_PNAV.Profiles[Index], Map("input", _PNAV_Input))
+	_PNAV_Require(LLM_Menu_PromptEditProfile(_PNAV.Profiles[Index]),
+		"A genuine admitted prompt opening must not be refused.")
 	_PNAV_Require(_PromptEdWeb_Gui is Gui && IsSet(_PromptEdWeb_Controller)
 		&& _PromptEdWeb_OpeningSource is Map && _LLM_Menu_ProfileSourceBound(_PromptEdWeb_OpeningSource),
 		"The genuine public editor must retain its real admitted configuration and native host.")
