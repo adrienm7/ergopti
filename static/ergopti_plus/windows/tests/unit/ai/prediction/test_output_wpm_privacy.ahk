@@ -1,4 +1,4 @@
-﻿; tests/unit/ai/prediction/test_ai_output_wpm_privacy.ahk
+﻿; tests/unit/ai/prediction/test_output_wpm_privacy.ahk
 
 ; ==============================================================================
 ; MODULE: AI Output and the WPM Readouts' Privacy (MET-02)
