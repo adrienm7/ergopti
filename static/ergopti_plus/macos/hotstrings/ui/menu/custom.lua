@@ -395,7 +395,8 @@ function M.build_custom(ctx, counts)
 		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
 		if type(sc) ~= "table" then return i18n.get("menu.shortcuts.keyboard.star_slot_reason.explicit_assignment") end
 		if sc_is_default(sc) then
-			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
+			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"),
+				require("hotstrings.engine.magic_key_display").display(state.trigger_char))
 		end
 		local mods_str = table.concat(coerce_mods(sc.mods), "+")
 		return mods_str ~= "" and (mods_str .. " + " .. tostring(sc.key or "?"):upper())

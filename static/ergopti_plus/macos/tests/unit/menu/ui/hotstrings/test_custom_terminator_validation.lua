@@ -80,6 +80,7 @@ local function run_action(mode, outcome, language)
 			if key == "menu.hotstrings.magic_key_prefix" or key == "menu.hotstrings.magic_key" then return Locale.get(key) end
 			return key
 		end,
+		format = function(key) return key end,
 		section = function(key) return key end,
 	}
 	package.loaded["core.ui.engine.dialog_util"] = {

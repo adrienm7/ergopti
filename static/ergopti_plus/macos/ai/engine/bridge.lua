@@ -1096,7 +1096,8 @@ local function update_preview_body(buf)
 					-- interceptor that runs on the same key). An autocorrection may also
 					-- accept Enter, but advertising Enter is false whenever that
 					-- terminator is disabled; magic is the action actually resolved.
-					trigger_label = validates_magic and magic_key or "↵",
+					-- « ★ (ù) »: the real marker and the key the user presses.
+					trigger_label = validates_magic and require("hotstrings.engine.magic_key_display").display(magic_key) or "↵",
 					glyph         = glyph,
 					glyph_name_key = glyph_name_key,
 					dimmed        = not m.is_winner,

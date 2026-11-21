@@ -19,7 +19,6 @@ local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("hotstrings.ui.hotstring_editor")
 local Logger           = require("core.logger.engine.logger")
 local PhaseStats       = require("infra.phase_stats")
-local text_utils = require("core.text.engine.utils")
 local i18n             = require("core.i18n.engine.i18n")
 local ui_restore       = require("menu.engine.ui_restore")
 local Manifest         = require("menu.engine.manifest_reader")
@@ -298,10 +297,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function applyTriggerChar(text)
 		if type(text) ~= "string" then return text end
-		-- Single source of truth for the escape (lib.text_utils) rather than a fourth
-		-- private copy of the same "%" doubling. Inlined at the use site so the
-		-- class guard can see the escape without having to trace a local.
-		return (text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char)))
+		-- « ★ (ù) », the shared display rule (hotstrings/engine/magic_key_display.lua).
+		return require("hotstrings.engine.magic_key_display").display_text(text, state.trigger_char)
 	end
 
 	-- Inputs the menubar icon was last rendered for, and whether an unknown

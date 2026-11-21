@@ -908,6 +908,14 @@ local function sparse_updates(flat)
 						"personal legacy source changed before preferences publication")
 					updates[#updates + 1] = require("hotstrings.engine.catalogue.personal_adoption").preference_row(personal,
 						path_parts[2] == "modules" and path_parts[4] or nil, value)
+				elseif leaf == ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR then
+					-- Absence is the layout's own default, so it follows the layout;
+					-- any other character, the manifest's ★ included, is written.
+					if value == require("hotstrings.engine.magic_key_display").layout_default() then
+						updates[#updates + 1] = Manifest.sparse_operation(leaf, Manifest.default_for(leaf))
+					else
+						updates[#updates + 1] = { section = path, key = key, value = value }
+					end
 				elseif Manifest.has_default(leaf) then
 					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
 				else
@@ -1224,6 +1232,9 @@ function M.build_initial_state(hotfiles, menu_mods, core_mods)
 
 	for _, mod in pairs(menu_mods) do load_defaults(mod) end
 	for _, mod in pairs(core_mods) do load_defaults(mod) end
+	-- The magic key's default follows the layout that types (ù on AZERTY, ; on
+	-- QWERTY); a saved value replaces it in merge_saved_data.
+	state.trigger_char = require("hotstrings.engine.magic_key_display").layout_default()
 
 	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
 		local name = M.get_group_name(f)

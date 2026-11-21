@@ -20,7 +20,6 @@ local i18n              = require("core.i18n.engine.i18n")
 local ValueCheck        = require("settings.engine.value_check")
 local LabelValue = require("core.i18n.engine.label_value")
 local hotstrings_config = require("hotstrings.engine.catalogue.config")
-local ManifestReader = require("menu.engine.manifest_reader")
 local ManifestMenu   = require("menu.engine.manifest_menu")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local Terminators     = require("layouts.engine.layers.terminators")
@@ -647,13 +646,14 @@ function M.build_management(ctx)
 
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
-	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR))
+	local MagicKeyRules = require("hotstrings.engine.magic_key_display")
+	local magic_key_value = MagicKeyRules.display(hs_state and hs_state.trigger_char or MagicKeyRules.layout_default())
 	local magic_key_action = function()
 			if not hs_state then return end
 			local ok_label = i18n.get("button.ok")
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
-				i18n.get("menu.hotstrings.magic_key_prompt"),
+				i18n.format("menu.hotstrings.magic_key_prompt", MagicKeyRules.display(MagicKeyRules.layout_default())),
 				hs_state.trigger_char, ok_label, i18n.get("common.cancel")
 			)
 			if ok_p and btn == ok_label and type(raw) == "string" then
