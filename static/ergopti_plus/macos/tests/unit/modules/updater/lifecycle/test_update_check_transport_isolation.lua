@@ -87,6 +87,7 @@ local function with_owner(run)
 				set = function(key, value) ctx.writes = ctx.writes + 1; ctx.values[key] = value; return true end,
 			},
 			http = ctx.http, manual_http = ctx.manual_http,
+			failure_contract = { classify = function() error("this test carries no failure receipt") end },
 			now = function() return ctx.now end,
 			current_version = function() return "0.0.0-dev.140" end,
 			installed_channel = function() return "dev" end,

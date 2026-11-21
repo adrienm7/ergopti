@@ -107,6 +107,7 @@ local function build(opts)
 			set = function(key, value) ctx.values[key] = value; return true end,
 		},
 		http = transport(), manual_http = transport(),
+		failure_contract = AutoCheck.failure_contract(),
 		now = function() return ctx.clock.now end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,
@@ -655,6 +656,49 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(#answers, 1)
 		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+	end)
+
+	-- UPD-13: hs.http gave status -1 and a localized sentence, so a refusing
+	-- proxy, an offline Mac or a refused certificate read « Could not reach
+	-- GitHub ». The worker's closed reason now reaches the window through its
+	-- receipt, by the vectors Linux and the shared contract replay.
+	local Protocol = require("core.network.engine.managed_http_protocol")
+	local corpus_file = assert(io.open(helpers.shared("tests/corpus/updater/check_session_vectors.json"), "rb"))
+	local native_receipts = Json.decode(corpus_file:read("*a")).native_receipts
+	corpus_file:close()
+	for _, vector in ipairs(native_receipts) do
+		helpers.it("upd-13: " .. vector.id, function()
+			helpers.assert_eq(Protocol.failure_receipt(vector.terminal), vector.receipt,
+				"the worker protocol proves the corpus receipt")
+			local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+			local answers = check_now(ctx, "dev")
+			-- The worker's own stdout: one terminal frame naming the reason
+			local terminal = '{"version":1,"success":false,"reason":"' .. vector.terminal .. '"}'
+			ctx.pending[1](Protocol.result(74, string.pack(">I4", #terminal + 1)
+				.. string.char(Protocol.TAG_TERMINAL) .. terminal))
+			helpers.assert_eq(ctx.requests[2].url, FEED_URL, "the feed is still read")
+			ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native offline (exit 74)" })
+			helpers.assert_eq(#answers, 1)
+			helpers.assert_eq(answers[1].reason_key, vector.expect)
+		end)
+	end
+
+	helpers.it("upd-13: the rate limit still wins over a native cause of the feed", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native proxy (exit 74)",
+			failure_receipt = Protocol.failure_receipt("proxy") })
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+	end)
+
+	helpers.it("upd-13: the production session checks through the launcher worker", function()
+		local source = assert(io.open(helpers.driver_root() .. "/modules/updater/auto_check.lua", "rb"))
+		local text = source:read("*a")
+		source:close()
+		helpers.assert_contains(text, 'manual_http = require("core.network.adapters.managed_http_worker").new(')
+		helpers.assert_contains(text, "failure_contract = M.failure_contract(),")
 	end)
 
 	helpers.it("offers a newer release of the checked channel without announcing it", function()

@@ -356,6 +356,7 @@ local function public_owner_retirement(mutation)
 					read_exact = function(key) return true, values[key] end,
 					set = function(key, value) values[key] = value; return true end },
 				http = { get = get }, manual_http = { get = get },
+				failure_contract = { classify = function() error("this test carries no failure receipt") end },
 			})
 			local answers = {}
 			local dispatched = checks.check_now("dev", function(result) answers[#answers + 1] = result end)

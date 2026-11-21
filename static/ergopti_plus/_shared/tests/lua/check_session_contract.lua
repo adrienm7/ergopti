@@ -108,6 +108,28 @@ return function(helpers, json, shared_root)
 		end)
 	end)
 
+	helpers.describe("update-check session vectors: a native receipt's cause (upd-13)", function()
+		local CheckResult = require("updater.engine.check_result")
+		local policy = assert(io.open(shared_root .. "/core/network/data/managed_network.json", "rb"))
+		local contract = require("core.network.engine.failure").new(json.decode(policy:read("*a")))
+		policy:close()
+		helpers.it("upd-13: the corpus holds the three named causes and the unnamed ones", function()
+			local expected = {}
+			for _, vector in ipairs(corpus.native_receipts) do expected[vector.expect] = true end
+			for _, key in ipairs({ "network.failure.offline", "network.failure.certificate",
+				"network.failure.proxy", "updater.no_connection" }) do
+				helpers.assert_true(expected[key] == true, key)
+			end
+		end)
+		for _, vector in ipairs(corpus.native_receipts) do
+			helpers.it("upd-13: " .. vector.id, function()
+				local report = contract.classify(vector.receipt, {})
+				helpers.assert_true(report.evidence ~= "invalid_receipt", "a well-formed receipt")
+				helpers.assert_eq(CheckResult.failure_key("no_connection", { report = report }), vector.expect)
+			end)
+		end
+	end)
+
 	helpers.describe("update-check session vectors: the exhausted rate limit", function()
 		for _, vector in ipairs(corpus.rate_limit) do
 			helpers.it(vector.id, function()

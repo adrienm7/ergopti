@@ -39,6 +39,7 @@ local JsonCodec   = require("core.fs.adapters.json_codec")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local Archives    = require("updater.engine.release_assets")
 local ProxyPolicy = require("core.network.engine.proxy_policy_core")
+local WorkerProtocol = require("core.network.engine.managed_http_protocol")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
@@ -307,25 +308,6 @@ assert(M.SWAP_READY_TICKS, "The release swap script names no boot-ready wait")
 M.BOOT_READY_CAPABILITY = M.SWAP_SCRIPT:match('%[ ! %-f "%$app(/Contents/Resources/[^"]+)" %]')
 assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready capability")
 
--- The managed-network receipt of each closed fact the staging script prints
--- when its download fails (« FAILED native:<reason> », the launcher's
--- ManagedBootstrapDownload reasons). Only what the reason proves is claimed:
--- a file or connect failure names no errno, so it stays an unknown cause.
-local NATIVE_RECEIPTS = {
-	offline = { backend = "urlsession", stage = "connect", failure_provenance = "verified",
-		network_status = "disconnected" },
-	certificate = { backend = "urlsession", stage = "tls", failure_provenance = "verified",
-		tls_verification = "enforced", tls_status = "untrusted_certificate" },
-	proxy = { backend = "urlsession", stage = "proxy_resolve", failure_provenance = "verified",
-		proxy_resolution_status = "unavailable" },
-	connect = { backend = "urlsession", stage = "connect", failure_provenance = "unknown" },
-	http = { backend = "urlsession", stage = "http", failure_provenance = "unknown" },
-	file_create = { backend = "native_fs", stage = "file_create", failure_provenance = "unknown" },
-	file_write = { backend = "native_fs", stage = "file_write", failure_provenance = "unknown" },
-	file_publish = { backend = "native_fs", stage = "file_rename", failure_provenance = "unknown" },
-	cleanup = { backend = "native_fs", stage = "file_remove", failure_provenance = "unknown" },
-}
-
 -- The curl exit codes whose stage is proven (proxy name resolution, peer
 -- certificate), as the Linux curl receipts read them.
 local CURL_STAGES = { [5] = "proxy_resolve", [60] = "tls" }
@@ -336,12 +318,10 @@ local CURL_STAGES = { [5] = "proxy_resolve", [60] = "tls" }
 --- @return table receipt Fields of _shared/core/network/data/managed_network.json.
 function M.failure_receipt(stdout)
 	local fact = type(stdout) == "string" and stdout:match("^FAILED ([%w_:]+)\n$") or nil
+	-- « FAILED native:<reason> » carries a ManagedBootstrapDownload reason; the
+	-- worker protocol owns what each one proves, and an unnamed one proves nothing
 	local reason = fact and fact:match("^native:([%w_]+)$")
-	if reason and NATIVE_RECEIPTS[reason] then
-		local receipt = {}
-		for key, value in pairs(NATIVE_RECEIPTS[reason]) do receipt[key] = value end
-		return receipt
-	end
+	if reason then return WorkerProtocol.failure_receipt(reason) end
 	local exit_code = fact and tonumber(fact:match("^curl:(%d+)$"))
 	if exit_code then
 		local stage = CURL_STAGES[exit_code]

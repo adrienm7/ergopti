@@ -227,6 +227,7 @@ local function actual_checks(refusal, interval)
 			set = function() return true end},
 		http = {get = function() obs.requests = obs.requests + 1; return false end},
 		manual_http = {get = function() obs.requests = obs.requests + 1; return false end},
+		failure_contract = {classify = function() error("this test carries no failure receipt") end},
 		now = function() return 1700000000 end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,
