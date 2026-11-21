@@ -938,6 +938,17 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	overflow: visible;
 }
 
+/* The selected period's read state (MET-06): empty and flat until it says something */
+.range-status {
+	color: var(--text-muted);
+	margin: 0;
+	padding: 0 12px;
+}
+
+.range-status:not(:empty) {
+	padding: 8px 12px;
+}
+
 table {
 	border-collapse: collapse;
 	text-align: left;

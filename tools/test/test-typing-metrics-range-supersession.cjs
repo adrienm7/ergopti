@@ -27,6 +27,7 @@ function fixture(host = 'macos') {
 		date_start: { value: '2026-09-01' },
 		date_end: { value: '2026-09-01' },
 		metrics_table_body: { innerHTML: 'last-good' },
+		range_status: { textContent: '' },
 		btn_case_sensitive: { classList: { contains: () => true } }
 	};
 	const state = {
@@ -47,6 +48,8 @@ function fixture(host = 'macos') {
 			UNINITIALIZED: 'uninitialized'
 		},
 		document: { getElementById: (id) => elements[id] || null },
+		// The i18n helper of state.js, which this fixture replaces: keys read as themselves
+		_t: (key) => key,
 		console,
 		setTimeout(fn, delay) {
 			const id = ++nextTimer;
@@ -280,6 +283,40 @@ test('none selection is distinct from all available apps', () => {
 	assert.equal(f.requests[0].request_id, 2);
 	assert.deepEqual(Array.from(f.requests[0].apps), []);
 });
+
+// MET-06: the only sign of a range read was the loader, French on every
+// locale, and a failure or a timeout put the previous table back silently
+// under the new selection. The status region now says each state.
+for (const host of ['macos', 'windows', 'linux']) {
+	for (const ending of ['failed', 'timeout']) {
+		test(`${host}: a ${ending} range read says so beside the previous table (met-06)`, () => {
+			const f = fixture(host);
+			f.context.request_range_data();
+			const status = f.elements.range_status;
+			assert.equal(status.textContent, 'ui_typing.range_loading', 'the read is announced');
+			assert.ok(
+				f.elements.metrics_table_body.innerHTML.includes('ui_typing.range_loading'),
+				'the loader reads the localized text'
+			);
+			assert.ok(
+				!/Récupération/.test(f.elements.metrics_table_body.innerHTML),
+				'no fixed French loader text'
+			);
+			const id = f.state.active_range_request_id;
+			if (ending === 'timeout') f.timers.get(f.state.range_request_watchdog).fn();
+			else assert.equal(f.context.complete_range_request(id, 'failed'), true);
+			assert.equal(f.elements.metrics_table_body.innerHTML, 'last-good');
+			assert.equal(status.textContent, `ui_typing.range_${ending}`, 'the failure stays in view');
+			f.context.request_range_data();
+			assert.equal(status.textContent, 'ui_typing.range_loading', 'a new read replaces it');
+			assert.equal(
+				f.context.receive_range_data(payload('fresh'), f.state.active_range_request_id),
+				true
+			);
+			assert.equal(status.textContent, '', 'a read that lands clears the status');
+		});
+	}
+}
 
 console.log(`${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;

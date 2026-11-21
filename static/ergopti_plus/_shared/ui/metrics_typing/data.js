@@ -3614,6 +3614,25 @@ function complete_cache_reset(reset_id, succeeded) {
 }
 
 /**
+ * Says what became of the selected period's read. The loader alone was the
+ * only sign of a request and a failure put the previous table back silently,
+ * under the new selection, with a loader text that was French on every locale
+ * (MET-06).
+ * @param {string} key - The i18n key of the state, or '' to clear it.
+ */
+function show_range_status(key) {
+	const status = document.getElementById('range_status');
+	if (!status) return;
+	// The region stays in the tree, empty, so a screen reader hears each change.
+	status.textContent = key ? _t(key) : '';
+}
+
+const RANGE_STATUS_KEYS = Object.freeze({
+	failed: 'ui_typing.range_failed',
+	timeout: 'ui_typing.range_timeout'
+});
+
+/**
  * Completes only the currently-owned range request. Native responses can race
  * cancellation, a watchdog, or a newer request; their monotonic id prevents a
  * stale terminal from unlocking or overwriting the newer request.
@@ -3647,6 +3666,9 @@ function complete_range_request(request_id, status = 'failed') {
 		const table_body = document.getElementById('metrics_table_body');
 		if (table_body && previous_html !== null) table_body.innerHTML = previous_html;
 	}
+	// A superseded request hands the status to its replacement, which sets it.
+	if (status !== 'superseded')
+		show_range_status(restore_loader ? RANGE_STATUS_KEYS[status] || '' : '');
 	return true;
 }
 
@@ -3694,8 +3716,10 @@ function request_range_data(show_loader = true) {
 		app_state.range_request_previous_table_html = table_body.innerHTML;
 		table_body.innerHTML =
 			'<tr><td colspan="8" style="text-align:center;padding:30px;">' +
-			'<div class="loader-spinner" aria-hidden="true"></div> R\u00E9cup\u00E9ration et d\u00E9chiffrement depuis la DB...' +
+			'<div class="loader-spinner" aria-hidden="true"></div> ' +
+			_t('ui_typing.range_loading') +
 			'</td></tr>';
+		show_range_status('ui_typing.range_loading');
 	} else {
 		app_state.range_request_previous_table_html = null;
 	}

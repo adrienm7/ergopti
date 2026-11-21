@@ -38,6 +38,8 @@ function frontend() {
 		app_state: state,
 		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized' },
 		RANGE_REQUEST_WATCHDOG_MS: 30000,
+		// The i18n helper of state.js, which this fixture replaces: keys read as themselves
+		_t: (key) => key,
 		document: {
 			getElementById() {
 				return element;
