@@ -20,6 +20,8 @@
 ---    regeneration after it. This module only asks and reports.
 --- 4. The report is deferred to the timer scheduler: the regeneration's outcome
 ---    arrives from a lease callback, where no modal dialog may run.
+--- 5. The report says what happened in the user's language; the bridge's
+---    technical reason goes to the log only, never into the dialog.
 --- ==============================================================================
 
 local M = {}
@@ -84,7 +86,7 @@ local function report(ok, result)
 	result = type(result) == "table" and result or {}
 	if result.stage ~= "regeneration" then
 		Logger.error(LOG, "The legacy Karabiner rules were not removed: %s.", tostring(result.reason))
-		return show_report(i18n.format("karabiner.legacy_cleanup.removal_failed", tostring(result.reason)))
+		return show_report(i18n.get("karabiner.legacy_cleanup.removal_failed"))
 	end
 	local removed_count = result.removed_count or 0
 	local parts = {}
@@ -98,7 +100,7 @@ local function report(ok, result)
 	else
 		Logger.error(LOG, "Legacy Karabiner rules removed (%d), but the regeneration failed: %s.",
 			removed_count, tostring(result.reason))
-		parts[#parts + 1] = i18n.format("karabiner.legacy_cleanup.apply_failed", tostring(result.reason))
+		parts[#parts + 1] = i18n.get("karabiner.legacy_cleanup.apply_failed")
 	end
 	return show_report(table.concat(parts, "\n\n"))
 end
@@ -137,7 +139,7 @@ local function present(remap, trigger)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "The legacy-rule removal raised: %s.", tostring(err))
-		show_report(i18n.format("karabiner.legacy_cleanup.removal_failed", "removal-raised"))
+		show_report(i18n.get("karabiner.legacy_cleanup.removal_failed"))
 	end
 	return true
 end

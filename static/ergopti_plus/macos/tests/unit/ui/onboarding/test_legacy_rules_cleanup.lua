@@ -148,8 +148,13 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 			local cleanup = load_cleanup(h)
 			cleanup.open(make_remap(h, PENDING))
 			fire_deferred(h)
-			helpers.assert_eq(h.alerts[2].informative,
-				"karabiner.legacy_cleanup.removal_failed|karabiner.json publication refused: source changed")
+			-- SNU-06: the bridge's technical reason is the log's, never the dialog's.
+			helpers.assert_eq(h.alerts[2].informative, "karabiner.legacy_cleanup.removal_failed")
+			local logged = false
+			for _, entry in ipairs(h.logs) do
+				if entry.level == "error" and entry.message:find("source changed", 1, true) then logged = true end
+			end
+			helpers.assert_true(logged, "the removal's reason is logged")
 
 			h.alerts, h.outcome = {}, { stage = "regeneration", reason = "script-paused", removed_count = 3,
 				backup_path = "/b.bak" }
@@ -157,8 +162,10 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 			fire_deferred(h)
 			local informative = h.alerts[2].informative
 			helpers.assert_true(informative:find("karabiner.legacy_cleanup.removed|3|/b.bak", 1, true) ~= nil)
-			helpers.assert_true(informative:find("karabiner.legacy_cleanup.apply_failed|script-paused", 1, true) ~= nil,
+			helpers.assert_true(informative:find("karabiner.legacy_cleanup.apply_failed", 1, true) ~= nil,
 				"a removal whose regeneration failed says both: " .. informative)
+			helpers.assert_true(informative:find("script-paused", 1, true) == nil,
+				"no technical reason reaches the dialog (snu-06): " .. informative)
 		end)
 	end)
 
@@ -180,6 +187,11 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 		helpers.assert_eq(fr["karabiner.legacy_cleanup.remove"], "Retirer les anciennes règles")
 		helpers.assert_eq(fr["common.later"], "Plus tard")
 		helpers.assert_eq(en["karabiner.legacy_cleanup.remove"], "Remove the old rules")
+		for _, key in ipairs({ "karabiner.legacy_cleanup.removal_failed", "karabiner.legacy_cleanup.apply_failed" }) do
+			for _, texts in ipairs({ fr, en }) do
+				helpers.assert_true(texts[key]:find("{1}", 1, true) == nil, key .. " holds no technical reason")
+			end
+		end
 		for _, key in ipairs({ "karabiner.legacy_cleanup.body_one", "karabiner.legacy_cleanup.body_other" }) do
 			helpers.assert_true(fr[key]:find("sauvegarde", 1, true) ~= nil, key .. " says a backup is made")
 			helpers.assert_true(en[key]:find("backup", 1, true) ~= nil, key .. " says a backup is made")
