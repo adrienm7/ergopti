@@ -75,6 +75,24 @@ function M.desktop_id(path)
 	return nil
 end
 
+--- Tells the user that the chosen file binds nothing, in the dialog's title,
+--- as Windows (a message box) and macOS (an alert) do for a refused pick.
+--- @param shell table Shell-runner authority (exec_checked, quote).
+--- @param title string Composed dialog title.
+--- @param opts table|nil Test ports (notify).
+local function tell_refusal(shell, title, opts)
+	local notify = type(opts) == "table" and opts.notify or function()
+		local message = require("core.i18n.engine.i18n").get("dialog.app_picker.selection_unverified")
+		local command = require("core.ui.ui.native_dialog").command() .. " --error --no-markup --title="
+			.. shell.quote(title) .. " --text=" .. shell.quote(message) .. " 2>/dev/null"
+		return require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end) == true
+	end
+	local delivered, accepted = pcall(notify)
+	if not delivered or accepted ~= true then
+		require("core.logger.engine.shim").error("apps.ui.chooser", "Application selection verification was refused.")
+	end
+end
+
 --- Opens the file dialog over the desktop entries.
 --- @param shell table Shell-runner authority (exec_checked, quote).
 --- @param title string Already-translated dialog title.
@@ -100,7 +118,10 @@ function M.pick(shell, title, opts)
 	local chosen = output:gsub("\n$", "")
 	if not chosen or chosen == "" then return nil, "application selection was cancelled" end
 	local id = M.desktop_id(chosen)
-	if not id then return nil, "the chosen file is not a desktop entry" end
+	if not id then
+		tell_refusal(shell, title, opts)
+		return nil, "the chosen file is not a desktop entry"
+	end
 	local resolve = type(opts) == "table" and opts.resolve or nil
 	if resolve == nil then
 		local loaded, owner = pcall(require, "apps.ui.desktop_application_resolution")
@@ -109,16 +130,7 @@ function M.pick(shell, title, opts)
 	local called, resolved, status = false, nil, nil
 	if type(resolve) == "function" then called, resolved, status = pcall(resolve, id) end
 	if not called or status ~= "found" or absolute_path(resolved) ~= absolute_path(chosen) then
-		local notify = type(opts) == "table" and opts.notify or function()
-			local message = require("core.i18n.engine.i18n").get("dialog.app_picker.selection_unverified")
-			local command = require("core.ui.ui.native_dialog").command() .. " --error --no-markup --title="
-				.. shell.quote(title) .. " --text=" .. shell.quote(message) .. " 2>/dev/null"
-			return require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end) == true
-		end
-		local delivered, accepted = pcall(notify)
-		if not delivered or accepted ~= true then
-			require("core.logger.engine.shim").error("apps.ui.chooser", "Application selection verification was refused.")
-		end
+		tell_refusal(shell, title, opts)
 		return nil, "the selected application is not the effective native desktop entry"
 	end
 	return id

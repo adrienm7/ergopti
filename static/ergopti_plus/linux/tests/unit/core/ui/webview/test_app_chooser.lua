@@ -90,6 +90,20 @@ helpers.describe("open_app application chooser (Linux)", function()
 		helpers.assert_eq((Chooser.pick(shell, "T")), nil)
 	end)
 
+	helpers.it("pck-09: a file that is no installed desktop entry is refused in words", function()
+		for _, chosen in ipairs({ "/home/ana/notes.txt", "/home/ana/Desktop/tool.desktop" }) do
+			local shell, commands = fake_shell(chosen)
+			helpers.assert_nil((Chooser.pick(shell, "Applications")))
+			helpers.assert_eq(#commands, 2, "the refusal is shown, not only logged: " .. chosen)
+			helpers.assert_true(commands[2]:find(" --error --no-markup ", 1, true) ~= nil)
+			helpers.assert_true(commands[2]:find(require("core.i18n.engine.i18n").get(
+				"dialog.app_picker.selection_unverified"), 1, true) ~= nil)
+		end
+		local shell, commands = fake_shell(nil)
+		helpers.assert_nil((Chooser.pick(shell, "Applications")))
+		helpers.assert_eq(#commands, 1, "a cancelled dialog says nothing more")
+	end)
+
 	helpers.it("desktop_id strips only a real .desktop suffix", function()
 		helpers.assert_eq(Chooser.desktop_id("/usr/share/applications/code.desktop"), "code")
 		helpers.assert_eq(Chooser.desktop_id("/x/.desktop"), nil)
@@ -389,8 +403,9 @@ helpers.describe("application chooser requires native confirmation", function()
 				"accepted|org.gnome.Nautilus|modal:1")
 		end)
 		helpers.it("(linux-app-chooser-status) " .. tool .. " refuses a line break inside the full record", function()
+			-- The refused record is told in a second modal dialog (pck-09)
 			helpers.assert_eq(native_dialog_receipt(0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
-				"refused|modal:1")
+				"refused|modal:2")
 		end)
 		helpers.it("(linux-app-chooser-status) " .. tool .. " confirmed empty output is not an application", function()
 			helpers.assert_eq(native_dialog_receipt(0, ""), "refused|modal:1")
