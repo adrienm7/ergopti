@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ تم الحفظ",
 	"profiles.created_title": "تم إنشاء الملف الشخصي",
 	"profiles.updated_title": "تم تحديث الملف الشخصي",
-	"prompt_editor.default_label": "ملف شخصي مخصص",
 	"prompt_editor.help_text": "ستُستبدل كتلة {context} بالنص المحدد. ستُستبدل كتلة {n} بعدد التنبؤات. التنسيق (دفعات): اطلب من النموذج فصل كل اقتراح بـ ---.",
 	"prompt_editor.insert_context": "إدراج كتلة {context}",
 	"prompt_editor.insert_language": "إدراج كتلة {language}",

@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Enregistré",
 	"profiles.created_title": "Profil créé",
 	"profiles.updated_title": "Profil modifié",
-	"prompt_editor.default_label": "Profil personnalisé",
 	"prompt_editor.help_text": "Le bloc {context} sera remplacé par le texte sélectionné. Le bloc {n} sera remplacé par le nombre de prédictions. Formatage (Batch) : Demandez au modèle de séparer chaque suggestion par ---.",
 	"prompt_editor.insert_context": "Insérer le bloc {context}",
 	"prompt_editor.insert_language": "Insérer le bloc {language}",

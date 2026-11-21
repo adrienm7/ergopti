@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ נשמר",
 	"profiles.created_title": "פרופיל נוצר",
 	"profiles.updated_title": "פרופיל עודכן",
-	"prompt_editor.default_label": "פרופיל מותאם",
 	"prompt_editor.help_text": "בלוק {context} יוחלף בטקסט הנבחר. בלוק {n} יוחלף במספר הניבויים. עיצוב (Batch): בקש מהמודל להפריד כל הצעה ב---.",
 	"prompt_editor.insert_context": "הוסף בלוק {context}",
 	"prompt_editor.insert_language": "הוסף בלוק {language}",

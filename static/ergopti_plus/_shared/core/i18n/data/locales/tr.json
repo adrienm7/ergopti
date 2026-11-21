@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Kaydedildi",
 	"profiles.created_title": "Profil oluşturuldu",
 	"profiles.updated_title": "Profil güncellendi",
-	"prompt_editor.default_label": "Özel profil",
 	"prompt_editor.help_text": "{context} bloğu seçilen metinle değiştirilecek. {n} bloğu tahmin sayısıyla değiştirilecek. Biçimlendirme (Toplu): Modelden her öneriyi --- ile ayırmasını isteyin.",
 	"prompt_editor.insert_context": "{context} bloğu ekle",
 	"prompt_editor.insert_language": "{language} bloğu ekle",

@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Gemt",
 	"profiles.created_title": "Profil oprettet",
 	"profiles.updated_title": "Profil opdateret",
-	"prompt_editor.default_label": "Brugerdefineret profil",
 	"prompt_editor.help_text": "Blokken {context} vil blive erstattet af den valgte tekst. Blokken {n} vil blive erstattet af antal forudsigelser. Formatering (batch): Bed modellen om at adskille hver forslag med ---.",
 	"prompt_editor.insert_context": "Indsæt {context}-blok",
 	"prompt_editor.insert_language": "Indsæt {language}-blok",

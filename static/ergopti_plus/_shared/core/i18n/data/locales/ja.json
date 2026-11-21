@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ 保存しました",
 	"profiles.created_title": "プロファイルを作成しました",
 	"profiles.updated_title": "プロファイルを更新しました",
-	"prompt_editor.default_label": "カスタムプロフィール",
 	"prompt_editor.help_text": "{context}ブロックは選択したテキストに置き換えられます。{n}ブロックは予測数に置き換えられます。フォーマット（バッチ）: モデルに各提案を---で区切るよう指示してください。",
 	"prompt_editor.insert_context": "{context}ブロックを挿入",
 	"prompt_editor.insert_language": "{language}ブロックを挿入",

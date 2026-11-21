@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ 저장됨",
 	"profiles.created_title": "프로필이 생성되었습니다",
 	"profiles.updated_title": "프로필이 업데이트되었습니다",
-	"prompt_editor.default_label": "사용자 정의 프로필",
 	"prompt_editor.help_text": "{context} 블록은 선택된 텍스트로 대체됩니다. {n} 블록은 예측 수로 대체됩니다. 형식 (배치): 모델에게 각 제안을 ---로 구분하도록 요청하세요.",
 	"prompt_editor.insert_context": "{context} 블록 삽입",
 	"prompt_editor.insert_language": "{language} 블록 삽입",

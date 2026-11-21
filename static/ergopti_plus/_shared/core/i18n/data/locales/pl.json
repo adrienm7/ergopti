@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Zapisano",
 	"profiles.created_title": "Profil utworzony",
 	"profiles.updated_title": "Profil zaktualizowany",
-	"prompt_editor.default_label": "Profil niestandardowy",
 	"prompt_editor.help_text": "Blok {context} zostanie zastąpiony wybranym tekstem. Blok {n} zostanie zastąpiony liczbą predykcji. Formatowanie (Wsad): Poproś model o oddzielenie każdej sugestii znakiem ---.",
 	"prompt_editor.insert_context": "Wstaw blok {context}",
 	"prompt_editor.insert_language": "Wstaw blok {language}",

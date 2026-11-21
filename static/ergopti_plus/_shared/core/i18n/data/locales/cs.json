@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Uloženo",
 	"profiles.created_title": "Profil vytvořen",
 	"profiles.updated_title": "Profil aktualizován",
-	"prompt_editor.default_label": "Vlastní profil",
 	"prompt_editor.help_text": "Blok {context} bude nahrazen vybraným textem. Blok {n} bude nahrazen počtem předpovědí. Formátování (dávka): Požádejte model, aby odděloval každý návrh pomocí ---.",
 	"prompt_editor.insert_context": "Vložit blok {context}",
 	"prompt_editor.insert_language": "Vložit blok {language}",

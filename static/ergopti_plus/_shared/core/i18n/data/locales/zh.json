@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ 已保存",
 	"profiles.created_title": "配置文件已创建",
 	"profiles.updated_title": "配置文件已更新",
-	"prompt_editor.default_label": "自定义配置",
 	"prompt_editor.help_text": "{context} 块将被替换为所选文本。{n} 块将被替换为预测数量。格式（批量）：请求模型用 --- 分隔每条建议。",
 	"prompt_editor.insert_context": "插入 {context} 块",
 	"prompt_editor.insert_language": "插入{language}块",

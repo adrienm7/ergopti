@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Opgeslagen",
 	"profiles.created_title": "Profiel aangemaakt",
 	"profiles.updated_title": "Profiel bijgewerkt",
-	"prompt_editor.default_label": "Aangepast profiel",
 	"prompt_editor.help_text": "Het blok {context} wordt vervangen door de geselecteerde tekst. Het blok {n} wordt vervangen door het aantal voorspellingen. Opmaak (Batch): Vraag het model elke suggestie te scheiden met ---.",
 	"prompt_editor.insert_context": "Blok {context} invoegen",
 	"prompt_editor.insert_language": "Voeg {language}-blok in",

@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Сохранено",
 	"profiles.created_title": "Профиль создан",
 	"profiles.updated_title": "Профиль обновлён",
-	"prompt_editor.default_label": "Пользовательский профиль",
 	"prompt_editor.help_text": "Блок {context} будет заменён выделенным текстом. Блок {n} — количеством предсказаний. Форматирование (пакетный): Попросите модель разделять предложения с помощью ---.",
 	"prompt_editor.insert_context": "Вставить блок {context}",
 	"prompt_editor.insert_language": "Вставить блок {language}",

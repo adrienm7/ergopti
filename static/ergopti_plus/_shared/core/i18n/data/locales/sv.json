@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Sparat",
 	"profiles.created_title": "Profil skapad",
 	"profiles.updated_title": "Profil uppdaterad",
-	"prompt_editor.default_label": "Anpassad profil",
 	"prompt_editor.help_text": "Blocket {context} ersätts med den markerade texten. Blocket {n} ersätts med antalet förutsägelser. Formatering (Batch): Be modellen att separera varje förslag med ---.",
 	"prompt_editor.insert_context": "Infoga {context}-block",
 	"prompt_editor.insert_language": "Infoga {language}-block",

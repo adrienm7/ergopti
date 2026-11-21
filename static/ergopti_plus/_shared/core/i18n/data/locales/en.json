@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ Saved",
 	"profiles.created_title": "Profile created",
 	"profiles.updated_title": "Profile updated",
-	"prompt_editor.default_label": "Custom profile",
 	"prompt_editor.help_text": "The {context} block will be replaced by the selected text. The {n} block will be replaced by the number of predictions. Formatting (Batch): Ask the model to separate each suggestion with ---.",
 	"prompt_editor.insert_context": "Insert {context} block",
 	"prompt_editor.insert_language": "Insert {language} block",

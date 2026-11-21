@@ -2985,7 +2985,6 @@
 	"personal_info.saved_title": "✓ सहेजा गया",
 	"profiles.created_title": "प्रोफ़ाइल बनाई गई",
 	"profiles.updated_title": "प्रोफ़ाइल अपडेट हुई",
-	"prompt_editor.default_label": "कस्टम प्रोफ़ाइल",
 	"prompt_editor.help_text": "{context} ब्लॉक को चयनित टेक्स्ट द्वारा प्रतिस्थापित किया जाएगा। {n} ब्लॉक को भविष्यवाणियों की संख्या द्वारा प्रतिस्थापित किया जाएगा। फॉर्मेटिंग (Batch): मॉडल को प्रत्येक सुझाव को --- से अलग करने के लिए कहें।",
 	"prompt_editor.insert_context": "{context} ब्लॉक डालें",
 	"prompt_editor.insert_language": "{language} ब्लॉक डालें",
