@@ -105,7 +105,7 @@ class InstallErrorTests(unittest.TestCase):
                 self.assertEqual(classify(evidence), cases[name]["class"])
 
     def test_evidence_never_carries_free_text(self):
-        evidence = self.runtime.install_failure_evidence(ValueError("/Users/someone/secret path"))
+        evidence = self.runtime.install_failure_evidence(ValueError("/Volumes/someone/secret path"))
         self.assertEqual(evidence, "phase=install reason=unavailable")
 
     def _install(self, free, download):
