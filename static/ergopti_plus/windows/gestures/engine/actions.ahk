@@ -1082,8 +1082,7 @@ _GestureToggleUIPage(which) {
 						}
 				case "model_browser":
 						return {
-								Hwnd: () => (IsSet(_LLM_MBW_Gui) ? _GestureGuiHwnd(_LLM_MBW_Gui) : 0)
-										|| (IsSet(_LLM_ModelBrowser_Gui) ? _GestureGuiHwnd(_LLM_ModelBrowser_Gui) : 0),
+								Hwnd: () => IsSet(_LLM_MBW_Gui) ? _GestureGuiHwnd(_LLM_MBW_Gui) : 0,
 								Open: () => LLM_ModelBrowser_Show(),
 						}
 				case "changelog":

@@ -966,6 +966,9 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ai/ui/menu/api_entries.ahk
 #Include ../ai/ui/menu/panels/local_server_panel.ahk
 #Include ../ai/ui/menu/menu_main.ahk
+; Definitions-only model browser page: its public entry is exercised with the
+; suite's genuinely absent WebView2, where it must refuse (WebView-only).
+#Include ../ai/ui/model_browser/init.ahk
 #Include ../ai/ui/menu/enable_admission.ahk
 #Include ../ai/ui/menu/actions.ahk
 #Include ../gestures/ui/menu/gestures.ahk
@@ -1159,6 +1162,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/ui/webview/test_take_focus.ahk
 #Include unit/core/ui/webview/test_personal_editors_webview_only.ahk
 #Include unit/core/ui/webview/test_webview_unavailable_refusal.ahk
+#Include unit/core/ui/webview/test_model_browser_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/core/text/toml/test_uridecode_literal_unicode.ahk
 #Include meta/core/ui/webview/test_script_observer.ahk
@@ -2015,7 +2019,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/tap_hold/test_tapholdwriter_int_before_bool.ahk
 #Include meta/ai/menu/test_toggle_reentrancy.ahk
 #Include meta/ai/menu/test_tab_source_hwnd.ahk
-#Include meta/ai/menu/test_modelbrowser_sort_callback.ahk
 #Include meta/platform/remap/keys/test_space_taphold_configurable.ahk
 #Include meta/hotstrings/engine/catalogue/test_terminators_requires_directive.ahk
 #Include meta/modules/keymap/test_layout_poll_pending_hkl.ahk

@@ -12,50 +12,21 @@
 ; FEATURES & RATIONALE:
 ; 1. Catalogue-first — the list comes from the shared models.json (not from
 ;    ``ollama list``), so the user can survey models they have not installed
-;    yet and decide based on specs. The "Status" column tells them what is
-;    already on disk so they can sort installed-first.
-; 2. Sortable ListView — clicking a column header sorts ascending /
-;    descending, exactly like a file manager. Useful to find the smallest
-;    model that still fits in RAM, or the fastest among the chat-type ones.
-; 3. Double-click = select — the row's display name flows through the same
+;    yet and decide based on specs. Each row states whether it is already on
+;    disk.
+; 2. One shared page — the sortable, filterable table is the shared web page
+;    _shared/ui/model_browser/index.html, identical to the macOS browser. It
+;    has no native substitute: without a usable WebView2 the opening refuses
+;    with the one recovery message (maintainer decision 2026-11-21).
+; 3. Selection = the menu's path — a picked row flows through the same
 ;    ``LLM_Menu_SetModel`` path as the menu picker, so the deps checker is
 ;    triggered when the user picks something not yet installed. No special-
 ;    case install flow lives in this file.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\..\_generated\identifiers.ahk
-#Include %A_LineFile%\..\..\..\..\core\lifecycle\engine\transition.ahk
 
 #Requires AutoHotkey v2.0
-#Include %A_LineFile%\..\..\..\..\core\ui\engine\font_scale.ahk
-
-
-; Module-level Gui handle so a second call brings the existing window to
-; the front instead of stacking duplicates.
-global _LLM_ModelBrowser_Gui := unset
-; Closing a reused native host revokes any selection still applying.
-global _LLM_ModelBrowser_Epoch := 0
-; Native visibility requests have their own last-intent receipt. The timer
-; retains only that receipt, never a Gui or its controls.
-global _LLM_ModelBrowser_Visibility := 0
-global _LLM_ModelBrowser_VisibilityTimer := 0
-global _LLM_ModelBrowser_VisibilityTimerRevision := 0
-; A failed unpublished native constructor keeps exact cleanup custody until
-; its timer, native window and owned properties have all retired.
-global _LLM_ModelBrowser_FailedNativeWindows := []
-
-
-
-; Column index of "params" in the ListView — kept as a constant so the
-; sort-on-header handler can resolve it without a magic number. Indices
-; match the Add() order below.
-global LLM_MB_COL_NAME      := 1
-global LLM_MB_COL_FAMILY    := 2
-global LLM_MB_COL_PARAMS    := 3
-global LLM_MB_COL_RAM       := 4
-global LLM_MB_COL_SPEED     := 5
-global LLM_MB_COL_TYPE      := 6
-global LLM_MB_COL_STATUS    := 7
 
 
 
@@ -68,57 +39,32 @@ global LLM_MB_COL_STATUS    := 7
 ; =====================================
 
 /**
- * Opens (or brings forward) the visual model browser. The Gui is built
- * once and reused — closing it hides it instead of destroying so the
- * next call is instantaneous. Returns the Gui handle for chained tests.
+ * Opens (or brings forward) the shared web model browser. Without a usable
+ * WebView2 nothing opens: the user gets the one localized refusal instead.
  *
- * @returns {Gui} The browser window handle.
+ * @returns {Gui|Integer} The browser window, or 0 when nothing opened.
  */
 LLM_ModelBrowser_Show() {
-	global _LLM_ModelBrowser_Gui, _LLM_Menu
 	global _LLM_MBW_SessionEpoch, _LLM_MBW_ResetDone, _LLM_MBW_Gui
-	_LLM_ModelBrowser_RetryFailedNativeWindows()
-	; Prefer the shared web table (sortable/filterable, identical to the macOS
-	; browser) when WebView2 is available and there is enough free RAM to boot it;
-	; fall back to the native ListView below when WebView2 is unavailable, the
-	; webview fails to spin up, or free RAM is too low for the Chromium cold start.
-	if (_LLM_MBW_WebView2Available() && !WebView_ShouldUseNativeFallback()) {
-		web := "", FallbackEpoch := 0
-		try web := _LLM_ModelBrowser_ShowWeb(&FallbackEpoch)
-		catch as Err
-			try LoggerError("LLM.browser", "WebView2 model browser failed: {1} — falling back to ListView.", Err.Message)
-		if IsObject(web)
-			return web
-		; Error reporting and failed-startup cleanup can both admit B. This
-		; old attempt cannot open a native fallback over its newer web session.
-		if FallbackEpoch && (_LLM_MBW_SessionEpoch != FallbackEpoch
-				|| !_LLM_MBW_ResetDone || IsSet(_LLM_MBW_Gui))
-			return 0
-	}
-	if IsSet(_LLM_ModelBrowser_Gui) {
-		Window := _LLM_ModelBrowser_Gui
-		Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, true)
-		if !(Ticket is Object)
-			return 0
-		try {
-			if !_LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
-				return 0
-			_LLM_ModelBrowser_RefreshRows(Window.ListView)
-			return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) ? Window : 0
-		} catch {
-			; A stale refresh/Show may not retire a successor, even if that
-			; successor reuses the same native Gui object.
-			if !_LLM_ModelBrowser_VisibilityRetire(Ticket, Window)
-				return 0
-			try Window.Destroy()
-		}
-	}
-	_LLM_ModelBrowser_Gui := _LLM_ModelBrowser_Build()
-	Window := _LLM_ModelBrowser_Gui
-	Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, true)
-	if !(Ticket is Object) || !_LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
+	if !WebView_RequireAvailable("model browser")
 		return 0
-	return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) ? Window : 0
+	web := "", RefusalEpoch := 0, Failure := ""
+	try web := _LLM_ModelBrowser_ShowWeb(&RefusalEpoch)
+	catch as Err
+		Failure := Err.Message
+	if IsObject(web)
+		return web
+	; Error reporting and failed-startup cleanup can both admit B. This old
+	; attempt stays silent over its newer web session: B owns the outcome.
+	if RefusalEpoch && (_LLM_MBW_SessionEpoch != RefusalEpoch
+			|| !_LLM_MBW_ResetDone || IsSet(_LLM_MBW_Gui)) {
+		if Failure != ""
+			try LoggerError("LLM.browser", "WebView2 model browser failed: {1} — a newer opening owns the browser.", Failure)
+		return 0
+	}
+	WebView_RefuseUnavailable("model browser",
+		Failure != "" ? "the browser failed: " . Failure : "WebView2 could not create the browser")
+	return 0
 }
 
 
@@ -127,262 +73,9 @@ LLM_ModelBrowser_Show() {
 
 ; ====================================
 ; ====================================
-; ======= 2/ Gui Construction ========
+; ======= 2/ Catalogue Helpers =======
 ; ====================================
 ; ====================================
-
-/**
- * Builds the browser Gui with a sortable ListView and a footer of action
- * buttons. The Gui itself is hidden until the caller invokes Show().
- *
- * @returns {Gui} New browser window.
- */
-_LLM_ModelBrowser_Build() {
-	; Variable name is ``g`` rather than ``gui`` because AHK v2 identifiers
-	; are case-insensitive: a local ``gui`` shadows the built-in ``Gui``
-	; class, so ``gui := Gui(...)`` resolves the right-hand side against
-	; the just-declared (and still unset) local — triggering "This local
-	; variable has not been assigned a value" the first time the menu
-	; fires. ``g`` (matching the convention used elsewhere in the driver)
-	; sidesteps the collision entirely.
-	g := Gui_Create("+Resize +MinSize720x420", t("menu.llm.browse_models_window_title"))
-	Host := {window: g, hwnd: 0, timer: 0, listview: 0, closing: false}
-	try {
-		Host.hwnd := g.Hwnd
-		g.OnEvent("Close", _LLM_ModelBrowser_OnClose)
-		g.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
-		g.MarginX := 10
-		g.MarginY := 10
-
-		Gui_SetFont(g, "s10")
-
-		; Filter row — search the table by typing a substring. Live filter on
-		; every keystroke so the list narrows as the user thinks, no Apply
-		; button needed. The hint label is dimmed to make the intent obvious.
-		g.Add("Text",, t("menu.llm.browse_models_filter"))
-		filter_edit := g.Add("Edit", "w560 vFilter")
-		; Debounce the refresh: it re-runs the two-key sort over the full catalogue.
-		; Installed tags are an in-memory snapshot; never probe Ollama from a GUI
-		; open/filter callback because its synchronous HTTP fallback can freeze input.
-		; The timer reference is stored
-		; on the Gui so SetTimer can cancel-by-identity across keystrokes.
-		g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
-		Host.timer := g.FilterDebounce
-		filter_edit.OnEvent("Change", (*) => (
-			SetTimer(g.FilterDebounce, 0),
-			SetTimer(g.FilterDebounce, -TimingsGet("ui", "model_browser_filter_debounce_ms"))
-		))
-
-		; ListView — columns mirror the metadata extracted in
-		; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
-		; tell installed vs available at a glance, but the column is filled
-		; lazily on refresh to avoid blocking the Gui at construction.
-		; RefreshRows owns family/parameter order. Automatic lexical insertion would
-		; both undo that order and shift its remembered active-row index.
-		lv := g.Add("ListView",
-			"r18 w780 vListView -Multi",
-			[ t("menu.llm.browse_col_name")
-			, t("menu.llm.browse_col_family")
-			, t("menu.llm.browse_col_params")
-			, t("menu.llm.browse_col_ram")
-			, t("menu.llm.browse_col_speed")
-			, t("menu.llm.browse_col_type")
-			, t("menu.llm.browse_col_status") ])
-		lv.OnEvent("DoubleClick", (LV, RowNumber) => _LLM_ModelBrowser_PickRow(LV, RowNumber))
-		g.ListView := lv
-		Host.listview := lv
-
-		; Action footer — Pick the current selection, Close. Pick mirrors a
-		; double-click so users used to right-clicking lists still discover
-		; the action.
-		g.Add("Button", "w120 Default", t("menu.llm.browse_pick"))
-			.OnEvent("Click", (*) => _LLM_ModelBrowser_PickRow(lv, lv.GetNext(0)))
-		g.Add("Button", "x+10 w120", t("button.close"))
-			.OnEvent("Click", _LLM_ModelBrowser_OnClose)
-
-		_LLM_ModelBrowser_RefreshRows(lv)
-		return g
-	} catch Any as Primary {
-		; Queue before cancellation/Destroy can reenter. Never replace the
-		; actual constructor error with a secondary cleanup error.
-		_LLM_ModelBrowser_QueueFailedNativeWindow(Host)
-		try _LLM_ModelBrowser_RetryFailedNativeWindows()
-		throw Primary
-	}
-}
-
-
-_LLM_ModelBrowser_QueueFailedNativeWindow(Host) {
-	global _LLM_ModelBrowser_FailedNativeWindows
-	PreviousCritical := Critical("On")
-	try {
-		for Pending in _LLM_ModelBrowser_FailedNativeWindows
-			if Pending == Host
-				return
-		_LLM_ModelBrowser_FailedNativeWindows.Push(Host)
-	} finally Critical(PreviousCritical)
-}
-
-; A callback reentering Show may open B independently, but cannot recursively
-; retry A or consume A's retained debt. Only constructor-created properties
-; are removed, and a refused Destroy keeps the record for the next opening.
-_LLM_ModelBrowser_RetryFailedNativeWindows() {
-	global _LLM_ModelBrowser_FailedNativeWindows, _LLM_ModelBrowser_Gui
-	PreviousCritical := Critical("On")
-	try Pending := _LLM_ModelBrowser_FailedNativeWindows.Clone()
-	finally Critical(PreviousCritical)
-	for Host in Pending {
-		PreviousCritical := Critical("On")
-		try {
-			if Host.closing || (IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Host.window)
-				continue
-			Host.closing := true
-		} finally Critical(PreviousCritical)
-		Settled := false
-		try {
-			Window := Host.window
-			if Window.HasOwnProp("FilterDebounce") && Window.FilterDebounce != Host.timer
-				throw Error("The failed native constructor no longer owns its filter callback.")
-			if Window.HasOwnProp("ListView") && Window.ListView != Host.listview
-				throw Error("The failed native constructor no longer owns its ListView reference.")
-			if IsObject(Host.timer)
-				TimerSetCallback(Host.timer, 0)
-			if Window.HasOwnProp("FilterDebounce")
-				Window.DeleteProp("FilterDebounce")
-			Window.Destroy()
-			if Host.hwnd && WMHandleExists(Host.hwnd) {
-				Remaining := GuiFromHwnd(Host.hwnd)
-				if !IsObject(Remaining) || Remaining == Window
-					throw Error("The failed native constructor window has not retired.")
-			}
-			if Window.HasOwnProp("ListView")
-				Window.DeleteProp("ListView")
-			Host.timer := 0, Host.listview := 0, Host.window := 0
-			Settled := true
-		} catch Any as Failure {
-			try LoggerWarn("LLM.browser", "Failed native browser cleanup remains pending (error_type={1}).", Type(Failure))
-		} finally {
-			PreviousCritical := Critical("On")
-			try {
-				Host.closing := false
-				if Settled {
-					Count := _LLM_ModelBrowser_FailedNativeWindows.Length
-					Loop Count {
-						Index := Count - A_Index + 1
-						if _LLM_ModelBrowser_FailedNativeWindows[Index] == Host
-							_LLM_ModelBrowser_FailedNativeWindows.RemoveAt(Index)
-					}
-				}
-			} finally Critical(PreviousCritical)
-		}
-	}
-}
-
-/**
- * Refreshes the ListView rows from the current models.json index, applying
- * an optional substring filter. Highlights the row matching the currently
- * selected model so the user can see the baseline before picking another.
- *
- * @param {ListView} lv - Target list-view control.
- * @param {string}   filter - Substring filter (case-insensitive). Empty = no filter.
- */
-_LLM_ModelBrowser_RefreshRows(lv, filter := "") {
-	global _LLM_Menu
-	lv.Delete()
-	index := LLM_GetModelIndex()
-	; The catalogue is static, so every model is listed regardless of state; the
-	; Installed status comes from the async-maintained cache. GUI open/filter must
-	; never perform live /api/tags I/O, even if the daemon was recently ready.
-	installed := Map()
-	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
-		for tag in _LLM_ModelBrowser_GetInstalledTags()
-			installed[StrLower(tag)] := true
-	}
-	filter_lc := StrLower(filter)
-	; Two-pass population so families end up grouped together — by sorting
-	; on family first, the user can quickly see all Qwen / Gemma / Llama
-	; variants next to each other without having to click the column.
-	names := []
-	for name, _ in index
-		names.Push(name)
-	names := _LLM_ModelBrowser_Sort(names)
-	row_for_active := 0
-	active := _LLM_Menu["model"]
-	for name in names {
-		info := index[name]
-		family := _LLM_ModelBrowser_GuessFamily(name)
-		; Guard every Map read with .Has() — a partial models.json entry
-		; (older revisions of the file, custom user-added entries) would
-		; otherwise throw UnsetItemError and kill the browser.
-		params := info.Has("params_b")    ? info["params_b"]    : 0
-		params_lbl := (params > 0) ? Format("{:.2f} B", params) : "—"
-		if info.Has("active_b") and info["active_b"] > 0 and info["active_b"] != params
-			params_lbl := params_lbl . " (" . Format("{:.2f} B", info["active_b"]) . " active)"
-		ram_val   := info.Has("ram_gb")      ? info["ram_gb"]      : 0
-		ram_lbl := (ram_val > 0) ? Format("{:.1f} Go", ram_val) : "—"
-		speed_val := info.Has("speed_tok_s") ? info["speed_tok_s"] : 0
-		speed_lbl := (speed_val > 0) ? (speed_val . " tok/s") : "—"
-		type_lbl   := info.Has("type")   ? info["type"]   : "—"
-		ollama_tag := info.Has("ollama") ? info["ollama"] : ""
-		status_lbl := installed.Has(StrLower(ollama_tag)) ? t("menu.llm.browse_status_installed") : t("menu.llm.browse_status_available")
-		row_text := name . " | " . family . " | " . params_lbl . " | " . ram_lbl . " | " . speed_lbl . " | " . type_lbl . " | " . status_lbl
-		if (filter_lc != "" and !InStr(StrLower(row_text), filter_lc))
-			continue
-		idx := lv.Add(, name, family, params_lbl, ram_lbl, speed_lbl, type_lbl, status_lbl)
-		if (name == active)
-			row_for_active := idx
-	}
-	loop 7
-		lv.ModifyCol(A_Index, "AutoHdr")
-	if (row_for_active > 0) {
-		lv.Modify(row_for_active, "Select Focus Vis")
-	}
-}
-
-/**
- * Returns ``names`` sorted by (family asc, params asc) so families end up
- * grouped and the smallest variant of each family appears first. Pure
- * function — does not mutate the caller's array.
- */
-_LLM_ModelBrowser_Sort(names) {
-	Snapshot := []
-	for Name in names
-		Snapshot.Push(Name)
-	if (Snapshot.Length < 2)
-		return Snapshot
-	; Native Array has no Sort method. Sort unique indices instead of model
-	; text so delimiters and duplicate names cannot alter the copied entries.
-	Indices := ""
-	loop Snapshot.Length
-		Indices .= (A_Index = 1 ? "" : "`n") . A_Index
-	Ordered := Sort(Indices, "", (a, b, *) => _LLM_ModelBrowser_Compare(Snapshot[Integer(a)], Snapshot[Integer(b)]))
-	out := []
-	for Index in StrSplit(Ordered, "`n")
-		out.Push(Snapshot[Integer(Index)])
-	return out
-}
-
-/**
- * Two-key comparator for model names: family ascending, then params_b
- * ascending. Returns negative / zero / positive per AHK v2 sort convention.
- *
- * @param {string} a - First model name.
- * @param {string} b - Second model name.
- * @returns {number} Comparison result.
- */
-_LLM_ModelBrowser_Compare(a, b) {
-	af := _LLM_ModelBrowser_GuessFamily(a)
-	bf := _LLM_ModelBrowser_GuessFamily(b)
-	cmp := StrCompare(af, bf, false)
-	if (cmp != 0)
-		return cmp
-	; Guard the secondary sort key — missing params_b sorts as 0
-	info_a := LLM_GetModelInfo(a)
-	info_b := LLM_GetModelInfo(b)
-	ap := (info_a is Map and info_a.Has("params_b")) ? info_a["params_b"] : 0
-	bp := (info_b is Map and info_b.Has("params_b")) ? info_b["params_b"] : 0
-	return (ap < bp) ? -1 : (ap > bp ? 1 : 0)
-}
 
 /**
  * Heuristic family grouping by name prefix. We do not have a "family"
@@ -410,267 +103,13 @@ _LLM_ModelBrowser_GetInstalledTags() {
 
 
 
-
-; ====================================
-; ====================================
-; ======= 3/ Action Handlers =========
-; ====================================
-; ====================================
-
-/**
- * Activates the highlighted model. Routes through the standard
- * LLM_Menu_SetModel path so the deps checker and engine re-init fire
- * exactly like a click in the flat menu. Closes the browser on success.
- */
-_LLM_ModelBrowser_PickRow(LV, RowNumber) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
-	Window := LV.Gui
-	PreviousCritical := Critical("On")
-	try {
-		Owner := {window: Window, epoch: _LLM_ModelBrowser_Epoch, lifecycle: _LifecycleLatestTransition}
-		if !_LLM_ModelBrowser_NativeCurrent(Owner)
-			return false
-	} finally Critical(PreviousCritical)
-	if (!RowNumber or RowNumber < 1)
-		return
-	name := LV.GetText(RowNumber, 1)
-	if (name == "")
-		return
-	Applied := LLM_Menu_SetModel(name)
-	if !(Applied is Integer) || Applied != 1 || !_LLM_ModelBrowser_NativeCurrent(Owner)
-		return false
-	Owner.model := name
-	if !_LLM_ModelBrowser_NativeCurrent(Owner)
-		return false
-	; This is the only model-selector entry left in the native tray. Like its
-	; Web counterpart, selecting an Ollama row also activates that backend.
-	if _LLM_Menu.Get("backend", "") != "ollama" {
-		; The original UI receipt is checked by the candidate mutator after
-		; terminal bundle acquisition, not adopted anew by a second setter.
-		Applied := LLM_Menu_CommitMutation("the LLM backend selection",
-			(Candidate) => _LLM_ModelBrowser_BackendCandidate(Candidate, Owner),
-			_LLM_Menu_ApplyBackendCommitted, _LLM_ModelBrowser_BackendWriter.Bind(Owner))
-		if !(Applied is Integer) || Applied != 1
-			return false
-	}
-	Owner.backend := "ollama"
-	if !_LLM_ModelBrowser_NativeCurrent(Owner)
-		return false
-	return _LLM_ModelBrowser_OnClose(Owner)
-}
-
-_LLM_ModelBrowser_BackendCandidate(Candidate, Owner) {
-	global ConfigurationFile
-	if !_LLM_ModelBrowser_NativeCurrent(Owner)
-		return false
-	; This mutator runs after the canonical transaction acquired its terminal
-	; bundle. Bind its actual issued target now; the writer may not adopt a
-	; newer bundle later if a native callback withdraws this one.
-	Path := ConfigurationFile
-	Token := _ConfigWriteLeaseSelectOwner(_ConfigWriteLeaseState().terminal, Path)
-	if !(Token is Object) || !_ConfigWriteLeaseOwns(Token, Path) || !_LLM_ModelBrowser_NativeCurrent(Owner)
-		return false
-	Owner.config_token := Token, Owner.config_path := Path
-	return _LLM_Menu_SetCandidateValue(Candidate, "backend", "ollama")
-}
-
-_LLM_ModelBrowser_BackendWriter(Owner, Path, Updates) {
-	if !Owner.HasOwnProp("config_token") || !(Path == Owner.config_path)
-			|| !_ConfigWriteLeaseOwns(Owner.config_token, Path) || !_LLM_ModelBrowser_BackendWriteCurrent(Owner)
-		return false
-	; Preserve the genuine config-document writer and repeat the original
-	; native owner predicate at its no-op/replace boundary. Once acknowledged,
-	; normal RAM/runtime publication still follows the durable configuration.
-	return TOML_ConfigBatchWrite(Path, Updates, [], _LLM_ModelBrowser_BackendWriteCurrent.Bind(Owner))
-}
-
-; Fixed-size RAM-only predicate for the actual native write admission.
-_LLM_ModelBrowser_BackendWriteCurrent(Owner) {
-	global ConfigurationFile
-	return _LLM_ModelBrowser_NativeCurrent(Owner) && (ConfigurationFile == Owner.config_path)
-		&& _ConfigWriteLeaseOwns(Owner.config_token)
-}
-
-; Independent of the model lifecycle epoch, which this selection itself bumps.
-; A pause stops typing, not configuration (EDD-1): a paused driver still
-; chooses a model, which the prediction runtime warms at the resume.
-_LLM_ModelBrowser_NativeCurrent(Owner) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
-	if Owner.HasOwnProp("model") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("model", "") == Owner.model))
-		return false
-	if Owner.HasOwnProp("backend") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("backend", "") == Owner.backend))
-		return false
-	return IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Owner.window
-		&& _LLM_ModelBrowser_Epoch == Owner.epoch && _LifecycleLatestTransition == Owner.lifecycle
-		&& (!(Owner.lifecycle is Object) || Owner.lifecycle.finished)
-}
-
-_LLM_ModelBrowser_OnClose(Params*) {
-	global _LLM_ModelBrowser_Gui
-	EventWindow := 0
-	if Params.Length {
-		if Params[1] is Gui
-			EventWindow := Params[1]
-		else if Params[1] is Gui.Control
-			EventWindow := Params[1].Gui
-	}
-	if !IsSet(_LLM_ModelBrowser_Gui)
-		return false
-	; Gui/GuiControl event arguments identify their original host. A late
-	; event from A must not borrow a replacement B from the singleton cache.
-	Window := EventWindow is Gui ? EventWindow : _LLM_ModelBrowser_Gui
-	if _LLM_ModelBrowser_Gui != Window
-		return false
-	Owner := Params.Length && IsObject(Params[1]) && Params[1].HasOwnProp("lifecycle") ? Params[1] : 0
-	Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, false, Owner)
-	if !(Ticket is Object)
-		return EventWindow is Gui
-	Completed := false
-	try Completed := _LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
-	; Gui Close applies its own default Cancel/Hide after a false result.
-	; Matching native events are fully handled even if a newer Show supersedes
-	; this Hide. Direct callers still receive the actual operation result.
-	return EventWindow is Gui ? true : Completed
-}
-
-; Claim only fixed-size RAM under Critical; native visibility and timer calls
-; stay outside it. A paused browser remains browsable, but a lifecycle change
-; or pause transition may never be adopted by an older continuation.
-_LLM_ModelBrowser_VisibilityClaim(Window, Visible, Owner := 0) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition
-	global _LLM_ModelBrowser_Visibility, _LLM_ModelBrowser_VisibilityTimer
-	PreviousCritical := Critical("On")
-	try {
-		if !IsSet(_LLM_ModelBrowser_Gui) || _LLM_ModelBrowser_Gui != Window
-				|| (Owner is Object && !_LLM_ModelBrowser_NativeCurrent(Owner))
-			return 0
-		_LLM_ModelBrowser_Epoch += 1
-		Ticket := {epoch: _LLM_ModelBrowser_Epoch, gui_ptr: ObjPtr(Window), visible: !!Visible,
-			lifecycle: _LifecycleLatestTransition, paused: A_IsSuspended}
-		OldTicket := _LLM_ModelBrowser_Visibility, OldTimer := _LLM_ModelBrowser_VisibilityTimer
-		_LLM_ModelBrowser_Visibility := Ticket, _LLM_ModelBrowser_VisibilityTimer := 0
-	} finally Critical(PreviousCritical)
-	if IsObject(OldTimer)
-		try TimerSetCallback(OldTimer, 0)
-	return Ticket
-}
-
-_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_ModelBrowser_Visibility
-	return Ticket is Object && _LLM_ModelBrowser_Visibility == Ticket
-		&& IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Window && ObjPtr(Window) == Ticket.gui_ptr
-		&& _LLM_ModelBrowser_Epoch == Ticket.epoch && _LifecycleLatestTransition == Ticket.lifecycle
-		&& A_IsSuspended == Ticket.paused
-}
-
-_LLM_ModelBrowser_VisibilityPerform(Window, Ticket) {
-	if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-		return false
-	if Ticket.visible
-		Window.Show()
-	else
-		Window.Hide()
-	; Win32 can finish an older ShowWindow after a newer nested Show/Hide
-	; already returned. Reconcile the actual last intent, not the old caller.
-	_LLM_ModelBrowser_VisibilityReconcile(Window)
-	return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-		&& WMHandleVisible(Window.Hwnd) == Ticket.visible
-}
-
-_LLM_ModelBrowser_VisibilityReconcile(Window) {
-	global _LLM_ModelBrowser_Visibility
-	; Bound work on an interrupted native stack. A third reentrant action
-	; gets an exact one-shot continuation instead of an unbounded native loop.
-	Loop 2 {
-		Ticket := _LLM_ModelBrowser_Visibility
-		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-			return false
-		Visible := WMHandleVisible(Window.Hwnd)
-		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-			continue
-		if Visible == Ticket.visible
-			return true
-		if Ticket.visible
-			Window.Show()
-		else
-			Window.Hide()
-	}
-	Ticket := _LLM_ModelBrowser_Visibility
-	if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-		return false
-	if WMHandleVisible(Window.Hwnd) == Ticket.visible
-		return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-	_LLM_ModelBrowser_VisibilitySchedule(Ticket, Window)
-	return false
-}
-
-_LLM_ModelBrowser_VisibilitySchedule(Ticket, Window) {
-	global _LLM_ModelBrowser_VisibilityTimer, _LLM_ModelBrowser_VisibilityTimerRevision
-	PreviousCritical := Critical("On")
-	try {
-		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) || IsObject(_LLM_ModelBrowser_VisibilityTimer)
-			return false
-		_LLM_ModelBrowser_VisibilityTimerRevision += 1
-		Timer := _LLM_ModelBrowser_VisibilityResume.Bind(Ticket, _LLM_ModelBrowser_VisibilityTimerRevision)
-		_LLM_ModelBrowser_VisibilityTimer := Timer
-	} finally Critical(PreviousCritical)
-	try TimerSetCallback(Timer, -1)
-	catch as Failure {
-		PreviousCritical := Critical("On")
-		try {
-			if _LLM_ModelBrowser_VisibilityTimer == Timer
-				_LLM_ModelBrowser_VisibilityTimer := 0
-		} finally Critical(PreviousCritical)
-		throw Failure
-	}
-	return true
-}
-
-_LLM_ModelBrowser_VisibilityResume(Ticket, Revision) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_VisibilityTimer, _LLM_ModelBrowser_VisibilityTimerRevision
-	PreviousCritical := Critical("On")
-	try {
-		if Revision != _LLM_ModelBrowser_VisibilityTimerRevision
-			return
-		OldTimer := _LLM_ModelBrowser_VisibilityTimer
-		_LLM_ModelBrowser_VisibilityTimer := 0
-		if !IsSet(_LLM_ModelBrowser_Gui)
-			return
-		Window := _LLM_ModelBrowser_Gui
-		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-			return
-	} finally Critical(PreviousCritical)
-	try _LLM_ModelBrowser_VisibilityReconcile(Window)
-	catch as Failure
-		try LoggerError("LLM.browser", "Native visibility continuation failed: {1}", Failure.Message)
-}
-
-_LLM_ModelBrowser_VisibilityRetire(Ticket, Window) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LLM_ModelBrowser_Visibility, _LLM_ModelBrowser_VisibilityTimer
-	PreviousCritical := Critical("On")
-	try {
-		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-			return false
-		OldTicket := _LLM_ModelBrowser_Visibility, OldTimer := _LLM_ModelBrowser_VisibilityTimer
-		_LLM_ModelBrowser_Epoch += 1
-		_LLM_ModelBrowser_Visibility := 0, _LLM_ModelBrowser_VisibilityTimer := 0, _LLM_ModelBrowser_Gui := unset
-	} finally Critical(PreviousCritical)
-	if IsObject(OldTimer)
-		try TimerSetCallback(OldTimer, 0)
-	return true
-}
-
-
-
-
 ; ==========================================
 ; ==========================================
-; ======= 4/ WebView2 Shared Browser ========
+; ======= 3/ WebView2 Shared Browser ========
 ; ==========================================
 ; ==========================================
 
-; Module-level state for the WebView2 variant — separate from the ListView Gui so
-; the two paths never clobber each other's handles.
+; Module-level state of the one WebView2 browser window.
 global _LLM_MBW_Gui        := unset
 global _LLM_MBW_WebView    := unset
 global _LLM_MBW_Controller := unset
@@ -700,21 +139,21 @@ global LLM_MBW_HOST_ACCESS_ALLOW := 1
 
 /**
  * Builds (or brings forward) the shared web model browser in a WebView2 window.
- * Returns the Gui on success, or "" to signal the caller to use the ListView
- * fallback (e.g. WebView2 create failed).
+ * Returns the Gui on success, or "" to ask the caller to refuse the opening
+ * with the WebView2 message (e.g. WebView2 create failed).
  * @returns {Gui|string}
  */
-_LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
+_LLM_ModelBrowser_ShowWeb(&RefusalEpoch := unset) {
 	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub
 	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
 	global _VendorDir, _SharedDir, _I18nLocale
 
-	FallbackEpoch := 0
+	RefusalEpoch := 0
 	EntryEpoch := _LLM_MBW_SessionEpoch
 	_LLM_MBW_RetryRetiredHosts()
 	if _LLM_MBW_SessionEpoch != EntryEpoch {
-		; Retirement consumed this older opening; forbid native fallback too.
-		FallbackEpoch := -1
+		; Retirement consumed this older opening; forbid its refusal too.
+		RefusalEpoch := -1
 		return 0
 	}
 	if IsSet(_LLM_MBW_Gui) {
@@ -724,8 +163,8 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 			WebView_TakeFocus(_LLM_MBW_Controller)
 		; A page still loading gets its catalogue from _LLM_MBW_OnPageReady, as
 		; LLM_ModelBrowser_Refresh assumes: injecting here would only queue a
-		; payload the ready handler rebuilds, and a failure to build it would send
-		; the caller to the native fallback beside the open page.
+		; payload the ready handler rebuilds, and a failure to build it would make
+		; the caller refuse an opening whose page is already open.
 		if _LLM_MBW_Ready && _LLM_MBW_StartupCurrent(SessionEpoch, Window)
 			_LLM_MBW_InjectCatalogue(SessionEpoch)
 		return Window
@@ -740,7 +179,7 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize780x460", t("model_browser.window_title"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false, Host := 0
+	Installed := false, FactoryFailed := false, ResetForRefusal := false, Host := 0
 	try {
 		if !_LLM_MBW_StartupCurrent(SessionEpoch)
 			return g
@@ -833,7 +272,7 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 	} finally {
 		if !Installed {
 			; Only this frame's captured resources retire, even if Close reopens.
-			ResetForFallback := _LLM_MBW_Reset(SessionEpoch, g)
+			ResetForRefusal := _LLM_MBW_Reset(SessionEpoch, g)
 			if IsObject(Host) {
 				_LLM_MBW_RetireSubscriptionHost(Host)
 			} else {
@@ -841,15 +280,15 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 					try Controller.Close()
 				try g.Destroy()
 			}
-			; Only this frame's exact detach ACK admits fallback. A Close
+			; Only this frame's exact detach ACK admits the refusal. A Close
 			; consumed before Reset must remain terminal even at epoch + 1.
 			; The public catch rechecks this old token after its own logger.
-			FallbackEpoch := ResetForFallback ? SessionEpoch + 1 : -1
+			RefusalEpoch := ResetForRefusal ? SessionEpoch + 1 : -1
 		}
 	}
 	; A retired constructor is handled. Only a still-owned factory failure
-	; may ask the public entry to open the native fallback.
-	return FactoryFailed && ResetForFallback && _LLM_MBW_SessionEpoch == SessionEpoch + 1
+	; may ask the public entry to refuse with the WebView2 message.
+	return FactoryFailed && ResetForRefusal && _LLM_MBW_SessionEpoch == SessionEpoch + 1
 		&& !IsSet(_LLM_MBW_Gui) ? "" : g
 }
 
@@ -892,7 +331,7 @@ _LLM_MBW_Subscribe(Host, Handler) {
 		} finally Critical(PreviousCritical)
 	}
 	; Preserve the original caller's current-startup error policy (including
-	; the public model browser's native fallback). A retired constructor must
+	; the public model browser's WebView2 refusal). A retired constructor must
 	; consume its late failure instead of reopening a canceled or newer UI.
 	if Failed && Current && !Host.retired
 		throw FailureValue
@@ -1702,16 +1141,6 @@ _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	if (Applied is Integer) && Applied == 1
 			&& ExpectedEpoch == _LLM_MBW_SessionEpoch
 		_LLM_MBW_OnClose()
-}
-
-/**
- * Returns true when WebView2 is available and the loader DLL exists.
- * @returns {boolean}
- */
-_LLM_MBW_WebView2Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
 }
 
 /**

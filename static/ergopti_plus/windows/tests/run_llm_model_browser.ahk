@@ -94,8 +94,8 @@ LLM_GetBackendBrands() => Map(
 	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
 	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
-; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
-; the (never-called here) ShowWeb path loads. The tests never create a webview.
+; Minimal WebView2 stand-in so the class reference in the (never-called here)
+; ShowWeb path loads. The tests never create a webview.
 class WebView2 {
 	static create(args*) {
 		return { CoreWebView2: {} }

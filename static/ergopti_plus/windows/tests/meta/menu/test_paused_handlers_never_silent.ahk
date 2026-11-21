@@ -65,8 +65,7 @@ _PHNS_Classified() {
 		"ScriptShortcutSlotRunsAction", "keeps the chords of pause time, as decided on 2026-11-14",
 		"_MI_StageSuspend", "checks the pause row itself",
 		; Fences against a pause transition.
-		"_LLM_Menu_BuildHeld", Fence, "_LLM_ModelBrowser_VisibilityClaim", Fence,
-		"_LLM_ModelBrowser_VisibilityCurrent", Fence, "MagicKeyEditor", Fence,
+		"_LLM_Menu_BuildHeld", Fence, "MagicKeyEditor", Fence,
 		"MagicKeySourceCapture", Fence,
 		; Snapshot fields compared by intent owners.
 		"_LLM_Menu_EnableSnapshot", Snapshot, "_LLM_Menu_PrivacySnapshot", Snapshot,
@@ -158,7 +157,6 @@ _PHNS_ConfigurationHandlersReadNoPause() {
 			"_LayMgrWeb_OnWebMessage", "_LayMgrWeb_CommandCurrent", "_LAY_BuildLayoutMenu",
 			"_ActPickWeb_OnWebMessage", "_ActPickWeb_Confirm", "_ActPickWeb_ProgramCapture",
 			"_LLM_MBW_OnWebMessage", "_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel",
-			"_LLM_ModelBrowser_PickRow", "_LLM_ModelBrowser_NativeCurrent",
 			"_LLM_Menu_PromptDeleteCachedModel", "_LLM_Menu_DeleteConfirmationCurrent",
 			"_LLM_ApplyScope", "_HS_OrderCommit", "_HS_OrderClick", "_HS_OrderMenu",
 			"PhysicalShortcutsMenuPort"]

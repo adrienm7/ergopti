@@ -1,9 +1,9 @@
 ﻿; tests/unit/core/ui/webview/test_model_browser_close_pause_owner.ahk
 
 ; ==============================================================================
-; MODULE: Model Browser Native Close Pause Tests
+; MODULE: Model Browser Close Pause Tests
 ; DESCRIPTION:
-; Runs the genuine SDK selection, native deferred apply and actual native Gui
+; Runs the genuine SDK selection, timer-deferred apply and actual native Gui
 ; destruction in a private child with boot-admitted configuration and the full
 ; central collector/writer. Browser COM and tray repaint are explicit boundaries.
 ; ==============================================================================
@@ -177,17 +177,17 @@ _MBPT_ChildSource(Directory) {
 		if Symbol == "LLM_Defaults_Load"
 			Code .= "LLM_Defaults_Load()`n"
 	}
-	AssertEqual(29, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	AssertEqual(29, Owners.Count, "All window, data, configuration, menu and runtime owners must be included")
 	; Dependency cancellation restores this genuine entry-point constant. Borrow
 	; its unchanged declaration without executing the driver's auto-start graph.
 	EntrySource := _DriverSourceConcat()
 	RegExReplace(EntrySource, "m)^global DRIVER_BASELINE_PRIORITY_CLASS :=[^`r`n]+", "", &PriorityDeclarations)
-	AssertEqual(1, PriorityDeclarations, "The native child requires the one real driver priority baseline")
+	AssertEqual(1, PriorityDeclarations, "The child requires the one real driver priority baseline")
 	AssertTrue(RegExMatch(EntrySource, "m)^global DRIVER_BASELINE_PRIORITY_CLASS :=[^`r`n]+", &PriorityDeclaration))
 	Code .= PriorityDeclaration[0] . "`n"
-	NativeGui := _DriverFuncBody("Gui_Create")
-	AssertTrue(NativeGui != "", "The native model browser requires its genuine GUI factory")
-	Code .= NativeGui . "`n"
+	GuiFactory := _DriverFuncBody("Gui_Create")
+	AssertTrue(GuiFactory != "", "The model browser owner requires its genuine GUI factory")
+	Code .= GuiFactory . "`n"
 	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
@@ -245,9 +245,7 @@ _MBPT_Case(Mode) {
 	AssertTrue((Creation is Integer) && Creation == 1, "Only an exclusively acquired child root may be recursively removed")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
-	AtDeadline := 0, ExportFailure := 0, VisibilityTrace := ""
-	; The visibility ordering children leave the last native phase they reached.
-	Traced := Mode == "native-show-current" || Mode == "native-show-close" || Mode == "native-hide-reopen-close"
+	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
 		_MBPT_StageAssets(Directory)
@@ -273,17 +271,8 @@ _MBPT_Case(Mode) {
 				Handle.requestTerminate()
 			Receipt := IsObject(Handle) ? Handle.terminate() : 1
 			Retired := (Receipt is Integer) && Receipt == 1
-			if Retired {
-				PhasePath := Directory . "\visibility-phases.txt"
-				if Traced && FileExist(PhasePath) {
-					try VisibilityTrace := FSReadStrict(PhasePath)
-					catch as TraceFailure {
-						if !IsObject(ExportFailure)
-							ExportFailure := TraceFailure
-					}
-				}
+			if Retired
 				DirDelete(Directory, true)
-			}
 		} catch as Failure {
 			if !IsObject(Primary)
 				Primary := Failure
@@ -297,13 +286,6 @@ _MBPT_Case(Mode) {
 	; is a completion diagnostic, not an independently measured stderr stream.
 	try {
 		if Retired {
-			if Traced {
-				for Line in StrSplit(VisibilityTrace, "`n", "`r")
-					if Line != ""
-						_TestPrint("# model-browser-visibility-phase " . Line)
-				if VisibilityTrace == ""
-					_TestPrint("# model-browser-visibility-phase UNKNOWN: the child stopped before its visibility subject")
-			}
 			_TestPrint("# model-browser-close-pause-owner terminal calls=" . State.Calls . " code=" . State.Code
 				. " deadline_calls=" . (IsObject(AtDeadline) ? AtDeadline.Calls : -1)
 				. " capture_delivered=" . (State.Calls == 1))
@@ -333,46 +315,9 @@ _MBPT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", "native-paused", "native-sort"]
-	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
+for _MBPT_Mode in ["current", "during-close", "paused-entry"]
+	Test("Model browser selection: " . _MBPT_Mode . " preserves pause ownership (model-browser-close-pause-owner)",
 		_MBPT_Case.Bind(_MBPT_Mode))
 
 Test("Model browser page close: the page's Escape closes the window and writes nothing (pck-19)",
 	_MBPT_Case.Bind("page-close"))
-
-for _MBBK_Mode in ["native-backend-current", "native-backend-api"]
-	Test("Native model browser activation: " . _MBBK_Mode . " activates the selected Ollama catalogue model (model-browser-native-backend)",
-		_MBPT_Case.Bind(_MBBK_Mode))
-
-for _MBBK_AdmissionMode in ["native-backend-second-refused", "native-backend-replaced", "native-backend-pause-resume"]
-	Test("Native model backend admission: " . _MBBK_AdmissionMode . " preserves acknowledged and current ownership (model-browser-native-backend-admission)",
-		_MBPT_Case.Bind(_MBBK_AdmissionMode))
-
-Test("Native model backend admission: a newer public model setter supersedes the pending row (model-browser-native-backend-superseded)",
-	_MBPT_Case.Bind("native-backend-superseded"))
-
-Test("Native model backend admission: pause/resume at the second schema entry cannot adopt new authority (model-browser-native-backend-second-admission)",
-	_MBPT_Case.Bind("native-backend-second-schema-pause"))
-
-Test("Native model backend admission: replacement at the real second writer entry cannot publish (model-browser-native-backend-writer-owner)",
-	_MBPT_Case.Bind("native-backend-second-writer-replaced"))
-
-for _MBBK_VisibilityMode in ["native-hide-current", "native-hide-reopen"]
-	Test("Native model visibility: " . _MBBK_VisibilityMode . " observes real Show during Hide (model-browser-native-show-hide-owner)",
-		_MBPT_Case.Bind(_MBBK_VisibilityMode))
-
-for _MBBK_ConstructorMode in ["native-ctor-current", "native-ctor-malformed"]
-	Test("Native model constructor: " . _MBBK_ConstructorMode . " retires its exact window and callbacks (model-browser-native-constructor-failure)",
-		_MBPT_Case.Bind(_MBBK_ConstructorMode))
-
-for _MBBK_ReentryMode in ["native-show-current", "native-show-close", "native-hide-reopen-close"]
-	Test("Native model visibility ordering: " . _MBBK_ReentryMode . " uses real native requests (model-browser-native-visibility-order-owner)",
-		_MBPT_Case.Bind(_MBBK_ReentryMode))
-
-for _MBBK_CloseVisibilityMode in ["native-hide-native-current", "native-hide-native-reopen"]
-	Test("Native model Close event: " . _MBBK_CloseVisibilityMode . " retains latest visibility (model-browser-native-close-visibility-owner)",
-		_MBPT_Case.Bind(_MBBK_CloseVisibilityMode))
-
-for _MBBK_CtorRetirementMode in ["native-ctor-retire-pre", "native-ctor-retire-post"]
-	Test("Native failed constructor retirement: " . _MBBK_CtorRetirementMode . " preserves primary and exact debt (model-browser-native-failed-constructor-retirement)",
-		_MBPT_Case.Bind(_MBBK_CtorRetirementMode))

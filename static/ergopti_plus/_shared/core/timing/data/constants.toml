@@ -958,9 +958,8 @@ x11_layout_reapply_settle_ms = 750
 x11_layout_reapply_window_ms = 60000
 x11_layout_reapply_read_timeout_ms = 5000
 
-# Windows: the model browser's filter debounce, the onboarding poll while a page
-# loads, and the wait before its gesture step reports done.
-model_browser_filter_debounce_ms = 120
+# Windows: the onboarding poll while a page loads, and the wait before its
+# gesture step reports done.
 onboarding_poll_ms = 100
 onboarding_gesture_done_ms = 100
 

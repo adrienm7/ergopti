@@ -34,8 +34,7 @@ _WBSG_CheckModelBrowserGuard() {
 	; model page chooses, downloads and removes a model while paused, as on
 	; macOS, so neither the handler nor its deferred continuations read the
 	; pause; the prediction runtime they feed waits for the resume itself.
-	for _, Fn in ["_LLM_MBW_OnWebMessage", "_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel",
-			"_LLM_ModelBrowser_PickRow", "_LLM_ModelBrowser_NativeCurrent"]
+	for _, Fn in ["_LLM_MBW_OnWebMessage", "_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel"]
 		AssertEqual(0, InStr(_StripFullLineComments(_DriverFuncBody(Fn)), "A_IsSuspended"),
 			Fn . " is a configuration path: a paused driver still applies it (EDD-1)")
 

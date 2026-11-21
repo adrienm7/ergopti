@@ -272,16 +272,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; boot source) returns ConfigCommitBuilt's answer, and its native writer
 	; (_ProxyOverride_WriteBootSource) returns TOML_ConfigBatchWrite's receipt
 	; behind the same lease and source-ownership predicate.
-	; 54: the model browser's backend writer (_LLM_ModelBrowser_BackendWriter)
-	; returns TOML_ConfigBatchWrite's receipt behind its owned lease.
-	; 55-56: the section-order transaction (_HS_OrderCommit) refuses before
+	; 54-55: the section-order transaction (_HS_OrderCommit) refuses before
 	; repainting, and its publisher (_HS_OrderWrite) returns the exact-source
 	; native receipt. Both are independently admitted above and exercised by
 	; the real configuration owner in test_hotstring_dynamic_menu_scope.ahk.
-	; 57: the windows' reading choice (ReadingPrefs_Set) returns false and
+	; 56: the windows' reading choice (ReadingPrefs_Set) returns false and
 	; neither publishes nor repaints on a refusal, driven for real by
 	; test_reading_preferences.ahk.
-	AssertEqual(57, Calls,
+	AssertEqual(56, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
