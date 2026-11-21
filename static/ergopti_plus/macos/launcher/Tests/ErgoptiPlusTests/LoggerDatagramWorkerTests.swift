@@ -993,54 +993,6 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 			"a long-lived launcher must re-run retention on the first record of a new wall-clock day")
 	}
 
-	/// Replays the dated_retention and topical_retention cases of the shared
-	/// parity corpus through a real purge. The purge compared the archive's noon
-	/// with now minus N x 86,400 s, so the N-days-old archive vanished after noon
-	/// while Windows and Linux keep it all day (logger parity audit LOG-03).
-	func testRetentionReplaysTheSharedParityCorpus() throws {
-		var root = URL(fileURLWithPath: #filePath)
-		for _ in 0..<5 { root.deleteLastPathComponent() }
-		let corpusURL = root.appendingPathComponent("_shared/tests/corpus/logger/parity_vectors.json")
-		let corpus = try XCTUnwrap(
-			JSONSerialization.jsonObject(with: Data(contentsOf: corpusURL)) as? [String: Any])
-		let dated = try XCTUnwrap((corpus["dated_retention"] as? [String: Any])?["cases"] as? [[String: Any]])
-		let topical = try XCTUnwrap((corpus["topical_retention"] as? [String: Any])?["cases"] as? [[String: Any]])
-		XCTAssertFalse(dated.isEmpty)
-		XCTAssertFalse(topical.isEmpty)
-
-		for vector in dated {
-			let id = try XCTUnwrap(vector["id"] as? String)
-			let directory = try makeLogDirectory()
-			let archive = directory.appendingPathComponent(
-				"ErgoptiPlus_\(try XCTUnwrap(vector["file_date"] as? String)).log")
-			try Data("archive\n".utf8).write(to: archive)
-			let now = try corpusInstant(try XCTUnwrap(vector["now"] as? String))
-			let sink = LoggerRecordSink(now: { now })
-			XCTAssertTrue(sink.configure(
-				directoryPath: directory.path,
-				retentionDays: try XCTUnwrap(vector["retention_days"] as? Int)))
-			sink.performDeferredMaintenance()
-			let purged = try XCTUnwrap(vector["purged"] as? Bool)
-			XCTAssertEqual(!FileManager.default.fileExists(atPath: archive.path), purged, id)
-		}
-
-		for vector in topical {
-			let id = try XCTUnwrap(vector["id"] as? String)
-			let directory = try makeLogDirectory()
-			let view = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-			try Data("view\n".utf8).write(to: view)
-			try FileManager.default.setAttributes(
-				[.modificationDate: try corpusInstant(try XCTUnwrap(vector["modified"] as? String))],
-				ofItemAtPath: view.path)
-			let now = try corpusInstant(try XCTUnwrap(vector["now"] as? String))
-			let sink = LoggerRecordSink(now: { now })
-			XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-			sink.performDeferredMaintenance()
-			let removed = try XCTUnwrap(vector["removed"] as? Bool)
-			XCTAssertEqual(!FileManager.default.fileExists(atPath: view.path), removed, id)
-		}
-	}
-
 
 
 
@@ -1201,20 +1153,6 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		)
 		addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
 		return directory
-	}
-
-	/// Local instant of a corpus "YYYY-MM-DD HH:MM:SS".
-	private func corpusInstant(_ text: String) throws -> Date {
-		let fields = text.split(whereSeparator: { $0 == "-" || $0 == " " || $0 == ":" }).compactMap { Int($0) }
-		XCTAssertEqual(fields.count, 6, "malformed corpus instant \(text)")
-		return try XCTUnwrap(Calendar.current.date(from: DateComponents(
-			year: fields[0],
-			month: fields[1],
-			day: fields[2],
-			hour: fields[3],
-			minute: fields[4],
-			second: fields[5]
-		)))
 	}
 
 	private func fixedDate(year: Int, month: Int, day: Int) throws -> Date {

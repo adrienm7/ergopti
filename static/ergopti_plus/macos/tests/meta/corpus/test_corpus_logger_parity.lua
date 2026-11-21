@@ -8,7 +8,7 @@
 --- declaration (what init.lua calls at boot), the driver's own dispatch for a
 --- failed format, the shared core's sink accounting and the boot purge rules of
 --- core/logger/engine/logger.lua. The native worker replays the retention
---- sections in LoggerDatagramWorkerTests.swift; Windows and Linux replay the
+--- sections in LoggerRetentionParityTests.swift; Windows and Linux replay the
 --- same file.
 --- ==============================================================================
 
