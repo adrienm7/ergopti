@@ -668,6 +668,9 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		; never start the detached projection while suspended.
 		if A_IsSuspended && (action != "range") && (action != "range_consumed") {
 				NotifyPausedRefusal("A metrics page action")
+				; The page holds its range for a Reset until it hears the outcome.
+				if (action == "clear_cache") && RegExMatch(msg, '"reset_id"\s*:\s*(\d{1,15})\b', &paused)
+						KLWV_SendCacheReset(which, Epoch, Integer(paused[1]), false)
 				return
 		}
 		switch action {
@@ -721,6 +724,12 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 			KLPF_RequestRange(which, entry["metrics_dir"], query, Epoch,
 				KLWV_OnRangeBuildTerminal.Bind(which, Epoch, request_id))
 		case "clear_cache":
+						; The page waits for this Reset's outcome before it asks for a range.
+						if !RegExMatch(msg, '"reset_id"\s*:\s*(\d{1,15})\b', &rid) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: a dashboard reset without a valid reset id was refused.")
+								return
+						}
+						ResetId := Integer(rid[1])
 						; Purge every layer of cache so the next rebuild is a full cold read:
 						; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
 						; - KLPF_LAST_JSON:      in-memory JSON blob for the push path
@@ -738,11 +747,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; successor build, so an explicit reset must retire it too.
 						if !KLR_CacheRetire(entry["metrics_dir"]) {
 								LoggerError("Keystats", "KLWV_OnWebMessage: the reader image could not be retired; caches were not fully purged.")
+								KLWV_SendCacheReset(which, Epoch, ResetId, false)
 								return
 						}
 						; Ergopti Studio's saved « My typing » read is derived from the same image.
 						if !KLR_StudioSnapshotRetire(entry["metrics_dir"]) {
 								LoggerError("Keystats", "KLWV_OnWebMessage: the saved Ergopti Studio read could not be retired; caches were not fully purged.")
+								KLWV_SendCacheReset(which, Epoch, ResetId, false)
 								return
 						}
 						if KLWV_IsCurrent(which, Epoch)
@@ -750,6 +761,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						try LoggerDebug("Keystats", "KLWV_OnWebMessage: dashboard caches purged.")
 						if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
 								return
+						; Before the rebuild: its publication must find the Reset settled.
+						KLWV_SendCacheReset(which, Epoch, ResetId, true)
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
 						KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
@@ -953,6 +966,22 @@ KLWV_RunMaintenance(which, Epoch, Kind, MaintenanceId, MetricsDir) {
 		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
 		catch as err {
 				try LoggerError("Keystats", "KLWV_RunMaintenance: the outcome could not reach '{1}': {2}", which, err.Message)
+				return false
+		}
+		return true
+}
+
+; Tells the page how its Reset ended. It holds its range until then, and a
+; failure returned silently: the page then waited for its watchdog (MET-19).
+KLWV_SendCacheReset(which, Epoch, ResetId, Ok) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		; Built by hand: the page requires a JSON boolean, which AHK has no type for.
+		msg := '{"type":"cache_reset","reset_id":' . ResetId . ',"ok":' . (Ok ? "true" : "false") . '}'
+		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
+		catch as err {
+				try LoggerError("Keystats", "KLWV_SendCacheReset: the outcome could not reach '{1}': {2}", which, err.Message)
 				return false
 		}
 		return true

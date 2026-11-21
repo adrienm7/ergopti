@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuale",
 	"ui_typing.rep_table_total": "Totale",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Ripristino non riuscito: non è stato possibile cancellare le statistiche salvate, quindi i dati mostrati non sono cambiati. Riapri la finestra per riprovare.",
 	"ui_typing.search_close": "Chiudi (Esc)",
 	"ui_typing.search_label": "Cerca nella pagina",
 	"ui_typing.search_next": "Successivo (Enter)",

@@ -1527,7 +1527,12 @@
 					window.__hostBridgeResponse = (bridge, isBase64, payload) => {
 						if (bridge !== 'metrics_typing_bridge') return;
 						const response = decodeHostBridgeResponse(isBase64, payload);
-						if (response) apply_prefetch(response);
+						if (!response) return;
+						// A Reset's answer settles it first: its rebuilt payload is
+						// refused while the Reset still owns the range (MET-19).
+						if (Object.hasOwn(response, 'reset_id'))
+							window.complete_cache_reset(response.reset_id, response.cleared === true);
+						apply_prefetch(response);
 					};
 					try {
 						window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'ready' });
@@ -1591,6 +1596,10 @@
 							if (typeof window.complete_range_request === 'function') {
 								window.complete_range_request(payload.request_id, payload.status);
 							}
+							return;
+						}
+						if (payload.type === 'cache_reset') {
+							window.complete_cache_reset(payload.reset_id, payload.ok);
 							return;
 						}
 						if (payload.type === 'metrics_maintenance') {

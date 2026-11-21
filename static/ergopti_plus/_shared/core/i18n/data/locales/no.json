@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuell",
 	"ui_typing.rep_table_total": "Totalt",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Tilbakestillingen mislyktes: den lagrede statistikken kunne ikke tømmes, så tallene som vises er uendret. Åpne vinduet på nytt for å prøve igjen.",
 	"ui_typing.search_close": "Lukk (ESC)",
 	"ui_typing.search_label": "Søk på siden",
 	"ui_typing.search_next": "Neste (Enter)",

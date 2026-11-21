@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Handmatig",
 	"ui_typing.rep_table_total": "Totaal",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Opnieuw instellen mislukt: de opgeslagen statistieken konden niet worden gewist, dus de getoonde cijfers zijn ongewijzigd. Open het venster opnieuw om het nog eens te proberen.",
 	"ui_typing.search_close": "Sluiten (Esc)",
 	"ui_typing.search_label": "Zoeken in pagina",
 	"ui_typing.search_next": "Volgende (Enter)",

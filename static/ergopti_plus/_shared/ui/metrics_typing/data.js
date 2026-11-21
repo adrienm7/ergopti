@@ -3552,33 +3552,55 @@ function render_wellness_kpi() {
 // ============================================
 
 /**
- * Retires old range ownership and requests an explicit cache purge. The polling
- * host keeps Reset ahead of range delivery until the actual purge completes.
+ * Retires old range ownership and requests an explicit cache purge. Every host
+ * answers this Reset's id with its outcome (complete_cache_reset); the page
+ * keeps Reset ahead of range delivery until then. Windows and Linux had no id:
+ * their failed purge reached nobody (MET-19).
  */
 function request_cache_reset() {
 	invalidate_typing_projection_cache();
 	complete_range_request(app_state.active_range_request_id, 'superseded');
 	window._prefetch_data = null;
+	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
+	const reset_id = ++app_state.cache_reset_sequence;
+	app_state.active_cache_reset_id = reset_id;
+	app_state.cache_reset_pending_range = null;
+	app_state.cache_reset_watchdog = setTimeout(
+		() => complete_cache_reset(reset_id, false),
+		RANGE_REQUEST_WATCHDOG_MS
+	);
+	const request = { action: 'clear_cache', reset_id };
 	if (window.chrome?.webview) {
-		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
+		try {
+			window.chrome.webview.postMessage(JSON.stringify(request));
+		} catch (error) {
+			console.error('request_cache_reset: the host is unreachable:', error);
+			fail_unsent_cache_reset(reset_id);
+		}
 		return;
 	}
 	if (
 		hostHasCapability('document_bridge') &&
 		window.webkit?.messageHandlers?.metrics_typing_bridge
 	) {
-		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
+		try {
+			window.webkit.messageHandlers.metrics_typing_bridge.postMessage(request);
+		} catch (error) {
+			console.error('request_cache_reset: the host is unreachable:', error);
+			fail_unsent_cache_reset(reset_id);
+		}
 		return;
 	}
-	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
-	const reset_id = ++app_state.cache_reset_sequence;
-	app_state.active_cache_reset_id = reset_id;
-	app_state.cache_reset_pending_range = null;
-	window._lua_request = JSON.stringify({ action: 'clear_cache', reset_id });
-	app_state.cache_reset_watchdog = setTimeout(
-		() => complete_cache_reset(reset_id, false),
-		RANGE_REQUEST_WATCHDOG_MS
-	);
+	window._lua_request = JSON.stringify(request);
+}
+
+/**
+ * Fails a Reset no host received, once its caller (reset_filters) has asked
+ * for its range: that range then fails with it instead of being sent.
+ * @param {number} reset_id - The unsent Reset.
+ */
+function fail_unsent_cache_reset(reset_id) {
+	setTimeout(() => complete_cache_reset(reset_id, false), 0);
 }
 
 /**
@@ -3606,6 +3628,9 @@ function complete_cache_reset(reset_id, succeeded) {
 		if (pending_range) pending_range();
 	} else {
 		complete_range_request(app_state.active_range_request_id, 'failed');
+		// Said after the range's own failure, which it replaces: the figures
+		// on screen are the ones the purge was meant to rebuild.
+		show_range_status('ui_typing.reset_failed');
 	}
 	return true;
 }

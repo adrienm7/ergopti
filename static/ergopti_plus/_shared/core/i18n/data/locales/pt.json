@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manual",
 	"ui_typing.rep_table_total": "Total",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Não foi possível repor: as estatísticas guardadas não puderam ser apagadas, por isso os valores apresentados não mudaram. Reabra a janela para tentar novamente.",
 	"ui_typing.search_close": "Fechar (Esc)",
 	"ui_typing.search_label": "Buscar na página",
 	"ui_typing.search_next": "Próximo (Enter)",

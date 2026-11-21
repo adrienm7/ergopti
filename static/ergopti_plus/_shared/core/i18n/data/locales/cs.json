@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuální",
 	"ui_typing.rep_table_total": "Celkem",
 	"ui_typing.rep_table_via_star": "Přes ★",
+	"ui_typing.reset_failed": "Obnovení selhalo: uložené statistiky nešlo vymazat, zobrazená čísla se proto nezměnila. Znovu otevřete okno a zkuste to znovu.",
 	"ui_typing.search_close": "Zavřít (Esc)",
 	"ui_typing.search_label": "Hledat na stránce",
 	"ui_typing.search_next": "Další (Enter)",

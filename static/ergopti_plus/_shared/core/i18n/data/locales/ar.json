@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "يدوي",
 	"ui_typing.rep_table_total": "المجموع",
 	"ui_typing.rep_table_via_star": "عبر ★",
+	"ui_typing.reset_failed": "فشلت إعادة التعيين: تعذّر مسح الإحصائيات المحفوظة، لذا لم تتغيّر الأرقام المعروضة. أعد فتح النافذة للمحاولة مرة أخرى.",
 	"ui_typing.search_close": "إغلاق (Esc)",
 	"ui_typing.search_label": "بحث في الصفحة",
 	"ui_typing.search_next": "التالي (Enter)",

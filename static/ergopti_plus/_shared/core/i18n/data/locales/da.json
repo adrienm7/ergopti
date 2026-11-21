@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuel",
 	"ui_typing.rep_table_total": "Total",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Nulstillingen mislykkedes: de gemte statistikker kunne ikke ryddes, så de viste tal er uændrede. Åbn vinduet igen for at prøve igen.",
 	"ui_typing.search_close": "Luk (ESC)",
 	"ui_typing.search_label": "Søg på siden",
 	"ui_typing.search_next": "Næste (Enter)",

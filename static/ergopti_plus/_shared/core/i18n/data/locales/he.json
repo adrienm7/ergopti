@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "ידני",
 	"ui_typing.rep_table_total": "סך הכל",
 	"ui_typing.rep_table_via_star": "באמצעות ★",
+	"ui_typing.reset_failed": "האיפוס נכשל: לא ניתן היה למחוק את הסטטיסטיקה השמורה, ולכן המספרים המוצגים לא השתנו. פתחו את החלון מחדש כדי לנסות שוב.",
 	"ui_typing.search_close": "סגור (Esc)",
 	"ui_typing.search_label": "חפש בדף",
 	"ui_typing.search_next": "הבא (Enter)",

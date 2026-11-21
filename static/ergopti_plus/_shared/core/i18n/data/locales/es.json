@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manual",
 	"ui_typing.rep_table_total": "Total",
 	"ui_typing.rep_table_via_star": "Vía ★",
+	"ui_typing.reset_failed": "No se pudo restablecer: las estadísticas guardadas no se pudieron borrar, así que las cifras mostradas no han cambiado. Vuelve a abrir la ventana para intentarlo de nuevo.",
 	"ui_typing.search_close": "Cerrar (Esc)",
 	"ui_typing.search_label": "Buscar en la página",
 	"ui_typing.search_next": "Siguiente (Intro)",

@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Ręcznie",
 	"ui_typing.rep_table_total": "Łącznie",
 	"ui_typing.rep_table_via_star": "Przez ★",
+	"ui_typing.reset_failed": "Resetowanie nie powiodło się: nie udało się wyczyścić zapisanych statystyk, więc wyświetlane liczby się nie zmieniły. Otwórz okno ponownie, aby spróbować jeszcze raz.",
 	"ui_typing.search_close": "Zamknij (Esc)",
 	"ui_typing.search_label": "Szukaj na stronie",
 	"ui_typing.search_next": "Następny (Enter)",

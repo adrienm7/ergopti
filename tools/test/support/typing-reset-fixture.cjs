@@ -169,6 +169,8 @@ function bootstrapFrontend(host) {
 		.find((source) => source.includes('let cached_historical'));
 	assert.ok(bootstrap);
 	vm.runInContext(bootstrap, f.context, { filename: 'typing-bootstrap.js' });
+	// A host message other than a prefetch (a range terminal, a Reset outcome).
+	f.hostMessage = (payload) => onMessage({ data: payload });
 	f.push = (blob) => {
 		if (host === 'windows') onMessage({ data: { type: 'prefetch', blob } });
 		else f.context.__hostBridgeResponse('metrics_typing_bridge', false, JSON.stringify(blob));

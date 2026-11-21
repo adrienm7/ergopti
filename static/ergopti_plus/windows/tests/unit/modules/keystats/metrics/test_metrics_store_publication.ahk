@@ -3,13 +3,15 @@
 ; ==============================================================================
 ; MODULE: Metrics Store Publication Tests
 ; DESCRIPTION: Worker publication and cache clearing retain their captured store.
+; A Reset that cannot retire the reader image tells its page so and rebuilds
+; nothing (MET-19).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 class _MSP_ClearMessage {
 	TryGetWebMessageAsString() {
-		return '{"action":"clear_cache"}'
+		return '{"action":"clear_cache","reset_id":3}'
 	}
 }
 
@@ -34,6 +36,7 @@ _MSP_StoreTransaction(Mode) {
 	for Path in [PathA, PathB]
 		AssertFalse(FSExists(Path), "fixture must not overwrite another store's snapshot")
 	CreatedPaths := []
+	CreatedDirs := []
 	SpawnArgs := []
 	Terminals := []
 	Deliveries := []
@@ -56,7 +59,7 @@ _MSP_StoreTransaction(Mode) {
 		CreatedPaths.Push(PathA)
 		AssertTrue(FSWrite(PathB, "disk-B"))
 		CreatedPaths.Push(PathB)
-		if Mode != "clear" {
+		if SubStr(Mode, 1, 5) != "clear" {
 			View := _MCR_View(() => 0)
 			KLWV.windows := Map("typing", Map("epoch", 41, "webview", View,
 				"metrics_dir", StoreA))
@@ -121,6 +124,25 @@ _MSP_StoreTransaction(Mode) {
 			KLWV.windows := Map("typing", Map("epoch", 41, "webview", View,
 				"metrics_dir", StoreB, "first_paint_done", true))
 			KLWV.metrics_dir := StoreA
+			if Mode == "clear-refused" {
+				; The reader image exists and its publication lock is held: the
+				; real KLR_CacheRetire refuses.
+				Image := KLR_CachePath(StoreB)
+				DirCreate(KLR_CacheDir(StoreB))
+				CreatedDirs.Push(KLR_CacheDir(StoreB))
+				AssertTrue(FSWrite(Image, "reader-image"))
+				CreatedPaths.Push(Image)
+				Guard := FSOpenExclusiveGuard(Image . ".publish.lock")
+				AssertTrue(Guard, "the fixture holds the image's publication lock")
+				CreatedPaths.Push(Image . ".publish.lock")
+				try KLWV_OnWebMessage("typing", 41, View, _MSP_ClearMessage())
+				finally FSCloseExclusiveGuard(Guard)
+				AssertTrue(FSExists(Image), "the held image is not retired")
+				AssertEqual(0, SpawnArgs.Length, "a failed Reset rebuilds nothing")
+				AssertEqual(1, View.Messages.Length, "the page hears its Reset failed")
+				AssertEqual('{"type":"cache_reset","reset_id":3,"ok":false}', View.Messages[1])
+				return
+			}
 			KLWV_OnWebMessage("typing", 41, View, _MSP_ClearMessage())
 			AssertFalse(FSExists(PathB), "clear must remove only its window's disk snapshot")
 			AssertFalse(KLPF_LAST_JSON.Has(PathB))
@@ -129,6 +151,8 @@ _MSP_StoreTransaction(Mode) {
 			AssertEqual(1, SpawnArgs.Length)
 			AssertEqual(StoreB, SpawnArgs[1][6], "refresh must use the window's store, not the global")
 			AssertEqual(PathB, KLPFWorker.jobs["typing"]["destination"])
+			AssertEqual(1, View.Messages.Length, "the page hears its Reset's outcome (MET-19)")
+			AssertEqual('{"type":"cache_reset","reset_id":3,"ok":true}', View.Messages[1])
 		}
 	} finally {
 		if LockHandle && LockHandle != -1
@@ -149,8 +173,10 @@ _MSP_StoreTransaction(Mode) {
 			if FSExists(Path)
 				AssertTrue(FSDelete(Path))
 		}
+		for Dir in CreatedDirs
+			DirDelete(Dir)
 	}
 }
-for Mode in ["publish", "publish-refused", "publish-locked", "clear"]
+for Mode in ["publish", "publish-refused", "publish-locked", "clear", "clear-refused"]
 	Test("metrics cache: " . Mode . " retains its store owner (metrics-store-isolation)",
 		_MSP_StoreTransaction.Bind(Mode))

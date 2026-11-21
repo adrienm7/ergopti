@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "手动",
 	"ui_typing.rep_table_total": "总计",
 	"ui_typing.rep_table_via_star": "通过 ★",
+	"ui_typing.reset_failed": "重置失败：无法清除已保存的统计数据，因此显示的数字没有变化。请重新打开窗口再试一次。",
 	"ui_typing.search_close": "关闭（Esc）",
 	"ui_typing.search_label": "在页面中搜索",
 	"ui_typing.search_next": "下一个（Enter）",

@@ -4,12 +4,16 @@
  * MODULE: Typing Metrics Reset Delivery
  * DESCRIPTION:
  * Verifies Reset priority and real purge acknowledgement before selected-range delivery.
+ * Windows and Linux sent their Reset without an id and never heard its outcome:
+ * a failed purge was told to nobody (MET-19). Every host now answers the id.
  * ==============================================================================
  */
 
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const vm = require('node:vm');
 const { frontend, bootstrapFrontend, actualPurge } = require('./support/typing-reset-fixture.cjs');
 let passed = 0;
@@ -284,18 +288,108 @@ test('first manifest prefetch cannot complete an explicit Reset', () => {
 	assert.equal(f.state.loading_data, true);
 });
 
+const EN = JSON.parse(
+	fs.readFileSync(
+		path.resolve(__dirname, '../../static/ergopti_plus/_shared/core/i18n/data/locales/en.json'),
+		'utf8'
+	)
+);
+
+/** The range status line the page writes its outcomes into, in English. */
+function withStatus(f) {
+	f.elements.range_status = { textContent: '' };
+	f.context._i18n_strings = EN;
+	return f.elements.range_status;
+}
+
 for (const host of ['windows', 'linux']) {
-	test(`${host}: explicit Reset uses direct clear then range messages`, () => {
+	test(`${host}: explicit Reset names its id and holds the range until its outcome (met-19)`, () => {
 		const f = frontend(host);
 		f.context.reset_filters();
 		f.dispatch();
 		assert.deepEqual(
 			f.requests.map((req) => req.action),
-			['clear_cache', 'range']
+			['clear_cache'],
+			'the range waits for the Reset'
 		);
 		assert.equal(f.context._lua_request, null);
+		const reset_id = f.requests[0].reset_id;
+		assert.ok(Number.isSafeInteger(reset_id) && reset_id > 0, 'the host can answer this Reset');
+		assert.equal(f.context.complete_cache_reset(reset_id, true), true);
+		assert.deepEqual(
+			f.requests.map((req) => req.action),
+			['clear_cache', 'range']
+		);
+	});
+	test(`${host}: an unreachable host fails the Reset at once (met-19)`, () => {
+		const f = frontend(host);
+		const status = withStatus(f);
+		if (host === 'windows')
+			f.context.chrome.webview.postMessage = () => {
+				throw new Error('gone');
+			};
+		else
+			f.context.webkit.messageHandlers.metrics_typing_bridge.postMessage = () => {
+				throw new Error('gone');
+			};
+		const errors = [];
+		f.context.console = { ...console, error: (...args) => errors.push(args.join(' ')) };
+		f.context.reset_filters();
+		// The failure lands once reset_filters has asked for its range.
+		for (const [id, timer] of Array.from(f.timers))
+			if (timer.delay === 0) {
+				f.timers.delete(id);
+				timer.fn();
+			}
+		f.dispatch();
+		assert.equal(f.state.active_cache_reset_id, 0, 'no Reset is left waiting for its watchdog');
+		assert.equal(f.state.loading_data, false, 'its range fails with it');
+		assert.deepEqual(
+			f.requests.filter((req) => req.action === 'range'),
+			[],
+			'and is not sent'
+		);
+		assert.equal(status.textContent, EN['ui_typing.reset_failed']);
+		assert.equal(errors.length, 1, 'the failure is logged');
 	});
 }
+
+for (const host of ['macos', 'windows', 'linux']) {
+	test(`${host}: a failed Reset tells the page in its language (met-19)`, () => {
+		const f = frontend(host);
+		const status = withStatus(f);
+		f.context.reset_filters();
+		f.dispatch();
+		const reset_id = f.state.active_cache_reset_id;
+		assert.ok(reset_id > 0);
+		assert.equal(f.context.complete_cache_reset(reset_id, false), true);
+		assert.equal(status.textContent, EN['ui_typing.reset_failed']);
+		assert.notEqual(status.textContent, 'ui_typing.reset_failed', 'the key exists');
+		assert.equal(f.state.loading_data, false);
+	});
+}
+
+test('windows: the host answer of a Reset reaches the page (met-19)', () => {
+	const f = bootstrapFrontend('windows');
+	const status = withStatus(f);
+	f.context.reset_filters();
+	const reset_id = f.state.active_cache_reset_id;
+	f.hostMessage({ type: 'cache_reset', reset_id, ok: false });
+	assert.equal(f.state.active_cache_reset_id, 0);
+	assert.equal(status.textContent, EN['ui_typing.reset_failed']);
+});
+
+test('linux: a Reset reply settles the Reset before its payload (met-19)', () => {
+	const f = bootstrapFrontend('linux');
+	const status = withStatus(f);
+	f.push({ metrics_manifest: {}, _prefetch_data: payload });
+	f.context.reset_filters();
+	f.dispatch();
+	const reset_id = f.state.active_cache_reset_id;
+	f.push({ metrics_manifest: {}, reset_id, cleared: false, _prefetch_data: payload });
+	assert.equal(f.state.active_cache_reset_id, 0);
+	assert.equal(status.textContent, EN['ui_typing.reset_failed']);
+});
 
 for (const success of [true, false]) {
 	test(`actual Lua purge completion controls latest frontend range, success=${success}`, () => {

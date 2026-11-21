@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuell",
 	"ui_typing.rep_table_total": "Gesamt",
 	"ui_typing.rep_table_via_star": "Über ★",
+	"ui_typing.reset_failed": "Zurücksetzen fehlgeschlagen: Die gespeicherten Statistiken konnten nicht gelöscht werden, die angezeigten Zahlen sind daher unverändert. Öffnen Sie das Fenster erneut, um es noch einmal zu versuchen.",
 	"ui_typing.search_close": "Schließen (Esc)",
 	"ui_typing.search_label": "In Seite suchen",
 	"ui_typing.search_next": "Nächste (Enter)",

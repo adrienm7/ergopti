@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuel",
 	"ui_typing.rep_table_total": "Toplam",
 	"ui_typing.rep_table_via_star": "★ Via",
+	"ui_typing.reset_failed": "Sıfırlama başarısız oldu: kayıtlı istatistikler temizlenemedi, bu yüzden gösterilen rakamlar değişmedi. Yeniden denemek için pencereyi tekrar açın.",
 	"ui_typing.search_close": "Kapat (Esc)",
 	"ui_typing.search_label": "Sayfada ara",
 	"ui_typing.search_next": "Sonraki (Enter)",

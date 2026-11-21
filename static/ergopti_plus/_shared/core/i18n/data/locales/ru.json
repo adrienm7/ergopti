@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Вручную",
 	"ui_typing.rep_table_total": "Всего",
 	"ui_typing.rep_table_via_star": "Через ★",
+	"ui_typing.reset_failed": "Не удалось выполнить сброс: сохранённую статистику не удалось очистить, поэтому показанные цифры не изменились. Откройте окно заново, чтобы повторить попытку.",
 	"ui_typing.search_close": "Закрыть (Esc)",
 	"ui_typing.search_label": "Поиск по странице",
 	"ui_typing.search_next": "Следующий (Enter)",

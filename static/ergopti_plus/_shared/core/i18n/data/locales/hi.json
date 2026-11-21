@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "मैनुअल",
 	"ui_typing.rep_table_total": "कुल",
 	"ui_typing.rep_table_via_star": "★ के माध्यम से",
+	"ui_typing.reset_failed": "रीसेट विफल रहा: सहेजे गए आँकड़े मिटाए नहीं जा सके, इसलिए दिखाए गए अंक नहीं बदले। फिर से कोशिश करने के लिए विंडो दोबारा खोलें।",
 	"ui_typing.search_close": "बंद करें (Esc)",
 	"ui_typing.search_label": "पृष्ठ में खोजें",
 	"ui_typing.search_next": "अगला (Enter)",

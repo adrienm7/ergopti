@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuel",
 	"ui_typing.rep_table_total": "Total",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "La réinitialisation a échoué : les statistiques enregistrées n'ont pas pu être effacées, les chiffres affichés n'ont donc pas changé. Rouvrez la fenêtre pour réessayer.",
 	"ui_typing.search_close": "Fermer (Échap)",
 	"ui_typing.search_label": "Rechercher dans la page",
 	"ui_typing.search_next": "Suivant (Entrée)",

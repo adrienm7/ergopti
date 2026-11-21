@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "수동",
 	"ui_typing.rep_table_total": "합계",
 	"ui_typing.rep_table_via_star": "★ 경유",
+	"ui_typing.reset_failed": "초기화하지 못했습니다. 저장된 통계를 지울 수 없어 표시된 수치는 바뀌지 않았습니다. 다시 시도하려면 창을 다시 여세요.",
 	"ui_typing.search_close": "닫기 (Esc)",
 	"ui_typing.search_label": "페이지에서 검색",
 	"ui_typing.search_next": "다음 (Enter)",

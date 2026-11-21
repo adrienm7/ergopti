@@ -240,19 +240,35 @@ local function handle(payload, state, context, request)
 	-- one observable effect was that resetting changed nothing.
 	-- The answer is the rebuilt payload itself: the page applies every reply as
 	-- dashboard data, and a bare { cleared = true } emptied the dashboard.
+	-- It names the page's Reset and its outcome: the page holds its range until
+	-- then, and read neither, so a failed purge was never told (MET-19).
 	if action == "clear_cache" then
+		local reset_id = payload.reset_id
+		if type(reset_id) ~= "number" or reset_id <= 0 or reset_id % 1 ~= 0 then
+			Logger.error(LOG, "A dashboard reset without a valid reset id was refused — nothing was cleared.")
+			return nil
+		end
 		_refresh_generation = _refresh_generation + 1
 		local cleared = false
 		if state.keystats and type(state.keystats.clear_cache) == "function" then
 			local ok, result = pcall(state.keystats.clear_cache)
 			cleared = ok and result == true
-			if cleared then Logger.info(LOG, "Dashboard caches cleared by user reset.") end
+			if cleared then
+				Logger.info(LOG, "Dashboard caches cleared by user reset.")
+			else
+				Logger.error(LOG, "Dashboard reset failed: the caches were not cleared (%s).",
+					ok and "the keystats refused while it flushes" or tostring(result))
+			end
 		else
 			Logger.error(LOG, "Reset requested but the keystats exposes no clear_cache — nothing was cleared.")
 		end
 		if not request.valid() then return nil end
 		local fresh, complete = build_ready(state)
-		if not fresh then return nil end
+		if not fresh then
+			Flush.call(APP_NAME, "complete_cache_reset", { reset_id, cleared }, state, context)
+			return nil
+		end
+		fresh.reset_id = reset_id
 		fresh.cleared = cleared
 		return fresh, cleared and complete
 	end
@@ -320,7 +336,8 @@ function M.on_message(payload, state, context)
 			for key, value in pairs(payload.apps) do apps[key] = value end
 		end
 		payload = { action = payload.action, start_date = payload.start_date, end_date = payload.end_date,
-			request_id = payload.request_id, apps = apps, maintenance_id = payload.maintenance_id }
+			request_id = payload.request_id, apps = apps, maintenance_id = payload.maintenance_id,
+			reset_id = payload.reset_id }
 	end
 	local action = type(payload) == "table" and payload.action or payload
 	if MAINTENANCE[action] then return request_maintenance(payload, state, context) end

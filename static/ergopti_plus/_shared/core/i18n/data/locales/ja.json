@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "手動",
 	"ui_typing.rep_table_total": "合計",
 	"ui_typing.rep_table_via_star": "★ 経由",
+	"ui_typing.reset_failed": "リセットに失敗しました。保存された統計を消去できなかったため、表示されている数値は変わっていません。もう一度試すにはウィンドウを開き直してください。",
 	"ui_typing.search_close": "閉じる (Esc)",
 	"ui_typing.search_label": "ページ内検索",
 	"ui_typing.search_next": "次へ (Enter)",

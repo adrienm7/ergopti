@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manuell",
 	"ui_typing.rep_table_total": "Totalt",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Återställningen misslyckades: den sparade statistiken kunde inte rensas, så siffrorna som visas är oförändrade. Öppna fönstret igen för att försöka på nytt.",
 	"ui_typing.search_close": "Stäng (Esc)",
 	"ui_typing.search_label": "Sök på sidan",
 	"ui_typing.search_next": "Nästa (Enter)",

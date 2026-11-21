@@ -3998,6 +3998,7 @@
 	"ui_typing.rep_table_manual": "Manual",
 	"ui_typing.rep_table_total": "Total",
 	"ui_typing.rep_table_via_star": "Via ★",
+	"ui_typing.reset_failed": "Reset failed: the saved statistics could not be cleared, so the figures shown are unchanged. Reopen the window to try again.",
 	"ui_typing.search_close": "Close (Esc)",
 	"ui_typing.search_label": "Search in page",
 	"ui_typing.search_next": "Next (Enter)",
