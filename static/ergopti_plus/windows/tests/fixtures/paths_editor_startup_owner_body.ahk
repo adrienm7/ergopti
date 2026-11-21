@@ -80,6 +80,8 @@ class _PWSO_Controller {
 			FilePathsEditor()
 		}
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

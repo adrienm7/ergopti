@@ -101,6 +101,8 @@ class _UCSO_Controller {
 		this.Closed += 1
 		_UCSO_Require(this.Closed == 1, "each returned controller closes exactly once")
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

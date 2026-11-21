@@ -110,6 +110,8 @@ class _LMCS_Controller {
 		this.Closed += 1
 		this.ActiveAtClose := this.CoreWebView2.Active
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

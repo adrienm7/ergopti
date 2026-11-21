@@ -232,9 +232,11 @@ _HCWWeb_TryOpen() {
 			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
 				return true
 			try Controller.Fill()
-			WebView_TakeFocus(Controller)
-			if _HCWWeb_StartupCurrent(SessionEpoch, g)
-				try LoggerSuccess("HotstringsConfigWindow", "Hotstrings config window shown via WebView2.")
+			if _HCWWeb_StartupCurrent(SessionEpoch, g) {
+				WebView_TakeFocus(Controller)
+				if _HCWWeb_StartupCurrent(SessionEpoch, g)
+					try LoggerSuccess("HotstringsConfigWindow", "Hotstrings config window shown via WebView2.")
+			}
 			return true
 		}
 	} finally {

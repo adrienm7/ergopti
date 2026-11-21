@@ -255,6 +255,8 @@ class _ESOW_Controller {
 	Close() {
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

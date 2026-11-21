@@ -73,6 +73,8 @@ class _APRC_Controller {
 		this.Closed += 1
 		_APRC_CloseBoundary(this)
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

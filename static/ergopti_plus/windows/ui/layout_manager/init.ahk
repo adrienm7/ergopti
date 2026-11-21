@@ -942,6 +942,8 @@ LayoutManager_Open(*) {
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false
 	Controller.Fill()
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
 	WebView_TakeFocus(Controller)
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false

@@ -72,6 +72,8 @@ class _APCF_Controller {
 		this.Closed += 1
 		_APCF_CloseBoundary(this)
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

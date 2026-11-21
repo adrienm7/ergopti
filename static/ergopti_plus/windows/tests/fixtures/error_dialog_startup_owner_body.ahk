@@ -106,6 +106,8 @@ class _EDOS_Controller {
 		this.Closed += 1
 		_EDOS_Require(this.Closed == 1, "An exact passive controller must retire successfully only once.")
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

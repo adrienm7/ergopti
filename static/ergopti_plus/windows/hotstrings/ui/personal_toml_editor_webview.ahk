@@ -224,9 +224,11 @@ _HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
 			try Controller.Fill()
-			WebView_TakeFocus(Controller)
-			if _HsEdWeb_StartupCurrent(SessionEpoch, g)
-				try LoggerSuccess("HsEditor", "Personal hotstring editor shown via WebView2.")
+			if _HsEdWeb_StartupCurrent(SessionEpoch, g) {
+				WebView_TakeFocus(Controller)
+				if _HsEdWeb_StartupCurrent(SessionEpoch, g)
+					try LoggerSuccess("HsEditor", "Personal hotstring editor shown via WebView2.")
+			}
 			return true
 		}
 	} finally {

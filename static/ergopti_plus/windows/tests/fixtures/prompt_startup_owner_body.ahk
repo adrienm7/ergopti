@@ -101,6 +101,8 @@ class _PRSO_Controller {
 		}
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

@@ -381,6 +381,8 @@ class _UIWH_BuildController {
 			return _UIWH_BuildView(this.State)
 		}
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.State["fills"] += 1
 		_UIWH_BuildCancel(this.State, "fill")

@@ -72,6 +72,8 @@ class _PNAV_Controller {
 	Close() {
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

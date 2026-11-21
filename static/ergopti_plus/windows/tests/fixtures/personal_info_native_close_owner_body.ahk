@@ -120,6 +120,8 @@ class _PINS_Controller {
 			_PINS.RetiredAtControllerClose := _PINS.SubscriptionsRetired
 		}
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

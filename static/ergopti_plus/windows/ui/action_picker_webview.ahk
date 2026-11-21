@@ -245,9 +245,11 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
 		try Controller.Fill()
-		WebView_TakeFocus(Controller)
-		if _ActPickWeb_StartupCurrent(SessionEpoch, g)
-			try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} item(s)).", Items.Length)
+		if _ActPickWeb_StartupCurrent(SessionEpoch, g) {
+			WebView_TakeFocus(Controller)
+			if _ActPickWeb_StartupCurrent(SessionEpoch, g)
+				try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} item(s)).", Items.Length)
+		}
 		return true
 	} finally {
 		if !Installed {

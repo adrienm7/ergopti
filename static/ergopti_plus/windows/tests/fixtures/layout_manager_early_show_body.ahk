@@ -142,6 +142,8 @@ class _LMSO_Controller {
 		}
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

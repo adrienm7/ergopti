@@ -124,6 +124,8 @@ class _MBSW_PassiveController {
 			return this.View
 		}
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		global _MBSW
 		_MBSW.Filled += 1
