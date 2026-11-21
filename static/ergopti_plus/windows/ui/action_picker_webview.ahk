@@ -591,7 +591,8 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
 					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
 				: ""
-			Hint := DisabledProgram ? t("platform_reason.program_runner_unavailable") : (It.HasOwnProp("Hint") ? It.Hint : "")
+			; A row's own reason (a chord that cannot run it) outranks the runner's.
+			Hint := It.HasOwnProp("Hint") ? It.Hint : DisabledProgram ? t("platform_reason.program_runner_unavailable") : ""
 			ItemsJson .= "{"
 				. _ActPickWeb_Kv("type", "action") . ","
 				. _ActPickWeb_Kv("id", It.Id) . ","

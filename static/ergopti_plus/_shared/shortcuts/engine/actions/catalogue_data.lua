@@ -286,7 +286,7 @@ return {
 	},
 	actions = {
 		["activity_simulation"] = { family = "sg", label_key = "sg_actions.activity_simulation", platforms = { "hs", "linux" }, requires = { linux = { "tool:systemd-inhibit" } } },
-		["alt_tab_monitor"] = { family = "sg", label_key = "sg_actions.alt_tab_monitor", platforms = { "hs", "linux" }, requires = { linux = { "session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum" } } },
+		["alt_tab_monitor"] = { family = "sg", label_key = "sg_actions.alt_tab_monitor", platforms = { "hs", "linux" }, requires = { linux = { "session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum" } }, chord_reason = { linux = "platform_reason.chord_runs_no_program_or_monitor_switch" } },
 		["alt_tab_windows"] = { family = "sg", label_key = "sg_actions.alt_tab_windows", platforms = { "hs" } },
 		["app_expose"] = { family = "sg", label_key = "sg_actions.app_expose", platforms = { "hs" } },
 		["app_previous"] = { family = "sg", label_key = "sg_actions.app_previous", platforms = { "hs" } },
@@ -432,7 +432,7 @@ return {
 		["right_click_toggle"] = { family = "sg", label_key = "sg_actions.right_click_toggle", platforms = { "hs", "linux" }, requires = { linux = { "session:x11", "tool:xdotool" } } },
 		["run_apple_shortcut"] = { family = "sg", label_key = "sg_actions.run_apple_shortcut", parameter = "apple_shortcut", platforms = { "hs" } },
 		["run_command"] = { family = "sg", label_key = "sg_actions.run_command", parameter = "command", platforms = { "hs", "linux" } },
-		["run_program"] = { family = "sg", label_key = "sg_actions.run_program", parameter = "program", platforms = { "hs", "linux" } },
+		["run_program"] = { family = "sg", label_key = "sg_actions.run_program", parameter = "program", platforms = { "hs", "linux" }, chord_reason = { linux = "platform_reason.chord_runs_no_program_or_monitor_switch" } },
 		["save"] = { family = "sg", label_key = "sg_actions.save", platforms = { "hs" } },
 		["screen_capture"] = { family = "sg", label_key = "sg_actions.screen_capture", platforms = { "hs", "linux" } },
 		["screen_capture_instant"] = { family = "sg", label_key = "sg_actions.screen_capture_instant", platforms = { "hs", "linux" } },

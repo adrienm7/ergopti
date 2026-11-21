@@ -97,6 +97,9 @@ function M.for_platform(platform, extras)
 			if action.requires and action.requires[platform] then
 				copy.requires = copy_list(action.requires[platform])
 			end
+			-- The platform_reason.* key a chord picker greys this action with
+			-- (decision KCD-2 of 2026-11-21).
+			if action.chord_reason then copy.chord_reason = action.chord_reason[platform] end
 			catalogue.actions[id] = copy
 		end
 	end

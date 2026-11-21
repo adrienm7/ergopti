@@ -683,3 +683,24 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
  } finally FileDelete(Path)
 }
 Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)
+
+; Decision KCD-2 of 2026-11-21: the chord picker greys a program launch and the
+; monitor Alt-Tab with their platform reason (macOS runs them through Karabiner)
+; and leaves out the one-shot Shift, which no chord runs on any OS.
+_KCCE_ChordPickerGreysWindowsOnlyRefusals() {
+	Items := Map()
+	for _, Item in KeyCombinationChordPickerItems()
+		if (Item.Type == "action")
+			Items[Item.Id] := Item
+	Reason := t("platform_reason.chord_runs_no_program_or_monitor_switch")
+	AssertTrue(Reason != "platform_reason.chord_runs_no_program_or_monitor_switch", "the reason is translated")
+	for _, Id in ["run_program", "alt_tab_monitor"] {
+		AssertTrue(Items.Has(Id), Id . " stays listed")
+		AssertTrue(Items[Id].HasOwnProp("Disabled") && Items[Id].Disabled, Id . " is greyed")
+		AssertEqual(Reason, Items[Id].Hint, Id . " says why")
+	}
+	AssertFalse(Items.Has("one_shot_shift"), "the one-shot Shift is left out")
+	AssertTrue(Items.Has("copy") && !Items["copy"].HasOwnProp("Disabled"), "a chord action stays pickable")
+}
+Test("key combination chords: the chord picker greys the Windows-only refusals with their reason (kcd-2-chord-reason)",
+	_KCCE_ChordPickerGreysWindowsOnlyRefusals)

@@ -127,6 +127,10 @@ technical = "Mission Control and App Exposé on macOS, Task View on Windows; Lin
 kind = "os_equivalent"
 technical = "Word deletion is Option+Backspace on macOS text fields and Ctrl+Backspace on Windows and Linux; each OS lists its own action."
 
+[reasons."platform_reason.chord_runs_no_program_or_monitor_switch"]
+kind = "not_yet"
+technical = "Karabiner-Elements runs a macOS chord as its rule's own output, so a program launch (a shell command) and the monitor Alt-Tab (Ctrl+F17 to its watcher) run there. Windows (windows/infra/key_combinations.ahk) and Linux (modules/shortcuts/key_combinations.lua) fire a chord from their key-combination engine, which owns no program session for a combination binding (ProgramActions_BindingSupported, the Linux program owner) and no per-monitor window cycle; they refuse both in a chord (KEY_COMBINATION_CHORD_REFUSED_ACTIONS, CHORD_REFUSED_ACTIONS) and their chord pickers grey them with this reason, read from the chord reason of each action in actions.toml. Kept so by the maintainer decision KCD-2 of 2026-11-21."
+
 [reasons."platform_reason.key_combinations_are_karabiner_settings_on_macos"]
 kind = "driver_storage"
 technical = "Karabiner-Elements runs the key combinations on macOS, so macOS keeps each pair's tap and hold with its Karabiner settings (mod_combos.config in config.toml) instead of shortcuts.key_combination_taps; the master switch, category_enabled.key_combinations, is the same on the three OS (maintainer decision KCD-6 of 2026-11-21)."

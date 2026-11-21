@@ -253,7 +253,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_key_history" })
 	Actions := Catalogue.Actions
 	Actions["activity_simulation"] := { Family: "sg", LabelKey: "sg_actions.activity_simulation", Parameter: "", Confirm: false }
-	Actions["alt_tab_monitor"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_monitor", Parameter: "", Confirm: false }
+	Actions["alt_tab_monitor"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_monitor", Parameter: "", Confirm: false, ChordReason: "platform_reason.chord_runs_no_program_or_monitor_switch" }
 	Actions["alt_tab_windows"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_windows", Parameter: "", Confirm: false }
 	Actions["app_switcher"] := { Family: "sg", LabelKey: "sg_actions.app_switcher", Parameter: "", Confirm: false }
 	Actions["app_window_previous"] := { Family: "sg", LabelKey: "sg_actions.app_window_previous", Parameter: "", Confirm: false }
@@ -378,7 +378,7 @@ GestureActionCatalogueData() {
 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
 	Actions["run_command"] := { Family: "sg", LabelKey: "sg_actions.run_command", Parameter: "command", Confirm: false }
-	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
+	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false, ChordReason: "platform_reason.chord_runs_no_program_or_monitor_switch" }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
 	Actions["screen_record"] := { Family: "sg", LabelKey: "sg_actions.screen_record", Parameter: "", Confirm: false }

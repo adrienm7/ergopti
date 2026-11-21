@@ -4624,6 +4624,7 @@
 	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "不适用于 Windows：Windows 设置只允许为三指和四指轻点以及四个直线方向的滑动指定快捷键，并且不会把触摸数据传给 Ergopti。因此那里没有双指或五指槽位、斜向槽位或水平滑动槽位。",
 	"platform_reason.category_master_is_a_gate_on_windows": "Windows 上不使用此名称：Windows 将此总开关作为 category_enabled 中该类别的开关保存。macOS 和 Linux 将其保存在该类别自己的部分中，名为 enabled。",
 	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS 上不使用此名称：在 macOS 上由 Karabiner-Elements 执行组合键，因此 macOS 将每对组合键的各个槽位与其 Karabiner 设置一起保存，即 config.toml 中的 mod_combos。",
+	"platform_reason.chord_runs_no_program_or_monitor_switch": "此处不能用于和弦：本系统的和弦经由 Ergopti 键盘引擎，发送按键和操作，但不会启动程序，也不会在单个屏幕的窗口间切换。macOS 通过其 Karabiner-Elements 和弦完成这两项。",
 	"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS 上不使用此名称：macOS 将此选项列在其 Ctrl 和 Cmd 快捷键中并与之一同保存，即 shortcuts.keys.wrap_text_if_selected。",
 	"platform_reason.action_application_switching_is_macos": "仅限 macOS：macOS 在应用之间切换，每个应用统领自己的窗口。Windows 和 Linux 用 Alt+Tab 在窗口之间切换：请使用对应的操作。",
 	"platform_reason.action_continuous_swipe_is_macos": "仅限 macOS：连续滑动会在手指移动时跟随它们，只有 macOS 驱动能读取这一点。Windows 从触控板设置收到已完成的手势，Linux 在滑动结束后才执行：请使用对应的单步操作。",

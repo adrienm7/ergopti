@@ -263,6 +263,12 @@ function catalogueEntries({ features, actions, layers, menu, hiddenReasons }) {
 			const reasons = {};
 			for (const [os, key] of Object.entries(OS))
 				if (!available[os]) reasons[os] = action[`reason_${key}`] || null;
+			// An action a chord of that OS cannot run is offered everywhere else:
+			// degraded, with the reason its chord picker shows (KCD-2, 2026-11-21).
+			const degraded = {};
+			for (const [os, key] of Object.entries(OS))
+				if (available[os] && action[`chord_reason_${key}`])
+					degraded[os] = action[`chord_reason_${key}`];
 			entries.push({
 				kind: 'action',
 				path: `${family}.${id}`,
@@ -270,7 +276,7 @@ function catalogueEntries({ features, actions, layers, menu, hiddenReasons }) {
 				label_key: `${family}.${id}`,
 				available,
 				reasons,
-				degraded: {}
+				degraded
 			});
 		}
 	}

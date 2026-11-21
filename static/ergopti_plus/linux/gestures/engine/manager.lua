@@ -991,6 +991,16 @@ function M.get_action_label(action_name)
 	return i18n.get(meta.label_key)
 end
 
+--- The platform_reason.* key a key chord's picker greys an action with: the
+--- chord_reason_linux of actions.toml (decision KCD-2 of 2026-11-21: macOS runs
+--- a program launch and the monitor Alt-Tab in a chord through Karabiner).
+--- @param action_name string A catalogue action id.
+--- @return string|nil reason_key Nil when a Linux chord can run the action.
+function M.get_action_chord_reason(action_name)
+	local meta = Catalogue.actions[action_name]
+	return meta and meta.chord_reason or nil
+end
+
 --- Returns the action ids the picker lists, in catalogue order, the
 --- modifier-chord block expanded. "none" is included: it is a valid binding.
 --- @return table

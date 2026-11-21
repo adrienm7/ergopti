@@ -898,9 +898,34 @@ KeyCombinationSlotRows(PairId, PairLabel) {
 			"disabled", true, "disabled_reason_key", "menu.shortcuts.key_combinations_chord_no_altgr")]
 	ChordRow := Map("action", (*) => ShowActionPicker(t("menu.shortcuts.key_combinations_chord_title_prefix") . PairLabel,
 		KeyCombinationChordOf(PairId), (ActionName) => SetKeyCombinationChord(PairId, ActionName),
-		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId))))
+		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId)), 0, KeyCombinationChordPickerItems()))
 	ChordRow["label"] := StrReplace(t("menu.shortcuts.key_combinations_chord"), "%s", _KeyCombinationChordLabel(PairId))
 	return [TapRow, HoldRow, ChordRow]
+}
+
+; The chord picker's items: the catalogue's, without the actions no chord runs
+; on any OS (the one-shot Shift), and with the actions only a Windows chord
+; cannot run greyed, each with the reason actions.toml gives it as
+; chord_reason_ahk (decision KCD-2 of 2026-11-21: macOS runs them through
+; Karabiner). KEY_COMBINATION_CHORD_REFUSED_ACTIONS still refuses both kinds.
+; @param Items {Array} Replaces GestureActionPickerItems() in tests.
+; @returns {Array} Picker items.
+KeyCombinationChordPickerItems(Items := 0) {
+	global KEY_COMBINATION_CHORD_REFUSED_ACTIONS, GESTURE_ACTION_CATALOGUE
+	Source := (Items is Array) ? Items : GestureActionPickerItems()
+	Actions := GESTURE_ACTION_CATALOGUE.Actions
+	Kept := []
+	for _, Item in Source {
+		if (Item.Type != "action") || !KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Item.Id) {
+			Kept.Push(Item)
+			continue
+		}
+		if !Actions.Has(Item.Id) || !Actions[Item.Id].HasOwnProp("ChordReason")
+			continue
+		Kept.Push({ Type: "action", Id: Item.Id, Label: Item.Label, Disabled: true,
+			Hint: t(Actions[Item.Id].ChordReason) })
+	}
+	return Kept
 }
 
 ; Opens the shared action picker on a pair's hold slot: the shared hold

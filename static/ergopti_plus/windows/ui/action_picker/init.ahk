@@ -60,8 +60,10 @@ ShowKeyboardSlotPicker(Prefix) {
 ; returns the integer 1 to close the picker, then after_close runs (the
 ; reload); any other answer keeps the picker open, as on macOS and Linux.
 ; Without a Slot, OnConfirm also runs while the picker is open: false keeps
-; it open for another pick, any other answer closes it.
-ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "", Slot := 0) {
+; it open for another pick, any other answer closes it. Items, when given,
+; replaces the catalogue's picker items for a slot that takes gesture actions
+; but greys or leaves out some of them (a key chord).
+ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "", Slot := 0, Items := 0) {
 		AfterClose := 0
 		if (Slot is Map) {
 				if !(Slot.Get("items", 0) is Array) || !HasMethod(Slot.Get("after_close", 0), "Call")
@@ -70,11 +72,15 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 		} else if !((Slot is Integer) && Slot == 0) {
 				throw TypeError("A picker slot is a Map.", -1, Type(Slot))
 		}
+		if !(Items is Array) && !((Items is Integer) && Items == 0)
+				throw TypeError("Picker items are an Array.", -1, Type(Items))
+		if (Items is Array) && (Slot is Map)
+				throw ValueError("A picker slot already brings its own items.", -1)
 		; Prefer the shared WebView2 picker (identical UI to macOS and Linux). It
 		; receives the ordered items of the generated catalogue, headings already
 		; localized with their level; the page injects its own native/none rows.
 		; The native searchable ListBox below remains as an automatic fallback.
-		PickerItems := (Slot is Map) ? Slot["items"] : GestureActionPickerItems()
+		PickerItems := (Slot is Map) ? Slot["items"] : (Items is Array) ? Items : GestureActionPickerItems()
 		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId, AfterClose)
 				return
 		AllItems := []

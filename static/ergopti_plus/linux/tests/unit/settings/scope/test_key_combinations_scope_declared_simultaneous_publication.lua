@@ -218,7 +218,8 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    helpers.assert_true(chord.fn());helpers.assert_eq(s.picker.binding,binding)
    local offers_caps_word=false
    for _,item in ipairs(s.picker.items) do
-    helpers.assert_true(item.id~='one_shot_shift' and item.id~='run_program' and item.id~='alt_tab_monitor')
+    helpers.assert_true(item.id~='one_shot_shift','no chord runs the one-shot Shift')
+    if item.id=='copy' then helpers.assert_true(item.disabled~=true,'a chord action stays pickable') end
     offers_caps_word=offers_caps_word or item.id=='caps_word'
    end
    helpers.assert_true(offers_caps_word,'the chord picker offers CapsWord')
@@ -332,9 +333,11 @@ end)
 
 
 
+-- Decision KCD-2 of 2026-11-21: macOS runs both in a chord through Karabiner,
+-- so the Linux chord picker lists them greyed, with the platform reason.
 helpers.describe("unjoined third-slot native receiving is unavailable",function()
  for _,action in ipairs({"run_program","alt_tab_monitor"}) do
-  helpers.it("the actual generic catalogue cannot authorize third-slot "..action,function()
+  helpers.it("(kcd-2-chord-reason) the chord picker greys third-slot "..action.." with its platform reason",function()
    with_menu(function(s)
     helpers.assert_true(s.gestures.is_assignable(action))
     helpers.assert_true(s.pairs.validate_slot("tap",pair,action))
@@ -343,7 +346,13 @@ helpers.describe("unjoined third-slot native receiving is unavailable",function(
     local row=find_menu(s.build(),'caps_lock + tab')
     local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))
     helpers.assert_true(chord.fn())
-    for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~=action) end
+    local listed
+    for _,item in ipairs(s.picker.items) do if item.id==action then listed=item end end
+    helpers.assert_true(listed~=nil,action.." stays listed")
+    helpers.assert_eq(listed.disabled,true)
+    local reason=s.translate("platform_reason.chord_runs_no_program_or_monitor_switch")
+    helpers.assert_true(reason~="platform_reason.chord_runs_no_program_or_monitor_switch","the reason is translated")
+    helpers.assert_eq(listed.hint,reason)
     helpers.assert_eq(s.picker.confirm(action),false)
     helpers.assert_eq(s.bytes[path],source);helpers.assert_eq(s.publications,0)
    end,true)

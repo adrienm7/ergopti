@@ -967,8 +967,11 @@ requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 [sg_actions.run_program]
 # Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
+# Not in a Windows or Linux chord (decision KCD-2 of 2026-11-21): Karabiner runs it on macOS.
 platform = "all"
 parameter = "program"
+chord_reason_ahk = "platform_reason.chord_runs_no_program_or_monitor_switch"
+chord_reason_linux = "platform_reason.chord_runs_no_program_or_monitor_switch"
 
 [sg_actions.run_command]
 # A shell command line the user typed, run by /bin/sh -l -c (a login shell's
@@ -1672,7 +1675,10 @@ emit_hs_mods = ["shift"]
 # owned X11 worker instead of emitting the unrelated global Alt+Tab shortcut.
 # Ctrl+F17 keeps the existing macOS watcher route for this distinct action.
 [sg_actions.alt_tab_monitor]
+# Not in a Windows or Linux chord (decision KCD-2 of 2026-11-21): Karabiner runs it on macOS.
 platform = "all"
+chord_reason_ahk = "platform_reason.chord_runs_no_program_or_monitor_switch"
+chord_reason_linux = "platform_reason.chord_runs_no_program_or_monitor_switch"
 emit_hs_key = "f17"
 emit_hs_mods = ["ctrl"]
 requires_linux = ["session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum"]
