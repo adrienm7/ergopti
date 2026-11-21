@@ -382,7 +382,12 @@ owner. Windows is the reference unless a shared contract says otherwise.
    its shared page; `update_check` on the three and its shared page; plus
    `release_notes`, `update_channels.js` and `version_order.js`. About 5,000
    lines. The Windows window shows only the managed download failure; the
-   macOS one shows the model and runtime downloads.
+   macOS one shows the model and runtime downloads. **Taken on 2026-11-21**
+   ([report](../2026-11-21-update-windows/report.md)): states, progress and
+   cancel, digest and signature, the feed-only fallback, localized errors,
+   keyboard and screen reader, preferences, relaunch and teardown; UPD-01
+   (Windows integrity notice), UPD-02 (Linux update cancel line), UPD-03
+   (Escape) and UPD-04 (the answer announced) fixed, UPD-05 to UPD-12 open.
 6. **Pickers and prompts.** `action_picker`, `model_browser`,
    `numeric_prompt`, `token_prompt`, `error_dialog`, `config_cleanup` and
    `physical_shortcuts`: their shared pages and the Linux and macOS hosts.

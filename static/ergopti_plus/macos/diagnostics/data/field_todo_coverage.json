@@ -805,6 +805,12 @@
 			"not_testable": "Changes the user's own Login Items and needs a logout: in the developer app, tick About > Start at login, approve it in System Settings > General > Login Items if asked, log out and in, then untick it."
 		},
 		{
+			"id": "update_windows",
+			"title": "Updates window: Escape, VoiceOver and a refused check (UPD-03, UPD-04, UPD-06)",
+			"checks": [],
+			"not_testable": "Needs a person with VoiceOver at the Updates window, and a network whose proxy or firewall refuses api.github.com: the field report neither listens to VoiceOver nor changes the network."
+		},
+		{
 			"id": "config_nfd_paths",
 			"title": "Configuration paths in NFD and NFC",
 			"checks": [],

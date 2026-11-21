@@ -376,8 +376,18 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     TRAY-03 a Linux desktop without a StatusNotifier host shows no icon and tells nothing (read the watcher, say so
     in the user's language); TRAY-04 rewrite `TrayMenu.spec.js` on the two real icon states and the option map, with
     vectors that can fail; TRAY-05 log a missing tray icon file on the three instead of drawing another;
-  - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
-    small native units, layout tool pages.
+  - update and download windows, taken on 2026-11-21
+    ([report](docs/audits/platform-parity/2026-11-21-update-windows/report.md)): UPD-01 (a refused Windows digest
+    named as a failed download), UPD-02 (a cancelled Linux update read « Ollama download cancelled »), UPD-03
+    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed. Left: UPD-05 closing
+    the Linux download window refuses the downloaded update's install (decide cancel or install); UPD-06 carry the
+    fetch receipt into the Lua update check so macOS and Linux name the proxy, offline or certificate cause as
+    Windows does; UPD-07 update download progress on Windows and Linux (and a Windows cancel); UPD-08 a failed Linux
+    update download drops the menu's offer; UPD-09 Linux says « restarting » before trying; UPD-10 a refused
+    signature named on the three; UPD-11 the macOS Versions install passes no failure receipt and leaves its stage
+    folder; UPD-12 the download page's English fallbacks and fixed `lang`;
+  - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
+    pages.
     30 min install budget), OLL-03 (stale owners), OLL-07 (Windows and Linux remove the earlier runtime once the
     pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
     `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13

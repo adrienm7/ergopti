@@ -137,6 +137,12 @@
 			"not_testable": "Needs a GNOME session without the AppIndicator extension, then a panel with one, and a screen reader: the field report runs inside the user's own session and cannot remove or add a panel extension."
 		},
 		{
+			"id": "update_windows",
+			"title": "Updates and download windows: Escape, Orca, a cancelled and a closed update download (UPD-02 to UPD-05)",
+			"checks": [],
+			"not_testable": "Needs a standalone install offered a newer release, a person who cancels and then closes the download window, and Orca: the field report never downloads or installs an update."
+		},
+		{
 			"id": "input_policies",
 			"title": "Branch wave3/input-policies: sticky delay, CapsWord menu, one-shot Shift device",
 			"checks": [

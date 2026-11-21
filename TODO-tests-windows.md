@@ -243,6 +243,11 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       first run (no `config.toml`), the icon shown beside the wizard reads « ErgoptiPlus — Starting… », is named «
       Ergopti+ », and a click on it brings the wizard forward. Left-click the icon too and note what it does (TRAY-02:
       nothing today, where macOS and Linux open the menu).
+- [ ] Updates window (UPD-01, UPD-03, UPD-04, 2026-11-21): with Narrator on, About > Check for updates: Narrator
+      reads « Checking for updates on the … channel » then the answer without a focus move, and Escape closes the
+      window while the page has the focus. On a test build fed by a local release mirror whose `.sha256` does not
+      match the asset, Update ends on « The integrity check of v… failed: nothing was installed. », never « Check
+      your internet connection »; nothing is replaced.
 - [ ] Boot and menu timings: a toggle must not rebuild 1000 rows; compare base and candidate with interleaved smoke
       boots (summed `process_cpu`); the 2026-11-16 smoke boots gave `Boot complete` between 5.9 and 8.7 s.
 - [ ] Hot-path span lines: at DEBUG, switch the layout once; the field log then holds a `layout.switch` pair beside the

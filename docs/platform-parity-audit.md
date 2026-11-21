@@ -181,6 +181,7 @@ named file is not a reviewed file.
 | Logger engines                 | [report](audits/platform-parity/2026-11-20-logger-engines/report.md)                               |
 | Managed Ollama runtime         | [report](audits/platform-parity/2026-11-20-managed-ollama/report.md)                               |
 | Tray adapters                  | [report](audits/platform-parity/2026-11-20-tray-adapters/report.md)                                |
+| Update and download windows    | [report](audits/platform-parity/2026-11-21-update-windows/report.md)                               |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -216,6 +217,18 @@ wizard's language. Left open: TRAY-02, a Windows left click does nothing
 nothing and says nothing; TRAY-04, the TrayMenu port spec and its vectors
 describe a three-state `setIcon(state)` no adapter has; TRAY-05, a missing
 icon file is replaced silently on the three.
+
+The update-windows campaign (November 21, 2026) fixed UPD-01 to UPD-04: a
+Windows update started from the Updates window whose digest is refused now
+names the integrity check instead of asking the user to check the
+connection; a cancelled Linux update no longer reads « Ollama download
+cancelled »; and the shared Updates page closes on Escape and announces the
+answer that replaces « checking », on the three drivers. Left open: UPD-05,
+closing the Linux download window throws the downloaded update away (a
+maintainer choice between cancel and install); UPD-06, macOS and Linux name
+no network cause for a failed check where Windows names the proxy or the
+certificate; UPD-07, no update progress on Windows and Linux; UPD-08 to
+UPD-12, smaller wording, receipt and offer gaps.
 
 ## Review status at resumption — November 12, 2026
 

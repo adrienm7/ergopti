@@ -26,6 +26,11 @@ terminal): coverage table, verdicts and what no run can test in
       startup settings » opens Login Items and the row is checked once allowed; log out and in: Ergopti starts from
       `build/macos/ErgoptiPlus.app`; untick it afterwards. A refusal of the ad hoc bundle by `SMAppService` is a
       failure to report (then the row greys on that build with a reason).
+- [ ] <!-- field-point: update_windows --> **Updates window (UPD-03, UPD-04, UPD-06, 2026-11-21):** with VoiceOver
+      on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a focus move,
+      and Escape closes the window. Then on a network whose proxy refuses api.github.com (or with a dead proxy set in
+      System Settings), check again and note the sentence: « Could not reach GitHub » today, where Windows names the
+      proxy (UPD-06).
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in

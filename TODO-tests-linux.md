@@ -61,6 +61,13 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       notification, a window) and the log line after « Tray icon created ». Then enable the extension and, on GNOME and
       on KDE Plasma, left-click and right-click the icon (both open the menu?) and let Orca read it: « Ergopti+ », then
       « Ergopti+ (paused) » after a pause.
+- [ ] <!-- field-point: update_windows --> Updates and download windows (UPD-02 to UPD-05, 2026-11-21), on a
+      standalone install offered a newer release, Orca on: About > Check for updates; Orca reads « Checking for
+      updates… » then the answer without a focus move, and Escape closes the window. Click Update, then Cancel in the
+      download window: it reads « Update download cancelled », never « Ollama download cancelled »; note whether the
+      menu still offers the update (UPD-08: it does not today). Click Update again and close the download window
+      while it downloads: note whether the release installs once downloaded (UPD-05: the log says « native install
+      refused » today) and whether the bar ever moves from 0 % (UPD-07).
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift
