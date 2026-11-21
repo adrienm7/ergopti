@@ -18,6 +18,9 @@
  * the whole history. Every snapshot marked `_partial` must therefore be named
  * as partial, with the oldest rebuilt day, and a complete snapshot must clear
  * that notice. Both dashboards must route every snapshot through the banner.
+ *
+ * The banner built its text once: a locale the Windows host injects after the
+ * first progress left it on its raw keys until the next message (MET-15).
  * ==============================================================================
  */
 
@@ -110,6 +113,30 @@ if (api) {
 	check(
 		api.format_eta(59) === '0:59' && api.format_eta(600) === '10:00',
 		`${REL}: format_eta must be m:ss`
+	);
+}
+
+// ── 2c. A locale that lands after the progress rewords the banner (MET-15) ─
+{
+	const { loadBanner } = require('./support/banner-dom.cjs');
+	const page = loadBanner(p.join(ROOT, REL));
+	page.window.metrics_rebuild.show_progress({ state: 'running', percent: 42, eta_s: 95 });
+	page.window.metrics_rebuild.mark_snapshot({ _partial: { oldest: '2026-08-01' } });
+	const banner = page.body.children.find((child) => child.id === 'metrics_rebuild_banner');
+	check(Boolean(banner), `${REL}: the banner is on the page`);
+	page.applyLocale(en, 'en');
+	const [label, , notice] = banner ? banner.children : [{}, {}, {}];
+	check(
+		label.textContent.includes('42%') && label.textContent.includes('1:35'),
+		`${REL}: the progress must reword itself when the locale lands, got "${label.textContent}"`
+	);
+	check(
+		String(notice.textContent).includes('August 1, 2026'),
+		`${REL}: the partial notice must reword itself when the locale lands, got "${notice.textContent}"`
+	);
+	check(
+		!`${label.textContent} ${notice.textContent}`.includes('ui_metrics_rebuild.'),
+		`${REL}: no raw key once the locale landed`
 	);
 }
 

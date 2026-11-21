@@ -124,7 +124,9 @@
 
 	let root = null;
 	let applied_revision = -1;
-	let freshness_view = { visible: false, failed: false, text: '' };
+	// The host's state, not its wording: the text is built from it at each
+	// render, so a locale that lands after it rewords the banner (MET-15).
+	let freshness_state = null;
 	const incomplete_parts = { manifest: false, range: false };
 
 	function ensure_root() {
@@ -152,6 +154,11 @@
 	 */
 	function render() {
 		ensure_root();
+		const freshness_view = describe_freshness(
+			freshness_state,
+			window._i18n_strings,
+			window._i18n_locale
+		);
 		const notice = describe_incomplete(incomplete_parts, window._i18n_strings);
 		const texts = [freshness_view.visible ? freshness_view.text : '', notice].filter(Boolean);
 		root.style.display = texts.length ? 'block' : 'none';
@@ -163,7 +170,7 @@
 	api.show = function (freshness, revision) {
 		if (!Number.isSafeInteger(revision) || revision < applied_revision) return false;
 		applied_revision = revision;
-		freshness_view = describe_freshness(freshness, window._i18n_strings, window._i18n_locale);
+		freshness_state = freshness;
 		render();
 		return true;
 	};
@@ -181,5 +188,10 @@
 		incomplete_parts[part] = incomplete === true;
 		render();
 	};
+
+	// Windows injects the locale after the first publication: reword then.
+	document.addEventListener('i18n:applied', function () {
+		if (root) render();
+	});
 	window.metrics_freshness = api;
 })();

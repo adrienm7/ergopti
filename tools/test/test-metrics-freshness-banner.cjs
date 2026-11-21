@@ -20,6 +20,9 @@
  * history. Hosts now show the partial counts, flagged per part (manifest,
  * n-gram range), and the banner must say the history is incomplete until both
  * parts arrive complete again.
+ *
+ * The banner built its text once: a locale the Windows host injects after the
+ * first publication left it on its raw keys until the next state (MET-15).
  * ==============================================================================
  */
 
@@ -113,6 +116,24 @@ if (api) {
 			`${REL}: complete data shows no incomplete notice`
 		);
 	}
+}
+
+// ── 2c. A locale that lands after the state rewords the banner (MET-15) ────
+{
+	const { loadBanner } = require('./support/banner-dom.cjs');
+	const page = loadBanner(p.join(ROOT, REL));
+	page.window.metrics_freshness.show({ state: 'stale', generated_at: AT }, 1);
+	page.window.metrics_freshness.mark_incomplete('range', true);
+	const banner = page.body.children.find((child) => child.id === 'metrics_freshness_banner');
+	check(Boolean(banner), `${REL}: the banner is on the page`);
+	page.applyLocale(fr, 'fr');
+	const text = banner ? banner.textContent : '';
+	check(
+		/^Données du 29 septembre 2026/.test(text) &&
+			text.includes(fr['ui_metrics_freshness.incomplete']),
+		`${REL}: the banner must reword itself when the locale lands after the state, got "${text}"`
+	);
+	check(!text.includes('ui_metrics_freshness.'), `${REL}: no raw key once the locale landed`);
 }
 
 // ── 3. The typing dashboard routes every host state through the banner ─────

@@ -129,8 +129,10 @@
 	let bar = null;
 	let label = null;
 	let notice = null;
-	let progress_state = { visible: false };
-	let partial_text = '';
+	// The host's payloads, not their wording: the text is built from them at
+	// each render, so a locale that lands after them rewords the banner (MET-15).
+	let progress_payload = null;
+	let partial_payload = null;
 
 	function ensure_root() {
 		if (root) return;
@@ -170,6 +172,12 @@
 
 	function render() {
 		ensure_root();
+		const progress_state = describe_progress(progress_payload, window._i18n_strings);
+		const partial_text = describe_partial(
+			partial_payload,
+			window._i18n_strings,
+			window._i18n_locale
+		);
 		const visible = progress_state.visible || partial_text !== '';
 		root.style.display = visible ? 'block' : 'none';
 		root.classList.toggle('failed', !!progress_state.failed);
@@ -183,16 +191,17 @@
 	}
 
 	api.show_progress = function (progress) {
-		progress_state = describe_progress(progress, window._i18n_strings);
+		progress_payload = progress;
 		render();
 	};
 	api.mark_snapshot = function (blob) {
-		partial_text = describe_partial(
-			blob && blob._partial,
-			window._i18n_strings,
-			window._i18n_locale
-		);
+		partial_payload = blob && blob._partial;
 		render();
 	};
+
+	// Windows injects the locale after the first publication: reword then.
+	document.addEventListener('i18n:applied', function () {
+		if (root) render();
+	});
 	window.metrics_rebuild = api;
 })();
