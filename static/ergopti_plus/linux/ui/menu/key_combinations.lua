@@ -8,7 +8,8 @@ local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
 local Features = require("menu.engine.manifest_reader")
 local Codec = require("core.text.engine.toml_codec")
-local PairRows = require("tap_hold.engine.key_combination_rows")
+local CombinationLabels = require("tap_hold.engine.combination_labels")
+local LabelValue = require("core.i18n.engine.label_value")
 local M = {}
 
 --- Builds the manifest's ordered-pair group, using a native context's UI ports.
@@ -107,8 +108,9 @@ function M.build(ctx,ui)
 		end)
 	end
 	-- The Windows layout (maintainer decision KCD-8 of 2026-11-21, shared in
-	-- tap_hold.engine.key_combination_rows): one submenu per first key, ticked
-	-- when any of its pairs is set, then one row per pair and its summary.
+	-- tap_hold.engine.combination_labels): one submenu per first key, ticked
+	-- when any of its pairs is set, then one row per pair and its summary,
+	-- naming its tap, hold and chord in that order.
 	local function hand_rows(hand)
 		local groups={}
 		for _,first in ipairs(KeyCatalog.of_hand(keys,hand)) do
@@ -124,7 +126,7 @@ function M.build(ctx,ui)
 					local label=ui.key_label(first).." + "..ui.key_label(second)
 					local tap_label=action_label(tap)
 					local chosen=hold_option(hold)
-					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t(PairRows.EMPTY_HOLD_KEY)
+					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t("tap_hold.hold.none")
 					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
 						commands={[require("settings.engine.keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
@@ -144,8 +146,10 @@ function M.build(ctx,ui)
 						return slots
 					end})
 					any=any or assigned
-					rows[#rows+1]={label=PairRows.pair_label(t,ui.key_label(first),ui.key_label(second),
-						tap~=Shared.NONE and tap_label or nil,hold~=Shared.NONE and hold_label or nil),checked=assigned or nil,submenu=sub}
+					local summary=CombinationLabels.summary({tap=tap~=Shared.NONE and tap_label or nil,
+						hold=hold~=Shared.NONE and hold_label or nil,chord=chord~=Shared.NONE and action_label(chord) or nil},
+						t("dialog.action_picker.disabled"))
+					rows[#rows+1]={label=LabelValue.compose(t,label,summary),checked=assigned or nil,submenu=sub}
 				end
 			end
 			groups[#groups+1]={label=ui.key_label(first),checked=any or nil,items=rows}

@@ -17,26 +17,35 @@ _CKPR_Corpus() {
 	return Corpus
 }
 
-; A null member is an empty slot; a null summary is the empty word.
-_CKPR_Text(Vector, Name) {
-	return Vector.Has(Name) && Vector[Name] is String ? Vector[Name] : ""
+; An absent slot of a vector's labels is an empty slot.
+_CKPR_Text(Labels, Slot) {
+	return Labels.Has(Slot) ? Labels[Slot] : ""
+}
+
+_CKPR_Join(Items) {
+	Joined := ""
+	for _, Item in Items
+		Joined .= (Joined == "" ? "" : ",") . Item
+	return Joined
 }
 
 _CKPR_Replay(Vector) {
-	Expected := _CKPR_Text(Vector, "summary")
-	if Expected == ""
-		Expected := t(_CKPR_Corpus()["empty_action_key"])
-	Assert(KeyCombinationPairSummary(_CKPR_Text(Vector, "tap"), _CKPR_Text(Vector, "hold")) == Expected,
-		"the pair summary follows the shared corpus")
+	Corpus := _CKPR_Corpus()
+	AssertEqual("tap,hold,chord", _CKPR_Join(Corpus["slot_order"]), "the slots KeyCombinationPairSummary joins")
+	AssertEqual(" / ", Corpus["separator"], "the separator KeyCombinationPairSummary joins with")
+	Expected := Vector["expected"] == Corpus["empty"] ? t(Corpus["empty"]) : Vector["expected"]
+	Labels := Vector["labels"]
+	AssertEqual(Expected, KeyCombinationPairSummary(_CKPR_Text(Labels, "tap"), _CKPR_Text(Labels, "hold"),
+		_CKPR_Text(Labels, "chord")), Vector["name"])
 }
 
 _CKPR_Register() {
 	Replayed := 0
 	for Vector in _CKPR_Corpus()["summaries"] {
 		Replayed += 1
-		Test("(kcd-8) corpus key combination pair rows: summary " . Replayed, _CKPR_Replay.Bind(Vector))
+		Test("(kcd-8) corpus key combination pair rows: " . Vector["name"], _CKPR_Replay.Bind(Vector))
 	}
-	if Replayed != 4
+	if Replayed != 8
 		throw Error("The key combination pair row corpus changed: " . Replayed . " rows.")
 }
 _CKPR_Register()

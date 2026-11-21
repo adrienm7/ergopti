@@ -834,21 +834,26 @@ _KeyCombinationPairRow(First, Second) {
 		|| KeyCombinationChordOf(PairId) != KEY_COMBINATION_NONE
 	TapLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationTapLabel(PairId)
 	HoldLabel := KeyCombinationHoldOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationHoldLabel(PairId)
-	Label := LabelValue(PairLabel, KeyCombinationPairSummary(TapLabel, HoldLabel))
+	ChordLabel := KeyCombinationChordOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationChordLabel(PairId)
+	Label := LabelValue(PairLabel, KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel))
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
 }
 
-; A pair's summary: its tap, its hold beside it when it has one, the hold
-; alone when the tap is empty, the picker's « disabled » when neither is set.
-; Linux and macOS draw the same (_shared/tap_hold/engine/key_combination_rows.lua);
-; all replay _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
+; A pair's summary: the label of each assigned slot in the order tap, hold,
+; chord, joined by " / ", or the picker's « disabled » when none is set.
+; Linux and macOS draw the same (_shared/tap_hold/engine/combination_labels.lua
+; summary); all replay _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
 ; @param TapLabel {String} The tap's label, "" when empty.
 ; @param HoldLabel {String} The hold's label, "" when empty.
+; @param ChordLabel {String} The chord's label, "" when empty.
 ; @returns {String}
-KeyCombinationPairSummary(TapLabel, HoldLabel) {
-	if (HoldLabel != "")
-		return TapLabel == "" ? HoldLabel : TapLabel . " / " . HoldLabel
-	return TapLabel == "" ? t("dialog.action_picker.disabled") : TapLabel
+KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel) {
+	Summary := ""
+	for _, Label in [TapLabel, HoldLabel, ChordLabel] {
+		if (Label != "")
+			Summary .= (Summary == "" ? "" : " / ") . Label
+	}
+	return Summary == "" ? t("dialog.action_picker.disabled") : Summary
 }
 
 _KeyCombinationPairMenuOpener(PairId, PairLabel) {
