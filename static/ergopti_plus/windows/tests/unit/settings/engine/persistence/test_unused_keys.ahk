@@ -624,6 +624,36 @@ _CUK_WebWindowDeferredClose() {
 Test("config cleanup webview: close during native creation releases the late controller (config-cleanup-webview)",
 	_CUK_WebWindowDeferredClose)
 
+; The options the cleanup window was built with, captured by the build stub.
+global _CUK_CapturedOpts := 0
+
+_CUK_CaptureOptsBuild(Host) {
+	global _CUK_CapturedOpts
+	_CUK_CapturedOpts := Host.Opts
+	Host.Cancelled := true
+	return false
+}
+
+_CUK_CleanupWindowTakesFocus() {
+	global _CUK_CapturedOpts
+	_CUK_CapturedOpts := 0
+	PreviousBuild := WebViewHost.Prototype.GetOwnPropDesc("_Build")
+	PreviousCurrent := ConfigCleanupWindow.Current
+	ConfigCleanupWindow.Current := 0
+	WebViewHost.Prototype.DefineProp("_Build", {Call: _CUK_CaptureOptsBuild})
+	try {
+		ConfigCleanupWindow.Open("unused-by-pck-11.toml")
+		AssertTrue(IsObject(_CUK_CapturedOpts), "the cleanup window is built with its options")
+		AssertFalse(_CUK_CapturedOpts.Get("NoActivate", false),
+			"pck-11: a window the user opens from the menu takes the keyboard, as on macOS and Linux")
+	} finally {
+		WebViewHost.Prototype.DefineProp("_Build", PreviousBuild)
+		ConfigCleanupWindow.Current := PreviousCurrent
+	}
+}
+Test("config cleanup webview: the window opened from the menu is activated (pck-11)",
+	_CUK_CleanupWindowTakesFocus)
+
 _CUK_ActionParameterOwnership() {
 	Target := ManifestBuildFeaturesMap()
 	for Binding in ["gesture__tap_4", "keyboard__primary_k", "script__pause", "tap_hold__caps_lock", "tap_key__number_row_left"] {
