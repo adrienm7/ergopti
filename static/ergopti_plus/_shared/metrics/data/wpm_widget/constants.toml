@@ -5,7 +5,7 @@
 # DESCRIPTION:
 # Single source of truth for how the Ergopti+ typing-speed readouts look on
 # every driver: the floating pill, its real-time graph mode, and the menu bar
-# (macOS) or tray (Linux) readout. Windows has no menu bar readout.
+# (macOS) or tray (Windows, Linux) readout.
 #
 # EVERY DRIVER READS THIS FILE AT RUNTIME. No driver restates a value from it:
 #   Hammerspoon — ui/wpm/*.lua through the shared _shared/metrics/engine model.

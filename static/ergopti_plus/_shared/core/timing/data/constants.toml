@@ -1060,8 +1060,9 @@ wpm_widget_idle_hide_ms = 3000
 # AHK: ui/wpm/wpm_config.ahk. HS and Linux: the shared wpm_widget model.
 wpm_color_hold_ms = 1000
 
-# Menu bar (macOS) / tray (Linux) readout update interval.
+# Menu bar (macOS) / tray (Windows, Linux) readout update interval.
 # HS: ui/wpm/wpm_menubar.lua. Linux: ui/wpm/tray_readout.lua.
+# AHK: ui/wpm/wpm_config.ahk (wpm_tray_readout.ahk).
 wpm_menubar_update_ms = 500
 
 # How long capturing the physical magic key by pressing it waits for a key

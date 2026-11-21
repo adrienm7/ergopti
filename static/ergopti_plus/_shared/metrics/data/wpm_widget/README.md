@@ -4,7 +4,7 @@
 
 The one description of how the typing-speed readouts look on every driver:
 the floating pill, its real-time graph mode, and the menu bar (macOS) or tray
-(Linux) readout. Windows has no menu bar readout. No driver restates a value
+(Windows, Linux) readout. No driver restates a value
 from `constants.toml`: each reads it at runtime and refuses to draw when a key
 is missing.
 
