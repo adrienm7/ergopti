@@ -419,6 +419,25 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
     cause its closed reason proves (field check in `TODO-tests-macos.md`, Swift unchanged);
   - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
+    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed. Left: UPD-05 closing
+    the Linux download window refuses the downloaded update's install (decide cancel or install); UPD-06 carry the
+    fetch receipt into the Lua update check so macOS and Linux name the proxy, offline or certificate cause as
+    Windows does; UPD-07 update download progress on Windows and Linux (and a Windows cancel); UPD-08 a failed Linux
+    update download drops the menu's offer; UPD-09 Linux says « restarting » before trying; UPD-10 a refused
+    signature named on the three; UPD-11 the macOS Versions install passes no failure receipt and leaves its stage
+    folder; UPD-12 the download page's English fallbacks and fixed `lang`;
+  - pickers and prompts, taken on 2026-11-21
+    ([report](docs/audits/platform-parity/2026-11-21-pickers-prompts/report.md)): PCK-01 (macOS key prompts masked),
+    PCK-02 (macOS keys untrimmed), PCK-03, PCK-04 and PCK-14 (the shared entry grammar read by the macOS and Linux
+    numeric prompts, vectors replayed through both), PCK-05 and PCK-12 (Escape on the token and cleanup pages),
+    PCK-06 (Linux picker title-bar close), PCK-07 (a confirmation without an id refused on the three), PCK-08
+    (Windows application picker headers), PCK-09 (Linux open_app refusal told), PCK-10 (macOS prompt editor
+    validation) and PCK-11 (Windows cleanup window focused) fixed. Left: PCK-13 a blank numeric answer resets on
+    macOS only (decide reset or refuse); PCK-15 a refused Windows confirmation closes the picker; PCK-16 WebView2
+    focus on open and PCK-17 two numeric boxes at once (field checks); PCK-18 retire or wire the Linux token bridge;
+    PCK-19 Escape on the model browser and physical shortcuts pages; PCK-20 prompt editor trim and unknown-action
+    logs; PCK-21 window titles in the Windows application picker; PCK-22 no right-to-left layout for ar and he;
+  - the next campaigns in the report's order: metrics views, small native units, layout tool
     pages.
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
     TRAY-03 (a Linux desktop with no tray host is told, in the user's language, what to install), TRAY-04

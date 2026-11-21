@@ -33,6 +33,16 @@ terminal): coverage table, verdicts and what no run can test in
       exhausted rate limit is named (UPD-06); a working network still offers or confirms the release. Install an offered update and close its download panel: the download goes on and the install prompt
       comes back (UPD-05). In the Versions window, install a release with the network down: the failure names the
       cause and no `.ergopti-release-install-` folder stays beside the app (UPD-11).
+- [ ] <!-- field-point: pickers_prompts --> **Pickers and prompts (PCK-01, PCK-02, PCK-05, PCK-10, PCK-14,
+      2026-11-21):** AI > API > ➕ a provider: the Token step shows dots, never the key, and a key pasted with a
+      trailing space works as on Windows (it is kept). The Hugging Face token window shows dots too and closes on
+      Escape. Temperature accepts « 0,8 » and refuses « 1e-1 » with « Enter a number from 0 to 1.3. ». In the prompt
+      editor, a prompt that ends with blank lines saves and reopens with them.
+- [ ] <!-- field-point: update_windows --> **Updates window (UPD-03, UPD-04, UPD-06, 2026-11-21):** with VoiceOver
+      on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a focus move,
+      and Escape closes the window. Then on a network whose proxy refuses api.github.com (or with a dead proxy set in
+      System Settings), check again and note the sentence: « Could not reach GitHub » today, where Windows names the
+      proxy (UPD-06).
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in

@@ -183,6 +183,7 @@ named file is not a reviewed file.
 | Tray adapters                  | [report](audits/platform-parity/2026-11-20-tray-adapters/report.md)                                |
 | Update and download windows    | [report](audits/platform-parity/2026-11-21-update-windows/report.md)                               |
 | Metrics views                  | [report](audits/platform-parity/2026-11-21-metrics-views/report.md)                                |
+| Pickers and prompts            | [report](audits/platform-parity/2026-11-21-pickers-prompts/report.md)                              |
 
 The logger-engines campaign (November 20, 2026) fixed LOG-01 to LOG-05,
 LOG-07 and LOG-08: the macOS level restore follows the manifest (eight names,
@@ -249,6 +250,29 @@ and the chart tooltips are locale keys in the 21 languages, and the
 hard-coded-strings gate scans the pages' HTML. Left open: MET-13 to MET-19,
 among them the hotstring counting of the macOS live speed (a maintainer
 decision).
+in the interface language instead of French. Left open: MET-09 to MET-19,
+among them the Linux heatmap's QWERTY names and frozen n-gram tables, the
+macOS empty and incomplete states, 61 French metric definitions in the
+pages' `title` attributes, and the hotstring counting of the macOS live speed
+(a maintainer decision).
+The pickers-and-prompts campaign (November 21, 2026) fixed PCK-01 to PCK-12
+and PCK-14: the macOS API key prompt and the token page hide the key, and
+macOS keeps it untrimmed as Windows and Linux do; the macOS and Linux numeric
+prompts read typed text with the shared entry grammar of
+`value_check_vectors.json`, replayed through each driver's real prompt
+(`_shared/tests/lua/numeric_entry_contract.lua`), so « 0,7 » is a number and
+a fraction of a whole number is refused with the declared range instead of
+being floored or refused in silence on Linux; a Linux action picker closed
+from its title bar retires its session; a confirmation that names no action
+is refused on the three; the Windows application picker's headers are
+localized; the open_app refusal is told on Linux; the macOS prompt editor
+refuses the fields Windows and Linux refuse; and the cleanup window takes the
+focus on Windows and closes on Escape. Left open: PCK-13, a blank numeric
+answer resets on macOS only (a maintainer choice); PCK-15, a refused Windows
+confirmation closes the picker; PCK-16 and PCK-17, the WebView2 focus on
+open and two numeric boxes at once (field checks); PCK-18 to PCK-22, a dead
+Linux token bridge, Escape on two more pages, prompt editor details, window
+titles in the Windows application picker and no right-to-left layout.
 
 ## Review status at resumption — November 12, 2026
 

@@ -261,6 +261,12 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 - [ ] Update download window (UPD-05, UPD-07, 2026-11-21): Update from the Updates window opens the download
       window, whose bar follows the bytes received; its Cancel stops the update, its close box does not (the update
       installs once verified).
+- [ ] Pickers and prompts (PCK-08, PCK-11, PCK-16, PCK-17, 2026-11-21): with Ergopti in English, Metrics >
+      exclude applications: the list's headers read « Application » and « Process », never « Processus ». Tray >
+      clean unused settings: the window comes to the front with the keyboard, and Escape closes it. Open a shortcut's
+      action picker from the tray and type at once, Narrator on: note whether the search field has the keyboard
+      (PCK-16: the driver never hands WebView2 the focus). Click « Other value… » of the AI temperature twice in a
+      row: note whether two input boxes open (PCK-17).
 - [ ] Updates window (UPD-01, UPD-03, UPD-04, 2026-11-21): with Narrator on, About > Check for updates: Narrator
       reads « Checking for updates on the … channel » then the answer without a focus move, and Escape closes the
       window while the page has the focus. On a test build fed by a local release mirror whose `.sha256` does not

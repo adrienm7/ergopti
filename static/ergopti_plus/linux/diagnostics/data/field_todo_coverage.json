@@ -137,6 +137,12 @@
 			"not_testable": "Needs a GNOME session without the AppIndicator extension, then a panel with one, and a screen reader: the field report runs inside the user's own session and cannot remove or add a panel extension."
 		},
 		{
+			"id": "pickers_prompts",
+			"title": "Numeric prompt, action picker title-bar close and open_app refusal (PCK-03, PCK-04, PCK-06, PCK-09)",
+			"checks": [],
+			"not_testable": "Needs a person at the desktop with Orca, typing in the numeric prompt, closing the picker from its title bar and choosing a file in the open_app dialog: the field report opens no window."
+		},
+		{
 			"id": "update_windows",
 			"title": "Updates and download windows: Escape, Orca, a cancelled and a closed update download (UPD-02 to UPD-05)",
 			"checks": [],

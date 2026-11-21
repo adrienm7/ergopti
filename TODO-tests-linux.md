@@ -94,6 +94,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       downloads: the release installs once downloaded and the daemon restarts on it, the notice saying so only once
       the restart is armed (UPD-05, UPD-09). With the network down, the failed check names its cause when curl proves
       one (UPD-06).
+- [ ] <!-- field-point: pickers_prompts --> Pickers and prompts (PCK-03, PCK-04, PCK-06, PCK-09, 2026-11-21), Orca
+      on: AI > Generation > Context length > Other value…, type « 250,5 » then Save: the window stays open and Orca
+      reads « Enter a whole number of characters from 80 to 4000. »; type « 1800 »: it saves and closes. Temperature
+      accepts « 0,7 ». Then open a shortcut's action picker and close it with the title bar's close button: reopening
+      it shows the new binding's title (PCK-06). Finally bind open_app and choose a `.desktop` file on the Desktop:
+      an error dialog says no binding was saved, instead of closing silently (PCK-09).
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

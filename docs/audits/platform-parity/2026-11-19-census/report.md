@@ -391,6 +391,14 @@ owner. Windows is the reference unless a shared contract says otherwise.
 6. **Pickers and prompts.** `action_picker`, `model_browser`,
    `numeric_prompt`, `token_prompt`, `error_dialog`, `config_cleanup` and
    `physical_shortcuts`: their shared pages and the Linux and macOS hosts.
+   **Taken on 2026-11-21** ([report](../2026-11-21-pickers-prompts/report.md)):
+   validation, cancel and Escape, keyboard and screen reader, preferences,
+   localization, focus, a second open, secrets and teardown, with the program
+   pickers, the prompt editor and the native dialogs; PCK-01 to PCK-12 and
+   PCK-14 fixed (masked and untrimmed keys, the shared entry grammar replayed
+   through the macOS and Linux numeric prompts, the Linux picker's title-bar
+   close, a refused confirmation without an id, localized headers, focused and
+   Escape-closed cleanup window), PCK-13 and PCK-15 to PCK-22 open.
 7. **Metrics views.** `metrics_apps`, `metrics_typing`, the Linux flush bridge
    and the shared `metrics_*` helpers. The metrics campaigns read the
    producers and the store, not these views. **Taken on 2026-11-21**
