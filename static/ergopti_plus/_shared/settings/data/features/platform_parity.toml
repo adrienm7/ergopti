@@ -465,6 +465,11 @@ file = "static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua"
 token = 'local function path_of(id, leaf) return "shortcuts." .. id .. "." .. leaf end'
 
 # The four emulated rows are read by a name built from the row id.
+# The key that types the real star joins the accented letters by its feature id.
+[owners.windows."shortcuts.star.*"]
+file = "static/ergopti_plus/windows/modules/keymap/layout/accented_shortcuts.ahk"
+token = '"star", "★"'
+
 [owners.windows."layout.emulate_*"]
 file = "static/ergopti_plus/_shared/settings/data/features/layout_rows_policy.ahk"
 token = 'Layout.Get("emulate_" . Row, "")'

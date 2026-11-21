@@ -182,12 +182,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "30db0a21c01f3b3dbca060e8dd4846bffb49f4c31421df532dbae6bf1ff8353b"
+					"sha256": "6c11abcba1e80bbce3793f3de6717c407ee6d155179f38f23e886feffc26b885"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+					"sha256": "3104d4636f7eecce32aabc33e178417bd8b16bbf20b2fa0de95b760a0451d1cd"
 				}
 			],
 			"macos": [
@@ -237,12 +237,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "30db0a21c01f3b3dbca060e8dd4846bffb49f4c31421df532dbae6bf1ff8353b"
+					"sha256": "6c11abcba1e80bbce3793f3de6717c407ee6d155179f38f23e886feffc26b885"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+					"sha256": "3104d4636f7eecce32aabc33e178417bd8b16bbf20b2fa0de95b760a0451d1cd"
 				}
 			],
 			"macos": [
@@ -284,12 +284,12 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "30db0a21c01f3b3dbca060e8dd4846bffb49f4c31421df532dbae6bf1ff8353b"
+					"sha256": "6c11abcba1e80bbce3793f3de6717c407ee6d155179f38f23e886feffc26b885"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_PressNative",
-					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+					"sha256": "3104d4636f7eecce32aabc33e178417bd8b16bbf20b2fa0de95b760a0451d1cd"
 				}
 			],
 			"macos": [
@@ -336,7 +336,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-					"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+					"sha256": "3104d4636f7eecce32aabc33e178417bd8b16bbf20b2fa0de95b760a0451d1cd"
 				}
 			],
 			"macos": [
