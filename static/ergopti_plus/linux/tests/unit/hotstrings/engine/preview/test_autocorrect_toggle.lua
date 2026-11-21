@@ -17,12 +17,15 @@ local names = { "core.ui.adapters.graphics_renderer", "core.events.timer_schedul
 for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 
 local shown = 0
+local announcements = nil
 package.loaded["core.ui.adapters.graphics_renderer"] = {
 	is_available = function() return true end,
 	show = function() shown = shown + 1; return true end,
 	hide = function() return true end,
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
+	-- preview_settings.apply also forwards the « announce » toggle here.
+	set_announcements_enabled = function(enabled) announcements = enabled end,
 }
 package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
 local stored = {}
@@ -50,6 +53,7 @@ helpers.describe("preview_autocorrect_enabled reaches the preview gate (linux-pr
 		helpers.assert_eq(Settings.default("autocorrect"), true)
 		Settings.apply(Preview)
 		helpers.assert_eq(Preview.show(CANDIDATES, "autocorrect"), true)
+		helpers.assert_eq(announcements, Settings.default("announce"), "apply forwards the announce toggle to the renderer")
 	end)
 
 	helpers.it("off hides only the autocorrection bubble", function()
