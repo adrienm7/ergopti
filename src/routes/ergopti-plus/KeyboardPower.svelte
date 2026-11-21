@@ -20,10 +20,11 @@ FEATURES & RATIONALE:
 	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';
+	import { localized, t } from './i18n.svelte.js';
 
 	/**
 	 * @type {{
-	 *   actionGroups: Array<{title: string, sections: Array<{title: string, actions: Array<{id: string, label: string, platform: string, axis: boolean}>}>}>
+	 *   actionGroups: Array<{title: string, titleEn: string, sections: Array<{title: string, titleEn: string, actions: Array<{id: string, label: string, labelEn: string, platform: string, axis: boolean}>}>}>
 	 * }}
 	 */
 	let { actionGroups } = $props();
@@ -44,13 +45,19 @@ FEATURES & RATIONALE:
 	}
 
 	// Same group → section structure as the driver's action picker, with
-	// empty sections and groups pruned after the platform filter.
+	// empty sections and groups pruned after the platform filter. Titles and
+	// labels come from the drivers' own French and English catalogues.
 	let visibleGroups = $derived(
 		actionGroups
 			.map((g) => ({
-				title: g.title,
+				key: g.title,
+				title: localized(g.title, g.titleEn),
 				sections: g.sections
-					.map((s) => ({ title: s.title, actions: forPlatform(s.actions) }))
+					.map((s) => ({
+						key: s.title,
+						title: localized(s.title, s.titleEn),
+						actions: forPlatform(s.actions)
+					}))
 					.filter((s) => s.actions.length > 0)
 			}))
 			.filter((g) => g.sections.length > 0)
@@ -60,167 +67,184 @@ FEATURES & RATIONALE:
 	);
 
 	// The 7 shared tap-hold keys — mirrors _shared/tap_hold/data/defaults.toml.
-	const tapHolds = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let tapHolds = $derived([
 		{
 			key: 'CapsLock',
-			tap: { label: 'Entrée', icon: '↩' },
+			tap: { label: t('Entrée'), icon: '↩' },
 			hold: { label: 'Ctrl / Cmd', icon: '⌃' },
-			note: 'La touche la plus accessible de la home-row devient validation ET modificateur.'
+			note: t('La touche la plus accessible de la home-row devient validation ET modificateur.')
 		},
 		{
 			key: 'LShift',
-			tap: { label: 'Copier', icon: '⧉' },
+			tap: { label: t('Copier'), icon: '⧉' },
 			hold: { label: 'Shift', icon: '⇧' },
-			note: 'Copier d’un seul appui sur une touche que votre auriculaire connaît déjà.'
+			note: t('Copier d’un seul appui sur une touche que votre auriculaire connaît déjà.')
 		},
 		{
 			key: 'LCtrl',
-			tap: { label: 'Coller', icon: '↧' },
+			tap: { label: t('Coller'), icon: '↧' },
 			hold: { label: 'Ctrl', icon: '⌃' },
-			note: 'Coller sans quitter la position de repos, sans accord à deux mains.'
+			note: t('Coller sans quitter la position de repos, sans accord à deux mains.')
 		},
 		{
 			key: 'LAlt',
-			tap: { label: 'Retour arrière', icon: '⌫' },
-			hold: { label: 'Couche navigation', icon: '☷' },
-			note: 'Backspace sous le pouce ; maintenu, il ouvre le layer de navigation ci-dessous.'
+			tap: { label: t('Retour arrière'), icon: '⌫' },
+			hold: { label: t('Couche navigation'), icon: '☷' },
+			note: t('Backspace sous le pouce ; maintenu, il ouvre le layer de navigation ci-dessous.')
 		},
 		{
 			key: 'RCtrl',
-			tap: { label: 'Shift one-shot', icon: '⇧¹' },
+			tap: { label: t('Shift one-shot'), icon: '⇧¹' },
 			hold: { label: 'Shift', icon: '⇧' },
-			note: 'Un appui = la prochaine lettre en majuscule. Fini le Shift maintenu pour une seule lettre.'
+			note: t(
+				'Un appui = la prochaine lettre en majuscule. Fini le Shift maintenu pour une seule lettre.'
+			)
 		},
 		{
 			key: 'AltGr',
 			tap: { label: 'Tab', icon: '⇥' },
 			hold: { label: 'AltGr', icon: '⌥' },
-			note: 'Tab au pouce droit — l’indentation et la navigation de formulaires sans étirement.'
+			note: t('Tab au pouce droit — l’indentation et la navigation de formulaires sans étirement.')
 		},
 		{
 			key: 'Tab',
-			tap: { label: 'Alt-Tab (écran)', icon: '⧉⇄' },
+			tap: { label: t('Alt-Tab (écran)'), icon: '⧉⇄' },
 			hold: { label: 'Alt', icon: '⎇' },
-			note: 'Bascule d’application sur le moniteur courant, en un seul appui.'
+			note: t('Bascule d’application sur le moniteur courant, en un seul appui.')
 		}
-	];
+	]);
 
 	// Real "nav" layer mappings from the shared TOML (HJKL + editing keys).
-	const navLayer = [
-		{ key: 'h', label: '←', desc: 'Gauche' },
-		{ key: 'j', label: '↓', desc: 'Bas' },
-		{ key: 'k', label: '↑', desc: 'Haut' },
-		{ key: 'l', label: '→', desc: 'Droite' },
-		{ key: 'u', label: '⇞', desc: 'Page haut' },
-		{ key: 'd', label: '⇟', desc: 'Page bas' },
-		{ key: 'g', label: '⇱', desc: 'Début' },
-		{ key: '⇧g', label: '⇲', desc: 'Fin' },
-		{ key: '⌫', label: '⌫mot', desc: 'Effacer mot' },
-		{ key: '⌦', label: '⌦mot', desc: 'Suppr. mot' }
-	];
+	let navLayer = $derived([
+		{ key: 'h', label: '←', desc: t('Gauche') },
+		{ key: 'j', label: '↓', desc: t('Bas') },
+		{ key: 'k', label: '↑', desc: t('Haut') },
+		{ key: 'l', label: '→', desc: t('Droite') },
+		{ key: 'u', label: '⇞', desc: t('Page haut') },
+		{ key: 'd', label: '⇟', desc: t('Page bas') },
+		{ key: 'g', label: '⇱', desc: t('Début') },
+		{ key: '⇧g', label: '⇲', desc: t('Fin') },
+		{ key: '⌫', label: t('⌫mot'), desc: t('Effacer mot') },
+		{ key: '⌦', label: t('⌦mot'), desc: t('Suppr. mot') }
+	]);
 
 	// A curated shortlist of the standout actions — the ones that solve a real
 	// daily annoyance. Labels/emojis mirror the shared catalog (actions.toml +
 	// fr.json); the "pain" copy is what makes them land. The full catalog below
 	// lists everything; this grid sells the highlights.
-	const superActions = [
+	let superActions = $derived([
 		{
 			icon: '🖱',
-			title: 'Téléporter la souris',
-			body: 'Le curseur saute sur l’écran voisin d’un seul tap — fini de deviner vers quel bord le pousser pour changer de moniteur.'
+			title: t('Téléporter la souris'),
+			body: t(
+				'Le curseur saute sur l’écran voisin d’un seul tap — fini de deviner vers quel bord le pousser pour changer de moniteur.'
+			)
 		},
 		{
 			icon: '🔦',
-			title: 'Surbrillance du curseur',
-			body: 'Perdu votre souris sur trois écrans ? Un halo la fait ressortir à l’instant — parfait aussi en présentation.'
+			title: t('Surbrillance du curseur'),
+			body: t(
+				'Perdu votre souris sur trois écrans ? Un halo la fait ressortir à l’instant — parfait aussi en présentation.'
+			)
 		},
 		{
 			icon: '📸',
-			title: 'Capture en un tap',
-			body: 'Région, fenêtre, plein écran ou OCR — sur la touche à gauche du 1, sans chercher le raccourci système.'
+			title: t('Capture en un tap'),
+			body: t(
+				'Région, fenêtre, plein écran ou OCR — sur la touche à gauche du 1, sans chercher le raccourci système.'
+			)
 		},
 		{
 			icon: '☰',
-			title: 'Sélectionner la ligne',
-			body: 'La ligne entière sélectionnée d’un geste, sans viser au pixel ni tripler-cliquer.'
+			title: t('Sélectionner la ligne'),
+			body: t('La ligne entière sélectionnée d’un geste, sans viser au pixel ni tripler-cliquer.')
 		},
 		{
 			icon: '🌐',
-			title: 'Ouvrir lien ou chemin',
-			body: 'Ouvre l’URL ou le chemin de fichier local sous le curseur — où qu’il se trouve dans le texte.'
+			title: t('Ouvrir lien ou chemin'),
+			body: t(
+				'Ouvre l’URL ou le chemin de fichier local sous le curseur — où qu’il se trouve dans le texte.'
+			)
 		},
 		{
 			icon: 'AA',
-			title: 'Changer la casse',
-			body: 'Bascule la sélection en MAJUSCULES, minuscules ou Casse De Titre — plus besoin de retaper.'
+			title: t('Changer la casse'),
+			body: t(
+				'Bascule la sélection en MAJUSCULES, minuscules ou Casse De Titre — plus besoin de retaper.'
+			)
 		}
-	];
+	]);
 
-	const powerMoves = [
+	let powerMoves = $derived([
 		{
 			icon: '⇪',
 			title: 'CapsWord',
-			body: 'MAJUSCULES sur le mot en cours uniquement — le shift virtuel se relâche à l’espace. Parfait pour les acronymes (NASA, TODO).'
+			body: t(
+				'MAJUSCULES sur le mot en cours uniquement — le shift virtuel se relâche à l’espace. Parfait pour les acronymes (NASA, TODO).'
+			)
 		},
 		{
 			icon: '⌫',
-			title: 'Suppression de mot',
-			body: 'Un geste efface le mot entier — idéal pour annuler une expansion d’un coup.'
+			title: t('Suppression de mot'),
+			body: t('Un geste efface le mot entier — idéal pour annuler une expansion d’un coup.')
 		},
 		{
 			icon: '“ ”',
-			title: 'Encadrer la sélection',
-			body: 'Sélectionnez du texte, tapez <code>"</code>, <code>(</code> ou <code>[</code> : la sélection est encadrée par la paire correspondante.'
+			title: t('Encadrer la sélection'),
+			body: t(
+				'Sélectionnez du texte, tapez <code>"</code>, <code>(</code> ou <code>[</code> : la sélection est encadrée par la paire correspondante.'
+			)
 		},
 		{
 			icon: '★',
-			title: 'Répéteur intelligent',
-			body: 'Sans abréviation en attente, ★ double la lettre précédente — les doublons sans SFB.'
+			title: t('Répéteur intelligent'),
+			body: t('Sans abréviation en attente, ★ double la lettre précédente — les doublons sans SFB.')
 		}
-	];
+	]);
 </script>
 
-<section class="keyboard" id="ep-tapholds" lang="fr" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-tapholds" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
 			<p class="kicker">Tap-Holds</p>
-			<h2>Sept touches à double vie.</h2>
+			<h2>{t('Sept touches à double vie.')}</h2>
 			<p class="lead">
-				Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. La même
-				logique sur les deux OS : <strong>les mêmes doigts</strong> déclenchent les mêmes gestes,
-				avec le modificateur natif de chaque plateforme — <kbd>Ctrl</kbd> sur Windows, <kbd>⌘</kbd>
-				sur macOS. L’objectif : <strong>une expérience unifiée</strong>, quel que soit l’ordinateur
-				devant vous. Ce sont les défauts livrés ; chaque touche, action et délai se change depuis le
-				menu.
+				{@html t(
+					'Un appui bref déclenche une action, un maintien conserve le rôle de modificateur. La même logique sur les deux OS : <strong>les mêmes doigts</strong> déclenchent les mêmes gestes, avec le modificateur natif de chaque plateforme — <kbd>Ctrl</kbd> sur Windows, <kbd>⌘</kbd> sur macOS. L’objectif : <strong>une expérience unifiée</strong>, quel que soit l’ordinateur devant vous. Ce sont les défauts livrés ; chaque touche, action et délai se change depuis le menu.'
+				)}
 			</p>
 		</header>
 
 		<div class="tap-grid">
-			{#each tapHolds as t, i}
+			{#each tapHolds as hold, i}
 				<article
 					class="ep-card ep-card--hover tap-card"
 					style="--accent: #fb8c00;"
 					use:reveal={{ delay: (i % 4) * 70 }}
 				>
-					<div class="tap-keycap"><kbd>{t.key}</kbd></div>
+					<div class="tap-keycap"><kbd>{hold.key}</kbd></div>
 					<dl class="tap-rows">
 						<div class="tap-row">
 							<dt class="tap-pill">Tap</dt>
-							<dd class="tap-glyph" aria-hidden="true">{t.tap.icon}</dd>
-							<dd class="tap-action">{t.tap.label}</dd>
+							<dd class="tap-glyph" aria-hidden="true">{hold.tap.icon}</dd>
+							<dd class="tap-action">{hold.tap.label}</dd>
 						</div>
 						<div class="tap-row tap-row--hold">
 							<dt class="tap-pill tap-pill--hold">Hold</dt>
-							<dd class="tap-glyph" aria-hidden="true">{t.hold.icon}</dd>
-							<dd class="tap-action">{t.hold.label}</dd>
+							<dd class="tap-glyph" aria-hidden="true">{hold.hold.icon}</dd>
+							<dd class="tap-action">{hold.hold.label}</dd>
 						</div>
 					</dl>
-					<p class="tap-note">{t.note}</p>
+					<p class="tap-note">{hold.note}</p>
 				</article>
 			{/each}
 
 			<article class="ep-card tap-card tap-card--nav" use:reveal={{ delay: 280 }}>
-				<h3>Layer navigation <small class="nav-hint">(maintenir <kbd>LAlt</kbd>)</small></h3>
+				<h3>
+					{t('Layer navigation')}
+					<small class="nav-hint">{@html t('(maintenir <kbd>LAlt</kbd>)')}</small>
+				</h3>
 				<ul class="nav-grid">
 					{#each navLayer as n}
 						<li class="nav-cell">
@@ -231,8 +255,9 @@ FEATURES & RATIONALE:
 					{/each}
 				</ul>
 				<p class="tap-note">
-					Flèches sur HJKL, pages, début/fin de ligne, effacement par mot — la main ne quitte jamais
-					la position de repos.
+					{t(
+						'Flèches sur HJKL, pages, début/fin de ligne, effacement par mot — la main ne quitte jamais la position de repos.'
+					)}
 				</p>
 			</article>
 		</div>
@@ -249,14 +274,15 @@ FEATURES & RATIONALE:
 	</div>
 </section>
 
-<section class="keyboard" id="ep-raccourcis" lang="fr" style="--section-accent: #fb8c00;">
+<section class="keyboard" id="ep-raccourcis" style="--section-accent: #fb8c00;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Raccourcis</p>
-			<h2>Des actions qui règlent de vraies galères.</h2>
+			<p class="kicker">{t('Raccourcis')}</p>
+			<h2>{t('Des actions qui règlent de vraies galères.')}</h2>
 			<p class="lead">
-				Bien au-delà du copier-coller : voici quelques-unes des actions les plus utiles — chacune
-				assignable à n’importe quelle touche, tap-hold ou geste.
+				{t(
+					'Bien au-delà du copier-coller : voici quelques-unes des actions les plus utiles — chacune assignable à n’importe quelle touche, tap-hold ou geste.'
+				)}
 			</p>
 		</header>
 
@@ -276,28 +302,26 @@ FEATURES & RATIONALE:
 		     filtered by the page's OS toggle -->
 		<section class="actions-block">
 			<h3 class="actions-title" use:reveal>
-				<span use:countup={visibleCount}>{visibleCount}</span> actions à assigner. À n’importe quelle
-				touche ou geste.
+				<span use:countup={visibleCount}>{visibleCount}</span>
+				{t('actions à assigner. À n’importe quelle touche ou geste.')}
 			</h3>
 			<p class="actions-lead" use:reveal>
-				Tap-holds, gestes trackpad et raccourcis piochent dans le même catalogue d’actions, défini
-				dans <strong>un seul fichier partagé par les trois drivers</strong>. Mêmes groupes, mêmes
-				sections que dans le sélecteur du driver — filtrés ici pour
-				<strong
-					>{ui.osStyle === 'macos' ? 'macOS' : ui.osStyle === 'linux' ? 'Linux' : 'Windows'}</strong
-				> ; changez d’OS en haut de page pour voir la différence.
+				{@html t(
+					'Tap-holds, gestes trackpad et raccourcis piochent dans le même catalogue d’actions, défini dans <strong>un seul fichier partagé par les trois drivers</strong>. Mêmes groupes, mêmes sections que dans le sélecteur du driver — filtrés ici pour <strong>{os}</strong> ; changez d’OS en haut de page pour voir la différence.',
+					{ os: ui.osStyle === 'macos' ? 'macOS' : ui.osStyle === 'linux' ? 'Linux' : 'Windows' }
+				)}
 			</p>
 			<div class="actions-groups">
-				{#each visibleGroups as g, gi (g.title)}
+				{#each visibleGroups as g, gi (g.key)}
 					<article class="ep-card actions-group" use:reveal={{ delay: (gi % 4) * 60 }}>
 						<h4 class="group-title">{g.title}</h4>
-						{#each g.sections as s (g.title + s.title)}
+						{#each g.sections as s (g.key + s.key)}
 							{#if s.title}<h5 class="section-title">{s.title}</h5>{/if}
 							<ul class="actions-cloud">
 								{#each s.actions as a (a.id)}
 									<li class="action-chip" class:axis={a.axis} title={a.id}>
-										{a.label}
-										{#if a.axis}<span class="axis-tag">axe</span>{/if}
+										{localized(a.label, a.labelEn)}
+										{#if a.axis}<span class="axis-tag">{t('axe')}</span>{/if}
 									</li>
 								{/each}
 							</ul>

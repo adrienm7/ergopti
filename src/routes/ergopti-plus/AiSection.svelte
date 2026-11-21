@@ -25,6 +25,7 @@ FEATURES & RATIONALE:
 	import { reveal } from './reveal.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
+	import { localized, t } from './i18n.svelte.js';
 
 	/**
 	 * @type {{
@@ -32,7 +33,7 @@ FEATURES & RATIONALE:
 	 *   totals: {providers: number, models: number, families: number},
 	 *   range: {min: string, max: string},
 	 *   apiProviders: Array<{id: string, label: string, defaultModel: string}>,
-	 *   profiles: Array<{id: string, label: string, batch: boolean}>,
+	 *   profiles: Array<{id: string, label: string, labelEn: string, batch: boolean}>,
 	 *   defaults: {debounceMs: number, numPredictions: number, contextLength: number, ollamaPort: number, mlxPort: number},
 	 *   geo: Record<string, {width: number, height: number}>
 	 * }}
@@ -42,43 +43,47 @@ FEATURES & RATIONALE:
 	// Tooltip mockup tabs — the three usage modes of the AI tooltip, using
 	// the driver's real color code (gray context, green corrections, orange
 	// predictions, yellow active-line marker).
-	const modes = [
-		{ id: 'predict', label: 'Prédiction' },
-		{ id: 'correct', label: 'Correction' },
-		{ id: 'both', label: 'Correction + prédiction' }
-	];
+	let modes = $derived([
+		{ id: 'predict', label: t('Prédiction') },
+		{ id: 'correct', label: t('Correction') },
+		{ id: 'both', label: t('Correction + prédiction') }
+	]);
 	let activeMode = $state('both');
 
 	// Descriptions used on the profile cards, keyed by profile id. The
 	// labels themselves come from the driver's locale files at build time.
-	const profileNotes = {
-		raw: 'Aucune instruction injectée : le modèle reçoit le contexte brut et continue. Idéal pour le code et les formats stricts.',
-		basic:
-			'Instruction minimale : continuer le texte entre N et M mots, sans commentaire. Le compromis vitesse/qualité par défaut.',
-		advanced:
-			'Deux lignes en sortie : la fin de phrase corrigée, puis la suite prédite. Bilingue FR/EN, avec exemples intégrés pour les petits modèles.',
-		batch_advanced:
+	let profileNotes = $derived({
+		raw: t(
+			'Aucune instruction injectée : le modèle reçoit le contexte brut et continue. Idéal pour le code et les formats stricts.'
+		),
+		basic: t(
+			'Instruction minimale : continuer le texte entre N et M mots, sans commentaire. Le compromis vitesse/qualité par défaut.'
+		),
+		advanced: t(
+			'Deux lignes en sortie : la fin de phrase corrigée, puis la suite prédite. Bilingue FR/EN, avec exemples intégrés pour les petits modèles.'
+		),
+		batch_advanced: t(
 			'Le contrat « Avancé », mais N suggestions distinctes en une seule requête — beaucoup plus économique que N appels.'
-	};
+		)
+	});
 </script>
 
-<section class="ai" id="ep-ia" lang="fr" style="--section-accent: var(--family-ia);">
+<section class="ai" id="ep-ia" style="--section-accent: var(--family-ia);">
 	<div class="ai-glow" aria-hidden="true"></div>
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Prédictions IA</p>
-			<h2>Une IA qui écrit avec vous. Chez vous.</h2>
+			<p class="kicker">{t('Prédictions IA')}</p>
+			<h2>{t('Une IA qui écrit avec vous. Chez vous.')}</h2>
 			<p class="lead">
-				Le driver embarque un pont vers un modèle de langage qui tourne <strong
-					>sur votre machine</strong
-				>. Il corrige la fin de votre phrase et propose la suite — validables en une touche, sans
-				que rien ne parte dans le cloud.
+				{@html t(
+					'Le driver embarque un pont vers un modèle de langage qui tourne <strong>sur votre machine</strong>. Il corrige la fin de votre phrase et propose la suite — validables en une touche, sans que rien ne parte dans le cloud.'
+				)}
 			</p>
 		</header>
 
 		<!-- Faithful tooltip mockup with mode tabs -->
 		<figure class="ai-demo" use:reveal>
-			<div class="mode-tabs" role="tablist" aria-label="Mode du tooltip IA">
+			<div class="mode-tabs" role="tablist" aria-label={t('Mode du tooltip IA')}>
 				{#each modes as m, i (m.id)}
 					<button
 						type="button"
@@ -103,100 +108,108 @@ FEATURES & RATIONALE:
 				role="tabpanel"
 				aria-labelledby="ai-mode-tab-{activeMode}"
 			>
-				<WindowChrome title="~/inbox/brouillon.eml" />
+				<WindowChrome title={t('~/inbox/brouillon.eml')} />
 
 				<div class="ai-body">
 					{#if activeMode === 'predict'}
 						<p class="ai-context">
-							Bonjour Madame, je vous écris pour <span class="caret" aria-hidden="true"></span>
-						</p>
-						<div class="hs-tooltip">
-							<ol class="tt-list">
-								<li class="tt-line tt-line--selected">
-									<span class="tt-spark" aria-hidden="true">✨</span>
-									<span class="tt-eq">…je vous écris pour</span>
-									<span class="tt-nw"> vous proposer un rendez-vous mardi prochain.</span>
-									<span class="tt-shortcut">⌥1</span>
-								</li>
-								<li class="tt-line">
-									<span class="tt-eq tt-dim">…je vous écris pour</span>
-									<span class="tt-nw tt-dim">
-										faire suite à notre échange de la semaine dernière.</span
-									>
-									<span class="tt-shortcut tt-dim">⌥2</span>
-								</li>
-								<li class="tt-line">
-									<span class="tt-eq tt-dim">…je vous écris pour</span>
-									<span class="tt-nw tt-dim"> accuser réception de votre dossier complet.</span>
-									<span class="tt-shortcut tt-dim">⌥3</span>
-								</li>
-							</ol>
-							<p class="tt-hint">Tab = accepter · ↑↓ = naviguer · Échap = ignorer</p>
-							<p class="tt-info">Llama 3.2 3B · Ollama · Basique — ⏱ 0,18 s</p>
-						</div>
-					{:else if activeMode === 'correct'}
-						<p class="ai-context">
-							Je vous remercie de me <span class="typo">recevoire</span> demain matin.<span
-								class="caret"
-								aria-hidden="true"
-							></span>
-						</p>
-						<div class="hs-tooltip">
-							<ol class="tt-list">
-								<li class="tt-line tt-line--selected">
-									<span class="tt-spark" aria-hidden="true">✨</span>
-									<span class="tt-eq">Je vous remercie de me</span>
-									<span class="tt-corr"> recevoir</span>
-									<span class="tt-eq"> demain matin.</span>
-									<span class="tt-shortcut">⌥1</span>
-								</li>
-							</ol>
-							<p class="tt-hint">Tab = accepter</p>
-							<p class="tt-info">Llama 3.2 3B · Ollama · Avancé — ⏱ 0,21 s</p>
-						</div>
-					{:else}
-						<p class="ai-context">
-							Le projet est <span class="typo">paralèle</span> à
+							{t('Bonjour Madame, je vous écris pour')}
 							<span class="caret" aria-hidden="true"></span>
 						</p>
 						<div class="hs-tooltip">
 							<ol class="tt-list">
 								<li class="tt-line tt-line--selected">
 									<span class="tt-spark" aria-hidden="true">✨</span>
-									<span class="tt-eq">Le projet est</span>
-									<span class="tt-corr"> parallèle</span>
-									<span class="tt-eq"> à</span>
+									<span class="tt-eq">{t('…je vous écris pour')}</span>
+									<span class="tt-nw"> {t('vous proposer un rendez-vous mardi prochain.')}</span>
+									<span class="tt-shortcut">⌥1</span>
+								</li>
+								<li class="tt-line">
+									<span class="tt-eq tt-dim">{t('…je vous écris pour')}</span>
+									<span class="tt-nw tt-dim">
+										{t('faire suite à notre échange de la semaine dernière.')}</span
+									>
+									<span class="tt-shortcut tt-dim">⌥2</span>
+								</li>
+								<li class="tt-line">
+									<span class="tt-eq tt-dim">{t('…je vous écris pour')}</span>
+									<span class="tt-nw tt-dim">
+										{t('accuser réception de votre dossier complet.')}</span
+									>
+									<span class="tt-shortcut tt-dim">⌥3</span>
+								</li>
+							</ol>
+							<p class="tt-hint">{t('Tab = accepter · ↑↓ = naviguer · Échap = ignorer')}</p>
+							<p class="tt-info">{t('Llama 3.2 3B · Ollama · Basique — ⏱ 0,18 s')}</p>
+						</div>
+					{:else if activeMode === 'correct'}
+						<p class="ai-context">
+							{t('Je vous remercie de me')}
+							<span class="typo">{t('recevoire')}</span>
+							{t('demain matin.')}<span class="caret" aria-hidden="true"></span>
+						</p>
+						<div class="hs-tooltip">
+							<ol class="tt-list">
+								<li class="tt-line tt-line--selected">
+									<span class="tt-spark" aria-hidden="true">✨</span>
+									<span class="tt-eq">{t('Je vous remercie de me')}</span>
+									<span class="tt-corr"> {t('recevoir')}</span>
+									<span class="tt-eq"> {t('demain matin.')}</span>
+									<span class="tt-shortcut">⌥1</span>
+								</li>
+							</ol>
+							<p class="tt-hint">{t('Tab = accepter')}</p>
+							<p class="tt-info">{t('Llama 3.2 3B · Ollama · Avancé — ⏱ 0,21 s')}</p>
+						</div>
+					{:else}
+						<p class="ai-context">
+							{t('Le projet est')}
+							<span class="typo">{t('paralèle')}</span>
+							{t('à')}
+							<span class="caret" aria-hidden="true"></span>
+						</p>
+						<div class="hs-tooltip">
+							<ol class="tt-list">
+								<li class="tt-line tt-line--selected">
+									<span class="tt-spark" aria-hidden="true">✨</span>
+									<span class="tt-eq">{t('Le projet est')}</span>
+									<span class="tt-corr"> {t('parallèle')}</span>
+									<span class="tt-eq"> {t('à')}</span>
 									<span class="tt-nw">
-										celui de l’an dernier, avec un budget revu à la hausse.</span
+										{t('celui de l’an dernier, avec un budget revu à la hausse.')}</span
 									>
 									<span class="tt-shortcut">⌥1</span>
 								</li>
 								<li class="tt-line">
-									<span class="tt-eq tt-dim">Le projet est</span>
-									<span class="tt-corr tt-dim"> parallèle</span>
-									<span class="tt-eq tt-dim"> à</span>
-									<span class="tt-nw tt-dim"> ceux que nous avons livrés en 2024.</span>
+									<span class="tt-eq tt-dim">{t('Le projet est')}</span>
+									<span class="tt-corr tt-dim"> {t('parallèle')}</span>
+									<span class="tt-eq tt-dim"> {t('à')}</span>
+									<span class="tt-nw tt-dim"> {t('ceux que nous avons livrés en 2024.')}</span>
 									<span class="tt-shortcut tt-dim">⌥2</span>
 								</li>
 							</ol>
-							<p class="tt-hint">Tab = accepter la correction ET la suite</p>
-							<p class="tt-info">Mistral 7B · Ollama · Avancé — ⏱ 0,34 s</p>
+							<p class="tt-hint">{t('Tab = accepter la correction ET la suite')}</p>
+							<p class="tt-info">{t('Mistral 7B · Ollama · Avancé — ⏱ 0,34 s')}</p>
 						</div>
 						<p class="ai-punch">
-							Un seul <kbd>Tab</kbd> insère la correction <strong>et</strong> la suite : 80 caractères
-							pour 1 frappe.
+							{@html t(
+								'Un seul <kbd>Tab</kbd> insère la correction <strong>et</strong> la suite : 80 caractères pour 1 frappe.'
+							)}
 						</p>
 					{/if}
 				</div>
 			</div>
 
 			<figcaption class="ai-legend">
-				Code couleur réel du driver : <span class="lg-gray">contexte</span> ·
-				<span class="lg-green">correction</span>
-				· <span class="lg-orange">prédiction</span> ·
-				<span class="lg-yellow">✨ ligne active</span>.
-				{defaults.numPredictions} suggestions, déclenchées après {defaults.debounceMs} ms d’inactivité
-				sur les {defaults.contextLength} derniers caractères — tout est réglable.
+				{t('Code couleur réel du driver :')}
+				<span class="lg-gray">{t('contexte')}</span> ·
+				<span class="lg-green">{t('correction')}</span>
+				· <span class="lg-orange">{t('prédiction')}</span> ·
+				<span class="lg-yellow">{t('✨ ligne active')}</span>.
+				{t(
+					'{n} suggestions, déclenchées après {ms} ms d’inactivité sur les {chars} derniers caractères — tout est réglable.',
+					{ n: defaults.numPredictions, ms: defaults.debounceMs, chars: defaults.contextLength }
+				)}
 			</figcaption>
 		</figure>
 
@@ -204,7 +217,7 @@ FEATURES & RATIONALE:
 		<section class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">1</span>
-				<span class="step-title">Choisissez votre moteur — local d’abord</span>
+				<span class="step-title">{t('Choisissez votre moteur — local d’abord')}</span>
 			</h3>
 			<ul class="backend-grid">
 				<li>
@@ -218,8 +231,9 @@ FEATURES & RATIONALE:
 							<span class="backend-port">port {defaults.ollamaPort}</span>
 						</header>
 						<p>
-							Le plus simple à installer — le driver propose même de le faire pour vous. Catalogue
-							de modèles immense, serveur local en écoute uniquement sur votre machine.
+							{t(
+								'Le plus simple à installer — le driver propose même de le faire pour vous. Catalogue de modèles immense, serveur local en écoute uniquement sur votre machine.'
+							)}
 						</p>
 					</article>
 				</li>
@@ -235,8 +249,9 @@ FEATURES & RATIONALE:
 							<span class="backend-port">port {defaults.mlxPort}</span>
 						</header>
 						<p>
-							Inférence accélérée par le GPU des puces Apple. Détecté et sélectionné automatiquement
-							sur les machines compatibles — réponses sous 100 ms sur les petits modèles.
+							{t(
+								'Inférence accélérée par le GPU des puces Apple. Détecté et sélectionné automatiquement sur les machines compatibles — réponses sous 100 ms sur les petits modèles.'
+							)}
 						</p>
 					</article>
 				</li>
@@ -245,24 +260,25 @@ FEATURES & RATIONALE:
 			<!-- Remote API providers — dynamic, from api_providers.json -->
 			<div class="api-band">
 				<p class="api-lead">
-					Envie d’un modèle plus puissant ? Branchez une clé API — <strong
-						>{apiProviders.length} fournisseurs</strong
-					> pris en charge, clés chiffrées localement (Trousseau macOS, DPAPI Windows) :
+					{@html t(
+						'Envie d’un modèle plus puissant ? Branchez une clé API — <strong>{n} fournisseurs</strong> pris en charge, clés chiffrées localement (Trousseau macOS, DPAPI Windows) :',
+						{ n: apiProviders.length }
+					)}
 				</p>
 				<ul class="api-chips">
 					{#each apiProviders as p}
 						<li
 							class="api-chip"
 							title={p.defaultModel
-								? `Modèle par défaut : ${p.defaultModel}`
-								: 'Endpoint personnalisé'}
+								? t('Modèle par défaut : {model}', { model: p.defaultModel })
+								: t('Endpoint personnalisé')}
 						>
 							{p.label}
 						</li>
 					{/each}
 				</ul>
 				<p class="api-note">
-					Liste générée depuis le fichier de configuration du driver — toujours à jour.
+					{t('Liste générée depuis le fichier de configuration du driver — toujours à jour.')}
 				</p>
 			</div>
 		</section>
@@ -272,16 +288,21 @@ FEATURES & RATIONALE:
 			<h3>
 				<span class="step-badge">2</span>
 				<span class="step-title"
-					>Choisissez votre modèle parmi <span use:countup={totals.models}>{totals.models}</span
-					></span
+					>{t('Choisissez votre modèle parmi')}
+					<span use:countup={totals.models}>{totals.models}</span></span
 				>
 			</h3>
 			<p class="step-lead">
-				Un catalogue curé de <strong>{totals.models} modèles open-weights</strong> issus de
-				<strong>{totals.providers} fournisseurs</strong>
-				({totals.families} familles), du {range.min} qui répond en 50 ms au {range.max} ultra-contextuel.
-				Le menu affiche la RAM et l’espace disque requis avant tout téléchargement — et accepte n’importe
-				quel identifiant HuggingFace ou tag Ollama en plus.
+				{@html t(
+					'Un catalogue curé de <strong>{models} modèles open-weights</strong> issus de <strong>{providers} fournisseurs</strong> ({families} familles), du {min} qui répond en 50 ms au {max} ultra-contextuel. Le menu affiche la RAM et l’espace disque requis avant tout téléchargement — et accepte n’importe quel identifiant HuggingFace ou tag Ollama en plus.',
+					{
+						models: totals.models,
+						providers: totals.providers,
+						families: totals.families,
+						min: range.min,
+						max: range.max
+					}
+				)}
 			</p>
 			<ul class="provider-grid">
 				{#each catalog as p, i}
@@ -289,7 +310,11 @@ FEATURES & RATIONALE:
 						<p class="provider-name" lang="en">{p.name}</p>
 						<p class="provider-family" title={p.families}>{p.families}</p>
 						<div class="provider-meta">
-							<span class="provider-count">{p.modelCount} modèle{p.modelCount > 1 ? 's' : ''}</span>
+							<span class="provider-count"
+								>{p.modelCount > 1
+									? t('{n} modèles', { n: p.modelCount })
+									: t('{n} modèle', { n: p.modelCount })}</span
+							>
 							{#if p.range}
 								<span class="provider-range">{p.range}</span>
 							{/if}
@@ -299,8 +324,9 @@ FEATURES & RATIONALE:
 			</ul>
 			<div class="browser-embed">
 				<p class="step-lead">
-					Et voici la <strong>vraie fenêtre</strong> du navigateur de modèles, alimentée ici avec ce
-					même catalogue — triez, cherchez, comparez :
+					{@html t(
+						'Et voici la <strong>vraie fenêtre</strong> du navigateur de modèles, alimentée ici avec ce même catalogue — triez, cherchez, comparez :'
+					)}
 				</p>
 				<DriverFrame
 					id="model_browser"
@@ -310,7 +336,9 @@ FEATURES & RATIONALE:
 				/>
 			</div>
 			<p class="api-note">
-				Catalogue généré depuis <code>models.json</code> — le même fichier que lit le driver.
+				{@html t(
+					'Catalogue généré depuis <code>models.json</code> — le même fichier que lit le driver.'
+				)}
 			</p>
 		</section>
 
@@ -318,14 +346,14 @@ FEATURES & RATIONALE:
 		<section class="ai-step" use:reveal>
 			<h3>
 				<span class="step-badge">3</span>
-				<span class="step-title">Choisissez (ou écrivez) votre profil de prompt</span>
+				<span class="step-title">{t('Choisissez (ou écrivez) votre profil de prompt')}</span>
 			</h3>
 			<ul class="profile-grid">
 				{#each profiles as p}
 					<li>
 						<article class="ep-card profile-card">
 							<header class="profile-head">
-								<span class="profile-label">{p.label}</span>
+								<span class="profile-label">{localized(p.label, p.labelEn)}</span>
 								{#if p.batch}<span class="profile-batch">batch</span>{/if}
 							</header>
 							<p>{profileNotes[p.id] ?? ''}</p>
@@ -334,10 +362,9 @@ FEATURES & RATIONALE:
 				{/each}
 			</ul>
 			<p class="step-foot">
-				L’éditeur de prompts intégré accepte vos propres instructions avec les variables
-				<code>{'{context}'}</code>, <code>{'{min_words}'}</code>, <code>{'{max_words}'}</code> —
-				imposez un ton, une langue, un métier. <em>« Termine mes phrases comme Hemingway »</em> est un
-				profil valide.
+				{@html t(
+					'L’éditeur de prompts intégré accepte vos propres instructions avec les variables <code>&#123;context&#125;</code>, <code>&#123;min_words&#125;</code>, <code>&#123;max_words&#125;</code> — imposez un ton, une langue, un métier. <em>« Termine mes phrases comme Hemingway »</em> est un profil valide.'
+				)}
 			</p>
 		</section>
 	</div>

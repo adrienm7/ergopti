@@ -21,10 +21,11 @@ FEATURES & RATIONALE:
 	import LiveSession from './LiveSession.svelte';
 	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
+	import { i18n, localized, t } from './i18n.svelte.js';
 
 	/**
 	 * @type {{
-	 *   categories: Array<{id: string, label: string, count: number, color: string, delaySec: number}>,
+	 *   categories: Array<{id: string, label: string, labelEn: string, count: number, color: string, delaySec: number}>,
 	 *   total: number,
 	 *   geo: Record<string, {width: number, height: number}>
 	 * }}
@@ -32,13 +33,16 @@ FEATURES & RATIONALE:
 	let { categories, total, geo } = $props();
 
 	// In-context example cards — universal families that work on ANY layout
-	// (they operate on the produced text, not the physical key).
-	const details = [
+	// (they operate on the produced text, not the physical key). The examples
+	// themselves are French text, marked lang="fr" where they are shown.
+	let details = $derived([
 		{
-			title: 'Autocorrection',
+			title: t('Autocorrection'),
 			color: '#43a047',
-			tag: 'Les fautes les plus fréquentes, balayées à la frappe',
-			lead: 'Apostrophes typographiques, capitalisation des marques, accents oubliés. Ce n’est pas un correcteur après coup : c’est appliqué pendant que vous tapez.',
+			tag: t('Les fautes les plus fréquentes, balayées à la frappe'),
+			lead: t(
+				'Apostrophes typographiques, capitalisation des marques, accents oubliés. Ce n’est pas un correcteur après coup : c’est appliqué pendant que vous tapez.'
+			),
 			rows: [
 				{ trig: 'chatgpt', out: 'ChatGPT', words: ['ChatGPT m’a aidé sur…'] },
 				{ trig: 'alexei', out: 'Alexeï', words: ['Alexeï Navalny'] },
@@ -47,10 +51,12 @@ FEATURES & RATIONALE:
 			]
 		},
 		{
-			title: 'Touche magique ★',
+			title: t('Touche magique ★'),
 			color: '#e53935',
-			tag: 'Un suffixe explicite pour les expansions longues',
-			lead: 'Pour vos snippets fréquents — formules, signatures, identifiants — la touche ★ déclenche l’expansion sans aucune ambiguïté. Aucun risque de collision avec la frappe normale.',
+			tag: t('Un suffixe explicite pour les expansions longues'),
+			lead: t(
+				'Pour vos snippets fréquents — formules, signatures, identifiants — la touche ★ déclenche l’expansion sans aucune ambiguïté. Aucun risque de collision avec la frappe normale.'
+			),
 			rows: [
 				{ trig: 'ct★', out: 'c’était', words: ['ct★ génial → c’était génial'] },
 				{ trig: 'pex★', out: 'par exemple', words: ['pex★ ce matin → par exemple ce matin'] },
@@ -58,7 +64,7 @@ FEATURES & RATIONALE:
 				{ trig: 'eef★', out: 'en effet', words: ['eef★, c’est vrai → en effet, c’est vrai'] }
 			]
 		}
-	];
+	]);
 
 	// The ★ key's two modes, decided from context at fire time.
 	const repeaterExamples = [
@@ -78,27 +84,27 @@ FEATURES & RATIONALE:
 	];
 
 	/**
-	 * Format a count with the French thousands separator.
+	 * Format a count with the thousands separator of the page's language.
 	 * @param {number} n
 	 * @returns {string}
 	 */
 	function fmt(n) {
-		return n.toLocaleString('fr-FR');
+		return n.toLocaleString(i18n.lang === 'en' ? 'en-GB' : 'fr-FR');
 	}
 </script>
 
-<section class="hotstrings" id="ep-hotstrings" lang="fr" style="--section-accent: #43a047;">
+<section class="hotstrings" id="ep-hotstrings" style="--section-accent: #43a047;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Expansions en temps réel</p>
+			<p class="kicker">{t('Expansions en temps réel')}</p>
 			<h2>
-				<data value={total} use:countup={total}>{fmt(total)}</data> corrections et expansions, prêtes
-				à l’emploi.
+				<data value={total} use:countup={total}>{fmt(total)}</data>
+				{t('corrections et expansions, prêtes à l’emploi.')}
 			</h2>
 			<p class="lead">
-				Cinq familles livrées avec le driver, chacune avec sa couleur de tooltip et son délai
-				réglable. Ce compteur est <strong>mesuré automatiquement</strong> depuis les fichiers du driver
-				à chaque mise à jour du site.
+				{@html t(
+					'Cinq familles livrées avec le driver, chacune avec sa couleur de tooltip et son délai réglable. Ce compteur est <strong>mesuré automatiquement</strong> depuis les fichiers du driver à chaque mise à jour du site.'
+				)}
 			</p>
 		</header>
 
@@ -111,15 +117,16 @@ FEATURES & RATIONALE:
 				{#each categories as cat, i}
 					<li class="family" style="--accent: {cat.color}; --reveal-delay: {i * 60}ms;">
 						<span class="family-dot" aria-hidden="true"></span>
-						<span class="family-name">{cat.label}</span>
+						<span class="family-name">{localized(cat.label, cat.labelEn)}</span>
 						<span class="family-count">{fmt(cat.count)}</span>
 						<span class="family-delay">{cat.delaySec} s</span>
 					</li>
 				{/each}
 			</ul>
 			<p class="family-note">
-				Couleurs et délais réels du driver — chaque famille est personnalisable et désactivable
-				depuis le menu.
+				{t(
+					'Couleurs et délais réels du driver — chaque famille est personnalisable et désactivable depuis le menu.'
+				)}
 			</p>
 		</div>
 
@@ -140,7 +147,7 @@ FEATURES & RATIONALE:
 							</hgroup>
 						</header>
 						<p class="detail-lead">{cat.lead}</p>
-						<ul class="detail-rows">
+						<ul class="detail-rows" lang="fr">
 							{#each cat.rows as r}
 								<li>
 									<div class="detail-trig">
@@ -165,12 +172,13 @@ FEATURES & RATIONALE:
 		<ul class="magic-duo">
 			<li class="card-item">
 				<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal>
-					<h3><span class="magic-num">1</span> Répéteur de lettre</h3>
+					<h3><span class="magic-num">1</span> {t('Répéteur de lettre')}</h3>
 					<p>
-						Si aucune abréviation ne correspond, <kbd class="star">★</kbd> double simplement la
-						lettre précédente. <strong>Plus aucun SFB sur les doublons.</strong>
+						{@html t(
+							'Si aucune abréviation ne correspond, <kbd class="star">★</kbd> double simplement la lettre précédente. <strong>Plus aucun SFB sur les doublons.</strong>'
+						)}
 					</p>
-					<ul class="magic-rows">
+					<ul class="magic-rows" lang="fr">
 						{#each repeaterExamples as r}
 							<li>
 								<span class="hs-key">{r.trig}</span>
@@ -185,12 +193,13 @@ FEATURES & RATIONALE:
 
 			<li class="card-item">
 				<article class="ep-card magic-card" style="--accent: #e53935;" use:reveal={{ delay: 90 }}>
-					<h3><span class="magic-num">2</span> Déclencheur d’abréviations</h3>
+					<h3><span class="magic-num">2</span> {t('Déclencheur d’abréviations')}</h3>
 					<p>
-						Si les lettres précédentes forment une abréviation connue, <kbd class="star">★</kbd> expanse
-						à la place. Les deux modes sont décidés au moment de la frappe — sans configuration.
+						{@html t(
+							'Si les lettres précédentes forment une abréviation connue, <kbd class="star">★</kbd> expanse à la place. Les deux modes sont décidés au moment de la frappe — sans configuration.'
+						)}
 					</p>
-					<ul class="magic-rows magic-rows--compact">
+					<ul class="magic-rows magic-rows--compact" lang="fr">
 						{#each triggerExamples as r}
 							<li>
 								<span class="hs-key">{r.trig}</span>
@@ -205,11 +214,11 @@ FEATURES & RATIONALE:
 
 		<!-- The REAL editor window, embedded live -->
 		<section class="editor-block">
-			<h3 class="editor-title" use:reveal>Et voici la vraie fenêtre d’édition.</h3>
+			<h3 class="editor-title" use:reveal>{t('Et voici la vraie fenêtre d’édition.')}</h3>
 			<p class="editor-lead" use:reveal>
-				Pas une capture d’écran : c’est la fenêtre d’édition du driver, servie depuis ses propres
-				fichiers et pilotée ici avec des données de démonstration. Sections pliables, recherche,
-				ajout en deux champs — chez vous, avec vos raccourcis.
+				{t(
+					'Pas une capture d’écran : c’est la fenêtre d’édition du driver, servie depuis ses propres fichiers et pilotée ici avec des données de démonstration. Sections pliables, recherche, ajout en deux champs — chez vous, avec vos raccourcis.'
+				)}
 			</p>
 			<DriverFrame
 				id="hotstring_editor"

@@ -12,9 +12,8 @@ stacked four bordered boxes here.
 FEATURES & RATIONALE:
 1. Clear Boundary: a visitor on AZERTY must instantly see that everything
    ABOVE works for them, and this section is the Ergopti-only bonus.
-2. Language: the section has no English translation yet, so it says it is
-   French (lang="fr", WCAG 3.1.2) even inside the English page; its English
-   example words say they are English.
+2. Language: the section follows the page's language through t(); its
+   example words keep their own language (WCAG 3.1.2), English or French.
 ==============================================================================
 -->
 
@@ -23,12 +22,16 @@ FEATURES & RATIONALE:
 	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
 	import KeyboardControls from '#lib/keyboard/controls/KeyboardControls.svelte';
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
-	const bigramCards = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let bigramCards = $derived([
 		{
-			title: 'Roulements de bigrammes',
+			title: t('Roulements de bigrammes'),
 			color: '#1e88e5',
-			lead: 'Des séquences inconfortables remplacées par des roulements fluides sur doigts adjacents. Vous tapez ce qui est confortable, le mot correct sort.',
+			lead: t(
+				'Des séquences inconfortables remplacées par des roulements fluides sur doigts adjacents. Vous tapez ce qui est confortable, le mot correct sort.'
+			),
 			rows: [
 				{ trig: 'sx', out: 'sk', words: 'ask, task, desk', lang: 'en' },
 				{ trig: 'cx', out: 'ck', words: 'back, check', lang: 'en' },
@@ -37,70 +40,88 @@ FEATURES & RATIONALE:
 			]
 		},
 		{
-			title: 'Réduction des SFBs',
+			title: t('Réduction des SFBs'),
 			color: '#e53935',
-			lead: 'La virgule devient une super touche morte qui neutralise les derniers bigrammes à même doigt. Les touches É/È/Ê s’en chargent côté gauche.',
+			lead: t(
+				'La virgule devient une super touche morte qui neutralise les derniers bigrammes à même doigt. Les touches É/È/Ê s’en chargent côté gauche.'
+			),
 			rows: [
-				{ trig: ',t', out: 'pt', words: 'aptement' },
-				{ trig: 'éà', out: 'ié', words: 'ciel' },
-				{ trig: 'àé', out: 'éi', words: 'antérieur' },
-				{ trig: 'êe', out: 'œ', words: 'sœur' }
+				{ trig: ',t', out: 'pt', words: 'aptement', lang: 'fr' },
+				{ trig: 'éà', out: 'ié', words: 'ciel', lang: 'fr' },
+				{ trig: 'àé', out: 'éi', words: 'antérieur', lang: 'fr' },
+				{ trig: 'êe', out: 'œ', words: 'sœur', lang: 'fr' }
 			]
 		},
 		{
-			title: 'Symboles de programmation',
+			title: t('Symboles de programmation'),
 			color: '#8e44ad',
-			lead: 'Les combinaisons pénibles du code deviennent des roulements vers l’intérieur sur la home-row d’Ergopti.',
+			lead: t(
+				'Les combinaisons pénibles du code deviennent des roulements vers l’intérieur sur la home-row d’Ergopti.'
+			),
 			rows: [
 				{ trig: '$=', out: '=>', words: 'fat arrow', lang: 'en' },
 				{ trig: '+?', out: '->', words: 'Rust, types', lang: 'en' },
-				{ trig: '!#', out: '!=', words: 'différent' },
-				{ trig: '<@', out: '</', words: 'fermeture HTML' }
+				{ trig: '!#', out: '!=', words: t('différent') },
+				{ trig: '<@', out: '</', words: t('fermeture HTML') }
 			]
 		}
-	];
+	]);
 
-	const superKeys = [
+	let superKeys = $derived([
 		{
-			title: ', + voyelle = J',
-			body: 'Le <kbd>j</kbd> cède sa place à la touche ★. La séquence <code>,</code>+voyelle — inexistante en français — produit le <code>j</code> : <code>,a</code> → <em>ja</em>, <code>,e</code> → <em>je</em>.'
+			title: t(', + voyelle = J'),
+			body: t(
+				'Le <kbd>j</kbd> cède sa place à la touche ★. La séquence <code>,</code>+voyelle — inexistante en français — produit le <code>j</code> : <code>,a</code> → <em>ja</em>, <code>,e</code> → <em>je</em>.'
+			)
 		},
 		{
-			title: ', + consonne = lettres rares',
-			body: '<code>,è</code> → <em>z</em>, <code>,y</code> → <em>k</em>, <code>,s</code> → <em>q</em>, <code>,c</code> → <em>ç</em>. Les lettres rares restent à une frappe du repos.'
+			title: t(', + consonne = lettres rares'),
+			body: t(
+				'<code>,è</code> → <em>z</em>, <code>,y</code> → <em>k</em>, <code>,s</code> → <em>q</em>, <code>,c</code> → <em>ç</em>. Les lettres rares restent à une frappe du repos.'
+			)
 		},
 		{
-			title: 'Q + voyelle = QU',
-			body: 'En français, <kbd>q</kbd> implique presque toujours <kbd>u</kbd> : tapez <code>qe</code>, <code>qoi</code> — le <em>u</em> s’insère tout seul.'
+			title: t('Q + voyelle = QU'),
+			body: t(
+				'En français, <kbd>q</kbd> implique presque toujours <kbd>u</kbd> : tapez <code>qe</code>, <code>qoi</code> — le <em>u</em> s’insère tout seul.'
+			)
 		},
 		{
-			title: 'ê = circonflexe direct',
-			body: 'Une touche dédiée pour le cas le plus fréquent, et <code>êa</code>, <code>êi</code>, <code>êo</code>, <code>êu</code> pour â, î, ô, û.'
+			title: t('ê = circonflexe direct'),
+			body: t(
+				'Une touche dédiée pour le cas le plus fréquent, et <code>êa</code>, <code>êi</code>, <code>êo</code>, <code>êu</code> pour â, î, ô, û.'
+			)
 		},
 		{
-			title: 'Suffixes en à',
-			body: '<code>às</code> → <em>ement</em>, <code>àt</code> → <em>ation</em>, <code>àr</code> → <em>eur</em>… Les terminaisons fréquentes en deux frappes au lieu de cinq.'
+			title: t('Suffixes en à'),
+			body: t(
+				'<code>às</code> → <em>ement</em>, <code>àt</code> → <em>ation</em>, <code>àr</code> → <em>eur</em>… Les terminaisons fréquentes en deux frappes au lieu de cinq.'
+			)
 		},
 		{
-			title: 'Apostrophe typographique',
-			body: "Dans du texte, <kbd>'</kbd> produit <em>’</em> ; dans du code, elle reste droite. Aucun réglage."
+			title: t('Apostrophe typographique'),
+			body: t(
+				"Dans du texte, <kbd>'</kbd> produit <em>’</em> ; dans du code, elle reste droite. Aucun réglage."
+			)
 		}
-	];
+	]);
 </script>
 
-<section class="exclusives" id="ep-ergopti" lang="fr" style="--section-accent: #ffc107;">
+<section class="exclusives" id="ep-ergopti" style="--section-accent: #ffc107;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">⚡ Bonus disposition Ergopti</p>
-			<h2>L’autre moitié du gain.</h2>
+			<p class="kicker">{t('⚡ Bonus disposition Ergopti')}</p>
+			<h2>{t('L’autre moitié du gain.')}</h2>
 			<p class="lead">
-				<strong><ErgoptiPlus></ErgoptiPlus> fonctionne sur n’importe quelle disposition</strong> —
-				AZERTY, QWERTY, Bépo… Tout ce qui précède marche sans rien changer à votre clavier. Les
-				fonctionnalités ci-dessous, elles, exploitent les positions exactes des touches d’<a
-					href="./"
-					class="ergo-link">Ergopti</a
+				<strong
+					><ErgoptiPlus></ErgoptiPlus> {t('fonctionne sur n’importe quelle disposition')}</strong
 				>
-				: adoptez la disposition et <ErgoptiPlus></ErgoptiPlus> les active automatiquement.
+				{t(
+					'— AZERTY, QWERTY, Bépo… Tout ce qui précède marche sans rien changer à votre clavier. Les fonctionnalités ci-dessous, elles, exploitent les positions exactes des touches de la disposition'
+				)}
+				<a href="./" class="ergo-link">Ergopti</a>{t(
+					' : adoptez la disposition et Ergopti+ les active automatiquement.'
+				)}
 			</p>
 		</header>
 
@@ -111,8 +132,9 @@ FEATURES & RATIONALE:
 			</div>
 			<figcaption>
 				<p class="ergo-keyboard-caption">
-					La disposition Ergopti et ses couches — explorez la couche AltGr, la touche magique et les
-					symboles de programmation.
+					{t(
+						'La disposition Ergopti et ses couches — explorez la couche AltGr, la touche magique et les symboles de programmation.'
+					)}
 				</p>
 			</figcaption>
 		</figure>

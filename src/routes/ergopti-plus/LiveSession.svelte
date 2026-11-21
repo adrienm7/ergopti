@@ -18,6 +18,7 @@ FEATURES & RATIONALE:
 	import { onMount } from 'svelte';
 	import WindowChrome from './WindowChrome.svelte';
 	import { ui } from './state.svelte.js';
+	import { t } from './i18n.svelte.js';
 
 	/** Base per-character delay for literal text (jittered for realism). */
 	const LITERAL_CHAR_MS = 28;
@@ -32,7 +33,8 @@ FEATURES & RATIONALE:
 
 	// Pre-recorded session: literal tokens are typed verbatim; hotstring
 	// tokens type a prefix, show the tooltip, then swap in the expansion.
-	// Colors mirror the driver's real family tints.
+	// Colors mirror the driver's real family tints. The typed sentence is
+	// French in every page language: the expansions are French ones.
 	const session = [
 		{ type: 'lit', text: 'Bonjour, ' },
 		{ type: 'hot', pre: 'jusqu', post: 'jusqu’', color: '#43a047', group: 'Auto' },
@@ -46,6 +48,14 @@ FEATURES & RATIONALE:
 		{ type: 'hot', pre: ',t', post: 'pt', color: '#1e88e5', group: 'SFB' },
 		{ type: 'lit', text: 'imal pour les doigts.' }
 	];
+
+	// The tooltip's family tag, in the page's language.
+	let groupLabels = $derived({
+		Auto: t('Auto'),
+		Magique: t('Magique'),
+		Perso: t('Perso'),
+		SFB: 'SFB'
+	});
 
 	let sessionText = $state('');
 	let sessionTooltip = $state(null);
@@ -106,24 +116,25 @@ FEATURES & RATIONALE:
 	});
 </script>
 
-<figure class="session-block" lang="fr">
+<figure class="session-block">
 	<div class="session-window ep-window os-{ui.osStyle}">
 		<WindowChrome title="message.txt" />
 		<div class="session-body">
-			<p class="session-line">
+			<p class="session-line" lang="fr">
 				{sessionText}<span class="caret" aria-hidden="true"></span>{#if sessionTooltip}<span
 						class="session-tooltip"
 						style="--tt: {sessionTooltip.color};"
 					>
 						<span class="tt-text">{sessionTooltip.text}</span>
-						<span class="tt-tag">{sessionTooltip.group}</span>
+						<span class="tt-tag">{groupLabels[sessionTooltip.group]}</span>
 					</span>{/if}
 			</p>
 		</div>
 	</div>
 	<figcaption class="session-caption">
-		Expansion en temps réel — une vraie phrase, plusieurs familles d’expansions, sans jamais rompre
-		le flux de frappe.
+		{t(
+			'Expansion en temps réel — une vraie phrase, plusieurs familles d’expansions, sans jamais rompre le flux de frappe.'
+		)}
 	</figcaption>
 </figure>
 

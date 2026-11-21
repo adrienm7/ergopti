@@ -22,15 +22,16 @@ FEATURES & RATIONALE:
 	import DriverFrame from './DriverFrame.svelte';
 	import LiveWpm from './LiveWpm.svelte';
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
 	/** @type {{geo: Record<string, {width: number, height: number}>}} */
 	let { geo } = $props();
 
 	// The two real dashboard windows, switchable.
-	const dashboards = [
-		{ id: 'metrics_typing', label: 'Statistiques de frappe' },
-		{ id: 'metrics_apps', label: 'Temps d’écran' }
-	];
+	let dashboards = $derived([
+		{ id: 'metrics_typing', label: t('Statistiques de frappe') },
+		{ id: 'metrics_apps', label: t('Temps d’écran') }
+	]);
 	let activeDashboard = $state('metrics_typing');
 
 	/** Keys that move between the tabs, as an offset or an absolute end. */
@@ -57,43 +58,56 @@ FEATURES & RATIONALE:
 	// 26-week activity calendar, deterministic intensity pattern.
 	const calendar = Array.from({ length: 26 * 7 }, (_, i) => (i * 7 + (i % 13)) % 5);
 
-	const capabilities = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let capabilities = $derived([
 		{
-			title: 'Évolution des MPM',
-			body: 'Votre vitesse jour après jour, semaine après semaine — avec les records et les moyennes glissantes.'
+			title: t('Évolution des MPM'),
+			body: t(
+				'Votre vitesse jour après jour, semaine après semaine — avec les records et les moyennes glissantes.'
+			)
 		},
 		{
-			title: 'Impact des hotstrings et de l’IA',
-			body: 'Les caractères « + Hotstrings » et « + IA » sont comptés à part : vous voyez exactement combien de frappe vous déléguez.'
+			title: t('Impact des hotstrings et de l’IA'),
+			body: t(
+				'Les caractères « + Hotstrings » et « + IA » sont comptés à part : vous voyez exactement combien de frappe vous déléguez.'
+			)
 		},
 		{
-			title: 'N-grammes — 19 onglets',
-			body: 'Des caractères aux heptagrammes, mots et raccourcis les plus tapés : la matière première pour créer vos prochains hotstrings.'
+			title: t('N-grammes — 19 onglets'),
+			body: t(
+				'Des caractères aux heptagrammes, mots et raccourcis les plus tapés : la matière première pour créer vos prochains hotstrings.'
+			)
 		},
 		{
-			title: 'Heatmaps clavier',
-			body: 'Deux cartes de chaleur montrent quelles touches travaillent le plus — et valident (ou non) votre disposition.'
+			title: t('Heatmaps clavier'),
+			body: t(
+				'Deux cartes de chaleur montrent quelles touches travaillent le plus — et valident (ou non) votre disposition.'
+			)
 		},
 		{
-			title: 'Ergonomie mesurée',
-			body: 'SFBs, roulements, redirections : les métriques des passionnés de layouts, calculées sur VOTRE frappe réelle.'
+			title: t('Ergonomie mesurée'),
+			body: t(
+				'SFBs, roulements, redirections : les métriques des passionnés de layouts, calculées sur VOTRE frappe réelle.'
+			)
 		},
 		{
-			title: 'Temps d’écran par app',
-			body: 'Temps par application, bascules entre apps, séries et scores de productivité — dans un second tableau de bord dédié.'
+			title: t('Temps d’écran par app'),
+			body: t(
+				'Temps par application, bascules entre apps, séries et scores de productivité — dans un second tableau de bord dédié.'
+			)
 		}
-	];
+	]);
 </script>
 
-<section class="metrics" id="ep-metriques" lang="fr" style="--section-accent: #00bfa5;">
+<section class="metrics" id="ep-metriques" style="--section-accent: #00bfa5;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Métriques de frappe</p>
-			<h2>On n’améliore que ce que l’on mesure.</h2>
+			<p class="kicker">{t('Métriques de frappe')}</p>
+			<h2>{t('On n’améliore que ce que l’on mesure.')}</h2>
 			<p class="lead">
-				Un enregistreur local compte vos frappes, mots et expansions dans une base
-				<strong>SQLite sur votre machine</strong> — rien ne part jamais ailleurs. Deux tableaux de bord
-				complets et un widget flottant en font un vrai coach de frappe.
+				{@html t(
+					'Un enregistreur local compte vos frappes, mots et expansions dans une base <strong>SQLite sur votre machine</strong> — rien ne part jamais ailleurs. Deux tableaux de bord complets et un widget flottant en font un vrai coach de frappe.'
+				)}
 			</p>
 		</header>
 
@@ -101,18 +115,18 @@ FEATURES & RATIONALE:
 		<figure class="preview-figure">
 			<div class="preview" use:reveal>
 				<dl class="preview-card">
-					<dt class="preview-label">Vitesse moyenne</dt>
+					<dt class="preview-label">{t('Vitesse moyenne')}</dt>
 					<dd class="preview-value">
-						74 <span class="preview-unit">MPM</span>
+						74 <span class="preview-unit">{t('MPM')}</span>
 						<svg class="spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
 							<polyline points={sparkPoints(wpmSpark)} pathLength="1" />
 						</svg>
 					</dd>
-					<dd class="preview-delta">+9 % ce mois-ci</dd>
+					<dd class="preview-delta">{t('+9 % ce mois-ci')}</dd>
 				</dl>
 
 				<dl class="preview-card">
-					<dt class="preview-label">Frappe déléguée</dt>
+					<dt class="preview-label">{t('Frappe déléguée')}</dt>
 					<dd class="preview-value">
 						31 <span class="preview-unit">%</span>
 						<svg
@@ -124,11 +138,11 @@ FEATURES & RATIONALE:
 							<polyline points={sparkPoints(delegSpark)} pathLength="1" />
 						</svg>
 					</dd>
-					<dd class="preview-delta">+ Hotstrings · + IA</dd>
+					<dd class="preview-delta">{t('+ Hotstrings · + IA')}</dd>
 				</dl>
 
 				<figure class="preview-card preview-card--calendar">
-					<figcaption class="preview-label">Activité — 26 semaines</figcaption>
+					<figcaption class="preview-label">{t('Activité — 26 semaines')}</figcaption>
 					<div class="calendar" aria-hidden="true">
 						{#each calendar as level, i}
 							<span class="cell" data-level={level} style="--i: {i};"></span>
@@ -137,8 +151,9 @@ FEATURES & RATIONALE:
 				</figure>
 			</div>
 			<figcaption class="preview-note" use:reveal>
-				Aperçu illustratif — les vrais tableaux de bord (<em>Statistiques de frappe</em> et
-				<em>Temps d’écran</em>) sont deux fenêtres du driver, avec vos données réelles.
+				{@html t(
+					'Aperçu illustratif — les vrais tableaux de bord (<em>Statistiques de frappe</em> et <em>Temps d’écran</em>) sont deux fenêtres du driver, avec vos données réelles.'
+				)}
 			</figcaption>
 		</figure>
 
@@ -159,8 +174,8 @@ FEATURES & RATIONALE:
 
 		<!-- The two REAL dashboard windows -->
 		<section class="dash-block">
-			<h3 class="dash-title" use:reveal>Les vraies fenêtres, servies depuis le driver.</h3>
-			<div class="dash-tabs" role="tablist" aria-label="Tableaux de bord" use:reveal>
+			<h3 class="dash-title" use:reveal>{t('Les vraies fenêtres, servies depuis le driver.')}</h3>
+			<div class="dash-tabs" role="tablist" aria-label={t('Tableaux de bord')} use:reveal>
 				{#each dashboards as d, i}
 					<button
 						type="button"
@@ -193,49 +208,52 @@ FEATURES & RATIONALE:
 				{/key}
 			</div>
 			<p class="dash-note" use:reveal>
-				Données de démonstration générées pour l’aperçu — chez vous, ces tableaux de bord se
-				remplissent de VOTRE frappe, et rien ne quitte jamais votre machine.
+				{t(
+					'Données de démonstration générées pour l’aperçu — chez vous, ces tableaux de bord se remplissent de VOTRE frappe, et rien ne quitte jamais votre machine.'
+				)}
 			</p>
 		</section>
 
 		<section class="widget-live ep-card" use:reveal>
 			<header class="widget-live-head">
-				<h3>Le widget MPM, toujours sous les yeux</h3>
+				<h3>{t('Le widget MPM, toujours sous les yeux')}</h3>
 				<p>
-					Un petit compteur flottant, toujours au premier plan, affiche votre vitesse en temps réel.
-					Regardez-le <strong>bondir</strong> quand une hotstring ou l’IA tape à votre place — c’est
-					toute la frappe déléguée qui devient visible :
+					{@html t(
+						'Un petit compteur flottant, toujours au premier plan, affiche votre vitesse en temps réel. Regardez-le <strong>bondir</strong> quand une hotstring ou l’IA tape à votre place — c’est toute la frappe déléguée qui devient visible :'
+					)}
 				</p>
 			</header>
 			<LiveWpm />
 		</section>
 
 		<section class="deleg-compare ep-card" use:reveal>
-			<h3 class="dc-title">Combien de frappe déléguez-vous&nbsp;?</h3>
+			<h3 class="dc-title">{t('Combien de frappe déléguez-vous ?')}</h3>
 			<dl class="dc-chart">
 				<div class="dc-row">
-					<dt class="dc-label">À la main</dt>
+					<dt class="dc-label">{t('À la main')}</dt>
 					<dd class="dc-track">
-						<span class="dc-seg dc-seg--manual" style="--w: 100%;">100 frappes</span>
+						<span class="dc-seg dc-seg--manual" style="--w: 100%;">{t('100 frappes')}</span>
 					</dd>
 				</div>
 				<div class="dc-row">
-					<dt class="dc-label">Avec Ergopti+</dt>
+					<dt class="dc-label">{t('Avec Ergopti+')}</dt>
 					<dd class="dc-track">
-						<span class="dc-seg dc-seg--typed" style="--w: 60%;">60 tapées</span>
-						<span class="dc-seg dc-seg--deleg" style="--w: 40%;">40 déléguées</span>
+						<span class="dc-seg dc-seg--typed" style="--w: 60%;">{t('60 tapées')}</span>
+						<span class="dc-seg dc-seg--deleg" style="--w: 40%;">{t('40 déléguées')}</span>
 					</dd>
 				</div>
 			</dl>
 			<p class="dc-note">
-				Hotstrings et IA écrivent le reste — pour le même texte, bien moins de frappes. Proportions
-				illustratives ; les vôtres sont dans le tableau de bord.
+				{t(
+					'Hotstrings et IA écrivent le reste — pour le même texte, bien moins de frappes. Proportions illustratives ; les vôtres sont dans le tableau de bord.'
+				)}
 			</p>
 		</section>
 
 		<p class="metrics-privacy" use:reveal>
-			🔐 Tout est calculé et stocké <strong>localement</strong>. Les champs de mot de passe sont
-			ignorés, le module entier se désactive d’un clic, et la base SQLite vous appartient.
+			{@html t(
+				'🔐 Tout est calculé et stocké <strong>localement</strong>. Les champs de mot de passe sont ignorés, le module entier se désactive d’un clic, et la base SQLite vous appartient.'
+			)}
 		</p>
 	</div>
 </section>

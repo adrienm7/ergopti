@@ -152,16 +152,19 @@ function loadApiProviders() {
 }
 
 /**
- * Load the prompt profiles joined with their French display labels, exactly
- * as the drivers do (profiles.json + locales key "llm.profile.<id>.label").
- * @returns {Array<{id: string, label: string, batch: boolean}>}
+ * Load the prompt profiles joined with their French and English display
+ * labels, exactly as the drivers do (profiles.json + locales key
+ * "llm.profile.<id>.label").
+ * @returns {Array<{id: string, label: string, labelEn: string, batch: boolean}>}
  */
 function loadProfiles() {
 	const profiles = readJson(resolve(LLM_ROOT, 'profiles.json'));
 	const fr = readJson(resolve(LOCALES_ROOT, 'fr.json'));
+	const en = readJson(resolve(LOCALES_ROOT, 'en.json'));
 	return profiles.map((p) => ({
 		id: p.id,
 		label: fr[`llm.profile.${p.id}.label`] ?? p.id,
+		labelEn: en[`llm.profile.${p.id}.label`] ?? p.id,
 		batch: Boolean(p.batch)
 	}));
 }
@@ -193,7 +196,7 @@ function loadLlmDefaults() {
  * Count the shipped hotstring entries per category by parsing the same TOML
  * files both drivers load at boot. An entry is any trigger mapped to a table
  * containing an "output" key inside a [[section]] array.
- * @returns {{categories: Array<{id: string, label: string, count: number, color: string, delaySec: number}>, total: number}}
+ * @returns {{categories: Array<{id: string, label: string, labelEn: string, count: number, color: string, delaySec: number}>, total: number}}
  */
 function loadHotstringCategories() {
 	const index = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, '_index.toml'), 'utf-8'));
@@ -249,6 +252,7 @@ function loadHotstringCategories() {
 		return {
 			id,
 			label: meta.description?.fr ?? id,
+			labelEn: meta.description?.en ?? id,
 			count,
 			color: meta.color ?? fallbackColor,
 			delaySec: meta.delay ?? defaults.delays?.default_sec ?? 0.75
@@ -325,19 +329,22 @@ const ACTIONS_ROOT = resolve(SHARED_ROOT, 'shortcuts/data/actions');
  * sg_order.items uses "#key" for group headers, "##key" for sub-headers and
  * "--" for separators. Headers resolve through the same locale keys the
  * picker uses. Axis actions form a final dedicated group.
- * @returns {Array<{title: string, sections: Array<{title: string, actions: Array<{id: string, label: string, platform: string, axis: boolean}>}>}>}
+ * @returns {Array<{title: string, titleEn: string, sections: Array<{title: string, titleEn: string, actions: Array<{id: string, label: string, labelEn: string, platform: string, axis: boolean}>}>}>}
  */
 function loadActionGroups() {
 	// The file carries a (doubled) UTF-8 BOM that smol-toml rejects.
 	const raw = readFileSync(resolve(ACTIONS_ROOT, 'actions.toml'), 'utf-8').replace(/^﻿+/, '');
 	const doc = parseToml(raw);
 	const fr = readJson(resolve(LOCALES_ROOT, 'fr.json'));
+	const en = readJson(resolve(LOCALES_ROOT, 'en.json'));
 	// Locale values keep the picker's leading "#" formatting marker — strip it.
-	const headerLabel = (key) =>
-		(fr[`sg_actions.sg_order.header.${key}`] ?? key).replace(/^#+\s*/, '');
+	const header = (catalog, key) =>
+		(catalog[`sg_actions.sg_order.header.${key}`] ?? key).replace(/^#+\s*/, '');
+	const headerLabel = (key) => ({ title: header(fr, key), titleEn: header(en, key) });
 	const action = (id, def, group, axis) => ({
 		id,
 		label: fr[`${group}.${id}`] ?? id,
+		labelEn: en[`${group}.${id}`] ?? id,
 		platform: def?.platform ?? 'all',
 		axis
 	});
@@ -348,15 +355,15 @@ function loadActionGroups() {
 	for (const item of doc.sg_order?.items ?? []) {
 		if (item === '--' || item === 'none') continue;
 		if (item.startsWith('##')) {
-			currentSection = { title: headerLabel(item.slice(2)), actions: [] };
+			currentSection = { ...headerLabel(item.slice(2)), actions: [] };
 			currentGroup?.sections.push(currentSection);
 		} else if (item.startsWith('#')) {
-			currentGroup = { title: headerLabel(item.slice(1)), sections: [] };
+			currentGroup = { ...headerLabel(item.slice(1)), sections: [] };
 			currentSection = null;
 			groups.push(currentGroup);
 		} else if (doc.sg_actions?.[item] && !doc.sg_actions[item].is_header) {
 			if (!currentSection) {
-				currentSection = { title: '', actions: [] };
+				currentSection = { title: '', titleEn: '', actions: [] };
 				currentGroup?.sections.push(currentSection);
 			}
 			currentSection.actions.push(action(item, doc.sg_actions[item], 'sg_actions', false));
@@ -369,7 +376,8 @@ function loadActionGroups() {
 	if (axisActions.length > 0) {
 		groups.push({
 			title: 'Axes continus',
-			sections: [{ title: '', actions: axisActions }]
+			titleEn: 'Continuous axes',
+			sections: [{ title: '', titleEn: '', actions: axisActions }]
 		});
 	}
 	return groups;
@@ -400,7 +408,7 @@ function plistString(xml, key) {
  * icon inlined as SVG (the bundles ship a web-friendly AppIcon.svg).
  * Fully automated: drop a described .app into macos/apps/ and it appears on
  * the page at the next deploy.
- * @returns {Array<{id: string, name: string, description: string, icon: string|null}>}
+ * @returns {Array<{id: string, name: string, description: string, descriptionEn: string, icon: string|null}>}
  */
 function loadMacosApps() {
 	return readdirSync(MACOS_APPS_ROOT, { withFileTypes: true })
@@ -424,6 +432,7 @@ function loadMacosApps() {
 				id: e.name.replace(/\.app$/, ''),
 				name: plistString(xml, 'CFBundleDisplayName') || plistString(xml, 'CFBundleName') || e.name,
 				description: descBlock ? plistString(descBlock, 'fr') : '',
+				descriptionEn: descBlock ? plistString(descBlock, 'en') : '',
 				icon
 			};
 		})

@@ -148,7 +148,7 @@ FEATURES & RATIONALE:
 <section class="hero" id="ep-demo">
 	<div class="hero-glow" aria-hidden="true"></div>
 	<div class="ep-wrap">
-		<div class="os-toggle" role="group" aria-label="Style des fenêtres">
+		<div class="os-toggle" role="group" aria-label={t('Style des fenêtres')}>
 			<span class="os-slider" style="--i: {osIndex};" aria-hidden="true"></span>
 			<button
 				type="button"

@@ -18,14 +18,14 @@ under another configuration path.
 	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '#lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
-	import { t, i18n } from './i18n.svelte.js';
+	import { t, i18n, localized } from './i18n.svelte.js';
 	import matrix from './feature-inventory.json';
 	import actions from './action-inventory.json';
 	import inputs from './input-inventory.json';
 	import menuGaps from './menu-gaps.json';
 	import behaviors from './behavior-inventory.json';
 
-	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
+	/** @type {{macosApps: Array<{id: string, name: string, description: string, descriptionEn: string}>}} */
 	let { macosApps } = $props();
 
 	// The five inventory tables hold thousands of cells: each one renders only
@@ -40,7 +40,7 @@ under another configuration path.
 <section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker" lang="fr">Trois systèmes</p>
+			<p class="kicker">{t('Trois systèmes')}</p>
 			<h2>{t('Trois systèmes, un projet.')}</h2>
 			<p class="lead">
 				{t(
@@ -274,23 +274,24 @@ under another configuration path.
 			<span class="lg off">{t('— entrée non déclarée pour ce système')}</span>
 		</p>
 
-		<!-- Per-OS bonuses (exclusive features that are not bundled apps); like the
-		     apps and the Linux call below, not translated yet: said French (WCAG 3.1.2). -->
-		<ul class="bonus-grid" lang="fr">
+		<!-- Per-OS bonuses (exclusive features that are not bundled apps). -->
+		<ul class="bonus-grid">
 			<li>
 				<article class="ep-card bonus-card" use:reveal>
-					<h3><i class="icon-windows bonus-icon" aria-hidden="true"></i> En bonus sur Windows</h3>
+					<h3>
+						<i class="icon-windows bonus-icon" aria-hidden="true"></i>
+						{t('En bonus sur Windows')}
+					</h3>
 					<ul class="bonus-list">
 						<li>
-							<strong>Ergopti sans installation.</strong> Le driver peut <em>émuler</em> la disposition
-							Ergopti par-dessus votre layout actuel — aucun installateur, aucun droit admin. Idéal au
-							bureau ou sur un poste verrouillé.
+							{@html t(
+								'<strong>Ergopti sans installation.</strong> Le driver peut <em>émuler</em> la disposition Ergopti par-dessus votre layout actuel — aucun installateur, aucun droit admin. Idéal au bureau ou sur un poste verrouillé.'
+							)}
 						</li>
 						<li>
-							<strong>Le meilleur d’Ergopti, même en AZERTY ou Bépo.</strong> Sans changer de
-							disposition, profitez de la couche de symboles AltGr d’Ergopti et des
-							<em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles
-							partout.
+							{@html t(
+								'<strong>Le meilleur d’Ergopti, même en AZERTY ou Bépo.</strong> Sans changer de disposition, profitez de la couche de symboles AltGr d’Ergopti et des <em>chiffres en accès direct</em> — deux des plus gros gains de la disposition, disponibles partout.'
+							)}
 						</li>
 					</ul>
 				</article>
@@ -298,15 +299,20 @@ under another configuration path.
 
 			<li>
 				<article class="ep-card bonus-card" use:reveal={{ delay: 90 }}>
-					<h3><i class="icon-appleinc bonus-icon" aria-hidden="true"></i> En bonus sur macOS</h3>
+					<h3>
+						<i class="icon-appleinc bonus-icon" aria-hidden="true"></i>
+						{t('En bonus sur macOS')}
+					</h3>
 					<ul class="bonus-list">
 						<li>
-							<strong>Backend MLX (Apple Silicon).</strong> Inférence IA locale accélérée par la puce
-							Apple — des prédictions plus rapides, toujours sans passer par le cloud.
+							{@html t(
+								'<strong>Backend MLX (Apple Silicon).</strong> Inférence IA locale accélérée par la puce Apple — des prédictions plus rapides, toujours sans passer par le cloud.'
+							)}
 						</li>
 						<li>
-							<strong>Moteur de gestes intégral.</strong> 36 emplacements de gestes trackpad et 3 axes
-							continus, là où Windows en propose 10.
+							{@html t(
+								'<strong>Moteur de gestes intégral.</strong> 36 emplacements de gestes trackpad et 3 axes continus, là où Windows en propose 10.'
+							)}
 						</li>
 					</ul>
 				</article>
@@ -314,13 +320,15 @@ under another configuration path.
 		</ul>
 
 		<!-- macOS bundled apps — showcased with their real bundle icons -->
-		<section class="apps-showcase" lang="fr" use:reveal>
+		<section class="apps-showcase" use:reveal>
 			<h3 class="apps-title">
-				<i class="icon-appleinc" aria-hidden="true"></i> Applications macOS incluses
+				<i class="icon-appleinc" aria-hidden="true"></i>
+				{t('Applications macOS incluses')}
 			</h3>
 			<p class="apps-lead">
-				Des utilitaires signés Ergopti, livrés directement dans le driver macOS — rien de plus à
-				installer.
+				{t(
+					'Des utilitaires signés Ergopti, livrés directement dans le driver macOS — rien de plus à installer.'
+				)}
 			</p>
 			<ul class="apps-grid">
 				{#each macosApps as app, i (app.id)}
@@ -333,28 +341,25 @@ under another configuration path.
 							</div>
 							<div class="app-text">
 								<h4>{app.name}</h4>
-								<p>{app.description}</p>
+								<p>{localized(app.description, app.descriptionEn)}</p>
 							</div>
 						</article>
 					</li>
 				{/each}
 			</ul>
 			<p class="apps-note">
-				Applications et descriptions extraites automatiquement des bundles embarqués dans le driver.
+				{t(
+					'Applications et descriptions extraites automatiquement des bundles embarqués dans le driver.'
+				)}
 			</p>
 		</section>
 
-		<aside class="linux-callout ep-card" lang="fr" use:reveal>
-			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
+		<aside class="linux-callout ep-card" use:reveal>
+			<h3>{t('🐧 Vous utilisez Linux ? On vous cherche.')}</h3>
 			<p>
-				Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même,
-				hotstrings via le moteur partagé, IA Ollama, métriques SQLite. Mais <strong
-					>personne ne l’a encore fait tourner en conditions réelles</strong
-				>
-				— il lui faut des testeurs avant d’être recommandable. Si vous voulez essuyer les plâtres,
-				<a href="https://github.com/adrienm7/ergopti" target="_blank" rel="noopener"
-					>ouvrez une issue sur GitHub</a
-				> : chaque retour fera avancer le support.
+				{@html t(
+					'Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même, hotstrings via le moteur partagé, IA Ollama, métriques SQLite. Mais <strong>personne ne l’a encore fait tourner en conditions réelles</strong> — il lui faut des testeurs avant d’être recommandable. Si vous voulez essuyer les plâtres, <a href="https://github.com/adrienm7/ergopti" target="_blank" rel="noopener">ouvrez une issue sur GitHub</a> : chaque retour fera avancer le support.'
+				)}
 			</p>
 		</aside>
 
@@ -362,9 +367,11 @@ under another configuration path.
 		<section class="cta-card" use:reveal>
 			<div class="cta-glow" aria-hidden="true"></div>
 			<h2 class="cta-title">{t('Vos doigts vous diront merci.')}</h2>
-			<p class="cta-sub" lang="fr">
-				Installez <ErgoptiPlus></ErgoptiPlus>, lancez-le, tapez <code>ct★</code> — et regardez
-				<samp class="cta-demo">c’était</samp> s’écrire tout seul. Le reste suivra.
+			<p class="cta-sub">
+				{t('Installez')}
+				<ErgoptiPlus></ErgoptiPlus>{@html t(
+					', lancez-le, tapez <code>ct★</code> — et regardez <samp class="cta-demo" lang="fr">c’était</samp> s’écrire tout seul. Le reste suivra.'
+				)}
 			</p>
 			<div class="cta-buttons">
 				<a

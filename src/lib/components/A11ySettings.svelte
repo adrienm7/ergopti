@@ -11,18 +11,23 @@ that colour-blind readers tell apart. The choices are owned by static/ergopti_pl
 (loaded by app.html before the page), which stores them per visitor and carries
 them into the Ergopti Studio frames; this component only edits them. A browser
 that refuses storage still gets the look for the current page, and is told so.
+Its text reads in the Ergopti+ pages' language (t() of
+src/routes/ergopti-plus/i18n.svelte.js, maintainer decision of 2026-11-21) and
+says so with its own lang attribute inside the French header.
 ==============================================================================
 -->
 
 <script>
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { i18n, t } from '../../routes/ergopti-plus/i18n.svelte.js';
 
-	const FONTS = [
-		['default', 'Police du site'],
-		['hyperlegible', 'Atkinson Hyperlegible (très lisible)'],
-		['dyslexic', 'OpenDyslexic (dyslexie)']
-	];
+	// $derived so the labels re-translate the instant the language toggles.
+	let fonts = $derived([
+		['default', t('Police du site')],
+		['hyperlegible', t('Atkinson Hyperlegible (très lisible)')],
+		['dyslexic', t('OpenDyslexic (dyslexie)')]
+	]);
 
 	const TEXT_SIZES = [
 		['100', '100 %'],
@@ -72,8 +77,9 @@ that refuses storage still gets the look for the current page, and is told so.
 	class="a11y-button"
 	id="a11y-settings-button"
 	aria-haspopup="dialog"
-	aria-label="Réglages d’accessibilité"
-	title="Réglages d’accessibilité"
+	aria-label={t('Réglages d’accessibilité')}
+	title={t('Réglages d’accessibilité')}
+	lang={i18n.lang}
 	onclick={open}
 >
 	<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
@@ -96,13 +102,15 @@ that refuses storage still gets the look for the current page, and is told so.
 	class="a11y-dialog"
 	id="a11y-settings"
 	aria-labelledby="a11y-settings-title"
+	lang={i18n.lang}
 	onclick={closeOnBackdrop}
 >
 	<form method="dialog">
-		<h2 id="a11y-settings-title">Réglages d’accessibilité</h2>
+		<h2 id="a11y-settings-title">{t('Réglages d’accessibilité')}</h2>
 		<p class="a11y-intro">
-			Ces réglages s’appliquent à tout le site et à Ergopti Studio, et sont retenus par ce
-			navigateur.
+			{t(
+				'Ces réglages s’appliquent à tout le site et à Ergopti Studio, et sont retenus par ce navigateur.'
+			)}
 		</p>
 
 		<label class="a11y-row">
@@ -112,24 +120,24 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.motion === 'reduce'}
 				onchange={(event) => toggle('motion', event.currentTarget.checked)}
 			/>
-			Réduire les animations et les défilements
+			{t('Réduire les animations et les défilements')}
 		</label>
 
 		<label class="a11y-row a11y-select">
-			Police
+			{t('Police')}
 			<select
 				id="a11y-font"
 				value={prefs.font || 'default'}
 				onchange={(event) => set('font', event.currentTarget.value)}
 			>
-				{#each FONTS as [value, label] (value)}
+				{#each fonts as [value, label] (value)}
 					<option {value}>{label}</option>
 				{/each}
 			</select>
 		</label>
 
 		<label class="a11y-row a11y-select">
-			Taille du texte
+			{t('Taille du texte')}
 			<select
 				id="a11y-text"
 				value={prefs.text || '100'}
@@ -148,7 +156,7 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.spacing === 'wide'}
 				onchange={(event) => toggle('spacing', event.currentTarget.checked)}
 			/>
-			Espacer les lettres, les mots et les lignes
+			{t('Espacer les lettres, les mots et les lignes')}
 		</label>
 
 		<label class="a11y-row">
@@ -158,7 +166,7 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.measure === 'short'}
 				onchange={(event) => toggle('measure', event.currentTarget.checked)}
 			/>
-			Raccourcir les lignes de texte
+			{t('Raccourcir les lignes de texte')}
 		</label>
 
 		<label class="a11y-row">
@@ -168,7 +176,7 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.align === 'start'}
 				onchange={(event) => toggle('align', event.currentTarget.checked)}
 			/>
-			Aligner tout le texte à gauche
+			{t('Aligner tout le texte à gauche')}
 		</label>
 
 		<label class="a11y-row">
@@ -178,7 +186,7 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.contrast === 'high'}
 				onchange={(event) => toggle('contrast', event.currentTarget.checked)}
 			/>
-			Contraste élevé
+			{t('Contraste élevé')}
 		</label>
 
 		<label class="a11y-row">
@@ -188,22 +196,24 @@ that refuses storage still gets the look for the current page, and is told so.
 				checked={prefs.colors === 'cvd'}
 				onchange={(event) => toggle('colors', event.currentTarget.checked)}
 			/>
-			Couleurs adaptées au daltonisme
+			{t('Couleurs adaptées au daltonisme')}
 		</label>
 
 		<p class="a11y-status" role="status">
 			{#if storageRefused}
-				Ce navigateur refuse l’enregistrement : les réglages valent pour cette page seulement.
+				{t(
+					'Ce navigateur refuse l’enregistrement : les réglages valent pour cette page seulement.'
+				)}
 			{/if}
 		</p>
 
 		<div class="a11y-actions">
-			<button type="button" onclick={reset}>Réinitialiser</button>
-			<button type="submit" class="a11y-close">Fermer</button>
+			<button type="button" onclick={reset}>{t('Réinitialiser')}</button>
+			<button type="submit" class="a11y-close">{t('Fermer')}</button>
 		</div>
 		<p class="a11y-statement">
 			<a href={resolve('/accessibilite')} onclick={() => dialog.close()}
-				>Déclaration d’accessibilité</a
+				>{t('Déclaration d’accessibilité')}</a
 			>
 		</p>
 	</form>

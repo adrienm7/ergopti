@@ -72,6 +72,18 @@ export function t(fr, vars) {
 }
 
 /**
+ * Pick the label of a driver data entry in the page's language: the build
+ * reads the drivers' own French and English labels (site-data.server.js), so
+ * data labels need no dictionary entry.
+ * @param {string} fr The French label.
+ * @param {string} [en] The English label, when the data has one.
+ * @returns {string}
+ */
+export function localized(fr, en) {
+	return i18n.lang === 'en' && en ? en : fr;
+}
+
+/**
  * Set the active language and persist the explicit choice.
  * @param {string} next A code present in AVAILABLE_LANGS.
  */

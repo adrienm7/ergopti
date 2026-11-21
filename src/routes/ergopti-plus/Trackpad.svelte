@@ -17,56 +17,61 @@ FEATURES & RATIONALE:
 <script>
 	import { countup } from './countup.js';
 	import { reveal } from './reveal.js';
+	import { t } from './i18n.svelte.js';
 
-	const gestures = [
+	// $derived so the cards re-translate the instant the language toggles.
+	let gestures = $derived([
 		{
-			fingers: '3 doigts',
+			fingers: t('3 doigts'),
 			type: 'Tap',
-			action: 'Définition du mot',
-			note: 'Posez trois doigts sur un mot : sa définition apparaît. Le geste signature.'
+			action: t('Définition du mot'),
+			note: t('Posez trois doigts sur un mot : sa définition apparaît. Le geste signature.')
 		},
 		{
-			fingers: '3 doigts',
+			fingers: t('3 doigts'),
 			type: 'Swipe ← →',
-			action: 'Mot précédent / suivant',
-			note: 'Avancez mot par mot dans n’importe quel champ texte.'
+			action: t('Mot précédent / suivant'),
+			note: t('Avancez mot par mot dans n’importe quel champ texte.')
 		},
 		{
-			fingers: '3 doigts',
+			fingers: t('3 doigts'),
 			type: 'Swipe ↑ ↓',
-			action: 'Volume + / −',
-			note: 'Axe continu : plus le geste est long, plus le volume bouge.'
+			action: t('Volume + / −'),
+			note: t('Axe continu : plus le geste est long, plus le volume bouge.')
 		},
 		{
-			fingers: '4 doigts',
+			fingers: t('4 doigts'),
 			type: 'Tap',
-			action: 'Copier',
-			note: 'Sélectionnez à deux doigts, copiez à quatre — plus rapide que le raccourci.'
+			action: t('Copier'),
+			note: t('Sélectionnez à deux doigts, copiez à quatre — plus rapide que le raccourci.')
 		},
 		{
-			fingers: '4 doigts',
+			fingers: t('4 doigts'),
 			type: 'Swipe ← →',
-			action: 'Onglet précédent / suivant',
-			note: 'Navigation d’onglets sans toucher le clavier.'
+			action: t('Onglet précédent / suivant'),
+			note: t('Navigation d’onglets sans toucher le clavier.')
 		},
 		{
-			fingers: '5 doigts',
+			fingers: t('5 doigts'),
 			type: 'Swipe ↑ ↓',
 			action: 'Mission Control / App Switcher',
-			note: 'Toutes vos fenêtres d’un geste.'
+			note: t('Toutes vos fenêtres d’un geste.')
 		}
-	];
+	]);
 </script>
 
-<section class="trackpad" id="ep-trackpad" lang="fr" style="--section-accent: #00bcd4;">
+<section class="trackpad" id="ep-trackpad" style="--section-accent: #00bcd4;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Gestes trackpad</p>
-			<h2><span use:countup={36}>36</span> emplacements de gestes. 3 axes continus.</h2>
+			<p class="kicker">{t('Gestes trackpad')}</p>
+			<h2>
+				<span use:countup={36}>36</span>
+				{t('emplacements de gestes. 3 axes continus.')}
+			</h2>
 			<p class="lead">
-				Le driver intercepte les gestes multi-touch bruts (pas les événements souris) et les associe
-				à l’action de votre choix. Taps et swipes de 2 à 5 doigts, catalogue d’actions intégré,
-				sensibilité réglable par geste.
+				{t(
+					'Le driver intercepte les gestes multi-touch bruts (pas les événements souris) et les associe à l’action de votre choix. Taps et swipes de 2 à 5 doigts, catalogue d’actions intégré, sensibilité réglable par geste.'
+				)}
 			</p>
 		</header>
 
@@ -88,9 +93,9 @@ FEATURES & RATIONALE:
 		</div>
 
 		<p class="gesture-foot" use:reveal>
-			Moteur complet sur <strong>macOS</strong> (36 slots + 3 axes, valeurs par défaut ci-dessus) ;
-			<strong>Windows</strong> expose 10 emplacements assignables (taps et swipes 3-4 doigts). Chaque
-			geste est réassignable depuis le menu, ou désactivable.
+			{@html t(
+				'Moteur complet sur <strong>macOS</strong> (36 slots + 3 axes, valeurs par défaut ci-dessus) ; <strong>Windows</strong> expose 10 emplacements assignables (taps et swipes 3-4 doigts). Chaque geste est réassignable depuis le menu, ou désactivable.'
+			)}
 		</p>
 	</div>
 </section>

@@ -21,6 +21,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { onMount } from 'svelte';
+	import { t } from './i18n.svelte.js';
 
 	// ── Widget canon, mirrored from _shared/metrics/data/wpm_widget/constants.toml ──
 	/** Blue background for manual keystrokes. */
@@ -42,13 +43,15 @@ FEATURES & RATIONALE:
 
 	// A repeating script: manual runs typed char-by-char, burst chunks (a
 	// hotstring expansion or an AI acceptance) appear at once and spike the MPM.
+	// The typed letter is French in every page language: the expansions are
+	// French ones; the tags are translated where they are drawn.
 	const SEGMENTS = [
 		{ kind: 'manual', text: 'Bonjour Madame, je vous écris pour ' },
 		{
 			kind: 'burst',
 			source: 'hotstring',
 			color: '#e53935',
-			tag: '★ Touche magique',
+			tag: 'magic',
 			text: 'par exemple '
 		},
 		{ kind: 'manual', text: 'convenir d’un ' },
@@ -56,7 +59,7 @@ FEATURES & RATIONALE:
 			kind: 'burst',
 			source: 'hotstring',
 			color: '#1e88e5',
-			tag: '★ Roulement',
+			tag: 'roll',
 			text: 'rendez-vous '
 		},
 		{ kind: 'manual', text: 'la semaine ' },
@@ -64,10 +67,16 @@ FEATURES & RATIONALE:
 			kind: 'burst',
 			source: 'ai',
 			color: COLOR_AI,
-			tag: '✨ IA — suite acceptée',
+			tag: 'ai',
 			text: 'prochaine, si vos disponibilités le permettent.'
 		}
 	];
+
+	let tagLabels = $derived({
+		magic: t('★ Touche magique'),
+		roll: t('★ Roulement'),
+		ai: t('✨ IA — suite acceptée')
+	});
 
 	let typed = $state('');
 	let mpm = $state(0);
@@ -143,26 +152,26 @@ FEATURES & RATIONALE:
 	let barMax = $derived(Math.max(60, ...bars));
 </script>
 
-<div class="live" lang="fr">
+<div class="live">
 	<div class="live-editor ep-window os-macos">
 		<div class="le-chrome">
 			<span class="dot"></span><span class="dot"></span><span class="dot"></span>
-			<span class="le-title">~/courriel/brouillon.txt</span>
+			<span class="le-title">{t('~/courriel/brouillon.txt')}</span>
 		</div>
 		<div class="le-body">
-			<span class="le-text">{typed}</span><span class="le-caret"></span>
+			<span class="le-text" lang="fr">{typed}</span><span class="le-caret"></span>
 			{#if flashTag}
-				<span class="le-tag" style="--tag: {pillColor};">{flashTag}</span>
+				<span class="le-tag" style="--tag: {pillColor};">{tagLabels[flashTag]}</span>
 			{/if}
 		</div>
 	</div>
 
-	<figure class="live-widget" aria-label="Widget MPM en direct">
+	<figure class="live-widget" aria-label={t('Widget MPM en direct')}>
 		<!-- The pill: big number over a darkened unit strip, exactly like the
 		     native widget. Background colour tracks the active typing source. -->
 		<div class="pill" style="--pill: {pillColor};">
 			<div class="pill-num">{mpm}</div>
-			<div class="pill-unit">MPM</div>
+			<div class="pill-unit">{t('MPM')}</div>
 		</div>
 		<div class="bars" aria-hidden="true">
 			{#each bars as v}
@@ -170,7 +179,7 @@ FEATURES & RATIONALE:
 			{/each}
 		</div>
 		<figcaption class="live-hint">
-			Les pics correspondent aux hotstrings et aux acceptations d’IA.
+			{t('Les pics correspondent aux hotstrings et aux acceptations d’IA.')}
 		</figcaption>
 	</figure>
 </div>

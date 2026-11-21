@@ -17,6 +17,7 @@ FEATURES & RATIONALE:
 <script>
 	import DriverFrame from './DriverFrame.svelte';
 	import { reveal } from './reveal.js';
+	import { i18n, t } from './i18n.svelte.js';
 
 	/** @type {{geo: Record<string, {width: number, height: number}>}} */
 	let { geo } = $props();
@@ -43,59 +44,68 @@ FEATURES & RATIONALE:
 	}
 
 	const today = new Date();
-	const dateShort = today.toLocaleDateString('fr-FR');
-	const dateLong = today.toLocaleDateString('fr-FR', {
-		day: 'numeric',
-		month: 'long',
-		year: 'numeric'
-	});
+	// The dates are written in the language the page is read in.
+	let dateLocale = $derived(i18n.lang === 'en' ? 'en-GB' : 'fr-FR');
+	let dateShort = $derived(today.toLocaleDateString(dateLocale));
+	let dateLong = $derived(
+		today.toLocaleDateString(dateLocale, {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		})
+	);
 
 	let personalExamples = $derived([
 		{
 			trig: 'np★',
 			out: `${info.first_name} ${info.last_name}`.trim() || '…',
-			desc: 'Nom complet'
+			desc: t('Nom complet')
 		},
-		{ trig: 'em★', out: info.email || '…', desc: 'E-mail' },
-		{ trig: 'tel★', out: info.phone || '…', desc: 'Téléphone' },
-		{ trig: 'sig★', out: `Cordialement, ${info.first_name}`.trim(), desc: 'Signature' },
-		{ trig: 'ad★', out: info.address || '…', desc: 'Adresse' },
+		{ trig: 'em★', out: info.email || '…', desc: t('E-mail') },
+		{ trig: 'tel★', out: info.phone || '…', desc: t('Téléphone') },
+		{
+			trig: 'sig★',
+			out: t('Cordialement, {name}', { name: info.first_name }).trim(),
+			desc: t('Signature')
+		},
+		{ trig: 'ad★', out: info.address || '…', desc: t('Adresse') },
 		{ trig: 'iban★', out: info.iban || '…', desc: 'IBAN' }
 	]);
 
 	let dynamicExamples = $derived([
-		{ trig: 'dt★', out: dateShort, desc: 'Date du jour' },
-		{ trig: 'date★', out: dateLong, desc: 'Date en lettres' },
-		{ trig: '@ph', out: info.phone || '…', desc: 'Téléphone configuré' },
+		{ trig: 'dt★', out: dateShort, desc: t('Date du jour') },
+		{ trig: 'date★', out: dateLong, desc: t('Date en lettres') },
+		{ trig: '@ph', out: info.phone || '…', desc: t('Téléphone configuré') },
 		{
 			trig: '@np★',
 			out: `${info.last_name} ⇥ ${info.first_name}`.trim(),
-			desc: 'Remplissage de formulaire'
+			desc: t('Remplissage de formulaire')
 		}
 	]);
 
-	const steps = [
-		'Sélectionnez un texte que vous tapez souvent.',
-		'Ouvrez le menu → Hotstrings personnels.',
-		'Choisissez un déclencheur (ex : sig★).',
-		'C’est actif — sans redémarrer le driver.'
-	];
+	let steps = $derived([
+		t('Sélectionnez un texte que vous tapez souvent.'),
+		t('Ouvrez le menu → Hotstrings personnels.'),
+		t('Choisissez un déclencheur (ex : sig★).'),
+		t('C’est actif — sans redémarrer le driver.')
+	]);
 </script>
 
-<section class="personal" id="ep-perso-hotstrings" lang="fr" style="--section-accent: #8e8e93;">
+<section class="personal" id="ep-perso-hotstrings" style="--section-accent: #8e8e93;">
 	<div class="ep-wrap">
 		<header class="section-head" use:reveal>
-			<p class="kicker">Vos propres raccourcis</p>
-			<h2>Et ceux que <em>vous</em> tapez tous les jours.</h2>
+			<p class="kicker">{t('Vos propres raccourcis')}</p>
+			<h2>{@html t('Et ceux que <em>vous</em> tapez tous les jours.')}</h2>
 			<p class="lead">
-				Signature, IBAN, formules récurrentes : ajoutez vos hotstrings <strong>en un clic</strong>
-				depuis le menu — stockés dans un simple fichier TOML, rechargés à la volée.
+				{@html t(
+					'Signature, IBAN, formules récurrentes : ajoutez vos hotstrings <strong>en un clic</strong> depuis le menu — stockés dans un simple fichier TOML, rechargés à la volée.'
+				)}
 			</p>
 		</header>
 
 		<div class="personal-grid">
 			<article class="ep-card" use:reveal>
-				<h3>Ajout en 5 secondes</h3>
+				<h3>{t('Ajout en 5 secondes')}</h3>
 				<ol class="steps">
 					{#each steps as s, i}
 						<li><span class="step-num">{i + 1}</span>{s}</li>
@@ -114,11 +124,11 @@ FEATURES & RATIONALE:
 			</article>
 
 			<article class="ep-card" use:reveal={{ delay: 90 }}>
-				<h3>Hotstrings dynamiques</h3>
+				<h3>{t('Hotstrings dynamiques')}</h3>
 				<p class="card-lead">
-					Certaines valeurs changent tous les jours (la date) ou ne doivent pas être écrites en dur
-					(téléphone, IBAN). Le préfixe <code>@</code> les calcule <strong>au moment précis</strong>
-					du déclenchement, depuis l’éditeur d’informations personnelles.
+					{@html t(
+						'Certaines valeurs changent tous les jours (la date) ou ne doivent pas être écrites en dur (téléphone, IBAN). Le préfixe <code>@</code> les calcule <strong>au moment précis</strong> du déclenchement, depuis l’éditeur d’informations personnelles.'
+					)}
 				</p>
 				<ul class="rows">
 					{#each dynamicExamples as d}
@@ -131,8 +141,9 @@ FEATURES & RATIONALE:
 					{/each}
 				</ul>
 				<p class="card-foot">
-					Nom, e-mail, téléphone, adresse, IBAN : tout est centralisé dans une seule fenêtre — les
-					hotstrings dynamiques s’en servent automatiquement.
+					{t(
+						'Nom, e-mail, téléphone, adresse, IBAN : tout est centralisé dans une seule fenêtre — les hotstrings dynamiques s’en servent automatiquement.'
+					)}
 				</p>
 			</article>
 		</div>
@@ -141,9 +152,9 @@ FEATURES & RATIONALE:
 		<figure class="info-embed">
 			<figcaption>
 				<p class="info-lead" use:reveal>
-					La fenêtre en question — la vraie. <strong>Modifiez un champ ci-dessous</strong> : les
-					exemples <code>np★</code>, <code>sig★</code>, <code>@np★</code>… au-dessus se réécrivent
-					en direct, exactement comme le feront vos expansions.
+					{@html t(
+						'La fenêtre en question — la vraie. <strong>Modifiez un champ ci-dessous</strong> : les exemples <code>np★</code>, <code>sig★</code>, <code>@np★</code>… au-dessus se réécrivent en direct, exactement comme le feront vos expansions.'
+					)}
 				</p>
 			</figcaption>
 			<DriverFrame
