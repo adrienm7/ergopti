@@ -406,6 +406,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     « Acceptées ») to i18n keys, with the hard-coded-strings gate extended to the pages' HTML; the Chart.js reading
     font (rest of MET-16); MET-17 net or gross hotstring counting in the live speed (maintainer decision); the
     cosmetic Linux range reply `driver_meta` (rest of MET-19);
+    interface language on the three). Left: MET-09 Linux heatmap key names from the live XKB keymap; MET-10 Linux
+    n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as the others do;
+    MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision », « Acceptées ») to
+    i18n keys, with the hard-coded-strings gate extended to the pages' HTML; MET-13 « Computing… » forever on an
+    empty range; MET-14 the apps render-error alert; MET-15 banners after a late locale; MET-16 calendar day values
+    (the chart reading font and spacing fixed); MET-17 net or gross hotstring counting in the live speed
+    (maintainer decision); MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the
+    page (the Linux range reply's `driver_meta` fixed);
   - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
@@ -534,11 +542,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       Linux suites, and a Windows field report with a driver.
 
 ## Remaining code work
-
-- [ ] **Windows-only typing snapshot reopen check (2026-11-21).** `tools/test/support/typing-snapshot-reopen-runtime.cjs`
-      runs only on win32, so CI (Linux) never runs it; locally it fails with `window.build_keycode_layout_for_driver is
-not a function` because its context loads the page bootstrap without `heatmap_win.js`. Give the harness that file
-      and decide whether the check should also run on the Linux CI runner.
 
 ### Windows
 

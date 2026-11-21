@@ -241,12 +241,35 @@ Notes:
   `test-no-hardcoded-ui-strings.cjs` scans JS strings only and misses them.
   Follow-up: move each into a `data-i18n-title` key in the 21 locales and
   extend the gate to the pages' HTML.
+- **MET-13 (low, shared):** a range or app selection with no data leaves each
+  card's « Computing… » placeholder for good (`has_data` false keeps it), and a
+  missing value reads « 0 ». Follow-up: `ui_typing.no_data` once the range read
+  has landed, « — » for a missing value.
+- **MET-14 (low, shared):** the apps page's render-error alert is never
+  removed after a later good render and prints the stack. Follow-up: remove it
+  at the end of a successful `renderDashboard`, show the message only.
+- **MET-15 (low, shared):** the freshness and rebuild banners build their text
+  once and do not listen for `i18n:applied`; a late locale (Windows injects it
+  on `ready`) can leave their first wording or a raw key until the next state.
+  Not reproduced.
+- **MET-16 (low, shared):** the activity calendar's per-day counts live only in
+  SVG `<title>` elements inside one `role="img"`, out of keyboard and
+  screen-reader reach. The Chart.js text now follows the reading font and
+  spacing (see the follow-ups below).
 - **MET-17 (decision, macOS):** the live speed counts an expansion differently.
   macOS removes one stamp per deleted trigger character before adding the
   output (net text); Windows and Linux add the whole output and keep the typed
   trigger (gross). Windows is the reference, so macOS reads lower after each
   hotstring or AI rewrite; which one the readout should mean is the
   maintainer's choice.
+- **MET-18 (low, Windows):** the pill needs two keystrokes after an idle: the
+  draw also requires `wpm > 0 || a source`, and the calculator returns 0 below
+  two events, where the shared `widget_visible` shows « 0 » at the first text
+  key on macOS and Linux (TWD-2).
+- **MET-19 (low, Windows and Linux):** a failed dashboard reset is silent on
+  Windows (`keystats_webview.ahk` returns) and Linux's `cleared = false` is not
+  read by the page; only macOS tells the page (`reset_id`). The Linux range
+  reply's `driver_meta` is fixed (see the follow-ups below).
 
 Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
 `TODO-tests-linux.md` (field point `metrics_views` on macOS and Linux): the
@@ -262,6 +285,45 @@ definitions in English on the three (MET-12).
 (MET-04), Narrator on the compact then graph widget (MET-08), and for MET-13
 to MET-16, MET-18 and MET-19 the empty range, the calendar's values with each
 reader, the banners in English, the first-key pill and a failed Reset.
+
+## Follow-ups of 2026-11-21
+
+- **MET-16, the chart text (`8678c3a37b`).** A canvas draws its own text, out
+  of reach of the root attributes of `a11y_prefs.js`. `metrics_chart_values.js`
+  now reads the body's computed style once the page is parsed: the font family
+  and line height become `Chart.defaults.font`, and a second plugin
+  (`ergoptiChartReading`) sets `letterSpacing` and `wordSpacing` on each chart
+  context in `em`, so they follow each label's size as `theme.css` states them.
+  A WebKit without those canvas properties draws the font without the spacing.
+  Regression: « loaded page draws the chart text in the reading font and
+  spacing » (`test-metrics-apps-publication-order.cjs`), with the expected
+  values read from `theme.css`; with the old module it fails « the reading
+  plugin is registered with Chart.js », and without the letter spacing it
+  fails too.
+- **MET-19, the Linux range reply (`0dccd12f49`).** The page replaces its
+  driver metadata with each reply's; the range reply now forwards the
+  dashboard payload's (`sc_kb` and `unmeasured`). Regression: « returns a
+  selected n-gram range over the native Linux bridge »
+  (`test_bridge_handlers_webview_manager.lua`), whose fixture now carries an
+  unmeasured KPI; under WSL Debian it fails with the old reply and passes now,
+  with `--only bridge` 93 of 93.
+- **The typing snapshot reopen check (`6e441a95b4`).** Its harness ran the
+  page bootstrap without `heatmap_win.js` and only on Windows. It now opens the
+  real loaded page for the WebView2 and Edge sidecar transports and replays
+  portable snapshots of the published shape on every OS; the snapshots of the
+  AHK writer stay Windows-only, since they need AutoHotkey v2. It also checks
+  the scan-code heatmap translation on reopen. With the platform forced to
+  Linux, dropping the history translation in the bootstrap fails « portable
+  windows/live: the scan-code heatmap must be translated on reopen », and
+  ignoring the `#prefetch=` sidecar fails « portable edge/live: bootstrap must
+  not swallow a failure ».
+- **Gates.** The 21 `test-metrics-*.cjs`, `test-windows-metrics-range-bridge.cjs`
+  (native snapshots included), the `test-typing-*.cjs`,
+  `test-app-windows-semantic-markup.cjs`,
+  `test-app-windows-accessibility-ratchet.cjs`,
+  `test-site-accessibility-ratchet.cjs`, the locale gates,
+  `test-no-hardcoded-ui-strings.cjs`, `test-shared-literal-inventory.cjs`,
+  Prettier and `lint-conventions.js --fail-on-violations`.
 
 ## Proof
 
