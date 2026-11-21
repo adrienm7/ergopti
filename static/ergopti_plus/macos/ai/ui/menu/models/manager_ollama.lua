@@ -18,6 +18,7 @@ local notifications = require("core.ui.engine.notifications")
 local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local text_utils    = require("core.text.engine.utils")
+local TableUtil     = require("core.text.engine.table_util")
 local OllamaBinary = require("ai.engine.ollama.binary")
 local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local OllamaServerCommand = require("ai.engine.ollama.server_command")
@@ -1130,10 +1131,7 @@ function M.new(deps, presets, ram_getter)
 	--- @return table|nil names Sorted model names.
 	function obj.installed_model_names()
 		if type(_installed_cache) ~= "table" then return nil end
-		local names = {}
-		for name in pairs(_installed_cache) do names[#names + 1] = name end
-		table.sort(names)
-		return names
+		return TableUtil.sorted_keys(_installed_cache)
 	end
 
 	--- Pre-warms the installed models cache under the same exact pause owner.
