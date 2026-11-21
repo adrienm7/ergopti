@@ -31,8 +31,8 @@
 MagicKeyRules(Data) {
 	if !(Data is Map) || !(Data.Get("marker", "") is String) || Data.Get("marker", "") == ""
 		throw TypeError("Magic key rules: the marker is missing.")
-	Format := Data.Get("display_format", "")
-	if !(Format is String) || !InStr(Format, "{char}", true)
+	DisplayFormat := Data.Get("display_format", "")
+	if !(DisplayFormat is String) || !InStr(DisplayFormat, "{char}", true)
 		throw TypeError("Magic key rules: the display format lacks its {char} placeholder.")
 	Families := Data.Get("layout_families", 0)
 	if !(Families is Array)
@@ -51,7 +51,7 @@ MagicKeyRules(Data) {
 			throw TypeError("Magic key rules: a literal marker key is not a key.")
 		Literal[Key] := true
 	}
-	return Map("marker", Data["marker"], "display_format", Format, "layout_families", Families,
+	return Map("marker", Data["marker"], "display_format", DisplayFormat, "layout_families", Families,
 		"literal", Literal)
 }
 

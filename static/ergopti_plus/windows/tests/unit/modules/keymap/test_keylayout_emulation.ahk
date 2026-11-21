@@ -251,7 +251,7 @@ _KLT_OptionsVectorsCase() {
 	global Features, CategoryEnabled, LayerEnabled, ScriptInformation
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(),
-		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
+		ScriptInformation["MagicKeySourceScan"]]
 	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\emulation_vectors.json", "UTF-8"))["vectors"]
 	Assert(Vectors.Length >= 12, "the options corpus holds its vectors")
 	Failures := []

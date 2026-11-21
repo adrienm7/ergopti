@@ -66,3 +66,39 @@ Test("magic key rules: the real French AZERTY gives u-grave (magic-key-default)"
 	AssertEqual(Chr(0xF9), MagicKeyLayoutDefaultFor(false, Hkl)),
 	Us := DllCall("LoadKeyboardLayoutW", "Str", "00000409", "UInt", 0x80, "Ptr"),
 	AssertEqual(";", MagicKeyLayoutDefaultFor(false, Us))))
+
+; An untouched magic key stays out of config.toml: its default follows the
+; layout, so a full save that wrote it would pin the layout it booted on.
+Test("magic key rules: a full save keeps an untouched layout default sparse (magic-key-default)", _MKR_SparseTrigger)
+
+; Whether the full save writes this magic key; the feature snapshot also names
+; trigger_char, at its manifest default, which the sparse writer omits.
+_MKR_HasTrigger(Updates, Char) {
+	for Update in Updates {
+		if Update.Section == "hotstrings" && Update.Key == "trigger_char" && Update.HasOwnProp("Value")
+				&& Update.Value == Char
+			return true
+	}
+	return false
+}
+
+_MKR_SparseTrigger() {
+	global ScriptInformation, _IniCache
+	Features := ManifestBuildFeaturesMap()
+	SavedKey := ScriptInformation["MagicKey"], SavedDefault := ScriptInformation["MagicKeyDefault"]
+	HadCache := IsSet(_IniCache), SavedCache := HadCache ? _IniCache : 0
+	try {
+		_IniCache := Map()
+		ScriptInformation["MagicKey"] := Chr(0xF9), ScriptInformation["MagicKeyDefault"] := Chr(0xF9)
+		AssertFalse(_MKR_HasTrigger(_ConfigCollectFullSaveUpdates(Features), Chr(0xF9)), "the layout default is not written")
+		ScriptInformation["MagicKey"] := "§"
+		AssertTrue(_MKR_HasTrigger(_ConfigCollectFullSaveUpdates(Features), "§"), "a chosen key is written")
+		ScriptInformation["MagicKey"] := Chr(0xF9)
+		_IniCache := Map("hotstrings", Map("trigger_char", Chr(0xF9)))
+		AssertTrue(_MKR_HasTrigger(_ConfigCollectFullSaveUpdates(Features), Chr(0xF9)), "an explicit key stays written")
+	} finally {
+		ScriptInformation["MagicKey"] := SavedKey, ScriptInformation["MagicKeyDefault"] := SavedDefault
+		if HadCache
+			_IniCache := SavedCache
+	}
+}

@@ -1631,7 +1631,11 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; The configured locale, "" (the neutral, absent row) when none was chosen.
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nConfiguredLocale() })
 		Updates.Push({ Section: "script", Key: ConfigLeaf.LOG_LEVEL, Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
-		Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
+		; An untouched magic key stays sparse: its default follows the layout that
+		; types (feature_state.ahk), so writing it would pin today's layout.
+		if (IsSet(_IniCache) && IniCacheGet(_IniCache, "hotstrings", ConfigLeaf.TRIGGER_CHAR) != "_")
+				|| ScriptInformation["MagicKey"] != ScriptInformation["MagicKeyDefault"]
+				Updates.Push({ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: ScriptInformation["MagicKey"] })
 		if IsSet(ScriptShortcutAssignments) {
 				for Slot, Action in ScriptShortcutAssignments
 						Updates.Push({ Section: ConfigKey.SHORTCUTS_SCRIPT_CONTROL, Key: Slot, Value: Action })

@@ -75,6 +75,7 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
+    "MagicKeyDefault", "★",
     ; The key the built-in Ergopti emulation declares as its magic key, as the
     ; boot resolves it (LayoutRegistry_MagicKeySource).
     "MagicKeySourceScan", "SC02E",

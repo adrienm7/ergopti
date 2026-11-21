@@ -578,6 +578,9 @@ _I18nInitRetainsVerifiedCache() {
 	SavedShared := _SharedDir
 	SavedLocale := _I18nLocale
 	SavedMagic := ScriptInformation.Get("MagicKey", "★")
+	; The shared display rule is read from the real shared root before the
+	; fixture points _SharedDir at its own locale folder.
+	MagicKeyRulesShared()
 	Directory := A_Temp . "\ergopti-locale-reuse-" . A_ScriptHwnd . "-" . A_TickCount
 	DirCreate(Directory . "\core\i18n\data\locales")
 	Path := Directory . "\core\i18n\data\locales\fr.json"
@@ -593,7 +596,7 @@ _I18nInitRetainsVerifiedCache() {
 		I18nInit(Map("script", Map("locale", "fr")))
 		AssertTrue(_I18nCacheLoaded)
 		AssertTrue(_I18nCache == Cache, "unchanged source keeps the verified locale map")
-		AssertEqual("Press new", t("hint"), "raw templates update only the configured glyph")
+		AssertEqual("Press ★ (new)", t("hint"), "raw templates update only the configured glyph's display")
 		AssertEqual("old stays literal", t("other"), "literal text never undergoes old-token replacement")
 		Timestamp := FileGetTime(Path, "M")
 		FileDelete(Path)
@@ -601,7 +604,7 @@ _I18nInitRetainsVerifiedCache() {
 		FileSetTime(Timestamp, Path, "M")
 		I18nInit(Map("script", Map("locale", "fr")))
 		AssertFalse(_I18nCacheLoaded, "same timestamp and size cannot conceal changed source bytes")
-		AssertEqual("Other new", t("hint"), "a detected source edit must also bypass a stale timestamp-valid TSV")
+		AssertEqual("Other ★ (new)", t("hint"), "a detected source edit must also bypass a stale timestamp-valid TSV")
 	} finally {
 		_SharedDir := SavedShared
 		_I18nLocale := SavedLocale

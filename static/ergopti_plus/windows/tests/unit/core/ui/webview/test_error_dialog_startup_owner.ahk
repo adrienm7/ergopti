@@ -114,7 +114,10 @@ _EDOT_Assets(Root) {
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
 	Inputs := ["diagnostics\data\schema.json", "diagnostics\data\redaction.json", "diagnostics\data\issue_templates.json",
 		"diagnostics\data\error_policy.json", "diagnostics\data\recent_issues.json", "diagnostics\data\day_log.json",
-		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
+		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json",
+		; The locale cache shows the magic key through the shared display rule,
+		; and the wizard proposes its layout default.
+		"hotstrings\data\magic_key.json", "layouts\data\keycodes\physical_keys.json"]
 	_EDOT_CreateParents(Root . "\shared", Inputs)
 	for Relative in Inputs {
 		Original := _SharedDir . "\" . Relative, Copy := Root . "\shared\" . Relative

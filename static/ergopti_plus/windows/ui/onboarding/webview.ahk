@@ -26,11 +26,6 @@
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 
-; French keyboard LANGID (low word of the HKL). When the active OS layout is
-; French we hint the frontend (system_layout = "french") so the hotstrings page
-; proposes the "u-grave" trigger character when no configuration names one.
-global ONBOARDING_LANGID_FRENCH := 0x040C
-
 ; The wizard's id in _shared/ui/apps.manifest.json, which sizes it.
 global ONBOARDING_APP_ID := "onboarding"
 
@@ -456,7 +451,9 @@ _OnbWeb_InjectInitData(SessionEpoch := unset, ReadFn := OnboardingReadCurrentVal
 		. ",empty_config_dir:" . _OnbWeb_JsStr(_Onboarding_ConfigDirFor(""))
 		. ",config_dir:" . _OnbWeb_JsStr(ConfigDir)
 		. ",current:" . OnboardingValuesJson(Values)
-		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())
+		; The magic key the page proposes when no configuration names one: the
+		; layout default the driver applies to an absent trigger_char.
+		. ",magic_key_default:" . _OnbWeb_JsStr(_OnbWeb_MagicKeyDefault(Values))
 		; The page fills the metrics consent warning with this path; later folder
 		; changes arrive through resolveMetricsPath -> window.setMetricsPath.
 		. ",metrics_path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(ConfigDir))
@@ -753,18 +750,16 @@ _OnbWeb_LocaleStringsJson(Code) {
 	return "{}"
 }
 
-; Maps the active OS keyboard layout to the substring the page's
-; _contextMagicKey matches: "french" for the French LANGID, "" otherwise (so
-; QWERTY-family layouts fall through to ";").
-_OnbWeb_SystemLayoutHint() {
-	global ONBOARDING_LANGID_FRENCH
-	try {
-		hkl  := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-		lang := hkl & 0xFFFF
-		if (lang == ONBOARDING_LANGID_FRENCH)
-			return "french"
-	}
-	return ""
+; The layout default of the magic key for the configuration being read
+; (MagicKeyLayoutDefaultFor): ù on AZERTY, ; on QWERTY, the manifest default
+; elsewhere and while an emulated layout types.
+; @param Values {Map} The configuration values the page starts from, by path.
+; @returns {String}
+_OnbWeb_MagicKeyDefault(Values) {
+	Base := Values.Get(ConfigKey.LAYOUT_ERGOPTI_BASE, false)
+	Selected := Values.Get(ConfigKey.LAYOUT_EMULATED_LAYOUT, "")
+	Emulated := ((Base is TOML_Bool) ? Base.Value : (Base == true)) || ((Selected is String) && Selected != "")
+	return MagicKeyLayoutDefaultFor(Emulated, KS_ResolveKeyboardLayout())
 }
 
 ; Whether a locale code is one this driver ships.

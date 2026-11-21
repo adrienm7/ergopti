@@ -253,7 +253,7 @@ _CPT_TargetedWriteCannotBeOverwrittenByStaleCanonicalState() {
 		ConfigurationFile := Path
 		CategoryEnabled := Map("TapHolds", true)
 		Features := Map()
-		ScriptInformation := Map("MagicKey", "*")
+		ScriptInformation := Map("MagicKey", "*", "MagicKeyDefault", "★")
 		ScriptShortcutAssignments := Map()
 		KeyboardShortcutAssignments := Map()
 		GestureAssignments := Map()

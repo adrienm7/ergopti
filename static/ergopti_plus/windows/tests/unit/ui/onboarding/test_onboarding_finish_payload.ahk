@@ -64,6 +64,12 @@ _TOFP_EmptyFolderInitDestination(Custom) {
 			"C:\Users\fixture\AppData\Local\Ergopti\config\")
 		AssertEqual(_TOFP_InitDataStringField(Script, "config_dir"), Custom ? "E:\Custom-B\" : "",
 			"the original custom-choice payload is preserved")
+		; The page proposes the layout default the driver applies to an absent
+		; trigger_char, no longer a guess from the OS language (2026-11-21).
+		AssertEqual(_TOFP_InitDataStringField(Script, "magic_key_default"),
+			MagicKeyLayoutDefaultFor(false, KS_ResolveKeyboardLayout()),
+			"the wizard proposes the driver's layout default of the magic key")
+		AssertFalse(InStr(Script, "system_layout:"), "the OS language guess is gone")
 		Assert(InStr(Script, ",capabilities:{gesture_registration:true},"),
 			"the Windows host tells the page it registers gestures with the system")
 		AssertFalse(FileExist(ConfigurationFile), "initial presentation cannot create configuration")

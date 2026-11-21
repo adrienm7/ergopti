@@ -95,7 +95,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		if Scenario == "nonneutral" || Scenario == "late-neutral"
 			Target["hotstrings"]["autocorrection"]["names"]["enabled"] := true
 		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
-		ScriptInformation := Map("MagicKey", "★")
+		ScriptInformation := Map("MagicKey", "★", "MagicKeyDefault", "★")
 		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
 		; The headless runner omits feature_state; use its exact manifest default projection.
 		KEYBOARD_SHORTCUT_DEFAULTS := Map()
@@ -404,7 +404,7 @@ _FMS_PersonalFileCaseAlias(Path, Name) {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
 		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
-		ScriptInformation := Map("MagicKey", "★")
+		ScriptInformation := Map("MagicKey", "★", "MagicKeyDefault", "★")
 		ScriptShortcutAssignments := Map(), KeyboardShortcutAssignments := Map()
 		; The headless runner omits feature_state; use its exact manifest default projection.
 		KEYBOARD_SHORTCUT_DEFAULTS := Map()
