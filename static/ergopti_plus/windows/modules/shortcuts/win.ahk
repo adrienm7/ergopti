@@ -21,20 +21,21 @@
 ; ================================
 ; ================================
 
-; Jitter parameters -- mirrored from Hammerspoon's AWAKE_JITTER_* constants
-global AWAKE_TICK_MIN_MS   := 1000  ; Minimum interval between ticks
-global AWAKE_TICK_MAX_MS   := 5000  ; Maximum interval between ticks
-global AWAKE_JITTER_PX     := 80    ; Max pixel offset around origin per tick
-global AWAKE_RETURN_MS     := 200   ; Delay before returning cursor to origin
+; Max pixel offset around origin per tick, as Hammerspoon's AWAKE_JITTER_X/Y.
+; The tick bounds and the return delay are the shared registry's [keep_awake].
+global AWAKE_JITTER_PX     := 80
 
 ; Origin captured at toggle-on; shared between Start and SimulateActivity
 global AwakeOriginX := 0, AwakeOriginY := 0
+
+; GetTickCount64 at the session's start: its length is the day's awake_ms.
+global AwakeStartedTick := 0
 
 ; InputHook used to detect any real keypress while keep-awake is active
 global AwakeInputHook := ""
 
 StartActivitySimulation(*) {
-		global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+		global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook, AwakeStartedTick
 		; Tray callbacks remain available while native Suspend is active. Refuse
 		; a new session here because its timers and InputHook bypass Suspend.
 		if A_IsSuspended
@@ -48,12 +49,13 @@ StartActivitySimulation(*) {
 				return false
 		}
 		ActivitySimulation := True
+		AwakeStartedTick := DllCall("GetTickCount64", "Int64")
 		; Capture the current cursor position as the jitter origin
 		Position := MCGetPos()
 		AwakeOriginX := Position["x"], AwakeOriginY := Position["y"]
 		; Reset the user-move baseline so the first tick never self-cancels
 		SimulateActivity(True)
-		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+		SetTimer(SimulateActivity, AwakeNextTickMs())
 		; Arm mouse-button cancel hooks
 		; These arm the CANCELLATION paths — swallowing a failure silently would leave
 		; keep-awake running with no way for the user to interrupt it (§5.3: never
@@ -88,8 +90,32 @@ StartActivitySimulation(*) {
 				StopActivitySimulation(false)
 				return false
 		}
+		LoggerInfo("shortcuts", "Keep-awake started.")
 		try NotifierSend(t("keepawake.started"), Map("title", t("keepawake.title")))
 		return true
+}
+
+; The next jitter tick, drawn between the shared [keep_awake] bounds.
+AwakeNextTickMs() {
+		return Random(TimingsGet("keep_awake", "tick_min_ms"), TimingsGet("keep_awake", "tick_max_ms"))
+}
+
+; Credits a finished session to the day's awake_ms, as macOS and Linux do
+; (maintainer decision KMD-3): a passive_period row of kind awake.
+; @param StartedTick {Integer} GetTickCount64 at the session's start.
+; @returns {Integer} True once the metrics owner accepted the session.
+AwakeCreditSession(StartedTick) {
+		DurationMs := Max(0, DllCall("GetTickCount64", "Int64") - StartedTick)
+		if !IsSet(KL_RecordAwakeSession)
+				return false
+		try Credited := KL_RecordAwakeSession(DurationMs)
+		catch as Err {
+				LoggerWarn("shortcuts", "The keep-awake session was not credited to the metrics: {1}.", Err.Message)
+				return false
+		}
+		if Credited != true
+				LoggerWarn("shortcuts", "The keep-awake session was not credited to the metrics.")
+		return Credited == true
 }
 
 ToggleActivitySimulation(*) {
@@ -102,7 +128,7 @@ ToggleActivitySimulation(*) {
 }
 
 StopActivitySimulation(Notify := true) {
-		global ActivitySimulation, AwakeInputHook
+		global ActivitySimulation, AwakeInputHook, AwakeStartedTick
 		; Ergopti_OnSuspendEnter calls this unconditionally on every pause so
 		; keep-awake can never outlive a suspend ("pause = tout eteint"
 		; invariant). Capture the prior state so the "stopped" toast below only
@@ -122,6 +148,10 @@ StopActivitySimulation(Notify := true) {
 		try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
 		; Stop the keypress detector
 		HookStopped := AwakeStopCancellationHook()
+		if WasActive {
+				LoggerInfo("shortcuts", "Keep-awake stopped.")
+				AwakeCreditSession(AwakeStartedTick)
+		}
 		if WasActive and Notify
 				try NotifierSend(t("keepawake.stopped"), Map("title", t("keepawake.title")))
 		return HookStopped
@@ -260,11 +290,11 @@ SimulateActivity(ResetOnly := False) {
 		LastY := AwakeOriginY + OffY
 
 		; Return to origin via a separate one-shot timer -- avoids blocking the thread
-		; with Sleep(), which would delay input-cancel detection by up to AWAKE_RETURN_MS
-		SetTimer(AwakeReturnToOrigin, -AWAKE_RETURN_MS)
+		; with Sleep(), which would delay input-cancel detection by up to the return delay
+		SetTimer(AwakeReturnToOrigin, -TimingsGet("keep_awake", "return_delay_ms"))
 
 		; Re-schedule the next tick at a new random interval
-		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+		SetTimer(SimulateActivity, AwakeNextTickMs())
 }
 
 

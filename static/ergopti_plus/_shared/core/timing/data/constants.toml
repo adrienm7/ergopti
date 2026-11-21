@@ -530,15 +530,15 @@ emergency_recycle_delay_ms = 20
 
 [keep_awake]
 # Minimum interval between mouse-jitter ticks.
-# AHK: win.ahk AWAKE_TICK_MIN_MS. HS: system.lua AWAKE_TICK_MIN_SEC.
+# AHK: win.ahk AwakeNextTickMs. HS: system.lua AWAKE_TICK_MIN_SEC.
 tick_min_ms = 1000
 
 # Maximum interval between mouse-jitter ticks.
-# AHK: win.ahk AWAKE_TICK_MAX_MS. HS: system.lua AWAKE_TICK_MAX_SEC.
+# AHK: win.ahk AwakeNextTickMs. HS: system.lua AWAKE_TICK_MAX_SEC.
 tick_max_ms = 5000
 
 # Delay to hold the cursor offset before returning it to origin.
-# AHK: win.ahk AWAKE_RETURN_MS. HS: system.lua AWAKE_RETURN_DELAY_SEC.
+# AHK: win.ahk SimulateActivity. HS: system.lua AWAKE_RETURN_DELAY_SEC.
 return_delay_ms = 200
 
 # Windows: how often keep-awake reads the cursor to stop when the user moves the

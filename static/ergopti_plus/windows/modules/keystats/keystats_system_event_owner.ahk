@@ -85,6 +85,25 @@ class KLSystemEventOwner {
 		return this.Drain()
 	}
 
+	/**
+	 * Records one completed measurement no physical edge reports (a keep-awake
+	 * session). It ended before any pause, so a paused owner keeps it pending.
+	 * @param Metadata {Map} The completed kind and duration_ms.
+	 * @returns {Integer} True when no technical delivery debt remains.
+	 */
+	RecordCompleted(Metadata) {
+		if !(Metadata is Map) || !Metadata.Has("kind") || !Metadata.Has("duration_ms")
+			throw TypeError("A completed system measurement needs its kind and duration_ms.")
+		PreviousCritical := Critical("On")
+		try {
+			if this.Stopping || this.Stopped
+				throw Error("A stopped system event owner cannot record a measurement.")
+			Frame := this.Capture()
+			this.Enqueue("passive_period", Metadata, Frame["timestamp"])
+		} finally Critical(PreviousCritical)
+		return this.Drain()
+	}
+
 	IsCurrent(Record, Generation) {
 		return !this.Stopped && Generation = this.Intervals.Generation
 			&& this.Pending.Length && this.Pending[1] == Record

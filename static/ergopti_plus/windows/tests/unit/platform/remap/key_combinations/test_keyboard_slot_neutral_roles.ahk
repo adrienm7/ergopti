@@ -290,7 +290,7 @@ Test("neutral slots: the slots bind after the layout and before the Win broker",
 ; The switches owned these until v19: an action must work with no switch at all.
 _KSNR_ActionsNeedNoSwitch() {
 	Win := _DriverDirConcat("modules/shortcuts")
-	AssertTrue(RegExMatch(Win, "m)^global AWAKE_TICK_MIN_MS") > 0, "keep-awake's constants exist whatever is bound")
+	AssertTrue(RegExMatch(Win, "m)^global AWAKE_JITTER_PX") > 0, "keep-awake's constants exist whatever is bound")
 	AssertFalse(RegExMatch(Win, 'if Features\["shortcuts"\]\["(move|search|open_downloads|get_hex_value|screen)"\]'),
 		"no retired switch gates an action's owner")
 	Body := _DriverFuncBody("GestureTakeNote")

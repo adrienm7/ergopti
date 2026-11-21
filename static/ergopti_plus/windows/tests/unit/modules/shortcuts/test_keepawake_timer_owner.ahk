@@ -63,13 +63,13 @@ _KATO_Source(Receipt) {
 		"AwakeCreateCancellationHook", "AwakeCheckMouseMoved", "SimulateActivity"]
 		AssertTrue(_DriverExtractFunctionBody(&Original, Name) != "", "the authentic subject must be nonempty: " . Name)
 	Start := _DriverFindFunctionDefinition(&Original, "StartActivitySimulation")
-	DeclarationsStart := InStr(Original, "global AWAKE_TICK_MIN_MS", true)
+	DeclarationsStart := InStr(Original, "global AWAKE_JITTER_PX", true)
 	AssertTrue(DeclarationsStart > 0 && DeclarationsStart < Start.Idx)
 	Declarations := SubStr(Original, DeclarationsStart, Start.Idx - DeclarationsStart)
 	DeclarationsCode := _DriverMaskNonCode(&Declarations)
 	AssertFalse(InStr(DeclarationsCode, "(", true), "only the real inactive state declarations may be replayed")
 	RegExReplace(DeclarationsCode, "m)^\s*global\b", "", &DeclarationCount)
-	AssertTrue(DeclarationCount >= 6, "all original session defaults must be present")
+	AssertTrue(DeclarationCount >= 4, "all original session defaults must be present")
 	Bound := Original
 	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MCGetPos(", "_KATO_GetPos(", 1)
 	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MCGetPos(", "_KATO_GetPos(", 1)
