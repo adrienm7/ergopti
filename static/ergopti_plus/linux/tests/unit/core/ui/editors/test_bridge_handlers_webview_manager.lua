@@ -683,6 +683,12 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
 			helpers.assert_eq(result.range_request_id, 41,
 				"range replies must preserve the UI request owner across the native bridge")
+			-- The page replaces its driver metadata with this reply's (MET-19).
+			helpers.assert_eq(result.driver_meta.heatmap_id, "sc_kb",
+				"a range reply names the scan-code heatmap the dashboard payload names")
+			helpers.assert_eq(result.driver_meta.unmeasured.space_switches,
+				"linux.space_switches_unmeasured",
+				"a range reply keeps the unmeasured KPIs of the dashboard payload")
 		end)
   end)
 

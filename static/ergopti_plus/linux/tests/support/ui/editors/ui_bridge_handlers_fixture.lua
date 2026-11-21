@@ -92,7 +92,10 @@ local function build_mock_state()
           },
           app_icons = {},
           _prefetch_data = { historical = {}, today = {} },
-          driver_meta = { os = "linux", heatmap_id = "sc_kb" },
+          driver_meta = {
+            os = "linux", heatmap_id = "sc_kb",
+            unmeasured = { space_switches = "linux.space_switches_unmeasured" },
+          },
         }
       end,
 		get_range_payload = function(start_date, end_date, apps)

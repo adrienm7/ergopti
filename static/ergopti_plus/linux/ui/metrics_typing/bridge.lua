@@ -287,7 +287,9 @@ local function handle(payload, state, context, request)
 				_prefetch_data = range,
 				keycode_layout = dashboard.keycode_layout,
 				range_request_id = payload.request_id,
-				driver_meta = { os = "linux", heatmap_id = "kc" },
+				-- The page replaces its driver metadata with each reply's: the
+				-- dashboard's keeps the scan-code heatmap and the unmeasured KPIs.
+				driver_meta = dashboard.driver_meta,
 			}
 			payload_complete(reply)
 			return reply
