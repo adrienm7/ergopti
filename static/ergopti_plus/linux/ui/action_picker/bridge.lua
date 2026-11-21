@@ -132,6 +132,8 @@ M.pending_opts = nil
 local function close_session(session, context)
 	if _active_session ~= session then return false end
 	local closed = false
+	-- The close notice this hide may raise belongs to this call, not to a title-bar close
+	session.closing = true
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		closed = context.close_owned_window() == true
 	else
@@ -139,6 +141,7 @@ local function close_session(session, context)
 		closed = ok_manager and type(Manager.hide) == "function"
 			and Manager.hide("action_picker") == true
 	end
+	session.closing = false
 	if not closed then
 		Logger.error(LOG, "Action picker close refused; exact session %s retained.",
 			tostring(session.epoch))
@@ -213,7 +216,11 @@ function M.open(opts, on_confirm, on_cancel)
 		local visible = type(Manager.is_visible) == "function"
 			and Manager.is_visible("action_picker") == true
 		if _active_session ~= previous_session then return false end
-		if visible and Manager.hide("action_picker") ~= true then
+		-- Its close notice belongs to this replacement, not to a title-bar close
+		previous_session.closing = true
+		local hidden = not visible or Manager.hide("action_picker") == true
+		previous_session.closing = false
+		if not hidden then
 			Logger.error(LOG, "Action picker replacement refused; prior session retained.")
 			return false
 		end
@@ -270,8 +277,34 @@ function M.open(opts, on_confirm, on_cancel)
 		if _active_session == session then close_session(session) end
 		return false
 	end
+	-- The native page this session owns, so a title-bar close retires exactly it
+	if type(Manager.current_epoch) == "function" then
+		local epoch_ok, native_epoch = pcall(Manager.current_epoch, "action_picker")
+		if epoch_ok and type(native_epoch) == "number" then session.native_epoch = native_epoch end
+	end
 	Logger.info(LOG, "Action picker session %d opened.", session.epoch)
 	return true
+end
+
+--- Retires the session whose window the user closed from its title bar or
+--- with the window manager's close key, as a cancel: the page sent nothing, so
+--- without this the session, its pending options and its program discovery
+--- outlived the window, as they do not on Windows (Close) or macOS (on_close).
+--- @param epoch number Native page epoch the webview manager closed.
+function M.on_window_closed(epoch)
+	local session = _active_session
+	if not session or session.closing or session.native_epoch == nil or session.native_epoch ~= epoch then return end
+	session.cancelled = true
+	if not session.confirmed and type(session.on_cancel) == "function" then
+		local ok_cancel = pcall(session.on_cancel, nil)
+		if not ok_cancel then Logger.error(LOG, "Action picker cancel callback failed; details withheld.") end
+	end
+	ProgramProviderPicker.close(session.providers)
+	if _active_session == session then
+		_active_session = nil
+		M.pending_opts = nil
+	end
+	Logger.info(LOG, "Action picker session %d closed by its window.", session.epoch)
 end
 
 function M.is_open()
