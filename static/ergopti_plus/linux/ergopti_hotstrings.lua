@@ -2973,7 +2973,7 @@ local function main()
 		-- invisible daemon or windows that never open.
 		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
 		if refusal then os.exit(refusal) end
-		tray_menu.setIcon({ title = "Ergopti" })
+		if not tray_menu.start() then Logger.error(LOG, "The tray icon could not be created.") end
 		if not privacy_owners.startup_checkpoint() then return end
 
 	if menu_builder then

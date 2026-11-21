@@ -202,7 +202,7 @@ helpers.describe("Adapter contract vectors: TrayMenu", function()
 	-- so each case asserts the thing a pcall could not: that the adapter still
 	-- accepts work afterwards. The menu is rebuilt on every feature toggle, so an
 	-- adapter that wedges after one bad call takes the whole tray with it.
-	helpers.it("setTooltip leaves the adapter accepting further calls", function()
+	helpers.it("setTooltip leaves the adapter accepting further calls (set_tooltip_does_not_throw)", function()
 		adapter.setTooltip("Test tooltip")
 		adapter.setTooltip("Second tooltip")
 		adapter.setMenu({})
@@ -210,7 +210,7 @@ helpers.describe("Adapter contract vectors: TrayMenu", function()
 			"the adapter must still be usable after a tooltip update")
 	end)
 
-	helpers.it("an empty menu is accepted and does not prevent a later one", function()
+	helpers.it("an empty menu is accepted and does not prevent a later one (set_menu_replaces_previous)", function()
 		adapter.setMenu({})
 		adapter.setMenu({ { title = "After", fn = function() end } })
 		helpers.assert_eq(type(adapter.setMenu), "function",
@@ -218,16 +218,74 @@ helpers.describe("Adapter contract vectors: TrayMenu", function()
 				.. "an error that should stop the next one")
 	end)
 
-	helpers.it("setIcon is accepted and does not disturb the menu", function()
-		adapter.setMenu({ { title = "Kept", fn = function() end } })
-		adapter.setIcon({ state = "active" })
-		adapter.setMenu({ { title = "Still here", fn = function() end } })
-		helpers.assert_eq(type(adapter.setIcon), "function",
+	-- The setIcon vectors read what hs.menubar received: the earlier spec's
+	-- setIcon('active') passed here because the adapter ignored the string, so
+	-- nothing a setIcon did could fail (TRAY-04).
+	local function recording_adapter()
+		local drawn = {}
+		local menubar = {}
+		function menubar:setTitle() return self end
+		function menubar:setMenu() return self end
+		function menubar:setTooltip() return self end
+		function menubar:setIcon(image) drawn[#drawn + 1] = image ; return self end
+		function menubar:delete() return self end
+		local recorded = helpers.load_with_stubs("tray.adapters.menu", {
+			menubar = { new = function() return menubar end },
+			image = { imageFromPath = function(path) return { path = path } end, imageFromName = function() return nil end },
+		})
+		return recorded, drawn
+	end
+
+	--- Runs fn with Logger.error recorded, and returns the messages.
+	local function logged_errors(fn)
+		local Logger = require("core.logger.engine.logger")
+		local original, errors = Logger.error, {}
+		Logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		local ok, err = pcall(fn)
+		Logger.error = original
+		assert(ok, err)
+		return errors
+	end
+
+	helpers.it("set_icon_draws_the_image", function()
+		local recorded, drawn = recording_adapter()
+		local logo = helpers.shared("tray/data/ergopti_tray.png")
+		helpers.assert_eq(recorded.setIcon({ image = logo }), true, "set_icon_draws_the_image: an existing file is drawn")
+		helpers.assert_eq(#drawn, 1)
+		helpers.assert_eq(drawn[1].path, logo, "set_icon_draws_the_image: the native icon is that file")
+	end)
+
+	helpers.it("set_icon_refuses_a_missing_file", function()
+		local recorded, drawn = recording_adapter()
+		local missing = helpers.temp_dir() .. "/tray-04-missing-logo.png"
+		local result
+		local errors = logged_errors(function() result = recorded.setIcon({ image = missing }) end)
+		helpers.assert_eq(result, false, "set_icon_refuses_a_missing_file: a missing file is refused")
+		helpers.assert_eq(#drawn, 0, "set_icon_refuses_a_missing_file: nothing else is drawn in its place")
+		helpers.assert_eq(#errors, 1, "set_icon_refuses_a_missing_file: the refusal is logged")
+		helpers.assert_true(errors[1]:find(missing, 1, true) ~= nil, "the log names the file")
+	end)
+
+	helpers.it("set_icon_refuses_a_state_name", function()
+		local recorded, drawn = recording_adapter()
+		local result
+		logged_errors(function() result = recorded.setIcon("active") end)
+		helpers.assert_eq(result, false, "set_icon_refuses_a_state_name: the old state string is refused")
+		logged_errors(function() result = recorded.setIcon({ state = "paused" }) end)
+		helpers.assert_eq(result, false, "set_icon_refuses_a_state_name: a map without an image is refused")
+		helpers.assert_eq(#drawn, 0)
+	end)
+
+	helpers.it("setIcon does not disturb the menu (set_menu_renders_without_exception)", function()
+		local recorded = recording_adapter()
+		helpers.assert_eq(recorded.setMenu({ { title = "Kept", fn = function() end } }), true)
+		recorded.setIcon({ image = helpers.shared("tray/data/ergopti_tray.png") })
+		helpers.assert_eq(recorded.setMenu({ { title = "Still here", fn = function() end } }), true,
 			"changing the icon must not tear down the menu underneath it — the pause "
 				.. "toggle changes the icon on every activation")
 	end)
 
-	helpers.it("destroy leaves the adapter able to rebuild", function()
+	helpers.it("destroy leaves the adapter able to rebuild (destroy_is_safe)", function()
 		adapter.destroy()
 		adapter.setMenu({ { title = "Rebuilt", fn = function() end } })
 		helpers.assert_eq(type(adapter.setMenu), "function",
@@ -241,6 +299,14 @@ helpers.describe("Adapter contract vectors: TrayMenu", function()
 		adapter.setMenu({ { title = "After two", fn = function() end } })
 		helpers.assert_eq(type(adapter.setMenu), "function",
 			"a second destroy must be a no-op, not a state corruption")
+	end)
+
+	helpers.it("destroy_then_set_icon_is_safe", function()
+		local recorded, drawn = recording_adapter()
+		helpers.assert_eq(recorded.destroy(), true)
+		helpers.assert_eq(recorded.setIcon({ image = helpers.shared("tray/data/ergopti_tray.png") }), true,
+			"destroy_then_set_icon_is_safe: a reload's first icon brings the item back")
+		helpers.assert_eq(#drawn, 1)
 	end)
 end)
 

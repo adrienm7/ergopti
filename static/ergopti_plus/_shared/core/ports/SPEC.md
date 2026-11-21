@@ -137,7 +137,7 @@ adapters expose these methods under their own naming convention:
 | `http.post(url, body, cb)` | `LLM_RemoteGenerate(…)`   | `M.generate(…)`               |
 | `timer.after(delay, fn)`   | `SetTimer(fn, -ms)`       | `hs.timer.doAfter(s, fn)`     |
 | `notifier.send(msg)`       | `TrayTip(title, text)`    | `M.notify(title, body, kind)` |
-| `tray.update(state)`       | `UpdateTrayIcon()`        | `update_icon(custom_text)`    |
+| `tray.setIcon({ image })`  | `TrayMenuSetIcon(Opts)`   | `M.setIcon(opts)`             |
 
 ### 5.2 Error behavior vocabulary
 

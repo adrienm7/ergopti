@@ -85,22 +85,33 @@ end
 -- =========================================
 -- =========================================
 
---- Sets the tray icon.
---- @param opts table { image?, title?, imageData? }
----              image     string   Path to an image file (hs.image.imageFromPath).
----              title     string   Text label shown beside or instead of the icon.
----              imageData userdata Pre-built hs.image object (takes priority).
+--- Draws an image file as the tray icon (port setIcon, TrayMenu.spec.js 2.0.0).
+--- A missing file is refused with one logged error and the previous icon stays:
+--- the adapter never draws another image in its place (TRAY-05).
+--- @param opts table { image, title?, imageData? }
+---              image     string   Path to an existing image file (hs.image.imageFromPath).
+---              title     string   macOS only: text shown beside the icon.
+---              imageData userdata macOS only: a prebuilt hs.image, in place of image.
 --- @return boolean accepted True only when every requested native mutation commits.
 function M.setIcon(opts)
-	local options = type(opts) == "table" and opts or {}
+	if type(opts) ~= "table" then
+		Logger.error(LOG, "setIcon() refused: it takes an option map whose image names a file, not %s.", tostring(opts))
+		return false
+	end
 
-	if options.imageData then
-		if not _mutate("setIcon", function(mb) return mb:setIcon(options.imageData) end) then
+	if opts.imageData then
+		if not _mutate("setIcon", function(mb) return mb:setIcon(opts.imageData) end) then
 			return false
 		end
-	elseif type(options.image) == "string" then
+	elseif type(opts.image) == "string" and opts.image ~= "" then
+		local handle = io.open(opts.image, "r")
+		if handle == nil then
+			Logger.error(LOG, "setIcon() refused: the tray icon file '%s' is missing.", opts.image)
+			return false
+		end
+		handle:close()
 		local loaded, image_or_err = xpcall(function()
-			return hs.image.imageFromPath(options.image)
+			return hs.image.imageFromPath(opts.image)
 		end, debug.traceback)
 		if not loaded or not image_or_err then
 			Logger.error(LOG, "setIcon(): image load failed: %s.", tostring(image_or_err))
@@ -109,10 +120,13 @@ function M.setIcon(opts)
 		if not _mutate("setIcon", function(mb) return mb:setIcon(image_or_err) end) then
 			return false
 		end
+	else
+		Logger.error(LOG, "setIcon() refused: the option map names no image file.")
+		return false
 	end
 
-	if type(options.title) == "string" then
-		return _mutate("setTitle", function(mb) return mb:setTitle(options.title) end)
+	if type(opts.title) == "string" then
+		return _mutate("setTitle", function(mb) return mb:setTitle(opts.title) end)
 	end
 	return true
 end

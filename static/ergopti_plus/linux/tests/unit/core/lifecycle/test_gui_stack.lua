@@ -108,7 +108,7 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 		local source = fh:read("*a")
 		fh:close()
 		local check = source:find('require("core.ui.engine.gui_stack").check_at_start(', 1, true)
-		local icon = source:find('tray_menu.setIcon({ title = "Ergopti" })', 1, true)
+		local icon = source:find("tray_menu.start()", 1, true)
 		helpers.assert_true(check ~= nil and icon ~= nil and check < icon, "the start check precedes the tray icon")
 	end)
 

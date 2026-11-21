@@ -58,7 +58,7 @@ local owner = require("menu.ui.builder.rebuild_owner").new({
 	on_error = function(reason) Logger.error(LOG, "Tray menu refresh refused: %s.", reason) end,
 })
 rebuild = owner.request
-TrayMenu.setIcon({ icon = "input-keyboard" })
+assert(TrayMenu.start(), "the tray icon must come up")
 rebuild()
 owner.pump()
 

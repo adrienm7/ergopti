@@ -38,6 +38,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { loadCjsModule } = require('../lib/load-cjs-module.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PORTS = path.join(ROOT, 'static/ergopti_plus/_shared/core/ports');
@@ -54,8 +55,10 @@ const MIRROR =
 		? MIRROR_FILES[0]
 		: path.join(MIRROR_DIR, 'test_adapter_contract_vectors_*.lua');
 
-// Measured 2026-08-01. Raise as ids are added to the Lua tests; never lower.
-const BASELINE_TRACEABLE = 61;
+// Measured 2026-08-01, raised 2026-11-21 when the TrayMenu vectors were
+// rewritten to read their result (TRAY-04). Raise as ids are added to the Lua
+// tests; never lower.
+const BASELINE_TRACEABLE = 73;
 
 const errors = [];
 
@@ -102,6 +105,40 @@ for (const mirror of [
 ]) {
 	if (!fs.readFileSync(path.join(ROOT, mirror), 'utf8').includes(FAIL_CLOSED_VECTOR))
 		errors.push(`${mirror} must replay the ${FAIL_CLOSED_VECTOR} vector`);
+}
+
+// TRAY-04: the tray port used to declare setIcon(state) over three states no
+// adapter took, with vectors that only asked for no exception, so a setIcon
+// that ignored its argument passed. Its setIcon vectors read the result, and
+// the three drivers replay them against their real adapters.
+const TRAY_SPEC = fs.readFileSync(path.join(PORTS, 'TrayMenu.spec.js'), 'utf8');
+const trayPort = loadCjsModule(path.join(PORTS, 'TrayMenu.spec.js'));
+if ('ICON_STATES' in trayPort.portContract)
+	errors.push(
+		'TrayMenu.spec.js must not declare icon states: setIcon takes an option map with an image'
+	);
+for (const vector of trayPort.contractTestVectors().filter((v) => /^set_icon_/.test(v.id))) {
+	if (!vector.assert || !('returns' in vector.assert))
+		errors.push(
+			`TrayMenu.spec.js ${vector.id} must assert what setIcon returns, not only that it does not throw`
+		);
+}
+const TRAY_VECTORS = [
+	'set_icon_draws_the_image',
+	'set_icon_refuses_a_missing_file',
+	'set_icon_refuses_a_state_name'
+];
+for (const mirror of [
+	'static/ergopti_plus/macos/tests/unit/core/lifecycle/adapters/test_adapter_contract_vectors_input_and_system.lua',
+	'static/ergopti_plus/windows/tests/unit/platform/system/test_adapter_contract_vectors.ahk',
+	'static/ergopti_plus/linux/tests/unit/platform/system/test_tray_menu_adapter.lua'
+]) {
+	const text = fs.readFileSync(path.join(ROOT, mirror), 'utf8');
+	for (const id of TRAY_VECTORS) {
+		if (!TRAY_SPEC.includes(`id: '${id}'`))
+			errors.push(`TrayMenu.spec.js must carry the ${id} vector`);
+		if (!text.includes(id)) errors.push(`${mirror} must replay the ${id} vector`);
+	}
 }
 
 if (traceable < BASELINE_TRACEABLE) {

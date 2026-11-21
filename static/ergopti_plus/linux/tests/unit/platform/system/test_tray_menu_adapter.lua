@@ -128,6 +128,63 @@ helpers.describe("tray_menu: with a backend", function()
 		helpers.assert_true(log.created ~= nil, "and the reload path can bring it back")
 	end)
 
+	-- The setIcon vectors of TrayMenu.spec.js 2.0.0 read what the indicator
+	-- received. The earlier spec's setIcon('active') could not fail: this
+	-- adapter ignored the string, as it ignored { title } (TRAY-04).
+	local function with_errors()
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		package.loaded["core.logger.engine.shim"] = logger
+		local tray, log = with_indicator(true)
+		return tray, log, errors
+	end
+
+	helpers.it("set_icon_draws_the_image", function()
+		local tray, log = with_errors()
+		local logo = helpers.load_module("core.fs.engine.paths").shared("tray/data/ergopti_tray.png")
+		helpers.assert_eq(tray.setIcon({ image = logo }), true, "set_icon_draws_the_image: an existing file is drawn")
+		helpers.assert_eq(log.icons[#log.icons], logo, "set_icon_draws_the_image: the indicator draws that file")
+	end)
+
+	helpers.it("set_icon_refuses_a_missing_file", function()
+		local tray, log, errors = with_errors()
+		tray.start()
+		local base = os.tmpname()
+		os.remove(base)
+		local missing = base .. "-tray-04-missing.png"
+		helpers.assert_eq(tray.setIcon({ image = missing }), false,
+			"set_icon_refuses_a_missing_file: a missing file is refused")
+		helpers.assert_eq(#log.icons, 0, "set_icon_refuses_a_missing_file: nothing else is drawn in its place")
+		helpers.assert_eq(#errors, 1, "set_icon_refuses_a_missing_file: the refusal is logged")
+		helpers.assert_contains(errors[1], missing)
+	end)
+
+	helpers.it("set_icon_refuses_a_state_name", function()
+		local tray, log, errors = with_errors()
+		tray.start()
+		helpers.assert_eq(tray.setIcon("active"), false, "set_icon_refuses_a_state_name: the old state string")
+		helpers.assert_eq(tray.setIcon({ title = "Ergopti" }), false, "a map without an image is refused too")
+		helpers.assert_eq(#log.icons, 0)
+		helpers.assert_eq(#errors, 2)
+	end)
+
+	helpers.it("destroy_then_set_icon_is_safe", function()
+		local tray, log = with_errors()
+		tray.start()
+		tray.destroy()
+		local logo = helpers.load_module("core.fs.engine.paths").shared("tray/data/ergopti_tray.png")
+		helpers.assert_eq(tray.setIcon({ image = logo }), true, "destroy_then_set_icon_is_safe: the icon comes back")
+		helpers.assert_eq(log.icons[#log.icons], logo)
+	end)
+
+	helpers.it("start brings the icon up with the state's logo", function()
+		local tray, log = with_indicator(true)
+		helpers.assert_eq(tray.start(), true)
+		helpers.assert_contains(log.created.icon, "ergopti_tray.png")
+		helpers.assert_eq(with_indicator(false).start(), false, "no backend, no icon, and the daemon is told")
+	end)
+
 	helpers.it("pumps without blocking", function()
 		local tray, log = with_indicator(true)
 		tray.setMenu({})

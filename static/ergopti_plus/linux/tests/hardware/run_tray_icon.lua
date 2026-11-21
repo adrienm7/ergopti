@@ -123,7 +123,7 @@ pump()
 assert(called == 1, "GTK must enter Lua after the pump becomes hot")
 callback:free()
 
-TrayMenu.setIcon({ title = "Ergopti" })
+assert(TrayMenu.start(), "the tray icon must come up")
 -- The clickable row proves the whole click path: the panel's dbusmenu Event,
 -- libdbusmenu's "activate", the shared dispatcher, and this row's function.
 local click_file = os.getenv("ERGOPTI_TRAY_CLICK_FILE")

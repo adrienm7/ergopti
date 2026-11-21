@@ -168,14 +168,34 @@ local function ensure_started()
 	return true
 end
 
---- Sets the tray icon.
---- @param opts table|nil { title? = string, icon? = string }
+--- Creates the tray icon with the logo of the current state. Linux-only and
+--- outside the port contract: the daemon brings its icon up here once the
+--- start check has passed, before the first menu exists.
+--- @return boolean live Whether an icon is live.
+function M.start()
+	return ensure_started()
+end
+
+--- Draws an image file as the tray icon (port setIcon, TrayMenu.spec.js 2.0.0).
+--- A missing file is refused with one logged error and the previous icon stays:
+--- the adapter never draws another image in its place (TRAY-05).
+--- @param opts table { image = string } Absolute path to an existing image file.
+--- @return boolean drawn
 function M.setIcon(opts)
-	if not ensure_started() then return end
-	local icon = type(opts) == "table" and opts.icon or nil
-	if type(icon) == "string" and icon ~= "" then
-		send_icon(icon)
+	if type(opts) ~= "table" or type(opts.image) ~= "string" or opts.image == "" then
+		Logger.error(LOG, "setIcon() refused: it takes an option map whose image names a file, not %s.",
+			tostring(opts))
+		return false
 	end
+	local handle = io.open(opts.image, "r")
+	if handle == nil then
+		Logger.error(LOG, "setIcon() refused: the tray icon file '%s' is missing.", opts.image)
+		return false
+	end
+	handle:close()
+	if not ensure_started() then return false end
+	_description = describe(_paused)
+	return Indicator.set_icon(opts.image, _description) == true
 end
 
 --- The native menu replacement behind setMenu, which counts and times it.

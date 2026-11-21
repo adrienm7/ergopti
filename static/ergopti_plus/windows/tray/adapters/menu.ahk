@@ -11,7 +11,7 @@
 ;
 ; NAMING CONVENTION:
 ; Port method → AHK name mapping:
-;   setIcon(opts)      → TrayMenuSetIcon(Opts)
+;   setIcon(opts)      → TrayMenuSetIcon(Opts), Opts a Map with "image"
 ;   setMenu(items)     → TrayMenuSetMenu(Items)
 ;   setTooltip(text)   → TrayMenuSetTooltip(Text)
 ;   destroy()          → TrayMenuDestroy()
@@ -30,24 +30,34 @@
 ; ===================================================
 ; ===================================================
 
-; Sets the tray icon image and/or tooltip.
-; @param Opts {Map|0} { image?: path_string, title?: label_string }
-;               image  {String} Path to an ICO or PNG file.
-;               title  {String} Text label shown as the tooltip text (via TrayMenuSetTooltip).
+; Draws an image file as the tray icon (port setIcon, TrayMenu.spec.js 2.0.0).
+; A missing file is refused with one logged error and the previous icon stays:
+; the adapter never draws another image in its place (TRAY-05).
+; @param Opts {Map} { image: path_string [, title: label_string] }
+;               image  {String} Path to an existing ICO or PNG file.
+;               title  {String} Windows only: the tooltip (via TrayMenuSetTooltip).
+; @returns {Boolean} Whether the image is drawn (and the title, when given, set).
 if !TrayMenuFrameNative("current")
 	throw Error("The native menu adapter could not retain its intrinsic cohort")
 
 TrayMenuSetIcon(Opts) {
-	if !(Opts is Map)
-		return
-	if Opts.Has("image") and Opts["image"] != "" {
-		try TraySetIcon(Opts["image"])
-		catch as Err
-			try LoggerError("TrayMenu", "Tray icon '{1}' could not be applied: {2}.", Opts["image"], Err.Message)
+	if !(Opts is Map) || !Opts.Has("image") || Type(Opts["image"]) != "String" || Opts["image"] == "" {
+		try LoggerError("TrayMenu", "setIcon refused: it takes an option map whose image names a file.")
+		return false
 	}
-	if Opts.Has("title") and Opts["title"] != "" {
-		TrayMenuSetTooltip(Opts["title"])
+	Image := Opts["image"]
+	if !FileExist(Image) {
+		try LoggerError("TrayMenu", "setIcon refused: the tray icon file '{1}' is missing.", Image)
+		return false
 	}
+	try TraySetIcon(Image)
+	catch as Err {
+		try LoggerError("TrayMenu", "Tray icon '{1}' could not be applied: {2}.", Image, Err.Message)
+		return false
+	}
+	if Opts.Has("title") and Opts["title"] != ""
+		return TrayMenuSetTooltip(Opts["title"])
+	return true
 }
 
 ; Replaces all items in the tray context menu.
