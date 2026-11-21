@@ -55,10 +55,16 @@ helpers.describe("acknowledged Linux ordered pair editing",function()
 			helpers.assert_eq(decoded.shortcuts.key_combination_taps.future_then_tab,"future");helpers.assert_eq(s.pairs.get_action(pair),"none")
 		end)
 	end)
-	helpers.it("refuses unrelated, unknown, native-only and malformed edit rows",function()
+	helpers.it("(kcd-4) admits the one-shot Shift as a pair's tap, never as its chord",function()
+		with_menu(function(s)
+			helpers.assert_true(s.gestures.is_assignable("one_shot_shift"))
+			helpers.assert_true(s.pairs.validate_slot("tap",pair,"one_shot_shift"))
+			helpers.assert_eq(s.pairs.validate_slot("combo",pair,"one_shot_shift"),false)
+		end)
+	end)
+	helpers.it("refuses unrelated, unknown and malformed edit rows",function()
 		for _,row in ipairs({{section="shortcuts.keyboard",key="primary_j",value="copy"},
 			{section="shortcuts.key_combination_taps",key="unknown_then_tab",value="copy"},
-			{section="shortcuts.key_combination_taps",key=pair,value="one_shot_shift"},
 			{section="shortcuts.key_combination_holds",key=pair,value="unknown"},
 			{section="gesture_parameters",key=parameter,value="invalid"},
 			{section="gesture_parameters",key="tap_3__open_url",value="https://new.example"},
@@ -316,20 +322,23 @@ helpers.describe("actual shared Linux ordered-pair menu",function()
 			helpers.assert_eq(find_menu(rows,s.translate("menu.shortcuts.key_combinations_chord")),nil)
 		end)
 	end)
-	helpers.it("opens the real action catalogue, offers CapsWord and excludes pair-native state actions",function()
+	-- (kcd-4) the one-shot Shift is a pair's tap on every OS (maintainer decision
+	-- of 2026-11-21): the Linux picker offers it as Windows and macOS do.
+	helpers.it("(kcd-4) opens the real action catalogue and offers CapsWord and the one-shot Shift",function()
 		with_menu(function(s)
 			local row=find_menu(s.build(),"caps_lock + tab")
 			local tap=find_menu(row.menu,s.translate("menu.shortcuts.key_combinations_hold_tap"):gsub("%%s","open_url"))
 			helpers.assert_true(tap.fn());helpers.assert_eq(s.picker.binding,binding)
-			local found,caps_word=false,false
+			local found,caps_word,one_shot=false,false,false
 			for _,item in ipairs(s.picker.items) do
-				helpers.assert_true(item.id~="one_shot_shift")
+				if item.id=="one_shot_shift" then one_shot=true end
 				if item.id=="open_url" then found=true end
 				if item.id=="caps_word" then caps_word=true end
 			end
 			helpers.assert_true(found)
 			-- (linux-caps-word-trigger) the Windows pair LAlt then CapsLock can bind it.
 			helpers.assert_true(caps_word,"the pair picker offers CapsWord")
+			helpers.assert_true(one_shot,"the pair picker offers the one-shot Shift")
 			helpers.assert_true(s.picker.confirm("open_url","https://picker.example"))
 			helpers.assert_eq(s.gestures.get_action_parameter(binding,"open_url"),"https://picker.example")
 			helpers.assert_eq(Codec.decode(s.bytes[path]).gesture_parameters[parameter],"https://picker.example")
