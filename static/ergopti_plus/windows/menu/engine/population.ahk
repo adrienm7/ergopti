@@ -113,6 +113,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 	Entry.Busy := true
 	HotPath_SpanTrace("tray.fill")
 	StartedAt := HotPath_Now()
+	StartedCycles := _MenuDeferred_ThreadCycles()
 	PreviousBuilding := _MenuPopulationBuilding
 	; Nested pickers stay deferred under the published owner, finished at their open.
 	if _MenuPopulationPublished is MenuPopulation
@@ -123,8 +124,12 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		_MenuDeferredChildren.Delete(Handle)
 		; Formatted first: the logger folds repeats of one template, and each list's
 		; first-open cost must stay readable (the startup smoke bounds this line).
-		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' built in {2} ms for {3}.",
-			Entry.ListId, Round(PerfElapsedUs(StartedAt) / 1000), Reason))
+		ElapsedMs := Round(PerfElapsedUs(StartedAt) / 1000)
+		Cycles := _MenuDeferred_ThreadCycles() - StartedCycles
+		; The startup smoke judges a list by its own thread's cycles per row:
+		; neither load nor another process's file scan moves that cost.
+		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' built in {2} ms, {3} thread cycle(s) for {4} row(s), for {5}.",
+			Entry.ListId, ElapsedMs, Cycles, _MenuDeferred_RowCount(Handle, Map()), Reason))
 	} catch as Err {
 		Entry.MenuObj.Delete()
 		_MenuDeferred_AddPlaceholder(Entry.MenuObj)
@@ -140,6 +145,41 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		HotPath_SpanDone("tray.fill", StartedAt, "list=" . Entry.ListId)
 	}
 	return true
+}
+
+/**
+ * The CPU cycles the calling thread has run so far. Unlike the wall clock, it
+ * does not count the time the thread waited on the scheduler or on a file.
+ * @returns {Integer} Cycles since the thread started.
+ */
+_MenuDeferred_ThreadCycles() {
+	if !DllCall("QueryThreadCycleTime", "Ptr", DllCall("GetCurrentThread", "Ptr"), "Int64*", &Cycles := 0)
+		throw OSError(A_LastError, -1, "QueryThreadCycleTime")
+	return Cycles
+}
+
+/**
+ * The native rows one build produced: its own rows and those of every submenu
+ * it built at once. A still-deferred child counts at its own build.
+ * @param {Integer} Handle The built native menu.
+ * @param {Map} Seen The menus already counted.
+ * @returns {Integer} The row count.
+ */
+_MenuDeferred_RowCount(Handle, Seen) {
+	global _MenuDeferredChildren
+	if Seen.Has(Handle)
+		return 0
+	Seen[Handle] := true
+	Count := TrayMenuHandleItemCount(Handle)
+	if Count < 0
+		throw OSError(A_LastError, -1, "GetMenuItemCount")
+	Rows := Count
+	loop Count {
+		Sub := TrayMenuSubmenuHandle(Handle, A_Index - 1)
+		if Sub && !_MenuDeferredChildren.Has(Sub)
+			Rows += _MenuDeferred_RowCount(Sub, Seen)
+	}
+	return Rows
 }
 
 /** Builds every deferred submenu: a reload replay must search the whole tree. */

@@ -121,12 +121,6 @@ const CHORD_CONFIGS = {
 const REALISTIC_HOTSTRINGS_FIXTURE = 'realistic-hotstrings';
 // The paused boot keeps the AI on: its deferred AI hotkeys are the resume proof.
 const SUSPEND_MARKER_CONFIG = '[llm]\nenabled = true\n';
-// The Hotstrings menu is one deferred submenu among about ten the smoke opens:
-// its slowest render may not cost more than all the others together, which
-// replaces a 2000 ms budget that followed the machine. Measured on 2026-11-20
-// at 0.31 for the realistic fixture and at most 0.14 for the others; a render
-// that reparses the personal file per metadata question measured 9.5.
-const HOTSTRINGS_RENDER_SHARE = 1;
 const REALISTIC_HOTSTRINGS_CONFIG =
 	'[category_enabled]\nhotstrings = true\n[hotstrings.dynamic.user_code]\nenabled = true\n';
 const REALISTIC_USER_CODE_SOURCE = 'ErgoptiDynamicHotstrings(api) {\n\treturn []\n}\n';
@@ -201,41 +195,63 @@ function hotstringsRenderTimes(configRoot) {
 }
 
 /**
- * The time the same boot spent building every other deferred submenu, in
- * milliseconds: the reference the Hotstrings menu render is judged against.
- * The smoke opens every submenu in one walk, so load slows both sides alike.
+ * Every deferred submenu build a boot logged: its list, wall time, the cycles
+ * its thread ran and the native rows it produced.
  * @param {string} configRoot
- * @returns {number}
+ * @returns {{list: string, ms: number, cycles: number, rows: number}[]}
  */
-function otherMenuBuildMs(configRoot) {
-	return [...logText(configRoot).matchAll(/Deferred submenu '([a-z_]+)' built in (\d+) ms/g)]
-		.filter((match) => match[1] !== 'hotstrings_menu')
-		.reduce((total, match) => total + Number(match[2]), 0);
+function deferredMenuBuilds(configRoot) {
+	return [
+		...logText(configRoot).matchAll(
+			/Deferred submenu '([a-z_]+)' built in (\d+) ms, (\d+) thread cycle\(s\) for (\d+) row\(s\)/g
+		)
+	].map((match) => ({
+		list: match[1],
+		ms: Number(match[2]),
+		cycles: Number(match[3]),
+		rows: Number(match[4])
+	}));
 }
 
 /**
- * Whether the slowest Hotstrings menu render stayed one menu build among the
- * others: no more than HOTSTRINGS_RENDER_SHARE times the boot's other menu
- * builds together. A fixed number of milliseconds followed the machine.
+ * Whether every Hotstrings menu build stayed an ordinary menu build: none of
+ * its rows may cost more thread cycles than a row of the costliest other menu
+ * the same boot built. Cycles ignore the time the thread waited on the
+ * scheduler or on another process's file scan, and a per-row cost holds when a
+ * personal setup adds rows; the reference is measured, not tuned. Measured on
+ * 2026-11-21 at 0.11 to 0.24 for the default fixtures and 0.32 for the
+ * realistic one; a render that reparses the personal file per metadata
+ * question measured 10.9.
  * @param {string} fixture
  * @param {string} configRoot
- * @param {number[]} renders hotstringsRenderTimes() of the same boot.
- * @returns {string} The problem, or '' when the render is within its share.
+ * @returns {string} The problem, or '' when every build is within its bound.
  */
-function hotstringsRenderProblem(fixture, configRoot, renders) {
-	const reference = otherMenuBuildMs(configRoot);
-	if (!(reference > 0))
-		return 'the boot built no other submenu to time the Hotstrings menu against';
-	const slowest = Math.max(0, ...renders);
-	const share = slowest / reference;
-	console.log(
-		`${fixture} Hotstrings menu render share: ${share.toFixed(2)} (${slowest} of ${reference} ms)`
+function hotstringsRenderProblem(fixture, configRoot) {
+	const builds = deferredMenuBuilds(configRoot).filter((build) => build.rows > 0);
+	const others = builds.filter((build) => build.list !== 'hotstrings_menu');
+	if (others.length === 0)
+		return 'the boot built no other submenu to judge the Hotstrings menu against';
+	const reference = others.reduce((costliest, build) =>
+		build.cycles / build.rows > costliest.cycles / costliest.rows ? build : costliest
 	);
-	if (share <= HOTSTRINGS_RENDER_SHARE) return '';
-	return (
-		`a Hotstrings menu render took ${slowest} ms, ${share.toFixed(2)} times the ${reference} ms ` +
-		`the boot's other menu builds took together (bound ${HOTSTRINGS_RENDER_SHARE}; renders ${renders.join(', ')} ms)`
-	);
+	const referenceCost = reference.cycles / reference.rows;
+	// The smoke opens the whole tray, so every boot builds the Hotstrings menu.
+	const hotstrings = builds.filter((build) => build.list === 'hotstrings_menu');
+	if (hotstrings.length === 0) return 'the boot logged no Hotstrings menu build with its cost';
+	for (const build of hotstrings) {
+		const ratio = build.cycles / build.rows / referenceCost;
+		console.log(
+			`${fixture} Hotstrings menu row cost: ${ratio.toFixed(2)} of a ${reference.list} row ` +
+				`(${build.rows} rows in ${build.ms} ms)`
+		);
+		if (ratio > 1)
+			return (
+				`a Hotstrings menu row cost ${ratio.toFixed(2)} times a row of ${reference.list}, the ` +
+				`costliest other menu of the boot (${build.cycles} cycles for ${build.rows} rows in ` +
+				`${build.ms} ms; ${reference.cycles} cycles for ${reference.rows} rows)`
+			);
+	}
+	return '';
 }
 
 // boot-work-owners-2026-11-18: the boot's repeated work, judged by owner instead
@@ -1010,7 +1026,7 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
-			const render = hotstringsRenderProblem(fixture, configRoot, renders);
+			const render = hotstringsRenderProblem(fixture, configRoot);
 			if (render) return fail(`${fixture}: ${render}`);
 			const counters = bootCounterProblem(configRoot);
 			if (counters) return fail(`${fixture}: ${counters}`);
@@ -1072,7 +1088,7 @@ async function main() {
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
 				'script-chord, literal-config-types, retired-Metrics, realistic-hotstrings, neutral-defaults and older-release boots reached ' +
-				'ready with no error logged, every Hotstrings menu render within its share of the menu builds and every script chord registered.\x1b[0m'
+				'ready with no error logged, every Hotstrings menu row within the cost of the costliest other menu row and every script chord registered.\x1b[0m'
 		);
 		passed = true;
 		return 0;

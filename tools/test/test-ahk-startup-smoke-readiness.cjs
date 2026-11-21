@@ -223,18 +223,21 @@ async function observe(source, root, scenario) {
 							const logs = path.join(probe, ...LOGS_SEGMENTS);
 							fs.mkdirSync(logs, { recursive: true });
 							// A real boot logs the staged Hotstrings menu publication and
-							// the submenu's deferred build at its first open; the smoke
-							// requires both, within their share of the other submenus'
-							// builds (100 ms here, none for render-unreferenced).
+							// the submenu's deferred build at its first open, with its
+							// thread cycles and rows. The smoke judges a row's cycles
+							// against the costliest other menu row (shortcuts_menu here,
+							// none for render-unreferenced). The ready boot keeps the dev
+							// CI shape of 2026-11-21: 82 ms of wall time against 73 ms of
+							// other builds, while its rows cost what they should.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
-							const deferredRender = (ms) =>
-								`[INFO] [MenuPopulation] Deferred submenu 'hotstrings_menu' built in ${ms} ms for the smoke.\n`;
+							const build = (list, ms, cycles, rows) =>
+								`[INFO] [MenuPopulation] Deferred submenu '${list}' built in ${ms} ms, ${cycles} thread cycle(s) for ${rows} row(s), for the smoke.\n`;
 							const otherMenus =
 								scenario === 'render-unreferenced'
 									? ''
-									: "[INFO] [MenuPopulation] Deferred submenu 'shortcuts_menu' built in 60 ms for the smoke.\n" +
-										"[INFO] [MenuPopulation] Deferred submenu 'personal_menu' built in 40 ms for the smoke.\n";
+									: build('shortcuts_menu', 60, 120000000, 100) +
+										build('personal_menu', 13, 20000000, 40);
 							// A paused AI-on boot defers its AI hotkeys and the resume
 							// activates them; the smoke requires both lines (#97).
 							let resume = '';
@@ -252,7 +255,9 @@ async function observe(source, root, scenario) {
 								warm && scenario === 'logged-error'
 									? '[ERROR] inert warm failure\n'
 									: render(15) +
-											deferredRender(scenario === 'slow-render' ? 3200 : 40) +
+											(scenario === 'slow-render'
+												? build('hotstrings_menu', 3200, 3200000000, 100)
+												: build('hotstrings_menu', 82, 20000000, 100)) +
 											otherMenus +
 											resume +
 											// The boot's first counter record and the owner records the smoke judges.
@@ -798,12 +803,12 @@ async function check(source, root = ROOT) {
 		if (scenario === 'slow-render')
 			assert.match(
 				result.diagnostics.join('\n'),
-				/fresh-config: a Hotstrings menu render took 3200 ms, 32\.00 times the 100 ms the boot's other menu builds took together \(bound 1;/
+				/fresh-config: a Hotstrings menu row cost 26\.67 times a row of shortcuts_menu, the costliest other menu of the boot \(3200000000 cycles for 100 rows in 3200 ms;/
 			);
 		if (scenario === 'render-unreferenced')
 			assert.match(
 				result.diagnostics.join('\n'),
-				/fresh-config: the boot built no other submenu to time the Hotstrings menu against/
+				/fresh-config: the boot built no other submenu to judge the Hotstrings menu against/
 			);
 		if (scenario === 'work-unnamed')
 			assert.match(
