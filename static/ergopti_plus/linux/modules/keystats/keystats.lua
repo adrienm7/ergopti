@@ -785,7 +785,8 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 end
 
 --- Initialises the keystats.
---- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir? }
+--- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir?, defer?,
+---   persistent_sqlite? (the daemon: one long-lived sqlite3 for the synchronous writer) }
 function M.init(opts)
 	if _flush_state or _flush_stopping or _reset_request then return false end
 	if not Preferences.admit() then return false end
@@ -822,7 +823,10 @@ function M.init(opts)
 	-- A usable writer must also acknowledge migration and actual registration.
 	_sqlite_admitted = false
 	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
-	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
+	if SqliteWriter then
+		open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path,
+			{ persistent_child = options.persistent_sqlite == true })
+	end
 	local sqlite_opened = open_called and open_result == true
 	-- The device id is the one of this host's by_device/ folder, which the
 	-- other drivers import; the ledger is refused, never the local store.

@@ -2,10 +2,15 @@
 
 # Linux: a persistent sqlite3 child for the metrics store (proposal, maintainer decision)
 
-Status: proposed on 2026-11-14 by worker L of the Linux performance pass; not
-implemented. Workers D and L reached the same conclusion: the boot cost left in
-the keystats stage is one process per SQL call, and only a long-lived child
-removes it.
+Status: proposed on 2026-11-14 by worker L of the Linux performance pass;
+chosen by the maintainer and implemented on 2026-11-21
+(`linux/modules/keystats/sqlite_child.lua`, contract and measure in
+docs/memory/maintainer-decisions.md). Two choices go beyond the text below:
+standard input is a socket, so a write to a dead child is EPIPE rather than a
+SIGPIPE that would end the daemon, and each script is followed by `BEGIN;`,
+which refuses a script that left a transaction open. Workers D and L reached the
+same conclusion: the boot cost left in the keystats stage is one process per SQL
+call, and only a long-lived child removes it.
 
 ## What it would save
 

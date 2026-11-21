@@ -44,6 +44,7 @@ M.GROUPS = {
 		"tests/unit/core/logger/test_native_files.lua",
 		"tests/unit/settings/test_shared_probe_native.lua",
 		"tests/unit/modules/keystats/storage/test_sqlite_first_open.lua",
+		"tests/unit/modules/keystats/storage/test_sqlite_child.lua",
 		"tests/unit/ai/engine/prediction/test_engine_integration.lua",
 		"tests/unit/ai/test_local_server_detection_native.lua",
 		"tests/unit/ai/engine/runtime/test_owned_ollama_coexistence.lua",

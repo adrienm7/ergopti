@@ -716,6 +716,7 @@ return {
 	"tests.unit.modules.keystats.storage.test_owned_flush",
 	"tests.unit.modules.keystats.storage.test_reader_kc_hold_contract",
 	"tests.unit.modules.keystats.storage.test_sqlite_command",
+	"tests.unit.modules.keystats.storage.test_sqlite_child",
 	"tests.unit.modules.keystats.storage.test_sqlite_first_open",
 	"tests.unit.modules.keystats.aggregation.test_suggestion_counters",
 	"tests.unit.modules.keystats.aggregation.test_system_metrics",

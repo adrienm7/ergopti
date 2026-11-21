@@ -40,6 +40,7 @@ local VALUES = {
 	log_prepare_tick_bytes = 65536,
 	shell_captured_output_bytes = 4194304,
 	registry_cache_payload_bytes = 4194304,
+	sqlite_child_read_bytes = 65536,
 	toml_source_chunk_bytes = 65536,
 	metrics_overlay_slack_bytes = 268435456,
 }
