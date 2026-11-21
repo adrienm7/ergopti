@@ -70,8 +70,11 @@ function hosts(s) {
 	const windowsTools = captures(s.windows, /_LLM_MBW_Tool\(Tools, "[a-z]+", "([a-z_]+)"/g);
 	return {
 		macos: {
-			// A listed action is dispatched to the owner, which must answer it.
-			actions: [...macAnswered].filter((a) => macListed.includes(a) || a === 'open_url'),
+			// A listed action is dispatched to the owner, which must answer it; the
+			// bridge answers open_url and the page's Escape close (PCK-19) itself.
+			actions: [...macAnswered].filter(
+				(a) => macListed.includes(a) || a === 'open_url' || a === 'close'
+			),
 			tools: [
 				...captures(s.macPage, /\{ id = "([a-z_]+)"/g),
 				...captures(s.macPage, /actions = \{ \{ id = "([a-z_]+)"/g),
