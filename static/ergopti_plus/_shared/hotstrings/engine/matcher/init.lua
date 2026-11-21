@@ -870,31 +870,27 @@ function M.new()
 		-- this; Linux did not, so a trigger followed by a typographic colon simply
 		-- never matched there.
 		--
-		-- The space is REQUIRED, not merely tolerated: a bare ":" with no nbsp
-		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
-		-- hotstring. Only the end-char path is affected; a trigger whose own last
-		-- codepoint is ":" still fires on the auto path untouched.
+		-- The space is tolerated, not required: a bare ":" or ";" ends a trigger
+		-- too, on the three OS (maintainer decision HCD-2, 2026-11-21: the user is
+		-- responsible for the hotstrings they create, and no shipped catalogue
+		-- rule misfires, test-hotstring-bare-colon-catalogue.cjs). A trigger whose
+		-- own last codepoint is ":" still fires on the auto path untouched.
 		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
 		local end_final_noop = false
 		if is_terminator and not text_is_claimed then
 			local typed = cps[buf_len]
 			local body_len = buf_len - 1
-			local eligible = true
 			if typed == ":" or typed == ";" then
 				local preceding = body_len >= 1 and cps[body_len] or nil
 				if preceding == NNBSP_CHAR or preceding == NBSP_CHAR then
 					body_len = body_len - 1
 					nbsp_stripped = true
-				else
-					eligible = false
 				end
 			end
-			if eligible then
-				local noop_len, noop
-				end_map, noop_len, end_repl, noop = best_match(body_len, false)
-				end_len = noop_len
-				end_final_noop = noop == true
-			end
+			local noop_len, noop
+			end_map, noop_len, end_repl, noop = best_match(body_len, false)
+			end_len = noop_len
+			end_final_noop = noop == true
 			if not end_map then nbsp_stripped = false end
 		end
 

@@ -574,11 +574,12 @@ helpers.describe("shared hotstring engine — typographic ':' and ';'", function
 			"U+00A0 must behave like U+202F")
 	end)
 
-	helpers.it("a BARE ':' does not end a hotstring", function()
-		-- The ":" of ":D" is mid-sequence text. Requiring the space is what keeps
-		-- an emoticon from triggering an expansion.
-		helpers.assert_true(_typo_play({ AFAIK }, _chars("afaik", ":")) == nil,
-			"a colon with no no-break space before it must not fire the end-char path")
+	helpers.it("a BARE ':' ends a hotstring (hcd-2-bare-colon)", function()
+		-- Maintainer decision HCD-2 (2026-11-21): the space is tolerated, not
+		-- required, as macOS has done since 2026-11-04.
+		local r = _typo_play({ AFAIK }, _chars("afaik", ":"))
+		helpers.assert_true(r ~= nil, "a colon with no no-break space before it must fire the end-char path")
+		helpers.assert_eq(6, r and r.backspace_count, "the trigger and the colon are replaced, nothing before")
 	end)
 
 	helpers.it("an auto trigger ending in ':' is untouched by the rule", function()
@@ -589,6 +590,47 @@ helpers.describe("shared hotstring engine — typographic ':' and ';'", function
 		helpers.assert_true(r ~= nil and r.replacement == "TODO:",
 			"a star trigger ending in ':' must fire on its own last character")
 	end)
+end)
+
+
+
+
+--- The shared end-character vectors (HCD-2), replayed through the engine.
+local function _end_character_vectors()
+	local this = debug.getinfo(1, "S").source:gsub("^@", "")
+	local linux_root = this:match("^(.*[/\\])tests[/\\]")
+	local handle = assert(io.open(linux_root .. "../_shared/tests/corpus/hotstrings/end_character_vectors.json", "r"))
+	local raw = handle:read("*a")
+	handle:close()
+	return require("core.text.engine.json").decode(raw).vectors
+end
+
+helpers.describe("shared hotstring engine — end-character corpus (hcd-2-bare-colon)", function()
+	for _, vector in ipairs(_end_character_vectors()) do
+		helpers.it(vector.id .. " (hcd-2-bare-colon)", function()
+			local mappings = {}
+			for _, m in ipairs(vector.mappings) do
+				mappings[#mappings + 1] = { trigger = m.trigger, replacement = m.replacement,
+					auto_expand = m.auto_expand == true }
+			end
+			local e = engine_mod.new()
+			e:load_mappings(mappings)
+			local result
+			for index, ch in ipairs(vector.typed) do
+				result = e:on_char(ch, { is_terminator = (ch == " " or ch == ":" or ch == ";") })
+				if index < #vector.typed then
+					helpers.assert_nil(result, "only the last character may fire")
+				end
+			end
+			if vector.expected.fires then
+				helpers.assert_not_nil(result, "the last character must fire")
+				helpers.assert_eq(vector.expected.replacement, result.replacement, "replacement")
+				helpers.assert_eq(vector.expected.backspace_count, result.backspace_count, "replaced codepoints")
+			else
+				helpers.assert_nil(result, "nothing may fire")
+			end
+		end)
+	end
 end)
 
 

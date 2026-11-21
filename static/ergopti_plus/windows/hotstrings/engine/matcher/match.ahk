@@ -233,45 +233,36 @@ HSE_FindMatchAtEnd(JustTypedChar, TextIsClaimed := false) {
 				; ``:`` and ``;`` on the Ergopti Shift layer always arrive as
 				; ``NNBSP + :``. The NNBSP lands in the buffer BEFORE the ``:``
 				; end-char, so ``BodyBuf`` ends in ``…triggerNNBSP`` rather than
-				; ``…trigger``. To let these typographic end-chars still fire
-				; hotstrings we:
-				;   1. Strip the trailing NNBSP/NBSP from BodyBuf so matching sees
-				;      ``…trigger`` again (EffBody).
-				;   2. Require that NNBSP/NBSP was indeed present — a bare ``:`` or
-				;      ``;`` NOT preceded by an nbsp must NOT expand (e.g. the ``:``
-				;      in ``:D`` must stay literal).
+				; ``…trigger``: strip that trailing NNBSP/NBSP so matching sees
+				; ``…trigger`` again (EffBody). A bare ``:`` or ``;`` ends a trigger
+				; too, as on macOS, Linux and the shared engine (maintainer decision
+				; HCD-2, 2026-11-21: the user is responsible for the hotstrings they
+				; create, and no shipped catalogue rule misfires).
 				IsTypoEndChar := (JustTypedChar == ":" or JustTypedChar == Chr(0x3B))
 				EffBody := BodyBuf
-				ShouldMatch := true
 				if IsTypoEndChar {
 						LastOfBody := SubStr(BodyBuf, -1)
 						if (LastOfBody == Chr(0x202F) or LastOfBody == Chr(0xA0)) {
 								; Strip the nbsp so the trigger can match the actual body text.
 								EffBody := SubStr(BodyBuf, 1, StrLen(BodyBuf) - 1)
 								HSE_TypoNbspStripped := true
-						} else {
-								; A bare ``:`` / ``;`` without preceding nbsp is a mid-sequence
-								; character (e.g. ``:D``) and must not trigger any expansion.
-								ShouldMatch := false
 						}
 				}
-				if ShouldMatch {
-						; End-char matching is suffix equality just like star matching.
-						; Probe the bounded set of buffer suffixes against full-trigger
-						; indexes, rather than walking every same-tail candidate.
-						HasEndCS := HSE_EndByTriggerCS.Count > 0
-						HasEndCI := HSE_EndByTriggerCI.Count > 0
-						if HasEndCS or HasEndCI {
-								MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN)
-								loop MaxSuffix {
-										Suffix := SubStr(EffBody, -A_Index)
-										if HasEndCS and HSE_EndByTriggerCS.Has(Suffix)
-												_HSE_ConsiderEndSpecs(HSE_EndByTriggerCS[Suffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
-										if HasEndCI {
-												LowerSuffix := StrLower(Suffix)
-												if HSE_EndByTriggerCI.Has(LowerSuffix)
-														_HSE_ConsiderEndSpecs(HSE_EndByTriggerCI[LowerSuffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
-										}
+				; End-char matching is suffix equality just like star matching.
+				; Probe the bounded set of buffer suffixes against full-trigger
+				; indexes, rather than walking every same-tail candidate.
+				HasEndCS := HSE_EndByTriggerCS.Count > 0
+				HasEndCI := HSE_EndByTriggerCI.Count > 0
+				if HasEndCS or HasEndCI {
+						MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN)
+						loop MaxSuffix {
+								Suffix := SubStr(EffBody, -A_Index)
+								if HasEndCS and HSE_EndByTriggerCS.Has(Suffix)
+										_HSE_ConsiderEndSpecs(HSE_EndByTriggerCS[Suffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
+								if HasEndCI {
+										LowerSuffix := StrLower(Suffix)
+										if HSE_EndByTriggerCI.Has(LowerSuffix)
+												_HSE_ConsiderEndSpecs(HSE_EndByTriggerCI[LowerSuffix], EffBody, JustTypedChar, &BestMatch, &BestEndChar)
 								}
 						}
 				}
