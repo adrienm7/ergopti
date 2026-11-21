@@ -23,13 +23,13 @@ helpers.describe("i18n persistence", function()
       helpers.assert_true(type(i18n.set_locale)  == "function", "set_locale")
       helpers.assert_true(type(i18n.list_locales)== "function", "list_locales")
       helpers.assert_true(type(i18n.display_name)== "function", "display_name")
-      helpers.assert_true(type(i18n.set_trigger_provider) == "function", "set_trigger_provider")
+      helpers.assert_true(type(i18n.set_display_provider) == "function", "set_display_provider")
       helpers.assert_true(type(i18n.init)        == "function", "init")
     end)
 
-    helpers.it("locale module exports set_trigger_provider", function()
+    helpers.it("locale module exports set_display_provider", function()
       local loc = helpers.load_module("core.i18n.engine.locale")
-      helpers.assert_true(type(loc.set_trigger_provider) == "function", "locale.set_trigger_provider")
+      helpers.assert_true(type(loc.set_display_provider) == "function", "locale.set_display_provider")
     end)
   end)
 
@@ -249,22 +249,22 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("trigger provider", function()
-    helpers.it("set_trigger_provider does not crash", function()
+    helpers.it("set_display_provider does not crash", function()
       local i18n = helpers.load_module("core.i18n.engine.i18n")
       -- Called directly. A setter that accepted the provider and then failed to
       -- use it would satisfy "does not crash" and leave every label showing the
       -- default trigger character.
-      i18n.set_trigger_provider(function() return "\\" end)
-      helpers.assert_eq(type(i18n.set_trigger_provider), "function",
+      i18n.set_display_provider(function(text) return text end)
+      helpers.assert_eq(type(i18n.set_display_provider), "function",
         "and the setter must remain callable for the next provider")
     end)
 
-    helpers.it("set_trigger_provider with nil is safe", function()
+    helpers.it("set_display_provider with nil is safe", function()
       local loc = helpers.load_module("core.i18n.engine.locale")
       -- nil means "go back to the default", not "break". The module must still be
       -- usable afterwards or the next real provider never lands.
-      loc.set_trigger_provider(nil)
-      helpers.assert_eq(type(loc.set_trigger_provider), "function",
+      loc.set_display_provider(nil)
+      helpers.assert_eq(type(loc.set_display_provider), "function",
         "clearing the provider must leave the setter callable")
     end)
   end)

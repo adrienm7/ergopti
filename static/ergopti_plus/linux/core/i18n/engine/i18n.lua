@@ -14,7 +14,7 @@
 --- 2. Locale discovery: list_locales() scans _shared/core/i18n/data/locales/ for
 ---    available .json files so the language menu is always up-to-date.
 --- 3. Same surface as macOS: get(), get_locale(), set_locale().
---- 4. Trigger provider passthrough: delegates to locale.set_trigger_provider().
+--- 4. Display provider passthrough: delegates to locale.set_display_provider().
 --- ==============================================================================
 
 local M = {}
@@ -290,11 +290,11 @@ function M.list_locales()
 	return _available
 end
 
---- Sets the trigger-character provider used for ★ substitution in locale strings.
---- Delegates to infra/locale.set_trigger_provider.
---- @param fn function Zero-argument function returning the trigger character string.
-function M.set_trigger_provider(fn)
-	locale_mod.set_trigger_provider(fn)
+--- Sets the provider that shows the magic key in locale strings (« ★ (ù) »).
+--- Delegates to core/i18n/engine/locale.set_display_provider.
+--- @param fn function (text, key) -> string.
+function M.set_display_provider(fn)
+	locale_mod.set_display_provider(fn)
 end
 
 --- Returns a human-readable display name for a locale code.

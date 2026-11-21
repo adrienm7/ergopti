@@ -304,7 +304,6 @@ local hotstrings_config = require("hotstrings.engine.catalogue.config")
 local injector          = require("hotstrings.engine.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("hotstrings.engine.magic_key")
-local MagicKeySource    = require("hotstrings.engine.magic_key_source")
 local RepeatKey         = require("hotstrings.engine.repeat_key")
 
 -- The user's own modifier chords. Hard require rather than optional: the module
@@ -1132,7 +1131,15 @@ local function main()
 	-- The delays of earlier builds are absolute; the file now stores them as offsets
 	-- of the base expansion delay. They already apply as they were: this rewrites them.
 	hotstrings_config.migrate_legacy_delays()
-	if hotstrings_config.set_magic_key(MagicKey.get(), MagicKey.default()) ~= true then
+	-- The magic key's default follows the layout that types (« ù » on AZERTY,
+	-- « ; » on QWERTY): latched now, from the session keymap read ahead of the
+	-- output layout below, because the catalogue and the dynamic rules bake the
+	-- key in right after.
+	if not keyboard_layout.refresh(opts.keymap) then
+		Logger.warn(LOG, "Layout unresolved — the magic key keeps the manifest default.")
+	end
+	MagicKey.resolve_session_default()
+	if hotstrings_config.set_magic_key(MagicKey.get(), MagicKey.marker()) ~= true then
 		error("The configured magic key cannot be applied to the hotstring catalogue.")
 	end
 
@@ -1410,8 +1417,6 @@ local function main()
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
-			-- A capture never crosses a pause boundary, either way.
-			MagicKeySource.cancel_capture()
 			-- A dead key pending in the emulation must not compose after the resume.
 			if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end
 			-- The spotlight ring is an overlay of its own timer: a pause ends it.
@@ -2560,37 +2565,12 @@ local function main()
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
 
-	-- The physical magic key: a plain press of the key chosen in [hotstrings]
-	-- magic_key_source types the magic key instead of its own character, while
-	-- the magic key's replace section is on. Decided first in the consumption
-	-- callback below, so no other consumer reads the key it replaces; the typed
-	-- magic key then takes the character path, as a re-emitted key would.
-	MagicKeySource.init({
-		is_active = function() return not script_actions.is_paused() end,
-		replace_on = function() return hotstrings_config.is_section_enabled("magickey", "replace") end,
-		magic_key = MagicKey.get,
-		-- Key presses only: a clipboard paste on every press is no typing, and
-		-- a character the layout lacks leaves the key its own.
-		can_type = injector.can_type_directly,
+	-- The ★ key's physical source for its Super+★ slot: what each grabbed key
+	-- types at its base level, a key a tap owner holds being no direct source.
+	-- Required inline: main() sits at LuaJIT's upvalue limit.
+	require("modules.shortcuts.star_key_source").init({
 		input_source_receipt = keyboard_hook.physical_source_receipt,
-		typing_plan = function(text) return require("adapters.keyboard_layout").resolve(text) end,
-		type_text = function(text)
-			if opts.dry_run then return false end
-			local result = injector.type_directly(text)
-			return type(result) == "table" and result.ok == true
-		end,
-		dispatch_char = function(char, code) on_char(char, code) end,
-		-- Decided before wrap-on-type, which then never sees the key: the ★
-		-- typed over a selection must end its window, or a wrap symbol typed
-		-- next would put the deleted text back from PRIMARY.
-		end_selection = wrap_on_type.end_selection_window,
-		-- A captured key must never reach an application, which only the grab
-		-- guarantees; the menu greys the capture row otherwise.
-		can_capture = function() return keyboard_hook.get_mode() == "intercept" end,
-		key_text = keyboard_hook.key_text,
-		-- Source proof follows owners already installed before capture. A tap
-		-- action cannot be inferred to type the magic character from its name.
-		direct_source_admitted = function(code, magic_remapped)
+		direct_source_admitted = function(code)
 			if TapHold.is_active() then
 				local native = require("platform.remap.tap_hold_engine").KEY_CODES
 				for id, key in pairs(TapHold.keys()) do
@@ -2604,21 +2584,15 @@ local function main()
 			end
 			return true
 		end,
-		defer = function(fn, delay_ms) return event_loop.defer(fn, delay_ms) end,
 	})
 
 	-- The layout emulation: each grabbed press types what the [layout] chosen
 	-- layout types there, over the session's own XKB layout, as on Windows.
-	-- Decided right after the physical magic key in the consumption callback.
 	-- Required inline: main() sits at LuaJIT's upvalue limit.
 	require("modules.keymap.layout_emulation").start({
 		injector = injector,
 		is_paused = function() return script_actions.is_paused() end,
 		dispatch_char = function(char, code) on_char(char, code) end,
-		magic_evdev = function()
-			if not hotstrings_config.is_section_enabled("magickey", "replace") then return nil end
-			return MagicKeySource.evdev_code()
-		end,
 		dry_run = opts.dry_run == true,
 	})
 	-- apply-x11 lasts for the X session: the layout chosen in an earlier one is
@@ -2837,13 +2811,6 @@ local function main()
 		return true
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
-		local magic_consumed, repeat_callback = MagicKeySource.on_key(detail)
-		if magic_consumed then
-			if type(repeat_callback) == "function" then
-				return { consume = true, repeat_callback = input_capture_gate.guard(repeat_callback) }
-			end
-			return true
-		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
 		-- under the Shortcuts master like the keyboard slots, on the keys whose
@@ -2875,35 +2842,6 @@ local function main()
 		-- stops before the typing path arms the next pause.
 		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
 		if consume_bound_chord(detail) then return true end
-		-- A shortcut chord on the layout's own magic key sends its modifiers + S
-		-- ([layout] ctrl_magic_save), while the magic key is replaced, as the
-		-- Windows hotkeys. After the keyboard slots, so a shortcut assigned to the
-		-- chord (the magic editor's Super+★ included) keeps it; before the layout
-		-- emulation, which would type the chord's own level. Required inline:
-		-- main() sits at LuaJIT's upvalue limit.
-		local saved, saved_repeat = require("modules.shortcuts.ctrl_magic_save").on_key(detail, {
-			active = function()
-				return not opts.dry_run and not script_actions.is_paused() and input_capture_gate.blocks_text() ~= true
-					and require("hotstrings.engine.catalogue.config").is_section_enabled("magickey", "replace")
-			end,
-			magic_key = function() return require("hotstrings.engine.magic_key").get() end,
-			chosen_source = function() return MagicKeySource.evdev_code() ~= nil end,
-			plain_text = function(code)
-				-- The emulated layout's key when it types one there, else the XKB keymap's.
-				local emulated = require("modules.keymap.layout_emulation").legend_for_evdev(code)
-				if emulated ~= nil then return emulated end
-				local base = require("adapters.keyboard_layout").base_symbol(code)
-				return type(base) == "table" and not base.dead and base.text or nil
-			end,
-			-- The keyboard slots were decided just above: a chord one of them owns
-			-- never reaches this consumer.
-			shortcut_owns = function() return false end,
-			defer = function(fn) return event_loop.defer(fn) end,
-			press = function(combo) return (require("gestures.engine.combo_emitter").press(combo)) end,
-		})
-		if saved then
-			return { consume = true, repeat_callback = input_capture_gate.guard(saved_repeat) }
-		end
 		-- The layout emulation, after the actions the user bound on a key.
 		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
@@ -2950,16 +2888,11 @@ local function main()
 	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and i18n_mod then
 		i18n_mod.init()
-		-- From the manifest, like every other reader of this value. This was the
-		-- last hardcoded backslash: the i18n layer substitutes the magic key into
-		-- every localised label that mentions it, so a driver that answered "\"
-		-- here printed the wrong key in 21 languages while the engine listened for
-		-- ★ — a menu that documented a keystroke nothing responded to.
-		-- Read on every substitution rather than captured once, so changing the key
+		-- Every localised label shows the magic key « ★ (ù) », never a bare ★
+		-- for another character nor that character alone (the shared rule).
+		-- Read on every lookup rather than captured once, so changing the key
 		-- from the menu relabels the 21 locales without a restart.
-		i18n_mod.set_trigger_provider(function()
-			return MagicKey.get()
-		end)
+		i18n_mod.set_display_provider(MagicKey.display_text)
 	end
 
 
@@ -3022,9 +2955,6 @@ local function main()
 				-- The preview renderer's own copy of the four toggles, which a
 				-- hotstrings scope refreshes alongside their canonical leaves.
 				tooltip_preview = tooltip_preview,
-				-- The physical magic key: the keyboard-layout menu reads and
-				-- chooses it, and captures one by pressing it.
-				magic_key_source = MagicKeySource,
 				-- Layout > « Layout on pause / resume » lists and saves through it.
 				pause_layout  = require("modules.keymap.pause_layout_switch"),
 				layout        = opts.layout,

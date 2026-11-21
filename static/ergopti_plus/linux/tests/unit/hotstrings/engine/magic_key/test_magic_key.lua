@@ -22,9 +22,8 @@
 --- 2. Length is counted in CODEPOINTS. "★" is three bytes and one character, so a
 ---    byte-length check rejects the shipped default itself, and every other
 ---    non-ASCII key a user might reasonably pick.
---- 3. A character common in prose is refused. Accepting "e" arms a trigger on
----    ordinary words, and the symptom — text mangled seemingly at random — reads
----    as a bug in the expansion engine rather than as the setting they chose.
+--- 3. Any one character is accepted, as on Windows and macOS: the layout
+---    defaults are « ù » on AZERTY and « ; » on QWERTY (2026-11-21).
 --- 4. A failed write is reported. A key that silently fails to persist comes back
 ---    at the next restart with no explanation.
 --- ==============================================================================
@@ -231,40 +230,19 @@ helpers.describe("magic key: what may be chosen", function()
 		restore_manifest(); restore_storage()
 	end)
 
-	helpers.it("refuses characters that occur in ordinary text", function()
+	helpers.it("accepts any one character, the layout defaults included", function()
 		local _, restore_storage = stub_storage({})
 		local restore_manifest = stub_manifest("★")
 		local magic = load_magic_key()
 
-		for _, candidate in ipairs({ " ", ".", ",", "'", "-" }) do
+		-- The rare-symbol policy refused « ù » and « ; », the AZERTY and QWERTY
+		-- defaults the maintainer chose on 2026-11-21 for the three OS.
+		for _, candidate in ipairs({ "ù", ";", "a", "é", "§", "★", "🔑" }) do
 			local ok, reason = magic.validate(candidate)
-			helpers.assert_true(not ok,
-				"a key that appears mid-sentence fires expansions on text the user is merely writing")
-			helpers.assert_eq("dialog.magic_key.error_common", reason,
-				"and the message has to explain that, or the refusal looks arbitrary")
+			helpers.assert_true(ok, "one character is a valid magic key: " .. candidate)
+			helpers.assert_eq(nil, reason)
 		end
-
-		restore_manifest(); restore_storage()
-	end)
-
-	helpers.it("rejects every ASCII letter and digit plus non-Latin word characters", function()
-		local _, restore_storage = stub_storage({})
-		local restore_manifest = stub_manifest("★")
-		local magic = load_magic_key()
-
-		local ordinary = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-		for index = 1, #ordinary do
-			helpers.assert_eq(magic.validate(ordinary:sub(index, index)), false,
-				"ordinary ASCII codepoints must never become destructive triggers")
-		end
-		for _, candidate in ipairs({ "é", "я", "א", "中", "١" }) do
-			helpers.assert_eq(magic.validate(candidate), false,
-				"the policy must reject word codepoints outside English too: " .. candidate)
-		end
-		for _, candidate in ipairs({ "§", "★", "◆", "✓", "🔑" }) do
-			helpers.assert_eq(magic.validate(candidate), true,
-				"the shared symbol policy must keep safe choices usable: " .. candidate)
-		end
+		helpers.assert_eq(select(2, magic.validate("ab")), "dialog.magic_key.error_length")
 
 		restore_manifest(); restore_storage()
 	end)
@@ -511,6 +489,59 @@ helpers.describe("Magic trigger declared native provider", function()
 			end)
 		end)
 	end
+end)
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 5/ Layout default and display ============
+-- ==================================================
+-- ==================================================
+
+require("tests.lua.hotstrings.magic_key_contract")(helpers, require("core.text.engine.json"),
+	helpers.driver_root() .. "/../_shared")
+
+helpers.describe("magic key: the default follows the layout, the display shows ★ (char)", function()
+
+	helpers.it("an AZERTY layout makes « ù » the default, a QWERTY one « ; »", function()
+		local _, restore_storage = stub_storage({})
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+		helpers.assert_eq("★", magic.default(), "before the layout is read, the manifest default")
+		local azerty = { KeyQ = "a", KeyW = "z", KeyA = "q", KeyY = "y" }
+		helpers.assert_eq("ù", (magic.resolve_layout_default(function(code) return azerty[code] end)))
+		helpers.assert_eq("ù", magic.get(), "an unconfigured driver uses the layout default")
+		local qwerty = { KeyQ = "q", KeyW = "w", KeyA = "a", KeyY = "y" }
+		helpers.assert_eq(";", (magic.resolve_layout_default(function(code) return qwerty[code] end)))
+		helpers.assert_eq(";", magic.get())
+		helpers.assert_eq("★", magic.marker(), "the catalogue marker never follows the layout")
+		restore_manifest(); restore_storage()
+	end)
+
+	helpers.it("a stored key outranks the layout default", function()
+		local _, restore_storage = stub_storage({ stored = "§" })
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+		local azerty = { KeyQ = "a", KeyW = "z", KeyA = "q" }
+		magic.resolve_layout_default(function(code) return azerty[code] end)
+		helpers.assert_eq("§", magic.get())
+		restore_manifest(); restore_storage()
+	end)
+
+	helpers.it("shows « ★ (ù) », never the configured character alone", function()
+		local _, restore_storage = stub_storage({ stored = "ù" })
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+		helpers.assert_eq("★ (ù)", magic.display())
+		helpers.assert_eq("Touche ★ (ù) et expansion", magic.display_text("Touche ★ et expansion"))
+		helpers.assert_eq("⇪★ CapsWord", magic.display_text("⇪★ CapsWord", "sg_actions.caps_word"),
+			"a literal marker key keeps the real ★")
+		helpers.assert_eq("★", magic.display("★"))
+		restore_manifest(); restore_storage()
+	end)
+
 end)
 
 package.loaded["hotstrings.engine.magic_key"] = previous_magic_key

@@ -256,7 +256,7 @@ function M.run(options)
 		elseif name == "platform.input.access" then
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "core.i18n.engine.i18n" then
-			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
+			return { init = noop, set_display_provider = noop, get = function(key) return key end }
 		elseif name == "core.logger.engine.perf_counters" then
 			-- The real counters: the exit path flushes their last interval.
 			return require(name)

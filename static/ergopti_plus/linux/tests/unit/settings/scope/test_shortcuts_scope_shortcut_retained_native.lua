@@ -4,8 +4,8 @@
 
 package.loaded["tests.support.infra.scope.shortcuts_scope_fixture"] = nil
 local Fixture = require("tests.support.infra.scope.shortcuts_scope_fixture")
-local helpers, Sandbox, Codec, Manifest, SOURCE, with_scope, with_collision_scope, COLLISION_BASE, NO_TAP_HOLDS, with_magic_collision_scope, with_magic_publication_scope, MAGIC_COLLISION_SOURCE =
-	Fixture.helpers, Fixture.Sandbox, Fixture.Codec, Fixture.Manifest, Fixture.SOURCE, Fixture.with_scope, Fixture.with_collision_scope, Fixture.COLLISION_BASE, Fixture.NO_TAP_HOLDS, Fixture.with_magic_collision_scope, Fixture.with_magic_publication_scope, Fixture.MAGIC_COLLISION_SOURCE
+local helpers, Sandbox, Codec, Manifest, SOURCE, with_scope, with_collision_scope, COLLISION_BASE, NO_TAP_HOLDS =
+	Fixture.helpers, Fixture.Sandbox, Fixture.Codec, Fixture.Manifest, Fixture.SOURCE, Fixture.with_scope, Fixture.with_collision_scope, Fixture.COLLISION_BASE, Fixture.NO_TAP_HOLDS
 
 
 
@@ -202,7 +202,7 @@ helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
 			local source = '[shortcuts]\nenabled = true\ntap_keys = ' .. literal .. ' # taps retained\n'
 				.. '[shortcuts.keyboard]\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n'
 			local expected = '[shortcuts]\ntap_keys = ' .. literal .. ' # taps retained\n[shortcuts.keyboard]\n'
-				.. 'magic_editor = "none"\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
+				.. 'meta_star = "none"\nfuture = "keep" # keyboard retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
 				.. 'script_altgr_backspace = "none"\nscript_altgr_delete = "none"\nscript_altgr_enter = "none"\nscript_altgr_escape = "none"\n'
 			with_scope(function(scope, owners, controls, path, backup)
 				local committed, detail = scope.apply("clear")
@@ -213,13 +213,13 @@ helpers.describe("Linux ordinary obsolete shortcut parent policy", function()
 				helpers.assert_eq(controls.runtime_calls, 1)
 				helpers.assert_eq(controls.device_calls, 0)
 				helpers.assert_eq(owners.manager.is_enabled(), false)
-				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none")
+				helpers.assert_eq(owners.keyboard.get_action("meta_star"), "none")
 				for _, id in ipairs({ "number_row_left", "number_row_right_1", "number_row_right_2" }) do
 					helpers.assert_eq(owners.taps.get_action(id), "none")
 				end
 				owners.keyboard._reset()
 				owners.taps._reset()
-				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "none", "fresh actual keyboard reader agrees with ACK")
+				helpers.assert_eq(owners.keyboard.get_action("meta_star"), "none", "fresh actual keyboard reader agrees with ACK")
 				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none", "fresh actual tap reader agrees with ACK")
 				helpers.assert_eq(scope.pending(), false)
 			end, source)
@@ -501,16 +501,16 @@ end)
 
 
 
-helpers.describe("conditional Magic Editor yields during collision preflight", function()
+helpers.describe("the ★ key slot yields during collision preflight", function()
 	for _, case in ipairs({
-		{ name = "default active Magic Editor yields to a new explicit physical source without granting delivery", stored = nil },
-		{ name = "custom Magic Editor action also yields to a new explicit physical source", stored = "copy" },
+		{ name = "the default ★ key slot yields to a new explicit physical source without granting delivery", stored = nil },
+		{ name = "a custom ★ key slot action also yields to a new explicit physical source", stored = "copy" },
 	}) do
 		helpers.it(case.name, function()
 			local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\n'
-				.. (case.stored and 'magic_editor = "copy"\n' or '')
+				.. (case.stored and 'meta_star = "copy"\n' or '')
 			with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
-				local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.magic_key" }
+				local names = { "modules.shortcuts.star_key_source" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, why = pcall(function()
 					local facts = { generation = 7, status = "ready", candidates = {
@@ -518,20 +518,19 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 					} }
 					-- Native facts are modeled; both the actual keyboard consumer and
 					-- shared conditional priority policy execute without replacement.
-					package.loaded[names[1]] = { editor_source = function() return facts end,
+					package.loaded[names[1]] = { source = function() return facts end,
 						known_codes = function() return { KeyJ = true } end }
-					package.loaded[names[2]] = { get = function() return "★" end }
 					local before = Sandbox.read_bytes(path)
-					local decision = owners.keyboard.magic_editor_decision({ master = true, paused = false, inhibited = false })
+					local decision = owners.keyboard.star_slot_decision({ master = true, paused = false, inhibited = false })
 					helpers.assert_true(decision.active); helpers.assert_eq(decision.source.native_code, 36)
-					helpers.assert_eq(decision.action, case.stored or Manifest.default_for("shortcuts.keyboard.magic_editor"))
-					local policy = require("shortcuts.engine.magic_editor_core")
-					local projected = policy.resolve({ default_action = Manifest.default_for(policy.PATH), stored_action = case.stored,
-						is_action = owners.gestures.is_assignable, trigger = "★", source = facts, known_codes = { KeyJ = true },
+					helpers.assert_eq(decision.action, case.stored or Manifest.default_for("shortcuts.keyboard.meta_star"))
+					local policy = require("shortcuts.engine.star_slot_core")
+					local projected = policy.resolve({ platform = "linux", default_action = Manifest.default_for(policy.slot("linux").path),
+						stored_action = case.stored, is_action = owners.gestures.is_assignable, source = facts, known_codes = { KeyJ = true },
 						explicit_claims = { ["evdev:36"] = { action = "copy", binding_id = "keyboard__physical_super_KeyJ" } },
 						configuration_generation = 1, admission = { master = true, paused = false, inhibited = false } })
 					helpers.assert_eq(projected.active, false); helpers.assert_eq(projected.reason, "explicit_assignment")
-					-- The conditional recommendation yields; only the independent
+					-- The conditional default yields; only the independent
 					-- modeled capability revocation prevents a new publication.
 					controls.on_source = function() controls.delivery_available = false end
 					local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_super_KeyJ", value = "copy", intent = "keyboard_assignment" } })
@@ -543,90 +542,6 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 				end)
 				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 				if not ok then error(why, 0) end
-			end)
-		end)
-	end
-end)
-
-
-
-
-helpers.describe("physical preflight joins the original Magic Key replacement", function()
-	for _, case in ipairs({
-		{ name = "plain chosen source", key = "physical_none_KeyJ", reason = "collision" },
-		{ name = "Shift source is not replaced", key = "physical_shift_KeyJ", reason = "unavailable" },
-		{ name = "Super editor chord is not the plain replacement", key = "physical_super_KeyJ", reason = "unavailable" },
-	}) do
-		helpers.it("(magic-collision-scope) " .. case.name, function()
-			with_magic_collision_scope(MAGIC_COLLISION_SOURCE, {}, function(scope, owners, controls, path)
-				local before = Sandbox.read_bytes(path)
-					-- V5 requires initial readiness before observing a collision-free input.
-					if case.reason == "unavailable" then
-						controls.on_source = function() controls.delivery_available = false end
-					end
-				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key, value = "copy", intent = "keyboard_assignment" } })
-				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, case.reason)
-				helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
-				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
-				helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(#controls.executed, 0)
-				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
-			end)
-		end)
-	end
-	for _, case in ipairs({
-		{ name = "automatic", source = COLLISION_BASE .. '[hotstrings]\nmagic_key_source = "auto"\n', state = {} },
-		{ name = "replacement off", source = MAGIC_COLLISION_SOURCE, state = { replace = false } },
-		{ name = "untypable", source = MAGIC_COLLISION_SOURCE, state = { typable = false } },
-	}) do
-		helpers.it("(magic-collision-scope) " .. case.name .. " adds no replacement collision or readiness", function()
-			with_magic_collision_scope(case.source, case.state, function(scope, owners, controls, path)
-				local before = Sandbox.read_bytes(path)
-					-- The original V5 final readiness fence remains decisive after observation.
-					controls.on_source = function() controls.delivery_available = false end
-				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "copy", intent = "keyboard_assignment" } })
-				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
-				helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
-				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
-				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
-			end)
-		end)
-	end
-	helpers.it("(magic-collision-scope) accepted queued capture refuses configuration before acquisition", function()
-		with_magic_collision_scope(MAGIC_COLLISION_SOURCE, {}, function(scope, _, controls, path, Source)
-			local chosen, before = {}, Sandbox.read_bytes(path)
-			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() error("no capture result before settlement") end }))
-			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
-			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "copy", intent = "keyboard_assignment" } })
-			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
-			helpers.assert_eq(chosen, {}); helpers.assert_eq(Sandbox.read_bytes(path), before)
-			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
-		end)
-	end)
-	for _, removing in ipairs({ false, true }) do
-		helpers.it("(magic-collision-scope) preserves native " .. (removing and "removal" or "None") .. " without invoking replacement admission", function()
-			local source = removing and MAGIC_COLLISION_SOURCE:gsub('magic_editor = "none"\n', 'magic_editor = "none"\nphysical_none_KeyJ = "copy"\n', 1) or MAGIC_COLLISION_SOURCE
-			with_magic_publication_scope(source, function(scope, owners, controls, path, Source)
-				-- Both legitimate native-intent writes must publish while actual readiness is false.
-				-- The production getter answers true since 2026-11-11 (LIN-004): this
-				-- case keeps the unqualified answer the safety refusal still handles.
-				helpers.assert_eq(owners.keyboard.physical_delivery_available(), true, "the production getter")
-				owners.keyboard.physical_delivery_available = function() return false end
-				helpers.assert_eq(scope.physical_delivery_available(), false)
-				local observations = 0
-				Source.capture_collision_inventory = function() observations = observations + 1; error("native intent must not acquire an output collision frame") end
-				local update = { section = "shortcuts.keyboard", key = "physical_none_KeyJ" }
-				if removing then update.delete = true
-				else update.value, update.intent = "none", "keyboard_assignment" end
-				local accepted, detail = scope.edit({ update })
-				helpers.assert_eq(accepted, true, detail); helpers.assert_eq(observations, 0)
-				helpers.assert_eq(scope.physical_delivery_available(), false)
-				local document = Codec.decode(Sandbox.read_bytes(path))
-				local expected
-				if not removing then expected = "none" end
-				helpers.assert_eq(document.shortcuts.keyboard.physical_none_KeyJ, expected)
-				helpers.assert_eq(document.hotstrings.magic_key_source, "KeyJ")
-				helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
-				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
 			end)
 		end)
 	end

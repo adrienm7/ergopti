@@ -236,7 +236,7 @@ local function build_fixture_menu(context)
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
 	if context.magic_key_source == nil then
-		names[#names + 1] = "hotstrings.engine.magic_key_source"
+		names[#names + 1] = "modules.shortcuts.star_key_source"
 		names[#names + 1] = "hotstrings.engine.matcher.preferences"
 	end
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -260,7 +260,7 @@ local function build_fixture_menu(context)
 			assert(source:write('[hotstrings]\nmagic_key_source = "auto"\n')); assert(source:close())
 			local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 			assert(preferences._set_file_for_test(magic_path))
-			context.magic_key_source = helpers.load_module("hotstrings.engine.magic_key_source")
+			context.magic_key_source = helpers.load_module("modules.shortcuts.star_key_source")
 			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
 		end
 		local Paths = require("core.fs.engine.paths")
@@ -1242,7 +1242,7 @@ require("tests.lua.menu.native_child_rows").run(helpers, require("menu.engine.ma
 
 helpers.describe("magic key source: actual complete tray provider", function()
 	helpers.it("(magic-key-source-family) native candidate rows preserve file-backed choices and declaration withdrawal", function()
-		local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
+		local names = { "modules.shortcuts.star_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write('[hotstrings]\nmagic_key_source = "KeyJ"\nfuture_setting = "retain"\n')); assert(file:close())
@@ -1250,7 +1250,7 @@ helpers.describe("magic key source: actual complete tray provider", function()
 		local child = declaration.magic_key_source_children
 		local ok, err = pcall(function()
 			local preferences = require("hotstrings.engine.matcher.preferences"); assert(preferences._set_file_for_test(path))
-			local Source = require("hotstrings.engine.magic_key_source")
+			local Source = require("modules.shortcuts.star_key_source")
 			local changes, deferred = 0, {}
 			Source.init({ is_active = function() return true end, replace_on = function() return true end,
 				magic_key = function() return "★" end, can_type = function() return true end,

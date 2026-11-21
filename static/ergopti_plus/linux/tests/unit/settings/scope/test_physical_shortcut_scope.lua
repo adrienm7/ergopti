@@ -34,7 +34,7 @@ local function with_scope(body, source, chord_j_identity)
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "gestures.engine.manager",
 				"infra.shortcuts_scope", "menu.ui.builder.builder", "modules.shortcuts.key_combinations",
 				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
-				"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }) do
+				"modules.shortcuts.star_key_source", "hotstrings.engine.matcher.preferences" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
@@ -114,7 +114,7 @@ local function with_scope(body, source, chord_j_identity)
 			-- new observer to the same actual route, file ports and preference owner.
 			local magic_preferences = require("hotstrings.engine.matcher.preferences")
 			assert(magic_preferences._set_file_for_test(path))
-			magic_owner = require("hotstrings.engine.magic_key_source")
+			magic_owner = require("modules.shortcuts.star_key_source")
 			local apply_keyboard = keyboard.apply_configuration
 			keyboard.apply_configuration = function(token, state)
 				controls.runtime_calls = controls.runtime_calls + 1
@@ -698,7 +698,7 @@ helpers.describe("scope fixture native loop custody", function()
 end)
 
 helpers.describe("Physical preflight preserves original admission and parameter publication", function()
-	local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic_editor = "none"\nphysical_none_KeyJ = "send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text = "old"\nother_owner__send_text = "keep"\n'
+	local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmeta_star = "none"\nphysical_none_KeyJ = "send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text = "old"\nother_owner__send_text = "keep"\n'
 	helpers.it("strict unavailable capability returns before any collision producer", function()
 		with_scope(function(scope, owners, controls, path)
 			local calls, original = 0, owners.keyboard.capture_collision_inventory

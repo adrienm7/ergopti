@@ -12,11 +12,10 @@
 --- same text for the same physical keys.
 ---
 --- FEATURES & RATIONALE:
---- 1. Decided in the keyboard hook's consumption callback, after the physical
----    magic key: the grabbed press never reaches the application, its text is
----    typed in its place and then handed to the character path, so the buffer,
----    the metrics and the hotstrings see exactly what the application shows,
----    as for the magic key (hotstrings/engine/magic_key_source.lua).
+--- 1. Decided in the keyboard hook's consumption callback: the grabbed press
+---    never reaches the application, its text is typed in its place and then
+---    handed to the character path, so the buffer, the metrics and the
+---    hotstrings see exactly what the application shows.
 --- 2. Key presses first: a text the session's XKB layout types with keys goes
 ---    out as key presses; a character it cannot type goes through the
 ---    injector's clipboard route, the one the expansions use for such
@@ -85,7 +84,7 @@ local HOOK_MODIFIERS = { shift = "shift", control = "ctrl", alt = "alt", alt_rig
 local HOLDABLE_MODIFIER_KEYS = { [EvdevCodes.KEY_CAPSLOCK] = "CapsLock", [EvdevCodes.KEY_RIGHTALT] = "AltRight" }
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
-	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active",
+	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "is_active",
 	"ergopti_family" }
 
 
@@ -101,7 +100,7 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 --- Takes the collaborators. Called once, before the hook starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
 ---   type_text, dispatch_char, emit_shortcut(char, code, mods), emit_key(code, modifiers) where
----   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, magic_evdev, is_active,
+---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, is_active,
 ---   ergopti_family (the registry family whose layouts read the accented-letter choices) }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
@@ -194,7 +193,7 @@ function M.legend(code)
 end
 
 --- M.legend for a grabbed key's evdev code: what the running emulation types
---- unshifted there (the Ctrl + magic key save finds the layout's magic key so).
+--- unshifted there.
 --- @param evdev number The key's evdev code.
 --- @return string|nil text nil when the emulation is off or leaves the key to
 ---   the system layout.
@@ -202,6 +201,17 @@ function M.legend_for_evdev(evdev)
 	if _evdev_to_code == nil then return nil end
 	local code = _evdev_to_code[evdev]
 	return code ~= nil and M.legend(code) or nil
+end
+
+--- Whether a configuration has the emulation type the base layer, without
+--- loading its layout: the magic key's layout default then falls back to the
+--- manifest default, since no emulated layout is an AZERTY or a QWERTY.
+--- @param config table Decoded config.toml.
+--- @param default_for function Manifest default reader.
+--- @return boolean
+function M.configured_base(config, default_for)
+	local settings = Settings.resolve(config, default_for, function() end)
+	return Settings.active(settings) and settings.base == true
 end
 
 --- What the emulation does now, for the menu: number_row says whether it types
@@ -349,8 +359,6 @@ function M.on_key(detail)
 	end
 	-- After the source emulation: this very press may have started a held modifier.
 	local mods = merged_mods(hand)
-	local magic = _deps.magic_evdev()
-	session.config.magic_code = magic and _evdev_to_code[magic] or nil
 	local decision, text = Emulation.decide(session, code, mods.shift == true, _deps.caps_locked() == true,
 		mods.altgr == true, mods.ctrl == true, mods.alt == true, mods.meta == true, detail.char)
 	if decision == Emulation.PASS then
@@ -474,7 +482,7 @@ local function shared_json(rel, lossless)
 end
 
 --- The daemon's collaborators for M.init, built from its ports.
---- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run }
 --- @return table deps
 function M.production_deps(ports)
 	local Registry = require("modules.keymap.layout_registry")
@@ -550,7 +558,6 @@ function M.production_deps(ports)
 		end,
 		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
-		magic_evdev = ports.magic_evdev,
 		is_active = function() return not ports.is_paused() end,
 		ergopti_family = function()
 			local settings, settings_err = Registry.settings()
@@ -561,7 +568,7 @@ function M.production_deps(ports)
 end
 
 --- Initializes the module with the daemon's collaborators and loads the layout.
---- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run }
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	M.init(M.production_deps(ports))

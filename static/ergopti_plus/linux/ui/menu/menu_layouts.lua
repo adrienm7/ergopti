@@ -11,11 +11,8 @@
 
 local M = {}
 
-local NativePresentation = require("menu.engine.native_presentation")
-local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local Logger = require("core.logger.engine.shim")
-local MagicKeySourceRows = require("layouts.engine.layers.magic_key_source")
 local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -130,72 +127,6 @@ local function _build_layouts(ctx)
 		local path = "layout.emulate_" .. row
 		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
 	end
-	-- Ctrl + magic key saves (modules/shortcuts/ctrl_magic_save.lua), as on Windows.
-	local CtrlMagicSave = require("modules.shortcuts.ctrl_magic_save")
-	render_ctx.feature_rows[CtrlMagicSave.PATH] = function()
-		local enabled = CtrlMagicSave.enabled()
-		if enabled == nil then error("config.toml is unreadable", 0) end
-		return EmulationRows.switch_row({
-			t = i18n_safe, label_key = "layout.ctrlmagicsave", checked = enabled,
-			toggle = function(value)
-				if not CtrlMagicSave.set(value) then
-					require("settings.engine.publication.save_failure").present(i18n_safe, function(message)
-						show_error(message, i18n_safe("common.error_title"))
-					end)
-				end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		})
-	end
-
-	-- The physical magic key: the key typing the magic key, chosen by pressing it
-	-- or from the candidates (hotstrings/engine/magic_key_source.lua); the rows
-	-- are the shared ones macOS draws too.
-	providers[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
-		local Source = ctx.magic_key_source
-		if type(Source) ~= "table" then
-			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
-			return {}
-		end
-		local function notify(key, level)
-			local ok_notifier, Notifier = pcall(require, "platform.focus.application_notifier")
-			if ok_notifier then
-				local body = i18n_safe(key)
-				local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
-				local title = receipt and NativePresentationTitle(receipt) or nil
-				if title == nil then return false end
-				Notifier.send(body, { title = title, level = level })
-			else
-				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
-			end
-		end
-		local function changed()
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end
-		return MagicKeySourceRows.menu_rows(Source.resolver(), {
-			manifest = ManifestMenu,
-			t = i18n_safe,
-			current = Source.get(),
-			key_text = Source.key_text,
-			reason = Source.choice_reason,
-			choose = function(value)
-				local ok, reason = Source.set(value)
-				if not ok then
-					show_error(i18n_safe(reason))
-					return
-				end
-				changed()
-			end,
-			capture = Source.can_capture() and function()
-				local started = Source.capture({
-					on_chosen = changed,
-					on_refused = function(reason) notify(reason, "warning") end,
-				})
-				if started then notify("dialog.magic_key_source.prompt", "info") end
-			end or nil,
-		})
-	end
-
 	-- The scope's restore and clear: the layout rows of config.toml (number-row
 	-- ordering and edges), loaded by the session before they settle.
 	local function apply_layout_scope(mode)

@@ -89,23 +89,6 @@
 				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/injector/test_backspace_restore.lua"
 			]
 		},
-		"magic_key_source": {
-			"members": ["hotstrings.magic_key_source"],
-			"registered": "yes",
-			"production_caller": "yes",
-			"persisted": "yes",
-			"applied": "yes",
-			"hardware_proven": "no",
-			"proof_tier": "unit",
-			"intentional": true,
-			"evidence": [
-				"static/ergopti_plus/linux/hotstrings/engine/magic_key_source.lua",
-				"static/ergopti_plus/linux/hotstrings/engine/matcher/preferences.lua",
-				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/hotstrings/engine/magic_key/test_source_config_toml_leaf.lua"
-			]
-		},
 		"script_chords": {
 			"members": [
 				"shortcuts.script_control.chords_enabled",
@@ -539,22 +522,6 @@
 				"layout.emulate_bottom_row"
 			]
 		},
-		"ctrl_magic_save": {
-			"members": ["layout.ctrl_magic_save"],
-			"registered": "yes",
-			"production_caller": "yes",
-			"persisted": "yes",
-			"applied": "yes",
-			"hardware_proven": "no",
-			"proof_tier": "unit",
-			"intentional": true,
-			"evidence": [
-				"static/ergopti_plus/linux/modules/shortcuts/ctrl_magic_save.lua",
-				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
-				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_ctrl_magic_save.lua"
-			]
-		},
 		"accented_shortcuts": {
 			"members": [
 				"shortcuts.e_grave.enabled",
@@ -564,7 +531,9 @@
 				"shortcuts.e_acute.enabled",
 				"shortcuts.e_acute.letter",
 				"shortcuts.a_grave.enabled",
-				"shortcuts.a_grave.letter"
+				"shortcuts.a_grave.letter",
+				"shortcuts.star.enabled",
+				"shortcuts.star.letter"
 			],
 			"registered": "yes",
 			"production_caller": "yes",
@@ -1130,7 +1099,7 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_slot_consumes_chord.lua"
 			]
 		},
-		"shortcuts.keyboard.magic_editor": {
+		"shortcuts.keyboard.meta_star": {
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "yes",
@@ -1139,10 +1108,11 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/_shared/shortcuts/engine/magic_editor_core.lua",
+				"static/ergopti_plus/_shared/shortcuts/engine/star_slot_core.lua",
+				"static/ergopti_plus/linux/modules/shortcuts/star_key_source.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_magic_editor_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_star_slot_policy.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
 			]

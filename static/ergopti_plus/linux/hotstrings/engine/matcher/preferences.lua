@@ -43,7 +43,6 @@ local LOG = "hotstrings.engine.matcher.preferences"
 --- is owned here without a second list.
 local OWNED = {
 	KEY.HOTSTRINGS_TRIGGER_CHAR,
-	KEY.HOTSTRINGS_MAGIC_KEY_SOURCE,
 	KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED,
 	KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED,
 	KEY.HOTSTRINGS_PREVIEW_AI_ENABLED,
@@ -68,10 +67,10 @@ for _, path in ipairs(OWNED) do
 end
 
 -- Owners' rules beyond the declared type. A stored value its owner refuses
--- (a magic key today's shared policy rejects) is outdated for the cleanup
+-- (a magic key that is not one character) is outdated for the cleanup
 -- exactly as it is for the owner's reader, which warns with the same words.
 local VALUE_RULES = {
-	[KEY.HOTSTRINGS_TRIGGER_CHAR] = function(value) return Terminators.validate_magic_key(value) == true end,
+	[KEY.HOTSTRINGS_TRIGGER_CHAR] = function(value) return Terminators.validate_character(value) == true end,
 	[KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS] = function(value)
 		return type(value) == "number" and value == value and value >= 0 and value < math.huge
 	end,

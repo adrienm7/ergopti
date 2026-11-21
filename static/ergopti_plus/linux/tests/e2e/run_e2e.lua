@@ -615,46 +615,6 @@ local AUTOCORRECT_SCENARIOS = {
 		keys = " chatgpt adn adaboost ", screen = " chatgpt adn AdaBoost " },
 }
 
--- A real consumed down owns repeats only while its native epochs and owners
--- remain valid. A refused repeat stays swallowed until release, even if the
--- pause, group or inhibition is restored before the next repeat.
-local MAGIC_REPEAT_SCENARIOS = {
-	{ name = "a captured assigned source refuses without changing configuration", magic_repeat = "tap-choice", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=KeyJ tap=send_text queued=0 executed=0 bytes=true captured=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment" },
-	{ name = "old conflicting magic intent preserves acknowledged tap priority", magic_repeat = "tap-legacy", keys = "",
-		screen = "replacement", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=1 executed=1 bytes=false captured=nil" },
-	{ name = "disabled shortcut delivery releases old conflicting native source", magic_repeat = "tap-off", keys = "",
-		screen = "★★★", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "paused conflicting sources produce no automated output", magic_repeat = "tap-paused", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "none releases configured source ownership", magic_repeat = "tap-none", keys = "",
-		screen = "★★★", tap_collision_receipt = "choice=true reason=nil source=Backquote tap=none queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "modified old conflicting sources preserve the physical chord", magic_repeat = "tap-modified", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "a held physical magic key emits every acknowledged repeat", magic_repeat = "accepted", keys = "",
-		screen = "★★★", magic_receipt = "decisions=1 dispatched=3 attempts=3 origins=1 raw=0 chosen=0" },
-	{ name = "a refused magic injection retires the held press", magic_repeat = "injection", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=2 origins=1 raw=0 chosen=0" },
-	{ name = "an untrusted origin cannot own magic repeats", magic_repeat = "untrusted", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a captured magic source consumes the held answer once", magic_repeat = "capture", keys = "",
-		screen = "", magic_receipt = "decisions=1 dispatched=0 attempts=0 origins=1 raw=0 chosen=1" },
-	{ name = "a pause retires magic repeats through resume", magic_repeat = "paused", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a group change retires magic repeats through restoration", magic_repeat = "group", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a source choice retires the old held magic key", magic_repeat = "source", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "input inhibition retires magic repeats through release", magic_repeat = "inhibited", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "an origin epoch change retires magic repeats", magic_repeat = "origin", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=2 raw=0 chosen=0" },
-	{ name = "an initial compose refusal retires the magic press through recovery", magic_repeat = "compose-first", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a refused compose retirement suppresses magic repeats", magic_repeat = "compose", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-}
-
 -- Each scenario runs in its own daemon child, started through the shell that
 -- io.popen and os.execute hand a command to: /bin/sh on Linux, cmd.exe on
 -- Windows. cmd.exe has no `NAME=value command` prefix, no single quotes and no
@@ -763,7 +723,6 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
-			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_AUTOCORRECT", scenario.autocorrect or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
@@ -772,19 +731,11 @@ do
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
 			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
-			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
+			local completed = ChildCapture.accepted(output, status, false)
 			if scenario.queue_ai then
 				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
 				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
 				else fail(prefix .. scenario.name .. " (AI input order)", scenario.queue_ai, receipt or "absent") end
-			end
-			if scenario.tap_collision_receipt then
-				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
-				if receipt == scenario.tap_collision_receipt then
-					pass(prefix .. scenario.name .. " (exact admission receipt)")
-				else
-					fail(prefix .. scenario.name .. " (exact admission receipt)", scenario.tap_collision_receipt, receipt or "absent")
-				end
 			end
 			if scenario.receipt then
 				local receipt = output:match("TAP_WRAP ([^\r\n]+)")
@@ -792,14 +743,6 @@ do
 					pass(prefix .. scenario.name .. " (exact owner receipt)")
 				else
 					fail(prefix .. scenario.name .. " (exact owner receipt)", scenario.receipt, receipt or "absent")
-				end
-			end
-			if scenario.magic_receipt then
-				local receipt = output:match("MAGIC_REPEAT ([^\r\n]+)")
-				if receipt == scenario.magic_receipt then
-					pass(prefix .. scenario.name .. " (exact repeat receipt)")
-				else
-					fail(prefix .. scenario.name .. " (exact repeat receipt)", scenario.magic_receipt, receipt or "absent")
 				end
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
@@ -814,7 +757,6 @@ do
 	end
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
-	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
 	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
 	run_key_scenarios(home_env, "", AUTOCORRECT_SCENARIOS)
 

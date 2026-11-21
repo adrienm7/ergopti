@@ -450,9 +450,9 @@ local function _build_shortcuts(ctx)
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
 				local reason
-				if slot == require("shortcuts.engine.magic_editor_core").SLOT_ID then
+				if slot == require("shortcuts.engine.star_slot_core").slot("linux").id then
 					local gate = ctx.input_capture_gate
-					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+					reason = Keyboard.star_slot_decision({ master = enabled == true,
 						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
 						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
 				end
@@ -496,9 +496,6 @@ local function _build_shortcuts(ctx)
 		end
 		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
 		local labels = { get = i18n_safe }
-		-- An action on the key chosen as the physical magic key takes its press;
-		-- the row says so, and so does the log when the assignment is made.
-		local Source = type(ctx.magic_key_source) == "table" and ctx.magic_key_source or nil
 		local rows = {}
 		for _, key in ipairs(TapKeys.keys()) do
 			local bound = TapKeys.get_action(key.id)
@@ -506,19 +503,13 @@ local function _build_shortcuts(ctx)
 			local function assign(option, picked)
 				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
 					option, function() return TapKeys.set_action(key.id, option) end, picked)
-				if assigned and Source and Source.tap_override_reason(key.linux, option) ~= nil then
-					Logger.warn(LOG, "Tap key '%s' → '%s' takes the physical magic key %s: that key no longer types "
-						.. "the magic key.", key.id, tostring(option), tostring(Source.get()))
-				end
 				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return assigned
 			end
-			local override = Source and Source.tap_override_reason(key.linux, bound) or nil
 			rows[#rows + 1] = {
 				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
-					or i18n_safe("menu.shortcuts.tap_keys.unassigned"))
-					.. (override and (" — " .. i18n_safe(override)) or ""),
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}
 		end

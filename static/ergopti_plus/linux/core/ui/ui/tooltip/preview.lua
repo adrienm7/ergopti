@@ -427,7 +427,8 @@ function M.build_rows(candidates, opts)
 	-- cannot change while one is being built, and reading it is a storage lookup.
 	local magic_key = TERMINATOR_LABEL
 	local ok_magic, MagicKey = pcall(require, "hotstrings.engine.magic_key")
-	if ok_magic and type(MagicKey.get) == "function" then magic_key = MagicKey.get() end
+	-- Shown as every UI shows it: « ★ », or « ★ (ù) » for another character.
+	if ok_magic and type(MagicKey.display) == "function" then magic_key = MagicKey.display() end
 
 	for _, candidate in ipairs(candidates or {}) do
 		if #rows >= limit then break end

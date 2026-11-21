@@ -694,7 +694,7 @@ local MODULE_FAMILIES = {
 		"hotstrings.engine.input_reader",
 		"hotstrings.engine.loader",
 		"hotstrings.engine.magic_key",
-		"hotstrings.engine.magic_key_source",
+		"modules.shortcuts.star_key_source",
 		"hotstrings.engine.output_tokens",
 		"hotstrings.engine.output_transaction",
 		"hotstrings.engine.preview_settings",

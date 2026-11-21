@@ -157,7 +157,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
-			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
+			"modules.shortcuts.star_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made
 		local ok, why = pcall(function()
@@ -252,58 +252,9 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 	end, source)
 end
 
-local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmeta_star = "none"\n'
 
 local NO_TAP_HOLDS = '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
-
-local magic_collision_file_read = require("core.fs.adapters.file_system").read
-
---- Uses the real replacement owner and its actual cached preference document.
-local function with_magic_source(scope, owners, controls, path, state, body)
-	local names = { "hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences" }
-	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	local Source, choices, typed = nil, {}, {}
-	local prior_read = controls.files.read
-	controls.files.read = magic_collision_file_read
-	local ok, why = pcall(function()
-		local Preferences = require("hotstrings.engine.matcher.preferences")
-		helpers.assert_true(Preferences._set_file_for_test(path))
-		Source = require("hotstrings.engine.magic_key_source")
-		Source.init({
-			is_active = function() return state.active ~= false end,
-			replace_on = function() return state.replace ~= false end,
-			magic_key = function() return "★" end,
-			can_type = function() return state.typable ~= false end,
-			type_text = function(text) typed[#typed + 1] = text; return true end,
-			dispatch_char = function() error("preflight cannot dispatch a character") end,
-			end_selection = function() error("preflight cannot change a selection") end,
-			can_capture = function() return true end, key_text = function() return "j" end,
-			defer = function(callback, delay) choices[#choices + 1] = { callback = callback, delay = delay }; return true end,
-		})
-		body(scope, owners, controls, path, Source, Preferences, choices)
-		helpers.assert_eq(typed, {}, "claim capture and preflight never type output")
-	end)
-	if Source then Source._reset_for_test() end
-	controls.files.read = prior_read
-	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	if not ok then error(why, 0) end
-end
-
---- Refusal scenarios retain their exact no-native-ownership-change guard.
-local function with_magic_collision_scope(source, state, body)
-	with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
-		with_magic_source(scope, owners, controls, path, state, body)
-	end)
-end
-
---- None/removal use the original full publisher without readiness or map grants.
-local function with_magic_publication_scope(source, body)
-	with_scope(function(scope, owners, controls, path)
-		with_magic_source(scope, owners, controls, path, {}, body)
-	end, source)
-end
-
-local MAGIC_COLLISION_SOURCE = COLLISION_BASE .. '[hotstrings]\nmagic_key_source = "KeyJ"\n'
 
 --- Uses the same actual file/runtime intake, with no UI/provider/service actors.
 local function with_prediction_preflight(source, body)
@@ -345,9 +296,5 @@ return {
 	COLLISION_BASE = COLLISION_BASE,
 	NO_TAP_HOLDS = NO_TAP_HOLDS,
 	magic_collision_file_read = magic_collision_file_read,
-	with_magic_source = with_magic_source,
-	with_magic_collision_scope = with_magic_collision_scope,
-	with_magic_publication_scope = with_magic_publication_scope,
-	MAGIC_COLLISION_SOURCE = MAGIC_COLLISION_SOURCE,
 	with_prediction_preflight = with_prediction_preflight,
 }

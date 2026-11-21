@@ -763,10 +763,10 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 	local function magic_source(content)
 		local file = os.tmpname()
 		Sandbox.write_bytes(file, content)
-		package.loaded["hotstrings.engine.magic_key_source"] = nil
+		package.loaded["modules.shortcuts.star_key_source"] = nil
 		local Preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 		assert(Preferences._set_file_for_test(file))
-		return require("hotstrings.engine.magic_key_source"), file
+		return require("modules.shortcuts.star_key_source"), file
 	end
 
 	--- Every rendered row title, depth first.

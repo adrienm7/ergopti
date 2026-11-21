@@ -4,8 +4,8 @@
 --- MODULE: Accented-Letter Shortcuts (Linux)
 --- DESCRIPTION:
 --- Ctrl, Alt or Super (Shift may ride along) on a key that types an accented
---- letter directly (è, ê, é, à) acts as the same chord on the letter the user
---- chose: Ctrl+é becomes Ctrl+C on AZERTY, BÉPO or an installed Ergopti
+--- letter directly (è, ê, é, à), or the real ★ (maintainer's decision of
+--- 2026-11-21), acts as the same chord on the letter the user chose: Ctrl+é becomes Ctrl+C on AZERTY, BÉPO or an installed Ergopti
 --- layout, whose accented keys would otherwise reach the application as a
 --- chord nothing binds. Windows defines the contract
 --- (windows/modules/keymap/layout/accented_shortcuts.ahk); this follows it.
@@ -19,7 +19,7 @@
 --- 3. Digits first: while the number row types its digits first, a digit-row
 ---    key is a digit and Ctrl on it stays Ctrl+digit, as on Windows.
 --- 4. Read at the press: config.toml is read only when Ctrl, Alt or Super is
----    held on one of the four letters, so a restore or clear of the Shortcuts
+---    held on one of the five keys, so a restore or clear of the Shortcuts
 ---    scope applies at the next press with no live state to keep in step.
 --- 6. Under the layout emulation: a key whose chords the emulation decides is
 ---    left to it (an Ergopti layout reads these same choices,
@@ -42,8 +42,8 @@ local ConfigOutdated = require("settings.engine.migration.outdated")
 local LOG = "modules.shortcuts.accented_shortcuts"
 
 --- The feature ids in menu order, and the letter each one is.
-M.IDS = { "e_grave", "e_circ", "e_acute", "a_grave" }
-M.LETTERS = { e_grave = "è", e_circ = "ê", e_acute = "é", a_grave = "à" }
+M.IDS = { "e_grave", "e_circ", "e_acute", "a_grave", "star" }
+M.LETTERS = { e_grave = "è", e_circ = "ê", e_acute = "é", a_grave = "à", star = "★" }
 
 local ID_OF_LETTER = {}
 for id, letter in pairs(M.LETTERS) do ID_OF_LETTER[letter] = id end

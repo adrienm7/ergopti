@@ -100,7 +100,7 @@ local function with_action(route, mode, action, body)
 				gestures = "gestures.engine.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
-				MagicKeySource = "hotstrings.engine.magic_key_source", script_chords = "modules.shortcuts.script_chords",
+				MagicKeySource = "modules.shortcuts.star_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "hotstrings.engine.catalogue.config",
 				MagicKey = "hotstrings.engine.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector

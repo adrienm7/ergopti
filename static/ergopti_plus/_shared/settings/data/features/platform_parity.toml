@@ -458,6 +458,12 @@ token = "local _modes, _sensitivities = {}, {}"
 file = "static/ergopti_plus/linux/gestures/engine/manager.lua"
 token = "local _modes, _sensitivities = {}, {}"
 
+# The ★ key's shortcut is read by the accented-letter owner, by a path built
+# from its id, as its four letters are.
+[section_owners.linux."shortcuts.star"]
+file = "static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua"
+token = 'local function path_of(id, leaf) return "shortcuts." .. id .. "." .. leaf end'
+
 # The four emulated rows are read by a name built from the row id.
 [owners.windows."layout.emulate_*"]
 file = "static/ergopti_plus/_shared/settings/data/features/layout_rows_policy.ahk"

@@ -390,7 +390,6 @@ local function start_emulation(document)
 		injector = Injector,
 		is_paused = function() return false end,
 		dispatch_char = function(char) _chars[#_chars + 1] = char end,
-		magic_evdev = function() return nil end,
 	}), "the emulation did not start")
 end
 

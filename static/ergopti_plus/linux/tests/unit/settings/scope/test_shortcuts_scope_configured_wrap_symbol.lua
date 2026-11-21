@@ -48,7 +48,7 @@ helpers.describe("Linux configured wrap-symbol physical collision preflight", fu
 	end
 
 	helpers.it("(wrap-configured-preflight) disabled wrapping is not a guessed collision or native readiness", function()
-		local source = '[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+		local source = '[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[shortcuts.keyboard]\nmeta_star = "none"\n'
 		with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
 			local before = Sandbox.read_bytes(path)
 			controls.chord_j_identity = "("

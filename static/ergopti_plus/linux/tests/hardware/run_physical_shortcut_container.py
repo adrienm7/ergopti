@@ -15,9 +15,7 @@ in config.toml as the editor would save them:
 2. No other owner also acts: a hotstring's last key (Z of "xz" -> MATCH) runs
    the slot and the hotstring never expands; a tap-hold key (Tab) keeps its
    tap-hold and the slot does not also run; under the navigation layer (Alt
-   held) K keeps the layer's ArrowLeft and physical_alt_KeyK does not also run;
-   the physical magic key (KeyQ) bound to a slot runs the slot and types no
-   magic character.
+   held) K keeps the layer's ArrowLeft and physical_alt_KeyK does not also run.
 
 Exit 0 = every assertion held; 1 = a failure; 2 = no environment.
 """
@@ -37,9 +35,9 @@ SELECT_ALL = ["K 29 1", "K 30 1", "K 30 0", "K 29 0"]
 PREPARE = r"""
 local Paths = require("settings.engine.paths")
 local fh = assert(io.open(Paths.config("config.toml"), "ab"))
-fh:write('\n[hotstrings]\nmagic_key_source = "KeyQ"\n\n[shortcuts]\nenabled = true\n\n[shortcuts.keyboard]\n'
+fh:write('\n[shortcuts]\nenabled = true\n\n[shortcuts.keyboard]\n'
 	.. 'physical_none_KeyJ = "select_all"\nphysical_none_KeyZ = "select_all"\nphysical_none_Tab = "select_all"\n'
-	.. 'physical_alt_KeyK = "select_all"\nphysical_none_KeyQ = "select_all"\n')
+	.. 'physical_alt_KeyK = "select_all"\n')
 fh:close()
 """
 
@@ -156,13 +154,6 @@ def proof():
             + " | ".join(rows),
         )
 
-        rows = rows_of(session, lambda: session.tap(KEYBOARD, KEY_Q))
-        cs.check(
-            rows == SELECT_ALL,
-            "the magic key bound to a slot ran the slot alone: " + " | ".join(rows),
-        )
-        text, _ = session.editor_state()
-        cs.check(text is not None and "★" not in text, "no magic character was typed")
     except cs.ProofFailure:
         session.dump_log()
         raise

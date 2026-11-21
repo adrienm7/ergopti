@@ -318,7 +318,7 @@ local function build_payload(state, open_mode, parsed, opening)
 		if ok_value and type(value) == "number" then default_priority = value end
 	end
 
-	local star = MagicKey.default()
+	local star = MagicKey.marker()
 	return {
 		-- An explicit array for the same reason: a personal file that is absent
 		-- or has no section gave D.sections = {}, with no forEach or findIndex.

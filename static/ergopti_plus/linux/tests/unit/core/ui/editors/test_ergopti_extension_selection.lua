@@ -41,39 +41,21 @@ local function with_private_choices(Config, content, body)
 end
 
 helpers.describe("Shipped Ergopti native menu (Linux)", function()
-	helpers.it("(ergopti-extension-selection) controls real shipped metadata and physical replacement without an installed layout", function()
+	helpers.it("(ergopti-extension-selection) controls real shipped metadata without an installed layout", function()
 		local names = { "hotstrings.engine.catalogue.config", "hotstrings.engine.loader",
-			"hotstrings.engine.magic_key_source", "hotstrings.engine.matcher.preferences", "menu.ui.builder.builder" }
+			"hotstrings.engine.matcher.preferences", "menu.ui.builder.builder" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
 			local Config = require("hotstrings.engine.catalogue.config")
 			local Choices = require("tests.support.hotstring_choices")
-			local source = '[hotstrings]\nmagic_key_source = "KeyJ"\n'
+			local source = '[hotstrings]\n'
 				.. 'groups = { magickey = true, french_distancesreduction = true }\n'
 				.. '[hotstrings.modules.magickey]\nreplace = false\ntext_expansion_symbols = true\n'
 				.. '[hotstrings.modules.french_distancesreduction]\nsuffixes_a = true\n'
 			with_private_choices(Config, source, function(path)
 				local Preferences = require("hotstrings.engine.matcher.preferences")
 				helpers.assert_true(Preferences._set_file_for_test(path))
-				local Source = require("hotstrings.engine.magic_key_source")
-				local typed, queued, dispatched, gates = {}, {}, {}, {}
-				Source.init({
-					is_active = function() return true end,
-					replace_on = function()
-						local admitted = Config.is_section_enabled("magickey", "replace")
-						gates[#gates + 1] = admitted
-						return admitted
-					end,
-					magic_key = function() return "★" end,
-					can_type = function() return true end,
-					type_text = function(text) typed[#typed + 1] = text; return true end,
-					end_selection = function() end,
-					dispatch_char = function(text, code) dispatched[#dispatched + 1] = { text, code } end,
-					can_capture = function() return true end,
-					key_text = function(code) return code == 36 and "j" or nil end,
-					defer = function(callback) queued[#queued + 1] = callback; return true end,
-				})
 				Config.init(require("hotstrings.engine.matcher").new(), nil)
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed, "the real bundled and shipped extension catalogue initializes")
@@ -92,19 +74,10 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				local item = find_row(assert(extension()).menu, label .. " (0)")
 				helpers.assert_type(item, "table", "the actual translated bound feature is inside Ergopti")
 				helpers.assert_nil(find_row(extension().menu, "replace (0)"))
-				helpers.assert_eq(Source.on_key({ code = 36, mods = {} }), false)
 				helpers.assert_true(item.fn())
 				helpers.assert_eq(Config.is_group_enabled("magickey"), true)
 				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), true,
 					"the real callback must publish the effective native gate before typing")
-				local consumed = Source.on_key({ code = 36, mods = {} })
-				helpers.assert_true(consumed, "the real menu opens the physical native-source gate; source="
-					.. tostring(Source.get()) .. "; native=" .. tostring(Source.evdev_code())
-					.. "; gate=" .. tostring(gates[#gates]) .. "; writes=" .. tostring(#typed))
-				helpers.assert_eq(Source.get(), "KeyJ")
-				helpers.assert_eq(Source.evdev_code(), 36)
-				helpers.assert_eq(typed, { "★" })
-				helpers.assert_eq(dispatched, { { "★", 36 } }, "actual injection is handed to the character path")
 				local saved = require("core.text.engine.toml_codec").decode(Choices.read(path))
 				helpers.assert_eq(saved.hotstrings.modules.magickey.replace, true)
 				local disable = find_row(extension().menu, I18n.get("menu.hotstrings.uncheck_all"))
@@ -113,7 +86,6 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				helpers.assert_eq(Config.is_section_checked("magickey", "text_expansion_symbols"), true,
 					"the extension does not own common symbol choices")
 				helpers.assert_eq(Config.is_group_enabled("magickey"), true, "an extension does not close another category")
-				helpers.assert_eq(Source.on_key({ code = 36, mods = {} }), false)
 				local enable = find_row(extension().menu, I18n.get("menu.hotstrings.check_all"))
 				helpers.assert_true(enable.fn())
 				helpers.assert_eq(Config.is_section_checked("magickey", "replace"), true)
@@ -122,7 +94,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				local before = Choices.read(path); ctx.paused = true
 				helpers.assert_true(disable.fn(), "the retained bulk callback still writes after a pause")
 				helpers.assert_true(Choices.read(path) ~= before, "the paused bulk change is saved")
-				Source._reset_for_test(); Preferences._set_file_for_test(nil)
+				Preferences._set_file_for_test(nil)
 			end)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end

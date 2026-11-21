@@ -755,7 +755,7 @@ end)
 local function with_source_command(alternative, callback)
 	local names = { "menu.ui.builder.builder", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
 		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
-		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "hotstrings.engine.magic_key",
+		"_generated.locale_table", "hotstrings.engine.magic_key",
 		"hotstrings.engine.preview_settings", "hotstrings.engine.repeat_key", "core.ui.ui.modal", "core.ui.ui.text_prompt",
 		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "ui.menu.start_at_login" }
 	local saved, restore_source = {}, nil

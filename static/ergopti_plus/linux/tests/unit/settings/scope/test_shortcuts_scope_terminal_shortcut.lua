@@ -16,12 +16,12 @@ helpers.describe("Linux terminal shortcut scope", function()
 			local source = { generation = 1, status = "ready", candidates = {
 				{ code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false },
 			} }
-			package.loaded["hotstrings.engine.magic_key_source"] = {
-				editor_source = function() return source end, known_codes = function() return { KeyJ = true } end,
+			package.loaded["modules.shortcuts.star_key_source"] = {
+				source = function() return source end, known_codes = function() return { KeyJ = true } end,
 			}
 			package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end }
 			local function decision()
-				return owners.keyboard.magic_editor_decision({ master = owners.manager.is_enabled(), paused = false, inhibited = false })
+				return owners.keyboard.star_slot_decision({ master = owners.manager.is_enabled(), paused = false, inhibited = false })
 			end
 			helpers.assert_true(owners.manager.set_enabled(true))
 			helpers.assert_true(owners.keyboard.set_action("meta_j", "none"))
@@ -34,7 +34,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 			helpers.assert_eq(cleared.shortcuts.keyboard.future_physical, "future_action", "unknown keyboard neighbors stay intact")
 			helpers.assert_eq(cleared.unrelated.keep, 42)
 			helpers.assert_eq(decision().active, false, "Clear keeps the shared logical slot and master disabled")
-			helpers.assert_true(owners.keyboard.set_action("magic_editor", "open_hotstrings_editor"))
+			helpers.assert_true(owners.keyboard.set_action("meta_star", "open_hotstrings_editor"))
 			helpers.assert_true(owners.manager.set_enabled(true))
 			helpers.assert_true(decision().active, "owned reactivation uses an acknowledged current source after physical intent removal")
 			source.status, source.candidates, source.generation = "unavailable", {}, 2
@@ -132,7 +132,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 				helpers.assert_eq(owners.chords.chords_enabled(), chords)
 				helpers.assert_eq(owners.url.get_url(), url)
 				for id, action in pairs(actions) do helpers.assert_eq(owners.chords.get_action(id), action) end
-				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+				helpers.assert_eq(owners.keyboard.get_action("meta_star"), "open_hotstrings_editor")
 				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
 				helpers.assert_true(owners.manager.configuration_admitted())
 				helpers.assert_eq(scope.pending(), false)

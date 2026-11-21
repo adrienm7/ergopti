@@ -704,7 +704,7 @@ do
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
 			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
-			put("hotstrings.engine.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
+			put("modules.shortcuts.star_key_source", { init = noop, on_key = no, cancel_capture = yes })
 			put("hotstrings.engine.repeat_key", { is_enabled = no })
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })

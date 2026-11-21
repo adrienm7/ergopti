@@ -764,7 +764,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.key and not def.custom and def.type ~= "separator" then
 					local key = def.key
-					local label = i18n_safe(def.label_key):gsub("★", MagicKey.get())
+					-- The locale layer shows the magic key « ★ (ù) ».
+					local label = i18n_safe(def.label_key)
 					consume_rows[#consume_rows + 1] = {
 						label   = label,
 						checked = Terminators.is_terminator_consume(key) and true or false,
@@ -792,11 +793,9 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- row follows the active language; only a custom slot carries the
 					-- literal label its user typed.
 					local text = def.custom and def.label or i18n_safe(def.label_key)
-					-- The live magic key, not the ★ the catalogue was written with.
-					-- The label is shipped as a literal star; a user who changed the
-					-- key saw the delimiter list still naming a character that is no
-					-- longer their trigger, in every language.
-					local label = text:gsub("★", MagicKey.get())
+					-- The live magic key: the locale layer shows a built-in label's ★
+					-- as « ★ (ù) » (core/i18n set_display_provider).
+					local label = text
 					-- A consumed delimiter is swallowed by the expansion; an unconsumed
 					-- one is typed after it. The difference is visible only in the
 					-- output, so the row has to say which it is — a space that vanishes
@@ -908,9 +907,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			local current = MagicKey.get()
 			local customised = MagicKey.is_customised()
 			local change = function()
+					-- The prompt names the default as every UI shows the magic key.
 					local chosen = prompt_text(
 						i18n_safe("dialog.magic_key.title"),
-						i18n_safe("dialog.magic_key.prompt"),
+						require("platform.input.keycodes.key_names").fill("dialog.magic_key.prompt",
+							MagicKey.display(MagicKey.default()), i18n_safe),
 						current)
 					-- nil is a cancelled dialog, which must change nothing. An empty
 					-- string is a user who cleared the box and pressed OK, and that is
@@ -932,7 +933,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end
 			local rows = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = change, magic_key_reset = reset },
-				{ magic_key_value = function() return current end }, { magic_key_reset_if_custom = function()
+				{ magic_key_value = function() return MagicKey.display(current) end }, { magic_key_reset_if_custom = function()
 					if not customised then return {} end
 					local reset_source = magic_frame_snapshot(ManifestMenu, "hotstrings_magic_trigger_reset", 1)
 					if not reset_source then return nil end

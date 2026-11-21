@@ -535,7 +535,7 @@ end)
 
 helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", function()
 	local function with_editor(initial, body, writes_fail)
-		local saved_source = package.loaded["hotstrings.engine.magic_key_source"]
+		local saved_source = package.loaded["modules.shortcuts.star_key_source"]
 		local saved_magic = package.loaded["hotstrings.engine.magic_key"]
 		local saved_builder = package.loaded["menu.ui.builder.builder"]
 		local gestures = require("gestures.engine.manager")
@@ -543,8 +543,8 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
 			queue = {}, fired = {} }
-		package.loaded["hotstrings.engine.magic_key_source"] = {
-			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
+		package.loaded["modules.shortcuts.star_key_source"] = {
+			source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
 			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
 		}
 		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
@@ -559,7 +559,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 			body(shortcuts, config, state)
 		end)
 		gestures.execute_action = saved_execute
-		package.loaded["hotstrings.engine.magic_key_source"] = saved_source
+		package.loaded["modules.shortcuts.star_key_source"] = saved_source
 		package.loaded["hotstrings.engine.magic_key"] = saved_magic
 		package.loaded["menu.ui.builder.builder"] = saved_builder
 		drop_config()
@@ -568,25 +568,25 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 
 	helpers.it("(magic-editor-broker) routes the manifest default through the ordinary executor and stable editable slot", function()
 		with_editor(nil, function(shortcuts, config, state)
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "open_hotstrings_editor")
-			helpers.assert_eq(shortcuts.available_slots("contextual"), { "magic_editor" })
-			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" })
-			helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + ★")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "open_hotstrings_editor")
+			helpers.assert_eq(shortcuts.available_slots("contextual"), { "meta_star" })
+			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "meta_star" })
+			helpers.assert_eq(shortcuts.get_slot_label("meta_star"), "Super + ★")
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			helpers.assert_eq(#state.fired, 0, "native capture queues ordinary actions outside the hook")
 			state.queue[1]()
-			helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__magic_editor" } })
+			helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__meta_star" } })
 			helpers.assert_eq(#config.keys(), 0, "a conditional default never seeds personal assignments")
-			helpers.assert_true(shortcuts.set_action("magic_editor", "none"))
+			helpers.assert_true(shortcuts.set_action("meta_star", "none"))
 			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "none", "clearing a default remains explicit across restart")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "none")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "none")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
-			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" }, "a cleared conditional slot remains editable")
-			helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "meta_star" }, "a cleared conditional slot remains editable")
+			helpers.assert_true(shortcuts.set_action("meta_star", "enter"))
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			state.queue[2]()
-			helpers.assert_eq(state.fired[2], { "enter", "keyboard__magic_editor" }, "reassignment uses the same ordinary action catalogue")
+			helpers.assert_eq(state.fired[2], { "enter", "keyboard__meta_star" }, "reassignment uses the same ordinary action catalogue")
 		end)
 	end)
 
@@ -640,7 +640,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 				local detail = { key = "deliberately unrelated", code = scenario.native, physical = true, mods = { meta = true } }
 				helpers.assert_true(shortcuts.consume(detail, state.options), "matching is physical and does not guess from a symbolic key")
 				state.queue[index]()
-				helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + " .. scenario.text)
+				helpers.assert_eq(shortcuts.get_slot_label("meta_star"), "Super + " .. scenario.text)
 			end
 			helpers.assert_eq(#state.fired, 3)
 			helpers.assert_eq(#config.keys(), 0, "following the effective source does not overwrite personal settings")
@@ -677,7 +677,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 			helpers.assert_true(shortcuts.set_action("meta_j", "none"))
 			helpers.assert_eq(config.get("shortcuts.keyboard.meta_j"), "none")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+			helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
 			helpers.assert_eq(#state.queue, 0, "personal native intent never silently invokes the recommendation")
 		end)
@@ -686,7 +686,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 	for _, action in ipairs({ "select_line", "none" }) do
 		helpers.it("(magic-editor-broker) preserves explicit personal physical claims including " .. action, function()
 			with_editor({ ["shortcuts.keyboard.meta_j"] = action }, function(shortcuts, config, state)
-				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+				helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment")
 				local consumed = shortcuts.consume(state.detail, state.options)
 				helpers.assert_eq(consumed, action ~= "none")
 				if consumed then
@@ -701,7 +701,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 				helpers.assert_true(shortcuts.apply_configuration(token, shortcuts.configuration_candidate({}, true)))
 				helpers.assert_true(shortcuts.apply_configuration(token, snapshot))
 				helpers.assert_true(shortcuts.release_configuration(token))
-				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment",
+				helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment",
 					"compensation restores provenance, including a personal none absent from live assignments")
 			end)
 		end)
@@ -715,7 +715,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 				elseif gate == "paused" then state.paused = true
 				elseif gate == "inhibited" then state.inhibited = true
 				elseif gate == "source" then state.generation = 2
-				elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+				elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("meta_star", "enter"))
 				else
 					local token = {}
 					helpers.assert_true(shortcuts.acquire_configuration(token))
@@ -732,13 +732,13 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 
 	helpers.it("(magic-editor-broker) retains the acknowledged action and provenance after persistence refusal", function()
 		with_editor({ ["shortcuts.keyboard.magic_editor"] = "enter" }, function(shortcuts, config, state)
-			helpers.assert_eq(shortcuts.set_action("magic_editor", "none"), false)
-			helpers.assert_eq(shortcuts.set_action("magic_editor", "select_line"), false)
+			helpers.assert_eq(shortcuts.set_action("meta_star", "none"), false)
+			helpers.assert_eq(shortcuts.set_action("meta_star", "select_line"), false)
 			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "enter")
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "enter")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "enter")
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			state.queue[1]()
-			helpers.assert_eq(state.fired, { { "enter", "keyboard__magic_editor" } })
+			helpers.assert_eq(state.fired, { { "enter", "keyboard__meta_star" } })
 		end, true)
 	end)
 end)

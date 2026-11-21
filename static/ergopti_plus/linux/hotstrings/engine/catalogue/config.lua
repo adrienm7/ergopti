@@ -1174,8 +1174,8 @@ end
 --- @return boolean
 function M.set_magic_key(effective, canonical)
 	local Terminators = require("layouts.engine.layers.terminators")
-	if Terminators.validate_magic_key(effective) ~= true
-		or Terminators.validate_magic_key(canonical) ~= true
+	if Terminators.validate_character(effective) ~= true
+		or Terminators.validate_character(canonical) ~= true
 	then
 		Logger.error(LOG, "Magic-key catalogue substitution refused invalid state.")
 		return false

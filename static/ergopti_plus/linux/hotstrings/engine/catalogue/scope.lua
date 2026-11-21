@@ -216,7 +216,7 @@ function M.new(options)
 			if WordReset.adopt_configuration(decoded) ~= true then return false end
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
-			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
+			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.marker()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
 			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			-- A first write creates the configuration folder the two files share.
@@ -270,7 +270,7 @@ function M.new_magic(options)
 		apply = function(document)
 			if Preferences.adopt(owner, document, { [ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR] = true }) ~= true then return false end
 			local trigger = MagicKey.get()
-			if Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
+			if Config.set_magic_key(trigger, MagicKey.marker()) ~= true then return false end
 			if Dynamic then
 				local ready, reason = Dynamic.refresh(snapshot.programmable)
 				if ready ~= true and not (reason == "builtin-unavailable" and Dynamic.get_rules_count() == 0) then return false end
