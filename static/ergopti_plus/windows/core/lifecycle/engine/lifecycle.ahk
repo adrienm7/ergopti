@@ -1581,6 +1581,12 @@ Ergopti_OnShutdown(reason, code) {
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()
+		; A keep-awake session still running is the day's awake_ms, as on macOS
+		; and Linux. Its stop credits it before the keystats' terminal drain, and
+		; only here: a refused exit above keeps keep-awake running.
+		try StopActivitySimulation(false)
+		catch as Err
+			try LoggerError("Lifecycle", "Keep-awake shutdown stop failed: {1}.", Err.Message)
 		KeystatsStopped := false
 		try KeystatsStopped := KL_Stop()
 		catch as Err

@@ -57,7 +57,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 	FirstIrreversiblePos := 0
 	for CallName in ['GestureScreenshotCancelAll("shutdown")',
 		"HotstringPrefixWatcherStop()", "HotstringPrefixWatcherOnShutdown()",
-		"KL_Stop()", 'UIASW_Stop("canceled")', "HookDispatcher.Stop()",
+		"StopActivitySimulation(false)", "KL_Stop()", 'UIASW_Stop("canceled")', "HookDispatcher.Stop()",
 		"KLWV_CloseAll()", "OllamaWV_Close()",
 		"_Updater_AbortStagingOnExit()"] {
 		CallPos := InStr(ShutdownBody, CallName, true)

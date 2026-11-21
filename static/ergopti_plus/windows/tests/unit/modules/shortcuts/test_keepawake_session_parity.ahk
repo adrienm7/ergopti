@@ -8,7 +8,8 @@
 ; [keep_awake] registry (SNU-01), a finished session is the day's awake_ms
 ; through a passive_period row of kind awake (SNU-02, maintainer decision
 ; KMD-3), and the session's start and stop are logged (SNU-03). The jitter
-; radius is the registry's too (SNU-13).
+; radius is the registry's too (SNU-13), and an accepted exit credits the
+; session still running (SNU-11).
 ;
 ; The session runs on a fake cancellation hook and its timers are never armed,
 ; so no case moves the user's cursor.
@@ -228,8 +229,28 @@ _KASP_JitterFromRegistry() {
 	AssertFalse(InStr(Source, "AWAKE_JITTER_PX", true), "no driver copy of the jitter radius remains")
 }
 
+; SNU-11: a session still running when the exit is accepted is credited. The
+; stop sits after the last refusal gate, so a refused exit keeps keep-awake on.
+_KASP_ExitCreditsRunningSession() {
+	Body := _StripFullLineComments(_DriverFuncBody("Ergopti_OnShutdown"))
+	Assert(Body != "", "the lifecycle owner must remain source-visible")
+	Terminal := InStr(Body, "ShutdownTerminal := true", true)
+	Stop := InStr(Body, "StopActivitySimulation(false)", true)
+	Keystats := InStr(Body, "KeystatsStopped := KL_Stop()", true)
+	Assert(Terminal > 0 && Stop > Terminal, "the exit stops keep-awake only once no gate can refuse it")
+	Assert(Keystats > Stop, "the session is credited before the keystats' terminal drain")
+	AssertFalse(InStr(SubStr(Body, 1, Terminal), "StopActivitySimulation", true),
+		"no refusal-capable part of the exit stops keep-awake")
+	; The stop that runs there credits once and shows nothing.
+	_KASP_WithSession(4000, (Journal, Lines) => (
+		StopActivitySimulation(false),
+		_KASP_AssertOneAwakeRow(Journal, 4000),
+		AssertEqual(1, _KASP_Matching(Lines, "Keep-awake stopped."), "the exit's stop is logged")))
+}
+
 Test("keep-awake: the jitter tick and cursor return read the shared registry (snu-01)", _KASP_TickFromRegistry)
 Test("keep-awake: the jitter radius reads the shared registry (snu-13)", _KASP_JitterFromRegistry)
+Test("keep-awake: an accepted exit credits the running session (snu-11)", _KASP_ExitCreditsRunningSession)
 Test("keep-awake: a finished session is credited to awake_ms (snu-02)", _KASP_SessionCredited)
 Test("keep-awake: a session stopped by a pause is credited after the resume (snu-02)", _KASP_PausedSessionKept)
 Test("keep-awake: stopping an idle keep-awake credits nothing (snu-02)", _KASP_IdleStopCreditsNothing)

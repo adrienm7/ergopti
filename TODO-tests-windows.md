@@ -253,14 +253,16 @@ physical size`); X and Y match the pad's width and height (logical span over mil
 eader.sqlite` held open by another program, press Reset: the status line says the
       reset failed and the figures stay (MET-19).
       Graph » (MET-08).
-- [ ] Keep-awake and the layout editor's export host (SNU-01 to SNU-03, SNU-07, 2026-11-21): 1. Start
+- [ ] Keep-awake and the layout editor's export host (SNU-01 to SNU-03, SNU-07, SNU-11, 2026-11-21): 1. Start
       Simulate activity (keep-awake): the cursor moves every 1 to 5 s and comes back 0.2 s later; the log holds
       « Keep-awake started. ». Leave it 3 min, stop it: « Keep-awake stopped. », and after the next metrics rebuild
       the typing dashboard counts about 3 min of keep-awake time today (it read 0 before). 2. Start it again, pause
       the driver after 1 min, resume after 1 min: the minute before the pause is counted once and keep-awake comes
       back. 3. In the layout editor window, with `vendor/ergopti_lua_export.exe` present, rename
       `_shared/layouts/engine/composer/export_step.lua` in a copy of the install and download the XKB files: the
-      editor says « This target cannot be generated from the current layout. », not a generic error code.
+      editor says « This target cannot be generated from the current layout. », not a generic error code. 4. Start
+      keep-awake, quit the driver from the tray after 2 min and start it again: the log holds « Keep-awake
+      stopped. » after « Exit accepted », and the dashboard counts those 2 min today (they were lost before).
 
 ### Pause, startup, updates and network
 
