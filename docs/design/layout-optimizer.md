@@ -430,6 +430,8 @@ that already pass it are refused (`change_limit_start`).
 changes » 3, « balanced » 1 and « free » 0, the slider up to 5, a limit of
 6 when the reader switches it on, « free » chosen first (maintainer, `docs/memory/maintainer-decisions.md`,
 « The Optimiser's change penalty starts free, at 0 »). Measured on AZERTY, the first 60 000 characters of
+6 when the reader switches it on, « free » chosen first (decided by the agent on 2026-11-19, validated by the
+maintainer on 2026-11-21). Measured on AZERTY, the first 60 000 characters of
 Nemolivier, 3 000 swaps, seed 1: weight 0 moves 92 % of the typed characters
 for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36.
 

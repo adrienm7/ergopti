@@ -646,6 +646,74 @@ off only the chords.
   `KeyCombinationPairSummary`, both replaying
   `_shared/tests/corpus/tap_hold/key_combination_pair_rows.json`.
 
+## The number-row XCTest cohort selects through the shared fixture (2026-11-21)
+
+Decided by the maintainer on 2026-11-21: the renewed image of
+`NumberRowSourceProbeTests.swift` prepared on 2026-11-19 (held candidate
+685cec9b89) is accepted. The suite selects through
+`KeyboardSourceSelectionFixture` and the launcher's headless role instead of
+calling `TISSelectInputSource` in the XCTest process, which left HIToolbox's
+current layout stale 3 times in about 5,900 steps. The pin of
+`tools/diagnostics/number_row_current_test_causal.py` moves with it:
+`CURRENT_TEST_SHA` 769b8165...d9d64ca, `CURRENT_TEST_BLOB` 7b09f33223,
+`CURRENT_ASSERTION_LINE` 339, the test row of
+`fixtures/number-row-current-test/build-inputs.json.raw` and its
+`ROSTER_SHA`. The review and its approval record are committed beside the
+roster (`test-source-review.json.raw`, `test-source-approval.json.raw`). The
+complete local build approval (all 145 inputs) was not part of the decision
+and is not issued. Rejected: keeping the in-process selection and accepting
+its rare stale restores.
+
+## The agent's open choices up to 2026-11-21 are validated as built (2026-11-21)
+
+Decided by the maintainer on 2026-11-21, with no code change: each choice below
+was implemented by an agent and stays as it is.
+
+- Questions of the 2026-11-15 hand-off: the layout names keep the agent's
+  casing (BEO, INTS, UCIEA, AHEI, MTGAP-T, CTGAP 3); dead keys keep their
+  marker style (`key-legend-dead`: accent colour and corner mark); split and
+  ortholinear boards keep their ISO ticks. The identity gate's false positive
+  on PDF root trailer keys was not part of this decision and stays open.
+- The former « Agent decisions to review » list, as a whole: a transform whose
+  field changed after its Ctrl+C restores the saved clipboard; one
+  `sticky_altgr` covers AltGr and Kana and the shipped AltGr key keeps its Tab
+  tap; the value limits of the
+  [inventory](../design/value-validation-inventory.md) (LLM temperature 0 to
+  1.3, context length 80 to 4000, CapsWord idle timeout at most 3600 s, URLs
+  at most 2048 characters, the updater interval's snap-to-preset rule,
+  `tap_holds.sticky_timeout_ms` up to 2147483647 ms, each family's row
+  decision); Kana keeps AltGr in a KLC when its key is Right Alt; the Ergopti
+  Studio choices (one page per window, the menu row after « Keyboard layout »,
+  the editor's tab bar, the key-colour selector and its green-to-red scale,
+  the Comparer's colours, folding and share wording, one fingering profile per
+  keyboard model, downloads into the Downloads folder, the KLA JSON and
+  Kalamine TOML exports, the source's `nav` layer as the one navigation
+  source with `layers.toml` its compiled form); the GNOME extension's
+  `org.ergopti.InputSource1` admitting any session-bus client and GTK 3
+  Compose setting only `GTK_IM_MODULE` from the user installer; a pending
+  system dead key staying the OS's state across a pause, with the pause and
+  resume notices kept; every Windows notice through `NotifierSend`, silent
+  unless it played the system sound before; GSD-1 (the macOS x1 swipe firing
+  twice for a right-then-left touch) kept and HCD-3 (one field for the named
+  personal tags on the three OS); no `input.latency` span on Windows and no
+  cache for the Linux `migrations.toml` parse.
+- « Configuration rows outside a reload »: question 1 option a with the
+  locale on option b, question 2 option a (entry « An absent `[script]` row
+  reads as its default on macOS and Linux, the locale excepted » below).
+- The Optimiser's change penalty: « Libre » (weight 0) stays the preset
+  chosen first, the presets stay « few changes » 3, « balanced » 1 and « free »
+  0, with the slider up to 5 and « at most 6 changed characters » when the
+  limit is switched on, a letter and its capital counting once
+  (`score_weights.json` `change_penalty`).
+- « An existing layout would do the job »: its gap stays in points (2, entry
+  « The Optimiser's small gap stays 2 points » below), not in % of the run's
+  gain, and the similarity display stays as built (weighted same-key share
+  first, the unweighted share beside it, five alike layouts).
+- The site placements of 2026-11-14 (fb510e1113, f555c231e5) are approved,
+  except that the « Essayer » page (`/ergopti/utilisation`: online typing and
+  text replacements) becomes a tab of Ergopti Studio; another agent implements
+  that move.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
@@ -959,9 +1027,8 @@ CapsLock; a new board's extra keys take board-only codes too
 Decided by the maintainer on 2026-11-19: `similar_score_gap` stays 2 points
 (`analysis_model.json`), under which the Optimiser says an existing layout
 does the job of the one it found. Why: a fixed number of score points reads
-the same on every corpus and needs no zero of the score. The unit (points or
-% of the run's gain) and the similarity shown first are still open in
-`TODO.md`.
+the same on every corpus and needs no zero of the score. The unit stays points
+and the similarity display stays as built (maintainer, 2026-11-21).
 
 ## Thumb keys: rest, travel, letter pairs and thumb SFBs (2026-11-19)
 
@@ -1967,6 +2034,10 @@ day (TODO « Configuration rows outside a reload », question 1, option a;
 « Configuration rows outside a reload are validated » above). A `[script]`
 row that a restored or hand-edited `config.toml` lacks (`log_level`,
 `show_error_dialog`, `reading_font`, `reading_spacing`) clears its native alias
+day (TODO « Configuration rows outside a reload », question 1, option a). A
+`[script]` row that a restored or hand-edited `config.toml` lacks
+(`log_level`, `show_error_dialog`, `reading_font`, `reading_spacing`) clears
+its native alias
 at the next start, so its owner reads the manifest default, as Windows reads an
 absent row from its only store. Every menu or wizard change writes the row
 through the sparse operation, held or not (`rewrite_configured`, Linux

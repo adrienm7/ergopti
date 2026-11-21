@@ -588,6 +588,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       the reviewer renews the image (« Maintainer decisions pending »), then CI proves it in ci-macos.yml's
       `e2e-hs` (« E2E tests ») lots of role managed-ollama-native, step « Qualify actual selected number-row Carbon
       XCTest controls » (twelve cases, seven TIS closures restored).
+- [ ] **[CI] Prove the number-row cohort's shared-fixture selection on macOS.** The XCTest process left HIToolbox's
+      current layout (`AppleCurrentKeyboardLayoutInputSourceID`) on the old source 3 times in about 5,900 steps when
+      it selected itself (runs 44025301586, 44029045918). Since 22e1017c6a (image accepted by the maintainer on
+      2026-11-21, [decision](docs/memory/maintainer-decisions.md)) `NumberRowSourceProbeTests.swift` selects through
+      `KeyboardSourceSelectionFixture` and the launcher's headless role, as `KeyboardSourceProbeTests`; no retry is
+      added. Left: the first macOS CI run after the push proves it in ci-macos.yml's `e2e-hs` (« E2E tests ») lots of
+      role managed-ollama-native, step « Qualify actual selected number-row Carbon XCTest controls » (twelve cases,
+      seven TIS closures restored); close this item on that green run.
 
 ## Carried over from the 1.0.9 requests
 
@@ -859,6 +867,11 @@ Each question names the default kept meanwhile; an answer moves into the item or
       the typed characters for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36. Choose the presets, whether
       « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
       (docs/design/layout-optimizer.md, « Change penalty »).
+- [ ] **The left thumb's second key (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      thumbs' own keys are NonConvert (left thumb), Convert and KanaMode (right), as on JIS; their effort and pairs
+      were settled on 2026-11-19 (docs/memory/maintainer-decisions.md). Kept meanwhile: one key for the left thumb,
+      so the layouts that need two there (Cahi, Chia, SNTH) stay out of the library. Choose whether the left thumb
+      gets a second key.
 
 - [ ] **Accessibility texts stay French (decided by the agent on 2026-11-19, to review by the maintainer).** The
       site's accessibility statement (`/accessibilite`) and its settings dialog (`A11ySettings.svelte`) do not get
@@ -898,6 +911,10 @@ Each question names the default kept meanwhile; an answer moves into the item or
       replacements and listed them by category; the Studio's « Essayer » tab types the layout only, so the list
       went with the page. List them by category on `/ergopti-plus/hotstrings`, read from the same catalogues
       (being implemented by another change).
+- [ ] **« Essayer » becomes a Studio tab (maintainer, 2026-11-21).** The site placements decided by the agent on
+      2026-11-14 (fb510e1113, f555c231e5) are approved ([decision](docs/memory/maintainer-decisions.md)), except the
+      « Essayer » page (`/ergopti/utilisation`: online typing and text replacements), which moves into a tab of
+      Ergopti Studio. Another agent is implementing it; close this item when that move lands.
 - [ ] **Row jumps in the global score? (decided by the agent on 2026-11-17, to review by the maintainer)** The new
       `row_jump` metric (two keys of one hand two rows or more apart, any fingers) is shown in the Comparer, the
       heatmap and the worst pairs, but has no weight: the study gives it none, and it overlaps SFBs and scissors.
@@ -926,3 +943,100 @@ Each question names the default kept meanwhile; an answer moves into the item or
       layer-hold pair's tap, the macOS thumb Backspace follows BackSpaceLogic, an expired winner fires nothing, a bare
       `:` or `;` ends a trigger everywhere, `@` tags wait the dynamic delay, and a tag follows the typed case per
       letter; implementation pending integration.
+- [ ] **Identity gate false positive (open question of the 2026-11-15 hand-off).** The identity gate's false
+      positive on every PDF's root trailer key in containers whose home is the root account's (left unchanged). The
+      hand-off's other questions (layout name casing, dead-key marker style, ISO ticks on split and ortholinear
+      boards) were validated as built by the maintainer on 2026-11-21.
+- [ ] **Accessibility choices of the second pass (decided by the agent on 2026-11-17, to review by the
+      maintainer).** The legacy `/ergopti-plus-old` page is kept and fixed, not retired, since the new Ergopti+ page
+      links to it (« Ancienne version de cette page »); the system's « increase contrast » (`prefers-contrast:
+more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
+      stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
+      first, not in board order. Approve or change.
+- [ ] **The locale's neutral value.** The manifest declares `script.locale` default `fr`, but every driver reads an
+      absent locale row as the system language, and the sparse writer deletes a chosen `fr` as neutral. On Windows,
+      whose full save writes the locale through `_ConfigSparseUpdates` (`settings/engine/io.ahk`), a French choice
+      on another system language therefore reads as that language after the next reload (read in source, not
+      replayed). The Lua drivers keep the native locale when the row is absent until this is settled: (a) no
+      neutral value for the locale (always written, never deleted), then an absent row clears the native value as
+      the other `[script]` rows do; (b) absence means `fr` on every OS (no system-language detection).
+- [ ] **macOS `migrations.toml` boot parse (about 30 ms of Lua 5.4): cache it?** Windows skips the parse with a typed
+      cache keyed by the registry's SHA-256 and the parser files' identity
+      (`settings/engine/publication/registry_cache.ahk`, validation still runs on a hit); config migration is where a
+      wrong cache would rewrite a user's settings. The Mac measurement is `migrations_registry_parse` in
+      TODO-tests-macos.md. Kept meanwhile: no cache.
+  1. **(recommended) Wait for the Mac measurement,** then port the Windows cache to Lua only if the parse costs over
+     20 ms (native `hs.hash.SHA256` of the source and parser files, a typed codec that evaluates no cached code,
+     validation kept on a hit).
+  2. Port the Windows typed cache now, before the measurement.
+  3. Never cache: 30 ms at boot is accepted.
+- [ ] **Linux keystats boot: a persistent sqlite3 child?** Registration, the two migration checks and the open walk
+      cost one sqlite3 process each (about 4 ms); the remaining cut is a persistent child for the synchronous writer
+      ([design](docs/design/linux-sqlite-persistent-child.md)): about 29.5 ms of store boot would become 5 to 7 ms,
+      and each later synchronous read (dashboard `query_rows`, `get_meta`) would save its 4 ms. Kept meanwhile: one
+      process per query.
+  1. **(recommended) Build the persistent child** as the design writes it (one `sqlite3` spawned through LuaJIT FFI,
+     each success acknowledged by a per-call random token, a refused statement ending the child and the next call
+     starting a new one, a read deadline added), then implement ([CODE]).
+  2. Keep one process per query: 30 ms at boot is accepted.
+  3. Link `libsqlite3` through FFI, the largest saving, which breaks the driver's rule of never linking SQLite.
+- [ ] **Wikisource texts as corpora: under which licence?** The built-in books come from Project Gutenberg
+      (`static/corpus/text_sources.json`). Wikisource publishes its pages under CC BY-SA 4.0, while the works it
+      transcribes are in the public domain and a faithful transcription arguably adds no new right. Kept meanwhile:
+      no Wikisource text.
+  1. **(recommended) Ship Wikisource texts as CC BY-SA 4.0,** the stricter reading, as the Wikipedia articles already
+     are: only for a public-domain work Project Gutenberg lacks (author dead over 70 years, published before the US
+     cut-off), each register entry naming the pages and revisions read and « Wikisource contributors » ([CODE]).
+  2. Ship them as public domain, crediting Wikisource as the source only.
+  3. No Wikisource: Project Gutenberg only.
+- [ ] **An e-mail or chat corpus?** No candidate is cleared: the Enron mails hold personal data, the Ubuntu IRC logs'
+      licence is unchecked, Wikipedia talk pages (CC BY-SA) sign each message with a user name. Tatoeba's short
+      sentences are the conversational register meanwhile.
+  1. **(recommended) None for now:** Tatoeba stays the conversational register until a source with a clear licence
+     and no personal data is found.
+  2. Check the Ubuntu IRC logs' licence and, if it allows shipping, import a bounded sample with nicknames replaced
+     ([CODE]).
+  3. Wikipedia talk pages under CC BY-SA 4.0 with the signatures stripped ([CODE]).
+- [ ] **Norvig's n-gram counts? (decided by the agent on 2026-11-17, to review by the maintainer)** norvig.com/ngrams
+      gives its code under MIT but no licence for its data files, which it says are « derived from the Google Web
+      Trillion Word Corpus », distributed by the Linguistic Data Consortium under its own licence. Kept meanwhile:
+      not imported; the Leipzig and Google Books tables cover the same need.
+  1. **(recommended) Leave them out:** nothing read allows shipping counts derived from an LDC corpus.
+  2. Ask Peter Norvig under which licence the counts may ship, then import them ([CODE]).
+- [ ] **Tatoeba's full exports as count tables? (decided by the agent on 2026-11-17, to review by the maintainer)**
+      Tatoeba's sentences are CC BY 2.0 FR, whose one condition is to credit each sentence's author; a count table
+      holds no sentence, so its authors could only be credited together. Kept meanwhile: the 30,000-sentence
+      samples, which name each author on its line.
+  1. **(recommended) Import counts of every French and English sentence,** crediting « Tatoeba contributors » with
+     a link to the export that names each author ([CODE]).
+  2. The same, with the export's author list shipped beside each table ([CODE]).
+  3. Keep the samples only.
+- [ ] **Key-combination parity decisions KCD-1 to KCD-8 (2026-11-17 pass).** Kept meanwhile: each OS as it is.
+  - KCD-1, « Copy tap → combo » under symmetry: Windows writes only the earlier order's chord
+    (`KeyCombinationChordCopyRows`), macOS and Linux (shared `plan_chord_copy`) every order's own chord, which
+    shows once symmetry is turned off. 1. **(recommended)** Windows follows the shared planner. 2. The shared
+    planner writes only the owner order under symmetry.
+  - KCD-2, a program launch or the monitor Alt-Tab in a chord: refused on Windows and Linux, admitted on macOS
+    (Karabiner runs them). 1. **(recommended)** Keep macOS admitting them, with a platform reason on the chord
+    picker of Windows and Linux. 2. Refuse them on macOS too.
+  - KCD-3, a refused `[mod_combos]` delay or a non-boolean `enabled`: Linux turns every chord off, Windows and
+    macOS warn and use the declared value. 1. **(recommended)** Linux warns and uses the declared value. 2. Keep Linux failing closed.
+  - KCD-4, the one-shot Shift as a pair's tap: the Linux menu refuses it, its read admits it, Windows and macOS run
+    it. 1. **(recommended)** Linux offers it. 2. Refuse it as a pair tap everywhere.
+  - KCD-5, under symmetry the macOS menu hides the reverse-order pairs, tap and hold included, though the
+    generator still applies them. 1. **(recommended)** List every pair, as Windows and Linux; only the chord row is
+    shared. 2. Keep them hidden and stop applying their tap and hold.
+  - KCD-6, `[mod_combos] enabled` switches every key combination on macOS, only the chords on Windows and Linux.
+    1. **(recommended)** macOS reads `category_enabled.key_combinations` as its master and `[mod_combos] enabled`
+       as the chords only, with a migration. 2. Windows and Linux read `[mod_combos] enabled` as the master.
+  - KCD-7, a pair or chord across two keyboards: Linux refuses it, Windows and macOS admit it.
+    1. **(recommended)** Keep it, with a platform reason. 2. Linux admits it.
+  - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
+    1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
+    2. Leave each OS's menu as it is.
+- [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
+      ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
+      the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
+      cascade ([report](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): HCD-1 an expired best
+      candidate (macOS falls to a lower rule), HCD-2 a bare `:` or `;` ends a trigger on macOS only, HCD-4 the delay
+      on `@` tags, HCD-5 an uppercase one-letter tag (privacy). Each report names the default kept meanwhile.
