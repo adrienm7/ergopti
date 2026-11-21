@@ -382,10 +382,6 @@ helpers.describe("HS-016 callback owners: every hand-off is visible and truthful
 				forbidden = { "GestActions.execute_single", "action_catalogue().execute_single" },
 			},
 			{
-				symbol = "function M.bind_cmd_star", label = "Cmd-star telemetry callback",
-				forbidden = { "on_trigger" },
-			},
-			{
 				symbol = "function M.auto_detect_backend", label = "backend auto-detect callback",
 				forbidden = { "callback" },
 			},

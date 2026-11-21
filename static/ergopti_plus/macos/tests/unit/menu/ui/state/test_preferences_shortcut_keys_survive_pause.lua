@@ -22,8 +22,8 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 local CONFIG_PATH = "/virtual/config.toml"
--- The built-in left on the bindings owner since schema v20 made Ctrl+G a slot.
-local DISABLED_ID = "cmd_star"
+-- The built-in left on the bindings owner since Cmd+★ → Cmd+S left (2026-11-21).
+local DISABLED_ID = "wrap_text_if_selected"
 
 --- Runs a scenario against real Preferences over an in-memory config file.
 --- @param callback function Receives (preferences, disk).
@@ -60,9 +60,11 @@ local function save_and_read_keys(preferences, bindings)
 		{ shortcuts_mod = bindings }), true, "the preference save must commit")
 	local saved, status = preferences.load(CONFIG_PATH)
 	helpers.assert_eq(status, "ok")
-	helpers.assert_type(saved.shortcut_keys, "table",
-		"[shortcuts.keys] must be written")
-	return saved.shortcut_keys
+	-- The one named built-in (the wrap tap) starts off, so a disabled
+	-- preference is its neutral absence and leaves [shortcuts.keys] empty.
+	helpers.assert_true(saved.shortcut_keys == nil or type(saved.shortcut_keys) == "table",
+		"[shortcuts.keys] must be a table when written")
+	return saved.shortcut_keys or {}
 end
 
 -- Owners derived from other files (tap-key assignments, the layer's wheel in
@@ -159,7 +161,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 			"menu.ui.transactions.session_demotions", "settings.ui.menu.preferences_transaction",
 		}, function()
 			with_preferences(function(preferences, disk, control)
-				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\ncmd_star = false\n"
+				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\nwrap_text_if_selected = false\n"
 				local saved = preferences.load(CONFIG_PATH)
 				Fixture.with_recommended_bindings(function(bindings, ctx)
 					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))

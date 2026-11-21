@@ -124,8 +124,6 @@ local KEY_MAP = {
 	preview_announcements                = { sec = "hotstrings"                                        },
 	preview_star_enabled                 = { sec = "hotstrings"                                        },
 	trigger_char                         = { sec = "hotstrings"                                        },
-	-- One of the manifest's enum values: take_value reports any other as outdated.
-	magic_key_source                     = { sec = "hotstrings", enum = true                           },
 	-- Dynamic hotstrings sub-section
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },

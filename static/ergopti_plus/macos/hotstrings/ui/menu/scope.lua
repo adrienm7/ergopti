@@ -64,7 +64,6 @@ local OWNERS = {
 	{ key = require("settings.engine.keys").LEAF.TAP_HOLD_RESETS_WORD, setter = "set_tap_hold_resets_word",
 		getter = "is_tap_hold_resets_word_enabled" },
 	{ key = require("settings.engine.keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
-	{ key = require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
 	{ key = require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },

@@ -350,46 +350,6 @@ helpers.describe("keymap start: exact native commitment", function()
 			fixture.keymap.stop()
 		end)
 	end)
-	helpers.it("acknowledges effective replacement transitions to the existing ordinary owner", function()
-		helpers.with_stub_scope({ "modules.shortcuts.keyboard_shortcuts", "hotstrings.engine.expander.magic_key_source" }, function()
-			local fixture, selected
-			local observed = {}
-			package.loaded["hotstrings.engine.expander.magic_key_source"] = {
-				set = function(value) selected = value; return value end,
-				keycode = function() return selected == "KeyJ" and 38 or nil end,
-			}
-			package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-				refresh_magic_editor = function()
-					observed[#observed + 1] = { effective = fixture.keymap.is_magic_key_replacement_effective() }
-					return true
-				end,
-			}
-			fixture = load_fixture()
-			package.loaded["hotstrings.engine.expander.registry"].is_group_enabled = function() return true end
-			package.loaded["hotstrings.engine.expander.registry"].is_section_enabled = function() return true end
-			package.loaded["platform.input.synthetic_input"].admission_open = function() return true end
-			helpers.assert_eq(fixture.keymap.start(), true)
-			helpers.assert_eq(fixture.keymap.set_magic_key_source("KeyJ"), true)
-			helpers.assert_eq(fixture.keymap.pause_processing(), true)
-			helpers.assert_eq(fixture.keymap.resume_processing(), true)
-			helpers.assert_eq(observed, { { effective = false }, { effective = true },
-				{ effective = false }, { effective = true } })
-			local tap = fixture.taps[1]
-			local is_enabled, stop = tap.isEnabled, tap.stop
-			tap.isEnabled = function() error("native source ownership unreadable") end
-			helpers.assert_nil(fixture.keymap.is_magic_key_replacement_effective())
-			tap.isEnabled = is_enabled
-			tap.stop = function() return false end
-			helpers.assert_eq(fixture.keymap.stop(), false)
-			helpers.assert_nil(fixture.keymap.is_magic_key_replacement_effective(),
-				"a live tap retained after teardown cannot prove source inactivity")
-			helpers.assert_eq(#observed, 4, "a refused lifecycle edge cannot publish an acknowledgment")
-			tap.stop = stop
-			helpers.assert_eq(fixture.keymap.stop(), true)
-			helpers.assert_eq(observed[5], { effective = false })
-		end)
-	end)
-
 	for _, teardown in ipairs({ false, true }) do
 		helpers.it("(terminator-stop-settle-fence) retains context guards until replay settles, teardown="
 			.. tostring(teardown), function()
@@ -833,7 +793,7 @@ end)
 local INPUT_MODULES = {
 	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
 	"modules.keymap.one_shot_shift", "hotstrings.engine.expander.control_sentinels",
-	"hotstrings.engine.expander.magic_key_source", "core.events.clock",
+	"core.events.clock",
 	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "core.timing.engine.deferred_work",
 	"platform.input.text_sender", "platform.input.keyboard_geometry", "ai.engine.prediction.app_filter",
 	"hotstrings.engine.matcher.engine", "hotstrings.engine.matcher", "core.text.engine.utils", "core.text.engine.utils_core",
@@ -867,11 +827,6 @@ local function with_input_fixture(callback)
 			package.loaded["platform.input.text_sender"] = {}
 			package.loaded["ai.engine.prediction.app_filter"] = {}
 			package.loaded["platform.input.keyboard_geometry"] = {}
-			package.loaded["hotstrings.engine.expander.magic_key_source"] = {
-				needs_geometry = function() return false end,
-				owns = function(code) return controls.magic_code == code end,
-				remaps = function(code) return controls.magic_code == code end,
-			}
 			factory = require("adapters.one_shot_shift")
 			package.loaded["adapters.one_shot_shift"] = { new = function(deps)
 				owner = factory.new({
@@ -1043,17 +998,6 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 			helpers.assert_eq(counts.downs + counts.ups, 0,
 				"the already-observed physical replay must not be counted twice")
 			helpers.assert_eq(counts.stale_passed, 0)
-		end)
-	end)
-
-	helpers.it("does not rewrite a late configured physical magic key", function()
-		with_input_fixture(function(fixture)
-			fixture.controls.magic_code = 3
-			local late = fixture.event(3, "j", 1200)
-			helpers.assert_eq(fixture.down(late), false)
-			helpers.assert_eq(late:getCharacters(), "j")
-			helpers.assert_eq(late.unicode_writes, 0)
-			helpers.assert_eq(fixture.calls.emitted, {})
 		end)
 	end)
 end)

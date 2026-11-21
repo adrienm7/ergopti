@@ -58,23 +58,26 @@ helpers.describe("menu_keyboard_slots: provided rows", function()
 		end
 	end)
 
-	it("keeps the fixed contextual row editable after an explicit none choice", function()
-		local ui, shortcuts, picker = fresh()
+	-- 2026-11-21: Ctrl+★ opening the editor is an ordinary row of the Ctrl
+	-- group, which a clear removes like any other assignment.
+	it("lists the ★ key's default in the Ctrl group and drops it once cleared", function()
+		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
-		helpers.assert_eq(shortcuts.set_keyboard_action("magic_editor", "none"), true)
-		local groups = shortcuts.get_keyboard_slot_groups()
-		local rows = ui.provide_rows(ctx, nil)
-		local contextual
-		for index, group in ipairs(groups) do
-			if group.prefix == "contextual" then contextual = rows[index] end
+		local function ctrl_rows()
+			local rows = ui.provide_rows(ctx, nil)
+			for index, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
+				if group.prefix == "secondary_" then return rows[index].items end
+			end
 		end
-		helpers.assert_not_nil(contextual)
-		helpers.assert_eq(#contextual.items, 1, "one fixed logical slot needs no redundant Add flow")
-		local row = contextual.items[1]
-		helpers.assert_true(row.label:find("Label:none", 1, true) ~= nil)
-		helpers.assert_nil(row.disabled, "source proof does not disable ordinary action editing")
-		row.action()
-		helpers.assert_eq(picker.opened[#picker.opened].opts.current, "none")
+		local function star_row(rows)
+			for _, row in ipairs(rows or {}) do
+				if type(row.label) == "string" and row.label:find("★", 1, true)
+					and row.label:find("Label:open_hotstrings_editor", 1, true) then return row end
+			end
+		end
+		helpers.assert_not_nil(star_row(ctrl_rows()), "Ctrl+★ opens the editor by default")
+		helpers.assert_eq(shortcuts.set_keyboard_action("secondary_star", "none"), true)
+		helpers.assert_nil(star_row(ctrl_rows()), "a cleared Ctrl+★ leaves the Ctrl group")
 	end)
 
 	it("hands over DATA, never hs.menubar rows", function()

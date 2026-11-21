@@ -31,7 +31,6 @@ local PhaseStats    = require("infra.phase_stats")
 local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
-local MagicKeySourceMenu = require("hotstrings.ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
@@ -53,10 +52,10 @@ M.DEFAULT_STATE = {
 }
 
 -- The phases one build records, so the field run's menu step names the one
--- that costs (number_row and magic_key run inside rows).
+-- that costs (number_row runs inside rows).
 M.PHASES = {
 	"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles", "menu_keyboard_layout.variants",
-	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row", "menu_keyboard_layout.magic_key",
+	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row",
 }
 
 
@@ -950,13 +949,6 @@ function M.build(ctx)
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
-		-- The physical magic key, chosen by pressing it or from the candidates.
-		[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
-			return MagicKeySourceMenu.rows({
-				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
-				update_menu = update_menu, paused = ctx and ctx.paused,
-			})
-		end,
 	})
 
 	-- `submenu`, not `items`: these rows are already materialised. The tray

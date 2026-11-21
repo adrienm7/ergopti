@@ -403,11 +403,6 @@ function M.load_with_stubs(module_name, hs_overrides)
 	if module_name == "hotstrings.engine.expander.expander" then
 		loaded["hotstrings.engine.expander.terminator_replay"] = nil
 	end
-	-- The keymap applies the physical magic key its child owns: a fresh keymap
-	-- must not inherit a key the previous fixture chose.
-	if module_name == "hotstrings.engine.expander" or module_name == "hotstrings.engine.expander.init" then
-		loaded["hotstrings.engine.expander.magic_key_source"] = nil
-	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
 	-- previous test's native contracts as an impossible fresh-parent/stale-child
@@ -1091,7 +1086,6 @@ local MODULE_FAMILIES = {
 		"modules.keymap.layout_sources_cache",
 		"ai.engine.bridge",
 		"ai.engine.api.context",
-		"hotstrings.engine.expander.magic_key_source",
 		"modules.keymap.number_row_live",
 		"modules.keymap.one_shot_shift",
 		"modules.keymap.pending_layout_activation",

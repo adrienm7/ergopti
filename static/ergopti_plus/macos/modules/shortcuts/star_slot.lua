@@ -1,16 +1,19 @@
---- modules/shortcuts/magic_editor.lua
+--- modules/shortcuts/star_slot.lua
 
 --- ==============================================================================
---- MODULE: Conditional Ordinary Editor Shortcut
+--- MODULE: The ★ Key's Ctrl Slot
 --- DESCRIPTION:
---- Projects a measured macOS input source into the shared magic-editor policy.
---- Native proof, physical acquisition and cleanup remain owned across source,
---- assignment, pause and preference changes; displayed glyphs never bind keys.
+--- Projects a measured macOS input source into the shared ★ key slot policy
+--- (_shared/shortcuts/engine/star_slot_core.lua): Ctrl+★ (secondary_star) binds
+--- the key that types ★ at its base level, and only such a key, whatever the
+--- configured magic key. Native proof, physical acquisition and cleanup remain
+--- owned across source, assignment, pause and preference changes; displayed
+--- glyphs never bind keys.
 --- ==============================================================================
 
 local M = {}
 
-local Policy = require("shortcuts.engine.magic_editor_core")
+local Policy = require("shortcuts.engine.star_slot_core")
 local Registrar = require("platform.input.hotkey_registrar")
 local Broker = require("adapters.input_source_broker")
 local Probe = require("adapters.keyboard_source_probe")
@@ -20,12 +23,15 @@ local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec = require("core.fs.adapters.json_codec")
 local Paths = require("core.fs.engine.paths")
 local Manifest = require("menu.engine.manifest_reader")
-local MagicKeySource = require("hotstrings.engine.expander.magic_key_source")
 local Geometry = require("platform.input.keyboard_geometry")
 local Logger = require("core.logger.engine.logger")
 
-local LOG = "shortcuts.engine.magic_editor_core"
-local SUBSCRIBER = "shortcuts.engine.magic_editor_core"
+local LOG = "shortcuts.star_slot"
+local SUBSCRIBER = "shortcuts.star_slot"
+
+-- The slot this driver binds: Ctrl+★ (secondary_star).
+local SLOT = Policy.slot("macos")
+M.SLOT = SLOT
 local _spec = nil
 local _started = false
 local _generation = 0
@@ -104,7 +110,7 @@ local function attempt_matches(attempt)
 		or context.legacy_present ~= attempt.legacy_present
 		or context.assignment_unavailable ~= attempt.assignment_unavailable
 		or Probe.current_source_id ~= ports.source_id then return false end
-	for _, name in ipairs({ "trigger", "magic_source", "replace_active", "paused", "inhibited" }) do
+	for _, name in ipairs({ "paused", "inhibited" }) do
 		if context[name] ~= ports[name] then return false end
 	end
 	return true
@@ -122,16 +128,13 @@ local function current(attempt)
 		return value
 	end
 	local ports = attempt.ports
-	return observe(ports.trigger) == attempt.trigger
-		and observe(ports.magic_source) == attempt.magic_source
-		and observe(ports.replace_active) == attempt.replace_active
-		and observe(ports.source_id) == attempt.source_id
+	return observe(ports.source_id) == attempt.source_id
 		and observe(ports.is_current) == true and owned()
 end
 
 local function project(receipt, attempt)
 	local context = attempt.context
-	local candidates, remapped_candidates, known = {}, {}, {}
+	local candidates, known = {}, {}
 	local by_native = {}
 	local keyboard_type = receipt and receipt.keyboard_type or nil
 	for code, entry in pairs(registry()) do
@@ -144,32 +147,24 @@ local function project(receipt, attempt)
 	for _, level in ipairs(receipt and receipt.levels or {}) do
 		local code = by_native[level.code]
 		if code then
-			local remapped = MagicKeySource.remaps(level.code, {}, function()
-				return attempt.replace_active
-			end, keyboard_type)
-			local candidate = {
+			candidates[#candidates + 1] = {
 				code = code,
 				native_code = level.code,
 				identity = Registrar.physical_identity({ "ctrl" }, level.code),
-				text = remapped and attempt.trigger or level.text,
-				direct = remapped or level.direct,
-				dead = not remapped and level.dead,
+				text = level.text,
+				direct = level.direct,
+				dead = level.dead,
 			}
-			candidates[#candidates + 1] = candidate
-			if remapped then remapped_candidates[#remapped_candidates + 1] = candidate end
 		end
 	end
-	-- An acknowledged explicit replacement owns the effective source. Automatic
-	-- scanning applies only when no selected replacement actually emits it.
-	if #remapped_candidates > 0 then candidates = remapped_candidates end
 	return Policy.resolve({
-		default_action = Manifest.default_for(Policy.PATH),
+		platform = "macos",
+		default_action = Manifest.default_for(SLOT.path),
 		stored_action = attempt.action,
 		is_action = attempt.ports.is_action,
-		trigger = attempt.trigger,
 		source = {
 			generation = attempt.generation,
-			status = receipt and attempt.replace_active ~= nil and "ready" or "unavailable",
+			status = receipt and "ready" or "unavailable",
 			candidates = candidates,
 		},
 		known_codes = known,
@@ -194,8 +189,7 @@ local function deliver()
 	local context, action, configuration = spec.context, spec.action, spec.configuration_generation
 	local ports = {
 		is_current = spec.is_current, execute = spec.execute,
-		paused = context.paused, inhibited = context.inhibited, trigger = context.trigger,
-		magic_source = context.magic_source, replace_active = context.replace_active,
+		paused = context.paused, inhibited = context.inhibited,
 	}
 	local source_id = original_source_id
 	local function owner_current()
@@ -205,7 +199,7 @@ local function deliver()
 			or context.legacy_present or context.assignment_unavailable
 			or spec.is_current ~= ports.is_current or spec.execute ~= ports.execute
 			or Probe.current_source_id ~= source_id then return false end
-		for _, name in ipairs({ "paused", "inhibited", "trigger", "magic_source", "replace_active" }) do
+		for _, name in ipairs({ "paused", "inhibited" }) do
 			if context[name] ~= ports[name] then return false end
 		end
 		return true
@@ -216,13 +210,10 @@ local function deliver()
 		if not owner_current() then return nil end
 		return value
 	end
-	local effective_action = action or Manifest.default_for(Policy.PATH)
+	local effective_action = action or Manifest.default_for(SLOT.path)
 	local function delivery_current()
 		local paused, inhibited = observe(ports.paused), observe(ports.inhibited)
-		if paused ~= false or inhibited ~= false
-			or observe(ports.trigger) ~= decision.trigger
-			or observe(ports.magic_source) ~= decision.magic_source
-			or observe(ports.replace_active) ~= decision.replace_active then return false end
+		if paused ~= false or inhibited ~= false then return false end
 		-- The parent's logger is another callback boundary. Retain this same
 		-- decision and rejoin it immediately before the parent's executor entry.
 		if observe(source_id) ~= decision.source_id or observe(ports.is_current) ~= true
@@ -234,7 +225,7 @@ local function deliver()
 		return true
 	end
 	if not delivery_current() then return false end
-	return ports.execute(decision.action, Policy.BINDING_ID, delivery_current)
+	return ports.execute(decision.action, SLOT.binding_id, delivery_current)
 end
 
 --- Replaces the source proof only after exact prior owners have settled.
@@ -258,7 +249,6 @@ function M.refresh()
 		legacy_present = context.legacy_present, assignment_unavailable = context.assignment_unavailable,
 		ports = {
 			source_id = original_source_id, is_current = spec.is_current, is_action = spec.is_action,
-			trigger = context.trigger, magic_source = context.magic_source, replace_active = context.replace_active,
 			paused = context.paused, inhibited = context.inhibited,
 		},
 		installing = true,
@@ -276,20 +266,15 @@ function M.refresh()
 	table.sort(codes)
 	if not attempt_matches(attempt) or _attempt ~= nil then return false end
 	attempt.source_id = source_id
-	for _, name in ipairs({ "trigger", "magic_source", "replace_active" }) do
-		attempt[name] = attempt.ports[name]()
-		if not attempt_matches(attempt) or _attempt ~= nil then return false end
-	end
 	_attempt = attempt
 	local operation = original_request({ source_id = source_id, codes = codes }, function(receipt, reason)
 		if not current(attempt) then return end
 		local decision = project(receipt, attempt)
 		if not current(attempt) then return end
-		decision.source_id, decision.trigger = attempt.source_id, attempt.trigger
-		decision.magic_source, decision.replace_active = attempt.magic_source, attempt.replace_active
+		decision.source_id = attempt.source_id
 		_decision = decision
 		if not decision.active then
-			Logger.debug(LOG, "Conditional editor shortcut is inactive: %s.", tostring(reason or decision.reason))
+			Logger.debug(LOG, "The ★ key slot is inactive: %s.", tostring(reason or decision.reason))
 			return
 		end
 		_acquisition_depth = _acquisition_depth + 1
@@ -298,7 +283,7 @@ function M.refresh()
 		_acquisition_depth = _acquisition_depth - 1
 		if not called or candidate == nil then
 			_decision = nil
-			Logger.warn(LOG, "Conditional editor shortcut native acquisition was refused.")
+			Logger.warn(LOG, "The ★ key slot native acquisition was refused.")
 			return
 		end
 		_handle = candidate

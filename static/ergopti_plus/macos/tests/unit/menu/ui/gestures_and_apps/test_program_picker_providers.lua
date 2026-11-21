@@ -142,7 +142,17 @@ local function with_provider(kind, options, body)
 		ctx.commit_program_parameter = owner.apply
 		if kind == "keyboard" then
 			rows = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)
-			rows[1].items[1].action()
+			-- The ★ key's Ctrl slot, an ordinary row of the Ctrl group (2026-11-21).
+			local slot_row
+			for index, group in ipairs(require("modules.shortcuts").get_keyboard_slot_groups()) do
+				if group.prefix == "secondary_" then
+					for _, item in ipairs(rows[index].items) do
+						if type(item.label) == "string" and item.label:find("★", 1, true) then slot_row = item end
+					end
+				end
+			end
+			assert(slot_row, "the Ctrl group lists the ★ key's slot")
+			slot_row.action()
 		elseif kind == "tap" then
 			rows = require("ui.menu.menu_tap_keys").provide_rows(ctx)
 			rows[1].action()

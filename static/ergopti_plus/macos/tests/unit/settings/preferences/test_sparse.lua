@@ -35,7 +35,7 @@ helpers.describe("sparse preference transactions", function()
 			helpers.assert_eq(decoded.future.keep, 99)
 			helpers.assert_eq(decoded.gestures and decoded.gestures.tap_2, nil)
 			helpers.assert_eq(decoded.hotstrings and decoded.hotstrings.repeat_key_enabled, nil)
-			helpers.assert_eq(decoded.shortcuts and decoded.shortcuts.keys and decoded.shortcuts.keys.cmd_star, nil)
+			helpers.assert_eq(decoded.shortcuts and decoded.shortcuts.keys and decoded.shortcuts.keys.wrap_text_if_selected, nil)
 		end)
 	end)
 

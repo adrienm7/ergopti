@@ -33,11 +33,11 @@ helpers.describe("neutral configuration contract", function()
 	helpers.it("keeps structured assignments whose neutral sentinel is false", function()
 		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
 		local binding = { mods = { "ctrl" }, key = "space" }
-		local operation = defaults.operation("shortcuts.keys.cmd_star", binding)
+		local operation = defaults.operation("shortcuts.keys.wrap_text_if_selected", binding)
 		helpers.assert_eq(operation.value, binding)
 		binding.key = "return"
 		helpers.assert_eq(operation.value.key, "space")
-		helpers.assert_eq(defaults.operation("shortcuts.keys.cmd_star", false).delete, true)
+		helpers.assert_eq(defaults.operation("shortcuts.keys.wrap_text_if_selected", false).delete, true)
 	end)
 
 	helpers.it("projects a detached neutral document for applying deleted preferences", function()
@@ -45,7 +45,7 @@ helpers.describe("neutral configuration contract", function()
 		local document = reader.document_defaults()
 		helpers.assert_eq(document.gestures.enabled, false)
 		helpers.assert_eq(document.gestures.tap_2, "none")
-		helpers.assert_eq(document.shortcuts.keys.cmd_star, false)
+		helpers.assert_eq(document.shortcuts.keys.wrap_text_if_selected, false)
 		document.gestures.enabled = true
 		helpers.assert_eq(reader.document_defaults().gestures.enabled, false)
 	end)

@@ -82,25 +82,6 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		end
 	end)
 
-	it("preserves contextual editing without a physical Add command", function()
-		local ui, shortcuts, picker = fresh()
-		local ctx = make_ctx()
-		helpers.assert_true(shortcuts.set_keyboard_action("magic_editor", "none"))
-		local fixed = { label = "Independent contextual fixed row", action = function() end }
-		local rows = ui.provide_rows(ctx, nil, { contextual = { fixed } })
-		local contextual
-		for index, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
-			if group.prefix == "contextual" then contextual = rows[index].items end
-		end
-		helpers.assert_eq(#contextual, 3, "fixed row, boundary and the genuine contextual editor, without Add")
-		helpers.assert_true(rawequal(contextual[1], fixed))
-		helpers.assert_eq(contextual[2].separator, true)
-		helpers.assert_true(contextual[3].label:find("Label:none", 1, true) ~= nil)
-		contextual[3].action()
-		helpers.assert_eq(#picker.opened, 1, "contextual editing still opens the genuine action picker")
-		helpers.assert_eq(picker.opened[1].opts.current, "none")
-	end)
-
 	it("names each group's modifiers in its heading and Add row in all twenty-one catalogues", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()

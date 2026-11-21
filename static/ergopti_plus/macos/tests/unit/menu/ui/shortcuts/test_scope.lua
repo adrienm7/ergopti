@@ -28,10 +28,10 @@ helpers.describe("terminal macOS shortcut scopes", function()
 			local committed, detail = f.owner.apply("clear")
 			helpers.assert_eq(committed, true, detail)
 			local actions, claims = f.keyboard.get_configuration_intent()
-			helpers.assert_eq(actions, { magic_editor = "none" })
-			helpers.assert_eq(claims, { magic_editor = true })
+			helpers.assert_eq(actions, { secondary_star = "none" })
+			helpers.assert_eq(claims, { secondary_star = true })
 			helpers.assert_eq(f.keyboard.get_action("secondary_space"), "none")
-			helpers.assert_eq(f.keyboard.get_action("magic_editor"), "none")
+			helpers.assert_eq(f.keyboard.get_action("secondary_star"), "none")
 		end)
 	end)
 
@@ -100,7 +100,7 @@ helpers.describe("terminal macOS shortcut scopes", function()
 					helpers.assert_eq(after_actions, actions)
 					helpers.assert_eq(after_claims, claims)
 					helpers.assert_eq(f.taps.get_action("number_row_left"), "none")
-					helpers.assert_eq(f.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+					helpers.assert_eq(f.keyboard.get_action("secondary_star"), "open_hotstrings_editor")
 					helpers.assert_eq(f.prefs.source_snapshot("config").content, source)
 					helpers.assert_eq(f.checkpoint.capture(), checkpoint)
 					helpers.assert_eq(f.owner.pending(), false)
@@ -364,9 +364,9 @@ end)
 helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
 	for _, literal in ipairs({ '"legacy"', '["legacy"]', "[]" }) do
 		helpers.it("clears neutral tap intent while retaining exact obsolete source " .. literal, function()
-			local source = '[shortcuts]\nenabled = true\nkeyboard = { magic_editor = "none", future = "keep" } # keyboard retained\n'
+			local source = '[shortcuts]\nenabled = true\nkeyboard = { secondary_star = "none", future = "keep" } # keyboard retained\n'
 				.. 'tap_keys = ' .. literal .. ' # taps retained\n[future]\nkeep = 7\n'
-			local expected = '[shortcuts]\nkeyboard = { magic_editor = "none", future = "keep" } # keyboard retained\n'
+			local expected = '[shortcuts]\nkeyboard = { secondary_star = "none", future = "keep" } # keyboard retained\n'
 				.. 'tap_keys = ' .. literal .. ' # taps retained\n[future]\nkeep = 7\n\n[shortcuts.script_control]\n'
 				.. 'script_altgr_backspace = "none"\nscript_altgr_delete = "none"\nscript_altgr_enter = "none"\nscript_altgr_escape = "none"\n'
 			Fixture.run(function(f)
@@ -416,7 +416,7 @@ helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
 	end
 
 	helpers.it("compensates a refused neutral clear publication without erasing the obsolete parent", function()
-		local source = '[shortcuts]\nenabled = true\nkeyboard = { magic_editor = "none", future = "keep" }\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
+		local source = '[shortcuts]\nenabled = true\nkeyboard = { secondary_star = "none", future = "keep" }\ntap_keys = ["legacy"]\n[future]\nkeep = 7\n'
 		Fixture.run(function(f)
 			local checkpoint = f.checkpoint.capture()
 			f.controls.refuse_write = true

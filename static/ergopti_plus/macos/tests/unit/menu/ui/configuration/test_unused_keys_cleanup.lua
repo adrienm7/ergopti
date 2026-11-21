@@ -201,14 +201,14 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: a removed [shortcuts.keys] hotkey is offered alone (config-outdated-at-hash)", function()
-			local source = "[shortcuts.keys]\ncmd_star = true\nat_hash = true\n"
+			local source = "[shortcuts.keys]\nwrap_text_if_selected = true\nat_hash = true\n"
 			Sandbox.with_config(source, function(path)
 				local before = driver_state(path)
 				local keys = Cleanup.find(path, IoAdapter).keys
 				helpers.assert_eq(#keys, 1)
 				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].kind },
 					{ "shortcuts.keys", "at_hash", "leaf" })
-				helpers.assert_eq(before.flat.shortcut_keys, { cmd_star = true })
+				helpers.assert_eq(before.flat.shortcut_keys, { wrap_text_if_selected = true })
 				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
 					file_adapter = IoAdapter })
 				helpers.assert_eq(result.status, "removed")
@@ -217,14 +217,29 @@ helpers.with_stub_scope(MODULES, function()
 			end)
 		end)
 
+		helpers.it("unused keys: the retired modifiers + ★ save switch is offered (magic-key-2026-11-21)", function()
+			-- Cmd+★ → Cmd+S left on 2026-11-21: a saved switch is no setting any more.
+			local source = "[shortcuts.keys]\ncmd_star = true\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "cmd_star" })
+		end)
+
+		helpers.it("unused keys: the retired physical magic key is offered (magic-key-2026-11-21)", function()
+			local source = "[hotstrings]\nmagic_key_source = \"KeyJ\"\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "magic_key_source" })
+		end)
+
 		helpers.it("unused keys: an empty [shortcuts.keys] key never discards the file (config-outdated-empty-key)", function()
 			-- Reporting "" raised inside the loader's pcall: the whole config.toml
 			-- was declared corrupt and the session ran on defaults.
-			local source = "[shortcuts.keys]\n\"\" = true\ncmd_star = true\n"
+			local source = "[shortcuts.keys]\n\"\" = true\nwrap_text_if_selected = true\n"
 			Sandbox.with_config(source, function(path)
 				local flat, status = Preferences.load(path)
 				helpers.assert_eq(status, "ok")
-				helpers.assert_eq(flat.shortcut_keys, { cmd_star = true })
+				helpers.assert_eq(flat.shortcut_keys, { wrap_text_if_selected = true })
 				local scan = Cleanup.find(path, IoAdapter)
 				helpers.assert_eq(scan.status, "ok", "the preview must not fail on the entry it reports")
 				helpers.assert_eq(#scan.keys, 0, "a quoted key has no line the cleanup can cut")
@@ -357,7 +372,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: an outdated inline-table member is offered and cut alone (config-outdated-inline)", function()
 			-- The inline table was one record kept by its live member, so the
 			-- warned at_hash was never offered: warned and offered differed.
-			local source = "[shortcuts]\nkeys = { at_hash = true, cmd_star = true }\n"
+			local source = "[shortcuts]\nkeys = { at_hash = true, wrap_text_if_selected = true }\n"
 			Sandbox.with_config(source, function(path)
 				local before = driver_state(path)
 				local keys = Cleanup.find(path, IoAdapter).keys
@@ -367,7 +382,7 @@ helpers.with_stub_scope(MODULES, function()
 					file_adapter = IoAdapter })
 				helpers.assert_eq(result.status, "removed")
 				helpers.assert_eq(result.removed, 1)
-				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { cmd_star = true }\n")
+				helpers.assert_eq(Sandbox.read_bytes(path), "[shortcuts]\nkeys = { wrap_text_if_selected = true }\n")
 				helpers.assert_eq(driver_state(path), before, "the live member keeps its value")
 				helpers.assert_eq(#Cleanup.find(path, IoAdapter).keys, 0)
 			end)
@@ -527,12 +542,12 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: an outdated value is offered even when the wizard reads the key (config-outdated-contract)", function()
-			-- The setup wizard marks shortcuts.keys.cmd_star; the owner's report
+			-- The setup wizard marks shortcuts.keys.wrap_text_if_selected; the owner's report
 			-- must still win, or the warned entry could never be removed.
-			local source = "[shortcuts.keys]\ncmd_star = \"yes\"\n"
+			local source = "[shortcuts.keys]\nwrap_text_if_selected = \"yes\"\n"
 			local scan = Engine.find_in_source(source, Cleanup.collect)
 			helpers.assert_eq(#scan.keys, 1)
-			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "cmd_star" })
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "shortcuts.keys", "wrap_text_if_selected" })
 		end)
 
 		helpers.it("unused keys: a non-scalar [script] value is ignored by the loader and offered", function()

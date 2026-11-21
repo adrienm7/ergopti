@@ -1,11 +1,12 @@
---- tests/unit/modules/shortcuts/magic_editor/test_magic_editor_keyboard_transaction.lua
+--- tests/unit/modules/shortcuts/star_slot/test_star_slot_keyboard_transaction.lua
 
 --- ==============================================================================
---- MODULE: Contextual Keyboard Slot Transaction
+--- MODULE: The ★ Key Slot's Keyboard Transaction
 --- DESCRIPTION:
---- Verifies that the ordinary keyboard preference owner admits the contextual
+--- Verifies that the ordinary keyboard preference owner admits the ★ key slot's
 --- source owner before exact publication, restores its old intent on refusal,
---- and fences a candidate callback until the canonical assignment commits.
+--- fences a candidate callback until the canonical assignment commits, and
+--- lists Ctrl+★ as an ordinary row of the Ctrl group.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -14,7 +15,7 @@ local Json = require("core.text.engine.json")
 local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
 	"settings.engine.preferences.preferences", "settings.engine.paths", "menu.engine.manifest_reader", "core.text.engine.toml_codec.writer",
-	"gestures.engine.actions", "modules.shortcuts.magic_editor",
+	"gestures.engine.actions", "modules.shortcuts.star_slot",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
@@ -44,7 +45,7 @@ local function with_subject(assignments, scenario)
 			layout_key_refusal = function() return nil end,
 			replace_physical_claims = function(_, rows) observed.claims = rows; return true end,
 		}
-		package.loaded["modules.shortcuts.magic_editor"] = {
+		package.loaded["modules.shortcuts.star_slot"] = {
 			start = function(spec)
 				observed.specs[#observed.specs + 1] = spec
 				observed.latest = spec
@@ -55,20 +56,17 @@ local function with_subject(assignments, scenario)
 		}
 		require("tests.support.keyboard_config_fixture").install(assignments, function()
 			observed.writes = observed.writes + 1
-			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__magic_editor")
+			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__secondary_star")
 			if controls.publication_refuses then error("owned publication refused") end
 		end)
 		require("core.text.engine.toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("menu.engine.manifest_reader"))
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		local subject = require("modules.shortcuts.keyboard_shortcuts")
 		local context = {
-			trigger = function() return "★" end,
-			magic_source = function() return "automatic" end,
-			replace_active = function() return false end,
 			paused = function() return false end,
 			inhibited = function() return false end,
 		}
-		helpers.assert_eq(subject.configure_magic_editor(context), true)
+		helpers.assert_eq(subject.configure_star_slot(context), true)
 		helpers.assert_eq(subject.start(), true)
 		scenario(subject, observed, controls)
 		controls.stop_refuses = false
@@ -76,12 +74,18 @@ local function with_subject(assignments, scenario)
 	end)
 end
 
-helpers.describe("contextual keyboard slot: ordinary persistence owner", function()
+helpers.describe("★ key slot: ordinary persistence owner", function()
 	helpers.it("owns one editable logical slot and preserves physical explicit none", function()
 		with_subject({ secondary_c = "none" }, function(subject, observed)
-			helpers.assert_eq(subject.get_action("magic_editor"), "open_hotstrings_editor")
-			helpers.assert_eq(subject.available_slots("contextual")[1].id, "magic_editor")
-			helpers.assert_eq(subject.assigned_slots("contextual")[1].action, "open_hotstrings_editor")
+			helpers.assert_eq(subject.get_action("secondary_star"), "open_hotstrings_editor")
+			local listed = subject.available_slots("secondary_")
+			helpers.assert_eq(listed[#listed].id, "secondary_star", "Ctrl+★ is a row of the Ctrl group")
+			local assigned = subject.assigned_slots("secondary_")
+			helpers.assert_eq(assigned[#assigned].id, "secondary_star")
+			helpers.assert_eq(assigned[#assigned].action, "open_hotstrings_editor", "the editor is its default")
+			for _, slot in ipairs(subject.available_slots("secondary_shift_")) do
+				helpers.assert_true(slot.id ~= "secondary_star", "the ★ slot belongs to Ctrl alone")
+			end
 			helpers.assert_eq(observed.latest.action, nil, "canonical absence remains the shared conditional default")
 			helpers.assert_eq(observed.binds, 0, "the logical slot never binds a displayed glyph")
 			helpers.assert_eq(observed.claims, {
@@ -93,16 +97,16 @@ helpers.describe("contextual keyboard slot: ordinary persistence owner", functio
 	helpers.it("fences explicit logical actions until exact publication", function()
 		local assignments = {}
 		with_subject(assignments, function(subject, observed)
-			helpers.assert_eq(subject.set_action("magic_editor", "script_pause_toggle"), true)
+			helpers.assert_eq(subject.set_action("secondary_star", "script_pause_toggle"), true)
 			helpers.assert_eq(observed.callback_during_write, false)
 			helpers.assert_eq(#observed.actions, 0)
-			helpers.assert_eq(assignments.magic_editor, "script_pause_toggle")
-			helpers.assert_eq(observed.latest.execute("script_pause_toggle", "keyboard__magic_editor"), true)
+			helpers.assert_eq(assignments.secondary_star, "script_pause_toggle")
+			helpers.assert_eq(observed.latest.execute("script_pause_toggle", "keyboard__secondary_star"), true)
 			helpers.assert_eq(observed.actions, { "script_pause_toggle" })
-			helpers.assert_eq(subject.set_action("magic_editor", "none"), true)
-			helpers.assert_eq(assignments.magic_editor, "none")
-			helpers.assert_eq(subject.set_action("magic_editor", "open_hotstrings_editor"), true)
-			helpers.assert_eq(assignments.magic_editor, "open_hotstrings_editor")
+			helpers.assert_eq(subject.set_action("secondary_star", "none"), true)
+			helpers.assert_eq(assignments.secondary_star, "none")
+			helpers.assert_eq(subject.set_action("secondary_star", "open_hotstrings_editor"), true)
+			helpers.assert_eq(assignments.secondary_star, "open_hotstrings_editor")
 			helpers.assert_eq(observed.latest.action, "open_hotstrings_editor")
 		end)
 	end)
@@ -124,12 +128,12 @@ helpers.describe("contextual keyboard slot: ordinary persistence owner", functio
 	end)
 
 	helpers.it("restores the prior conditional intent and bytes after publication refusal", function()
-		local assignments = { magic_editor = "none" }
+		local assignments = { secondary_star = "none" }
 		with_subject(assignments, function(subject, observed, controls)
 			controls.publication_refuses = true
-			helpers.assert_eq(subject.set_action("magic_editor", "script_pause_toggle"), false)
-			helpers.assert_eq(assignments.magic_editor, "none")
-			helpers.assert_eq(subject.get_action("magic_editor"), "none")
+			helpers.assert_eq(subject.set_action("secondary_star", "script_pause_toggle"), false)
+			helpers.assert_eq(assignments.secondary_star, "none")
+			helpers.assert_eq(subject.get_action("secondary_star"), "none")
 			helpers.assert_eq(observed.latest.action, "none")
 			helpers.assert_eq(observed.callback_during_write, false)
 			helpers.assert_eq(#observed.actions, 0)
@@ -139,18 +143,18 @@ helpers.describe("contextual keyboard slot: ordinary persistence owner", functio
 	helpers.it("does not publish before conditional admission or stage across cleanup debt", function()
 		with_subject({}, function(subject, observed, controls)
 			controls.admission_refuses = true
-			helpers.assert_eq(subject.set_action("magic_editor", "none"), false)
+			helpers.assert_eq(subject.set_action("secondary_star", "none"), false)
 			helpers.assert_eq(observed.writes, 0)
-			helpers.assert_eq(subject.get_action("magic_editor"), "open_hotstrings_editor")
+			helpers.assert_eq(subject.get_action("secondary_star"), "open_hotstrings_editor")
 			controls.stop_refuses = true
 			helpers.assert_eq(subject.stop(), false)
-			helpers.assert_eq(subject.apply_configuration({ shortcuts = { keyboard = { magic_editor = "none" } } }), false)
+			helpers.assert_eq(subject.apply_configuration({ shortcuts = { keyboard = { secondary_star = "none" } } }), false)
 		end)
 	end)
 end)
 
 
-helpers.describe("contextual keyboard slot: logger-bound source rejoin", function()
+helpers.describe("★ key slot: logger-bound source rejoin", function()
 	helpers.it("refuses a source revoked inside the actual parent logger callback", function()
 		with_subject({}, function(_, observed)
 			local logger = package.loaded["core.logger.engine.logger"]
@@ -160,7 +164,7 @@ helpers.describe("contextual keyboard slot: logger-bound source rejoin", functio
 				source_current = false
 				return original_callback(log, name, callback, ...)
 			end
-			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__secondary_star", function()
 				rechecks = rechecks + 1
 				return source_current
 			end)
@@ -175,7 +179,7 @@ helpers.describe("contextual keyboard slot: logger-bound source rejoin", functio
 	helpers.it("delivers an unchanged live source exactly once after logging", function()
 		with_subject({}, function(_, observed)
 			local rechecks = 0
-			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__secondary_star", function()
 				rechecks = rechecks + 1
 				return true
 			end)
@@ -188,7 +192,7 @@ helpers.describe("contextual keyboard slot: logger-bound source rejoin", functio
 	helpers.it("rejoins parent lifecycle after the source recheck callback", function()
 		with_subject({}, function(subject, observed)
 			local rechecks = 0
-			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__secondary_star", function()
 				rechecks = rechecks + 1
 				subject.stop()
 				return true

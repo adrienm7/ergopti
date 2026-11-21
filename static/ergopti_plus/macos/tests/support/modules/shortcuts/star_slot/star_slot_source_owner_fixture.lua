@@ -1,9 +1,9 @@
---- tests/support/modules/shortcuts/magic_editor/magic_editor_source_owner_fixture.lua
+--- tests/support/modules/shortcuts/star_slot/star_slot_source_owner_fixture.lua
 
 --- ==============================================================================
---- MODULE: Shared fixture for test_magic_editor_source_owner
+--- MODULE: Shared fixture for test_star_slot_source_owner
 --- DESCRIPTION:
---- Prelude shared by the test_magic_editor_source_owner_* test files: their modules, default
+--- Prelude shared by the test_star_slot_source_owner_* test files: their modules, default
 --- state and scenario fixture. Each test file loads it fresh, so no state
 --- leaks from one file to the next.
 --- ==============================================================================
@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "menu.engine.manifest_reader",
 	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
-	"platform.input.hotkey_registrar", "hotstrings.engine.expander.magic_key_source", "modules.shortcuts.magic_editor",
-	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
+	"platform.input.hotkey_registrar", "modules.shortcuts.star_slot",
+	"platform.input.keyboard_geometry", "shortcuts.engine.star_slot_core",
 }
 
 local function with_fixture(callback)
@@ -32,15 +32,8 @@ local function with_fixture(callback)
 			return '{"keys":{"KeyA":{"kind":"key","hs":0},"KeyC":{"kind":"key","hs":8},"KeyB":{"kind":"key","hs":11},"KeyJ":{"kind":"key","hs":38},"Backquote":{"kind":"key","hs":50,"macos_iso":{"hs":10}},"IntlBackslash":{"kind":"key","hs":10,"macos_iso":{"hs":50}}}}'
 		end }
 		local state = {
-			source_id = "source.first", trigger = "★", magic_source = "automatic",
-			replace_active = false, paused = false, inhibited = false, current = true,
-			requests = {}, actions = {}, cancel_refuses = false, projections = {}, remap_types = {},
-		}
-		package.loaded["hotstrings.engine.expander.magic_key_source"] = {
-			remaps = function(code, _, active, keyboard_type)
-				state.remap_types[#state.remap_types + 1] = { code = code, keyboard_type = keyboard_type }
-				return (state.remap_code == code or (state.remap_codes or {})[code] == true) and active() == true
-			end,
+			source_id = "source.first", paused = false, inhibited = false, current = true,
+			requests = {}, actions = {}, cancel_refuses = false, projections = {},
 		}
 		package.loaded["adapters.input_source_broker"] = {
 			subscribe = function(_, observer) state.source_changed = observer; return true end,
@@ -63,13 +56,13 @@ local function with_fixture(callback)
 				return retained.operation
 			end,
 		}
-		local policy = require("shortcuts.engine.magic_editor_core")
-		package.loaded["shortcuts.engine.magic_editor_core"] = setmetatable({ resolve = function(options)
+		local policy = require("shortcuts.engine.star_slot_core")
+		package.loaded["shortcuts.engine.star_slot_core"] = setmetatable({ resolve = function(options)
 			state.projections[#state.projections + 1] = options
 			return policy.resolve(options)
 		end }, { __index = policy })
 		local registrar = require("platform.input.hotkey_registrar")
-		local subject = require("modules.shortcuts.magic_editor")
+		local subject = require("modules.shortcuts.star_slot")
 		local spec = {
 			configuration_generation = 1,
 			is_action = function(action)
@@ -81,9 +74,6 @@ local function with_fixture(callback)
 				return true
 			end,
 			context = {
-				trigger = function() return state.trigger end,
-				magic_source = function() return state.magic_source end,
-				replace_active = function() return state.replace_active end,
 				paused = function() return state.paused end,
 				inhibited = function() return state.inhibited end,
 			},
@@ -95,7 +85,7 @@ local function with_fixture(callback)
 			local selected = {}
 			for _, level in ipairs(levels or {
 				{ code = 0, text = "a", direct = true, dead = false },
-				{ code = 8, text = state.trigger, direct = true, dead = false },
+				{ code = 8, text = "★", direct = true, dead = false },
 				{ code = 11, text = "b", direct = true, dead = false },
 			}) do selected[level.code] = level end
 			local ordered = {}

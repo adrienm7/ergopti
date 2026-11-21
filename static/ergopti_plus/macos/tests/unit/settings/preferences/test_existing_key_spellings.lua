@@ -132,7 +132,7 @@ helpers.describe("the Hotstrings switch saves over existing key spellings (toml-
 			{ "older build whole-file encoder", old_build_file() },
 			{ "older build after the boot migration", migrated_old_build_file() },
 			{ "shipped macOS example config", shared_file("settings/data/config_schema/examples/hs_config.example.toml") },
-			{ "quoted bare-compatible keys", '# kept comment\n[hotstrings]\n"enabled" = false\n"magic_key_source" = "auto"\n'
+			{ "quoted bare-compatible keys", '# kept comment\n[hotstrings]\n"enabled" = false\n"trigger_char" = "★"\n'
 				.. '[hotstrings.groups]\n"autocorrection" = false\n[future]\nkeep = 99\n' },
 			{ "hand-written [[hotstrings.terminators]] list", '# kept comment\n[hotstrings]\nexpansion_delay = 0.5\n\n'
 				.. '[[hotstrings.terminators]]\nkey = "custom_x"\nchar = "¤"\nlabel = "¤"\nconsume = true\n\n[future]\nkeep = 99\n' },

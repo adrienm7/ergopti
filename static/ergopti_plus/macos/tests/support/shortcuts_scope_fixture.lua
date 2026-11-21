@@ -122,7 +122,7 @@ local function run_fixture(body, source)
 	facades.system.has_screenshot_pause_claim = function(parent) return claims[parent] == true end
 	facades.system.has_pending_screenshot_action = function() return false end
 	for _, edge in ipairs({ "pause", "stop", "resume" }) do facades.system[edge .. "_awake"] = function() return true end end
-	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
+	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_tap_keys" }) do
 		facades.system[name] = function() return handle("binding") end
 	end
 	for name, facade in pairs(facades) do
@@ -155,7 +155,7 @@ local function run_fixture(body, source)
 	local state = { shortcuts = true, script_control_enabled = true,
 		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
 			script_altgr_delete = "open_personal_shortcuts", script_altgr_escape = "none" },
-		shortcut_keys = { cmd_star = true }, chatgpt_url = "https://example.test" }
+		shortcut_keys = { wrap_text_if_selected = true }, chatgpt_url = "https://example.test" }
 	for key, value in pairs(saved.gesture_action_parameters or {}) do
 		local binding, action = gestures.split_action_parameter_key(key)
 		if binding and action and type(value) == "string" then
@@ -163,7 +163,7 @@ local function run_fixture(body, source)
 		end
 	end
 	taps.load(gestures.is_assignable)
-	bindings.pause_hotkeys_only(); bindings.enable("cmd_star")
+	bindings.pause_hotkeys_only(); bindings.enable("wrap_text_if_selected")
 	bindings.set_chatgpt_url(state.chatgpt_url)
 	helpers.assert_eq(shortcuts.start(), true)
 	helpers.assert_eq(bindings.is_started(), true, "fixture static registry started")

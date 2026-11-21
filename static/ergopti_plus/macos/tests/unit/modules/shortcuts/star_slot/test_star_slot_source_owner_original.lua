@@ -1,7 +1,7 @@
---- tests/unit/modules/shortcuts/magic_editor/test_magic_editor_source_owner_original.lua
+--- tests/unit/modules/shortcuts/star_slot/test_star_slot_source_owner_original.lua
 
 --- ==============================================================================
---- MODULE: Conditional Editor Shortcut Source Ownership
+--- MODULE: The ★ Key Slot's Original Source Issuer
 --- DESCRIPTION:
 --- Exercises the real shared decision and native registrar around controlled
 --- source receipts. Only a unique direct numeric source may acquire a chord;
@@ -9,15 +9,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture")
+package.loaded["tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture"] = nil
+local Fixture = require("tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture")
 local with_fixture = Fixture.with_fixture
 
 
 
 
 
-helpers.describe("conditional editor shortcut: original signed-source issuer", function()
+helpers.describe("★ key slot: original signed-source issuer", function()
 	for _, field in ipairs({ "current_source_id", "request" }) do
 		helpers.it("refuses a replaced original " .. field .. " before constructor allocation", function()
 			with_fixture(function(subject, registrar, _, state, spec)
@@ -66,30 +66,6 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 			helpers.assert_eq(started, false)
 			helpers.assert_eq(foreign_calls, 0)
 			helpers.assert_eq(requests, 0, "the replaced request must not allocate after the original source read")
-			helpers.assert_eq(registrar.live_count(), 0)
-		end)
-	end)
-
-	helpers.it("rejoins the original request issuer after the final constructor context read", function()
-		with_fixture(function(subject, registrar, _, state, spec)
-			local probe = package.loaded["adapters.keyboard_source_probe"]
-			local request, reads, foreign_calls = probe.request, 0, 0
-			spec.context.replace_active = function()
-				reads = reads + 1
-				probe.request = function(...)
-					foreign_calls = foreign_calls + 1
-					return request(...)
-				end
-				return state.replace_active
-			end
-			local started = subject.start(spec)
-			local requests = #state.requests
-			probe.request = request
-			helpers.assert_eq(subject.stop(), true)
-			helpers.assert_eq(reads, 1, "the original late context read actually executes")
-			helpers.assert_eq(started, false)
-			helpers.assert_eq(foreign_calls, 0)
-			helpers.assert_eq(requests, 0)
 			helpers.assert_eq(registrar.live_count(), 0)
 		end)
 	end)
@@ -358,7 +334,7 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 end)
 
 
-helpers.describe("conditional editor shortcut: receipt-bound keyboard geometry", function()
+helpers.describe("★ key slot: receipt-bound keyboard geometry", function()
 	for _, row in ipairs({
 		{ name = "ISO Backquote", model = 7002, native = 10, physical = "Backquote" },
 		{ name = "ISO neighbor", model = 7002, native = 50, physical = "IntlBackslash" },
@@ -376,9 +352,6 @@ helpers.describe("conditional editor shortcut: receipt-bound keyboard geometry",
 				end
 				helpers.assert_not_nil(selected)
 				helpers.assert_eq(selected.code, row.physical, "the numeric chord alone must not hide a swapped canonical slot")
-				for _, call in ipairs(state.remap_types) do
-					helpers.assert_eq(call.keyboard_type, row.model, "replacement ownership must use this exact translation receipt")
-				end
 				native.hotkey._bound[1].pressed_fn()
 				helpers.assert_eq(#state.actions, 1)
 				helpers.assert_eq(subject.stop(), true)
@@ -399,17 +372,14 @@ helpers.describe("conditional editor shortcut: receipt-bound keyboard geometry",
 	end)
 end)
 
-helpers.describe("conditional editor shortcut: parent executor source rejoin", function()
-	for _, field in ipairs({ "source_id", "trigger", "magic_source", "replace_active", "paused", "inhibited", "current" }) do
+helpers.describe("★ key slot: parent executor source rejoin", function()
+	for _, field in ipairs({ "source_id", "paused", "inhibited", "current" }) do
 		helpers.it("fences " .. field .. " changes before parent executor entry", function()
 			with_fixture(function(subject, registrar, native, state, spec, respond)
 				local entered, rejoined, accepted = 0, 0, nil
 				spec.execute = function(_, _, delivery_current)
 					entered = entered + 1
 					if field == "source_id" then state.source_id = "source.second"
-					elseif field == "trigger" then state.trigger = ";"
-					elseif field == "magic_source" then state.magic_source = "KeyJ"
-					elseif field == "replace_active" then state.replace_active = true
 					elseif field == "current" then state.current = false
 					else state[field] = true end
 					if type(delivery_current) ~= "function" then

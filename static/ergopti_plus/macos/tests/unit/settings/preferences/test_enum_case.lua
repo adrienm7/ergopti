@@ -27,8 +27,6 @@ helpers.describe("preferences: enum case variants", function()
 				'agent_mode = "Auto"',
 				"[llm.trigger]",
 				'while_hotstring_tooltip = "BOTH"',
-				"[hotstrings]",
-				'magic_key_source = "semicolon"',
 				"[layout]",
 				'virtual_keyboard = "ISO"',
 				"[ui]",
@@ -41,7 +39,6 @@ helpers.describe("preferences: enum case variants", function()
 			helpers.assert_eq(warnings, {}, "a case variant is not outdated configuration")
 			helpers.assert_eq(flat.llm_agent_mode, "auto")
 			helpers.assert_eq(flat.llm_while_hotstring_tooltip, "both")
-			helpers.assert_eq(flat.magic_key_source, "Semicolon")
 			helpers.assert_eq(flat.layout_virtual_keyboard, "iso")
 			helpers.assert_eq(flat.menubar_icon, "v2")
 			helpers.assert_eq(flat.gesture_modes and flat.gesture_modes.swipe_3_left, "x1")

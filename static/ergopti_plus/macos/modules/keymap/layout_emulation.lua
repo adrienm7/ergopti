@@ -12,10 +12,9 @@
 --- the same text for the same physical keys.
 ---
 --- FEATURES & RATIONALE:
---- 1. The event itself carries the emulated text (setUnicodeString), the way
----    the physical magic key already does: the buffer, the metrics, the
----    hotstrings and the application all read the same characters, and no
----    synthetic event is posted on the typing path.
+--- 1. The event itself carries the emulated text (setUnicodeString): the
+---    buffer, the metrics, the hotstrings and the application all read the
+---    same characters, and no synthetic event is posted on the typing path.
 --- 2. A dead key's press is consumed and types nothing until the next key
 ---    composes; a key the emulation leaves to the system layout completes it
 ---    with the system layout's character.
@@ -73,7 +72,7 @@ for id, flag in pairs(FLAG_OF) do
 end
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "keyboard_type",
-	"physical_code", "keycode_for_char", "magic_code", "is_active", "autorepeat", "now_ms", "post",
+	"physical_code", "keycode_for_char", "is_active", "autorepeat", "now_ms", "post",
 	"option_sides" }
 
 -- Right Option (kVK_RightOption) and the key the source emulation names it.
@@ -92,7 +91,7 @@ local ALTGR = "AltRight"
 
 --- Takes the collaborators. Called once, before the keymap tap starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
----   keyboard_type(event), physical_code(entry, keyboard_type), keycode_for_char(char), magic_code,
+---   keyboard_type(event), physical_code(entry, keyboard_type), keycode_for_char(char),
 ---   is_active, autorepeat(event), now_ms, post(outputs) posting { type = "text", text } and
 ---   { type = "key", key_code, flags } after the callback, in order, option_sides(event) ->
 ---   { left = boolean, right = boolean } the Option keys an event's device flags hold }
@@ -429,7 +428,6 @@ function M.key_down(e, key_code)
 	end
 	-- After the source emulation: this very press may have started a held modifier.
 	local flags = merged_flags(e:getFlags())
-	session.config.magic_code = _deps.magic_code()
 	local native = nil
 	if Emulation.pending(session) then native = e:getCharacters(false) end
 	local decision, text = Emulation.decide(session, code, flags.shift == true, flags.capslock == true,
@@ -527,7 +525,7 @@ function M.us_keycode(char, keycodes)
 end
 
 --- Initializes the module with the driver's collaborators and loads the layout.
---- @param ports table { is_paused, magic_code }
+--- @param ports table { is_paused }
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	local Registry = require("modules.keymap.layout_registry")
@@ -559,7 +557,6 @@ function M.start(ports)
 		keycode_for_char = function(char)
 			return hs.keycodes.map[char] or M.us_keycode(char, shared_json("layouts/data/mac_keycodes.json", false))
 		end,
-		magic_code = ports.magic_code,
 		is_active = function() return not ports.is_paused() end,
 		autorepeat = function(e)
 			local value = e:getProperty(hs.eventtap.event.properties.keyboardEventAutorepeat)

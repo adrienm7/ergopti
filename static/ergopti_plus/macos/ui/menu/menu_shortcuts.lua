@@ -31,7 +31,6 @@ local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ActionPicker  = require("ui.action_picker")
 local TapKeysMenu   = require("ui.menu.menu_tap_keys")
-local ManifestReader = require("menu.engine.manifest_reader")
 local TextUtils = require("core.text.engine.utils_core")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("core.lifecycle.engine.compat.utf8")
@@ -97,7 +96,6 @@ local function pretty_key(id, state)
 	if #parts == 0 then return id end
 
 	local key = parts[#parts]
-	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR) end
 	if key == "period"   then key = "." end
 	if key == "quote"    then key = "'" end
 	if key == "capslock" then key = "CapsLock" end
@@ -574,7 +572,6 @@ function M.build(ctx)
 	-- (Tap-Holds › Edit the layer) and never listed here.
 	local wrap_item = nil
 	local ctrl_items = {}
-	local cmd_items  = {}
 
 	if type(shortcuts.list_shortcuts) == "function" then
 		local ok, list = pcall(shortcuts.list_shortcuts)
@@ -584,8 +581,6 @@ function M.build(ctx)
 					local mi = make_shortcut_item(s, shortcuts, ctx)
 					if s.id == require("settings.engine.keys").LEAF.WRAP_TEXT_IF_SELECTED then
 						wrap_item = mi
-					elseif s.id:sub(1, 4) == "cmd_" then
-						table.insert(cmd_items, mi)
 					end
 				end
 			end
@@ -900,14 +895,13 @@ function M.build(ctx)
 			return rows
 		end,
 		keyboard_slots = function(_ctx)
-			-- The built-in Ctrl and Cmd shortcuts open the group of their own
-			-- modifier: as groups of their own they drew a second "Ctrl" and
-			-- "Cmd" submenu beside the configurable one.
+			-- The ChatGPT URL editor opens the Ctrl group: as a group of its own it
+			-- drew a second "Ctrl" submenu beside the configurable one. No named
+			-- Cmd shortcut remains since Cmd+★ → Cmd+S left (2026-11-21).
 			-- Editable while paused: the slots are unbound during a pause and an
 			-- edit is bound when resume starts them again (EDD-1).
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or nil, {
 				secondary_ = ctrl_items,
-				primary_   = cmd_items,
 			})
 		end,
 		-- The number-row tap keys, named by what each types under the current

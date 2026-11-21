@@ -247,8 +247,6 @@ local function fake_keymap(controls)
 	function km.set_shortcut_resets_word(value) km.shortcut_resets = value; return true end
 	function km.is_tap_hold_resets_word_enabled() return km.tap_hold_resets end
 	function km.set_tap_hold_resets_word(value) km.tap_hold_resets = value; return true end
-	function km.get_magic_key_source() return km.magic_key_source end
-	function km.set_magic_key_source(value) km.magic_key_source = value; return true end
 	function km.get_trigger_char() return km.trigger end
 	function km.set_trigger_char(value)
 		if controls.refuse_trigger then

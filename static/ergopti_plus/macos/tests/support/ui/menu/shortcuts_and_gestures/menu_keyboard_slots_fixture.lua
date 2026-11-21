@@ -53,26 +53,22 @@ local function make_ctx()
 	return ctx, updates
 end
 
---- Separates physical Add flows from the fixed contextual editor row.
+--- The modifier groups, each with its physical Add flow.
 --- @param shortcuts table Real shortcut facade.
 --- @return table groups
 local function physical_groups(shortcuts)
 	local groups = {}
-	for _, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
-		if not group.fixed then groups[#groups + 1] = group end
-	end
+	for _, group in ipairs(shortcuts.get_keyboard_slot_groups()) do groups[#groups + 1] = group end
 	return groups
 end
 
---- Finds the corresponding physical rows without depending on contextual placement.
+--- The rows of every modifier group, in group order.
 --- @param rows table Complete group rows.
 --- @param shortcuts table Real shortcut facade.
 --- @return table physical
 local function physical_rows(rows, shortcuts)
 	local physical = {}
-	for index, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
-		if not group.fixed then physical[#physical + 1] = rows[index] end
-	end
+	for index in ipairs(shortcuts.get_keyboard_slot_groups()) do physical[#physical + 1] = rows[index] end
 	return physical
 end
 

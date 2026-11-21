@@ -377,7 +377,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_preview_category_glyphs",     val = state.preview_category_glyphs },
 			{ fn = "set_preview_announcements",       val = state.preview_announcements },
 			{ fn = "set_trigger_char",                val = state.trigger_char },
-			{ fn = "set_magic_key_source",            val = state.magic_key_source },
 		}) do
 			if type(keymap[item.fn]) == "function" then
 				try("hotstrings", "keymap." .. item.fn, keymap[item.fn], item.val)
@@ -807,15 +806,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 
 	local shortcut_owner = core_mods and core_mods.shortcuts_mod
-	if shortcut_owner and type(shortcut_owner.configure_magic_editor) == "function" then
-		try_exact("shortcuts", "shortcuts.configure_magic_editor", shortcut_owner.configure_magic_editor, {
+	if shortcut_owner and type(shortcut_owner.configure_star_slot) == "function" then
+		try_exact("shortcuts", "shortcuts.configure_star_slot", shortcut_owner.configure_star_slot, {
 			legacy_present = sc ~= nil or not editor_handoff_committed,
-			trigger = function() return keymap.get_trigger_char() end,
-			magic_source = function() return keymap.get_magic_key_source() end,
-			replace_active = function()
-				if type(keymap.is_magic_key_replacement_effective) ~= "function" then return nil end
-				return keymap.is_magic_key_replacement_effective()
-			end,
 			paused = function() return shortcut_owner.is_paused() == true end,
 			inhibited = function() return shortcut_owner.has_bindings_pause_debt() == true end,
 		})

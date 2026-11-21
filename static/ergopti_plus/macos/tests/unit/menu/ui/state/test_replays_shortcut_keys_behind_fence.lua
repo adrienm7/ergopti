@@ -25,7 +25,7 @@ local Fixture = require("tests.support.shortcut_bindings_fixture")
 -- it a keyboard slot).
 local DISABLED_ID = "wrap_text_if_selected"
 -- A registered binding with a raw factory the fixture can make refuse.
-local REFUSED_ID = "cmd_star"
+local REFUSED_ID = "wrap_text_if_selected"
 -- Owners derived from other files (tap-key assignments, the layer's wheel in
 -- layers.toml) rather than from a saved key.
 local DERIVED_IDS = { tap_keys = true }

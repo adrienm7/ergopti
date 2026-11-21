@@ -108,7 +108,6 @@ local RAW_FACTORIES = {
 	bind_instant_screenshot = "at_hash",
 	bind_layer_wheel = "layer_wheel",
 	bind_wrap_text_if_selected = "wrap_text_if_selected",
-	bind_cmd_star = "cmd_star",
 	bind_tap_keys = "tap_keys",
 }
 

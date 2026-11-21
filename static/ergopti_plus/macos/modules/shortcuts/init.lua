@@ -182,8 +182,7 @@ M.get_keyboard_group_modifiers_label = KeyboardShortcuts.get_keyboard_group_modi
 M.available_keyboard_slots = KeyboardShortcuts.available_slots
 M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
 M.keyboard_binding_id      = KeyboardShortcuts.binding_id
-M.configure_magic_editor   = KeyboardShortcuts.configure_magic_editor
-M.refresh_magic_editor     = KeyboardShortcuts.refresh_magic_editor
+M.configure_star_slot      = KeyboardShortcuts.configure_star_slot
 
 --- Stops independent shortcut children without letting one refusal hide its sibling.
 --- @param steps table[] Ordered `{name, stop}` descriptors.

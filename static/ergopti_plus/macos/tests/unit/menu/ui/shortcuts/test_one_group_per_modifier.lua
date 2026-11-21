@@ -29,7 +29,6 @@ local function render_shortcuts_submenu()
 			list_shortcuts = function()
 				return {
 					{ id = "wrap_text_if_selected", label = "Wrap", enabled = true },
-					{ id = "cmd_star", label = "Star", enabled = true },
 				}
 			end,
 			is_enabled            = function() return true end,
@@ -70,7 +69,7 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 		helpers.assert_nil(find(rows, "menu.shortcuts.submenu_cmd"), "a second Cmd group is drawn")
 	end)
 
-	helpers.it("puts the built-in Ctrl and Cmd shortcuts in their modifier's group", function()
+	helpers.it("keeps the Ctrl and Cmd groups with their own rows", function()
 		local rows = render_shortcuts_submenu()
 		local ctrl = find(rows, "menu.shortcuts.ctrl_group")
 		local cmd = find(rows, "menu.shortcuts.cmd_group")
@@ -78,7 +77,6 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 		helpers.assert_true(cmd ~= nil and type(cmd.menu) == "table", "the Cmd group must render")
 		helpers.assert_true(has_row_containing(ctrl.menu, "menu.shortcuts.chatgpt_url_item"),
 			"the ChatGPT URL editor must sit in the Ctrl group")
-		helpers.assert_true(has_row_containing(cmd.menu, "Star"), "cmd_star must sit in the Cmd group")
 		helpers.assert_true(has_row_containing(ctrl.menu, "menu.shortcuts.ctrl_add"),
 			"the Ctrl group keeps its add row")
 	end)

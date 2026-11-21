@@ -12,11 +12,11 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
--- Cmd+* is the named built-in left since schema v20 made Ctrl+G a keyboard slot.
-local DISABLED_ID = "cmd_star"
+-- The wrap tap is the named built-in left since Cmd+★ → Cmd+S left (2026-11-21).
+local DISABLED_ID = "wrap_text_if_selected"
 
 --- Builds the real Shortcuts submenu around the given registry and returns
---- the named Cmd rows, the only ones the stubbed renderer hands back.
+--- the named wrap row, the only one the stubbed renderer hands back.
 --- @param bindings table Real Bindings module.
 --- @param state_shortcuts boolean Shortcuts master switch.
 --- @param paused boolean|nil Whether the script is paused.
@@ -48,7 +48,7 @@ local function build_cmd_rows(bindings, state_shortcuts, paused)
 		package.loaded["menu.engine.manifest_menu"] = {
 			group_receiver = native_renderer.group_receiver,
 			template_rows = native_renderer.template_rows,
-			build = function(_, _, _, _, _, lists) return lists.keyboard_slots() end,
+			build = function(_, _, _, _, _, lists) return { lists.wrap_symbols_menu()[1] } end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = {
@@ -76,15 +76,14 @@ local function build_cmd_rows(bindings, state_shortcuts, paused)
 	end)
 end
 
---- Asserts one checkmark per named Cmd shortcut, the rows following the
---- registry's own order of its cmd_* entries.
+--- Asserts the checkmark of the named wrap shortcut.
 --- @param bindings table Real Bindings module.
 --- @param rows table Rendered rows.
 --- @param context string Diagnostic context.
 local function assert_checkmarks(bindings, rows, context)
 	local compared = 0
 	for _, entry in ipairs(bindings.list_shortcuts()) do
-		if entry.id:sub(1, 4) == "cmd_" then
+		if entry.id == DISABLED_ID then
 			compared = compared + 1
 			local row = rows[compared]
 			helpers.assert_true(type(row) == "table", context .. ": a row is drawn for " .. entry.id)
@@ -92,8 +91,8 @@ local function assert_checkmarks(bindings, rows, context)
 				context .. ": row checkmark for " .. entry.id)
 		end
 	end
-	helpers.assert_true(compared >= 1, "the Cmd rows must be rendered, or nothing was compared")
-	helpers.assert_eq(#rows, compared, context .. ": one row per named Cmd shortcut")
+	helpers.assert_true(compared == 1, "the wrap row must be rendered, or nothing was compared")
+	helpers.assert_eq(#rows, compared, context .. ": one row for the named shortcut")
 end
 
 

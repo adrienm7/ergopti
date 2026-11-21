@@ -75,19 +75,18 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"`layout_switching` rendered nothing — the provider was read before its rows were collected")
 	end)
 
-	helpers.it("places replacement in the extension while Layout retains its physical picker", function()
+	-- The magic key is a configured character since 2026-11-21: the Layout menu
+	-- no longer picks a physical key for it.
+	helpers.it("places replacement in the extension and offers no physical magic-key picker", function()
 		local ctx = make_ctx()
 		local row = tray_row(ctx)
 		local seen = titles(row and row.menu)
 		helpers.assert_nil(seen["Replace J with the magic key"],
 			"the relocated replacement control must have no second Layout owner")
-		local physical_picker = false
 		for title in pairs(seen) do
-			if title:sub(1, #"menu.layout.magic_key_source: ") == "menu.layout.magic_key_source: " then
-				physical_picker = true
-			end
+			helpers.assert_true(title:find("magic_key_source", 1, true) == nil,
+				"the Layout renderer must expose no physical-key selection: " .. title)
 		end
-		helpers.assert_true(physical_picker, "the actual Layout renderer still exposes physical-key selection")
 		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ManifestMenu = require("menu.engine.manifest_menu")
 		local rows = Hotstrings.build_bound_section_rows(ctx, { { group = "magickey", section = "replace" } })

@@ -1,7 +1,7 @@
---- tests/unit/modules/shortcuts/magic_editor/test_magic_editor_refresh_during_proof.lua
+--- tests/unit/modules/shortcuts/star_slot/test_star_slot_refresh_during_proof.lua
 
 --- ==============================================================================
---- MODULE: Editor Shortcut Retarget During A Running Source Proof
+--- MODULE: ★ Key Slot Retarget During A Running Source Proof
 --- DESCRIPTION:
 --- A retarget that arrives while the native source proof still runs fences
 --- that proof and accepts: the proof's settlement starts the new one, once.
@@ -14,10 +14,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture")
+package.loaded["tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture"] = nil
+local Fixture = require("tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture")
 
-helpers.describe("magic editor: a retarget during a running source proof", function()
+helpers.describe("★ key slot: a retarget during a running source proof", function()
 	helpers.it("accepts, waits for the running proof, then proves the source once more", function()
 		Fixture.with_fixture(function(subject, registrar, _, state, spec)
 			state.cancel_refuses = true

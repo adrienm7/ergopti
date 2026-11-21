@@ -53,7 +53,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		end
 		local shortcuts = {
 			list_shortcuts = function()
-				return { { id = "cmd_star", label = "Alpha", enabled = true } }
+				return { { id = "wrap_text_if_selected", label = "Alpha", enabled = true } }
 			end,
 			is_enabled = function() return enabled end,
 			enable = function() return set_enabled(true) end,
@@ -78,17 +78,13 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["menu.ui.builder.utils"] = {}
-		-- The built-in Cmd rows reach the tray inside the keyboard-slot Cmd
-		-- group (no fixed Ctrl row remains since schema v20); hand them
-		-- straight back as the Shortcuts submenu.
+		-- The named wrap row is the built-in row left since Cmd+★ left
+		-- (2026-11-21); hand it straight back as the Shortcuts submenu.
 		package.loaded["menu.engine.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(
 			function(_, _, _, _, _, lists)
-				return lists.keyboard_slots()
+				return { lists.wrap_symbols_menu()[1] }
 			end)
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["ui.menu.menu_keyboard_slots"] = {
-			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.primary_ end,
-		}
 		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "star" end }
 
 		local Menu = require("ui.menu.menu_shortcuts")

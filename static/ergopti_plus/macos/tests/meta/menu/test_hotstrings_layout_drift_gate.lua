@@ -167,11 +167,6 @@ local CANONICAL_LAYOUT_MENU = {
 	"list:layout_features_altgr",
 	"group:layout_emulated_rows",
 	"list:number_row_policy",
-	-- Replacement is controlled by the shipped Ergopti hotstrings extension.
-	-- The physical key remains selectable here on every driver by pressing it
-	-- or choosing from the candidates
-	-- (hotstrings/ui/menu/magic_key_source_menu.lua).
-	"list:magic_key_source",
 	"---",
 	-- UPDATED 2026-10-23: the Karabiner virtual keyboard type (Automatic, ISO,
 	-- ANSI) that menu_keyboard_layout.lua registers as a choice command. It

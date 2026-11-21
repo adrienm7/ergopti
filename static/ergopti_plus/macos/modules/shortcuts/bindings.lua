@@ -83,7 +83,6 @@ local refusal_retry
 
 local EXACT_RELEASE_IDS = {
 	tap_keys = true,
-	cmd_star = true,
 	wrap_text_if_selected = true,
 }
 
@@ -251,45 +250,8 @@ hotkey_defs.wrap_text_if_selected   = function()
 		get_live_wrap_pairs, delivery_admitted)
 end
 
--- Fixed shortcuts that are not catalogue actions. The Ctrl-letter chords (Ctrl+G
--- included since schema v20) and Cmd+Shift+V are role-named keyboard slots now;
--- see keyboard_shortcuts.lua.
-hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
--- The live owners the modifiers + magic key save reads at each chord. The
--- expander is the keymap the boot already started: before it, no chord saves.
-local function loaded_expander()
-	return package.loaded["hotstrings.engine.expander"]
-end
-local CMD_STAR_PORTS = {
-	replace_on = function()
-		local expander = loaded_expander()
-		return type(expander) == "table" and expander.is_magic_key_replace_on() == true
-	end,
-	-- A physical key the user chose keeps every chord the layout gives it.
-	chosen_source = function()
-		return require("hotstrings.engine.expander.magic_key_source").keycode() ~= nil
-	end,
-	magic_key = function()
-		local expander = loaded_expander()
-		return type(expander) == "table" and expander.get_trigger_char() or nil
-	end,
-	-- What the input source types on the key with no modifier: the layout's own
-	-- magic key is the key whose plain press types it (KeyC on Ergopti+).
-	plain_text = function(keycode)
-		local map = hs.keycodes and hs.keycodes.map
-		return type(map) == "table" and map[keycode] or nil
-	end,
-	-- A keyboard shortcut on the chord, the magic editor's Ctrl+★ included, keeps it.
-	shortcut_owns = function(mods, keycode)
-		return require("platform.input.hotkey_registrar").has_live_binding(mods, keycode)
-	end,
-}
-
-hotkey_defs.cmd_star   = function()
-	-- Pass the log callback so bind_cmd_star can log the re-fired chord.
-	return sys_acts.bind_cmd_star(log_shortcut, delivery_admitted, CMD_STAR_PORTS)
-end
-
+-- The Ctrl-letter chords (Ctrl+G included since schema v20) and Cmd+Shift+V are
+-- role-named keyboard slots now; see keyboard_shortcuts.lua.
 -- A master enable is not a preset import. Each child starts from its own
 -- neutral desired value and may later be enabled explicitly behind any fence.
 for name in pairs(hotkey_defs) do
@@ -1077,7 +1039,7 @@ end
 --- Builds a sort key that groups shortcuts in display order:
 ---   1) ctrl + single letter (ctrl_a … ctrl_z)
 ---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
----   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
+---   3) cmd shortcuts (cmd_shift_v, …)
 ---   4) everything else (tap_keys — never listed by the menu)
 --- Within each group items sort alphabetically by id.
 --- @param id string The shortcut identifier.

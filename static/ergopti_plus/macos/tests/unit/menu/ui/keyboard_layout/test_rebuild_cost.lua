@@ -31,45 +31,4 @@ helpers.describe("Keyboard layout row rebuild cost", function()
 			helpers.assert_eq(decodes, 2)
 		end)
 	end)
-
-	helpers.it("(menu-rebuild-2026-10-31) labels the magic-key candidates from one owner table", function()
-		helpers.with_fresh_modules({ "hotstrings.ui.menu.magic_key_source_menu", "hotstrings.engine.expander.magic_key_source" }, function()
-			local Geometry = require("platform.input.keyboard_geometry")
-			local Source = require("hotstrings.engine.expander.magic_key_source")
-			local Menu = require("hotstrings.ui.menu.magic_key_source_menu")
-			local candidates = #Source.resolver().candidates()
-			helpers.assert_true(candidates > 1, "the manifest must declare several candidates")
-			local original, projections = Geometry.physical_code, 0
-			Geometry.physical_code = function(...)
-				projections = projections + 1
-				return original(...)
-			end
-			local ok, rows = pcall(Menu.rows, {
-				state = {}, save_prefs = function() return true end,
-				keymap = { set_magic_key_source = function() end }, paused = false,
-			})
-			Geometry.physical_code = original
-			assert(ok, rows)
-			helpers.assert_true(type(rows) == "table" and #rows > 0, "the magic-key rows must render")
-			-- One projection per candidate: a lookup per row made it quadratic.
-			helpers.assert_eq(projections, candidates)
-		end)
-	end)
-
-	helpers.it("(menu-rebuild-2026-10-31) keeps the candidate owner code_for answers", function()
-		helpers.with_fresh_modules({ "hotstrings.engine.expander.magic_key_source" }, function()
-			local Source = require("hotstrings.engine.expander.magic_key_source")
-			local resolver = Source.resolver()
-			local owners, owned = Source.candidates_by_code(nil), 0
-			for _, candidate in ipairs(resolver.candidates()) do
-				local native = resolver.native(candidate)
-				if native ~= nil and owners[native] ~= nil then
-					owned = owned + 1
-					helpers.assert_eq(Source.code_for(native, nil), owners[native])
-				end
-			end
-			helpers.assert_true(owned > 0, "the ANSI candidates must own their codes")
-			helpers.assert_nil(Source.code_for("not a code", nil))
-		end)
-	end)
 end)

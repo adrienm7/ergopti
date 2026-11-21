@@ -1,35 +1,36 @@
---- tests/unit/modules/shortcuts/magic_editor/test_magic_editor_source_owner_native.lua
+--- tests/unit/modules/shortcuts/star_slot/test_star_slot_source_owner_native.lua
 
 --- ==============================================================================
---- MODULE: Conditional Editor Shortcut Source Ownership
+--- MODULE: The ★ Key Slot's Source Ownership
 --- DESCRIPTION:
 --- Exercises the real shared decision and native registrar around controlled
---- source receipts. Only a unique direct numeric source may acquire a chord;
---- stale callbacks, explicit choices and unfinished cleanup cannot deliver.
+--- source receipts. Only a unique key typing ★ at its base level may acquire
+--- Ctrl+★; stale callbacks, explicit choices and unfinished cleanup cannot
+--- deliver.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-package.loaded["tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture"] = nil
-local Fixture = require("tests.support.modules.shortcuts.magic_editor.magic_editor_source_owner_fixture")
+package.loaded["tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture"] = nil
+local Fixture = require("tests.support.modules.shortcuts.star_slot.star_slot_source_owner_fixture")
 local with_fixture = Fixture.with_fixture
 
 
 
 
 
-helpers.describe("conditional editor shortcut: native source and ordinary ownership", function()
-	helpers.it("binds the numeric direct source and retargets after source and trigger changes", function()
+helpers.describe("★ key slot: native source and ordinary ownership", function()
+	helpers.it("binds the key typing ★ and retargets after a source change", function()
 		with_fixture(function(subject, registrar, native, state, spec, respond)
 			helpers.assert_eq(subject.start(spec), true)
 			respond()
 			helpers.assert_eq(native.hotkey._bound[1].key, 8)
 			helpers.assert_eq(native.hotkey._bound[1].mods, { "ctrl" })
 			native.hotkey._bound[1].pressed_fn()
-			helpers.assert_eq(state.actions, { { action = "open_hotstrings_editor", binding = "keyboard__magic_editor" } })
-			state.source_id, state.trigger = "source.second", "ù"
+			helpers.assert_eq(state.actions, { { action = "open_hotstrings_editor", binding = "keyboard__secondary_star" } })
+			state.source_id = "source.second"
 			state.source_changed()
 			helpers.assert_eq(registrar.live_count(), 0, "old physical owner must be released before new proof")
-			respond(nil, { { code = 11, text = "ù", direct = true, dead = false } })
+			respond(nil, { { code = 11, text = "★", direct = true, dead = false } })
 			helpers.assert_eq(native.hotkey._bound[1].key, 11)
 			helpers.assert_eq(subject.stop(), true)
 			helpers.assert_eq(registrar.live_count(), 0)
@@ -51,43 +52,27 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 		end
 	end)
 
-	helpers.it("uses only an acknowledged explicit replacement beside a native star", function()
-		with_fixture(function(subject, _, native, state, spec, respond)
-			state.magic_source, state.remap_code, state.replace_active = "KeyJ", 38, true
+	-- Regression of the 2026-11-21 decision: the slot followed the configured
+	-- magic key, so ù moved Ctrl+★ onto the ù key and an AZERTY layout without
+	-- ★ still shipped the editor shortcut.
+	helpers.it("binds the real ★ key, never the key of the configured magic key", function()
+		with_fixture(function(subject, registrar, native, _, spec, respond)
 			helpers.assert_eq(subject.start(spec), true)
-			respond()
-			helpers.assert_eq(native.hotkey._bound[1].key, 38,
-				"the selected active replacement must outrank an unrelated native star")
-			native.hotkey._bound[1].pressed_fn()
-			helpers.assert_eq(#state.actions, 1)
-			state.replace_active = false
-			native.hotkey._bound[1].pressed_fn()
-			helpers.assert_eq(#state.actions, 1, "a replacement-gate change fences the captured source immediately")
-			helpers.assert_eq(subject.refresh(), true)
-			respond()
-			helpers.assert_eq(native.hotkey._bound[1].key, 8, "an ineffective replacement returns to the actual native scan")
+			respond(nil, { { code = 11, text = "ù", direct = true, dead = false },
+				{ code = 8, text = "★", direct = true, dead = false } })
+			helpers.assert_eq(native.hotkey._bound[1].key, 8)
+			helpers.assert_eq(registrar.live_count(), 1)
 			helpers.assert_eq(subject.stop(), true)
 		end)
 	end)
 
-	helpers.it("refuses raw fallback when explicit replacement ownership is unacknowledged", function()
-		with_fixture(function(subject, registrar, _, state, spec, respond)
-			state.magic_source, state.remap_code, state.replace_active = "KeyJ", 38, nil
+	helpers.it("ships no default on a layout without a ★ key", function()
+		with_fixture(function(subject, registrar, _, _, spec, respond)
 			helpers.assert_eq(subject.start(spec), true)
-			respond()
+			respond(nil, { { code = 11, text = "ù", direct = true, dead = false },
+				{ code = 0, text = "a", direct = true, dead = false } })
 			helpers.assert_eq(registrar.live_count(), 0)
-			helpers.assert_eq(subject.reason(), "source_unavailable")
-			helpers.assert_eq(subject.stop(), true)
-		end)
-	end)
-
-	helpers.it("refuses a collaborator's two ambiguous effective physical identities", function()
-		with_fixture(function(subject, registrar, _, state, spec, respond)
-			state.magic_source, state.replace_active = "Backquote", true
-			state.remap_codes = { [10] = true, [50] = true }
-			helpers.assert_eq(subject.start(spec), true)
-			respond()
-			helpers.assert_eq(registrar.live_count(), 0, "the primary resolver code cannot stand in for hardware proof")
+			helpers.assert_eq(subject.reason(), "source_missing")
 			helpers.assert_eq(subject.stop(), true)
 		end)
 	end)
@@ -139,10 +124,10 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 		end)
 	end)
 
-	helpers.it("fences stale proof and callbacks after trigger, pause or admission changes", function()
+	helpers.it("fences stale proof and callbacks after source, pause or admission changes", function()
 		with_fixture(function(subject, registrar, native, state, spec, respond)
 			helpers.assert_eq(subject.start(spec), true)
-			state.trigger = ";"
+			state.source_id = "source.second"
 			respond()
 			helpers.assert_eq(registrar.live_count(), 0)
 			helpers.assert_eq(subject.refresh(), true)
@@ -179,7 +164,7 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 		with_fixture(function(subject, registrar, native, state, spec, respond)
 			helpers.assert_eq(subject.start(spec), true)
 			state.cancel_refuses = true
-			state.source_id, state.trigger = "source.second", "ù"
+			state.source_id = "source.second"
 			-- Accepted and deferred: the fenced proof's settlement retargets, so a
 			-- caller must not report it as cleanup debt (stop() still does, above).
 			helpers.assert_eq(subject.refresh(), true)
@@ -187,7 +172,7 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			respond(1)
 			helpers.assert_eq(registrar.live_count(), 0, "settled stale proof remains fenced")
 			helpers.assert_eq(#state.requests, 2, "acknowledged settlement resumes the latest intent")
-			respond(2, { { code = 11, text = "ù", direct = true, dead = false } })
+			respond(2, { { code = 11, text = "★", direct = true, dead = false } })
 			helpers.assert_eq(native.hotkey._bound[1].key, 11)
 			helpers.assert_eq(subject.stop(), true)
 		end)
@@ -259,10 +244,10 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			local logger = package.loaded["core.logger.engine.logger"]
 			local error_log = logger.error
 			logger.error = function(...) errors = errors + 1; return error_log(...) end
-			spec.context.replace_active = function()
+			spec.context.inhibited = function()
 				reads = reads + 1
 				stopped = subject.stop()
-				return state.replace_active
+				return state.inhibited
 			end
 			callback()
 			helpers.assert_eq(stopped, true, "exact native and probe owners must actually retire")
@@ -281,10 +266,10 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			helpers.assert_eq(subject.start(spec), true)
 			respond()
 			local reads = 0
-			spec.context.replace_active = function()
+			spec.context.inhibited = function()
 				reads = reads + 1
 				state.current = false
-				return state.replace_active
+				return state.inhibited
 			end
 			native.hotkey._bound[1].pressed_fn()
 			local actions = #state.actions
@@ -300,10 +285,10 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			helpers.assert_eq(subject.start(spec), true)
 			respond()
 			local reads = 0
-			spec.context.replace_active = function()
+			spec.context.inhibited = function()
 				reads = reads + 1
 				state.source_id = "source.second"
-				return state.replace_active
+				return state.inhibited
 			end
 			native.hotkey._bound[1].pressed_fn()
 			local actions = #state.actions
@@ -342,22 +327,4 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			end)
 		end)
 	end
-
-
-	helpers.it("allocates no source query after construction context retires its owner", function()
-		with_fixture(function(subject, registrar, _, state, spec)
-			local stopped = nil
-			spec.context.trigger = function()
-				stopped = subject.stop()
-				return state.trigger
-			end
-			local started = subject.start(spec)
-			local requests = #state.requests
-			helpers.assert_eq(subject.stop(), true)
-			helpers.assert_eq(registrar.live_count(), 0)
-			helpers.assert_eq(stopped, true, "the constructor read must actually settle its old owner")
-			helpers.assert_eq(started, false, "a retired constructor must not acknowledge startup")
-			helpers.assert_eq(requests, 0, "no new query owner may be allocated after retirement")
-		end)
-	end)
 end)

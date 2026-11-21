@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 local function load_subject()
 	local controls = {
 		refuse_special = false,
-		refuse_cmd_star = false,
+		refuse_wrap = false,
 		delete_throws_once = false,
 	}
 	local counters = {created = 0, deleted = 0, stop_awake = 0}
@@ -51,9 +51,8 @@ local function load_subject()
 		stop_awake = function() counters.stop_awake = counters.stop_awake + 1; return true end,
 		bind_tap_keys = special_factory,
 		bind_layer_wheel = special_factory,
-		bind_wrap_text_if_selected = special_factory,
-		bind_cmd_star = function()
-			if controls.refuse_cmd_star then return nil, "macOS refused Cmd+*" end
+		bind_wrap_text_if_selected = function()
+			if controls.refuse_wrap then return nil, "macOS refused the wrap tap" end
 			return special_factory()
 		end,
 		toggle_awake = function() end,
@@ -152,36 +151,36 @@ helpers.describe("shortcut bindings: one refused hotkey fails alone (shortcut-re
 	end)
 
 	-- 2026-10-28: a refused Ctrl+G left every shortcut dead. Ctrl+G is a keyboard
-	-- slot since schema v20; the isolation stays pinned on the remaining built-in.
-	helpers.it("names a hotkey macOS refuses in a WARNING and keeps the others", function()
+	-- slot since schema v20 and Cmd+★ left on 2026-11-21; the isolation stays
+	-- pinned on the remaining built-in.
+	helpers.it("names a hotkey macOS refuses in a WARNING and retries it", function()
 		local subject, controls = load_subject()
-		controls.refuse_cmd_star = true
+		controls.refuse_wrap = true
 		local warnings = {}
 		package.loaded["core.logger.engine.logger"].warn = function(_, msg, ...)
 			warnings[#warnings + 1] = { msg = msg, args = { ... } }
 		end
 
 		helpers.assert_eq(subject.start(), true)
-		helpers.assert_eq(subject.is_bound("cmd_star"), false)
-		helpers.assert_eq(subject.is_bound("wrap_text_if_selected"), true,
-			"a factory that does not use the refused chord stays bound")
-		local refusal = subject.pending_bindings().cmd_star
-		helpers.assert_true(type(refusal) == "string" and refusal:find("Cmd+*", 1, true) ~= nil,
-			"the refusal names the chord: " .. tostring(refusal))
+		helpers.assert_eq(subject.is_started(), true, "a refused hotkey must not abort the layer")
+		helpers.assert_eq(subject.is_bound("wrap_text_if_selected"), false)
+		local refusal = subject.pending_bindings().wrap_text_if_selected
+		helpers.assert_true(type(refusal) == "string" and refusal:find("wrap tap", 1, true) ~= nil,
+			"the refusal names the hotkey: " .. tostring(refusal))
 		local warned = false
 		for _, entry in ipairs(warnings) do
 			if tostring(entry.msg):find("could not be registered", 1, true)
-				and tostring(entry.args and entry.args[1]) == "cmd_star" then warned = true end
+				and tostring(entry.args and entry.args[1]) == "wrap_text_if_selected" then warned = true end
 		end
 		helpers.assert_true(warned, "the refusal is a WARNING naming the hotkey")
-		controls.refuse_cmd_star = false
+		controls.refuse_wrap = false
 		helpers.assert_eq(subject.bind_pending(), true, "the retry binds it once macOS accepts it")
-		helpers.assert_eq(subject.is_bound("cmd_star"), true)
+		helpers.assert_eq(subject.is_bound("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("still rolls everything back when the lifecycle changes mid-start", function()
 		local subject, _, counters = load_subject()
-		package.loaded["modules.shortcuts.actions.system"].bind_cmd_star = function()
+		package.loaded["modules.shortcuts.actions.system"].bind_wrap_text_if_selected = function()
 			subject.pause()
 			return nil
 		end

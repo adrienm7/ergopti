@@ -74,7 +74,7 @@ helpers.describe("canonical keyboard shortcut ownership", function()
 			subject.mark_config_reads(Codec.decode(control.content), function(...) marks[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(marks, { ["shortcuts.keyboard.primary_a"] = true })
 			helpers.assert_eq(subject.get_owned_config_paths(), {
-				"shortcuts.keyboard.magic_editor", "shortcuts.keyboard.primary_a",
+				"shortcuts.keyboard.primary_a", "shortcuts.keyboard.secondary_star",
 			})
 			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
 				require("settings.ui.menu.unused_keys_cleanup").collect)

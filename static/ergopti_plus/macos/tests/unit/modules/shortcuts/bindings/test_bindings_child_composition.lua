@@ -202,7 +202,6 @@ local function complete_system_facade(ctx, system, options)
 		bind_tap_keys = "tap_keys",
 		bind_layer_wheel = "layer_wheel",
 		bind_wrap_text_if_selected = "wrap_text_if_selected",
-		bind_cmd_star = "cmd_star",
 	}) do
 		system[method] = function(...)
 			local args = {...}
@@ -627,7 +626,7 @@ end)
 
 helpers.describe("shortcut bindings: raw owner release identity", function()
 	for _, id in ipairs({
-		"tap_keys", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " callback when its factory reenters pause", function()
 			local options = { reenter_raw_factory = id }
@@ -647,7 +646,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " enable factory that reenters pause", function()
 			local options = {}
@@ -669,7 +668,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("retains " .. id .. " on pause delete " .. mode, function()
