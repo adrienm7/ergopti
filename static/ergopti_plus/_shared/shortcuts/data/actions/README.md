@@ -48,6 +48,12 @@ locales, and `equivalent_<os>` may list the actions that do the same on that
 OS. The generator refuses a missing reason, a reason on an OS the row claims
 and an equivalent that OS does not offer, then writes the table below.
 
+An action an OS runs but refuses in a key-combination chord says why there:
+`chord_reason_<os>` (`ahk`, `linux`) names a `platform_reason.*` locale key,
+and that OS's chord picker greys the action with it (maintainer decision
+KCD-2 of 2026-11-21: a program launch and the monitor Alt-Tab run in a chord
+on macOS only).
+
 A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
 `shortcut`, `app`, `command`, `path`, `apple_shortcut`) is validated, prompted
 for and explained by each driver's gesture module: macOS
