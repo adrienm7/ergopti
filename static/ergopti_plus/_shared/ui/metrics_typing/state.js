@@ -74,6 +74,8 @@ const app_state = {
 	selected_apps: new Set(),
 	app_selection_mode: APP_SELECTION_MODE.UNINITIALIZED,
 	did_apply_initial_reset: false,
+	// Whether a range read has been received: an empty card then says so.
+	range_data_landed: false,
 	current_tab: 'c',
 	sort_col: 'count',
 	sort_asc: false,
