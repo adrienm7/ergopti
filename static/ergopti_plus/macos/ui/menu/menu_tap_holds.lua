@@ -663,6 +663,10 @@ end
 --- assigned slot, chord included (CombinationLabels.summary), and its menu of
 --- tap, hold and chord slots, each opening the shared action picker — the
 --- Windows layout (maintainer decision KCD-8 of 2026-11-21).
+---
+--- Every ordered pair is listed, symmetry or not, since each order keeps its
+--- own tap and hold (KCD-5); only its chord row is shared: under symmetry a
+--- reverse-order pair reads and writes the chord of the order that owns it.
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
@@ -755,9 +759,8 @@ end
 --- Builds one hand's pair rows the Windows way (maintainer decision KCD-8 of
 --- 2026-11-21): one submenu per key held first, in catalogue order, holding
 --- one row per key struck under it, in catalogue order, ticked while any of
---- its pairs is assigned. Under symmetry the reverse half of a pair is
---- hidden: the order that owns the chord runs it for both. Rows are grayed
---- out when the integration is disabled.
+--- its pairs is assigned. Every ordered pair is listed (KCD-5). Rows are
+--- grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
@@ -784,11 +787,16 @@ local function build_raccourcis_items(karabiner, action_index, update_menu, enab
 		local group_label = nil
 		for _, second in ipairs(catalogue) do
 			local combo_def = second.id ~= first.id and by_keys[first.id .. "\0" .. second.id] or nil
-			if combo_def and is_symmetric and non_canonical[combo_def.id] then combo_def = nil end
 			if combo_def then
 				local labels = CombinationLabels.resolve(catalogue, first.id, second.id, i18n.get)
 				group_label = labels.group_label
-				local row = build_one_combo_item(karabiner, action_index, update_menu, combo_def, labels.label, combo_def.id)
+				-- Under symmetry the order that owns the chord runs it for both.
+				local chord_id = combo_def.id
+				if is_symmetric and non_canonical[combo_def.id] then
+					local owner = by_keys[second.id .. "\0" .. first.id]
+					if owner then chord_id = owner.id end
+				end
+				local row = build_one_combo_item(karabiner, action_index, update_menu, combo_def, labels.label, chord_id)
 				any_assigned = any_assigned or row.checked == true
 				rows[#rows + 1] = row
 			end
@@ -953,8 +961,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 end
 
 --- Toggles symmetric combinations: when on, "touche 1 + touche 2" and "touche 2
---- + touche 1" fire the same chord, and the reverse half of each pair is hidden
---- from the pair rows to avoid duplicates. The row is the manifest's `check`
+--- + touche 1" fire the same chord; both orders keep their rows and their own
+--- tap and hold, and share only the chord row. The row is the manifest's `check`
 --- combo_symmetric; this is only what a click does.
 --- @param karabiner   table    The karabiner module.
 --- @param update_menu function Callback to refresh the menu bar.

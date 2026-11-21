@@ -6,12 +6,15 @@
 --- Maintainer decisions of 2026-11-21. KCD-8: every OS lays out the pair rows
 --- the Windows way, one submenu per key held first, each pair's slots in the
 --- order tap, hold, chord, and the chord in the pair's summary, replayed from
---- _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
+--- _shared/tests/corpus/tap_hold/key_combination_pair_rows.json. KCD-5: under
+--- symmetry the macOS menu lists every ordered pair, tap and hold included, as
+--- Windows and Linux do; only the chord row is shared between the two orders.
 ---
 --- ROOT CAUSE ENCODED:
 --- macOS drew a section header per first key with every pair beneath it,
 --- ordered the slots chord, tap, hold, summarised a pair as « chord / tap /
---- hold » with every empty slot named.
+--- hold » with every empty slot named, and hid the reverse-order pairs under
+--- symmetry though the generator still applied their tap and hold.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -165,6 +168,49 @@ helpers.describe("macOS pair rows follow the Windows layout (kcd-8-pair-rows)", 
 			local empty = find(group, REVERSE_PAIR)
 			helpers.assert_eq(empty.title, REVERSE_PAIR .. "dialog.action_picker.disabled",
 				"an empty pair shows the Windows empty word")
+		end)
+	end)
+end)
+
+helpers.describe("symmetry lists every pair and shares only the chord (kcd-5-symmetric-pairs)", function()
+	helpers.it("lists the reverse order with its own tap and the owner's chord (kcd-5-symmetric-pairs)", function()
+		helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "ui.action_picker" }, function()
+			local slots = { [FORWARD] = { tap = "copy", combo = "paste" }, [REVERSE] = { hold = "ctrl" } }
+			local group = build(remap_double(slots, true, {}))
+			local reverse = find(group, REVERSE_PAIR)
+			helpers.assert_not_nil(reverse, "the reverse order keeps its row under symmetry")
+			helpers.assert_eq(reverse.title, REVERSE_PAIR .. "Ctrl / Paste",
+				"its own hold, and the chord the owner order runs for both")
+			helpers.assert_eq(find(group, PAIR).title, PAIR .. "Copy / Paste")
+		end)
+	end)
+
+	helpers.it("writes a reverse pair's tap to itself and its chord to the owner (kcd-5-symmetric-pairs)", function()
+		helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "ui.action_picker" }, function()
+			local writes = {}
+			local group, picks = build(remap_double({}, true, writes))
+			local rows = slot_rows(find(group, REVERSE_PAIR))
+			rows[1].fn()
+			picks[#picks].choose("copy")
+			rows[3].fn()
+			picks[#picks].choose("paste")
+			helpers.assert_eq(writes[1], { setter = "set_combo_tap_action", id = REVERSE, action = "copy" })
+			helpers.assert_eq(writes[2], { setter = "set_combo_combo_action", id = FORWARD, action = "paste" },
+				"the shared chord row writes the owner order")
+			helpers.assert_eq(picks[2].suffix, "key_name.right_shift + key_name.left_shift",
+				"the picker names the pair the user opened")
+		end)
+	end)
+
+	helpers.it("keeps each order's chord apart without symmetry (kcd-5-symmetric-pairs)", function()
+		helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "ui.action_picker" }, function()
+			local writes = {}
+			local group, picks = build(remap_double({ [FORWARD] = { combo = "paste" } }, false, writes))
+			local reverse = find(group, REVERSE_PAIR)
+			helpers.assert_eq(reverse.title, REVERSE_PAIR .. "dialog.action_picker.disabled")
+			slot_rows(reverse)[3].fn()
+			picks[#picks].choose("copy")
+			helpers.assert_eq(writes[1], { setter = "set_combo_combo_action", id = REVERSE, action = "copy" })
 		end)
 	end)
 end)

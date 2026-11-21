@@ -5184,8 +5184,9 @@ end
 
 --- Sets combo symmetric mode and persists it.
 --- When true, key_down_order: "strict" is removed from chord rules so A+B and
---- B+A fire the same action. Non-canonical (reverse) combos are also suppressed
---- in the KE config and in the menu.
+--- B+A fire the same action. The chord of a non-canonical (reverse) combo is
+--- suppressed in the KE config; its tap and hold stay, and the menu lists it
+--- with the shared chord row (maintainer decision KCD-5 of 2026-11-21).
 --- @param value boolean
 function M.set_combo_symmetric(value)
 	if not require_state("set_combo_symmetric") then return false end
