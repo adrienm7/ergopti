@@ -511,26 +511,40 @@ AppPicker_BuildRows(initial) {
 		return rows
 }
 
-; Return a friendly display name for a top-level window. Falls back to
-; the bare executable name when no descriptive title is available.
+; Returns the application name of a top-level window: its executable's
+; description (« Microsoft Word »), never its title, which can name a document,
+; a mail subject or a web page (PCK-21). macOS shows bundle names and Linux
+; application ids. An executable without a description shows its process name.
+; @param hwnd {Integer} A top-level window.
+; @returns {String} The application name.
 AppPicker_FriendlyName(hwnd) {
-		proc := ""
-		try proc := WinGetProcessName("ahk_id " . hwnd)
-		title := ""
-		try title := WinGetTitle("ahk_id " . hwnd)
+		proc := WinGetProcessName("ahk_id " . hwnd)
+		path := ""
+		; A non-elevated driver cannot read an elevated process's path; its
+		; process name, read above, still names it.
+		try path := WinGetProcessPath("ahk_id " . hwnd)
+		desc := (path != "") ? AppPicker_FileDescription(path) : ""
+		return (desc != "") ? desc : proc
+}
 
-		; Strip the « ProcessName » suffix some apps tack on; we want the
-		; human-meaningful part. Heuristic: prefer the longest segment
-		; separated by " - ".
-		best := ""
-		if (title != "") {
-				for seg in StrSplit(title, " - ") {
-						seg := Trim(seg)
-						if (seg != "" && StrLen(seg) > StrLen(best))
-								best := seg
-				}
-		}
-		if (best != "")
-				return best
-		return proc
+; Reads an executable's FileDescription from its version resource.
+; @param path {String} The executable's full path.
+; @returns {String} The description, or "" when the file declares none.
+AppPicker_FileDescription(path) {
+		size := DllCall("version\GetFileVersionInfoSizeW", "Str", path, "Ptr", 0, "UInt")
+		if !size
+				return ""
+		info := Buffer(size, 0)
+		if !DllCall("version\GetFileVersionInfoW", "Str", path, "UInt", 0, "UInt", size, "Ptr", info, "Int")
+				return ""
+		pair := 0, pairBytes := 0
+		if !DllCall("version\VerQueryValueW", "Ptr", info, "Str", "\VarFileInfo\Translation",
+				"Ptr*", &pair, "UInt*", &pairBytes, "Int") || pairBytes < 4
+				return ""
+		key := Format("\StringFileInfo\{:04X}{:04X}\FileDescription",
+				NumGet(pair, 0, "UShort"), NumGet(pair, 2, "UShort"))
+		text := 0, chars := 0
+		if !DllCall("version\VerQueryValueW", "Ptr", info, "Str", key, "Ptr*", &text, "UInt*", &chars, "Int") || chars <= 1
+				return ""
+		return Trim(StrGet(text, "UTF-16"))
 }
