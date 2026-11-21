@@ -55,6 +55,7 @@ CASES += [
         native_status=74,
         deliver=False,
         want=10,
+        stdout=b"FAILED native:file_write\n",
         calls=["native"],
     ),
     dict(
@@ -76,6 +77,7 @@ CASES += [
         native_status=74,
         deliver=False,
         want=10,
+        stdout=b"FAILED native:connect\n",
         calls=["native"],
     ),
     dict(
@@ -84,6 +86,7 @@ CASES += [
         native_status=75,
         deliver=False,
         want=10,
+        stdout=b"FAILED native:deadline\n",
         calls=["native"],
     ),
     dict(name="complete-nonzero", packet=COMPLETE, native_status=74, want=10, calls=["native"]),
@@ -254,6 +257,7 @@ CASES += [
         explicit=True,
         curl_status=22,
         want=10,
+        stdout=b"FAILED curl:22\n",
         calls=["curl"],
     ),
     dict(
@@ -363,7 +367,7 @@ def main():
             stage = root / "stage"
             fmt = case.get("format", "zip")
             archive = stage / ("release." + fmt)
-            c = {k: v for k, v in case.items() if k not in ["packet", "calls", "proxies"]}
+            c = {k: v for k, v in case.items() if k not in ["packet", "calls", "proxies", "stdout"]}
             c.update(
                 packet_hex=case["packet"].hex(),
                 log=str(root / "calls.jsonl"),
@@ -460,8 +464,15 @@ def main():
             if calls != case["calls"]:
                 errors.append("literal-call-sequence")
             expected_ready = ("READY " + str(stage / "app" / "ErgoptiPlus.app") + "\n").encode()
-            if result.stdout != (expected_ready if case["want"] == 0 else b""):
-                errors.append("literal-READY-or-empty")
+            # A failed download names one closed fact for the failure receipt;
+            # every other refusal prints nothing.
+            expected_stdout = expected_ready if case["want"] == 0 else case.get("stdout", b"")
+            if result.stdout != expected_stdout:
+                errors.append("literal-READY-FAILED-or-empty")
+            # A failure retires the stage it created (UPD-11); a collision
+            # leaves the pre-existing directory untouched.
+            if case["want"] != 0 and not case.get("collision") and stage.exists():
+                errors.append("failed-stage-retained")
             if case.get("collision") and (stage / "owned-before").read_text() != "untouched":
                 errors.append("collision-preimage")
             if case.get("explicit") or case.get("manual"):
