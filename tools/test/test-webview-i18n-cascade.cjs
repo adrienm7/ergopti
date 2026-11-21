@@ -302,7 +302,35 @@ function check(label, cond, detail) {
 		);
 	}
 
-	// ── 8. The chain the code declares must be shipped ────────────────────────
+	// ── 8. A locale a body script names before DOM ready is the one loaded ────
+	//
+	// The site's editor, comparer and optimizer set window._i18n_locale from
+	// their ?lang= in a body script, after the head ran i18n.js. Reading the
+	// locale only once, in the head, loaded French on an English link.
+	{
+		let onReady = null;
+		let win = null;
+		let langAtStart = null;
+		const result = await run(els(), { en: EN, fr: FR }, undefined, (ctx) => {
+			win = ctx.window;
+			ctx.document.readyState = 'loading';
+			ctx.document.addEventListener = (_name, listener) => {
+				onReady = listener;
+			};
+			langAtStart = () => ctx.document.documentElement.lang;
+		});
+		const headLang = langAtStart();
+		win._i18n_locale = 'en';
+		onReady();
+		for (let i = 0; i < 12; i++) await Promise.resolve();
+		check(
+			'locale-named-after-head',
+			headLang === 'fr' && result.fetched[0] === 'en' && langAtStart() === 'en',
+			`a page naming "en" after the head fetched ${JSON.stringify(result.fetched)} and set lang "${langAtStart()}"`
+		);
+	}
+
+	// ── 9. The chain the code declares must be shipped ────────────────────────
 	//
 	// A cascade naming a locale that is not on disk is a cascade to nothing.
 	for (const code of ['en', 'fr']) {

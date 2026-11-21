@@ -207,7 +207,12 @@
 	document.documentElement.lang = active_code;
 
 	function load() {
-		var code = active_code;
+		// The Studio pages on the site (editor, comparer, optimizer) name the
+		// locale from their ?lang= in a body script, after this head script
+		// ran: it is read again here, or those pages load French whatever the
+		// link asked for.
+		var code = window._i18n_locale || active_code;
+		document.documentElement.lang = code;
 
 		// The chain always starts with the active locale, and never repeats it:
 		// with _i18n_locale === "en" the chain is en → fr, not en → en → fr.
