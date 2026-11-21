@@ -77,7 +77,7 @@ function M.init(opts)
 		strings_en  = nil,
 		strings_fr  = nil,
 		locale      = "fr",
-		get_trigger = nil,
+		display_text = nil,
 		json_decode         = opts.json_decode,
 		resolve_locale_path = opts.resolve_locale_path,
 		read_file  = type(opts.read_file) == "function" and opts.read_file or nil,
@@ -226,8 +226,8 @@ function M.has(key)
 	return false
 end
 
---- Returns the translated string for the given dot-notation key,
---- with ★ substituted for the current trigger character.
+--- Returns the translated string for the given dot-notation key, every ★ shown
+--- as the driver's display provider shows the magic key (« ★ (ù) »).
 --- Returns an empty string if the key is not found.
 --- @param key string Dot-notation key.
 --- @return string
@@ -243,11 +243,9 @@ function M.get(key)
 		s = _state.strings_fr and _state.strings_fr[key]
 	end
 	if type(s) ~= "string" then return "" end
-	if _state.get_trigger then
-		local ok, trigger = pcall(_state.get_trigger)
-		if ok and type(trigger) == "string" and trigger ~= "" then
-			s = (s:gsub("★", (trigger:gsub("%%", "%%%%"))))
-		end
+	if _state.display_text then
+		local ok, shown = pcall(_state.display_text, s, key)
+		if ok and type(shown) == "string" then s = shown end
 	end
 	return s
 end
@@ -275,12 +273,14 @@ function M.current_locale()
 	return _state and _state.locale or nil
 end
 
---- Sets the trigger-character provider used for ★ substitution.
---- @param fn function A zero-argument function returning the trigger string.
-function M.set_trigger_provider(fn)
-	if not require_init("set_trigger_provider") then return end
+--- Sets the provider that shows the magic key in a translated string: the
+--- shared display rule (_shared/hotstrings/engine/magic_key_rules.lua), which
+--- keeps the ★ of a literal marker key.
+--- @param fn function (text, key) -> string.
+function M.set_display_provider(fn)
+	if not require_init("set_display_provider") then return end
 	if type(fn) == "function" then
-		_state.get_trigger = fn
+		_state.display_text = fn
 	end
 end
 

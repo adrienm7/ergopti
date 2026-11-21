@@ -495,7 +495,7 @@ Decided by the maintainer on 2026-11-21 for Windows, macOS and Linux
 - Its default follows the layout that types: « ù » on AZERTY, « ; » on
   QWERTY, the manifest default « ★ » elsewhere. One source:
   `_shared/hotstrings/data/magic_key.json` (`layout_families`, probed on the
-  base level of named keys), read by `_shared/hotstrings/engine/magic_key.lua`
+  base level of named keys), read by `_shared/hotstrings/engine/magic_key_rules.lua`
   and `_shared/hotstrings/data/magic_key.ahk`, replaying
   `_shared/tests/corpus/hotstrings/magic_key_vectors.json`. Linux accepts any
   one character, as Windows and macOS do.

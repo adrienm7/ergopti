@@ -3297,6 +3297,7 @@
 	"shortcuts.eacute": "É 键上的所有快捷键对应 ",
 	"shortcuts.ecirc": "Ê 键上的所有快捷键对应 ",
 	"shortcuts.egrave": "È 键上的所有快捷键对应 ",
+	"shortcuts.star": "★ 键上的所有快捷键对应 ",
 	"shortcuts.gethexvalue": "Win + X（十六进制）= 复制光标下像素的 HEX 颜色到剪贴板",
 	"shortcuts.gpt": "Win + G（GPT）= 打开 ChatGPT（可配置网址）",
 	"shortcuts.keep_awake_ended": "☕ 防休眠已结束",

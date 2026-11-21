@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Shared Magic Key Character Rules
 ; DESCRIPTION:
-; Portable AHK twin of _shared/hotstrings/engine/magic_key.lua. The magic key
+; Portable AHK twin of _shared/hotstrings/engine/magic_key_rules.lua. The magic key
 ; is a configured character, never a physical key position (maintainer's
 ; decision of 2026-11-21): its default follows the layout that types (« ù » on
 ; AZERTY, « ; » on QWERTY, the manifest default elsewhere) and every

@@ -3297,6 +3297,7 @@
 	"shortcuts.eacute": "All shortcuts on the É key map to those of ",
 	"shortcuts.ecirc": "All shortcuts on the Ê key map to those of ",
 	"shortcuts.egrave": "All shortcuts on the È key map to those of ",
+	"shortcuts.star": "All shortcuts on the ★ key map to those of ",
 	"shortcuts.gethexvalue": "Win + X (heX) = Copy the HEX colour of the pixel under the cursor to clipboard",
 	"shortcuts.gpt": "Win + G(PT) = Open ChatGPT (configurable URL)",
 	"shortcuts.keep_awake_ended": "☕ Keep-awake ended",

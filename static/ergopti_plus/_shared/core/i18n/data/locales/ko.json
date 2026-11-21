@@ -3297,6 +3297,7 @@
 	"shortcuts.eacute": "É 키의 모든 단축키는 다음의 단축키에 해당합니다: ",
 	"shortcuts.ecirc": "Ê 키의 모든 단축키는 다음의 단축키에 해당합니다: ",
 	"shortcuts.egrave": "È 키의 모든 단축키는 다음의 단축키에 해당합니다: ",
+	"shortcuts.star": "★ 키의 모든 단축키는 다음의 단축키에 해당합니다: ",
 	"shortcuts.gethexvalue": "Win + X (heX) = 커서 아래 픽셀의 HEX 색상을 클립보드에 복사",
 	"shortcuts.gpt": "Win + G(PT) = ChatGPT 열기 (설정 가능한 URL)",
 	"shortcuts.keep_awake_ended": "☕ 절전 방지 종료",

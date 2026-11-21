@@ -8,7 +8,7 @@
 --- @param json table Shared JSON codec.
 --- @param shared_root string Absolute shared source directory.
 return function(helpers, json, shared_root)
-	local MagicKey = require("hotstrings.engine.magic_key")
+	local MagicKey = require("hotstrings.engine.magic_key_rules")
 	local function read(path)
 		local handle = assert(io.open(shared_root .. path, "rb"))
 		local text = handle:read("*a")

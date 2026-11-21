@@ -3297,6 +3297,7 @@
 	"shortcuts.eacute": "Éキーのすべてのショートカットは以下のキーのショートカットに対応します: ",
 	"shortcuts.ecirc": "Êキーのすべてのショートカットは以下のキーのショートカットに対応します: ",
 	"shortcuts.egrave": "Èキーのすべてのショートカットは以下のキーのショートカットに対応します: ",
+	"shortcuts.star": "★キーのすべてのショートカットは以下のキーのショートカットに対応します: ",
 	"shortcuts.gethexvalue": "Win + X (heX) = カーソル下のピクセルのHEXカラーをクリップボードにコピー",
 	"shortcuts.gpt": "Win + G(PT) = ChatGPTを開く (設定可能なURL)",
 	"shortcuts.keep_awake_ended": "☕ スリープ防止を終了しました",

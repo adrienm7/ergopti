@@ -1,4 +1,4 @@
---- _shared/hotstrings/engine/magic_key.lua
+--- _shared/hotstrings/engine/magic_key_rules.lua
 
 --- ==============================================================================
 --- MODULE: Magic Key Character Rules (shared)
