@@ -1,6 +1,9 @@
 {
 	"schema_version": 1,
 	"_comment": "SNU-12, decided by the maintainer on 2026-11-21 (docs/memory/maintainer-decisions.md): every end of a running keep-awake session while the driver keeps running shows one short notification, the same locale key on the three OS, through a transient notice with no window to close (a Windows tray balloon, a macOS alert banner, a Linux desktop notification). A session that was not running shows nothing, and the driver's own exit stays silent. Each case lists the drivers that replay it; a cause a driver does not have names why in `not_replayed`.",
+	"field_semantics": {
+		"not_replayed": "Descriptive: for each driver missing from the case drivers list, why that driver has no such end of session. Replays select their cases through drivers only."
+	},
 	"key": "shortcuts.keep_awake_ended",
 	"cases": [
 		{

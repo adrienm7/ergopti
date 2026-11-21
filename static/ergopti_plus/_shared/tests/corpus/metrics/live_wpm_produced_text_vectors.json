@@ -1,6 +1,9 @@
 {
 	"schema_version": 1,
 	"_comment": "MET-17, decided by the maintainer on 2026-11-21 (docs/memory/maintainer-decisions.md): the live speed (the WPM pill and the tray or menu bar readout) counts the text produced, as macOS does. A producer's output first takes back the characters it erased (a hotstring's trigger, the text an AI rewrite replaced), the newest ones at or before its time, then adds its own characters. Times are milliseconds from the case's start; `typed` is one keystroke, `produced` a producer's output of that many characters after `deletes` erased ones. `count` is the characters left in the window at `read_at`, `wpm` the readout under the shared timings (characters / 5 over max(read_at - oldest, wpm_min_duration_ms)), `gross_wpm` what the readout showed before on Windows and Linux. macOS is the reference this file transcribes (modules/keystats/init.lua notify_synthetic, remove_effective_timestamp_at_or_before); its live buffers have no clock seam, so it does not replay it.",
+	"field_semantics": {
+		"gross_wpm": "Descriptive: the readout Windows and Linux showed before MET-17, when the live speed counted keystrokes only. No replay feeds it; it records what the change moved away from."
+	},
 	"drivers": ["windows", "linux"],
 	"not_replayed": {
 		"macos": "The reference implementation: notify_synthetic removes one effective stamp per deleted character at or before the operation, then inserts the output; its buffers read hs.timer.absoluteTime with no clock seam."
