@@ -15,8 +15,8 @@
 // and only ever posts the allowlisted actions below; each host checks them
 // again before acting.
 // Keyboard and screen reader: the root names the interface language every
-// host seeds (window._i18n_locale), and a redraw keeps the focus on the row
-// the user acted on, on the three hosts.
+// host seeds (window._i18n_locale), a redraw keeps the focus on the row the
+// user acted on, and Escape posts close, on the three hosts.
 // ===========================================================================
 
 // ========================================
@@ -577,6 +577,16 @@ document.getElementById('btn-editor').addEventListener('click', function () {
 });
 
 document.getElementById('btn-close').addEventListener('click', function () {
+	send('close');
+});
+
+// Escape closes the window, as « Close » does and as Escape closes the Updates
+// window (UPD-03): the WebView holds the keyboard focus, so no host window
+// sees the key (LTP-07). The window keeps no unsaved work, and an operation
+// in flight goes on without it.
+document.addEventListener('keydown', function (event) {
+	if (event.key !== 'Escape' || event.defaultPrevented) return;
+	event.preventDefault();
 	send('close');
 });
 

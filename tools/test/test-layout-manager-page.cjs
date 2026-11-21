@@ -1563,6 +1563,30 @@ check('(ltp-06) a redraw keeps the focus on the row the user acted on', () => {
 	assert.equal(document.activeElement, byId.get('btn-close'));
 });
 
+// Escape did nothing in the layout manager on the three hosts, where it closes
+// the Updates window (UPD-03): the WebView holds the focus (LTP-07).
+check('(ltp-07) Escape closes the layout manager', () => {
+	const { document, messages } = loadPage();
+	const keydown = document.events.listeners.filter((entry) => entry.type === 'keydown');
+	assert.equal(keydown.length, 1, 'the page listens to the keyboard');
+	let prevented = false;
+	keydown[0].listener({
+		key: 'Escape',
+		defaultPrevented: false,
+		preventDefault: () => (prevented = true)
+	});
+	assert.deepEqual(plain(messages[messages.length - 1]), { action: 'close' });
+	assert.ok(prevented);
+	const count = messages.length;
+	keydown[0].listener({ key: 'Escape', defaultPrevented: true, preventDefault() {} });
+	keydown[0].listener({ key: 'Enter', defaultPrevented: false, preventDefault() {} });
+	assert.equal(
+		messages.length,
+		count,
+		'an Escape another control handled, or another key, closes nothing'
+	);
+});
+
 // =========================================
 // =========================================
 // ======= Localized host refusals =========
