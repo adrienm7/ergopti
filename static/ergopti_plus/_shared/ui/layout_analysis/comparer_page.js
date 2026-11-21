@@ -4416,26 +4416,33 @@
 		async function share() {
 			const { url, own, personal } = shareLink();
 			const status = $('la-share-status');
-			status.hidden = false;
+			// The status shows once its outcome is known: shown while the link is
+			// still being built and copied, it would announce a copy not yet made.
+			const report = (text) => {
+				status.textContent = text;
+				status.hidden = false;
+			};
+			status.hidden = true;
 			// The visitor's own layouts travel in the fragment (layout_formats.js toLink).
 			let link = url;
 			try {
 				if (own.length > 0) link = `${url}#${await window.LAYOUT_FORMATS.toLink(own)}`;
 			} catch (error) {
 				const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
-				status.textContent = t(refusal.key, refusal.values);
+				report(t(refusal.key, refusal.values));
 				return;
 			}
 			try {
 				await navigator.clipboard.writeText(link);
-				status.textContent =
+				report(
 					link.length > window.LAYOUT_FORMATS.LINK_LONG
 						? t('layout_analysis.share.copied_long', { size: format(link.length / 1024, 0) })
 						: personal
 							? t('layout_analysis.share.copied_partial')
-							: t('layout_analysis.share.copied');
+							: t('layout_analysis.share.copied')
+				);
 			} catch {
-				status.textContent = t('layout_analysis.share.failed', { url: link });
+				report(t('layout_analysis.share.failed', { url: link }));
 			}
 		}
 

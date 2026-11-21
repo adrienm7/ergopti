@@ -436,14 +436,26 @@ async function exerciseShareLinkLayouts(browser, origin) {
 			th.textContent.includes('My swap')
 		)
 	);
+	// A slow clipboard, as on a loaded CI runner: the status must wait for the
+	// copy, or this read sees the clipboard from before it (CI, 2026-11-21).
+	await page.evaluate(() => {
+		const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+		navigator.clipboard.writeText = (text) =>
+			new Promise((resolve) => setTimeout(resolve, 500)).then(() => write(text));
+	});
 	await page.click('#la-share');
 	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const shareStatus = await page.textContent('#la-share-status');
 	const link = await page.evaluate(() => navigator.clipboard.readText());
+	assert.ok(
+		link.startsWith(`${origin}/ui/layout_analysis/`),
+		`the Comparer's link is copied: ${link.slice(0, 120)} (status: ${shareStatus})`
+	);
 	const url = new URL(link);
 	assert.match(
 		url.hash,
 		/^#l=1\.[A-Za-z0-9_-]+$/,
-		`the link carries the layout: ${link.slice(0, 120)}`
+		`the link carries the layout: ${link.slice(0, 120)} (status: ${shareStatus})`
 	);
 	assert.equal(url.searchParams.get('layouts').split(',').sort().join(','), 'azerty,ergopti');
 	assert.equal(
