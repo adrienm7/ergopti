@@ -75,8 +75,8 @@ local ConfigKeys = require("settings.engine.keys")
 local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
 
 -- Keep-awake jitter parameters. The tick interval bounds + return delay come
--- from the shared cross-driver registry ([keep_awake]); the pixel offsets are
--- macOS-local (no AHK equivalent).
+-- from the shared cross-driver registry ([keep_awake]); the pixel offsets
+-- match Windows' AWAKE_JITTER_PX (modules/shortcuts/win.ahk).
 local AWAKE_TICK_MIN_SEC     = Timings.sec("keep_awake", "tick_min_ms")     -- Minimum interval between mouse-jitter ticks
 local AWAKE_TICK_MAX_SEC     = Timings.sec("keep_awake", "tick_max_ms")     -- Maximum interval between mouse-jitter ticks
 local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (visible but stays near origin)
@@ -431,6 +431,33 @@ stop_awake_input_watcher = function()
 end
 
 
+--- Credits the session that just ended, once, whatever ended it: a passive
+--- period of kind awake (the day's awake_ms, maintainer decision KMD-3) and
+--- the focused app's share, so the dashboard can subtract it from per-app
+--- stats when the user opted out of counting keep-awake time.
+local function credit_awake_session()
+	if not awake_started_at then return end
+	local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
+	local focused_app = awake_focused_app
+	awake_started_at  = nil
+	awake_focused_app = nil
+	if dur_ms <= 0 then return end
+	local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
+	if not ok_lm or type(log_manager) ~= "table" then
+		Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(log_manager))
+		return
+	end
+	if type(log_manager.log_passive_period) == "function" then
+		local logged, err = pcall(log_manager.log_passive_period, "awake", dur_ms)
+		if not logged then
+			Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(err))
+		end
+	end
+	if focused_app and type(log_manager.tag_awake_focus) == "function" then
+		pcall(log_manager.tag_awake_focus, focused_app, dur_ms)
+	end
+end
+
 --- Auto-disables keep-awake after the observing eventtap has returned.
 --- The activation token prevents an old queued callback from disabling a newer
 --- keep-awake session after a rapid OFF -> ON cycle.
@@ -448,23 +475,7 @@ local function auto_disable_awake(expected_started_at)
 
 	close_awake_alert()
 
-	-- Log duration so the dashboard accounts for the keep-awake period.
-	if awake_started_at then
-		local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
-		if dur_ms > 0 then
-			local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
-			if ok_lm and log_manager then
-				if type(log_manager.log_passive_period) == "function" then
-					pcall(log_manager.log_passive_period, "awake", dur_ms)
-				end
-				if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
-					pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
-				end
-			end
-		end
-		awake_started_at  = nil
-		awake_focused_app = nil
-	end
+	credit_awake_session()
 
 	Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
 end
@@ -486,25 +497,7 @@ function M.toggle_awake()
 		-- a scheduled "put the pointer back" firing up to AWAKE_RETURN_DELAY_SEC
 		-- after the user switched the feature off — a cursor that moves by itself
 		-- once nothing is supposed to be moving it.
-		-- Log the keep-awake duration as a special passive period AND tag the
-		-- focused app so the dashboard can subtract it from per-app stats
-		-- when the user opted out of counting keep-awake time.
-		if awake_started_at then
-			local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
-			if dur_ms > 0 then
-				local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
-				if ok_lm and log_manager then
-					if type(log_manager.log_passive_period) == "function" then
-						pcall(log_manager.log_passive_period, "awake", dur_ms)
-					end
-					if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
-						pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
-					end
-				end
-			end
-			awake_started_at  = nil
-			awake_focused_app = nil
-		end
+		credit_awake_session()
 
 		Logger.info(LOG, "Keep-awake disabled.")
 		-- Close the persistent banner first, THEN show the transient "off" toast so
@@ -641,11 +634,18 @@ function M.toggle_awake()
 	end
 end
 
---- Stops keep-awake cleanly; called when the bindings module shuts down.
+--- Stops keep-awake cleanly; called by the driver's pause and when the
+--- bindings module shuts down. A running session is credited and logged as
+--- the user's stop is, as on Windows and Linux.
 function M.stop_awake()
+	local was_active = awake_active == true
 	_awake_generation = _awake_generation + 1
 	awake_active = false
 	awake_grace_started_at = nil
+	if was_active then
+		credit_awake_session()
+		Logger.info(LOG, "Keep-awake stopped by the driver's pause or shutdown.")
+	end
 
 	local watcher_settled = stop_awake_input_watcher()
 	local return_timer_settled = cancel_awake_return_timer()

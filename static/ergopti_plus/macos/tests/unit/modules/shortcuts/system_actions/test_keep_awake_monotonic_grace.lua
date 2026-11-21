@@ -41,7 +41,8 @@ local OWNED_MODULES = {
 
 --- Runs one system owner against coherent real timing and provenance consumers.
 --- @param callback function Receives the system owner and native observations.
-local function with_awake(callback)
+--- @param log_manager table|nil The keystats log manager the session credits.
+local function with_awake(callback, log_manager)
 	local saved_random, saved_randomseed = math.random, math.randomseed
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope(OWNED_MODULES, function()
@@ -53,7 +54,8 @@ local function with_awake(callback)
 				assert(low == 0 and high == 1, "unexpected jitter random bounds")
 				return 1
 			end
-			local world = { awake = 10000, civil = 1700000000, taps = {}, timers = {}, closed = {}, errors = {} }
+			local world = { awake = 10000, civil = 1700000000, taps = {}, timers = {}, closed = {}, errors = {},
+				infos = {} }
 			local native = require("tests.stubs.hs")
 			_G.hs = native
 
@@ -107,6 +109,7 @@ local function with_awake(callback)
 
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
+			logger.info = function(_, format, ...) world.infos[#world.infos + 1] = string.format(format, ...) end
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.timing.engine.timings"] = {
 				sec = function(group, key)
@@ -131,6 +134,7 @@ local function with_awake(callback)
 				"core.text.engine.utils", "hotstrings.engine.expander.control_sentinels", "platform.input.key_state",
 				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
+			if log_manager then package.loaded["modules.keystats.log_manager"] = log_manager end
 			local System = require("modules.shortcuts.actions.system")
 			local Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_eq(System.toggle_awake(), true, "a healthy native watcher and tick must activate")
@@ -238,4 +242,66 @@ helpers.describe("keep-awake activation grace measures awake duration", function
 			observe_activity(kind, 0.1, 60, false)
 		end)
 	end
+end)
+
+
+--- A keystats log manager double that records the credited sessions.
+--- @return table log_manager
+--- @return table credited { kind, duration_ms } per call
+local function recording_log_manager()
+	local credited = {}
+	return {
+		log_passive_period = function(kind, duration_ms)
+			credited[#credited + 1] = { kind = kind, duration_ms = duration_ms }
+		end,
+	}, credited
+end
+
+--- Counts the lines that contain the needle.
+--- @param lines table
+--- @param needle string
+--- @return number
+local function matching(lines, needle)
+	local found = 0
+	for _, line in ipairs(lines) do
+		if line:find(needle, 1, true) then found = found + 1 end
+	end
+	return found
+end
+
+-- SNU-04: a pause or a shutdown ended the session without crediting the day's
+-- awake_ms or logging it, where Windows and Linux credit every finished session.
+helpers.describe("keep-awake credits a session the driver stops (snu-04)", function()
+	helpers.it("a pause credits the running session once and logs it", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 30
+			helpers.assert_eq(System.pause_awake(), true)
+			helpers.assert_eq(System.is_awake_active(), false)
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 30000 } },
+				"the paused session is the day's awake_ms")
+			helpers.assert_eq(matching(world.infos, "Keep-awake stopped by the driver's pause or shutdown."), 1)
+		end, log_manager)
+		helpers.assert_eq(#credited, 1, "the teardown after the pause credits nothing more")
+	end)
+
+	helpers.it("a shutdown credits the running session once", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 12
+			helpers.assert_eq(System.stop_awake(), true)
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 12000 } })
+		end, log_manager)
+		helpers.assert_eq(#credited, 1)
+	end)
+
+	helpers.it("the user's stop still credits once", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 5
+			System.toggle_awake()
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 5000 } })
+		end, log_manager)
+		helpers.assert_eq(#credited, 1)
+	end)
 end)
