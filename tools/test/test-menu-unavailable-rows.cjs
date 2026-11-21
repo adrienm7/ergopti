@@ -1007,8 +1007,9 @@ console.log(
 				linux[1]
 			) &&
 			/value = value,/.test(linux[1]) &&
-			/min = bounds\.min/.test(linux[1]) &&
-			/max = bounds\.max/.test(linux[1]) &&
+			// The setting's declaration reads the typed text (PCK-03): no range of the menu's own
+			/key = "llm\.generation\." \.\. setting\.name,/.test(linux[1]) &&
+			!/min = bounds\.min/.test(linux[1]) &&
 			/on_save = save,/.test(linux[1]) &&
 			/local saved, accepted, reason = pcall\(classified or retained or set, name, value, source, current, receipt, owner_current\)/.test(
 				linuxRequest[1]
@@ -1017,11 +1018,13 @@ console.log(
 			/pcall\(dialog\.text_prompt/.test(mac[1]) &&
 			/apply_setting_transaction\(\{/.test(mac[1]) &&
 			/key = key/.test(mac[1]) &&
-			/value = final_val/.test(mac[1]) &&
+			// The shared entry grammar reads the typed text (PCK-14)
+			/parse_declared\(title, schema_key, raw\)/.test(mac[1]) &&
+			/value = new_val/.test(mac[1]) &&
 			/runtime_fn = hs_fn/.test(mac[1]) &&
 			/publish_setting = true/.test(mac[1]) &&
-			/"llm_temperature", nil, "set_llm_temperature"/.test(source.mac) &&
-			/"llm_context_length", nil, "set_llm_context_length"/.test(source.mac) &&
+			/"llm_temperature", "set_llm_temperature"/.test(source.mac) &&
+			/"llm_context_length", "set_llm_context_length"/.test(source.mac) &&
 			/Ui_InputBox\(/.test(windows) &&
 			/_LLM_Menu_TryNormalizeIntegerPrompt\(/.test(windows) &&
 			/LLM_Menu_CommitMutation\(/.test(windows) &&
@@ -1052,6 +1055,7 @@ console.log(
 		['linux', 'numeric_setting_request(ctx.on_menu_changed, Settings,'],
 		['linux', 'on_save = save,'],
 		['mac', 'pcall(dialog.text_prompt'],
+		['mac', 'parse_declared(title, schema_key, raw)'],
 		['mac', 'runtime_fn = hs_fn'],
 		['mac', 'publish_setting = true'],
 		['windows', '_LLM_Menu_SetCandidateValue(Candidate, key, val)'],

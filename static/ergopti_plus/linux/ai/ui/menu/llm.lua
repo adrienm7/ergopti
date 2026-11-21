@@ -262,7 +262,6 @@ local function _build_llm(ctx)
 					["llm_debounce_is_never"] = function() return never end,
 				}) or {}) do delay_choices[#delay_choices + 1] = row end
 			end
-			local bounds = TriggerSettings.bounds(name)
 			local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
 				[require("settings.engine.keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
 					local ok_prompt, Prompt = pcall(require, "core.ui.ui.numeric_prompt")
@@ -282,13 +281,12 @@ local function _build_llm(ctx)
 					local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
 						"ai.engine.settings.trigger_settings", name, "llm.trigger." .. name)
 					if not save then return false end
+					-- The declaration reads the typed text: a fraction of a millisecond is refused, not floored
 					Prompt.ask({
 						title = i18n_safe(title_key),
-						hint = string.format("%d – %d ms", bounds.min, bounds.max),
+						key = "llm.trigger." .. name,
 						value = value,
-						min = bounds.min,
-						max = bounds.max,
-						on_save = function(number, page_current) return save(math.floor(number), page_current) end,
+						on_save = save,
 					}, ctx.webview)
 				end,
 			})
@@ -1086,10 +1084,8 @@ local function _build_llm(ctx)
 						if not save then return false end
 						Prompt.ask({
 							title = i18n_safe(setting.key),
-							hint = string.format("%s – %s", tostring(bounds.min), tostring(bounds.max)),
+							key = "llm.generation." .. setting.name,
 							value = value,
-							min = bounds.min,
-							max = bounds.max,
 							on_save = save,
 						}, ctx.webview)
 					end,

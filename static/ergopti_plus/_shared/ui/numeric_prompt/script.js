@@ -13,18 +13,18 @@
 // instead, so both have presets AND free entry.
 //
 // FEATURES & RATIONALE:
-// 1. The host owns the bounds. The page draws whatever range it is given rather
-//    than knowing about temperature or context length, so a second setting
-//    needs no second page.
-// 2. It refuses out of range rather than clamping. Clamping would return a
-//    number the user did not type while showing them the one they did.
-// 3. It says why. An input that rejects silently reads as a broken button.
+// 1. The host owns the rule. The page sends the text as typed and the host
+//    reads it with the shared value check, so « 0,7 », a fraction in a whole
+//    number or a value out of range is judged as macOS and Windows judge it,
+//    not by the field's own number parser.
+// 2. It refuses rather than clamping or rounding. Either would save a number
+//    the user did not type while showing them the one they did.
+// 3. It says why: the host's refusal names the accepted range, and the field
+//    is marked invalid for a screen reader.
 // ===========================================================================
 
 const post = makeHostBridge('numeric_prompt_bridge');
 
-/** The range the host declared, filled by receive_prompt. */
-let bounds = { min: null, max: null };
 /** Monotonic host request identity; prevents a retained page answering its successor. */
 let requestEpoch = null;
 
@@ -37,16 +37,28 @@ function showError(message) {
 	if (!box) return;
 	box.textContent = message || '';
 	box.hidden = !message;
+	const input = document.getElementById('value-input');
+	if (input) input.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+/**
+ * Shows the host's refusal of the typed text, and returns to the field.
+ * Called by the host after it refused a save.
+ * @param {string} message - Localized refusal naming what is accepted.
+ */
+function show_refusal(message) {
+	showError(typeof message === 'string' ? message : '');
+	const input = document.getElementById('value-input');
+	if (input) input.focus();
 }
 
 /**
  * Fills the window from the host's request.
  * Called by the host after the page reports itself ready.
- * @param {object} request - { title, hint, value, min, max }
+ * @param {object} request - { title, hint, value, range, request_epoch }
  */
 function receive_prompt(request) {
 	if (!request || typeof request !== 'object') return;
-	bounds = { min: request.min, max: request.max };
 	requestEpoch = typeof request.request_epoch === 'number' ? request.request_epoch : null;
 	showError('');
 
@@ -57,52 +69,20 @@ function receive_prompt(request) {
 
 	const input = document.getElementById('value-input');
 	if (input) {
-		if (typeof request.min === 'number') input.min = String(request.min);
-		if (typeof request.max === 'number') input.max = String(request.max);
 		input.value = request.value === undefined ? '' : String(request.value);
 		input.focus();
 		input.select();
 	}
 
 	const range = document.getElementById('range-hint');
-	if (range && typeof request.min === 'number' && typeof request.max === 'number') {
-		range.textContent = request.min + ' – ' + request.max;
-	}
+	if (range) range.textContent = typeof request.range === 'string' ? request.range : '';
 	showError('');
 }
 
-/**
- * A translated string from the strings i18n.js stored. The page called a
- * window-level translator that nothing defines, so every refusal showed an
- * empty, hidden message and the window seemed to ignore the click.
- */
-function _t(key) {
-	const strings = window._i18n_strings || {};
-	return strings[key] !== undefined ? strings[key] : key;
-}
-
-/** Sends the typed value back, or reports why it cannot. */
+/** Sends the text as typed; the host reads it and answers a refusal with show_refusal. */
 function doSave() {
 	const input = document.getElementById('value-input');
-	const raw = input ? input.value : '';
-	const value = Number(raw);
-
-	// An empty field is not zero. Number('') is 0, and saving that would set a
-	// temperature of zero for a user who cleared the box to start over.
-	if (raw === '' || Number.isNaN(value)) {
-		showError(_t('numeric_prompt.not_a_number'));
-		return;
-	}
-	if (typeof bounds.min === 'number' && value < bounds.min) {
-		showError(_t('numeric_prompt.out_of_range'));
-		return;
-	}
-	if (typeof bounds.max === 'number' && value > bounds.max) {
-		showError(_t('numeric_prompt.out_of_range'));
-		return;
-	}
-
-	post({ action: 'save', value: value, request_epoch: requestEpoch });
+	post({ action: 'save', text: input ? input.value : '', request_epoch: requestEpoch });
 }
 
 /** Closes without changing anything. */
@@ -115,6 +95,7 @@ window.addEventListener('load', function () {
 	const input = document.getElementById('value-input');
 	if (input) {
 		input.addEventListener('keydown', function (event) {
+			if (event.isComposing) return;
 			if (event.key === 'Enter') doSave();
 			if (event.key === 'Escape') doCancel();
 		});

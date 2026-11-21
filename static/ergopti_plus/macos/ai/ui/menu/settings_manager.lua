@@ -182,66 +182,52 @@ local function reject_numeric_input(title, reason_key)
 	return false
 end
 
---- Refuses a value its shared value schema declaration refuses, with the
---- localized text naming the accepted range.
+--- Reads typed text through its shared value schema declaration: the entry
+--- grammar of value_check_vectors.json, which Windows and Linux replay too
+--- (« 0,7 » and « +5 » are numbers, « 1e3 » and « 0x10 » are not), and the
+--- localized text naming the accepted range on a refusal.
 --- @param title string Localized prompt title.
 --- @param key string Value schema key.
---- @param value any Candidate in the declared unit.
---- @return boolean refused True when the value was refused (and notified).
-local function refuse_outside_declaration(title, key, value)
+--- @param raw string Typed text.
+--- @return number|nil value The value in the declared unit, nil when refused (and notified).
+local function parse_declared(title, key, raw)
 	local ValueCheck = require("settings.engine.value_check")
-	local checked = ValueCheck.check_value(ValueCheck.declaration(key), value)
-	if checked.ok then return false end
-	Logger.warn(LOG, "Numeric input for %s refused (%s).", key, checked.reason)
+	local parsed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+	if parsed.ok then return parsed.value end
+	Logger.warn(LOG, "Numeric input for %s refused (%s).", key, parsed.reason)
 	local ok, notified = Logger.callback(LOG, "Numeric input rejection notification", Notifications.notify,
-		tostring(title), ValueCheck.refusal_text(key, checked, i18n.get), "warning")
+		tostring(title), ValueCheck.refusal_text(key, parsed, i18n.get), "warning")
 	if ok ~= true or notified ~= true then
 		Logger.warn(LOG, "Numeric input rejection notification was refused.")
 	end
-	return true
+	return nil
 end
 
---- Opens a standardized numeric input prompt and updates the state.
+--- Opens a standardized numeric input prompt and updates the state. The typed
+--- value passes its value schema declaration, which owns the range and whether
+--- a fraction is admitted.
 --- @param deps table Global dependencies.
 --- @param apply_setting_transaction function Transaction owner.
 --- @param title string Dialog title.
 --- @param msg string Dialog informative text.
 --- @param key string The state key to update.
---- @param factor number|nil Multiply factor for display (e.g. 1000 for ms).
 --- @param hs_fn string|nil The keymap function name to sync the value.
 --- @param default_val number|string|nil The fallback default value.
---- @param min_val number|nil Minimum allowed value.
---- @param max_val number|nil Maximum allowed value.
---- @param integer_only boolean|nil Refuse a fractional value (a count, not a measure).
---- @param schema_key string|nil Value schema key whose declaration the typed value must pass.
-local function generic_numeric_prompt(
-	deps,
-	apply_setting_transaction,
-	title,
-	msg,
-	key,
-	factor,
-	hs_fn,
-	default_val,
-	min_val,
-	max_val,
-	integer_only,
-	schema_key
-)
+--- @param schema_key string Value schema key whose declaration the typed value must pass.
+local function generic_numeric_prompt(deps, apply_setting_transaction, title, msg, key, hs_fn, default_val, schema_key)
+	if type(schema_key) ~= "string" then error("generic_numeric_prompt: a value schema key is required", 2) end
 	local state = deps.state
 
 	local current_val = tonumber(state[key])
 	if current_val == nil then current_val = tonumber(default_val) or 0 end
-	local display_val = factor and math.floor(current_val * factor) or current_val
-	local display_def = (factor and tonumber(default_val)) and math.floor(tonumber(default_val) * factor) or default_val
 
-	local full_msg = tostring(msg) .. string.format(i18n.get("menu.settings.reset_instruction"), tostring(display_def))
+	local full_msg = tostring(msg) .. string.format(i18n.get("menu.settings.reset_instruction"), tostring(default_val))
 
 	Logger.debug(LOG, string.format("Opening numeric prompt for %s…", key))
 	local ok_p, btn, raw = pcall(dialog.text_prompt,
 		tostring(title),
 		full_msg,
-		tostring(display_val),
+		tostring(current_val),
 		i18n.get("button.ok"), i18n.get("common.cancel")
 	)
 
@@ -250,32 +236,15 @@ local function generic_numeric_prompt(
 		if raw:match("^%s*$") then
 			new_val = tonumber(default_val) or 0
 		else
-			new_val = tonumber(raw)
+			new_val = parse_declared(title, schema_key, raw)
+			if new_val == nil then return false end
 		end
-		
-		if new_val and integer_only and new_val ~= math.floor(new_val) then
-			-- The shared prompt builder slices the context by this count; a
-			-- fraction made it extract an empty context.
-			return reject_numeric_input(title)
-		elseif new_val and is_finite_number(new_val) then
-			if schema_key and refuse_outside_declaration(title, schema_key, new_val) then return false end
-			if (min_val and new_val < min_val) or (max_val and new_val > max_val) then
-				return reject_numeric_input(title, "numeric_prompt.out_of_range")
-			end
-
-			-- Reverse the factor if applied
-			local final_val = factor and (new_val / factor) or new_val
-			return apply_setting_transaction({
-				key = key,
-				value = final_val,
-				runtime_fn = hs_fn,
-				publish_setting = true,
-			})
-		elseif new_val then
-			return reject_numeric_input(title, "numeric_prompt.out_of_range")
-		else
-			return reject_numeric_input(title)
-		end
+		return apply_setting_transaction({
+			key = key,
+			value = new_val,
+			runtime_fn = hs_fn,
+			publish_setting = true,
+		})
 	end
 end
 
@@ -564,11 +533,11 @@ function M.new(deps)
 			else
 				-- The typed milliseconds pass the shared value schema first: a
 				-- value between -1 and 0 (other than -1) is no longer admitted.
-				local typed_ms = tonumber(raw)
-				if typed_ms and refuse_outside_declaration(i18n.get("menu.settings.delay_title"),
-					require("settings.engine.keys").KEY.LLM_TRIGGER_DEBOUNCE_MS, typed_ms) then return false end
+				local typed_ms = parse_declared(i18n.get("menu.settings.delay_title"),
+					require("settings.engine.keys").KEY.LLM_TRIGGER_DEBOUNCE_MS, raw)
+				if typed_ms == nil then return false end
 				new_val = typed_ms
-				if new_val and new_val >= 0 then new_val = new_val / 1000 end
+				if new_val >= 0 then new_val = new_val / 1000 end
 			end
 			
 			if new_val and is_finite_number(new_val) and new_val >= -1 then
@@ -606,11 +575,10 @@ function M.new(deps)
 			if raw:match("^%s*$") then
 				new_val = llm_mod.DEFAULT_STATE.llm_min_request_interval
 			else
-				local typed_ms = tonumber(raw)
-				if typed_ms and refuse_outside_declaration(i18n.get("menu.settings.min_interval_title"),
-					require("settings.engine.keys").KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS, typed_ms) then return false end
-				new_val = typed_ms
-				if new_val and new_val >= 0 then new_val = new_val / 1000 end
+				local typed_ms = parse_declared(i18n.get("menu.settings.min_interval_title"),
+					require("settings.engine.keys").KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS, raw)
+				if typed_ms == nil then return false end
+				new_val = typed_ms / 1000
 			end
 
 			if new_val and is_finite_number(new_val) and new_val >= 0 then
@@ -643,13 +611,9 @@ function M.new(deps)
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
 		if ok_p and btn == i18n.get("button.ok") then
-			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then
-				return reject_numeric_input(i18n.get("menu.settings.max_words_title"))
-			end
-			local new_val = tonumber(digits) or 0
-			if refuse_outside_declaration(i18n.get("menu.settings.max_words_title"),
-				require("settings.engine.keys").KEY.LLM_GENERATION_MAX_WORDS, new_val) then return false end
+			local new_val = parse_declared(i18n.get("menu.settings.max_words_title"),
+				require("settings.engine.keys").KEY.LLM_GENERATION_MAX_WORDS, raw)
+			if new_val == nil then return false end
 
 			return obj.apply_setting_transaction({
 				key = "llm_max_words",
@@ -677,13 +641,9 @@ function M.new(deps)
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
 		if ok_p and btn == i18n.get("button.ok") then
-			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then
-				return reject_numeric_input(i18n.get("menu.settings.min_words_title"))
-			end
-			local new_val = tonumber(digits) or 1
-			if refuse_outside_declaration(i18n.get("menu.settings.min_words_title"),
-				require("settings.engine.keys").KEY.LLM_GENERATION_MIN_WORDS, new_val) then return false end
+			local new_val = parse_declared(i18n.get("menu.settings.min_words_title"),
+				require("settings.engine.keys").KEY.LLM_GENERATION_MIN_WORDS, raw)
+			if new_val == nil then return false end
 
 			return obj.apply_setting_transaction({
 				key = "llm_min_words",
@@ -704,7 +664,7 @@ function M.new(deps)
 		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
 			i18n.get("menu.settings.temperature_title"),
 			i18n.get("menu.llm.temperature_prompt"),
-			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, nil, nil, nil,
+			"llm_temperature", "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature,
 			require("settings.engine.keys").KEY.LLM_GENERATION_TEMPERATURE
 		)
 	end
@@ -725,8 +685,8 @@ function M.new(deps)
 		return generic_numeric_prompt(deps, apply_context,
 			i18n.get("menu.settings.context_length_title"),
 			i18n.get("menu.llm.context_length_prompt"),
-			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,
-			nil, nil, true, require("settings.engine.keys").KEY.LLM_GENERATION_CONTEXT_LENGTH
+			"llm_context_length", "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,
+			require("settings.engine.keys").KEY.LLM_GENERATION_CONTEXT_LENGTH
 		)
 	end
 	

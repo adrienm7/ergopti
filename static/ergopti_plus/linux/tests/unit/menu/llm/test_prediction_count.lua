@@ -285,8 +285,9 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(#f.log.prompts, 1)
 				local prompt = f.log.prompts[1]
 				helpers.assert_true(rawequal(prompt.webview, f.webview))
-				helpers.assert_eq(prompt.spec.min, context.min)
-				helpers.assert_eq(prompt.spec.max, context.max)
+				-- The declaration reads the typed text (pck-03): no range of the menu's own
+				helpers.assert_eq(prompt.spec.key, context.declaration)
+				helpers.assert_nil(prompt.spec.min); helpers.assert_nil(prompt.spec.max)
 				helpers.assert_eq(prompt.spec.value, context.current)
 				if context.name == "debounce_ms" then
 					-- Headed by the declared caption of the AI trigger group, not a

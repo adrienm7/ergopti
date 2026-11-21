@@ -123,7 +123,8 @@ function M.with_configuration(body)
 		end
 		function f.save(value)
 			local request = assert(received[#received], "a real prompt request was published")
-			return prompt.on_message({ action = "save", value = value, request_epoch = request.request_epoch }, {})
+			-- The page sends the text as typed
+			return prompt.on_message({ action = "save", text = tostring(value), request_epoch = request.request_epoch }, {})
 		end
 		body(f)
 	end, debug.traceback)

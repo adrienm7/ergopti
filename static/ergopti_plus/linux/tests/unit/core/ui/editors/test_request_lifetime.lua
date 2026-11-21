@@ -51,7 +51,7 @@ local function scenario(body)
 	}
 	state.manager = manager
 	state.ask = function(title, callback)
-		return Prompt.ask({ title = title, value = 2, min = 0, max = 10,
+		return Prompt.ask({ title = title, value = 2, key = "llm.generation.min_words",
 			on_save = callback or function() state.saves = state.saves + 1; return true end }, manager)
 	end
 	state.latest_epoch = function() return state.pushed[#state.pushed].request_epoch end
@@ -65,7 +65,7 @@ end
 --- @param epoch number Exact request identity.
 --- @return table
 local function save(prompt, epoch)
-	return prompt.on_message({ action = "save", value = 3, request_epoch = epoch }, {})
+	return prompt.on_message({ action = "save", text = "3", request_epoch = epoch }, {})
 end
 
 helpers.describe("Numeric prompt exact request lifetime", function()
@@ -155,7 +155,7 @@ helpers.describe("Numeric prompt exact request lifetime", function()
 					state.on_hide = nil
 					helpers.assert_true(state.ask("Second"))
 				end
-				local result = prompt.on_message({ action = action, value = 3, request_epoch = first }, {})
+				local result = prompt.on_message({ action = action, text = "3", request_epoch = first }, {})
 				helpers.assert_eq(state.visible, true); helpers.assert_eq(prompt.is_pending(), true)
 				helpers.assert_eq(result.closed, false); helpers.assert_eq(result.stale, true)
 				helpers.assert_eq(prompt.on_message("ready", {}).request.title, "Second")

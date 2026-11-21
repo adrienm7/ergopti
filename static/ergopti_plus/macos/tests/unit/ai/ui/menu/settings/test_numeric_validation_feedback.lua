@@ -4,7 +4,9 @@
 --- MODULE: LLM Numeric Setting Validation Feedback
 --- DESCRIPTION:
 --- Ensures every numeric prompt reports rejected input to the user before
---- returning, without mutating runtime or persisted settings.
+--- returning, without mutating runtime or persisted settings, and reads typed
+--- text with the shared entry grammar (pck-14): « 0,8 » is a number, as on
+--- Windows and Linux, and a refusal names the declared range.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -139,27 +141,38 @@ local INVALID_ROUTES = {
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
-		name = "temperature decimal comma",
-		raw = "0,8",
+		name = "temperature exponent",
+		raw = "1e-1",
 		title = "menu.settings.temperature_title",
+		body = "dialog.value_check.range_decimal",
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
 		name = "context length garbage",
 		raw = "garbage",
 		title = "menu.settings.context_length_title",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_context_length() end,
 	},
 	{
 		name = "fractional context length",
 		raw = "80.5",
 		title = "menu.settings.context_length_title",
+		body = "dialog.value_check.range_integer_unit",
+		invoke = function(manager) return manager.set_context_length() end,
+	},
+	{
+		name = "hexadecimal context length",
+		raw = "0x100",
+		title = "menu.settings.context_length_title",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_context_length() end,
 	},
 	{
 		name = "debounce garbage",
 		raw = "garbage",
 		title = "menu.settings.delay_title",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
@@ -180,6 +193,7 @@ local INVALID_ROUTES = {
 		name = "request interval garbage",
 		raw = "garbage",
 		title = "menu.settings.min_interval_title",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_request_interval() end,
 	},
 	{
@@ -200,12 +214,14 @@ local INVALID_ROUTES = {
 		name = "fractional maximum word count",
 		raw = "1.5",
 		title = "menu.settings.max_words_title",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_max_words() end,
 	},
 	{
 		name = "negative minimum word count",
 		raw = "-2",
 		title = "menu.settings.min_words_title",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_words() end,
 	},
 	{
@@ -239,6 +255,21 @@ helpers.describe("settings_manager numeric validation feedback", function()
 			end)
 		end)
 	end
+
+	helpers.it("pck-14: a decimal comma is a number, as on Windows and Linux", function()
+		with_fixture("0,8", function(manager, observations)
+			helpers.assert_eq(manager.set_temperature(), true)
+			helpers.assert_eq(observations.applications[1].value, 0.8)
+			helpers.assert_eq(#observations.notifications, 0)
+		end)
+	end)
+
+	helpers.it("pck-14: a leading plus is a number, as on Windows and Linux", function()
+		with_fixture("+12", function(manager, observations)
+			helpers.assert_eq(manager.set_min_words(), true)
+			helpers.assert_eq(observations.applications[1].value, 12)
+		end)
+	end)
 
 	helpers.it("accepts the maximum context length without clamping", function()
 		with_fixture("4000", function(manager, observations)
@@ -291,3 +322,30 @@ helpers.describe("settings_manager numeric validation feedback", function()
 		end)
 	end)
 end)
+
+--- Types one vector into the real temperature dialog, its declaration replaced by the vector's.
+--- @param declaration table Vector declaration.
+--- @param text string Typed text.
+--- @return table { saved, value, message }
+local function type_into_dialog(declaration, text)
+	local got = nil
+	with_fixture(text, function(manager, observations)
+		local ValueCheck = require("settings.engine.value_check")
+		local real = ValueCheck.declaration
+		ValueCheck.declaration = function() return declaration end
+		local ok, result = pcall(manager.set_temperature)
+		ValueCheck.declaration = real
+		if not ok then error(result, 0) end
+		local application = observations.applications[1]
+		local notification = observations.notifications[1]
+		got = {
+			saved = result == true and application ~= nil,
+			value = application and application.value,
+			message = notification and notification.body,
+		}
+	end)
+	return got
+end
+
+require("tests.lua.numeric_entry_contract").register(helpers, helpers.shared, type_into_dialog,
+	function(key) return key end)

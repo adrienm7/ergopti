@@ -29,8 +29,7 @@ module.exports = [
 				title: 'Température',
 				hint: 'Plus la valeur est haute, plus les suggestions sont variées.',
 				value: 0.7,
-				min: 0,
-				max: 2,
+				range: 'Saisissez un nombre de 0 à 1,3.',
 				request_epoch: 3
 			});
 		},

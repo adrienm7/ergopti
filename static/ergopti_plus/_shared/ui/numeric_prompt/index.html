@@ -19,9 +19,11 @@
 				<!-- The field has no label of its own: the question above names it and
 				     the hint, the range and a refusal describe it (WCAG 1.3.1, 3.3.2). -->
 				<input
-					type="number"
+					type="text"
 					id="value-input"
-					step="any"
+					inputmode="decimal"
+					autocomplete="off"
+					spellcheck="false"
 					aria-labelledby="prompt-title"
 					aria-describedby="prompt-hint range-hint error"
 				/>
