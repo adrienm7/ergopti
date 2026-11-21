@@ -82,12 +82,23 @@ const CURATED_READS = [
 	},
 	{
 		reader: 'ergopti_plus/macos/menu/ui/init.lua',
+		needles: ['MenubarLogo.choose(base_dir .. "../../img/logo/"'],
+		targets: [
+			'img/logo/logo_simple.png',
+			'img/logo/logo_simple_disabled.png',
+			'img/logo/logo_black.png',
+			'img/logo/logo_white.png'
+		],
+		why: 'the menu bar icon passes the logo folder to the logo chooser'
+	},
+	{
+		reader: 'ergopti_plus/macos/menu/ui/menubar_logo.lua',
 		needles: [
-			'base_dir .. "../../img/logo/"',
 			'"logo_simple.png"',
 			'"logo_simple_disabled.png"',
 			'"logo_black.png"',
-			'"logo_white.png"'
+			'"logo_white.png"',
+			'logo_dir .. (paused and files.paused or files.active)'
 		],
 		targets: [
 			'img/logo/logo_simple.png',
@@ -95,7 +106,7 @@ const CURATED_READS = [
 			'img/logo/logo_black.png',
 			'img/logo/logo_white.png'
 		],
-		why: 'the menu bar icon joins one of four logo names to the logo folder'
+		why: 'the logo chooser joins one of four logo names to the logo folder'
 	},
 	{
 		reader: 'ergopti_plus/macos/core/ui/engine/notifications.lua',
