@@ -243,14 +243,21 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
 - Computed once per store version: macOS and Linux keep the projection with the store's `meta.rev` (bumped by every
   ingest), Windows with a hash of the keystats files' paths, sizes and modification times (the `cache` folder left
   out: it holds only derived projections); an unchanged store answers at once, without a read.
-- Saved read (Windows): the worker validates and replays the new events and may re-save the reader image before
-  it answers (30 s and more on a 1.1 GB image), so the resident saves each complete read in
-  `metrics\cache\studio_ngrams.json` (a header line with the store stamp, then the JSON) and pushes it as soon as
-  a window asks, before the worker's fresh read; a saved read of the unchanged store is the answer. The file holds
-  the same n-gram counts as the reader image beside it, in clear like them (at-rest encryption covers typed text,
-  not these aggregates), and the cache folder's ignore rule keeps it out of any sync. A metrics purge and the
-  dashboard's cache reset remove it, and a read that overlapped a purge is read again rather than saved. macOS and
-  Linux read their store directly (no replay), so only their first read after a restart costs the query.
+- Saved read (every driver): each complete read is saved in the contract's snapshot format (a header line, the
+  format word then the store stamp, then the JSON) and pushed as soon as a window asks, before the fresh read; a
+  saved read of the unchanged store is the answer. Windows keeps it in `metrics\cache\studio_ngrams.json`: its
+  worker validates and replays the new events and may re-save the reader image before it answers (30 s and more on
+  a 1.1 GB image). macOS keeps it beside `db.sqlite` in its keystats cache folder, Linux beside `metrics.sqlite`
+  (created 0600 like the store), and both read on the main loop's next turn, after the saved read reached the page
+  (the first read after a restart pays the whole store: 4.5 s with a cold page cache on a 1.1 GB image). The file
+  holds the same n-gram counts as the store beside it, in clear like them (at-rest encryption covers typed text,
+  not these aggregates), in a folder no sync carries. A saved read out of its format, of another schema or of
+  another source is logged and never shown; the format's accepted and refused cases are the vectors of
+  `_shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json`, replayed by the three drivers. A metrics
+  purge and the dashboard's cache reset remove it (a purge reports success only once it is gone), and a macOS
+  cache rebuilt from the ledgers, whose `meta.rev` starts again, drops the previous one. On Windows a read that
+  overlapped a purge is read again rather than saved; macOS and Linux read and save on the main loop, so the
+  purge's completion, which removes the file, runs after any save of a read made before it.
 - The page publishes each host answer as a `studio-ngrams` DOM event for the analysis panel and « Comparer »; a
   host may answer twice (a saved projection at once, then the fresh one). The first arrival selects « My typing »,
   even before the panel or the Comparer exists; a later one replaces its tables without changing the user's corpus

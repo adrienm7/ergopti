@@ -186,7 +186,12 @@ Hands needed:
       Optimiser: the « Optimiser » tab opens the optimizer; after « Analyse my typing », « My typing » is its chosen
       corpus; « Optimize » with 10 s runs to « Done » with a score, the window staying usable while it runs on the page;
       « Open in the editor » opens the result in a new tab of « Éditer » and « Compare with other layouts » adds it in «
-      Comparer »; its choices are back after closing and reopening the window.
+      Comparer »; its choices are back after closing and reopening the window. « Ma frappe » at once (2026-11-21):
+      open the Studio once and wait for « Ma frappe » (`studio_ngrams.json` appears beside `db.sqlite` in the
+      keystats cache folder), reload Hammerspoon, type a few words, reopen the Studio: « Ma frappe » is the chosen
+      corpus within a second (the saved read), then its counts change a little when the fresh read lands, without
+      changing a corpus picked meanwhile; note how long the menu bar stays busy on a large store. After the
+      dashboard's « Purge » or cache reset, the next Studio open shows no saved read.
 - [ ] <!-- field-point: one_shot_modifiers --> One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », the
       one-shot Shift and a gesture-armed `sticky_*` then never auto-cancel; a Karabiner tap-hold key set to tap
       `sticky_altgr` and hold Option types one Option-level character after a tap.

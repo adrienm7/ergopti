@@ -116,7 +116,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       Optimiser: the « Optimiser » tab opens the optimizer; after « Analyse my typing », « My typing » is its chosen
       corpus; « Optimize » with 10 s runs to « Done » with a score, the window staying usable while it runs on the page;
       « Open in the editor » opens the result in a new tab of « Éditer » and « Compare with other layouts » adds it in «
-      Comparer »; its choices are back after closing and reopening the window.
+      Comparer »; its choices are back after closing and reopening the window. « Ma frappe » at once (2026-11-21):
+      open the Studio once and wait for « Ma frappe » (`studio_ngrams.json` appears beside `metrics.sqlite`, mode
+      0600), restart the driver, type a few words, reopen the Studio: « Ma frappe » is the chosen corpus within a
+      second (the saved read), then its counts change a little when the fresh read lands, without changing a corpus
+      picked meanwhile. After the dashboard's « Purge » or cache reset, the next Studio open shows no saved read.
 - [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler: the XKB export of
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a, α
       (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl) on a real GNOME or KDE session.

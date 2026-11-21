@@ -226,13 +226,14 @@ waits for the maintainer's review).
       `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and
       emulate any layout source the same way (a patch per layout, or a default patch for layouts without Ergopti+
       levels); the selector's older Ergopti versions (1.1 to 2.1) stay frozen snapshots without a source.
-- [ ] **[LATER] « Ma frappe » saved read on macOS and Linux (2026-11-17).** Windows pushes its last complete Studio
-      read at once (`metrics\cache\studio_ngrams.json`) because its worker replays new events and may re-save a
-      1.1 GB reader image first (30 s and more). macOS and Linux have no such worker: they read `db.sqlite` read only
-      and keep the projection per `meta.rev`, so only the first open after a restart pays the read. The same SQL took
-      0.75 s warm and 4.5 s with a cold page cache on the maintainer's 1.1 GB image (290 KB of JSON). Measure that
-      first open on a large macOS store (Hammerspoon reads on its main thread) and on Linux before deciding whether
-      they save the read too.
+- [ ] **« Ma frappe » saved read on macOS and Linux, field check (2026-11-21).** macOS and Linux now save each
+      complete Studio read beside their store, in the Windows format (`_shared/metrics/data/studio_ngrams.json`,
+      `snapshot`; vectors in `_shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json`), show it at once and
+      read the store on the next turn; the purge and the dashboard reset remove it. Left: the first open after a
+      restart still reads the whole store on the main thread (the same SQL took 0.75 s warm and 4.5 s with a cold
+      page cache on the maintainer's 1.1 GB image), now after the saved read is shown. Measure it on a large macOS
+      store and on Linux (the « Ma frappe » at once checks of TODO-tests-macos.md and TODO-tests-linux.md) before
+      moving the read off the main thread.
 - [ ] **« Ma frappe » fresh read on Windows (2026-11-18).** The Studio now shows the saved read at once (its marker
       keys made every tab refuse it before) and its SQL projection takes 1.7 s instead of 3.8 s on the maintainer's
       1.1 GB reader image, and the read reaches the window as soon as the worker writes its stage, before the
