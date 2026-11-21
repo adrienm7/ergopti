@@ -138,7 +138,8 @@ const STUDIO = new Set([
 	'layout_editor',
 	'layout_editor_window',
 	'layout_manager',
-	'layout_optimizer'
+	'layout_optimizer',
+	'layout_try'
 ]);
 const PHYSICAL = [
 	/(?<![-\w])(margin|padding|border)-(left|right)(-\w+)?\s*:/,

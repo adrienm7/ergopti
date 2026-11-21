@@ -39,6 +39,7 @@ const PAGE_DIR = path.join(UI, 'layout_try');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const SCRIPTS = [
 	'../a11y_prefs.js',
+	'../page_locale.js',
 	'../theme_choice.js',
 	'../i18n.js',
 	'../host_bridge.js',

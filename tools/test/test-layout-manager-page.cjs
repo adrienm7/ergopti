@@ -223,6 +223,10 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		atob: (text) => Buffer.from(text, 'base64').toString('binary'),
 		btoa: (text) => Buffer.from(text, 'binary').toString('base64')
 	});
+	// Every page loads page_locale.js first, which owns the root lang and dir.
+	vm.runInContext(fs.readFileSync(path.join(SHARED, 'ui/page_locale.js'), 'utf8'), context, {
+		filename: 'page_locale.js'
+	});
 	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
 	for (const prelude of page.preludes || [])
 		vm.runInContext(prelude.source, context, { filename: prelude.filename });

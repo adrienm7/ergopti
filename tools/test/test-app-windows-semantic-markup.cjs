@@ -44,7 +44,8 @@ const NOT_COVERED_HERE = Object.freeze({
 	layout_editor: 'Studio page; its semantic pass belongs to the Studio campaign',
 	layout_editor_window: 'Studio window; its semantic pass belongs to the Studio campaign',
 	layout_manager: 'Studio page; its semantic pass belongs to the Studio campaign',
-	layout_optimizer: 'Studio page; its semantic pass belongs to the Studio campaign'
+	layout_optimizer: 'Studio page; its semantic pass belongs to the Studio campaign',
+	layout_try: 'Studio page; its semantic pass belongs to the Studio campaign'
 });
 
 /** Self-checks: each refusal on a small example, so a passing gate is not a blind one. */

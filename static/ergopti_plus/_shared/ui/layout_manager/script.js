@@ -68,7 +68,7 @@ const _post = makeHostBridge('layout_manager_bridge');
 // the root lang (WCAG 3.1.1), which index.html declares as fr. Every host seeds
 // window._i18n_locale before this script runs (LTP-01, LTP-02).
 if (typeof window._i18n_locale === 'string' && window._i18n_locale !== '')
-	document.documentElement.lang = window._i18n_locale;
+	window.setPageLocale(window._i18n_locale);
 else console.error('layout manager: no window._i18n_locale seeded; the page language stays fr');
 
 // The elements of the last redraw that can take the focus back:

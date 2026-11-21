@@ -448,6 +448,7 @@
 		"test:hotstrings-bridge-parity": "node ./tools/test/test-hotstrings-bridge-parity.cjs",
 		"test:menu-parity": "node ./tools/test/test-menu-parity.cjs",
 		"test:menu-top-level-parity": "node ./tools/test/test-menu-top-level-parity.cjs",
+		"test:page-direction": "node ./tools/test/test-page-direction.cjs",
 		"test:menu-no-duplicate-actions": "node ./tools/test/test-menu-no-duplicate-actions.cjs",
 		"test:linux-menu-parts": "node ./tools/test/test-linux-menu-parts.cjs",
 		"test:karabiner-binary-paths-single-source": "node ./tools/test/test-karabiner-binary-paths-single-source.cjs",

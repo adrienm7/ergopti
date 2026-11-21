@@ -213,7 +213,7 @@
 		// ran: it is read again here, or those pages load French whatever the
 		// link asked for.
 		var code = window._i18n_locale || active_code;
-		document.documentElement.lang = code;
+		window.setPageLocale(code);
 
 		// The chain always starts with the active locale, and never repeats it:
 		// with _i18n_locale === "en" the chain is en → fr, not en → en → fr.
