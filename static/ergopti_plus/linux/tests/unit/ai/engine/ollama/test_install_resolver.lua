@@ -75,6 +75,17 @@ test("canonical Linux asset comes from packaged catalogue", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
 	expect(asset.version == "0.40.6" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
 	expect(asset.bytes == 1438364593 and asset.sha256 == "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0", "independent pinned byte/hash receipts")
+	expect(asset.unpacked_bytes == catalogue.assets["linux-amd64"].unpacked_bytes, "the pinned unpacked size travels with the asset")
+end)
+
+-- OLL-14: the free-space check counts the unpacked runtime, so a pin without it is unreadable.
+test("an asset without its unpacked size is refused (ollama-install-free-space)", function()
+	for _, value in ipairs({ "absent", 0, 1.5, "4315093779" }) do
+		local copy = release()
+		copy.assets["linux-amd64"].unpacked_bytes = value ~= "absent" and value or nil
+		local asset, reason = Policy.asset(copy, "linux", "x86_64")
+		expect(asset == nil and reason == "ollama_release_unreadable", "unpacked size " .. tostring(value))
+	end
 end)
 
 test("version asset and complete digest form immutable directory name", function()

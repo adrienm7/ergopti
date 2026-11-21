@@ -920,6 +920,7 @@ class ReceivingCatalogueControls(unittest.TestCase):
             binary_sha256="b" * 64,
             provenance_sha256="c" * 64,
             bytes=123,
+            unpacked_bytes=369,
             runtime_libraries_sha256={"lib/fixture.dylib": "d" * 64},
         )
         for field in ("version", "source_commit", "capability", "native_http_capability"):

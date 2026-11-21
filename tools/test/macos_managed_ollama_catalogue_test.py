@@ -220,6 +220,14 @@ class PortableCatalogue(unittest.TestCase):
         )
         self.assertEqual(result["provenance_sha256"], sha_bytes(self.receipt_path.read_bytes()))
 
+    def test_the_catalogue_names_the_bytes_its_archive_unpacks_to(self):
+        # OLL-14: the installer's free-space check counts them beside the archive.
+        _, result = self.admit()
+        with tarfile.open(self.asset, "r:gz") as archive:
+            unpacked = sum(member.size for member in archive if member.isfile())
+        self.assertGreater(unpacked, 0)
+        self.assertEqual(result["unpacked_bytes"], unpacked)
+
     def test_missing_unknown_and_tampered_receipt_fields_refuse(self):
         mutations = {
             "schema_version": True,

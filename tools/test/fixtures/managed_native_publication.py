@@ -163,6 +163,7 @@ def fixture(repository, assets, tag, channel):
             + filename,
             "sha256": sha256(archive.read_bytes()),
             "bytes": archive.stat().st_size,
+            "unpacked_bytes": len(BINARY) + len(LIBRARY),
             "version": VERSION,
             "source_commit": SOURCE_COMMIT,
             "capability": CAPABILITY,

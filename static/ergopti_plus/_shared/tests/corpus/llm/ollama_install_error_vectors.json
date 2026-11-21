@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"_comment": "OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). `cases`: one install failure's evidence line, as the driver named in `os` writes it, and the class _shared/ai/data/ollama_install_errors.json gives it; every driver replays every case, since the rule is one. `free_space`: the pinned asset's bytes, the registry margin and the free bytes of the install volume, and whether the download may start. Replayed by windows/tests/unit/ai/servers/test_ollama_install_errors.ahk, linux/tests/unit/ai/engine/ollama/test_install_errors.lua and macos/tests/unit/ai/engine/ollama/test_install_errors.lua, the macOS free-space rule by tools/test/macos_managed_ollama_install_errors_test.py.",
+	"_comment": "OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). `cases`: one install failure's evidence line, as the driver named in `os` writes it, and the class _shared/ai/data/ollama_install_errors.json gives it; every driver replays every case, since the rule is one. `free_space`: the pinned asset's bytes, its unpacked bytes, the registry margin and the free bytes of the install volume, and whether the download may start. Replayed by windows/tests/unit/ai/servers/test_ollama_install_errors.ahk, linux/tests/unit/ai/engine/ollama/test_install_errors.lua and macos/tests/unit/ai/engine/ollama/test_install_errors.lua, the macOS free-space rule by tools/test/macos_managed_ollama_install_errors_test.py.",
 	"cases": [
 		{
 			"id": "windows_disk_full_write",
@@ -205,34 +205,47 @@
 		{
 			"id": "fits_with_margin",
 			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
 			"margin_bytes": 1073741824,
-			"free_bytes": 3000000000,
+			"free_bytes": 8000000000,
 			"fits": true
 		},
 		{
 			"id": "exactly_enough",
 			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
 			"margin_bytes": 1073741824,
-			"free_bytes": 2544906312,
+			"free_bytes": 6958399776,
 			"fits": true
 		},
 		{
 			"id": "one_byte_short",
 			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
 			"margin_bytes": 1073741824,
-			"free_bytes": 2544906311,
+			"free_bytes": 6958399775,
+			"fits": false
+		},
+		{
+			"id": "archive_and_margin_fit_unpacked_does_not",
+			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
+			"margin_bytes": 1073741824,
+			"free_bytes": 2544906312,
 			"fits": false
 		},
 		{
 			"id": "archive_fits_margin_does_not",
 			"asset_bytes": 174459907,
+			"unpacked_bytes": 523379721,
 			"margin_bytes": 1073741824,
-			"free_bytes": 500000000,
+			"free_bytes": 1000000000,
 			"fits": false
 		},
 		{
 			"id": "disk_full",
 			"asset_bytes": 1438364593,
+			"unpacked_bytes": 4315093779,
 			"margin_bytes": 1073741824,
 			"free_bytes": 0,
 			"fits": false

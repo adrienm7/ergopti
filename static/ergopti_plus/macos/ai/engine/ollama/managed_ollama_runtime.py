@@ -339,7 +339,8 @@ def free_space_margin():
     """Return the registry's free-space margin, [limits] of the shared timings.
 
     _shared/ai/data/ollama_install_errors.json states the rule: the pinned
-    archive plus this margin must be free before the download starts (OLL-04).
+    archive, its unpacked runtime and this margin must be free before the
+    download starts (OLL-04, OLL-14).
     """
     import tomllib
 
@@ -352,12 +353,16 @@ def free_space_margin():
     return margin
 
 
-def fits(asset_bytes, margin_bytes, free_bytes):
-    """Tell whether the archive may start downloading; the rule of the shared corpus."""
-    for value in (asset_bytes, margin_bytes, free_bytes):
+def fits(asset_bytes, unpacked_bytes, margin_bytes, free_bytes):
+    """Tell whether the archive may start downloading; the rule of the shared corpus.
+
+    The archive stays in its temporary folder until the extraction ends, so the
+    archive and the runtime it unpacks to are both on the volume at once.
+    """
+    for value in (asset_bytes, unpacked_bytes, margin_bytes, free_bytes):
         if type(value) is not int or value < 0:
             raise POLICY.RuntimeRefusal("free_space")
-    return free_bytes >= asset_bytes + margin_bytes
+    return free_bytes >= asset_bytes + unpacked_bytes + margin_bytes
 
 
 def free_bytes(path):
@@ -371,14 +376,14 @@ def free_bytes(path):
     return status.f_bavail * status.f_frsize
 
 
-def require_free_space(directory, asset_bytes):
+def require_free_space(directory, asset_bytes, unpacked_bytes):
     """Refuse the install before its download when the volume cannot hold it."""
     available = free_bytes(directory)
     margin = free_space_margin()
-    if not fits(asset_bytes, margin, available):
+    if not fits(asset_bytes, unpacked_bytes, margin, available):
         print(
             "Managed Ollama runtime needs %d free bytes, %d are free."
-            % (asset_bytes + margin, available),
+            % (asset_bytes + unpacked_bytes + margin, available),
             file=sys.stderr,
         )
         raise POLICY.RuntimeRefusal("install_disk_full")
@@ -636,7 +641,7 @@ def install(
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if target.parent.is_symlink():
         raise POLICY.RuntimeRefusal("runtime")
-    require_free_space(target.parent, asset["bytes"])
+    require_free_space(target.parent, asset["bytes"], asset["unpacked_bytes"])
     with tempfile.TemporaryDirectory(prefix=".ollama-native-http-", dir=target.parent) as temporary:
         root = Path(temporary)
         archive = root / asset["filename"]

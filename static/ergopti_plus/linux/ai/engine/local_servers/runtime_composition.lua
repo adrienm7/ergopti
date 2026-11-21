@@ -51,7 +51,8 @@ function M.new(deps)
 	local probe_timeout=d.timings.ms('llm','local_server_probe_timeout_ms')
 	local poll=d.timings.ms('ui','ollama_deps_poll_ms')
 	-- The free-space rule of _shared/ai/engine/ollama/install_errors.lua, checked
-	-- before the download starts: the pinned archive plus the registry margin (OLL-04).
+	-- before the download starts: the pinned archive, its unpacked runtime and the
+	-- registry margin (OLL-04, OLL-14).
 	local space=d.free_space
 	assert(type(space)=='table' and type(space.free_bytes)=='function', 'install free-space port unavailable')
 	local margin=d.timings.count('limits','ollama_install_free_space_margin_bytes')
@@ -168,8 +169,9 @@ function M.new(deps)
 		if not read or type(free)~='number' then
 			return empty('install_free_space_unavailable ' .. tostring(read and free_reason or free),done)
 		end
-		if not InstallErrors.fits(plan.asset.bytes,margin,free) then
-			return empty(string.format('install_disk_full free=%d required=%d',free,plan.asset.bytes+margin),done)
+		if not InstallErrors.fits(plan.asset.bytes,plan.asset.unpacked_bytes,margin,free) then
+			return empty(string.format('install_disk_full free=%d required=%d',free,
+				plan.asset.bytes+plan.asset.unpacked_bytes+margin),done)
 		end
 		if not current(authorized) then return empty('runtime_source_changed',done) end
 		local files,reason=admission_new(d.resolver,d.file_factory,authorized,true)

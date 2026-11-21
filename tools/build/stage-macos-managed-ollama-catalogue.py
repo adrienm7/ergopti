@@ -565,6 +565,11 @@ def admit_asset(
         "url": "",
         "sha256": receipt["sha256"],
         "bytes": receipt["bytes"],
+        # The bytes the installer's extraction writes, which its free-space
+        # check counts beside the archive (OLL-14).
+        "unpacked_bytes": sum(
+            record["bytes"] for record in records.values() if record["kind"] == "file"
+        ),
         "version": contract["version"],
         "source_commit": contract["source_commit"],
         "capability": contract["capability"],

@@ -56,7 +56,8 @@ helpers.describe("Managed Ollama install errors (ollama-install-errors)", functi
 			helpers.assert_eq(classifier.message_key(class), "ollama.install_error." .. class, case.id)
 		end
 		for _, case in ipairs(vectors.free_space) do
-			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.margin_bytes, case.free_bytes), case.fits, case.id)
+			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.unpacked_bytes, case.margin_bytes, case.free_bytes),
+				case.fits, case.id)
 		end
 	end)
 

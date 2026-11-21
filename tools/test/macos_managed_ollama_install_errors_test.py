@@ -1,8 +1,10 @@
 # tools/test/macos_managed_ollama_install_errors_test.py
 """The macOS managed Ollama install's free-space rule and failure evidence.
 
-OLL-04 and OLL-05 of docs/audits/platform-parity/2026-11-20-managed-ollama/report.md:
-the installer refuses a volume without room before its download, and names
+OLL-04, OLL-05 and OLL-14 of
+docs/audits/platform-parity/2026-11-20-managed-ollama/report.md: the installer
+refuses a volume without room for the archive, its unpacked runtime and the
+margin before its download, and names
 every failure with the closed words the driver classifies through
 _shared/ai/data/ollama_install_errors.json. Nothing is downloaded or installed:
 the transfer and the volume are fakes.
@@ -54,12 +56,17 @@ class InstallErrorTests(unittest.TestCase):
             with self.subTest(case["id"]):
                 self.assertIs(
                     self.runtime.fits(
-                        case["asset_bytes"], case["margin_bytes"], case["free_bytes"]
+                        case["asset_bytes"],
+                        case["unpacked_bytes"],
+                        case["margin_bytes"],
+                        case["free_bytes"],
                     ),
                     case["fits"],
                 )
         with self.assertRaises(self.runtime.POLICY.RuntimeRefusal):
-            self.runtime.fits(None, 0, 1)
+            self.runtime.fits(None, 0, 0, 1)
+        with self.assertRaises(self.runtime.POLICY.RuntimeRefusal):
+            self.runtime.fits(1, None, 0, 1)
 
     def test_margin_is_the_registry_value(self):
         text = (SHARED / "core/timing/data/constants.toml").read_text(encoding="utf-8")
@@ -111,6 +118,7 @@ class InstallErrorTests(unittest.TestCase):
             "filename": "ollama.tgz",
             "sha256": "a" * 64,
             "bytes": 174459907,
+            "unpacked_bytes": 523379721,
         }
         runtime.inputs = lambda: (b"{}", b"{}", "macos-arm64", {}, asset)
         runtime.owned_directory = lambda: target
@@ -128,6 +136,17 @@ class InstallErrorTests(unittest.TestCase):
         self.assertEqual(
             classify(self.runtime.install_failure_evidence(caught.exception)), "disk_full"
         )
+
+    def test_room_for_the_archive_and_margin_alone_refuses_before_the_download(self):
+        # OLL-14: the archive stays until its extraction ends.
+        downloads = []
+        enough_for_the_archive = 174459907 + self.runtime.free_space_margin()
+        with self.assertRaises(self.runtime.POLICY.RuntimeRefusal) as caught:
+            self._install(
+                enough_for_the_archive, lambda *arguments, **options: downloads.append(arguments)
+            )
+        self.assertEqual(caught.exception.args, ("install_disk_full",))
+        self.assertEqual(downloads, [], "nothing was downloaded")
 
     def test_a_failed_transfer_names_the_download_phase(self):
         runtime = self.runtime

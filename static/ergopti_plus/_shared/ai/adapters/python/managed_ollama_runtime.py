@@ -34,6 +34,7 @@ ASSET_FIELDS = {
     "url",
     "sha256",
     "bytes",
+    "unpacked_bytes",
     "version",
     "source_commit",
     "capability",
@@ -147,7 +148,15 @@ def select_asset(contract_bytes, catalogue_bytes, host):
     for name in ("sha256", "binary_sha256", "provenance_sha256"):
         if not isinstance(asset[name], str) or SHA256.fullmatch(asset[name]) is None:
             raise RuntimeRefusal("metadata")
-    if type(asset["bytes"]) is not int or asset["bytes"] <= 0 or not isinstance(asset["url"], str):
+    # unpacked_bytes: the files the archive unpacks to, which the free-space
+    # check before the download counts beside the archive (OLL-14).
+    if (
+        type(asset["bytes"]) is not int
+        or asset["bytes"] <= 0
+        or type(asset["unpacked_bytes"]) is not int
+        or asset["unpacked_bytes"] <= 0
+        or not isinstance(asset["url"], str)
+    ):
         raise RuntimeRefusal("metadata")
     if asset["url"]:
         if len(asset["url"].encode("utf-8")) > 65536 or any(

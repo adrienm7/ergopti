@@ -132,6 +132,7 @@ class FixturePorts:
             "url": "",
             "sha256": sha256(data),
             "bytes": len(data),
+            "unpacked_bytes": 3 * len(data),
             "version": contract["version"],
             "source_commit": contract["source_commit"],
             "capability": contract["capability"],

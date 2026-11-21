@@ -82,19 +82,21 @@ LLM_OllamaInstallErrorKey(Class) {
 }
 
 /**
- * Whether the pinned archive may start downloading: its bytes and the registry
- * margin must be free on the install volume.
+ * Whether the pinned archive may start downloading: the archive, the runtime it
+ * unpacks to and the registry margin must be free on the install volume, since
+ * the archive stays until its extraction ends (OLL-14).
  * @param {Integer} AssetBytes Pinned archive size.
+ * @param {Integer} UnpackedBytes Pinned unpacked runtime size.
  * @param {Integer} MarginBytes [limits] ollama_install_free_space_margin_bytes.
  * @param {Integer} FreeBytes Bytes free for the user on the install volume.
  * @returns {Boolean}
  */
-LLM_OllamaInstallFits(AssetBytes, MarginBytes, FreeBytes) {
-	for Value in [AssetBytes, MarginBytes, FreeBytes] {
+LLM_OllamaInstallFits(AssetBytes, UnpackedBytes, MarginBytes, FreeBytes) {
+	for Value in [AssetBytes, UnpackedBytes, MarginBytes, FreeBytes] {
 		if !(Value is Integer) || Value < 0
 			throw ValueError("Free-space inputs must be non-negative integers.")
 	}
-	return FreeBytes >= AssetBytes + MarginBytes
+	return FreeBytes >= AssetBytes + UnpackedBytes + MarginBytes
 }
 
 /**

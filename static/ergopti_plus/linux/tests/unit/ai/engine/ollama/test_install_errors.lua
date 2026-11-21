@@ -43,9 +43,11 @@ helpers.describe("Managed Ollama install errors (Linux)", function()
 
 	helpers.it("ollama-install-error-vectors: the free-space rule of every shared vector", function()
 		for _, case in ipairs(corpus().free_space) do
-			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.margin_bytes, case.free_bytes), case.fits, case.id)
+			helpers.assert_eq(InstallErrors.fits(case.asset_bytes, case.unpacked_bytes, case.margin_bytes, case.free_bytes),
+				case.fits, case.id)
 		end
-		helpers.assert_true(not pcall(InstallErrors.fits, nil, 0, 1), "a missing asset size is refused, not guessed")
+		helpers.assert_true(not pcall(InstallErrors.fits, nil, 0, 0, 1), "a missing asset size is refused, not guessed")
+		helpers.assert_true(not pcall(InstallErrors.fits, 1, nil, 0, 1), "a missing unpacked size is refused, not guessed")
 	end)
 
 	helpers.it("ollama-install-error-vectors: a malformed data file is refused", function()

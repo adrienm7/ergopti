@@ -27,7 +27,7 @@ local function fixture(extra)
 	local source={current=function()return w.authorized end,publish=function()end,app_capture=function()end,app_current=function()end,compensate=function()return true end}
 	local resolver={plan=function()return{asset=w.asset,parent=RELEASE,directory=RELEASE..'/ollama',
 		runtime='/data/runtimes/ollama',uid=1000}end,current=function()return w.ancestry end}
-	w.asset={name='independent-pinned-fixture',version='0.40.6',sha256=SHA,bytes=40}
+	w.asset={name='independent-pinned-fixture',version='0.40.6',sha256=SHA,bytes=40,unpacked_bytes=300}
 	w.parent=RELEASE;w.free=1000;w.margin=60
 	w.files={RELEASE..'/ollama/bin/ollama',RELEASE..'/ollama/lib/ollama/libggml.so'}
 	w.descriptor={files=function()return w.files end};w.file_owner={}
@@ -71,15 +71,21 @@ test('binary installation consumes exact phase/file owners and budget',function(
 	eq(w.admission.consent,true);eq(w.admission.f,w.factory)
 end)
 test('stale installation admission dispatches no phase',function()local w=fixture();w.authorized=false;local o=w.controller.ports.install({},w.budget,w.authorizer,function()end);eq(o:is_settled(),true);eq(w.phase_options,nil)end)
--- OLL-04: the pinned archive and the registry margin must fit before the download.
-test('an install volume without room for the archive and its margin dispatches no phase (ollama-install-free-space)',function()
-	local w=fixture();w.free=99
+-- OLL-04, OLL-14: the pinned archive, its unpacked runtime and the registry
+-- margin must fit before the download.
+test('an install volume without room for the archive, its runtime and its margin dispatches no phase (ollama-install-free-space)',function()
+	local w=fixture();w.free=399
 	local result;local o=w.controller.ports.install({},w.budget,w.authorizer,function(r)result=r end)
 	eq(o:is_settled(),true);eq(w.phase_options,nil);eq(w.admission,nil);eq(w.free_path,w.parent)
-	eq(result.ok,false);eq(result.error,'install_disk_full free=99 required=100')
+	eq(result.ok,false);eq(result.error,'install_disk_full free=399 required=400')
 end)
-test('room for the archive and its margin installs (ollama-install-free-space)',function()
+test('room for the archive and its margin alone does not install the unpacked runtime (ollama-install-free-space)',function()
 	local w=fixture();w.free=100
+	local result;w.controller.ports.install({},w.budget,w.authorizer,function(r)result=r end)
+	eq(w.phase_options,nil);eq(result.error,'install_disk_full free=100 required=400')
+end)
+test('room for the archive, its runtime and its margin installs (ollama-install-free-space)',function()
+	local w=fixture();w.free=400
 	eq(w.controller.ports.install({},w.budget,w.authorizer,function()end),w.op);eq(w.free_path,w.parent)
 end)
 test('an unreadable install volume refuses the install (ollama-install-free-space)',function()

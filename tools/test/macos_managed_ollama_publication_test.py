@@ -242,6 +242,7 @@ class PublicationAdmission(unittest.TestCase):
                 + "/releases/download/v0.0.0-dev.166/"
                 + binding["filename"],
                 "bytes": len(payload),
+                "unpacked_bytes": 3 * len(payload),
                 "sha256": hashlib.sha256(payload).hexdigest(),
                 "binary_sha256": "1" * 64,
                 "provenance_sha256": "2" * 64,

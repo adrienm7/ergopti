@@ -383,8 +383,9 @@ class OllamaManagedBootstrap {
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"port", Integer(Match[1]), "deadline_ms", LLM_DEPS_POLL_TIMEOUT_MS,
 			"pull_deadline_ms", TimingsGet("llm", "ollama_model_pull_timeout_ms"),
-			; The free-space rule of install_errors.ahk, checked before the download (OLL-04)
+			; The free-space rule of install_errors.ahk, checked before the download (OLL-04, OLL-14)
 			"free_space", Map("asset_bytes", Release["assets"][Asset]["bytes"],
+				"unpacked_bytes", Release["assets"][Asset]["unpacked_bytes"],
 				"margin_bytes", TimingsGet("limits", "ollama_install_free_space_margin_bytes")),
 			"download", Map("ManagedRoot", Root, "CataloguePath", Catalogue,
 				"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
@@ -1377,7 +1378,8 @@ class OllamaManagedBootstrap {
 
 	/**
 	 * Refuses the download when the managed root's volume cannot hold the pinned
-	 * archive and the registry margin (OLL-04); fails the flow with the disk words.
+	 * archive, its unpacked runtime and the registry margin (OLL-04, OLL-14);
+	 * fails the flow with the disk words.
 	 * @returns {Boolean} True when the download may start.
 	 */
 	_HasRoomForDownload() {
@@ -1389,10 +1391,10 @@ class OllamaManagedBootstrap {
 			this._Fail("free_space_unreadable", LLM_OllamaInstallErrorKey(LLM_OLLAMA_INSTALL_ERROR_UNKNOWN))
 			return false
 		}
-		if LLM_OllamaInstallFits(Space["asset_bytes"], Space["margin_bytes"], Free)
+		if LLM_OllamaInstallFits(Space["asset_bytes"], Space["unpacked_bytes"], Space["margin_bytes"], Free)
 			return true
 		LoggerError("LLM.managed", "The managed root's volume has {1} free bytes; the runtime needs {2}.",
-			Free, Space["asset_bytes"] + Space["margin_bytes"])
+			Free, Space["asset_bytes"] + Space["unpacked_bytes"] + Space["margin_bytes"])
 		this._Fail("free_space", LLM_OllamaInstallErrorKey("disk_full"))
 		return false
 	}

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Managed Ollama Install Error Tests (Windows)
 ; DESCRIPTION:
-; OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign: every failed
+; OLL-04, OLL-05 and OLL-14 of the 2026-11-20 managed Ollama campaign: every failed
 ; install showed « Local Ollama could not be prepared », a full disk and an
 ; unreachable host alike, and only the PowerShell helper checked the archive's
 ; size against the volume. Replays the shared corpus, drives the real bootstrap
@@ -32,8 +32,10 @@ _OIE_ReplaysTheCorpus() {
 	for Class in ["network", "disk_full", "checksum", "permission", "cancelled", "unknown"]
 		AssertTrue(Seen.Has(Class), "the corpus covers " . Class)
 	for Vector in Corpus["free_space"]
-		AssertEqual(Vector["fits"], LLM_OllamaInstallFits(Vector["asset_bytes"], Vector["margin_bytes"], Vector["free_bytes"]), Vector["id"])
-	AssertThrows(() => LLM_OllamaInstallFits("", 0, 1), "a missing asset size is refused, not guessed")
+		AssertEqual(Vector["fits"], LLM_OllamaInstallFits(Vector["asset_bytes"], Vector["unpacked_bytes"],
+			Vector["margin_bytes"], Vector["free_bytes"]), Vector["id"])
+	AssertThrows(() => LLM_OllamaInstallFits("", 0, 0, 1), "a missing asset size is refused, not guessed")
+	AssertThrows(() => LLM_OllamaInstallFits(1, "", 0, 1), "a missing unpacked size is refused, not guessed")
 	AssertThrows(() => LLM_OllamaInstallErrorKey("no_such_class"), "an unknown class has no message")
 }
 Test("managed install errors: every shared vector has its class (ollama-install-error-vectors)", _OIE_ReplaysTheCorpus)
@@ -74,7 +76,7 @@ _OIE_Failure(Setup) {
 
 _OIE_NoRoomNoDownload() {
 	Setup(F) {
-		F.FreeBytes := 149
+		F.FreeBytes := 449
 	}
 	Result := _OIE_Failure(Setup)
 	F := Result.Fixture
@@ -84,21 +86,36 @@ _OIE_NoRoomNoDownload() {
 	AssertEqual(1, F.FailedCalls)
 	AssertEqual(t("ollama.install_error.disk_full"), Result.Message, "the disk words, not the generic failure")
 }
-Test("managed install errors: a volume without room for the archive and its margin downloads nothing (ollama-install-free-space)",
+Test("managed install errors: a volume without room for the archive, its runtime and its margin downloads nothing (ollama-install-free-space)",
 	_OIE_NoRoomNoDownload)
 
 _OIE_RoomDownloads() {
 	Setup(F) {
-		F.FreeBytes := 150
+		F.FreeBytes := 450
 	}
 	Result := _OIE_Failure(Setup)
 	Downloads := 0
 	for Action in Result.Fixture.Calls
 		Downloads += Action == "download"
-	AssertEqual(1, Downloads, "room for the archive and its margin starts the download")
+	AssertEqual(1, Downloads, "room for the archive, its runtime and its margin starts the download")
 	AssertEqual(0, Result.Fixture.FailedCalls)
 }
-Test("managed install errors: room for the archive and its margin downloads (ollama-install-free-space)", _OIE_RoomDownloads)
+Test("managed install errors: room for the archive, its runtime and its margin downloads (ollama-install-free-space)",
+	_OIE_RoomDownloads)
+
+; OLL-14: the archive stays until its extraction ends, so room for the archive
+; and the margin alone must not start a download the extraction cannot finish.
+_OIE_UnpackedRuntimeCounts() {
+	Setup(F) {
+		F.FreeBytes := 150
+	}
+	Result := _OIE_Failure(Setup)
+	for Action in Result.Fixture.Calls
+		AssertTrue(Action != "download", "the unpacked runtime counts before the download")
+	AssertEqual(t("ollama.install_error.disk_full"), Result.Message)
+}
+Test("managed install errors: room for the archive and its margin alone downloads nothing (ollama-install-free-space)",
+	_OIE_UnpackedRuntimeCounts)
 
 _OIE_UnreadableVolume() {
 	Setup(F) {

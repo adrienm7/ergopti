@@ -69,19 +69,23 @@ function M.new(data)
 	return classifier
 end
 
---- Tells whether the pinned archive may start downloading: its bytes and the
---- registry margin must be free on the install volume.
+--- Tells whether the pinned archive may start downloading: the archive, the
+--- runtime it unpacks to and the registry margin must be free on the install
+--- volume, since the archive stays until its extraction ends (OLL-14).
 --- @param asset_bytes number Pinned archive size.
+--- @param unpacked_bytes number Pinned unpacked runtime size.
 --- @param margin_bytes number [limits] ollama_install_free_space_margin_bytes.
 --- @param free_bytes number Bytes free for the user on the install volume.
 --- @return boolean fits
-function M.fits(asset_bytes, margin_bytes, free_bytes)
-	for _, value in ipairs({ asset_bytes, margin_bytes, free_bytes }) do
+function M.fits(asset_bytes, unpacked_bytes, margin_bytes, free_bytes)
+	local values = { asset_bytes, unpacked_bytes, margin_bytes, free_bytes }
+	for index = 1, 4 do
+		local value = values[index]
 		if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
 			error("free-space inputs must be non-negative integers", 2)
 		end
 	end
-	return free_bytes >= asset_bytes + margin_bytes
+	return free_bytes >= asset_bytes + unpacked_bytes + margin_bytes
 end
 
 return M

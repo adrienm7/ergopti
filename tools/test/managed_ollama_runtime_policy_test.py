@@ -37,6 +37,7 @@ class RuntimePolicyTests(unittest.TestCase):
             "url": "",
             "sha256": "a" * 64,
             "bytes": 100,
+            "unpacked_bytes": 300,
             "version": "0.40.6",
             "source_commit": "2476d5ead197abe04629651028f83d48dc75d2b2",
             "capability": "ERGOPTI_OLLAMA_NATIVE_HTTP_V1",
@@ -124,6 +125,8 @@ class RuntimePolicyTests(unittest.TestCase):
     def test_traversal_bad_digest_bool_size_and_credential_url_refuse(self):
         for name, value in (
             ("bytes", True),
+            ("unpacked_bytes", True),
+            ("unpacked_bytes", 0),
             ("binary_sha256", "bad"),
             ("runtime_libraries_sha256", {"../backend.dylib": "a" * 64}),
             ("url", "https://user:secret@example.test/" + self.asset["filename"]),

@@ -328,7 +328,7 @@ class _G4B_Fixture {
 		Plan := Map("ManagedRoot", "C:\managed", "CataloguePath", "C:\catalogue.json",
 			"CatalogueSha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"AssetId", "windows-amd64", "port", 23456, "version", "0.24.0", "deadline_ms", 9000,
-			"pull_deadline_ms", 50000, "free_space", Map("asset_bytes", 100, "margin_bytes", 50),
+			"pull_deadline_ms", 50000, "free_space", Map("asset_bytes", 100, "unpacked_bytes", 300, "margin_bytes", 50),
 			"download", Map("ManagedRoot", "C:\managed"))
 		Port := Map("plan", Plan, "files", this.Files, "runtime", this.Runtime,
 			"current", (*) => this.CurrentValue, "clock", (*) => this.Now,

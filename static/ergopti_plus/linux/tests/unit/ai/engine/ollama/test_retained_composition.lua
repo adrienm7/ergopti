@@ -8,14 +8,14 @@ helpers.describe("Retained Ollama runtime composition", function()
   local Compose = helpers.load_module_with_dependency("ai.engine.local_servers.runtime_composition", "ai.engine.local_servers.runtime_repair", {
    new = function(ports) captured = ports; return {} end,
   })
-  local asset = { key = "linux-amd64", version = "0.24.0", name = "ollama-linux-amd64.tar.zst", bytes = 3,
+  local asset = { key = "linux-amd64", version = "0.24.0", name = "ollama-linux-amd64.tar.zst", bytes = 3, unpacked_bytes = 4,
    url = "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst",
    sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" }
   local archive, budget, files, result = {}, {}, {}, {}
   local function yes() return true end
   Compose.new({ source = { current = yes, publish = yes, app_capture = yes, app_current = yes },
    timings = { ms = function() return 100 end, count = function() return 0 end },
-   free_space = { free_bytes = function() return 3 end },
+   free_space = { free_bytes = function() return 7 end },
    resolver = { plan = function() return { asset = asset, parent = "/home/user/.local/share/ergopti" } end, current = yes },
    installed = { capture = function() return {} end }, file_factory = {}, archive_factory = archive,
    admission = { new = function() return files end }, install_phase = { start = function(ports, options)
