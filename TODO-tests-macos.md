@@ -26,11 +26,11 @@ terminal): coverage table, verdicts and what no run can test in
       startup settings » opens Login Items and the row is checked once allowed; log out and in: Ergopti starts from
       `build/macos/ErgoptiPlus.app`; untick it afterwards. A refusal of the ad hoc bundle by `SMAppService` is a
       failure to report (then the row greys on that build with a reason).
-- [ ] <!-- field-point: update_windows --> **Updates window (UPD-03 to UPD-06, UPD-11, 2026-11-21):** with
+- [ ] <!-- field-point: update_windows --> **Updates window (UPD-03 to UPD-06, UPD-11, UPD-13, 2026-11-21):** with
       VoiceOver on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a
-      focus move, and Escape closes the window. On a network whose proxy refuses api.github.com, check again: the
-      sentence stays « Could not reach GitHub » (hs.http proves no cause), and an exhausted rate limit is named
-      (UPD-06). Install an offered update and close its download panel: the download goes on and the install prompt
+      focus move, and Escape closes the window. With Wi-Fi off, check again: the window names the offline cause, not
+      « Could not reach GitHub »; behind a proxy that asks for authentication, it names the proxy (UPD-13); an
+      exhausted rate limit is named (UPD-06); a working network still offers or confirms the release. Install an offered update and close its download panel: the download goes on and the install prompt
       comes back (UPD-05). In the Versions window, install a release with the network down: the failure names the
       cause and no `.ergopti-release-install-` folder stays beside the app (UPD-11).
 

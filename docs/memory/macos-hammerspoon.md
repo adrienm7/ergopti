@@ -690,6 +690,16 @@ Boot success is published only after the complete chain commits.
 Adapters translate native semantics into explicit project contracts. Do not let
 callers depend on undocumented raw `hs.*` truthiness or callback behavior.
 
+### project-hs-http-proves-no-network-cause
+
+`hs.http` answers a transport failure with status -1 and a localized sentence,
+so nothing it returns may be classified as a proxy, offline or certificate
+cause. A Lua caller that must name the cause runs the launcher's
+`--managed-http-worker` through `core/network/adapters/managed_http_worker.lua`
+(the manual update check, UPD-13). The worker's stdout is binary frames, which
+hs.task delivers as text: the adapter redirects them to a private file and reads
+it back with `io.open(path, "rb")`; never parse the frames from task stdout.
+
 ### project-hs-pathwatcher-start-hides-native-refusal
 
 `hs.pathwatcher:start()` returns the watcher object and hides the underlying

@@ -130,9 +130,10 @@ Notes:
   managed-network contract classified from the fetch's native receipt (an
   unknown cause proves nothing), else the reason's own key. `check_session`
   admits only those keys. Linux carries its curl receipt and the API page's
-  rate limit; Windows records the rate limit on its request. macOS names the
+  rate limit; Windows records the rate limit on its request. macOS named the
   rate limit only: hs.http answers a transport failure with status -1 and a
-  localized sentence, which the contract may not interpret (UPD-13 below).
+  localized sentence, which the contract may not interpret (UPD-13, fixed
+  below).
 - **UPD-07.** Windows reads the bytes its staging worker wrote into the
   parent-owned capture (`ObserveBody`) at each monitor tick and shows them in
   the shared download window, kind `app_update`
@@ -154,15 +155,33 @@ Notes:
   proves and no more; an EXIT trap removes the stage it created unless an app
   is READY.
 
-## Open
+### Fixed in the second follow-up
 
-- **UPD-13 (low, macOS):** a failed check behind a refusing proxy, offline or
-  with a refused certificate still reads « Could not reach GitHub » on macOS.
-  hs.http reports no native evidence (status -1 and a localized sentence), so
-  the managed-network contract has nothing to classify. Follow-up: run the
-  manual check through the launcher's managed HTTP worker, whose closed
-  reasons (`offline`, `certificate`, `proxy`) `release_installer.failure_receipt`
-  already maps.
+| Id     | OS    | Sequence                                                                                     | Reference                                                                         | Before                                                                                                                                        | Regression                                                                                                                                                                                                                  |
+| ------ | ----- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UPD-13 | macOS | A manual check offline, behind a proxy asking for credentials, or with a refused certificate | Windows and Linux name the managed-network cause of their native receipt (UPD-06) | hs.http answered status -1 and a localized sentence, which the contract may not interpret: every such failure read « Could not reach GitHub » | `native_receipts` of `check_session_vectors.json`, replayed by `check_session_contract.lua` (macOS, Linux) and `upd-13: …` (`test_update_auto_check.lua`); `test_managed_http_protocol.lua`, `test_managed_http_worker.lua` |
+
+Notes:
+
+- **UPD-13.** The manual check's transport is now
+  `core/network/adapters/managed_http_worker.lua`: it runs the launcher's
+  existing `--managed-http-worker` role (ManagedHTTPWorker.swift, unchanged),
+  which resolves the system proxy route and the certificate trust itself and
+  ends a failed transfer with a closed reason derived from the NSURLSession and
+  CFNetwork error codes. `core/network/engine/managed_http_protocol.lua` reads
+  its frames (one head, the body, one terminal frame; anything else is refused
+  whole) and owns the reason → receipt table that `release_installer` used to
+  keep alone (UPD-11). `auto_check` classifies the API attempt's receipt
+  through the shared contract and hands the report to
+  `check_result.failure_key`, as Linux does: `offline`, `certificate` and
+  `proxy` are named; `connect`, a deadline or an unavailable route prove no
+  cause and keep « Could not reach GitHub ». No text is read for a cause.
+- **Limits.** The worker reports `proxy` for a proxy that asks for credentials
+  (407) or a proxy route it cannot build; a proxy that refuses the TCP
+  connection is `connect` and stays unnamed, as on the Versions path. The
+  worker follows no redirect, so a redirected API or feed URL reads as its 3xx
+  answer and fails the check honestly. The background check stays on hs.http:
+  its failure is only logged.
 
 Native receiving, in `TODO-tests-windows.md`, `TODO-tests-macos.md` and
 `TODO-tests-linux.md` (field point `update_windows` on macOS and Linux):
@@ -244,3 +263,34 @@ WAYLAND_DISPLAY`): every `upd-` case green, and the full suite 24,211 passed
   `test-macos-release-stage-native-receiving.cjs`, red before this follow-up
   too; a real download, install, restart or Sparkle session; `npm run test:js`
   and `verify-change` (they refuse this checkout's Node pin).
+
+Second follow-up commit (UPD-13): `7a5ae7ce9c`.
+
+- **Red on the old code.** With `auto_check.lua` and `release_installer.lua`
+  from `2063644afd` (the test's contract port stubbed, since the old owner
+  takes none), `test_update_auto_check.lua` fails 4 cases: the offline,
+  certificate and proxy vectors read `updater.no_connection`, and the
+  production session still checks through hs.http. The vectors that prove no
+  cause pass there too, as they must. `test_managed_http_protocol.lua` and
+  `test_managed_http_worker.lua` fail: their modules do not exist.
+- **Green on the new code.** From a `git archive` copy under WSL
+  (`unset DISPLAY WAYLAND_DISPLAY`, unprivileged user): the full macOS Lua 5.4
+  suite, 29,179 passed and 3 failed, the same 3 that fail on `2063644afd`
+  (`test_no_coauthor_in_commits`: the copy has no Git history;
+  `test_native_python_bootstrap_interrupt`: a process-group signal under WSL;
+  `prepare and title come from …`); the Linux suite's `upd-13` cases, 8 of 8
+  under LuaJIT.
+- **Gates.** `test-update-check-dialog.cjs` (1,494 checks), the locale gates,
+  `test-shared-literal-inventory.cjs`, `test-linux-feature-parity.cjs`,
+  `test-config-key-literals.cjs`, `test-macos-dev-qualification-deferral.cjs`,
+  `field-todo-summary.py --os macos --check-doc`,
+  the formatter and `lint-conventions.js --fail-on-violations`.
+  `test-desktop-ci-evidence.cjs` passes its verdict checks, then stops on a
+  Windows fixture (« the native directory identifies another device »), before
+  any macOS part.
+- **Only macOS proves.** The worker itself (Swift unchanged, so no XCTest
+  suite was touched): that a real offline Mac, a proxy asking for credentials
+  and a refused certificate end in `offline`, `proxy` and `certificate`, that
+  GitHub answers the identity request with the list, its ETag and a 304, and
+  that the dev and packaged launchers both resolve. The field point
+  `update_windows` of `TODO-tests-macos.md` asks for it.
