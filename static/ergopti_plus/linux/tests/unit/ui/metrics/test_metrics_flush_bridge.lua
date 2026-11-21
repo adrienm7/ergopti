@@ -307,7 +307,7 @@ H.describe("metrics flush bridge", function()
 		end)
 	end
 	for _, mode in ipairs({ "immediate", "deferred" }) do
-		H.it("(range-projection-unavailable) " .. mode .. " nil projection cannot publish or poison the next read", function()
+		H.it("(range-projection-unavailable, met-05) " .. mode .. " nil projection fails the request, publishes nothing", function()
 			local F = fixture("metrics_typing")
 			if mode == "immediate" then F.read_safe() end
 			local available = F.K.get_range_payload
@@ -321,7 +321,11 @@ H.describe("metrics flush bridge", function()
 				F.settle()
 			end
 			H.assert_eq(F.c.reads, 1, "A nil range must stop before reading/caching another dashboard payload")
-			H.assert_eq(#F.pushed, 0, "No incomplete range may be published")
+			-- met-05: no data is published, but the waiting page is told its
+			-- request failed rather than left on its loader for the watchdog.
+			H.assert_eq(#F.pushed, 1, "One terminal, and no incomplete range, reaches the page (met-05)")
+			H.assert_contains(F.pushed[1], "window.complete_range_request.apply(null,[80,\"failed\"])")
+			H.assert_nil(F.pushed[1]:find("__hostBridgeResponse", 1, true), "the terminal carries no data")
 			F.K.get_range_payload = available
 			local reply = F.B.on_message({ action = "range", request_id = 81 }, F.state, F.context)
 			H.assert_eq(reply.range_request_id, 81)

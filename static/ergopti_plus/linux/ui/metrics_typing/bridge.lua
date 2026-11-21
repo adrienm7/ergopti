@@ -131,6 +131,22 @@ local function schedule_refresh(state, context, request)
 	end
 end
 
+--- Ends one range request the page is waiting for as failed. A nil answer sent
+--- nothing, so the page kept its loader for the 120 s watchdog, where Windows
+--- sends its range_terminal and macOS receive_range_data(null) at once (MET-05).
+--- @param payload table The range request, with its request_id.
+--- @param state table
+--- @param context table|nil
+--- @param reason string Logged cause, never the user's selection.
+--- @return nil
+local function fail_range(payload, state, context, reason)
+	Logger.warn(LOG, "Typing metrics range request #%s refused: %s.", tostring(payload.request_id), reason)
+	if type(payload.request_id) == "number" then
+		Flush.call(APP_NAME, "complete_range_request", { payload.request_id, "failed" }, state, context)
+	end
+	return nil
+end
+
 --- Handles a ready or refresh request from the shared typing dashboard.
 --- @param payload any Request payload from the WebKit bridge.
 --- @param state table Daemon state.
@@ -180,9 +196,10 @@ local function handle(payload, state, context, request)
 	if action == "range" and type(payload) == "table" then
 		if state.keystats and type(state.keystats.get_range_payload) == "function" then
 			local range = state.keystats.get_range_payload(payload.start_date, payload.end_date, payload.apps)
-			if not range or not request.valid() then return nil end
+			if not request.valid() then return nil end
+			if not range then return fail_range(payload, state, context, "the range read failed") end
 			local dashboard = build_payload(state, false)
-			if not dashboard then return nil end
+			if not dashboard then return fail_range(payload, state, context, "the dashboard read failed") end
 			local reply = {
 				metrics_manifest = dashboard.metrics_manifest,
 				metrics_manifest_incomplete = dashboard.metrics_manifest_incomplete,
@@ -194,6 +211,8 @@ local function handle(payload, state, context, request)
 			payload_complete(reply)
 			return reply
 		end
+		Logger.error(LOG, "The keystats exposes no get_range_payload; the range request is answered as failed.")
+		return fail_range(payload, state, context, "no range reader")
 	end
 	return nil
 end
