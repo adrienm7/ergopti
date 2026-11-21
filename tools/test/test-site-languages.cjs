@@ -25,6 +25,11 @@
  *    pinned text sits inside an element of the stated language.
  * 3. The detector itself finds an English sentence, ignores French and
  *    accepted terms, and is silenced by lang="en".
+ * 4. The files read in English with the Ergopti+ pages (their components,
+ *    the accessibility statement and its settings dialog, translated on
+ *    2026-11-21) hold no French passage in their markup, with or without
+ *    lang="fr": their text goes through t(). A word at least ENGLISH_RATIO
+ *    times more frequent in French than in English subtitles is French.
  *
  * Text built by expressions ({…}) is out of its reach; the hand review of
  * the built pages covered it (docs/audits/accessibility/README.md).
@@ -226,6 +231,28 @@ function englishWordsOf(source) {
 	return words;
 }
 
+/** Whether a lower-case word reads as French rather than English. */
+function frenchWord(word) {
+	if (word.length < 3) return false;
+	const french = FRENCH.get(word) || 0;
+	return french > ENGLISH_MIN_SHARE && french > ENGLISH_RATIO * (ENGLISH.get(word) || 0);
+}
+
+/**
+ * French passages in the markup of a file read in English: the text runs
+ * outside code holding a French word, whatever language they declare.
+ * @returns {string[]} One entry per run.
+ */
+function frenchPassagesOf(source) {
+	const passages = [];
+	for (const run of textRuns(source)) {
+		if (run.code) continue;
+		const words = run.text.toLowerCase().match(/[\p{L}]+/gu) || [];
+		if (words.some(frenchWord)) passages.push(run.text.replace(/\s+/g, ' ').trim());
+	}
+	return passages;
+}
+
 /** Every Svelte file under a directory, as paths relative to the repository. */
 function svelteFiles(directory, out = []) {
 	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -267,6 +294,26 @@ assert.deepEqual(
 	[]
 );
 assert.deepEqual(englishWordsOf('<p>TH, WH, il fait office de relatives</p>'), []);
+assert.deepEqual(
+	frenchPassagesOf('<section lang="fr"><p>Une section toujours écrite en français.</p></section>'),
+	['Une section toujours écrite en français.']
+);
+assert.deepEqual(frenchPassagesOf("<p>{t('Une phrase traduite')}</p><p>Window style</p>"), []);
+
+// 4/ No French passage in the files read in English.
+const ENGLISH_READY = svelteFiles(path.join(SRC, 'routes', 'ergopti-plus')).concat([
+	'src/routes/accessibilite/+page.svelte',
+	'src/lib/components/A11ySettings.svelte'
+]);
+const frenchLeft = [];
+for (const file of ENGLISH_READY)
+	for (const passage of frenchPassagesOf(fs.readFileSync(path.join(ROOT, file), 'utf8')))
+		frenchLeft.push(file + ': ' + passage.slice(0, 60));
+assert.deepEqual(
+	frenchLeft,
+	[],
+	'A French passage is back under the English Ergopti+ page: write it through t() with its English entry'
+);
 
 // 1/ No new English passage without lang.
 const current = measure();
