@@ -498,6 +498,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-cards-explained.cjs"],
 			"repro": "npm run test:metrics-cards-explained"
+		},
+		{
+			"id": "metrics-number-locale",
+			"ordinal": 715,
+			"name": "metrics pages format every number in the interface language (MET-07)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-number-locale.cjs"],
+			"repro": "npm run test:metrics-number-locale"
 		}
 	]
 }
