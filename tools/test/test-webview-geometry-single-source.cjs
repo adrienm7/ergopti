@@ -761,7 +761,8 @@ for (const d of DRIVERS) {
 		errors.push('Windows: WebViewHost must show a « maximized » app with the Maximize option.');
 	}
 	if (
-		!/WebView_FitToWindow\(this\.Controller\)\s*\n\s*if this\.CloseRequested\s*\n\s*return false\s*\n\s*\n\s*; ── Safety flush/.test(
+		// The page then takes the keyboard (PCK-16) before the safety flush.
+		!/WebView_FitToWindow\(this\.Controller\)\s*\n\s*if this\.CloseRequested\s*\n\s*return false\s*\n\s*; An activated window hands its keyboard to the page \(PCK-16\)\.\s*\n\s*if !Opts\.Get\("NoActivate", false\)\s*\n\s*WebView_TakeFocus\(this\.Controller\)\s*\n\s*if this\.CloseRequested\s*\n\s*return false\s*\n\s*\n\s*; ── Safety flush/.test(
 			windowsHost
 		)
 	) {
