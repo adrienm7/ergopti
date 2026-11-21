@@ -52,11 +52,13 @@ local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range; nothing is written.
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13).
 --- @param key string Declaration of the shared value schema.
 --- @param text any What the person typed.
+--- @param default any The setting's default, in the stored unit.
 --- @return any|nil value The value in the stored unit, nil when refused.
-local function read_typed(key, text)
-	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+local function read_typed(key, text, default)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
 	require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
@@ -799,7 +801,8 @@ local function build_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"])
+			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"],
+				karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS / 1000)
 			if seconds == nil then return end
 			commit_menu_setting(karabiner, "Tap/hold timeout", function()
 				return karabiner.set_tap_hold_timeout(whole_ms(seconds))
@@ -831,7 +834,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
 			-- 0 is no time limit; a negative or fractional answer is refused.
-			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"])
+			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"],
+				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS))
 			if ms == nil then return end
 			commit_menu_setting(karabiner, "Sticky timeout", function()
 				return karabiner.set_sticky_timeout(ms)
@@ -899,7 +903,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"])
+			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"],
+				Manifest.default_for(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 			if ms == nil then return end
 			commit_menu_setting(karabiner, "Simultaneous threshold", function()
 				return karabiner.set_simultaneous_threshold(ms)

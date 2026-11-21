@@ -157,6 +157,9 @@ function M.ask(request, webview)
 		value = request.value,
 		key = request.key,
 		entry = entry,
+		-- A blank answer saves the setting's default when the caller names one
+		-- (maintainer decision PCK-13, 2026-11-21, as on Windows and macOS).
+		default = request.default,
 		-- What the setting accepts, in the words of a refusal
 		range = ValueCheck.render_message(ValueCheck.message_parts(entry, ValueCheck.parse_entry(entry, "")),
 			I18n.get),
@@ -261,7 +264,7 @@ function M.on_message(payload, _state)
 		if not current(request) then return { saved = false, stale = true } end
 		-- The page sends what was typed; the shared check reads it, so the
 		-- caller's setter never sees a value its declaration forbids.
-		local parsed = ValueCheck.parse_entry(request.entry, payload.text)
+		local parsed = ValueCheck.parse_entry(request.entry, payload.text, request.default)
 		if not parsed.ok then
 			Logger.warn(LOG, "Prompt entry for %s refused (%s).", request.key, parsed.reason)
 			local shown = show_refusal(request, ValueCheck.render_message(

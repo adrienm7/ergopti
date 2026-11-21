@@ -106,7 +106,9 @@ _TH_PromptOneShotDelay(PromptFn := 0, Path := "", ReloadFn := 0) {
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
 		; The shared value check names the accepted range in its refusal.
-		Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Answer.Value)
+		; A blank answer resets the setting to its default (PCK-13).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Answer.Value,
+			ManifestDefaultFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS))
 		if !Typed["ok"] {
 			ValueCheckShowRefusal(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS, Typed, Answer.Value)
 			return false
@@ -631,7 +633,9 @@ _TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
 		; The shared value schema owns the accepted range and its refusal text.
-		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Answer.Value)
+		; A blank answer resets the global delay to its default (PCK-13).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Answer.Value,
+			TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
 		if !Typed["ok"] {
 			ValueCheckShowRefusal("tap_hold.time_activation_seconds", Typed, Answer.Value)
 			return false

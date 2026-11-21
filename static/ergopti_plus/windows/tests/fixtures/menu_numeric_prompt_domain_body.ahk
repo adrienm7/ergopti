@@ -17,6 +17,11 @@ Ui_MsgBox(*) {
  _MDPN_World.Notices += 1
 }
 HotstringsBaseDelay() => 0.75
+; The base delay's manifest default, which a blank answer resets to (PCK-13).
+ManifestDefaultFor(Path) {
+ _MDPN_Require(Path == ConfigKey.HOTSTRINGS_EXPANSION_DELAY, "Only the base delay reads a manifest default")
+ return 0.5
+}
 HotstringsResolve(*) => {HasOverride: true, Delay: 0.321}
 _HS_CommitBaseDelay(Value) {
  global _MDPN_World
@@ -66,7 +71,17 @@ try {
  Before := _MDPN_World.Calls.Length
  _MDPN_Run(Mode)
  _MDPN_Require(_MDPN_World.Calls.Length == Before, "Cancel must publish nothing")
- for Raw in ["", "18446744073709551619", "00018446744073709551619", "9223372036854775808"] {
+ ; A blank base delay resets to its default (PCK-13, 2026-11-21); an override
+ ; resets through its own row, so a blank one stays refused.
+ _MDPN_World.Answer := {Result: "OK", Value: ""}
+ Before := _MDPN_World.Calls.Length
+ _MDPN_Run(Mode)
+ if Mode == "base"
+  _MDPN_Require(_MDPN_World.Calls.Length == Before + 1 && _MDPN_World.Calls[-1].Value == 0.5,
+   "A blank base delay must publish its default once")
+ else
+  _MDPN_Require(_MDPN_World.Calls.Length == Before, "A blank override must publish nothing")
+ for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808"] {
   _MDPN_World.Answer := {Result: "OK", Value: Raw}
   Before := _MDPN_World.Calls.Length
   _MDPN_Run(Mode)

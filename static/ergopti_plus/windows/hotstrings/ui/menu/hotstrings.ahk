@@ -285,7 +285,9 @@ _HS_PromptDefaultDelay() {
 		return
 	}
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY), IB.Value)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY), IB.Value,
+		ManifestDefaultFor(ConfigKey.HOTSTRINGS_EXPANSION_DELAY))
 	if !Typed["ok"] {
 		ValueCheckShowRefusal(ConfigKey.HOTSTRINGS_EXPANSION_DELAY, Typed, IB.Value)
 		return

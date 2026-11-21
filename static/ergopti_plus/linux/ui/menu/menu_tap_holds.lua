@@ -25,12 +25,14 @@ local LOG = "ui.menu.menu_tap_holds"
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range, and nothing is
 --- written.
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13).
 --- @param key string Declaration of the shared value schema.
 --- @param text string What the person typed.
+--- @param default any The setting's default, in the stored unit.
 --- @return any|nil value The value in the stored unit, nil when refused.
-local function read_typed(key, text)
+local function read_typed(key, text, default)
 	local ValueCheck = require("settings.engine.value_check")
-	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
 	show_error(plain_markup(ValueCheck.refusal_text(key, result, i18n_safe)), i18n_safe("dialog.value_check.title"))
@@ -234,7 +236,8 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, value)
+		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, value,
+			require("platform.remap.tap_hold_loader").GLOBAL_DEFAULT_SECONDS)
 		if seconds == nil then return false end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, seconds, guard)
@@ -256,7 +259,8 @@ local function _build_tap_holds(ctx)
 			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
 		if value == nil then return false end
 		-- The shared value check names the accepted range in its refusal.
-		local ms = read_typed(require("settings.engine.value_check").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, value)
+		local ms = read_typed(require("settings.engine.value_check").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, value,
+			require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS))
 		if ms == nil then return false end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, ms, guard)

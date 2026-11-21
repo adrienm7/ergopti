@@ -680,7 +680,9 @@ _LLM_Menu_TryNormalizeIntegerPrompt(Result, Raw, Key, &Normalized,
 	Declarations := LLM_Option_IntegerDeclarations()
 	if Declarations.Has(Key) {
 		; The shared value schema owns the grammar, the range and its refusal text.
-		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Declarations[Key]), String(Raw))
+		; A blank answer resets the setting to its default (PCK-13).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Declarations[Key]), String(Raw),
+			ManifestDefaultFor(Declarations[Key]))
 		if !Typed["ok"]
 			return _LLM_Menu_NotifyRefusal(Declarations[Key], Typed, Raw, NotifyFn)
 		Parsed := Integer(Typed["value"])
@@ -718,6 +720,12 @@ _LLM_Menu_TryNormalizeTemperaturePrompt(Result, Raw, &Normalized,
 	if Result != "OK"
 		return false
 	Raw := StrReplace(Raw, ",", ".")
+	; A blank answer resets the temperature to its default (PCK-13), through the
+	; shared entry grammar's reset.
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.LLM_GENERATION_TEMPERATURE), Raw,
+		ManifestDefaultFor(ConfigKey.LLM_GENERATION_TEMPERATURE))
+	if Typed.Has("reset")
+		Raw := Typed["value"]
 	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized) {
 		; The refusal names the shared value schema's range (and its two decimals).
 		Entry := ValueCheckEntryFor(ConfigKey.LLM_GENERATION_TEMPERATURE)

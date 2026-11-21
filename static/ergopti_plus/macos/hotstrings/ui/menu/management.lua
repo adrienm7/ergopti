@@ -465,8 +465,9 @@ function M.build_management(ctx)
 	local delay_menu = {}
 	-- Reads a typed delay through the shared value check: whole milliseconds in
 	-- the declared range; a refusal is notified with the text naming the range.
-	local function typed_delay(raw, key)
-		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+	-- A blank answer resets it to `default` (maintainer decision PCK-13).
+	local function typed_delay(raw, key, default)
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw, default)
 		if typed.ok then return typed.value end
 		Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
 		pcall(notifications.notify, i18n.get("dialog.value_check.title"),
@@ -501,7 +502,8 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY)
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY,
+					ManifestReader.default_for(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY))
 				if new_sec == nil then return end
 
 				if is_base then
@@ -719,7 +721,8 @@ function M.build_management(ctx)
 		-- The shared value check accepts a decimal comma (how half the locales
 		-- write 1,5 s) and names the declared range in its refusal.
 		local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
-		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		-- A blank answer resets it to its default (maintainer decision PCK-13).
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw, ManifestReader.default_for(key))
 		if not typed.ok then
 			Logger.warn(LOG, "Invalid idle reset '%s' — ignored (%s).", raw, typed.reason)
 			pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),
@@ -768,7 +771,8 @@ function M.build_management(ctx)
 			ok_label, i18n.get("button.cancel"))
 		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
 		local key = ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS
-		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		-- A blank answer resets it to its default (maintainer decision PCK-13).
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw, ManifestReader.default_for(key))
 		if not typed.ok then
 			Logger.warn(LOG, "Invalid Backspace restore window '%s' — ignored (%s).", raw, typed.reason)
 			pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),

@@ -667,7 +667,7 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
  try {
   Before := FSReadUtf8Exact(Path)
   ; Whole milliseconds from 1 to 1000 (the shared value schema); 3.5 is refused.
-  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon", "3.5", "1001"] {
+  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "soon", "3.5", "1001"] {
    AssertFalse(KeyCombinationChordCommitDelay(Raw, Path, Reload), "The complete user magnitude must be refused before any config write")
    AssertEqual(Before, FSReadUtf8Exact(Path), "A rejected delay cannot change even private source bytes")
    AssertEqual(0, Reloads, "A rejected delay cannot reload")
@@ -677,6 +677,11 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
   AssertTrue(KeyCombinationChordCommitDelay(" 1000 ", Path, Reload), "the declared maximum is accepted")
   AssertEqual(2, Reloads)
   AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 1000")
+  ; A blank answer resets the delay to its default (PCK-13, 2026-11-21): the
+  ; sparse writer turns the default into the absent row.
+  AssertTrue(KeyCombinationChordCommitDelay("  ", Path, Reload), "a blank delay is accepted")
+  AssertEqual(3, Reloads)
+  AssertFalse(InStr(FSReadUtf8Exact(Path), "simultaneous_threshold_ms"), "and resets it to its default")
  } finally FileDelete(Path)
 }
 Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)

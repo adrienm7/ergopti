@@ -57,8 +57,9 @@ function M.register(helpers, shared_path)
 		for _, vector in ipairs(corpus.entry) do
 			local row = vector
 			helpers.it("value-check: entry " .. row.id, function()
-				local result = ValueCheck.parse_entry(corpus.declarations[row.declaration], row.text)
+				local result = ValueCheck.parse_entry(corpus.declarations[row.declaration], row.text, row.default)
 				helpers.assert_eq(result.ok, row.ok)
+				helpers.assert_eq(result.reset == true, row.reset == true, "a blank number resets (pck-13)")
 				if row.ok then helpers.assert_eq(result.value, row.value) else helpers.assert_eq(result.reason, row.reason) end
 				if row.min ~= nil then
 					helpers.assert_eq(result.min, row.min)

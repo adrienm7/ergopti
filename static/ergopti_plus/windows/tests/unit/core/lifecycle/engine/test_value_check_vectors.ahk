@@ -59,8 +59,12 @@ _ValueCheckTest_Entry() {
 	for Row in Corpus["entry"] {
 		if Row.Has("ahk_skip")
 			continue
-		Result := ValueCheckParseEntry(Corpus["declarations"][Row["declaration"]], Row["text"])
+		Result := Row.Has("default")
+			? ValueCheckParseEntry(Corpus["declarations"][Row["declaration"]], Row["text"], Row["default"])
+			: ValueCheckParseEntry(Corpus["declarations"][Row["declaration"]], Row["text"])
 		AssertEqual(Row["ok"] ? true : false, Result["ok"] ? true : false, "entry " . Row["id"] . " ok")
+		AssertEqual(Row.Has("reset") && Row["reset"] ? true : false, Result.Has("reset") && Result["reset"] ? true : false,
+			"entry " . Row["id"] . " reset (pck-13)")
 		if Row["ok"]
 			AssertEqual(Row["value"], Result["value"], "entry " . Row["id"] . " value")
 		else

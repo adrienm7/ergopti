@@ -200,18 +200,24 @@ _ValueCheckEntryRefusal(Reason, Entry) {
  * Reads what a person typed in an entry box. A declaration with entry_scale is
  * typed in another unit than it is stored (milliseconds typed, seconds stored:
  * scale 1000) and entry_type says whether the typed number may carry decimals;
- * a refusal's bounds are in the typed unit.
+ * a refusal's bounds are in the typed unit. A blank numeric box resets the
+ * setting: given the setting's default, it answers that default with "reset"
+ * (maintainer decision PCK-13, 21 November 2026, on the three OS); without one
+ * it is refused as empty.
  * @param {Map} Entry - Declaration from ValueCheckEntryFor().
  * @param {Any} Text - Raw text of the box.
- * @returns {Map} As ValueCheckValue().
+ * @param {Any} Default - The setting's default, answered for a blank number.
+ * @returns {Map} As ValueCheckValue(), with "reset" true for a blank answer.
  */
-ValueCheckParseEntry(Entry, Text) {
+ValueCheckParseEntry(Entry, Text, Default?) {
 	if !(Text is String)
 		return _ValueCheckEntryRefusal("wrong_type", Entry)
 	Kind := Entry["type"]
 	if (Kind == "string" || Kind == "path")
 		return ValueCheckValue(Entry, Text)
 	Trimmed := Trim(Text, " `t`r`n")
+	if (Trimmed == "" && IsSet(Default) && (Kind == "integer" || Kind == "decimal"))
+		return Map("ok", true, "value", Default, "reset", true)
 	if (Trimmed == "")
 		return _ValueCheckEntryRefusal("empty", Entry)
 	if (Kind == "integer" || Kind == "decimal") {

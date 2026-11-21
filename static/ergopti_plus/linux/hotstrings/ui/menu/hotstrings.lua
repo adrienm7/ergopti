@@ -540,8 +540,9 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @param title string Already-translated dialog title.
 	--- @param current_sec number
 	--- @param key string Declaration of the shared value schema.
+	--- @param default number|nil Seconds a blank answer resets to (PCK-13).
 	--- @return number|nil Seconds, or nil when cancelled or refused.
-	local function prompt_delay(title, current_sec, key)
+	local function prompt_delay(title, current_sec, key, default)
 		local raw = prompt_text(
 			title,
 			i18n_safe("menu.hotstrings.delay_prompt"),
@@ -550,7 +551,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- Refused rather than clamped, by the shared value schema: a negative or
 		-- fractional millisecond is a typo, and the refusal names the accepted range.
 		local ValueCheck = require("settings.engine.value_check")
-		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw, default)
 		if not typed.ok then
 			Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
 			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
@@ -595,8 +596,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current,
-					require("settings.engine.value_check").KEY.HOTSTRINGS_EXPANSION_DELAY)
+				local key = require("settings.engine.value_check").KEY.HOTSTRINGS_EXPANSION_DELAY
+				local chosen = prompt_delay(title, current, key, require("menu.engine.manifest_reader").default_for(key))
 				if chosen == nil then return end
 				return commit_delay(config.set_base_delay, chosen)
 			end,
@@ -1640,7 +1641,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- The shared value schema owns the accepted range and its refusal text.
 				local ValueCheck = require("settings.engine.value_check")
 				local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
-				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer)
+				-- A blank answer resets it to its default (maintainer decision PCK-13).
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer,
+					require("menu.engine.manifest_reader").default_for(key))
 				if not typed.ok then
 					Logger.warn(LOG, "Invalid idle delay '%s' — ignored (%s).", tostring(answer), typed.reason)
 					show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
@@ -1680,7 +1683,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				if answer == nil then return false end
 				local ValueCheck = require("settings.engine.value_check")
 				local key = ValueCheck.KEY.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS
-				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer)
+				-- A blank answer resets it to its default (maintainer decision PCK-13).
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer,
+					require("menu.engine.manifest_reader").default_for(key))
 				if not typed.ok then
 					Logger.warn(LOG, "Invalid Backspace undo window '%s' — ignored (%s).", tostring(answer), typed.reason)
 					show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))

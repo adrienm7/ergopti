@@ -743,7 +743,9 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 	if !(Answer is Object) || Answer.Result != "OK"
 		return false
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Answer.Value)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Answer.Value,
+		ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS))
 	if !Typed["ok"] {
 		if HasMethod(NotifyFn, "Call") {
 			try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
@@ -803,7 +805,8 @@ PromptHotstringsBackspaceRestoreWindowMs(PromptFn := 0, WriterFn := 0, NotifyFn 
 	if !(Answer is Object) || Answer.Result != "OK"
 		return false
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(Entry, Answer.Value)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(Entry, Answer.Value, ManifestDefaultFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS))
 	if !Typed["ok"] {
 		if HasMethod(NotifyFn, "Call") {
 			try LoggerWarn("Editors", "Invalid Backspace undo window typed — ignored.")

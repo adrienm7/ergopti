@@ -187,7 +187,8 @@ function M.build(ctx,ui)
 				-- The shared value check names the accepted range; a refusal writes nothing.
 				local ValueCheck=require("settings.engine.value_check")
 				local key=require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS
-				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected)
+				-- A blank answer resets it to its default (maintainer decision PCK-13).
+				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected,delay_entry.default)
 				if not typed.ok then
 					ui.error(ValueCheck.refusal_text(key,typed,t),t("dialog.value_check.title"))
 					return false

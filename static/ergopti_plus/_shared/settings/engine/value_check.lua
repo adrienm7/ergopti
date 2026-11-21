@@ -193,13 +193,20 @@ end
 --- `entry_scale` is typed in another unit than it is stored (milliseconds
 --- typed, seconds stored: scale 1000) and `entry_type` says whether the typed
 --- number may carry decimals; a refusal's bounds are in the typed unit.
+--- A blank numeric box resets the setting: given the setting's default, it
+--- answers that default with `reset = true` (maintainer decision PCK-13,
+--- 2026-11-21, on the three OS); without one it is refused as empty.
 --- @param entry table Declaration from entry_for().
 --- @param text any Raw text of the box.
+--- @param default any|nil The setting's default, answered for a blank number.
 --- @return table result
-function M.parse_entry(entry, text)
+function M.parse_entry(entry, text, default)
 	if type(text) ~= "string" then return entry_refusal("wrong_type", entry) end
 	if entry.type == "string" or entry.type == "path" then return M.check_value(entry, text) end
 	local trimmed = require("core.text.engine.utils_core").trim(text)
+	if trimmed == "" and default ~= nil and (entry.type == "integer" or entry.type == "decimal") then
+		return { ok = true, value = default, reset = true }
+	end
 	if trimmed == "" then return entry_refusal("empty", entry) end
 	if entry.type == "integer" or entry.type == "decimal" then
 		local integral = trimmed:match("^[+-]?%d+$")

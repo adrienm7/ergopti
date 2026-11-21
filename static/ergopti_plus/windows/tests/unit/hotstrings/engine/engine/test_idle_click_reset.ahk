@@ -254,9 +254,14 @@ _HICR_PromptRefusesAndAccepts() {
 		AssertTrue(PromptHotstringsIdleResetSeconds(
 			(*) => ({ Result: "OK", Value: "7,5" }), _HICR_Writer, (*) => 0, _HICR_Rebuild))
 		AssertEqual(7.5, HSE_IdleResetSeconds)
+		; A blank answer resets the delay to its default (PCK-13, 2026-11-21).
+		AssertTrue(PromptHotstringsIdleResetSeconds(
+			(*) => ({ Result: "OK", Value: "  " }), _HICR_Writer, (*) => 0, _HICR_Rebuild))
+		AssertEqual(ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), HSE_IdleResetSeconds,
+			"a blank answer resets the delay to its default (pck-13-2026-11-21)")
 		AssertFalse(PromptHotstringsIdleResetSeconds(
 			(*) => ({ Result: "Cancel", Value: "9" }), _HICR_Writer, (*) => 0, _HICR_Rebuild))
-		AssertEqual(1, _HICR_Writes.Length, "a cancelled prompt writes nothing")
+		AssertEqual(2, _HICR_Writes.Length, "a cancelled prompt writes nothing")
 	} finally {
 		HSE_IdleResetSeconds := SavedSeconds
 	}

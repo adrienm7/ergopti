@@ -147,8 +147,12 @@ function replayVectors(V) {
 		if (!row.ok) check(result.reason === row.reason, `stored ${row.id}: reason ${result.reason}`);
 	}
 	for (const row of corpus.entry) {
-		const result = V.parseEntry(corpus.declarations[row.declaration], row.text);
+		const result = V.parseEntry(corpus.declarations[row.declaration], row.text, row.default);
 		check(result.ok === row.ok, `entry ${row.id}: ok ${result.ok}, expected ${row.ok}`);
+		check(
+			(result.reset === true) === (row.reset === true),
+			`entry ${row.id}: reset ${result.reset}`
+		);
 		if (row.ok) check(result.value === row.value, `entry ${row.id}: value ${result.value}`);
 		else check(result.reason === row.reason, `entry ${row.id}: reason ${result.reason}`);
 		if (row.min !== undefined) {

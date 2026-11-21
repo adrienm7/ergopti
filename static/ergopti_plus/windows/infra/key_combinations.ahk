@@ -1802,7 +1802,9 @@ KeyCombinationChordPromptDelay() {
 KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 	global ConfigurationFile
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text,
+		ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 	if !Typed["ok"] {
 		ValueCheckShowRefusal(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Typed, Text)
 		return false

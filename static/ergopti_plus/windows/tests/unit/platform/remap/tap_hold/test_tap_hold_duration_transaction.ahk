@@ -791,9 +791,13 @@ _THD_NumericPromptBody(GlobalDelay, Raw, ExpectedMs, TargetPath) {
 _THD_NumericPromptDomain(GlobalDelay) {
  ; Whole milliseconds only (the shared value schema): a hexadecimal, fractional or
  ; exponent spelling is refused with the accepted range, never reinterpreted.
- for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "", "0",
+ for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "0",
    "0x3", "3.4", "3e0", "10001"]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 0))
+ ; A blank global delay resets it to its default (PCK-13, 2026-11-21); a key's
+ ; own delay resets through its own row, so a blank one stays refused.
+ _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, "",
+  GlobalDelay ? Round(TAPHOLD_DEFAULT_ACTIVATION_SECONDS * 1000) : 0))
  for Raw in ["3", "0003", "+3", " 3 "]
   _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 3))
  ; The declared maximum itself is admitted.

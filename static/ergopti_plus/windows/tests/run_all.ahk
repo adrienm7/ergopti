@@ -976,6 +976,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/core/lifecycle/engine/test_llm_persistence_runner.ahk
 #Include unit/ai/api/test_temperature_boundary.ahk
 #Include unit/ai/menu/test_numeric_option_ranges.ahk
+#Include unit/ai/menu/test_blank_numeric_resets.ahk
 #Include unit/ai/api/test_sync_target.ahk
 #Include unit/ai/menu/test_transactions.ahk
 #Include unit/ai/menu/test_api_entries_transactions.ahk

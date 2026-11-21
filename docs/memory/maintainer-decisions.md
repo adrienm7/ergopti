@@ -63,6 +63,27 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## A blank numeric answer resets the setting to its default (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (PCK-13 in the pickers and prompts
+campaign, `2026-11-21-pickers-prompts`): validating an empty numeric prompt
+resets the setting to its default on Windows, macOS and Linux, as macOS's AI
+settings already did (« Leave blank to reset »). Windows refused it as empty
+and Linux with the range sentence. The shared entry grammar owns the rule:
+`parse_entry(entry, text, default)` (`value_check.js`, `ui/value_check.js`,
+`value_check.lua`, `ValueCheckParseEntry`) answers a blank integer or decimal
+with `{ ok, value = default, reset = true }` when its caller passes the
+setting's default, and still refuses it as `empty` without one;
+`value_check_vectors.json` replays both on the three ports and in JS. Every
+setting prompt passes its default: the manifest default of its key, the
+tap-hold global default (`TAPHOLD_DEFAULT_ACTIVATION_SECONDS`,
+`tap_hold_loader.GLOBAL_DEFAULT_SECONDS`, `DEFAULT_TAP_HOLD_TIMEOUT_MS`), and
+on Linux the AI numeric page receives it in its request (`numeric_prompt.lua`,
+`ui/numeric_prompt/script.js`). Overrides whose blank would mean « follow the
+inherited value again » (a category or section delay, a personal file's
+priority, a key's own tap-hold delay, an app category score) keep refusing a
+blank: they reset through their own rows (« default », reset key delay).
+
 ## The locale's neutral value is the absent row (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (TODO « The locale's neutral

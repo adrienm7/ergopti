@@ -149,14 +149,24 @@ function checkValue(entry, value) {
  * is typed in another unit than it is stored (milliseconds typed, seconds
  * stored: scale 1000), and `entry_type` says whether the typed number may
  * carry decimals; the bounds of a refusal are then given in the typed unit.
+ * A blank numeric box resets the setting: given the setting's default, it
+ * answers that default with `reset: true` (maintainer decision PCK-13,
+ * 2026-11-21, on the three OS); without one it is refused as empty.
  * @param {Object} entry - Declaration from entryFor().
  * @param {string} text - Raw text of the box.
- * @return {{ok: boolean, value?: *, reason?: string, min?: number, max?: number}}
+ * @param {*} [fallback] - The setting's default, answered for a blank number.
+ * @return {{ok: boolean, value?: *, reset?: boolean, reason?: string, min?: number, max?: number}}
  */
-function parseEntry(entry, text) {
+function parseEntry(entry, text, fallback) {
 	if (typeof text !== 'string') return entryRefusal('wrong_type', entry);
 	if (entry.type === 'string' || entry.type === 'path') return checkValue(entry, text);
 	const trimmed = text.trim();
+	if (
+		trimmed === '' &&
+		fallback !== undefined &&
+		(entry.type === 'integer' || entry.type === 'decimal')
+	)
+		return { ok: true, value: fallback, reset: true };
 	if (trimmed === '') return entryRefusal('empty', entry);
 	if (entry.type === 'integer' || entry.type === 'decimal') {
 		if (!DECIMAL_TEXT.test(trimmed)) return entryRefusal('wrong_type', entry);

@@ -285,6 +285,8 @@ local function _build_llm(ctx)
 					Prompt.ask({
 						title = i18n_safe(title_key),
 						key = "llm.trigger." .. name,
+						-- A blank answer resets it to its default (maintainer decision PCK-13).
+						default = require("menu.engine.manifest_reader").default_for("llm.trigger." .. name),
 						value = value,
 						on_save = save,
 					}, ctx.webview)
@@ -1085,6 +1087,8 @@ local function _build_llm(ctx)
 						Prompt.ask({
 							title = i18n_safe(setting.key),
 							key = "llm.generation." .. setting.name,
+							-- A blank answer resets it to its default (maintainer decision PCK-13).
+							default = require("menu.engine.manifest_reader").default_for("llm.generation." .. setting.name),
 							value = value,
 							on_save = save,
 						}, ctx.webview)
