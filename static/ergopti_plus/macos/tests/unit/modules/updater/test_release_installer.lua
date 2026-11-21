@@ -155,7 +155,8 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(results[1][1], call.args[6] .. "/app/ErgoptiPlus.app")
 		helpers.assert_eq(results[2][2], "download")
 		helpers.assert_eq(results[3][2], "verify")
-		helpers.assert_eq(results[4][2], "verify")
+		-- UPD-10: a refused code signature is its own stage
+		helpers.assert_eq(results[4][2], "signature")
 		helpers.assert_nil(results[4][1])
 	end)
 

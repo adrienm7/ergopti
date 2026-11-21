@@ -158,7 +158,9 @@ function M.download_offered(updater, release, ctx)
 			completed = true
 			owner.active, owner.terminal, owner.installing = false, true, false
 			owner.succeeded = installed
-			owner.failed_download = archive == nil and stage ~= "verify"
+			-- A refused check (digest, signature) is no failed transfer to retry
+			local transfer_failed = archive == nil and stage ~= "verify" and stage ~= "signature"
+			owner.failed_download = transfer_failed
 			if installed then Logger.success(LOG, "Update %s installed.", tag)
 			else Logger.error(LOG, "Update %s failed at the %s: %s.", tag,
 				archive and "install" or (stage or "download"), tostring(err)) end
@@ -171,10 +173,12 @@ function M.download_offered(updater, release, ctx)
 				DownloadWindow.complete(session_id, installed, installed
 					and I18n.get(restarted and "updater.installed_restarting" or "updater.installed_restart_refused")
 						:gsub("{1}", function() return tag end)
-					or (stage == "verify"
-						and I18n.get("changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
+					or ((stage == "verify" or stage == "signature")
+						-- A refused signature is named as one (UPD-10)
+						and I18n.get(stage == "signature" and "changelog_window.install_error_signature"
+							or "changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
 						or I18n.get(archive and "updater.install_error" or "updater.install_error_download")),
-					archive == nil and stage ~= "verify" and failure_receipt or nil)
+					transfer_failed and failure_receipt or nil)
 			end
 		end
 		local function done(archive, err, stage, failure_receipt)

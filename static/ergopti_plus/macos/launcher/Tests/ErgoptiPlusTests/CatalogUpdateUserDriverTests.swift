@@ -199,7 +199,8 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		let cases: [(Int, String)] = [
 			(Int(SUError.downloadError.rawValue), "updater.no_connection"),
 			(Int(SUError.runningTranslocated.rawValue), "updater.move_to_applications"),
-			(Int(SUError.signatureError.rawValue), "updater.install_error"),
+			(Int(SUError.signatureError.rawValue), "updater.install_error_signature"),
+			(Int(SUError.unarchivingError.rawValue), "updater.install_error"),
 		]
 		for (index, entry) in cases.enumerated() {
 			let error = NSError(domain: SUSparkleErrorDomain, code: entry.0,

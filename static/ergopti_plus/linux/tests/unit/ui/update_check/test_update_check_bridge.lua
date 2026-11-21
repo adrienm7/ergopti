@@ -313,6 +313,29 @@ helpers.describe("update-check window bridge (Linux)", function()
 		end)
 	end
 
+	-- UPD-10: a refused signature read as an integrity check
+	helpers.it("upd-10: the window names a refused signature, with no network receipt", function()
+		scenario(available, function(bridge, context)
+			local receipts = {}
+			package.loaded["ui.download_window.bridge"].complete = function(id, ok, message, receipt)
+				context.completed[#context.completed + 1] = { id, ok, message }
+				receipts[#receipts + 1] = receipt == nil and "none" or receipt
+			end
+			context.updater.download_update = function(_, callback)
+				callback(nil, "update signature refused: the signature does not match", "signature", { stage = "http" })
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(context.completed[1][2], false)
+			helpers.assert_eq(context.completed[1][3],
+				(I18n.get("changelog_window.install_error_signature"):gsub("{tag}", "v0.0.0-dev.150")))
+			helpers.assert_eq(receipts[1], "none", "a refused signature is no network failure")
+			helpers.assert_eq(context.finished[1][3], "signature", "the hook hears the stage")
+		end)
+	end)
+
 	helpers.it("refuses to install a release the updater no longer offers", function()
 		scenario(function(channel)
 			local answer = available(channel)

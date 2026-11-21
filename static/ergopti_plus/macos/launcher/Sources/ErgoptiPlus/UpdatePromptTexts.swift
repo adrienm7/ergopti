@@ -51,6 +51,7 @@ struct UpdatePromptTexts {
 		"updater.up_to_date",
 		"updater.no_connection",
 		"updater.install_error",
+		"updater.install_error_signature",
 		"updater.move_to_applications",
 		"updater.close",
 		"menu.about.update_checking",
@@ -163,6 +164,9 @@ struct UpdatePromptTexts {
 		case Int(SUError.runningFromDiskImageError.rawValue),
 			Int(SUError.runningTranslocated.rawValue):
 			return "updater.move_to_applications"
+		case Int(SUError.signatureError.rawValue):
+			// A refused EdDSA signature is named, not a generic failure (UPD-10)
+			return "updater.install_error_signature"
 		default:
 			return "updater.install_error"
 		}

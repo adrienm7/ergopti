@@ -61,7 +61,22 @@ M.REASON = {
 	-- The newest feed release whose downloaded asset, signature or key did not
 	-- verify: nothing is installed, as when a digest from the API mismatches.
 	feed_signature = "changelog_window.install_error_feed_signature",
+	-- A release whose detached or code signature was refused (UPD-10): named
+	-- as a signature, not as an integrity check or an unexpected error.
+	signature = "changelog_window.install_error_signature",
 }
+
+--- The page's reason for a download that stopped at one of its stages.
+--- @param stage string|nil "download", "verify" (size, digest, bundle) or
+---   "signature" (a detached or code signature refused).
+--- @param feed boolean|nil A release read from the public feed: its signature
+---   is its only authentication, so any refused check names it.
+--- @return string reason_key One of M.REASON.
+function M.download_reason(stage, feed)
+	if stage == "signature" then return feed == true and M.REASON.feed_signature or M.REASON.signature end
+	if stage == "verify" then return feed == true and M.REASON.feed_signature or M.REASON.verify end
+	return M.REASON.download
+end
 
 local KNOWN_REASON = {}
 for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
@@ -416,9 +431,10 @@ function M.new(ports)
 			settled = true
 			if not path then
 				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, ErrorDescription.describe(detail or reason))
-				-- A verification failure keeps its own wording: a digest mismatch, or
-				-- the required signature of a release read from the public feed.
+				-- A verification failure keeps its own wording: a digest mismatch, a
+				-- refused signature, or the required signature of a feed release.
 				local verified = reason == M.REASON.verify or reason == M.REASON.feed_signature
+					or reason == M.REASON.signature
 				fail(tag, verified and reason or M.REASON.download, backup, failure_receipt, current)
 				return
 			end

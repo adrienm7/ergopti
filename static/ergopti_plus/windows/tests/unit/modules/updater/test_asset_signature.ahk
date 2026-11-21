@@ -245,6 +245,26 @@ _TAS_GateWired() {
 
 Test("AssetSignature: every install path passes the gate before its transaction (asset-signature)", _TAS_GateWired)
 
+; UPD-10: a refused API signature said « unexpected error », and a refused feed
+; signature's box said only « Could not install the update ».
+_TAS_RefusalNamesTheSignature() {
+	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
+	Refused := InStr(Body, "if !SignatureAllows")
+	Begin := InStr(Body, "_Updater_BeginDownloadTransaction(")
+	Assert(Refused > 0 && Begin > Refused, "the API gate refusal precedes the transaction")
+	Report := SubStr(Body, Refused, Begin - Refused)
+	Assert(InStr(Report, '_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_signature"'),
+		"a refused API signature is named in the box and on the Versions page")
+	Feed := InStr(Body, "AssetSignature_AuthenticateFeedAsset(AssetName, Release.Tag, Request)")
+	FeedReport := SubStr(Body, Feed, Refused - Feed)
+	Assert(InStr(FeedReport, '_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_feed_signature"'),
+		"a refused feed signature is named in the box too")
+	for Key in ["updater.install_error_signature", "changelog_window.install_error_signature"]
+		Assert(t(Key) != Key, Key . " is localized")
+}
+
+Test("AssetSignature: a refused signature is named as one (upd-10)", _TAS_RefusalNamesTheSignature)
+
 
 
 

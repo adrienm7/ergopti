@@ -2246,7 +2246,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 			return false
 		}
 		if !IsObject(Asset) {
-			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_feed_signature", "Icon!", 0, InstallObserver)
+			_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_feed_signature", "Icon!", 0, InstallObserver)
 			return false
 		}
 		AssetUrl := Asset.Url
@@ -2258,8 +2258,9 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
+	; A refused signature is named as one, never as an unexpected error (UPD-10)
 	if !SignatureAllows {
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
+		_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_signature", "Icon!", 0, InstallObserver)
 		return false
 	}
 

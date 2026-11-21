@@ -3118,7 +3118,8 @@ local function main()
 				if not installed then
 					if notifier and title then
 						notifier.send(i18n_mod.get(stage == "download" and "updater.install_error_download"
-							or "updater.install_error"), { title = title, level = "error" })
+							or stage == "signature" and "updater.install_error_signature" or "updater.install_error"),
+							{ title = title, level = "error" })
 					end
 					if rebuild_tray_menu then rebuild_tray_menu() end
 					return false

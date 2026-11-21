@@ -1531,7 +1531,7 @@ end
 --- @param callback function|nil
 --- @param path string|nil
 --- @param err string|nil
---- @param stage string|nil "download" or "verify": where a failure happened.
+--- @param stage string|nil "download", "verify" or "signature": where a failure happened.
 --- @param release table|nil The release the archive belongs to.
 --- @param failure_state string The updater state a failure returns to.
 --- @param failure_receipt table|nil Structured native evidence, never inferred from err.

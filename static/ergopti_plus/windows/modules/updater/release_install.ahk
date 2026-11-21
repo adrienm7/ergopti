@@ -36,7 +36,8 @@ global RELEASE_INSTALL_REASONS := Map(
 	"unknown_release", "changelog_window.install_error_unknown_release",
 	"no_details",      "changelog_window.install_error_no_details",
 	"feed_not_newest", "changelog_window.install_error_feed_not_newest",
-	"feed_signature",  "changelog_window.install_error_feed_signature")
+	"feed_signature",  "changelog_window.install_error_feed_signature",
+	"signature",       "changelog_window.install_error_signature")
 
 ; The tag of the release being installed from the Versions window, or "".
 global _ReleaseInstallTag := ""

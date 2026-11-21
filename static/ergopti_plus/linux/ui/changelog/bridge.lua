@@ -611,10 +611,9 @@ local function install_session()
 			if type(download) ~= "function" or not selected_current(accepted, record, retained_owner, release) then return false end
 			-- A feed release that fails verification failed its signature, the only
 			-- authentication it has: the page says so instead of a bare integrity error.
-			local verify_reason = accepted.feed and ReleaseInstall.REASON.feed_signature or ReleaseInstall.REASON.verify
+			local feed = accepted.feed == true
 			return download(record, function(path, err, stage, failure_receipt)
-				done(path, stage == "verify" and verify_reason or ReleaseInstall.REASON.download, err,
-					failure_receipt)
+				done(path, ReleaseInstall.download_reason(stage, feed), err, failure_receipt)
 			end, function()
 				return rawget(manager, "download_release") == download
 					and selected_current(accepted, record, retained_owner, release)

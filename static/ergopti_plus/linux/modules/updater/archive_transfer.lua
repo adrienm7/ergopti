@@ -303,7 +303,8 @@ function M.new(ports)
        local sized, size = pcall(sealed_size, artifact)
        local accepted, message = signature.decide({ size = sized and size or nil, sha256 = expected },
         txn.signature_text, txn.signature_fetch_error, selected.signature_required)
-       if accepted ~= true then fail(message or "update signature refused", "verify"); return end
+       -- Its own stage: a refused signature is named, not read as a digest (UPD-10)
+       if accepted ~= true then fail(message or "update signature refused", "signature"); return end
       end
       txn.finished = true; active = nil; Budget.retire(budget)
       pcall(callback, adopted.path, nil, nil, nil, artifact)

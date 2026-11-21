@@ -66,14 +66,18 @@ M._getenv = os.getenv
 -- ================================
 -- ================================
 
--- Exit codes of the staging script: 10 is the download, 20 and up a check.
+-- Exit codes of the staging script: 10 is the download, 20 and up a check,
+-- 27 the code signature of the new app (codesign --verify, UPD-10).
 M.EXIT_DOWNLOAD = 10
 M.EXIT_VERIFY_FIRST = 20
+M.EXIT_SIGNATURE = 27
 
 --- The native extraction owner, captured once through the source-layout resolver.
 local stage_path = Paths.shared("../macos/adapters/release_stage.sh")
 M.STAGE_SCRIPT = type(stage_path) == "string" and FileSystem.read(stage_path) or nil
 assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native release staging script is unavailable")
+assert(M.STAGE_SCRIPT:find("codesign %-%-verify[^\n]*|| exit " .. M.EXIT_SIGNATURE .. "\n"),
+	"The native release staging script names no code-signature exit")
 
 --- Replaces the installed app once the launcher has quit, then keeps it only
 --- once its boot reports ready (the Windows swap's boot-ready and probation):
@@ -305,7 +309,7 @@ assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready cap
 
 --- Downloads and verifies one release into a fresh staging folder.
 --- @param asset table M.find_asset() result.
---- @param done function fn(staged_app|nil, stage "download"|"verify", detail).
+--- @param done function fn(staged_app|nil, stage "download"|"verify"|"signature", detail).
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
@@ -369,7 +373,8 @@ function M.stage(asset, done)
 			return
 		end
 		local code = tonumber(exit_code)
-		local stage = (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
+		local stage = code == M.EXIT_SIGNATURE and "signature"
+			or (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
 		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)

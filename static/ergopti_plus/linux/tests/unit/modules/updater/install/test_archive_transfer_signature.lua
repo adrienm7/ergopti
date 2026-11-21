@@ -123,18 +123,18 @@ test("a good signature releases the archive with its sealed size and digest", fu
  assert(g.calls[1].asset.size == 4096 and g.calls[1].asset.sha256 == string.rep("a", 64))
  assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only" and h.cancelled ~= true)
 end)
-test("a bad signature refuses the archive in words", function()
+test("upd-10: a bad signature refuses the archive in words, at its own stage", function()
  local g = gate(false)
  local h = run(g, { ok = true, body = "c2ln" })
  assert(#g.calls == 1 and h.cancelled == true)
  assert(#h.callbacks == 1 and h.callbacks[1][1] == nil)
- assert(h.callbacks[1][2]:find("signature does not match", 1, true) and h.callbacks[1][3] == "verify")
+ assert(h.callbacks[1][2]:find("signature does not match", 1, true) and h.callbacks[1][3] == "signature")
 end)
-test("a missing signature download reaches the gate as a fetch error", function()
+test("upd-10: a missing signature download reaches the gate as a fetch error", function()
  local g = gate(false)
  local h = run(g, { ok = false, error = "HTTP 404" })
  assert(#g.calls == 1 and g.calls[1].text == nil and g.calls[1].fetch_error == "HTTP 404")
- assert(h.callbacks[1][1] == nil and h.callbacks[1][3] == "verify")
+ assert(h.callbacks[1][1] == nil and h.callbacks[1][3] == "signature")
 end)
 test("a release without a signature asset still reaches the gate", function()
  local g = gate(false)
@@ -169,7 +169,21 @@ test("a feed release without the gate or the signature URL does not start", func
  local ok = pcall(fixture, gate(true), false, "yes")
  assert(not ok, "only a literal true marks a feed release")
 end)
-assert(#tests == 7, "signature transfer case floor")
+test("upd-10: each stage names its own reason, a feed release its signature", function()
+ local ReleaseInstall = require("updater.engine.release_install")
+ local R = ReleaseInstall.REASON
+ for _, case in ipairs({
+  { "signature", false, R.signature }, { "signature", true, R.feed_signature },
+  { "verify", false, R.verify }, { "verify", true, R.feed_signature },
+  { "download", false, R.download }, { "download", true, R.download }, { nil, false, R.download },
+ }) do
+  assert(ReleaseInstall.download_reason(case[1], case[2]) == case[3], tostring(case[1]) .. " " .. tostring(case[2]))
+ end
+ assert(R.signature == "changelog_window.install_error_signature")
+ local I18n = require("core.i18n.engine.i18n")
+ assert(I18n.get(R.signature) ~= R.signature, "the refused signature has its localized line")
+end)
+assert(#tests == 8, "signature transfer case floor")
 
 local helpers = require("tests.helpers")
 helpers.describe("Archive Transfer Signature", function()
