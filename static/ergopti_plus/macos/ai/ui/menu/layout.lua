@@ -55,6 +55,7 @@ local FALLBACK_GREYS_WHEN_OFF = {
 	llm_generation_settings = true,
 	llm_display             = true,
 	llm_navigation          = true,
+	llm_ollama_runtime      = true,
 }
 
 -- Map of row id -> disabled_when_off (bool). nil until first load.

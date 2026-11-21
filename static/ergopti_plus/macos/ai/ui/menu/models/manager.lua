@@ -994,9 +994,16 @@ function M.new(deps)
 	--- Removes a model from the local Ollama server, whatever backend the AI
 	--- menu uses for predictions (the developer field run's cleanup).
 	--- @param model string Ollama model name.
+	--- @param on_done function|nil Told once whether the model is gone.
 	--- @return boolean accepted
-	function obj.delete_ollama_model(model)
-		return ollama.delete_model(model) == true
+	function obj.delete_ollama_model(model, on_done)
+		return ollama.delete_model(model, on_done) == true
+	end
+
+	--- The Ollama models the last `ollama list` read, nil before any read.
+	--- @return table|nil names
+	function obj.ollama_installed_model_names()
+		return ollama.installed_model_names()
 	end
 
 	--- Downloads a catalogue model through the MLX download window, whatever

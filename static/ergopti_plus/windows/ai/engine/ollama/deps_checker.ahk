@@ -16,6 +16,7 @@
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\identifiers.ahk
 #Include managed_bootstrap.ahk
+#Include runtime_uninstall.ahk
 
 
 

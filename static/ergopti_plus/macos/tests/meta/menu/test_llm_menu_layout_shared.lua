@@ -44,6 +44,7 @@ local CANON = {
 	{ id = "llm_generation_settings", greys_off = true },
 	{ id = "llm_display",             greys_off = true },
 	{ id = "llm_navigation",          greys_off = true },
+	{ id = "llm_ollama_runtime",      greys_off = true },
 }
 
 -- Takes a selector unique to one production file rather than that file's
@@ -221,7 +222,7 @@ helpers.describe("shared fixed LLM group declarations", function()
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, nil)
 				count = count + 1
-			elseif row.id == "llm_generation_settings" then
+			elseif row.id == "llm_generation_settings" or row.id == "llm_ollama_runtime" then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, nil)
@@ -231,7 +232,7 @@ helpers.describe("shared fixed LLM group declarations", function()
 			end
 		end
 		helpers.assert_eq(count, 3)
-		helpers.assert_eq(additional_groups, 1)
+		helpers.assert_eq(additional_groups, 2, "the generation settings and Ergopti's Ollama (OLL-11)")
 	end)
 end)
 

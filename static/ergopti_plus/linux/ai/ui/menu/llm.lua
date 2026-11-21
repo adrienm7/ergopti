@@ -921,6 +921,58 @@ local function _build_llm(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end) == true
 	end
+	-- The lifecycle of Ergopti's Ollama (llm_ollama_runtime_rows, OLL-11). Each
+	-- row runs the owner that already did it: the AI enable installs, starts
+	-- and repairs (runtime_repair reinstalls a tree that fails its seal), the
+	-- page's delete removes the selected model, and the shared sequence
+	-- uninstalls (ai/engine/ollama/runtime_uninstall_ports.lua). Declared after
+	-- delete_model, so the closures below hold it.
+	group_builders["llm_ollama_runtime"] = function()
+		local InstallState = require("ai.engine.ollama.install_state")
+		local function start()
+			if type(llm.enable) ~= "function" then return false end
+			return llm.enable(ctx.on_menu_changed) == true
+		end
+		local function uninstall()
+			local confirmed = ask_yes_no(i18n_safe("ollama.uninstall.confirm_title"),
+				plain_markup(i18n_safe("ollama.uninstall.confirm_body")),
+				i18n_safe("ollama.uninstall.confirm_button"), i18n_safe("button.cancel"))
+			if confirmed ~= true then return false end
+			local remove_models = ask_yes_no(i18n_safe("ollama.uninstall.models_title"),
+				plain_markup(i18n_safe("ollama.uninstall.models_body")),
+				i18n_safe("ollama.uninstall.remove_models_button"), i18n_safe("ollama.uninstall.keep_models_button")) == true
+			require("ai.engine.ollama.runtime_uninstall_ports").uninstall(llm, remove_models,
+				require("platform.focus.application_notifier").send, i18n_safe,
+				nil, function()
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end)
+			return true
+		end
+		local runtime_ctx = {}
+		for key, value in pairs(ctx) do runtime_ctx[key] = value end
+		runtime_ctx.commands = {
+			[COMMAND.LLM_OLLAMA_INSTALL] = start,
+			[COMMAND.LLM_OLLAMA_START] = start,
+			[COMMAND.LLM_OLLAMA_REPAIR] = start,
+			[COMMAND.LLM_OLLAMA_DELETE_MODEL] = function()
+				local model = type(llm.get_current_model) == "function" and llm.get_current_model() or nil
+				if type(model) ~= "string" or model == "" then
+					return require("ai.engine.ollama.runtime_uninstall_ports").no_model_notice(
+						require("platform.focus.application_notifier").send, i18n_safe)
+				end
+				return delete_model(model)
+			end,
+			[COMMAND.LLM_OLLAMA_UNINSTALL] = uninstall,
+		}
+		runtime_ctx.state_getters = {
+			llm_ollama_installed = function() return InstallState.managed_installed() end,
+			llm_ollama_absent = function() return not InstallState.managed_installed() end,
+		}
+		local rows = ManifestMenu.build("llm_ollama_runtime_rows", "LLM Ollama", nil, nil, runtime_ctx, nil)
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
+	end
 	-- One button opens the model selector page, where the backend and the model
 	-- are chosen together (maintainer, 2026-10-27): the backend's emoji, then
 	-- the model. The menu lists no model and no API entry. Drawing the button

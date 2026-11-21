@@ -50,7 +50,8 @@ _LMLS_Canonical() {
 		Map("id", "llm_trigger",             "off", true),
 		Map("id", "llm_generation_settings", "off", true),
 		Map("id", "llm_display",             "off", true),
-		Map("id", "llm_navigation",          "off", true)
+		Map("id", "llm_navigation",          "off", true),
+		Map("id", "llm_ollama_runtime",      "off", true)
 	]
 }
 
@@ -236,18 +237,19 @@ _LMLS_CurrentGroupSourceAndDataControls() {
 	_LMLS_CurrentRowTypesPolicy(_LMLS_ManifestRows())
 }
 
-; The four fixed parents are declared groups; the model and profile rows are
-; declared lists whose native providers supply row DATA.
+; The five fixed parents are declared groups (Ergopti's Ollama joined them for
+; OLL-11); the model and profile rows are declared lists whose native providers
+; supply row DATA.
 _LMLS_CurrentRowTypesPolicy(Rows) {
 	Groups := 0
 	for Row in Rows {
 		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation"
-			|| Row["id"] == "llm_generation_settings" {
+			|| Row["id"] == "llm_generation_settings" || Row["id"] == "llm_ollama_runtime" {
 			AssertEqual("group", Row["type"], "fixed LLM parents require shared group ownership")
 			Groups += 1
 		} else AssertEqual("list", Row["type"], "the model and profile rows are list rows whose providers supply DATA")
 	}
-	AssertEqual(4, Groups, "exactly the selected genuine fixed parents have shared group ownership")
+	AssertEqual(5, Groups, "exactly the selected genuine fixed parents have shared group ownership")
 }
 Test("llm-menu-layout-shared: true canonical groups require executable native source owners", _LMLS_CurrentGroupSourceAndDataControls)
 
@@ -280,11 +282,11 @@ _LMLS_CurrentRowTypeWithdrawalControls() {
 Test("llm-menu-layout-shared: every current declared native route rejects its type withdrawal", _LMLS_CurrentRowTypeWithdrawalControls)
 
 ; The model selector page (2026-10-27) left six handwritten canonical rows:
-; the Backend row joined the page.
+; the Backend row joined the page. Ergopti's Ollama (OLL-11) made it seven.
 ; Pin their complete inventory before withdrawing any genuine current route.
 _LMLS_CurrentInventoryPolicy(Rows) {
 	Canonical := _LMLS_Canonical()
-	Types := ["list", "list", "group", "group", "group", "group"]
+	Types := ["list", "list", "group", "group", "group", "group", "group"]
 	AssertEqual(Canonical.Length, Types.Length, "one handwritten route type per canonical row")
 	AssertEqual(Canonical.Length, Rows.Length, "current LLM inventory row count")
 	for Index, Expected in Canonical {
@@ -332,7 +334,7 @@ _LMLS_InventorySourceControl(Kind) {
 			Values.RemoveAt(Profile)
 			ExpectedMessage := "current LLM inventory row count - expected: <" . Shipped . ">, actual: <" . (Shipped - 1) . ">"
 		case "duplicate":
-			; Retain six rows and four groups: cardinality alone must not admit this.
+			; Retain seven rows and five groups: cardinality alone must not admit this.
 			Values[Model] := Values[Profile]
 			ExpectedMessage := "current LLM inventory IDs and order - expected: <llm_model>, actual: <llm_profile>"
 		case "reordered":
@@ -360,13 +362,13 @@ _LMLS_InventorySourceControl(Kind) {
 	AssertEqual(Source, FileRead(Path, "UTF-8"), "source controls never modify the canonical manifest")
 }
 
-Test("llm-menu-layout-shared: genuine current source retains the complete six-row inventory",
+Test("llm-menu-layout-shared: genuine current source retains the complete seven-row inventory",
 	_LMLS_InventorySourceControl.Bind("current"))
 Test("llm-menu-layout-shared: revived retired live row cannot join the current source inventory",
 	_LMLS_InventorySourceControl.Bind("revived"))
 Test("llm-menu-layout-shared: missing real-source row refuses before route withdrawal",
 	_LMLS_InventorySourceControl.Bind("missing"))
-Test("llm-menu-layout-shared: duplicate real-source ID cannot borrow six-row cardinality",
+Test("llm-menu-layout-shared: duplicate real-source ID cannot borrow seven-row cardinality",
 	_LMLS_InventorySourceControl.Bind("duplicate"))
 Test("llm-menu-layout-shared: reordered real-source IDs cannot borrow current route types",
 	_LMLS_InventorySourceControl.Bind("reordered"))

@@ -101,6 +101,14 @@ local function managed_status()
 	return ok and type(verdict) == "table" and type(verdict.status) == "string" and verdict.status or "unavailable"
 end
 
+--- Whether Ergopti's own Ollama is installed: the Ollama menu greys its rows
+--- by it (llm_ollama_runtime_rows).
+--- @param status function|nil Reads the managed status (tests).
+--- @return boolean installed
+function M.managed_installed(status)
+	return (status or managed_status)() == "installed"
+end
+
 local DEFAULT_PORTS = {
 	failure = M.failure,
 	managed = managed_status,

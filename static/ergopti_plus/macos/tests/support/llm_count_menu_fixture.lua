@@ -106,7 +106,9 @@ return function(callback, options)
 				apply_llm_profile_shortcut = noop, restore_shortcuts = accept }
 		end }
 		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = { check_and_install_deps = accept }
-		package.loaded["ai.engine.ollama.deps_checker"] = { check_and_install_deps = accept }
+		-- The « Ergopti's Ollama » rows grey by the managed runtime (OLL-11).
+		package.loaded["ai.engine.ollama.deps_checker"] = { check_and_install_deps = accept,
+			runtime_available = function() return false end }
 		package.loaded["menu.engine.manifest_menu"] = nil
 		local core = package.loaded["ai.engine"]
 		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES

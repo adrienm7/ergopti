@@ -587,6 +587,20 @@
 				"hs",
 				"linux"
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "group",
+			"id": "llm_ollama_runtime",
+			"i18n": "menu.llm.ollama_runtime.title",
+			"disabled_when_off": true,
+			"platforms": [
+				"ahk",
+				"hs",
+				"linux"
+			]
 		}
 	],
 	"about_update_channel_menu": [
@@ -3873,6 +3887,56 @@
 			"type": "list",
 			"id": "llm_val_modifiers",
 			"i18n": "menu.llm.val_label"
+		}
+	],
+	"llm_ollama_runtime_rows": [
+		{
+			"type": "command",
+			"id": "llm_ollama_install",
+			"i18n": "menu.llm.ollama_runtime.install",
+			"disabled_when": [
+				"llm_ollama_absent"
+			],
+			"disabled_reason_key": "menu.llm.ollama_runtime.installed_reason"
+		},
+		{
+			"type": "command",
+			"id": "llm_ollama_start",
+			"i18n": "menu.llm.ollama_runtime.start",
+			"disabled_when": [
+				"llm_ollama_installed"
+			],
+			"disabled_reason_key": "menu.llm.ollama_runtime.missing_reason"
+		},
+		{
+			"type": "command",
+			"id": "llm_ollama_repair",
+			"i18n": "menu.llm.ollama_runtime.repair",
+			"disabled_when": [
+				"llm_ollama_installed"
+			],
+			"disabled_reason_key": "menu.llm.ollama_runtime.missing_reason"
+		},
+		{
+			"type": "command",
+			"id": "llm_ollama_delete_model",
+			"i18n": "menu.llm.ollama_runtime.delete_model",
+			"disabled_when": [
+				"llm_ollama_installed"
+			],
+			"disabled_reason_key": "menu.llm.ollama_runtime.missing_reason"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "llm_ollama_uninstall",
+			"i18n": "menu.llm.ollama_runtime.uninstall",
+			"disabled_when": [
+				"llm_ollama_installed"
+			],
+			"disabled_reason_key": "menu.llm.ollama_runtime.missing_reason"
 		}
 	],
 	"number_row_policy_rows": [

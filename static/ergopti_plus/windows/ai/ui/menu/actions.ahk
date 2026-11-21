@@ -92,6 +92,43 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	try LLM_Menu_BootstrapOllama(true)
 }
 
+/**
+ * The « Ergopti's Ollama » submenu (llm_ollama_runtime_rows, OLL-11). Each row
+ * runs the owner that already did it: the install warning row's bootstrap
+ * installs; the same bootstrap starts the daemon and reinstalls a version
+ * folder whose receipt no longer matches; the model page's prompt deletes the
+ * selected model; LLM_Menu_OllamaUninstall uninstalls.
+ * @returns {Menu} The native submenu.
+ */
+LLM_Menu_BuildOllamaRuntimeMenu() {
+	Commands := Map(MenuCommand.LLM_OLLAMA_INSTALL, _LLM_Menu_OnWarningInstallClick,
+		MenuCommand.LLM_OLLAMA_START, _LLM_Menu_OnOllamaStart,
+		MenuCommand.LLM_OLLAMA_REPAIR, _LLM_Menu_OnOllamaStart,
+		MenuCommand.LLM_OLLAMA_DELETE_MODEL, (*) => _LLM_Menu_OnOllamaDeleteModel(),
+		MenuCommand.LLM_OLLAMA_UNINSTALL, (*) => LLM_Menu_OllamaUninstall())
+	Getters := Map("llm_ollama_installed", () => LLM_OllamaManagedRuntimePresent(),
+		"llm_ollama_absent", () => !LLM_OllamaManagedRuntimePresent())
+	return MenuRenderer_Build("llm_ollama_runtime_rows", "LLM", Map(), Map(), Map(), Commands, Getters)
+}
+
+; Starts the managed daemon; a version folder that fails its receipt is installed again.
+_LLM_Menu_OnOllamaStart(*) {
+	LoggerInfo("LLM", "Ollama start or repair asked from the menu.")
+	return LLM_Menu_BootstrapOllama(true)
+}
+
+; Deletes the selected model after the model page's own confirmation.
+_LLM_Menu_OnOllamaDeleteModel() {
+	global _LLM_Menu
+	Model := _LLM_Menu.Get("model", "")
+	if Model == "" {
+		NotifierSend(t("menu.llm.ollama_runtime.no_model"), Map("title", t("menu.llm.ollama_runtime.title"),
+			"level", "warning"))
+		return false
+	}
+	return _LLM_Menu_PromptDeleteCachedModel(Model)
+}
+
 LLM_Menu_OnToggle(EnablePort := 0, *) {
 	global _LLM_Menu
 	static _Toggling := false

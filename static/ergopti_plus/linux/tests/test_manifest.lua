@@ -766,6 +766,7 @@ return {
 	"tests.unit.ai.engine.ollama.test_model_download",
 	"tests.unit.ai.engine.ollama.test_model_delete",
 	"tests.unit.ai.engine.ollama.test_model_warmup",
+	"tests.unit.ai.engine.ollama.test_runtime_uninstall",
 	"tests.unit.ai.engine.settings.test_display_settings",
 	"tests.unit.ai.engine.test_backend_brands",
 	"tests.unit.menu.llm.test_model_selector_api_listing",

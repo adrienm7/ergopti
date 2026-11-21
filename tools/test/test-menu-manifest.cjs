@@ -5447,12 +5447,16 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				'llm_generation_settings',
 				',',
 				'LLM_Menu_BuildGenerationMenu',
+				',',
+				'llm_ollama_runtime',
+				',',
+				'LLM_Menu_BuildOllamaRuntimeMenu',
 				')'
 			];
 			assert.deepEqual(
 				scriptTokens(actualGroupBody, ext).map((token) => token.value),
 				values,
-				'actual returned group Map is the complete native four-child construction'
+				'actual returned group Map is the complete native five-child construction'
 			);
 			assert.ok(
 				hasSequence(actualGroupBody, ext, values),

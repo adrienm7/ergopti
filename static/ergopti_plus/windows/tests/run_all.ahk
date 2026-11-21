@@ -2466,6 +2466,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/ai/servers/test_ollama_install_files_port.ahk
 #Include unit/ai/servers/test_ollama_runtime_owner.ahk
 #Include unit/ai/servers/test_ollama_managed_bootstrap.ahk
+#Include unit/ai/servers/test_ollama_runtime_uninstall.ahk
 #Include unit/ai/servers/test_ollama_managed_origin.ahk
 #Include unit/ai/servers/test_ollama_owned_only.ahk
 #Include unit/ai/prediction/test_request_plan.ahk

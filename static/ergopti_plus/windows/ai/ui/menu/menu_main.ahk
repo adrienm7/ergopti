@@ -377,7 +377,8 @@ _LLM_Menu_GroupBuilders() {
 	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
 		"llm_display", LLM_Menu_BuildDisplayMenu,
 		"llm_navigation", LLM_Menu_BuildNavMenu,
-		"llm_generation_settings", LLM_Menu_BuildGenerationMenu)
+		"llm_generation_settings", LLM_Menu_BuildGenerationMenu,
+		"llm_ollama_runtime", LLM_Menu_BuildOllamaRuntimeMenu)
 }
 
 /**
@@ -510,7 +511,8 @@ _LLM_MenuLayout_Fallback() {
 		Map("id", "llm_trigger",             "disabled_when_off", true),
 		Map("id", "llm_generation_settings", "disabled_when_off", true),
 		Map("id", "llm_display",             "disabled_when_off", true),
-		Map("id", "llm_navigation",          "disabled_when_off", true)
+		Map("id", "llm_navigation",          "disabled_when_off", true),
+		Map("id", "llm_ollama_runtime",      "disabled_when_off", true)
 	]
 }
 

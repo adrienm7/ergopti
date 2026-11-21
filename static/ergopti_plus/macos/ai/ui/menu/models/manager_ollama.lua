@@ -1125,6 +1125,17 @@ function M.new(deps, presets, ram_getter)
 		return _installed_cache or {}
 	end
 
+	--- The installed models the last `ollama list` read, nil before any read:
+	--- the uninstall deletes them (OLL-11).
+	--- @return table|nil names Sorted model names.
+	function obj.installed_model_names()
+		if type(_installed_cache) ~= "table" then return nil end
+		local names = {}
+		for name in pairs(_installed_cache) do names[#names + 1] = name end
+		table.sort(names)
+		return names
+	end
+
 	--- Pre-warms the installed models cache under the same exact pause owner.
 	local function schedule_initial_refresh()
 		local operation = begin_maintenance("Ollama initial installed-model refresh")
@@ -2453,10 +2464,28 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	function obj.delete_model(model_name)
-		if not model_name or model_name == "" then return false end
+	--- Removes one installed model through `ollama rm`.
+	--- @param model_name string Ollama model name.
+	--- @param on_done function|nil Told once whether the model is gone: the
+	---   uninstall deletes the models one after the other (OLL-11).
+	--- @return boolean accepted
+	function obj.delete_model(model_name, on_done)
+		local answered, deleted = false, false
+		local function told(succeeded)
+			if answered or type(on_done) ~= "function" then return end
+			answered = true
+			Logger.callback(LOG, "Ollama model deletion caller", on_done, succeeded == true)
+		end
+		if not model_name or model_name == "" then told(false); return false end
 		local operation = begin_maintenance("Ollama model deletion")
-		if operation == nil then return false end
+		if operation == nil then told(false); return false end
+		-- Every terminal of a deletion, refusals included, ends its operation.
+		local finish_operation = operation.finish
+		operation.finish = function(...)
+			local result = table.pack(finish_operation(...))
+			told(deleted)
+			return table.unpack(result, 1, result.n)
+		end
 		Logger.debug(LOG, string.format("Deleting Ollama model %s…", model_name))
 		
 		local readiness_accepted = ensure_ollama_running(function()
@@ -2503,6 +2532,7 @@ function M.new(deps, presets, ram_getter)
 					and operation.is_authorized() == true
 				cancel_delete_timeout()
 				release_requirement_task(owner)
+				deleted = authorized == true and code == 0
 				operation.finish(nil, "Ollama model deletion terminal")
 				if authorized ~= true then return false end
 				if code == 0 then

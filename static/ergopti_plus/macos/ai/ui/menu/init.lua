@@ -1433,6 +1433,47 @@ local function create_menu(deps)
 
 				child_group_for("llm_navigation", ManifestMenu.render_rows(nav_rows, "llm_navigation"), MenuLayout.row_disabled("llm_navigation", is_disabled, paused))
 
+				-- Ergopti's Ollama (llm_ollama_runtime_rows, OLL-11): each row runs
+				-- the owner that already did it; ai/ui/menu/ollama_runtime.lua says which.
+				do
+					local OllamaRuntime = require("ai.ui.menu.ollama_runtime")
+					local InstallOffer = require("ai.ui.menu.runtime_install_offer")
+					local dialog = require("core.ui.engine.dialog_util")
+					local runtime_commands, runtime_getters = OllamaRuntime.handlers({
+						install = function() return InstallOffer.select_ollama(nil) == true end,
+						start = function()
+							return require("ai.engine.ollama.deps_checker").check_and_install_deps(nil) == true
+						end,
+						delete_selected = function()
+							local model = type(state.llm_model) == "string" and state.llm_model or ""
+							if model == "" or not _active_models_mgr then
+								pcall(notifications.notify, i18n.get("menu.llm.ollama_runtime.title"),
+									i18n.get("menu.llm.ollama_runtime.no_model"), "warning")
+								return false
+							end
+							local ok, choice = pcall(dialog.block_alert, i18n.get("menu.llm.delete_model_title"),
+								string.format(i18n.get("menu.llm.delete_model_body"), model),
+								i18n.get("button.delete"), i18n.get("button.cancel"), "warning")
+							if not ok or choice ~= i18n.get("button.delete") then return false end
+							return _active_models_mgr.delete_ollama_model(
+								_active_models_mgr.backend_actual_model_name("ollama", model)) == true
+						end,
+						uninstall = function()
+							return OllamaRuntime.uninstall({
+								block_alert = dialog.block_alert,
+								notify = function(title, body, level) pcall(notifications.notify, title, body, level) end,
+								i18n_get = i18n.get,
+							})
+						end,
+						installed = function() return InstallOffer.is_installed("ollama") == true end,
+					})
+					local runtime_rows = ManifestMenu.template_rows("llm_ollama_runtime_rows", runtime_commands,
+						runtime_getters, {})
+					child_group_for("llm_ollama_runtime",
+						ManifestMenu.render_rows(runtime_rows or {}, "llm_ollama_runtime_rows"),
+						MenuLayout.row_disabled("llm_ollama_runtime", is_disabled, paused))
+				end
+
 				-- One handler per declared row, each appending what was collected for
 				-- it. A row the manifest declares and this table does not answer is
 				-- logged and dropped by the renderer, which is what makes the

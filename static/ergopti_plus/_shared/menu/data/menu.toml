@@ -576,6 +576,21 @@ i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
 platforms = ["ahk", "hs", "linux"]
 
+# The lifecycle of the Ollama Ergopti installs and runs on its own port (OLL-11
+# of the 2026-11-20 managed Ollama campaign): one row per action, wired on each
+# driver to the owner that already ran it from the model page or a consent
+# dialog, so the parity table checks them. Its rows are in
+# llm_ollama_runtime_rows.
+[[menu.llm_menu]]
+type = "---"
+
+[[menu.llm_menu]]
+type = "group"
+id = "llm_ollama_runtime"
+i18n = "menu.llm.ollama_runtime.title"
+disabled_when_off = true
+platforms = ["ahk", "hs", "linux"]
+
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
 #
@@ -3423,6 +3438,50 @@ i18n = "menu.llm.nav_label"
 type = "list"
 id = "llm_val_modifiers"
 i18n = "menu.llm.val_label"
+
+# Install reads « not installed yet »; every other row needs the installed
+# runtime. Start and repair run the same owner on each driver (it starts the
+# daemon and reinstalls a tree that fails its seal or signature check), named
+# by what the user wants. Uninstall asks first and removes the downloaded
+# models only when the user says so (shared sequence:
+# _shared/ai/engine/ollama/runtime_uninstall.lua).
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_install"
+i18n = "menu.llm.ollama_runtime.install"
+disabled_when = ["llm_ollama_absent"]
+disabled_reason_key = "menu.llm.ollama_runtime.installed_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_start"
+i18n = "menu.llm.ollama_runtime.start"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_repair"
+i18n = "menu.llm.ollama_runtime.repair"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_delete_model"
+i18n = "menu.llm.ollama_runtime.delete_model"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "---"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_uninstall"
+i18n = "menu.llm.ollama_runtime.uninstall"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
 
 # The existing choice renderer supplies provider DATA; availability and writes
 # remain native-owned. This child declaration owns all labels and value order.
