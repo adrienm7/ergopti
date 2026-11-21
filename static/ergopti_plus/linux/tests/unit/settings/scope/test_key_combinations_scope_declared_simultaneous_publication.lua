@@ -270,7 +270,19 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    end,true)
   end)
  end
- for _,typed in ipairs({'3.5','1001','0x10',' '}) do
+ -- The global delay has a default, so a blank answer resets it (maintainer decision PCK-13).
+ helpers.it("a blank typed delay resets the global delay to its default (PCK-13)",function()
+  with_menu(function(s)
+   local function delay_row() return find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s','')) end
+   s.delay_selection='75';helpers.assert_true(delay_row().fn())
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.simultaneous_threshold_ms,75)
+   s.delay_selection=' ';helpers.assert_true(delay_row().fn())
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.simultaneous_threshold_ms,nil)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   helpers.assert_eq(s.errors,0)
+  end,true)
+ end)
+ for _,typed in ipairs({'3.5','1001','0x10'}) do
   helpers.it("refuses typed delay '"..typed.."' with the accepted range and no publication (value-validation)",function()
    with_menu(function(s)
     s.delay_selection=typed
