@@ -48,9 +48,12 @@ FEATURE_TIMEOUT_SECONDS = 15
 # Each Karabiner variant synchronously builds, merges, publishes and re-publishes
 # one complete rule graph, so the work grows with the closed variant inventory.
 # Apple silicon runners finished all eight inside the former fixed 10 s while
-# Intel runners never did; six seconds per variant keeps several times that
-# measured arm64 cost. A variant that never completes still exhausts the budget.
-KARABINER_VARIANT_ALLOWANCE_SECONDS = 6
+# Intel runners never did. Six seconds per variant then timed out an Intel run
+# (dev run 44892323018) that had completed seven variants in 3.7 to 9.1 s each,
+# 44.4 s in all, with the same driver an earlier Intel run had passed: ten
+# seconds per variant keeps that slowest measured variant inside its share. A
+# variant that never completes still exhausts the budget.
+KARABINER_VARIANT_ALLOWANCE_SECONDS = 10
 KARABINER_FEATURE_TIMEOUT_SECONDS = KARABINER_VARIANT_ALLOWANCE_SECONDS * len(KARABINER_VARIANTS)
 # codesign --deep reads every nested signature of the embedded runtime.
 CODESIGN_TIMEOUT_SECONDS = 30
