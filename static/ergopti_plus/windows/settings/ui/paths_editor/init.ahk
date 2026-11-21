@@ -183,6 +183,9 @@ _PathsEdWeb_TryOpen() {
 
 		; Navigation can synchronously deliver callbacks. Only this frame's
 		; captured view and controller may be used after that boundary.
+		View.AddScriptToExecuteOnDocumentCreated(_PathsEdWeb_SeedScript())
+		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
+			return true
 		try View.Navigate(_PathsEdWeb_HtmlUrl())
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
@@ -528,6 +531,18 @@ _PathsEdWeb_InitDataJs() {
 		. "defaultLogsDir:" . _PathsEdWeb_JsStr(DefLogs) . ","
 		. "strings:{" . Strings . "}"
 		. "})"
+}
+
+/**
+ * The statement the page runs before its own scripts: the interface language
+ * and the reader's font and spacing, as WebViewHost and the macOS and Linux
+ * page builders seed them. This editor had neither, so it kept the default
+ * font and spacing whatever the reader chose (LTP-09).
+ * @returns {String}
+ */
+_PathsEdWeb_SeedScript() {
+	global _I18nLocale
+	return "window._i18n_locale=" . JsonStringLiteral(_I18nLocale) . ";" . ReadingPrefs_SeedScript()
 }
 
 _PathsEdWeb_HtmlUrl() {

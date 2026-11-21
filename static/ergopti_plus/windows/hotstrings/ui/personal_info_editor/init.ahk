@@ -165,6 +165,9 @@ _PiEdWeb_TryOpen(&FailureReason := "") {
 		try View.SetVirtualHostNameToFolderMapping(PIED_VHOST, _SharedDir, PIED_HOST_ACCESS_ALLOW)
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
+		View.AddScriptToExecuteOnDocumentCreated(_PiEdWeb_SeedScript())
+		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
+			return true
 		try View.Navigate(_PiEdWeb_HtmlUrl())
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
@@ -371,6 +374,18 @@ _PiEdWeb_InitDataJs(EditorSource := unset) {
 		. "," . _PiEdWeb_JsStr("common.cancel") . ":" . _PiEdWeb_JsStr(t("common.cancel"))
 
 	return "if(window.initData)window.initData({fields:[" . Fields . "],strings:{" . Strings . "}})"
+}
+
+/**
+ * The statement the page runs before its own scripts: the interface language
+ * and the reader's font and spacing, as WebViewHost and the macOS and Linux
+ * page builders seed them. This editor had neither, so it kept the default
+ * font and spacing whatever the reader chose (LTP-09).
+ * @returns {String}
+ */
+_PiEdWeb_SeedScript() {
+	global _I18nLocale
+	return "window._i18n_locale=" . JsonStringLiteral(_I18nLocale) . ";" . ReadingPrefs_SeedScript()
 }
 
 _PiEdWeb_HtmlUrl() {

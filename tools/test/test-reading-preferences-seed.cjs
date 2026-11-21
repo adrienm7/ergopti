@@ -99,17 +99,13 @@ function windowsProblems(files) {
 	return problems;
 }
 
-// The Windows windows that navigate a page of their own with no locale seed,
-// read by no campaign yet. The list only shrinks: a window that gains its seed
-// must leave it, and a new window without one fails (LTP-01, the layout
-// manager, was such a window).
-const UNSEEDED_WINDOWS = Object.freeze([
-	'windows/hotstrings/ui/personal_info_editor/init.ahk',
-	'windows/settings/ui/paths_editor/init.ahk',
-	'windows/ui/onboarding/webview.ahk'
-]);
+// The Windows windows that navigate a page of their own with no locale seed.
+// The list only shrinks and is now empty: the layout manager (LTP-01), then the
+// personal information editor, the paths editor and the onboarding wizard
+// (LTP-09) gained their seed. A new window without one fails.
+const UNSEEDED_WINDOWS = Object.freeze([]);
 
-/** Problems of the Windows windows that navigate a page without seeding it. */
+/** Problems of the Windows windows that navigate a page without seeding it first. */
 function unseededProblems(files, allowed = UNSEEDED_WINDOWS) {
 	const problems = [];
 	for (const [file, source] of files) {
@@ -117,6 +113,10 @@ function unseededProblems(files, allowed = UNSEEDED_WINDOWS) {
 		const seeded = source.includes('_i18n_locale=');
 		if (navigates && !seeded && !allowed.includes(file))
 			problems.push(`${file}: navigates a page without the locale and reading seeds`);
+		// A boot script added after the navigation reaches only a later document.
+		const script = source.indexOf('AddScriptToExecuteOnDocumentCreated(');
+		if (navigates && seeded && (script < 0 || script > source.search(/\.Navigate\(/)))
+			problems.push(`${file}: navigates its page before adding the seed`);
 		if (allowed.includes(file) && (!navigates || seeded))
 			problems.push(`${file}: no longer an unseeded window, remove it from UNSEEDED_WINDOWS`);
 	}
@@ -206,16 +206,37 @@ assert.equal(
 );
 const manager = windows.find(([file]) => file === 'windows/ui/layout_manager/init.ahk');
 assert.ok(manager, 'the layout manager host is read');
-assert.equal(
-	unseededProblems([[manager[0], manager[1].replaceAll('_i18n_locale=', '_i18n_unset=')]]).length,
-	4,
-	'a window that navigates without its seed is found (and the listed ones are gone)'
-);
 assert.deepEqual(
-	unseededProblems([[manager[0], manager[1].replaceAll('_i18n_locale=', '_i18n_unset=')]], []),
+	unseededProblems([[manager[0], manager[1].replaceAll('_i18n_locale=', '_i18n_unset=')]]),
 	[`${manager[0]}: navigates a page without the locale and reading seeds`],
 	'the layout manager without its seed is named (LTP-01)'
 );
+assert.equal(UNSEEDED_WINDOWS.length, 0, 'the unseeded list only shrinks, and is empty');
+for (const file of [
+	'windows/hotstrings/ui/personal_info_editor/init.ahk',
+	'windows/settings/ui/paths_editor/init.ahk',
+	'windows/ui/onboarding/webview.ahk'
+]) {
+	const window = windows.find(([name]) => name === file);
+	assert.ok(window, `${file} is read`);
+	assert.deepEqual(
+		unseededProblems([[file, window[1].replaceAll('_i18n_locale=', '_i18n_unset=')]]),
+		[`${file}: navigates a page without the locale and reading seeds`],
+		`${file} without its seed is named (LTP-09)`
+	);
+	assert.deepEqual(
+		unseededProblems([
+			[file, window[1].replaceAll('AddScriptToExecuteOnDocumentCreated(', 'Other(')]
+		]),
+		[`${file}: navigates its page before adding the seed`],
+		`${file} navigating before its seed is named (LTP-09)`
+	);
+	assert.deepEqual(
+		unseededProblems([window], [file]),
+		[`${file}: no longer an unseeded window, remove it from UNSEEDED_WINDOWS`],
+		'a seeded window left in the list is named'
+	);
+}
 assert.equal(
 	luaProblems([[builders[0][0], builders[0][1].replace(/Reading\.head_fragment\(/g, 'Other(')]], [])
 		.length,

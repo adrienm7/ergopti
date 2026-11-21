@@ -246,6 +246,7 @@ _Onboarding_TryWeb() {
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui", WEBVIEW_HOST_ACCESS_ALLOW)
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST_ASSETS, _StaticDir, WEBVIEW_HOST_ACCESS_ALLOW)
 
+	_OnbWeb_WebView.AddScriptToExecuteOnDocumentCreated(_OnbWeb_SeedScript(_ob_locale))
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
 	try _OnbWeb_Controller.Fill()
 	WebView_TakeFocus(_OnbWeb_Controller)
@@ -830,6 +831,18 @@ _Onboarding_ConfigDirFor(Chosen) {
 ; @return string
 _Onboarding_MetricsPathFor(Chosen) {
 	return StrReplace(KL_MetricsDirFor(_Onboarding_ConfigDirFor(Chosen)), "\", "/")
+}
+
+/**
+ * The statement the page runs before its own scripts: the language the wizard
+ * opens in and the reader's font and spacing, as WebViewHost and the macOS and
+ * Linux page builders seed them. A first run has read no choice yet, so the
+ * reading seed is empty and a11y_prefs.js keeps its defaults (LTP-09).
+ * @param {String} Locale The wizard's current language (_ob_locale).
+ * @returns {String}
+ */
+_OnbWeb_SeedScript(Locale) {
+	return "window._i18n_locale=" . JsonStringLiteral(Locale) . ";" . ReadingPrefs_SeedScript()
 }
 
 ; Returns the virtual-host URL for _shared/ui/onboarding/index.html. Served from

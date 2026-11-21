@@ -116,3 +116,25 @@ _TRP_WarmHostsFollowTheChoice() {
 	}
 }
 Test("reading preferences: a retained window host follows a changed choice (met-03)", _TRP_WarmHostsFollowTheChoice)
+
+; The personal information editor, the paths editor and the onboarding wizard
+; navigate their own WebView2 and seeded neither the language nor the reader's
+; choices, so they kept the default font and spacing (LTP-09). The wizard opens
+; in its own language, before I18nInit has read the configured one.
+_TRP_OwnWindowsSeedTheirPage() {
+	global _I18nLocale
+	SavedLocale := _I18nLocale
+	_I18nLocale := "de"
+	try {
+		_TRP_With(Map(ConfigLeaf.READING_FONT, "dyslexic"), () => (
+			AssertEqual('window._i18n_locale="de";window.__ergopti_reading={"font":"dyslexic"};', _PiEdWeb_SeedScript(),
+				"the personal information editor seeds the language and the reading choice"),
+			AssertEqual('window._i18n_locale="de";window.__ergopti_reading={"font":"dyslexic"};', _PathsEdWeb_SeedScript(),
+				"the paths editor seeds the language and the reading choice"),
+			AssertEqual('window._i18n_locale="it";window.__ergopti_reading={"font":"dyslexic"};', _OnbWeb_SeedScript("it"),
+				"the onboarding wizard seeds its own language and the reading choice")))
+	} finally {
+		_I18nLocale := SavedLocale
+	}
+}
+Test("reading preferences: the editors and the wizard seed their own page (ltp-09)", _TRP_OwnWindowsSeedTheirPage)
