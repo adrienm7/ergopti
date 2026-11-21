@@ -87,9 +87,9 @@ local function run_add_fixture(provider, prompt_result)
 			error = function() end,
 		}
 		package.loaded["core.ui.engine.dialog_util"] = {
-			text_prompt = function(title, hint, default_val)
+			text_prompt = function(title, hint, default_val, _ok, _cancel, secure)
 				prompt_calls = prompt_calls + 1
-				prompt_texts[prompt_calls] = { title = title, hint = hint, default = default_val }
+				prompt_texts[prompt_calls] = { title = title, hint = hint, default = default_val, secure = secure }
 				return prompt_result(prompt_calls)
 			end,
 			block_alert = function()
@@ -184,6 +184,24 @@ helpers.describe("API panel per-account address", function()
 		helpers.assert_eq(got.staged_entry.base_url, "https://contoso.openai.azure.com/openai/v1")
 		helpers.assert_eq(got.staged_entry.model, "my-deployment")
 		helpers.assert_eq(got.validation_calls, 1)
+	end)
+
+	helpers.it("pck-01: the key is typed in a secure field", function()
+		local values = { "contoso", "azure-key", "my-deployment" }
+		local got = run_add_fixture(AZURE, function(index) return "button.ok", values[index] end)
+		helpers.assert_eq(got.prompt_calls, 3)
+		helpers.assert_eq(got.prompt_texts[2].secure, true, "the key prompt hides what is typed")
+		helpers.assert_eq(got.prompt_texts[1].secure, false, "an address value stays visible")
+		helpers.assert_eq(got.prompt_texts[3].secure, false, "the model stays visible")
+	end)
+
+	helpers.it("pck-02: the key is kept byte for byte, as Windows and Linux keep it", function()
+		local values = { " contoso ", " azure-key\t", "my-deployment" }
+		local got = run_add_fixture(AZURE, function(index) return "button.ok", values[index] end)
+		helpers.assert_type(got.staged_entry, "table")
+		helpers.assert_eq(got.staged_entry.token, " azure-key\t", "a secret is never trimmed")
+		helpers.assert_eq(got.staged_entry.base_url, "https://contoso.openai.azure.com/openai/v1",
+			"a visible value is still trimmed")
 	end)
 
 	helpers.it("refuses a value that would change the host, before the key is asked", function()

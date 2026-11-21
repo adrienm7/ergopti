@@ -514,12 +514,13 @@ function M.build(ctx)
 				action       = (not paused and not mutation_busy) and function()
 					if not add_commands_ready() then return false end
 					local function trim(s) return TextUtils.trim(tostring(s or "")) end
-					local function prompt_field(title_key, default_val, hint)
+					-- A secret is typed in a secure field and kept byte for byte, as Windows and Linux keep it
+					local function prompt_field(title_key, default_val, hint, secret)
 						if not add_commands_ready() then return false, nil end
 						local ok_label = i18n.get("button.ok")
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
-							ok_label, i18n.get("button.cancel"))
+							ok_label, i18n.get("button.cancel"), secret == true)
 						if not ok then return false, nil end
 						local picked_btn, picked_text
 						if ret_a == ok_label or ret_a == i18n.get("button.cancel") then
@@ -529,6 +530,7 @@ function M.build(ctx)
 						end
 						if picked_btn ~= ok_label then return false, nil end
 						if not add_commands_ready() then return false, nil end
+						if secret then return true, tostring(picked_text or "") end
 						return true, trim(picked_text)
 					end
 
@@ -584,7 +586,8 @@ function M.build(ctx)
 					local token_ok, token = prompt_field(
 						string.format("API %s — Token", p.label),
 						"",
-						i18n.get("menu.llm.api_prompt_token"))
+						i18n.get("menu.llm.api_prompt_token"),
+						true)
 					if not token_ok then return false end
 					if not LocalAuth.entry_token_allowed(pid, token, base_url,
 						require("ai.engine.local_servers.local_servers").SERVERS) then
