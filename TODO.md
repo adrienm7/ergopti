@@ -387,6 +387,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     folder; UPD-12 the download page's English fallbacks and fixed `lang`;
   - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
     pages.
+    until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
+    TRAY-03 (a Linux desktop with no tray host is told, in the user's language, what to install), TRAY-04
+    (`TrayMenu.spec.js` 2.0.0 states the real `setIcon({ image })` contract and its vectors read the result on the
+    three drivers) and TRAY-05 (a missing tray icon file is logged once and drawn as a warning sign whose name says
+    so, never as the other state) fixed; their desktop checks are field points. Left: TRAY-02 a Windows left click
+    does nothing where macOS and Linux open the menu (maintainer decision);
+  - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
+    small native units, layout tool pages.
     30 min install budget), OLL-03 (stale owners), OLL-07 (Windows and Linux remove the earlier runtime once the
     pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
     `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13

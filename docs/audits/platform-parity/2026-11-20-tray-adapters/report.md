@@ -39,7 +39,7 @@ Checked and kept:
   variant, `[ui] menubar_icon`, declared macOS-only with
   `platform_reason.layout_bundle_and_menubar_are_macos`. No driver draws an
   error or update icon: an update shows as a menu row and a notification on the
-  three. See TRAY-04 for the port spec that says otherwise.
+  three. TRAY-04 corrected the port spec that said otherwise.
 - **Rows.** The shared renderers decide every label, check and greying; a
   greyed row's reason is part of its label (« label — head of the reason »), so
   it reaches each native menu as text. The adapters only carry `checked` and
@@ -63,8 +63,8 @@ Checked and kept:
   `hs.menubar.new` as a failed start (`menu.start did not commit`), reported by
   the launcher's localized fatal alert (`dialog.fatal_error.cannot_start`).
   Windows always has its tray: AutoHotkey adds its icon again when Explorer
-  broadcasts `TaskbarCreated`, as the WPM readout does for its own icon. See
-  TRAY-03 for a Linux desktop with no tray host at all.
+  broadcasts `TaskbarCreated`, as the WPM readout does for its own icon.
+  TRAY-03 added the check for a Linux desktop with no tray host at all.
 - **Teardown.** AutoHotkey removes its tray icon at exit and the driver deletes
   the WPM readout icon (`WPMTrayReadout_Shutdown`); Hammerspoon removes its
   menu-bar item when it quits or reloads, and a failed start deletes it
@@ -73,9 +73,12 @@ Checked and kept:
 
 ## Fixed
 
-| Id      | OS      | Sequence                                                                     | Reference                                                                                                                                                   | Before                                                                                                                                                                                                                                                                                                                                                                                                                                          | Regression                                                                                                                                                                |
-| ------- | ------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TRAY-01 | Windows | Start the driver in any language but French and right-click it as it appears | Linux draws its tray after `i18n.init()` (the same bug, fixed 2026-08-07, `test_i18n_is_ready_before_the_tray.lua`); macOS names its item when it builds it | The icon was revealed before `Onboarding_Run` with rows projected from `_I18nLocale`, still the module default `fr` until `I18nInit` some 60 lines later: « ⏸︎ Suspendre », « 🔄 Recharger », « ⏹ Quitter » until the refresh before feature initialization, and « ErgoptiPlus — Démarrage… » during the whole first-run wizard, which opens in English. No tooltip was set before the tray root: a screen reader read the script's file name | `the cold tray appears in the configured locale, named` (meta), `the icon is named before it is shown` and `the first-run startup row follows the wizard's locale` (unit) |
+| Id      | OS        | Sequence                                                                     | Reference                                                                                                                                                   | Before                                                                                                                                                                                                                                                                                                                                                                                                                                          | Regression                                                                                                                                                                                                                                                                               |
+| ------- | --------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TRAY-01 | Windows   | Start the driver in any language but French and right-click it as it appears | Linux draws its tray after `i18n.init()` (the same bug, fixed 2026-08-07, `test_i18n_is_ready_before_the_tray.lua`); macOS names its item when it builds it | The icon was revealed before `Onboarding_Run` with rows projected from `_I18nLocale`, still the module default `fr` until `I18nInit` some 60 lines later: « ⏸︎ Suspendre », « 🔄 Recharger », « ⏹ Quitter » until the refresh before feature initialization, and « ErgoptiPlus — Démarrage… » during the whole first-run wizard, which opens in English. No tooltip was set before the tray root: a screen reader read the script's file name | `the cold tray appears in the configured locale, named` (meta), `the icon is named before it is shown` and `the first-run startup row follows the wizard's locale` (unit)                                                                                                                |
+| TRAY-03 | Linux     | Start the daemon with `--tray` on GNOME without the AppIndicator extension   | Windows and macOS always show their icon; a missing tray library is already refused in words (`gui_stack.lua`)                                              | libayatana created its icon with no `org.kde.StatusNotifierWatcher` host and fell back to an XEmbed `GtkStatusIcon` nothing embeds: « Tray icon created », then no icon, no menu and no word                                                                                                                                                                                                                                                    | `test_tray_host_check.lua`: `a session with no host tells the user what to install, three ways`, `a probe that cannot read the session is logged, never told as a missing tray`, `a --tray launch schedules the check once the icon is up` and four more                                 |
+| TRAY-04 | the three | Call the port's `setIcon` as `TrayMenu.spec.js` describes it                 | The spec is the contract a new driver is written from                                                                                                       | `setIcon(state)` over `active`, `paused`, `disabled` that « adapters MUST accept »; no adapter took a state, and the `set_icon_*` vectors only asked for no exception, which an adapter ignoring its argument satisfied                                                                                                                                                                                                                         | `set_icon_draws_the_image`, `set_icon_refuses_a_missing_file`, `set_icon_refuses_a_state_name` and `destroy_then_set_icon_is_safe` on the three mirrors; `test-port-vector-traceability.cjs` requires them                                                                               |
+| TRAY-05 | the three | Remove the paused logo file of an install and pause                          | —                                                                                                                                                           | Windows kept the running icon (`if FileExist(...) TraySetIcon`), macOS drew `logo_simple.png` for a missing disabled logo and « 🔧 » for a missing logo, Linux resolved a missing paused logo to the active one, all without a log line                                                                                                                                                                                                         | `a missing logo file is said, not drawn as the other state` and `only the tray owners draw the tray icon` (AHK), `test_menubar_logo_missing.lua` (macOS), `a missing paused logo never resolves to the running one` and `draws the warning sign, logs the file once and says so` (Linux) |
 
 Notes:
 
@@ -89,6 +92,36 @@ Notes:
   projected in `ONBOARDING_FIRST_RUN_LOCALE`, the language the wizard opens in
   (`TrayBootstrapInertLabel`, `_Onboarding_Translate`). One function,
   `_DriverRevealTrayIcon`, holds the only `A_IconHidden := false`.
+- **TRAY-03.** `tray/adapters/status_notifier_host.lua` reads the session:
+  `NameHasOwner` of the watcher, its `IsStatusNotifierHostRegistered`
+  property (no auto-start, each call bounded by `[ui] tray_host_bus_timeout_ms`)
+  and the X11 `_NET_SYSTEM_TRAY_S<screen>` selection, so an XEmbed-only panel
+  (i3bar, an old XFCE panel) counts as a host. `tray/engine/host_check.lua`
+  runs it once, `[ui] tray_host_check_delay_ms` (15 s) after `start()`, since
+  the GNOME extension registers its watcher only once the shell has loaded.
+  With no host it says so through the status window, a notification and the
+  console (`startup.linux_tray_host_missing_title` and `_body`, which names
+  `gnome-shell-extension-appindicator`); a probe that cannot read the session
+  is an error in the log, never a « no tray » message.
+- **TRAY-04.** The spec (2.0.0) states the real contract: `setIcon` takes an
+  option map whose `image` names an existing file and returns whether it is
+  drawn; a missing file or a map without one is refused with one logged error
+  and the previous icon stays. The two states stay with the pause owners,
+  outside the port. The three adapters implement it (Windows and macOS keep
+  their `title` extra; Linux creates its icon through `start()` instead of a
+  `setIcon({ title })` that drew nothing), and the mirrors read the result:
+  `A_IconFile`, what `hs.menubar` received, what the indicator received. The
+  dead node shape left in `set_menu_replaces_previous` is gone too. The
+  Windows `TrayMenuSetMenu` and `TrayMenuDestroy` still have no production
+  caller; they are port surface, kept.
+- **TRAY-05.** Each pause state draws only its own file. Windows draws through
+  `TrayApplyStateIcon` (`state_tip.ahk`, the one owner of the boot and pause
+  icons) and falls back to the `user32.dll` warning sign; macOS chooses through
+  `menu/ui/menubar_logo.lua` and draws « ⚠︎ »; Linux resolves through the
+  shared protocol, which no longer falls back to the other state, and draws the
+  themed `dialog-warning`. One error is logged per missing file and the icon's
+  accessible name says the file is missing
+  (`accessibility.tray_tip_icon_missing` and `_paused_icon_missing`).
 
 ## Open
 
@@ -101,42 +134,15 @@ Notes:
   both buttons). Windows is the reference and the right-click is its
   convention, so aligning it is the maintainer's choice, not a fix; a change
   would also have to route the early-click queue.
-- **TRAY-03 (medium, Linux):** a desktop with no tray host shows nothing and
-  says nothing. When libayatana loads but no `org.kde.StatusNotifierWatcher`
-  owns the session bus (GNOME without the AppIndicator extension), the library
-  falls back to an XEmbed `GtkStatusIcon`, which no Wayland session and no
-  recent GNOME embeds: the daemon logs « Tray icon created » and the user has
-  no menu, while Windows and macOS always show theirs. The memory records the
-  fact (`project-linux-first-install-needs-luajit-module-builds`); no start
-  check reads the watcher. Follow-up: query `NameHasOwner` for the watcher
-  after `create()` and, when it is absent and the fallback icon is not
-  embedded, tell the user in their language how to get a tray, as
-  `gui_stack.lua` does for a missing library. Field check below.
-- **TRAY-04 (coverage):** the port spec describes an adapter nobody wrote.
-  `TrayMenu.spec.js` declares `setIcon(state)` with three states, among them
-  `disabled` (error), in `ICON_STATES` that « adapters MUST accept ». No
-  adapter takes a state: Windows takes `{image, title}` (and `title` sets the
-  tooltip), macOS `{image, imageData, title}` (`title` is visible text beside
-  the icon), Linux `{icon}` (it ignores `title` and draws the pause through
-  `setPaused`). The `set_icon_*` vectors pass on Windows and macOS because a
-  string is ignored, so they cannot fail. The real pause owners
-  (`UpdateTrayIcon`, macOS `update_icon`, Linux `setPaused`) bypass the port,
-  and the Windows `TrayMenuSetMenu`, `TrayMenuSetIcon` and `TrayMenuDestroy`
-  have no production caller. Follow-up: rewrite the spec on the two real states
-  and the option map, with vectors that read the result.
-- **TRAY-05 (low, the three):** a missing icon file is drawn as something else
-  without a word. Windows keeps the previous icon
-  (`if FileExist(...) TraySetIcon`), so a missing paused icon leaves the active
-  one on a paused driver; macOS draws `logo_simple.png` for a missing disabled
-  logo and the title « 🔧 » for a missing logo; Linux shows the active logo for
-  a missing paused one and warns only when both are missing. The assets ship
-  with every build, so only a damaged install sees it; one logged error per
-  missing asset would be enough.
 
-Native receiving, in `TODO-tests-windows.md` and `TODO-tests-linux.md`: the
-Windows cold tray in another language and its name read by Narrator (TRAY-01),
-and a Linux desktop without a tray host (TRAY-03), with the click and the
-accessible name on a desktop that has one.
+Native receiving, in the three `TODO-tests-<os>.md`: the Windows cold tray in
+another language and its name read by Narrator (TRAY-01); a Linux desktop
+without a tray host, then with one, the window and notification that say so,
+the click and the accessible name (`tray_host_missing`, TRAY-03); a missing
+paused logo on the three, its warning sign, its name read by the screen reader
+and its single log line (Windows line, `tray_icon_missing` on macOS and Linux,
+TRAY-05). The macOS and Linux points are registered in their
+`field_todo_coverage.json` and coverage tables.
 
 ## Proof
 
@@ -154,3 +160,63 @@ Commit `36224233b7` (TRAY-01).
   the run; the new `tray_host_missing` point was checked against both coverage
   files by hand); `npm run test:js` and `verify-change` (they refuse this checkout's
   Node pin).
+
+Commits `6fb02d7d98` (TRAY-05), `04c92079e1` (TRAY-04), `70083d79fd` (the
+TRAY-05 guard off pinned paths), `fee1b92a2d` (TRAY-03), `ec577560d9` (the
+Main startup fixture through `start()` and the host check), `9fedb3f955`
+(the degraded input-access tray through `start()`, a caller TRAY-04 had
+missed), `8111cb6f38` (the macOS menu boot fixture and the two `update_icon`
+source pins follow the logo owner) and `71d75452bf` (the host check off the
+shared literal ratchet).
+
+- **Red on the old code.** TRAY-05: with `state_tip.ahk` taken back, the AHK
+  unit case fails (« This local variable has not been assigned a value »), and
+  with `boot.ahk` and `lifecycle.ahk` taken back the source guard names
+  `boot.ahk`; with `protocol.lua`, the Linux `menu.lua` and the macOS
+  `init.lua` taken back from `7b7e0eec1f` and `menubar_logo.lua` removed, the
+  two Linux cases fail on « a paused daemon drawn with the running logo looks
+  running » and « the warning sign, not the running logo », and the macOS suite
+  fails to load. TRAY-04: with the three adapters taken back from `6fb02d7d98`,
+  the Windows vectors fail 4 of 4 (`TrayMenuSetIcon` returned `""`), macOS
+  fails `set_icon_refuses_a_missing_file` and `set_icon_refuses_a_state_name`
+  on their assertions, Linux fails `set_icon_draws_the_image` on its assertion
+  and the three others on the missing `start()`; with the old spec,
+  `test-port-vector-traceability.cjs` lists the icon states, the three
+  no-exception vectors and the three missing ones. TRAY-03: without
+  `host_check.lua` the suite fails to load, and with only the old entry point
+  `a --tray launch schedules the check once the icon is up` fails. The
+  degraded tray: with the old `access.lua`, `keeps the icon, names the failure
+and exits only on Quit` fails.
+- **Green on the new code.** AHK (`ahk-parallel.cjs --fresh --wait=300`):
+  `--only=tray` 177 of 177, `--only=adapter` 64 of 64, `--only=boot` 547 of
+  547, `--only=a11y` 42 of 42,
+  `--only=TrayMenu:` 7 of 7, `--only=tray-05` 2 of 2. Lua under WSL (Debian,
+  normal user, `git archive` copies, `DISPLAY` and `WAYLAND_DISPLAY` unset):
+  Linux `--only tray` 99 of 99 and `--only startup-late-grab` 34 of 34, the
+  TRAY-03 cases one by one, the macOS modules
+  `test_adapter_contract_vectors_input_and_system` (63 of 63) and
+  `test_menubar_logo_missing` (6 of 6). The native probe ran on private session
+  buses (`dbus-run-session` and a stand-in watcher): no watcher → `has_host`
+  false; a watcher with a host → true; a watcher without one → false. Whole
+  suites: Linux 24 316 passed, 65 failed, none of them tray cases, and the
+  groups that fail when run alone (`model-cancel-settlement`, the keystats
+  `vector reset_` and `vector suspend_` cases) fail the same way on
+  `7b7e0eec1f`; the others pass alone on both, and the « Permission denied »
+  ones read `/tmp` fixtures a root run left. macOS 29 039 passed, 57 failed:
+  each of the 17 modules holding a failure was rerun alone on `7b7e0eec1f` and
+  on the final tree with the same tallies, once the two stale `update_icon`
+  pins and the boot fixture were fixed (`8111cb6f38`).
+- **Gates.** The locale gates, `test-action-labels-have-locale-keys.cjs`,
+  `test-shared-literal-inventory.cjs`, `test-linux-feature-parity.cjs` (after
+  re-pinning the Linux control owner: the entry point changed only in its tray
+  start block), `test-no-pinned-source-reads.cjs` (170 of 170), `-lua.cjs` and
+  `-linux.cjs`, `test-config-key-literals.cjs`, `test-ahk-encoding.cjs`, the
+  port gates (`test-port-compliance.cjs`, `test-port-vector-traceability.cjs`
+  with its baseline raised from 61 to 73, `test-port-adapter-matrix.cjs`),
+  `test-timings-registry-liveness.cjs`, `test-linux-tray-icon-assets.cjs`,
+  `test-field-todo-summary.cjs` and `test-linux-field-report-contract.cjs` (in
+  WSL), `lint-conventions.js --fail-on-violations` and the formatter.
+  `test-linux-install-layout-registry.cjs` and `test-linux-elf-needed-closure.cjs`
+  fail the same way on `7b7e0eec1f`.
+- **Not run here.** The real desktops (field points above); `npm run test:js`
+  and `verify-change` (Node pin).
