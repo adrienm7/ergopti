@@ -1413,12 +1413,25 @@ do
 		Logger.error(LOG, "The old remap settings could not be carried over before the config migration (%s).",
 			tostring(import_outcome))
 	end
+	-- The registry's typed parse cache skips its 30 ms decode on an unchanged
+	-- build; validation still runs on a hit (settings/adapters/registry_cache.lua).
+	local RegistryCache = require("settings.adapters.registry_cache")
+	local home = os.getenv("HOME")
+	local registry_loader = nil
+	if type(home) == "string" and home ~= "" then
+		RegistryCache.init({ cache_path = home .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative
+			.. "/config_registry/migrations.cache" })
+		registry_loader = RegistryCache.load_registry
+	else
+		Logger.warn(LOG, "HOME is unset: the migration registry is parsed without its cache.")
+	end
 	local migration = ConfigMigrate.boot({
 		context       = context,
 		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
 		driver        = "hs",
 		registry_path = require("core.fs.engine.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		registry_loader = registry_loader,
 		file_adapter  = file_system,
 		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})

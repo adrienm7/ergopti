@@ -1602,6 +1602,12 @@ log_prepare_tick_bytes = 65536
 # HS: core/process/adapters/shell_runner.lua.
 shell_captured_output_bytes = 4194304
 
+# Largest typed payload the macOS migration registry cache admits; the
+# registry's is about 3 KB, so a larger cache file is forged or corrupt and is
+# refused. Windows keeps the same bound as its codec's MAX_BYTES.
+# HS: settings/adapters/registry_cache.lua. AHK: settings/engine/publication/registry_cache.ahk.
+registry_cache_payload_bytes = 4194304
+
 # Read granularity of the macOS TOML cache when it collects a source's exact
 # bytes. Read through macos/_generated/registry_limits.lua.
 # HS: core/fs/adapters/toml_cache.lua.

@@ -1579,7 +1579,10 @@ end
 --- content) -> true | false, detail` (must refuse an existing path) and
 --- `publish(path, content, expected_source) -> true | false, detail`; by
 --- default all three go through toml_codec.writer with `file_adapter`.
---- @param opts table `{ path, driver, registry? | registry_path, stamp?,
+--- `registry_loader(registry_path, file_adapter) -> registry | nil, detail`
+--- replaces M.load_registry (the macOS parse cache); what it returns must
+--- still be a registry M.validate_registry issued.
+--- @param opts table `{ path, driver, registry? | registry_path, registry_loader?, stamp?,
 ---   file_adapter?, read?, create_backup?, publish?, logger?, context?,
 ---   companions? }`; `companions` maps the bare file name an import_companion
 ---   op names to its path, read when a migration is due.
@@ -1595,7 +1598,7 @@ function M.run(opts)
 	-- cannot turn a custom seam into native authority by editing opts later.
 	local supplied = opts
 	opts = {}
-	for _, name in ipairs({ "path", "driver", "registry", "registry_path", "stamp", "file_adapter", "read",
+	for _, name in ipairs({ "path", "driver", "registry", "registry_path", "registry_loader", "stamp", "file_adapter", "read",
 		"create_backup", "publish", "logger", "context", "context_error", "companions" }) do opts[name] = rawget(supplied, name) end
 	if not M.DRIVERS[opts.driver] then error("config_migrate.run needs a known driver", 2) end
 	local path = opts.path
@@ -1647,7 +1650,10 @@ function M.run(opts)
 	if supplied_registry and registry == nil then return refuse("failed", "registry was not issued by validation") end
 	if not supplied_registry then
 		local loaded
-		loaded, registry_err = M.load_registry(opts.registry_path, opts.file_adapter)
+		if opts.registry_loader ~= nil and type(opts.registry_loader) ~= "function" then
+			return refuse("failed", "registry_loader must be a function")
+		end
+		loaded, registry_err = (opts.registry_loader or M.load_registry)(opts.registry_path, opts.file_adapter)
 		registry = loaded and detached(validated_registries[loaded])
 	end
 	if not registry then return refuse("failed", registry_err) end
