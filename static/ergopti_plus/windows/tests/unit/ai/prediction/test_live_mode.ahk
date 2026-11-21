@@ -614,8 +614,10 @@ _LLV_ExecutableStatement(Source, Pattern, Depth) {
  * @returns {Boolean}
  */
 _LLV_GenerationRoute(Groups, Build) {
+	; Any position in the builders map: later groups (the managed Ollama rows)
+	; may follow the generation entry without changing its renderer.
 	Bound := _LLV_ExecutableStatement(Groups,
-		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
+		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu[,)]', 1)
 	Draw := _LLV_ExecutableStatement(Build,
 		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", Map\(\), _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	return Bound && Draw
