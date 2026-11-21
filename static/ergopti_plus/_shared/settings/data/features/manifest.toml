@@ -2081,10 +2081,12 @@ platforms = ["ahk"]
 requires = { windows = [] }
 reason_key = "platform_reason.take_note_settings_are_windows"
 
+# Empty means the user's Desktop: a shipped folder path names a folder that
+# exists on one machine only (maintainer decision SNU-10, 2026-11-21).
 [[features.shortcuts.take_note]]
 id = "destination_folder"
-default = "D:\\Bureau"
-recommended = "D:\\Bureau"
+default = ""
+recommended = ""
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.take_note"

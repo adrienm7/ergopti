@@ -121,7 +121,7 @@ global Features := Map(
         ),
         "take_note", Map(
             "dated_notes",        false,
-            "destination_folder", "D:\\Bureau",
+            "destination_folder", "",
         ),
         ; Letter pickers (phase 11) — accented base-layer keys, configurable
         ; target latin letter consumed by ErgoptiBaseMapping.

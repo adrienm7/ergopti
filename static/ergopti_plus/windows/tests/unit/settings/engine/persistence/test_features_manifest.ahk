@@ -330,7 +330,7 @@ TestFMv2_ShortcutsTakeNote() {
 	AssertEqual("Map", Type(Entry))
 	AssertFalse(Entry.Has("enabled"), "the switch is the meta_n slot since schema v19")
 	AssertEqual(false, Entry["dated_notes"])
-	AssertEqual("D:\Bureau", Entry["destination_folder"])
+	AssertEqual("", Entry["destination_folder"], "an empty folder means the user's Desktop (SNU-10)")
 }
 Test("ManifestBuildFeaturesMap: take_note shortcut carries dated_notes + destination_folder",
 	TestFMv2_ShortcutsTakeNote)

@@ -489,7 +489,7 @@ search_engine_url_query = "https://www.google.com/search?q="
 
 [shortcuts.take_note]
 dated_notes = false
-destination_folder = "D:\\Bureau"
+destination_folder = ""
 
 
 

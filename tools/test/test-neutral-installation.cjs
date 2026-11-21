@@ -23,6 +23,10 @@
  *      values, so documentation cannot show an activated emulation.
  *   5. The row switches that narrow an emulation (emulate_*) stay parameters:
  *      on their own they alter no input, which is why they may default on.
+ *   6. No shipped default, recommended value, first-run template or example
+ *      names an absolute folder of one machine (a drive letter, /Users/ or
+ *      /home/): the take-note folder shipped as D:\Bureau, which exists only
+ *      on the maintainer's PC (maintainer decision SNU-10, 2026-11-21).
  * ==============================================================================
  */
 
@@ -240,6 +244,41 @@ async function checkExample() {
 	assert.notEqual(masters.layout, true, 'the example must not switch the layout master on');
 }
 
+/** Absolute folders that exist on one machine only. */
+const MACHINE_PATH = /(^|["'\s=])([A-Za-z]:[\\/]|\/Users\/|\/home\/)/;
+
+/** Point 6: no shipped value, template or example names one machine's folder. */
+function checkNoMachinePaths(manifest) {
+	for (const entry of manifest.entries) {
+		const values = [
+			entry.default,
+			entry.recommended,
+			...Object.values(entry.default_per_platform ?? {}),
+			...Object.values(entry.recommended_per_platform ?? {})
+		];
+		for (const value of values) {
+			if (typeof value !== 'string') continue;
+			assert(
+				!MACHINE_PATH.test(value),
+				`${entry.section}.${entry.id} ships the machine path ${JSON.stringify(value)}`
+			);
+		}
+	}
+	const files = [
+		paths.shared('_generated', 'config_template.toml'),
+		...Object.values(NEUTRAL_LAYOUT).map(({ driver }) =>
+			paths.shared('..', driver, '_generated', 'config_template.toml')
+		),
+		paths.shared('settings/data/config_schema/examples/ahk_config.example.toml')
+	];
+	for (const file of files) {
+		for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+			if (/^\s*#/.test(line)) continue;
+			assert(!MACHINE_PATH.test(line), `${file} ships a machine path: ${line.trim()}`);
+		}
+	}
+}
+
 /** Entry point. */
 async function main() {
 	const manifest = await loadManifest();
@@ -261,6 +300,7 @@ async function main() {
 		await checkPlatform(manifest, platform, spec);
 	}
 	await checkExample();
+	checkNoMachinePaths(manifest);
 	console.log('test-neutral-installation: OK');
 }
 

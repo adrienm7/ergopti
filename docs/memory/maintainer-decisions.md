@@ -63,6 +63,19 @@ with the child, start included (-73 %). This host starts a process in about
 28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
 the same ratio; the Linux field boot is the figure to confirm.
 
+## The take-note folder ships empty, meaning the Desktop (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (SNU-10 in the small native units
+campaign, `2026-11-21-small-native-units`): `[shortcuts.take_note]
+destination_folder` defaults to `""` in the feature manifest, its generated
+templates and the Windows example, and the driver reads an empty value as the
+user's Desktop (`A_Desktop`, `modules/take_note.ahk`). It used to ship
+`D:\Bureau`, a folder that exists on the maintainer's PC only. macOS has no
+take-note folder setting, and Linux writes its daily notes under its data
+folder (`Paths.data("notes")`), so neither ships a machine path.
+`test-neutral-installation.cjs` refuses any shipped default, recommended value,
+template or example line that names a drive letter, `/Users/` or `/home/`.
+
 ## A left click on the Windows tray opens its menu (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (TRAY-02 in
