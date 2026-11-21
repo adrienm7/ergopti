@@ -25,6 +25,7 @@ global LLM_OLLAMA_RUNTIME_VENDOR_NAMES := ["ergopti_route_plan.ps1", "ergopti_ne
 	"ergopti_windows_proxy_config.ps1", "ergopti_native_proxy_ex.ps1", "ergopti_network_pac.ps1"]
 
 #Include runtime_owner.ahk
+#Include install_errors.ahk
 
 global _LLM_ManagedBootstrap := 0
 ; The one observer of a menu pull's percentage (the model selector page):
@@ -382,6 +383,9 @@ class OllamaManagedBootstrap {
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"port", Integer(Match[1]), "deadline_ms", LLM_DEPS_POLL_TIMEOUT_MS,
 			"pull_deadline_ms", TimingsGet("llm", "ollama_model_pull_timeout_ms"),
+			; The free-space rule of install_errors.ahk, checked before the download (OLL-04)
+			"free_space", Map("asset_bytes", Release["assets"][Asset]["bytes"],
+				"margin_bytes", TimingsGet("limits", "ollama_install_free_space_margin_bytes")),
 			"download", Map("ManagedRoot", Root, "CataloguePath", Catalogue,
 				"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
 				"ReleaseHost", Identifiers.Hosts.GITHUB,
@@ -662,6 +666,8 @@ class OllamaManagedBootstrap {
 			return this._Fail("inspection_receipt")
 		if !this._Consent("install")
 			return this._Declined()
+		if !this._HasRoomForDownload()
+			return false
 		Request := this.Plan["download"].Clone()
 		Request["TicketId"] := this._Ticket()
 		Request["StartedTick"] := this._Now()
@@ -674,7 +680,7 @@ class OllamaManagedBootstrap {
 	_Downloaded(Terminal) {
 		Receipt := this.LastReceipt
 		if !this._Success(Terminal, Receipt) || Receipt["phase"] != "downloaded"
-			return this._Fail("download")
+			return this._Fail("download", this._InstallFailureKey(Receipt))
 		if Receipt.Get("pac_fallback_stage", "") != ""
 			LoggerWarn("LLM.managed", "Automatic proxy configuration unusable at {1}; the download went direct.",
 				Receipt["pac_fallback_stage"])
@@ -688,7 +694,7 @@ class OllamaManagedBootstrap {
 	_Prepared(Terminal) {
 		Receipt := this.LastReceipt
 		if !this._Success(Terminal, Receipt) || Receipt["phase"] != "prepared"
-			return this._Fail("preparation")
+			return this._Fail("preparation", this._InstallFailureKey(Receipt))
 		this.Prepared := Receipt.Clone()
 		Request := Map("ManagedRoot", this.Plan["ManagedRoot"], "TicketId", Receipt["ticket"],
 			"StageIdentity", Receipt["stage_identity"], "ManifestSha256", Receipt["manifest_sha256"])
@@ -698,7 +704,7 @@ class OllamaManagedBootstrap {
 	_Published(Terminal) {
 		Receipt := this.LastReceipt
 		if !this._Success(Terminal, Receipt) || Receipt["phase"] != "published"
-			return this._Fail("publication")
+			return this._Fail("publication", this._InstallFailureKey(Receipt))
 		Receipt["root_identity"] := this.Prepared["root_identity"]
 		Receipt["manifest_sha256"] := this.Prepared["manifest_sha256"]
 		this.Published := Receipt.Clone()
@@ -1367,6 +1373,43 @@ class OllamaManagedBootstrap {
 			_LLM_Deps_State := "pending"
 		}
 		return this.Cancel()
+	}
+
+	/**
+	 * Refuses the download when the managed root's volume cannot hold the pinned
+	 * archive and the registry margin (OLL-04); fails the flow with the disk words.
+	 * @returns {Boolean} True when the download may start.
+	 */
+	_HasRoomForDownload() {
+		Space := this.Plan["free_space"]
+		Root := this.Plan["ManagedRoot"]
+		try Free := this.Port is Map ? this.Port["free_bytes"].Call(Root) : LLM_OllamaInstallFreeBytes(Root)
+		catch as Err {
+			LoggerError("LLM.managed", "The managed root's free space is unreadable: {1}.", Err.Message)
+			this._Fail("free_space_unreadable", LLM_OllamaInstallErrorKey(LLM_OLLAMA_INSTALL_ERROR_UNKNOWN))
+			return false
+		}
+		if LLM_OllamaInstallFits(Space["asset_bytes"], Space["margin_bytes"], Free)
+			return true
+		LoggerError("LLM.managed", "The managed root's volume has {1} free bytes; the runtime needs {2}.",
+			Free, Space["asset_bytes"] + Space["margin_bytes"])
+		this._Fail("free_space", LLM_OllamaInstallErrorKey("disk_full"))
+		return false
+	}
+
+	/**
+	 * The message of a failed install step, from the class of its helper's
+	 * evidence (OLL-05); a step without evidence is of the unknown class.
+	 * @param {Map|Integer} Receipt The step's last receipt, 0 when none was read.
+	 * @returns {String} A locale key.
+	 */
+	_InstallFailureKey(Receipt) {
+		Evidence := Receipt is Map ? Receipt.Get("failure_evidence", "") : ""
+		if !(Evidence is String) || Evidence == ""
+			Evidence := "receipt_without_evidence"
+		Class := LLM_OllamaInstallErrorClass(Evidence)
+		LoggerError("LLM.managed", "Managed install failure of class {1}: {2}.", Class, Evidence)
+		return LLM_OllamaInstallErrorKey(Class)
 	}
 
 	_Fail(Phase, MessageKey := "ollama.runtime_repair_failed", Model := "") {

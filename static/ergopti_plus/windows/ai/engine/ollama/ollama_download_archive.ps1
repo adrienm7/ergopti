@@ -118,8 +118,16 @@ function Invoke-OllamaArchiveEntry {
 		$completion.exit_code = 0; $completion.receipt = $result
 		return $completion
 	} catch {
+		$data = $_.Exception.Data
+		$stage = if ($data.Contains('ollama_failure_stage')) { [string]$data['ollama_failure_stage'] } else { 'entry' }
+		$reason = if ($data.Contains('ollama_failure_reason')) { [string]$data['ollama_failure_reason'] } else { 'download' }
+		# The dot-sourced managed-files owner writes the evidence line (OLL-05); a
+		# refusal before it loads is a refused captured source, of the unknown class.
+		$evidence = 'stage=source reason=refused ' + $_.Exception.GetType().FullName
+		if (Test-Path Function:\Get-OllamaFailureEvidence) { $evidence = Get-OllamaFailureEvidence $_.Exception $stage $reason }
 		$failure = [ordered]@{ ok = $false; phase = 'refused'; cleanup_pending = $true;
-			ticket = $entryRequest.ticket; error = 'native_archive_download_refused'; exception_type = $_.Exception.GetType().FullName }
+			ticket = $entryRequest.ticket; error = 'native_archive_download_refused'; exception_type = $_.Exception.GetType().FullName;
+			failure_evidence = $evidence }
 		if ($_.Exception.Data.Contains('ollama_creation_receipt')) { $failure.creation_receipt = $_.Exception.Data['ollama_creation_receipt'] }
 		elseif ($null -ne $retainedReceipt) { $failure.creation_receipt = $retainedReceipt }
 		$completion.receipt = $failure

@@ -31,7 +31,13 @@ function Invoke-OllamaManagedArchiveDownload {
 	$null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $state
 	$stagePath = [IO.Path]::Combine($Root.path, '.stage-' + $Ticket)
 	$drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($stagePath))
-	if ($drive.AvailableFreeSpace -lt $Source.pin.bytes) { throw 'The pinned archive does not fit its private target volume.' }
+	# 0x80070070 is ERROR_DISK_FULL: the evidence names a full disk (OLL-04).
+	if ($drive.AvailableFreeSpace -lt $Source.pin.bytes) {
+		$full = [IO.IOException]::new('The pinned archive does not fit its private target volume.', -2147024784)
+		$full.Data['ollama_failure_stage'] = $state.Stage
+		$full.Data['ollama_failure_reason'] = $state.Reason
+		throw $full
+	}
 	$wal = Begin-OllamaCreationWal $Root $Source $Ticket
 	$stageHandle = [IntPtr]::Zero
 	$directories = [ordered]@{}
@@ -74,6 +80,7 @@ function Invoke-OllamaManagedArchiveDownload {
 			if ($null -eq $capture.output_owner -or $bytes -ne $Source.pin.bytes -or
 				[Ergopti.Ollama.ManagedNative]::Identity($read.SafeFileHandle.DangerousGetHandle()) -cne $capture.output_owner.identity -or
 				$read.Length -ne $Source.pin.bytes -or (Get-OllamaStreamHash $read) -cne $Source.pin.sha256) {
+				$state.Reason = 'verify'
 				throw 'The complete acquired archive differs from its original identity or pin.'
 			}
 		} finally { $read.Dispose() }
@@ -88,6 +95,9 @@ function Invoke-OllamaManagedArchiveDownload {
 	} catch {
 		$failure = $_
 		$primaryFailure = $failure
+		# Where the transfer stopped, for the entry's evidence line (OLL-05).
+		$failure.Exception.Data['ollama_failure_stage'] = $state.Stage
+		$failure.Exception.Data['ollama_failure_reason'] = $state.Reason
 		try { $failure.Exception.Data['ollama_creation_receipt'] = Get-OllamaCreationReceipt $wal }
 		catch { [Console]::Error.WriteLine('Archive refusal cannot prove its final creation journal image.') }
 		throw $failure.Exception

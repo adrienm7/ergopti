@@ -316,6 +316,11 @@ class _G4B_Fixture {
 		this.VersionLeaves := []
 		this.RetireRefusal := ""
 		this.Requests := []
+		; Free bytes of the managed root's volume, and the evidence each refused
+		; file action returns (OLL-04, OLL-05).
+		this.FreeBytes := 1000
+		this.FreeReads := 0
+		this.Refusals := Map()
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
@@ -323,13 +328,14 @@ class _G4B_Fixture {
 		Plan := Map("ManagedRoot", "C:\managed", "CataloguePath", "C:\catalogue.json",
 			"CatalogueSha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"AssetId", "windows-amd64", "port", 23456, "version", "0.24.0", "deadline_ms", 9000,
-			"pull_deadline_ms", 50000,
+			"pull_deadline_ms", 50000, "free_space", Map("asset_bytes", 100, "margin_bytes", 50),
 			"download", Map("ManagedRoot", "C:\managed"))
 		Port := Map("plan", Plan, "files", this.Files, "runtime", this.Runtime,
 			"current", (*) => this.CurrentValue, "clock", (*) => this.Now,
 			"consent", ObjBindMethod(this, "Consent"), "models", ObjBindMethod(this, "Models"),
 			"version", ObjBindMethod(this, "VersionReceipt"), "pull", ObjBindMethod(this, "Pull"),
-			"version_leaves", (*) => this.VersionLeaves)
+			"version_leaves", (*) => this.VersionLeaves,
+			"free_bytes", ObjBindMethod(this, "Free"))
 		this.Flow := OllamaManagedBootstrap(this.Model, 9101,
 			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port, Silent)
 		this.Flow.Begin()
@@ -350,6 +356,13 @@ class _G4B_Fixture {
 		Receipt := LLM_LocalModelListReceipt(Map("ok", true, "status", 200, "body", '{"models":' . Rows . '}'))
 		AssertTrue(Receipt["names"] is Map, "Use the actual independent production parser's normalized-name set.")
 		return Done.Call(Receipt)
+	}
+	Free(Root) {
+		AssertEqual("C:\managed", Root, "Free space is read for the managed root.")
+		this.FreeReads += 1
+		if this.FreeBytes is Error
+			throw this.FreeBytes
+		return this.FreeBytes
 	}
 	VersionReceipt(Done) {
 		return Done.Call(Map("ok", true, "status", 200, "body", '{"version":"' . this.Version . '"}'))
@@ -416,6 +429,13 @@ class _G4B_Files {
 					return true
 				}
 			default: Receipt["phase"] := "retired"
+		}
+		if F.Refusals.Has(Action) {
+			Receipt := Map("ok", false, "phase", "refused", "ticket", Receipt["ticket"],
+				"failure_evidence", F.Refusals[Action])
+			F.Flow.LastReceipt := Receipt
+			Done.Call(Map("exit", 1, "exit_observed", true, "output_observed", true))
+			return true
 		}
 		F.Flow.LastReceipt := Receipt
 		Done.Call(Map("exit", 0, "exit_observed", true, "output_observed", true))
@@ -1704,6 +1724,12 @@ _G4CX_CaseWithTimingsReady(Mode) {
 				if Argv[A_Index] == "-ReleaseHost"
 					Forwarded := Argv[A_Index + 1]
 			AssertEqual(Identifiers.Hosts.GITHUB, Forwarded, "The real file port forwards the shared release host")
+			; OLL-04: the free-space rule reads the pinned asset's size and the registry margin.
+			Release := JsonParse(FileRead(_SharedDir . "\ai\data\ollama_release.json", "UTF-8"))
+			AssertEqual(Release["assets"][Returned.Plan["AssetId"]]["bytes"], Returned.Plan["free_space"]["asset_bytes"],
+				"The free-space rule needs the pinned archive's own size (ollama-install-free-space)")
+			AssertEqual(TimingsGet("limits", "ollama_install_free_space_margin_bytes"), Returned.Plan["free_space"]["margin_bytes"],
+				"The free-space margin is the registry's (ollama-install-free-space)")
 			AssertTrue(Returned.Cancel(), "No native task was started; the actual owner must acknowledge ordinary retirement")
 			Returned := 0
 			AssertEqual(1, ControlCounter.Deleted, "The ordinary full constructor remains destructible after real cancellation")

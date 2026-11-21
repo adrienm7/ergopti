@@ -26,6 +26,27 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# The evidence line of a refused step, classified by the driver with
+# _shared/ai/data/ollama_install_errors.json (OLL-05): the closed stage and
+# reason words, then each exception of the chain with its HRESULT and Win32
+# code, which name a full disk or a refused access whatever the Windows
+# language, then the outer message. A .NET call wraps its own exception in a
+# MethodInvocationException, so the inner ones carry the cause.
+function Get-OllamaFailureEvidence($Exception, [string]$Stage, [string]$Reason) {
+	$words = [Collections.Generic.List[string]]::new()
+	$words.Add('stage=' + $Stage)
+	$words.Add('reason=' + $Reason)
+	$current = $Exception
+	for ($depth = 0; $null -ne $current -and $depth -lt 4; $depth++) {
+		$words.Add($current.GetType().FullName)
+		$words.Add('hresult=0x' + ('{0:x8}' -f $current.HResult))
+		if ($current -is [ComponentModel.Win32Exception]) { $words.Add('win32=' + $current.NativeErrorCode) }
+		$current = $current.InnerException
+	}
+	$words.Add(($Exception.Message -replace '[\r\n]+', ' '))
+	return ($words -join ' ')
+}
+
 function Initialize-OllamaManagedNative {
 	if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 		throw 'Managed Ollama files require native Windows.'
@@ -562,7 +583,10 @@ function Prepare-OllamaManagedStage($Root, $Archive, [string]$Ticket,
 	if ($Ticket -notmatch '^[0-9a-f]{32}\z') { throw 'A stage needs its originating private ticket.' }
 	$stage = [IO.Path]::Combine($Root.path, '.stage-' + $Ticket)
 	$drive = [IO.DriveInfo]::new([IO.Path]::GetPathRoot($stage))
-	if ($drive.AvailableFreeSpace -lt $Archive.total) { throw 'The complete portable archive will not fit on the target volume.' }
+	# 0x80070070 is ERROR_DISK_FULL: the evidence names a full disk (OLL-04).
+	if ($drive.AvailableFreeSpace -lt $Archive.total) {
+		throw [IO.IOException]::new('The complete portable archive will not fit on the target volume.', -2147024784)
+	}
 	$wal = Begin-OllamaCreationWal $Root $Archive $Ticket
 	$handle = [IntPtr]::Zero
 	$directoryHandles = [ordered]@{}
@@ -1193,7 +1217,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 		if (-not $result.ok) { exit 1 }
 	} catch {
 		$failure = [ordered]@{ ok = $false; phase = 'refused'; cleanup_pending = $true; ticket = $TicketId;
-			error = $_.Exception.Message }
+			error = $_.Exception.Message; failure_evidence = (Get-OllamaFailureEvidence $_.Exception $Action 'install') }
 		if ($_.Exception.Data.Contains('ollama_creation_receipt')) { $failure.creation_receipt = $_.Exception.Data['ollama_creation_receipt'] }
 		if ($_.Exception.Data.Contains('ollama_publication_receipt')) { $failure.publication_receipt = $_.Exception.Data['ollama_publication_receipt'] }
 		elseif ($null -ne $publicationReceipt) { $failure.publication_receipt = $publicationReceipt }
