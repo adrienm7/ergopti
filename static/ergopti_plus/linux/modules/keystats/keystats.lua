@@ -297,10 +297,13 @@ local _capture_boundary = 0
 local _typing_boundary = {}
 local _app_key_boundary = {}
 
--- Persisted manifest cache keyed by SQLite's monotonic revision. The live
--- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
--- every two seconds without ever serving stale keystrokes.
-local _manifest_cache = { revision = nil, manifest = nil }
+-- Persisted projections keyed by SQLite's monotonic revision: the manifest,
+-- and today's n-grams for the typing dashboard's live refresh (one sqlite3 CLI
+-- read of today cost about 650 ms of the daemon's only thread on a 30-day
+-- store). The live delta is layered on a copy, so an open dashboard avoids a
+-- CLI query every two seconds without ever serving stale keystrokes. One
+-- table: this chunk is at LuaJIT's 200-local limit.
+local _projection_cache = { manifest = {}, today = {} }
 
 -- Whether password-field suppression is active.
 local _suppressed = false
@@ -1992,13 +1995,14 @@ local function persisted_manifest()
 	-- An unavailable store cannot certify that no historical rows exist.
 	if not (sqlite_available() and SqliteReader) then return {}, false end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
-	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
-		return _manifest_cache.manifest, true
+	local cached = _projection_cache.manifest
+	if cached.manifest and revision ~= nil and cached.revision == revision then
+		return cached.manifest, true
 	end
 	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
 	-- A partial manifest is shown but never cached, so the next read retries
 	if complete then
-		_manifest_cache = { revision = revision, manifest = fresh }
+		_projection_cache.manifest = { revision = revision, manifest = fresh }
 	end
 	return fresh, complete == true
 end
@@ -2007,7 +2011,7 @@ end
 --- @return boolean True once it is dropped; false while a flush owes the store.
 function M.forget_manifest()
 	if M.has_flush_debt() or _flush_stopping then return false end
-	_manifest_cache = { revision = nil, manifest = nil }
+	_projection_cache = { manifest = {}, today = {} }
 	return true
 end
 
@@ -2213,6 +2217,40 @@ function M.get_range_payload(start_date, end_date, apps)
 	payload.today = payload.today or {}
 	add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 	return payload
+end
+
+--- Today's n-grams of every app, for the typing dashboard's live refresh.
+--- The page keeps the history it holds, so only today's rows are projected:
+--- the persisted ones, read from SQLite once per revision and day, plus the
+--- unflushed delta, layered on a copy as in a range read.
+--- @return table|nil payload { today, today_date, incomplete? }; nil, reason
+---   while a flush is pending or the projection is unavailable.
+function M.get_today_payload()
+	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
+	local clock = observe_calendar()
+	local date = clock.date
+	local revision = sqlite_available() and SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
+	local persisted, complete
+	local cached = _projection_cache.today
+	if cached.today and revision ~= nil and cached.revision == revision and cached.date == date then
+		persisted, complete = cached.today, true
+	else
+		-- An unavailable store cannot certify that today has no persisted rows.
+		persisted, complete = {}, false
+		if sqlite_available() then
+			local bounds = SqliteReader.split_bounds(date, date, date)
+			local read
+			read, complete = SqliteReader.read_range_split_today(_sqlite_path, date, date, nil, bounds.today)
+			persisted, complete = read.today or {}, complete == true
+		end
+		-- A partial read is shown but never kept, so the next refresh retries
+		_projection_cache.today = { revision = complete and revision or nil, date = date,
+			today = complete and persisted or nil }
+	end
+	local payload = { historical = empty_ngrams(), today = TableUtil.deep_copy(persisted) }
+	add_live_ngram_delta(payload, nil, date, date, clock)
+	return { today = payload.today, today_date = date, incomplete = not complete or nil }
 end
 
 
@@ -3400,7 +3438,7 @@ function M.pump_flush()
 			_walker_contexts = marks.walker
 			_persisted_open_walk = marks.open_walk
 			if marks.recovered then _recovered_walks = nil end
-			_manifest_cache = { revision = nil, manifest = nil }
+			_projection_cache = { manifest = {}, today = {} }
 			_last_flush_committed, _flush_state = true, nil
 			-- Committed rows wait for the ledger's next bounded export.
 			_ledger.pending = true
@@ -3872,7 +3910,7 @@ function _maintenance.advance()
 		if request.tombstone then
 			-- A failed COMMIT retains its snapshot in _flush_state, so a settled
 			-- store after the tombstone's dispatch is that tombstone committed.
-			_manifest_cache = { revision = nil, manifest = nil }
+			_projection_cache = { manifest = {}, today = {} }
 			if _last_flush_committed ~= true then
 				-- Never let a refused purge commit later with a later flush.
 				for index, event in ipairs(_pending_system_events) do

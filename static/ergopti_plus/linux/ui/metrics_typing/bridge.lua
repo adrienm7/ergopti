@@ -25,6 +25,10 @@
 ---    types there, else the loaded XKB keymap's, as Windows sends its active
 ---    layout and macOS `hs.keycodes.map`. Linux sent none, so the page kept
 ---    the static QWERTY names on every layout (MET-09).
+--- 6. The page's 2 s poll follows the typing: its refresh carries today's
+---    n-grams, without the history the page already holds, as Windows pushes
+---    them. It carried the manifest alone, so the character, bigram and word
+---    tables stood still while the window was open (MET-10).
 --- ==============================================================================
 
 local M = {}
@@ -108,6 +112,28 @@ local function build_payload(state, include_prefetch)
 	end
 	if type(payload) == "table" then payload.keycode_layout = keycode_layout() end
 	return payload
+end
+
+--- Builds the poll's refresh: the manifest and today's n-grams. Without
+--- `historical` the page keeps the history it holds and replaces today's.
+--- @param state table
+--- @return table|nil
+local function build_refresh(state)
+	local refreshed = build_payload(state, false)
+	if type(refreshed) ~= "table" then return refreshed end
+	local keystats = state.keystats
+	if not keystats or type(keystats.get_today_payload) ~= "function" then
+		Logger.error(LOG, "The keystats exposes no get_today_payload; the refresh carries the manifest alone.")
+		return refreshed
+	end
+	local today, err = keystats.get_today_payload()
+	if type(today) == "table" then
+		refreshed._prefetch_data = today
+	else
+		Logger.warn(LOG, "Today's n-grams unavailable for the refresh (%s); the tables keep their last counts.",
+			tostring(err))
+	end
+	return refreshed
 end
 
 --- Builds the dashboard payload with whether it may be kept for the next opening.
@@ -203,7 +229,7 @@ local function handle(payload, state, context, request)
 	end
 	if action == "refresh" then
 		Logger.debug(LOG, "Typing metrics UI requested refresh.")
-		local refreshed = build_payload(state, false)
+		local refreshed = build_refresh(state)
 		payload_complete(refreshed)
 		return refreshed
 	end

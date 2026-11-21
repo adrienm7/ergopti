@@ -20,16 +20,23 @@ local function fixture(app)
 		subscribers[#subscribers + 1] = callback
 		return true
 	end
-	K.get_dashboard_payload = function()
+	K.get_dashboard_payload = function(options)
 		counts.reads = counts.reads + 1
 		if pending then return nil, "SQLite flush pending" end
+		local prefetch = nil
+		if not options or options.include_prefetch ~= false then prefetch = { historical = {}, today = {} } end
 		return { metrics_manifest = { day = { app = { chars = 17 } } }, app_icons = {},
-			_prefetch_data = { historical = {}, today = {} }, driver_meta = { os = "linux" } }
+			_prefetch_data = prefetch, driver_meta = { os = "linux" } }
 	end
 	K.get_range_payload = function()
 		counts.reads = counts.reads + 1
 		if pending then return nil, "SQLite flush pending" end
 		return { historical = { witness = 9 }, today = {} }
+	end
+	K.get_today_payload = function()
+		counts.reads = counts.reads + 1
+		if pending then return nil, "SQLite flush pending" end
+		return { today = { app = { witness = 5 } }, today_date = "2026-11-21" }
 	end
 	K.capture_app_category_edit = function() return {} end
 	K.set_app_category = function()
@@ -362,6 +369,25 @@ H.describe("metrics flush bridge", function()
 			H.assert_true(tonumber(code) ~= nil and type(legend) == "string" and legend ~= "")
 		end
 	end)
+	H.it("(live-ngrams-refresh, met-10) the poll refresh carries today's n-grams, not the history", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		local reply = F.B.on_message({ action = "refresh" }, F.state, F.context)
+		H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+		H.assert_eq(reply._prefetch_data.today.app.witness, 5, "today's tables follow the typing")
+		H.assert_eq(reply._prefetch_data.today_date, "2026-11-21")
+		H.assert_nil(reply._prefetch_data.historical, "an omitted history keeps the one the page holds")
+		H.assert_eq(F.c.reads, 2, "one manifest read and one today read")
+	end)
+	H.it("(live-ngrams-refresh, met-10) a refused today read keeps the manifest refresh", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		F.K.get_today_payload = function() return nil, "SQLite projection unavailable" end
+		local reply = F.B.on_message({ action = "refresh" }, F.state, F.context)
+		H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+		H.assert_nil(reply._prefetch_data, "the tables keep their last counts")
+	end)
+
 	H.it("typing range preserves request identity after deferred settlement", function()
 		local F = fixture("metrics_typing")
 		H.assert_nil(F.B.on_message({ action = "range", request_id = 71 }, F.state, F.context))
