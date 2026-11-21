@@ -183,6 +183,8 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	events.listeners = [];
 	const window = {
 		events: [],
+		// Every host seeds the interface language before the page's scripts.
+		_i18n_locale: 'locale' in page ? page.locale : 'en',
 		dispatchEvent: (event) => window.events.push(event),
 		webkit: {
 			messageHandlers: {
@@ -193,7 +195,7 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	const context = vm.createContext({
 		window,
 		document,
-		console,
+		console: page.console || console,
 		setTimeout: (fn) => fn(),
 		TextDecoder,
 		Event: class Event {
@@ -218,8 +220,9 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 }
 
 /** The layout editor's own window, as the hosts open it. */
-function loadEditorPage() {
+function loadEditorPage(options = {}) {
 	return loadPage({
+		...options,
 		html: editorHtml,
 		source: editorSource,
 		bridge: 'layout_editor_window_bridge',
@@ -1453,6 +1456,42 @@ check('every host names the shortcut menu file the page counts', () => {
 			lua.includes('shortcut_menu_path = M.SHORTCUT_MENU_PATH'),
 		'the macOS and Linux hosts name another shortcut menu file'
 	);
+});
+
+// =========================================
+// =========================================
+// ======= Keyboard and screen reader ======
+// =========================================
+// =========================================
+
+// Both pages declared lang="fr" and kept it in every locale on the three
+// hosts, so a screen reader read an English or a German window with a French
+// voice (LTP-02).
+check('(ltp-02) both pages name the interface language the host seeds', () => {
+	for (const [name, load] of [
+		[
+			'the layout manager',
+			(options) => loadPage({ html, source, bridge: 'layout_manager_bridge', ...options })
+		],
+		['the Studio', loadEditorPage]
+	]) {
+		assert.equal(
+			load({ locale: 'de' }).document.documentElement.lang,
+			'de',
+			`${name} reads in German`
+		);
+		const errors = [];
+		const unseeded = load({
+			locale: undefined,
+			console: { ...console, error: (m) => errors.push(m) }
+		});
+		assert.equal(
+			unseeded.document.documentElement.lang,
+			'fr',
+			`${name} keeps its declared language`
+		);
+		assert.equal(errors.length, 1, `${name} says that its host seeded no language`);
+	}
 });
 
 // =========================================

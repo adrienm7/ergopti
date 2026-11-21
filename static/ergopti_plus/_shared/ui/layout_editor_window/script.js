@@ -69,6 +69,15 @@ let _state = null;
 
 const _post = makeHostBridge('layout_editor_window_bridge');
 
+// The Studio speaks the interface language: a screen reader picks its voice
+// from the root lang (WCAG 3.1.1), which index.html declares as fr, and the
+// Comparer's numbers fall back on it. Every host seeds window._i18n_locale
+// before this script runs (LTP-02).
+if (typeof window._i18n_locale === 'string' && window._i18n_locale !== '')
+	document.documentElement.lang = window._i18n_locale;
+else
+	console.error('layout editor window: no window._i18n_locale seeded; the page language stays fr');
+
 /**
  * Whether a locale key has a translation.
  * @param {string} key
