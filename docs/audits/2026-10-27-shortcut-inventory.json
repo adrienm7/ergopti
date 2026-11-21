@@ -230,11 +230,14 @@
 		{
 			"driver": "windows",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.magic_editor",
-			"chord": null,
+			"config_key": "shortcuts.keyboard.meta_star",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "star"
+			},
 			"action": "open_hotstrings_editor",
-			"slot": "magic_editor",
-			"note": "Contextual slot: the magic key, no modifier."
+			"slot": "meta_star",
+			"note": "The key that types ★ at its base level, when the layout has one."
 		},
 		{
 			"driver": "macos",
@@ -467,18 +470,6 @@
 		{
 			"driver": "macos",
 			"kind": "special_boolean",
-			"config_key": "shortcuts.keys.cmd_star",
-			"chord": {
-				"modifiers": ["cmd"],
-				"key": "star"
-			},
-			"action": null,
-			"slot": null,
-			"note": "Cmd+* re-fires Cmd+S; native owner, not a catalogue action."
-		},
-		{
-			"driver": "macos",
-			"kind": "special_boolean",
 			"config_key": "shortcuts.keys.wrap_text_if_selected",
 			"chord": null,
 			"action": "wrap_selection",
@@ -500,11 +491,14 @@
 		{
 			"driver": "macos",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.magic_editor",
-			"chord": null,
+			"config_key": "shortcuts.keyboard.secondary_star",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "star"
+			},
 			"action": "open_hotstrings_editor",
-			"slot": "magic_editor",
-			"note": "Contextual slot: the magic key, no modifier."
+			"slot": "secondary_star",
+			"note": "The key that types ★ at its base level, when the layout has one."
 		},
 		{
 			"driver": "linux",
@@ -533,11 +527,14 @@
 		{
 			"driver": "linux",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.magic_editor",
-			"chord": null,
+			"config_key": "shortcuts.keyboard.meta_star",
+			"chord": {
+				"modifiers": ["super"],
+				"key": "star"
+			},
 			"action": "open_hotstrings_editor",
-			"slot": "magic_editor",
-			"note": "Contextual slot: the magic key, no modifier."
+			"slot": "meta_star",
+			"note": "The key that types ★ at its base level, when the layout has one."
 		},
 		{
 			"driver": "linux",

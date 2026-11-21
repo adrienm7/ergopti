@@ -473,7 +473,7 @@ const CHORD_PREFIXES = {
 		['alt_', ['option']],
 		['primary_shift_', ['cmd', 'shift']],
 		['primary_', ['cmd']],
-		// The built-in switches that are not slots yet (ctrl_g, cmd_star).
+		// The built-in switch that is not a slot yet (ctrl_g).
 		['cmd_', ['cmd']],
 		['ctrl_', ['ctrl']]
 	],

@@ -39,7 +39,7 @@ MagicKeyRules(Data) {
 		throw TypeError("Magic key rules: the layout families are missing.")
 	for Family in Families {
 		if !(Family is Map) || !(Family.Get("base", 0) is Map) || Family["base"].Count == 0
-				|| !(Family.Get("magic_key", "") is String) || Family["magic_key"] == ""
+				|| !(Family.Get("default_char", "") is String) || Family["default_char"] == ""
 			throw TypeError("Magic key rules: a layout family lacks its base keys or magic key.")
 	}
 	Keys := Data.Get("literal_marker_keys", 0)
@@ -70,7 +70,7 @@ MagicKeyRules(Data) {
  * @param {Map} Rules Result of MagicKeyRules.
  * @param {Func} BaseTextOf (Code) → what the key types with no modifier, "" for nothing.
  * @param {String} Fallback The manifest default of hotstrings.trigger_char.
- * @returns {Map} "magic_key" and "family" ("" for the fallback).
+ * @returns {Map} "char" and "family" ("" for the fallback).
  */
 MagicKeyLayoutDefault(Rules, BaseTextOf, Fallback) {
 	if !(Fallback is String) || Fallback == ""
@@ -84,9 +84,9 @@ MagicKeyLayoutDefault(Rules, BaseTextOf, Fallback) {
 			}
 		}
 		if Matches
-			return Map("magic_key", Family["magic_key"], "family", Family["id"])
+			return Map("char", Family["default_char"], "family", Family["id"])
 	}
-	return Map("magic_key", Fallback, "family", "")
+	return Map("char", Fallback, "family", "")
 }
 
 

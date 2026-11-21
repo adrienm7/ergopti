@@ -39,8 +39,6 @@ two disagree in either direction.
 | `hotstrings.enabled`                                          | —               | n/a                                    | n/a                  |
 | `hotstrings.dynamic.enabled`                                  | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.trigger_char`                                     | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.magic_key_source`                                 | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.magic_key_source_char`                            | n/a             | n/a                                    | —                    |
 | `hotstrings.repeat_key_enabled`                               | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.backspace_restore_enabled`                        | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.backspace_restore_window_ms`                      | —               | `evdev`, `uinput`                      | —                    |
@@ -183,6 +181,8 @@ two disagree in either direction.
 | `shortcuts.take_note.destination_folder`                      | n/a             | n/a                                    | —                    |
 | `shortcuts.a_grave.enabled`                                   | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.a_grave.letter`                                    | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.star.enabled`                                      | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.star.letter`                                       | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.e_acute.enabled`                                   | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.e_acute.letter`                                    | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.e_circ.enabled`                                    | n/a             | `evdev`, `uinput`                      | —                    |
@@ -199,7 +199,8 @@ two disagree in either direction.
 | `shortcuts.script_control.script_altgr_delete`                | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.script_control.script_altgr_enter`                 | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.script_control.script_altgr_escape`                | `karabiner`     | `evdev`, `uinput`                      | —                    |
-| `shortcuts.keyboard.magic_editor`                             | —               | `evdev`, `uinput`                      | —                    |
+| `shortcuts.keyboard.meta_star`                                | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.keyboard.secondary_star`                           | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.primary_b`                                | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_a`                                   | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_d`                                   | n/a             | n/a                                    | —                    |
@@ -369,7 +370,6 @@ two disagree in either direction.
 | `layout.emulate_top_row`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulate_home_row`                                     | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulate_bottom_row`                                   | —               | `evdev`, `uinput`                      | —                    |
-| `layout.ctrl_magic_save`                                      | n/a             | `evdev`, `uinput`                      | —                    |
 | `layout.emulated_layout`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `category_enabled.hotstrings`                                 | n/a             | n/a                                    | —                    |
 | `category_enabled.layout`                                     | n/a             | n/a                                    | —                    |
@@ -382,7 +382,6 @@ two disagree in either direction.
 | `tap_holds.lone_modifier_tap_max_ms`                          | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `tap_holds.sticky_timeout_ms`                                 | —               | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keys.wrap_text_if_selected`                        | —               | n/a                                    | n/a                  |
-| `shortcuts.keys.cmd_star`                                     | —               | n/a                                    | n/a                  |
 | `category_enabled.autocorrection`                             | n/a             | n/a                                    | —                    |
 | `category_enabled.distances_reduction`                        | n/a             | n/a                                    | —                    |
 | `category_enabled.sfbs_reduction`                             | n/a             | n/a                                    | —                    |

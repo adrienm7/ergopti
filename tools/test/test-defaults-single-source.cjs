@@ -249,9 +249,10 @@ async function main() {
 	// sur les 3 OS »). A new entry joins this list by a deliberate decision,
 	// never by a default edit.
 	const APPROVED_ACTIVE_BY_DEFAULT = [
-		// The maintainer also requested a conditional ordinary editor shortcut
-		// following only the actual unmodified physical magic source (2026-10-02).
-		'shortcuts.keyboard.magic_editor',
+		// The ★ key's slot opens the hotstrings editor wherever a key types ★
+		// at its base level (maintainer's decision of 2026-11-21).
+		'shortcuts.keyboard.meta_star',
+		'shortcuts.keyboard.secondary_star',
 		'shortcuts.script_control.script_altgr_backspace',
 		'shortcuts.script_control.script_altgr_delete',
 		'shortcuts.script_control.script_altgr_enter',
@@ -289,8 +290,19 @@ async function main() {
 	assert.deepEqual(
 		activeByDefault.sort(),
 		[...APPROVED_ACTIVE_BY_DEFAULT].sort(),
-		'only approved script-management and physical magic editor slots may be active by default'
+		'only approved script-management and ★ key slots may be active by default'
 	);
+	// No shortcut defaults to an AI prediction or to the hotstring editor but
+	// the ★ key's slot (maintainer's decision of 2026-11-21).
+	const EDITOR_SLOTS = ['meta_star', 'secondary_star'];
+	for (const entry of manifest.entries) {
+		if (typeof entry.default !== 'string') continue;
+		const name = entry.section + '.' + entry.id;
+		if (entry.default.startsWith('llm_'))
+			assert.fail(`${name}: no shortcut defaults to an AI action (${entry.default})`);
+		if (entry.default === 'open_hotstrings_editor' && !EDITOR_SLOTS.includes(entry.id))
+			assert.fail(`${name}: only the ★ key's slot defaults to the hotstring editor`);
+	}
 	const numberRow = manifest.entries.find(
 		(entry) => entry.section === 'layout' && entry.id === 'direct_access_digits'
 	);
@@ -302,15 +314,16 @@ async function main() {
 		hs: 'native',
 		linux: 'native'
 	});
-	const contextual = manifest.entries.find(
-		(entry) => entry.section === 'shortcuts.keyboard' && entry.id === 'magic_editor'
-	);
-	assert.deepEqual(contextual.platforms, ['ahk', 'hs', 'linux']);
-	assert.equal(
-		contextual.cleared,
-		'none',
-		'explicit contextual removal is a durable ordinary assignment'
-	);
+	const starPlatforms = {};
+	for (const id of EDITOR_SLOTS) {
+		const slot = manifest.entries.find(
+			(entry) => entry.section === 'shortcuts.keyboard' && entry.id === id
+		);
+		assert.ok(slot, `shortcuts.keyboard.${id} must be declared`);
+		assert.equal(slot.cleared, 'none', 'clearing the ★ key slot is a durable ordinary assignment');
+		for (const platform of slot.platforms) starPlatforms[platform] = id;
+	}
+	assert.deepEqual(starPlatforms, { ahk: 'meta_star', hs: 'secondary_star', linux: 'meta_star' });
 	const shortcutMaster = manifest.entries.find(
 		(entry) => entry.section === 'category_enabled' && entry.id === 'shortcuts'
 	);
@@ -336,9 +349,9 @@ async function main() {
 			fs.readFileSync(paths.shared('..', driver, '_generated', 'config_template.toml'), 'utf8')
 		);
 		assert.equal(
-			template.shortcuts.keyboard.magic_editor,
+			template.shortcuts.keyboard[starPlatforms[platform]],
 			'open_hotstrings_editor',
-			`${driver}: ordinary contextual default`
+			`${driver}: the ★ key slot's default`
 		);
 		const master =
 			platform === 'ahk' ? template.category_enabled.shortcuts : template.shortcuts.enabled;

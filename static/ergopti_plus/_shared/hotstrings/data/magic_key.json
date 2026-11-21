@@ -11,7 +11,7 @@
 				"KeyW": "z",
 				"KeyA": "q"
 			},
-			"magic_key": "ù"
+			"default_char": "ù"
 		},
 		{
 			"id": "qwerty",
@@ -21,7 +21,7 @@
 				"KeyY": "y",
 				"KeyA": "a"
 			},
-			"magic_key": ";"
+			"default_char": ";"
 		}
 	],
 	"literal_marker_keys": [

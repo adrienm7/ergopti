@@ -128,16 +128,6 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { linux: 'linux/menu/ui/builder/builder.lua' }
 	},
-	magic_key_source: {
-		menu: 'magic_key_source_menu',
-		platforms: ['ahk', 'hs', 'linux'],
-		kind: 'submenu'
-	},
-	magic_key_source_heading: {
-		menu: 'magic_key_source_children',
-		platforms: ['ahk', 'hs', 'linux'],
-		kind: 'submenu'
-	},
 	// The empty native Input Sources provider composes its actual shared command.
 	active_layouts: {
 		menu: 'layout_active_source_empty_commands',

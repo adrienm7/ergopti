@@ -78,7 +78,7 @@
 		"test:config-migrations": "node ./tools/test/test-config-migrations.cjs",
 		"test:config-template-spacing": "node ./tools/test/test-config-template-spacing.cjs",
 		"test:config-template-shared": "node ./tools/test/test-config-template-shared.cjs",
-		"test:magic-key-source": "node ./tools/test/test-magic-key-source.cjs",
+		"test:magic-key-rules": "node ./tools/test/test-magic-key-rules.cjs",
 		"test:cascade-arrow-bounds": "node ./tools/test/test-cascade-arrow-bounds.cjs",
 		"test:locale-order": "node ./tools/test/test-locale-order-single-source.cjs",
 		"test:model-hw-calc": "uv run python static/ergopti_plus/macos/ai/data/test_generate_models_calc.py",

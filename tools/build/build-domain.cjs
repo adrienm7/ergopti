@@ -269,7 +269,7 @@ const PIPELINE = [
 
 	// -------------------------------------------------------
 	// Step 6: Every AHK feature read site is backed by the manifest. Guards the
-	// layout.ahk ctrl_magic_save UnsetItemError class — a feature read at a path
+	// layout.ahk UnsetItemError class — a feature read at a path
 	// the manifest does not define (section-prefix drift, removed feature, etc.).
 	// -------------------------------------------------------
 	{

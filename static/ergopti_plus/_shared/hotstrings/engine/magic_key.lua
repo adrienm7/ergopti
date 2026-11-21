@@ -46,8 +46,8 @@ function M.new(data)
 	for _, family in ipairs(data.layout_families) do
 		assert(type(family.id) == "string" and type(family.base) == "table" and next(family.base) ~= nil,
 			"magic_key: a layout family lacks its id or base keys")
-		assert(type(family.magic_key) == "string" and family.magic_key ~= "",
-			"magic_key: a layout family lacks its magic key")
+		assert(type(family.default_char) == "string" and family.default_char ~= "",
+			"magic_key: a layout family lacks its default character")
 	end
 	assert(type(data.literal_marker_keys) == "table", "magic_key: the literal marker keys are missing")
 	local literal = {}
@@ -89,7 +89,7 @@ function M:layout_default(base_text_of, fallback)
 				break
 			end
 		end
-		if matches then return family.magic_key, family.id end
+		if matches then return family.default_char, family.id end
 	end
 	return fallback, nil
 end
