@@ -423,10 +423,10 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     while paused on Windows through `WebViewHost` `RunsWhilePaused`; a Studio change refused during a Windows layout
     reload is answered `busy`; six host refusals worded in the 21 locales; on the three, both pages name the
     interface language, the layout manager keeps the focus on the row acted on and closes on Escape); desktop checks
-    are field points. Left: LTP-08 `dir` on both pages (to PCK-22); LTP-09 seed the Windows personal information
-    editor, paths editor and onboarding pages and empty `UNSEEDED_WINDOWS` in `test-reading-preferences-seed.cjs`;
-    LTP-10 open the other Windows configuration windows on `WebViewHost` (physical shortcuts first) with
-    `RunsWhilePaused`;
+    are field points. LTP-09 and LTP-10 fixed afterwards: the Windows personal information editor, paths editor and
+    onboarding wizard seed the language and reading choices (`UNSEEDED_WINDOWS` is empty), and the physical shortcuts
+    editor and the configuration cleanup answer their page while paused, every `WebViewHost` window placed by
+    `test-webview-host-pause-census.cjs`. Left: LTP-08 `dir` on both pages (to PCK-22);
   - the next campaigns in the report's order: pickers and prompts, small native units.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy

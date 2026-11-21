@@ -425,7 +425,8 @@ owner. Windows is the reference unless a shared contract says otherwise.
    remove and emulate, the pause and teardown; LTP-01 to LTP-07 fixed (the
    Windows layout manager's seed and paused Studio, a refused Studio change
    answered, six refusals worded, the pages' language, focus and Escape),
-   LTP-08 to LTP-10 open.
+   then LTP-09 and LTP-10 (three more Windows windows seeded, the other
+   Windows configuration windows answering while paused); LTP-08 open.
 
 Re-campaigns for drift, after the never-campaigned modules or when a module's
 structure step lands:
@@ -614,23 +615,25 @@ the AHK unit suite with fake ports.
 
 ### Fixed
 
-| Id     | OS      | Sequence                                                                                  | Before                                                                                                                                                                         | Regression                                                                                                    |
-| ------ | ------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| LTP-01 | Windows | A reading font, wider spacing or English, then « Install or remove layouts… »             | `LayoutManager_Open` navigated its own WebView2 with no boot script: default font and spacing, no language named, where every other window and both Lua builders seed them     | `unseededProblems` (`test-reading-preferences-seed.cjs`); the seed in `test_layout_manager_command_owner.ahk` |
-| LTP-02 | all     | Any locale but French, a screen reader on, in the layout manager or the Studio            | Both pages declared `lang="fr"` and load no `i18n.js` (UPD-12): read with a French voice, the Comparer's numbers falling back on French                                        | `(ltp-02)` (`test-layout-manager-page.cjs`)                                                                   |
-| LTP-03 | Windows | Pause the driver, open Ergopti Studio, save, install or emulate                           | `WebViewHost` dropped every message, deferred the ready and refused every script while suspended: a blank Studio, or saves that waited forever; macOS and Linux answer (EDD-1) | `(ltp-03-studio-paused)` (`test_script_outcomes.ahk`)                                                         |
-| LTP-04 | Windows | Install from the Studio, or apply its navigation layer, while a layout reload is pending  | Refused with a log line only: the page's install stayed pending, then the page refused every later one as `save_busy`; macOS and Linux answer `busy`                           | `(ltp-04-busy-answer)` (`test_layout_composer_source.ahk`)                                                    |
-| LTP-05 | all     | A refused Install, Emulate, Save or Download (full data folder, failed switch, file name) | `invalid`, `write_failed`, `use_failed`, `source_invalid_file`, `uninstall_failed` and `busy` had no text: « Refused (write_failed). »                                         | `(ltp-05)` (`test-layout-manager-page.cjs`), codes read from their owners                                     |
-| LTP-06 | all     | Keyboard or screen reader: « Install », « Use » or « Update » in the layout manager       | Every push rebuilt the list and the focus fell to the document: the user started again from the top                                                                            | `(ltp-06)` (`test-layout-manager-page.cjs`)                                                                   |
-| LTP-07 | all     | Escape in the layout manager                                                              | Nothing: the WebView holds the focus, so no host window sees the key, where Escape closes the Updates window (UPD-03)                                                          | `(ltp-07)` (`test-layout-manager-page.cjs`)                                                                   |
+| Id     | OS      | Sequence                                                                                                                 | Before                                                                                                                                                                         | Regression                                                                                                                      |
+| ------ | ------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| LTP-01 | Windows | A reading font, wider spacing or English, then « Install or remove layouts… »                                            | `LayoutManager_Open` navigated its own WebView2 with no boot script: default font and spacing, no language named, where every other window and both Lua builders seed them     | `unseededProblems` (`test-reading-preferences-seed.cjs`); the seed in `test_layout_manager_command_owner.ahk`                   |
+| LTP-02 | all     | Any locale but French, a screen reader on, in the layout manager or the Studio                                           | Both pages declared `lang="fr"` and load no `i18n.js` (UPD-12): read with a French voice, the Comparer's numbers falling back on French                                        | `(ltp-02)` (`test-layout-manager-page.cjs`)                                                                                     |
+| LTP-03 | Windows | Pause the driver, open Ergopti Studio, save, install or emulate                                                          | `WebViewHost` dropped every message, deferred the ready and refused every script while suspended: a blank Studio, or saves that waited forever; macOS and Linux answer (EDD-1) | `(ltp-03-studio-paused)` (`test_script_outcomes.ahk`)                                                                           |
+| LTP-04 | Windows | Install from the Studio, or apply its navigation layer, while a layout reload is pending                                 | Refused with a log line only: the page's install stayed pending, then the page refused every later one as `save_busy`; macOS and Linux answer `busy`                           | `(ltp-04-busy-answer)` (`test_layout_composer_source.ahk`)                                                                      |
+| LTP-05 | all     | A refused Install, Emulate, Save or Download (full data folder, failed switch, file name)                                | `invalid`, `write_failed`, `use_failed`, `source_invalid_file`, `uninstall_failed` and `busy` had no text: « Refused (write_failed). »                                         | `(ltp-05)` (`test-layout-manager-page.cjs`), codes read from their owners                                                       |
+| LTP-06 | all     | Keyboard or screen reader: « Install », « Use » or « Update » in the layout manager                                      | Every push rebuilt the list and the focus fell to the document: the user started again from the top                                                                            | `(ltp-06)` (`test-layout-manager-page.cjs`)                                                                                     |
+| LTP-07 | all     | Escape in the layout manager                                                                                             | Nothing: the WebView holds the focus, so no host window sees the key, where Escape closes the Updates window (UPD-03)                                                          | `(ltp-07)` (`test-layout-manager-page.cjs`)                                                                                     |
+| LTP-09 | Windows | A reading font, wider spacing or English, then the personal information editor, the paths editor or the first-run wizard | Each navigated its own WebView2 with no boot script: default font and spacing and no language named, as the layout manager before LTP-01                                       | `unseededProblems` (`test-reading-preferences-seed.cjs`, `UNSEEDED_WINDOWS` empty); `(ltp-09)` (`test_reading_preferences.ahk`) |
+| LTP-10 | Windows | Pause the driver, then edit the physical shortcuts or clean the unused configuration keys                                | `WebViewHost` fenced both windows as it fenced the Studio before LTP-03: a blank page or a save never answered; macOS and Linux answer (EDD-1)                                 | `censusProblems` (`test-webview-host-pause-census.cjs`)                                                                         |
 
 Notes:
 
 - **LTP-01.** `_LayMgrWeb_SeedScript` adds `window._i18n_locale` and
   `ReadingPrefs_SeedScript()` before the navigation. The seed gate now fails
   on any Windows window that navigates a page without a locale seed; three
-  windows outside this campaign stay in its shrinking `UNSEEDED_WINDOWS`
-  (LTP-09).
+  windows outside this campaign stayed in its shrinking `UNSEEDED_WINDOWS`
+  until LTP-09.
 - **LTP-03.** `WebViewHost` reads the pause through `_PauseFenced`: a window
   opened with `RunsWhilePaused` (the Studio) keeps its messages, ready and
   scripts, every other window keeps the `webview-script-pause` fence. What the
@@ -646,6 +649,19 @@ Notes:
   disabled, and to the result line when the row left the list.
 - **LTP-07.** As UPD-03, an Escape another control handled is left alone; the
   window keeps no unsaved work and an operation in flight goes on.
+- **LTP-09.** `_PiEdWeb_SeedScript`, `_PathsEdWeb_SeedScript` and
+  `_OnbWeb_SeedScript` add the same statement before the navigation; the
+  wizard seeds the language it opens in (`_ob_locale`), and on a first run no
+  reading choice is read yet, so `a11y_prefs.js` keeps its defaults.
+  `UNSEEDED_WINDOWS` is empty and must stay so, and the gate now also fails
+  on a window that adds its seed after its first navigation.
+- **LTP-10.** The physical shortcuts editor and the configuration cleanup open
+  with `RunsWhilePaused`; what the editor saves reaches typing at the resume,
+  through its scope, and the cleanup's write still waits for a configuration
+  write in flight. The census places every window built on `WebViewHost`: a
+  configuration window without the option, an unplaced new window or a fenced
+  one without its reason fails. The download failure report stays fenced: its
+  owners read the pause themselves and retry only after the resume.
 
 ### Open
 
@@ -653,15 +669,6 @@ Notes:
   Arabic and Hebrew the layout manager's rows and buttons and the Studio's bar
   and dialogs stay left to right (the keyboards themselves must). Left to
   PCK-22, which adds `dir` to the shared pages.
-- **LTP-09 (medium, Windows):** the personal information editor, the paths
-  editor and the onboarding wizard also navigate their own page with no locale
-  or reading seed (`UNSEEDED_WINDOWS`). Follow-up: seed them as
-  `_LayMgrWeb_SeedScript` does and empty the list.
-- **LTP-10 (medium, Windows):** the other configuration windows built on
-  `WebViewHost`, the physical shortcuts editor first, still drop their page
-  messages while paused, which EDD-1 forbids (`physical-editor-paused` reads
-  the menu port only). Follow-up: open them with `RunsWhilePaused`, in the
-  pickers and prompts campaign that owns them.
 
 Field points: `TODO-tests-windows.md` « Layouts and Ergopti Studio » (Narrator,
 the reading font, focus, Escape, the paused Studio) and `layout_tool_pages` in
@@ -705,3 +712,31 @@ a `git archive` copy in WSL (as root, so the permission cases fail there), the
 Linux `infra` group ran the field coverage cases green (4 of 4) with one
 unrelated `driver-control-declaration` red, and the `ui` group and the macOS
 modules stopped when the WSL service stopped answering.
+
+LTP-09 and LTP-10, afterwards: commits `ee0fce8e13` (LTP-09), `af5a469cf7`
+(LTP-10) and `94ec03b07f` (the test children's seed ports). Red on the old code, with the
+fixed driver files taken back from the commit before each:
+
+- LTP-09: `node tools/test/test-reading-preferences-seed.cjs` fails naming the
+  personal information editor, the paths editor and the onboarding wizard
+  (`navigates a page without the locale and reading seeds`); `(ltp-09)` in
+  `test_reading_preferences.ahk` calls three seed functions that did not exist.
+- LTP-10: `node tools/test/test-webview-host-pause-census.cjs` fails naming
+  `windows/settings/ui/cleanup.ahk` and `windows/ui/physical_shortcuts/host.ahk`
+  (`a configuration window opened without RunsWhilePaused (EDD-1)`).
+
+Green on the fix: `test-reading-preferences-seed`,
+`test-webview-host-pause-census`, `test-app-windows-semantic-markup`,
+`test-app-windows-accessibility-ratchet`, the locale gates
+(`test-locale-catalogue-complete`, `test-i18n-referenced-keys-resolve`,
+`test-audit-translations-scope`, `test-webview-i18n-cascade`,
+`check_locales.py`), `test-shared-literal-inventory`, the three
+`test-no-pinned-source-reads` gates (no baseline raised),
+`test-js-feature-inventory`, `test-ci-pipeline-wiring`, the AHK encoding gate,
+the AHK cases matching `ltp-0`, `reading preferences`, `onboarding`, `onbweb`,
+`paths editor`, `Native paths editor`, `personal`, `editor-early-show`,
+`webview`, `paus`, `physical`, `cleanup`, `model browser`, `present window`,
+`menu layout`, `reset_config` and `shortcuts: path dialog` (each run green),
+format and `lint-conventions --fail-on-violations`. `test-field-todo-summary`
+calls `python3`, which this machine lacks; its `--check-doc` runs pass with
+`python`. No shared page or Lua source changed.

@@ -30,6 +30,10 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       Pause the driver, open Ergopti Studio: the editor shows the last source, « Save » and « Emulate without
       installing » answer at once, and the emulation types only after the resume (LTP-03). Do not install or remove
       a layout you need.
+- [ ] Seeded editors and paused configuration windows (LTP-09, LTP-10, 2026-11-21), same reading font: the personal
+      information editor and the config-folder editor show that font (LTP-09). Pause the driver, open the physical
+      shortcuts editor, change one row and save: the page answers at once and the shortcut acts only after the resume;
+      the unused configuration keys cleanup also answers while paused (LTP-10).
 - [ ] **Layout editor's Windows installer (2026-11-15):** from the Studio (site or app), « Format » « Windows
       installer (.zip) » then « Download » on Ergopti, unzip, run `kbdergop-setup.exe` as administrator: the layout is
       listed and types as with the tool's own installer; edit `layout.ini` (a space, an extra key or line) and run it
