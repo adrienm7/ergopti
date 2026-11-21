@@ -472,16 +472,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     does nothing where macOS and Linux open the menu (maintainer decision);
   - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
     small native units, layout tool pages.
-    30 min install budget), OLL-03 (stale owners), OLL-07 (Windows and Linux remove the earlier runtime once the
+    30 min install budget), OLL-03 (stale owners), OLL-04 (one free-space rule before the download on the three, the
+    pinned archive plus `[limits] ollama_install_free_space_margin_bytes`), OLL-05 (the install failure's class and
+    message on the three, classes in `_shared/ai/data/ollama_install_errors.json`, vectors replayed by the three
+    suites), OLL-07 (Windows and Linux remove the earlier runtime once the
     pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
     `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13
     (Linux admits readiness only from its own process group's socket with the pinned version), OLL-10 (Windows and
     Linux pull a model Ollama cannot load once more, one shared rule and its vectors) and OLL-11 (the lifecycle
     actions are rows of « Ollama d’Ergopti » on the three, with an uninstall that keeps or deletes the models)
-    fixed. Left: OLL-04
-    free-space check on macOS and Linux and an `ollama.no_space` message; OLL-05 the install's network and checksum
-    classes (macOS markers never printed); OLL-06 one readiness bound once the cold start is measured (field
-    checks);
+    fixed. Left: OLL-06 one readiness bound once the cold start is measured (field checks); OLL-14 a pull's
+    `no_space` class still shows the generic pull failure, and the install margin awaits pinned expanded sizes;
   - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
     metrics views, small native units, layout tool pages.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
