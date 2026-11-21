@@ -443,7 +443,10 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 					callbacks: {
 						title: tooltipTitleCallback,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -530,7 +533,10 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 					callbacks: {
 						title: tooltipTitleCallback,
 						label: (ctx) =>
-							`Accept\u00E9es\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accepted').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -570,10 +576,27 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 // ====================================================
 
 /**
- * Tooltip title callback for hourly charts: shows "lundi 14/04 à 15h" instead
- * of a full date, since the day is already known when in single-day mode.
+ * Names one time slot of a single-day chart in the interface language: the
+ * weekday, the day and month, and the time. It was French on every locale
+ * (« lundi 14/04 à 15 h »).
+ * @param {string} day_name - Localized weekday name.
+ * @param {Date} date - The slot start.
+ * @param {Object} time_options - Intl.DateTimeFormat options for the time.
+ * @returns {string} The slot title.
+ */
+function chart_slot_title(day_name, date, time_options) {
+	const locale = number_locale();
+	return _t('ui_typing.chart_slot_title')
+		.replace('{day}', day_name)
+		.replace('{date}', date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' }))
+		.replace('{time}', date.toLocaleTimeString(locale, time_options));
+}
+
+/**
+ * Tooltip title callback for hourly charts: shows the weekday, date and hour
+ * instead of a full date, since the day is already known in single-day mode.
  * @param {Array} context - Chart.js tooltip context array.
- * @returns {string} Hour-aware French-formatted label.
+ * @returns {string} Hour-aware label in the interface language.
  */
 const tooltipTitleCallbackHourly = (context) => {
 	const days = [
@@ -587,10 +610,7 @@ const tooltipTitleCallbackHourly = (context) => {
 	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
-	const dd = String(d.getDate()).padStart(2, '0');
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const h = d.getHours();
-	return `${dayName} ${dd}/${mm} \u00E0 ${h}\u202Fh`;
+	return chart_slot_title(dayName, d, { hour: 'numeric' });
 };
 
 /**
@@ -745,7 +765,10 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
 					callbacks: {
 						title: tooltipTitleCallbackHourly,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -776,10 +799,10 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
 // ==================================================================
 
 /**
- * Tooltip title callback for 5-minute charts: shows "lundi 14/04 à 15h05"
- * so the user can read the exact time slot without any ambiguity.
+ * Tooltip title callback for 5-minute charts: shows the weekday, date, hour
+ * and minute so the user can read the exact time slot without any ambiguity.
  * @param {Array} context - Chart.js tooltip context array.
- * @returns {string} Minute-aware French-formatted label.
+ * @returns {string} Minute-aware label in the interface language.
  */
 const tooltipTitleCallbackMinute5 = (context) => {
 	const days = [
@@ -793,11 +816,7 @@ const tooltipTitleCallbackMinute5 = (context) => {
 	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
-	const dd = String(d.getDate()).padStart(2, '0');
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const h = d.getHours();
-	const min = String(d.getMinutes()).padStart(2, '0');
-	return `${dayName} ${dd}/${mm} \u00E0 ${h}h${min}`;
+	return chart_slot_title(dayName, d, { hour: 'numeric', minute: '2-digit' });
 };
 
 /**
@@ -941,7 +960,10 @@ function _render_minute5_precision_chart(pts, color, hourWindow) {
 					callbacks: {
 						title: tooltipTitleCallbackMinute5,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},

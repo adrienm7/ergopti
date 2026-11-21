@@ -2243,7 +2243,10 @@ function render_ergo_trigram_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('ergo_trigram_val', `${pct(redir).toFixed(2)}<span class="stat-unit">% Redir.</span>`);
+	set(
+		'ergo_trigram_val',
+		`${pct(redir).toFixed(2)}<span class="stat-unit">% ${_t('ui_typing.lbl_redir')}</span>`
+	);
 	set('ergo_sfs_pct', `${pct(sfs).toFixed(2)}%`);
 	set('ergo_sks_pct', `${pct(sks).toFixed(2)}%`);
 	set('ergo_redir_pct', `${pct(redir).toFixed(2)}%`);
@@ -2364,7 +2367,10 @@ function render_errors_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('errors_val', `${overall_rate.toFixed(2)}<span class="stat-unit">% taux global</span>`);
+	set(
+		'errors_val',
+		`${overall_rate.toFixed(2)}<span class="stat-unit">${_t('ui_typing.unit_global_rate')}</span>`
+	);
 	set('errors_total', format_number(total_errs));
 
 	const worst = rows.slice().sort((a, b) => b.rate - a.rate)[0];
@@ -3194,7 +3200,10 @@ function render_apps_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('apps_val', `${format_number(_apps_data.length)}<span class="stat-unit">apps actives</span>`);
+	set(
+		'apps_val',
+		`${format_number(_apps_data.length)}<span class="stat-unit">${_t('ui_typing.unit_active_apps')}</span>`
+	);
 
 	if (_apps_data.length === 0) {
 		const loading = document.getElementById('apps_loading');

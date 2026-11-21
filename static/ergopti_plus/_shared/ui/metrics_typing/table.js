@@ -1664,11 +1664,11 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			tip_lines.push(
 				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
 					`<tr style="color:${ThemeTokens.color('grey-888')};">` +
-					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
-					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">% /SFBs touche</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">% SFBs tot.</td>` +
+					`<td style="padding:1px 6px 1px 0;">${escapeHtml(_t('ui_typing.sfb_pairs_col_pair'))}</td>` +
+					`<td style="padding:1px 4px;text-align:right;">${escapeHtml(_t('ui_typing.sfb_pairs_col_count'))}</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_key'))}</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">${escapeHtml(_t('ui_typing.sfb_pairs_col_rate'))}</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_total'))}</td>` +
 					`</tr>`
 			);
 

@@ -18,13 +18,19 @@
  *     when called through pcall.
  *   Web UIs (JavaScript): alert, confirm, prompt, assignments to textContent,
  *     innerText, placeholder and title, setAttribute of a visible attribute,
- *     and the title, placeholder, aria-label and alt attributes of HTML built in
- *     strings.
+ *     the title, placeholder, aria-label and alt attributes of HTML built in
+ *     strings, what Chart.js tooltip callbacks return, and, in the metrics
+ *     pages' scripts, the text between the tags of HTML built in strings.
+ *   Web pages (HTML): the title, placeholder, aria-label and alt attributes
+ *     and the text of every element. i18n.js fills data-i18n, data-i18n-title
+ *     and data-i18n-placeholder, so a page writes the key and no text. The
+ *     metrics pages held 61 French definitions in `title` attributes, read in
+ *     French in every locale, because only the scripts were scanned (MET-12).
  *   Linux shell scripts the user runs (install.sh, uninstall.sh, the launcher
  *     and the install/ helpers): every echo and printf sentence.
  *
- * A literal counts when, once escapes, format placeholders and the product
- * name are removed, it still holds a run of two letters (two words for shell,
+ * A literal counts when, once escapes, format placeholders, the product name
+ * and (in markup) the metric acronyms are removed, it still holds a run of two letters (two words for shell,
  * whose echo also returns values such as a package name). Strings inside a
  * nested call are not counted unless the call only formats its arguments
  * (Format, StrReplace, string.format): a translation call takes a key, and
@@ -108,6 +114,12 @@ const ALLOWED = [
 		sink: 'printf',
 		text: '%s\\t' + file + '\\n',
 		reason: 'digest and installed path emitted by the ownership manifest serializer'
+	})),
+	...['Space', 'BackSpace'].map((text) => ({
+		file: '_shared/ui/metrics_typing/format.js',
+		sink: 'html text',
+		text,
+		reason: 'the keycap chip of a [[SPACE]] or [[BS]] token in a typed sequence, as the key reads'
 	})),
 	{
 		file: 'linux/install.sh',
@@ -193,6 +205,13 @@ const JS_TEXT_ATTRIBUTES = new Set(['title', 'placeholder', 'aria-label', 'alt']
 // The attribute itself, not the tail of a longer one: data-i18n-title="key"
 // names a locale key, it shows no text.
 const HTML_TEXT_ATTRIBUTE = /(?<![\w-])(title|placeholder|aria-label|alt)\s*=\s*"([^"]*)"/g;
+// The typing metrics' acronyms, units and space names and the feature name
+// read the same in every language, as the product name does.
+const INVARIANT_TERMS = /\b(?:SFBs?|SHB|SHU|LSB|SFS|SKS|N?NBSP|km|Hotstrings)\b/g;
+// The scripts whose markup strings are read for element text too. Elsewhere
+// such strings also build code samples and property lists, so a page joins
+// this list once its markup text is clean.
+const MARKUP_TEXT_DIRECTORIES = ['_shared/ui/metrics_typing/', '_shared/ui/metrics_apps/'];
 
 const SHELL_SCRIPTS = ['linux/install.sh', 'linux/uninstall.sh', 'linux/bin/ergopti-hotstrings'];
 const SHELL_SCRIPT_DIRECTORIES = ['linux/install'];
@@ -535,11 +554,103 @@ function memberName(node) {
 }
 
 /**
- * Finds the hard-coded visible literals of one JavaScript source.
+ * Names the key of an object literal property.
+ * @param {object} node Property node.
+ * @returns {string|null} Name, or null when computed.
+ */
+function propertyName(node) {
+	if (node.computed) return null;
+	if (node.key.type === 'Identifier') return node.key.name;
+	return typeof node.key.value === 'string' ? node.key.value : null;
+}
+
+/**
+ * Tells whether the text of an element reads as words once its entities, its
+ * {placeholder} tokens and the metric acronyms are removed.
+ * @param {string} text Element text as written.
+ * @returns {boolean} True when the text is user-facing prose.
+ */
+function isMarkupProse(text) {
+	return isProse(
+		text
+			.replace(/&[a-zA-Z]+;|&#x?[0-9a-fA-F]+;/g, ' ')
+			.replace(/\$\{[^}]*\}|\{[a-z_]+\}/g, ' ')
+			.replace(INVARIANT_TERMS, ' ')
+	);
+}
+
+/**
+ * Replaces each character of a match but the line breaks by a space, so the
+ * line numbers of the rest of the page do not move.
+ * @param {string} source Page.
+ * @param {RegExp} pattern Global pattern of the parts to blank.
+ * @returns {string} The page without those parts.
+ */
+function blankOut(source, pattern) {
+	return source.replace(pattern, (part) => part.replace(/[^\n]/g, ' '));
+}
+
+/**
+ * Finds the hard-coded visible text of one HTML page: the title, placeholder,
+ * aria-label and alt attributes of its elements, and the text between its
+ * tags. i18n.js fills data-i18n, data-i18n-title and data-i18n-placeholder, so
+ * an element carrying the key shows no fixed text; a literal beside the key is
+ * still a French fallback and is reported.
  * @param {string} source File contents.
  * @returns {{sink: string, text: string, line: number}[]} Findings.
  */
-function scanJs(source) {
+function scanHtml(source) {
+	const page = blankOut(
+		blankOut(blankOut(source, /<!--[\s\S]*?-->/g), /<script\b[\s\S]*?<\/script>/gi),
+		/<style\b[\s\S]*?<\/style>/gi
+	);
+	const findings = [];
+	const lineAt = (index) => page.slice(0, index).split('\n').length;
+	let textStart = 0;
+	for (let at = page.indexOf('<'); at >= 0; at = page.indexOf('<', at + 1)) {
+		if (!/[a-zA-Z/!]/.test(page[at + 1] || '')) continue;
+		const text = page.slice(textStart, at);
+		if (isMarkupProse(text)) {
+			const offset = textStart + text.search(/\S/);
+			findings.push({
+				sink: 'html text',
+				text: text.trim().replace(/\s+/g, ' '),
+				line: lineAt(offset)
+			});
+		}
+		// A quoted value may hold `<` or `>` (« gap < 1 s »): the tag ends at the
+		// first `>` outside quotes.
+		let end = at + 1;
+		for (let quote = null; end < page.length; end++) {
+			const c = page[end];
+			if (quote) {
+				if (c === quote) quote = null;
+			} else if (c === '"' || c === "'") quote = c;
+			else if (c === '>') break;
+		}
+		const tag = page.slice(at, end + 1);
+		for (const match of tag.matchAll(HTML_TEXT_ATTRIBUTE)) {
+			if (isProse(match[2].replace(INVARIANT_TERMS, ' ')))
+				findings.push({
+					sink: `html ${match[1]}`,
+					text: match[2],
+					line: lineAt(at + match.index)
+				});
+		}
+		textStart = end + 1;
+		at = end;
+	}
+	return findings;
+}
+
+/**
+ * Finds the hard-coded visible literals of one JavaScript source.
+ * @param {string} source File contents.
+ * @param {boolean} markupText Whether the text between tags of its markup
+ *     strings is read too (MARKUP_TEXT_DIRECTORIES).
+ * @returns {{sink: string, text: string, line: number}[]} Findings.
+ */
+function scanJs(source, markupText = false) {
 	let program;
 	try {
 		program = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
@@ -581,6 +692,27 @@ function scanJs(source) {
 		for (const match of markup.matchAll(HTML_TEXT_ATTRIBUTE)) {
 			if (isProse(match[2]))
 				findings.push({ sink: `html ${match[1]}`, text: match[2], line: node.loc.start.line });
+		}
+		// The text of a cell or label built in a string: `<td …>Paire</td>`.
+		if (!markupText) return;
+		for (const match of markup.matchAll(/>([^<>]+)</g)) {
+			if (isMarkupProse(match[1]))
+				findings.push({ sink: 'html text', text: match[1], line: node.loc.start.line });
+		}
+	});
+	// Chart.js draws what its tooltip callbacks return as plain text.
+	walkJs(program, (node) => {
+		if (node.type !== 'Property' || propertyName(node) !== 'callbacks') return;
+		if (node.value.type !== 'ObjectExpression') return;
+		for (const callback of node.value.properties) {
+			const fn = callback.value;
+			if (!fn || !/FunctionExpression$/.test(fn.type)) continue;
+			const sink = `chart ${propertyName(callback)}`;
+			if (fn.body.type !== 'BlockStatement') record(sink, fn.body);
+			else
+				walkJs(fn.body, (inner) => {
+					if (inner.type === 'ReturnStatement') record(sink, inner.argument);
+				});
 		}
 	});
 	return findings;
@@ -677,7 +809,16 @@ function collectFindings(driversRoot = DRIVERS) {
 		...walk(path.join(driversRoot, '_shared', 'ui'), ['.js']),
 		...walk(path.join(driversRoot, 'macos', 'ui'), ['.js'])
 	];
-	for (const file of scripts) add(file, scanJs(fs.readFileSync(file, 'utf8')));
+	for (const file of scripts) {
+		const relative = path.relative(driversRoot, file).replaceAll('\\', '/');
+		const markupText = MARKUP_TEXT_DIRECTORIES.some((directory) => relative.startsWith(directory));
+		add(file, scanJs(fs.readFileSync(file, 'utf8'), markupText));
+	}
+	const pages = [
+		...walk(path.join(driversRoot, '_shared', 'ui'), ['.html']),
+		...walk(path.join(driversRoot, 'macos', 'ui'), ['.html'])
+	];
+	for (const file of pages) add(file, scanHtml(fs.readFileSync(file, 'utf8')));
 	const shell = [
 		...SHELL_SCRIPTS.map((relative) => path.join(driversRoot, relative)),
 		...SHELL_SCRIPT_DIRECTORIES.flatMap((relative) =>
@@ -802,6 +943,57 @@ function selfTest() {
 			['setAttribute(aria-label)', 'Fermer']
 		],
 		'the JavaScript scan reports dialogs, text properties and HTML attributes'
+	);
+	const chart = scanJs(
+		[
+			'new Chart(el, { options: { plugins: { tooltip: { callbacks: {',
+			'\ttitle: tooltipTitleCallback,',
+			'\tlabel: (ctx) => `Pr\\u00E9cision\\u00A0: ${ctx.parsed.y}\\u00A0%`,',
+			"\tfooter: (ctx) => { if (!ctx) return ''; return 'Acceptées : ' + ctx; },",
+			"\tafterLabel: (ctx) => _t('k').replace('{value}', ctx.parsed.y)",
+			'} } } } });',
+			'html += `<td title="${_t(\'k\')}">Paire</td><td>${n}</td><td>SFBs &nbsp;{n}</td>`;'
+		].join('\n'),
+		true
+	);
+	assert.deepEqual(
+		chart.map((finding) => [finding.sink, finding.text]),
+		[
+			['html text', 'Paire'],
+			['chart label', 'Précision : '],
+			['chart footer', 'Acceptées : ']
+		],
+		'the JavaScript scan reports chart tooltip text and the text of built cells'
+	);
+	assert.deepEqual(
+		scanJs("html += '<td>Paire</td>';"),
+		[],
+		'element text in markup strings is read only where MARKUP_TEXT_DIRECTORIES says'
+	);
+	const html = scanHtml(
+		[
+			'<html><head><title>Temps sur les applications</title>',
+			'<style>.a { content: "Texte"; }</style><script>alert("Clic");</script></head>',
+			'<!-- un commentaire -->',
+			'<div class="split-col" title="Estimation du temps économisé.">',
+			'<th title="Rafale (gap < 1 s) sur la période" data-i18n="k"></th>',
+			'<button title="Fermer" data-i18n-title="k.close">&#x2715;</button>',
+			'<input data-i18n-placeholder="k.search" />',
+			'<span data-i18n="k.label"></span><p>0 SFBs</p><b>% Redir.</b>',
+			'<img alt="ErgoptiPlus"><a aria-label="Ouvrir">x</a>'
+		].join('\n')
+	);
+	assert.deepEqual(
+		html.map((finding) => [finding.sink, finding.text, finding.line]),
+		[
+			['html text', 'Temps sur les applications', 1],
+			['html title', 'Estimation du temps économisé.', 4],
+			['html title', 'Rafale (gap < 1 s) sur la période', 5],
+			['html title', 'Fermer', 6],
+			['html text', '% Redir.', 8],
+			['html aria-label', 'Ouvrir', 9]
+		],
+		'the HTML scan reports fixed attributes and text, French fallbacks beside a key included'
 	);
 	const shell = scanShell(
 		[

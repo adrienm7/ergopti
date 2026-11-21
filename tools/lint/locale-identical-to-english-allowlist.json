@@ -3116,6 +3116,10 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "es", "fr", "nl", "pt"]
 		},
+		"ui_typing.btn_toggle_llm": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "hi", "ja", "ko", "zh"]
+		},
 		"ui_typing.calendar_month_0": {
 			"reason": "loanword-or-cognate",
 			"locales": ["de"]

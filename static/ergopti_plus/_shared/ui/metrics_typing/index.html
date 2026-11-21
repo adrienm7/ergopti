@@ -70,9 +70,8 @@
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
 						data-i18n-title="ui_typing.btn_toggle_llm_title"
-					>
-						+ IA
-					</button>
+						data-i18n="ui_typing.btn_toggle_llm"
+					></button>
 					<button
 						class="filter-btn source-toggle active"
 						id="btn_toggle_hs"
@@ -364,7 +363,7 @@
 							id="sfb_heatmap_same_key_btn"
 							class="filter-btn sfb-toggle-btn active"
 							onclick="toggle_sfb_heatmap_same_key()"
-							title="Inclure ou exclure les redoublements de même touche (AA, BB…) dans la heatmap SFB. Indépendant du bouton du bloc SFB."
+							data-i18n-title="ui_typing.title_sfb_heatmap_doublings"
 							data-i18n="ui_typing.btn_doublings_included"
 						></button>
 					</p>
@@ -440,24 +439,18 @@
 								id="sfb_same_key_btn"
 								class="filter-btn sfb-toggle-btn active"
 								onclick="toggle_sfb_same_key()"
-								title="Inclure les redoublements de même touche (AA, BB…) dans le calcul des SFBs"
+								data-i18n-title="ui_typing.title_sfb_doublings"
 								data-i18n="ui_typing.btn_doublings_included"
 							></button>
 						</h2>
 						<p class="stat-value stat-value-tip" id="sfb_val">0<span class="stat-unit">%</span></p>
 						<p class="stat-details" id="sfb_loading" data-i18n="ui_typing.loading"></p>
 						<dl class="stat-details-split" id="sfb_details" style="display: none">
-							<div
-								class="split-col"
-								title="SFBs bruts — bigrammes manuels frappés par le même doigt"
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_sfbs_raw">
 								<dt class="split-label" data-i18n="ui_typing.lbl_sfbs_raw"></dt>
 								<dd class="split-val"><strong id="sfb_pct">0 SFBs</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="SFBs évités grâce aux hotstrings — bigrammes dans les expansions HS qui auraient été des SFBs si typés manuellement"
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_sfbs_avoided">
 								<dt
 									class="split-label"
 									style="font-size: 11px"
@@ -465,7 +458,7 @@
 								></dt>
 								<dd class="split-val">
 									<strong id="sfb_avoided" style="font-size: 11px; color: var(--kpi-hs-color)"
-										>0 évités</strong
+										>0</strong
 									>
 								</dd>
 							</div>
@@ -495,31 +488,19 @@
 							data-i18n="ui_typing.loading_ellipsis"
 						></p>
 						<dl class="stat-details-split" id="ergo_bigram_details" style="display: none">
-							<div
-								class="split-col"
-								title="Roulement intérieur : main vers le pouce (auriculaire vers index). Le plus confortable."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_inward_roll">
 								<dt class="split-label" data-i18n="ui_typing.lbl_roll_in"></dt>
 								<dd class="split-val"><strong id="ergo_roll_in_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Roulement extérieur : main vers le bord (index vers auriculaire)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_outward_roll">
 								<dt class="split-label" data-i18n="ui_typing.lbl_roll_out"></dt>
 								<dd class="split-val"><strong id="ergo_roll_out_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Lateral Stretch Bigrams : bigramme même main avec une extension latérale."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_lsb">
 								<dt class="split-label">LSB</dt>
 								<dd class="split-val"><strong id="ergo_lsb_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Ciseaux : changement de rangée inconfortable sur la même main."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_scissors">
 								<dt class="split-label" data-i18n="ui_typing.lbl_scissors"></dt>
 								<dd class="split-val"><strong id="ergo_scissor_pct">0%</strong></dd>
 							</div>
@@ -540,38 +521,26 @@
 								id="ergo_trigram_info"
 							></button>
 						</h2>
-						<p class="stat-value" id="ergo_trigram_val">0<span class="stat-unit">% Redir.</span></p>
+						<p class="stat-value" id="ergo_trigram_val">0<span class="stat-unit">%</span></p>
 						<p
 							class="stat-details"
 							id="ergo_trigram_loading"
 							data-i18n="ui_typing.loading_ellipsis"
 						></p>
 						<dl class="stat-details-split" id="ergo_trigram_details" style="display: none">
-							<div
-								class="split-col"
-								title="Same-Finger Skipgram : un SFB avec une touche d un autre doigt intercalée."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_sfs">
 								<dt class="split-label">SFS</dt>
 								<dd class="split-val"><strong id="ergo_sfs_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Same-Key Skipgram : ABA, la même touche en positions 1 et 3."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_sks">
 								<dt class="split-label">SKS</dt>
 								<dd class="split-val"><strong id="ergo_sks_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Redirection : trois touches même main avec un changement de direction."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_redirect">
 								<dt class="split-label" data-i18n="ui_typing.lbl_redir"></dt>
 								<dd class="split-val"><strong id="ergo_redir_pct">0%</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Mauvaise redirection : redirection sans que l index intervienne."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_bad_redirect">
 								<dt class="split-label" data-i18n="ui_typing.lbl_bad_redir"></dt>
 								<dd class="split-val"><strong id="ergo_bad_redir_pct">0%</strong></dd>
 							</div>
@@ -593,31 +562,19 @@
 						</p>
 						<p class="stat-details" id="errors_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="errors_details" style="display: none">
-							<div
-								class="split-col"
-								title="Total des bigrammes manuels qui ont été suivis d un backspace."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_error_bigrams">
 								<dt class="split-label" data-i18n="ui_typing.lbl_corrected_bigrams"></dt>
 								<dd class="split-val"><strong id="errors_total">0</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Bigramme qui se trompe le plus souvent (taux d erreur le plus élevé)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_worst_bigram">
 								<dt class="split-label" data-i18n="ui_typing.lbl_worst_bigram"></dt>
 								<dd class="split-val"><strong id="errors_worst">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Cascades : runs de ≥ 3 backspaces consécutifs, signalant une correction majeure (mot ou phrase entière effacée)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_cascades">
 								<dt class="split-label" data-i18n="ui_typing.lbl_cascades"></dt>
 								<dd class="split-val"><strong id="errors_cascades">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Délai moyen entre un backspace et la frappe suivante. Plus c\'est long, plus la correction interrompt votre flux."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_recovery">
 								<dt class="split-label" data-i18n="ui_typing.lbl_recovery_time"></dt>
 								<dd class="split-val"><strong id="errors_recovery">—</strong></dd>
 							</div>
@@ -639,23 +596,23 @@
 						</p>
 						<p class="stat-details" id="roi_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="roi_details" style="display: none">
-							<div class="split-col" title="Estimation du temps économisé.">
+							<div class="split-col" data-i18n-title="ui_typing.title_time_saved">
 								<dt class="split-label" data-i18n="ui_typing.lbl_time_saved"></dt>
 								<dd class="split-val"><strong id="roi_time_saved">—</strong></dd>
 							</div>
-							<div class="split-col" title="Caractères nets ajoutés par les hotstrings.">
+							<div class="split-col" data-i18n-title="ui_typing.title_via_hotstrings">
 								<dt class="split-label" data-i18n="ui_typing.lbl_via_hotstrings"></dt>
 								<dd class="split-val">
 									<strong id="roi_hs_saved" style="color: var(--kpi-hs-color)">0</strong>
 								</dd>
 							</div>
-							<div class="split-col" title="Caractères nets ajoutés par l IA.">
+							<div class="split-col" data-i18n-title="ui_typing.title_via_ai">
 								<dt class="split-label" data-i18n="ui_typing.lbl_via_ai"></dt>
 								<dd class="split-val">
 									<strong id="roi_llm_saved" style="color: var(--kpi-llm-color)">0</strong>
 								</dd>
 							</div>
-							<div class="split-col" title="Part des suggestions IA acceptées.">
+							<div class="split-col" data-i18n-title="ui_typing.title_ai_acceptance">
 								<dt class="split-label" data-i18n="ui_typing.lbl_ai_acceptance"></dt>
 								<dd class="split-val"><strong id="roi_llm_acc">—</strong></dd>
 							</div>
@@ -676,22 +633,19 @@
 						</p>
 						<p class="stat-details" id="lexical_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="lexical_details" style="display: none">
-							<div class="split-col" title="Nombre de mots distincts produits sur la période.">
+							<div class="split-col" data-i18n-title="ui_typing.title_unique_words">
 								<dt class="split-label" data-i18n="ui_typing.lbl_unique_words"></dt>
 								<dd class="split-val"><strong id="lexical_unique">0</strong></dd>
 							</div>
-							<div class="split-col" title="Nombre total de mots tapés (avec leurs répétitions).">
+							<div class="split-col" data-i18n-title="ui_typing.title_total_words">
 								<dt class="split-label" data-i18n="ui_typing.lbl_total_words"></dt>
 								<dd class="split-val"><strong id="lexical_total">0</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Longueur moyenne d un mot, pondérée par sa fréquence d utilisation."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_avg_word_length">
 								<dt class="split-label" data-i18n="ui_typing.lbl_avg_length"></dt>
 								<dd class="split-val"><strong id="lexical_avg_len">0</strong></dd>
 							</div>
-							<div class="split-col" title="Le mot le plus tapé sur la période.">
+							<div class="split-col" data-i18n-title="ui_typing.title_top_word">
 								<dt class="split-label" data-i18n="ui_typing.lbl_top_word"></dt>
 								<dd class="split-val"><strong id="lexical_top">—</strong></dd>
 							</div>
@@ -712,25 +666,19 @@
 						</p>
 						<p class="stat-details" id="rhythm_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="rhythm_details" style="display: none">
-							<div
-								class="split-col"
-								title="Plus longue rafale ininterrompue (gap < 1 s) sur la période."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_longest_burst">
 								<dt class="split-label" data-i18n="ui_typing.lbl_longest_burst"></dt>
 								<dd class="split-val"><strong id="rhythm_max_chars">—</strong></dd>
 							</div>
-							<div class="split-col" title="Nombre total de rafales finalisées sur la période.">
+							<div class="split-col" data-i18n-title="ui_typing.title_burst_count">
 								<dt class="split-label" data-i18n="ui_typing.lbl_total_bursts"></dt>
 								<dd class="split-val"><strong id="rhythm_count">—</strong></dd>
 							</div>
-							<div class="split-col" title="Délai inter-touches moyen pendant les rafales (en ms).">
+							<div class="split-col" data-i18n-title="ui_typing.title_burst_interval">
 								<dt class="split-label" data-i18n="ui_typing.lbl_avg_delay"></dt>
 								<dd class="split-val"><strong id="rhythm_mean_delay">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Coefficient de variation des délais inter-touches : écart-type ÷ moyenne. Plus c'est bas, plus le rythme est régulier."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_rhythm_cv">
 								<dt class="split-label" data-i18n="ui_typing.lbl_regularity"></dt>
 								<dd class="split-val"><strong id="rhythm_cv">—</strong></dd>
 							</div>
@@ -755,22 +703,19 @@
 							data-i18n="ui_typing.loading_ellipsis"
 						></p>
 						<dl class="stat-details-split" id="sessions_details" style="display: none">
-							<div
-								class="split-col"
-								title="Durée cumulée passée à taper réellement (somme des durées de chaque séance)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_active_time">
 								<dt class="split-label" data-i18n="ui_typing.lbl_total_active_time"></dt>
 								<dd class="split-val"><strong id="sessions_total_time">—</strong></dd>
 							</div>
-							<div class="split-col" title="Plus longue séance par durée (en minutes).">
+							<div class="split-col" data-i18n-title="ui_typing.title_longest_session_duration">
 								<dt class="split-label" data-i18n="ui_typing.lbl_longest_time"></dt>
 								<dd class="split-val"><strong id="sessions_longest_time">—</strong></dd>
 							</div>
-							<div class="split-col" title="Plus longue séance par nombre de caractères tapés.">
+							<div class="split-col" data-i18n-title="ui_typing.title_longest_session_chars">
 								<dt class="split-label" data-i18n="ui_typing.lbl_longest_chars"></dt>
 								<dd class="split-val"><strong id="sessions_longest_chars">—</strong></dd>
 							</div>
-							<div class="split-col" title="Durée moyenne d’une séance.">
+							<div class="split-col" data-i18n-title="ui_typing.title_avg_session">
 								<dt class="split-label" data-i18n="ui_typing.lbl_avg_duration"></dt>
 								<dd class="split-val"><strong id="sessions_avg_time">—</strong></dd>
 							</div>
@@ -790,25 +735,19 @@
 						</p>
 						<p class="stat-details" id="records_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="records_details" style="display: none">
-							<div
-								class="split-col"
-								title="Plus longue rafale ininterrompue (gap < 1 s) jamais enregistrée."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_record_burst">
 								<dt class="split-label" data-i18n="ui_typing.lbl_longest_burst"></dt>
 								<dd class="split-val"><strong id="records_burst_chars">—</strong></dd>
 							</div>
-							<div class="split-col" title="Plus longue séance par durée jamais enregistrée.">
+							<div class="split-col" data-i18n-title="ui_typing.title_record_session">
 								<dt class="split-label" data-i18n="ui_typing.lbl_longest_session"></dt>
 								<dd class="split-val"><strong id="records_session">—</strong></dd>
 							</div>
-							<div class="split-col" title="Journée avec le plus de caractères tapés.">
+							<div class="split-col" data-i18n-title="ui_typing.title_record_day">
 								<dt class="split-label" data-i18n="ui_typing.lbl_best_day"></dt>
 								<dd class="split-val"><strong id="records_best_day">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Plus longue suite de jours consécutifs avec au moins une frappe."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_record_streak">
 								<dt class="split-label" data-i18n="ui_typing.lbl_streak"></dt>
 								<dd class="split-val"><strong id="records_streak">—</strong></dd>
 							</div>
@@ -826,10 +765,7 @@
 						<p class="stat-value" id="charmix_val">—</p>
 						<p class="stat-details" id="charmix_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="charmix_details" style="display: none">
-							<div
-								class="split-col"
-								title="Lettres alphabétiques (latin de base + extensions courantes)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_chars_letters">
 								<dt
 									class="split-label"
 									style="color: rgb(96, 165, 250)"
@@ -837,7 +773,7 @@
 								></dt>
 								<dd class="split-val"><strong id="charmix_letter">—</strong></dd>
 							</div>
-							<div class="split-col" title="Chiffres 0–9.">
+							<div class="split-col" data-i18n-title="ui_typing.title_chars_digits">
 								<dt
 									class="split-label"
 									style="color: rgb(251, 191, 36)"
@@ -845,10 +781,7 @@
 								></dt>
 								<dd class="split-val"><strong id="charmix_digit">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Ponctuation et symboles courants (.,;:!? '&quot; ()[]{}&lt;&gt;=+*/\|-)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_chars_punct">
 								<dt
 									class="split-label"
 									style="color: rgb(248, 113, 113)"
@@ -856,7 +789,7 @@
 								></dt>
 								<dd class="split-val"><strong id="charmix_punct">—</strong></dd>
 							</div>
-							<div class="split-col" title="Espace, tabulation, retour à la ligne, NBSP, NNBSP.">
+							<div class="split-col" data-i18n-title="ui_typing.title_chars_spaces">
 								<dt
 									class="split-label"
 									style="color: var(--ekpi-roi-ink)"
@@ -864,10 +797,7 @@
 								></dt>
 								<dd class="split-val"><strong id="charmix_space">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Tout le reste : caractères non latins, marqueurs spéciaux ([BS], [F1]…), etc."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_chars_other">
 								<dt
 									class="split-label"
 									style="color: rgb(168, 162, 158)"
@@ -892,38 +822,23 @@
 						</p>
 						<p class="stat-details" id="apps_loading" data-i18n="ui_typing.loading_ellipsis"></p>
 						<dl class="stat-details-split" id="apps_details" style="display: none">
-							<div
-								class="split-col"
-								title="App où votre vitesse moyenne (CPM) est la plus élevée — où vous êtes le plus à l'aise."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_fastest_app">
 								<dt class="split-label" data-i18n="ui_typing.lbl_fastest_app"></dt>
 								<dd class="split-val"><strong id="apps_fastest">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="App qui concentre le plus de caractères tapés sur la période."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_top_app">
 								<dt class="split-label" data-i18n="ui_typing.lbl_top_app"></dt>
 								<dd class="split-val"><strong id="apps_top_volume">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Paire d’apps entre lesquelles vous alternez le plus — révèle le workflow type."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_app_pair">
 								<dt class="split-label" data-i18n="ui_typing.lbl_frequent_pair"></dt>
 								<dd class="split-val"><strong id="apps_top_pair">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Layouts clavier détectés sur la période (selon hs.keycodes.currentLayout au moment du flush). Format : layout (occurrences)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_layouts">
 								<dt class="split-label" data-i18n="ui_typing.lbl_layouts_used"></dt>
 								<dd class="split-val"><strong id="apps_layouts">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Modifieur dont la durée moyenne de maintien est la plus élevée. Un modifieur tenu très longtemps en moyenne signale un chord-typing lent ou un layer prolongé."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_longest_modifier">
 								<dt class="split-label" data-i18n="ui_typing.lbl_top_mod_held"></dt>
 								<dd class="split-val"><strong id="apps_top_mod_hold">—</strong></dd>
 							</div>
@@ -946,52 +861,31 @@
 							data-i18n="ui_typing.loading_ellipsis"
 						></p>
 						<dl class="stat-details-split" id="wellness_details" style="display: none">
-							<div
-								class="split-col"
-								title="Temps actif typing ÷ temps total où l'app était au foreground. 100% = vous tapez en continu, 20% = vous lisez beaucoup."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_active_ratio">
 								<dt class="split-label" data-i18n="ui_typing.lbl_active_ratio"></dt>
 								<dd class="split-val"><strong id="wellness_active_ratio">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Plus longue suite de touches frappées par le même doigt sans alternance. Au-delà de 4-5, le doigt accumule la fatigue."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_finger_streak">
 								<dt class="split-label" data-i18n="ui_typing.lbl_same_finger_streak"></dt>
 								<dd class="split-val"><strong id="wellness_finger_streak">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Plus longue suite sur la même main. Une bonne disposition vise à alterner les mains régulièrement."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_hand_streak">
 								<dt class="split-label" data-i18n="ui_typing.lbl_same_hand_streak"></dt>
 								<dd class="split-val"><strong id="wellness_hand_streak">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Nombre de séances dépassant 90 min sans pause de 5+ min. Au-delà, le risque ergonomique augmente sensiblement."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_long_sessions">
 								<dt class="split-label" data-i18n="ui_typing.lbl_long_sessions"></dt>
 								<dd class="split-val"><strong id="wellness_long_sessions">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Frappes considérées comme auto-repeat (touche maintenue, ex. flèche). Soustraites des compteurs effectifs car une seule décision motrice."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_autorepeat">
 								<dt class="split-label" data-i18n="ui_apps.h2_autorepeat"></dt>
 								<dd class="split-val"><strong id="wellness_autorepeat">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Latence moyenne entre l'activation d’une app et votre première frappe — proxy de votre temps de réflexion / réorientation au changement de contexte."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_focus_latency">
 								<dt class="split-label" data-i18n="ui_typing.lbl_focus_latency"></dt>
 								<dd class="split-val"><strong id="wellness_focus_latency">—</strong></dd>
 							</div>
-							<div
-								class="split-col"
-								title="Temps cumulé pendant lequel l'écran était verrouillé ou la machine en veille. Soustrait du temps d’app pour un ratio actif précis (et non gonflé par les pauses physiques)."
-							>
+							<div class="split-col" data-i18n-title="ui_typing.title_passive_time">
 								<dt class="split-label" data-i18n="ui_typing.lbl_passive_time"></dt>
 								<dd class="split-val"><strong id="wellness_passive_ms">—</strong></dd>
 							</div>
@@ -1244,7 +1138,7 @@
 										<input
 											type="text"
 											id="search_input"
-											placeholder="Rechercher…"
+											data-i18n-placeholder="ui_typing.search_placeholder"
 											onclick="event.stopPropagation()"
 											onkeyup="handle_search()"
 										/>
@@ -1396,7 +1290,6 @@
 				<input
 					type="text"
 					id="app_search"
-					placeholder="Rechercher une application..."
 					data-i18n-placeholder="ui_typing.modal_search_app"
 					onkeyup="render_app_list()"
 				/>
@@ -1421,7 +1314,6 @@
 			<input
 				type="text"
 				id="find_input"
-				placeholder="Rechercher…"
 				autocomplete="off"
 				data-i18n-placeholder="ui_typing.search_placeholder"
 			/>
@@ -1429,7 +1321,6 @@
 			<button
 				class="find-nav-btn"
 				onclick="find_in_page(false)"
-				title="Précédent (Maj+Entrée)"
 				data-i18n-title="ui_typing.search_prev"
 			>
 				&#8249;
@@ -1437,7 +1328,6 @@
 			<button
 				class="find-nav-btn"
 				onclick="find_in_page(true)"
-				title="Suivant (Entrée)"
 				data-i18n-title="ui_typing.search_next"
 			>
 				&#8250;
@@ -1445,7 +1335,6 @@
 			<button
 				class="find-close-btn"
 				onclick="close_find_bar()"
-				title="Fermer (Échap)"
 				data-i18n-title="ui_typing.search_close"
 			>
 				&#x2715;

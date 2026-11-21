@@ -2,7 +2,7 @@
 <html lang="fr">
 	<head>
 		<meta charset="UTF-8" />
-		<title>Temps sur les applications</title>
+		<title data-i18n="ui_apps.title"></title>
 		<script src="../vendor/chart.umd.js"></script>
 		<script src="../metrics_chart_values.js"></script>
 		<script src="../host_bridge.js"></script>
@@ -665,39 +665,20 @@
 							<tr>
 								<th data-i18n="ui_apps.col_app_name"></th>
 								<th data-i18n="ui_apps.col_category"></th>
+								<th data-i18n-title="ui_apps.tip_col_focus" data-i18n="ui_apps.col_focus"></th>
 								<th
-									title="Temps avec l’app au foreground (somme des durées de focus)."
-									data-i18n="ui_apps.col_focus"
-								></th>
-								<th
-									title="Part du temps focus passée à frapper activement (inter-touches sommés)."
+									data-i18n-title="ui_apps.tip_col_typing_pct"
 									data-i18n="ui_apps.col_typing_pct"
 								></th>
+								<th data-i18n-title="ui_apps.tip_col_density" data-i18n="ui_apps.col_density"></th>
 								<th
-									title="Caractères tapés ÷ minutes de focus. Densité de production texte par app."
-									data-i18n="ui_apps.col_density"
-								></th>
-								<th
-									title="Nombre de séances détectées dans cette app sur la période (gap inactif &lt; 5 min)."
+									data-i18n-title="ui_apps.tip_col_sessions"
 									data-i18n="ui_apps.col_sessions"
 								></th>
-								<th
-									title="Latence moyenne entre l’activation de l’app et votre première frappe — temps d’orientation."
-									data-i18n="ui_apps.col_latency"
-								></th>
-								<th
-									title="Caractères produits via hotstrings ÷ caractères totaux. Indique l’apport des raccourcis dans cette app."
-									data-i18n="ui_apps.col_hs_pct"
-								></th>
-								<th
-									title="Plus long enchaînement same-finger observé dans cette app — signal d’anti-alternance ergonomique."
-								>
-									SFB
-								</th>
-								<th
-									title="Durée moyenne d’appui sur les modifiers (Cmd / Shift / Option) dans cette app."
-									data-i18n="ui_apps.col_hold"
-								></th>
+								<th data-i18n-title="ui_apps.tip_col_latency" data-i18n="ui_apps.col_latency"></th>
+								<th data-i18n-title="ui_apps.tip_col_hs_pct" data-i18n="ui_apps.col_hs_pct"></th>
+								<th data-i18n-title="ui_apps.tip_col_sfb">SFB</th>
+								<th data-i18n-title="ui_apps.tip_col_hold" data-i18n="ui_apps.col_hold"></th>
 								<th data-i18n="ui_apps.col_top_dests"></th>
 							</tr>
 						</thead>
