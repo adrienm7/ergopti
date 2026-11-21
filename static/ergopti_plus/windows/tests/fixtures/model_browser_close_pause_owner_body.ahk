@@ -1009,7 +1009,7 @@ _MBPO_ConstructorFailure() {
 ; This retained private sidecar is diagnostic only. It survives forced child
 ; retirement, so an unfinished callback cannot erase the last native phase.
 _MBPO_VisibilityTrace(State, Phase) {
-	if State.Mode != "native-hide-reopen-close" || !State.HasOwnProp("PhasePath")
+	if !State.HasOwnProp("PhasePath")
 		return
 	try FileAppend(Phase . " active=" . State.Active . " shows=" . State.ShowCount
 		. " closes=" . State.CloseCalls . " tick=" . A_TickCount . "`n", State.PhasePath, "UTF-8-RAW")
@@ -1080,11 +1080,11 @@ _MBPO_VisibilityReentry() {
 		Mode: _MBPO.Mode, Reopened: false, ShowSeen: false, ShowCount: 0, VisibleAfterFirstShow: false, CloseCalls: 0, HiddenDuringClose: false,
 		ReopenCallbackActive: false, FirstShowReturned: false, RepairShowSeen: false,
 		SameAfterReopen: false, CriticalAtShow: -1, Failed: false, Failure: 0, Debt: false, TraceFailures: 0}
-	if State.Mode == "native-hide-reopen-close" {
-		State.PhasePath := A_Args[2] . "\visibility-phases.txt"
-		Creation := FSWriteCreateDurable(State.PhasePath, "visibility-phase-start`n")
-		_MBPO_Require((Creation is Integer) && Creation == 1, "The private diagnostic sidecar must be created exclusively")
-	}
+	; Every ordering mode keeps the sidecar: a native-show-current child once
+	; stalled past its parent's deadline on CI (2026-11-21) with no output at all.
+	State.PhasePath := A_Args[2] . "\visibility-phases.txt"
+	Creation := FSWriteCreateDurable(State.PhasePath, "visibility-phase-start`n")
+	_MBPO_Require((Creation is Integer) && Creation == 1, "The private diagnostic sidecar must be created exclusively")
 	try {
 		_MBPO_VisibilityTrace(State, "setup.before-build")
 		_MBPO_Require(!_LLM_MBW_WebView2Available(), "The native visibility subject must use the actual missing browser binding")
