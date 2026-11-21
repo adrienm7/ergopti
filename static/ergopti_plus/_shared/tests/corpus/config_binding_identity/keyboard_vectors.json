@@ -5,7 +5,7 @@
 		"super_shift_k",
 		"alt_shift_k",
 		"future_literal",
-		"magic_editor",
+		"meta_star",
 		"win_sc029",
 		"alt_sc029",
 		"ctrl_sc029",
@@ -34,7 +34,7 @@
 		},
 		{
 			"name": "current contextual owner",
-			"binding": "keyboard__magic_editor",
+			"binding": "keyboard__meta_star",
 			"expected": "current"
 		},
 		{
