@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Puntero del ratón resaltado",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (en pausa)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (falta el archivo del icono, reinstale Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (en pausa, falta el archivo del icono, reinstale Ergopti+)",
 	"app_category.business": "Negocios",
 	"app_category.development": "Herramientas de desarrollo",
 	"app_category.education": "Educación",

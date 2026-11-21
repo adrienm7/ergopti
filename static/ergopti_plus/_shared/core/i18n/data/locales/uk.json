@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Вказівник миші виділено",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (призупинено)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (немає файлу значка, перевстановіть Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (призупинено, немає файлу значка, перевстановіть Ergopti+)",
 	"app_category.business": "Бізнес",
 	"app_category.development": "Інструменти розробника",
 	"app_category.education": "Освіта",

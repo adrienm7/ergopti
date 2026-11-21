@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Muisaanwijzer gemarkeerd",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (gepauzeerd)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (pictogrambestand ontbreekt, installeer Ergopti+ opnieuw)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (gepauzeerd, pictogrambestand ontbreekt, installeer Ergopti+ opnieuw)",
 	"app_category.business": "Zakelijk",
 	"app_category.development": "Ontwikkelaarstools",
 	"app_category.education": "Onderwijs",

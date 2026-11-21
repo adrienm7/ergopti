@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Pointeur de la souris mis en évidence",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (en pause)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (fichier d’icône manquant, réinstallez Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (en pause, fichier d’icône manquant, réinstallez Ergopti+)",
 	"app_category.business": "Affaires",
 	"app_category.development": "Développement",
 	"app_category.education": "Éducation",

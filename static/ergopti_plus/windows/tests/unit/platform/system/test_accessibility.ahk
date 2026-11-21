@@ -314,6 +314,44 @@ _A11yT_FirstRunInertRowFollowsItsLocale() {
 Test("a11y tray: the first-run startup row follows the wizard's locale (tray-01-2026-11-20)",
 	_A11yT_FirstRunInertRowFollowsItsLocale)
 
+; A missing logo file is never drawn as the other state's logo: it is logged
+; once, the warning sign is drawn, and the tray text says so (TRAY-05).
+_A11yT_MissingLogoIsSaidNotSwapped() {
+	Paused := "Z:\tray-05\missing-" . A_TickCount . "\logo_simple_disabled.ico"
+	Present := Map(Paused, false)
+	Exists(Path) => Present.Get(Path, false) ? "A" : ""
+	Draws := [], Logs := []
+	SetIcon(File, Number := "", Freeze := "") {
+		Draws.Push([File, Number, Freeze])
+	}
+	Log(Path) {
+		Logs.Push(Path)
+	}
+	try {
+		AssertFalse(TrayApplyStateIcon(true, Paused, Exists, SetIcon, Log), "a missing logo is not reported as drawn")
+		AssertEqual(1, Draws.Length)
+		AssertEqual("user32.dll", Draws[1][1], "the warning sign is drawn, not the running logo")
+		AssertEqual(-101, Draws[1][2])
+		AssertEqual(true, Draws[1][3], "the paused icon stays frozen against AutoHotkey's own")
+		AssertEqual(1, Logs.Length, "the missing file is logged")
+		AssertEqual(Paused, Logs[1])
+		AssertEqual(t("accessibility.tray_tip_paused_icon_missing"), TrayStateTipText(true),
+			"the tray text says the paused logo is missing")
+		AssertEqual(t("accessibility.tray_tip"), TrayStateTipText(false), "the running state is not affected")
+		TrayApplyStateIcon(true, Paused, Exists, SetIcon, Log)
+		AssertEqual(1, Logs.Length, "a missing file is logged once, not at every pause")
+		Present[Paused] := true
+		AssertTrue(TrayApplyStateIcon(true, Paused, Exists, SetIcon, Log))
+		AssertEqual(Paused, Draws[Draws.Length][1], "a restored file is drawn again")
+		AssertEqual(t("accessibility.tray_tip_paused"), TrayStateTipText(true))
+	} finally {
+		Present[Paused] := true
+		TrayApplyStateIcon(true, Paused, Exists, SetIcon, Log)
+	}
+}
+Test("a11y tray: a missing logo file is said, not drawn as the other state (tray-05-2026-11-21)",
+	_A11yT_MissingLogoIsSaidNotSwapped)
+
 
 
 

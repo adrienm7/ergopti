@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Musepekeren er uthevet",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (satt på pause)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (ikonfil mangler, installer Ergopti+ på nytt)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (satt på pause, ikonfil mangler, installer Ergopti+ på nytt)",
 	"app_category.business": "Forretning",
 	"app_category.development": "Utvikling",
 	"app_category.education": "Utdanning",

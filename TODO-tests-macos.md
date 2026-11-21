@@ -254,3 +254,8 @@ Hands needed:
       the 2000 ms preset a one-second wait still undoes. 4. Another key between the expansion and the Backspace: a
       plain Backspace. 5. Option off in the Hotstrings parameters menu: Backspace never undoes; the free entry
       refuses 10 ms with an alert naming 50 to 10000.
+- [ ] <!-- field-point: tray_icon_missing --> Missing menu-bar logo (TRAY-05, 2026-11-21): in a copy of the app, move
+      `img/logo/logo_simple_disabled.png` away and start it: running, the usual logo; pause: the item shows « ⚠︎ »
+      instead of the logo, VoiceOver reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the
+      configured language, and the log holds one error naming the file, not one per pause; resume: the logo comes
+      back. Put the file back.

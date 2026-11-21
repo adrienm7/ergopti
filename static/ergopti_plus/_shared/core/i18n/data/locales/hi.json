@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "माउस पॉइंटर हाइलाइट किया गया",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (रोका गया)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (आइकन फ़ाइल गुम है, Ergopti+ फिर से इंस्टॉल करें)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (रोका गया, आइकन फ़ाइल गुम है, Ergopti+ फिर से इंस्टॉल करें)",
 	"app_category.business": "व्यवसाय",
 	"app_category.development": "विकास",
 	"app_category.education": "शिक्षा",

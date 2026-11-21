@@ -1790,16 +1790,15 @@ UpdateTrayIcon() {
 		; throw on a not-yet-built menu item. The icon swap below still happens.
 		if A_IsSuspended {
 				try A_TrayMenu.Check(MenuSuspend)
-				if FileExist(IconPathDisabled)
-						TraySetIcon(IconPathDisabled, , True)
+				TrayApplyStateIcon(true, IconPathDisabled)
 		}
 		else {
 				try A_TrayMenu.Uncheck(MenuSuspend)
-				if FileExist(IconPath)
-						TraySetIcon(IconPath)
+				TrayApplyStateIcon(false, IconPath)
 		}
 		; The icon tells the pause to the eye; the tooltip, which a screen
-		; reader reads as the icon's name, tells it in words.
+		; reader reads as the icon's name, tells it in words, and says when
+		; the state's logo file is missing (TRAY-05).
 		TrayPublishStateTip(A_IsSuspended)
 		MenuPopulation_Resume()
 }

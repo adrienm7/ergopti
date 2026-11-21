@@ -929,6 +929,12 @@
 			"title": "Backspace restore after an expansion: the magic key, a terminator, the window and the option",
 			"checks": [],
 			"not_testable": "The undo is a person's Backspace timed against an expansion in a real text field; the field run types no hotstring and presses no Backspace into an installed driver."
+		},
+		{
+			"id": "tray_icon_missing",
+			"title": "Missing menu-bar logo: the warning sign, its VoiceOver name and one logged error (TRAY-05)",
+			"checks": [],
+			"not_testable": "Needs a copy of the app with a logo file moved away, a pause and VoiceOver: the field run must not damage the installed app and reads no screen reader."
 		}
 	]
 }

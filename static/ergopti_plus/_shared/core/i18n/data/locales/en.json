@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Mouse pointer highlighted",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (paused)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (icon file missing, reinstall Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (paused, icon file missing, reinstall Ergopti+)",
 	"app_category.business": "Business",
 	"app_category.development": "Developer Tools",
 	"app_category.education": "Education",

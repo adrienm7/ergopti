@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Mauszeiger hervorgehoben",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (pausiert)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (Symboldatei fehlt, Ergopti+ neu installieren)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (pausiert, Symboldatei fehlt, Ergopti+ neu installieren)",
 	"app_category.business": "Geschäft",
 	"app_category.development": "Entwickler-Tools",
 	"app_category.education": "Bildung",

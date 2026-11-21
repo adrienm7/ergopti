@@ -143,6 +143,12 @@
 			"not_testable": "Needs a standalone install offered a newer release, a person who cancels and then closes the download window, and Orca: the field report never downloads or installs an update."
 		},
 		{
+			"id": "tray_icon_missing",
+			"title": "Missing tray logo: the warning sign, its Orca name and one logged error (TRAY-05)",
+			"checks": [],
+			"not_testable": "Needs a copy of the install with a logo file moved away, a panel and a screen reader: the field report must not damage the installed daemon and reads no screen reader."
+		},
+		{
 			"id": "input_policies",
 			"title": "Branch wave3/input-policies: sticky delay, CapsWord menu, one-shot Shift device",
 			"checks": [

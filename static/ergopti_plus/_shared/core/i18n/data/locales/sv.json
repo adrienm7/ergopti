@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Muspekaren är markerad",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (pausad)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (ikonfil saknas, installera om Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (pausad, ikonfil saknas, installera om Ergopti+)",
 	"app_category.business": "Företag",
 	"app_category.development": "Utveckling",
 	"app_category.education": "Utbildning",

@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "마우스 포인터 강조 표시됨",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (일시 중지됨)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (아이콘 파일 없음, Ergopti+를 다시 설치하세요)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (일시 중지됨, 아이콘 파일 없음, Ergopti+를 다시 설치하세요)",
 	"app_category.business": "비즈니스",
 	"app_category.development": "개발자 도구",
 	"app_category.education": "교육",

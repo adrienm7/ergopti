@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "已突出显示鼠标指针",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+（已暂停）",
+	"accessibility.tray_tip_icon_missing": "Ergopti+（图标文件缺失，请重新安装 Ergopti+）",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+（已暂停，图标文件缺失，请重新安装 Ergopti+）",
 	"app_category.business": "商务",
 	"app_category.development": "开发工具",
 	"app_category.education": "教育",

@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- Every case installs its own indicator double; the module end puts the real
 -- entries back so no later module meets the double.
 local restore_loaded = helpers.keep_loaded({ "tray.adapters.appindicator", "tray.adapters.menu",
-	"core.i18n.engine.i18n" })
+	"core.i18n.engine.i18n", "tray.protocol", "core.logger.engine.shim" })
 
 --- Installs a stand-in indicator and loads the adapter over it.
 --- @param available boolean Whether the machine can host a tray.
@@ -305,6 +305,69 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		helpers.assert_true(ok, tostring(icon))
 		helpers.assert_eq(icon, Paths.shared("tray/data/ergopti_tray.png"),
 			"the icon is the shared root's own path to the logo")
+	end)
+
+end)
+
+
+helpers.describe("tray_menu: a missing logo file is said, not swapped (tray-05)", function()
+
+	helpers.it("a missing paused logo never resolves to the running one", function()
+		local luv = require("luv")
+		local root = os.tmpname()
+		os.remove(root)
+		assert(luv.fs_mkdir(root, 448))
+		assert(luv.fs_mkdir(root .. "/tray", 448))
+		assert(luv.fs_mkdir(root .. "/tray/data", 448))
+		local running = root .. "/tray/data/ergopti_tray.png"
+		local handle = assert(io.open(running, "wb"))
+		handle:write("\137PNG\r\n\26\n")
+		handle:close()
+		local Protocol = helpers.load_module("tray.protocol")
+		local paused_icon, paused_missing = Protocol.resolve_tray_icon(root, true)
+		local running_icon, running_missing = Protocol.resolve_tray_icon(root, false)
+		os.remove(running)
+		luv.fs_rmdir(root .. "/tray/data")
+		luv.fs_rmdir(root .. "/tray")
+		luv.fs_rmdir(root)
+		helpers.assert_eq(paused_icon, "", "a paused daemon drawn with the running logo looks running")
+		helpers.assert_eq(paused_missing, root .. "/tray/data/ergopti_tray_paused.png",
+			"the missing file is named for the log")
+		helpers.assert_eq(running_icon, running)
+		helpers.assert_eq(running_missing, nil)
+	end)
+
+	helpers.it("draws the warning sign, logs the file once and says so", function()
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		package.loaded["core.logger.engine.shim"] = logger
+		local missing = "/usr/lib/ergopti/_shared/tray/data/ergopti_tray_paused.png"
+		package.loaded["tray.protocol"] = {
+			resolve_tray_icon = function(_, paused)
+				if paused then return "", missing end
+				return "/usr/lib/ergopti/_shared/tray/data/ergopti_tray.png", nil
+			end,
+		}
+		package.loaded["core.i18n.engine.i18n"] = {
+			has = function() return true end,
+			get = function(key) return "<" .. key .. ">" end,
+		}
+		local tray, log = with_indicator(true)
+		tray.setMenu({})
+		tray.setPaused(true)
+		helpers.assert_eq(log.icons[#log.icons], "dialog-warning",
+			"the warning sign, not the running logo and not a keyboard glyph")
+		helpers.assert_eq(log.descriptions[#log.icons], "<accessibility.tray_tip_paused_icon_missing>",
+			"a screen reader hears that the paused logo is missing")
+		helpers.assert_eq(#errors, 1, "the missing file is logged")
+		helpers.assert_contains(errors[1], missing)
+		tray.setPaused(false)
+		tray.setPaused(true)
+		helpers.assert_eq(#errors, 1, "once, not at every pause")
+		tray.setPaused(false)
+		helpers.assert_eq(log.descriptions[#log.icons], "<accessibility.tray_tip>",
+			"the running state, whose logo exists, is named as usual")
 	end)
 
 end)

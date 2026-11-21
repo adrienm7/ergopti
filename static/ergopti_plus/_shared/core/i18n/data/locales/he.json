@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "סמן העכבר מודגש",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (מושהה)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (קובץ הסמל חסר, התקינו מחדש את Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (מושהה, קובץ הסמל חסר, התקינו מחדש את Ergopti+)",
 	"app_category.business": "עסקים",
 	"app_category.development": "פיתוח",
 	"app_category.education": "חינוך",

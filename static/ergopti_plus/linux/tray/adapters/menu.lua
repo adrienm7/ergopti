@@ -52,10 +52,12 @@ local LOG = "tray.adapters.menu"
 -- sessions. Stable on purpose: a generated one makes the icon jump every start.
 local INDICATOR_ID = "ergopti-plus"
 
--- Fallback icon name from the freedesktop theme. Used until an installed icon
--- exists — a themed name always resolves to something, where a missing file
--- resolves to a blank space the user cannot click.
-local FALLBACK_ICON = "input-keyboard"
+-- The freedesktop themed icon drawn when a state's logo file is missing. A
+-- themed name always resolves to something, where a missing file resolves to
+-- a blank space the user cannot click; the warning sign, unlike the keyboard
+-- glyph drawn before, says that something is wrong, and the description says
+-- what (TRAY-05).
+local MISSING_ICON = "dialog-warning"
 
 
 
@@ -87,6 +89,11 @@ local _paused = false
 -- a locale change relabels it without re-sending an unchanged one.
 local _description = nil
 
+-- Whether the logo file of the state last resolved is missing, so the
+-- description says so, and the missing files already logged, each once.
+local _icon_missing = false
+local _missing_reported = {}
+
 
 
 
@@ -96,29 +103,40 @@ local _description = nil
 -- =========================================
 -- =========================================
 
---- Resolves the icon to show: the bundled Ergopti logo if it is installed, else
---- a themed name. Never "" — an empty icon is an invisible, unclickable tray
---- entry, which is what the previous implementation produced on every machine.
+--- Resolves the icon to show: the bundled logo of the state, else the themed
+--- warning sign, logged once per missing file. Never "" — an empty icon is an
+--- invisible, unclickable tray entry, which is what the previous implementation
+--- produced on every machine — and never the other state's logo.
 --- @param paused boolean|nil True for the greyed logo.
 --- @return string
 local function resolve_icon(paused)
-	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
-	if ok_paths and type(Paths.shared_root) == "function" then
-		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), paused)
-		if ok and type(icon) == "string" and icon ~= "" then return icon end
+	local Paths = require("core.fs.engine.paths")
+	local icon, missing = Protocol.resolve_tray_icon(Paths.shared_root(), paused)
+	_icon_missing = icon == ""
+	if not _icon_missing then return icon end
+	missing = missing or "(no shared tree)"
+	if not _missing_reported[missing] then
+		_missing_reported[missing] = true
+		Logger.error(LOG, "Tray icon file %s is missing; the themed '%s' sign is drawn instead. Reinstall Ergopti+.",
+			missing, MISSING_ICON)
 	end
-	Logger.warn(LOG, "Bundled tray logo not found — showing the themed '%s' icon.", FALLBACK_ICON)
-	return FALLBACK_ICON
+	return MISSING_ICON
 end
 
 --- The icon's accessible description: the only place the paused state is
---- said in words, since a screen reader cannot see the greyed logo. "" while
---- the locale catalogue is not loaded yet (get() would answer the key itself);
---- the next menu build fills it.
+--- said in words, since a screen reader cannot see the greyed logo, and the
+--- place that says the logo file is missing. "" while the locale catalogue is
+--- not loaded yet (get() would answer the key itself); the next menu build
+--- fills it.
 --- @param paused boolean
 --- @return string
 local function describe(paused)
-	local key = paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip"
+	local key
+	if _icon_missing then
+		key = paused and "accessibility.tray_tip_paused_icon_missing" or "accessibility.tray_tip_icon_missing"
+	else
+		key = paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip"
+	end
 	if I18n.has(key) ~= true then return "" end
 	return I18n.get(key)
 end
@@ -126,8 +144,9 @@ end
 --- Sends the icon with its description.
 --- @param icon string|nil An explicit icon, else the state's logo.
 local function send_icon(icon)
+	local shown = icon or resolve_icon(_paused)
 	_description = describe(_paused)
-	Indicator.set_icon(icon or resolve_icon(_paused), _description)
+	Indicator.set_icon(shown, _description)
 end
 
 --- Creates the tray icon if it does not exist yet.
@@ -138,8 +157,9 @@ local function ensure_started()
 		_backend = nil
 		return false
 	end
+	local icon = resolve_icon(_paused)
 	local description = describe(_paused)
-	if not Indicator.create(INDICATOR_ID, resolve_icon(_paused), "Ergopti+", description) then
+	if not Indicator.create(INDICATOR_ID, icon, "Ergopti+", description) then
 		return false
 	end
 	_description = description

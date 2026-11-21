@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Musemarkøren er fremhævet",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (sat på pause)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (ikonfil mangler, geninstaller Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (sat på pause, ikonfil mangler, geninstaller Ergopti+)",
 	"app_category.business": "Forretning",
 	"app_category.development": "Udvikling",
 	"app_category.education": "Uddannelse",

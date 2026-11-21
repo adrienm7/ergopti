@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "マウスポインターを強調表示しました",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+（一時停止中）",
+	"accessibility.tray_tip_icon_missing": "Ergopti+（アイコンファイルがありません。Ergopti+ を再インストールしてください）",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+（一時停止中。アイコンファイルがありません。Ergopti+ を再インストールしてください）",
 	"app_category.business": "ビジネス",
 	"app_category.development": "開発者ツール",
 	"app_category.education": "教育",

@@ -36,7 +36,8 @@ local MenuState     = require("menu.ui.builder.state")
 local WrapMutation  = require("menu.engine.wrap_mutation")
 local MenuWatchers  = require("menu.ui.builder.watchers")
 local TrayMenu      = require("tray.adapters.menu")
-local Storage       = require("core.fs.adapters.storage")
+local MenubarLogo   = require("menu.ui.menubar_logo")
+local Storage      = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
@@ -308,6 +309,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- below the closure would bind the nil global instead.
 	local _last_icon_key = nil
 	local _unknown_icon_reported = false
+	-- Logo files already reported missing or unreadable, each logged once.
+	local _missing_logos_reported = {}
 
 
 	local function update_icon(custom_text)
@@ -335,8 +338,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- once from the listener and once from the menu refresh that follows.
 		-- The icon depends on exactly two inputs; when neither moved there is
 		-- nothing to redraw.
-		-- The tooltip names the item for VoiceOver, paused or not.
-		local tooltip = i18n.get(paused and "accessibility.tray_tip_paused" or "accessibility.tray_tip")
+		-- The shared logo directory lives at static/img/logo (two levels up from
+		-- static/ergopti_plus/macos, where base_dir points). Each state draws its
+		-- own file: a missing one is never drawn as the other state (TRAY-05).
+		local logo_path, missing_logo = MenubarLogo.choose(base_dir .. "../../img/logo/", variant, paused,
+			MenubarLogo.file_exists)
+
+		-- The tooltip names the item for VoiceOver, paused or not, and says
+		-- when the logo file is missing.
+		local tooltip = i18n.get(MenubarLogo.tooltip_key(paused, missing_logo ~= nil))
 		local icon_key = tostring(variant) .. "|" .. tostring(paused) .. "|" .. tostring(tooltip)
 		if custom_text == nil and icon_key == _last_icon_key then return end
 		_last_icon_key = (custom_text == nil) and icon_key or nil
@@ -345,24 +355,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			Logger.error(LOG, "Menu-bar tooltip could not be set: %s.", tostring(tip_err))
 		end
 
-		-- The shared logo directory lives at static/img/logo (two levels up from
-		-- static/ergopti_plus/macos, where base_dir points)
-		local logo_dir = base_dir .. "../../img/logo/"
-		local logo_file
-		if variant == "v1" then
-			-- A dedicated disabled simple logo may not yet exist — fall back to logo_simple.png
-			if paused then
-				local disabled_path = logo_dir .. "logo_simple_disabled.png"
-				local f = io.open(disabled_path, "r")
-				if f then f:close(); logo_file = "logo_simple_disabled.png" else logo_file = "logo_simple.png" end
-			else
-				logo_file = "logo_simple.png"
+		local ok_img, ico = false, nil
+		if missing_logo then
+			if not _missing_logos_reported[missing_logo] then
+				_missing_logos_reported[missing_logo] = true
+				Logger.error(LOG, "Menu-bar logo '%s' is missing; the warning sign is drawn instead. Reinstall Ergopti+.",
+					missing_logo)
 			end
 		else
-			logo_file = paused and "logo_black.png" or "logo_white.png"
+			ok_img, ico = pcall(hs.image.imageFromPath, logo_path)
+			if not (ok_img and ico) and not _missing_logos_reported[logo_path] then
+				_missing_logos_reported[logo_path] = true
+				Logger.error(LOG, "Menu-bar logo '%s' could not be decoded; the warning sign is drawn instead: %s.",
+					logo_path, tostring(ico))
+			end
 		end
-
-		local ok_img, ico = pcall(hs.image.imageFromPath, logo_dir .. logo_file)
 
 		pcall(function() myMenu:setTitle(custom_text and (" " .. tostring(custom_text)) or "") end)
 
@@ -405,12 +412,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- Ensure title is cleared when no custom text provided.
 			if not custom_text then pcall(function() myMenu:setTitle("") end) end
 		else
-			-- If no image available, ensure we explicitly clear any previous icon
-			-- and set the default title when no custom text is present.
-			if not custom_text then
-				pcall(function() myMenu:setIcon(nil) end)
-				pcall(function() myMenu:setTitle("🔧") end)
-			end
+			-- No logo: clear the previous one, which may be the other state's,
+			-- and draw the warning sign; the tooltip says the file is missing.
+			pcall(function() myMenu:setIcon(nil) end)
+			pcall(function()
+				myMenu:setTitle(MenubarLogo.MISSING_TITLE .. (custom_text and (" " .. tostring(custom_text)) or ""))
+			end)
 		end
 	end
 

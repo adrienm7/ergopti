@@ -68,6 +68,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       menu still offers the update (UPD-08: it does not today). Click Update again and close the download window
       while it downloads: note whether the release installs once downloaded (UPD-05: the log says « native install
       refused » today) and whether the bar ever moves from 0 % (UPD-07).
+- [ ] <!-- field-point: tray_icon_missing --> Missing tray logo (TRAY-05, 2026-11-21): on a desktop with a tray host,
+      in a copy of the install, move `_shared/tray/data/ergopti_tray_paused.png` away and start the daemon with
+      `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca
+      reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the configured language, and the log
+      holds one error naming the file, not one per pause; resume: the logo comes back. Put the file back.
 - [ ] <!-- field-point: input_policies --> Input policies: with the Bépo registry layout installed, monnaie then
       cédille types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row
       changes the one-shot wait; a CapsWord menu change applies to the running session; native one-shot Shift

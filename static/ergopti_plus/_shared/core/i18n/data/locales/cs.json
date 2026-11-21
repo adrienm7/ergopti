@@ -5,6 +5,8 @@
 	"accessibility.spotlight_shown": "Ukazatel myši zvýrazněn",
 	"accessibility.tray_tip": "Ergopti+",
 	"accessibility.tray_tip_paused": "Ergopti+ (pozastaveno)",
+	"accessibility.tray_tip_icon_missing": "Ergopti+ (chybí soubor ikony, přeinstalujte Ergopti+)",
+	"accessibility.tray_tip_paused_icon_missing": "Ergopti+ (pozastaveno, chybí soubor ikony, přeinstalujte Ergopti+)",
 	"app_category.business": "Práce",
 	"app_category.development": "Vývojářské nástroje",
 	"app_category.education": "Vzdělávání",

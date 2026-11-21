@@ -41,11 +41,13 @@ local ICONS = {
 	paused = "/tray/data/ergopti_tray_paused.png",
 }
 
---- Finds the bundled tray icon.
+--- Finds the bundled tray icon of a pause state.
 ---
---- Returns "" when there is none, and the CALLER must treat that as "use a
---- themed name" rather than as an icon. An empty icon name produces a blank,
---- unclickable space in the panel.
+--- Returns "" when the state's file is missing, and the CALLER must say so
+--- (log it, draw a warning sign) rather than use "" as an icon: an empty icon
+--- name produces a blank, unclickable space in the panel. A missing paused logo
+--- used to resolve to the running one, so a damaged install showed a paused
+--- daemon as running without a word (TRAY-05); each state now has only its own.
 ---
 --- Resolved from the SHARED root, not from the driver root. The candidates used
 --- to be "<driver root>/../_shared/tray/data/…", which is wrong on the system
@@ -59,19 +61,16 @@ local ICONS = {
 --- host opens forward slashes, and the panel receiving the path is on Linux.
 --- @param shared_root string|nil Absolute path to the shared tree.
 --- @param paused boolean|nil True for the greyed logo shown while paused.
---- @return string Absolute path to an existing icon file, or "".
+--- @return string path Absolute path to the state's existing icon file, or "".
+--- @return string|nil missing The state's absent file, nil when it exists or
+---   when there is no shared tree to look in.
 function M.resolve_tray_icon(shared_root, paused)
-	if type(shared_root) ~= "string" or shared_root == "" then return "" end
-	local order = paused and { ICONS.paused, ICONS.active } or { ICONS.active }
-	for _, suffix in ipairs(order) do
-		local path = shared_root .. suffix
-		local fh = io.open(path, "r")
-		if fh then
-			fh:close()
-			return path
-		end
-	end
-	return ""
+	if type(shared_root) ~= "string" or shared_root == "" then return "", nil end
+	local path = shared_root .. (paused and ICONS.paused or ICONS.active)
+	local fh = io.open(path, "r")
+	if fh == nil then return "", path end
+	fh:close()
+	return path, nil
 end
 
 return M
