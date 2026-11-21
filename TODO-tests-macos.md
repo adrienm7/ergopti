@@ -44,6 +44,12 @@ terminal): coverage table, verdicts and what no run can test in
       and Escape closes the window. Then on a network whose proxy refuses api.github.com (or with a dead proxy set in
       System Settings), check again and note the sentence: « Could not reach GitHub » today, where Windows names the
       proxy (UPD-06).
+- [ ] <!-- field-point: layout_tool_pages --> **Layout manager and Ergopti Studio (LTP-02, LTP-06, LTP-07,
+      2026-11-21):** with VoiceOver on and the interface in English, open Layout > « Install or remove layouts… »:
+      VoiceOver reads the window in English, not with a French voice, and so does Ergopti Studio. Tab to « Use » or
+      « Update » on a layout already installed and press Space: after the answer the focus is still on that row (its
+      button, or its name while the operation runs), never back at the top of the window. Escape closes the layout
+      manager. Do not install or remove a layout you need.
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in

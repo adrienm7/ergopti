@@ -23,6 +23,13 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 
 ### Layouts and Ergopti Studio
 
+- [ ] Layout tool pages (LTP-01 to LTP-07, 2026-11-21), Narrator on, interface in English and the Configuration
+      menu's reading font set to Atkinson Hyperlegible: « Install or remove layouts… » shows that font and Narrator
+      reads it in English (LTP-01, LTP-02), as Ergopti Studio. Tab to « Use » or « Update » on an installed layout
+      and press Space: after the answer the focus is still on that row; Escape closes the window (LTP-06, LTP-07).
+      Pause the driver, open Ergopti Studio: the editor shows the last source, « Save » and « Emulate without
+      installing » answer at once, and the emulation types only after the resume (LTP-03). Do not install or remove
+      a layout you need.
 - [ ] **Layout editor's Windows installer (2026-11-15):** from the Studio (site or app), « Format » « Windows
       installer (.zip) » then « Download » on Ergopti, unzip, run `kbdergop-setup.exe` as administrator: the layout is
       listed and types as with the tool's own installer; edit `layout.ini` (a space, an extra key or line) and run it

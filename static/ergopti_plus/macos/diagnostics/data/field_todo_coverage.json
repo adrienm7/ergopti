@@ -817,6 +817,12 @@
 			"not_testable": "Needs a person with VoiceOver at the Updates window, and a network whose proxy or firewall refuses api.github.com: the field report neither listens to VoiceOver nor changes the network."
 		},
 		{
+			"id": "layout_tool_pages",
+			"title": "Layout manager and Studio: VoiceOver language, focus after Install, Escape (LTP-02, LTP-06, LTP-07)",
+			"checks": [],
+			"not_testable": "Needs a person with VoiceOver in the layout manager and Ergopti Studio, in a locale other than French: the field report neither listens to VoiceOver nor installs a layout."
+		},
+		{
 			"id": "metrics_views",
 			"title": "Metrics dashboards: the range status read by VoiceOver and numbers in the interface language (MET-06, MET-07)",
 			"checks": [],

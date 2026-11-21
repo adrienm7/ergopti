@@ -72,6 +72,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       while it downloads: note whether the release installs once downloaded (UPD-05: the log says « native install
       refused » today) and whether the bar ever moves from 0 % (UPD-07).
 - [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, MET-09, MET-10, MET-12, 2026-11-21), Orca on, interface in
+- [ ] <!-- field-point: layout_tool_pages --> Layout manager and Ergopti Studio (LTP-02, LTP-06, LTP-07,
+      2026-11-21), Orca on, interface in English: Layout > « Install or remove layouts… » and Ergopti Studio are read
+      in English, not with a French voice. Tab to « Use » or « Update » on a layout already installed and press
+      Space: after the answer the focus is still on that row (its button, or its name while the operation runs).
+      Escape closes the layout manager. Do not install or remove a layout you need.
+- [ ] <!-- field-point: metrics_views --> Metrics dashboards (MET-04 to MET-07, 2026-11-21), Orca on, interface in
       English: in the typing dashboard change the dates: Orca reads « Reading the selected period… » and the loader
       says the same; with `db.sqlite` made unreadable (`chmod 000`, then put it back) a new date range says at once
       that it could not be read instead of spinning for 2 min (MET-05, MET-06). Numbers read `12,345` and `1.2M`
