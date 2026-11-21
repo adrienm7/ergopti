@@ -146,9 +146,17 @@ helpers.describe("configured Linux ordered pair ownership", function()
 		package.loaded["ai.engine.prediction.engine"] = previous
 		if not ok then error(err, 0) end
 	end)
-	helpers.it("refuses a cross-keyboard pair and a duplicate-code source collision", function()
+	-- KCD-7 (maintainer decision of 2026-11-21): a pair across two keyboards
+	-- runs, as on Windows and macOS.
+	helpers.it("(kcd-7) admits a pair whose second key comes from another keyboard", function()
 		local state = make(); process(state,58,1,0)
-		local _,action,_,frame = process(state,15,1,10,origin(7,"other-keyboard")); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
+		local _,action,_,frame = process(state,15,1,10,origin(7,"other-keyboard"))
+		helpers.assert_true(frame ~= nil, "the key struck on the other keyboard is taken by the pair")
+		helpers.assert_eq(action,nil,"the pair has a hold: it decides at release, as on one keyboard")
+		helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("refuses a duplicate-code source collision", function()
+		local state = make(); process(state,58,1,0)
 		helpers.assert_eq(rows(process(state,58,1,20,origin(7,"other-keyboard"))),"")
 		helpers.assert_eq(rows(process(state,58,0,30,origin(7,"other-keyboard"))),"")
 		helpers.assert_true(state.base.held[58] ~= nil)
@@ -1474,12 +1482,14 @@ helpers.describe("same-device third slot through original production consumers (
 			helpers.assert_eq(native_rows(s),"29:1 29:0 28:1 28:0")
 		end)
 	end)
-	helpers.it("does not steal a matching second from a different original device",function()
+	-- KCD-7 (maintainer decision of 2026-11-21): a chord across two keyboards
+	-- runs, as on Windows and macOS.
+	helpers.it("(kcd-7) a chord takes its second key from a different original device",function()
 		with_chord({},function(s)
 			s.edge("a",58,1,1000);s.edge("b",15,1,1010)
-			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 15:1")
+			helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+			helpers.assert_true(not native_rows(s):find("15:1",1,true),"the second key never reaches the application")
 			s.edge("b",15,0,1011);s.edge("a",58,0,1200)
-			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
 		end)
 	end)
 	for _,field in ipairs({"symmetric", "simultaneous_threshold_ms"}) do

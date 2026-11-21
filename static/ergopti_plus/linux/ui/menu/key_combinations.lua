@@ -59,7 +59,7 @@ function M.build(ctx,ui)
 	end
 	local editable = snapshot() ~= nil
 	local function action_label(action)
-		if action==Shared.NONE then return t(PairRows.EMPTY_ACTION_KEY) end
+		if action==Shared.NONE then return t("dialog.action_picker.disabled") end
 		return ui.action_label(action,actions)
 	end
 	local function hold_option(value)
