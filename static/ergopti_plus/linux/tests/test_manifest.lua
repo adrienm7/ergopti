@@ -677,6 +677,7 @@ return {
 	"tests.unit.hotstrings.engine.catalogue.test_rolls_left_arrow",
 	"tests.unit.hotstrings.engine.injector.test_output_transaction",
 	"tests.unit.hotstrings.engine.dynamic.test_personal_info_combo_resolver",
+	"tests.unit.hotstrings.engine.dynamic.test_personal_tag_case",
 	"tests.unit.hotstrings.engine.engine.test_prefix_expansions",
 	"tests.unit.hotstrings.engine.engine.test_priority_override_collision",
 	"tests.unit.hotstrings.engine.engine.test_priority_publication",

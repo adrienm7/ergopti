@@ -31,6 +31,11 @@ local TomlCodec = require("core.text.engine.toml_codec.codec")
 local UnicodeCase = require("core.text.engine.unicode_case")
 local NamedTags   = require("hotstrings.engine.personal_info.tags")
 
+-- The dynamic family section the @-tags belong to: their expansion delay is the
+-- dynamic category's, as on Linux and Windows (maintainer decision HCD-4,
+-- 2026-11-21). The shared name the Linux manager reads too.
+local PERSONAL_SECTION = NamedTags.SECTION
+
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
 -- shipped without the shared tree still expands correctly — the provider then
@@ -538,7 +543,9 @@ local function resolve_combo(combo)
 		end
 		local value  = key and _info[key] or nil
 		if type(value) ~= "string" or value == "" then return {}, {} end
-		table.insert(parts, value)
+		-- The letter's typed case sets its field's case (HCD-5): « @Np » types
+		-- « NOM Prénom ».
+		table.insert(parts, NamedTags.cased_value(letter, value))
 		table.insert(fields, key)
 	end
 	return parts, fields
@@ -837,7 +844,18 @@ local function interceptor(event, _km_buffer, ctx)
 				
 				_state = STATE_IDLE
 				_combo = ""
-				
+
+				-- The magic key must follow the tag within the dynamic category's
+				-- delay (HCD-4); an expired tag fires nothing and the key goes on.
+				if not _keymap or type(_keymap.dynamic_rule_within_delay) ~= "function" then
+					Logger.error(LOG, "keymap.dynamic_rule_within_delay is missing — @-tag refused.")
+					return nil
+				end
+				if not _keymap.dynamic_rule_within_delay(PERSONAL_SECTION, ctx and ctx.elapsed) then
+					Logger.debug(LOG, "@-tag expired before the magic key (content withheld).")
+					return nil
+				end
+
 				if do_expand(combo) then return "consume" end
 				return nil
 			end

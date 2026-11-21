@@ -54,6 +54,7 @@ local function drive_real_expansion()
 	local interceptor
 	local fake_km = {
 		register_interceptor      = function(fn) interceptor = fn end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function() end,
 		inject_dynamic = function(n_back, result_text, emit_action, variant)
 			captured.n_back      = n_back

@@ -40,6 +40,7 @@ local function with_subject(content, run)
 		local keymap = {
 			get_trigger_char = function() return '@' end,
 			register_interceptor = function() state.registrations = state.registrations + 1 end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function() state.registrations = state.registrations + 1 end,
 			invalidate_hotstring_preview = function() return true end,
 		}

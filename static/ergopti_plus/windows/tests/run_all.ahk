@@ -550,6 +550,7 @@ InstallSendNoOps()
 ; and reads only globals, so the tests drive the REAL function against fixture
 ; personal-info maps rather than asserting on its source.
 #Include unit/hotstrings/engine/personal/test_info_combo_resolver.ahk
+#Include unit/hotstrings/engine/personal/test_personal_tag_case.ahk
 #Include unit/settings/engine/persistence/test_master_gates.ahk
 #Include unit/hotstrings/engine/engine/test_domain_registry.ahk
 #Include unit/hotstrings/engine/engine/test_domain_expander.ahk

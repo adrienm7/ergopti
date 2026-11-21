@@ -123,8 +123,9 @@ helpers.describe("personal_info @-combo: all or nothing", function()
 		local function resolved(combo)
 			return table.concat(PersonalInfo._resolve_combo_for_test(INFO, aliases, combo), "|")
 		end
-		helpers.assert_eq(resolved("İi"), "Marie|Dupont", "dotted capital I remains its exact scalar")
-		helpers.assert_eq(resolved("ẞs"), "Marie|Dupont", "sharp S's uppercase expansion is not two aliases")
+		helpers.assert_eq(resolved("İi"), "MARIE|Dupont",
+			"dotted capital I remains its exact scalar; typed upper, it types capitals (HCD-5)")
+		helpers.assert_eq(resolved("ẞs"), "MARIE|Dupont", "sharp S's uppercase expansion is not two aliases")
 		helpers.assert_eq(resolved("i\u{0307}"), "", "a decomposed spelling is not normalized")
 	end)
 
@@ -133,7 +134,7 @@ helpers.describe("personal_info @-combo: all or nothing", function()
 		local function resolved(combo)
 			return table.concat(PersonalInfo._resolve_combo_for_test(INFO, aliases, combo), "|")
 		end
-		helpers.assert_eq(resolved("Σk"), "Marie|Dupont")
+		helpers.assert_eq(resolved("Σk"), "MARIE|Dupont", "an upper letter types capitals (HCD-5)")
 		aliases["σ"] = "last_name"
 		helpers.assert_eq(resolved("Σk"), "", "two sigma mappings must not select an arbitrary field")
 	end)

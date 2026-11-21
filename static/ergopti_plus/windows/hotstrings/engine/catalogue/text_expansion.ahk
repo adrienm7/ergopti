@@ -91,10 +91,12 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			; out of the debug fire-trace. Without it the expansion is recorded
 			; verbatim, twice per row, into a log that is replicated to every other
 			; device and kept for fourteen days.
+			; TimeActivationSeconds: the dynamic category's delay gates every @-tag,
+			; as on macOS and Linux (maintainer decision HCD-4, 2026-11-21).
 			InfoTagValue := PersonalInformation[InfoTagField]
 			CreateHotstring("*", "@" . InfoTag . ScriptInformation["MagicKey"],
 				InfoTagValue, Map("FinalResult", True).Set("IsPrivate", True)
-					.Set("Category", "personal")
+					.Set("Category", "personal").Set("TimeActivationSeconds", _DynamicHotstringDelay())
 					.Set("PreviewFields", [InfoTagField]).Set("PreviewValues", [InfoTagValue]))
 		}
 
@@ -171,13 +173,9 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			}
 		}
 
-		; Every combo concatenates one or more personal_info fields, so the whole
-		; generated family is private for the same reason the single-field tags are.
+		; Registration is one letter long, so each combo is one letter tag.
 		CreateHotstringCombo(combo, value, PreviewFields, PreviewValues) {
-			CreateHotstring("*", "@" combo "" . ScriptInformation["MagicKey"], value, Map("OnlyText", False).Set(
-				"FinalResult", True).Set("IsPrivate", True)
-				.Set("Category", "personal")
-				.Set("PreviewFields", PreviewFields).Set("PreviewValues", PreviewValues))
+			PersonalInfoRegisterLetterTag(combo, PreviewFields[1], PreviewValues[1])
 		}
 
 		; Every combo LONGER than one letter is resolved at fire time by
@@ -272,4 +270,33 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 		LoadHotstringsSection("magickey", "repeat_corrections", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["repeat_corrections"])
 	}
 	try BootProfile_Mark("HS sub: dynamic + repeat-key registered")
+}
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 2/ Personal letter tags =======
+; =======================================
+; =======================================
+
+; Registers the one-letter personal tag « @<letter>★ ». Every tag types a
+; personal_info field, so it is private for the same reason the named tags are.
+; One exact-case registration per typed case: the letter's case sets the value's
+; (maintainer decision HCD-5, 2026-11-21), so « @n★ » types the field as stored
+; and « @N★ » in capitals. The dynamic category's delay gates both (HCD-4).
+; @param Letter The alias letter, as the [letters] table spells it.
+; @param Field The personal_info field it names.
+; @param Value The field's stored value.
+PersonalInfoRegisterLetterTag(Letter, Field, Value) {
+	global ScriptInformation
+	for Typed in (StrLower(Letter) == StrUpper(Letter) ? [Letter] : [StrLower(Letter), StrUpper(Letter)]) {
+		Cased := PersonalInfoTagCasedValue(Typed, Value)
+		CreateHotstring("*C", "@" . Typed . ScriptInformation["MagicKey"], SendEscapeLiteral(Cased),
+			Map("OnlyText", False).Set("FinalResult", True).Set("IsPrivate", True)
+				.Set("Category", "personal").Set("TimeActivationSeconds", _DynamicHotstringDelay())
+				.Set("PreviewFields", [Field]).Set("PreviewValues", [Cased]))
+	}
 }

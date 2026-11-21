@@ -93,6 +93,27 @@ _PIPreviewIsTagChar(Ch) {
 	return (StrLower(Ch) !== StrUpper(Ch))
 }
 
+; Whether a typed tag letter asks for capitals: a cased letter typed in its
+; upper form. The twin of the shared tags.lua letter_is_upper.
+; @param Letter One typed character of the tag.
+; @return true when the letter is an upper-case letter.
+PersonalInfoTagLetterIsUpper(Letter) {
+	return Letter != "" and StrUpper(Letter) == Letter and StrLower(Letter) !== Letter
+}
+
+; The value a letter alias types, cased as the letter was typed (maintainer
+; decision HCD-5, 2026-11-21): a lower letter types its field as stored, an
+; upper letter in capitals, one field per letter, the way a word hotstring
+; follows mot / Mot / MOT. `@Np` types « NOM Prénom ». A named tag (`@iban`)
+; types its value as stored. The twin of the shared tags.lua cased_value, both
+; pinned by _shared/tests/corpus/personal_info/tag_case_vectors.json.
+; @param Letter The typed tag letter.
+; @param Value The field's stored value.
+; @return The value to type.
+PersonalInfoTagCasedValue(Letter, Value) {
+	return PersonalInfoTagLetterIsUpper(Letter) ? StrUpper(Value) : Value
+}
+
 ; The @-tag the buffer ends with, or "" when it does not end with one.
 ;
 ; Walks back from the end rather than matching a regex: PCRE's letter classes

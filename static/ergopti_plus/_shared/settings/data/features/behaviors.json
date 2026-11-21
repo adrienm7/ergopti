@@ -8,7 +8,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2"
+			"sha256": "91f88ff08985552161ffc6363988393b35fa185270e2a255c619ffb1167f1462"
 		},
 		{
 			"id": "windows-control",

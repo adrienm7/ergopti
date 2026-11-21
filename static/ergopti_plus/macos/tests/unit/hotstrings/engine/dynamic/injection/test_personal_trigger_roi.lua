@@ -24,6 +24,7 @@ helpers.describe("personal information trigger ROI", function()
 			local interceptor, accepted = nil, false
 			local keymap = {
 				register_interceptor = function(fn) interceptor = fn end,
+				dynamic_rule_within_delay = function() return true end,
 				register_preview_provider = function() end,
 				inject_dynamic = function() return accepted end,
 			}

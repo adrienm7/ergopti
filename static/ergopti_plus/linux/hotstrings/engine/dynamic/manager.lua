@@ -64,7 +64,7 @@ local PERSONAL_PREVIEW_GROUP = "personal"
 -- separate decisions read it — the per-family switch, the preview gate and the
 -- privacy flag on a fired expansion — and a literal repeated at three sites is a
 -- literal that can be corrected at two of them.
-local PERSONAL_SECTION = "personal_info"
+local PERSONAL_SECTION = NamedTags.SECTION
 
 
 -- =========================================
@@ -278,12 +278,24 @@ function M.init(opts)
 		-- are accepted; decomposed multi-codepoint spellings are rejected rather
 		-- than normalized, which avoids silently merging two user-owned mappings.
 		if alias_length == 1 and staged_info[field] then
+			-- One rule per typed case, the letter's case setting the value's
+			-- (HCD-5): « @n » types the field as stored, « @N » in capitals. A
+			-- case twin another alias names differently stays exact, so the two
+			-- user mappings never merge.
 			local value = staged_info[field]
-			Engine.add_rule(
-				"@" .. letter,                      -- suffix: "@p"
-				PERSONAL_SECTION,                    -- section
-				function() return value end          -- resolver
-			)
+			local lower = UnicodeCase.lower(letter)
+			local upper = UnicodeCase.upper(letter)
+			for _, typed in ipairs(lower == upper and { letter } or { lower, upper }) do
+				local twin = staged_letters[typed]
+				if strict_codepoint_length(typed) == 1 and (typed == letter or twin == nil) then
+					local cased = NamedTags.cased_value(typed, value)
+					Engine.add_rule(
+						"@" .. typed,                        -- suffix: "@p" / "@P"
+						PERSONAL_SECTION,                     -- section
+						function() return cased end           -- resolver
+					)
+				end
+			end
 		elseif alias_length == nil then
 			Logger.error(LOG, "Personal alias rejected: key is not valid UTF-8.")
 		elseif alias_length ~= 1 then
@@ -361,8 +373,8 @@ function M.resolve_combo(tag)
 	-- typing "@NP" must mean what "@np" means.
 	for _, raw_letter in ipairs(letters) do
 		local letter = UnicodeCase.lower(raw_letter)
-		-- Combos are case-insensitive; single-field registered rules remain
-		-- exact. If equivalent aliases name different fields, refusing the
+		-- Aliases are case-insensitive; the typed case sets the value's case
+		-- (resolve_combo_values). If equivalent aliases name different fields, refusing the
 		-- entire combo avoids silently putting a different value in a form.
 		-- Case conversion can expand one codepoint (e.g. İ): do not normalize
 		-- the user's keys or admit the resulting multi-codepoint spelling.
@@ -391,8 +403,13 @@ end
 --- @return table Array of strings; empty when the tag resolves to nothing.
 function M.resolve_combo_values(tag)
 	local values = {}
-	for _, field in ipairs(M.resolve_combo(tag)) do
-		values[#values + 1] = _info[field]
+	local fields = M.resolve_combo(tag)
+	-- A named tag types its value as stored; each letter of a letter tag sets
+	-- the case of its own field (HCD-5, NamedTags.cased_value).
+	local letters = NamedTags.field(tag) == nil and strict_codepoints(tag) or nil
+	for index, field in ipairs(fields) do
+		local value = _info[field]
+		values[#values + 1] = letters and NamedTags.cased_value(letters[index], value) or value
 	end
 	return values
 end

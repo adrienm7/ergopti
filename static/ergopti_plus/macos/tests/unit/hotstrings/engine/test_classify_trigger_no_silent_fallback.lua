@@ -55,6 +55,7 @@ local function probe(source, claim)
 		local keymap = {
 			get_trigger_char = function() return "★" end,
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function() end,
 			inject_dynamic = function() record.attempts = record.attempts + 1; return true end,
 		}

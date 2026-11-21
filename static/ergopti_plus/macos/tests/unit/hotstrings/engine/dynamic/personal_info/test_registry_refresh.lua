@@ -296,7 +296,7 @@ helpers.describe("personal-info aliases and literal prefix output (PIM-001, PIM-
 		with_fixture(function(fixture)
 			local resolved = fixture.PersonalInfo._resolve_combo_for_test(
 				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "É𐐀")
-			helpers.assert_eq(table.concat(resolved, "|"), "Lyon|Lyon")
+			helpers.assert_eq(table.concat(resolved, "|"), "LYON|LYON", "upper letters type capitals (HCD-5)")
 			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
 			local decoded = require("core.text.engine.toml_codec.codec").decode(fixture.read_file())
 			helpers.assert_eq(decoded.letters["é"], "city")

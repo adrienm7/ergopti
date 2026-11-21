@@ -79,6 +79,7 @@ local function load_personal_info(config_path, logs)
 	local keymap = {
 		get_trigger_char = function() return "★" end,
 		register_interceptor = function() end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function() end,
 		invalidate_hotstring_preview = function()
 			fence.calls = fence.calls + 1
@@ -164,6 +165,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 		local started = personal_info.start("", {
 			get_trigger_char = function() return "â˜…" end,
 			register_interceptor = function() registrations = registrations + 1 end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function() registrations = registrations + 1 end,
 		}, "/unowned/personal_info.toml")
 		helpers.assert_eq(started, false)
@@ -517,6 +519,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			local keymap = {
 				get_trigger_char = function() return "★" end,
 				register_interceptor = function() registrations = registrations + 1 end,
+				dynamic_rule_within_delay = function() return true end,
 				register_preview_provider = function() registrations = registrations + 1 end,
 			}
 
@@ -571,6 +574,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			local keymap = {
 				get_trigger_char = function() return "★" end,
 				register_interceptor = function() registrations = registrations + 1 end,
+				dynamic_rule_within_delay = function() return true end,
 				register_preview_provider = function() registrations = registrations + 1 end,
 			}
 

@@ -1631,7 +1631,7 @@ HSE_TryRepeatKey(MagicKey) {
 ;   buffer does not end with a resolvable @-combo.
 HSE_TryPersonalInfoCombo(MagicKey) {
 		global HSE_Buffer, HSE_Suppressed, HSE_RebuildInProgress, HSE_RegistryTransitionDepth
-		global HSE_PersonalInfoCombosEnabled, PersonalInformation, PI_PREVIEW_CATEGORY
+		global HSE_PersonalInfoCombosEnabled, PersonalInformation, PI_PREVIEW_CATEGORY, PERSONAL_INFO_TAGS
 		; Same live-rebuild fence as HSE_TryRepeatKey: while the registry is being
 		; rewritten the matcher answers "" for every sequence, which means "cannot
 		; answer now", not "nothing claims this". Expanding here during that window
@@ -1660,7 +1660,9 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 				return ""
 		}
 		; A Tab between fields: the values land in consecutive form fields, which is
-		; what a multi-field combo is for.
+		; what a multi-field combo is for. Each letter of a letter tag sets the case
+		; of its own field (HCD-5); a named tag types its value as stored.
+		IsNamedTag := IsSet(PERSONAL_INFO_TAGS) and PERSONAL_INFO_TAGS.Has(StrLower(Tag))
 		Replacement := ""
 		PreviewValues := []
 		for Index, Field in Fields {
@@ -1674,6 +1676,8 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 				if (Value == "") {
 						return ""
 				}
+				if !IsNamedTag
+						Value := PersonalInfoTagCasedValue(SubStr(Tag, Index, 1), Value)
 				PreviewValues.Push(Value)
 				if (Index > 1) {
 						Replacement .= "{Tab}"
@@ -1687,7 +1691,11 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 		; FinalResult routes the send through SendFinalResult (SendInput), which is
 		; what every other @ registration uses — measured, it is the path the
 		; keystats's InputHook does not observe.
+		; The dynamic category's expansion delay, as for the registered @-tags and
+		; on macOS and Linux (maintainer decision HCD-4, 2026-11-21).
 		return {
+				TimeActivationSeconds: _DynamicHotstringDelay(),
+				PrevCharKey: HSE_TimeGateReferenceChar(TriggerStr, true),
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
 				Star:        true,

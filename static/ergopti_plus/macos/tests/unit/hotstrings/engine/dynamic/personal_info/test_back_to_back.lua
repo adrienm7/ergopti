@@ -47,6 +47,7 @@ local function boot(outcomes)
 	local keymap = {
 		get_trigger_char = function() return TRIGGER end,
 		register_interceptor = function(callback) interceptor = callback end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function() end,
 		classify_trigger = function() return false, false, false end,
 		inject_dynamic = function(deletes, text, emitter, category, is_private)

@@ -40,6 +40,7 @@ local function make_fake_keymap()
 		add                       = function() end,
 		register_preview_provider = function(fn) rec.preview = fn end,
 		register_interceptor      = function(fn) rec.interceptors[#rec.interceptors + 1] = fn end,
+		dynamic_rule_within_delay = function() return true end,
 		inject_dynamic            = function(deletes, text)
 			rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
 			return true
@@ -151,7 +152,8 @@ helpers.describe("personal_info Unicode aliases", function()
 		helpers.assert_eq(interceptor(key(TRIGGER), buffer), "consume")
 		helpers.assert_eq(#rec.injects, 1)
 		helpers.assert_eq(rec.injects[1].deletes, 5, "the sentinel and four scalars")
-		helpers.assert_eq(rec.injects[1].text, "LyonMarieLyonMarie")
+		-- Each upper letter types its field in capitals (HCD-5).
+		helpers.assert_eq(rec.injects[1].text, "LYONMarieLYONMARIE")
 	end)
 
 	helpers.it("personal-unicode-alias: Backspace removes a whole supplementary scalar", function()
@@ -198,7 +200,8 @@ helpers.describe("personal_info Unicode aliases: preview and expansion agree whi
 	local source = '[info]\ncity = "Lyon"\nfirst_name = "Marie"\n[letters]\n'
 		.. '"é" = "city"\n"ü" = "first_name"\n"𐐨" = "city"\n'
 	local typed = { "É", "Ü", "𐐀" }
-	local fields = { "Lyon", "Marie", "Lyon" }
+	-- The letters are typed upper, so each field types in capitals (HCD-5).
+	local fields = { "LYON", "MARIE", "LYON" }
 
 	--- Types "@" and the cased combo, then Backspace until `kept` scalars remain.
 	--- @param kept integer

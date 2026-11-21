@@ -1,0 +1,35 @@
+{
+	"_comment": "Personal @-tag case vectors (maintainer decision HCD-5, 2026-11-21). A personal tag follows the typed case the way a word hotstring does for mot / Mot / MOT, one field per letter: a lower letter types its field as stored, an upper letter types it in capitals (Unicode upper case, so « Prénom » gives « PRÉNOM »). A letter alias is case-insensitive: `n` and `N` name the same field. A named tag (`@iban`, `@IBAN`) names a field, not a letter, and types the value as stored whatever its case. `values` lists the typed fields in order (a Tab separates them on screen); an empty list means the tag types nothing. Synthetic data only. Replayed by the shared rule (tags.lua cased_value) through the Linux manager (linux/tests/unit/hotstrings/engine/dynamic/test_personal_tag_case.lua), the macOS resolver (macos/tests/unit/hotstrings/engine/dynamic/test_personal_tag_case.lua) and the Windows engine (windows/tests/unit/hotstrings/engine/personal/test_personal_tag_case.ahk).",
+	"info": {
+		"street_address": "aaa",
+		"city": "bbb",
+		"country": "ccc",
+		"last_name": "Nom",
+		"first_name": "Prénom",
+		"iban": "Fr00 abcd"
+	},
+	"letters": {
+		"a": "street_address",
+		"b": "city",
+		"c": "country",
+		"n": "last_name",
+		"p": "first_name"
+	},
+	"vectors": [
+		{ "id": "single_lower_letter_types_the_value_as_stored", "tag": "n", "values": ["Nom"] },
+		{ "id": "single_upper_letter_types_capitals", "tag": "N", "values": ["NOM"] },
+		{ "id": "single_upper_accented_value", "tag": "P", "values": ["PRÉNOM"] },
+		{ "id": "multi_letter_lower", "tag": "abc", "values": ["aaa", "bbb", "ccc"] },
+		{ "id": "multi_letter_mixed_case", "tag": "aBc", "values": ["aaa", "BBB", "ccc"] },
+		{ "id": "multi_letter_all_caps", "tag": "ABC", "values": ["AAA", "BBB", "CCC"] },
+		{ "id": "name_then_first_name", "tag": "Np", "values": ["NOM", "Prénom"] },
+		{ "id": "first_name_in_capitals", "tag": "nP", "values": ["Nom", "PRÉNOM"] },
+		{ "id": "named_tag_types_the_value_as_stored", "tag": "iban", "values": ["Fr00 abcd"] },
+		{
+			"id": "named_tag_in_capitals_types_the_value_as_stored",
+			"tag": "IBAN",
+			"values": ["Fr00 abcd"]
+		},
+		{ "id": "unknown_letter_types_nothing", "tag": "nZ", "values": [] }
+	]
+}
