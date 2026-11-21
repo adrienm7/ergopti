@@ -241,11 +241,14 @@ incomplete-read notice and unmeasured cards, and a failed typing range read
 ends its request at once instead of after the 120 s watchdog. On the three,
 the typing dashboard says in a status region, in the interface language, that
 a range read runs, failed or took too long, and both dashboards format numbers
-in the interface language instead of French. Left open: MET-09 to MET-19,
-among them the Linux heatmap's QWERTY names and frozen n-gram tables, the
-macOS empty and incomplete states, 61 French metric definitions in the
-pages' `title` attributes, and the hotstring counting of the macOS live speed
-(a maintainer decision).
+in the interface language instead of French. A second pass fixed MET-09 to
+MET-12: the Linux heatmap names the keys by the active layout or emulation and
+its n-gram tables follow the typing; a missing or incomplete macOS store is
+shown with the incomplete notice and never saved; the 61 metric definitions
+and the chart tooltips are locale keys in the 21 languages, and the
+hard-coded-strings gate scans the pages' HTML. Left open: MET-13 to MET-19,
+among them the hotstring counting of the macOS live speed (a maintainer
+decision).
 
 ## Review status at resumption — November 12, 2026
 

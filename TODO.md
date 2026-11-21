@@ -387,14 +387,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     receipt and removes its stage, and the download page has no English fallback. Left: UPD-13 macOS names no proxy,
     offline or certificate cause (hs.http proves none; route the check through the launcher's managed HTTP worker);
   - metrics views, taken on 2026-11-21 ([report](docs/audits/platform-parity/2026-11-21-metrics-views/report.md)):
-    MET-01 to MET-08 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
-    names of every WPM surface; Linux apps read state and range failure; the range status and numbers in the
-    interface language on the three). Left: MET-09 Linux heatmap key names from the live XKB keymap; MET-10 Linux
-    n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as the others do;
-    MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision », « Acceptées ») to
-    i18n keys, with the hard-coded-strings gate extended to the pages' HTML; MET-13 « Computing… » forever on an
-    empty range; MET-14 the apps render-error alert; MET-15 banners after a late locale; MET-16 calendar day values
-    and the chart reading font; MET-17 net or gross hotstring counting in the live speed (maintainer decision);
+    MET-01 to MET-12 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
+    names of every WPM surface; Linux apps read state and range failure, heatmap names from the active layout and
+    live n-gram tables; macOS missing and incomplete stores shown with their notice; the range status, numbers and
+    metric definitions in the interface language on the three, the hard-coded-strings gate now scanning the
+    pages' HTML). Left: MET-13 « Computing… » forever on an empty range; MET-14 the apps render-error alert; MET-15
+    banners after a late locale; MET-16 calendar day values and the chart reading font; MET-17 net or gross hotstring
+    counting in the live speed (maintainer decision);
     MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
   - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the

@@ -400,7 +400,9 @@ owner. Windows is the reference unless a shared contract says otherwise.
    teardown; MET-01 to MET-08 fixed (the Windows idle reset, AI output
    privacy, warm hosts and surface names; the Linux apps read state and range
    failure; the range status and the numbers in the interface language on the
-   three), MET-09 to MET-19 open.
+   three), then MET-09 to MET-12 (the Linux heatmap names and live tables,
+   the macOS missing and incomplete stores, the metric definitions in 21
+   locales), MET-13 to MET-19 open.
 8. **Small native and single-file units.** `linux/native/archive_output`,
    `windows/native/ergopti_lua_export.c`, `linux/modules/keep_awake.lua`,
    `macos/ui/virtual_hid_update.lua`, `macos/ui/legacy_rules_cleanup.lua`,

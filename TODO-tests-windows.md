@@ -234,7 +234,8 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       reopen them: both show the new font (MET-03). 4. Interface in English: the dashboards read `12,345` and `1.2M`
       and a date change reads « Reading the selected period… » with Narrator (MET-06, MET-07). 5. Narrator on, the
       WPM widget in compact then graph mode at the same speed: Narrator names both « N WPM », never « ErgoptiPlus WPM
-      Graph » (MET-08).
+      Graph » (MET-08). 6. Interface in English: hovering a card definition or a chart point reads English, never
+      « Précision » or « Acceptées » (MET-12).
 
 ### Pause, startup, updates and network
 

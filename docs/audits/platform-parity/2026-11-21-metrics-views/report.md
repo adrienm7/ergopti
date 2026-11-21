@@ -83,6 +83,10 @@ Checked and kept:
 | MET-06 | all     | Typing dashboard: change the dates; the read runs, fails or times out                     | The freshness banner names the state of the data                                   | The loader alone said a read was running, in fixed French on every locale; a failure put the previous table back silently under the new selection; nothing reached a screen reader | `… range read says so beside the previous table (met-06)`, failed and timeout on the three hosts (`test-typing-metrics-range-supersession.cjs`) |
 | MET-07 | all     | Any dashboard in a locale other than French                                               | The dates follow `window._i18n_locale`                                             | Every number was French: thin-space thousands, decimal comma, « Md » (`format.js`), `Intl.NumberFormat('fr-FR')` in the apps tables, the OS locale in the chart text alternative   | `test-metrics-number-locale.cjs`                                                                                                                |
 | MET-08 | Windows | Narrator on, the WPM widget switched from compact to graph (or rebuilt) at the same speed | Linux clears its name cache with the surface                                       | The name cache held the text alone, so the new window was never named and Narrator read « ErgoptiPlus WPM Graph »                                                                  | `a11y readers: every WPM surface is named at the same speed (met-08)` (`test_accessibility.ahk`)                                                |
+| MET-09 | Linux   | Typing dashboard on AZERTY, BÉPO or the Ergopti emulation                                 | Windows sends its layout by scan code, macOS `hs.keycodes.map`                     | No answer carried a layout, so the heatmap named every key in QWERTY                                                                                                               | `(heatmap-active-layout, met-09)` (`test_metrics_flush_bridge.lua`)                                                                             |
+| MET-10 | Linux   | Typing dashboard open, type in another window                                             | Windows pushes today's n-grams, macOS re-requests the range                        | The 2 s refresh answered the manifest alone: the character, bigram and word tables stood still                                                                                     | `(live-ngrams-refresh, met-10)` (`test_metrics_flush_bridge.lua`), `run_sqlite_calendar_split.lua`                                              |
+| MET-11 | macOS   | Either dashboard with no `db.sqlite`, or after an incomplete read                         | Windows and Linux publish what they read flagged incomplete                        | Typing published an empty store as complete and fresh and saved it; apps published nothing, so the disk snapshot or an empty page stayed without a notice                          | `(missing-store-incomplete, met-11)`, `(apps-incomplete-publication, met-11)`, `met-11` of `test-metrics-apps-publication-order.cjs`            |
+| MET-12 | all     | Either dashboard in a locale other than French                                            | Every label is a locale key                                                        | 61 metric definitions were fixed French `title` attributes, with the chart tooltips, the SFB pair headers, two units, the apps window title and three placeholders                 | `test-no-hardcoded-ui-strings.cjs`, which now scans the pages                                                                                   |
 
 Notes:
 
@@ -109,39 +113,44 @@ Notes:
 - **MET-07.** `format_number_parts` formats exactly below a million and in the
   compact notation from a million on, in the seeded interface language; the
   exact-value tooltip and the apps `format_int` use the same locale.
+- **MET-09.** The typing bridge adds `keycode_layout` to the dashboard payload,
+  the refresh and the range reply: for evdev codes 1 to 88 (the PC scan codes
+  the page maps with `SC_TO_KC`), the running emulation's legend, else the XKB
+  keymap's symbol (`keyboard_layout.base_symbol`), a dead key as its resting
+  accent. The page's special-key names still override it, as on Windows.
+- **MET-10.** The refresh carries `_prefetch_data = { today, today_date }`
+  without `historical`, which the page reads as a live delta (the history it
+  holds stays), from the new `keystats.get_today_payload`. Measured under WSL
+  on a 60-day store (300 tokens a day in three tables): one sqlite3 CLI read of
+  today cost 150 ms, a full-history read 360 to 590 ms, both on the daemon's
+  only thread. Today's persisted rows are therefore kept per SQLite revision
+  and day beside the manifest (one `_projection_cache`: the chunk is at
+  LuaJIT's 200-local limit), so a refresh between two flushes costs about 7 ms,
+  the unflushed delta layered on a copy. A refused today read leaves the
+  manifest refresh and logs why.
+- **MET-11.** A missing store is an incomplete read on both macOS dashboards,
+  as on Linux: nothing certifies that no rows exist. Typing flags
+  `manifest_incomplete` (and the range `incomplete`) and saves no snapshot;
+  apps publishes the partial or empty manifest with `manifest_incomplete`,
+  which `publishMetricsAppsData` applies with the revision it belongs to, and
+  saves neither its manifest cache nor its disk snapshot. A present empty store
+  is still complete. The typing scenarios that used a missing store as their
+  complete path open a present, empty one (`empty_store.lua`).
+- **MET-12.** 70 keys in the 21 locales: the 61 definitions
+  (`ui_typing.title_*`, `ui_apps.tip_col_*`), the chart tooltips
+  (`chart_accuracy`, `chart_accepted`, `chart_slot_title`, the hour in
+  `Intl`), the five SFB pair headers and « + AI »; existing keys now name the
+  apps window title, the three search placeholders, « % global rate » and
+  « active apps ». The layouts title no longer names `hs.keycodes`, and the
+  modifier hold no longer lists macOS keys alone. The hard-coded-strings gate
+  scans every `.html` page of `_shared/ui` and `macos/ui` (the four text
+  attributes and the text of every element, a French fallback beside a key
+  included), what Chart.js tooltip callbacks return, and the element text the
+  metrics scripts build in strings; metric acronyms, units and the feature
+  name read the same in every language.
 
 ## Open
 
-- **MET-09 (medium, Linux):** the typing heatmap always names the keys in
-  QWERTY. Windows sends `keycode_layout` (`KLPF_KeycodeLayout`) and macOS
-  `kc_layout` from `hs.keycodes.map`; Linux sends no layout in
-  `get_dashboard_payload` nor in the range reply, so
-  `build_keycode_layout_for_driver` keeps the static names. Follow-up: project
-  the live XKB keymap the daemon already reads into the same `kc_layout` map.
-- **MET-10 (medium, Linux):** the character, bigram and word tables and the
-  heatmap do not follow the typing while the window keeps the focus. The 2 s
-  poll's `refresh` answers the manifest only (`build_payload(state, false)`),
-  and the page's manifest-only path draws no n-gram query; macOS re-requests the
-  range at each live manifest, Windows pushes today's n-grams. Follow-up:
-  request the range when a refresh's manifest changed, or carry today's n-grams
-  in the refresh as Windows does, after measuring the SQLite read on a large
-  store.
-- **MET-11 (medium, macOS):** the empty and incomplete states differ. With no
-  database the typing host publishes an empty manifest as complete and fresh,
-  and keeps it as the next snapshot; the apps host publishes nothing on an
-  incomplete read or with no database (« refresh refused »), so the page keeps
-  the disk cache, or stays empty, without a notice. Windows and Linux send the
-  partial counts flagged incomplete. Follow-up: publish the partial projection
-  with `metrics_manifest_incomplete`, and an empty store as empty, not fresh.
-- **MET-12 (medium, shared):** 61 explanatory tooltips are fixed French
-  `title` attributes, 53 in `metrics_typing/index.html` and 8 in
-  `metrics_apps/index.html`, plus the « % /SFBs touche » header of `table.js`
-  and the « Précision : » and « Acceptées : » chart tooltips of `charts.js`;
-  `i18n.js` translates only `data-i18n-title`. They are the definitions of the
-  metrics, so every other locale reads them in French.
-  `test-no-hardcoded-ui-strings.cjs` scans JS strings only and misses them.
-  Follow-up: move each into a `data-i18n-title` key in the 21 locales and
-  extend the gate to the pages' HTML.
 - **MET-13 (low, shared):** a range or app selection with no data leaves each
   card's « Computing… » placeholder for good (`has_data` false keeps it), and a
   missing value reads « 0 ». Follow-up: `ui_typing.no_data` once the range read
@@ -181,7 +190,10 @@ app and a private window (MET-02), a dashboard and the diagnostics reopened
 after a reading change (MET-03), the range status and the numbers in English
 with Narrator, VoiceOver and Orca (MET-06, MET-07), a Linux store made
 unreadable during a date change (MET-05) and the apps notice clearing
-(MET-04), and Narrator on the compact then graph widget (MET-08).
+(MET-04), Narrator on the compact then graph widget (MET-08), the Linux
+heatmap on AZERTY and the emulation (MET-09), the Linux tables following the
+typing without a stutter (MET-10), a macOS store moved aside (MET-11), and the
+definitions in English on the three (MET-12).
 
 ## Proof
 
@@ -236,3 +248,58 @@ WAYLAND_DISPLAY`): `--only=met-05` 2 of 2. The pages:
   browser accessibility scan (`app-windows-accessibility.playwright.cjs`, no
   browser here); a rendered dashboard or widget; `npm run test:js` and
   `verify-change` (they refuse this checkout's Node pin).
+
+Second pass, MET-09 to MET-12: commits `2395e643ff` (MET-12), `342ef5165f`
+(MET-11), `ce990e4125` (MET-09), `a057c9ed3e` (MET-10).
+
+- **Red on the old code** (`44e4c35fb8`):
+  - MET-12: with the old two pages, `charts.js`, `table.js` and `data.js`,
+    the extended gate reports 56 distinct typing titles (the 53 definitions and
+    three French fallbacks beside a key), the 8 apps definitions, both chart
+    labels, five pair headers, two units, three element texts, the apps window
+    title and two placeholders.
+  - MET-11: with the old `metrics_apps/init.lua`, both
+    `apps-incomplete-publication` cases fail (no publication reaches the page);
+    with the old `metrics_typing/init.lua`, `missing-store-incomplete` fails
+    « an empty manifest with no store is not the next snapshot ».
+  - MET-09: with the old `bridge.lua`, both `met-09` cases fail (no
+    `keycode_layout`).
+  - MET-10: with the old `bridge.lua`, the refresh case fails « attempt to
+    index field '\_prefetch_data' »; with the old `keystats.lua`,
+    `run_sqlite_calendar_split.lua` fails its 8 checks.
+- **Green on the new code.** macOS under WSL (Lua 5.4) from a `git archive`
+  copy: the 39 modules of `tests/unit/ui/metrics` and the 22 other modules
+  that load the metrics fixtures or dashboards, but four
+  `test_reader_*_fingerprint.lua` (the two run on `44e4c35fb8` fail there
+  too). Linux under
+  WSL (LuaJIT) from a `git archive` copy of `linux/`, `_shared/` and
+  `layouts/` (`unset DISPLAY WAYLAND_DISPLAY`): the 16 metrics modules (458
+  cases; the one failure reads the copy's missing `windows/` tree),
+  `test_keystats.lua` (79), `test_owned_flush.lua` (82),
+  `test_dashboard_bridge_actions.lua` (11) and `run_sqlite_calendar_split.lua`
+  (8 checks). The pages: `test-metrics-apps-publication-order.cjs` (31),
+  `test-metrics-filter-cache.cjs` (1,300),
+  `test-typing-metrics-range-supersession.cjs` (23),
+  `test-metrics-heatmap-translation.cjs`, `test-metrics-number-locale.cjs`.
+- **Gates.** `test-no-hardcoded-ui-strings.cjs` (no baseline entry),
+  `test-metrics-cards-explained.cjs`, `test-app-windows-semantic-markup.cjs`,
+  `test-app-windows-accessibility-ratchet.cjs`, the locale gates
+  (`test-locale-catalogue-complete.cjs` with 5,496 keys,
+  `test-locale-hints-quote-live-labels.cjs`,
+  `test-action-labels-have-locale-keys.cjs`, `audit-translations.cjs`,
+  `test-i18n-referenced-keys-resolve.cjs`, `test-webview-i18n-cascade.cjs`),
+  `test-shared-literal-inventory.cjs`, `test-linux-feature-parity.cjs`,
+  `test-no-pinned-source-reads.cjs` and `-linux.cjs`,
+  `test-config-key-literals.cjs`, `field-todo-summary.py --check-doc`, the
+  formatter and `lint-conventions.js --fail-on-violations`.
+  `test-no-pinned-source-reads-lua.cjs` reports 6 files and 10 reads over its
+  baseline of 5 and 9 on `44e4c35fb8` already; this pass adds none. After
+  the rebase onto `f49cd0bce7` the page gates above pass again;
+  `test-windows-metrics-range-bridge.cjs` stops at its snapshot reopen case
+  (« window.build_keycode_layout_for_driver is not a function ») with this
+  pass's pages restored from `f49cd0bce7` too.
+- **Not run here.** The full macOS and Linux suites: the WSL service failed
+  several times under load, twice at the same point of a Linux keystats run
+  (right after `test_trigger_roi`), so only the modules above ran; the
+  AutoHotkey suites (no Windows code changed); a rendered dashboard;
+  `npm run test:js` and `verify-change` (Node pin).
