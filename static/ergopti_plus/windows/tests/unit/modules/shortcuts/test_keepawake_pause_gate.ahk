@@ -111,10 +111,10 @@ Test("keep-awake: a keypress while suspended does not cancel the session (keepaw
 ; The cursor is only read: the origin is placed far from it so the movement
 ; check sees a user move and would queue the cancellation.
 _KAPG_MouseMovedCheckBody(Hook) {
-	global ActivitySimulation, AwakeOriginX, AwakeOriginY, AWAKE_JITTER_PX
+	global ActivitySimulation, AwakeOriginX, AwakeOriginY
 	Position := MCGetPos()
-	AwakeOriginX := Position["x"] + 10 * AWAKE_JITTER_PX
-	AwakeOriginY := Position["y"] + 10 * AWAKE_JITTER_PX
+	AwakeOriginX := Position["x"] + 10 * TimingsGet("keep_awake", "jitter_px")
+	AwakeOriginY := Position["y"] + 10 * TimingsGet("keep_awake", "jitter_px")
 	Suspend(true)
 	AwakeCheckMouseMoved()
 	Suspend(false)

@@ -74,13 +74,12 @@ local ConfigKeys = require("settings.engine.keys")
 -- The control-sentinel listener slot the wheel bindings track the layer with.
 local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
 
--- Keep-awake jitter parameters. The tick interval bounds + return delay come
--- from the shared cross-driver registry ([keep_awake]); the pixel offsets
--- match Windows' AWAKE_JITTER_PX (modules/shortcuts/win.ahk).
+-- Keep-awake jitter parameters: the tick interval bounds, the jitter radius
+-- and the return delay are the shared cross-driver registry's [keep_awake],
+-- which Windows reads too (modules/shortcuts/win.ahk).
 local AWAKE_TICK_MIN_SEC     = Timings.sec("keep_awake", "tick_min_ms")     -- Minimum interval between mouse-jitter ticks
 local AWAKE_TICK_MAX_SEC     = Timings.sec("keep_awake", "tick_max_ms")     -- Maximum interval between mouse-jitter ticks
-local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (visible but stays near origin)
-local AWAKE_JITTER_Y         = 80   -- Max vertical pixel offset per tick (visible but stays near origin)
+local AWAKE_JITTER_PX        = Timings.count("keep_awake", "jitter_px")     -- Max pixel offset per tick on each axis
 local AWAKE_RETURN_DELAY_SEC = Timings.sec("keep_awake", "return_delay_ms") -- Seconds to hold offset before returning to origin
 
 -- No-op key code posted on every keep-awake tick to signal KEYBOARD activity.
@@ -338,8 +337,8 @@ schedule_awake_tick = function(generation)
 		end
 
 		if origin then
-			local ox = math.random(-AWAKE_JITTER_X, AWAKE_JITTER_X)
-			local oy = math.random(-AWAKE_JITTER_Y, AWAKE_JITTER_Y)
+			local ox = math.random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
+			local oy = math.random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
 			local tx = origin.x + ox
 			local ty = origin.y + oy
 
@@ -571,8 +570,8 @@ function M.toggle_awake()
 					or type(pos.x) ~= "number" or type(pos.y) ~= "number" then
 					return finish_tap(false, fence_events)
 				end
-				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_X and
-				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_Y then
+				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_PX and
+				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_PX then
 					return finish_tap(false, fence_events)
 				end
 			end

@@ -21,9 +21,8 @@
 ; ================================
 ; ================================
 
-; Max pixel offset around origin per tick, as Hammerspoon's AWAKE_JITTER_X/Y.
-; The tick bounds and the return delay are the shared registry's [keep_awake].
-global AWAKE_JITTER_PX     := 80
+; The jitter radius, the tick bounds and the return delay are the shared
+; registry's [keep_awake], which macOS reads too.
 
 ; Origin captured at toggle-on; shared between Start and SimulateActivity
 global AwakeOriginX := 0, AwakeOriginY := 0
@@ -98,6 +97,13 @@ StartActivitySimulation(*) {
 ; The next jitter tick, drawn between the shared [keep_awake] bounds.
 AwakeNextTickMs() {
 		return Random(TimingsGet("keep_awake", "tick_min_ms"), TimingsGet("keep_awake", "tick_max_ms"))
+}
+
+; The largest jitter offset per axis, and the move that marks the user's own
+; mouse: the shared [keep_awake] jitter_px, an integer so Random draws whole
+; pixels.
+AwakeJitterPx() {
+		return TimingsGet("keep_awake", "jitter_px")
 }
 
 ; Credits a finished session to the day's awake_ms, as macOS and Linux do
@@ -195,7 +201,8 @@ AwakeCheckMouseMoved() {
 				return
 		Position := MCGetPos()
 		CurX := Position["x"], CurY := Position["y"]
-		if (Abs(CurX - AwakeOriginX) > AWAKE_JITTER_PX or Abs(CurY - AwakeOriginY) > AWAKE_JITTER_PX) {
+		JitterPx := AwakeJitterPx()
+		if (Abs(CurX - AwakeOriginX) > JitterPx or Abs(CurY - AwakeOriginY) > JitterPx) {
 				SetTimer(StopActivitySimulation, -1)
 		}
 }
@@ -268,18 +275,19 @@ SimulateActivity(ResetOnly := False) {
 				return
 		}
 
-		; If the cursor moved more than AWAKE_JITTER_PX from where we left it,
+		; If the cursor moved more than the jitter radius from where we left it,
 		; the user touched the mouse or touchpad -- stop without moving again.
+		JitterPx := AwakeJitterPx()
 		Position := MCGetPos()
 		CurX := Position["x"], CurY := Position["y"]
-		if (LastX != -1 and (Abs(CurX - LastX) > AWAKE_JITTER_PX or Abs(CurY - LastY) > AWAKE_JITTER_PX)) {
+		if (LastX != -1 and (Abs(CurX - LastX) > JitterPx or Abs(CurY - LastY) > JitterPx)) {
 				StopActivitySimulation()
 				return
 		}
 
-		; Move to a random offset around the captured origin (+-AWAKE_JITTER_PX)
-		OffX := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
-		OffY := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
+		; Move to a random offset around the captured origin (+-JitterPx)
+		OffX := Random(-JitterPx, JitterPx)
+		OffY := Random(-JitterPx, JitterPx)
 		MCSetPos(AwakeOriginX + OffX, AwakeOriginY + OffY)
 
 		; Signal OS activity without a visible keystroke

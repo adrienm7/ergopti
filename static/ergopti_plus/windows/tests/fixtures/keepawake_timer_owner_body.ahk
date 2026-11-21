@@ -108,7 +108,7 @@ _KATO_Observe(Phase) {
 }
 
 _KATO_Exercise() {
-	global _KATO, AwakeInputHook, ActivitySimulation, AWAKE_JITTER_PX
+	global _KATO, AwakeInputHook, ActivitySimulation
 	Started := A_TickCount
 	_KATO.A := _KATO_Start()
 	if _KATO.Mode == "retired-keyboard" {
@@ -125,7 +125,7 @@ _KATO_Exercise() {
 		return
 	}
 
-	_KATO.X += AWAKE_JITTER_PX + 1
+	_KATO.X += TimingsGet("keep_awake", "jitter_px") + 1
 	_KATO.Capturing := true
 	try AwakeCheckMouseMoved()
 	finally _KATO.Capturing := false

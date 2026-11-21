@@ -117,6 +117,11 @@ local function with_awake(callback, log_manager)
 					assert(group == "keep_awake" and seconds[key] ~= nil, "unexpected keep-awake timing")
 					return seconds[key]
 				end,
+				-- Not the shipped 80: a radius only the registry can give (snu-13).
+				count = function(group, key)
+					assert(group == "keep_awake" and key == "jitter_px", "unexpected keep-awake count")
+					return 7
+				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["platform.input.keycodes"] = { F18_WAKE_OS = 79 }
@@ -242,6 +247,47 @@ helpers.describe("keep-awake activation grace measures awake duration", function
 			observe_activity(kind, 0.1, 60, false)
 		end)
 	end
+end)
+
+
+--- Moves the mouse OffsetPx right of the jitter origin after the activation
+--- grace and answers whether the move queued the auto-off.
+--- @param offset number Horizontal distance from the origin, in pixels.
+--- @return boolean disabled
+local function mouse_move_disables(offset)
+	local disabled = nil
+	with_awake(function(System, world, native)
+		world.awake = world.awake + 2
+		world.civil = world.civil + 2
+		local event_type = native.eventtap.event.types.mouseMoved
+		local event = {
+			getProperty = function() return 0 end,
+			getType = function() return event_type end,
+			getKeyCode = function() return 0 end,
+			getFlags = function() return {} end,
+			location = function() return { x = 100 + offset, y = 200 } end,
+			timestamp = function() return math.floor(world.awake * 1e9) end,
+		}
+		helpers.assert_eq(world.watcher.fn(event), false, "a mouse move always passes through")
+		local dispatcher = nil
+		for _, timer in ipairs(world.timers) do
+			if timer.active and timer.delay == 0 then dispatcher = timer end
+		end
+		disabled = dispatcher ~= nil
+		if dispatcher then dispatcher:fire() end
+	end)
+	return disabled
+end
+
+-- SNU-13: the jitter radius was an 80 px copy of the Windows one; it is the
+-- shared [keep_awake] jitter_px, read by both drivers.
+helpers.describe("keep-awake's jitter radius is the shared registry's (snu-13)", function()
+	helpers.it("a move beyond the registry's jitter_px stops the session", function()
+		helpers.assert_eq(mouse_move_disables(10), true)
+	end)
+	helpers.it("a move within it keeps the session", function()
+		helpers.assert_eq(mouse_move_disables(5), false)
+	end)
 end)
 
 

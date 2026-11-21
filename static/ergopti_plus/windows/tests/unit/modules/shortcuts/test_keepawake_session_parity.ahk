@@ -7,7 +7,8 @@
 ; units parity campaign): its jitter tick and cursor return read the shared
 ; [keep_awake] registry (SNU-01), a finished session is the day's awake_ms
 ; through a passive_period row of kind awake (SNU-02, maintainer decision
-; KMD-3), and the session's start and stop are logged (SNU-03).
+; KMD-3), and the session's start and stop are logged (SNU-03). The jitter
+; radius is the registry's too (SNU-13).
 ;
 ; The session runs on a fake cancellation hook and its timers are never armed,
 ; so no case moves the user's cursor.
@@ -179,7 +180,56 @@ _KASP_StopLogged() {
 	AssertContains(Body, 'LoggerInfo("shortcuts", "Keep-awake started.")', "the start is logged")
 }
 
+; Lets a queued one-shot timer run.
+_KASP_SettleTimers() {
+	Started := A_TickCount
+	while A_TickCount - Started < 100
+		Sleep(10)
+}
+
+; Places the jitter origin OffsetPx right of the cursor, sets the registry's
+; jitter_px to RadiusPx, runs the movement check, and answers whether the
+; session survived. The cursor is only read.
+_KASP_SurvivesOffset(OffsetPx, RadiusPx) {
+	global _TimingsCache, AwakeOriginX, AwakeOriginY, ActivitySimulation
+	Section := _TimingsCache["keep_awake"]
+	SavedRadius := Section["jitter_px"]
+	SavedX := AwakeOriginX, SavedY := AwakeOriginY
+	Result := { Survived: false }
+	try {
+		Section["jitter_px"] := String(RadiusPx)
+		_KASP_WithSession(1000, _KASP_CheckOffset.Bind(OffsetPx, Result))
+	} finally {
+		Section["jitter_px"] := SavedRadius
+		AwakeOriginX := SavedX, AwakeOriginY := SavedY
+	}
+	return Result.Survived
+}
+
+_KASP_CheckOffset(OffsetPx, Result, Journal, Lines) {
+	global AwakeOriginX, AwakeOriginY, ActivitySimulation
+	Position := MCGetPos()
+	AwakeOriginX := Position["x"] + OffsetPx
+	AwakeOriginY := Position["y"]
+	AwakeCheckMouseMoved()
+	_KASP_SettleTimers()
+	Result.Survived := ActivitySimulation
+}
+
+; SNU-13: the jitter radius is the registry's, which macOS reads too, not an
+; 80 px driver copy.
+_KASP_JitterFromRegistry() {
+	AssertFalse(_KASP_SurvivesOffset(5, 3), "a move beyond the shared jitter_px stops the session")
+	AssertTrue(_KASP_SurvivesOffset(5, 10), "positive control: a move within it keeps the session")
+	Source := FSReadStrict(_DriverProductionFileForSymbol("SimulateActivity"))
+	Body := _DriverExtractFunctionBody(&Source, "SimulateActivity")
+	AssertContains(Body, "Random(-JitterPx, JitterPx)", "the jitter draws within the shared radius")
+	AssertContains(Body, "JitterPx := AwakeJitterPx()", "the tick reads the shared radius")
+	AssertFalse(InStr(Source, "AWAKE_JITTER_PX", true), "no driver copy of the jitter radius remains")
+}
+
 Test("keep-awake: the jitter tick and cursor return read the shared registry (snu-01)", _KASP_TickFromRegistry)
+Test("keep-awake: the jitter radius reads the shared registry (snu-13)", _KASP_JitterFromRegistry)
 Test("keep-awake: a finished session is credited to awake_ms (snu-02)", _KASP_SessionCredited)
 Test("keep-awake: a session stopped by a pause is credited after the resume (snu-02)", _KASP_PausedSessionKept)
 Test("keep-awake: stopping an idle keep-awake credits nothing (snu-02)", _KASP_IdleStopCreditsNothing)

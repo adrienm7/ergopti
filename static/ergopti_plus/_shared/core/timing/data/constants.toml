@@ -541,6 +541,12 @@ tick_max_ms = 5000
 # AHK: win.ahk SimulateActivity. HS: system.lua AWAKE_RETURN_DELAY_SEC.
 return_delay_ms = 200
 
+# Not a duration: the largest pixel offset of a jitter tick around its origin,
+# on each axis, and the move beyond which the user's own mouse stops the
+# session. Linux inhibits idleness instead and moves nothing.
+# AHK: win.ahk AwakeJitterPx. HS: system.lua AWAKE_JITTER_PX.
+jitter_px = 80
+
 # Windows: how often keep-awake reads the cursor to stop when the user moves the
 # mouse. AHK: modules/shortcuts/win.ahk AwakeCheckMouseMoved.
 mouse_check_poll_ms = 150
