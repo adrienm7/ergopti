@@ -1,0 +1,41 @@
+{
+	"schema_version": 1,
+	"description": "The magic key is a configured character (hotstrings.trigger_char), never a physical key position (maintainer's decision of 2026-11-21). Hotstring data always writes the real marker; each driver replaces it by the configured character at runtime. Its default is the manifest default of hotstrings.trigger_char, unless the layout that types belongs to one of the families below: their base levels are probed on the listed keys (W3C KeyboardEvent.code), and a family matches when every key it names types that character with no modifier. Every user-facing text shows the marker followed by the configured character in parentheses (display_format) whenever that character is not the marker itself; the locale keys in literal_marker_keys name the real ★ character (the CapsWord delimiter, the option offering ★, the key that types ★), so their ★ stays as written. Lua: _shared/hotstrings/engine/magic_key.lua; AutoHotkey: _shared/hotstrings/data/magic_key.ahk; JavaScript: _shared/ui/hotstring_editor/script.js. All three replay _shared/tests/corpus/hotstrings/magic_key_vectors.json.",
+	"marker": "★",
+	"display_format": "★ ({char})",
+	"layout_families": [
+		{
+			"id": "azerty",
+			"base": {
+				"KeyQ": "a",
+				"KeyW": "z",
+				"KeyA": "q"
+			},
+			"magic_key": "ù"
+		},
+		{
+			"id": "qwerty",
+			"base": {
+				"KeyQ": "q",
+				"KeyW": "w",
+				"KeyY": "y",
+				"KeyA": "a"
+			},
+			"magic_key": ";"
+		}
+	],
+	"literal_marker_keys": [
+		"layout_optimizer.option.deadKeyLayer.help",
+		"menu.shortcuts.group_accented",
+		"menu.shortcuts.keyboard.meta_star",
+		"menu.shortcuts.keyboard.secondary_star",
+		"menu.shortcuts.keyboard.star_slot_reason.source_ambiguous",
+		"menu.shortcuts.keyboard.star_slot_reason.source_dead",
+		"menu.shortcuts.keyboard.star_slot_reason.source_missing",
+		"menu.shortcuts.keyboard.star_slot_reason.source_requires_modifiers",
+		"onboarding.magic_key.option_blackstar",
+		"platform_reason.star_slot_is_ctrl_on_macos",
+		"sg_actions.caps_word",
+		"sg_actions.capsword"
+	]
+}

@@ -692,21 +692,12 @@ it with repeated synthetic probes.
 Keymap defaults live in the owning keymap module and flow through explicit
 injection. Menus and bridges consume those defaults rather than redeclaring them.
 
-### project-physical-magic-key-is-one-keyboardevent-code
+### project-magic-key-is-a-character
 
-`hotstrings.magic_key_source` names the physical magic key on every driver by
-its KeyboardEvent.code, resolved through the physical-key tables (scan code,
-macOS keycode as the tap sees it behind Karabiner's ANSI virtual keyboard,
-evdev code). Backquote and IntlBackslash answer to both keycodes a bare ISO
-board swaps them to, as the tap keys do; never read the tap in nav_layer's ISO
-form, which names Karabiner's input side. Its default `auto` means
-the layout owns the key: Windows keeps its declared, detected, then shipped
-Ergopti chain, while macOS and Linux remap nothing, because their Ergopti+
-OS layouts already type the magic key on KeyC. Action: add a candidate only
-through the manifest enum and mac_keycodes.json (test-magic-key-source.cjs
-pins both); never make a Lua driver remap `auto`, which
-would take KeyC from every QWERTY user who turned the replace section on. A
-key the user chose is another key of their layout: every driver remaps its
-plain press only. Windows' every-level RemapKey (Shift gives "J"), Ctrl+★ save
-and Win+★ editor belong to the layout's own position alone
-(`LayoutRegistry_MagicKeyHotkeys`).
+The magic key is the configured `hotstrings.trigger_char`, never a physical
+key (maintainer's decision of 2026-11-21, `maintainer-decisions.md`). Only an
+emulated layout's declared `[extension.magic_key]` remaps a key, while the
+`replace` section is on; never reintroduce a user-chosen or detected physical
+source. Its layout default and its « ★ (ù) » display live in
+`_shared/hotstrings/data/magic_key.json`; a driver that shows the magic key
+calls the shared display rule instead of substituting ★ itself.

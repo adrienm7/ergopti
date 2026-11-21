@@ -176,13 +176,11 @@ content = [
 	"layout.emulate_top_row",
 	"layout.emulate_home_row",
 	"layout.emulate_bottom_row",
-	# The modifiers + magic key save reads its chord from the keyboard grab.
-	"layout.ctrl_magic_save",
 ]
 "hotstrings/engine/injector.lua" = ["hotstrings.**", "llm.**"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
-# Ctrl+é as Ctrl+C: decided in the keyboard hook's consumption callback.
-"modules/shortcuts/accented_shortcuts.lua" = ["shortcuts.a_grave.*", "shortcuts.e_acute.*", "shortcuts.e_circ.*", "shortcuts.e_grave.*"]
+# Ctrl+é as Ctrl+C and Ctrl+★ as Ctrl+<letter>: decided in the keyboard hook's consumption callback.
+"modules/shortcuts/accented_shortcuts.lua" = ["shortcuts.a_grave.*", "shortcuts.e_acute.*", "shortcuts.e_circ.*", "shortcuts.e_grave.*", "shortcuts.star.*"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
 "modules/keystats/" = ["metrics.**"]
 # The touchpad reader and the gesture actions; gestures/ui/ is the menu.
@@ -205,8 +203,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '
 "hotstrings/engine/dynamic/" = ["hotstrings.dynamic.*"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
-# The modifiers + magic key save presses its modifiers + S through the combo emitter.
-"gestures/engine/combo_emitter.lua" = ["gestures.**", "layout.ctrl_magic_save"]
+"gestures/engine/combo_emitter.lua" = ["gestures.**"]
 
 [detection.linux.uinput.plumbing]
 "adapters/" = "the evdev and uinput adapters the owners call"

@@ -790,19 +790,6 @@ body {
 	margin-bottom: 16px;
 }
 
-.star-badge {
-	background: var(--tag-bg);
-	border-radius: 4px;
-	color: var(--text);
-	display: inline-block;
-	font-family: 'SF Mono', Menlo, monospace;
-	font-size: 11px;
-	font-weight: 500;
-	margin-inline-start: 2px;
-	padding: 1px 3px 1px 5px;
-	vertical-align: baseline;
-}
-
 /* =================================== */
 /* =================================== */
 /* ======= 7/ Editors & Inputs ======= */

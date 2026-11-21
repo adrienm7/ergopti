@@ -27,8 +27,6 @@ platform.ahk.alt_gr_is_kana_remap = "auto"
 [hotstrings]
 platform.hs.enabled = false
 trigger_char = "★"
-magic_key_source = "auto"
-platform.ahk.magic_key_source_char = "j"
 repeat_key_enabled = false
 backspace_restore_enabled = true
 backspace_restore_window_ms = 500
@@ -552,6 +550,12 @@ letter = "v"
 
 
 
+[shortcuts.star]
+enabled = false
+letter = "s"
+
+
+
 [shortcuts.e_acute]
 enabled = false
 letter = "c"
@@ -595,7 +599,9 @@ script_altgr_escape = "script_quit"
 
 
 [shortcuts.keyboard]
-magic_editor = "open_hotstrings_editor"
+platform.ahk.meta_star = "open_hotstrings_editor"
+platform.linux.meta_star = "open_hotstrings_editor"
+platform.hs.secondary_star = "open_hotstrings_editor"
 
 
 
@@ -843,8 +849,6 @@ emulate_number_row = true
 emulate_top_row = true
 emulate_home_row = true
 emulate_bottom_row = true
-platform.ahk.ctrl_magic_save = false
-platform.linux.ctrl_magic_save = false
 emulated_layout = ""
 pause_switch_enabled = false
 on_pause = ""
@@ -894,7 +898,6 @@ sticky_timeout_ms = 2000
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-cmd_star = false
 
 
 
@@ -983,6 +986,7 @@ sections = [
 	"shortcuts.search",
 	"shortcuts.take_note",
 	"shortcuts.a_grave",
+	"shortcuts.star",
 	"shortcuts.e_acute",
 	"shortcuts.e_circ",
 	"shortcuts.e_grave",
@@ -1187,6 +1191,7 @@ sections = [
 	"metrics",
 	"shortcuts",
 	"shortcuts.a_grave",
+	"shortcuts.star",
 	"shortcuts.e_acute",
 	"shortcuts.e_circ",
 	"shortcuts.e_grave",

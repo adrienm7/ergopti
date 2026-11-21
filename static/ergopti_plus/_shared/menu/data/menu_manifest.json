@@ -2553,19 +2553,6 @@
 			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		},
 		{
-			"type": "list",
-			"id": "magic_key_source"
-		},
-		{
-			"type": "feature",
-			"path": "layout.ctrl_magic_save",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"reason_key": "platform_reason.ctrl_magic_save_is_cmd_star_on_macos"
-		},
-		{
 			"type": "---"
 		},
 		{
@@ -2674,6 +2661,15 @@
 		{
 			"type": "letter_picker",
 			"id": "a_grave",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+		},
+		{
+			"type": "letter_picker",
+			"id": "star",
 			"platforms": [
 				"ahk",
 				"linux"
@@ -4353,41 +4349,6 @@
 				"ahk"
 			],
 			"unavailable": "hide"
-		}
-	],
-	"magic_key_source_menu": [
-		{
-			"type": "group",
-			"id": "magic_key_source_heading",
-			"i18n": "menu.layout.magic_key_source"
-		}
-	],
-	"magic_key_source_children": [
-		{
-			"type": "command",
-			"id": "magic_key_source_capture",
-			"i18n": "menu.layout.magic_key_source.capture",
-			"disabled_when": [
-				"magic_key_source_capture_ready"
-			]
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "check",
-			"id": "magic_key_source_automatic",
-			"i18n": "menu.layout.magic_key_source.auto",
-			"checked_when": [
-				"magic_key_source_is_automatic"
-			]
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "list",
-			"id": "magic_key_source_candidates"
 		}
 	],
 	"hotstrings_delay_captions": {

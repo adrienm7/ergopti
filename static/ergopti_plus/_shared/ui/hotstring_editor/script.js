@@ -26,6 +26,11 @@ function _t(key) {
 let D = null;
 let TRIGGER_CHAR = '★';
 let STAR = '★';
+// The magic key as every UI shows it, « ★ (ù) » for another character
+// (_shared/hotstrings/data/magic_key.json display_format, pinned by
+// tools/test/test-magic-key-rules.cjs): never a bare ★ for another character,
+// never that character alone.
+const MAGIC_KEY_DISPLAY_FORMAT = '★ ({char})';
 
 let edSec = null;
 let edEntry = null;
@@ -122,6 +127,16 @@ function normToken(name) {
 }
 
 /**
+ * How the configured magic key is shown: the marker alone when it is the marker.
+ * @param {string} char - Configured magic key.
+ * @returns {string} « ★ » or « ★ (char) ».
+ */
+function magicKeyDisplay(char) {
+	if (char === STAR) return STAR;
+	return MAGIC_KEY_DISPLAY_FORMAT.replace('{char}', char);
+}
+
+/**
  * Replaces the internal star representation with the user's custom trigger character for UI display.
  * @param {string} s - The internal string containing stars.
  * @returns {string} The formatted string ready for display.
@@ -129,6 +144,17 @@ function normToken(name) {
 function toDisplay(s) {
 	if (!s || TRIGGER_CHAR === STAR) return s || '';
 	return String(s).split(STAR).join(TRIGGER_CHAR);
+}
+
+/**
+ * Shows a stored string as a message or a read-only view does: each ★ becomes
+ * the magic key's display, « ★ (ù) ».
+ * @param {string} s - The internal string containing stars.
+ * @returns {string} The string as shown.
+ */
+function toShown(s) {
+	if (!s) return '';
+	return String(s).split(STAR).join(magicKeyDisplay(TRIGGER_CHAR));
 }
 
 /**
@@ -315,7 +341,7 @@ function updateCbDescs() {
 		? (
 				_t('editor.hotstrings.desc_auto_on') ||
 				'Expands immediately (ideal for triggers ending with %s).'
-			).replace('%s', escapeHtml(TRIGGER_CHAR))
+			).replace('%s', escapeHtml(magicKeyDisplay(TRIGGER_CHAR)))
 		: _t('editor.hotstrings.desc_auto_off') ||
 			'Requires Space or Enter to expand (recommended for autocorrect).';
 
@@ -332,27 +358,11 @@ function updateCbDescs() {
 }
 
 /**
- * Updates visual hints explaining trigger characters.
+ * Shows the configured magic key on the button that inserts it.
  */
 function updateHints() {
-	const hint = document.getElementById('trig-hint');
-	if (hint) {
-		if (TRIGGER_CHAR !== STAR) {
-			// The magic key as shown and as stored: keys, so kbd.
-			hint.innerHTML =
-				'<kbd class="star-badge">' +
-				escapeHtml(TRIGGER_CHAR) +
-				'</kbd> ' +
-				(_t('editor.hotstrings.trig_hint_text') || 'shown, stored as') +
-				' <kbd class="star-badge">' +
-				escapeHtml(STAR) +
-				'</kbd>';
-		} else {
-			hint.textContent = '';
-		}
-	}
 	const mb = document.getElementById('magic-btn');
-	if (mb) mb.textContent = TRIGGER_CHAR;
+	if (mb) mb.textContent = magicKeyDisplay(TRIGGER_CHAR);
 }
 
 function updateCompactBtn() {
@@ -398,7 +408,7 @@ function makeTrigChip() {
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.trigChar = 'true';
-	s.textContent = TRIGGER_CHAR;
+	s.textContent = magicKeyDisplay(TRIGGER_CHAR);
 	return s;
 }
 
@@ -880,12 +890,12 @@ function dispTrig(s) {
 	if (!s) return '';
 	return escapeHtml(toDisplay(s))
 		.split(escapeHtml(TRIGGER_CHAR))
-		.join('<kbd class="trig-star">' + escapeHtml(TRIGGER_CHAR) + '</kbd>');
+		.join('<kbd class="trig-star">' + escapeHtml(magicKeyDisplay(TRIGGER_CHAR)) + '</kbd>');
 }
 
 function dispOutput(s) {
 	if (!s) return '';
-	const display = toDisplay(s);
+	const display = toShown(s);
 	const tokens = /\{([^}]+)\}/g;
 	let out = '';
 	let last = 0;
@@ -1459,7 +1469,7 @@ function saveEntry(andNew) {
 				_t('editor.hotstrings.err_trigger_dup_msg') ||
 				'The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?'
 			)
-				.replace('%s', escapeHtml(toDisplay(trig)))
+				.replace('%s', escapeHtml(toShown(trig)))
 				.replace('%s', escapeHtml(dupSection)),
 			executeSave,
 			{
@@ -1479,7 +1489,7 @@ function delEntryStop(e, si, ei) {
 }
 
 function delEntry(si, ei) {
-	const trig = toDisplay(D.sections[si].entries[ei].trigger);
+	const trig = toShown(D.sections[si].entries[ei].trigger);
 	showConfirm(
 		(_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', escapeHtml(trig)),
 		function () {

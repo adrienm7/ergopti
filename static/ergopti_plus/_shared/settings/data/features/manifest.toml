@@ -499,45 +499,6 @@ family = "setting"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
-# The physical key that types the magic key while `hotstrings.magic_key.replace`
-# is on, named by its W3C KeyboardEvent.code like a layout extension's
-# [extension.magic_key] declaration, so one value means the same key on every
-# driver: Windows resolves it to a scan code, macOS to a virtual keycode and
-# Linux to an evdev code, all through _shared/layouts/data/keycodes/physical_keys.json.
-# "auto" leaves the key to the layout: on Windows the emulated layout's declared
-# key, or the key typing magic_key_source_char on the OS layout, or the key the
-# built-in Ergopti layout declares; on macOS and Linux the OS keyboard layout,
-# which types the magic key itself (the driver remaps nothing). The candidates
-# are the character keys a registry layout defines
-# (_shared/layouts/data/mac_keycodes.json) except Space, which every
-# hotstring terminator relies on; tools/test/test-magic-key-source.cjs pins both
-# lists together. It replaced the Windows-only magic_key_source_scan in config
-# schema v5 (migrations.toml), so a value is a parameter of the replace feature,
-# not an activation of its own.
-[[features.hotstrings]]
-id = "magic_key_source"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = "auto"
-recommended = "auto"
-family = "setting"
-type = "enum"
-enum_values = ["auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]
-description_key = "menu.hotstrings.magic_key_source"
-
-# The character whose key Windows looks for on the OS layout when no key is
-# chosen and no emulated layout declares one. The Lua drivers have no such
-# detection: without a choice their OS layout types the magic key itself.
-[[features.hotstrings]]
-id = "magic_key_source_char"
-default = "j"
-recommended = "j"
-family = "setting"
-type = "string"
-description_key = "menu.hotstrings.magic_key_source_char"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.magic_key_detection_is_windows"
-
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
 # it was written: macOS ships the engine (hotstrings/engine/expander/expander.lua
 # try_repeat_feature) AND the toggle, and has for as long as that file has
@@ -2143,6 +2104,39 @@ reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
+# ================================
+# ===== 3.5.1b shortcuts.star =====
+# ================================
+
+# The key that types ★ at its base level, when the layout has one, joins the
+# accented-letter shortcuts (maintainer's decision of 2026-11-21): Ctrl+★ acts
+# as Ctrl+<letter>, so a user who wants Ctrl+★ to save picks « s ». Off in an
+# empty configuration and in the recommended setup: the save rule this replaces
+# was a user's choice.
+[[features.shortcuts.star]]
+id = "enabled"
+default = false
+recommended = false
+family = "feature"
+type = "boolean"
+description_key = "menu.shortcuts.star"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+[[features.shortcuts.star]]
+id = "letter"
+default = "s"
+recommended = "s"
+family = "setting"
+type = "string"
+description_key = "menu.shortcuts.star.letter"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+
+
 # ===================================
 # ===== 3.5.2 shortcuts.e_acute =====
 # ===================================
@@ -2382,18 +2376,39 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 # ====================================
 # ===== 3.5.7 shortcuts.keyboard =====
 
+# The key that types ★ at its base level, when the layout has one: Win+★
+# (Windows, Super+★ on Linux) and Ctrl+★ (macOS) open the hotstrings editor in
+# an empty configuration, the maintainer's decision of 2026-11-21. A layout
+# without such a key binds nothing, so no default ships there. The chord is an
+# ordinary slot of its modifier's submenu, which the user may clear. The shared
+# policy is _shared/shortcuts/engine/star_slot_core.lua.
 [[features.shortcuts.keyboard]]
-id = "magic_editor"
-platforms = ["ahk", "hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+id = "meta_star"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.star_slot_is_ctrl_on_macos"
 default = "open_hotstrings_editor"
 recommended = "open_hotstrings_editor"
 family = "feature"
 active_by_default = true
-rule_exception = "Maintainer decision of 2026-10-02: the conditional editor shortcut ships on; it follows only the unmodified physical magic source and types nothing."
+rule_exception = "Maintainer decision of 2026-11-21: the ★ key's editor shortcut ships on wherever the layout types ★ at its base level, and types nothing."
 cleared = "none"
 type = "action"
-description_key = "menu.shortcuts.keyboard.magic_editor"
+description_key = "menu.shortcuts.keyboard.meta_star"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_star"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.star_slot_is_ctrl_on_macos"
+default = "open_hotstrings_editor"
+recommended = "open_hotstrings_editor"
+family = "feature"
+active_by_default = true
+rule_exception = "Maintainer decision of 2026-11-21: the ★ key's editor shortcut ships on wherever the layout types ★ at its base level, and types nothing."
+cleared = "none"
+type = "action"
+description_key = "menu.shortcuts.keyboard.secondary_star"
 # ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
@@ -4428,21 +4443,6 @@ family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_bottom_row"
 
-# Every shortcut chord on the layout's own magic key sends the same modifiers +
-# S (Ctrl+Shift+★ → Ctrl+Shift+S), AltGr excepted: the shared rule
-# _shared/shortcuts/engine/magic_key_save_core.lua. macOS keeps its switch among
-# its shortcuts (shortcuts.keys.cmd_star).
-[[features.layout]]
-id = "ctrl_magic_save"
-platforms = ["ahk", "linux"]
-requires = { windows = [], linux = ["evdev", "uinput"] }
-reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos"
-default = false
-recommended = false
-family = "feature"
-type = "boolean"
-description_key = "menu.layout.ctrl_magic_save"
-
 # The registry layout (static/layouts/registry, _shared/layouts/data) the
 # three drivers emulate by reading its .keylayout over whatever system layout is
 # installed, "" for none. While set it supersedes the Ergopti emulation above. A
@@ -4635,19 +4635,6 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["hs"]
-requires = { macos = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-# The macOS switch of the shared modifiers + magic key save rule, which Windows
-# and Linux keep as layout.ctrl_magic_save.
-[[features.shortcuts.keys]]
-id = "cmd_star"
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "shortcuts.label_cmd_star"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"

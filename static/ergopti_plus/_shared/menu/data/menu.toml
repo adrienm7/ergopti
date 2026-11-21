@@ -2146,8 +2146,8 @@ reason_key = "platform_reason.only_linux_migrates_in_the_background"
 #   2. The emulation: the layout Ergopti+ types whatever OS layout is
 #      selected. It overrides that layout, nothing installed.
 #   3. The layout tuning: what adjusts the active layout, the OS one or the
-#      emulated one (layers, rows, digits in direct access, accented-letter
-#      shortcuts, the magic key, Ctrl+★).
+#      emulated one (layers, rows, digits in direct access, the shortcuts
+#      on the accented letters and on ★).
 # Then, after a separator and no header, the rows that tune no layout: the
 # physical keyboard Linux decodes and Karabiner presents, and the menu bar icon.
 # docs/memory/maintainer-decisions.md, « The layout menu: input sources,
@@ -2360,7 +2360,8 @@ type = "list"
 id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
-# the accented letter directly in the user's own layout, not Ergopti's positions.
+# the accented letter (or ★, since 2026-11-21) directly in the user's own
+# layout, not Ergopti's positions.
 # Linux follows Windows (modules/shortcuts/accented_shortcuts.lua); a macOS
 # layout file carries its own Command and Control layer.
 [[menu.layout_menu]]
@@ -2369,21 +2370,6 @@ id = "accented_letters"
 i18n = "menu.shortcuts.group_accented"
 platforms = ["ahk", "linux"]
 reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
-
-# The physical key whose replacement choice lives in Hotstrings Ergopti
-# (hotstrings.magic_key_source), on every driver: one row naming the key in
-# effect, whose submenu captures the next key pressed, restores the automatic
-# key or lists every candidate. A `list`, because each candidate is labelled
-# with what the user's own layout types on it, which only the driver can ask.
-[[menu.layout_menu]]
-type = "list"
-id = "magic_key_source"
-
-[[menu.layout_menu]]
-type = "feature"
-path = "layout.ctrl_magic_save"
-platforms = ["ahk", "linux"]
-reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos"
 
 [[menu.layout_menu]]
 type = "---"
@@ -2450,6 +2436,14 @@ reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "a_grave"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+# The key that types ★ at its base level, when the layout has one (maintainer's
+# decision of 2026-11-21): Ctrl+★ can act as Ctrl+S once the user picks « s ».
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "star"
 platforms = ["ahk", "linux"]
 reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
@@ -3808,35 +3802,6 @@ id = "personal_shortcuts_registered"
 i18n = "menu.shortcuts.personal"
 platforms = ["ahk"]
 unavailable = "hide"
-
-# Complete physical magic-key presentation. Native ports supply only current
-# key text, candidate data and the existing capture/choice command callbacks.
-[[menu.magic_key_source_menu]]
-type = "group"
-id = "magic_key_source_heading"
-i18n = "menu.layout.magic_key_source"
-
-[[menu.magic_key_source_children]]
-type = "command"
-id = "magic_key_source_capture"
-i18n = "menu.layout.magic_key_source.capture"
-disabled_when = ["magic_key_source_capture_ready"]
-
-[[menu.magic_key_source_children]]
-type = "---"
-
-[[menu.magic_key_source_children]]
-type = "check"
-id = "magic_key_source_automatic"
-i18n = "menu.layout.magic_key_source.auto"
-checked_when = ["magic_key_source_is_automatic"]
-
-[[menu.magic_key_source_children]]
-type = "---"
-
-[[menu.magic_key_source_children]]
-type = "list"
-id = "magic_key_source_candidates"
 
 # Parameter providers retain their native state and mutation owners; these frames
 # own the fixed parent captions, child order and presentation boundaries.

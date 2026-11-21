@@ -632,26 +632,14 @@
 		"path": "layout_menu.accented_letters",
 		"visibility": "hide",
 		"labels": {
-			"fr": "Raccourcis sur é è ê à (en accès direct)",
-			"en": "Shortcuts on é è ê à (when typed directly)"
+			"fr": "Raccourcis sur é è ê à ★ (en accès direct)",
+			"en": "Shortcuts on é è ê à ★ (when typed directly)"
 		},
 		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
 				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.",
 				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici."
-			}
-		}
-	},
-	{
-		"path": "layout_menu.layout.ctrl_magic_save",
-		"visibility": "hide",
-		"labels": { "fr": "layout.ctrl_magic_save", "en": "layout.ctrl_magic_save" },
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": {
-			"macos": {
-				"en": "Not on macOS: macOS keeps this setting among its shortcuts (Cmd+★ → Cmd+S). On all three systems the rule is the same: the magic key with modifiers sends the same modifiers + S.",
-				"fr": "Pas sous macOS : macOS range ce réglage dans ses raccourcis (Cmd+★ → Cmd+S). Sur les trois systèmes la règle est la même : la touche magique avec des modificateurs envoie les mêmes modificateurs + S."
 			}
 		}
 	},
@@ -743,6 +731,18 @@
 		"path": "accented_letters_group.a_grave",
 		"visibility": "hide",
 		"labels": { "fr": "a_grave", "en": "a_grave" },
+		"platforms": { "windows": true, "macos": false, "linux": true },
+		"reasons": {
+			"macos": {
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici."
+			}
+		}
+	},
+	{
+		"path": "accented_letters_group.star",
+		"visibility": "hide",
+		"labels": { "fr": "star", "en": "star" },
 		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {

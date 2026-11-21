@@ -501,8 +501,6 @@ class MenuCommand {
 	static MAGIC_KEY_CONFIG_LINUX := "magic_key_config_linux"
 	static MAGIC_KEY_CONFIG_NATIVE := "magic_key_config_native"
 	static MAGIC_KEY_RESET := "magic_key_reset"
-	static MAGIC_KEY_SOURCE_AUTOMATIC := "magic_key_source_automatic"
-	static MAGIC_KEY_SOURCE_CAPTURE := "magic_key_source_capture"
 	static MANUAL_TUTORIAL := "manual_tutorial"
 	static MENUBAR_COLORS := "menubar_colors"
 	static MENUBAR_ICON := "menubar_icon"

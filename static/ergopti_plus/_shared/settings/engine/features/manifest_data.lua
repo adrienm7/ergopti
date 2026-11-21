@@ -90,12 +90,6 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" }, recommended = "★", family = "setting",
 	},
 	{
-		path = "hotstrings.magic_key_source", id = "magic_key_source", section = "hotstrings", default = "auto", type = "enum", description_key = "menu.hotstrings.magic_key_source", platforms = { "ahk", "hs", "linux" }, recommended = "auto", family = "setting", enum_values = { "auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash" },
-	},
-	{
-		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_detection_is_windows", platforms = { "ahk" },
-	},
-	{
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
@@ -522,6 +516,12 @@ M.features = {
 		path = "shortcuts.a_grave.letter", id = "letter", section = "shortcuts.a_grave", default = "v", type = "string", description_key = "menu.shortcuts.a_grave.letter", platforms = { "ahk", "linux" }, recommended = "v", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
+		path = "shortcuts.star.enabled", id = "enabled", section = "shortcuts.star", default = false, type = "boolean", description_key = "menu.shortcuts.star", platforms = { "ahk", "linux" }, recommended = false, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+	},
+	{
+		path = "shortcuts.star.letter", id = "letter", section = "shortcuts.star", default = "s", type = "string", description_key = "menu.shortcuts.star.letter", platforms = { "ahk", "linux" }, recommended = "s", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+	},
+	{
 		path = "shortcuts.e_acute.enabled", id = "enabled", section = "shortcuts.e_acute", default = false, type = "boolean", description_key = "menu.shortcuts.e_acute", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
@@ -570,7 +570,10 @@ M.features = {
 		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", family = "feature", cleared = "none",
 	},
 	{
-		path = "shortcuts.keyboard.magic_editor", id = "magic_editor", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.magic_editor", platforms = { "ahk", "hs", "linux" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none",
+		path = "shortcuts.keyboard.meta_star", id = "meta_star", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.meta_star", platforms = { "ahk", "linux" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none", reason_key = "platform_reason.star_slot_is_ctrl_on_macos",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_star", id = "secondary_star", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.secondary_star", platforms = { "hs" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none", reason_key = "platform_reason.star_slot_is_ctrl_on_macos",
 	},
 	{
 		path = "shortcuts.keyboard.primary_b", section = "shortcuts.keyboard", platforms = { "ahk" },
@@ -1080,9 +1083,6 @@ M.features = {
 		path = "layout.emulate_bottom_row", id = "emulate_bottom_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_bottom_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.ctrl_magic_save", id = "ctrl_magic_save", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ctrl_magic_save", platforms = { "ahk", "linux" }, recommended = false, family = "feature", reason_key = "platform_reason.ctrl_magic_save_is_cmd_star_on_macos",
-	},
-	{
 		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
 	},
 	{
@@ -1117,9 +1117,6 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "category_enabled.autocorrection", section = "category_enabled", platforms = { "ahk" },

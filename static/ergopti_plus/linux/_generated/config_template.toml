@@ -63,7 +63,6 @@ enabled = false
 
 [hotstrings]
 trigger_char = "★"
-magic_key_source = "auto"
 repeat_key_enabled = false
 backspace_restore_enabled = true
 backspace_restore_window_ms = 500
@@ -519,6 +518,12 @@ letter = "v"
 
 
 
+[shortcuts.star]
+enabled = false
+letter = "s"
+
+
+
 [shortcuts.e_acute]
 enabled = false
 letter = "c"
@@ -562,7 +567,7 @@ script_altgr_escape = "script_quit"
 
 
 [shortcuts.keyboard]
-magic_editor = "open_hotstrings_editor"
+meta_star = "open_hotstrings_editor"
 
 
 
@@ -725,7 +730,6 @@ emulate_number_row = true
 emulate_top_row = true
 emulate_home_row = true
 emulate_bottom_row = true
-ctrl_magic_save = false
 emulated_layout = ""
 pause_switch_enabled = false
 on_pause = ""

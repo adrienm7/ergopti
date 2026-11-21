@@ -47,7 +47,6 @@ local PRESENTATIONS = {
 }
 
 local NATIVE_PRESENTATIONS = {
-	["magic_key_source_notice"] = { kind = "notification", title_key = "dialog.magic_key_source.title", platforms = {"linux"} },
 	["profile_shortcut_dialog"] = { kind = "dialog", title_key = "menu.profiles.shortcut_title", platforms = {"hs"} },
 }
 

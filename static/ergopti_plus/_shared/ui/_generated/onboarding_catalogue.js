@@ -3588,28 +3588,6 @@
 												"key": "shortcuts.label_wrap_text"
 											}
 										]
-									},
-									{
-										"path": "shortcuts.keys.cmd_star",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.cmd"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"text": "★"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_cmd_star"
-											}
-										]
 									}
 								]
 							}

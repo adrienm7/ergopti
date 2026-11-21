@@ -479,33 +479,47 @@ Cancel button stops it, on the three OS:
 No compatibility path was kept (the maintainer asked for clean breaks, Linux
 has no users).
 
-## Modifiers + ★ send the same modifiers + S on the three OS (2026-11-20)
+## The magic key is a configured character (2026-11-21)
 
-Decided by the maintainer on 2026-11-20 (TODO BND-1, BND-2: « ★ en accès
-direct mais tous les raccourcis avec modifiers donnent avec s », « sur les 3
-os »): the layout's own magic key typed alone stays the magic key, and every
-shortcut chord on it sends the same modifiers + S on Windows, macOS and Linux
-(Ctrl+Shift+★ → Ctrl+Shift+S, Alt+★ → Alt+S, Cmd+★ → Cmd+S, Win+Shift+★ →
-Win+Shift+S). One rule decides it: `_shared/shortcuts/engine/magic_key_save_core.lua`
-and its AHK twin `_shared/shortcuts/data/magic_key_save.ahk`, both replaying
-`_shared/tests/corpus/shortcuts/magic_key_save_vectors.json`. Its exceptions:
+Decided by the maintainer on 2026-11-21 for Windows, macOS and Linux
+(« touche ★ / touche magique »). It supersedes the modifiers + ★ save of
+2026-11-20 (TODO BND-1, BND-2) and the conditional editor shortcut of
+2026-10-02.
 
-- Shift alone keeps the key's Shift level.
-- The AltGr chord keeps the layout's AltGr character, never AltGr+S: Ctrl+Alt
-  without Win on Windows, Option without Cmd or Ctrl on macOS (so Option+★ is
-  not Alt+S there), AltGr with anything else held on Linux.
-- A keyboard shortcut assigned to the exact chord keeps it, the magic editor's
-  Win+★ (Windows), Ctrl+★ (macOS) and Super+★ (Linux) included: the save takes
-  only the chords no shortcut owns.
-- As before, only while the magic key is replaced and the driver is not paused,
-  never on a physical magic key the user chose, and every auto-repeat saves
-  again.
-
-The switches stay where they were: `layout.ctrl_magic_save` on Windows and
-Linux, `shortcuts.keys.cmd_star` on macOS. Merging them would move the macOS
-tap out of the shortcut bindings that own its lifecycle and menu row, for no
-change of behaviour, so each switch now covers the whole rule
-(`platform_reason.ctrl_magic_save_is_cmd_star_on_macos`, kind `driver_storage`).
+- The magic key is the character of `hotstrings.trigger_char`, set in a
+  one-character input box, never a physical key position: the user-chosen
+  physical key (`hotstrings.magic_key_source`, its capture and candidate
+  list) and the Windows detection character (`magic_key_source_char`) are
+  gone. The `replace` section keeps only the key the emulated layout declares
+  (`[extension.magic_key]`).
+- Its default follows the layout that types: « ù » on AZERTY, « ; » on
+  QWERTY, the manifest default « ★ » elsewhere. One source:
+  `_shared/hotstrings/data/magic_key.json` (`layout_families`, probed on the
+  base level of named keys), read by `_shared/hotstrings/engine/magic_key.lua`
+  and `_shared/hotstrings/data/magic_key.ahk`, replaying
+  `_shared/tests/corpus/hotstrings/magic_key_vectors.json`. Linux accepts any
+  one character, as Windows and macOS do.
+- Hotstring data (catalogues, extensions, personal files) always writes the
+  real ★; each driver replaces it by the configured character at runtime.
+- Every UI shows « ★ (configured character) », « ★ (ù) », never a bare ★
+  for another character and never that character alone: menus, tooltips,
+  previews, the hotstring editor. The locale keys listed in
+  `literal_marker_keys` name the real ★ (the CapsWord delimiter, the ★ option,
+  the key that types ★) and keep it. Studio shows layouts, not the magic key.
+- Removed: modifiers + ★ → modifiers + S (`layout.ctrl_magic_save`,
+  `shortcuts.keys.cmd_star`, `magic_key_save_core.lua`) and the hard-coded
+  « Win+★ / Ctrl+★ opens the hotstring editor » (`shortcuts.keyboard.magic_editor`).
+- Only a layout with a key that types ★ at its base level ships a default
+  shortcut: Win+★ (`meta_star`, Super+★ on Linux) and Ctrl+★ on macOS
+  (`secondary_star`) open the hotstrings editor. They are ordinary slots of
+  the « with Win » / « with Ctrl » submenu, which the user may clear; a layout
+  without such a key binds nothing. Policy: `_shared/shortcuts/engine/star_slot_core.lua`
+  and its AHK twin, replaying `star_slot_vectors.json`.
+- The accented-letter shortcuts (é è ê à) gain the key that types ★ at its
+  base level (`shortcuts.star`, off by default, letter « s »): a user who wants
+  Ctrl+★ to act as Ctrl+S turns it on. macOS keeps the accented reason: its
+  layout file owns the Command layer.
+- No other shortcut defaults to an AI prediction or to the hotstring editor.
 
 ## The Backspace undo counts per host, not per perceived character (2026-11-19)
 
@@ -628,8 +642,8 @@ it reads in this order on the three OS:
    émulées » (the rows left to the OS layout while learning), the number row
    (`number_row_policy`, digits in direct access on the OS or emulated
    layout), the é è ê à shortcuts (Windows, Linux; they follow the key that
-   types the letter in the active layout), the physical magic key and the
-   modifiers + ★ save (Windows, Linux). The former « Couches émulées » sub-header
+   types the letter in the active layout, and ★ since 2026-11-21). The former
+   « Couches émulées » sub-header
    (`menu.layout.header_layers`) left: this header covers the two layer rows.
 4. Last, past a separator and without a header, the rows that tune no layout:
    Linux's base layout (`base_layouts`, the physical qwerty / azerty family

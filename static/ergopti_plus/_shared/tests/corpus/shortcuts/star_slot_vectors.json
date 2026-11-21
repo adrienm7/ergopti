@@ -1,19 +1,19 @@
 {
-	"version": 1,
+	"version": 2,
+	"description": "Replayed by the three drivers (Lua: _shared/tests/lua/layouts/star_slot_contract.lua; AutoHotkey through _shared/shortcuts/data/star_slot.ahk). The source of the ★ key's slot is the one key that types the real ★ at its base level; the configured magic key never moves it. A change without candidates has KeyC typing ★.",
 	"vectors": [
 		{
-			"id": "absent_action_follows_direct_semicolon",
+			"id": "absent_action_follows_the_direct_star_key",
 			"changes": {},
 			"expected": {
 				"active": true,
 				"action": "open_hotstrings_editor",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
-			"id": "trigger_moves_to_direct_u_grave",
+			"id": "configured_magic_key_never_moves_the_slot",
 			"changes": {
-				"trigger": "ù",
 				"candidates": [
 					{
 						"code": "Quote",
@@ -26,15 +26,15 @@
 				]
 			},
 			"expected": {
-				"active": true,
+				"active": false,
 				"action": "open_hotstrings_editor",
-				"source_code": "Quote"
+				"reason": "source_missing",
+				"source_code": null
 			}
 		},
 		{
 			"id": "direct_star_comes_from_its_actual_key",
 			"changes": {
-				"trigger": "★",
 				"candidates": [
 					{
 						"code": "KeyC",
@@ -53,9 +53,8 @@
 			}
 		},
 		{
-			"id": "case_sensitive_trigger_never_selects_lowercase",
+			"id": "a_letter_key_is_never_the_star_key",
 			"changes": {
-				"trigger": "A",
 				"candidates": [
 					{
 						"code": "KeyA",
@@ -75,15 +74,14 @@
 			}
 		},
 		{
-			"id": "shift_required_trigger_stays_inactive",
+			"id": "shift_level_star_stays_inactive",
 			"changes": {
-				"trigger": "*",
 				"candidates": [
 					{
 						"code": "Digit8",
 						"native_code": 28,
 						"identity": "physical:Digit8",
-						"text": "*",
+						"text": "★",
 						"direct": false,
 						"dead": false
 					}
@@ -97,15 +95,14 @@
 			}
 		},
 		{
-			"id": "altgr_required_trigger_stays_inactive",
+			"id": "altgr_level_star_stays_inactive",
 			"changes": {
-				"trigger": "™",
 				"candidates": [
 					{
 						"code": "Digit2",
 						"native_code": 19,
 						"identity": "physical:Digit2",
-						"text": "™",
+						"text": "★",
 						"direct": false,
 						"dead": false
 					}
@@ -119,15 +116,14 @@
 			}
 		},
 		{
-			"id": "dead_accent_is_not_a_direct_tap",
+			"id": "dead_star_is_not_a_direct_tap",
 			"changes": {
-				"trigger": "^",
 				"candidates": [
 					{
 						"code": "BracketLeft",
 						"native_code": 33,
 						"identity": "physical:BracketLeft",
-						"text": "^",
+						"text": "★",
 						"direct": false,
 						"dead": true
 					}
@@ -145,10 +141,10 @@
 			"changes": {
 				"candidates": [
 					{
-						"code": "Semicolon",
-						"native_code": 41,
-						"identity": "physical:Semicolon",
-						"text": ";",
+						"code": "KeyC",
+						"native_code": 8,
+						"identity": "physical:KeyC",
+						"text": "★",
 						"direct": true,
 						"dead": false
 					},
@@ -156,7 +152,7 @@
 						"code": "Quote",
 						"native_code": 39,
 						"identity": "physical:Quote",
-						"text": ";",
+						"text": "★",
 						"direct": true,
 						"dead": false
 					}
@@ -174,18 +170,18 @@
 			"changes": {
 				"candidates": [
 					{
-						"code": "Semicolon",
-						"native_code": 41,
-						"identity": "physical:Semicolon",
-						"text": ";",
+						"code": "KeyC",
+						"native_code": 8,
+						"identity": "physical:KeyC",
+						"text": "★",
 						"direct": true,
 						"dead": false
 					},
 					{
-						"code": "Semicolon",
-						"native_code": 41,
-						"identity": "physical:Semicolon",
-						"text": ";",
+						"code": "KeyC",
+						"native_code": 8,
+						"identity": "physical:KeyC",
+						"text": "★",
 						"direct": true,
 						"dead": false
 					}
@@ -194,7 +190,7 @@
 			"expected": {
 				"active": true,
 				"action": "open_hotstrings_editor",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -206,7 +202,7 @@
 				"active": false,
 				"action": "none",
 				"reason": "shortcut_disabled",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -217,7 +213,7 @@
 			"expected": {
 				"active": true,
 				"action": "copy",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -229,7 +225,7 @@
 				"active": false,
 				"action": "open_hotstrings_editor",
 				"reason": "shortcuts_disabled",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -241,7 +237,7 @@
 				"active": false,
 				"action": "open_hotstrings_editor",
 				"reason": "paused",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -253,7 +249,7 @@
 				"active": false,
 				"action": "open_hotstrings_editor",
 				"reason": "inhibited",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -265,7 +261,7 @@
 				"active": false,
 				"action": "open_hotstrings_editor",
 				"reason": "explicit_assignment",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -277,7 +273,7 @@
 				"active": false,
 				"action": "open_hotstrings_editor",
 				"reason": "explicit_assignment",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
@@ -312,13 +308,22 @@
 			"expected": {
 				"active": true,
 				"action": "open_hotstrings_editor",
-				"source_code": "Semicolon"
+				"source_code": "KeyC"
 			}
 		},
 		{
-			"id": "changed_trigger_never_keeps_the_previous_key",
+			"id": "semicolon_layout_has_no_star_key",
 			"changes": {
-				"trigger": "ù"
+				"candidates": [
+					{
+						"code": "Semicolon",
+						"native_code": 41,
+						"identity": "physical:Semicolon",
+						"text": ";",
+						"direct": true,
+						"dead": false
+					}
+				]
 			},
 			"expected": {
 				"active": false,

@@ -141,39 +141,6 @@
 		"reason": null
 	},
 	{
-		"path": "hotstrings.magic_key_source",
-		"family": "setting",
-		"labels": {
-			"fr": "Touche physique de la touche magique",
-			"en": "Physical key of the magic key"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": true,
-			"linux": true
-		},
-		"reason_key": null,
-		"reason": null
-	},
-	{
-		"path": "hotstrings.magic_key_source_char",
-		"family": "setting",
-		"labels": {
-			"fr": "Caractère de la touche source magique",
-			"en": "Magic-key source character"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.magic_key_detection_is_windows",
-		"reason": {
-			"fr": "Windows uniquement : sans touche choisie, Windows cherche la touche qui tape ce caractère sur sa disposition de clavier. Sur macOS et Linux, la disposition de clavier tape elle-même la touche magique.",
-			"en": "Windows only: with no key chosen, Windows looks for the key that types this character on its keyboard layout. On macOS and Linux the keyboard layout itself types the magic key."
-		}
-	},
-	{
 		"path": "hotstrings.repeat_key_enabled",
 		"family": "feature",
 		"labels": {
@@ -2340,6 +2307,42 @@
 		}
 	},
 	{
+		"path": "shortcuts.star.enabled",
+		"family": "feature",
+		"labels": {
+			"fr": "shortcuts.star.enabled",
+			"en": "shortcuts.star.enabled"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+		"reason": {
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
+		}
+	},
+	{
+		"path": "shortcuts.star.letter",
+		"family": "setting",
+		"labels": {
+			"fr": "shortcuts.star.letter",
+			"en": "shortcuts.star.letter"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": false,
+			"linux": true
+		},
+		"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+		"reason": {
+			"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. L’émulation d’une disposition sous macOS prend elle aussi la combinaison dans cette couche (celle d’Ergopti donne Cmd+è, ê, é, à comme Cmd+Z, X, C, V), et macOS n’offre aucun menu pour choisir une autre lettre. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Sous une disposition Ergopti émulée, Windows et Linux appliquent aussi la lettre choisie ici.",
+			"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too."
+		}
+	},
+	{
 		"path": "shortcuts.e_acute.enabled",
 		"family": "feature",
 		"labels": {
@@ -2607,19 +2610,40 @@
 		"reason": null
 	},
 	{
-		"path": "shortcuts.keyboard.magic_editor",
+		"path": "shortcuts.keyboard.meta_star",
 		"family": "feature",
 		"labels": {
-			"fr": "Raccourci de la touche magique",
-			"en": "Magic-key shortcut"
+			"fr": "Win / Super + ★ : Ouvrir l’éditeur de hotstrings",
+			"en": "Win / Super + ★: Open the hotstrings editor"
 		},
 		"platforms": {
 			"windows": true,
-			"macos": true,
+			"macos": false,
 			"linux": true
 		},
-		"reason_key": null,
-		"reason": null
+		"reason_key": "platform_reason.star_slot_is_ctrl_on_macos",
+		"reason": {
+			"fr": "Win+★ sous Windows, Super+★ sous Linux, Ctrl+★ sous macOS : un clavier Mac n’a pas de touche Windows, et Ctrl y est le modificateur resté libre à côté de Cmd.",
+			"en": "Win+★ on Windows, Super+★ on Linux, Ctrl+★ on macOS: a Mac keyboard has no Windows key, and Ctrl is the modifier left free beside Cmd."
+		}
+	},
+	{
+		"path": "shortcuts.keyboard.secondary_star",
+		"family": "feature",
+		"labels": {
+			"fr": "Ctrl + ★ : Ouvrir l’éditeur de hotstrings",
+			"en": "Ctrl + ★: Open the hotstrings editor"
+		},
+		"platforms": {
+			"windows": false,
+			"macos": true,
+			"linux": false
+		},
+		"reason_key": "platform_reason.star_slot_is_ctrl_on_macos",
+		"reason": {
+			"fr": "Win+★ sous Windows, Super+★ sous Linux, Ctrl+★ sous macOS : un clavier Mac n’a pas de touche Windows, et Ctrl y est le modificateur resté libre à côté de Cmd.",
+			"en": "Win+★ on Windows, Super+★ on Linux, Ctrl+★ on macOS: a Mac keyboard has no Windows key, and Ctrl is the modifier left free beside Cmd."
+		}
 	},
 	{
 		"path": "shortcuts.keyboard.primary_b",
@@ -5526,24 +5550,6 @@
 		"reason": null
 	},
 	{
-		"path": "layout.ctrl_magic_save",
-		"family": "feature",
-		"labels": {
-			"fr": "layout.ctrl_magic_save",
-			"en": "layout.ctrl_magic_save"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": true
-		},
-		"reason_key": "platform_reason.ctrl_magic_save_is_cmd_star_on_macos",
-		"reason": {
-			"fr": "Pas sous macOS : macOS range ce réglage dans ses raccourcis (Cmd+★ → Cmd+S). Sur les trois systèmes la règle est la même : la touche magique avec des modificateurs envoie les mêmes modificateurs + S.",
-			"en": "Not on macOS: macOS keeps this setting among its shortcuts (Cmd+★ → Cmd+S). On all three systems the rule is the same: the magic key with modifiers sends the same modifiers + S."
-		}
-	},
-	{
 		"path": "layout.emulated_layout",
 		"family": "feature",
 		"labels": {
@@ -5735,24 +5741,6 @@
 		"labels": {
 			"fr": "Taper un symbole encadre la sélection",
 			"en": "Typing a symbol wraps the selection"
-		},
-		"platforms": {
-			"windows": false,
-			"macos": true,
-			"linux": false
-		},
-		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
-		"reason": {
-			"fr": "Ce raccourci appartient au système qui le lie : chaque pilote propose ses actions sur les combinaisons que son système laisse libres (touche Windows sous Windows, Ctrl et Cmd sous macOS, emplacements du clavier sous Linux) et enregistre le choix sous son propre nom.",
-			"en": "This shortcut belongs to the system that binds it: each driver offers its actions on the chords its own system leaves free (Windows key combinations on Windows, Ctrl and Cmd on macOS, keyboard slots on Linux) and stores the choice under its own name."
-		}
-	},
-	{
-		"path": "shortcuts.keys.cmd_star",
-		"family": "feature",
-		"labels": {
-			"fr": "Modificateurs + ★ envoient modificateurs + S (Cmd+★ → Cmd+S)",
-			"en": "Modifiers + ★ send modifiers + S (Cmd+★ → Cmd+S)"
 		},
 		"platforms": {
 			"windows": false,

@@ -18,7 +18,6 @@ reading_spacing = "default"
 [hotstrings]
 enabled = false
 trigger_char = "★"
-magic_key_source = "auto"
 repeat_key_enabled = false
 backspace_restore_enabled = true
 backspace_restore_window_ms = 500
@@ -534,7 +533,7 @@ script_altgr_escape = "script_quit"
 
 
 [shortcuts.keyboard]
-magic_editor = "open_hotstrings_editor"
+secondary_star = "open_hotstrings_editor"
 
 
 
@@ -730,4 +729,3 @@ sticky_timeout_ms = 2000
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-cmd_star = false

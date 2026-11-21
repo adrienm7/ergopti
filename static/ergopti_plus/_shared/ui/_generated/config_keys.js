@@ -511,8 +511,6 @@
 			MAGIC_KEY_CONFIG_LINUX: "magic_key_config_linux",
 			MAGIC_KEY_CONFIG_NATIVE: "magic_key_config_native",
 			MAGIC_KEY_RESET: "magic_key_reset",
-			MAGIC_KEY_SOURCE_AUTOMATIC: "magic_key_source_automatic",
-			MAGIC_KEY_SOURCE_CAPTURE: "magic_key_source_capture",
 			MANUAL_TUTORIAL: "manual_tutorial",
 			MENUBAR_COLORS: "menubar_colors",
 			MENUBAR_ICON: "menubar_icon",
