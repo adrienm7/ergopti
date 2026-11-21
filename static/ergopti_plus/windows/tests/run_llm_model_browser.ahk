@@ -103,6 +103,9 @@ class WebView2 {
 }
 
 #Include ../core/network/engine/external_url_policy.ahk
+; The page asks the uninstall owner whether the managed runtime is published;
+; the real lookup runs here against the stubbed empty managed root above.
+#Include ../ai/engine/ollama/runtime_uninstall.ahk
 #Include ../ai/ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
