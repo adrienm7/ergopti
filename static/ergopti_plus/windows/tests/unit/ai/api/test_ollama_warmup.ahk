@@ -365,3 +365,58 @@ for _OllamaPendingRetryMode in ["pending", "complete", "disabled", "ready", "mod
 
 Test("warmup status snapshot: retry observes the owned completion flag (warmup-status-snapshot)",
 	_OllamaWarmupPendingRetryCase.Bind("snapshot"))
+
+/** A managed flow that records the repair pulls the warmup asks of it. */
+class _OllamaRepairFlow {
+	__New(Accept) {
+		this.Accept := Accept
+		this.Pulls := []
+	}
+
+	PullModel(Model, OnDone := 0, CurrentFn := 0, Repair := false) {
+		this.Pulls.Push(Map("model", Model, "repair", Repair, "done", OnDone))
+		return this.Accept
+	}
+}
+
+/**
+ * Answers one warmup with a load failure, through the real result path.
+ * @param {String} Mode "load", "again", "crash" or "refused".
+ */
+_OllamaWarmupRepairCase(Mode) {
+	global _LLM_Ollama_RepairPort, _LLM_Ollama_RepairedModels, _LLM_Ollama_WarmupRetryModel
+		, _LLM_Ollama_WarmupGeneration
+	SavedPort := _LLM_Ollama_RepairPort, SavedRepaired := _LLM_Ollama_RepairedModels
+	SavedModel := _LLM_Ollama_WarmupRetryModel
+	Flow := _OllamaRepairFlow(Mode != "refused"), Notices := []
+	LoadBody := '{"error":"Unable to load model: C:\\models\\blobs\\sha256-ab"}'
+	try {
+		_LLM_Ollama_RepairPort := Map("flow", Flow, "notify", Notify)
+		_LLM_Ollama_RepairedModels := Map()
+		_LLM_Ollama_WarmupRetryModel := "qwen:2b"
+		Body := Mode == "crash" ? '{"error":"llama runner process has terminated: exit status 2"}' : LoadBody
+		_LLM_Ollama_OnWarmupDone(500, _LLM_Ollama_WarmupGeneration, Body)
+		if Mode == "again"
+			_LLM_Ollama_OnWarmupDone(500, _LLM_Ollama_WarmupGeneration, LoadBody)
+		if Mode == "crash" {
+			AssertEqual(0, Flow.Pulls.Length, "another load failure is only reported")
+			AssertEqual(0, Notices.Length)
+			return
+		}
+		AssertEqual(1, Flow.Pulls.Length, "a model Ollama cannot load is pulled once, never twice")
+		AssertEqual("qwen:2b", Flow.Pulls[1]["model"])
+		AssertTrue(Flow.Pulls[1]["repair"], "a repair asks no download consent")
+		AssertEqual(Mode == "refused" ? 0 : 1, Notices.Length, "the repair is told once it runs")
+	} finally {
+		LLM_OllamaCancelWarmupRetry()
+		_LLM_Ollama_RepairPort := SavedPort, _LLM_Ollama_RepairedModels := SavedRepaired
+		_LLM_Ollama_WarmupRetryModel := SavedModel
+	}
+	Notify(Body, Title) {
+		Notices.Push(Title)
+		AssertTrue(InStr(Body, "qwen:2b") > 0, "the notice names the model")
+		return true
+	}
+}
+for _OllamaRepairMode in ["load", "again", "crash", "refused"]
+	Test("warmup model repair (oll-10): " . _OllamaRepairMode, _OllamaWarmupRepairCase.Bind(_OllamaRepairMode))

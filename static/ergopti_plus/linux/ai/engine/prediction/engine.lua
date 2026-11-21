@@ -4239,6 +4239,23 @@ function M.warmup_request(target, on_done)
 	return ollama.warmup(target.origin, target.model, target.receipt, on_done)
 end
 
+--- Pulls a model once more after Ollama could not load it, as Windows and
+--- macOS do: Ollama downloads the damaged layers again, then the selection of
+--- the installed tag warms it again.
+--- @param failure table The shared policy's load failure.
+--- @return boolean dispatched
+function M.repair_model(failure)
+	if not LocalModelPolicy.is_load_failure(failure) then return false end
+	local text = string.format(i18n.get("ollama.model_repair"), failure.model)
+	local ok, sent = pcall(require("platform.focus.application_notifier").send, text,
+		{ title = i18n.get("ollama.model_repair_title"), level = "info" })
+	if not ok or sent ~= true then Logger.warn(LOG, "The model repair notice was not shown.") end
+	return M.download_model(failure.model, failure.model, function(succeeded)
+		if succeeded then Logger.info(LOG, "The model Ollama could not load was pulled again.")
+		else Logger.error(LOG, "The repair pull of a model Ollama could not load failed.") end
+	end) == true
+end
+
 --- The health the AI title dot shows, from the Ollama warmup chain.
 --- @return string|nil status "ready", "warming", "unreachable", or nil when
 ---   no Ollama model may be loaded now (the API backend has no load gate).

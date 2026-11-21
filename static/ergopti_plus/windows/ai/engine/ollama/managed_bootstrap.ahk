@@ -846,8 +846,12 @@ class OllamaManagedBootstrap {
 		return this._NativePull()
 	}
 
-	/** An explicit menu download borrows this exact ready runtime, never PATH. */
-	PullModel(Model, OnDone := 0, CurrentFn := 0) {
+	/**
+	 * An explicit menu download borrows this exact ready runtime, never PATH.
+	 * A repair pulls an installed model Ollama could not load, so it asks no
+	 * download consent: the model was consented to when first installed.
+	 */
+	PullModel(Model, OnDone := 0, CurrentFn := 0, Repair := false) {
 		if !this.Ready || !this._Current() || !this.RuntimeIdentityReady() || IsObject(this.PullTask) || this.MenuPull is Map
 			return false
 		try Tag := LLM_ManagedModelTag(Model)
@@ -865,7 +869,7 @@ class OllamaManagedBootstrap {
 			return false
 		LoggerTrace("LLM.managed", "Starting bounded managed menu model download.")
 		try {
-			if !this._Consent("model", Tag) {
+			if !Repair && !this._Consent("model", Tag) {
 				this._MenuPullRetire(Operation)
 				return false
 			}

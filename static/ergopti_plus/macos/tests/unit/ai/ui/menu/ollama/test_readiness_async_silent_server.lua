@@ -186,6 +186,60 @@ helpers.describe("Ollama pull loadability failure", function()
 	end)
 end)
 
+helpers.describe("Ollama model repair reads the shared load rule (oll-10)", function()
+	--- Checks an installed model, then answers its load probe.
+	--- @param fixture table The real-manager fixture.
+	--- @param status integer HTTP status of the load answer.
+	--- @param body string Load answer body.
+	--- @return table terminal External terminal counters and failure reasons.
+	local function answer_installed_load(fixture, status, body)
+		local terminal = {successes = 0, failures = 0, reasons = {}}
+		fixture.manager.check_requirements("missing-model", function()
+			terminal.successes = terminal.successes + 1
+			return true
+		end, function(reason)
+			terminal.failures = terminal.failures + 1
+			terminal.reasons[#terminal.reasons + 1] = reason
+			return true
+		end, {is_current = function() return true end})
+		fixture.spawns[1].complete(0, '{"version":"ready"}', "")
+		fixture.native_tasks[1].on_done(0, "NAME ID SIZE\nmissing-model:latest a1 1 GB\n", "")
+		fixture.http_callbacks[1].callback(status, body, {})
+		return terminal
+	end
+
+	--- Counts the model repair notices.
+	--- @param fixture table The real-manager fixture.
+	--- @return integer count
+	local function repair_notices(fixture)
+		local count = 0
+		for _, notice in ipairs(fixture.notifications) do
+			if notice[1] == "ollama.model_repair_title" then count = count + 1 end
+		end
+		return count
+	end
+
+	helpers.it("(oll-10) pulls an installed model once more when Ollama cannot load it, whatever its casing", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local terminal = answer_installed_load(fixture, 500,
+				'{"error":"Unable to load model: /models/blobs/sha256-ab"}')
+			helpers.assert_eq(fixture.native_tasks[2] and fixture.native_tasks[2].label, "Ollama model pull")
+			helpers.assert_eq(repair_notices(fixture), 1)
+			helpers.assert_eq(terminal.failures, 0)
+		end)
+	end)
+
+	helpers.it("(oll-10) reports another load failure without pulling", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local terminal = answer_installed_load(fixture, 500,
+				'{"error":"llama runner process has terminated: exit status 2"}')
+			helpers.assert_nil(fixture.native_tasks[2])
+			helpers.assert_eq(repair_notices(fixture), 0)
+			helpers.assert_eq(terminal.reasons, {"model_load_failed"})
+		end)
+	end)
+end)
+
 helpers.describe("Ollama model-ready presentation owns loadability", function()
 	local function ready_notice_count(fixture)
 		local count = 0

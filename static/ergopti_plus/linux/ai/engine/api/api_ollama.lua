@@ -337,7 +337,8 @@ end
 --- @param base_url string Ollama origin.
 --- @param model string Ollama-native tag.
 --- @param runtime_receipt table|nil The engine's runtime receipt the target was read with.
---- @param on_done function Receives (loaded, failure): a string, or the missing-model failure.
+--- @param on_done function Receives (loaded, failure): a string, or the missing-model or
+---   load failure of the shared policy.
 --- @return table operation Owned transport; `started` is false when refused before sending.
 function M.warmup(base_url, model, runtime_receipt, on_done)
 	local response = { runtime_engine = ResponseEngine, runtime_capture = ResponseCapture,
@@ -356,6 +357,11 @@ function M.warmup(base_url, model, runtime_receipt, on_done)
 	}, function() end, function(result)
 		if not runtime_current(response) then return end
 		if type(result) == "table" and result.ok == true then on_done(true); return end
+		if type(result) == "table"
+			and LocalModelPolicy.load_failed(result.status, result.error_body or result.body) then
+			on_done(false, LocalModelPolicy.load_failure(model, base_url))
+			return
+		end
 		on_done(false, LocalModelPolicy.response_failure(result, base_url)
 			or (type(result) == "table" and type(result.error) == "string" and result.error) or "HTTP transport failed")
 	end)

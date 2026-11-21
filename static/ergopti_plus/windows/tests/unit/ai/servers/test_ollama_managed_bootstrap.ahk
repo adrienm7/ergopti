@@ -62,6 +62,24 @@ _G4B_ReadyMenuPullDeadline() {
 }
 Test("managed bootstrap: READY menu pull has a separate captured deadline (groups247-menu-pull-deadline)", _G4B_ReadyMenuPullDeadline)
 
+_G4B_RepairPullAsksNoConsent() {
+	F := _G4B_Fixture()
+	Pull(Target, Model, Callback) {
+		F.Pulls += 1
+		return true
+	}
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		F.Flow.Port["pull"] := Pull
+		Consents := F.Consents.Length, Pulls := F.Pulls
+		AssertTrue(F.Flow.PullModel("qwen3:0.6b", 0, 0, true))
+		AssertEqual(Consents, F.Consents.Length, "a repair of an installed model asks nothing")
+		AssertEqual(Pulls + 1, F.Pulls)
+	} finally F.Close()
+}
+Test("managed bootstrap: a repair pull asks no download consent (oll-10)", _G4B_RepairPullAsksNoConsent)
+
 _G4B_ReadyMenuPullSuccessor() {
 	F := _G4B_Fixture()
 	Callbacks := [], Published := 0

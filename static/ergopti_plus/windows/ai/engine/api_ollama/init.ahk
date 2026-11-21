@@ -563,6 +563,12 @@ global _LLM_Ollama_IsReady := false
 ; dropped every prediction at FirePrediction.
 global _LLM_Ollama_WarmupRetryFn := unset
 global _LLM_Ollama_WarmupRetryModel := ""
+; The models pulled once more after Ollama could not load them: one repair each
+; for the session, as on macOS and Linux, so a model that still fails is
+; reported by the warmup retries instead of downloaded again and again.
+global _LLM_Ollama_RepairedModels := Map()
+; Test seam of the repair: Map("flow", managed flow, "notify", fn(Body, Title)).
+global _LLM_Ollama_RepairPort := 0
 global _LLM_Ollama_WarmupRetryIntervalMs := 5000
 global _LLM_Ollama_WarmupStartedTick := 0
 ; Monotonic id so stale warmup poll chains bail after a newer warmup starts.

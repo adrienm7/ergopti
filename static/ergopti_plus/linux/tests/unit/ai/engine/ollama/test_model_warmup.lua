@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Drives the warmup chain on a virtual clock: the first load after the shared
 --- initial delay, the doubling retry up to its cap, the wait behind a
---- prediction, the end on success or on a missing model, and the stop that
---- every engine teardown path relies on. Also pins the Ollama load request.
+--- prediction, the end on success or on a missing model, the one repair pull of
+--- a model Ollama cannot load, and the stop that every engine teardown path
+--- relies on. Also pins the Ollama load request.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,7 +24,7 @@ local CAP_SEC = Timings.ms("llm", "warmup_retry_cap_ms") / 1000
 local function run(scenario)
 	package.loaded["ai.engine.local_servers.warmup"] = nil
 	local Warmup = require("ai.engine.local_servers.warmup")
-	local world = { scheduler = Fakes.timer_scheduler(), requests = {}, busy = false,
+	local world = { scheduler = Fakes.timer_scheduler(), requests = {}, busy = false, repairs = {},
 		target = { origin = "http://127.0.0.1:11434", model = "qwen:2b", receipt = {} } }
 	local ok, err = xpcall(function()
 		helpers.assert_true(Warmup.init({
@@ -31,6 +32,10 @@ local function run(scenario)
 			changed = function() world.changed = (world.changed or 0) + 1 end,
 			target = function() return world.target end,
 			busy = function() return world.busy end,
+			repair = function(failure)
+				world.repairs[#world.repairs + 1] = failure
+				return world.refuse_repair ~= true
+			end,
 			request = function(target, on_done)
 				if world.native_request then
 					local operation = world.native_request()
@@ -220,6 +225,47 @@ helpers.describe("Ollama model warmup chain", function()
 		end)
 	end)
 
+	helpers.it("(oll-10) a model Ollama cannot load is pulled once more and ends the chain", function()
+		run(function(Warmup, world)
+			Warmup.schedule("enable")
+			world.scheduler.test.advance(INITIAL_SEC)
+			answer(world, false, LocalModelPolicy.load_failure("qwen:2b", world.target.origin))
+			helpers.assert_eq(#world.repairs, 1)
+			helpers.assert_eq(world.repairs[1].model, "qwen:2b")
+			world.scheduler.test.advance(CAP_SEC * 4)
+			helpers.assert_eq(#world.requests, 1, "the repair pull selects the model, which warms it again")
+			helpers.assert_eq(Warmup.pending(), false)
+		end)
+	end)
+
+	helpers.it("(oll-10) a model still failing after its repair is reported and retried, never pulled again", function()
+		run(function(Warmup, world)
+			Warmup.schedule("enable")
+			world.scheduler.test.advance(INITIAL_SEC)
+			answer(world, false, LocalModelPolicy.load_failure("qwen:2b", world.target.origin))
+			helpers.assert_true(Warmup.schedule("model selected"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			answer(world, false, LocalModelPolicy.load_failure("qwen:2b", world.target.origin))
+			helpers.assert_eq(#world.repairs, 1)
+			helpers.assert_eq(Warmup.status(), "unreachable")
+			world.scheduler.test.advance(BASE_SEC * 2)
+			helpers.assert_eq(#world.requests, 3, "the chain keeps retrying the load")
+		end)
+	end)
+
+	helpers.it("(oll-10) a refused repair pull keeps the chain retrying", function()
+		run(function(Warmup, world)
+			world.refuse_repair = true
+			Warmup.schedule("enable")
+			world.scheduler.test.advance(INITIAL_SEC)
+			answer(world, false, LocalModelPolicy.load_failure("qwen:2b", world.target.origin))
+			helpers.assert_eq(#world.repairs, 1)
+			helpers.assert_true(Warmup.pending())
+			world.scheduler.test.advance(BASE_SEC * 2)
+			helpers.assert_eq(#world.requests, 2)
+		end)
+	end)
+
 	helpers.it("linux-model-warmup: stop retires the timer and the request, and drops their answer", function()
 		run(function(Warmup, world)
 			Warmup.schedule("enable")
@@ -307,6 +353,11 @@ helpers.describe("Ollama model warmup request", function()
 			helpers.assert_eq(outcomes[1], { true })
 			helpers.assert_eq(outcomes[2][1], false)
 			helpers.assert_true(LocalModelPolicy.is_missing(outcomes[2][2]))
+			sent[1].on_done({ ok = false, status = 500,
+				error_body = '{"error":"unable to load model: /models/blobs/sha256-ab"}' })
+			helpers.assert_eq(outcomes[3][1], false)
+			helpers.assert_true(LocalModelPolicy.is_load_failure(outcomes[3][2]), "(oll-10) a load failure reaches the chain")
+			helpers.assert_eq(outcomes[3][2].model, "qwen:2b")
 			current = false
 			helpers.assert_eq(Api.warmup("http://127.0.0.1:11434", "qwen:2b", {}, function() end).started, false,
 				"a stale runtime receipt sends no load request")

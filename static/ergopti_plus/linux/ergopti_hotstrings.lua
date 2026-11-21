@@ -2215,6 +2215,7 @@ local function main()
 			target = prediction_engine.warmup_target,
 			request = prediction_engine.warmup_request,
 			busy = prediction_engine.is_predicting,
+			repair = prediction_engine.repair_model,
 			changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

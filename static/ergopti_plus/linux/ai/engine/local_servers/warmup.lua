@@ -50,6 +50,10 @@ local _ready_key = nil
 local _chain_key = nil
 -- Whether the running chain has failed at least once since it started.
 local _failed = false
+-- The origins and models pulled once more after Ollama could not load them:
+-- one repair each for the process, as on Windows and macOS, so a model that
+-- still fails is reported instead of downloaded again and again.
+local _repaired = {}
 
 
 
@@ -124,7 +128,7 @@ end
 --- @param key string
 --- @param next_interval number
 --- @param loaded boolean
---- @param failure string|table|nil A transport reason, or the missing-model failure.
+--- @param failure string|table|nil A transport reason, or the missing-model or load failure.
 local function on_result(generation, key, next_interval, loaded, failure)
 	if generation ~= _generation then return end
 	if loaded then
@@ -140,6 +144,19 @@ local function on_result(generation, key, next_interval, loaded, failure)
 		Logger.info(LOG, "Warmup ended: Ollama does not have the selected model.")
 		notify_changed()
 		return
+	end
+	if LocalModelPolicy.is_load_failure(failure) and _ports.repair ~= nil and not _repaired[key] then
+		_repaired[key] = true
+		_chain_key = nil
+		local ok, accepted = pcall(_ports.repair, failure)
+		if ok and accepted == true then
+			Logger.info(LOG, "Warmup ended: Ollama could not load the model, which is pulled once more.")
+			notify_changed()
+			return
+		end
+		Logger.error(LOG, "The repair pull of a model Ollama could not load was refused: %s.",
+			tostring(accepted))
+		_chain_key = key
 	end
 	if first_failure then notify_changed() end
 	if _timer then
@@ -207,7 +224,8 @@ end
 --- Binds the ports once for this process.
 --- @param ports table { scheduler = { after, cancel }, target = function → { origin, model, receipt }|nil,
 ---   request = function(target, on_done(loaded, failure)) → owned operation, busy = function → boolean,
----   changed = optional function called when status() changes after a load answer }
+---   changed = optional function called when status() changes after a load answer,
+---   repair = optional function(load_failure) → true once a pull of that model is dispatched }
 --- @return boolean bound
 function M.init(ports)
 	Logger.start(LOG, "Initializing…")
@@ -218,7 +236,8 @@ function M.init(ports)
 	if type(ports) ~= "table" or type(ports.scheduler) ~= "table" or type(ports.scheduler.after) ~= "function"
 		or type(ports.scheduler.cancel) ~= "function" or type(ports.target) ~= "function"
 		or type(ports.request) ~= "function" or type(ports.busy) ~= "function"
-		or (ports.changed ~= nil and type(ports.changed) ~= "function") then
+		or (ports.changed ~= nil and type(ports.changed) ~= "function")
+		or (ports.repair ~= nil and type(ports.repair) ~= "function") then
 		Logger.error(LOG, "Warmup initialization refused: incomplete ports.")
 		return false
 	end

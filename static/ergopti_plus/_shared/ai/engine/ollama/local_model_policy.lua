@@ -3,12 +3,19 @@
 --- ==============================================================================
 --- MODULE: Local Model Presence Policy
 --- DESCRIPTION:
---- Pure Ollama model-name matching and missing-model classification. Native
---- drivers own HTTP requests, cancellation, consent and model downloads.
+--- Pure Ollama model-name matching, missing-model and load-failure
+--- classification. Native drivers own HTTP requests, cancellation, consent and
+--- model downloads.
 --- ==============================================================================
 
 local M = {}
 M.MODEL_MISSING = "model_missing"
+M.MODEL_LOAD_FAILED = "model_load_failed"
+
+-- Ollama's answer when an installed model's weights cannot be read: a damaged
+-- blob, which one more pull of the same tag downloads again. Matched without
+-- case, in the raw body, so a reworded casing still repairs.
+local LOAD_FAILURE_MARKER = "unable to load model"
 
 
 
@@ -101,6 +108,34 @@ end
 --- @return boolean
 function M.is_missing(failure)
 	return type(failure) == "table" and failure.reason == M.MODEL_MISSING
+		and M.normalize(failure.model) ~= nil and type(failure.base_url) == "string"
+end
+
+--- Whether an answer to a load request (a one-token /api/chat) says the
+--- installed weights cannot be loaded. The three drivers pull such a model once
+--- more, then report the failure (_shared/tests/corpus/llm/local_model_presence.json
+--- `load_failures`).
+--- @param status any HTTP status of the answer.
+--- @param body any Raw answer body.
+--- @return boolean
+function M.load_failed(status, body)
+	if type(status) ~= "number" or status < 400 or type(body) ~= "string" then return false end
+	return body:lower():find(LOAD_FAILURE_MARKER, 1, true) ~= nil
+end
+
+--- Represents a model whose weights Ollama could not load.
+--- @param model string
+--- @param base_url string
+--- @return table
+function M.load_failure(model, base_url)
+	return { reason = M.MODEL_LOAD_FAILED, model = model, base_url = base_url }
+end
+
+--- Whether a native failure names a local model that failed to load.
+--- @param failure any
+--- @return boolean
+function M.is_load_failure(failure)
+	return type(failure) == "table" and failure.reason == M.MODEL_LOAD_FAILED
 		and M.normalize(failure.model) ~= nil and type(failure.base_url) == "string"
 end
 

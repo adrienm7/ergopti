@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/local_model_presence.json through the shared
 --- policy that api_ollama.lua loads, as Linux already does: model-name
---- normalization, the exact "model not found" errors and the strict listing
---- receipt.
+--- normalization, the exact "model not found" errors, the load failure the
+--- model repair reads and the strict listing receipt.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,6 +37,15 @@ helpers.describe("local model presence vectors (macOS)", function()
 	for _, vector in ipairs(corpus.missing_responses) do
 		helpers.it("reads the missing model of HTTP " .. vector.status .. " " .. vector.error, function()
 			helpers.assert_eq(Policy.missing_model(vector.status, vector.error), expected_of(vector))
+		end)
+	end
+
+	helpers.it("reads the load-failure vectors (oll-10)", function()
+		helpers.assert_true(#corpus.load_failures > 0)
+	end)
+	for _, vector in ipairs(corpus.load_failures) do
+		helpers.it("classifies the load answer " .. vector.id .. " (oll-10)", function()
+			helpers.assert_eq(Policy.load_failed(vector.status, vector.body), vector.expected)
 		end)
 	end
 

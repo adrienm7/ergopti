@@ -270,6 +270,11 @@ helpers.describe("local model presence: independent shared corpus", function()
 			local expected = not Json.is_null(vector.expected) and vector.expected or nil
 			helpers.assert_eq(Policy.missing_model(vector.status, vector.error), expected, vector.error)
 		end
+		helpers.assert_true(#corpus.load_failures > 0, "the load-failure vectors are read")
+		for _, vector in ipairs(corpus.load_failures) do
+			helpers.assert_eq(Policy.load_failed(vector.status, vector.body), vector.expected,
+				"shared load-failure rule (oll-10): " .. vector.id)
+		end
 		for _, vector in ipairs(corpus.lists) do
 			local names, reason = Policy.list_receipt(vector)
 			helpers.assert_eq(reason, vector.reason, vector.body)

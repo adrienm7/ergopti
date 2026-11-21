@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; Pure AHK port of _shared/ai/engine/ollama/local_model_policy.lua. Native drivers own
 ; requests, cancellation, consent and downloads; the independent corpus owns
-; model normalization, strict list receipts and missing-model classification.
+; model normalization, strict list receipts, missing-model and load-failure
+; classification.
 ; ==============================================================================
 
 LLM_LocalModelNormalize(Name) {
@@ -72,6 +73,14 @@ LLM_LocalModelIsMissing(Failure) {
 	return Failure is Map && Failure.Get("reason", "") == "model_missing"
 		&& LLM_LocalModelNormalize(Failure.Get("model", "")) != ""
 		&& Failure.Get("base_url", 0) is String
+}
+
+; Ollama's answer when an installed model's weights cannot be read, as the Lua
+; policy's load_failed: the three drivers pull such a model once more.
+LLM_LocalModelLoadFailed(Status, Body) {
+	if !(Status is Integer) || Status < 400 || !(Body is String)
+		return false
+	return InStr(Body, "unable to load model") > 0
 }
 
 LLM_LocalModelShouldNotify(Notified, Model) {

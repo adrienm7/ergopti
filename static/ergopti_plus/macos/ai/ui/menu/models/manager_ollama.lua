@@ -30,6 +30,7 @@ local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 local TimerScheduler = require("core.events.timer_scheduler")
 local HttpClient = require("core.network.adapters.http_client")
 local RequirementRegistry = require("ai.ui.menu.requirement_operation_registry")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}
@@ -1343,7 +1344,9 @@ function M.new(deps, presets, ram_getter)
 
 				local err_text = type(result) == "table"
 					and type(result.body) == "string" and result.body or ""
-				local load_error = err_text:find("unable to load model", 1, true) ~= nil
+				-- The rule the three drivers share: such a model is pulled once more.
+				local load_error = LocalModelPolicy.load_failed(
+					type(result) == "table" and result.status or nil, err_text)
 				settle_failure(err_text, load_error)
 			end)
 		if type(client.onSettled) == "function" then

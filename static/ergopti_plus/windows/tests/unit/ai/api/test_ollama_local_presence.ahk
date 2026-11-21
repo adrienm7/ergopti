@@ -72,6 +72,17 @@ _OllamaLocalPresenceCorpus() {
 }
 Test("Ollama local presence: replays the independent shared model corpus (todo-46-local-model)", _OllamaLocalPresenceCorpus)
 
+_OllamaLocalLoadFailureCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\llm\local_model_presence.json", "UTF-8"))
+	AssertTrue(Corpus["load_failures"].Length > 0, "the load-failure vectors are read")
+	for Vector in Corpus["load_failures"]
+		AssertEqual(Vector["expected"] ? true : false,
+			LLM_LocalModelLoadFailed(Vector["status"], Vector["body"]) ? true : false,
+			"shared load-failure rule (oll-10): " . Vector["id"])
+}
+Test("Ollama local presence: replays the shared load-failure rule (oll-10)", _OllamaLocalLoadFailureCorpus)
+
 _OllamaPresenceRecordList(State, Callback, Owner, Strict) {
 	State["tags"] += 1
 	State["strict"] := Strict

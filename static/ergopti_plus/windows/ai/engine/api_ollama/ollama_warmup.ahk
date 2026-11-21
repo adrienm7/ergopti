@@ -165,7 +165,7 @@ _LLM_Ollama_PollWarmupRequest(Request, CurrentFn, Generation, Started, TimeoutBu
 
 _LLM_Ollama_OnWarmupPollResult(CurrentFn, Generation, Status, Body) {
 	if CurrentFn.Call()
-		_LLM_Ollama_OnWarmupDone(Status, Generation)
+		_LLM_Ollama_OnWarmupDone(Status, Generation, Body)
 	else
 		_LLM_Ollama_OnWarmupPollFailed("source_withdrawal", Generation)
 }
@@ -177,8 +177,8 @@ _LLM_Ollama_OnWarmupPollFailed(reason, gen := 0) {
 	try LoggerInfo("LLM.ollama", "Warmup poll ended ({1}) — grace inference may proceed.", reason)
 }
 
-_LLM_Ollama_OnWarmupDone(status, gen := 0) {
-	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration
+_LLM_Ollama_OnWarmupDone(status, gen := 0, body := "") {
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, _LLM_Ollama_WarmupRetryModel
 	if (gen != 0 and gen != _LLM_Ollama_WarmupGeneration)
 		return
 	if (status = 200) {
@@ -186,9 +186,49 @@ _LLM_Ollama_OnWarmupDone(status, gen := 0) {
 		try LoggerInfo("LLM.ollama", "Model warmed up — ready for predictions.")
 		; Warmup succeeded — reset the backoff so a future warmup cycle starts fresh
 		LLM_OllamaCancelWarmupRetry(true)
+	} else if LLM_LocalModelLoadFailed(status, body) && LLM_OllamaRepairModel(_LLM_Ollama_WarmupRetryModel) {
+		try LoggerInfo("LLM.ollama", "Warmup ended: Ollama could not load the model, which is pulled once more.")
 	} else {
 		try LoggerInfo("LLM.ollama", "Warmup finished with HTTP {1} — will retry.", status)
 	}
+}
+
+/**
+ * Pulls a model once more after Ollama could not load it, as macOS
+ * (manager_ollama.lua) and Linux (local_servers/warmup.lua) do: Ollama
+ * downloads the damaged layers again, then the warmup loads it again. Only the
+ * managed runtime pulls without a console, and each model is repaired once for
+ * the session.
+ * @param {String} Tag Ollama tag the warmup could not load.
+ * @returns {Boolean} True once the repair pull is dispatched.
+ */
+LLM_OllamaRepairModel(Tag) {
+	global _LLM_Ollama_RepairedModels, _LLM_Ollama_RepairPort, _LLM_ManagedBootstrap
+	Name := LLM_LocalModelNormalize(Tag)
+	if Name == "" || _LLM_Ollama_RepairedModels.Has(Name)
+		return false
+	Port := _LLM_Ollama_RepairPort
+	Flow := Port is Map ? Port["flow"] : _LLM_ManagedBootstrap
+	if !IsObject(Flow) || !HasMethod(Flow, "PullModel") {
+		LoggerWarn("LLM.ollama", "Ollama could not load '{1}'; only the managed runtime pulls it again.", Tag)
+		return false
+	}
+	_LLM_Ollama_RepairedModels[Name] := true
+	if !Flow.PullModel(Tag, LLM_OllamaScheduleWarmupRetry.Bind(Tag), 0, true) {
+		LoggerError("LLM.ollama", "The repair pull of '{1}', which Ollama could not load, was refused.", Tag)
+		return false
+	}
+	LLM_OllamaCancelWarmupRetry()
+	Title := t("ollama.model_repair_title"), Body := StrReplace(t("ollama.model_repair"), "%s", Tag)
+	Notify := Port is Map ? Port["notify"] : _LLM_Ollama_RepairNotify
+	Shown := Notify.Call(Body, Title)
+	if !(Shown is Integer && Shown == true)
+		LoggerWarn("LLM.ollama", "The model repair notice was not shown.")
+	return true
+}
+
+_LLM_Ollama_RepairNotify(Body, Title) {
+	return NotifierSend(Body, Map("title", Title, "level", "info"))
 }
 
 /**

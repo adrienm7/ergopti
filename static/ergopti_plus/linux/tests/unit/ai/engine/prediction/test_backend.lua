@@ -1338,6 +1338,39 @@ helpers.describe("prediction engine: model warmup lifecycle", function()
 	end
 	local INITIAL_SEC = require("core.timing.engine.timings").ms("llm", "warmup_initial_delay_ms") / 1000
 
+	helpers.it("(oll-10) the engine pulls a model Ollama cannot load once more, with its notice", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local names = { "ai.engine.local_servers.model_download", "platform.focus.application_notifier" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local pulls, notices = {}, {}
+		local okay, problem = pcall(function()
+			package.loaded["ai.engine.local_servers.model_download"] = {
+				start = function(base_url, tag)
+					pulls[#pulls + 1] = { base_url = base_url, tag = tag }
+					return true
+				end,
+				shutdown = function() return true end,
+			}
+			package.loaded["platform.focus.application_notifier"] = {
+				send = function(text, options)
+					notices[#notices + 1] = { text = text, options = options }
+					return true
+				end,
+			}
+			local Policy = require("ai.engine.ollama.local_model_policy")
+			helpers.assert_eq(engine.repair_model({ reason = "model_missing", model = "ollama-model" }), false,
+				"only a load failure is repaired")
+			helpers.assert_true(engine.repair_model(Policy.load_failure("ollama-model", "http://127.0.0.1:11434")))
+			helpers.assert_eq(#pulls, 1)
+			helpers.assert_eq(pulls[1].tag, "ollama-model")
+			helpers.assert_eq(#notices, 1)
+			helpers.assert_true(notices[1].text:find("ollama-model", 1, true) ~= nil)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		restore(); if not okay then error(problem, 0) end
+	end)
+
 	helpers.it("linux-model-warmup: the engine loads its Ollama model, and a pause stops the chain until resume", function()
 		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
 		local world, restore_warmup = bound_warmup(engine)

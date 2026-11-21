@@ -43,6 +43,45 @@
 			"expected": null
 		}
 	],
+	"load_failures": [
+		{
+			"id": "corrupted_blob",
+			"status": 500,
+			"body": "{\"error\":\"unable to load model: /models/blobs/sha256-ab\"}",
+			"expected": true
+		},
+		{
+			"id": "capitalized",
+			"status": 500,
+			"body": "{\"error\":\"Unable to load model: /models/blobs/sha256-ab\"}",
+			"expected": true
+		},
+		{
+			"id": "plain_text",
+			"status": 500,
+			"body": "unable to load model: /models/blobs/sha256-ab",
+			"expected": true
+		},
+		{
+			"id": "runner_crash",
+			"status": 500,
+			"body": "{\"error\":\"llama runner process has terminated: exit status 2\"}",
+			"expected": false
+		},
+		{
+			"id": "missing",
+			"status": 404,
+			"body": "{\"error\":\"model 'qwen2.5:7b' not found\"}",
+			"expected": false
+		},
+		{
+			"id": "answered",
+			"status": 200,
+			"body": "{\"message\":{\"content\":\"unable to load model\"}}",
+			"expected": false
+		},
+		{ "id": "no_answer", "status": 0, "body": "", "expected": false }
+	],
 	"lists": [
 		{
 			"status": 200,
