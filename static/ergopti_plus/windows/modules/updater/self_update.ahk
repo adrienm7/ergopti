@@ -1746,6 +1746,19 @@ _Updater_StagingFailureIsVerification(Stdout) {
 	return (Stdout is String) && (InStr(Stdout, "SHA-256") || InStr(Stdout, "too small"))
 }
 
+; The modal box of a staging failure no Versions window follows. A refused
+; digest names the integrity check, as that window and the Linux download
+; window do: « check your connection » sent the user after a network that
+; worked (UPD-01).
+; @param Failure {Map} The parsed staging failure.
+; @param Tag {String} The release being installed.
+; @returns {String}
+_Updater_StagingFailureNotice(Failure, Tag) {
+	if (Failure["reason"] == "verify")
+		return StrReplace(t("changelog_window.install_error_verify"), "{tag}", Tag)
+	return t("updater.install_error_download")
+}
+
 
 ; Configures only native callbacks. The UI translates the shared contract's
 ; safe report; neither the envelope nor the retained owner is a page payload.
@@ -1971,7 +1984,7 @@ _Updater_RetryManagedFailure(Owner, Observer := unset) {
 	return _Updater_StartObservedInstall(Release, IsSet(Observer) ? Observer : _UpdaterInstallObserver, Owner["request"], Owner) == true
 }
 
-_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
+_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Tag, Observation := 0) {
 	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
 	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
 	if Owner is Map
@@ -2002,7 +2015,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
 		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
 			Failure["receipt"], Observation.Observer, Observation.Epoch)
 			if _Updater_InstallObservationCurrent(Observation)
-				Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+				Ui_MsgBox(_Updater_StagingFailureNotice(Failure, Tag), t("updater.window_title"), "Icon!")
 		return true
 	}
 	Observed := _Updater_NotifyInstallPhase("failed",
@@ -2828,7 +2841,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if (ExitCode != 0 or Stdout != "READY") {
 		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
 		Failure := _Updater_ParseStagingFailure(Stdout)
-		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Observation)
+		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Tag, Observation)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)

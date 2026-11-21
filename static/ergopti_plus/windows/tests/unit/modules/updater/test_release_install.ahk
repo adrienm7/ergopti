@@ -283,6 +283,23 @@ _RIT_FailuresReachTheObserver() {
 Test("Release install: the update path's failures reach the Versions window (release-install-observer)",
 	_RIT_FailuresReachTheObserver)
 
+; UPD-01: an update from the Updates window has no Versions window following it,
+; so its refused digest reached the modal box as « Failed to download the update
+; package. Check your internet connection », the text of a failed transfer.
+_RIT_UnfollowedVerifyNamesTheIntegrityCheck() {
+	Verify := _Updater_StagingFailureNotice(Map("reason", "verify"), "v9.9.9")
+	AssertEqual(StrReplace(t("changelog_window.install_error_verify"), "{tag}", "v9.9.9"), Verify,
+		"a refused digest names the integrity check of the release")
+	AssertTrue(InStr(Verify, "v9.9.9") > 0, "the integrity notice names the release. Got: " . Verify)
+	AssertTrue(Verify != t("updater.install_error_download"),
+		"a refused digest is not reported as a failed download")
+	AssertEqual(t("updater.install_error_download"),
+		_Updater_StagingFailureNotice(Map("reason", "download"), "v9.9.9"),
+		"a failed transfer keeps the download notice")
+}
+Test("Release install: an unfollowed refused digest names the integrity check (upd-01)",
+	_RIT_UnfollowedVerifyNamesTheIntegrityCheck)
+
 ; Capture the real central logger without replacing its state or file sinks.
 _RIT_WithLifecycleLogs(Body) {
 	global _LOGGER_TEST_SINK
