@@ -165,7 +165,7 @@ end }
 -- still reach the function of the CURRENT menu.
 for _ = 1, 3 do TrayMenu.setMenu(rows) end
 if TrayMenu.getBackend() ~= "appindicator" then
-	print("FAIL the adapter reports no live backend after setIcon")
+	print("FAIL the adapter reports no live backend after start()")
 	os.exit(1)
 end
 print("ok   tray icon created through the production adapter")

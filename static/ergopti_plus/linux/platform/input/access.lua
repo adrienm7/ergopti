@@ -199,8 +199,7 @@ end
 function M.hold_tray(deps, texts)
 	local Logger = require("core.logger.engine.shim")
 	local tray = deps.tray
-	tray.setIcon({ title = "Ergopti" })
-	if tray.getBackend() == nil then return end
+	if not tray.start() then return end
 	local actions = deps.actions or DEFAULT_ACTIONS
 	local function show_details()
 		if not tray.showStatusWindow(M.WINDOW_TITLE, texts.title .. "\n\n" .. texts.body) then

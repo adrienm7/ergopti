@@ -113,7 +113,13 @@ helpers.describe("input_access: a tray launch stays visible", function()
 	--- A tray adapter double that records what the user would see.
 	local function fake_tray(backend)
 		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false, windows = {} }
-		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
+		-- The degraded tray creates its icon as the daemon does (TRAY-04): a
+		-- setIcon without an image file is refused and would show nothing.
+		function tray.start()
+			tray.calls[#tray.calls + 1] = "start"
+			return backend ~= nil
+		end
+		function tray.setIcon() error("the degraded tray must create its icon with start()") end
 		function tray.getBackend() return backend end
 		-- Flattens the fallback builder's arguments into the rows a click reaches;
 		-- the adapter's own suite pins the separators it adds.
