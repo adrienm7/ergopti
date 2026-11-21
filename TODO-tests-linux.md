@@ -80,6 +80,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       the keys as they type (A on the Q key), also after a date change (MET-09). Type in another window with the
       dashboard open: the character, bigram and word tables follow within a few seconds, and typing does not
       stutter at each refresh (MET-10). Hovering a card definition reads it in English (MET-12).
+      closing the window (MET-04). A past range with no typing reads « No data » on every card (MET-13); Tab reaches
+      the activity calendar's « Chart values » and Orca reads each day and its count (MET-16); Reset pressed while a
+      flush is still being written says in the status line that it failed (MET-19).
 - [ ] <!-- field-point: tray_icon_missing --> Missing tray logo (TRAY-05, 2026-11-21): on a desktop with a tray host,
       in a copy of the install, move `_shared/tray/data/ergopti_tray_paused.png` away and start the daemon with
       `--tray`: running, the usual logo; pause: the panel draws the themed warning sign, not the running logo, Orca

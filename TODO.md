@@ -395,6 +395,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     banners after a late locale; MET-16 calendar day values and the chart reading font; MET-17 net or gross hotstring
     counting in the live speed (maintainer decision);
     MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
+    MET-01 to MET-08 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
+    names of every WPM surface; Linux apps read state and range failure; the range status and numbers in the
+    interface language on the three), then MET-13 to MET-16, MET-18 and MET-19 (the empty state of an empty range,
+    the apps render alert cleared, the banners reworded when the locale lands, every value of the SVG drawings in a
+    keyboard disclosure with the app windows scan counting a drawing without one, the Windows pill from the first
+    key, a failed Reset told to the page on the three). Left: MET-09 Linux heatmap key names from the live XKB
+    keymap; MET-10 Linux n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as
+    the others do; MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision »,
+    « Acceptées ») to i18n keys, with the hard-coded-strings gate extended to the pages' HTML; the Chart.js reading
+    font (rest of MET-16); MET-17 net or gross hotstring counting in the live speed (maintainer decision); the
+    cosmetic Linux range reply `driver_meta` (rest of MET-19);
   - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
     macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy

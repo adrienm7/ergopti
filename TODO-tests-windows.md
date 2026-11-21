@@ -227,7 +227,7 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       buttons read « Restore default: Delay (ms) » and so on, the colour swatch is not read as a progress bar. 8. Fields named by their label: the Win + G link editor (« Link: »), the Releases window's channel picker
       (« Update channel ») and notes (« Changelog »), the input check's field.
 
-- [ ] Metrics views and WPM readouts (MET-01 to MET-03, MET-06 to MET-08, 2026-11-21): 1. With the tray
+- [ ] Metrics views and WPM readouts (MET-01 to MET-03, MET-06 to MET-08, MET-13 to MET-19, 2026-11-21): 1. With the tray
       readout on, type a burst then stop: the readout falls to nothing about 5 s after the last key, not 15 s
       (MET-01). 2. Accept an AI suggestion in an app listed in the metrics exclusions and in a private browser
       window: the pill and the tray readout stay off; in an ordinary window they turn the AI colour (MET-02). 3. Open the typing dashboard and the diagnostics, close both, change Configuration > reading font or spacing,
@@ -236,6 +236,11 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       WPM widget in compact then graph mode at the same speed: Narrator names both « N WPM », never « ErgoptiPlus WPM
       Graph » (MET-08). 6. Interface in English: hovering a card definition or a chart point reads English, never
       « Précision » or « Acceptées » (MET-12).
+      Graph » (MET-08). 6. Wait 10 s without typing, then type one letter: the pill shows « 0 » at once (MET-18). 7. In the typing dashboard pick a past range with no typing: every card reads « No data », not « Computing… »
+      (MET-13). 8. Tab to the activity calendar's « Chart values »: Narrator reads each day and its count (MET-16). 9. Open the dashboard in English from a French session: the banners read English (MET-15). 10. With the
+      metrics folder's `cache
+eader.sqlite` held open by another program, press Reset: the status line says the
+      reset failed and the figures stay (MET-19).
 
 ### Pause, startup, updates and network
 
