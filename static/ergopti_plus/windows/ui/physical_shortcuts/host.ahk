@@ -353,7 +353,10 @@ class PhysicalShortcutsHost {
 			"position_available", () => KHPositionCaptureAvailable() == 1,
 			"capture_position", (Guard, Receive) => KHCapturePosition(Guard, Receive),
 			"cancel_position", (Token) => KHCancelPosition(Token) == 1))
-		Host.Opts := Map("OnMessage", (MessageHost, Payload) => MessageHost.Protocol.Receive(Payload))
+		; Configuration: the page answers while paused, as on macOS and Linux;
+		; WebViewHost fenced it until the resume (EDD-1, LTP-10).
+		Host.Opts := Map("RunsWhilePaused", true,
+			"OnMessage", (MessageHost, Payload) => MessageHost.Protocol.Receive(Payload))
 		PhysicalShortcutsHost.Current := Host
 		LoggerStart("PhysicalShortcuts", "Opening the physical shortcut editor.")
 		try Built := Host._Build()

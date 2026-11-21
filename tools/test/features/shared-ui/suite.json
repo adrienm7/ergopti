@@ -701,6 +701,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-page-direction.cjs"],
 			"repro": "node tools/test/test-page-direction.cjs"
+		},
+		{
+			"id": "webview-host-pause-census",
+			"ordinal": 719,
+			"name": "every Windows window built on WebViewHost is placed in the pause census, and each configuration window among them answers its page while the driver is paused",
+			"cmd": "node",
+			"args": ["tools/test/test-webview-host-pause-census.cjs"],
+			"repro": "npm run test:webview-host-pause-census"
 		}
 	]
 }

@@ -135,7 +135,8 @@ class ConfigCleanupWindow extends WebViewHost {
 		; The host names the window from the manifest and adds the product name.
 		; The user opens it from the menu, so it takes the keyboard as on macOS and
 		; Linux: shown without activation it sat behind the active application.
-		Host.Opts := Map("OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
+		; Configuration: the page answers while paused (EDD-1, LTP-10).
+		Host.Opts := Map("RunsWhilePaused", true, "OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
 			"OnMessage", (MessageHost, Message) => MessageHost.Deliver(Message))
 		ConfigCleanupWindow.Current := Host
 		try Built := Host._Build()
