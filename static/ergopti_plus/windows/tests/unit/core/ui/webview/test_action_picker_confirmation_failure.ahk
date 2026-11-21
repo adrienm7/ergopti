@@ -108,6 +108,6 @@ _APCF_Case(Mode) {
 		throw ExportFailure
 }
 
-for _APCF_Mode in ["current", "error", "empty-error", "string-error", "map-error"]
-	Test("Action picker confirmation: " . _APCF_Mode . " reaches the real logger (action-picker-confirmation-failure)",
+for _APCF_Mode in ["current", "refused", "error", "empty-error", "string-error", "map-error"]
+	Test("Action picker confirmation: " . _APCF_Mode . " reaches the real logger, a refusal keeps the picker open (action-picker-confirmation-failure, pck-15)",
 		_APCF_Case.Bind(_APCF_Mode))

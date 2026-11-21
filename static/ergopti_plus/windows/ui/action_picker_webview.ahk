@@ -478,7 +478,8 @@ _ActPickWeb_PushInit() {
 }
 
 ; Apply the chosen action: map the synthetic native pick back to "" (as the
-; native dialog did), close the window, then invoke the caller's callback.
+; native dialog does), invoke the caller's callback, then close the window
+; unless the callback refused the pick.
 ; A value the page's editor collected is offered to the parameter prompt the
 ; callback's assignment runs, for this action only, and withdrawn afterwards.
 _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := false, Provider := false) {
@@ -519,22 +520,30 @@ _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := f
 			Parameter := Resolved
 		}
 		; Manual and ordinary picks also retire discovery before assigning anything.
-		; Refusal still closes this session; it cannot lend its callback to a new one.
+		; A discovery that cannot retire closes this session without assigning.
 		cb := _ActPickWeb_OnConfirm
 		Retired := _ActPickWeb_ProgramRetire()
 		if !_ActPickWeb_SessionCurrent(Epoch)
 			return false
 		Mapped := (Id == "__native__") ? "" : Id
-		_ActPickWeb_Close()
-		if !Retired || !_ActPickWeb_ResetDone
-				|| _ActPickWeb_SessionEpoch != Epoch + 1
+		if !Retired || (cb == 0 || cb == "") {
+			_ActPickWeb_Close()
 			return false
-		if (cb == 0 || cb == "")
-			return false
+		}
+		; The caller assigns while the window is open, as on macOS and Linux: a
+		; refused or failed assignment (false, or a throw) keeps the picker open
+		; for another pick (PCK-15); any other answer closes it.
 		if HasParameter
 			GestureOfferPickedParameter(Mapped, Parameter)
-		try cb(Mapped)
+		try Result := cb(Mapped)
 		finally GestureClearPickedParameter()
+		if (Result is Integer) && Result == 0 {
+			LoggerWarn("ActionPicker", "Action picker confirmation was refused; the picker stays open.")
+			return false
+		}
+		; The assignment may have replaced this picker; only its own session closes.
+		if _ActPickWeb_SessionCurrent(Epoch)
+			_ActPickWeb_Close()
 		return true
 	} catch Any as Failure {
 		if Failure is Error

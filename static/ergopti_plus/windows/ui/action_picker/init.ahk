@@ -59,6 +59,8 @@ ShowKeyboardSlotPicker(Prefix) {
 ; picked id). Its pick is committed while the picker is still open: OnConfirm
 ; returns the integer 1 to close the picker, then after_close runs (the
 ; reload); any other answer keeps the picker open, as on macOS and Linux.
+; Without a Slot, OnConfirm also runs while the picker is open: false keeps
+; it open for another pick, any other answer closes it.
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "", Slot := 0) {
 		AfterClose := 0
 		if (Slot is Map) {
@@ -174,8 +176,14 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 						AfterClose.Call(Mapped)
 						return
 				}
+				; A refused assignment (false) keeps the dialog open for a retry,
+				; as the WebView picker does (PCK-15).
+				Result := OnConfirm(Mapped)
+				if (Result is Integer) && Result == 0 {
+						try LoggerWarn("ActionPicker", "The pick '{1}' was refused. The picker stays open.", Mapped)
+						return
+				}
 				W.Destroy()
-				OnConfirm(Mapped)
 		}
 }
 
