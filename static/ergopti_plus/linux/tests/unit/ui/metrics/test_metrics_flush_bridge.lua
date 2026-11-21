@@ -334,6 +334,34 @@ H.describe("metrics flush bridge", function()
 		end)
 	end
 
+	H.it("(heatmap-active-layout, met-09) every typing answer names the keys by the active layout", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		-- An AZERTY keymap with a dead circumflex: what each key types now
+		local azerty = { [16] = "a", [17] = "z", [30] = "q", [26] = "^" }
+		local ok, err = pcall(function()
+			F.B._legend = function(code) return azerty[code] end
+			local expected = { ["16"] = "a", ["17"] = "z", ["26"] = "^", ["30"] = "q" }
+			H.assert_eq(F.B.on_message({ action = "ready" }, F.state, F.context).keycode_layout, expected)
+			H.assert_eq(F.B.on_message({ action = "refresh" }, F.state, F.context).keycode_layout, expected)
+			local range = F.B.on_message({ action = "range", request_id = 90 }, F.state, F.context)
+			H.assert_eq(range.keycode_layout, expected, "a range reply keeps the legends (the page rebuilds them per answer)")
+			azerty[16] = "b"
+			H.assert_eq(F.B.on_message({ action = "refresh" }, F.state, F.context).keycode_layout["16"], "b",
+				"a layout switch reaches the next answer")
+		end)
+		F.B._reset()
+		if not ok then error(err, 0) end
+	end)
+	H.it("(heatmap-active-layout, met-09) the default legend reads the emulation, then the XKB keymap", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		local layout = F.B.on_message({ action = "ready" }, F.state, F.context).keycode_layout
+		H.assert_eq(type(layout), "table", "an answer always carries the map, empty with no keymap loaded")
+		for code, legend in pairs(layout) do
+			H.assert_true(tonumber(code) ~= nil and type(legend) == "string" and legend ~= "")
+		end
+	end)
 	H.it("typing range preserves request identity after deferred settlement", function()
 		local F = fixture("metrics_typing")
 		H.assert_nil(F.B.on_message({ action = "range", request_id = 71 }, F.state, F.context))

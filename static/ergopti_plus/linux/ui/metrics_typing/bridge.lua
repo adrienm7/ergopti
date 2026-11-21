@@ -20,6 +20,11 @@
 ---    reset is a clean rebuild.
 --- 4. A payload built from an incomplete SQLite read is answered (the page says
 ---    the history is incomplete) but never kept, so the next opening retries.
+--- 5. The heatmap names the keys the user types: every answer carries
+---    `keycode_layout`, evdev code → the legend the running layout emulation
+---    types there, else the loaded XKB keymap's, as Windows sends its active
+---    layout and macOS `hs.keycodes.map`. Linux sent none, so the page kept
+---    the static QWERTY names on every layout (MET-09).
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +40,10 @@ local APP_NAME = "metrics_typing"
 -- How long the refresh waits after a cached answer: long enough for WebKit to
 -- run the reply and paint, short enough that the numbers catch up at once.
 local REFRESH_DELAY_MS = 250
+
+-- The evdev codes the heatmap can name: 1 to 88 are the PC scan codes the page
+-- maps onto its keyboard (SC_TO_KC), as Windows reads scan codes 1 to 87.
+local LAYOUT_LAST_CODE = 88
 
 -- The last complete "ready" payload, and the generation of the latest refresh
 -- (a newer request supersedes an older pending one).
@@ -63,15 +72,42 @@ local function payload_complete(payload)
 	return complete
 end
 
+--- What a plain press of a key types now: the layout emulation's legend when
+--- it types that key, else the loaded XKB keymap's symbol (a dead key reads
+--- as its resting accent).
+--- @param code integer evdev key code.
+--- @return string|nil legend nil when the key types nothing printable.
+local function default_legend(code)
+	local emulated = require("modules.keymap.layout_emulation").legend_for_evdev(code)
+	if emulated ~= nil then return emulated end
+	local base = require("adapters.keyboard_layout").base_symbol(code)
+	return type(base) == "table" and base.text or nil
+end
+
+--- Builds the heatmap's legend map from the active layout.
+--- @return table { [evdev code string] = legend }
+local function keycode_layout()
+	local out = {}
+	for code = 1, LAYOUT_LAST_CODE do
+		local legend = M._legend(code)
+		if type(legend) == "string" and legend ~= "" then out[tostring(code)] = legend end
+	end
+	return out
+end
+
 --- Builds the dashboard payload from the daemon state.
 --- @param state table
 --- @param include_prefetch boolean
 --- @return table|nil
 local function build_payload(state, include_prefetch)
+	local payload
 	if state.keystats and type(state.keystats.get_dashboard_payload) == "function" then
-		return state.keystats.get_dashboard_payload({ include_prefetch = include_prefetch })
+		payload = state.keystats.get_dashboard_payload({ include_prefetch = include_prefetch })
+	else
+		payload = AppsBridge.build_payload(state)
 	end
-	return AppsBridge.build_payload(state)
+	if type(payload) == "table" then payload.keycode_layout = keycode_layout() end
+	return payload
 end
 
 --- Builds the dashboard payload with whether it may be kept for the next opening.
@@ -102,9 +138,11 @@ local function default_push(payload, state, context)
 	return Flush.push(APP_NAME, M.bridge_name, payload, state, context)
 end
 
--- Injectable seams for tests; production uses the event loop and WebKit.
+-- Injectable seams for tests; production uses the event loop, WebKit and the
+-- running layout.
 M._defer = default_defer
 M._push = default_push
+M._legend = default_legend
 local Requests = Flush.new(APP_NAME, function(...) return M._push(...) end,
 	function(reply, cache, keystats, generation)
 		if cache then
@@ -205,6 +243,7 @@ local function handle(payload, state, context, request)
 				metrics_manifest_incomplete = dashboard.metrics_manifest_incomplete,
 				app_icons = {},
 				_prefetch_data = range,
+				keycode_layout = dashboard.keycode_layout,
 				range_request_id = payload.request_id,
 				driver_meta = { os = "linux", heatmap_id = "kc" },
 			}
@@ -277,6 +316,7 @@ function M._reset()
 	_incomplete_reported = false
 	M._defer = default_defer
 	M._push = default_push
+	M._legend = default_legend
 end
 
 return M
