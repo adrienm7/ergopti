@@ -5,6 +5,64 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## macOS caches the migration registry's typed parse (2026-11-21)
+
+The maintainer chose to port the Windows registry cache
+(`windows/settings/engine/publication/registry_cache.ahk`) to macOS before the
+Mac measurement: `macos/settings/adapters/registry_cache.lua`, handed to
+`config_migrate.run` as its `registry_loader` by `init.lua`. Its contract, which
+a later change must keep:
+
+- the key is the native `hs.hash.SHA256` of `migrations.toml` and of every
+  parser file (the TOML codec folder, `table_util`, `utils_core`, the cache
+  module itself) plus `_VERSION`; the cache module's own bytes stand in for a
+  format version, so a format change is a stale cache;
+- the payload codec is typed (`string.pack` tags, bounded by
+  `[limits] registry_cache_payload_bytes`, counts checked against the bytes
+  left, sorted unique keys, no trailing byte) and never loads cached code, as
+  the hotstring `toml_cache` does;
+- `migrate.validate_registry` runs on every hit;
+- a stale cache is logged at INFO, a corrupt or rejected one at WARNING, then
+  the source is parsed again and the cache rewritten.
+
+Linux keeps parsing (about 7 ms cold under LuaJIT). Measured under lua5.4 on
+WSL, 3 × 21 interleaved rounds: the registry is 10.9 KB since its squash (the
+30 ms figure was the 74 KB one); decode and validate 2.3-2.5 ms median, a hit
+0.35-0.40 ms on a quiet host (16 ms against 1 ms on a loaded one). The native
+SHA-256 of the 365 KB identity is not in the hit figure; the Mac boot
+measurement stays the field point `migrations_registry_parse`.
+
+## Linux runs the synchronous metrics writer on one sqlite3 child (2026-11-21)
+
+The maintainer chose the persistent child of
+`docs/design/linux-sqlite-persistent-child.md`:
+`linux/modules/keystats/sqlite_child.lua`, used by `sqlite_writer.lua`'s `_exec`
+and `_query_output` (so `query_rows`, `get_meta`, the store boot) when
+`open_db` gets `{ persistent_child = true }`, which only the daemon passes
+(`keystats.init({ persistent_sqlite = true })`). Its contract:
+
+- one `sqlite3 -init /dev/null -bail -noheader` started with LuaJIT FFI
+  (`posix_spawnp`, no luv); stock Lua keeps one process per statement;
+- each success is the `.print` of a per-call token from `/dev/urandom`, drawn
+  absent from the script; a forged token line is data;
+- `-bail` ends the child on a refused statement, rolling its batch back; a
+  script that leaves a transaction open is refused (`BEGIN;` fails); the next
+  call starts a new child, and a child that died between calls is replaced
+  before the script is sent;
+- every exchange has a deadline (`[keystats] sqlite_child_deadline_ms`, 30 s
+  for VACUUM INTO on a large store): past it the child is killed and reaped;
+  bytes written out of frame end the child too;
+- standard input is a socket so a dead child gives EPIPE, never SIGPIPE;
+- the writer logs only `sanitise_error` categories; the child logs no SQL,
+  output or stderr byte; `close_db` ends the child and waits for it.
+
+Measured with `linux/tests/hardware/bench_sqlite_store_boot.lua` (LuaJIT, WSL,
+system sqlite3 3.46.1, 3 × 21 interleaved warm boots, six statements each):
+store boot median 157.6-184.4 ms with a process per statement, 42.4-45.4 ms
+with the child, start included (-73 %). This host starts a process in about
+28 ms where the design's container took 4 ms, so the design's 29.5 → 5-7 ms is
+the same ratio; the Linux field boot is the figure to confirm.
+
 ## Closing an update's window does not stop the update (2026-11-21)
 
 Decided by the agent on 2026-11-21, to review by the maintainer (UPD-05 in
