@@ -49,6 +49,14 @@ const MOVED = [
 	'suffixes_a.toml',
 	'magickeyreplace.toml'
 ];
+const EXTENSION_HOTSTRINGS = path.join(
+	ROOT,
+	'static',
+	'layouts',
+	'registry',
+	'ergopti',
+	'hotstrings'
+);
 const LUA_CANDIDATES = ['luajit', 'lua5.4', 'lua'];
 const MARK = '@@';
 
@@ -56,6 +64,18 @@ const errors = [];
 
 function shellQuote(value) {
 	return `'${String(value).replaceAll("'", `'"'"'`)}'`;
+}
+
+/**
+ * The number of hotstring entries an extension file declares, one per
+ * `"trigger" = { output = ... }` line, so the expected load count follows
+ * the shipped data instead of a figure copied from it.
+ */
+function declaredEntries(file) {
+	const text = fs.readFileSync(path.join(EXTENSION_HOTSTRINGS, file), 'utf8');
+	const count = text.split(/\r?\n/).filter((line) => /^".*" = \{.*\boutput = /.test(line)).length;
+	assert.ok(count > 0, `${file} declares no hotstring entry`);
+	return String(count);
 }
 
 /** Runs a Bash script body and returns the child result. */
@@ -622,9 +642,9 @@ try {
 				}
 			}
 			for (const [group, expected] of [
-				['sfbsreduction', '34'],
-				['rolls', '35'],
-				['repeat_corrections', '14']
+				['sfbsreduction', declaredEntries('sfbsreduction.toml')],
+				['rolls', declaredEntries('rolls.toml')],
+				['repeat_corrections', declaredEntries('repeatcorrections.toml')]
 			]) {
 				if (counts.get(group) !== expected) {
 					errors.push(
