@@ -15,7 +15,8 @@
 // and only ever posts the allowlisted actions below; each host checks them
 // again before acting.
 // Keyboard and screen reader: the root names the interface language every
-// host seeds (window._i18n_locale).
+// host seeds (window._i18n_locale), and a redraw keeps the focus on the row
+// the user acted on, on the three hosts.
 // ===========================================================================
 
 // ========================================
@@ -69,6 +70,10 @@ const _post = makeHostBridge('layout_manager_bridge');
 if (typeof window._i18n_locale === 'string' && window._i18n_locale !== '')
 	document.documentElement.lang = window._i18n_locale;
 else console.error('layout manager: no window._i18n_locale seeded; the page language stays fr');
+
+// The elements of the last redraw that can take the focus back:
+// { row, action, el }, action '' for a row's heading.
+let _focusables = [];
 
 /**
  * Returns the translated string for key, or key itself when it is missing.
@@ -344,7 +349,12 @@ function renderRow(row, busy) {
 	item.appendChild(card);
 
 	const header = element('header', 'layout-header');
-	header.appendChild(element('h2', 'layout-name', row.name));
+	const heading = element('h2', 'layout-name', row.name);
+	// Out of the Tab order: the focus comes back here when the button the user
+	// pressed is disabled or gone after the redraw.
+	heading.setAttribute('tabindex', '-1');
+	_focusables.push({ row: row.id, action: '', el: heading });
+	header.appendChild(heading);
 	const badges = element('ul', 'layout-badges');
 	badges.appendChild(
 		element('li', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
@@ -424,6 +434,7 @@ function actionButton(action, id, disabled, variant, target) {
 	button.type = 'button';
 	button.disabled = disabled;
 	button.dataset.action = action;
+	_focusables.push({ row: id, action, el: button });
 	button.addEventListener('click', function () {
 		if (target) send(action, undefined, target);
 		else send(action, id);
@@ -456,9 +467,50 @@ function render() {
 	}
 
 	const list = document.getElementById('layout-list');
+	const focused = focusedTarget();
+	_focusables = [];
 	while (list.firstChild) list.removeChild(list.firstChild);
 	for (const row of rows) list.appendChild(renderRow(row, busy));
 	document.getElementById('empty').hidden = rows.length > 0;
+	if (focused) restoreFocus(focused);
+}
+
+/**
+ * The row and action of the list element that holds the focus, before a
+ * redraw replaces it.
+ * @returns {{row: string, action: string}|null}
+ */
+function focusedTarget() {
+	const active = document.activeElement;
+	const target = _focusables.find((candidate) => candidate.el === active);
+	return target ? { row: target.row, action: target.action } : null;
+}
+
+/**
+ * Gives the focus back after a redraw: to the same button when it can take
+ * it, else to its row's heading, else to the result line, which names a row
+ * that left the list. The redraw replaced every element, so without this the
+ * focus fell to the document and a keyboard or screen reader user started
+ * again from the top after each install (LTP-06).
+ * @param {{row: string, action: string}} focused
+ */
+function restoreFocus(focused) {
+	const same = _focusables.find(
+		(candidate) =>
+			candidate.row === focused.row && candidate.action === focused.action && !candidate.el.disabled
+	);
+	const heading = _focusables.find(
+		(candidate) => candidate.row === focused.row && candidate.action === ''
+	);
+	const result = document.getElementById('result');
+	const target = same
+		? same.el
+		: heading
+			? heading.el
+			: result.hidden
+				? document.getElementById('btn-refresh')
+				: result;
+	target.focus();
 }
 
 // ========================================

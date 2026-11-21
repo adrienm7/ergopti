@@ -95,6 +95,9 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	const byId = new Map();
 	const i18nElements = [];
 	const messages = [];
+	// Whether an element tree holds an element.
+	const holds = (root, target) =>
+		root === target || root.children.some((child) => holds(child, target));
 
 	function makeElement(tag) {
 		const classes = new Set();
@@ -132,7 +135,12 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 			},
 			removeChild(child) {
 				el.children.splice(el.children.indexOf(child), 1);
+				// As a browser does, a removed element takes the focus away with it.
+				if (holds(child, document.activeElement)) document.activeElement = document.body;
 				return child;
+			},
+			focus() {
+				document.activeElement = el;
 			},
 			getAttribute: (name) => el.attributes[name],
 			setAttribute: (name, value) => {
@@ -159,8 +167,11 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 	}
 
 	const events = [];
+	const body = makeElement('body');
 	const document = {
 		title: '',
+		body,
+		activeElement: body,
 		// The page's declared language, the formatter's last resort.
 		documentElement: { lang: (/<html lang="([^"]+)"/.exec(page.html) || [])[1] },
 		events,
@@ -1492,6 +1503,64 @@ check('(ltp-02) both pages name the interface language the host seeds', () => {
 		);
 		assert.equal(errors.length, 1, `${name} says that its host seeded no language`);
 	}
+});
+
+const focusState = (extra = {}) => ({
+	platform: 'linux',
+	shortcut_menu_path: SHORTCUT_MENU.linux,
+	index,
+	source: 'network',
+	installed: { ergol: index.layouts.find((entry) => entry.id === 'ergol') },
+	active: 'ergopti',
+	...extra
+});
+/** The button of one action in one row of the list. */
+function rowButton(byId, id, action) {
+	const row = byId.get('layout-list').children.find((item) => item.dataset.id === id);
+	return findAll(row, (el) => el.dataset.action === action)[0];
+}
+
+// Every push redrew the list from scratch and the focus fell to the document:
+// after « Install » a keyboard or screen reader user started again from the
+// top of the window (LTP-06).
+check('(ltp-06) a redraw keeps the focus on the row the user acted on', () => {
+	const { byId, window, document } = loadPage();
+	window.initData({ strings, state: focusState() });
+	const select = rowButton(byId, 'ergol', 'select');
+	select.focus();
+	select.click();
+	// The same state again (a refresh): the new « Use » button of that row has it.
+	window.updateState(focusState());
+	assert.notEqual(document.activeElement, select, 'the list was drawn again');
+	assert.equal(
+		document.activeElement,
+		rowButton(byId, 'ergol', 'select'),
+		'the same button keeps it'
+	);
+	// In flight, every button is disabled: the row's heading has the focus.
+	window.updateState(focusState({ busy: { id: 'ergol', action: 'select' } }));
+	const heading = findAll(
+		byId.get('layout-list'),
+		(el) => el.tagName === 'H2' && el.textContent === 'Ergo-L'
+	)[0];
+	assert.equal(document.activeElement, heading, 'the row keeps it while its buttons are disabled');
+	assert.equal(
+		heading.getAttribute('tabindex'),
+		'-1',
+		'the heading takes the focus out of the Tab order'
+	);
+	// A row that leaves the list: the result line that names it has the focus.
+	const fresh = focusState({ installed: {} });
+	window.updateState({
+		...fresh,
+		index: { layouts: [] },
+		result: { id: 'ergol', action: 'uninstall', ok: true, name: 'Ergo-L' }
+	});
+	assert.equal(document.activeElement, byId.get('result'), 'the result line takes it');
+	// Focus outside the list is left where it is.
+	byId.get('btn-close').focus();
+	window.updateState(focusState());
+	assert.equal(document.activeElement, byId.get('btn-close'));
 });
 
 // =========================================
