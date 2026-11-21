@@ -694,11 +694,34 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 	end)
 
 	helpers.it("upd-13: the production session checks through the launcher worker", function()
-		local source = assert(io.open(helpers.driver_root() .. "/modules/updater/auto_check.lua", "rb"))
-		local text = source:read("*a")
-		source:close()
-		helpers.assert_contains(text, 'manual_http = require("core.network.adapters.managed_http_worker").new(')
-		helpers.assert_contains(text, "failure_contract = M.failure_contract(),")
+		local AutoCheck = load_module()
+		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
+		local worker, worker_opts, seen = { get = function() end }, nil, nil
+		local ok, err = pcall(function()
+			helpers.with_stub_scope({ "core.events.wake_watcher", "core.network.adapters.http_client",
+				"core.network.adapters.managed_http_worker", "core.fs.adapters.storage", "core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
+					start = function() return true end, stop = function() return true end,
+				} end }
+				package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+				package.loaded["core.network.adapters.managed_http_worker"] = {
+					new = function(opts) worker_opts = opts; return worker end,
+				}
+				package.loaded["core.fs.adapters.storage"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
+				AutoCheck.load_config = function() return { timeout_sec = 7 } end
+				AutoCheck.new = function(opts)
+					seen = opts
+					return { on_wake = function() end, start = function() return true end, stop = function() return true end }
+				end
+				helpers.assert_true(AutoCheck.start_session({}).stop())
+			end)
+		end)
+		AutoCheck.new, AutoCheck.load_config = old_new, old_config
+		if not ok then error(err, 0) end
+		helpers.assert_true(seen.manual_http == worker, "the manual check goes through the launcher worker")
+		helpers.assert_eq(worker_opts, { timeout_sec = 7 }, "the worker gets the configured timeout")
+		helpers.assert_eq(type(seen.failure_contract.classify), "function", "the managed-network contract is passed")
 	end)
 
 	helpers.it("offers a newer release of the checked channel without announcing it", function()
