@@ -32,6 +32,8 @@ LoggerError(Owner, Template, Args*) {
 }
 LoggerWarn(*) => 0
 WebView_ShouldUseNativeFallback() => false
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) {
 	global _MBSW
 	_MBSW.Environments += 1

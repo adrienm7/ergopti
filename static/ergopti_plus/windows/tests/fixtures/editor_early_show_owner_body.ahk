@@ -205,6 +205,8 @@ _ESOW_Confirm(*) {
 	_ESOW.Confirmations += 1
 }
 
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) {
 	global _ESOW
 	_ESOW.Environments += 1

@@ -21,6 +21,8 @@ _PTSO_Require(Condition, Message) {
 t(Key) => Key
 LoggerSuccess(*) => 0
 LoggerError(*) => 0
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {

@@ -278,7 +278,9 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 	}
 	; Class methods are not top-level functions; pin them in the whole source.
 	Source := _DriverSourceNoComments()
-	Assert(RegExMatch(Source, "WMPresentWindow\(Existing\.Gui\)\R\s*return Existing\b"),
+	; The presented page then takes the keyboard back (PCK-16).
+	Assert(RegExMatch(Source, 'WMPresentWindow\(Existing\.Gui\)\R\s*if Existing\.HasOwnProp\("Controller"\)[^\r\n]*\R'
+		. '\s*WebView_TakeFocus\(Existing\.Controller\)\R\s*\}\R\s*return Existing\b'),
 		"WebViewHost.TryOpen must present the existing singleton through WMPresentWindow")
 	Assert(InStr(Source, "return WMPresentWindow(Existing.Gui)") > 0,
 		"ConfigCleanupWindow.Open must present the open cleanup window through WMPresentWindow")

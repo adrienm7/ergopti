@@ -182,6 +182,8 @@ _HESW_Open() {
 	OpenHotstringsConfigWindow()
 }
 
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) {
 	global _HESW
 	_HESW.Environments += 1
