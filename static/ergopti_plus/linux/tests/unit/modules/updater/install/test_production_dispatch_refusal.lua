@@ -199,7 +199,7 @@ test("captured closed allocator fact preserves the existing available offer desp
   assert(callbacks == 1 and h.manager.get_state() == "available")
  end)
 end)
-test("matching historical error text without the fixed allocator fact keeps ordinary failure state", function()
+test("upd-08: a failed update download keeps the offer it failed on", function()
  scenario({ construct = function(h, terminal)
   h.flow_operation.started = false; h.flow_physical = true
   terminal(nil, "temporary path unavailable", "download")
@@ -209,10 +209,11 @@ test("matching historical error text without the fixed allocator fact keeps ordi
   assert(h.manager.download_update(nil, function(path, message)
    callbacks = callbacks + 1; assert(path == nil and message == "temporary path unavailable")
   end) == false)
-  assert(callbacks == 1 and h.manager.get_state() == "idle")
+  assert(callbacks == 1 and h.manager.get_state() == "available", "upd-08: the menu keeps « Update now »")
+  assert(h.manager.get_cached_release() == h.release)
  end)
 end)
-test("physical-probe source withdrawal prevents restoring an old available offer", function()
+test("upd-08: physical-probe source withdrawal still leaves the cached offer available", function()
  scenario({ construct = function(h, terminal)
   h.flow_operation.started = false; h.flow_operation.closed_allocation_refusal = true; h.flow_physical = true
   terminal(nil, "independent allocator error", "download")
@@ -221,7 +222,7 @@ test("physical-probe source withdrawal prevents restoring an old available offer
   h.manager._test_set_cached_release(h.release)
   local callbacks = 0
   assert(h.manager.download_update(nil, function(path) callbacks = callbacks + 1; assert(path == nil) end) == false)
-  assert(callbacks == 1 and h.paused == true and h.manager.get_state() == "idle")
+  assert(callbacks == 1 and h.paused == true and h.manager.get_state() == "available")
  end)
 end)
 assert(#tests == 8, "actual dispatch receiving floor")

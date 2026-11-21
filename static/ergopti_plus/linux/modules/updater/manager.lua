@@ -1536,6 +1536,8 @@ end
 --- @param failure_state string The updater state a failure returns to.
 --- @param failure_receipt table|nil Structured native evidence, never inferred from err.
 local function publish_download(callback, path, err, stage, release, failure_state, failure_receipt)
+	-- An offer survives its failed download only while it is still the cached one
+	if not path and failure_state == "available" and _cached_release == nil then failure_state = "idle" end
 	_state = path and "available" or failure_state
 	_verified_archive = path
 	_verified_release = path and release or nil
@@ -1786,7 +1788,9 @@ function M.download_update(url, callback)
 		if type(callback) == "function" then callback(nil, "updater is not ready to download", "download") end
 		return false
 	end
-	return start_download(release, download_url, callback, "idle")
+	-- A failed or cancelled download keeps the offer, so the menu still says
+	-- « Update now », as a Versions download does (UPD-08)
+	return start_download(release, download_url, callback, "available")
 end
 
 --- Downloads and verifies the archive of a release the user chose in the
