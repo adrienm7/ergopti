@@ -400,6 +400,69 @@
 			"file": "static/corpus/frequency/google_books/fr_1grams_2020.json",
 			"format": "count_table",
 			"title_key": "layout_analysis.corpus.name.fr_books_words"
+		},
+		{
+			"id": "fr_tatoeba_all",
+			"title": "Tatoeba — all French sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.fr_tatoeba_all",
+			"language": "fr",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/tatoeba/fr_sentences_2026_11_21.json",
+			"format": "count_table"
+		},
+		{
+			"id": "en_tatoeba_all",
+			"title": "Tatoeba — all English sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.en_tatoeba_all",
+			"language": "en",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/tatoeba/en_sentences_2026_11_21.json",
+			"format": "count_table"
+		},
+		{
+			"id": "de_tatoeba_all",
+			"title": "Tatoeba — all German sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.de_tatoeba_all",
+			"language": "de",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/tatoeba/de_sentences_2026_11_21.json",
+			"format": "count_table"
+		},
+		{
+			"id": "es_tatoeba_all",
+			"title": "Tatoeba — all Spanish sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.es_tatoeba_all",
+			"language": "es",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/tatoeba/es_sentences_2026_11_21.json",
+			"format": "count_table"
+		},
+		{
+			"id": "it_tatoeba_all",
+			"title": "Tatoeba — all Italian sentences (counts)",
+			"title_key": "layout_analysis.corpus.name.it_tatoeba_all",
+			"language": "it",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/tatoeba/it_sentences_2026_11_21.json",
+			"format": "count_table"
+		},
+		{
+			"id": "en_norvig_words",
+			"title": "Norvig — English words from the Web (counts)",
+			"title_key": "layout_analysis.corpus.name.en_norvig_words",
+			"language": "en",
+			"kind": "words",
+			"file": "static/corpus/frequency/norvig/en_count_1w.json",
+			"format": "count_table"
+		},
+		{
+			"id": "en_taskmaster_chat",
+			"title": "Taskmaster — written English dialogs (counts)",
+			"title_key": "layout_analysis.corpus.name.en_taskmaster_chat",
+			"language": "en",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/taskmaster/en_tm1_self_dialogs.json",
+			"format": "count_table"
 		}
 	]
 }

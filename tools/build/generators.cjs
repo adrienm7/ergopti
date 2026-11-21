@@ -308,7 +308,14 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_doyle_sherlock.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_hemon_chapdelaine.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_renard_poil_de_carotte.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_philippe_bubu.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_philippe_bubu.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_tatoeba_all.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_tatoeba_all.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_de_tatoeba_all.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_es_tatoeba_all.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_it_tatoeba_all.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_norvig_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_taskmaster_chat.js'
 		]
 	},
 	{

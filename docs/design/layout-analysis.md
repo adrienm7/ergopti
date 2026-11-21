@@ -926,7 +926,7 @@ Shipped as of 2026-11-14:
   titles describe rather than name a work, so each has a localized name
   (`title_key`, `layout_analysis.corpus.name.<id>`, in the 21 locales) that
   the Comparer, the analysis panel and the Optimiser show. Each table is
-  0.5 to 0.8 MB of JSON, and its generated `corpus_<id>.js` is loaded only
+  0.3 to 0.8 MB of JSON, and its generated `corpus_<id>.js` is loaded only
   when its corpus is chosen.
   `tools/build/import-count-tables.cjs` rebuilds them from the archives pinned
   by SHA-256 in `static/corpus/count_table_sources.json` (a tar.gz is read
@@ -941,10 +941,18 @@ Shipped as of 2026-11-14:
   shares it weighs: its change divided by its mean travel); the largest
   change, recorded in `prune_check`, is 0.037. Leipzig offers no larger
   download than a million sentences for these corpora, and the tables are
-  bounded by their pruning, not by the corpus size. Not imported, waiting for the maintainer (TODO.md, « Maintainer
-  decisions pending »): Norvig's counts (derived from the LDC-licensed Google
-  Web 1T, no licence for the data) and Tatoeba's full exports as counts
-  (CC BY 2.0 FR asks each sentence's author to be credited).
+  bounded by their pruning, not by the corpus size.
+- Imported by the maintainer's choice (2026-11-21): every sentence of
+  Tatoeba's French, English, German, Spanish and Italian exports
+  (`tatoeba_sentences`, CC BY 2.0 FR, « Tatoeba contributors » credited with a
+  link to the export naming each author; bzip2 unpacked by the `bzip2`
+  program, as Node has no codec), counted as text; Peter Norvig's
+  `count_1w.txt` (`word_counts`, 333,333 English Web words, no data licence
+  stated, derived from Google's Web 1T, shipped with that credit), counted by
+  the word-list rule; and the chat corpus, Taskmaster-1's 7,708 written
+  dialogs (`taskmaster_dialogs`, CC BY 4.0, Google), each utterance one line
+  of text. Tatoeba rewrites its exports weekly: keep the archives
+  (`--archive-dir`) to rebuild those tables.
 - Google Books Ngram (version 20200217, CC BY 3.0): the French 1-grams,
   counted by the word-list rule (`google_books_1grams`). The six shards
   (3.2 GB) are streamed through curl and gunzip, never stored, each hashed as

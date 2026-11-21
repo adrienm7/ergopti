@@ -37,6 +37,11 @@
  *    --archive-dir), hashed and unzipped as it streams, and refused at its
  *    end unless its SHA-256 is its pin. A shard with no pin yet is refused
  *    too, unless --record-pins writes the hash it streamed into the sources.
+ * 8. Other sources, each read whole: a Tatoeba per-language export
+ *    (« id<TAB>lang<TAB>sentence », bzip2, unpacked by the bzip2 program
+ *    that Git for Windows, macOS and Linux ship) and a Taskmaster dialog file
+ *    (JSON, each utterance one line) count as text; a plain « word<TAB>count »
+ *    list (Norvig's) counts by the word-list rule, as Lexique does.
  * ==============================================================================
  */
 
@@ -57,7 +62,19 @@ const CORPUS_DIR = path.join(REPO_ROOT, 'static', 'corpus');
 const SOURCES_PATH = path.join(CORPUS_DIR, 'count_table_sources.json');
 const ANALYSIS_DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const REGISTER_PATH = path.join(CORPUS_DIR, 'register.json');
-const KINDS = ['leipzig_sentences', 'lexique_words', 'google_books_1grams'];
+const KINDS = [
+	'leipzig_sentences',
+	'lexique_words',
+	'google_books_1grams',
+	'tatoeba_sentences',
+	'taskmaster_dialogs',
+	'word_counts'
+];
+// The kinds whose sentences count as text (bigrams and trigrams cross words);
+// the others are word lists.
+const TEXT_KINDS = ['leipzig_sentences', 'tatoeba_sentences', 'taskmaster_dialogs'];
+// The largest unpacked bzip2 export read whole (English Tatoeba: about 120 MB).
+const MAX_UNPACKED_BYTES = 1 << 30;
 // A Google Books token kept as a word: letters and combining marks, with
 // apostrophes and hyphens inside or at the end (« l' », « peut-être »). A
 // tagged token (« livre_NOUN ») or one holding digits or punctuation is not.
@@ -170,15 +187,37 @@ function tarMember(tar, name) {
 }
 
 /**
- * The text of one member of a pinned archive (zip or tar.gz).
+ * The bytes of a bzip2 file, unpacked by the bzip2 program (Node has no
+ * bzip2 codec). The bytes go through its standard input: no path is parsed.
+ * @param {Buffer} bytes - The bzip2 file.
+ * @returns {Buffer}
+ * @throws {Error} When bzip2 is missing or refuses the file.
+ */
+function bunzip2(bytes) {
+	const run = spawnSync('bzip2', ['-dc'], { input: bytes, maxBuffer: MAX_UNPACKED_BYTES });
+	if (run.error || run.status !== 0)
+		throw new Error(`bzip2 failed: ${run.error ? run.error.message : run.stderr.toString()}`);
+	return run.stdout;
+}
+
+/**
+ * The text of a pinned source: a member of a zip or tar.gz archive, a bzip2
+ * file, or a plain file (no member).
  * @param {object} source - A count_table_sources.json entry.
  * @param {string} archivePath - The archive, already checked.
  * @returns {string}
+ * @throws {Error} When a member is named for a file that has none, or missing for an archive.
  */
 function memberText(source, archivePath) {
 	const bytes = fs.readFileSync(archivePath);
+	const archive = archivePath.endsWith('.zip') || archivePath.endsWith('.tar.gz');
+	if (archive !== Boolean(source.member))
+		throw new Error(`${source.output}: a member is named for an archive, and only for one`);
 	if (archivePath.endsWith('.zip')) return zipMember(bytes, source.member).toString('utf8');
-	return tarMember(zlib.gunzipSync(bytes), source.member).toString('utf8');
+	if (archivePath.endsWith('.tar.gz'))
+		return tarMember(zlib.gunzipSync(bytes), source.member).toString('utf8');
+	if (archivePath.endsWith('.bz2')) return bunzip2(bytes).toString('utf8');
+	return bytes.toString('utf8');
 }
 
 /** Adds the counts of `from` into `into`. */
@@ -261,18 +300,98 @@ function repairMojibake(line) {
  */
 function leipzigCounts(text, engine) {
 	const lines = text.replace(/﻿/g, '').split('\n');
+	return sentenceCounts(
+		lines.map((line) => repairMojibake(line.replace(/^\d+\t/, ''))),
+		engine
+	);
+}
+
+/**
+ * The counts of sentences, one per line: each chunk of lines counted as text
+ * by the engine, and its words by the engine's word rule (countWords).
+ * @param {string[]} lines - The sentences, without line breaks.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {{chars: object, bigrams: object, trigrams: object, words: object}}
+ */
+function sentenceCounts(lines, engine) {
 	const counts = { chars: {}, bigrams: {}, trigrams: {} };
 	const words = {};
 	for (let i = 0; i < lines.length; i += LINES_PER_CHUNK) {
-		const chunk = lines
-			.slice(i, i + LINES_PER_CHUNK)
-			.map((line) => repairMojibake(line.replace(/^\d+\t/, '')))
-			.join('\n');
+		const chunk = lines.slice(i, i + LINES_PER_CHUNK).join('\n');
 		merge(counts, engine.ngramsFromText(chunk));
 		engine.countWords(chunk, 1, words);
 	}
 	counts.words = words;
 	return counts;
+}
+
+/**
+ * The counts of a Tatoeba per-language export: the sentence of each
+ * « id<TAB>lang<TAB>sentence » line, counted as text.
+ * @param {string} text - The unpacked export.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {object} The counts, with words.
+ * @throws {Error} When a line has not three columns or a numeric id.
+ */
+function tatoebaCounts(text, engine) {
+	const sentences = [];
+	for (const line of text.replace(/﻿/g, '').split('\n')) {
+		if (line === '') continue;
+		const cells = line.replace(/\r$/, '').split('\t');
+		if (cells.length !== 3 || !/^\d+$/.test(cells[0]))
+			throw new Error(`not a Tatoeba sentence line: ${JSON.stringify(line.slice(0, 80))}`);
+		sentences.push(cells[2]);
+	}
+	return sentenceCounts(sentences, engine);
+}
+
+/**
+ * The counts of a Taskmaster dialog file: each utterance's text one line,
+ * counted as text (the annotations are not read).
+ * @param {string} text - The JSON array of dialogs.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {object} The counts, with words.
+ * @throws {Error} When a dialog has no utterances or an utterance no text.
+ */
+function taskmasterCounts(text, engine) {
+	const dialogs = JSON.parse(text);
+	if (!Array.isArray(dialogs)) throw new Error('a Taskmaster file is an array of dialogs');
+	const utterances = [];
+	for (const dialog of dialogs) {
+		if (!dialog || !Array.isArray(dialog.utterances))
+			throw new Error('a Taskmaster dialog has no utterances');
+		for (const utterance of dialog.utterances) {
+			if (!utterance || typeof utterance.text !== 'string')
+				throw new Error(`an utterance of ${dialog.conversation_id} has no text`);
+			utterances.push(utterance.text.replace(/\s*[\r\n]+\s*/g, ' '));
+		}
+	}
+	return sentenceCounts(utterances, engine);
+}
+
+/**
+ * The counts of a « word<TAB>count » list, counted by the word-list rule.
+ * @param {string} text - The list.
+ * @param {object} source - The table's source (its output names it).
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {object} The counts, with words.
+ * @throws {Error} When a line is not a word and a positive integer count.
+ */
+function wordCountCounts(text, source, engine) {
+	const list = [];
+	for (const line of text.replace(/﻿/g, '').split('\n')) {
+		if (line.trim() === '') continue;
+		const [word, count, extra] = line.replace(/\r$/, '').split('\t');
+		if (!word || /\s/.test(word) || extra !== undefined || !/^[1-9]\d*$/.test(count || ''))
+			throw new Error(`not a « word<TAB>count » line: ${JSON.stringify(line.slice(0, 80))}`);
+		list.push(`${word} ${count}`);
+	}
+	const joined = list.join('\n');
+	console.log(`import-count-tables: ${source.output}: ${list.length} words`);
+	return {
+		...Analysis.wordListCounts(joined, source.output),
+		words: Analysis.wordListWords(engine, joined)
+	};
 }
 
 /**
@@ -582,16 +701,18 @@ function archiveOf(source, archiveDir, scratch) {
 
 /**
  * The counts of a source read from one pinned archive.
- * @param {object} source - A leipzig_sentences or lexique_words entry.
+ * @param {object} source - An entry of a kind read from one archive (not google_books_1grams).
  * @param {string} archivePath - Its checked archive.
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @returns {object} The counts, with words.
  */
 function archiveCounts(source, archivePath, engine) {
 	const text = memberText(source, archivePath);
-	return source.kind === 'leipzig_sentences'
-		? leipzigCounts(text, engine)
-		: lexiqueCounts(text, source, engine);
+	if (source.kind === 'leipzig_sentences') return leipzigCounts(text, engine);
+	if (source.kind === 'tatoeba_sentences') return tatoebaCounts(text, engine);
+	if (source.kind === 'taskmaster_dialogs') return taskmasterCounts(text, engine);
+	if (source.kind === 'word_counts') return wordCountCounts(text, source, engine);
+	return lexiqueCounts(text, source, engine);
 }
 
 /**
@@ -615,7 +736,7 @@ function buildTable(source, ratio, counts, engine) {
 			`${source.output}: pruning at ${ratio} changes ${check.at} by ${check.max_metric_change}, over ${PRUNE_TOLERANCE}`
 		);
 	return tableText(
-		source.kind === 'leipzig_sentences' ? 'text' : 'word_list',
+		TEXT_KINDS.includes(source.kind) ? 'text' : 'word_list',
 		tables,
 		prunedBelow,
 		check,
@@ -666,6 +787,13 @@ if (require.main === module)
 
 module.exports = {
 	memberText,
+	bunzip2,
+	sentenceCounts,
+	tatoebaCounts,
+	taskmasterCounts,
+	wordCountCounts,
+	KINDS,
+	TEXT_KINDS,
 	tarMember,
 	booksShardCounts,
 	BOOKS_WORD,

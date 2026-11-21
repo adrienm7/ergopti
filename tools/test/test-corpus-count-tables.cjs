@@ -16,7 +16,9 @@
  * by the same check); a word-list table shows the word-list caveat; and the
  * reader refuses a malformed table. Each table also ships its word table: the
  * engine's WORD_TABLE_SIZE most frequent words of the same sentences or list,
- * counted by the engine's word rule; a tar.gz member is read in Node.
+ * counted by the engine's word rule; a tar.gz member is read in Node, a
+ * bzip2 export through the bzip2 program. A Tatoeba export and a Taskmaster
+ * dialog file count as text, a « word<TAB>count » list as a word list.
  * ==============================================================================
  */
 
@@ -89,7 +91,7 @@ let checks = 0;
 		);
 		assert.equal(
 			counts.countedAs,
-			source.kind === 'leipzig_sentences' ? 'text' : 'word_list',
+			Import.TEXT_KINDS.includes(source.kind) ? 'text' : 'word_list',
 			`${file}: counted as its kind counts`
 		);
 		// The word table is cut at the engine's size: every source has more words.
@@ -147,6 +149,87 @@ let checks = 0;
 	const repaired = plain(Import.leipzigCounts('1\tl\u00e2\u20ac\u2122a\n', engine));
 	delete repaired.words;
 	assert.deepEqual(repaired, mainTables(engine.ngramsFromText('l\u2019a')));
+	checks++;
+}
+
+// A Tatoeba export counts its sentence column as text; a line that is not
+// « id<TAB>lang<TAB>sentence » fails the import instead of being skipped.
+{
+	const engine = Analysis.loadEngine();
+	const counts = plain(Import.tatoebaCounts('1\tfra\tab c\n22\tfra\tc\n', engine));
+	assert.deepEqual(counts.words, { ab: 1 });
+	delete counts.words;
+	assert.deepEqual(counts, mainTables(engine.ngramsFromText('ab c\nc')));
+	assert.throws(() => Import.tatoebaCounts('1\tab c\n', engine), /not a Tatoeba sentence line/);
+	assert.throws(() => Import.tatoebaCounts('x\tfra\tab\n', engine), /not a Tatoeba sentence line/);
+	checks++;
+}
+
+// A Taskmaster file counts each utterance as one line of text, its inner line
+// breaks folded to one space; a dialog without utterances fails the import.
+{
+	const engine = Analysis.loadEngine();
+	const dialogs = JSON.stringify([
+		{ conversation_id: 'dlg-1', utterances: [{ text: 'hi\n there' }, { text: 'ok' }] }
+	]);
+	const counts = plain(Import.taskmasterCounts(dialogs, engine));
+	assert.deepEqual(counts.words, { hi: 1, there: 1, ok: 1 });
+	delete counts.words;
+	assert.deepEqual(counts, mainTables(engine.ngramsFromText('hi there\nok')));
+	assert.throws(() => Import.taskmasterCounts('[{}]', engine), /has no utterances/);
+	assert.throws(
+		() => Import.taskmasterCounts('[{"conversation_id":"d","utterances":[{}]}]', engine),
+		/an utterance of d has no text/
+	);
+	checks++;
+}
+
+// A « word<TAB>count » list (Norvig's) counts by the word-list rule, as the
+// same list in Lexique's form does; a malformed line fails the import.
+{
+	const engine = Analysis.loadEngine();
+	const counts = plain(Import.wordCountCounts('the\t30\nof\t20\n', { output: 'test' }, engine));
+	const expected = plain(Analysis.wordListCounts('the 30\nof 20', 'test'));
+	for (const name of ['chars', 'bigrams', 'trigrams'])
+		assert.deepEqual(counts[name], expected[name]);
+	assert.deepEqual(counts.words, { the: 30, of: 20 });
+	for (const bad of ['the\n', 'the\t0\n', 'the\t3\tx\n', 'a b\t3\n'])
+		assert.throws(
+			() => Import.wordCountCounts(bad, { output: 'test' }, engine),
+			/not a « word<TAB>count » line/,
+			JSON.stringify(bad)
+		);
+	assert.deepEqual(
+		Import.KINDS.filter((kind) => Import.TEXT_KINDS.includes(kind)),
+		Import.TEXT_KINDS,
+		'every text kind is a kind'
+	);
+	checks++;
+}
+
+// A bzip2 export is unpacked by the bzip2 program; a plain file is read as it
+// is, and naming a member for it (or none for an archive) is refused.
+{
+	const os = require('node:os');
+	const { spawnSync } = require('node:child_process');
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-count-member-'));
+	try {
+		const packed = spawnSync('bzip2', ['-c'], { input: Buffer.from('1\tfra\tété\n') });
+		assert.equal(packed.status, 0, 'bzip2 packs the sample');
+		const bz2 = path.join(dir, 'fra_sentences.tsv.bz2');
+		fs.writeFileSync(bz2, packed.stdout);
+		assert.equal(Import.memberText({ output: 'test' }, bz2), '1\tfra\tété\n');
+		const plainFile = path.join(dir, 'count_1w.txt');
+		fs.writeFileSync(plainFile, 'the\t3\n');
+		assert.equal(Import.memberText({ output: 'test' }, plainFile), 'the\t3\n');
+		assert.throws(
+			() => Import.memberText({ output: 'test', member: 'x' }, plainFile),
+			/a member is named for an archive, and only for one/
+		);
+		assert.throws(() => Import.bunzip2(Buffer.from('not bzip2')), /bzip2 failed/);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
 	checks++;
 }
 
@@ -530,7 +613,7 @@ async function booksShard() {
 booksShard().then(
 	() =>
 		console.log(
-			`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig, Lexique and Google Books rules, word tables, pruning, reader, zip, tar)`
+			`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig, Lexique, Google Books, Tatoeba, Taskmaster and word-count rules, word tables, pruning, reader, zip, tar, bzip2)`
 		),
 	(error) => {
 		console.error(error);

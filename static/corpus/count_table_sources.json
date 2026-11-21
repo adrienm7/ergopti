@@ -114,6 +114,48 @@
 			],
 			"years": [1950, 2019],
 			"min_count": 100
+		},
+		{
+			"output": "frequency/tatoeba/fr_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/fra/fra_sentences.tsv.bz2",
+			"sha256": "c9e91cc5a0640db7bfc4423fadf3985db42df08dafce4983d4c6b8c2cf7a4d3d"
+		},
+		{
+			"output": "frequency/tatoeba/en_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2",
+			"sha256": "0c4d3b18152bd6507bbf77ab690532b25de1e60da950f68705b3c88935c01fb4"
+		},
+		{
+			"output": "frequency/tatoeba/de_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/deu/deu_sentences.tsv.bz2",
+			"sha256": "e16c57e695bfeccccb455c305d262c5cbe2aa74a5c1e1edb725d53cf907309ac"
+		},
+		{
+			"output": "frequency/tatoeba/es_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/spa/spa_sentences.tsv.bz2",
+			"sha256": "7872d2e66debfd8e73e96cc9bca9560a32cc914aee9c820649d7d3d5e7353f48"
+		},
+		{
+			"output": "frequency/tatoeba/it_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/ita/ita_sentences.tsv.bz2",
+			"sha256": "20dc0feb2a4340daf69d42fd4bfb51e4d04c899e2a5bce3692169de9fe1a11fe"
+		},
+		{
+			"output": "frequency/norvig/en_count_1w.json",
+			"kind": "word_counts",
+			"url": "https://norvig.com/ngrams/count_1w.txt",
+			"sha256": "51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690"
+		},
+		{
+			"output": "frequency/taskmaster/en_tm1_self_dialogs.json",
+			"kind": "taskmaster_dialogs",
+			"url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/335324ca7afee220b6114e72d90f994e07a888c4/TM-1-2019/self-dialogs.json",
+			"sha256": "1e590ed0ccee279e40c2fb9e083d3b9417477c6bfe35ce5b2277167698dd858d"
 		}
 	]
 }
