@@ -466,31 +466,41 @@ root only.
 
 ## Layout score: graded costs (2026-11-21)
 
-Decided by the maintainer on 2026-11-21 (« Barème proposé + réglable »): the
-Studio's layout score moves from single weights to graded costs, each a table
-of `score_weights.json` « grades » that multiplies its metric's weight.
+Decided by the maintainer on 2026-11-21 (« Barème proposé + réglable », the
+scale active by default): the Studio's layout score moves from single
+weights to graded costs, each a table of `score_weights.json` « grades ».
 
 - An SFB costs by the rows its finger crosses: a two-row SFB (bottom to top)
   is worse than a one-row one (home to top).
-- Skipgrams cost by the fingers involved: two adjacent fingers more than the
-  1st and 3rd fingers, which cost more than index and pinky (barely counted,
-  comfortable). The engine reads them as an alternation whose first and last
-  keys are two fingers of one hand, added to the same-finger skipgrams.
-- `row_jump` (one hand, two rows or more apart) counts only on different
-  fingers, so it no longer doubles the SFBs; it is worse on adjacent fingers;
-  its weight is half the SFB weight (`sfb` 5, `row_jump` 2.5).
+- A skipgram is « un bigramme tapé avec la même main mais sur rangées
+  différentes »: a same-hand bigram on two different fingers whose keys are
+  on different rows. It is the `row_jump` metric, one metric for every row
+  distance, graded by its fingers (adjacent > 1st and 3rd fingers >
+  index and pinky, barely counted) times its rows (two > one); its weight is
+  half the SFB weight (`sfb` 5, `row_jump` 2.5). One finger's move is an SFB,
+  never a row jump, so nothing is counted twice. Order of badness: SFB 2 rows
+  > SFB 1 row > adjacent fingers > 1st and 3rd fingers > index and pinky.
+  > The cross-hand trigram reading of the first version was wrong and is gone;
+  > the same-finger skipgram `sfs` keeps its single weight.
 - The travel costs by finger: one key's move costs less with the index than
   with the pinky.
+- Hand alternation keeps its weight and gets a switch (rewarded or not),
+  on by default.
+- Same-hand runs cost progressively (`hand_run`): each keystroke weighs the
+  multiplier of the run it is in, an alternation ×1, three same-hand keys
+  ×2, four ×3, and so on (one multiplier per length up to six keys, then a
+  linear growth, all editable). « vacances » on Ergo-L, typed by the left hand
+  alone, is the maintainer's example of a bad run.
 
-The agent proposes the starting scale from Cyanophage, genkey and Oxeylyzer
-and ships it only after the ranking-impact report
-(`docs/audits/layout-analysers/graded-costs-ranking.md`); every grade is
+The agent proposes the starting scale from Cyanophage, genkey, Oxeylyzer and
+the Keyboard Layout Optimizer and ships it after the ranking-impact report
+(`docs/audits/layout-analysers/graded-costs-ranking.md`); every value is
 editable in the Comparer's score settings and round-trips in its settings
 file (version 3). `score_weights.json` is the one source; the flat grades
-(`LAYOUT_ANALYSIS.flatGrades()`, `row_jump` at 0) give the former scores to
-the last bit. Action: a change of scale goes through `score_weights.json`,
-`node tools/codegen/codegen-layout-analysis-data-js.cjs` and a new run of
-`node tools/dev/rank-graded-costs.cjs --all` for the report.
+(`LAYOUT_ANALYSIS.flatGrades()`, `row_jump` and `hand_run` at 0) give the
+former scores to the last bit. Action: a change of scale goes through
+`score_weights.json`, `node tools/codegen/codegen-layout-analysis-data-js.cjs`
+and a new run of `node tools/dev/rank-graded-costs.cjs --all` for the report.
 
 ## Layout score: SFB travel and access weights (2026-11-19)
 

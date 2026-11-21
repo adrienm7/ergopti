@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * A maintainer tool, never run in CI: ranks the whole layout library twice on
  * the Studio's main corpora, once by the flat model (the single weights of
- * before 2026-11-21: LAYOUT_ANALYSIS.flatGrades() and row_jump at 0) and once
+ * before 2026-11-21: LAYOUT_ANALYSIS.flatGrades(), row_jump and hand_run at
+ * 0) and once
  * by a graded scale (score_weights.json's shipped one, or a candidate file),
  * and prints the comparison as Markdown: each corpus's top 30 by the graded
  * scale beside its flat rank, Ergopti's layouts, the largest moves and the
@@ -59,7 +60,7 @@ const OWN_LAYOUT = /^ergopti/;
 // How many of the largest moves up and down each corpus lists.
 const MOVERS = 8;
 // The metrics whose points the graded costs change.
-const GRADED_METRICS = ['sfb', 'sfs', 'row_jump', 'distance'];
+const GRADED_METRICS = ['sfb', 'row_jump', 'distance', 'hand_run'];
 
 // ===========================
 // ======= 1/ Engines ========
@@ -84,10 +85,11 @@ function engine(patch, corpus) {
 	return { E, tables };
 }
 
-/** The flat model: every grade flat and row_jump at 0. */
+/** The flat model: every grade flat, row_jump and hand_run at 0. */
 function flatModel(data, E) {
 	data.grades = E.flatGrades();
 	data.weights.row_jump = 0;
+	data.weights.hand_run = 0;
 }
 
 /**
