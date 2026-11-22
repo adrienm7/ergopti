@@ -1369,23 +1369,25 @@ boot_total_ms = 2500
 # p50 2433 ms (teardown, VM re-exec and boot); 4000 ms leaves the boot budget
 # plus the teardown's 1.5 s.
 # HS: init.lua (through core/lifecycle/engine/reload/guard.lua).
+# LX: core/timing/engine/reload_timing.lua. AHK: core/timing/engine/reload_timing.ahk.
 driver_reload_ms = 4000
 
 # One rebuild of the menu tree. It runs on the main thread, and from 250 ms key
 # events reach the taps late ([logger]'s main-thread hold count threshold,
 # core/logger/engine/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
 # budget names a defect the log already shows.
-# HS: menu/ui/init.lua.
+# HS: menu/ui/init.lua. LX: menu/ui/builder/timed_build.lua.
+# AHK: menu/ui/builder/rebuild.ahk.
 menu_rebuild_ms = 250
 
 # One request to a local AI server (Ollama, MLX, a local OpenAI-compatible
 # server), request to answer. Measured local time to first token p50 1573 ms.
-# HS: modules/llm/api_ollama.lua. AHK: ai/engine/prediction/request_latency.ahk.
+# HS: ai/engine/api/ollama.lua. AHK: ai/engine/prediction/request_latency.ahk.
 llm_local_request_ms = 2000
 
 # One request to a cloud AI provider, request to answer. Measured 706 to 1479 ms;
 # 3000 ms leaves room for a provider's own queue.
-# HS: modules/llm/api_remote.lua. LX: modules/llm/api_remote.lua.
+# HS: ai/engine/api/remote.lua. LX: ai/engine/api/api_remote.lua.
 # AHK: ai/engine/prediction/request_latency.ahk.
 llm_remote_request_ms = 3000
 

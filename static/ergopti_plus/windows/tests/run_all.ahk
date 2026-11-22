@@ -204,6 +204,8 @@ global _DefaultLogsDir := _LogsDir
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
 #Include ../core/timing/engine/config.ahk
+#Include ../core/logger/engine/perf_budget.ahk
+#Include ../core/timing/engine/reload_timing.ahk
 
 #Include ../core/ui/engine/window_utils.ahk
 #Include ../core/network/engine/external_url_policy.ahk
@@ -1107,6 +1109,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/lifecycle/engine/reload/test_successor_quiescence.ahk
 #Include unit/core/lifecycle/engine/reload/test_worker_identity.ahk
 #Include unit/core/lifecycle/engine/reload/test_deferral.ahk
+#Include unit/core/timing/test_reload_timing.ahk
 #Include unit/core/lifecycle/engine/test_dev_source.ahk
 #Include unit/menu/test_tray_menu_separator_popup.ahk
 #Include unit/menu/test_deferred_children.ahk

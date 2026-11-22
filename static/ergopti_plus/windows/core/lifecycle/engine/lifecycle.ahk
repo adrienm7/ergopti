@@ -313,8 +313,10 @@ _ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
 ; @returns {Map} The successor's "pid" and owned process "handle".
 LifecycleLaunchSuccessor() {
 	LifecycleRetireWorkers()
-	return ReloadSuccessorLaunch(ReloadSuccessorCommand(A_IsCompiled,
-		A_AhkPath, A_ScriptFullPath), A_InitialWorkingDir)
+	; The successor judges the whole reload against its budget at boot completion
+	; (core/timing/engine/reload_timing.ahk).
+	return ReloadTimingLaunchStamped(() => ReloadSuccessorLaunch(ReloadSuccessorCommand(A_IsCompiled,
+		A_AhkPath, A_ScriptFullPath), A_InitialWorkingDir))
 }
 
 ; Stops the detached workers before a successor launches. A worker that re-runs

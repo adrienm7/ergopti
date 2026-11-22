@@ -100,6 +100,10 @@ if A_IsCompiled {
 	}
 	try EnvSet("ERGOPTI_UPDATER_SWAP_TERMINAL", "")
 }
+; The launch tick of the reload this process completes (core/timing/engine/reload_timing.ahk),
+; taken before any child can inherit it; judged once the boot completes.
+global _ReloadInheritedLaunchTick := ""
+try _ReloadInheritedLaunchTick := ReloadTimingTakeInherited()
 
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
@@ -460,6 +464,7 @@ if UIASW_IsWorkerInvocation()
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include core/timing/engine/config.ahk
+#Include core/timing/engine/reload_timing.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
 #Include modules/keymap/layout/accented_shortcuts.ahk
 
@@ -1591,6 +1596,10 @@ LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _Boo
 try PerfBudget_Report("BootProfile", "boot", _BootTotalMs, TimingsGet("budgets", "boot_total_ms"))
 catch as _BootBudgetErr
 	LoggerError("BootProfile", "The boot could not be judged against its budget: {1}.", _BootBudgetErr.Message)
+; The reload this boot follows, from its launch in the previous instance.
+try ReloadTimingComplete(_ReloadInheritedLaunchTick)
+catch as _ReloadTimingErr
+	LoggerError("Lifecycle", "The reload could not be judged against its budget: {1}.", _ReloadTimingErr.Message)
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())
