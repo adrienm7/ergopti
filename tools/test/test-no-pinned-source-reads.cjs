@@ -24,9 +24,10 @@
  *
  * ROOT CAUSE ENCODED:
  * A test that FileReads a quoted "(modules|lib|ui|core|platform|settings|menu|tray|ai|apps|diagnostics|gestures|hotstrings)/…*.ahk" path and does not use
- * a _Driver* helper is location-pinned. This ratchet counts them and fails if
- * the count rises above the frozen baseline. Lower (never raise) the baseline as
- * tests migrate to _DriverFuncBody("Fn") / _DriverSourceConcat(). It is the test
+ * a _Driver* helper is location-pinned. This ratchet compares them with the
+ * named lists of pinned-source-reads-ledger.json and fails on a pin the ledger
+ * does not name and on an entry whose pin is gone. Drop entries (never add one)
+ * as tests migrate to _DriverFuncBody("Fn") / _DriverSourceConcat(). It is the test
  * twin of the OS-purity ratchets (test_ahk_os_purity_ratchet.ahk /
  * test_port_adapter_coverage.lua): no new instances of a tolerated-but-deprecated
  * pattern.
@@ -37,13 +38,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const { enforcePinnedLedger } = require('./lib/pinned-source-ledger.cjs');
+const { withOrdinals } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 
-// Frozen baseline — the current count of location-pinned source-reading test
-// files. Drive toward zero by migrating each to a _Driver* helper; NEVER raise
-// it to make a new test pass.
+// Location-pinned source-reading test files, once a frozen count. Drive toward
+// zero by migrating each to a _Driver* helper; NEVER add an entry to make a new
+// test pass.
 // History: 19 → 20 (session 2026-07-10: test_hse_suppress_release_bounded.ahk
 //                     added a raw FileRead of a driver source. This is an .ahk-only
 //                     ratchet, so only .ahk tests count here — the .lua source-scan
@@ -72,9 +75,11 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 // this number, and the 24 newly visible ones have not been triaged.
 // 2026-10-30: 31 → 23, local read helpers moved to _DriverFileSource.
 // 2026-11-11: 23 → 22, the keep-awake pause gate reads through _DriverFuncBody.
-const BASELINE = 22;
+// 2026-11-22: the count had drifted two below its baseline again (20 files,
+// 170 literals); both counts became the named lists of
+// pinned-source-reads-ledger.json, which fail on a new pin and on a fixed one.
 
-// Second frozen baseline — the count of individual pinned path literals, not of
+// Second list, once a frozen count — the individual pinned path literals, not
 // files. Counting files alone left two holes: a file already on the list could
 // grow from one pinned path to ten without moving the number, and the helper
 // exemption is per FILE, so one _DriverFuncBody call made every raw path beside
@@ -98,7 +103,6 @@ const BASELINE = 22;
 //              behaviour tests; the count had drifted one above the baseline.)
 //      173 → 170 (2026-11-18: the bundled-app entry points and the layout registry
 //              watch module are found by name; the count had drifted two above.)
-const READ_BASELINE = 170;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirs?Concat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
@@ -146,26 +150,28 @@ function stripComments(src) {
 
 const pinned = [];
 const perFileReads = [];
+const readIds = [];
 let reads = 0;
 for (const file of collectTests(TESTS_DIR, [])) {
 	const src = stripComments(fs.readFileSync(file, 'utf8'));
-	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+	const rel = path.relative(TESTS_DIR, file).replace(/\\/g, '/');
 
 	// Path-literal count first, and unconditionally: a helper elsewhere in the
 	// file does not make a raw path beside it move-resilient. Files that never
 	// read a source at all are still skipped — a path named only in an assertion
 	// message goes stale on a move, it does not break.
 	if (src.includes('FileRead')) {
-		let hits = 0;
+		const literals = [];
 		for (const line of src.split('\n')) {
 			// An Assert()/Test() line naming a file is prose: on a move it goes
 			// stale, it does not break. Only paths the code actually resolves count.
 			if (/^\s*(Assert\w*|Test)\s*\(/.test(line)) continue;
-			hits += (line.match(SOURCE_PATH_RE_G) || []).length;
+			literals.push(...(line.match(SOURCE_PATH_RE_G) || []));
 		}
-		if (hits > 0) {
-			reads += hits;
-			perFileReads.push({ rel, hits });
+		if (literals.length > 0) {
+			reads += literals.length;
+			perFileReads.push({ rel, hits: literals.length });
+			readIds.push(...withOrdinals(literals.map((literal) => `${rel} ${literal}`)));
 		}
 	}
 
@@ -187,34 +193,21 @@ if (measure) {
 	process.exit(0);
 }
 
-let failed = false;
-if (count > BASELINE) {
-	failed = true;
-	console.error(
-		`\x1b[31m[ERROR] Location-pinned source reads in AHK tests rose to ${count} file(s) (baseline ${BASELINE}).\x1b[0m`
-	);
-	console.error(
+enforcePinnedLedger({
+	driver: 'windows',
+	files: pinned,
+	reads: readIds,
+	script: 'tools/test/test-no-pinned-source-reads.cjs',
+	fileAdvice:
 		'  A new test reads a driver source file by a hardcoded path. Use a move-resilient\n' +
-			'  helper instead — _DriverFuncBody("Fn") or _DriverSourceConcat() — so a file move\n' +
-			'  does not break it, or assert behaviour directly. Do NOT raise the baseline.'
-	);
-}
-if (reads > READ_BASELINE) {
-	failed = true;
-	console.error(
-		`\x1b[31m[ERROR] Individual pinned AHK source paths rose to ${reads} (baseline ${READ_BASELINE}).\x1b[0m`
-	);
-	console.error(
+		'  helper instead — _DriverFuncBody("Fn") or _DriverSourceConcat() — so a file move\n' +
+		'  does not break it, or assert behaviour directly. Do NOT add it to the ledger.',
+	readAdvice:
 		'  A file that already reads sources by hardcoded path gained another one — that used\n' +
-			'  to be free, because only files were counted, and a single helper call exempted the\n' +
-			'  whole file. Do NOT raise the baseline.'
-	);
-}
-if (failed) {
-	console.error('  Run `node tools/test/test-no-pinned-source-reads.cjs --measure` to list them.');
-	process.exit(1);
-}
+		'  to be free, because only files were counted, and a single helper call exempted the\n' +
+		'  whole file. Do NOT add it to the ledger.'
+});
 
 console.log(
-	`\x1b[32m[OK] No new location-pinned source reads (${count}/${BASELINE} file(s), ${reads}/${READ_BASELINE} literal(s)).\x1b[0m`
+	`\x1b[32m[OK] No new location-pinned source reads (${count} file(s), ${reads} literal(s), each in pinned-source-reads-ledger.json).\x1b[0m`
 );

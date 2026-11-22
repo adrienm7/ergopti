@@ -20,9 +20,10 @@
  * read is the unit that gets ratcheted.
  *
  * ROOT CAUSE ENCODED:
- * A test naming a driver source path is location-pinned. This ratchet counts
- * them and FAILS if the count rises above the frozen baseline. Lower (never
- * raise) the baseline as tests migrate to behaviour assertions or to
+ * A test naming a driver source path is location-pinned. This ratchet compares
+ * them with the macos section of pinned-source-reads-ledger.json and FAILS on a
+ * pin the ledger does not name and on an entry whose pin is gone. Drop entries
+ * (never add one) as tests migrate to behaviour assertions or to
  * helpers.read_driver_source(symbol). It is the test twin of the OS-purity
  * ratchets and of the AHK pinned-read ratchet.
  *
@@ -46,14 +47,16 @@
 const fs = require('fs');
 const path = require('path');
 const { findPinnedPaths, collectLuaTests } = require('../lint/pinned-source-read.cjs');
+const { enforcePinnedLedger } = require('./lib/pinned-source-ledger.cjs');
+const { withOrdinals } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 
-// Frozen baseline — the count of macOS test FILES naming a driver source path.
-// Drive toward zero by migrating each to a behaviour assertion or to
-// helpers.read_driver_source(symbol); NEVER raise it to make a new test pass.
+// macOS test FILES naming a driver source path, once a frozen count. Drive
+// toward zero by migrating each to a behaviour assertion or to
+// helpers.read_driver_source(symbol); NEVER add an entry to make a new test pass.
 //
 // History: 134 → 133 → 134 → 136 → 140 → 153 → 156 as deliberate source
 //          invariants landed with bug fixes, each either audit-prescribed or
@@ -146,9 +149,10 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //            7 → 5 (2026-11-01: helpers.module_name_of and
 //                    helpers.read_module_source; the adapter wiring and fs_dir
 //                    guards name their module instead of its path.)
-const BASELINE = 5;
+//            5 (2026-11-22: the count became the named files list of the macos
+//                    section of pinned-source-reads-ledger.json.)
 
-// Second frozen baseline — individual pinned READS, not files.
+// Second list, once a frozen count — individual pinned READS, not files.
 //
 // Counting files alone left two holes, both of the kind a ratchet is supposed to
 // make impossible. A file already on the list was free: it could grow from one
@@ -230,7 +234,8 @@ const BASELINE = 5;
 //              recurring-timer, settings-namespace, raw-task and GC-retention
 //              guards are keyed by module name; the reads left are the driver
 //              root's init.lua, which no module name reaches.)
-const READ_BASELINE = 9;
+//        9 (2026-11-22: the count became the named reads list of the macos
+//              section of pinned-source-reads-ledger.json.)
 
 // A move-resilient scan helper (symbol-keyed whole-tree read), so converting a
 // test to one of these drops it from the FILE count (never from the read count).
@@ -238,10 +243,11 @@ const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
 const perFileReads = [];
+const readIds = [];
 let reads = 0;
 for (const file of collectLuaTests(TESTS_DIR, [])) {
 	const src = fs.readFileSync(file, 'utf8');
-	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+	const rel = path.relative(TESTS_DIR, file).replace(/\\/g, '/');
 
 	// Only literals resolving to a real file count: a test asserting a module is
 	// GONE must name it, and there is nothing there to convert.
@@ -252,6 +258,7 @@ for (const file of collectLuaTests(TESTS_DIR, [])) {
 	if (hits.length > 0) {
 		reads += hits.length;
 		perFileReads.push({ rel, hits: hits.length, paths: hits });
+		readIds.push(...withOrdinals(hits.map((hit) => `${rel} ${hit.rel}`)));
 	}
 
 	if (HELPER_RE.test(src)) continue; // already move-resilient
@@ -272,36 +279,21 @@ if (process.argv.includes('--measure')) {
 	process.exit(0);
 }
 
-let failed = false;
-if (count > BASELINE) {
-	failed = true;
-	console.error(
-		`\x1b[31m[ERROR] Path-pinned source reads in macOS tests rose to ${count} file(s) (baseline ${BASELINE}).\x1b[0m`
-	);
-	console.error(
+enforcePinnedLedger({
+	driver: 'macos',
+	files: pinned,
+	reads: readIds,
+	script: 'tools/test/test-no-pinned-source-reads-lua.cjs',
+	fileAdvice:
 		'  A new test names a driver source file by a hardcoded path. Load the module and\n' +
-			'  assert behaviour, or use helpers.read_driver_source(symbol), so a file move does\n' +
-			'  not break it. Do NOT raise the baseline.'
-	);
-}
-if (reads > READ_BASELINE) {
-	failed = true;
-	console.error(
-		`\x1b[31m[ERROR] Individual pinned macOS source reads rose to ${reads} (baseline ${READ_BASELINE}).\x1b[0m`
-	);
-	console.error(
+		'  assert behaviour, or use helpers.read_driver_source(symbol), so a file move does\n' +
+		'  not break it. Do NOT add it to the ledger.',
+	readAdvice:
 		'  A file already on the pinned list gained another hardcoded path — that used to be\n' +
-			'  free, because only files were counted. The read is what a `git mv` breaks, so the\n' +
-			'  read is what is frozen. Do NOT raise the baseline.'
-	);
-}
-if (failed) {
-	console.error(
-		'  Run `node tools/test/test-no-pinned-source-reads-lua.cjs --measure [--paths]` to list them.'
-	);
-	process.exit(1);
-}
+		'  free, because only files were counted. The read is what a `git mv` breaks, so the\n' +
+		'  read is what is frozen. Do NOT add it to the ledger.'
+});
 
 console.log(
-	`\x1b[32m[OK] No new path-pinned macOS source reads (${count}/${BASELINE} file(s), ${reads}/${READ_BASELINE} read(s)).\x1b[0m`
+	`\x1b[32m[OK] No new path-pinned macOS source reads (${count} file(s), ${reads} read(s), each in pinned-source-reads-ledger.json).\x1b[0m`
 );

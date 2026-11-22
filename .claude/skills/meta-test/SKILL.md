@@ -23,13 +23,14 @@ Defined in `tests/test_framework.ahk`:
 | `_StripFullLineComments(Src)` | comment-stripped copy of any source string |
 
 **Never hardcode a path like `"platform/remap/lalt.ahk"`.** A CI ratchet
-(`tools/test/test-no-pinned-source-reads.cjs`) fails the build when the count of
-location-pinned reads rises above its frozen baselines. `_DriverFileSource` is for
-a claim about a whole file, such as a single-file absence assertion; it throws on
-a renamed or an ambiguous name.
+(`tools/test/test-no-pinned-source-reads.cjs`) fails the build on any
+location-pinned read that `tools/test/pinned-source-reads-ledger.json` does not
+name, and on a ledger entry whose read is gone (`--shrink-ledger` drops those).
+`_DriverFileSource` is for a claim about a whole file, such as a single-file
+absence assertion; it throws on a renamed or an ambiguous name.
 
-**Never raise that baseline to make a change pass** — convert the test to a
-helper read instead. Raising it is the ratchet equivalent of weakening a test.
+**Never add a ledger entry to make a change pass** — convert the test to a
+helper read instead. Adding one is the ratchet equivalent of weakening a test.
 
 Why this works: each file's content is contiguous inside the concatenation, so
 relative order and "nearest preceding `#HotIf`" assertions stay valid even after

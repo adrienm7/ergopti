@@ -31,7 +31,7 @@
  * 2. Entries of `type: "feature"` are the rows the tray menu actually renders.
  *    Those MUST resolve — a failure is a user-visible raw id.
  * 3. Every other entry type (scalars, stored widget state, selections) is
- *    carried by a RATCHET that can only shrink, because those keys are not
+ *    carried by a named ledger that can only shrink, because those keys are not
  *    passed through this resolver at runtime and fixing all of them is a
  *    separate job. A new one still fails the build.
  * ==============================================================================
@@ -41,6 +41,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { compareKnownDebt, readJsonLedger, shrinkJsonLedger } = require('./lib/known-debt.cjs');
 
 const PASS_SYMBOL = '✓';
 const FAIL_SYMBOL = '✗';
@@ -49,10 +50,13 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const RESOLVER = 'static/ergopti_plus/windows/menu/engine/manifest_descriptions.ahk';
 const LOCALE_DIR = 'static/ergopti_plus/_shared/core/i18n/data/locales';
 
-// Non-feature entries whose label does not resolve today. This number may only
-// go DOWN. It is not a target to be raised: every entry behind it is a menu
-// label that would render as a raw id if it were ever rendered.
-const NON_FEATURE_FALLTHROUGH_BASELINE = 77;
+// Non-feature entries whose label does not resolve today, named in the
+// non_feature_rows section of menu-label-fallthrough-ledger.json. The list may
+// only shrink: every entry behind it is a menu label that would render as a raw
+// id if it were ever rendered. A count of 77 until 2026-11-22, when it had
+// drifted four above the 73 measured.
+const LEDGER_FILE = path.join(__dirname, 'menu-label-fallthrough-ledger.json');
+const LEDGER_SECTION = 'non_feature_rows';
 
 // Feature rows that legitimately have no locale key, because their label comes
 // from a DIFFERENT source. `hotstrings.personal.*` are the user's own sections:
@@ -209,21 +213,23 @@ check(
 		: ''
 );
 
-check(
-	`non-feature label fall-throughs did not grow (${otherBad.length} <= ${NON_FEATURE_FALLTHROUGH_BASELINE})`,
-	otherBad.length <= NON_FEATURE_FALLTHROUGH_BASELINE,
-	`${otherBad.length} entries do not resolve, baseline is ${NON_FEATURE_FALLTHROUGH_BASELINE}. New offenders: ${otherBad
-		.map((r) => r.path)
-		.join(
-			', '
-		)}. Never raise the baseline to make a change pass — add the folded locale key instead.`
+const otherPaths = otherBad.map((r) => r.path);
+if (process.argv.includes('--shrink-ledger'))
+	process.exit(shrinkJsonLedger(LEDGER_FILE, { [LEDGER_SECTION]: otherPaths }) ? 0 : 1);
+const { added: newFallthroughs, fixed: fixedFallthroughs } = compareKnownDebt(
+	otherPaths,
+	readJsonLedger(LEDGER_FILE, LEDGER_SECTION)
 );
-
-if (otherBad.length < NON_FEATURE_FALLTHROUGH_BASELINE) {
-	console.log(
-		`  ${PASS_SYMBOL}  ratchet can be tightened: NON_FEATURE_FALLTHROUGH_BASELINE is ${NON_FEATURE_FALLTHROUGH_BASELINE}, actual is ${otherBad.length}`
-	);
-}
+check(
+	`every non-feature label fall-through is named in ${LEDGER_SECTION} (${otherBad.length})`,
+	newFallthroughs.length === 0,
+	`new offenders: ${newFallthroughs.join(', ')}. Never add them to the ledger to make a change pass — add the folded locale key instead.`
+);
+check(
+	`every ${LEDGER_SECTION} entry still falls through`,
+	fixedFallthroughs.length === 0,
+	`now resolved: ${fixedFallthroughs.join(', ')}. Run \`node tools/test/test-manifest-menu-labels-resolve.cjs --shrink-ledger\` to drop them.`
+);
 
 // The specific key the audit found, pinned by name so the exact regression
 // cannot come back through a locale edit.

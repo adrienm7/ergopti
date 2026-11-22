@@ -18,10 +18,15 @@
  *    tightens by itself.
  * 3. Every entry carries a non-empty reason; an entry without one is refused,
  *    so the ledger cannot become a silent allowlist.
+ * 4. A long ledger lives in a JSON file beside its test, one reason per
+ *    section; --shrink-ledger style rewrites only ever drop entries.
  * ==============================================================================
  */
 
 'use strict';
+
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Compares found offenders with the ledger that admits them.
@@ -66,4 +71,87 @@ function reportKnownDebt({ label, found, ledger, ledgerName, advice = '' }) {
 	return added.length === 0 && fixed.length === 0;
 }
 
-module.exports = { compareKnownDebt, reportKnownDebt };
+/**
+ * Builds a ledger whose entries share one reason, for a long list frozen in
+ * one go whose items have not been triaged one by one.
+ * @param {string[]} items - Admitted offender identities.
+ * @param {string} reason - Why they were admitted.
+ * @returns {Record<string, string>} The ledger.
+ * @throws {Error} When an item repeats.
+ */
+function ledgerFromList(items, reason) {
+	const ledger = {};
+	for (const item of items) {
+		if (Object.hasOwn(ledger, item)) throw new Error(`known-debt: "${item}" is listed twice`);
+		ledger[item] = reason;
+	}
+	return ledger;
+}
+
+/**
+ * Suffixes repeated identities with their rank (" #2", " #3"), so one file
+ * reading the same path twice is two ledger entries, not one.
+ * @param {string[]} ids - Identities in source order.
+ * @returns {string[]} The same identities, made unique.
+ */
+function withOrdinals(ids) {
+	const seen = new Map();
+	return ids.map((id) => {
+		const rank = (seen.get(id) || 0) + 1;
+		seen.set(id, rank);
+		return rank === 1 ? id : `${id} #${rank}`;
+	});
+}
+
+/**
+ * Reads one section of a JSON ledger file: {"<section>": {"reason": "...",
+ * "entries": ["...", ...]}}. Long ledgers live in such a file, beside their
+ * test, so the test code holds the rule and the file the admitted items.
+ * @param {string} file - Absolute path of the ledger file.
+ * @param {string} section - The section name.
+ * @returns {Record<string, string>} The ledger.
+ * @throws {Error} When the section, its reason or its entries are missing.
+ */
+function readJsonLedger(file, section) {
+	const entry = JSON.parse(fs.readFileSync(file, 'utf8'))[section];
+	if (!entry || typeof entry.reason !== 'string' || entry.reason.trim() === '')
+		throw new Error(`${path.basename(file)}: no "${section}" section with a reason`);
+	if (!Array.isArray(entry.entries))
+		throw new Error(`${path.basename(file)}: the "${section}" section has no entries list`);
+	return ledgerFromList(entry.entries, entry.reason);
+}
+
+/**
+ * Drops the fixed entries of JSON ledger sections; refuses, and writes
+ * nothing, while a scan finds an item its section does not admit.
+ * @param {string} file - Absolute path of the ledger file.
+ * @param {Record<string, string[]>} foundBySection - Each section's scan.
+ * @returns {boolean} True when the file was rewritten.
+ */
+function shrinkJsonLedger(file, foundBySection) {
+	const all = JSON.parse(fs.readFileSync(file, 'utf8'));
+	let refused = false;
+	for (const [section, found] of Object.entries(foundBySection)) {
+		for (const item of compareKnownDebt(found, readJsonLedger(file, section)).added) {
+			refused = true;
+			console.error(`[ERROR] ${section}: ${item} is new; a ledger never grows.`);
+		}
+	}
+	if (refused) return false;
+	for (const [section, found] of Object.entries(foundBySection)) {
+		const kept = new Set(found);
+		all[section].entries = all[section].entries.filter((item) => kept.has(item));
+		console.log(`${path.basename(file)} ${section}: ${all[section].entries.length} entr(ies).`);
+	}
+	fs.writeFileSync(file, JSON.stringify(all, null, '\t') + '\n');
+	return true;
+}
+
+module.exports = {
+	compareKnownDebt,
+	reportKnownDebt,
+	ledgerFromList,
+	withOrdinals,
+	readJsonLedger,
+	shrinkJsonLedger
+};

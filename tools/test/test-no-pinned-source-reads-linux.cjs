@@ -15,7 +15,9 @@
  *    one definition, so the two drivers' numbers mean the same thing.
  * 2. Two counts, files and reads, for the reason the macOS twin gives: a file
  *    already on the list could otherwise add pins for free.
- * 3. Lower, never raise, the baselines as tests move to behaviour.
+ * 3. Both are named lists in the linux section of
+ *    pinned-source-reads-ledger.json: a new pin and a fixed entry both fail,
+ *    so the lists only shrink as tests move to behaviour.
  * ==============================================================================
  */
 
@@ -24,6 +26,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { findPinnedPaths, collectLuaTests } = require('../lint/pinned-source-read.cjs');
+const { enforcePinnedLedger } = require('./lib/pinned-source-ledger.cjs');
+const { withOrdinals } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -85,22 +89,24 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 // e2e child fragment, which loads the event loop by that path; the healthcheck
 // asserts the opener worker's argv, which is that path. Converting them would
 // pin a different string, not remove the pin.
-const BASELINE = 7;
-const READ_BASELINE = 13;
+// 7 files and 13 reads on 2026-11-22, when both counts became the named lists
+// of the linux section of pinned-source-reads-ledger.json.
 const HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 const pinned = [];
 const perFileReads = [];
+const readIds = [];
 let reads = 0;
 for (const file of collectLuaTests(TESTS_DIR, [])) {
 	const src = fs.readFileSync(file, 'utf8');
-	const rel = path.relative(ROOT, file).replace(/\\/g, '/');
+	const rel = path.relative(TESTS_DIR, file).replace(/\\/g, '/');
 	// Only literals resolving to a real file count: a test asserting a module is
 	// gone must name it, and there is nothing there to convert.
 	const hits = findPinnedPaths(src, DRIVER_ROOT).filter((hit) => hit.resolves);
 	if (hits.length > 0) {
 		reads += hits.length;
 		perFileReads.push({ rel, hits: hits.length });
+		readIds.push(...withOrdinals(hits.map((hit) => `${rel} ${hit.rel}`)));
 	}
 	if (HELPER_RE.test(src) || hits.length === 0) continue;
 	pinned.push(rel);
@@ -114,28 +120,17 @@ if (process.argv.includes('--measure')) {
 	process.exit(0);
 }
 
-const problems = [];
-if (pinned.length > BASELINE)
-	problems.push(
-		`Path-pinned source reads in Linux tests rose to ${pinned.length} file(s) (baseline ${BASELINE}).`
-	);
-if (reads > READ_BASELINE)
-	problems.push(
-		`Individual pinned Linux source reads rose to ${reads} (baseline ${READ_BASELINE}).`
-	);
-// A ratchet left above the measurement lets the next pin land unseen.
-if (pinned.length < BASELINE || reads < READ_BASELINE)
-	problems.push(
-		`The measurement fell to ${pinned.length} file(s) and ${reads} read(s): lower BASELINE and READ_BASELINE to it.`
-	);
-if (problems.length > 0) {
-	for (const problem of problems) console.error(`\x1b[31m[ERROR] ${problem}\x1b[0m`);
-	console.error(
-		'  Load the module and assert behaviour, or read it by symbol, so a file move does not\n' +
-			'  break the test. Do NOT raise a baseline. List them with --measure.'
-	);
-	process.exit(1);
-}
+const advice =
+	'  Load the module and assert behaviour, or read it by symbol, so a file move does not\n' +
+	'  break the test. Do NOT add it to the ledger.';
+enforcePinnedLedger({
+	driver: 'linux',
+	files: pinned,
+	reads: readIds,
+	script: 'tools/test/test-no-pinned-source-reads-linux.cjs',
+	fileAdvice: advice,
+	readAdvice: advice
+});
 console.log(
-	`\x1b[32m[OK] No new path-pinned Linux source reads (${pinned.length}/${BASELINE} file(s), ${reads}/${READ_BASELINE} read(s)).\x1b[0m`
+	`\x1b[32m[OK] No new path-pinned Linux source reads (${pinned.length} file(s), ${reads} read(s), each in pinned-source-reads-ledger.json).\x1b[0m`
 );

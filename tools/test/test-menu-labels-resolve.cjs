@@ -39,6 +39,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { readJsonLedger, reportKnownDebt, shrinkJsonLedger } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const GEN = path.join(
@@ -61,14 +62,19 @@ const EN = path.join(
 	'en.json'
 );
 
-// Frozen baseline — manifest entries whose label falls through to the raw path
-// tail. Lower it as translations land; NEVER raise it.
+// Manifest entries whose label falls through to the raw path tail, named
+// ("<kind> <path>") in the manifest_entries section of
+// menu-label-fallthrough-ledger.json. Drop entries as translations land; NEVER
+// add one.
 // History: 111 → 110 (2026-08-02: the driver namespace left the description_key,
 //                     which reconnected shortcuts.personal to the translation
 //                     that had been sitting in all 21 catalogues unused.)
 //          110 → 107 (2026-11-02: layout.pause_switch_enabled, on_pause and
 //                     on_resume left the section key for their own.)
-const FALLTHROUGH_BASELINE = 107;
+//          107 (2026-11-22: the count had drifted five above the 102 measured
+//                     and became the named ledger.)
+const LEDGER_FILE = path.join(__dirname, 'menu-label-fallthrough-ledger.json');
+const LEDGER_SECTION = 'manifest_entries';
 
 /** Segments that name a driver rather than a feature. */
 const DRIVER_SEGMENTS = ['ahk', 'hs', 'linux', 'macos', 'windows'];
@@ -159,6 +165,10 @@ const fellThrough = entries.filter(
 		!candidateKeys(e.key, e.path).some((c) => catalogue[c] !== undefined && catalogue[c] !== '')
 );
 
+const fellThroughIds = fellThrough.map((e) => `${e.kind} ${e.path}`);
+if (process.argv.includes('--shrink-ledger'))
+	process.exit(shrinkJsonLedger(LEDGER_FILE, { [LEDGER_SECTION]: fellThroughIds }) ? 0 : 1);
+
 if (process.argv.includes('--measure')) {
 	console.log(`manifest entries: ${entries.length}`);
 	console.log(`driver-namespaced description_key: ${namespaced.length}`);
@@ -201,15 +211,21 @@ if (namespaced.length > 0) {
 			'  where a translation may already exist. Use the semantic path: menu.<path>.'
 	);
 }
-if (fellThrough.length > FALLTHROUGH_BASELINE) {
+if (
+	!reportKnownDebt({
+		label: 'Manifest entry with no translated label',
+		found: fellThroughIds,
+		ledger: readJsonLedger(LEDGER_FILE, LEDGER_SECTION),
+		ledgerName: `menu-label-fallthrough-ledger.json ${LEDGER_SECTION}`,
+		advice:
+			"  The candidate chain ends by returning the path's last segment, so this never\n" +
+			'  fails at runtime — it shows an English identifier inside a translated menu.\n' +
+			'  Add the key to the locale catalogues. Do NOT add it to the ledger.'
+	})
+) {
 	failed = true;
 	console.error(
-		`\x1b[31m[ERROR] Manifest entries with no translated label rose to ${fellThrough.length} (baseline ${FALLTHROUGH_BASELINE}).\x1b[0m`
-	);
-	console.error(
-		"  The candidate chain ends by returning the path's last segment, so this never\n" +
-			'  fails at runtime — it shows an English identifier inside a translated menu.\n' +
-			'  Add the key to the locale catalogues. Do NOT raise the baseline.'
+		'  Run `node tools/test/test-menu-labels-resolve.cjs --shrink-ledger` to drop fixed entries.'
 	);
 }
 if (failed) {
@@ -218,5 +234,5 @@ if (failed) {
 }
 
 console.log(
-	`\x1b[32m[OK] No driver-namespaced description_key; ${fellThrough.length}/${FALLTHROUGH_BASELINE} entries lack a translated label.\x1b[0m`
+	`\x1b[32m[OK] No driver-namespaced description_key; ${fellThrough.length} entries lack a translated label, each in the ledger.\x1b[0m`
 );
