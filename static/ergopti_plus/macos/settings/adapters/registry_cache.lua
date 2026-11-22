@@ -29,6 +29,7 @@ local M = {}
 local Logger = require("core.logger.engine.logger")
 local FsDir = require("core.fs.engine.dir")
 local Migrate = require("settings.engine.migration.migrate")
+local NativePath = require("core.fs.engine.native_path")
 local TomlCodec = require("core.text.engine.toml_codec")
 local LOG = "settings.adapters.registry_cache"
 
@@ -242,7 +243,7 @@ local function parser_identity(ports)
 	local paths = {}
 	local codec_path = package.searchpath("core.text.engine.toml_codec.codec", package.path)
 	if not codec_path then error("registry parser identity could not find the TOML codec", 0) end
-	local codec_dir = codec_path:match("^(.*)/[^/]+$")
+	local codec_dir = NativePath.dirname(codec_path)
 	local names = ports.list_dir(codec_dir)
 	local listed = {}
 	for _, name in ipairs(names) do
@@ -263,7 +264,7 @@ local function parser_identity(ports)
 		if type(bytes) ~= "string" then
 			error("registry parser identity could not read '" .. path .. "' (" .. tostring(detail) .. ")", 0)
 		end
-		lines[#lines + 1] = path:match("[^/]+$") .. ":" .. checked_hash(ports.hash, bytes, path)
+		lines[#lines + 1] = NativePath.basename(path) .. ":" .. checked_hash(ports.hash, bytes, path)
 	end
 	return checked_hash(ports.hash, table.concat(lines, "\n"), "the parser identity")
 end
@@ -324,7 +325,7 @@ end
 local function native_ensure_dir(dir)
 	local attributes = hs.fs.attributes(dir)
 	if attributes then return attributes.mode == "directory" end
-	local parent = dir:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(dir)
 	if parent and parent ~= "" and not native_ensure_dir(parent) then return false end
 	return hs.fs.mkdir(dir) == true
 end
@@ -421,7 +422,7 @@ function M.load_registry(path)
 		Logger.warn(LOG, "Registry cache could not be encoded: %s.", tostring(payload))
 		return registry
 	end
-	local dir = cache_path:match("^(.*)/[^/]+$")
+	local dir = NativePath.dirname(cache_path)
 	local written, write_error = false, "the cache folder could not be created"
 	if dir and ports.ensure_dir(dir) then
 		written, write_error = ports.write(cache_path, M.envelope(identity, payload, ports.hash))
