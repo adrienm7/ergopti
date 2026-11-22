@@ -573,6 +573,10 @@ async function exerciseHeroPause(context, origin, basePath, inflight) {
 		await page.emulateMedia({ reducedMotion: 'no-preference' });
 		await page.goto(origin + basePath + '/ergopti-plus', { waitUntil: 'networkidle' });
 		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
+		// The page follows the browser's language, English on the runner, and
+		// the demo's labels are translated: the check reads the French page.
+		await page.getByRole('button', { name: 'FR', exact: true }).click();
+		await page.waitForFunction(() => document.documentElement.lang === 'fr');
 		const pause = page.locator('.demo-pause');
 		await pause.click();
 		await page.locator('.demo-pause', { hasText: 'Relancer la démo' }).waitFor();
