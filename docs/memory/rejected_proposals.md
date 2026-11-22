@@ -108,9 +108,11 @@ the simplification audit (`docs/audits/2026-08-03-mise-en-commun-et-simplificati
 ## Native single-field dialogs as webviews
 
 Do not replace every remaining native single-field dialog with a webview. A
-host, bridge contract, and native fallback are more machinery than the small
-dialogs they replace. Reconsider only if several dialogs can share an existing
-host and measured UX benefit outweighs that lifecycle surface.
+host and bridge contract are more machinery than the small dialogs they
+replace, and a webview window would then refuse without WebView2, since no
+WebView window keeps a native fallback (maintainer decision 2026-11-21).
+Reconsider only if several dialogs can share an existing host and measured UX
+benefit outweighs that lifecycle surface.
 
 ## Contiguous SQLite clone buffers for incremental history growth
 
