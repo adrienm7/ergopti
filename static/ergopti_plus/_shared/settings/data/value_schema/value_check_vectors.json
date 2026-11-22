@@ -1,5 +1,5 @@
 {
-	"_comment": "Replayed by value_check.js (tools/test/test-value-schema.cjs), the Lua port (_shared/tests/lua/value_check_contract.lua, run by the macOS and Linux suites) and the AHK port (windows/tests/unit/core/lifecycle/engine/test_value_check_vectors.ahk). Values JSON cannot spell are strings: \"nan\", \"inf\", \"-inf\". A stored vector checks a loaded value, an entry vector checks typed text. ahk_skip marks a vector the AHK port cannot express. An entry vector's default is the setting default its caller passes: a blank number answers it with reset (maintainer decision PCK-13, 2026-11-21).",
+	"_comment": "Replayed by value_check.js (tools/test/test-value-schema.cjs), the Lua port (_shared/tests/lua/value_check_contract.lua, run by the macOS and Linux suites) and the AHK port (windows/tests/unit/core/lifecycle/engine/test_value_check_vectors.ahk). Values JSON cannot spell are strings: \"nan\", \"inf\", \"-inf\". A stored vector checks a loaded value, an entry vector checks typed text. ahk_skip marks a vector the AHK port cannot express. An entry vector's default is the setting default its caller passes: a blank number answers it with reset (maintainer decision PCK-13, 2026-11-21). An entry vector with override passes the inherit marker of an override prompt instead: a blank number answers inherit and no value, any other text is read as before (maintainer decision of 2026-11-22).",
 	"declarations": {
 		"timeout_ms": {
 			"type": "integer",
@@ -398,6 +398,46 @@
 			"text": "   ",
 			"ok": false,
 			"reason": "empty"
+		},
+		{
+			"id": "entry-override-empty-inherits",
+			"declaration": "timeout_ms",
+			"text": "   ",
+			"override": true,
+			"ok": true,
+			"inherit": true
+		},
+		{
+			"id": "entry-override-decimal-empty-inherits",
+			"declaration": "temperature",
+			"text": "",
+			"override": true,
+			"ok": true,
+			"inherit": true
+		},
+		{
+			"id": "entry-override-value-is-read",
+			"declaration": "timeout_ms",
+			"text": "350",
+			"override": true,
+			"ok": true,
+			"value": 350
+		},
+		{
+			"id": "entry-override-above-is-refused",
+			"declaration": "timeout_ms",
+			"text": "600001",
+			"override": true,
+			"ok": false,
+			"reason": "above_maximum"
+		},
+		{
+			"id": "entry-override-letters-are-refused",
+			"declaration": "timeout_ms",
+			"text": "abc",
+			"override": true,
+			"ok": false,
+			"reason": "wrong_type"
 		},
 		{
 			"id": "entry-special-negative",

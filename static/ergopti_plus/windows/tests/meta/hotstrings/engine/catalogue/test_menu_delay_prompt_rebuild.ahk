@@ -37,8 +37,12 @@ _MDPR_HelperRebuildsAfterStrictWrite(Helper, Writer) {
 
 _MDPR_BothDelayPromptsRebuild() {
 	_MDPR_OverrideWriteRebuildsLive("_HS_PromptDefaultDelay", "_HS_CommitBaseDelay")
-	_MDPR_OverrideWriteRebuildsLive("_HS_PromptCategoryDelay", "_HS_CommitDelayOverride")
+	_MDPR_OverrideWriteRebuildsLive("_HS_PromptCategoryDelay", "_HS_CategoryDelayAnswer")
+	_MDPR_OverrideWriteRebuildsLive("_HS_CategoryDelayAnswer", "_HS_CommitDelayOverride")
+	; A blank answer removes the override (maintainer decision of 2026-11-22).
+	_MDPR_OverrideWriteRebuildsLive("_HS_CategoryDelayAnswer", "_HS_ClearDelayOverride")
 	_MDPR_HelperRebuildsAfterStrictWrite("_HS_CommitDelayOverride", "HotstringsSetOverride")
+	_MDPR_HelperRebuildsAfterStrictWrite("_HS_ClearDelayOverride", "HotstringsClearOverride")
 	_MDPR_HelperRebuildsAfterStrictWrite("_HS_CommitBaseDelay", "HotstringsSetBaseDelay")
 
 	Rebuild := _DriverFuncBody("_HS_RebuildAfterDelayChange")
@@ -60,7 +64,8 @@ _MDPN_Source() {
  Source .= "#Include " . _DriverDir . "\core\lifecycle\engine\value_check.ahk`n"
  ; ...and the generated key constants the prompt bodies name.
  Source .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
- for Symbol in ["_HS_PromptDefaultDelay", "_HS_PromptCategoryDelay", "_HS_PromptPersonalFileField"] {
+ for Symbol in ["_HS_PromptDefaultDelay", "_HS_PromptCategoryDelay", "_HS_CategoryDelayAnswer",
+   "_HS_PromptPersonalFileField", "_HS_PersonalFileFieldAnswer"] {
   Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
   AssertTrue(Owner != "", "Every prompt must resolve its actual production owner")
   Text := FSReadStrict(Owner)

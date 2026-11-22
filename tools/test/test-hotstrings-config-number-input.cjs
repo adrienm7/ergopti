@@ -77,9 +77,7 @@ for (const [method, key] of [
 	f.input.change();
 	assert.equal(messages.pop()[key], 100, `${method}: a whole number is sent as typed`);
 	assert.equal(f.input.refusal, '', `${method}: an admitted value clears the refusal`);
-	for (const invalid of method === 'bindDelay'
-		? ['', '1e2', '2.5', '9007199254740992']
-		: ['1e2', '2.5', '9007199254740992']) {
+	for (const invalid of ['1e2', '2.5', '9007199254740992']) {
 		f.input.value = invalid;
 		f.input.refusal = '';
 		f.input.change();
@@ -88,27 +86,42 @@ for (const [method, key] of [
 			0,
 			`${method}: invalid integer ${invalid} must not be silently truncated`
 		);
-		// The empty delay is an unfinished edit, not a refusal (WVH-001).
-		if (invalid !== '') {
-			assert.notEqual(f.input.refusal, '', `${method}: ${invalid} must be refused with a message`);
-		}
+		assert.notEqual(f.input.refusal, '', `${method}: ${invalid} must be refused with a message`);
 	}
 }
-for (const section of [null, { name: 'snippets', priority: 3, priority_default: 5 }]) {
-	const f = field();
-	context.bindPriority(f, category, section);
-	f.input.value = '';
-	f.input.validity = { badInput: true };
-	f.input.change();
-	assert.equal(messages.length, 0, 'an unfinished numeric edit must not erase the override');
-	f.input.validity = { badInput: false };
-	f.input.change();
-	const clear = messages.pop();
-	assert.equal(clear?.action, 'clear_priority', 'clearing priority must request inheritance');
-	assert.equal(
-		clear?.section,
-		section?.name || '',
-		'the correct category or section must be cleared'
-	);
+// A blank delay or priority removes the override, so the inherited value
+// applies again (maintainer decision of 2026-11-22, PCK-13 for overrides);
+// text the number field cannot read stays refused.
+for (const [method, action] of [
+	['bindDelay', 'clear_delay'],
+	['bindPriority', 'clear_priority']
+]) {
+	for (const section of [
+		null,
+		{ name: 'snippets', delay_ms: 50, priority: 3, priority_default: 5 }
+	]) {
+		const f = field();
+		context[method](f, category, section);
+		f.input.value = '';
+		f.input.validity = { badInput: true };
+		f.input.change();
+		assert.equal(messages.length, 0, `${method}: an unreadable entry must not erase the override`);
+		assert.notEqual(
+			f.input.refusal,
+			'',
+			`${method}: an unreadable entry is refused with a message`
+		);
+		f.input.validity = { badInput: false };
+		f.input.value = '  ';
+		f.input.change();
+		const clear = messages.pop();
+		assert.equal(clear?.action, action, `${method}: a blank entry must request inheritance`);
+		assert.equal(
+			clear?.section,
+			section?.name || '',
+			`${method}: the correct category or section must be cleared`
+		);
+		assert.equal(f.input.refusal, '', `${method}: a blank entry is no refusal`);
+	}
 }
-console.log('hotstring numeric settings preserve entered values and clear priority');
+console.log('hotstring numeric settings preserve entered values and a blank clears the override');

@@ -730,7 +730,7 @@ local function prompt_pick_app(generation, webview)
 			if not choice then return end
 			local cats    = load_categories()
 			if not cats then return end
-			local current = cats.apps[choice.text] or { type = default_app_category(), score = 0 }
+			local current = cats.apps[choice.text] or { type = default_app_category(), score = CategoryStore.UNEDITED_SCORE }
 			M.prompt_category(choice.text, current.type, current.score, generation, webview)
 		end, function(chooser)
 			chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))

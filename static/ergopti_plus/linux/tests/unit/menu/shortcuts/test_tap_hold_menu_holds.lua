@@ -771,6 +771,18 @@ helpers.describe("declared complete per-key delay tail", function()
 			helpers.assert_eq(reloads, 1)
 			helpers.assert_eq(refreshes, 2)
 			helpers.assert_eq(notices, 2)
+			-- A blank answer removes the key's own delay, so the global delay
+			-- applies again (maintainer decision of 2026-11-22, PCK-13 for overrides).
+			local global_ms = tostring(math.floor(Manager.global_seconds() * 1000 + 0.5))
+			helpers.assert_true(prompts[#prompts][2]:find(global_ms, 1, true) ~= nil, "the hint names the global delay")
+			answer = "  "
+			helpers.assert_eq(callback(), true, "a blank answer removes the key's own delay")
+			document = assert(require("core.text.engine.toml_codec").decode(read()))
+			local own = document.tap_hold.keys.left_ctrl
+			helpers.assert_nil(own and own.time_activation_seconds, "the key keeps no delay of its own")
+			helpers.assert_eq(document.tap_hold.keys.left_shift.time_activation_seconds, 0.4)
+			helpers.assert_eq(document.future.keep, "neighbour")
+			helpers.assert_eq(notices, 2, "a blank answer is no refusal")
 		end)
 		TextPrompt.ask, os.execute = previous_ask, previous_execute
 		Writer._reset_for_test(); os.remove(path); restore(Manager)

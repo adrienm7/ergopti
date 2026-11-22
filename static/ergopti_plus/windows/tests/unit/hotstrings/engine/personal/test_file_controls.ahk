@@ -651,6 +651,32 @@ _PFC_QuotedMetadataUsesSemanticOwner() {
 Test("personal-file-metadata: quoted leaves preserve semantic identity and all foreign source data",
 	_PFC_QuotedMetadataUsesSemanticOwner)
 
+/**
+ * The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+ * delay or priority removes the file's or section's own value, so the
+ * inherited one applies again. The empty value removes the leaf and nothing else.
+ */
+_PFC_EmptyMetadataRemovesTheLeaf() {
+	Fixture := _PFC_Fixture()
+	try {
+		Source := '[_meta]`ndelay = 0.25`npriority = 40`n'
+			. '[_meta.sections.live]`npriority = 71`nneighbor = "untouched"`n'
+			. '[[live]]`n"abcd" = "first"`n'
+		Candidate := Fixture.owner.PatchMetadata("live", "priority", "", Source)
+		Parsed := TOML_ParseDocument(Candidate)
+		AssertFalse(Parsed["_meta"]["sections"]["live"].Has("priority"), "the section's own priority is removed")
+		AssertEqual("untouched", Parsed["_meta"]["sections"]["live"]["neighbor"])
+		AssertEqual(40, Fixture.owner.ReadMetadata(Candidate).Priority, "the file's priority is kept")
+		Candidate := Fixture.owner.PatchMetadata("", "delay", "", Candidate)
+		Parsed := TOML_ParseDocument(Candidate)
+		AssertFalse(Parsed["_meta"].Has("delay"), "the file's own delay is removed")
+		AssertEqual(40, Parsed["_meta"]["priority"])
+		AssertContains(Candidate, '[[live]]`n"abcd" = "first"')
+	} finally _PFC_Cleanup(Fixture)
+}
+Test("personal-file-metadata: an empty value removes the leaf (pck-13-overrides-2026-11-22)",
+	_PFC_EmptyMetadataRemovesTheLeaf)
+
 /** A native case fold cannot authorize rewriting a foreign semantic key. */
 _PFC_MetadataCaseAliasesRefuse() {
 	Fixture := _PFC_Fixture()

@@ -484,9 +484,11 @@ function M.build_management(ctx)
 	local delay_menu = {}
 	-- Reads a typed delay through the shared value check: whole milliseconds in
 	-- the declared range; a refusal is notified with the text naming the range.
-	-- A blank answer resets it to `default` (maintainer decision PCK-13).
+	-- A blank answer resets it to `default` (maintainer decision PCK-13); an
+	-- override passes ValueCheck.INHERIT and gets it back for a blank answer.
 	local function typed_delay(raw, key, default)
 		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw, default)
+		if typed.ok and typed.inherit then return ValueCheck.INHERIT end
 		if typed.ok then return typed.value end
 		Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
 		pcall(notifications.notify, i18n.get("dialog.value_check.title"),
@@ -521,8 +523,10 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
+				-- A blank answer resets the row to its own default: the manifest
+				-- default of the base delay, else the key's shipped delay.
 				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY,
-					ManifestReader.default_for(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY))
+					is_base and ManifestReader.default_for(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY) or default_val)
 				if new_sec == nil then return end
 
 				if is_base then
@@ -570,13 +574,23 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, ValueCheck.INHERIT)
 				if new_sec == nil then return end
 
 				-- Persist through hotstrings_config (same store + file the config
 				-- window writes to, so the two UIs never desync) then apply to the
 				-- running engine so the new delay takes effect without a restart.
-				if hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
+				-- A blank answer removes the category's own delay, so the inherited
+				-- delay applies again (maintainer decision of 2026-11-22).
+				if rawequal(new_sec, ValueCheck.INHERIT) then
+					if hotstrings_config.clear_override(category, nil, "delay") ~= true then return false end
+					local inherited = hotstrings_config.resolve(category, nil)
+					new_sec = type(inherited) == "table" and inherited.delay or nil
+					if type(new_sec) ~= "number" then
+						Logger.error(LOG, "The delay of '%s' has no inherited value after its override was removed.", category)
+						return false
+					end
+				elseif hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
 					return false
 				end
 				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end

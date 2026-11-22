@@ -267,7 +267,10 @@ _THD_PromptAndBoundKey(TargetPath) {
 	AssertEqual(1, _THD_Prompts.Length)
 	AssertEqual(350, _THD_Prompts[1]["current"], "effective per-key350ms is not guessed global200ms")
 	Assert(!InStr(_THD_Prompts[1]["prompt"], "%d"), "the native prompt substitutes its printf placeholder")
-	Assert(InStr(_THD_Prompts[1]["prompt"], "350"), "the translated prompt displays the effective value")
+	; The box holds the effective value; the hint names the global delay a
+	; blank answer goes back to (maintainer decision of 2026-11-22).
+	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	Assert(InStr(_THD_Prompts[1]["prompt"], String(GlobalMs)), "the translated prompt names the global delay")
 	AssertEqual(0, _THD_Prompts[1]["critical"])
 	AssertEqual(1, _THD_Setters.Length)
 	AssertEqual("caps_lock", _THD_Setters[1]["key"])
@@ -305,6 +308,30 @@ _THD_PromptRefusesMalformed(TargetPath) {
 }
 Test("tap-hold duration: cancellation and malformed prompt shapes have no effects (tap-hold-key-delay)",
 	() => _THHS_WithNativeFixture(_THD_PromptRefusesMalformed))
+
+; The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+; per-key delay removes the key's own delay, so the global delay applies again.
+; Before, the blank was refused as empty and nothing changed.
+_THD_PromptBlankRemovesKeyDelay(TargetPath) {
+	global _THD_Answer, _THD_Setters, _THD_Reloads
+	Resets := []
+	ResetFn := (KeyId) => (Resets.Push(KeyId), 1)
+	for Blank in ["", "   "] {
+		_THD_Reset()
+		_THD_Answer := { Result: "OK", Value: Blank }
+		Shown := _ValueCheckTest_Refusals.Length
+		AssertEqual(1, _TH_PromptKeyDelay("caps_lock", _THD_Prompt, _THD_Setter, _THD_Reload, ResetFn),
+			"a blank answer is accepted")
+		AssertEqual(0, _THD_Setters.Length, "no delay of its own is written")
+		AssertEqual("caps_lock", Resets[-1], "the key's own delay is removed")
+		AssertEqual(1, _THD_Reloads.Length)
+		AssertEqual("delay_reset", _THD_Reloads[1]["reason"])
+		AssertEqual(Shown, _ValueCheckTest_Refusals.Length, "a blank answer is no refusal")
+	}
+	AssertEqual(2, Resets.Length)
+}
+Test("tap-hold duration: a blank per-key delay removes the override (pck-13-overrides-2026-11-22)",
+	() => _THHS_WithNativeFixture(_THD_PromptBlankRemovesKeyDelay))
 
 _THD_PromptRefusesNonStrictOwners(TargetPath) {
 	global _THD_Mode, _THD_Result, _THD_Setters, _THD_Reloads

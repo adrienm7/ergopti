@@ -79,6 +79,28 @@ function M.register(helpers, spec)
 			end)
 		end
 	end)
+
+	-- The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+	-- typed score goes back to the unedited score; out-of-range and unreadable
+	-- scores stay refused with the localized range.
+	helpers.describe(spec.label .. ": typed scores", function()
+		local translate = function(key) return key end
+		helpers.it("app-category-store: a blank score is the unedited score (pck-13-overrides-2026-11-22)", function()
+			for _, blank in ipairs({ "", "   " }) do
+				local score, refusal = Store.parse_score_entry(blank, translate)
+				helpers.assert_eq(score, Store.UNEDITED_SCORE)
+				helpers.assert_eq(refusal, nil)
+			end
+		end)
+		helpers.it("app-category-store: out-of-range and unreadable scores stay refused (pck-13-overrides-2026-11-22)", function()
+			for _, text in ipairs({ "2.5", "-3", "abc" }) do
+				local score, refusal = Store.parse_score_entry(text, translate)
+				helpers.assert_eq(score, nil, text)
+				helpers.assert_true(type(refusal) == "string" and refusal ~= "", text .. " is refused with a message")
+			end
+			helpers.assert_eq((Store.parse_score_entry("1,5", translate)), 1.5)
+		end)
+	end)
 end
 
 return M

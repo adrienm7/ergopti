@@ -57,9 +57,12 @@ function M.register(helpers, shared_path)
 		for _, vector in ipairs(corpus.entry) do
 			local row = vector
 			helpers.it("value-check: entry " .. row.id, function()
-				local result = ValueCheck.parse_entry(corpus.declarations[row.declaration], row.text, row.default)
+				local fallback = row.default
+				if row.override == true then fallback = ValueCheck.INHERIT end
+				local result = ValueCheck.parse_entry(corpus.declarations[row.declaration], row.text, fallback)
 				helpers.assert_eq(result.ok, row.ok)
 				helpers.assert_eq(result.reset == true, row.reset == true, "a blank number resets (pck-13)")
+				helpers.assert_eq(result.inherit == true, row.inherit == true, "an override's blank inherits (2026-11-22)")
 				if row.ok then helpers.assert_eq(result.value, row.value) else helpers.assert_eq(result.reason, row.reason) end
 				if row.min ~= nil then
 					helpers.assert_eq(result.min, row.min)

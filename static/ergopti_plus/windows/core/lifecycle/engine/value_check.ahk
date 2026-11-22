@@ -197,17 +197,31 @@ _ValueCheckEntryRefusal(Reason, Entry) {
 }
 
 /**
+ * The default an override prompt passes to ValueCheckParseEntry(): a blank
+ * number then answers "inherit", and the caller removes the override so the
+ * inherited value applies again (maintainer decision of 22 November 2026,
+ * PCK-13 for overrides). One object, compared by identity.
+ * @returns {Object} The marker.
+ */
+ValueCheckInherit() {
+	static Marker := {}
+	return Marker
+}
+
+/**
  * Reads what a person typed in an entry box. A declaration with entry_scale is
  * typed in another unit than it is stored (milliseconds typed, seconds stored:
  * scale 1000) and entry_type says whether the typed number may carry decimals;
  * a refusal's bounds are in the typed unit. A blank numeric box resets the
  * setting: given the setting's default, it answers that default with "reset"
  * (maintainer decision PCK-13, 21 November 2026, on the three OS); without one
- * it is refused as empty.
+ * it is refused as empty. Given ValueCheckInherit() instead, an override's
+ * blank answers "inherit" and no value (maintainer decision of 22 November
+ * 2026), and its caller removes the override.
  * @param {Map} Entry - Declaration from ValueCheckEntryFor().
  * @param {Any} Text - Raw text of the box.
- * @param {Any} Default - The setting's default, answered for a blank number.
- * @returns {Map} As ValueCheckValue(), with "reset" true for a blank answer.
+ * @param {Any} Default - The setting's default, or ValueCheckInherit() for an override.
+ * @returns {Map} As ValueCheckValue(), with "reset" true for a blank answer, or "inherit".
  */
 ValueCheckParseEntry(Entry, Text, Default?) {
 	if !(Text is String)
@@ -216,8 +230,11 @@ ValueCheckParseEntry(Entry, Text, Default?) {
 	if (Kind == "string" || Kind == "path")
 		return ValueCheckValue(Entry, Text)
 	Trimmed := Trim(Text, " `t`r`n")
-	if (Trimmed == "" && IsSet(Default) && (Kind == "integer" || Kind == "decimal"))
+	if (Trimmed == "" && IsSet(Default) && (Kind == "integer" || Kind == "decimal")) {
+		if IsObject(Default) && Default == ValueCheckInherit()
+			return Map("ok", true, "inherit", true)
 		return Map("ok", true, "value", Default, "reset", true)
+	}
 	if (Trimmed == "")
 		return _ValueCheckEntryRefusal("empty", Entry)
 	if (Kind == "integer" || Kind == "decimal") {

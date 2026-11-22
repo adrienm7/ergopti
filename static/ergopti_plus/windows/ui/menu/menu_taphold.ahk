@@ -702,15 +702,15 @@ _TH_ResetKeyDelay(KeyId, SetterFn := 0, ReloadFn := 0) {
  * @param {String} KeyId Shared physical-key identifier.
  * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
  */
-_TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+_TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0, ResetFn := 0) {
 	global TapHold
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _TH_PromptKeyDelay(KeyId, PromptFn, SetterFn, ReloadFn)
+		try return _TH_PromptKeyDelay(KeyId, PromptFn, SetterFn, ReloadFn, ResetFn)
 		finally Critical(InheritedCritical)
 	}
-	for Adapter in [PromptFn, SetterFn, ReloadFn] {
+	for Adapter in [PromptFn, SetterFn, ReloadFn, ResetFn] {
 		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
 			return false
 	}
@@ -731,19 +731,26 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 	if !_TH_DurationSourceMatches(SourceWitness, StartPath)
 		return false
 	CurrentMs := Round(TapHoldDuration(MasterGateDesiredTapHold(StartState), KeyId) * 1000)
-	Prompt := StrReplace(t("menu.tapholds.key_tap_delay_dialog_prompt_current"), "%d", CurrentMs)
+	; The hint names the global delay a blank answer goes back to.
+	Prompt := StrReplace(t("menu.tapholds.key_tap_delay_dialog_prompt"), "%d",
+		Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(StartState)) * 1000))
 	Title := t("menu.tapholds.key_tap_delay_dialog_title")
 	try {
 		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		; The shared value schema owns the accepted range and its refusal text.
-		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.keys.*.time_activation_seconds"), Answer.Value)
+		; The shared value schema owns the accepted range and its refusal text. A
+		; blank answer removes the key's own delay, so the global delay applies
+		; again (maintainer decision of 22 November 2026, PCK-13 for overrides).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.keys.*.time_activation_seconds"), Answer.Value,
+			ValueCheckInherit())
 		if !Typed["ok"] {
 			ValueCheckShowRefusal("tap_hold.keys.*.time_activation_seconds", Typed, Answer.Value)
 			return false
 		}
+		if Typed.Has("inherit")
+			return _TH_ResetKeyDelay(KeyId, ResetFn, ReloadFn)
 		Seconds := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The per-key delay prompt was refused: {1}.", Err.Message)

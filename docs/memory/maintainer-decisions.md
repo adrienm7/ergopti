@@ -130,6 +130,32 @@ three measures that each start once the reload is accepted, and they stay so:
 The budget measures teardown plus boot; a wait before admission is not the
 reload's cost. Do not move a starting point to the user's request.
 
+## A blank override answer removes the override (2026-11-22)
+
+Decided by the maintainer on 2026-11-22 (PCK-13 for overrides, after the
+2026-11-21 rule for global settings): on every prompt of a value that
+inherits another one, a blank answer removes the override, so the inherited
+value applies again, on the three OS. Out-of-range and unreadable answers stay
+refused with the shared range message.
+
+- The shared entry grammar owns it: an override passes the inherit marker
+  (`ValueCheck.INHERIT` in `value_check.lua`, `INHERIT` in `value_check.js`
+  and `ui/value_check.js`, `ValueCheckInherit()` in AHK) as its default, and a
+  blank number answers `{ ok, inherit = true }` with no value.
+  `value_check_vectors.json` (`override` vectors) replays it on the three
+  ports and in JS.
+- The override prompts: a hotstring category's delay (tray rows of the three
+  OS), a key's own tap-hold delay (the three OS, which reset it as « Use the
+  global delay » does), a personal file's or section's delay and priority on
+  Windows's tray (the empty value removes the `[_meta]` leaf), and the
+  hotstrings settings page's delay and priority fields (three OS; a number
+  field's unreadable text stays refused, never read as blank).
+- An app's productivity score has no inherited value: a blank goes back to
+  the score of an app never edited (`UNEDITED_SCORE`, 0).
+- The per-key tap-hold prompt now names the global delay on the three OS,
+  « leave blank to use the global delay: N ms », in the 21 locales; the other
+  override prompts named no default, so their hints are unchanged.
+
 ## A locale chosen without config.toml creates the file (2026-11-22)
 
 Decided by the maintainer on 2026-11-22: choosing a language while
@@ -226,10 +252,9 @@ setting prompt passes its default: the manifest default of its key, the
 tap-hold global default (`TAPHOLD_DEFAULT_ACTIVATION_SECONDS`,
 `tap_hold_loader.GLOBAL_DEFAULT_SECONDS`, `DEFAULT_TAP_HOLD_TIMEOUT_MS`), and
 on Linux the AI numeric page receives it in its request (`numeric_prompt.lua`,
-`ui/numeric_prompt/script.js`). Overrides whose blank would mean « follow the
-inherited value again » (a category or section delay, a personal file's
-priority, a key's own tap-hold delay, an app category score) keep refusing a
-blank: they reset through their own rows (« default », reset key delay).
+`ui/numeric_prompt/script.js`). Overrides follow their own rule since
+2026-11-22: a blank removes the override (« A blank override answer removes
+the override », 2026-11-22).
 
 ## The locale's neutral value is the absent row (2026-11-21)
 

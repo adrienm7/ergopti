@@ -375,6 +375,28 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		end
 	end
 
+	-- The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+	-- category delay removes the override, so the inherited delay applies again.
+	-- Before, the blank was refused and nothing changed.
+	helpers.it("category delay removes its override on a blank answer (pck-13-overrides-2026-11-22)", function()
+		local config, calls = receipt_config("category", "true")
+		local cleared = {}
+		config.clear_override = function(...)
+			cleared[#cleared + 1] = { n = select("#", ...), ... }
+			return true
+		end
+		local changed = 0
+		local called, result, _, notices = observe(delay_action(config, "category",
+			function() changed = changed + 1 end), "   ")
+		helpers.assert_true(called)
+		helpers.assert_eq(result, true, "the removal is acknowledged")
+		helpers.assert_eq(#calls, 0, "no override is written")
+		helpers.assert_eq(#cleared, 1, "the override is removed")
+		helpers.assert_eq(cleared[1][1], "magickey");helpers.assert_eq(cleared[1][2], nil);helpers.assert_eq(cleared[1][3], "delay")
+		helpers.assert_eq(changed, 1)
+		helpers.assert_eq(#notices, 0, "a blank answer is no refusal")
+	end)
+
 	local function read(path)
 		local file = assert(io.open(path, "rb"));local content = file:read("*a");assert(file:close());return content
 	end

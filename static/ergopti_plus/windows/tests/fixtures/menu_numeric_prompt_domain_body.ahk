@@ -28,10 +28,16 @@ _HS_CommitBaseDelay(Value) {
  _MDPN_World.Calls.Push({Field: "delay", Value: Value})
  return true
 }
-_HS_CommitDelayOverride(Category, Value) {
+_HS_CommitDelayOverride(Category, Value, *) {
  global _MDPN_World
  _MDPN_Require(Category == "magickey", "The original category must reach publication")
  return _HS_CommitBaseDelay(Value)
+}
+_HS_ClearDelayOverride(Category, *) {
+ global _MDPN_World
+ _MDPN_Require(Category == "magickey", "The original category must reach its removal")
+ _MDPN_World.Calls.Push({Field: "delay", Value: "inherit"})
+ return true
 }
 class _MDPN_Owner {
  __New() => this.source := Map("label", "Private personal source")
@@ -71,16 +77,22 @@ try {
  Before := _MDPN_World.Calls.Length
  _MDPN_Run(Mode)
  _MDPN_Require(_MDPN_World.Calls.Length == Before, "Cancel must publish nothing")
- ; A blank base delay resets to its default (PCK-13, 2026-11-21); an override
- ; resets through its own row, so a blank one stays refused.
+ ; A blank base delay resets to its default (PCK-13, 2026-11-21); a blank
+ ; override removes itself, so the inherited value applies again (maintainer
+ ; decision of 2026-11-22): the category clears its delay, a personal file
+ ; commits the empty value its owner removes.
  _MDPN_World.Answer := {Result: "OK", Value: ""}
  Before := _MDPN_World.Calls.Length
  _MDPN_Run(Mode)
+ _MDPN_Require(_MDPN_World.Calls.Length == Before + 1, "A blank answer must publish once")
+ Blank := _MDPN_World.Calls[-1]
+ _MDPN_Require(Blank.Field == ExpectedField, "A blank answer keeps its field")
  if Mode == "base"
-  _MDPN_Require(_MDPN_World.Calls.Length == Before + 1 && _MDPN_World.Calls[-1].Value == 0.5,
-   "A blank base delay must publish its default once")
+  _MDPN_Require(Blank.Value == 0.5, "A blank base delay must publish its default")
+ else if Mode == "category"
+  _MDPN_Require(Blank.Value == "inherit", "A blank category delay must remove its override")
  else
-  _MDPN_Require(_MDPN_World.Calls.Length == Before, "A blank override must publish nothing")
+  _MDPN_Require((Blank.Value is String) && Blank.Value == "", "A blank personal field must remove its value")
  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808"] {
   _MDPN_World.Answer := {Result: "OK", Value: Raw}
   Before := _MDPN_World.Calls.Length

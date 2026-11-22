@@ -558,6 +558,22 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 		end)
 	end)
 
+	-- The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+	-- answer removes the key's own delay, so the global delay applies again.
+	helpers.it("removes the key's own delay on a blank answer (pck-13-overrides-2026-11-22)", function()
+		with_delay_native(function(rows, observed)
+			observed.answer = { ["text returned"] = "   " }
+			helpers.assert_eq(rows()[6].fn(), true)
+			helpers.assert_eq(observed.calls, { { kid = "left_shift" } }, "the per-key setter removes the delay")
+			helpers.assert_eq(#observed.alerts, 0, "a blank answer is no refusal")
+			helpers.assert_eq(observed.regenerations, 1)
+			observed.answer = { ["text returned"] = "20000" }
+			helpers.assert_eq(rows()[6].fn(), false, "an out-of-range answer stays refused")
+			helpers.assert_eq(#observed.calls, 1)
+			helpers.assert_eq(#observed.alerts, 1)
+		end)
+	end)
+
 	helpers.it("reads actual delay order/caption declarations without losing native row owners (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed, manifest)
 			local tail = manifest.get_array("tap_hold_key_delay_tail")

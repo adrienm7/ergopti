@@ -325,12 +325,44 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	if (IB.Result != "OK") {
 		return
 	}
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor("hotstrings_config.*.delay"), IB.Value)
+	return _HS_CategoryDelayAnswer(Cat, IB.Value)
+}
+
+; Applies a category delay typed in its prompt. A blank answer removes the
+; category's own delay, so the inherited delay applies again (maintainer
+; decision of 22 November 2026, PCK-13 for overrides); an out-of-range or
+; unreadable answer is refused with the shared message.
+_HS_CategoryDelayAnswer(Cat, Text, SetterFn := 0, ClearFn := 0, RebuildFn := 0) {
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor("hotstrings_config.*.delay"), Text, ValueCheckInherit())
 	if !Typed["ok"] {
-		ValueCheckShowRefusal("hotstrings_config.*.delay", Typed, IB.Value)
-		return
+		ValueCheckShowRefusal("hotstrings_config.*.delay", Typed, Text)
+		return false
 	}
-	return _HS_CommitDelayOverride(Cat, Typed["value"])
+	if Typed.Has("inherit")
+		return _HS_ClearDelayOverride(Cat, ClearFn, RebuildFn)
+	return _HS_CommitDelayOverride(Cat, Typed["value"], SetterFn, RebuildFn)
+}
+
+; Removes a category's own delay, then re-registers the hotstrings live, as
+; _HS_CommitDelayOverride does for a new one.
+_HS_ClearDelayOverride(Cat, ClearFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _HS_ClearDelayOverride(Cat, ClearFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HasMethod(ClearFn, "Call")
+		? ClearFn.Call(Cat, "", "delay")
+		: HotstringsClearOverride(Cat, "", "delay")
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Failed to remove the '{1}' delay override: {2}.", Cat, Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+	return _HS_RebuildAfterDelayChange("the '" . Cat . "' delay override", RebuildFn)
 }
 
 ; Persist the base expansion delay, then re-register the hotstrings live: their
@@ -1279,16 +1311,24 @@ _HS_PromptPersonalFileField(Owner, Section, Field) {
 	Prompt := Ui_InputBox(t("hs_config.label_" . Field), Owner.source["label"], "w340 h140", Current)
 	if Prompt.Result != "OK"
 		return
-	Value := Trim(Prompt.Value)
+	return _HS_PersonalFileFieldAnswer(Owner, Section, Field, Prompt.Value)
+}
+
+; Applies a personal file field typed in its prompt. A blank delay or
+; priority removes the file's or section's own value, so the inherited one
+; applies again (maintainer decision of 22 November 2026, PCK-13 for
+; overrides); an out-of-range or unreadable answer is refused.
+_HS_PersonalFileFieldAnswer(Owner, Section, Field, Text) {
+	Value := Trim(Text)
 	if Field == "delay" || Field == "priority" {
 		; The shared value schema owns the accepted range and its localized refusal.
 		Key := "hotstrings_config.*." . Field
-		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Key), Prompt.Value)
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Key), Text, ValueCheckInherit())
 		if !Typed["ok"] {
-			ValueCheckShowRefusal(Key, Typed, Prompt.Value)
+			ValueCheckShowRefusal(Key, Typed, Text)
 			return false
 		}
-		Value := Typed["value"]
+		Value := Typed.Has("inherit") ? "" : Typed["value"]
 	} else if !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")
 		return false
 	return Owner.Commit(Section, Field, Value)

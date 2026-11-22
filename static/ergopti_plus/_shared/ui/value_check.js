@@ -53,6 +53,12 @@ const REASONS = [
 
 const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path', 'url'];
 
+// The fallback an override passes to parseEntry(): a blank number then
+// answers `{ ok: true, inherit: true }`, and the caller removes the override
+// so the inherited value applies again (maintainer decision of 2026-11-22,
+// PCK-13 for overrides).
+const INHERIT = Object.freeze({ inherit: true });
+
 // A web address: a lowercase http or https scheme, then at least one
 // character and no ASCII space or control character anywhere, so a stored
 // link never reaches a browser or a shell carrying a line break or a space.
@@ -156,11 +162,13 @@ function checkValue(entry, value) {
  * carry decimals; the bounds of a refusal are then given in the typed unit.
  * A blank numeric box resets the setting: given the setting's default, it
  * answers that default with `reset: true` (maintainer decision PCK-13,
- * 2026-11-21, on the three OS); without one it is refused as empty.
+ * 2026-11-21, on the three OS); without one it is refused as empty. Given
+ * INHERIT instead, an override's blank answers `inherit: true` and no value
+ * (maintainer decision of 2026-11-22).
  * @param {Object} entry - Declaration from entryFor().
  * @param {string} text - Raw text of the box.
- * @param {*} [fallback] - The setting's default, answered for a blank number.
- * @return {{ok: boolean, value?: *, reset?: boolean, reason?: string, min?: number, max?: number}}
+ * @param {*} [fallback] - The setting's default, or INHERIT for an override.
+ * @return {{ok: boolean, value?: *, reset?: boolean, inherit?: boolean, reason?: string, min?: number, max?: number}}
  */
 function parseEntry(entry, text, fallback) {
 	if (typeof text !== 'string') return entryRefusal('wrong_type', entry);
@@ -171,7 +179,9 @@ function parseEntry(entry, text, fallback) {
 		fallback !== undefined &&
 		(entry.type === 'integer' || entry.type === 'decimal')
 	)
-		return { ok: true, value: fallback, reset: true };
+		return fallback === INHERIT
+			? { ok: true, inherit: true }
+			: { ok: true, value: fallback, reset: true };
 	if (trimmed === '') return entryRefusal('empty', entry);
 	if (entry.type === 'integer' || entry.type === 'decimal') {
 		if (!DECIMAL_TEXT.test(trimmed)) return entryRefusal('wrong_type', entry);
@@ -625,5 +635,5 @@ function requireValue(schema, key, value) {
 		"TAP_HOLDS_STICKY_TIMEOUT_MS": "tap_holds.sticky_timeout_ms"
 	};
 
-	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
+	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, INHERIT, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
 })();

@@ -540,8 +540,9 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @param title string Already-translated dialog title.
 	--- @param current_sec number
 	--- @param key string Declaration of the shared value schema.
-	--- @param default number|nil Seconds a blank answer resets to (PCK-13).
-	--- @return number|nil Seconds, or nil when cancelled or refused.
+	--- @param default number|table|nil Seconds a blank answer resets to (PCK-13),
+	---   or ValueCheck.INHERIT, given back for an override's blank answer.
+	--- @return number|table|nil Seconds, the INHERIT marker, or nil when cancelled or refused.
 	local function prompt_delay(title, current_sec, key, default)
 		local raw = prompt_text(
 			title,
@@ -557,6 +558,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 			return nil
 		end
+		if typed.inherit then return ValueCheck.INHERIT end
 		return typed.value
 	end
 
@@ -635,9 +637,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current,
-					require("settings.engine.value_check").KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
+				local ValueCheck = require("settings.engine.value_check")
+				local chosen = prompt_delay(title, current, ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, ValueCheck.INHERIT)
 				if chosen == nil then return end
+				-- A blank answer removes the category's own delay, so the inherited
+				-- delay applies again (maintainer decision of 2026-11-22).
+				if rawequal(chosen, ValueCheck.INHERIT) then
+					return commit_delay(config.clear_override, category, nil, "delay")
+				end
 				return commit_delay(config.set_override, category, nil, "delay", chosen)
 			end,
 		}

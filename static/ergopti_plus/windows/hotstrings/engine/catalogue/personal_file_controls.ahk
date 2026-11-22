@@ -429,14 +429,16 @@ class PersonalFileAdoptedOwner {
 		return true
 	}
 
-	/** Patch one semantic leaf through the existing lossless document owner. */
+	/** Patch one semantic leaf through the existing lossless document owner; "" removes it. */
 	PatchMetadata(Section, Field, Value, Content) {
 		if !this.MetadataAvailable(Section, Field, Content)
 			throw ValueError("The personal metadata field has an ambiguous source owner.")
 		Header := Section == "" ? "_meta" : "_meta.sections." . TOML_RenderKey(Section)
-		StoredValue := Field == "show_tooltip" ? TOML_Bool(Value) : Value
-		Candidate := TOML_BuildConfigDocumentCandidate(Content,
-			[{ Section: Header, Key: Field, Value: StoredValue }], [])
+		if (Value is String) && Value == ""
+			Row := { Section: Header, Key: Field, Delete: 1 }
+		else
+			Row := { Section: Header, Key: Field, Value: Field == "show_tooltip" ? TOML_Bool(Value) : Value }
+		Candidate := TOML_BuildConfigDocumentCandidate(Content, [Row], [])
 		Result := Candidate["content"]
 		; The generic configuration owner emits a BOM. Personal sources retain
 		; their captured physical encoding posture instead of acquiring one.
@@ -456,7 +458,11 @@ class PersonalFileAdoptedOwner {
 			throw Error("The personal hotstring source changed before scoped publication.")
 	}
 
-	/** Publish one gate or validated metadata field with the existing compensated journal. */
+	/**
+	 * Publish one gate or validated metadata field with the existing compensated
+	 * journal. A metadata Value of "" removes the field, so the file's own value
+	 * or the default applies again (maintainer decision of 22 November 2026).
+	 */
 	Commit(Section, Field, Value, Options := unset) {
 		if A_IsCritical {
 			Previous := Critical("Off")
@@ -470,6 +476,8 @@ class PersonalFileAdoptedOwner {
 				throw ValueError("Personal activation requires a Boolean value.")
 		} else if !_HCW_IsOverrideField(Field)
 			throw ValueError("Invalid personal-file metadata target.")
+		else if (Value is String) && Value == ""
+			Value := ""
 		else if Field == "delay" && !TickTryDurationMsFromSeconds(Value, &DelayMs)
 			throw ValueError("Invalid personal-file delay.")
 		else if Field == "priority" && !HotstringsTryPriority(Value, &Priority)

@@ -54,13 +54,15 @@ local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range; nothing is written.
---- A blank answer resets the setting to `default` (maintainer decision PCK-13).
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13);
+--- an override passes ValueCheck.INHERIT and gets it back for a blank answer.
 --- @param key string Declaration of the shared value schema.
 --- @param text any What the person typed.
---- @param default any The setting's default, in the stored unit.
+--- @param default any The setting's default, in the stored unit, or ValueCheck.INHERIT.
 --- @return any|nil value The value in the stored unit, nil when refused.
 local function read_typed(key, text, default)
 	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
+	if result.ok and result.inherit then return ValueCheck.INHERIT end
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
 	require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
@@ -537,8 +539,15 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			local call_ok, ok, result = pcall(hs.osascript.applescript, script)
 			if not call_ok or ok ~= true or type(result) ~= "table"
 				or type(result["text returned"]) ~= "string" then return false end
-			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"])
+			-- A blank answer removes the key's own delay, so the global delay the
+			-- hint names applies again (maintainer decision of 2026-11-22).
+			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"], ValueCheck.INHERIT)
 			if seconds == nil then return false end
+			if rawequal(seconds, ValueCheck.INHERIT) then
+				return commit_menu_setting(karabiner, "Per-key timeout reset", function()
+					return karabiner.set_tap_timeout(kid, nil)
+				end, update_menu)
+			end
 			return commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
 				return karabiner.set_tap_timeout(kid, whole_ms(seconds))
 			end, update_menu)

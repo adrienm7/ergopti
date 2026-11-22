@@ -25,14 +25,16 @@ local LOG = "ui.menu.menu_tap_holds"
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range, and nothing is
 --- written.
---- A blank answer resets the setting to `default` (maintainer decision PCK-13).
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13);
+--- an override passes ValueCheck.INHERIT and gets it back for a blank answer.
 --- @param key string Declaration of the shared value schema.
 --- @param text string What the person typed.
---- @param default any The setting's default, in the stored unit.
+--- @param default any The setting's default, in the stored unit, or ValueCheck.INHERIT.
 --- @return any|nil value The value in the stored unit, nil when refused.
 local function read_typed(key, text, default)
 	local ValueCheck = require("settings.engine.value_check")
 	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
+	if result.ok and result.inherit then return ValueCheck.INHERIT end
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
 	show_error(plain_markup(ValueCheck.refusal_text(key, result, i18n_safe)), i18n_safe("dialog.value_check.title"))
@@ -206,16 +208,20 @@ local function _build_tap_holds(ctx)
 		return true
 	end
 
-	--- Asks for a key's own delay, in milliseconds.
-	local function ask_delay(key_id, current_ms)
+	--- Asks for a key's own delay, in milliseconds. A blank answer removes it,
+	--- so the global delay the hint names applies again (maintainer decision
+	--- of 2026-11-22, PCK-13 for overrides); the setter takes nil for that.
+	local function ask_delay(key_id, current_ms, global_ms)
 		local guard, setter = edit_guard("set_threshold")
 		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
-			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, value)
+		local ValueCheck = require("settings.engine.value_check")
+		local seconds = read_typed(ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, value, ValueCheck.INHERIT)
 		if seconds == nil then return false end
+		if rawequal(seconds, ValueCheck.INHERIT) then seconds = nil end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, key_id, seconds, guard)
 		if not call_ok or persisted ~= true then
@@ -334,7 +340,7 @@ local function _build_tap_holds(ctx)
 				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
 				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
 				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
-				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms, global_ms) end,
 				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
