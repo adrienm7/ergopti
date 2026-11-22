@@ -106,6 +106,38 @@ every maintainer request here.
       exclusion formats. macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
       each reader separately), so the race does not exist there; their transient hints
       (`org.nspasteboard.TransientType`, `x-kde-passwordManagerHint`) are not set yet.
+      Count ratchets now compare named ledgers (a new item and a fixed entry both fail: `tools/test/lib/known-debt.cjs`
+      and the per-file OS-purity ledgers of both drivers) and the TOML cost tests compare two input sizes. What is
+      left needs a measurement or a design first.
+  - `unit/ai/api/test_post_save_owner.ahk` still caps one API save at 400 registry deep compares. Measured
+    2026-11-22 by owner (`ConfigMigrateDeepCompareOwnersTake`): 152 per save, of which the anonymous transition
+    guards `capture_recovery:<Func.Prototype.Call` 56 and `capture_transition:<Func.Prototype.Call` 48, and
+    `check_write:ConfigMigrateBoot<ConfigSchemaCanPrepareWrite` 29. An owner table like the startup smoke's
+    `BOOT_WORK_OWNERS` needs the unit those guards repeat per (native observations of one transaction?) traced in
+    `settings/engine/migration/migrate.ahk` first; naming them « each » without it would let the former
+    1 665-compare journal re-read back in.
+  - `test-driver-tree-parity.cjs` (shared 66, union 87, tests 18/75, canonical 9) and
+    `test-port-vector-traceability.cjs` (73) are floors and ceilings that the structure phase 2 runner rewrites with
+    `--update-baseline --allow-rise`; listing the directories instead means changing that runner with them.
+  - The two Studio speed bounds (120 and 5000 table walks) rest on ratios measured with every core busy; read the
+    ratio each test prints on a quiet PC and on CI, and set each bound to twice the highest.
+  - Kept on purpose: order-of-magnitude bounds that state their reason (the Linux e2e 3000 tray rows against the
+    former 103 058), loop-progress bounds a test chooses for its own loop, frozen historical references, corpus
+    floors and non-vacuity floors.
+- [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
+      driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
+      `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
+      green; the app picker refusal failed once among neighbours (BM_CLICK, now exclusive). Two clipboard fixtures
+      still failed once each, alone in the exclusive phase: `gesture-transform-native-render-focus` current
+      (sends=0) and `sendinstant-native-snapshot-copy` current. On this PC (clipboard history on) explorer.exe and
+      `cbdhsvc` open the clipboard after every write (probe: 40 writes, 492 foreign lock samples from the two).
+      The gesture child alone failed 13 of 40 runs: twice `CB_IsBusy` saw explorer.exe and SendInstant took the
+      clipboard-free path; three times SendInstant returned with no paste and no log, which an instrumented loop
+      put at `CB_WritePlainSnapshot` (its single-shot CAS and `_CB_PlainAuthenticate` both refuse any open
+      lease); seven times Ctrl+V was sent but the Edit never pasted (explorer.exe held the lock just after the
+      paste in 4 of the 6 instrumented cases); once the capture timed out. The production paste can lose an expansion the same way. Decide whether publication
+      waits for readers (bounded, like `CB_OpenClipboardWithin`) before authenticating and pasting, then make the
+      fixtures hold a known reader instead of depending on the desktop's.
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
