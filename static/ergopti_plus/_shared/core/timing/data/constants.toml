@@ -10,6 +10,9 @@
 # All values are in milliseconds unless the key name says otherwise.
 # Keys ending in _sec are in seconds (kept for readability where the
 # underlying API works in seconds, e.g. hs.timer.doAfter).
+# Every duration is an integer (maintainer decision, 2026-11-22): the three
+# readers refuse a fraction, and only *_mm distances and *_factor keys hold
+# one (tools/test/test-timings-registry-liveness.cjs).
 #
 # Editing this file is the single authoritative way to tune timings.
 # Driver-local constants that duplicate a value here should be removed

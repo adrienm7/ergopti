@@ -7,7 +7,9 @@
 --- core/timing/engine/timings.lua binds: an unreachable shared tree, an unreadable or empty
 --- registry, a missing section and a non-numeric key all raise naming the
 --- cause, and the seconds and count helpers read the same value as the
---- millisecond accessor. The driver binding reads the real registry.
+--- millisecond accessor. A fractional duration raises, as the Windows reader
+--- refuses it (maintainer decision, November 22, 2026); only count reads a
+--- fraction. The driver binding reads the real registry.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,7 +22,7 @@ local function ports(overrides)
 		log = "test.timings",
 		loaded_level = "done",
 		shared_path = function() return "/shared/constants.toml" end,
-		parse = function() return { sections = { ui = { delay_ms = 1500, retention_days = 30, label = "x" } } } end,
+		parse = function() return { sections = { ui = { delay_ms = 1500, retention_days = 30, label = "x", half_ms = 1.5, step_mm = 1.5 } } } end,
 	}
 	for key, value in pairs(overrides or {}) do built[key] = value end
 	return built, logged
@@ -59,6 +61,14 @@ helpers.describe("shared timings reader (macOS)", function()
 		helpers.assert_contains(raised(function() timings.ms("absent", "delay_ms") end), "missing section [absent]")
 		helpers.assert_contains(raised(function() timings.ms("ui", "label") end), "missing or non-numeric key [ui].label")
 		helpers.assert_contains(raised(function() timings.sec("ui", "absent") end), "[ui].absent")
+	end)
+
+	helpers.it("(timings-integer-ms) refuses a fractional duration and reads a fractional distance", function()
+		local timings = Timings.new(ports())
+		helpers.assert_contains(raised(function() timings.ms("ui", "half_ms") end),
+			"[ui].half_ms is not an integer number of milliseconds")
+		helpers.assert_contains(raised(function() timings.sec("ui", "half_ms") end), "[ui].half_ms")
+		helpers.assert_eq(timings.count("ui", "step_mm"), 1.5)
 	end)
 
 	helpers.it("refuses a reader built without its ports", function()

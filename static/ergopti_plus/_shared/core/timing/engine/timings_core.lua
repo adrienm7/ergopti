@@ -21,8 +21,11 @@
 ---    type test alone would let boot die later on a misleading missing section.
 --- 4. Unit helpers: `ms` returns the value verbatim, `sec` divides by 1000 for
 ---    the OS timer APIs that take seconds, and `count` reads an entry that is
----    not a duration (days of retention, ring-buffer entries) without lying
----    about its unit at the call site.
+---    not a duration (days of retention, ring-buffer entries, a distance in
+---    millimetres) without lying about its unit at the call site.
+--- 5. Integer milliseconds: `ms` and `sec` refuse a fractional value, as the
+---    Windows TimingsGet does (maintainer decision, November 22, 2026); only
+---    `count` reads a fraction, for the `*_mm` and `*_factor` entries.
 --- ==============================================================================
 
 local TableUtil = require("core.text.engine.table_util")
@@ -71,11 +74,11 @@ function M.new(ports)
 
 	local timings = {}
 
-	--- The raw value of a `[section] key` pair, in the registry's unit.
+	--- The raw number of a `[section] key` pair, any unit.
 	--- @param section string The TOML section name.
 	--- @param key string The key within that section.
 	--- @return number
-	function timings.ms(section, key)
+	local function number(section, key)
 		local entries = sections[section]
 		if type(entries) ~= "table" then
 			error(string.format("[timings] missing section [%s] in constants.toml", tostring(section)))
@@ -83,6 +86,19 @@ function M.new(ports)
 		local value = entries[key]
 		if type(value) ~= "number" then
 			error(string.format("[timings] missing or non-numeric key [%s].%s in constants.toml",
+				tostring(section), tostring(key)))
+		end
+		return value
+	end
+
+	--- A duration in integer milliseconds; a fraction raises.
+	--- @param section string The TOML section name.
+	--- @param key string The key within that section.
+	--- @return number
+	function timings.ms(section, key)
+		local value = number(section, key)
+		if value ~= math.floor(value) then
+			error(string.format("[timings] [%s].%s is not an integer number of milliseconds in constants.toml",
 				tostring(section), tostring(key)))
 		end
 		return value
@@ -101,7 +117,7 @@ function M.new(ports)
 	--- @param key string
 	--- @return number
 	function timings.count(section, key)
-		return timings.ms(section, key)
+		return number(section, key)
 	end
 
 	return timings

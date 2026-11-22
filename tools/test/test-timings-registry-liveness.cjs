@@ -37,6 +37,10 @@
  * 3a. A key the Windows driver reads with TimingsGet or TimingsGetSec holds a
  *    TOML integer: that reader refuses any other value at runtime, where it
  *    used to truncate a float or accept a quoted number the Lua reader refuses.
+ * 3b. Every duration is integer milliseconds on the three drivers (maintainer
+ *    decision, November 22, 2026): each key that is not a distance (`*_mm`) or
+ *    a factor (`*_factor`) holds a TOML integer, as the Lua `ms` and `sec` and
+ *    the Windows TimingsGet refuse a fraction.
  * 4. [limits] holds the byte caps (a child process's output, a declaration file,
  *    a feed, an identifier). Each key ends in `_bytes` and holds a positive
  *    integer, and a Lua or JavaScript `*_BYTES` constant may not retype the
@@ -176,6 +180,30 @@ function analyse(registry, sources, pins, pinGateTexts) {
 	return { errors, runtime, pinned };
 }
 
+/** The keys that may hold a fraction: a distance in millimetres or a factor. */
+const FRACTIONAL_KEY = /_(?:mm|factor)$/;
+
+/**
+ * The keys that break the integer-millisecond rule.
+ * @param {Object} registry Parsed registry.
+ * @returns {string[]} One error per fractional or non-numeric duration.
+ */
+function integerAnalysis(registry) {
+	const errors = [];
+	for (const [section, keys] of Object.entries(registry)) {
+		if (keys === null || typeof keys !== 'object') continue;
+		for (const [key, value] of Object.entries(keys)) {
+			if (FRACTIONAL_KEY.test(key) ? typeof value === 'number' : Number.isInteger(value)) continue;
+			errors.push(
+				`[${section}].${key} = ${JSON.stringify(value)} is not ${FRACTIONAL_KEY.test(key) ? 'a number' : 'an integer'}. ` +
+					'Every duration is integer milliseconds on the three drivers; only *_mm and *_factor keys ' +
+					'hold a fraction.'
+			);
+		}
+	}
+	return errors;
+}
+
 const LIMIT_BASELINE = path.join(__dirname, 'limit-literal-baseline.json');
 const LIMIT_BASELINE_COMMENT =
 	'Lua and JavaScript *_BYTES constants that retype a [limits] value (tools/test/test-timings-registry-liveness.cjs). Shrink it with --update-limit-baseline; never add to it.';
@@ -310,6 +338,12 @@ function selfTest() {
 		),
 		2
 	);
+	if (integerAnalysis({ ui: { delay_ms: 1.5 } }).length !== 1)
+		failures.push('a fractional duration was accepted');
+	if (integerAnalysis({ ui: { retention_days: '30' } }).length !== 1)
+		failures.push('a quoted count was accepted');
+	if (integerAnalysis({ gestures: { step_mm: 1.5, scale_factor: 0.5, tap_ms: 700 } }).length !== 0)
+		failures.push('a fractional distance or factor was refused');
 	const limitsRegistry = { limits: { cap_bytes: 65536 } };
 	const retyped = { rel: 'linux/a.lua', text: 'local MAX_OUTPUT_BYTES = 65536\n' };
 	const other = { rel: 'linux/b.lua', text: 'local MAX_OTHER_BYTES = 777\nlocal X = 65536 * 2\n' };
@@ -338,6 +372,7 @@ function main() {
 	const pinGateTexts = PIN_GATES.map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 	const result = analyse(registry, sources, [...PINS, ...SOURCE_PINS], pinGateTexts);
 	errors.push(...result.errors);
+	errors.push(...integerAnalysis(registry));
 	errors.push(...selfTest().map((f) => `self-test: ${f}`));
 
 	const limits = limitsAnalysis(registry, sources, new Set(SOURCE_PINS.map((p) => p.file)));
@@ -383,4 +418,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { analyse, productionSources, limitsAnalysis };
+module.exports = { analyse, productionSources, limitsAnalysis, integerAnalysis };
