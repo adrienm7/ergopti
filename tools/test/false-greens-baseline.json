@@ -5,5 +5,7 @@
 	"pcall-only": 0,
 	"corpus-skip": 0,
 	"unfloored-scan": 0,
-	"message-witness": 0
+	"message-witness": 0,
+	"bare-try": 9,
+	"pcall-swallow": 2
 }

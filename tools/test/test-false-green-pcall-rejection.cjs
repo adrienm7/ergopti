@@ -328,7 +328,94 @@ for (const [body, reason] of [
 ]) {
 	assert.equal(witness(body).length, 0, `a real caught-state witness is not reported: ${reason}`);
 }
+// AutoHotkey v2 runs a try with no catch and no finally as an empty catch, so
+// an assertion in its body cannot fail. Each seeded violation must be reported;
+// each control has a handler or asserts nothing in the guarded body.
+const bareTry = (body) =>
+	context.findBareTryAssertions(ahkFixture, ['Case() {', ...body, '}'].join('\n'));
+for (const [body, reason] of [
+	[['\ttry {', '\t\tAssertEqual(1, F())', '\t}', '\tCleanup()'], 'braced body, cleanup after it'],
+	[['\ttry', '\t{', '\t\tAssertTrue(F())', '\t}'], 'brace on its own line'],
+	[['\ttry AssertEqual(1, F())', '\tCleanup()'], 'single statement on the try line'],
+	[['\ttry', '\t\tAssertFalse(F())', '\tCleanup()'], 'single statement on the next line'],
+	[
+		['\ttry AssertEqual(1, F(),', '\t\t"message")', '\tCleanup()'],
+		'single statement continued on the next line'
+	],
+	[['\ttry _CASE_AssertShape(F())', '\tCleanup()'], 'per-file assertion helper'],
+	[
+		['\ttry {', '\t\tHelper()', '\t}', '}', 'Helper() {', '\tAssert(F() = 1)'],
+		'call to a helper of the file that asserts'
+	]
+]) {
+	assert.equal(bareTry(body).length, 1, `a swallowed assertion is reported: ${reason}`);
+}
+for (const [body, reason] of [
+	[
+		['\ttry {', '\t\tAssertEqual(1, F())', '\t} finally {', '\t\tCleanup()', '\t}'],
+		'finally on the closing line'
+	],
+	[
+		['\ttry {', '\t\tAssertEqual(1, F())', '\t}', '\tfinally Cleanup()'],
+		'finally on the next line'
+	],
+	[['\ttry AssertEqual(1, F())', '\tfinally Cleanup()'], 'single statement with finally'],
+	[
+		['\ttry AssertEqual(1, F(),', '\t\t"message")', '\tcatch as E', '\t\tthrow E'],
+		'continued statement with catch'
+	],
+	[['\ttry FileDelete(Path)', '\tAssertTrue(true = F())'], 'assertion after a cleanup try'],
+	[['\ttry {', '\t\tX := F()', '\t}', '\tAssertEqual(1, X)'], 'assertion outside the guarded body'],
+	[
+		['\ttry {', '\t\t; AssertEqual(1, F())', '\t\tMsg := "Assert(" . X', '\t}'],
+		'comment and string data'
+	]
+]) {
+	assert.equal(
+		bareTry(body).length,
+		0,
+		`a guarded or assertion-free try is not reported: ${reason}`
+	);
+}
+// The Lua counterpart: a pcall used as a statement, or whose status nobody
+// reads, swallows the error a failed assertion raises.
+const luaFixture = path.join(__dirname, 'synthetic-swallow.lua');
+const swallow = (body) =>
+	context.findPcallSwallowedAssertions(luaFixture, `helpers.it("case", function()\n${body}\nend)`);
+for (const [body, reason] of [
+	['  pcall(function() helpers.assert_eq(1, f()) end)', 'statement pcall'],
+	['  xpcall(function()\n    assert(f())\n  end, debug.traceback)', 'statement xpcall'],
+	['  local ok = pcall(function() h.expect(f()) end)', 'status never read'],
+	[
+		'  local ok = pcall(function() helpers.assert_true(f()) end)\n  local ok = pcall(other)\n  helpers.assert_true(ok)',
+		'status overwritten before it is read'
+	],
+	['  local function check() helpers.assert_eq(1, f()) end\n  pcall(check)', 'named local helper']
+]) {
+	assert.equal(swallow(body).length, 1, `a swallowed Lua assertion is reported: ${reason}`);
+}
+for (const [body, reason] of [
+	[
+		'  local ok, err = pcall(function() helpers.assert_eq(1, f()) end)\n  helpers.assert_true(ok, err)',
+		'status asserted'
+	],
+	[
+		'  helpers.assert_true(pcall(function() helpers.assert_eq(1, f()) end))',
+		'status passed to an assertion'
+	],
+	['  if not pcall(function() assert(f()) end) then error("failed") end', 'status tested'],
+	['  pcall(function() cleanup() end)', 'cleanup without assertion'],
+	['  pcall(function() log("assert(") end) -- assert(x)', 'string and comment data'],
+	['  return pcall(function() assert(f()) end)', 'status returned to the caller']
+]) {
+	assert.equal(
+		swallow(body).length,
+		0,
+		`a checked or assertion-free pcall is not reported: ${reason}`
+	);
+}
 console.log(
 	'false-green pcall rejection: 14 scenarios; AHK mixed quotes: 5 live/dead/nested vectors; ' +
-		'continuation child harness live/dead vectors; message witness: 7 seeded violations, 4 controls passed'
+		'continuation child harness live/dead vectors; message witness: 7 seeded violations, 4 controls passed; ' +
+		'bare try: 7 seeded violations, 7 controls passed; pcall swallow: 5 seeded violations, 6 controls passed'
 );

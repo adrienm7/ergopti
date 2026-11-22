@@ -790,6 +790,309 @@ function findMessageWitnesses(file, src) {
 	return out;
 }
 
+/**
+ * PATTERN 8 — An assertion inside a bare `try` (Windows only).
+ * AutoHotkey v2 treats a `try` with neither `catch` nor `finally` as if it had
+ * an empty catch: every exception raised in its body, including the one a failed
+ * assertion throws, is discarded. A test body wrapped that way to guarantee its
+ * cleanup cannot fail at all. Nine tests of test_apply_config_toml.ahk stayed
+ * green that way while their expectations were wrong.
+ *
+ * Both spellings are covered: `try Statement` (on the same line or the next one)
+ * and the braced block. An assertion is any call whose name contains `Assert` or
+ * `Expect`, which also covers the per-file helpers (`_KLTO_AssertRefused`), or a
+ * call to a suite function whose own body asserts.
+ */
+const AHK_ASSERTION_CALL =
+	/(?<![\w.])[A-Za-z_]\w*(?:Assert|Expect)\w*\s*\(|(?<![\w.])(?:Assert|Expect)\w*\s*\(/;
+
+// A line that continues the previous expression: a leading comma or binary
+// operator (never `++`/`--`, which start a statement of their own).
+const AHK_CONTINUATION_LINE =
+	/^\s*(?:,|\.(?!\w)|\?|:(?!=)|&&|\|\||(?:and|or|is|in|contains)\b|[+\-](?![+\-])|[*/^~<>=!&|])/i;
+
+/**
+ * Masks what is not code of this file: whole-line and block comments, quoted
+ * data, trailing comments, and continuation-section string data.
+ * @param {string[]} lines Physical source lines.
+ * @returns {string[]} Code per line, "" where the line carries none.
+ */
+function ahkCodeLines(lines) {
+	const data = ahkContinuationLines(lines);
+	let inBlockComment = false;
+	return lines.map((line, i) => {
+		if (inBlockComment) {
+			if (/^\s*\*\//.test(line) || /\*\/\s*$/.test(line)) inBlockComment = false;
+			return '';
+		}
+		if (/^\s*\/\*/.test(line)) {
+			inBlockComment = !/\*\/\s*$/.test(line.replace(/^\s*\/\*/, ''));
+			return '';
+		}
+		if (data[i] || isComment(line, '.ahk')) return '';
+		return ahkStructuralCode(line);
+	});
+}
+
+/**
+ * Finds where a braced block that opens at (line, col) closes.
+ * @param {string[]} code Masked code lines.
+ * @param {number} line Line of the opening brace.
+ * @param {number} col Column of the opening brace.
+ * @returns {{line: number, col: number}} Position just after the closing brace.
+ */
+function ahkBlockEnd(code, line, col) {
+	let depth = 0;
+	for (let j = line; j < code.length; j++) {
+		const text = code[j];
+		for (let k = j === line ? col : 0; k < text.length; k++) {
+			if (text[k] === '{') depth++;
+			else if (text[k] === '}' && --depth === 0) return { line: j, col: k + 1 };
+		}
+	}
+	return { line: code.length - 1, col: code[code.length - 1].length };
+}
+
+/** Index of the next line holding code at or after `from`, or -1. */
+function ahkNextCodeLine(code, from) {
+	for (let j = from; j < code.length; j++) if (code[j].trim() !== '') return j;
+	return -1;
+}
+
+let assertingAhkFunctions = null;
+
+/**
+ * Names of the suite's functions whose own body asserts. The suite shares one
+ * namespace, so a helper defined in support/ or in another test file counts.
+ * One level of delegation is resolved, as for the dead-test check.
+ * @returns {Set<string>} Function names.
+ */
+function ahkAssertingFunctions() {
+	if (assertingAhkFunctions) return assertingAhkFunctions;
+	assertingAhkFunctions = new Set();
+	for (const [name, block] of sharedAhkFunctionBlocks()) {
+		const body = ahkCodeLines(block.text.split(/\r?\n/)).slice(1).join('\n');
+		if (AHK_ASSERTION_CALL.test(body)) assertingAhkFunctions.add(name);
+	}
+	return assertingAhkFunctions;
+}
+
+function findBareTryAssertions(file, src) {
+	const out = [];
+	const lines = src.split(/\r?\n/);
+	const code = ahkCodeLines(lines);
+	// The file's own helpers count even when it is read outside the suite tree,
+	// as when an older revision is checked from history.
+	const asserting = new Set(ahkAssertingFunctions());
+	for (const [name, block] of ahkAllFunctionBlocks(src)) {
+		const body = ahkCodeLines(block.text.split(/\r?\n/)).slice(1).join('\n');
+		if (AHK_ASSERTION_CALL.test(body)) asserting.add(name);
+	}
+	const assertsIn = (text) => {
+		if (AHK_ASSERTION_CALL.test(text)) return true;
+		for (const m of text.matchAll(/(?<![\w.])([A-Za-z_]\w*)\s*\(/g))
+			if (asserting.has(m[1]) && !isControlKeyword(m[1])) return true;
+		return false;
+	};
+
+	for (let i = 0; i < code.length; i++) {
+		for (const opener of code[i].matchAll(/(?:^|[{}])\s*(try)\b(?!\s*:)/gi)) {
+			const after = opener.index + opener[0].length;
+			let rest = code[i].slice(after);
+			let bodyText;
+			let end;
+			let startLine = i;
+			let startCol = after;
+			if (rest.trim() === '') {
+				startLine = ahkNextCodeLine(code, i + 1);
+				if (startLine < 0) continue;
+				startCol = 0;
+				rest = code[startLine];
+			}
+			const brace = rest.indexOf('{');
+			const blockStatement = /^\s*\{/.test(rest) || /\{\s*$/.test(rest);
+			if (blockStatement && brace >= 0) {
+				end = ahkBlockEnd(code, startLine, startCol + brace);
+				const parts = [code[startLine].slice(startCol)];
+				for (let j = startLine + 1; j < end.line; j++) parts.push(code[j]);
+				if (end.line > startLine) parts.push(code[end.line].slice(0, end.col));
+				bodyText = parts.join('\n');
+			} else {
+				// A single statement ends where its brackets balance and the next line
+				// does not continue it with a leading operator or comma.
+				let last = startLine;
+				let depth = 0;
+				let text = rest;
+				const parts = [];
+				for (;;) {
+					parts.push(text);
+					for (const ch of text) {
+						if ('([{'.includes(ch)) depth++;
+						else if (')]}'.includes(ch)) depth--;
+					}
+					const next = ahkNextCodeLine(code, last + 1);
+					if (next < 0) break;
+					if (depth <= 0 && !AHK_CONTINUATION_LINE.test(code[next])) break;
+					last = next;
+					text = code[next];
+				}
+				end = { line: last, col: code[last].length };
+				bodyText = parts.join('\n');
+			}
+			if (!assertsIn(bodyText)) continue;
+
+			// The handler follows the body: on the closing line (`} finally {`) or on
+			// the next line holding code.
+			let follow = code[end.line].slice(end.col);
+			if (follow.trim() === '') {
+				const next = ahkNextCodeLine(code, end.line + 1);
+				follow = next < 0 ? '' : code[next];
+			}
+			if (/^\s*(?:catch|finally)\b/i.test(follow)) continue;
+			out.push({
+				file: rel(file),
+				line: i + 1,
+				text: lines[i].trim(),
+				detail: 'bare try is an empty catch — a failed assertion in its body is swallowed'
+			});
+		}
+	}
+	return out;
+}
+
+/**
+ * PATTERN 9 — An assertion inside a pcall whose status is dropped (macOS, Linux).
+ * The Lua counterpart of the bare AHK `try`: `pcall(function() … assert … end)`
+ * used as a statement discards the status, so the error a failed assertion
+ * raises never reaches the runner. A status stored in a variable that nothing
+ * reads afterwards is the same shape.
+ *
+ * An assertion is any call whose last name segment starts with `assert` or
+ * `expect`, in the anonymous function itself or in a function of the same file
+ * that the pcall names directly.
+ */
+const LUA_ASSERTION_CALL = /(?<![\w])(?:[A-Za-z_][\w]*[.:])*(?:assert|expect)\w*\s*\(/;
+
+/**
+ * Blanks Lua comments and string contents while keeping every offset and line
+ * break, so brackets and keywords can be counted on code alone.
+ * @param {string} src Full file source.
+ * @returns {string} Source of the same length with only code left.
+ */
+function luaMask(src) {
+	const out = src.split('');
+	const blank = (from, to) => {
+		for (let k = from; k < to; k++) if (out[k] !== '\n') out[k] = ' ';
+	};
+	const longClose = (at) => {
+		const m = src.slice(at).match(/^\[(=*)\[/);
+		if (!m) return -1;
+		const close = src.indexOf(`]${m[1]}]`, at + m[0].length);
+		return close < 0 ? src.length : close + m[1].length + 2;
+	};
+	for (let i = 0; i < src.length; i++) {
+		const ch = src[i];
+		if (ch === '-' && src[i + 1] === '-') {
+			const end = longClose(i + 2);
+			const stop = end >= 0 ? end : (src.indexOf('\n', i) + 1 || src.length + 1) - 1;
+			blank(i, stop);
+			i = stop - 1;
+		} else if (ch === '[' && /^\[=*\[/.test(src.slice(i, i + 64))) {
+			const end = longClose(i);
+			blank(i + 1, end - 1);
+			i = end - 1;
+		} else if (ch === '"' || ch === "'") {
+			let j = i + 1;
+			while (j < src.length && src[j] !== ch && src[j] !== '\n') j += src[j] === '\\' ? 2 : 1;
+			blank(i + 1, j);
+			i = j;
+		}
+	}
+	return out.join('');
+}
+
+/** Offset just after the bracket that closes the one opened at `open`. */
+function luaCloseParen(masked, open) {
+	let depth = 0;
+	for (let k = open; k < masked.length; k++) {
+		if (masked[k] === '(') depth++;
+		else if (masked[k] === ')' && --depth === 0) return k + 1;
+	}
+	return masked.length;
+}
+
+function findPcallSwallowedAssertions(file, src) {
+	const out = [];
+	const masked = luaMask(src);
+	const lineOf = (at) => masked.slice(0, at).split('\n').length;
+	const lines = src.split(/\r?\n/);
+
+	// Local functions of this file whose own body asserts, for `pcall(helper, …)`.
+	const asserting = new Set();
+	for (const m of masked.matchAll(
+		/\bfunction\s+([\w.:]+)\s*\(|\blocal\s+(\w+)\s*=\s*function\s*\(/g
+	)) {
+		const name = (m[1] || m[2]).split(/[.:]/).pop();
+		let depth = 0;
+		let end = masked.length;
+		const re = /\b(?:function|do|then|repeat)\b|\b(?:end|until)\b/g;
+		re.lastIndex = m.index;
+		for (let t = re.exec(masked); t; t = re.exec(masked)) {
+			depth += /^(?:end|until)$/.test(t[0]) ? -1 : 1;
+			// `while … do` and `for … do` open one block with two keywords.
+			if (
+				t[0] === 'do' &&
+				/\b(?:while|for)\b[^\n]*$/.test(masked.slice(m.index, t.index).split('\n').pop())
+			)
+				depth--;
+			if (depth === 0) {
+				end = t.index;
+				break;
+			}
+		}
+		if (LUA_ASSERTION_CALL.test(masked.slice(m.index + m[0].length, end))) asserting.add(name);
+	}
+
+	for (const m of masked.matchAll(/(?<![\w.:])x?pcall\s*\(/g)) {
+		const open = m.index + m[0].length - 1;
+		const close = luaCloseParen(masked, open);
+		const args = masked.slice(open + 1, close - 1);
+		const target = args.match(/^\s*([\w.:]+)/);
+		const asserts = /^\s*function\b/.test(args)
+			? LUA_ASSERTION_CALL.test(args)
+			: Boolean(target) && asserting.has(target[1].split(/[.:]/).pop());
+		if (!asserts) continue;
+
+		const before = masked.slice(masked.lastIndexOf('\n', m.index) + 1, m.index);
+		const assigned = before.match(/^\s*(?:local\s+)?([A-Za-z_]\w*)\s*(?:,[^=]*)?=\s*$/);
+		let dropped;
+		if (assigned) {
+			// A status nobody reads afterwards is as good as no status. Its next
+			// mention must be a read: a reassignment starts an unrelated value.
+			const next = new RegExp(`(?<![\\w.:])${assigned[1]}(?![\\w])`).exec(masked.slice(close));
+			const reassigned =
+				next &&
+				/(?:^|\n)[ \t]*(?:local[ \t]+)?(?:\w+[ \t]*,[ \t]*)*$/.test(
+					masked.slice(0, close + next.index)
+				) &&
+				/^\w+[ \t]*(?:,[^=\n]*)?=(?!=)/.test(masked.slice(close + next.index));
+			dropped = assigned[1] === '_' || !next || reassigned;
+		} else {
+			// Only a pcall that starts its own statement drops its status.
+			dropped = /(?:^|\b(?:then|do|else|end)|;)\s*$/.test(before);
+		}
+		if (!dropped) continue;
+		const line = lineOf(m.index);
+		out.push({
+			file: rel(file),
+			line,
+			text: (lines[line - 1] || '').trim(),
+			detail: 'pcall status is dropped — a failed assertion inside it is swallowed'
+		});
+	}
+	return out;
+}
+
 // ==================================================
 // ==================================================
 // ======= 4/ Scanning and reporting ================
@@ -1033,7 +1336,9 @@ const PATTERNS = {
 	'pcall-only': 'Assertion on a pcall status — proves "did not crash", nothing else',
 	'corpus-skip': 'Early return when a corpus could not be loaded — a missing contract passes',
 	'unfloored-scan': 'Source-scan loop that never asserts it matched anything',
-	'message-witness': 'Caught error message as the only throw witness — Error("") reads as no throw'
+	'message-witness': 'Caught error message as the only throw witness — Error("") reads as no throw',
+	'bare-try': 'Assertion inside a try with no catch or finally — AHK swallows its failure',
+	'pcall-swallow': 'Assertion inside a pcall whose status is dropped — Lua swallows its failure'
 };
 
 function scan() {
@@ -1044,7 +1349,9 @@ function scan() {
 		'pcall-only': [],
 		'corpus-skip': [],
 		'unfloored-scan': [],
-		'message-witness': []
+		'message-witness': [],
+		'bare-try': [],
+		'pcall-swallow': []
 	};
 	for (const tree of TREES) {
 		for (const file of walk(tree.dir, tree.ext)) {
@@ -1056,7 +1363,11 @@ function scan() {
 			if (tree.ext === '.ahk') {
 				findings['vacuous-absence'].push(...findVacuousAbsence(file, src));
 				findings['message-witness'].push(...findMessageWitnesses(file, src));
-			} else findings['pcall-only'].push(...findPcallOnly(file, src));
+				findings['bare-try'].push(...findBareTryAssertions(file, src));
+			} else {
+				findings['pcall-only'].push(...findPcallOnly(file, src));
+				findings['pcall-swallow'].push(...findPcallSwallowedAssertions(file, src));
+			}
 		}
 	}
 	return findings;
