@@ -203,7 +203,26 @@ const RECOVERY = [
 	],
 	['layout_editor.error.source_keylayout', ' Open it in Ukelele, save it again, then import it.'],
 	['layout_editor.error.source_format', ' Choose a layout file the editor saved.'],
-	['layout_editor.error.source_version', ' Update Ergopti+, then import the file again.']
+	['layout_editor.error.source_version', ' Update Ergopti+, then import the file again.'],
+	// The host refusals the Studio words since LTP-05 (0af969360c).
+	[
+		'layout_editor.error.invalid',
+		' Try again; if it keeps failing, the details are in today’s log.'
+	],
+	[
+		'layout_editor.error.write_failed',
+		' Check that the folder is writable and has free space, then try again.'
+	],
+	[
+		'layout_editor.error.use_failed',
+		' Choose it in the layout menu; if it keeps failing, the details are in today’s log.'
+	],
+	['layout_editor.error.source_invalid_file', ' Use a plain file name and a UTF-8 text file.'],
+	[
+		'layout_editor.error.uninstall_failed',
+		' Try again; if it keeps failing, the details are in today’s log.'
+	],
+	['layout_editor.error.busy', ' Wait a moment, then try again.']
 ];
 
 // The editor codes that are not a failure to recover from, each with why.
