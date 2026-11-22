@@ -8,7 +8,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "200b523c95b96f2af3fb9323898e5594fdaef329f30d9ce081eb676980c0dd47"
+			"sha256": "7facf8b3aefb7b6090091891d9e1f1aea304230f42f040a12fd47f3a8a7514d3"
 		},
 		{
 			"id": "windows-control",
@@ -29,21 +29,21 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.try_repeat_feature",
-			"sha256": "9e5a94bb1a63d0fd8b546ed27c980c68f6d07cd52d4aed1336b72f6d3ee18989"
+			"sha256": "7d59af8b2edb366b7e44c99fb79e0a2ef8a7fa333934f71bbbe3aaa5d732a01a"
 		},
 		{
 			"id": "macos-control",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "afb0c653cfa21b461d8b62440406bd0554ca1694f6702fc9796b9ad4c6a107e6"
+			"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
 		},
 		{
 			"id": "macos-undo",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
 			"symbol": "function M.undo_on_backspace",
-			"sha256": "9e5a94bb1a63d0fd8b546ed27c980c68f6d07cd52d4aed1336b72f6d3ee18989"
+			"sha256": "7d59af8b2edb366b7e44c99fb79e0a2ef8a7fa333934f71bbbe3aaa5d732a01a"
 		},
 		{
 			"id": "linux-repeat",
@@ -57,28 +57,28 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "b9c973c12d6e324dbb7f5760294d83a6ac4430991d957d842c3b85d4b5f5ef2a"
+			"sha256": "6bcf8d853efdf1b832c7abbc88c48e6f921ab72bea8cbc009e4f9fee3013fba1"
 		},
 		{
 			"id": "windows-dead-legacy",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 			"symbol": "DeadKey(Mapping)",
-			"sha256": "30db0a21c01f3b3dbca060e8dd4846bffb49f4c31421df532dbae6bf1ff8353b"
+			"sha256": "1c75acfc3db925693590758b26b6357743be60aadb2612fe2a8ff14121cd682b"
 		},
 		{
 			"id": "windows-dead-registry",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_PressNative",
-			"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+			"sha256": "8c58119d200c63b49d56a48dda34dc4c205791df049ee5c6e47ff5b582e318d6"
 		},
 		{
 			"id": "macos-dead-native",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "afb0c653cfa21b461d8b62440406bd0554ca1694f6702fc9796b9ad4c6a107e6"
+			"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
 		},
 		{
 			"id": "linux-dead-capture",
@@ -99,21 +99,21 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
 			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
-			"sha256": "82a9fd5d7632029ac912ad949e087296fb8be8f7490232b11b61c73d0e5fbe96"
+			"sha256": "8c58119d200c63b49d56a48dda34dc4c205791df049ee5c6e47ff5b582e318d6"
 		},
 		{
 			"id": "macos-layout-emulation",
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.key_down(e, key_code)",
-			"sha256": "6389d41f17b54abd2e65e05b4e740f47dbff3dec2dd95544067e1caed918acda"
+			"sha256": "64f99670dc43f2c8b4440a6caf79fdc65ef50f6271d341e03dcd6e0481f677e8"
 		},
 		{
 			"id": "linux-layout-emulation",
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
 			"symbol": "function M.on_key(detail)",
-			"sha256": "481d4401b362e018d1d6025717ab8be851c70a3f507e887c4390a87b1dc859eb"
+			"sha256": "61a461ec07f0ab2ee94fc4427e84becbaa2c7ade3ba3e5a150aef539809ec2e4"
 		}
 	],
 	"behaviors": [

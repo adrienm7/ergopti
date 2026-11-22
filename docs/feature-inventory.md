@@ -123,7 +123,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_holds.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 50 paths not declared
+## macos — 49 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
@@ -168,7 +168,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.tap_holds` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
-- [ ] `category_enabled.key_combinations` (setting; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `network.proxy_override` (setting; declared: windows; reason: `platform_reason.proxy_override_is_native_settings`)
 - [ ] `category_enabled.autocorrection` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.distances_reduction` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
