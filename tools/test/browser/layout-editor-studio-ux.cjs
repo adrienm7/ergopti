@@ -302,7 +302,12 @@ async function exerciseScoreChip(browser, origin) {
 			live: document.getElementById('le-score-live').textContent
 		}));
 	const first = await chip();
-	assert.match(first.score, /^\d+([.,]\d)?$/, `the chip shows the score: ${JSON.stringify(first)}`);
+	// The graded costs can take a score below zero: the chip keeps its sign.
+	assert.match(
+		first.score,
+		/^[-−]?\d+([.,]\d)?$/,
+		`the chip shows the score: ${JSON.stringify(first)}`
+	);
 	assert.equal(first.change, '', 'no change on the first analysis');
 	assert.match(first.live, /^Score .* · rank \d+\sof \d+$/, `announced: ${first.live}`);
 	const live = await page.$eval('#le-score-live', (node) => [

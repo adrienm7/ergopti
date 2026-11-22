@@ -6531,7 +6531,9 @@
 		addLayouts: (list) => instance().addLayouts(list),
 		compare: (list) => instance().compare(list),
 		setFormat: (id) => instance().setFormat(id),
-		onResults: (listener) => instance().onResults(listener)
+		onResults: (listener) => instance().onResults(listener),
+		// The metrics each themed tab charts, read by the Studio browser test.
+		tabMetrics: () => JSON.parse(JSON.stringify(TAB_METRICS))
 	};
 	// Keystats tables that arrive before the mount wait for it, and so does their state.
 	document.addEventListener(NGRAMS_EVENT, (event) => {

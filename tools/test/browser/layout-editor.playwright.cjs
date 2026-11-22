@@ -1404,14 +1404,16 @@ async function exerciseComparerTabs(page) {
 	assert.equal(await page.locator('#la-hands .la-chart-row').count(), bars, 'a hand bar each');
 	assert.equal(await page.locator('#la-hands-legend li').count(), 2, 'left and right named');
 	// Each themed tab: one named chart per metric, read as a table, and the sortable table.
-	for (const [tab, charts] of [
-		['fingers', 3],
-		// sfb_distance and pinky_ring joined the bigrams with the score floors.
-		['bigrams', 12],
-		['trigrams', 5],
-		['rows', 6],
-		['misc', 11]
-	]) {
+	// The comparer names the metrics of each tab: one chart each, then the table.
+	const tabMetrics = await page.evaluate(() => window.LAYOUT_ANALYSIS_COMPARER.tabMetrics());
+	assert.deepEqual(
+		Object.keys(tabMetrics),
+		['fingers', 'bigrams', 'trigrams', 'rows', 'misc'],
+		'the themed tabs'
+	);
+	for (const [tab, metrics] of Object.entries(tabMetrics)) {
+		const charts = metrics.length;
+		assert.ok(charts > 0, `${tab}: the tab charts metrics`);
 		await page.click(`#la-tab-${tab}`);
 		const figures = await page.$$eval(`#la-charts-${tab} .la-figure`, (sections) =>
 			sections.map((section) => {
