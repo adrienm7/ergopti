@@ -414,7 +414,9 @@ async function exerciseRedirects(page, origin, basePath) {
 		const fresh = await page.context().newPage();
 		try {
 			await fresh.goto(origin + basePath + from, { waitUntil: 'commit' });
-			await fresh.waitForURL(target);
+			// The load event of a replaced page can be lost: the URL is read
+			// at commit and the page's own menu proves it rendered.
+			await fresh.waitForURL(target, { waitUntil: 'commit' });
 			await fresh.locator('#menu-pages').waitFor({ state: 'attached' });
 			assert.equal(fresh.url(), target, 'Former address ' + from);
 		} finally {
