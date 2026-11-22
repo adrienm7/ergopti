@@ -65,7 +65,10 @@ return function(callback)
 			return self
 		end
 		local original_open, original_rename = io.open, os.rename
-		io.open = function()
+		-- Only writes stay off the disk: the Studio retirement a reset makes reads
+		-- the shared n-gram contract through io.open.
+		io.open = function(path, mode)
+			if mode == nil or mode:sub(1, 1) == "r" then return original_open(path, mode) end
 			local file = {}
 			file.write = function() return file end
 			file.close = function() return true end

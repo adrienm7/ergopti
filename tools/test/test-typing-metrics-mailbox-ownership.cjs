@@ -90,7 +90,9 @@ local dashboard,context=require('tests.support.metrics_typing_fixture')({
 package.loaded['hs.json'].decode=json.decode
 package.loaded['hs.json'].encode=json.encode
 package.loaded['modules.keystats.sqlite_reader']={}
-local reads,errors,removes=0,0,0
+local reads,errors,removes,retires=0,0,0,0
+-- The reset also retires Ergopti Studio's saved read of the same store (326035f5da)
+package.loaded['modules.keystats.studio_snapshot']={retire=function() retires=retires+1;return true end}
 package.loaded['modules.keystats.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
 package.loaded['core.logger.engine.logger'].error=function() errors=errors+1 end
 os.remove=function() removes=removes+1;return true end
@@ -130,7 +132,7 @@ for index,outcome in ipairs(outcomes) do
  end
 end
 while #slices>0 do table.remove(slices,1)() end
-print('RESULT='..json.encode({codes=codes,completions=completions,before=before,reads=reads,errors=errors,removes=removes}))
+print('RESULT='..json.encode({codes=codes,completions=completions,before=before,reads=reads,errors=errors,removes=removes,retires=retires}))
 `
 	});
 	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
@@ -185,7 +187,13 @@ test('a retained Reset executes once after its own successful acknowledgement', 
 	const completed = controller(request, outcomes);
 	// The snapshot and any partial save are both unlinked by one reset
 	assert.equal(completed.removes, 2);
-	assert.equal(completed.reads, 1, 'a committed reset projects fresh data once');
+	assert.equal(completed.retires, 1, 'the reset retires the Studio read of the same store once');
+	// The retirement reads the store path for its argument; the projection reads it once more.
+	assert.equal(
+		completed.reads - completed.retires,
+		1,
+		'a committed reset projects fresh data once'
+	);
 	assert.equal(completed.errors, 0);
 	assert.equal(
 		context.app_state.active_cache_reset_id,
