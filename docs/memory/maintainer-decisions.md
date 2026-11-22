@@ -392,6 +392,30 @@ Decided by the maintainer on 2026-11-21, from
   Linux's exact-case one-letter rules (Linux and Windows now register one rule
   per typed case) and the case folding of Windows and macOS.
 
+## A key chord runs a program launch and the monitor Alt-Tab (2026-11-22)
+
+Decided by the maintainer on 2026-11-22 (« implémente le asap alors »,
+replacing the KCD-2 answer of 2026-11-21): Windows and Linux run
+`run_program` and `alt_tab_monitor` from a key-combination chord, as macOS
+does through Karabiner. Only the shared `CHORD_REFUSED_EVERYWHERE` list (the
+one-shot Shift) stays out of a chord;
+`tools/test/test-chord-refused-actions-single-source.cjs` fails on any other
+refusal.
+
+- A chord runs under the binding of the pair that owns it
+  (`combination__<pair>`), the binding its tap uses, so both share one
+  program parameter.
+- Windows: `ProgramActions_BindingSupported` admits `combination__` bindings
+  and the launch snapshot reads the chord from `[mod_combos.config.<pair>]`
+  `combo` (`_ProgramActions_StoredAction`), so a pair's tap can run a program
+  too. `AltTabMonitor` needs no key state of its own.
+- Linux: the gesture manager's `binding_action(binding, expected)` answers
+  the pair's chord when its tap runs another action; the program and window
+  owners then take the chord's owner guard (`capture_chord`) and read the same
+  `[mod_combos.config.<pair>]` table.
+- The reason `platform_reason.chord_runs_no_program_or_monitor_switch` and the
+  `chord_reason_<os>` fields of `actions.toml` are gone.
+
 ## Key combinations: one behaviour on the three OS (2026-11-21)
 
 Decided by the maintainer on 2026-11-21 (KCD-1 to KCD-8 of
@@ -403,10 +427,10 @@ off only the chords.
   the three OS, the shared `plan_chord_copy` rule; Windows
   `KeyCombinationChordCopyRows` follows it. Vectors:
   `_shared/tests/corpus/tap_hold/key_combination_chord_copy.json`.
-- KCD-2: macOS keeps admitting a program launch and the monitor Alt-Tab in a
-  chord (Karabiner runs them). The Windows and Linux chord pickers grey both
-  with `platform_reason.chord_runs_no_program_or_monitor_switch`, read from
-  the `chord_reason_<driver>` fields of `actions.toml`.
+- KCD-2: a program launch and the monitor Alt-Tab run in a chord on the
+  three OS; superseded on 2026-11-22 (see « A key chord runs a program launch
+  and the monitor Alt-Tab » above), the first answer greyed them on Windows
+  and Linux.
 - KCD-3: a refused `[mod_combos]` delay or a non-boolean `enabled` is
   reported and the declared value applies on Linux, as on Windows and macOS;
   the chords no longer all turn off.
@@ -423,7 +447,9 @@ off only the chords.
 - KCD-8: every menu lays out the pair rows the Windows way: one submenu per
   first key, then « First + Second : summary », the pair's own menu in the
   order tap, hold, chord. The summary names each assigned slot in that order,
-  chord included, joined by « / », or « disabled » when none is:
+  chord included, joined by « / », or « disabled » when none is (the
+  maintainer confirmed the chord's name in the text on 2026-11-22, for example
+  « Copier / Ctrl / Coller »):
   `_shared/tap_hold/engine/combination_labels.lua` `summary` and Windows
   `KeyCombinationPairSummary`, both replaying
   `_shared/tests/corpus/tap_hold/key_combination_pair_rows.json`.
