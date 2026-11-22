@@ -29,9 +29,12 @@ _PCRT_ChildSource(NativePause := false) {
 	Owners := Map()
 	; The native case extracts FilePathsEditor alone, so its file's own includes
 	; are lost: the font scaler it calls must come from its genuine owner.
+	; The retirement case opens the page, so it also needs the reading seed's
+	; owner (LTP-09); the native admission case never builds a page.
 	for Symbol in ["JsonStringLiteral", "FilePathsEditor", "_PathsEdWeb_TryOpen", "WMPresentWindow", "TickElapsed",
-			"Gui_SetFont"] {
-		if (NativePause && Symbol == "FilePathsEditor") || (!NativePause && Symbol == "Gui_SetFont")
+			"Gui_SetFont", "ReadingPrefs_SeedScript"] {
+		if (NativePause && (Symbol == "FilePathsEditor" || Symbol == "ReadingPrefs_SeedScript"))
+				|| (!NativePause && Symbol == "Gui_SetFont")
 			continue
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The paths retirement child requires its whole genuine owner: " . Symbol)
@@ -40,7 +43,8 @@ _PCRT_ChildSource(NativePause := false) {
 			Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(5, Owners.Count, "The codec/public or font/host/native presentation/clock owners must be present")
+	AssertEqual(NativePause ? 5 : 6, Owners.Count,
+		"The codec/public/page seed or font/host/native presentation/clock owners must be present")
 	if NativePause {
 		Body := _DriverFuncBody("FilePathsEditor")
 		AssertTrue(Body != "", "The native admission test requires the actual public editor")

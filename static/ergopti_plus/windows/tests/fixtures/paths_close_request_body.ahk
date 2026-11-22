@@ -221,7 +221,7 @@ _PCRS_Observe() {
 }
 
 _PCRS_Main() {
-	global _PCRS, _VendorDir, _SharedDir, _ConfigDir, _PathsFile, _PathsEdWeb_SessionEpoch
+	global _PCRS, _VendorDir, _SharedDir, _ConfigDir, _PathsFile, _PathsEdWeb_SessionEpoch, _I18nLocale
 	if A_Args.Length != 2
 		ExitApp(2)
 	Persistent(true)
@@ -229,6 +229,8 @@ _PCRS_Main() {
 		Cleanup: false, PublicCalls: 0, DestroySeen: 0, AfterArms: 0, AfterCalls: 0, AfterObserved: false,
 		RequestInsideClose: false, RequestReturned: false}
 	_VendorDir := A_Args[2], _SharedDir := A_Args[2] . "\shared"
+	; The interface language I18nInit sets in the driver: the page seed names it (LTP-09).
+	_I18nLocale := "en"
 	_ConfigDir := A_Args[2] . "\config\", _PathsFile := A_Args[2] . "\paths.toml"
 	Primary := 0, Observed := false
 	OnError(_PCRS_OnError)
