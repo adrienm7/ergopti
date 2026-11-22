@@ -30,6 +30,9 @@ helpers.describe("metrics apps incomplete publication", function()
 	for _, case in ipairs({
 		{ name = "a missing store", store = { missing = true } },
 		{ name = "an incomplete read", store = { complete = false } },
+		-- The recommended preset's boot E2E opened it so: the live-interval read
+		-- reached the tracker keystats never started and logged an ERROR.
+		{ name = "a missing store with metrics off", store = { missing = true, metrics_off = true } },
 	}) do
 		helpers.it("(apps-incomplete-publication, met-11) " .. case.name .. " is shown incomplete, not saved", function()
 			with_delivery(false, function(_, state, evaluations, errors, _, pending)

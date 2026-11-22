@@ -914,6 +914,14 @@ end
 -- =============================================
 -- =============================================
 
+--- Tells whether keystats has started this tracker. A reader that runs while
+--- metrics are off, such as the apps dashboard, asks first: there is then no
+--- open interval to add, and calling a state accessor would log an ERROR.
+--- @return boolean initialized True once M.init() accepted its dependencies.
+function M.is_initialized()
+	return _state ~= nil
+end
+
 --- Returns the unpersisted foreground duration for the active application.
 --- App-time events are normally committed only on a focus transition. The
 --- dashboard also needs the open interval so a long uninterrupted work block

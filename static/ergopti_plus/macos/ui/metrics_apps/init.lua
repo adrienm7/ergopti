@@ -844,6 +844,8 @@ end
 local function with_live_active_app_duration(manifest)
 	local ok_tracker, tracker = pcall(require, "modules.keystats.context_tracker")
 	if not ok_tracker or type(tracker.get_active_app_snapshot) ~= "function" then return manifest end
+	-- Metrics off: keystats never started the tracker, so no interval is open
+	if tracker.is_initialized() ~= true then return manifest end
 	local ok_snapshot, snapshot = pcall(tracker.get_active_app_snapshot)
 	if not ok_snapshot or type(snapshot) ~= "table"
 		or type(snapshot.app) ~= "string" or type(snapshot.duration_ms) ~= "number"

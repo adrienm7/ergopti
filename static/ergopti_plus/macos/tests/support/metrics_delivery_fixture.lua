@@ -12,9 +12,10 @@ local with_window = require("tests.support.dashboard_window_fixture")
 --- Opens the apps dashboard over a virtual store and hands the observations over.
 --- @param cached boolean Whether a disk snapshot exists.
 --- @param callback function Receives dashboard, state, evaluations, errors, successes, pending.
---- @param store table|nil { missing = boolean, complete = boolean }: no db.sqlite, or an
----   incomplete manifest read; a present, complete store by default. state.disk_writes
----   counts the snapshot writes.
+--- @param store table|nil { missing = boolean, complete = boolean, metrics_off = boolean }:
+---   no db.sqlite, an incomplete manifest read, or the real context tracker that keystats
+---   never started; a present, complete store with a started tracker by default.
+---   state.disk_writes counts the snapshot writes.
 local function with_delivery(cached, callback, store)
 	store = store or {}
 	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
@@ -31,7 +32,12 @@ local function with_delivery(cached, callback, store)
 		package.loaded["modules.keystats.sqlite_reader"] = {
 			read_manifest = function() return {}, store.complete ~= false end,
 		}
-		package.loaded["modules.keystats.context_tracker"] = { get_active_app_snapshot = function() end }
+		if not store.metrics_off then
+			package.loaded["modules.keystats.context_tracker"] = {
+				is_initialized = function() return true end,
+				get_active_app_snapshot = function() end,
+			}
+		end
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}
 			state.disk_writes = 0
