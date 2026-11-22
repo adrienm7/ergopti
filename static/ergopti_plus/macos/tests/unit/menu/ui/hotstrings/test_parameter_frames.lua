@@ -586,7 +586,20 @@ helpers.describe("hotstrings word-reset rows", function()
 		end, 3)
 	end)
 
-	for _, answer in ipairs({ "-1", "abc", "", "inf" }) do
+	-- A blank answer resets the setting to its manifest default, 3 s
+	-- (maintainer decision PCK-13); any other unreadable answer is refused.
+	helpers.it("resets a blank free value to the default without an alert (PCK-13)", function()
+		with_word_reset(function(f, set, alerts)
+			local idle = word_reset_rows(f)
+			idle.menu[8].fn()
+			helpers.assert_eq(set, { { "idle", 3 } })
+			helpers.assert_eq(f.context.state.idle_reset_seconds, 3)
+			helpers.assert_eq(alerts(), 0)
+			helpers.assert_eq(f.calls.writes, 1, "the reset is saved once")
+		end, 4.5, "")
+	end)
+
+	for _, answer in ipairs({ "-1", "abc", "inf" }) do
 		helpers.it("refuses the free value '" .. answer .. "' with an alert", function()
 			with_word_reset(function(f, set, alerts)
 				local idle = word_reset_rows(f)
@@ -666,7 +679,21 @@ helpers.describe("hotstrings Backspace undo rows (backspace-restore-menu)", func
 		end, 3, " 750 ")
 	end)
 
-	for _, answer in ipairs({ "10", "20000", "abc", "" }) do
+	-- A blank answer resets the window to its manifest default, 500 ms
+	-- (maintainer decision PCK-13); out-of-range answers stay refused.
+	helpers.it("resets a blank free window to the default without an alert (PCK-13)", function()
+		with_word_reset(function(f, set, alerts)
+			stub_backspace_restore(f, set, 1000)
+			local _, window = backspace_restore_rows(f)
+			window.menu[6].fn()
+			helpers.assert_eq(set, { { "backspace_restore_window", 500 } })
+			helpers.assert_eq(f.context.state.backspace_restore_window_ms, 500)
+			helpers.assert_eq(alerts(), 0)
+			helpers.assert_eq(f.calls.writes, 1, "the reset is saved once")
+		end, 3, "")
+	end)
+
+	for _, answer in ipairs({ "10", "20000", "abc" }) do
 		helpers.it("refuses the free window '" .. answer .. "' outside the declared range with an alert", function()
 			with_word_reset(function(f, set, alerts)
 				stub_backspace_restore(f, set, 500)
