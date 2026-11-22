@@ -534,8 +534,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     PCK-16 (Windows WebView windows take the keyboard on open), PCK-17 (one Windows input box at a time), PCK-18
     (the dead Linux token bridge retired), PCK-19 (Escape on the model browser and physical shortcuts), PCK-20
     (prompt editor fields saved alike, shared vectors), PCK-21 (Windows application names, no window titles) and
-    PCK-22 (`dir` from the locale on every page, logical CSS) fixed. Left: PCK-13 a blank numeric answer resets on
-    macOS only (decide reset or refuse);
+    PCK-22 (`dir` from the locale on every page, logical CSS) fixed, then PCK-13 (a blank numeric answer resets a
+    global setting to its default and removes an override, maintainer 2026-11-21 and 2026-11-22, on the three OS);
   - the next campaigns in the report's order: metrics views, small native units, layout tool
     pages.
     until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
@@ -820,6 +820,68 @@ Each question names the default kept meanwhile; an answer moves into the item or
       different fingers only (one finger's move stays an SFB) and weighs half the SFB weight (`sfb` 5, `row_jump`
       2.5), on dev since 732f924251 ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »).
       Review the shipped scale against `docs/audits/layout-analysers/graded-costs-ranking.md`.
+      the maintainer on 2026-11-19, and the similarity shown first, the weighted share of the characters on the
+      same key and level, spaces aside, with the same finger and row, the unweighted share beside it, on
+      2026-11-22 (`docs/memory/maintainer-decisions.md`). Kept meanwhile: the gap is said in points, not in %,
+      since the score has no zero; five alike layouts are listed. Choose whether a gap in % of the run's gain
+      over its start would read better (docs/design/layout-optimizer.md, « Existing layouts »).
+- [ ] **Optimizer change penalty (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      Optimiser can take off its objective the cost of leaving the start layout: a weight in score points per % of
+      the corpus's characters moved, each weighted by its occurrences as `layoutSimilarity` weighs them (100 − its
+      weighted same-key share), and a hard « at most N changed characters » (a letter and its capital count once).
+      Kept meanwhile (`score_weights.json` `change_penalty`): presets « few changes » 3, « balanced » 1, « free » 0,
+      the slider up to 5, « at most 6 changed characters » when the limit is switched on, and « free » chosen
+      first, so a run moves what pays as before until the reader asks otherwise. Measured on AZERTY, the first 60 000 characters of Nemolivier, 3 000 swaps: weight 0 moves 92 % of
+      the typed characters for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36. Choose the presets, whether
+      « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
+      (docs/design/layout-optimizer.md, « Change penalty »).
+
+- [ ] **Accessibility texts stay French (decided by the agent on 2026-11-19, to review by the maintainer).** The
+      site's accessibility statement (`/accessibilite`) and its settings dialog (`A11ySettings.svelte`) do not get
+      the 21 locales: the site has no locale system (only the Ergopti+ pages read in English, through `t()`), and
+      what Ergopti+ and Ergopti Studio show in the app already goes through the 21 locales. Under the English
+      Ergopti+ page they say `lang="fr"` with the rest of the site's header, footer and banner, so a screen reader
+      reads them as French (`tools/test/test-site-languages.cjs`). Kept meanwhile: French only.
+  1. **(recommended) Keep them French** until the site itself offers a language choice, then route them through it.
+  2. Translate the dialog and the statement into English now, with the Ergopti+ `t()` dictionary.
+  3. Give them the 21 locales, which first needs a locale system for the whole site.
+- [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
+      finished AI predictions are announced only while the system says a screen reader runs (Windows
+      `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.
+- [ ] **Ergopti+ sections in French under the English page (decided by the agent on 2026-11-17, to review by the
+      maintainer).** Ten sections of the Ergopti+ pages have no English text; they now say `lang="fr"`, so a screen
+      reader reads them as French (`tools/test/test-ergopti-plus-languages.cjs`). Kept meanwhile: marked, not
+      translated.
+  1. **(recommended) Translate them** through `t()` and `locales/en.js`, dropping each `lang="fr"` as it goes.
+  2. Keep them French on the English page.
+- [ ] **Undo with no timer (decided by the agent on 2026-11-17, to review by the maintainer).** The Studio's restores
+      offer « Undo » until the section is edited again or another restore replaces it, not for a few seconds (WCAG
+      2.2.1, no time limits). Kept meanwhile: no timer.
+  1. **(recommended) Keep it without a timer.**
+  2. Hide the offer after a delay, paused while it has the focus or the pointer.
+- [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
+      Utilisation page is split into « Essayer » and `/ergopti/installation` (downloads, OS guides, printable
+      layouts); `/utilisation` without an anchor lands on installation. « Essayer » is now Ergopti Studio's tab
+      (`/studio/essayer`, maintainer 2026-11-21, `docs/memory/maintainer-decisions.md`): `/ergopti/utilisation`
+      redirects to it with `layout=ergopti`, anchors kept. No `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations).
+      Ergopti+ sub-pages: présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités
+      (tap-holds, raccourcis, trackpad, métriques), configuration (réglages, vie privée), installation (démarrer,
+      télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
+      shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
+      disc of the logos) is new. Approve or change.
+- [ ] **List the text replacements of the former « Essayer » page on `/ergopti-plus/hotstrings` (maintainer
+      2026-11-22, `docs/memory/maintainer-decisions.md`).** `/ergopti/utilisation` also typed Ergopti+'s ★ text
+      replacements and listed them by category; the Studio's « Essayer » tab types the layout only, so the list
+      went with the page. List them by category on `/ergopti-plus/hotstrings`, read from the same catalogues
+      (being implemented by another change).
+- [ ] **Row jumps in the global score? (decided by the agent on 2026-11-17, to review by the maintainer)** The new
+      `row_jump` metric (two keys of one hand two rows or more apart, any fingers) is shown in the Comparer, the
+      heatmap and the worst pairs, but has no weight: the study gives it none, and it overlaps SFBs and scissors.
+      The effort per word uses the score's weights on the word typed alone, folded to lower case. Kept meanwhile:
+      informative only.
+  1. **(recommended) Keep it informative** until the study weighs it.
+  2. Give it a small default weight (e.g. 0.5 point per %) in `score_weights.json` and the study.
+  3. Count only jumps on different fingers, so it no longer overlaps the SFBs.
 - [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour

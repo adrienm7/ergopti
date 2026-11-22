@@ -156,6 +156,22 @@ refused with the shared range message.
   « leave blank to use the global delay: N ms », in the 21 locales; the other
   override prompts named no default, so their hints are unchanged.
 
+## Three choices without code change (2026-11-22)
+
+Decided by the maintainer on 2026-11-22:
+
+- **Windows without WebView2 opens the metrics dashboard in Edge app mode.**
+  It is the same web page in an Edge window, not a native fallback, so it
+  stays.
+- **The Optimiser's « existing layout » similarity shows the weighted share
+  first**: the share of the characters on the same key, finger and row,
+  weighted by their occurrences, with the unweighted share beside it
+  (docs/design/layout-optimizer.md, « Existing layouts »).
+- **The text replacements of the former « Essayer » page are listed on
+  `/ergopti-plus/hotstrings`**, read from the same catalogues; the Studio's
+  « Essayer » tab keeps typing the layout only. Another change implements the
+  listing.
+
 ## A locale chosen without config.toml creates the file (2026-11-22)
 
 Decided by the maintainer on 2026-11-22: choosing a language while
