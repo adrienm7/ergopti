@@ -497,11 +497,22 @@ def main():
         pins = json.loads(
             (repository / "static/ergopti_plus/_shared/ai/data/ollama_release.json").read_text()
         )
-        assert pins["version"] == "0.40.6" and pins["assets"]["linux-amd64"] == {
-            "filename": "ollama-linux-amd64.tar.zst",
-            "bytes": ARCHIVE_BYTES,
-            "sha256": ARCHIVE_SHA256,
-        }, "independently frozen official archive fields required"
+        asset = pins["assets"]["linux-amd64"]
+        # unpacked_bytes is the repository's own measure of the archive
+        # (tools/build/pin-ollama-release.cjs, OLL-14), not an official field:
+        # it is admitted by shape, the official fields stay frozen here.
+        assert (
+            pins["version"] == "0.40.6"
+            and set(asset) == {"filename", "bytes", "sha256", "unpacked_bytes"}
+            and {key: asset[key] for key in ("filename", "bytes", "sha256")}
+            == {
+                "filename": "ollama-linux-amd64.tar.zst",
+                "bytes": ARCHIVE_BYTES,
+                "sha256": ARCHIVE_SHA256,
+            }
+            and type(asset["unpacked_bytes"]) is int
+            and asset["unpacked_bytes"] > ARCHIVE_BYTES
+        ), "independently frozen official archive fields required"
 
         # HOME is trusted by the production resolver; /tmp and writable-by-others
         # ancestors deliberately remain refused. Never rewrite an existing path.
