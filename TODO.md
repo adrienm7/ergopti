@@ -206,7 +206,10 @@ baseline as violations go.
       their scan (fifth pass), and since the tenth pass that scan also blocks an element a mouse can click or hover
       that the keyboard cannot reach, arrow keys that do nothing in a tab list, list box or menu, and a modal that
       Escape leaves open; the hotstring editor's sections move with the arrow keys and the metrics tooltips open on
-      focus. Left: the macOS and Linux native windows; the typing heatmaps' key popups and the apps table's column
+      focus. Since 2026-11-22 the Studio keyboard walk refuses hover-only content too (an element with a hover
+      listener that the keyboard cannot reach or that does not follow the focus, a drawing's values in hover
+      titles only; the app windows' check, proved first on a small page): every Studio page and tab passes.
+      Left: the macOS and Linux native windows; the typing heatmaps' key popups and the apps table's column
       explanations are still hover only (the same counts are in the tables).
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by

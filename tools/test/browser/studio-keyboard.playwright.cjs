@@ -18,7 +18,8 @@
  * Since 2026-11-19 each walk is followed by the operability checks of
  * studio-operability.cjs (the shared lib/keyboard-operability.cjs judgement
  * and widget driver, a focus indicator at every stop, every image hidden or
- * named, tab lists with one stop and Home and End), and every tab of each
+ * named, tab lists with one stop and Home and End; since 2026-11-22 nothing
+ * shown on hover alone, proved first on a small page), and every tab of each
  * page's main tab list is opened and checked the same way, the Comparer's on
  * a link naming four layouts. Page errors and requests outside the loopback
  * origin fail the gate. --report prints every problem instead of stopping;
@@ -36,7 +37,8 @@ const { chromium } = require('playwright');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
 const operability = require('../lib/keyboard-operability.cjs');
-const { operabilityProblems } = require('./studio-operability.cjs');
+const { operabilityProblems, hoverProblems } = require('./studio-operability.cjs');
+const appChecks = require('../lib/app-window-checks.cjs');
 
 // --root=<folder> serves another copy of static/ (a revert proof on an older
 // commit's pages); --report prints every problem instead of stopping at the first page.
@@ -252,6 +254,9 @@ async function open(browser, origin, target, query = '') {
 		pointer: operability.POINTER_EVENTS,
 		keys: operability.KEY_EVENTS
 	});
+	// Records the hover and focus listeners too, for the hover-only check
+	// (studio-operability.cjs, lib/app-window-checks.cjs).
+	await context.addInitScript(appChecks.recordListeners);
 	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
@@ -339,11 +344,52 @@ async function sweepTabs(page, target, everyTab = false) {
 	return names.length;
 }
 
+/**
+ * Proves on a small page, under both listener records of open(), that the
+ * hover check refuses what only a hovering pointer reaches and passes what
+ * the keyboard reaches too, so a Studio page read at zero was really read.
+ */
+async function proveHoverCheck(browser) {
+	const context = await browser.newContext();
+	await context.addInitScript(operability.instrumentListeners, {
+		pointer: operability.POINTER_EVENTS,
+		keys: operability.KEY_EVENTS
+	});
+	await context.addInitScript(appChecks.recordListeners);
+	try {
+		const page = await context.newPage();
+		await page.goto('about:blank');
+		await page.setContent(`<main><h1>Check</h1>
+			<span id="hover">Hover me</span>
+			<span id="follows" tabindex="-1">Hover or focus me</span>
+			<button id="native">Native</button>
+			<svg id="titles" role="img" aria-label="Days"><rect width="1" height="1"><title>Monday — 3</title></rect></svg>
+			<svg id="listed" role="img" aria-label="Days" data-keyboard-equivalent="#days"><rect width="1" height="1"><title>Monday — 3</title></rect></svg>
+			<details><summary id="days">Values</summary><p>Monday — 3</p></details></main>`);
+		await page.evaluate(() => {
+			const show = () => {};
+			document.getElementById('hover').addEventListener('mouseenter', show);
+			const follows = document.getElementById('follows');
+			follows.onmouseenter = show;
+			follows.onfocus = show;
+			document.getElementById('native').addEventListener('mouseover', show);
+		});
+		assert.deepEqual(
+			await hoverProblems(page),
+			['mouse only (hover): span#hover «Hover me»', 'svg#titles has values in hover titles only'],
+			'the hover check refuses hover-only content and passes what follows the focus'
+		);
+	} finally {
+		await context.close();
+	}
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
 	const browser = await chromium.launch();
 	try {
+		await proveHoverCheck(browser);
 		for (const target of PAGES) {
 			const { context, page, errors } = await open(browser, origin, target);
 			try {

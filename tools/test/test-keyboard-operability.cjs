@@ -139,6 +139,16 @@ function checkWiring() {
 		.map((name) => fs.readFileSync(path.join(ROOT, 'tools/test/browser', name), 'utf8'))
 		.join('\n');
 	assert.match(studio, /operabilityProblems\(rows\)/, 'The Studio keyboard gate judges its pages');
+	assert.match(
+		studio,
+		/addInitScript\(appChecks\.recordListeners\)/,
+		'The Studio keyboard gate records the hover listeners'
+	);
+	assert.match(
+		studio,
+		/\.concat\(await hoverProblems\(page\)\)/,
+		'The Studio keyboard gate refuses content shown on hover only'
+	);
 }
 
 checkOperability();

@@ -15,7 +15,13 @@
  * 2. every stop of the walk shows a focus indicator of its own (2.4.7);
  * 3. every image is hidden as decoration or named (lib/page-images.cjs);
  * 4. the Studio's tab lists keep one Tab stop and answer Home and End too,
- *    beyond the shared check's one arrow key (the ARIA tabs pattern).
+ *    beyond the shared check's one arrow key (the ARIA tabs pattern);
+ * 5. nothing shows on hover alone (WCAG 1.4.13, 2.1.1, since 2026-11-22):
+ *    an element with a hover listener takes the focus, holds a control that
+ *    does, or follows the focus too, and a drawing keeps no value in the
+ *    hover titles of its marks only; the app windows' checks
+ *    (lib/app-window-checks.cjs), whose listener record
+ *    studio-keyboard.playwright.cjs installs before the page's scripts.
  * ==============================================================================
  */
 
@@ -23,6 +29,7 @@
 
 const operability = require('../lib/keyboard-operability.cjs');
 const { exerciseWidgets } = require('./keyboard-operability.playwright.cjs');
+const appChecks = require('../lib/app-window-checks.cjs');
 const { collectImages, imageProblems } = require('../lib/page-images.cjs');
 
 /**
@@ -98,6 +105,20 @@ async function tablistProblems(page, label) {
 }
 
 /**
+ * What only a hovering pointer reaches: an element with a hover listener that
+ * the keyboard cannot reach, and a drawing's values in hover titles only.
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string[]>}
+ */
+async function hoverProblems(page) {
+	const operable = await page.evaluate(appChecks.operabilityProblems);
+	const images = await page.evaluate(appChecks.imageProblems);
+	return operable
+		.filter((problem) => problem.startsWith('mouse only (hover)'))
+		.concat(images.filter((problem) => problem.endsWith('in hover titles only')));
+}
+
+/**
  * Every operability problem of a page after its Tab walk.
  * @param {import('playwright').Page} page
  * @param {string} label
@@ -114,6 +135,7 @@ async function operabilityProblems(page, label, stops) {
 	const problems = operability
 		.operabilityProblems(rows)
 		.concat(imageProblems(images))
+		.concat(await hoverProblems(page))
 		.map((problem) => `${label}: ${problem}`);
 	const unmarked = new Set();
 	for (const stop of stops)
@@ -132,4 +154,4 @@ async function operabilityProblems(page, label, stops) {
 	return { problems, controls: rows.length, images: images.length, markup };
 }
 
-module.exports = { operabilityProblems, tablistProblems };
+module.exports = { operabilityProblems, tablistProblems, hoverProblems };
