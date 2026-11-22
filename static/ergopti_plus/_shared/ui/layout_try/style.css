@@ -44,6 +44,17 @@ body:has(> main.layout-try) {
 	font-size: 1.6em;
 	line-height: 1.25;
 	margin: 0 0 var(--lt-space-2);
+	/* At 200 % text in a 320 px window, « disposition » alone is wider than the
+	   title's box and would scroll the page sideways (WCAG 1.4.10). */
+	overflow-wrap: anywhere;
+}
+
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.lt-lead,
+.lt-muted {
+	max-width: 60ch;
 }
 
 .layout-try h2 {
