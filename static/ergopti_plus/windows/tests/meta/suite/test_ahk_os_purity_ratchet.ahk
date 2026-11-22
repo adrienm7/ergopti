@@ -226,7 +226,10 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; 2026-11-12: the layout registry watch and the metrics time zone conversions
 ; moved into hotstrings/adapters/registry_notify.ahk and platform/system/time_zone.ahk;
 ; read from this counter at modules+lib 247, tightened.
-_AOPR_BASELINE_CORE  := 247
+; 2026-11-22: the deferred menu build probe's thread, module and process
+; counters moved into core/events/boot_clock.ahk; read at modules+lib 236
+; (DllCall=159 COM=1 FileIO=76), tightened.
+_AOPR_BASELINE_CORE  := 236
 _AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 

@@ -127,7 +127,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 	LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' build started for {2}.", Entry.ListId, Reason))
 	StartedAt := HotPath_Now()
 	Probe.Begin("build")
-	StartedCycles := _MenuDeferred_ThreadCycles()
+	StartedCycles := ProcessThreadCycles()
 	PreviousBuilding := _MenuPopulationBuilding
 	; Nested pickers stay deferred under the published owner, finished at their open.
 	if _MenuPopulationPublished is MenuPopulation
@@ -139,7 +139,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		; Formatted first: the logger folds repeats of one template, and each list's
 		; first-open cost must stay readable (the startup smoke bounds this line).
 		ElapsedMs := Round(PerfElapsedUs(StartedAt) / 1000)
-		Cycles := _MenuDeferred_ThreadCycles() - StartedCycles
+		Cycles := ProcessThreadCycles() - StartedCycles
 		Probe.Unwind(0)
 		; The startup smoke judges a list by its own thread's cycles per row:
 		; neither load nor another process's file scan moves that cost.
@@ -165,17 +165,6 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 }
 
 /**
- * The CPU cycles the calling thread has run so far. Unlike the wall clock, it
- * does not count the time the thread waited on the scheduler or on a file.
- * @returns {Integer} Cycles since the thread started.
- */
-_MenuDeferred_ThreadCycles() {
-	if !DllCall("QueryThreadCycleTime", "Ptr", DllCall("GetCurrentThread", "Ptr"), "Int64*", &Cycles := 0)
-		throw OSError(A_LastError, -1, "QueryThreadCycleTime")
-	return Cycles
-}
-
-/**
  * Attributes one deferred build's cost to the calls inside it. A segment's own
  * cost excludes the segments nested in it, so the costliest one names the call
  * that ran the cycles. Thread cycles and thread times are this thread's; page
@@ -191,9 +180,9 @@ class MenuDeferredProbe {
 		this.Stack := []
 		this.Segments := Map()
 		this.Totals := 0
-		this.ModulesBefore := _MenuDeferred_LoadedModules()
-		this.ObjectsBefore := _MenuDeferred_GuiObjects()
-		this.StartedAfterMs := _MenuDeferred_ProcessAgeMs()
+		this.ModulesBefore := ProcessLoadedModules()
+		this.ObjectsBefore := ProcessGuiObjects()
+		this.StartedAfterMs := ProcessAgeMs()
 		this.CountersBefore := _MenuDeferred_CounterSnapshot()
 	}
 
@@ -241,8 +230,8 @@ class MenuDeferredProbe {
 		global MENU_DEFERRED_PROBE_TOP
 		if !(this.Totals is Array)
 			throw Error("A deferred build probe is described only once its build closed")
-		Loaded := _MenuDeferred_ModuleNames(this.ModulesBefore, _MenuDeferred_LoadedModules())
-		Objects := _MenuDeferred_GuiObjects()
+		Loaded := _MenuDeferred_ModuleNames(this.ModulesBefore, ProcessLoadedModules())
+		Objects := ProcessGuiObjects()
 		Text := Format("started {1} ms after process start; {2}; modules loaded: {3}; GDI {4:+d}, USER {5:+d}; {6}",
 			this.StartedAfterMs, _MenuDeferred_ProbeCost(this.Totals), Loaded == "" ? "none" : Loaded,
 			Objects[1] - this.ObjectsBefore[1], Objects[2] - this.ObjectsBefore[2],
@@ -323,35 +312,17 @@ _MenuDeferred_ProbeCost(Cost) {
 }
 
 /**
- * Samples the probe fields. Native entry points are resolved once: the sample
- * runs twice per renderer row of a deferred build.
+ * Samples the probe fields: the process counters (core/events/boot_clock.ahk)
+ * and the performance-counter ticks.
  * @returns {Array} The eight probe fields.
  */
 _MenuDeferred_ProbeSample() {
-	static Kernel32 := DllCall("GetModuleHandle", "Str", "kernel32", "Ptr")
-	static CycleTime := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "QueryThreadCycleTime", "Ptr")
-	static ThreadTimes := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "GetThreadTimes", "Ptr")
-	static MemoryInfo := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "K32GetProcessMemoryInfo", "Ptr")
-	static IoCounters := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "GetProcessIoCounters", "Ptr")
-	static Thread := DllCall("GetCurrentThread", "Ptr"), Process := DllCall("GetCurrentProcess", "Ptr")
-	static Times := Buffer(32, 0), Memory := Buffer(80, 0), Io := Buffer(48, 0)
 	; One uninterrupted read: a thread run between two of these reads billed its
 	; cycles to one segment and its wall time to the next (measured 2026-11-21).
 	PreviousCritical := Critical("On")
 	try {
-		if !DllCall(CycleTime, "Ptr", Thread, "Int64*", &Cycles := 0)
-			throw OSError(A_LastError, -1, "QueryThreadCycleTime")
-		if !DllCall(ThreadTimes, "Ptr", Thread, "Ptr", Times, "Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24)
-			throw OSError(A_LastError, -1, "GetThreadTimes")
-		NumPut("UInt", 80, Memory, 0)
-		if !DllCall(MemoryInfo, "Ptr", Process, "Ptr", Memory, "UInt", 80)
-			throw OSError(A_LastError, -1, "K32GetProcessMemoryInfo")
-		if !DllCall(IoCounters, "Ptr", Process, "Ptr", Io)
-			throw OSError(A_LastError, -1, "GetProcessIoCounters")
-		; FILETIME kernel and user at 16 and 24; PageFaultCount follows cb; IO_COUNTERS
-		; holds ReadOperationCount at 0, OtherOperationCount at 16, ReadTransferCount at 24.
-		Sample := [Cycles, NumGet(Times, 16, "Int64"), NumGet(Times, 24, "Int64"), NumGet(Memory, 4, "UInt"),
-			NumGet(Io, 0, "Int64"), NumGet(Io, 24, "Int64"), NumGet(Io, 16, "Int64"), PerfClockTicks()]
+		Sample := ProcessProbeCounters()
+		Sample.Push(PerfClockTicks())
 	} finally Critical(PreviousCritical)
 	return Sample
 }
@@ -402,67 +373,17 @@ _MenuDeferred_CounterMoves(Before, After) {
 }
 
 /**
- * The modules this process has loaded, by base address.
- * @returns {Map} Module handle to true.
- */
-_MenuDeferred_LoadedModules() {
-	Process := DllCall("GetCurrentProcess", "Ptr")
-	Handles := Buffer(512 * A_PtrSize, 0)
-	loop {
-		if !DllCall("K32EnumProcessModules", "Ptr", Process, "Ptr", Handles, "UInt", Handles.Size, "UInt*", &Needed := 0)
-			throw OSError(A_LastError, -1, "K32EnumProcessModules")
-		if Needed <= Handles.Size
-			break
-		Handles := Buffer(Needed, 0)
-	}
-	Modules := Map()
-	loop Needed // A_PtrSize
-		Modules[NumGet(Handles, (A_Index - 1) * A_PtrSize, "Ptr")] := true
-	return Modules
-}
-
-/**
  * The base names of the modules loaded since a census.
  * @param {Map} Before The earlier census.
  * @param {Map} After The later census.
  * @returns {String} Comma-separated names, empty when none.
  */
 _MenuDeferred_ModuleNames(Before, After) {
-	Process := DllCall("GetCurrentProcess", "Ptr")
 	Names := ""
-	for Module in After {
-		if Before.Has(Module)
-			continue
-		Name := Buffer(520, 0)
-		if !DllCall("K32GetModuleBaseNameW", "Ptr", Process, "Ptr", Module, "Ptr", Name, "UInt", 260)
-			throw OSError(A_LastError, -1, "K32GetModuleBaseNameW")
-		Names .= (Names == "" ? "" : ", ") . StrGet(Name, "UTF-16")
-	}
+	for Module in After
+		if !Before.Has(Module)
+			Names .= (Names == "" ? "" : ", ") . ProcessModuleBaseName(Module)
 	return Names
-}
-
-/**
- * This process's GDI and USER object counts.
- * @returns {Array} GDI, then USER.
- */
-_MenuDeferred_GuiObjects() {
-	Process := DllCall("GetCurrentProcess", "Ptr")
-	; GR_GDIOBJECTS = 0, GR_USEROBJECTS = 1.
-	return [DllCall("GetGuiResources", "Ptr", Process, "UInt", 0, "UInt"),
-		DllCall("GetGuiResources", "Ptr", Process, "UInt", 1, "UInt")]
-}
-
-/**
- * Milliseconds since this process was created, so a build is placed against the
- * readiness line of the same log whatever the logger's timestamp precision.
- * @returns {Integer}
- */
-_MenuDeferred_ProcessAgeMs() {
-	Creation := Buffer(8, 0), Unused := Buffer(8, 0), Now := Buffer(8, 0)
-	if !DllCall("GetProcessTimes", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Creation, "Ptr", Unused, "Ptr", Unused, "Ptr", Unused)
-		throw OSError(A_LastError, -1, "GetProcessTimes")
-	DllCall("GetSystemTimePreciseAsFileTime", "Ptr", Now)
-	return (NumGet(Now, 0, "Int64") - NumGet(Creation, 0, "Int64")) // 10000
 }
 
 /**

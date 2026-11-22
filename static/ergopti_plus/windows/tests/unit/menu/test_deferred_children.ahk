@@ -238,3 +238,27 @@ _MDC_ProbeReleasedByAFailedBuild() {
 	AssertEqual(0, _MenuDeferredProbe, "a refused build leaves no probe for the next renderer call")
 }
 Test("menu deferred: a refused build releases its probe", () => _MDC_Run(_MDC_ProbeReleasedByAFailedBuild))
+
+; The probe's native reads live in core/events/boot_clock.ahk; each one answers
+; for this very process, so a wrong handle or offset shows as a wrong value.
+_MDC_ProbeProcessCountersAreThisProcess() {
+	Before := ProcessProbeCounters()
+	AssertEqual(7, Before.Length, "cycles, kernel, user, page faults, reads, read bytes, other I/O")
+	for Value in Before
+		AssertTrue(IsInteger(Value) && Value >= 0, "every counter is a non-negative integer")
+	Started := A_TickCount
+	while A_TickCount - Started < 20
+		continue
+	After := ProcessProbeCounters()
+	AssertTrue(After[1] > Before[1], "the busy wait ran thread cycles")
+	AssertTrue(ProcessThreadCycles() >= After[1], "the thread cycle reading only advances")
+	Modules := ProcessLoadedModules()
+	Kernel32 := DllCall("GetModuleHandle", "Str", "kernel32", "Ptr")
+	AssertTrue(Modules.Has(Kernel32), "the census holds every loaded module")
+	AssertEqual("kernel32.dll", StrLower(ProcessModuleBaseName(Kernel32)))
+	Objects := ProcessGuiObjects()
+	AssertTrue(Objects[1] > 0 && Objects[2] > 0, "a script with a hidden window owns GDI and USER objects")
+	Age := ProcessAgeMs()
+	AssertTrue(Age >= A_TickCount - Started && Age < 86400000, "the process started before this test")
+}
+Test("menu deferred: the probe's process counters read this process", _MDC_ProbeProcessCountersAreThisProcess)
