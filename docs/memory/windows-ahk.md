@@ -975,7 +975,7 @@ application's and the switch-on needs no reload: `AiActionBlocked`
 (`ai/engine/action_gate.ahk`) is asked at each press by `TapHoldTapAction`, whose
 blocked answer is the native tap, by `TapKeyShouldFire`,
 `ScriptShortcutSlotRunsAction`, `KeyCombinationOwns`/`KeyCombinationFire`,
-`GestureDispatch` and `_MagicEditorBrokerWinner`. Native keyboard slots cannot ask,
+`GestureDispatch` and `_StarSlotBrokerWinner`. Native keyboard slots cannot ask,
 so `KeyboardShortcutsFollowAiSwitch` releases and re-arms their handles at boot and
 at the commit of the switch. Readers of what is stored (menu, writer) use
 `TapHoldConfiguredTapAction`. Action: a new key-claiming layer asks
@@ -1138,10 +1138,9 @@ registered unconditionally with the family in its live criterion
 (`ScriptAltGrKanaChordIsLive`), never inside an `if` on the family
 (`test_altgr_family_follows_layout.ahk` scans every registration). The
 digit-row swap follows the same way, per press on the foreground layout
-(`DigitRowIsSwapped`, `test_layout_digit_row_probe.ahk`). The only layout
-read still fixed at load is the magic key's source key without the Ergopti
-emulation; the layout poll reloads only when it differs
-(`LayoutRemapSignature`).
+(`DigitRowIsSwapped`, `test_layout_digit_row_probe.ahk`). The magic key's
+remap follows only an emulated layout's declared key since 2026-11-21, so no
+OS-layout switch reloads the driver for it.
 
 ### project-number-row-hotkeys-replay-headless
 
@@ -1632,7 +1631,7 @@ The seven trust cases pass on the hosted Git 2.56 lanes in LocalMachine scope.
 
 `KeyboardShortcutsBindAll` runs after `modules/keymap/layout.ahk` because a slot's
 letter means the key that types it under the Ergopti emulation
-(`KeyboardSlotLayoutScan` reads `RemappedList`), and before `MagicEditorStart`
+(`KeyboardSlotLayoutScan` reads `RemappedList`), and before `StarSlotStart`
 because a Win slot on such a key joins the physical broker, which acquires its
 keys once. Moving the binding earlier silently returns every emulated letter to the
 host layout's key; keep the order pinned by `test_keyboard_slot_neutral_roles.ahk`.

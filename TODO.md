@@ -531,15 +531,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       about 0.5 ms per cached row with its case variants, the `generated_hotstrings.tsv` admission about 110 ms);
       layout and remaps 1.0 s (a disk cache is rejected: native hotkey registration), of which the two Ergopti
       `.keylayout` parses about 100-170 ms (both needed: Ergopti+ gives the AltGr keys), their spec 35-60 ms,
-      `platform/remap.ahk` 150 ms and the magic editor's cohort registration 45-60 ms; the configuration stage
+      `platform/remap.ahk` 150 ms and the ★ key slot's cohort registration 45-60 ms; the configuration stage
       500-700 ms; the shortcuts stage 170-330 ms; the AI catalogue 230 ms (deferring it means a lazy accessor for
       its 184 readers). The tray menu is built before readiness by decision (« Windows boot: keyboard before tray »
       in `docs/memory/maintainer-decisions.md`), so it cannot move after ready; what is left in it is the menu rows
       themselves. Done 18 November (same bench, 3 interleaved rounds of 3 boots, PC under heavy use, so whole-boot
       totals moved more with load than with the code): the shipped `index.json` is decoded once for both layouts
-      (one decode 14-26 ms; `ErgoptiLayout_Init` 375 to 266 ms), the magic editor's source probe reads the base
+      (one decode 14-26 ms; `ErgoptiLayout_Init` 375 to 266 ms), the ★ key slot's source probe reads the base
       tables and the number-row mode once per probe instead of once per key (196 table builds to 2;
-      `MagicEditorStart` 248 to 156 ms), and the tray's Hotstrings total counts bundled files from the admitted
+      `StarSlotStart` 248 to 156 ms), and the tray's Hotstrings total counts bundled files from the admitted
       hotstring cache rows instead of rescanning about 3,200 catalogue lines (172 to 31 ms; the tray stage 734 to
       500 ms CPU). The i18n stage is 60-80 ms warm: its 700 ms and 480 ms of the hotstring stage in earlier
       notes were cold caches of a fresh private code copy, which the benchmark now warms first. A smoke boot beside a
