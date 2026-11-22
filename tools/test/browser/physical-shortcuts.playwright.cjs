@@ -47,6 +47,12 @@ const assert = (condition, label) => {
 			});
 			const html = fs
 				.readFileSync(ui + 'index.html', 'utf8')
+				// page_locale.js owns the root lang and dir: the page calls
+				// window.setPageLocale when the user changes language.
+				.replace(
+					'<script src="../page_locale.js"></script>',
+					'<script>' + fs.readFileSync(shared('ui', 'page_locale.js'), 'utf8') + '</script>'
+				)
 				.replace(
 					'<script src="../host_bridge.js"></script>',
 					'<script>' + fs.readFileSync(shared('ui', 'host_bridge.js'), 'utf8') + '</script>'
