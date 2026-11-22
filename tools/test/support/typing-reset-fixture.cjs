@@ -196,6 +196,15 @@ require('tests.support.typing_delivery_fixture')(function(dashboard,context,_,er
  package.loaded['hs.json'].encode=json.encode
  package.loaded['hs.json'].decode=json.decode
  local removes=0
+ -- The delivery fixture records the retirement of Ergopti Studio's saved read
+ -- of the same store (326035f5da) instead of unlinking it; it must settle
+ -- before the terminal too.
+ local snapshot=package.loaded['modules.keystats.studio_snapshot']
+ local record=snapshot.retire
+ snapshot.retire=function(...)
+  assert(#evaluations==2,'terminal must not be emitted before the Studio read is retired')
+  return record(...)
+ end
  os.remove=function()
   assert(#evaluations==2,'terminal must not be emitted before purge settles')
   removes=removes+1
@@ -207,9 +216,9 @@ require('tests.support.typing_delivery_fixture')(function(dashboard,context,_,er
  assert(removes==0 and #evaluations==2)
  evaluations[2].done(true,nil)
  -- One reset unlinks the snapshot and any partial save, then, once both are gone,
- -- Ergopti Studio's saved read of the same store (326035f5da)
- assert(removes==${success ? 3 : 2} and #evaluations==3)
- print('PURGE='..json.encode({ack=evaluations[2].code,terminal=evaluations[3].code,removes=removes,errors=#errors}))
+ -- retires the Studio read
+ assert(removes==2 and #evaluations==3)
+ print('PURGE='..json.encode({ack=evaluations[2].code,terminal=evaluations[3].code,removes=removes,retires=#context.studio_retired,errors=#errors}))
 end)
 `
 	});

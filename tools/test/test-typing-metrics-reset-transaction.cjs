@@ -397,10 +397,11 @@ for (const success of [true, false]) {
 		f.context.reset_filters();
 		const clear = f.context._lua_request;
 		const native = actualPurge(clear, success);
+		assert.equal(native.removes, 2, 'the snapshot and any partial save are unlinked');
 		assert.equal(
-			native.removes,
-			success ? 3 : 2,
-			'the snapshot and any partial save are unlinked, then the Studio read once both are gone'
+			native.retires,
+			success ? 1 : 0,
+			'the Studio read is retired once both are gone, and kept when they are not'
 		);
 		assert.equal(vm.runInContext(native.ack, f.context), true);
 		f.select('2026-09-04');
