@@ -33,6 +33,7 @@ const NOT_AUDITED_HERE = Object.freeze({
 	layout_editor: 'Studio page, scanned and walked by the site gates',
 	layout_analysis: 'Studio page, scanned and walked by the site gates',
 	layout_optimizer: 'Studio page, scanned and walked by the site gates',
+	layout_try: 'Studio page, scanned and walked by the site gates',
 	// The app's Studio window frames the same three pages under one host page.
 	layout_editor_window: 'Studio window, its pages are the Studio pages above'
 });
