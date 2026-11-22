@@ -172,7 +172,10 @@ FEATURES & RATIONALE:
 	.personal-grid {
 		display: grid;
 		gap: 16px;
-		grid-template-columns: repeat(2, 1fr);
+		/* minmax(0, …): at 200 % text the IBAN of the first card would widen
+		   its column past half the grid and push the second card past the
+		   section's edge, which clips it. */
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	.steps {
@@ -224,6 +227,13 @@ FEATURES & RATIONALE:
 
 	.rows .hs-desc {
 		margin-left: auto;
+	}
+
+	/* An expansion alone on its line wraps inside the card rather than
+	   passing its edge (the IBAN, the address, the e-mail at 200 % text). */
+	.rows .hs-out {
+		overflow-wrap: anywhere;
+		white-space: normal;
 	}
 
 	.card-lead {
