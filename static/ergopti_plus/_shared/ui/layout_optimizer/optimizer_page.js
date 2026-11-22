@@ -2772,14 +2772,23 @@
 			$('lo-open-comparer').addEventListener('click', openComparer);
 			$('lo-chart-svg').addEventListener('pointermove', chartHover);
 			$('lo-chart-svg').addEventListener('pointerleave', chartLeave);
+			// The boards are redrawn on the next frame, never inside the observer:
+			// a redraw changes the page's height, so the page opened on its own
+			// (the app's Ergopti+ window) raised « ResizeObserver loop completed
+			// with undelivered notifications ».
 			if (typeof ResizeObserver === 'function') {
-				let width = root.clientWidth;
+				let drawnWidth = root.clientWidth;
+				let frame = 0;
 				new ResizeObserver(() => {
-					if (root.clientWidth === width) return;
-					width = root.clientWidth;
-					drawPinBoards();
-					drawResultBoards();
-					if (state.chart) drawChart();
+					const width = root.clientWidth;
+					cancelAnimationFrame(frame);
+					frame = requestAnimationFrame(() => {
+						if (width === drawnWidth) return;
+						drawnWidth = width;
+						drawPinBoards();
+						drawResultBoards();
+						if (state.chart) drawChart();
+					});
 				}).observe(root);
 			}
 		}

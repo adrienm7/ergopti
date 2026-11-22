@@ -93,6 +93,17 @@ async function open(browser, origin, how) {
 	const page = await context.newPage();
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
+	// A ResizeObserver loop is an error event with no exception behind it, so
+	// Playwright's pageerror never sees it: the page says it on the console.
+	await page.addInitScript(() => {
+		window.addEventListener('error', (event) => {
+			if (!event.error) console.error(`window error: ${event.message}`);
+		});
+	});
+	page.on('console', (message) => {
+		if (message.type() === 'error' && message.text().startsWith('window error: '))
+			errors.push(message.text());
+	});
 	page.on('request', (request) => {
 		if (!request.url().startsWith(origin + '/') && !request.url().startsWith('blob:'))
 			errors.push(`unexpected request: ${request.url()}`);
@@ -770,6 +781,31 @@ async function exerciseKeyboard(browser, origin) {
 	await context.close();
 }
 
+/**
+ * The page opened on its own (the app's Ergopti+ window) and resized: the
+ * boards and the chart are redrawn on the next frame, never inside the
+ * ResizeObserver, which raised « ResizeObserver loop completed with
+ * undelivered notifications » until 2026-11-22.
+ */
+async function exerciseResize(browser, origin) {
+	const { page, errors, context } = await open(browser, origin);
+	await shortBudget(page);
+	assert.match(await runToEnd(page), /^Done/);
+	const nextFrames = () =>
+		page.evaluate(
+			() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		);
+	const boards = () => page.locator('#lo-result-board .lo-key').count();
+	assert.ok((await boards()) > 0, 'the result board is drawn before the resize');
+	for (const width of [1100, 900, 720, 560, 420, 375, 1280]) {
+		await page.setViewportSize({ width, height: 900 });
+		await nextFrames();
+	}
+	assert.ok((await boards()) > 0, 'the result board is drawn again after the resize');
+	assert.deepEqual(errors, [], 'resizing the page raises no error');
+	await context.close();
+}
+
 async function main() {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -1324,6 +1360,9 @@ async function main() {
 		// ======= 4i/ The keyboard: tabs, boards and the live score =======
 		await exerciseKeyboard(browser, origin);
 
+		// ======= 4j/ Resized on its own, no ResizeObserver loop =======
+		await exerciseResize(browser, origin);
+
 		// ======= 5/ Light and dark at phone width, every locale =======
 		for (const colorScheme of ['light', 'dark']) {
 			const { page, errors, context } = await open(browser, origin, {
@@ -1376,7 +1415,8 @@ module.exports = {
 	exerciseProgressChart,
 	exerciseThumbKeys,
 	exerciseResultsShelf,
-	exerciseResultTable
+	exerciseResultTable,
+	exerciseResize
 };
 
 if (require.main === module)
