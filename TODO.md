@@ -658,6 +658,30 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       11.9 MB over 577 included files, of which the functions no production code names are about 46 KB, so dead code
       is no lever, and `vendor/UIA.ahk` is about 70 ms; config.toml is decoded twice by design (the private shadow);
       the menu manifest is needed whole before the tray.
+      Done 22 November (bench configuration with hotstrings and the AI on and three 37 KB personal files; PC heavily
+      loaded by other agents, so whole-boot wall times moved with load; main-thread cycles from QueryThreadCycleTime,
+      3 interleaved rounds of one warm-up and 3 boots per variant, medians of 9): the logger redacted each line with
+      `Redact_Apply`, which resolved the rules and the context again for every line (the 17 shipped names lower-cased
+      twice, each folder spelling, a bound callback per pass) and rebuilt the line once per pass: about 1.1 ms a
+      line, 315-350 ms for a boot's 280 lines in a QPC harness, felt as one 200-300 ms main-thread stall wherever the
+      first 500 ms flush timer fell (the Ergopti layout read, `platform/remap.ahk` or `MagicEditorStart` in turn:
+      'layout and remaps' read 485-590 ms instead of 220-270). A flush now prepares the passes once
+      (`Redact_Prepare`, `Redact_ApplyPrepared`) and skips a pass whose needle the text lacks with one native search:
+      the same 280 lines in 24-45 ms with byte-identical output; 'layout and remaps' 1871 to 1179 Mcycles, the tray
+      stage 968 to 687, the stages' sum 6423 to 5258 and a boot's logger flushes 3709 to 1967 Mcycles
+      (`test_native_write.ahk` counts one preparation per batch). Full startup smoke, 2 interleaved runs per variant:
+      green both ways, the first deferred menu build of a fixture boot at 11.5 s median before and 10.2 s after
+      (32 fixture boots each, same load). macOS and Linux redact each line through the shared Lua module, which
+      folded the line to lower case and rebuilt it once per pass and resolved the home-relative configuration folder
+      again per line: an unmatched line now costs one fold and no rebuild (`redact_work.lua`), the 280 lines in
+      47-59 ms instead of 104-219 ms under Lua 5.4, the 43 shared vectors unchanged. Measured and left: the script
+      parse is linear in code volume (synthetic 5, 10 and 20 MB scripts validate in 1.0, 1.8 and 3.8 s CPU, about
+      0.18 ms per KB; the entry's `/validate` 1.45-1.97 s); the two `.keylayout` parses take about 130 ms together in
+      a QPC harness, 5 ms of it the tag scan and the rest interpreter cost per tag and attribute (a split-based
+      attribute reader measured no gain); each additional personal hotstring file costs a full `TOML_ParseDocument`
+      at discovery (60-120 ms for 37 KB, kept for the menu's metadata questions) and 140 ms of registration in
+      `LoadExtTomlFile` (about 0.5 ms a row); the boot full save just after the ready line (`_SaveFullConfigDeferred`)
+      holds the main thread about 990 Mcycles, measured once.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.
