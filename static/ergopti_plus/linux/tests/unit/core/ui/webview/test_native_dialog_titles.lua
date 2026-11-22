@@ -482,8 +482,9 @@ h.describe("native application picker record admission", function()
 			os.remove(prefix); os.remove(selected)
 			assert(Shell.run("rmdir -- " .. Shell.quote(applications) .. " " .. Shell.quote(directory)))
 			if not ok then error(receipt, 0) end
-			h.assert_eq(receipt, "refused|modal:1",
-				"an unsupported desktop-file id must be refused, never turned into another installed app")
+			-- The second modal is the error dialog that says nothing was bound (PCK-09).
+			h.assert_eq(receipt, "refused|modal:2",
+				"an unsupported desktop-file id must be refused and said, never turned into another installed app")
 		end)
 	end
 end)
