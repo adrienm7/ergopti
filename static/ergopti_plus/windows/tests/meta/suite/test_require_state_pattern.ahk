@@ -48,11 +48,11 @@
 ; keystroke, was among the files flagged.
 ;
 ; So this stays a ratchet, and the value is drift: a NEW module that introduces
-; injected state without a guard raises the count and fails here, at which point
-; a human decides whether it is a real violation or another cache. Do not
-; "fix" the existing entries by bolting guards onto them.
+; injected state without a guard is not in the named drift ledger and fails
+; here, at which point a human decides whether it is a real violation or another
+; cache. Do not "fix" the existing entries by bolting guards onto them.
 ;
-; NEVER raise the baseline to make a change pass.
+; NEVER add a drift entry to make a change pass.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -100,7 +100,31 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 ; predicate. See the module header: this is a drift baseline, not a defect count.
 ; Lowered to 25 on 2026-11-12 once a duplicate-start rejection counted as a
 ; guard (diagnostics/engine/field_run/field_run.ahk already rejected one).
-_REQUIRE_STATE_BASELINE := 25
+; Named on 2026-11-22: the drift is the list in require_state_drift.txt beside
+; this file, which only shrinks. A new unguarded file fails, and so does a line
+; that is guarded, allowlisted or gone, where the count let one pay for the
+; other. The paths live in a data file so this source does not pin them.
+
+/**
+ * Reads the admitted drift from require_state_drift.txt beside this file: one
+ * driver path per line, "#" lines are comments.
+ * @returns {Map} Path to true.
+ */
+_MetaRequireStateDrift() {
+	SplitPath(A_LineFile, , &OwnDir)
+	Drift := Map()
+	for Line in StrSplit(FileRead(OwnDir . "\require_state_drift.txt", "UTF-8"), "`n", "`r") {
+		Line := Trim(Line)
+		if Line == "" || SubStr(Line, 1, 1) == "#"
+			continue
+		if Drift.Has(Line)
+			throw Error("require_state_drift.txt lists " . Line . " twice")
+		Drift[Line] := true
+	}
+	if !Drift.Count
+		throw Error("require_state_drift.txt admits nothing; delete the file and its reader instead")
+	return Drift
+}
 
 _MetaListAhkFilesGuardV2(Dir) {
 	Files := []
@@ -144,7 +168,8 @@ _MetaRequireStateHasGuard(Body) {
 }
 
 _MetaGuardRatchet() {
-	global _REQUIRE_STATE_ALLOWLIST, _REQUIRE_STATE_BASELINE
+	global _REQUIRE_STATE_ALLOWLIST
+	Drift := _MetaRequireStateDrift()
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Violations := []
@@ -182,18 +207,21 @@ _MetaGuardRatchet() {
 		}
 	}
 
-	Offenders := ""
-	for Rel in Violations
-		Offenders .= (Offenders == "" ? "" : ", ") . Rel
-
 	; Non-vacuity floor. The original scan saw THREE files and could not
 	; fail; anything in this range proves it is still reaching the whole
 	; driver. Set below the current 59 so excluding a few more constants
 	; from the predicate does not trip it.
 	Assert(ScannedCount >= 50,
 		"the guard scan must reach the whole driver (only " . ScannedCount . " files with module-level state seen) — it previously scanned 3 and was therefore incapable of failing")
-	Assert(Violations.Length <= _REQUIRE_STATE_BASELINE,
-		"files with unguarded module-level state rose to " . Violations.Length . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
+	Unguarded := Map()
+	for Rel in Violations {
+		Unguarded[Rel] := true
+		Assert(Drift.Has(Rel),
+			Rel . " holds unguarded module-level state and is not in require_state_drift.txt. This is a DRIFT signal, not a proven defect: check whether it holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not add it to the drift ledger.")
+	}
+	for Rel in Drift
+		Assert(Unguarded.Has(Rel),
+			Rel . " no longer holds unguarded module-level state (guarded, allowlisted, moved or gone); remove it from require_state_drift.txt.")
 }
 Test("meta require_state: module-level state without an init guard does not increase", _MetaGuardRatchet)
 
