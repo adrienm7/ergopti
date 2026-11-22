@@ -673,3 +673,51 @@ _SMB_FramePendingWalksFollowForeignCalls() {
 }
 Test("personal DATA frame: pending receipts are walked after foreign calls only and mutations stay refused (frame-pending-walk)",
 	_SMB_FramePendingWalksFollowForeignCalls)
+
+; An absent registry stages nothing, so it takes and walks no deep receipt of the
+; earlier pending leaves: doing so was about 220 million cycles of every Shortcuts
+; menu build at startup. A provider that rewrites one of their entries is still refused.
+_SMB_FramePendingCaptureCount() {
+	return _PerfCountersOwner().Counts.Get("menu.frame_pending_capture", 0)
+}
+
+_SMB_FrameAbsentRegistryTakesNoReceipt() {
+	global _MenuPopulationBuilding
+	Previous := _MenuPopulationBuilding
+	Owner := MenuPopulation(), Native := Menu(), Foreign := Menu()
+	Action := (*) => 0
+	ForeignRows := [Map("label", "Earlier seeded", "action", Action), Map("label", "Earlier pending", "action", Action)]
+	Data := [Map("label", "Frame seeded", "action", Action), Map("label", "Frame pending", "action", Action)]
+	try {
+		_MenuPopulationBuilding := Owner
+		Owner.Fill(Foreign, ForeignRows, "personal_shortcuts_frame", 2)
+		Binding := Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
+			"provider", () => 0)
+		Walks := _SMB_FramePendingWalkCounts(), Captures := _SMB_FramePendingCaptureCount()
+		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted))
+		AssertTrue(Admitted, "an absent registry is a deliberate skip")
+		AssertEqual(Captures, _SMB_FramePendingCaptureCount(), "an absent registry takes no pending receipt")
+		Now := _SMB_FramePendingWalkCounts()
+		AssertEqual(Walks[1], Now[1], "an absent registry walks no pending receipt")
+		AssertEqual(Walks[2], Now[2], "an absent registry has no walk to skip")
+		AssertEqual(0, TrayMenuItemCount(Native))
+		Entry := Owner.Pending[Foreign.Handle]
+		Binding["provider"] := () => (Entry.NextRow := 2, 0)
+		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
+			"a pending entry rewritten by a provider with no rows is refused")
+		AssertFalse(Admitted)
+		Entry.NextRow := 1
+		Binding["provider"] := () => Data
+		Captures := _SMB_FramePendingCaptureCount()
+		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding))
+		AssertEqual(Captures + 1, _SMB_FramePendingCaptureCount(), "rows to stage take the receipts once")
+	} finally {
+		Owner.Stop()
+		Owner.Pending.Clear()
+		_MenuPopulationBuilding := Previous
+		_CTC_ReleaseMenu(Native)
+		_CTC_ReleaseMenu(Foreign)
+	}
+}
+Test("personal DATA frame: an absent registry takes and walks no pending receipt (empty-frame-receipts)",
+	_SMB_FrameAbsentRegistryTakesNoReceipt)

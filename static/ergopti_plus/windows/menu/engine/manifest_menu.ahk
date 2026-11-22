@@ -3194,6 +3194,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 	static CaptionVectorOwner := _MR_CaptionVectorMetadata, CountPolicyOwner := _MR_TranslatedCountPolicy
 	static CaptionFormatOwner := _MR_CaptionFormat, DialectOwner := _MR_ReportDriverDialect
 	static PendingCaptureOwner := _MR_FramePendingSnapshot, PendingCurrentOwner := _MR_FramePendingCurrent
+	static PendingImageOwner := _MR_FramePendingImage, PendingImageCurrentOwner := _MR_FramePendingImageCurrent
 	static ReceiptCallbacksOwner := _MR_FrameReceiptCallablesCurrent, ReceiptAdmissionOwner := _MR_FrameReceiptAdmitted
 	static NativeHandleGetter := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get
 	static NativeMethods := Map()
@@ -3203,6 +3204,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 	}
 	Admitted := false
 	Child := false, ChildHandle := 0, LeafCallbacks := [], Published := false, Population := false, Pending := false, PendingEntry := false
+	PendingImage := false, PendingReceipt := false
 	PrimaryError := false
 	; The deferred-leaf receipts of EARLIER menus hold every pending row built so far, and
 	; re-walking them cost about 32 ms per check, 32 checks per frame (1.0 s of a 14 s boot,
@@ -3211,7 +3213,19 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 	; one, or when the staged child or its pending entry changed. The native readers
 	; (DestinationOwner) are the genuine owners that OwnersLive re-verifies on every
 	; check and only read native state, so they are not counted.
+	; The deep receipts guard what this frame stages into the population, so they are
+	; taken once the provider has returned rows to stage: an absent registry (the default
+	; personal file) stages nothing, and capturing then walking 46 pending entries twice
+	; for it made the personal row about 310 million cycles (150 ms) of every Shortcuts
+	; menu build, 90 million without (startup smoke, 2026-11-22). Until then the
+	; entries' identities and own fields, compared on every check, refuse a provider
+	; that adds, withdraws or rewrites one.
+	; The capture is the current image, so its own key needs no walk.
 	Guard := { Foreign: 0, PendingKey: "" }
+	PendingKeyNow() {
+		return Guard.Foreign . ":" . (Child is Menu ? ObjPtr(Child) : 0)
+			. ":" . (IsObject(PendingEntry) ? ObjPtr(PendingEntry) : 0)
+	}
 	RegistryOwners := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
 		_MenuDispatchLastFire, _MenuDispatchClickSequences]
 	DispatcherEpoch := _MenuDispatcherEpoch
@@ -3234,6 +3248,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 			[CaptionVectorOwner, _MR_CaptionVectorMetadata], [CountPolicyOwner, _MR_TranslatedCountPolicy],
 			[CaptionFormatOwner, _MR_CaptionFormat], [DialectOwner, _MR_ReportDriverDialect],
 			[PendingCaptureOwner, _MR_FramePendingSnapshot], [PendingCurrentOwner, _MR_FramePendingCurrent],
+			[PendingImageOwner, _MR_FramePendingImage], [PendingImageCurrentOwner, _MR_FramePendingImageCurrent],
 			[ReceiptCallbacksOwner, _MR_FrameReceiptCallablesCurrent], [ReceiptAdmissionOwner, _MR_FrameReceiptAdmitted],
 			[PublishOwner, _MR_FramePublish], [StageOwner, _MR_FrameStageAdmitted]]
 		for Pair in Pairs {
@@ -3327,8 +3342,8 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 			if !PendingDesc.HasOwnProp("Value")
 				return 0
 			Pending := PendingDesc.Value
-			PendingReceipt := PendingCaptureOwner.Call(Pending)
-			if !PendingReceipt || !(Pending is Map)
+			PendingImage := PendingImageOwner.Call(Pending)
+			if !PendingImage
 				return 0
 			FillOwner := Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill").Call
 			if Object.Prototype.HasOwnProp.Call(FillOwner, "Call")
@@ -3378,8 +3393,10 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 				NowPending := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending")
 				if !NowPending.HasOwnProp("Value") || NowPending.Value != Pending
 					return false
-				PendingKey := Guard.Foreign . ":" . (Child is Menu ? ObjPtr(Child) : 0)
-					. ":" . (IsObject(PendingEntry) ? ObjPtr(PendingEntry) : 0)
+				; Before the first rows to stage, the entries' own fields stand for the receipts.
+				if !PendingReceipt
+					return PendingImageCurrentOwner.Call(PendingImage, Child, PendingEntry) && OwnersLive()
+				PendingKey := PendingKeyNow()
 				if PendingKey != Guard.PendingKey {
 					PerfCount("menu.frame_pending_walk")
 					_perfWalk := PerfStage_Begin()
@@ -3407,6 +3424,13 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 		if Type(Data) == "Integer" && Data == 0 {
 			Admitted := true
 			return 0
+		}
+		if Population is MenuPopulation {
+			PerfCount("menu.frame_pending_capture")
+			PendingReceipt := PendingCaptureOwner.Call(Pending)
+			if !PendingReceipt
+				return 0
+			Guard.PendingKey := PendingKeyNow()
 		}
 		if !LeafOwner.Call(Data) || !DestinationLive()
 			return 0
@@ -3673,8 +3697,9 @@ _MR_FramePendingOwnEntry(Pending, Child, KnownHandle := unset) {
 	return OwnerDesc.HasOwnProp("Value") && OwnerDesc.Value == Child ? Entry : false
 }
 
-; Previous deferred entries are raw finite state, not opaque Object identities.
-_MR_FramePendingSnapshot(Pending) {
+; Previous deferred entries are raw finite state, not opaque Object identities: the
+; image holds each entry's identity and own field values, without their nested rows.
+_MR_FramePendingImage(Pending) {
 	if !(Pending is Map) || ObjGetBase(Pending) != Map.Prototype
 		return false
 	for Name in ObjOwnProps(Pending)
@@ -3690,15 +3715,28 @@ _MR_FramePendingSnapshot(Pending) {
 				return false
 			Fields[Name] := Desc.Value
 		}
-		Receipt := _MR_ReasonedGroupSnapshot(Fields)
-		if !Receipt || !_MR_FrameReceiptCallablesCurrent(Receipt)
-			return false
-		Entries[Handle] := Map("entry", Entry, "fields", Fields, "receipt", Receipt)
+		Entries[Handle] := Map("entry", Entry, "fields", Fields)
 	}
 	return Map("pending", Pending, "entries", Entries)
 }
 
-_MR_FramePendingCurrent(Capture, Child, NewEntry) {
+; The image plus a deep receipt of every entry's fields, nested rows included.
+_MR_FramePendingSnapshot(Pending) {
+	Capture := _MR_FramePendingImage(Pending)
+	if !Capture
+		return false
+	for Handle, Held in Capture["entries"] {
+		Receipt := _MR_ReasonedGroupSnapshot(Held["fields"])
+		if !Receipt || !_MR_FrameReceiptCallablesCurrent(Receipt)
+			return false
+		Held["receipt"] := Receipt
+	}
+	return Capture
+}
+
+; Whether the pending entries are still the imaged ones with the same own fields,
+; plus at most this frame's own new entry.
+_MR_FramePendingImageCurrent(Capture, Child, NewEntry) {
 	Pending := Capture["pending"], Entries := Capture["entries"]
 	if ObjGetBase(Pending) != Map.Prototype
 		return false
@@ -3720,13 +3758,23 @@ _MR_FramePendingCurrent(Capture, Child, NewEntry) {
 				|| Type(Desc.Value) != Type(Fields[Name]) || Desc.Value != Fields[Name]
 				return false
 		}
-		if Count != Fields.Count || !_MR_ReasonedGroupCurrent(Held["receipt"])
-			|| !_MR_FrameReceiptCallablesCurrent(Held["receipt"])
+		if Count != Fields.Count
 			return false
 	}
 	if NewEntry && (!(Child is Menu) || Entries.Has(Child.Handle)
 		|| _MR_FramePendingOwnEntry(Pending, Child) != NewEntry)
 		return false
+	return true
+}
+
+; The image check, then every entry's deep receipt.
+_MR_FramePendingCurrent(Capture, Child, NewEntry) {
+	if !_MR_FramePendingImageCurrent(Capture, Child, NewEntry)
+		return false
+	for Handle, Held in Capture["entries"] {
+		if !_MR_ReasonedGroupCurrent(Held["receipt"]) || !_MR_FrameReceiptCallablesCurrent(Held["receipt"])
+			return false
+	}
 	return true
 }
 
