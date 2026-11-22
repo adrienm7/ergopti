@@ -641,12 +641,15 @@ _CUK_CleanupWindowTakesFocus() {
 	PreviousCurrent := ConfigCleanupWindow.Current
 	ConfigCleanupWindow.Current := 0
 	WebViewHost.Prototype.DefineProp("_Build", {Call: _CUK_CaptureOptsBuild})
+	; The suite has no WebView2: the shared admission is admitted for this build.
+	WebView_UnavailableReason.DefineProp("Call", {Call: (*) => ""})
 	try {
 		ConfigCleanupWindow.Open("unused-by-pck-11.toml")
 		AssertTrue(IsObject(_CUK_CapturedOpts), "the cleanup window is built with its options")
 		AssertFalse(_CUK_CapturedOpts.Get("NoActivate", false),
 			"pck-11: a window the user opens from the menu takes the keyboard, as on macOS and Linux")
 	} finally {
+		WebView_UnavailableReason.DeleteProp("Call")
 		WebViewHost.Prototype.DefineProp("_Build", PreviousBuild)
 		ConfigCleanupWindow.Current := PreviousCurrent
 	}
