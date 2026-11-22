@@ -195,7 +195,7 @@ helpers.describe("extensions: scanning finds packs and names them", function()
 			["/user"] = { "/user/demo", "/user/broken", "/user/healthy" },
 		}, {
 			["/user/demo/manifest.toml"] = "[extension\nname = ",
-			["/user/broken/manifest.toml"] = "[extension.magic_key]\nkey = 3\n",
+			["/user/broken/manifest.toml"] = "[extension.hotstring_bindings.words]\ncategory = 3\n",
 		})
 		local strict = pcall(Extensions.scan, { "/bundled", "/user" }, io_fns)
 		helpers.assert_eq(false, strict, "without on_error a broken pack still refuses the whole scan")
