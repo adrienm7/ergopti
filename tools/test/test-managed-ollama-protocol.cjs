@@ -450,7 +450,7 @@ const cases = [
 	['tools/test/managed_ollama_runtime_policy_test.py', 7],
 	['tools/test/managed_ollama_pull_test.py', 10],
 	// OLL-04 and OLL-05: the free-space rule and failure evidence; fakes only.
-	['tools/test/macos_managed_ollama_install_errors_test.py', 8]
+	['tools/test/macos_managed_ollama_install_errors_test.py', 9]
 ];
 if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
