@@ -493,7 +493,7 @@
 		},
 		{
 			"id": "js-0546",
-			"ordinal": 714,
+			"ordinal": 713,
 			"name": "typing dashboard cards each say what they count (help text, WCAG 3.3.5)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-cards-explained.cjs"],
@@ -501,7 +501,7 @@
 		},
 		{
 			"id": "metrics-number-locale",
-			"ordinal": 715,
+			"ordinal": 714,
 			"name": "metrics pages format every number in the interface language (MET-07)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-number-locale.cjs"],
@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "metrics-view-states",
-			"ordinal": 719,
+			"ordinal": 718,
 			"name": "metrics dashboards show their empty, error and value states (MET-13, MET-14, MET-16)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-view-states.cjs"],

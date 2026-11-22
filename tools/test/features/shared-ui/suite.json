@@ -544,7 +544,7 @@
 		},
 		{
 			"id": "layout-jis-abnt",
-			"ordinal": 690,
+			"ordinal": 689,
 			"name": "the JIS and ABNT keyboards: their boards in the editor and the analysis engine, and their keys through the .keylayout, KLC, XKB and keyboard DLL round trips, with Microsoft's own JIS and ABNT layouts read where present",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-jis-abnt.cjs"],
@@ -552,7 +552,7 @@
 		},
 		{
 			"id": "app-colour-contrast",
-			"ordinal": 691,
+			"ordinal": 690,
 			"name": "Studio heatmap keys keep a visible edge, finger hues stay told apart and readable, metrics muted text reads at 4.5:1, in both themes",
 			"cmd": "node",
 			"args": ["tools/test/test-app-colour-contrast.cjs"],
@@ -560,7 +560,7 @@
 		},
 		{
 			"id": "ergopti-plus-languages",
-			"ordinal": 692,
+			"ordinal": 691,
 			"name": "Ergopti+ sections written only in French say so under the English page and every t() key has its English entry",
 			"cmd": "node",
 			"args": ["tools/test/test-ergopti-plus-languages.cjs"],
@@ -568,7 +568,7 @@
 		},
 		{
 			"id": "keyboard-walk",
-			"ordinal": 695,
+			"ordinal": 694,
 			"name": "the Studio keyboard walk refuses a trap, a repeated or hidden stop, a positive tabindex, a jump back up the page and a Shift+Tab order that differs",
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-walk.cjs"],
@@ -576,7 +576,7 @@
 		},
 		{
 			"id": "key-shape",
-			"ordinal": 697,
+			"ordinal": 696,
 			"name": "the Studio board draws the ISO Enter as one L-shaped path, its lower row from bottom_col, and no other key as an L",
 			"cmd": "node",
 			"args": ["tools/test/test-key-shape.cjs"],
@@ -584,7 +584,7 @@
 		},
 		{
 			"id": "heat-scale",
-			"ordinal": 698,
+			"ordinal": 697,
 			"name": "the Studio's heat figures read one blue-to-red scale, readable with its ink on every point in both themes, with key edges and legends",
 			"cmd": "node",
 			"args": ["tools/test/test-heat-scale.cjs"],
@@ -592,7 +592,7 @@
 		},
 		{
 			"id": "app-windows-accessibility-ratchet",
-			"ordinal": 699,
+			"ordinal": 698,
 			"name": "the app windows accessibility ratchet refuses new violations and walk problems, its baseline is well formed, every window page is audited and each fixture posts to its page's bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-app-windows-accessibility-ratchet.cjs"],
@@ -600,7 +600,7 @@
 		},
 		{
 			"id": "site-languages",
-			"ordinal": 702,
+			"ordinal": 701,
 			"name": "English passages in the French site say lang=\"en\", the French site chrome says lang=\"fr\" under the English Ergopti+ page, and a new unmarked one is refused",
 			"cmd": "node",
 			"args": ["tools/test/test-site-languages.cjs"],
@@ -608,7 +608,7 @@
 		},
 		{
 			"id": "site-video-captions",
-			"ordinal": 704,
+			"ordinal": 703,
 			"name": "every video and embedded player of the site has a WebVTT captions track whose file exists and a transcript, and the checker refuses each missing part",
 			"cmd": "node",
 			"args": ["tools/test/test-site-video-captions.cjs"],
@@ -616,7 +616,7 @@
 		},
 		{
 			"id": "heading-landmarks",
-			"ordinal": 705,
+			"ordinal": 704,
 			"name": "the Studio and app window outline check refuses no h1 or two, a skipped heading level, no main or two, an unnamed landmark and two landmarks under one name",
 			"cmd": "node",
 			"args": ["tools/test/test-heading-landmarks.cjs"],
@@ -624,7 +624,7 @@
 		},
 		{
 			"id": "site-semantic-html",
-			"ordinal": 707,
+			"ordinal": 706,
 			"name": "every div and span of the site is justified in the reviewed allowlist with its exact count, none is interactive, and no Svelte accessibility warning is left",
 			"cmd": "node",
 			"args": ["tools/test/test-site-semantic-html.cjs"],
@@ -632,7 +632,7 @@
 		},
 		{
 			"id": "site-image-alternatives",
-			"ordinal": 708,
+			"ordinal": 707,
 			"name": "every img of the site has an alt, every inline svg and icon glyph is hidden or a named image, and the checker refuses each missing one",
 			"cmd": "node",
 			"args": ["tools/test/test-site-image-alternatives.cjs"],
@@ -640,7 +640,7 @@
 		},
 		{
 			"id": "keyboard-operability",
-			"ordinal": 709,
+			"ordinal": 708,
 			"name": "the keyboard operability judgement refuses every control only a mouse can use and every disclosure, popup or composite widget the keys do not drive, and the site and app window gates call it",
 			"cmd": "node",
 			"args": ["tools/test/test-keyboard-operability.cjs"],
@@ -648,7 +648,7 @@
 		},
 		{
 			"id": "studio-semantic-html",
-			"ordinal": 710,
+			"ordinal": 709,
 			"name": "every div and span of the Studio pages, in their HTML and in the DOM their scripts build, is justified in the Studio list, and none has a pointer handler, an interactive or computed role or a tabindex",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-semantic-html.cjs"],
@@ -656,7 +656,7 @@
 		},
 		{
 			"id": "studio-reading-preferences",
-			"ordinal": 712,
+			"ordinal": 711,
 			"name": "every Studio page, on the site and in the app's windows, loads the shared reading preferences right after the theme, and the theme styles each of them",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-reading-preferences.cjs"],
@@ -664,7 +664,7 @@
 		},
 		{
 			"id": "page-images",
-			"ordinal": 713,
+			"ordinal": 712,
 			"name": "the rendered page image check refuses an img without alt, a shown svg neither hidden nor named and a nameless role=img element",
 			"cmd": "node",
 			"args": ["tools/test/test-page-images.cjs"],
@@ -672,7 +672,7 @@
 		},
 		{
 			"id": "app-windows-semantic-markup",
-			"ordinal": 716,
+			"ordinal": 715,
 			"name": "the app windows write no div or span without a listed reason, no div or span acts as a control, and every img and svg has a text alternative or is hidden",
 			"cmd": "node",
 			"args": ["tools/test/test-app-windows-semantic-markup.cjs"],
@@ -680,7 +680,7 @@
 		},
 		{
 			"id": "reading-preferences-seed",
-			"ordinal": 717,
+			"ordinal": 716,
 			"name": "the reader's font and spacing are features with a11y_prefs.js's values, offered in the Configuration menu on the three drivers, and every app window's host seeds them",
 			"cmd": "node",
 			"args": ["tools/test/test-reading-preferences-seed.cjs"],
@@ -688,7 +688,7 @@
 		},
 		{
 			"id": "layout-editor-levels",
-			"ordinal": 718,
+			"ordinal": 717,
 			"name": "Neo 2's Mod3 and Mod4 levels and their held keys go through the layout editor's TOML save and reload, its exports name what they leave out, and the drivers' emulation lists the keys it cannot hold",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-editor-levels.cjs"],
@@ -696,7 +696,7 @@
 		},
 		{
 			"id": "page-direction",
-			"ordinal": 720,
+			"ordinal": 721,
 			"name": "every app window sets its root lang and dir from the locale, so Arabic and Hebrew lay out right to left, and no window rule names a physical left or right",
 			"cmd": "node",
 			"args": ["tools/test/test-page-direction.cjs"],
@@ -704,7 +704,7 @@
 		},
 		{
 			"id": "webview-host-pause-census",
-			"ordinal": 721,
+			"ordinal": 722,
 			"name": "every Windows window built on WebViewHost is placed in the pause census, and each configuration window among them answers its page while the driver is paused",
 			"cmd": "node",
 			"args": ["tools/test/test-webview-host-pause-census.cjs"],
@@ -712,7 +712,7 @@
 		},
 		{
 			"id": "studio-edit-history",
-			"ordinal": 722,
+			"ordinal": 723,
 			"name": "Ergopti Studio's undo history walks its named steps in order, a new edit after an undo clears Redo, it keeps the registry's number of steps, fails fast on an inconsistent use, answers Ctrl or Cmd with Z, Y and Shift+Z outside text fields, and names its steps in all 21 locales",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-edit-history.cjs"],
@@ -720,7 +720,7 @@
 		},
 		{
 			"id": "studio-try",
-			"ordinal": 723,
+			"ordinal": 724,
 			"name": "Ergopti Studio's « Essayer » tab types a library layout's levels and dead keys, takes ?layout= and the former page's anchors, is listed by the Studio and the Disposition Ergopti, receives the redirect of /ergopti/utilisation, and names its strings in all 21 locales",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-try.cjs"],

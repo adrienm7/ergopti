@@ -685,7 +685,7 @@
 		},
 		{
 			"id": "update-asset-signature",
-			"ordinal": 693,
+			"ordinal": 692,
 			"name": "update asset signatures sign and verify the canonical record, refuse enforcement without a key and reach both release lanes with the signing secret",
 			"cmd": "node",
 			"args": ["tools/test/test-update-asset-signature.cjs"],
@@ -693,7 +693,7 @@
 		},
 		{
 			"id": "linux-appimage-container-path",
-			"ordinal": 701,
+			"ordinal": 700,
 			"name": "the oldest-LTS AppImage container fronts the runner's node executable alone on its PATH, so no runner program is staged",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-appimage-container-path.cjs"],

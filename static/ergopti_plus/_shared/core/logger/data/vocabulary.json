@@ -76,6 +76,7 @@
 		"empty_selection",
 		"end_of_ladder",
 		"error",
+		"expired",
 		"explicit_assignment",
 		"failed",
 		"fetch_failed",
