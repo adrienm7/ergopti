@@ -891,9 +891,8 @@ catch as _EnvErr
 ; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
 ; call, which lands mid-config and buries its JSON parse inside a later, unrelated
 ; mark. The tray menu needs it within milliseconds anyway. Only the active locale
-; is parsed here; the EN/FR fallbacks (consulted solely on a missing key) are
-; warmed off the critical path by I18nWarmFallbacks() armed after "ready" — which
-; halves the boot i18n cost on a complete locale (one parse instead of two).
+; is parsed here; the EN/FR fallbacks are consulted solely on a missing key,
+; which a complete catalogue never has, so they load only on such a miss.
 BootProfile_StageBegin("i18n")
 I18nPreload()
 BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
@@ -1721,10 +1720,6 @@ if _LangMenuBuildPending
 ; request only after the initial root publishes, so the LLM timer cannot
 ; invalidate the boot generation and force a duplicate full submenu scan. The
 ; enabled path is still owned by asynchronous dependency readiness.
-; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
-; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
-; before this fires triggers a one-time lazy load inside t().
-SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
 ; Hotstrings and their preview index were completed before ready above. Do not arm a
 ; duplicate post-ready registration timer: even a no-op timer can contend with the
 ; first keystroke and must not define feature availability.

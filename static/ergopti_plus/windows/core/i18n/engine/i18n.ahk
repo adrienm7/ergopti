@@ -57,13 +57,6 @@ global I18N_LOCALES := LocaleTableData()
 ; selected locale triggers a script restart.
 global _I18nReloadDebounceMs := 150
 
-; Delay (ms) before warming the EN/FR fallback caches off the boot critical path.
-; Only the active locale is parsed eagerly at boot (the tray menu needs it); the
-; fallbacks — consulted solely when a key is missing from the active locale — are
-; warmed shortly after "ready" so they never cost the user boot latency. A miss
-; that arrives before this timer fires triggers a one-time lazy load inside t().
-global I18N_FALLBACK_WARM_DELAY_MS := 200
-
 ; Cached sorted locale list for the menu
 global _I18nSortedLocalesCache := false
 
@@ -180,27 +173,15 @@ I18nInit(Cache, LocaleProbe := 0) {
 ; Pre-load the ACTIVE locale cache on the boot path so the first t() call during
 ; menu construction never blocks on disk I/O. The EN/FR fallback caches are NOT
 ; loaded here — they are consulted only on a missing key, so warming them at boot
-; cost the user a second JSON parse for nothing on a complete locale. They are
-; warmed instead by I18nWarmFallbacks() off the critical path (or lazily on the
-; first miss inside t()). Must be called after I18nInit().
+; cost the user a second JSON parse for nothing on a complete locale. They load
+; lazily on the first miss inside t(), which a complete catalogue never has (see
+; I18nProbe). Must be called after I18nInit().
 I18nPreload() {
 	global _I18nCache
 	try LoggerTrace("i18n", "Preloading active locale cache…")
 	_I18nEnsureActiveLoaded()
 	try LoggerDone("i18n", "Active locale warm ({1} key(s)); fallbacks deferred off the boot path.",
 		_I18nCache.Count)
-}
-
-; Warm the EN/FR fallback caches off the boot critical path. Armed as a deferred
-; SetTimer after "ready" so a later missing-key lookup is a cheap map hit rather
-; than a synchronous JSON parse mid-interaction. Idempotent.
-I18nWarmFallbacks() {
-	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
-	try LoggerTrace("i18n", "Warming fallback locale caches…")
-	_I18nEnsureFallbacksLoaded()
-	try LoggerDone("i18n", "Fallback caches warm ({1} EN, {2} FR).",
-		_I18nCacheEnLoaded ? _I18nCacheEn.Count : 0,
-		_I18nCacheFrLoaded ? _I18nCacheFr.Count : 0)
 }
 
 

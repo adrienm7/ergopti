@@ -50,8 +50,8 @@ global _I18nCacheEnLoaded := false
 global _I18nCacheFr := Map()
 global _I18nCacheFrLoaded := false
 
-; True once the EN/FR fallback caches have been warmed — eagerly by the deferred
-; I18nWarmFallbacks timer, or lazily on the first active-locale miss inside t().
+; True once the EN/FR fallback caches have been loaded, lazily on the first
+; active-locale miss inside t() or by a caller that needs the whole catalogue.
 ; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
 global _I18nFallbacksWarmed := false
 
@@ -430,8 +430,8 @@ I18nLookup(Key) {
 	; must resolve to the fallback, not to an empty string).
 	if _I18nCache.Has(Key) and _I18nCache[Key] != ""
 		return _I18nCache[Key]
-	; Miss in the active locale → consult the fallbacks. They are warmed off the
-	; boot path (I18nWarmFallbacks); if a miss arrives first, load them once now.
+	; Miss in the active locale → consult the fallbacks, loaded once at the first
+	; such miss: a complete catalogue never has one, so no timer warms them.
 	if !_I18nFallbacksWarmed
 		_I18nEnsureFallbacksLoaded()
 	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key) and _I18nCacheEn[Key] != ""
