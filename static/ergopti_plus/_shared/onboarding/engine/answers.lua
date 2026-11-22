@@ -115,7 +115,7 @@ function M.load(text, driver)
 			assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0,
 				"the onboarding catalogue gives the trigger character no length limit")
 			local validation = page.magic_key.validation
-			assert(validation == nil or validation == "magic_key",
+			assert(validation == nil or validation == "one_character",
 				"the onboarding catalogue declares an unsupported trigger validation")
 			claim(page.magic_key.path, { kind = "character", default = page.magic_key.default,
 				max_characters = limit, validation = validation })
@@ -196,7 +196,7 @@ local function refusal(entry, value)
 		return "the trigger character is at most " .. entry.max_characters .. " characters",
 			entry.validation and "dialog.magic_key.error_length" or nil
 	end
-	if entry.validation == "magic_key" then
+	if entry.validation == "one_character" then
 		local valid = require("layouts.engine.layers.terminators").validate_character(value)
 		if valid ~= true then
 			return "the trigger character is not one character", "dialog.magic_key.error_length"

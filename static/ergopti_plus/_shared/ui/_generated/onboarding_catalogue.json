@@ -6136,7 +6136,7 @@
 						"hint_key": "onboarding.magic_key.choose_freely",
 						"custom_label_key": "onboarding.magic_key.option_custom",
 						"max_characters": 1,
-						"validation": "magic_key",
+						"validation": "one_character",
 						"options": [
 							{
 								"value": "★",

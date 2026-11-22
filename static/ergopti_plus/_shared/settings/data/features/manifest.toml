@@ -4960,7 +4960,7 @@ path = "hotstrings.trigger_char"
 # « ù » on AZERTY and « ; » on QWERTY are the layout defaults). Linux's bridge
 # shows its refusals through the localized dialog keys (validation).
 platforms = ["ahk", "hs", "linux"]
-validation = { linux = "magic_key" }
+validation = { linux = "one_character" }
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"

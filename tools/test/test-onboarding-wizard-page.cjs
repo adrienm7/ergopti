@@ -1033,7 +1033,7 @@ function cataloguePaths(driver) {
 		['★', 'ù', ';'],
 		'Linux offers the AZERTY and QWERTY layout defaults like the other OS'
 	);
-	assert.equal(described.magic_key.validation, 'magic_key');
+	assert.equal(described.magic_key.validation, 'one_character');
 	assert.ok(
 		!operations.some((op) => op.path === 'hotstrings.trigger_char'),
 		'the default trigger is sparse until the user changes it'
@@ -1797,14 +1797,18 @@ function assertSeparated(row, where) {
 			described.magic_key.options.map((option) => option.value),
 			['★', 'ù', ';']
 		);
-		assert.equal(described.magic_key.validation, driver === 'linux' ? 'magic_key' : undefined);
+		assert.equal(described.magic_key.validation, driver === 'linux' ? 'one_character' : undefined);
 	}
 	for (const platforms of [[], ['unknown'], ['linux', 'linux'], 'linux']) {
 		const malformed = JSON.parse(JSON.stringify(choice));
 		malformed.options[0].platforms = platforms;
 		assert.throws(() => buildWith(malformed), /option platforms must be a nonempty known subset/);
 	}
-	for (const validation of ['magic_key', { linux: 'safe_magic_key' }, { hs: 'magic_key' }]) {
+	for (const validation of [
+		'one_character',
+		{ linux: 'safe_magic_key' },
+		{ hs: 'one_character' }
+	]) {
 		const malformed = JSON.parse(JSON.stringify(choice));
 		malformed.validation = validation;
 		assert.throws(() => buildWith(malformed), /validation|unsupported/);

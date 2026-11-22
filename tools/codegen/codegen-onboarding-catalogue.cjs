@@ -1291,7 +1291,7 @@ function magicKeyFor(id, page, platform, projection, labels) {
 		if (!isPlainObject(choice.validation))
 			throw new Error(`${choice.path} validation must be per platform`);
 		for (const [owner, policy] of Object.entries(choice.validation)) {
-			if (owner !== 'linux' || policy !== 'magic_key')
+			if (owner !== 'linux' || policy !== 'one_character')
 				throw new Error(`${choice.path} has an unsupported validation policy`);
 		}
 	}
