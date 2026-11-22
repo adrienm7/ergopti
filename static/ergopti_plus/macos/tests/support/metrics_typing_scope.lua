@@ -19,7 +19,7 @@ local OWNERS = {
 	"core.fs.adapters.file_system", "diagnostics.adapters.metadata_command_stats", "core.fs.adapters.write_lock_path", "core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths",
 	"core.i18n.engine.i18n", "core.fs.engine.dir", "core.text.engine.utils", "core.text.engine.utils_core",
 	"hs.fs", "hs.json", "core.text.engine.json", "core.ui.ui.builder", "ui.metrics_typing",
-	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
+	"modules.keystats.log_manager", "modules.keystats.sqlite_reader", "modules.keystats.studio_snapshot",
 	-- The dashboard and the reader name the shared metric keys through this table.
 	"metrics.engine.view.manifest_keys",
 	"core.timing.engine.paced_job", "core.timing.engine.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",

@@ -44,6 +44,15 @@ return function(callback)
 		end
 		-- A present, empty store: a missing one publishes an incomplete history
 		EmptyStore.install()
+		-- The dashboard reset also retires Ergopti Studio's saved « My typing »
+		-- read of the same store; record each retirement instead of touching disk.
+		context.studio_retired, context.studio_retire_result = {}, true
+		package.loaded["modules.keystats.studio_snapshot"] = {
+			retire = function(store_path)
+				context.studio_retired[#context.studio_retired + 1] = store_path or false
+				return context.studio_retire_result
+			end,
+		}
 		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
 		local logger = package.loaded["core.logger.engine.logger"]
