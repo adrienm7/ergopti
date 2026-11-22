@@ -193,3 +193,48 @@ _MDC_RealPopupOpenBuildsTheRows() {
 	AssertEqual("real row one", _MDC_FirstCaption(Child))
 }
 Test("menu deferred: a real native open swaps the placeholder inside WM_INITMENUPOPUP", () => _MDC_Run(_MDC_RealPopupOpenBuildsTheRows))
+
+_MDC_ProbeNamesTheCostliestCall() {
+	global _MenuDeferredProbe
+	AssertEqual(0, MenuDeferred_ProbeBegin("outside"), "outside a deferred build a renderer step costs nothing")
+	Seen := 0, Label := ""
+	Fill(Target) {
+		Seen := _MenuDeferredProbe
+		Token := MenuDeferred_ProbeBegin("test_menu")
+		MenuDeferred_ProbeStep(Token, "test_menu/cheap")
+		MenuDeferred_ProbeStep(Token, "test_menu/busy")
+		Started := A_TickCount
+		while A_TickCount - Started < 20
+			Label .= "x"
+		MenuDeferred_ProbeStep(Token, "test_menu/cheap")
+		MenuDeferred_ProbeEnd(Token)
+		Target.Add("row", (*) => 0)
+	}
+	Child := MenuDeferred_Create(Fill, "test_list")
+	AssertTrue(MenuDeferred_Build(Child.Handle))
+	AssertTrue(Seen is MenuDeferredProbe, "the build publishes its probe to the renderer")
+	AssertEqual(0, _MenuDeferredProbe, "the build restores the probe it found")
+	AssertEqual(0, Seen.Stack.Length, "every segment closed with the build")
+	AssertEqual(2, Seen.Segments["test_menu/cheap"].Calls, "a step met twice is one segment")
+	Own := 0
+	for , Segment in Seen.Segments
+		Own += Segment.Own[1]
+	AssertEqual(Seen.Totals[1], Own, "own costs partition the build: nested segments are not billed twice")
+	Text := Seen.Describe()
+	AssertContains(Text, "own costliest: | test_menu/busy x1: ", "the busy step is named first")
+	AssertContains(Text, "modules loaded: ")
+	AssertContains(Text, "counters moved: ")
+}
+Test("menu deferred: the build probe names the costliest call inside it", () => _MDC_Run(_MDC_ProbeNamesTheCostliestCall))
+
+_MDC_ProbeReleasedByAFailedBuild() {
+	global _MenuDeferredProbe
+	Fill(Target) {
+		MenuDeferred_ProbeStep(MenuDeferred_ProbeBegin("test_menu"), "test_menu/refused")
+		throw Error("refused")
+	}
+	Child := MenuDeferred_Create(Fill, "test_list")
+	AssertThrows(() => MenuDeferred_Build(Child.Handle))
+	AssertEqual(0, _MenuDeferredProbe, "a refused build leaves no probe for the next renderer call")
+}
+Test("menu deferred: a refused build releases its probe", () => _MDC_Run(_MDC_ProbeReleasedByAFailedBuild))

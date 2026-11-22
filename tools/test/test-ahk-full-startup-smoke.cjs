@@ -196,21 +196,42 @@ function hotstringsRenderTimes(configRoot) {
 
 /**
  * Every deferred submenu build a boot logged: its list, wall time, the cycles
- * its thread ran and the native rows it produced.
+ * its thread ran, the native rows it produced and the driver's probe of it
+ * (MenuDeferredProbe: its costliest calls, page faults, I/O and the modules it
+ * loaded), which follows each build line. A boot whose probe lines do not pair
+ * one to one with its build lines keeps every probe empty rather than a wrong one.
  * @param {string} configRoot
- * @returns {{list: string, ms: number, cycles: number, rows: number}[]}
+ * @returns {{list: string, ms: number, cycles: number, rows: number, probe: string}[]}
  */
 function deferredMenuBuilds(configRoot) {
-	return [
-		...logText(configRoot).matchAll(
+	const text = logText(configRoot);
+	const builds = [
+		...text.matchAll(
 			/Deferred submenu '([a-z_]+)' built in (\d+) ms, (\d+) thread cycle\(s\) for (\d+) row\(s\)/g
 		)
 	].map((match) => ({
 		list: match[1],
 		ms: Number(match[2]),
 		cycles: Number(match[3]),
-		rows: Number(match[4])
+		rows: Number(match[4]),
+		probe: ''
 	}));
+	const probes = [...text.matchAll(/Deferred submenu '([a-z_]+)' probe: ([^\r\n]*)/g)];
+	if (
+		probes.length === builds.length &&
+		probes.every((match, index) => match[1] === builds[index].list)
+	)
+		probes.forEach((match, index) => (builds[index].probe = match[2]));
+	return builds;
+}
+
+/**
+ * One build's probe as the console and a failure print it.
+ * @param {{list: string, probe: string}} build
+ * @returns {string}
+ */
+function deferredBuildProbe(build) {
+	return `${build.list} probe: ${build.probe || '(not logged)'}`;
 }
 
 /**
@@ -260,12 +281,16 @@ function hotstringsRenderProblem(fixture, configRoot) {
 			`${fixture} Hotstrings menu row cost: ${ratio.toFixed(2)} of a ${reference.list} row ` +
 				`(${build.rows} rows in ${build.ms} ms)`
 		);
+		// Both probes, every boot: a CI stall is attributed from the job log alone.
+		console.log(`${fixture} ${deferredBuildProbe(build)}`);
+		console.log(`${fixture} ${deferredBuildProbe(reference)}`);
 		if (ratio > 1)
 			return {
 				problem:
 					`a Hotstrings menu row cost ${ratio.toFixed(2)} times a row of ${reference.list}, the ` +
 					`costliest other menu of the boot (${build.cycles} cycles for ${build.rows} rows in ` +
-					`${build.ms} ms; ${reference.cycles} cycles for ${reference.rows} rows)`,
+					`${build.ms} ms; ${reference.cycles} cycles for ${reference.rows} rows); ` +
+					`${deferredBuildProbe(build)}; ${deferredBuildProbe(reference)}`,
 				overBound: true
 			};
 	}

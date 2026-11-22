@@ -222,6 +222,9 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 ; key names); Fast records whether the .tsv cache was hit, for log clarity only.
 _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	TsvPath := RegExReplace(JsonPath, "\.json$", ".tsv")
+	; A whole catalogue costs a menu build that loads it about 100 million
+	; cycles: counted so the deferred build probe names that load.
+	PerfCount("i18n.locale_map_loads")
 
 	; ── Fast path: a fresh .tsv cache ──
 	if AllowFast && FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
@@ -240,6 +243,7 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	}
 
 	; ── Slow path: parse JSON, then regenerate the cache for next boot ──
+	PerfCount("i18n.locale_json_parses")
 	if !FileExist(JsonPath) {
 		try LoggerWarn("i18n", "Locale file not found: '{1}' — falling back to key names.", JsonPath)
 		return { Cache: Map(), Ok: false, Fast: false }
@@ -347,6 +351,7 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 	global ScriptInformation
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"] : "★"
+	PerfCount("i18n.fallback_loads." . Code)
 	R := _I18nLoadLocaleMap(_I18nLocalePath(Code), MagicKey)
 	Cache := R.Cache
 	Loaded := R.Ok

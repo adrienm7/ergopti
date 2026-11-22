@@ -26,6 +26,14 @@ global MENU_POPULATION_BATCH_ROWS := 16
 ; and reach the tray through the updater's bare initMenu, and a child whose owner
 ; went with that build would show its placeholder for ever.
 global _MenuDeferredChildren := Map()
+; The probe of the deferred build in progress, or 0. A cold CI boot spent about
+; 200 million more thread cycles on one deferred build than a warm one, on
+; whichever list it fell (run 44931338249), and no local boot reproduced it: the
+; probe says which call inside the build ran them and what the process did then.
+global _MenuDeferredProbe := 0
+; Probe segments one line names, the costliest own cycles first; the rest are
+; summed into one figure.
+global MENU_DEFERRED_PROBE_TOP := 6
 
 class MenuPopulationReentryError extends Error {
 }
@@ -104,7 +112,7 @@ _MenuDeferred_AddPlaceholder(Child) {
  * @returns {Boolean} True when this call built the rows.
  */
 MenuDeferred_Build(Handle, Reason := "navigation") {
-	global _MenuDeferredChildren, _MenuPopulationBuilding, _MenuPopulationPublished
+	global _MenuDeferredChildren, _MenuPopulationBuilding, _MenuPopulationPublished, _MenuDeferredProbe
 	if !_MenuDeferredChildren.Has(Handle)
 		return false
 	Entry := _MenuDeferredChildren[Handle]
@@ -112,7 +120,13 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		throw MenuPopulationReentryError("Deferred submenu build reentered")
 	Entry.Busy := true
 	HotPath_SpanTrace("tray.fill")
+	; Started outside the measured cycles: its module census is not the build's.
+	PreviousProbe := _MenuDeferredProbe
+	Probe := MenuDeferredProbe()
+	_MenuDeferredProbe := Probe
+	LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' build started for {2}.", Entry.ListId, Reason))
 	StartedAt := HotPath_Now()
+	Probe.Begin("build")
 	StartedCycles := _MenuDeferred_ThreadCycles()
 	PreviousBuilding := _MenuPopulationBuilding
 	; Nested pickers stay deferred under the published owner, finished at their open.
@@ -126,10 +140,12 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		; first-open cost must stay readable (the startup smoke bounds this line).
 		ElapsedMs := Round(PerfElapsedUs(StartedAt) / 1000)
 		Cycles := _MenuDeferred_ThreadCycles() - StartedCycles
+		Probe.Unwind(0)
 		; The startup smoke judges a list by its own thread's cycles per row:
 		; neither load nor another process's file scan moves that cost.
 		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' built in {2} ms, {3} thread cycle(s) for {4} row(s), for {5}.",
 			Entry.ListId, ElapsedMs, Cycles, _MenuDeferred_RowCount(Handle, Map()), Reason))
+		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' probe: {2}.", Entry.ListId, Probe.Describe()))
 	} catch as Err {
 		Entry.MenuObj.Delete()
 		_MenuDeferred_AddPlaceholder(Entry.MenuObj)
@@ -137,6 +153,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 			Entry.ListId, Reason, Err.Message)
 		throw Err
 	} finally {
+		_MenuDeferredProbe := PreviousProbe
 		_MenuPopulationBuilding := PreviousBuilding
 		Entry.Busy := false
 		PerfCount("menu.deferred_open_us." . Entry.ListId, PerfElapsedUs(StartedAt))
@@ -156,6 +173,296 @@ _MenuDeferred_ThreadCycles() {
 	if !DllCall("QueryThreadCycleTime", "Ptr", DllCall("GetCurrentThread", "Ptr"), "Int64*", &Cycles := 0)
 		throw OSError(A_LastError, -1, "QueryThreadCycleTime")
 	return Cycles
+}
+
+/**
+ * Attributes one deferred build's cost to the calls inside it. A segment's own
+ * cost excludes the segments nested in it, so the costliest one names the call
+ * that ran the cycles. Thread cycles and thread times are this thread's; page
+ * faults and I/O operations are the whole process's, so another thread's work
+ * shows there and not in the cycles. Thread times advance by scheduler ticks.
+ */
+class MenuDeferredProbe {
+	; Cycles, kernel and user 100 ns units, page faults, read operations, read
+	; bytes, other I/O operations (opens, queries), performance-counter ticks.
+	static Fields := 8
+
+	__New() {
+		this.Stack := []
+		this.Segments := Map()
+		this.Totals := 0
+		this.ModulesBefore := _MenuDeferred_LoadedModules()
+		this.ObjectsBefore := _MenuDeferred_GuiObjects()
+		this.StartedAfterMs := _MenuDeferred_ProcessAgeMs()
+		this.CountersBefore := _MenuDeferred_CounterSnapshot()
+	}
+
+	/**
+	 * Opens a segment nested in the current one.
+	 * @param {String} Label A closed code name: a list id or a manifest row id.
+	 */
+	Begin(Label) {
+		this.Stack.Push({ Label: Label, At: _MenuDeferred_ProbeSample(), Nested: [0, 0, 0, 0, 0, 0, 0, 0] })
+	}
+
+	/**
+	 * Closes every segment deeper than Depth, the innermost first. The outermost
+	 * one's inclusive cost becomes the build's totals.
+	 * @param {Integer} Depth The open segments to keep.
+	 */
+	Unwind(Depth) {
+		while this.Stack.Length > Depth {
+			Now := _MenuDeferred_ProbeSample()
+			Frame := this.Stack.Pop()
+			Inclusive := []
+			loop MenuDeferredProbe.Fields
+				Inclusive.Push(Now[A_Index] - Frame.At[A_Index])
+			if this.Stack.Length {
+				Parent := this.Stack[this.Stack.Length]
+				loop MenuDeferredProbe.Fields
+					Parent.Nested[A_Index] += Inclusive[A_Index]
+			} else
+				this.Totals := Inclusive
+			if !this.Segments.Has(Frame.Label)
+				this.Segments[Frame.Label] := { Calls: 0, Own: [0, 0, 0, 0, 0, 0, 0, 0] }
+			Segment := this.Segments[Frame.Label]
+			Segment.Calls += 1
+			loop MenuDeferredProbe.Fields
+				Segment.Own[A_Index] += Inclusive[A_Index] - Frame.Nested[A_Index]
+		}
+	}
+
+	/**
+	 * The probe line: totals, modules loaded and GUI objects created during the
+	 * build, then its costliest segments by own cycles.
+	 * @returns {String}
+	 */
+	Describe() {
+		global MENU_DEFERRED_PROBE_TOP
+		if !(this.Totals is Array)
+			throw Error("A deferred build probe is described only once its build closed")
+		Loaded := _MenuDeferred_ModuleNames(this.ModulesBefore, _MenuDeferred_LoadedModules())
+		Objects := _MenuDeferred_GuiObjects()
+		Text := Format("started {1} ms after process start; {2}; modules loaded: {3}; GDI {4:+d}, USER {5:+d}; {6}",
+			this.StartedAfterMs, _MenuDeferred_ProbeCost(this.Totals), Loaded == "" ? "none" : Loaded,
+			Objects[1] - this.ObjectsBefore[1], Objects[2] - this.ObjectsBefore[2],
+			_MenuDeferred_CounterMoves(this.CountersBefore, _MenuDeferred_CounterSnapshot()))
+		Ranked := []
+		for Label, Segment in this.Segments
+			Ranked.Push({ Label: Label, Segment: Segment })
+		; Insertion sort: a build has a few dozen segments.
+		loop Ranked.Length {
+			Index := A_Index
+			while Index > 1 && Ranked[Index].Segment.Own[1] > Ranked[Index - 1].Segment.Own[1] {
+				Swap := Ranked[Index], Ranked[Index] := Ranked[Index - 1], Ranked[Index - 1] := Swap
+				Index -= 1
+			}
+		}
+		Text .= "; own costliest:"
+		Rest := [0, 0, 0, 0, 0, 0, 0, 0], RestCount := 0
+		for Row in Ranked {
+			if A_Index <= MENU_DEFERRED_PROBE_TOP {
+				Text .= Format(" | {1} x{2}: {3}", Row.Label, Row.Segment.Calls, _MenuDeferred_ProbeCost(Row.Segment.Own))
+				continue
+			}
+			RestCount += 1
+			loop MenuDeferredProbe.Fields
+				Rest[A_Index] += Row.Segment.Own[A_Index]
+		}
+		if RestCount
+			Text .= Format(" | {1} other segment(s): {2}", RestCount, _MenuDeferred_ProbeCost(Rest))
+		return Text
+	}
+}
+
+/**
+ * Opens one renderer build's segment in the deferred build in progress.
+ * @param {String} Label The manifest key.
+ * @returns {Object|Integer} The token Step and End take; 0 outside a deferred build.
+ */
+MenuDeferred_ProbeBegin(Label) {
+	global _MenuDeferredProbe
+	if !(_MenuDeferredProbe is MenuDeferredProbe)
+		return 0
+	Token := { Probe: _MenuDeferredProbe, Depth: _MenuDeferredProbe.Stack.Length }
+	_MenuDeferredProbe.Begin(Label)
+	return Token
+}
+
+/**
+ * Ends the previous step of a renderer build and opens the next one, nested in
+ * its build's segment. An early continue or a caught error needs no closing call.
+ * @param {Object|Integer} Token What MenuDeferred_ProbeBegin returned.
+ * @param {String} Label The step's closed code name.
+ */
+MenuDeferred_ProbeStep(Token, Label) {
+	if !Token
+		return
+	Token.Probe.Unwind(Token.Depth + 1)
+	Token.Probe.Begin(Label)
+}
+
+/**
+ * Closes a renderer build's segment and its last step.
+ * @param {Object|Integer} Token What MenuDeferred_ProbeBegin returned.
+ */
+MenuDeferred_ProbeEnd(Token) {
+	if Token
+		Token.Probe.Unwind(Token.Depth)
+}
+
+/**
+ * One cost as the probe line prints it.
+ * @param {Array} Cost The eight probe fields.
+ * @returns {String}
+ */
+_MenuDeferred_ProbeCost(Cost) {
+	return Format("{1:.1f}M cycles, {2:.1f} ms wall, kernel {3:.1f} ms, user {4:.1f} ms, {5} page fault(s), {6} read op(s) of {7} byte(s), {8} other I/O op(s)",
+		Cost[1] / 1000000, Cost[8] * 1000 / PerfClockFrequency(), Cost[2] / 10000, Cost[3] / 10000,
+		Cost[4], Cost[5], Cost[6], Cost[7])
+}
+
+/**
+ * Samples the probe fields. Native entry points are resolved once: the sample
+ * runs twice per renderer row of a deferred build.
+ * @returns {Array} The eight probe fields.
+ */
+_MenuDeferred_ProbeSample() {
+	static Kernel32 := DllCall("GetModuleHandle", "Str", "kernel32", "Ptr")
+	static CycleTime := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "QueryThreadCycleTime", "Ptr")
+	static ThreadTimes := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "GetThreadTimes", "Ptr")
+	static MemoryInfo := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "K32GetProcessMemoryInfo", "Ptr")
+	static IoCounters := DllCall("GetProcAddress", "Ptr", Kernel32, "AStr", "GetProcessIoCounters", "Ptr")
+	static Thread := DllCall("GetCurrentThread", "Ptr"), Process := DllCall("GetCurrentProcess", "Ptr")
+	static Times := Buffer(32, 0), Memory := Buffer(80, 0), Io := Buffer(48, 0)
+	; One uninterrupted read: a thread run between two of these reads billed its
+	; cycles to one segment and its wall time to the next (measured 2026-11-21).
+	PreviousCritical := Critical("On")
+	try {
+		if !DllCall(CycleTime, "Ptr", Thread, "Int64*", &Cycles := 0)
+			throw OSError(A_LastError, -1, "QueryThreadCycleTime")
+		if !DllCall(ThreadTimes, "Ptr", Thread, "Ptr", Times, "Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24)
+			throw OSError(A_LastError, -1, "GetThreadTimes")
+		NumPut("UInt", 80, Memory, 0)
+		if !DllCall(MemoryInfo, "Ptr", Process, "Ptr", Memory, "UInt", 80)
+			throw OSError(A_LastError, -1, "K32GetProcessMemoryInfo")
+		if !DllCall(IoCounters, "Ptr", Process, "Ptr", Io)
+			throw OSError(A_LastError, -1, "GetProcessIoCounters")
+		; FILETIME kernel and user at 16 and 24; PageFaultCount follows cb; IO_COUNTERS
+		; holds ReadOperationCount at 0, OtherOperationCount at 16, ReadTransferCount at 24.
+		Sample := [Cycles, NumGet(Times, 16, "Int64"), NumGet(Times, 24, "Int64"), NumGet(Memory, 4, "UInt"),
+			NumGet(Io, 0, "Int64"), NumGet(Io, 24, "Int64"), NumGet(Io, 16, "Int64"), PerfClockTicks()]
+	} finally Critical(PreviousCritical)
+	return Sample
+}
+
+/**
+ * The interval counters and hot-path segment counts at one moment. Another
+ * AutoHotkey thread that interrupts a build runs on this same OS thread, so its
+ * cycles are the build's: what it counted is what names it.
+ * @returns {Object} Counters is the live registry, Counts and Segments copies.
+ */
+_MenuDeferred_CounterSnapshot() {
+	Live := _PerfCountersOwner().Counts
+	Counts := Map()
+	for Name, Value in Live
+		Counts[Name] := Value
+	Segments := Map()
+	for Label, Sample in _HotPathStatisticsOwner().Stats.Series
+		Segments[Label] := Sample.Count
+	return { Counters: Live, Counts: Counts, Stats: _HotPathStatisticsOwner().Stats, Segments: Segments }
+}
+
+/**
+ * What moved between two counter snapshots, as the probe line prints it. A
+ * flush between them publishes and resets the registry, which says so instead.
+ * @param {Object} Before The earlier snapshot.
+ * @param {Object} After The later snapshot.
+ * @returns {String}
+ */
+_MenuDeferred_CounterMoves(Before, After) {
+	if Before.Counters != After.Counters
+		Moved := "flushed during the build"
+	else {
+		Moved := ""
+		for Name, Value in After.Counts
+			if Value != Before.Counts.Get(Name, 0)
+				Moved .= (Moved == "" ? "" : ", ") . Name . "+" . (Value - Before.Counts.Get(Name, 0))
+	}
+	if Before.Stats != After.Stats
+		Ran := "summarised during the build"
+	else {
+		Ran := ""
+		for Label, Count in After.Segments
+			if Count != Before.Segments.Get(Label, 0)
+				Ran .= (Ran == "" ? "" : ", ") . Label . " x" . (Count - Before.Segments.Get(Label, 0))
+	}
+	return Format("counters moved: {1}; hot-path segments run: {2}",
+		Moved == "" ? "none" : Moved, Ran == "" ? "none" : Ran)
+}
+
+/**
+ * The modules this process has loaded, by base address.
+ * @returns {Map} Module handle to true.
+ */
+_MenuDeferred_LoadedModules() {
+	Process := DllCall("GetCurrentProcess", "Ptr")
+	Handles := Buffer(512 * A_PtrSize, 0)
+	loop {
+		if !DllCall("K32EnumProcessModules", "Ptr", Process, "Ptr", Handles, "UInt", Handles.Size, "UInt*", &Needed := 0)
+			throw OSError(A_LastError, -1, "K32EnumProcessModules")
+		if Needed <= Handles.Size
+			break
+		Handles := Buffer(Needed, 0)
+	}
+	Modules := Map()
+	loop Needed // A_PtrSize
+		Modules[NumGet(Handles, (A_Index - 1) * A_PtrSize, "Ptr")] := true
+	return Modules
+}
+
+/**
+ * The base names of the modules loaded since a census.
+ * @param {Map} Before The earlier census.
+ * @param {Map} After The later census.
+ * @returns {String} Comma-separated names, empty when none.
+ */
+_MenuDeferred_ModuleNames(Before, After) {
+	Process := DllCall("GetCurrentProcess", "Ptr")
+	Names := ""
+	for Module in After {
+		if Before.Has(Module)
+			continue
+		Name := Buffer(520, 0)
+		if !DllCall("K32GetModuleBaseNameW", "Ptr", Process, "Ptr", Module, "Ptr", Name, "UInt", 260)
+			throw OSError(A_LastError, -1, "K32GetModuleBaseNameW")
+		Names .= (Names == "" ? "" : ", ") . StrGet(Name, "UTF-16")
+	}
+	return Names
+}
+
+/**
+ * This process's GDI and USER object counts.
+ * @returns {Array} GDI, then USER.
+ */
+_MenuDeferred_GuiObjects() {
+	Process := DllCall("GetCurrentProcess", "Ptr")
+	; GR_GDIOBJECTS = 0, GR_USEROBJECTS = 1.
+	return [DllCall("GetGuiResources", "Ptr", Process, "UInt", 0, "UInt"),
+		DllCall("GetGuiResources", "Ptr", Process, "UInt", 1, "UInt")]
+}
+
+/**
+ * Milliseconds since this process was created, so a build is placed against the
+ * readiness line of the same log whatever the logger's timestamp precision.
+ * @returns {Integer}
+ */
+_MenuDeferred_ProcessAgeMs() {
+	Creation := Buffer(8, 0), Unused := Buffer(8, 0), Now := Buffer(8, 0)
+	if !DllCall("GetProcessTimes", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Creation, "Ptr", Unused, "Ptr", Unused, "Ptr", Unused)
+		throw OSError(A_LastError, -1, "GetProcessTimes")
+	DllCall("GetSystemTimePreciseAsFileTime", "Ptr", Now)
+	return (NumGet(Now, 0, "Int64") - NumGet(Creation, 0, "Int64")) // 10000
 }
 
 /**

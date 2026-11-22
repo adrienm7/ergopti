@@ -235,6 +235,11 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 				throw Error("Declared frame DATA registration has competing owners")
 		}
 	}
+	; Inside a deferred build, each row's cost is its own probe segment
+	; (MenuDeferredProbe); elsewhere the token is 0 and every step returns at once.
+	ProbeToken := MenuDeferred_ProbeBegin(ManifestKey)
+	if ProbeToken
+		MenuDeferred_ProbeStep(ProbeToken, ManifestKey . ":prologue")
 	MenuDef    := _MR_GetMenuDef(ManifestKey)
 	if IsSet(TargetMenu)
 		Result := TargetMenu
@@ -251,6 +256,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	OffRule := Map("reason_key", "", "roles", Map(), "settled", 0, "item", 0)
 	try {
 		for Item in MenuDef {
+			if ProbeToken
+				MenuDeferred_ProbeStep(ProbeToken, ManifestKey . "/" . _MR_Get(Item, "id", _MR_Get(Item, "type", "?")))
 			_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters)
 			OffRule["item"] := Item
 			if !_MR_CommandLiteralPrefix(Item, &Prefix) {
@@ -359,6 +366,9 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 				Id := _MR_Get(Item, "id")
 				if (Id != "" and ListProviders is Map and ListProviders.Has(Id)) {
 					Rows := (ListProviders[Id])()
+					; The provider's data and its native rows are two segments.
+					if ProbeToken
+						MenuDeferred_ProbeStep(ProbeToken, ManifestKey . "/" . Id . ":render")
 					Added := _MR_RenderRows(Result, Rows, Id, 1)
 					ItemCount += Added
 				} else {
@@ -379,8 +389,11 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	} finally _MR_BuildMemoLeave(BuildMemo)
 
 	; Positions are read before the separator pass can move a row.
+	if ProbeToken
+		MenuDeferred_ProbeStep(ProbeToken, ManifestKey . ":epilogue")
 	_MR_ApplyCategoryOff(Result, OffRule)
 	_MR_NormalizeSeparators(Result)
+	MenuDeferred_ProbeEnd(ProbeToken)
 	return Result
 }
 

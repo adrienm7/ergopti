@@ -798,7 +798,12 @@ HSE_DeferredRegistrationSlice(BudgetMs := "") {
 				Critical(PreviousCritical)
 		}
 		Job.Slices += 1
-		Job.BusyMs += (PerfClockTicks() - Started) * 1000 / Frequency
+		SliceMs := (PerfClockTicks() - Started) * 1000 / Frequency
+		Job.BusyMs += SliceMs
+		; Counted where a deferred menu build's probe reads them: a slice that
+		; interrupts the build runs on its thread and bills it its cycles.
+		PerfCount("hotstrings.deferred_slices")
+		PerfCount("hotstrings.deferred_slice_us", Round(SliceMs * 1000))
 		if (Job.StepIndex <= Job.Steps.Length) {
 				TimerArmOneShotMs(HSE_DeferredRegistrationSlice, TimingsGet("hotstrings", "deferred_registration_gap_ms"))
 				return true
