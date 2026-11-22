@@ -65,10 +65,7 @@ helpers.describe("Linux prediction first display budget (linux-display-budget)",
 	end)
 
 	helpers.it("(linux-display-budget) the engine starts a chain per request and judges its first drawn candidates", function()
-		local root = debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*)/tests/unit/")
-		local file = assert(io.open(root .. "/ai/engine/prediction/engine.lua", "r"))
-		local source = file:read("*a")
-		file:close()
+		local source = assert(helpers.read_module_source("ai.engine.prediction.engine"))
 		local sending = source:find("Sending %sprediction request", 1, true)
 		local started = source:find("local display_chain = DisplayBudget.start(DisplayBudget.production_ports())", 1, true)
 		local shown = source:find("show_candidates(visible, meta) and #visible > 0 and _overlay then display_chain.shown() end",
