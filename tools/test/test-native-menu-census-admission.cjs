@@ -28,11 +28,12 @@ const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 // The tray model list retired with the model selector page (2026-10-27), the
 // Windows chord switches with schema v19, the macOS Karabiner switch rows with
 // the owned runtime default, the Windows navigation layer editor host with
-// Ergopti Studio.
+// Ergopti Studio, the macOS magic key source menu with the ★ slot model.
 const RETIRED_SOURCES = new Set([
 	RETIRED,
 	'macos/ui/menu/menu_llm/models_selector.lua',
 	'macos/ui/menu/remap_switch.lua',
+	'macos/hotstrings/ui/menu/magic_key_source_menu.lua',
 	'windows/modules/shortcuts/ctrl.ahk',
 	'windows/ui/layer_editor/init.ahk'
 ]);
@@ -51,7 +52,8 @@ const currentName = (rel) =>
 		.replace(
 			/^windows\/modules\/llm\/prediction_keystats\.ahk$/,
 			'windows/ai/engine/prediction/keystats.ahk'
-		);
+		)
+		.replace(/^windows\/infra\/magic_editor\.ahk$/, 'windows/infra/star_slot.ahk');
 const currentTree = JSON.parse(JSON.stringify(legacy).replace(/keylogger/g, 'keystats'));
 for (const driver of DRIVERS)
 	currentTree.drivers[driver].sourceFiles =

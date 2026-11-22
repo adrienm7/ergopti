@@ -260,8 +260,27 @@ function admittedSourceRetirements(driver, traversed) {
 	return new Set([
 		retired,
 		...admittedSelectorRetirement(),
-		...admittedRemapSwitchRetirement(manifest)
+		...admittedRemapSwitchRetirement(manifest),
+		...admittedMagicKeySourceMenuRetirement()
 	]);
+}
+
+/**
+ * The magic key source menu (magic_key_source_menu.lua) retired when Ctrl+★
+ * became an ordinary slot of the real ★ key. Its retirement is admitted only
+ * while no macOS source names the module again.
+ * @returns {Set<string>} The admitted retired source.
+ */
+function admittedMagicKeySourceMenuRetirement() {
+	const retired = 'macos/hotstrings/ui/menu/magic_key_source_menu.lua';
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	for (const file of sourceFiles(path.join(SP, 'macos'), '.lua'))
+		for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), '.lua'))
+			assert.ok(
+				!(token.kind === 'string' && /(?:^|[./])magic_key_source_menu$/.test(token.value)),
+				`retired magic key source menu is required again: ${path.relative(SP, file)}`
+			);
+	return new Set([retired]);
 }
 
 /**
@@ -459,7 +478,9 @@ const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
 const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	// models_selector.lua retired with the tray model list (model selector page, 2026-10-27).
 	// remap_switch.lua retired with the two Karabiner Configuration rows (owned runtime default).
+	// magic_key_source_menu.lua retired when Ctrl+★ became an ordinary slot of the ★ key.
 	macos: Object.freeze([
+		'macos/hotstrings/ui/menu/magic_key_source_menu.lua',
 		'macos/ui/menu/menu_llm/live_mode_panel.lua',
 		'macos/ui/menu/menu_llm/models_selector.lua',
 		'macos/ui/menu/remap_switch.lua'
@@ -482,6 +503,11 @@ const CURRENT_SOURCE_RENAMES = Object.freeze([
 	Object.freeze({
 		from: /^linux\/ui\/menu\/menu_builder\.lua$/,
 		to: 'linux/menu/ui/builder/builder.lua'
+	}),
+	// The magic key redesign turned the editor into the ★ slot's owner.
+	Object.freeze({
+		from: /^windows\/infra\/magic_editor\.ahk$/,
+		to: 'windows/infra/star_slot.ahk'
 	})
 ]);
 
