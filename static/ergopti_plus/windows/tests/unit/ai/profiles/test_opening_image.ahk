@@ -683,7 +683,9 @@ _PFNL_Case(External, Control := "") {
 			"The actual native writer must admit the unchanged current full-state fixture")
 		InitialImage := FSConfigReadUtf8Exact(World.ConfigPath)
 		InitialMenu := _LLM_Menu
-		CurrentLocale := I18nGetLocale()
+		; The persisted preference, not the language in use: a full save writes
+		; the configured locale, "" (follow the system) when the row is absent.
+		CurrentLocale := I18nConfiguredLocale()
 		ExpectedLocale := External ? (CurrentLocale == "en" ? "fr" : "en") : CurrentLocale
 		ExternalImage := InitialImage
 		if External {
