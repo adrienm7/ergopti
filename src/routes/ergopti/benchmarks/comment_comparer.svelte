@@ -52,9 +52,10 @@
 	</p>
 	<p>
 		De même, une disposition peut partir du principe que l’appui sur la touche <kbd>Q</kbd> donne
-		<kbd-output>QU</kbd-output>, comme le proposent Optimot ou <ErgoptiPlus></ErgoptiPlus>. Il faut
-		alors s’assurer que le corpus reflète aussi cette modification. Pour cela, il convient de
-		remplacer tous les "qu" par des "q" dans le corpus. Cela permet alors de placer le <kbd>Q</kbd>
+		<samp class="kbd-output">QU</samp>, comme le proposent Optimot ou <ErgoptiPlus></ErgoptiPlus>.
+		Il faut alors s’assurer que le corpus reflète aussi cette modification. Pour cela, il convient
+		de remplacer tous les "qu" par des "q" dans le corpus. Cela permet alors de placer le
+		<kbd>Q</kbd>
 		sur la colonne du <kbd>U</kbd> sans que cela ne génère de <SFB></SFB>s. Oublier de modifier le
 		corpus va entraîner une énorme augmentation des <SFB></SFB>s alors que ce n’est pas "mérité".
 	</p>

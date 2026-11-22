@@ -1,9 +1,9 @@
-image-block {
+.image-block {
 	margin: 0 auto;
 	text-align: center;
 }
 
-image-block img {
+.image-block img {
 	border: 10px solid rgba(0, 0, 0, 0.5);
 	border-radius: 10px;
 	margin: 0 auto;
@@ -11,7 +11,7 @@ image-block img {
 	/* box-shadow: rgba(209, 209, 209, 0.8) 0 0 10px 1px; */
 }
 
-image-block p {
+.image-block p {
 	font-size: 1.3rem;
 	font-weight: bold;
 }

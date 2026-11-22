@@ -31,11 +31,12 @@
 	<KeyboardBasis id="controle" />
 	<tiny-space></tiny-space>
 	<p>
-		Les raccourcis <kbd-output>Ctrl</kbd-output> + <kbd-output>X</kbd-output>,
-		<kbd-output>Ctrl</kbd-output>
-		+ <kbd-output>C</kbd-output>,
-		<kbd-output>Ctrl</kbd-output>
-		+ <kbd-output>V</kbd-output> et <kbd-output>Ctrl</kbd-output> + <kbd-output>Z</kbd-output>
+		Les raccourcis <samp class="kbd-output">Ctrl</samp> + <samp class="kbd-output">X</samp>,
+		<samp class="kbd-output">Ctrl</samp>
+		+ <samp class="kbd-output">C</samp>,
+		<samp class="kbd-output">Ctrl</samp>
+		+ <samp class="kbd-output">V</samp> et <samp class="kbd-output">Ctrl</samp> +
+		<samp class="kbd-output">Z</samp>
 		sont conservés à gauche avec <Ergopti></Ergopti>. Cela permet de les réaliser sans avoir à
 		bouger la main droite. Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>,
 		<kbd>Ctrl</kbd>
@@ -69,8 +70,8 @@
 		deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir pressé).
 		Ainsi, presser puis relâcher un modificateur envoie un raccourci, mais le maintenir avec une
 		autre touche garde son rôle habituel. Cela permet d’intégrer des touches
-		<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
-		<kbd-output>Alt+Tab</kbd-output>
+		<samp class="kbd-output">Copier</samp>, <samp class="kbd-output">Coller</samp> et
+		<samp class="kbd-output">Alt+Tab</samp>
 		respectivement sur
 		<kbd>LShift</kbd>, <kbd>LCtrl</kbd> et <kbd>Alt</kbd>. En outre, un layer de navigation ainsi
 		que les touches

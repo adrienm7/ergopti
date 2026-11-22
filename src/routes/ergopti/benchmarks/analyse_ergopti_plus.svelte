@@ -19,7 +19,9 @@
 		Une réelle analyse d’<ErgoptiPlus></ErgoptiPlus> nécessite de modifier le corpus afin d’y refléter
 		les nouvelles manières de taper les touches. Par exemple, il faut modifier toutes les doubles lettres
 		du corpus pour les remplacer par la lettre suivie de <kbd>★</kbd>. De même, tous les <SFB
-		></SFB>s pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme <kbd-output>pt</kbd-output> en
+		></SFB>s pris en charge par <ErgoptiPlus></ErgoptiPlus>, comme
+		<samp class="kbd-output">pt</samp>
+		en
 		<kbd>,t</kbd>, doivent être remplacés. Un
 		<a href={asset('corpus/conversion_corpus.py')} download class="link">simple script Python</a> permet
 		de faire ces modifications.
@@ -35,12 +37,12 @@
 	<p>
 		Voici les résultats d’<ErgoptiPlus></ErgoptiPlus> obtenus sur le corpus français-anglais Essais :
 	</p>
-	<image-block>
+	<figure class="image-block">
 		<enhanced:img
 			src="../../../lib/images/benchmarks/plus/ergopti+_reduction_SFBs.jpg"
 			alt="Screenshot de benchmark Ergopti+"
 		/>
-	</image-block>
+	</figure>
 	<h3>Analyse des <SFB></SFB>s</h3>
 	<p>
 		Cette analyse met en lumière la quasi-suppression des <SFB></SFB>s, avec une valeur d’environ 3.
@@ -50,19 +52,19 @@
 	</p>
 	<p>Voici une vue plus détaillée (attention, les axes des ordonnées ne sont pas les mêmes) :</p>
 	<h4><Ergopti></Ergopti></h4>
-	<image-block>
+	<figure class="image-block">
 		<enhanced:img
 			src="../../../lib/images/benchmarks/plus/SFBs_ergopti.jpg"
 			alt="SFBs de la disposition Ergopti"
 		/>
-	</image-block>
+	</figure>
 	<h4><ErgoptiPlus></ErgoptiPlus></h4>
-	<image-block>
+	<figure class="image-block">
 		<enhanced:img
 			src="../../../lib/images/benchmarks/plus/SFBs_ergopti+.jpg"
 			alt="SFBs de la disposition Ergopti+"
 		/>
-	</image-block>
+	</figure>
 	<p>
 		Plusieurs <SFB></SFB>s se produisent maintenant sur l’index gauche en <kbd>★,</kbd> et
 		<kbd>★.</kbd>, même s’ils sont déjà deux fois moins nombreux qu’avec <ErgoptiPlus
@@ -89,18 +91,18 @@
 		disposition pour y ajouter ses propres raccourcis. Dans la version <ErgoptiPlus></ErgoptiPlus> testés,
 		seule une petite vingtaine de mots très courants ont été remplacés par un raccourci. Parmi ceux-ci
 		:
-		<kbd-output>ainsi</kbd-output>
-		en <kbd>a★</kbd>, <kbd-output>exemple</kbd-output> en <kbd>x★</kbd> et
-		<kbd-output>faire</kbd-output>
+		<samp class="kbd-output">ainsi</samp>
+		en <kbd>a★</kbd>, <samp class="kbd-output">exemple</samp> en <kbd>x★</kbd> et
+		<samp class="kbd-output">faire</samp>
 		en <kbd>f★</kbd>.
 	</p>
 	<h3>Analyse de la fréquence d’utilisation des doigts</h3>
-	<image-block>
+	<figure class="image-block">
 		<enhanced:img
 			src="../../../lib/images/benchmarks/plus/finger_usage_comparison.jpg"
 			alt="Comparaison de la fréquence d’utilisation des doigts"
 		/>
-	</image-block>
+	</figure>
 	<p>
 		Comme vous pouvez le constater sur l’image ci-dessous, l’index gauche est plus utilisé (6% vs
 		8%) avec <ErgoptiPlus></ErgoptiPlus>. Cela vient des nombreuses utilisations de la touche

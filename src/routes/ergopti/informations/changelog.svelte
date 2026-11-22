@@ -10,17 +10,17 @@
 	<h3>Version 2.2.1 (Janvier 2026)</h3>
 	<ul>
 		<li>
-			Correction de l’inversion des caractères <kbd-output>-</kbd-output> et
-			<kbd-output>_</kbd-output>
-			sur la touche <kbd-output class="deadkey">◌̈</kbd-output>.
+			Correction de l’inversion des caractères <samp class="kbd-output">-</samp> et
+			<samp class="kbd-output">_</samp>
+			sur la touche <samp class="kbd-output deadkey">◌̈</samp>.
 		</li>
 		<li>
 			Ajout des caractères <kbd>í</kbd> et <kbd>Í</kbd> manquants. Cet ajout permute les positions
 			sur la couche circonflexe de <kbd>ó</kbd>/<kbd>Ó</kbd>, <kbd>º</kbd>/<kbd>°</kbd> ainsi que de
 			<kbd>/</kbd>/<kbd>\</kbd>. Désormais, il est plus facile d’écrire des dates de type
-			<kbd>dd/mm/yyyy</kbd>, car le <kbd-output>/</kbd-output> est plus accessible, se réalisant par
-			appui sur <kbd-output class="deadkey">◌̂</kbd-output> puis
-			<kbd-output class="deadkey">◌̈</kbd-output>.
+			<kbd>dd/mm/yyyy</kbd>, car le <samp class="kbd-output">/</samp> est plus accessible, se
+			réalisant par appui sur <samp class="kbd-output deadkey">◌̂</samp> puis
+			<samp class="kbd-output deadkey">◌̈</samp>.
 		</li>
 		<li>
 			Le pilote Windows utilise désormais <strong>Kana au lieu de AltGr</strong>, ce qui libère
@@ -48,15 +48,16 @@
 		Le changement le plus visible d’<Ergopti></Ergopti> v2.2 est la permutation des touches
 		<kbd>€</kbd>, <kbd>%</kbd> et <kbd>=</kbd> sur la rangée des chiffres. Celle-ci a été réalisée
 		afin d’améliorer l’accès aux touches les plus fréquentes. De plus, la touche
-		<kbd>€</kbd> a été modifiée pour mettre le <kbd-output>€</kbd-output> en AltGr et placer le
-		<kbd-output>$</kbd-output> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup
+		<kbd>€</kbd> a été modifiée pour mettre le <samp class="kbd-output">€</samp> en AltGr et placer
+		le
+		<samp class="kbd-output">$</samp> en accès direct. Ici encore, c’est parce que ce caractère est beaucoup
 		plus utilisé, que ce soit en tant que monnaie, mais aussi en programmation ou sur Excel par exemple.
 	</p>
 	<p>
-		En outre, les symboles <kbd-output>º</kbd-output>, <kbd-output>°</kbd-output> et
-		<kbd-output>ª</kbd-output> étaient auparavant sur la touche <kbd>0</kbd>. Ils ont été déplacés
-		sur la touche <kbd>=</kbd> afin de libérer les emplacements sur la touche <kbd>0</kbd>. Cette
-		modification a permis d’ajouter, sur les touches de chiffres, les chiffres en exposant en
+		En outre, les symboles <samp class="kbd-output">º</samp>, <samp class="kbd-output">°</samp> et
+		<samp class="kbd-output">ª</samp> étaient auparavant sur la touche <kbd>0</kbd>. Ils ont été
+		déplacés sur la touche <kbd>=</kbd> afin de libérer les emplacements sur la touche <kbd>0</kbd>.
+		Cette modification a permis d’ajouter, sur les touches de chiffres, les chiffres en exposant en
 		<kbd>AltGr</kbd> ainsi que les chiffres en indice en <kbd>Shift</kbd> + <kbd>AltGr</kbd>.
 	</p>
 	<tiny-space></tiny-space>
@@ -93,7 +94,8 @@
 		plus accessible. C’est, tout comme le passage en v2.0, une histoire de longueur des doigts. En
 		outre, le roulement <kbd>CH</kbd> s’en trouve être beaucoup plus confortable, étant désormais un
 		roulement vers l’intérieur. Une autre amélioration est que le <kbd>C</kbd> n’est plus sur le
-		même doigt que le <kbd>D</kbd>, ce qui permet de taper la commande <kbd-output>cd</kbd-output>
+		même doigt que le <kbd>D</kbd>, ce qui permet de taper la commande
+		<samp class="kbd-output">cd</samp>
 		(change directory) sans <SFB></SFB>.
 	</p>
 	<p>

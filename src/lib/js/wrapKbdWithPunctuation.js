@@ -1,12 +1,12 @@
 // wrapKbdWithPunctuation.js
 
 /**
- * Finds all <kbd>, <kbd-output> and <kbd-non> elements
+ * Finds all <kbd>, <samp class="kbd-output"> and <kbd-non> elements
  * and wraps the element + surrounding punctuation/parentheses
  * into a <span class="nowrap">.
  */
 export function wrapKbdWithPunctuation(root = document) {
-	const selector = 'kbd, kbd-output, kbd-non';
+	const selector = 'kbd, samp.kbd-output, kbd-non';
 
 	function wrap(el, extraBefore = null, extraAfter = null) {
 		const span = document.createElement('span');

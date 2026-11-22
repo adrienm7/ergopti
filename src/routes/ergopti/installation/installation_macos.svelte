@@ -116,12 +116,13 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 <ul>
 	<li><strong>Ergopti</strong> : version standard, la même que le KbdEdit sur Windows ;</li>
 	<li>
-		<strong>Ergopti+</strong> : version standard incluant la touche <kbd-output>★</kbd-output> à la
-		place de
+		<strong>Ergopti+</strong> : version standard incluant la touche
+		<samp class="kbd-output">★</samp>
+		à la place de
 		<kbd>J</kbd>
 		ainsi que les petites modifications en
-		<kbd>AltGr</kbd> (<kbd-output>%</kbd-output> à la place de <kbd>œ</kbd>,
-		<kbd-output>!</kbd-output>
+		<kbd>AltGr</kbd> (<samp class="kbd-output">%</samp> à la place de <kbd>œ</kbd>,
+		<samp class="kbd-output">!</samp>
 		à la place de <kbd>ç</kbd>, etc.) ;
 	</li>
 	<li>
@@ -132,13 +133,14 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 <p>
 	<strong>Ergopti++</strong> permet de rapidement tester les roulements personnalisés comme
 	<kbd>hc</kbd>
-	donnant <kbd-output>wh</kbd-output> ou encore <kbd>(#</kbd> donnant <kbd-output>("</kbd-output>.
-	Toutefois, elle entraîne certains petits problèmes. Parmi ceux-ci, il y a le fait qu'il faut
-	appuyer 2 fois sur <kbd>Entrée</kbd> pour valider la touche morte et envoyer
-	<kbd-output>Entrée</kbd-output>. Les touches mortes ne fonctionnent pas non plus sur l'écran de
-	verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la fermeture
-	automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces raisons,
-	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec le driver
+	donnant <samp class="kbd-output">wh</samp> ou encore <kbd>(#</kbd> donnant
+	<samp class="kbd-output">("</samp>. Toutefois, elle entraîne certains petits problèmes. Parmi
+	ceux-ci, il y a le fait qu'il faut appuyer 2 fois sur <kbd>Entrée</kbd> pour valider la touche
+	morte et envoyer
+	<samp class="kbd-output">Entrée</samp>. Les touches mortes ne fonctionnent pas non plus sur
+	l'écran de verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la
+	fermeture automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces
+	raisons, il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec le driver
 	<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a> pour y définir ces roulements.
 </p>
 <p>

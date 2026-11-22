@@ -43,8 +43,15 @@ select {
 
 /* Boutons kbd */
 
+/* The text a key types is a samp (sample output), not a made-up element: it
+   keeps the text's font as the old custom element did, under the key font of
+   Keyboard.css, instead of the browser's monospace for samp. */
+:where(samp.kbd-output) {
+	font: inherit;
+}
+
 kbd,
-kbd-output,
+samp.kbd-output,
 kbd-non {
 	--taille: 1;
 	background-color: hsla(100deg, 0%, 60%, 10%);
@@ -68,7 +75,7 @@ kbd {
 	background-color: hsl(0, 0%, 14%);
 }
 
-kbd-output {
+samp.kbd-output {
 	background-color: hsla(0, 0%, 100%, 0.9);
 	border: 1px solid rgba(0, 0, 0, 0.3);
 	color: black;
@@ -80,10 +87,10 @@ kbd-non {
 }
 
 kbd:active,
-kbd-output:active,
+samp.kbd-output:active,
 kbd-non:active,
 kbd:hover,
-kbd-output:hover,
+samp.kbd-output:hover,
 kbd-non:hover {
 	box-shadow: rgba(204, 204, 204, 0.7) 0 0.766667px 0 0;
 	position: relative;
@@ -91,7 +98,7 @@ kbd-non:hover {
 }
 
 kbd.deadkey,
-kbd-output.deadkey {
+samp.kbd-output.deadkey {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;
 	--key-opacity: 5% !important;
@@ -108,7 +115,7 @@ kbd-output.deadkey {
 	font-weight: normal;
 }
 
-kbd-output.deadkey {
+samp.kbd-output.deadkey {
 	--key-opacity: 100% !important;
 }
 

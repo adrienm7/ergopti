@@ -15,11 +15,25 @@
 			"reason": "Colours the Ergopti brand name wherever it sits in running text."
 		},
 		{
+			"file": "src/lib/components/Ergopti.svelte",
+			"element": "name-ergopti (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Keeps the Ergopti brand name on one line in running text (ergopti_name.css); no phrasing element means a name."
+		},
+		{
 			"file": "src/lib/components/ErgoptiPlus.svelte",
 			"element": "span.glow",
 			"count": 1,
 			"kind": "styling-hook",
 			"reason": "Colours the « + » of the Ergopti+ name; no phrasing element means a coloured character."
+		},
+		{
+			"file": "src/lib/components/ErgoptiPlus.svelte",
+			"element": "name-ergopti-plus (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Keeps the Ergopti+ brand name on one line in running text (ergopti_name.css); no phrasing element means a name."
 		},
 		{
 			"file": "src/lib/components/Footer.svelte",
@@ -155,6 +169,13 @@
 			"reason": "Empty spacer that keeps the room of the fixed banner under the header on narrow screens."
 		},
 		{
+			"file": "src/lib/components/LegacyRedirect.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
+		},
+		{
 			"file": "src/lib/components/PageWrapper.svelte",
 			"element": "div (none)",
 			"count": 1,
@@ -181,6 +202,13 @@
 			"count": 1,
 			"kind": "layout",
 			"reason": "Width box around main that the site layout scans for heading ids; main itself is the landmark."
+		},
+		{
+			"file": "src/lib/components/PageWrapper.svelte",
+			"element": "bloc-main (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex row of the table of contents and the article column (layout.css); the nav and the main inside carry the meaning."
 		},
 		{
 			"file": "src/lib/components/SFB.svelte",
@@ -218,6 +246,27 @@
 			"reason": "The label text of a sub-navigation link, a flex item next to its icon."
 		},
 		{
+			"file": "src/lib/keyboard/KeyboardBasis.svelte",
+			"element": "keyboard (none)",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "The keyboard drawing carries role=\"table\" and its name; Keyboard.css lays it out as rows of key caps."
+		},
+		{
+			"file": "src/lib/keyboard/KeyboardBasis.svelte",
+			"element": "keyboard-row (none)",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "One row of the keyboard drawing, role=\"row\" of its table."
+		},
+		{
+			"file": "src/lib/keyboard/KeyboardBasis.svelte",
+			"element": "keyboard-key (none)",
+			"count": 1,
+			"kind": "aria-widget",
+			"reason": "One key of the keyboard drawing, role=\"cell\" of its table."
+		},
+		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonColor.svelte",
 			"element": "span.color-text-gradient",
 			"count": 2,
@@ -225,11 +274,46 @@
 			"reason": "Puts the gradient on the word of the selected option inside the button label."
 		},
 		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonColor.svelte",
+			"element": "keyboard-control-color (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonLayer.svelte",
+			"element": "keyboard-control-layer (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonPlus.svelte",
+			"element": "keyboard-control-plus (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the button inside is the named control."
+		},
+		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonType.svelte",
 			"element": "span.ergodox-text-gradient",
 			"count": 2,
 			"kind": "styling-hook",
 			"reason": "Puts the gradient on the word of the selected option inside the button label."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControlButtonType.svelte",
+			"element": "keyboard-control-type (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
+		},
+		{
+			"file": "src/lib/keyboard/controls/KeyboardControls.svelte",
+			"element": "keyboard-controls (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The row of the controls under a keyboard drawing (KeyboardControls.css); the buttons and selects inside are named."
 		},
 		{
 			"file": "src/routes/+layout.svelte",
@@ -288,6 +372,34 @@
 			"reason": "The button look of the development banner link text."
 		},
 		{
+			"file": "src/routes/+layout.svelte",
+			"element": "bloc-page.bg-blue",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The flex column of the whole page that keeps the header sticky and the footer at the bottom; the header, main and footer inside carry the meaning."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "keyboard-reference (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Pins the keyboard reference button and its panel to the window corner; the button inside is the control."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "clavier-reference.bg-blue",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The panel the keyboard reference button shows and hides (aria-controls); the drawing inside is a named table."
+		},
+		{
+			"file": "src/routes/+layout.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/+page.svelte",
 			"element": "span.product-link",
 			"count": 1,
@@ -300,6 +412,13 @@
 			"count": 3,
 			"kind": "language",
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/accessibilite/+page.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
 		},
 		{
 			"file": "src/routes/ergopti-plus/+layout.svelte",
@@ -1674,11 +1793,53 @@
 			"reason": "An aria-hidden fake window control of a drawn title bar."
 		},
 		{
+			"file": "src/routes/ergopti/+page.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/benchmarks/+page.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
+		},
+		{
+			"file": "src/routes/ergopti/benchmarks/comment_comparer.svelte",
+			"element": "tiny-space (none)",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/benchmarks/comparateurs_dispositions.svelte",
 			"element": "div (none)",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Puts the layout select on its own line above the comparison."
+		},
+		{
+			"file": "src/routes/ergopti/benchmarks/comparateurs_dispositions.svelte",
+			"element": "tiny-space (none)",
+			"count": 4,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/benchmarks/corpus.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/informations/+page.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
 		},
 		{
 			"file": "src/routes/ergopti/informations/autocritiques.svelte",
@@ -1709,6 +1870,13 @@
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
 		},
 		{
+			"file": "src/routes/ergopti/informations/changelog.svelte",
+			"element": "tiny-space (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/informations/genese_sources.svelte",
 			"element": "span.path1",
 			"count": 3,
@@ -1723,11 +1891,39 @@
 			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
 		},
 		{
+			"file": "src/routes/ergopti/informations/genese_sources.svelte",
+			"element": "tiny-space (none)",
+			"count": 5,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/installation/+page.svelte",
 			"element": "div (none)",
 			"count": 2,
 			"kind": "layout",
 			"reason": "A 1rem spacer and the flex row of the two PDF links."
+		},
+		{
+			"file": "src/routes/ergopti/installation/+page.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
+		},
+		{
+			"file": "src/routes/ergopti/installation/+page.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_linux.svelte",
+			"element": "tiny-space (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/installation/installation_macos.svelte",
@@ -1744,6 +1940,20 @@
 			"reason": "Margin spacers between the download blocks of the installation steps."
 		},
 		{
+			"file": "src/routes/ergopti/installation/installation_macos.svelte",
+			"element": "tiny-space (none)",
+			"count": 5,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/installation/installation_macos.svelte",
+			"element": "nbsp (none)",
+			"count": 1,
+			"kind": "styling-hook",
+			"reason": "Draws the narrow no-break space before a colon as a visible block inside the key (Keyboard.css), so the reader sees where it goes."
+		},
+		{
 			"file": "src/routes/ergopti/installation/installation_windows.svelte",
 			"element": "div.download-buttons",
 			"count": 1,
@@ -1758,11 +1968,74 @@
 			"reason": "Margin spacers between the download blocks of the installation steps."
 		},
 		{
+			"file": "src/routes/ergopti/installation/installation_windows.svelte",
+			"element": "small-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/+page.svelte",
+			"element": "bloc-introduction (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/+page.svelte",
+			"element": "bloc-fin (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The full-width band under the article column for the closing Ergopti+ presentation; its section carries the meaning."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/chiffres_acces_direct.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
 			"element": "div (none)",
 			"count": 18,
 			"kind": "styling-hook",
 			"reason": "The legend boxes of the hand-drawn keys, styled by Keyboard.css as keyboard-key div like the generated keys, and the gap between the hands."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "keyboard (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "A small drawing of the home row in the key-cap style of Keyboard.css; its letters read in order and its legend names it."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "keyboard-row.center",
+			"count": 2,
+			"kind": "layout",
+			"reason": "The one row of the home-row drawing, centred by Keyboard.css; its keys read in order."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "keyboard-key (none)",
+			"count": 16,
+			"kind": "layout",
+			"reason": "One key cap of the home-row drawing, coloured by finger (data-finger); its letter is its text."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "keyboard-legend (none)",
+			"count": 2,
+			"kind": "layout",
+			"reason": "The caption line under the home-row drawing in the drawing style of Keyboard.css; a figcaption would need the drawing to be a figure that Keyboard.css does not style."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
+			"element": "tiny-space (none)",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
@@ -1807,6 +2080,13 @@
 			"reason": "The framed box of a summary in the main flow; it is part of the text, not tangential to it, so not an aside."
 		},
 		{
+			"file": "src/routes/ergopti/presentation/espace_insecable_automatique.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
 			"element": "span (none)",
 			"count": 3,
@@ -1849,6 +2129,34 @@
 			"reason": "Keeps a word and the punctuation after it on one line (white-space: nowrap)."
 		},
 		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "tiny-space (none)",
+			"count": 3,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "small-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
+			"element": "big-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/minimisation_sfbs.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
 			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
 			"element": "div (none)",
 			"count": 1,
@@ -1861,6 +2169,34 @@
 			"count": 7,
 			"kind": "language",
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
+			"element": "tiny-space (none)",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
+			"element": "keyboard-control-rolls (none)",
+			"count": 1,
+			"kind": "layout",
+			"reason": "Centres the roll picker under the keyboard drawing; the select inside is the named control."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/placement_logique_touches.svelte",
+			"element": "tiny-space (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+		},
+		{
+			"file": "src/routes/ergopti/presentation/utilisation_une_main.svelte",
+			"element": "tiny-space (none)",
+			"count": 2,
+			"kind": "decorative",
+			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/studio/+layout.svelte",

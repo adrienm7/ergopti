@@ -11,9 +11,9 @@
 		intelligent. Saisis sur la couche <kbd>Shift</kbd>, ils sont
 		<strong>automatiquement insérés précédés d’une espace insécable</strong>. Contrairement à une
 		espace classique, ce caractère spécial garantit que la ponctuation reste toujours solidaire du
-		mot qui la précède. Résultat : fini les <kbd-output>?</kbd-output> orphelins rejetés seuls en début
-		de ligne ! Tous vos documents, e-mails, messages sur les réseaux sociaux et autres textes gagneront
-		instantanément en professionnalisme.
+		mot qui la précède. Résultat : fini les <samp class="kbd-output">?</samp> orphelins rejetés seuls
+		en début de ligne ! Tous vos documents, e-mails, messages sur les réseaux sociaux et autres textes
+		gagneront instantanément en professionnalisme.
 	</p>
 	<p>
 		⚠ <strong>Attention toutefois :</strong> ce raccourci est réservé au texte courant, et au

@@ -94,9 +94,10 @@
 		>Win</kbd
 	>) rend la lettre de base Ergopti de chaque touche. Sur les touches sans lettre simple, comme
 	<kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, <kbd>è</kbd>, elle rend respectivement
-	<kbd-output>C</kbd-output>, <kbd-output>V</kbd-output>, <kbd-output>X</kbd-output>,
-	<kbd-output>Z</kbd-output> pour garder Copier/Coller/Couper/Annuler sous les doigts. Après la
-	copie des fichiers, l'installeur compile la disposition, seule puis à côté d'une autre (comme
+	<samp class="kbd-output">C</samp>, <samp class="kbd-output">V</samp>,
+	<samp class="kbd-output">X</samp>,
+	<samp class="kbd-output">Z</samp> pour garder Copier/Coller/Couper/Annuler sous les doigts. Après
+	la copie des fichiers, l'installeur compile la disposition, seule puis à côté d'une autre (comme
 	<code>us</code>). Il ne déclare l'installation réussie que si ce type personnalisé est bien
 	présent. La réinstallation par-dessus une version précédente (y compris l'ancienne méthode)
 	nettoie automatiquement les restes de l'installation antérieure. Enfin, la variante « Ergopti++ »
@@ -222,9 +223,9 @@
 </p>
 <ul>
 	<li>
-		Le raccourci <kbd-output>Ctrl+Z</kbd-output> en <kbd>Ctrl</kbd> + <kbd>È</kbd> ne semble pas fonctionner.
-		Pourtant, tous les autres raccourcis sur les lettres accentuées fonctionnent, alors qu'ils sont définis
-		de la même manière.
+		Le raccourci <samp class="kbd-output">Ctrl+Z</samp> en <kbd>Ctrl</kbd> + <kbd>È</kbd> ne semble pas
+		fonctionner. Pourtant, tous les autres raccourcis sur les lettres accentuées fonctionnent, alors
+		qu'ils sont définis de la même manière.
 	</li>
 	<li>
 		Sur Wayland, XCompose ne fonctionne pas dans certains programmes. C'est notamment le cas des
@@ -238,11 +239,12 @@
 		sur
 		<kbd>Entrée</kbd>
 		en état de touche morte envoie la touche morte, mais pas directement
-		<kbd-output>Entrée</kbd-output>. Pour cela, il est nécessaire d'appuyer une deuxième fois sur la
-		touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de remappage de
-		clavier, comme cela a été corrigé sur macOS. <br /> Un autre problème plus embêtant est que la
-		répétition de deux lettres ne fonctionne pas, notamment pour la lettre
-		<kbd>P</kbd>. Pour taper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
+		<samp class="kbd-output">Entrée</samp>. Pour cela, il est nécessaire d'appuyer une deuxième fois
+		sur la touche. Ce problème peut probablement être résolu en utilisant un autre logiciel de
+		remappage de clavier, comme cela a été corrigé sur macOS. <br /> Un autre problème plus embêtant
+		est que la répétition de deux lettres ne fonctionne pas, notamment pour la lettre
+		<kbd>P</kbd>. Pour taper <samp class="kbd-output">PP</samp>, il faut appuyer quatre fois sur la
+		touche
 		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d'utiliser la version standard d'<Ergopti
 		></Ergopti> ou « Ergopti+ » (un seul +) avec le driver
 		<a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a>.

@@ -60,7 +60,7 @@ keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
 */
 
 kbd,
-kbd-output,
+samp.kbd-output,
 kbd-non,
 keyboard-key {
 	align-content: center;
@@ -76,7 +76,7 @@ keyboard-key {
 }
 
 p kbd,
-p kbd-output {
+p samp.kbd-output {
 	line-height: 1.2em;
 }
 

@@ -7,10 +7,13 @@
  * The site's markup says what it is (maintainer request of 2026-11-19: « no
  * non-semantic tag: main, section, aside, nav…, no span or div if
  * possible »). A div or a span is allowed only where no element has the
- * meaning, and each one is justified in a reviewed list.
+ * meaning, and each one is justified in a reviewed list. A made-up element
+ * (`<bloc-main>`, `<keyboard>`) counts as one: it means no more than a div
+ * (since 2026-11-22, when the 92 `<kbd-output>` became `<samp>` and the
+ * `<image-block>` became `<figure>`).
  *
  * WHAT IS CHECKED, in every Svelte file under src/:
- * 1. Every div and span matches an entry of site-semantic-html-allowlist.json:
+ * 1. Every div, span and made-up element matches an entry of site-semantic-html-allowlist.json:
  *    its file, its element (tag and first static class, or #id, or « (none) »)
  *    and its exact count, with a kind from a closed list and a reason. An
  *    unlisted element fails (use the element that has the meaning, or add a
@@ -81,6 +84,46 @@ function checkTheChecker() {
 	assert.deepEqual(sample('<div id="target" tabindex="-1"></div>').interactive, []);
 	assert.deepEqual(sample('<div class="mode-tabs" role="tablist"></div>').interactive, []);
 	assert.deepEqual(sample('<button onclick={go}>x</button>').interactive, []);
+	// A made-up element is generic: the text a key types was <kbd-output>, a
+	// screenshot box <image-block>; their real elements are not counted, nor a
+	// build-time directive.
+	assert.deepEqual(
+		[
+			...sample(
+				'<p><kbd-output>pt</kbd-output><image-block></image-block><keyboard></keyboard><nbsp></nbsp></p>'
+			).counts
+		],
+		[
+			['kbd-output (none)', 1],
+			['image-block (none)', 1],
+			['keyboard (none)', 1],
+			['nbsp (none)', 1]
+		]
+	);
+	assert.deepEqual(
+		[
+			...sample(
+				'<p><samp class="kbd-output">pt</samp></p><figure class="image-block"><enhanced:img src="a.jpg" alt="a" /></figure><svg><path d="M0"></path></svg>'
+			).counts
+		],
+		[]
+	);
+	assert.match(sample('<keyboard-key onclick={go}>x</keyboard-key>').interactive[0], /click/);
+	assert.match(
+		allowlistProblems({
+			elements: [
+				{
+					file: 'a.svelte',
+					element: 'samp.kbd-output',
+					count: 1,
+					kind: 'styling-hook',
+					reason: 'A real element never needs a justification of its own.'
+				}
+			],
+			svelteIgnores: []
+		})[0],
+		/made-up element/
+	);
 	// Elements inside blocks are seen, keyed by class, id or (none).
 	const keys = sample(
 		'{#if a}<div class="grid {b}">{#each c as d}<span>{d}</span>{/each}</div>{/if}<div id="x"></div>'
@@ -162,7 +205,7 @@ function main(args = process.argv.slice(2)) {
 	}
 	const total = allowlist.elements.reduce((sum, entry) => sum + entry.count, 0);
 	console.log(
-		`Site semantic HTML: ${site.measured.size} files, ${total} justified div/span, no interactive one, no Svelte a11y warning`
+		`Site semantic HTML: ${site.measured.size} files, ${total} justified div, span or made-up element, no interactive one, no Svelte a11y warning`
 	);
 }
 

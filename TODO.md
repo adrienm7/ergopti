@@ -191,8 +191,13 @@ baseline as violations go.
       The app windows' div and span are held by `npm run test:app-windows-semantic-markup` (1162 → 276, each
       justified in `tools/test/app-windows-semantic-markup/`) and their mouse-only controls by the app windows scan
       ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
-      Left: the Studio pages' own div and span lists; the site's custom elements (`bloc-main`,
-      `keyboard-reference`…), as generic as a div but outside the gate.
+      The Studio pages' div and span are held by `npm run test:studio-semantic-html` (143, each justified in
+      `tools/test/studio-semantic-html-allowlist.json`, none interactive). Since 2026-11-22 the site gate also
+      counts made-up elements (a custom element name or one HTML does not define, as generic as a div): the 92
+      `<kbd-output>` became `<samp class="kbd-output">` and the 4 `<image-block>` a `<figure>`, and the 87 left
+      are justified in the same list. Left: those 87 — the 42 empty spacers (`tiny-space`…, a CSS margin would
+      do), the page blocks (`bloc-page`, `bloc-main`, `bloc-introduction`, `bloc-fin`), the keyboard drawings'
+      `keyboard`, `keyboard-row` and `keyboard-key`, the controls' wrappers and the brand names.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked

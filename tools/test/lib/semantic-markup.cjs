@@ -9,7 +9,10 @@
  * blocking tests). A div or a span is allowed only where no element has the
  * meaning, and each one is justified in a reviewed list per scope (the site,
  * the app windows, the Studio pages), with its exact count, a kind from a
- * closed list and a reason. None may be interactive.
+ * closed list and a reason. None may be interactive. A made-up element
+ * (`bloc-main`, `keyboard`: a custom element name, or a name HTML does not
+ * define) is as generic as a div for assistive technology, so the same
+ * judgement holds it wherever the scope's reader sees it (the site's does).
  *
  * Reader-agnostic: a scope's reader (tools/test/lib/svelte-markup.cjs for the
  * site's Svelte files, an HTML reader for the static pages) turns each
@@ -23,6 +26,37 @@
 'use strict';
 
 const GENERIC = Object.freeze(['div', 'span']);
+// Every element HTML, SVG and MathML define that a page here may write; any
+// other plain name is unknown to the browser (HTMLUnknownElement) and, like a
+// custom element, carries no meaning.
+const KNOWN_ELEMENTS = new Set(
+	(
+		'a abbr address area article aside audio b base bdi bdo blockquote body br button canvas ' +
+		'caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed ' +
+		'fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i ' +
+		'iframe img input ins kbd label legend li link main map mark menu meta meter nav noscript ' +
+		'object ol optgroup option output p picture pre progress q rp rt ruby s samp script search ' +
+		'section select slot small source span strong style sub summary sup table tbody td template ' +
+		'textarea tfoot th thead time title tr track u ul var video wbr ' +
+		'svg g path circle ellipse line polyline polygon rect text tspan defs use symbol desc ' +
+		'lineargradient radialgradient stop clippath mask pattern image foreignobject ' +
+		'math mi mn mo ms mtext mrow msup msub mfrac msqrt mroot'
+	).split(' ')
+);
+
+/**
+ * Whether a tag is generic: a div, a span, or a made-up element (a custom
+ * element name with a hyphen, or a name HTML, SVG and MathML do not define).
+ * A namespaced name (`enhanced:img`, `svelte:head`) is a build-time
+ * directive, not an element of the page.
+ * @param {string} tag - Lower-case tag name.
+ * @returns {boolean}
+ */
+function isGeneric(tag) {
+	if (GENERIC.includes(tag)) return true;
+	if (tag.includes(':')) return false;
+	return tag.includes('-') || !KNOWN_ELEMENTS.has(tag.toLowerCase());
+}
 // Why a generic element may stay: no HTML element means any of these.
 const KINDS = Object.freeze({
 	layout: 'a flex, grid or positioning box with no meaning of its own',
@@ -99,7 +133,7 @@ function inventoryOf(descriptors, file) {
 	const counts = new Map();
 	const interactive = [];
 	for (const element of descriptors) {
-		if (!GENERIC.includes(element.tag)) continue;
+		if (!isGeneric(element.tag)) continue;
 		const key = elementKey(element);
 		counts.set(key, (counts.get(key) || 0) + 1);
 		const where = `${file}:${element.line} <${key}>`;
@@ -137,8 +171,11 @@ function allowlistProblems(allowlist) {
 		if (!Object.hasOwn(KINDS, entry.kind)) problems.push(`${label}: unknown kind ${entry.kind}`);
 		if (typeof entry.reason !== 'string' || entry.reason.trim().length < MIN_REASON_LENGTH)
 			problems.push(`${label}: the reason must say why no element fits`);
-		if (!/^(div|span)(\.[\w-]+|#[\w-]+| \(none\))$/.test(entry.element ?? ''))
-			problems.push(`${label}: element must be div or span with .class, #id or (none)`);
+		const tag = /^([a-z][\w-]*)(\.[\w-]+|#[\w-]+| \(none\))$/.exec(entry.element ?? '');
+		if (!tag || !isGeneric(tag[1]))
+			problems.push(
+				`${label}: element must be a div, a span or a made-up element with .class, #id or (none)`
+			);
 		const key = entry.file + '\0' + entry.element;
 		if (seen.has(key)) problems.push(`${label}: listed twice`);
 		seen.add(key);
@@ -555,6 +592,7 @@ function matchAllowlist(occurrences, allEntries, file) {
 
 module.exports = {
 	GENERIC,
+	isGeneric,
 	CONTAINER_EVENTS,
 	KINDS,
 	INTERACTIVE_ROLES,

@@ -123,8 +123,8 @@
 		déplacement du <kbd>K</kbd>. Toutefois, les résultats seront quand même très similaires. Il y
 		aura peut-être un tout petit peu plus de <SFB></SFB>s sur le <kbd>A</kbd> que dans la réalité,
 		car il y a plus de
-		<kbd-output>KA</kbd-output>
-		que de <kbd-output>KU</kbd-output>.
+		<samp class="kbd-output">KA</samp>
+		que de <samp class="kbd-output">KU</samp>.
 	</p>
 </section>
 
