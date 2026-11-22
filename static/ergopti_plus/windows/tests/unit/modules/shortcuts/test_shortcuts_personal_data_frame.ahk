@@ -674,50 +674,92 @@ _SMB_FramePendingWalksFollowForeignCalls() {
 Test("personal DATA frame: pending receipts are walked after foreign calls only and mutations stay refused (frame-pending-walk)",
 	_SMB_FramePendingWalksFollowForeignCalls)
 
-; An absent registry stages nothing, so it takes and walks no deep receipt of the
-; earlier pending leaves: doing so was about 220 million cycles of every Shortcuts
-; menu build at startup. A provider that rewrites one of their entries is still refused.
-_SMB_FramePendingCaptureCount() {
-	return _PerfCountersOwner().Counts.Get("menu.frame_pending_capture", 0)
+; Earlier pending leaves keep their rows sealed, so the receipts hold none of them:
+; with the rows in the receipts, capturing and walking them for the empty personal
+; frame was about 220 million cycles of every Shortcuts menu build at startup.
+; Every edit a provider can make to an earlier leaf is still refused or cannot
+; reach it: a nested row, its store, a callable it names.
+_SMB_FrameOpenRowsCount() {
+	return _PerfCountersOwner().Counts.Get("menu.frame_pending_open_rows", 0)
 }
 
-_SMB_FrameAbsentRegistryTakesNoReceipt() {
+; Edits the first remaining row of an earlier leaf through whatever it holds.
+_SMB_FrameEditEarlierRow(Entry) {
+	Rows := Entry.Rows
+	if Rows is Array
+		Rows[1]["label"] := "Edited earlier row"
+	else
+		MenuSealedRows_Slice(Rows, 1, 1)[1]["label"] := "Edited earlier row"
+}
+
+_SMB_FrameEarlierLeafCases() {
 	global _MenuPopulationBuilding
 	Previous := _MenuPopulationBuilding
-	Owner := MenuPopulation(), Native := Menu(), Foreign := Menu()
-	Action := (*) => 0
-	ForeignRows := [Map("label", "Earlier seeded", "action", Action), Map("label", "Earlier pending", "action", Action)]
+	Owner := false, Native := false, Foreign := false
+	EarlierAction := (*) => 0, Action := (*) => 0
 	Data := [Map("label", "Frame seeded", "action", Action), Map("label", "Frame pending", "action", Action)]
-	try {
+	Fresh() {
+		if Owner {
+			Owner.Stop()
+			Owner.Pending.Clear()
+			_CTC_ReleaseMenu(Native)
+			_CTC_ReleaseMenu(Foreign)
+		}
+		Owner := MenuPopulation(), Native := Menu(), Foreign := Menu()
 		_MenuPopulationBuilding := Owner
-		Owner.Fill(Foreign, ForeignRows, "personal_shortcuts_frame", 2)
-		Binding := Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
-			"provider", () => 0)
-		Walks := _SMB_FramePendingWalkCounts(), Captures := _SMB_FramePendingCaptureCount()
-		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted))
+		Owner.Fill(Foreign, [Map("label", "Earlier seeded", "action", EarlierAction),
+			Map("label", "Earlier pending", "action", EarlierAction)], "personal_shortcuts_frame", 2)
+		return Owner.Pending[Foreign.Handle]
+	}
+	Append(Provider, &Admitted) {
+		return MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts",
+			Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
+				"provider", Provider), , , &Admitted)
+	}
+	try {
+		; An absent registry: the receipts hold no open row of the earlier leaf.
+		Entry := Fresh()
+		OpenRows := _SMB_FrameOpenRowsCount()
+		AssertEqual(0, Append(() => 0, &Admitted))
 		AssertTrue(Admitted, "an absent registry is a deliberate skip")
-		AssertEqual(Captures, _SMB_FramePendingCaptureCount(), "an absent registry takes no pending receipt")
-		Now := _SMB_FramePendingWalkCounts()
-		AssertEqual(Walks[1], Now[1], "an absent registry walks no pending receipt")
-		AssertEqual(Walks[2], Now[2], "an absent registry has no walk to skip")
-		AssertEqual(0, TrayMenuItemCount(Native))
-		Entry := Owner.Pending[Foreign.Handle]
-		Binding["provider"] := () => (Entry.NextRow := 2, 0)
-		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
-			"a pending entry rewritten by a provider with no rows is refused")
-		AssertFalse(Admitted)
-		Entry.NextRow := 1
-		Binding["provider"] := () => Data
-		Captures := _SMB_FramePendingCaptureCount()
-		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding))
-		AssertEqual(Captures + 1, _SMB_FramePendingCaptureCount(), "rows to stage take the receipts once")
+		AssertEqual(OpenRows, _SMB_FrameOpenRowsCount(), "the pending receipts hold no open row")
+		; A nested row of the earlier leaf edited by the provider never reaches it unrefused.
+		for Provided in [0, Data] {
+			Entry := Fresh()
+			Result := Append(((E, D) => () => (_SMB_FrameEditEarlierRow(E), D))(Entry, Provided), &Admitted)
+			Refused := Result == 0 && !Admitted
+			AssertTrue(Owner.Complete(Foreign.Handle))
+			Assert(Refused || TrayMenuItemCaption(Foreign, 1) == "Earlier pending",
+				"a nested row of an earlier leaf edited by the provider is refused or does not reach the leaf ("
+				. TrayMenuItemCaption(Foreign, 1) . ")")
+		}
+		; Its sealed store written again under the same ticket is refused.
+		for Provided in [0, Data] {
+			Entry := Fresh()
+			Forge := ((E, D) => () => (_MenuSealedRows_Store("drop", E.Rows),
+				_MenuSealedRows_Store("put", E.Rows, [Map("label", "Forged", "action", Action)]), D))(Entry, Provided)
+			AssertEqual(0, Append(Forge, &Admitted), "a rewritten sealed store is refused")
+			AssertFalse(Admitted)
+		}
+		; A callable its sealed rows name, given an own Call, is refused.
+		Entry := Fresh()
+		try {
+			AssertEqual(0, Append(() => (EarlierAction.DefineProp("Call", {Call: (*) => 0}), Data), &Admitted),
+				"a callable of an earlier leaf given an own Call is refused")
+			AssertFalse(Admitted)
+		} finally {
+			if Object.Prototype.HasOwnProp.Call(EarlierAction, "Call")
+				EarlierAction.DeleteProp("Call")
+		}
 	} finally {
-		Owner.Stop()
-		Owner.Pending.Clear()
+		if Owner {
+			Owner.Stop()
+			Owner.Pending.Clear()
+			_CTC_ReleaseMenu(Native)
+			_CTC_ReleaseMenu(Foreign)
+		}
 		_MenuPopulationBuilding := Previous
-		_CTC_ReleaseMenu(Native)
-		_CTC_ReleaseMenu(Foreign)
 	}
 }
-Test("personal DATA frame: an absent registry takes and walks no pending receipt (empty-frame-receipts)",
-	_SMB_FrameAbsentRegistryTakesNoReceipt)
+Test("personal DATA frame: earlier leaves hold sealed rows, and every edit to one is refused (sealed-pending-rows)",
+	_SMB_FrameEarlierLeafCases)

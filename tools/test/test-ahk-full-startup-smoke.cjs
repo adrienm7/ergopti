@@ -254,28 +254,28 @@ function deferredBuildFallbackProblem(configRoot) {
 	return '';
 }
 
-// Shortcuts menu builds judged by emptyPersonalFrameProblem over the whole run.
-let emptyPersonalFramesJudged = 0;
+// Shortcuts menu builds judged by sealedPendingRowsProblem over the whole run.
+let sealedPendingRowsJudged = 0;
 
 /**
- * Whether every Shortcuts menu build left the pending receipts alone for its
- * personal shortcuts frame. The smoke's personal file is the default one, which
- * registers no shortcut, so the frame stages nothing and has no receipt to take
- * or walk. Capturing and twice walking the receipts of the 46 pending submenus
- * for that absent registry made the personal row about 310 million cycles
- * (150 ms) of every build, against about 90 million (45 ms) without them
- * (2026-11-22); the probe's counter moves show it without a cycle bound.
+ * Whether every Shortcuts menu build found the earlier pending submenus' rows
+ * sealed. Its personal shortcuts frame holds receipts of every pending submenu
+ * of the tray and checks them after each call out; with their rows in the
+ * receipts, capturing and walking the 46 pending submenus made the personal row
+ * about 310 million cycles (150 ms) of every build (2026-11-22). Sealed rows
+ * leave a receipt with no open row, which the probe's counter moves show
+ * without a cycle bound.
  * @param {string} configRoot
  * @returns {string} The first offending build, or '' when there is none.
  */
-function emptyPersonalFrameProblem(configRoot) {
+function sealedPendingRowsProblem(configRoot) {
 	for (const build of deferredMenuBuilds(configRoot)) {
 		if (build.list !== 'shortcuts_menu') continue;
 		if (!build.probe) return `the ${build.list} build logged no probe line to judge`;
-		emptyPersonalFramesJudged += 1;
-		const moves = build.probe.match(/menu\.frame_pending_(?:capture|walk)\+\d+/g);
+		sealedPendingRowsJudged += 1;
+		const moves = build.probe.match(/menu\.frame_pending_open_rows\+\d+/g);
 		if (moves)
-			return `the empty personal shortcuts frame of the ${build.list} build took pending receipts (${moves.join(', ')}): ${deferredBuildProbe(build)}`;
+			return `the ${build.list} build held open pending rows in its receipts (${moves.join(', ')}): ${deferredBuildProbe(build)}`;
 	}
 	return '';
 }
@@ -1122,7 +1122,7 @@ async function main() {
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
 			const fallback = deferredBuildFallbackProblem(configRoot);
 			if (fallback) return fail(`${fixture}: ${fallback}`);
-			const personalFrame = emptyPersonalFrameProblem(configRoot);
+			const personalFrame = sealedPendingRowsProblem(configRoot);
 			if (personalFrame) return fail(`${fixture}: ${personalFrame}`);
 			const { problem: render, overBound } = hotstringsRenderProblem(fixture, configRoot);
 			if (render && !overBound) return fail(`${fixture}: ${render}`);
@@ -1215,10 +1215,8 @@ async function main() {
 				if (warmWork) return fail(`${fixture}/warm: ${warmWork}`);
 			}
 		}
-		if (emptyPersonalFramesJudged === 0)
-			return fail(
-				'no boot built the Shortcuts menu, so its personal shortcuts frame went unjudged'
-			);
+		if (sealedPendingRowsJudged === 0)
+			return fail('no boot built the Shortcuts menu, so its pending receipts went unjudged');
 		const stale = staleWorkOwners();
 		if (stale.length > 0)
 			return fail(

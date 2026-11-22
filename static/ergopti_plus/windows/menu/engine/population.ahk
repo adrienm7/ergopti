@@ -435,6 +435,140 @@ MenuDeferred_Retire(LiveHandles) {
 		_MenuDeferredChildren.Delete(Handle)
 }
 
+/**
+ * The rows a pending leaf still has to draw, sealed: the store keeps its own deep
+ * copy, which no caller holds, so neither the caller's row Maps nor a reader can
+ * change them. Rows go in once, at construction, and come out as fresh copies.
+ * What a copy cannot isolate, the callables and menus the rows name, is checked
+ * by MenuSealedRows_Stamp. The ticket keeps no data: the store is keyed by the
+ * ticket's identity and drops its rows when the ticket goes.
+ */
+class MenuSealedRows {
+	/** @param {Array} Rows The leaf rows to seal. */
+	__New(Rows) {
+		_MenuSealedRows_Store("put", this, Rows)
+	}
+
+	__Delete() {
+		_MenuSealedRows_Store("drop", this)
+	}
+}
+
+/**
+ * How many rows a sealed store holds.
+ * @param {MenuSealedRows} Ticket
+ * @returns {Integer}
+ */
+MenuSealedRows_Count(Ticket) {
+	return _MenuSealedRows_Store("count", Ticket)
+}
+
+/**
+ * Fresh copies of a sealed store's rows, From to To inclusive.
+ * @param {MenuSealedRows} Ticket
+ * @param {Integer} From First row, 1-based.
+ * @param {Integer} To Last row; below From gives no row.
+ * @returns {Array}
+ */
+MenuSealedRows_Slice(Ticket, From, To) {
+	return _MenuSealedRows_Store("slice", Ticket, From, To)
+}
+
+/**
+ * The stamp a sealed store had when it was written, while it is still that store
+ * and every callable and menu its rows name is intact; 0 otherwise. A store that
+ * was dropped and written again under the same ticket has a new stamp.
+ * @param {MenuSealedRows} Ticket
+ * @returns {Integer}
+ */
+MenuSealedRows_Stamp(Ticket) {
+	return _MenuSealedRows_Store("stamp", Ticket)
+}
+
+; The one owner of every sealed row copy. Its slots are reachable from nowhere
+; else, so "put" and "drop" are the only ways they change, and each "put" takes a
+; new serial.
+_MenuSealedRows_Store(Operation, Ticket, From := 0, To := 0) {
+	static Slots := Map(), Serial := 0
+	if !(Ticket is MenuSealedRows)
+		throw TypeError("Sealed menu rows need their ticket")
+	Key := ObjPtr(Ticket)
+	if Operation == "drop" {
+		if Slots.Has(Key)
+			Slots.Delete(Key)
+		return true
+	}
+	if Operation == "put" {
+		if Slots.Has(Key)
+			throw Error("Sealed menu rows are written once")
+		if !(From is Array)
+			throw TypeError("Sealed menu rows must be an Array")
+		Objects := []
+		Copy := _MenuSealedRows_Copy(From, Objects)
+		Serial += 1
+		Slots[Key] := { Rows: Copy, Objects: Objects, Serial: Serial }
+		return Serial
+	}
+	if Operation == "stamp" {
+		if !Slots.Has(Key)
+			return 0
+		Slot := Slots[Key]
+		for Value in Slot.Objects
+			if !_MenuSealedRows_ObjectIntact(Value)
+				return 0
+		return Slot.Serial
+	}
+	if !Slots.Has(Key)
+		throw Error("Sealed menu rows were dropped")
+	Rows := Slots[Key].Rows
+	if Operation == "count"
+		return Rows.Length
+	if Operation == "slice" {
+		Slice := []
+		Index := From
+		while Index <= To
+			Slice.Push(_MenuSealedRows_Copy(Rows[Index++]))
+		return Slice
+	}
+	throw ValueError("Unknown sealed menu rows operation: " . Operation)
+}
+
+; A deep copy of the Maps and Arrays; other objects are kept by identity and,
+; when Objects is given, listed for the stamp.
+_MenuSealedRows_Copy(Value, Objects := 0) {
+	if Value is Map {
+		Copy := Map()
+		Copy.CaseSense := Value.CaseSense
+		for Key, Field in Value
+			Copy[Key] := _MenuSealedRows_Copy(Field, Objects)
+		return Copy
+	}
+	if Value is Array {
+		Copy := []
+		loop Value.Length
+			Copy.Push(Value.Has(A_Index) ? _MenuSealedRows_Copy(Value[A_Index], Objects) : unset)
+		return Copy
+	}
+	if IsObject(Value) && Objects is Array
+		Objects.Push(Value)
+	return Value
+}
+
+; What a receipt of the rows checked of the objects they name: a callable keeps
+; its intrinsic Call, a menu keeps its native methods.
+_MenuSealedRows_ObjectIntact(Value) {
+	if Value is Func
+		return !Object.Prototype.HasOwnProp.Call(Value, "Call")
+	if Value is Menu {
+		if ObjGetBase(Value) != Menu.Prototype
+			return false
+		for Name in ["Handle", "Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+			if Object.Prototype.HasOwnProp.Call(Value, Name)
+				return false
+	}
+	return true
+}
+
 /** Owns the unpublished remainder of native leaf menus for one root build. */
 class MenuPopulation {
 	__New() {
@@ -476,7 +610,7 @@ class MenuPopulation {
 		}
 		_MR_NormalizeSeparators(MenuObj)
 		if Remainder.Length > 0
-			this.Pending[MenuObj.Handle] := { MenuObj: MenuObj, Rows: Remainder,
+			this.Pending[MenuObj.Handle] := { MenuObj: MenuObj, Rows: MenuSealedRows(Remainder),
 				ListId: ListId, Depth: Depth, NextRow: 1, Busy: false, Failure: "" }
 		return MenuObj
 	}
@@ -486,7 +620,7 @@ class MenuPopulation {
 		MenuDeferred_BuildAll("reload replay identity")
 		Handles := []
 		for Handle, Entry in this.Pending {
-			for Row in Entry.Rows {
+			for Row in MenuSealedRows_Slice(Entry.Rows, 1, MenuSealedRows_Count(Entry.Rows)) {
 				if Row is Map && Row.Get("replay_id", "") == Identity {
 					Handles.Push(Handle)
 					break
@@ -518,10 +652,9 @@ class MenuPopulation {
 				throw Error("Native leaf population previously failed: " . Entry.Failure)
 			Entry.Busy := true
 			OwnBusy := true
-			LastRow := MaxRows ? Min(Entry.Rows.Length, Entry.NextRow + MaxRows - 1) : Entry.Rows.Length
-			Batch := []
-			loop LastRow - Entry.NextRow + 1
-				Batch.Push(Entry.Rows[Entry.NextRow + A_Index - 1])
+			RowCount := MenuSealedRows_Count(Entry.Rows)
+			LastRow := MaxRows ? Min(RowCount, Entry.NextRow + MaxRows - 1) : RowCount
+			Batch := MenuSealedRows_Slice(Entry.Rows, Entry.NextRow, LastRow)
 			; Only prepared rows are appended here: no file discovery or provider
 			; invocation. Leaf menus retain their own remaining rows. Tray requests wait;
 			; unexpected synchronous 0x117 reentry is refused before partial paint.
@@ -533,7 +666,7 @@ class MenuPopulation {
 			PerfCount(Reason == "background" ? "menu.leaf_background" : "menu.leaf_foreground")
 			PerfCount("menu.leaf_rows", Appended)
 			Entry.NextRow := LastRow + 1
-			Remaining := Entry.Rows.Length - LastRow
+			Remaining := RowCount - LastRow
 			if Remaining == 0 {
 				; Normalize once, across every batch boundary. Intermediate trailing
 				; separators belong to the unpublished remainder, never a painted menu.
