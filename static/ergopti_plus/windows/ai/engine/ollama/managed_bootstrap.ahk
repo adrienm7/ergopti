@@ -1419,9 +1419,9 @@ class OllamaManagedBootstrap {
 		Evidence := Receipt is Map ? Receipt.Get("failure_evidence", "") : ""
 		if !(Evidence is String) || Evidence == ""
 			Evidence := "receipt_without_evidence"
-		Class := LLM_OllamaInstallErrorClass(Evidence)
-		LoggerError("LLM.managed", "Managed install failure of class {1}: {2}.", Class, Evidence)
-		return LLM_OllamaInstallErrorKey(Class)
+		ErrorClass := LLM_OllamaInstallErrorClass(Evidence)
+		LoggerError("LLM.managed", "Managed install failure of class {1}: {2}.", ErrorClass, Evidence)
+		return LLM_OllamaInstallErrorKey(ErrorClass)
 	}
 
 	_Fail(Phase, MessageKey := "ollama.runtime_repair_failed", Model := "") {
