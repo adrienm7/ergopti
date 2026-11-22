@@ -721,5 +721,15 @@ export default {
 	correction: 'correction',
 	prédiction: 'prediction',
 	'✨ ligne active': '✨ active line',
-	'Style des fenêtres': 'Window style'
+	'Style des fenêtres': 'Window style',
+	'Touche ★': '★ key',
+	'Tous les remplacements de texte de la touche ★': 'Every text replacement of the ★ key',
+	'La liste complète, lue dans les fichiers que le driver charge. Tapez l’abréviation puis ★ : elle est remplacée par le texte de droite.':
+		'The complete list, read from the files the driver loads. Type the abbreviation then ★: it is replaced by the text on the right.',
+	'Rechercher un remplacement': 'Search a replacement',
+	'{shown} sur {total} remplacements': '{shown} of {total} replacements',
+	'{total} remplacements': '{total} replacements',
+	Abréviation: 'Abbreviation',
+	Remplacement: 'Replacement',
+	'Aucun remplacement ne correspond à cette recherche.': 'No replacement matches this search.'
 };

@@ -402,7 +402,11 @@ visualisation file and its six dead keys, so its text-area behaviour (typing
 at the caret, Tab leaving the field, Backspace, a waiting dead key) moved to
 `layout_try/typing.js`, which reads any library layout; the former page's
 Ergopti+ extras (the ★ text replacements and its replacement list) went with
-the page, an open question in TODO.md.
+the page. The maintainer settled them on 2026-11-22: `/ergopti-plus/hotstrings`
+lists every ★ replacement by section (`TextReplacements.svelte`), read at build
+time from the magic key catalogue the drivers load (the neutral
+`magickey.toml` and each language pack `_index.toml` declares), never a copy;
+the site shows ★ as written in the data. The Studio tab stays layout only.
 
 ## The site reads in English where Ergopti+ does (2026-11-21)
 

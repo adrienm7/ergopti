@@ -13,6 +13,7 @@ Sub-page of the Ergopti+ section; it loads only its own sections. The shell
 	import { t } from '../i18n.svelte.js';
 	import Hotstrings from '../Hotstrings.svelte';
 	import PersonalHotstrings from '../PersonalHotstrings.svelte';
+	import TextReplacements from '../TextReplacements.svelte';
 
 	// Populated at build time by +page.server.js from the driver's data files.
 	let { data } = $props();
@@ -32,4 +33,5 @@ Sub-page of the Ergopti+ section; it loads only its own sections. The shell
 <h1 class="ep-subpage-title">{t('Hotstrings')}</h1>
 
 <Hotstrings categories={data.hotstringCategories} total={data.hotstringTotal} geo={winGeo} />
+<TextReplacements sections={data.textReplacements} />
 <PersonalHotstrings geo={winGeo} />

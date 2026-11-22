@@ -1681,6 +1681,13 @@
 			"reason": "A pill around a short tag of a card (port, badge, version); no phrasing element means a tag."
 		},
 		{
+			"file": "src/routes/ergopti-plus/TextReplacements.svelte",
+			"element": "div.ep-wrap",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The width-limiting wrapper inside each section (.ep-wrap), with no meaning of its own."
+		},
+		{
 			"file": "src/routes/ergopti-plus/Trackpad.svelte",
 			"element": "div.ep-wrap",
 			"count": 1,

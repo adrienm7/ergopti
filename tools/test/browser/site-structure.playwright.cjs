@@ -68,7 +68,7 @@ const REFERENCE_KEYBOARD = Object.freeze({
 const ERGOPTI_PLUS_SECTIONS = Object.freeze({
 	'/ergopti-plus': ['ep-demo', 'ep-promesses'],
 	'/ergopti-plus/presentation': ['ep-pourqui', 'ep-ergopti', 'ep-comparatif'],
-	'/ergopti-plus/hotstrings': ['ep-hotstrings', 'ep-perso-hotstrings'],
+	'/ergopti-plus/hotstrings': ['ep-hotstrings', 'ep-remplacements', 'ep-perso-hotstrings'],
 	'/ergopti-plus/ia': ['ep-ia'],
 	'/ergopti-plus/fonctionnalites': ['ep-tapholds', 'ep-raccourcis', 'ep-trackpad', 'ep-metriques'],
 	'/ergopti-plus/configuration': ['ep-personnalisation', 'ep-confidentialite'],
@@ -94,6 +94,11 @@ const REDIRECTS = Object.freeze([
 	['/ergopti-plus#ep-telecharger', '/ergopti-plus/installation#ep-telecharger'],
 	['/ergopti-plus#ep-faq', '/ergopti-plus/faq#ep-faq']
 ]);
+// The hotstring catalogue the drivers load, which the Hotstrings page lists.
+const HOTSTRINGS_CATALOGUE = path.resolve(
+	__dirname,
+	'../../../static/ergopti_plus/_shared/hotstrings/data/catalogue'
+);
 const DESKTOP_VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 const PHONE_VIEWPORT = Object.freeze({ width: 390, height: 844 });
 
@@ -634,10 +639,115 @@ async function exerciseGeneratedKeyboard(page, origin, basePath) {
 		);
 }
 
+/**
+ * The ★ replacements of the magic key catalogue, read here straight from the
+ * TOML files the drivers load: the language-neutral file then each language
+ * pack _index.toml declares for it, every section table in sections_order.
+ * @returns {Array<{section: string, title: {fr: string, en: string}, rows: string[][]}>}
+ */
+function catalogueReplacements() {
+	const { parse } = require('smol-toml');
+	const read = (file) => parse(fs.readFileSync(path.join(HOTSTRINGS_CATALOGUE, file), 'utf8'));
+	const index = read('_index.toml');
+	const files = ['magickey.toml'];
+	for (const pack of index.languages.order)
+		if (index.languages[pack].categories_order.includes('magickey'))
+			files.push(pack + '/magickey.toml');
+	return files.flatMap((file) => {
+		const doc = read(file);
+		const tables = Object.keys(doc).filter((key) => key !== '_meta');
+		const ordered = doc._meta.sections_order.filter((name) => tables.includes(name));
+		assert.deepEqual([...ordered].sort(), [...tables].sort(), file + ': every table is ordered');
+		return ordered.map((section) => ({
+			section,
+			title: doc._meta.sections[section],
+			rows: doc[section].flatMap((table) =>
+				Object.entries(table).map(([trigger, entry]) => [trigger, entry.output])
+			)
+		}));
+	});
+}
+
+/**
+ * The Hotstrings page lists every section and every entry of the magic key
+ * catalogue (maintainer, 2026-11-22), each section a disclosure that opens
+ * from the keyboard, and its search narrows the list to the matches.
+ */
+async function exerciseTextReplacements(page, origin, basePath) {
+	const expected = catalogueReplacements();
+	assert.ok(expected.length > 0 && expected.every((group) => group.rows.length > 0));
+	await visit(page, origin, basePath, '/ergopti-plus/hotstrings');
+	const region = page.locator('#ep-remplacements');
+	const read = () =>
+		region.locator('details.rep-group').evaluateAll((groups) =>
+			groups.map((group) => ({
+				section: group.dataset.section,
+				hidden: group.hidden,
+				label: group.querySelector('summary .rep-label').textContent,
+				rows: [...group.querySelectorAll('tbody tr')].map((row) =>
+					[...row.cells].map((cell) => cell.textContent)
+				)
+			}))
+		);
+	const lang = await page.evaluate(() => document.documentElement.lang);
+	assert.deepEqual(
+		await read(),
+		expected.map((group) => ({
+			section: group.section,
+			hidden: false,
+			label: group.title[lang],
+			rows: group.rows
+		})),
+		'Every ★ replacement of the catalogue is listed, section by section'
+	);
+	const headers = await region
+		.locator('table.rep-table')
+		.first()
+		.evaluate((table) => ({
+			caption: table.caption?.textContent ?? '',
+			scopes: [...table.tHead.rows[0].cells].map((cell) => cell.tagName + ':' + cell.scope)
+		}));
+	assert.equal(headers.caption, expected[0].title[lang], 'Each table is captioned');
+	assert.deepEqual(headers.scopes, ['TH:col', 'TH:col'], 'Each table has column headers');
+
+	// The disclosure opens from the keyboard.
+	const first = region.locator('details.rep-group').first();
+	await first.locator('summary').focus();
+	await page.keyboard.press('Enter');
+	assert.equal(await first.evaluate((group) => group.open), true, 'Enter opens a section');
+
+	// A search keeps only the matching rows and unfolds their sections.
+	const [trigger, output] = expected.at(-1).rows[0];
+	await region.getByRole('searchbox').fill(trigger);
+	const found = (await read()).filter((group) => !group.hidden);
+	assert.ok(found.length > 0, 'The search finds the entry');
+	for (const group of found)
+		for (const row of group.rows)
+			assert.ok((row[0] + '\n' + row[1]).toLowerCase().includes(trigger.toLowerCase()));
+	assert.ok(
+		found.some((group) => group.rows.some((row) => row[0] === trigger && row[1] === output)),
+		'The searched entry is listed'
+	);
+	assert.ok(
+		await region
+			.locator(`details.rep-group[data-section="${expected.at(-1).section}"]`)
+			.evaluate((group) => group.open),
+		'The matching section unfolds'
+	);
+	// The live output says how many remain (a short count, so no thousands separator).
+	const remaining = found.reduce((sum, group) => sum + group.rows.length, 0);
+	assert.ok(remaining < 1000);
+	assert.match(
+		await region.locator('output').textContent(),
+		new RegExp('^\\s*' + remaining + '\\D')
+	);
+}
+
 /** The whole structure check, in one browser page. */
 async function exerciseSiteStructure(page, origin, basePath) {
 	await exerciseHome(page, origin, basePath);
 	await exerciseSections(page, origin, basePath);
+	await exerciseTextReplacements(page, origin, basePath);
 	await exerciseDeadKeyLegends(page, origin, basePath);
 	await exerciseGeneratedKeyboard(page, origin, basePath);
 	await exerciseStudioHandoff(page, origin, basePath);

@@ -262,6 +262,48 @@ function loadHotstringCategories() {
 	return { categories, total: categories.reduce((s, c) => s + c.count, 0) };
 }
 
+/**
+ * List every ★ text replacement, section by section, from the magic key
+ * catalogue the drivers load: the language-neutral file, then each language
+ * pack _index.toml declares for it. Sections follow each file's
+ * sections_order; an order name with no table in the file is bound elsewhere
+ * (the Ergopti extension), so it is skipped, while a table the order omits
+ * fails the build rather than vanishing from the page.
+ * @returns {Array<{id: string, label: string, labelEn: string, lang: string|null, entries: Array<[string, string]>}>}
+ */
+function loadTextReplacements() {
+	const index = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, '_index.toml'), 'utf-8'));
+	const sources = [{ file: 'magickey.toml', lang: null }];
+	for (const pack of index.languages?.order ?? []) {
+		const declared = index.languages[pack];
+		if ((declared?.categories_order ?? []).includes('magickey'))
+			sources.push({ file: `${pack}/magickey.toml`, lang: declared.locale });
+	}
+
+	const sections = [];
+	for (const { file, lang } of sources) {
+		const doc = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, file), 'utf-8'));
+		const order = (doc._meta?.sections_order ?? []).filter((name) => name !== '-');
+		const unordered = Object.keys(doc).filter((key) => key !== '_meta' && !order.includes(key));
+		if (unordered.length)
+			throw new Error(`${file}: sections missing from sections_order: ${unordered.join(', ')}`);
+		for (const id of order) {
+			if (!Array.isArray(doc[id])) continue;
+			const title = doc._meta.sections?.[id];
+			if (!title?.fr) throw new Error(`${file}: section ${id} has no French title`);
+			const entries = doc[id].flatMap((table) =>
+				Object.entries(table).map(([trigger, entry]) => {
+					if (typeof entry?.output !== 'string')
+						throw new Error(`${file}: ${id} entry ${trigger} has no output`);
+					return /** @type {[string, string]} */ ([trigger, entry.output]);
+				})
+			);
+			sections.push({ id, label: title.fr, labelEn: title.en ?? title.fr, lang, entries });
+		}
+	}
+	return sections;
+}
+
 // ==============================================
 // ==============================================
 // ======= 4/ Locales — Native Names ============
@@ -490,12 +532,13 @@ export function overviewData() {
 	};
 }
 
-/** Hotstrings sub-page: the catalogue categories and the editor frames. */
+/** Hotstrings sub-page: the catalogue categories, the ★ replacements and the editor frames. */
 export function hotstringsData() {
 	const hotstrings = loadHotstringCategories();
 	return {
 		hotstringCategories: hotstrings.categories,
 		hotstringTotal: hotstrings.total,
+		textReplacements: loadTextReplacements(),
 		...frames()
 	};
 }
