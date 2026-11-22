@@ -266,6 +266,9 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 
 ### Pause, startup, updates and network
 
+- [ ] TIM-01, a reload is measured: Reload from the tray, then from a saved setting; the log has « Reload
+      completed in N ms (reload request to boot complete). » once per reload, an « Over budget: reload » warning
+      only above 4000 ms, and a plain start of the driver writes neither.
 - [ ] EDD-1, a pause stops typing, not configuration: paused, save once from each editor (prompt, paths, hotstrings
       window, layout manager install/select/remove, action picker, model page choice, download and removal, magic key
       capture), from the AI scope restore and the hotstring order rows, and from the AI menu's local server rows with

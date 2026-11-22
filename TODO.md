@@ -448,6 +448,25 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     (the chart reading font and spacing fixed); MET-17 net or gross hotstring counting in the live speed
     (maintainer decision); MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the
     page (the Linux range reply's `driver_meta` fixed);
+  - timing engines, taken on 2026-11-22 (census units `macos/core/timing` and `linux/core/timing`, with the Windows
+    reader, the `[budgets]` judges and the reload measures; tap-hold and key-combination timings left out): TIM-01
+    (a Windows reload is now logged « Reload completed in N ms » and judged against `[budgets] driver_reload_ms`,
+    the launch tick handed to the successor through its environment, `core/timing/engine/reload_timing.ahk`) and
+    TIM-02 (`TimingsGet` admits only a TOML integer and `TimingsGetNumber` only a TOML number, as the Lua reader
+    refuses a quoted value; English errors; the liveness gate refuses a non-integer key a Windows `TimingsGet`
+    reads) fixed. The macOS `deferred_work`, `paced_job` and `paced_json` and the Linux `native_sleep` and
+    `native_timer` are OS-specific by their reason. Left: TIM-03 Linux judges no `llm_local_request_ms`
+    (`api_ollama.lua`); TIM-04 `prediction_display_ms` judged on macOS only (the Windows tooltip already freezes a
+    TTFT); TIM-05 no Windows `driver_reload` field-run step. Decisions:
+    - TIM-Q1, a fractional duration: the Lua `ms` and `sec` accept 1.5 for a `*_ms` key, Windows now refuses it
+      and the gate refuses it only for the keys Windows reads. 1. **(recommended)** Integer milliseconds for every
+      duration key on the three: the gate checks every key that is not `*_mm` or `*_factor`, and the Lua `ms`
+      refuses a non-integer. 2. Keep fractional durations legal on macOS and Linux.
+    - TIM-Q2, where a reload starts: macOS counts from `hs.reload()`, Linux from its stamp after the cleanup-debt
+      checks, Windows from the successor launch (after the configuration lease, so a reload queued behind a
+      configuration write is not counted while it waits). 1. **(recommended)** Keep the three: each starts once
+      the reload is admitted, as the budget's teardown-plus-boot measure assumes. 2. Count from the user's
+      request, waits included, on the three.
   - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
     and the chart reading font; MET-17 net or gross hotstring counting in the live speed (maintainer decision);
     MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
