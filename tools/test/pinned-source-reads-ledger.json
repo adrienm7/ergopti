@@ -19,7 +19,6 @@
 			"unit/core/lifecycle/engine/reload/test_suspend_prefetch_receipt.ahk",
 			"unit/diagnostics/ui/healthcheck/test_owner_snapshots.ahk",
 			"unit/hotstrings/engine/engine/test_cascade.ahk",
-			"unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk",
 			"unit/settings/engine/migration/test_common_autocorrection_migration.ahk",
 			"unit/settings/engine/scope/test_hotstring_dynamic_menu_scope.ahk"
 		]
@@ -57,9 +56,6 @@
 			"meta/core/network/test_curl_response_size_bound.ahk \"\\..\\core\\process\\adapters\\shell_runner.ahk\"",
 			"meta/core/process/shell_runner/test_isolated_logger.ahk \"\\core\\process\\adapters\\shell_runner.ahk\"",
 			"meta/core/process/shell_runner/test_isolated_logger.ahk \"\\tests\\meta\\core\\process\\shell_runner\\test_isolated_logger.ahk\"",
-			"meta/core/ui/webview/test_low_ram_native_fallback.ahk \"ai/ui/model_browser/init.ahk\"",
-			"meta/core/ui/webview/test_low_ram_native_fallback.ahk \"core/ui/engine/webview/utils.ahk\"",
-			"meta/core/ui/webview/test_low_ram_native_fallback.ahk \"ui/changelog/init.ahk\"",
 			"meta/core/ui/webview/test_webview2_temp_leak.ahk \"ai/engine/ollama/webview.ahk\"",
 			"meta/core/ui/webview/test_webview2_temp_leak.ahk \"ai/engine/ollama/webview.ahk\" #2",
 			"meta/core/ui/webview/test_webview2_temp_leak.ahk \"ai/ui/model_browser/init.ahk\"",
@@ -169,7 +165,6 @@
 			"unit/hotstrings/engine/engine/test_cascade.ahk \"\\..\\settings\\engine\\preferences\\feature_state.ahk\"",
 			"unit/hotstrings/engine/expander/test_ergopti_keylayout_tables.ahk '\\core\\fs\\adapters\\file_system.ahk'",
 			"unit/hotstrings/engine/expander/test_ergopti_keylayout_tables.ahk '\\core\\text\\engine\\json.ahk'",
-			"unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk \"\\modules\\keymap\\layout.ahk\"",
 			"unit/menu/builder/test_reload_replay.ahk \"\\ErgoptiPlus.ahk\"",
 			"unit/modules/keymap/test_pause_layout_switch.ahk \"\\..\\ErgoptiPlus.ahk\"",
 			"unit/modules/keystats/test_keystats_clipboard_provenance.ahk \"/clipboard/adapters/clipboard.ahk\"",

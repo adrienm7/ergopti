@@ -136,10 +136,9 @@ _RTM_CallSites() {
 	Assert(Launch != "", "LifecycleLaunchSuccessor() must exist")
 	Assert(RegExMatch(Launch, "s)ReloadTimingLaunchStamped\(\(\) => ReloadSuccessorLaunch\("),
 		"the successor is launched with the launch tick in its environment")
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Boot := ""
-	try Boot := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
-	Assert(Boot != "", "ErgoptiPlus.ahk must be readable")
+	; Each marker exists once, in the driver's entry file: the census keeps a
+	; file whole, so their order there survives a move of the entry file.
+	Boot := _DriverSourceConcat()
 	TakeAt := InStr(Boot, "_ReloadInheritedLaunchTick := ReloadTimingTakeInherited()")
 	GateAt := InStr(Boot, "; --- Single-owner gate")
 	BootDoneAt := InStr(Boot, 'LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)')
