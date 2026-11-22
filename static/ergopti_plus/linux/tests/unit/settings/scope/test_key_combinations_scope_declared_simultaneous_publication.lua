@@ -309,11 +309,11 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
  helpers.it("(kcl-copy-skips-chordless-tap) a tap no chord runs keeps its chord and the others copy",function()
   with_menu(function(s)
    local other="tab_then_caps_lock"
-   local text=source:gsub('future_then_tab = "future"\n','future_then_tab = "future"\n'..other..' = "run_program"\n',1)
+   local text=source:gsub('future_then_tab = "future"\n','future_then_tab = "future"\n'..other..' = "one_shot_shift"\n',1)
     ..'[mod_combos.config.'..other..']\ncombo="copy"\n'
    seed_public(s,text)
-   helpers.assert_eq(s.pairs.get_action(other),"run_program")
-   helpers.assert_eq(s.pairs.validate_slot("combo",other,"run_program"),false)
+   helpers.assert_eq(s.pairs.get_action(other),"one_shot_shift")
+   helpers.assert_eq(s.pairs.validate_slot("combo",other,"one_shot_shift"),false)
    local warned={};local Logger=require("core.logger.engine.shim");local warn=Logger.warn
    Logger.warn=function(module,message,...) warned[#warned+1]=string.format(message,...);return warn(module,message,...) end
    local copied=find_menu(s.build(),s.translate('menu.tapholds.copy_tap_to_combo'),true).fn()
@@ -324,7 +324,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    helpers.assert_eq(doc.mod_combos.config[other].combo,'copy',"the chord of a chordless tap is left as it is")
    helpers.assert_eq(s.pairs.get_chord(pair),'open_url');helpers.assert_eq(s.pairs.get_chord(other),'copy')
    local named=false
-   for _,line in ipairs(warned) do named=named or (line:find(other,1,true)~=nil and line:find("run_program",1,true)~=nil) end
+   for _,line in ipairs(warned) do named=named or (line:find(other,1,true)~=nil and line:find("one_shot_shift",1,true)~=nil) end
    helpers.assert_true(named,"the skipped pair and its tap are logged")
   end,true)
  end)
@@ -347,8 +347,13 @@ helpers.describe("third-slot program launch and monitor Alt-Tab",function()
     local listed
     for _,item in ipairs(s.picker.items) do if item.id==action then listed=item end end
     helpers.assert_true(listed~=nil,action.." stays listed")
-    helpers.assert_true(listed.disabled~=true,action.." is pickable")
-    if action=="alt_tab_monitor" then
+    -- Greyed only when this session lacks the action (no X11 window tool),
+    -- exactly as every other picker shows it: never for being a chord.
+    local catalogued
+    for _,item in ipairs(s.gestures.get_picker_items()) do if item.id==action then catalogued=item end end
+    helpers.assert_eq(listed.disabled==true,catalogued.disabled==true,action.." is greyed only as the catalogue greys it")
+    helpers.assert_eq(listed.hint,catalogued.hint)
+    if action=="alt_tab_monitor" and listed.disabled~=true then
      helpers.assert_true(s.picker.confirm(action))
      helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,action)
      helpers.assert_eq(s.pairs.get_chord(pair),action)

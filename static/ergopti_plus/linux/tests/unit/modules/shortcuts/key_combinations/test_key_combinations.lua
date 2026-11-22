@@ -2349,11 +2349,9 @@ helpers.describe("chord slots read from config.toml", function()
 		helpers.assert_true(said("tab_then_caps_lock", "foreign_hold"), "the unavailable hold is logged")
 		helpers.assert_true(said("future_then_tab"), "the pair on a missing key is logged")
 	end)
-	-- The menu refused these three in a chord while the read admitted a program
-	-- launch or the monitor Alt-Tab, which then did nothing at the chord with no
-	-- word; Windows refuses and logs all three at its read.
+	-- The read refuses and logs what no chord runs, as Windows does at its read.
 	helpers.it("(kcl-chord-read-refuses-chordless-action) the read refuses what the chord picker refuses", function()
-		for _, action in ipairs({ "one_shot_shift", "run_program", "alt_tab_monitor" }) do
+		for _, action in ipairs({ "one_shot_shift" }) do
 			local Logger = require("core.logger.engine.shim")
 			local warn, warned = Logger.warn, nil
 			Logger.warn = function(module, message, ...) warned = string.format(message, ...); return warn(module, message, ...) end
@@ -2363,6 +2361,15 @@ helpers.describe("chord slots read from config.toml", function()
 			helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy", "the other chord survives")
 			helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", action .. " runs in no chord")
 			helpers.assert_true(type(warned) == "string" and warned:find(action, 1, true) ~= nil, action .. " is logged")
+		end
+	end)
+	-- KCD-2 (maintainer decision of 2026-11-22): a chord runs a program launch
+	-- and the monitor Alt-Tab, as on Windows and macOS.
+	helpers.it("(kcd-2-chord-runs) the read keeps a chord's program launch and monitor Alt-Tab", function()
+		for _, action in ipairs({ "run_program", "alt_tab_monitor" }) do
+			local snapshot = chord_snapshot({ "copy", action }, { copy = true, [action] = true })
+			helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy")
+			helpers.assert_eq(snapshot.chords.tab_then_caps_lock, action, action .. " runs in a chord")
 		end
 	end)
 end)

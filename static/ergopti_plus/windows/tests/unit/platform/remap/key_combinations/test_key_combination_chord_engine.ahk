@@ -724,9 +724,9 @@ _KCCE_ProgramOwnerAdmitsAChord() {
 		"a key combination's binding may run a program")
 	Document := TOML_ParseDocument('[mod_combos.config.caps_lock_then_tab]`ncombo = "run_program"`n'
 		. '[shortcuts.key_combination_taps]`ntab_then_caps_lock = "run_program"`n')
-	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "mod_combos.config", "caps_lock_then_tab"))
+	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "chord", "caps_lock_then_tab"))
 	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "key_combination_taps", "tab_then_caps_lock"))
-	AssertEqual("", _ProgramActions_StoredAction(Document, "mod_combos.config", "tab_then_caps_lock"))
+	AssertEqual("", _ProgramActions_StoredAction(Document, "chord", "tab_then_caps_lock"))
 }
 Test("key combination chords: the program owner admits a chord's launch (kcd-2-chord-runs)",
 	_KCCE_ProgramOwnerAdmitsAChord)

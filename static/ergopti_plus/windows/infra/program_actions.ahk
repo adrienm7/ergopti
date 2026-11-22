@@ -31,7 +31,7 @@ _ProgramActions_BindingAction(Binding, &Section := "", &Slot := "") {
 				Section := "key_combination_taps"
 				return "run_program"
 			}
-			Section := "mod_combos.config"
+			Section := "chord"
 			return IsSet(KeyCombinationChords) && (KeyCombinationChords is Map) ? KeyCombinationChords.Get(Slot, "") : ""
 		case "gesture":
 			Section := "gestures"
@@ -70,11 +70,11 @@ _ProgramActions_Snapshot(Binding) {
 }
 
 ; The action the canonical document stores for a binding's slot: a section of
-; [shortcuts], [gestures], or a chord's [mod_combos.config.<pair>] combo.
+; [shortcuts], [gestures], or (Section "chord") a chord's [mod_combos.config.<pair>] combo.
 _ProgramActions_StoredAction(Document, Section, Slot) {
-	if (Section == "mod_combos.config") {
-		Combos := Document.Get("mod_combos", 0)
-		Config := (Combos is Map) ? Combos.Get("config", 0) : 0
+	if (Section == "chord") {
+		Combos := Document.Get(ConfigLeaf.MOD_COMBOS, 0)
+		Config := (Combos is Map) ? Combos.Get(ConfigLeaf.CONFIG, 0) : 0
 		Row := (Config is Map) ? Config.Get(Slot, 0) : 0
 		return (Row is Map) ? Row.Get("combo", "") : ""
 	}
