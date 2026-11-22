@@ -82,3 +82,31 @@ _TLNV_FullSaveWritesTheChoice() {
 }
 Test("locale: the full save writes the configured locale only (locale-neutral-2026-11-21)",
 	_TLNV_FullSaveWritesTheChoice)
+
+; The maintainer's decision of 2026-11-22: a locale chosen while config.toml
+; does not exist creates the file with the locale row. Windows already did
+; through its configuration writer (the boot creates the folder); this pins it
+; with the real writer, as macOS and Linux now do.
+_TLNV_ChoiceCreatesAnAbsentConfig() {
+	global _I18nLocale, _I18nConfiguredLocale, ConfigurationFile
+	HadPath := IsSet(ConfigurationFile), SavedPath := HadPath ? ConfigurationFile : ""
+	Saved := {Locale: _I18nLocale, Configured: _I18nConfiguredLocale}
+	Dir := A_Temp . "\ergopti_tlnv_" . A_TickCount . "_" . Random(1, 1000000)
+	try {
+		DirCreate(Dir)
+		ConfigurationFile := Dir . "\config.toml"
+		_I18nLocale := "fr", _I18nConfiguredLocale := ""
+		Quiet := (*) => 0
+		AssertFalse(FileExist(ConfigurationFile) != "", "config.toml starts absent")
+		AssertTrue(I18nSetLocale("de", 0, Quiet, Quiet), "the choice is saved")
+		AssertTrue(FileExist(ConfigurationFile) != "", "config.toml is created")
+		AssertTrue(InStr(FileRead(ConfigurationFile, "UTF-8"), 'locale = "de"') > 0, "with the locale row")
+		AssertEqual("de", I18nConfiguredLocale())
+	} finally {
+		_I18nLocale := Saved.Locale, _I18nConfiguredLocale := Saved.Configured
+		ConfigurationFile := HadPath ? SavedPath : unset
+		try DirDelete(Dir, true)
+	}
+}
+Test("locale: a choice creates an absent config.toml (locale-creates-config-2026-11-22)",
+	_TLNV_ChoiceCreatesAnAbsentConfig)

@@ -333,7 +333,14 @@ helpers.describe("i18n explicit wizard persistence", function()
 			-- default_config_dir() is where the storage adapter keeps storage.json.
 			package.loaded["settings.engine.paths"] = { config_home = function() return root end,
 				default_config_dir = function() return root .. "/" .. FOLDER end,
-				config = function(name) return root .. "/config/" .. name end }
+				config = function(name) return root .. "/config/" .. name end,
+				-- The folder of config.toml stands for the default one, unless the
+				-- case makes it a custom folder, which is never created.
+				prepare_default_config_dir = function()
+					if options.custom_config_dir then return true end
+					local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
+					return created == true or created == 0
+				end }
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
 			package.loaded["settings.engine.scope.script_settings"] = nil
@@ -360,7 +367,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.remove(helpers.stage_path(path)); os.remove(path)
 		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak")
-		if options.config or options.config_dir then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
+		os.execute("rmdir " .. string.format("%q", root .. "/config") .. " 2>/dev/null")
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
@@ -519,8 +526,9 @@ helpers.describe("i18n explicit wizard persistence", function()
 
 	-- A chosen locale is always written (maintainer decision of 2026-11-21, the
 	-- locale's neutral value is the absent row): an absent config.toml is
-	-- created in its folder, and a folder that is missing refuses the choice
-	-- rather than keeping a locale the next start would clear.
+	-- created with its default folder (maintainer decision of 2026-11-22), and
+	-- a missing custom folder refuses the choice rather than keeping a locale
+	-- the next start would clear.
 	helpers.it("(locale-neutral-2026-11-21) writes a chosen locale into an absent source", function()
 		local observed = with_owned_store({ config_dir = true }, function(i18n)
 			local accepted = i18n.persist_locale("en")
@@ -529,8 +537,16 @@ helpers.describe("i18n explicit wizard persistence", function()
 		helpers.assert_eq(observed, { accepted = true, config = '\n[script]\nlocale = "en"\n', active = "en" })
 	end)
 
-	helpers.it("(locale-neutral-2026-11-21) refuses a choice whose configuration folder is absent", function()
-		local observed = with_owned_store({}, function(i18n, path, seed)
+	helpers.it("(locale-creates-config-2026-11-22) creates the missing default folder and config.toml", function()
+		local observed = with_owned_store({}, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, config = '\n[script]\nlocale = "en"\n', active = "en" })
+	end)
+
+	helpers.it("(locale-creates-config-2026-11-22) refuses a choice whose custom configuration folder is missing", function()
+		local observed = with_owned_store({ custom_config_dir = true }, function(i18n, path, seed)
 			local accepted = i18n.persist_locale("en")
 			local file = io.open(require("settings.engine.paths").config("config.toml"), "rb")
 			if file then file:close() end

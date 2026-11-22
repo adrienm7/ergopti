@@ -157,12 +157,28 @@ end
 --- missing ancestors, and refuses files or failed creates without a probe file.
 --- @param normalized string Absolute override, or empty for the default.
 --- @return boolean prepared
-local function prepare_config_directory(normalized)
-	local target = normalized == "" and M.default_config_dir() or normalized
+local function make_directory(target)
 	local Shell = require("core.process.adapters.shell_runner")
 	local called, ready = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(target) .. " 2>/dev/null")
-	if called and ready == true then return true end
+	return called and ready == true
+end
+
+local function prepare_config_directory(normalized)
+	if make_directory(normalized == "" and M.default_config_dir() or normalized) then return true end
 	require("core.logger.engine.shim").error("settings.engine.paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
+	return false
+end
+
+--- Creates the configuration directory when it is the default one, so a
+--- locale chosen before any config.toml exists is written (maintainer
+--- decision of 2026-11-22). A custom directory is never created here: a
+--- missing one may be an unmounted volume, and its write refuses the change.
+--- @return boolean ready False only when the default directory could not be made.
+function M.prepare_default_config_dir()
+	local target = M.get_config_dir()
+	if target ~= M.default_config_dir() then return true end
+	if make_directory(target) then return true end
+	require("core.logger.engine.shim").error("settings.engine.paths", "The default configuration directory could not be created.")
 	return false
 end
 

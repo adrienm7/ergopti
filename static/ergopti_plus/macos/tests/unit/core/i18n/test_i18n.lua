@@ -1156,14 +1156,30 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.assert_contains(actual, 'locale = "fr"')
 	end)
 
-	helpers.it("refuses a locale choice while config.toml is absent", function()
+	-- Maintainer decision of 2026-11-22: a locale chosen while config.toml
+	-- does not exist creates the file with the locale row.
+	helpers.it("creates config.toml for a locale choice while it is absent (locale-creates-config-2026-11-22)", function()
 		os.remove(config_path)
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
-		helpers.assert_eq(i18n.set_locale("de"), false)
+		helpers.assert_true(i18n.set_locale("de"))
+
+		helpers.assert_eq(i18n.get_locale(), "de")
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de", "the choice is saved")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_contains(actual, 'locale = "de"')
+	end)
+
+	helpers.it("removes the config.toml it created when the saved choice is refused (locale-creates-config-2026-11-22)", function()
+		os.remove(config_path)
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		with_settings_refusal("false", function()
+			helpers.assert_eq(i18n.set_locale("de"), false)
+		end)
 
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"), "nothing is saved without a written row")
+		helpers.assert_nil(io.open(config_path, "rb"), "the created file is removed with the refused choice")
 	end)
 
 	helpers.it("persist_locale() writes to settings without changing in-memory locale", function()

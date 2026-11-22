@@ -215,9 +215,24 @@ local function needed_operation(options, document)
 	return operation
 end
 
+--- Builds the receipt that restores the source a rewrite replaced: the exact
+--- bytes it read, or the absence of a file it created.
+--- @param options table Rewrite options.
+--- @param source table `{ status, content }` read before the write.
+--- @param after string Bytes the write published or prepared.
+--- @return table receipt
+local function rewrite_receipt(options, source, after)
+	local receipt = { path = options.path, file_adapter = options.file_adapter, after = after }
+	if source.status == "absent" then receipt.before_absent = true else receipt.before = source.content end
+	return receipt
+end
+
 --- Rewrites the config.toml row a native change replaces: always when the file
 --- owns the row's absence, else only when the file holds it. Called before the
---- native value is stored, so a refused write changes nothing.
+--- native value is stored, so a refused write changes nothing. An absent
+--- config.toml is created with the row (maintainer decision of 2026-11-22: a
+--- locale chosen before any file exists is written); its receipt restores the
+--- absence. An unreadable or malformed file still refuses the change.
 --- @param options table { path, file_adapter, manifest, key (canonical path), value }.
 --- @return boolean committed True when the file needs no change or was rewritten.
 --- @return string|nil detail Why the change was refused.
@@ -230,18 +245,17 @@ function M.rewrite_owned(options)
 		return true, nil, { path = options.path, file_adapter = options.file_adapter,
 			before = source.content, after = source.content, status = source.status, noop = true }
 	end
-	if source.status ~= "ok" then return false, "config.toml is absent, so the change has no receipt" end
 	local committed, write_detail, content, cleanup, candidate = Writer.batch_write(options.path, { operation }, options.file_adapter, source)
 	if committed ~= true then
 		local receipt
-		if type(cleanup) == "function" and type(candidate) == "string" and source.status == "ok" then
-			receipt = { path = options.path, file_adapter = options.file_adapter, before = source.content,
-				after = candidate, publication_cleanup = cleanup }
+		if type(cleanup) == "function" and type(candidate) == "string" then
+			receipt = rewrite_receipt(options, source, candidate)
+			receipt.publication_cleanup = cleanup
 		end
 		return false, "config.toml was not rewritten: " .. tostring(write_detail), receipt
 	end
-	if type(content) ~= "string" or source.status ~= "ok" then return false, "config.toml rewrite receipt is unavailable" end
-	local receipt = { path = options.path, file_adapter = options.file_adapter, before = source.content, after = content }
+	if type(content) ~= "string" then return false, "config.toml rewrite receipt is unavailable" end
+	local receipt = rewrite_receipt(options, source, content)
 	local observed, status = Writer.read_classified(options.path, options.file_adapter)
 	if status ~= "ok" or observed ~= content then
 		return false, "config.toml rewrite readback did not match", receipt
@@ -249,12 +263,29 @@ function M.rewrite_owned(options)
 	return true, nil, receipt
 end
 
+--- Removes the file a rewrite created, only while it still holds exactly the
+--- bytes that rewrite published: a later writer's file is kept.
+--- @param receipt table Receipt with before_absent.
+--- @return boolean restored
+local function restore_created(receipt)
+	local current, status = Writer.read_classified(receipt.path, receipt.file_adapter)
+	if status == "absent" then return true end
+	if status ~= "ok" or current ~= receipt.after then return false end
+	if Writer.remove_if_unchanged(receipt.path, receipt.file_adapter, { status = "ok", content = receipt.after }) ~= true then
+		return false
+	end
+	local _, removed_status = Writer.read_classified(receipt.path, receipt.file_adapter)
+	return removed_status == "absent"
+end
+
 --- Restores only the exact bytes this rewrite published, never a later writer.
 function M.restore_rewrite(receipt)
 	if receipt == nil then return true end
 	if type(receipt) == "table" and receipt.noop == true then return true end
-	if type(receipt) ~= "table" or type(receipt.before) ~= "string" or type(receipt.after) ~= "string" then return false end
+	if type(receipt) ~= "table" or type(receipt.after) ~= "string" then return false end
+	if receipt.before_absent ~= true and type(receipt.before) ~= "string" then return false end
 	if receipt.publication_cleanup ~= nil and Writer.retry_publication_cleanup(receipt) ~= true then return false end
+	if receipt.before_absent == true then return restore_created(receipt) end
 	local current, status = Writer.read_classified(receipt.path, receipt.file_adapter)
 	if status == "ok" and current == receipt.before then return true end
 	if status ~= "ok" or current ~= receipt.after then return false end

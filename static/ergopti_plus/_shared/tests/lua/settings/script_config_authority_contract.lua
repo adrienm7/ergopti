@@ -225,11 +225,43 @@ function M.run(helpers, options)
 			os.remove(path)
 			helpers.assert_true(committed)
 			helpers.assert_true(after:find('locale = "en"', 1, true) ~= nil, "an absent locale row is written too")
-			path = scratch(nil)
-			local owned_committed = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
-				manifest = manifest, key = "script.log_level", value = "ERROR" })
-			helpers.assert_eq(owned_committed, false, "an owned change without a file has no receipt and is refused")
-			helpers.assert_eq(read(path), nil, "and creates nothing")
+		end)
+
+		-- Maintainer decision of 2026-11-22: a locale chosen while config.toml
+		-- does not exist creates the file; before, the owned rewrite refused it.
+		helpers.it("an owned change creates an absent config.toml and its receipt restores the absence (locale-creates-config-2026-11-22)", function()
+			local path = scratch(nil)
+			local committed, detail, receipt = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.locale", value = "de" })
+			local created = read(path)
+			helpers.assert_true(committed, "the change is accepted: " .. tostring(detail))
+			helpers.assert_true(created ~= nil and created:find('locale = "de"', 1, true) ~= nil,
+				"the file is created with the locale row")
+			helpers.assert_true(Authority.verify_rewrite(receipt), "the receipt reads back the created bytes")
+			helpers.assert_true(Authority.restore_rewrite(receipt), "the rollback is accepted")
+			helpers.assert_eq(read(path), nil, "and restores the absence")
+		end)
+
+		helpers.it("the rollback of a created config.toml keeps a later writer's file (locale-creates-config-2026-11-22)", function()
+			local path = scratch(nil)
+			local committed, _, receipt = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.locale", value = "de" })
+			helpers.assert_true(committed)
+			local later = '[script]\nlocale = "it"\n'
+			local handle = assert(io.open(path, "wb")); handle:write(later); handle:close()
+			helpers.assert_eq(Authority.restore_rewrite(receipt), false, "a file edited since is not removed")
+			helpers.assert_eq(read(path), later)
+			os.remove(path)
+		end)
+
+		helpers.it("an unreadable config.toml still refuses an owned change (locale-creates-config-2026-11-22)", function()
+			local path = scratch("[script\nlocale = \n")
+			local committed = Authority.rewrite_owned({ path = path, file_adapter = options.file_adapter,
+				manifest = manifest, key = "script.locale", value = "de" })
+			local after = read(path)
+			os.remove(path)
+			helpers.assert_eq(committed, false, "a malformed file is refused")
+			helpers.assert_eq(after, "[script\nlocale = \n", "and left as it was")
 		end)
 	end)
 end

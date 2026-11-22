@@ -130,6 +130,28 @@ three measures that each start once the reload is accepted, and they stay so:
 The budget measures teardown plus boot; a wait before admission is not the
 reload's cost. Do not move a starting point to the user's request.
 
+## A locale chosen without config.toml creates the file (2026-11-22)
+
+Decided by the maintainer on 2026-11-22: choosing a language while
+config.toml does not exist creates the file with its `[script] locale` row,
+on the three OS. Before, macOS and Linux refused the choice and saved nothing.
+
+- macOS: `script_config_authority.rewrite_owned` creates an absent file; its
+  receipt (`before_absent`) restores the absence, removing the file only while
+  it still holds the bytes this rewrite published. The folder is the one
+  `paths.get("ConfigTomlPath")` already ensures.
+- Linux: `script_scope.edit_setting` for the locale first calls
+  `paths.prepare_default_config_dir()`, which creates the folder only when it
+  is the default one (`$XDG_CONFIG_HOME/ergopti`); a missing custom folder is
+  never created (it may be an unmounted volume) and its write refuses the
+  choice.
+- Windows already did it: the boot creates the configuration folder and the
+  configuration writer creates an absent config.toml
+  (`test_neutral_value.ahk` pins it with the real writer).
+
+Everything else stays fail-fast: an unreadable or malformed config.toml still
+refuses the change and is left as it was.
+
 ## macOS caches the migration registry's typed parse (2026-11-21)
 
 The maintainer chose to port the Windows registry cache

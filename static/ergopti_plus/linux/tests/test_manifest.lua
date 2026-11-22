@@ -362,6 +362,7 @@ return {
 	"tests.unit.settings.scope.test_tap_hold_scope",
 	"tests.unit.settings.scope.test_tap_hold_scope_obsolete",
 	"tests.unit.settings.test_paths_shared_root_layouts",
+	"tests.unit.settings.test_paths_default_config_dir",
 	"tests.unit.core.lifecycle.test_runtime_diagnostics",
 	"tests.unit.core.lifecycle.test_runtime_guard",
 	"tests.unit.core.lifecycle.shutdown.test_coordinator",

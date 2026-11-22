@@ -140,6 +140,11 @@ function M.edit_setting(key, value)
 	if not alias or not native_name or not M.retry_edit(key) then return false end
 	local previous = _edit_owners[key]
 	if previous and previous.release() ~= true then return false end
+	-- A chosen locale creates config.toml, and its default folder, when they
+	-- do not exist yet (maintainer decision of 2026-11-22).
+	if key == ConfigKeys.KEY.SCRIPT_LOCALE and require("settings.engine.paths").prepare_default_config_dir() ~= true then
+		return false
+	end
 	_sequence = _sequence + 1
 	local path = require("settings.engine.paths").config("config.toml")
 	local timestamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
