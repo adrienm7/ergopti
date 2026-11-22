@@ -629,6 +629,8 @@ function personalCentral(unit) {
 	admitted.take(
 		'PendingDesc := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending") if !PendingDesc.HasOwnProp("Value") return 0 Pending := PendingDesc.Value PendingReceipt := PendingCaptureOwner.Call(Pending) if !PendingReceipt || !(Pending is Map) return 0'
 	);
+	// The capture is the current image, so the first check has nothing to walk.
+	admitted.take('Guard.PendingKey := "0:0:0"');
 	admitted.take(
 		'FillOwner := Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill").Call if Object.Prototype.HasOwnProp.Call(FillOwner, "Call") return 0 } else if Type(Population) != "Integer" || Population != 0 return 0'
 	);
