@@ -1,5 +1,5 @@
 {
-	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » may state « dead_keys » (a character of its rows → a standard accent of layout_formats.js): a KLA file cannot say that a key is dead, so each is stated where the layout types that accent's letters nowhere else (Optimot, BvoFRak and the Spanish QWERTY: ê, á or ü only through ^, ´ or ¨), and the codegen composes it by Unicode normalisation as the Studio's importers do. An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). An entry re-encoded from the layout's official files (« source » optimot, xkeyboard_config, neo_layout or engram, imported on 2026-11-18) states its dead keys as cells ({\"dead\": state}) and their compositions as « dead_rules » (the second key's character, or « dead:<state> » for a dead key, → the output, taken from the layout's XCompose over the libX11 en_US.UTF-8 Compose table, or from its README); a standard accent's state composes by normalisation what its rules leave out, and sequences of three keys or more are left out. The Neo family's four levels are Neo's levels 1, 2, 3 and 5 (Mod3 stands for AltGr), without level 4, which needs Mod4. The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here. A layout with a letter on a thumb key (re-read on 2026-11-19 from the Hands Down, KLAnext and cyanophage files left out for it) types its thumbs on the thumb keys of analysis_model.json (NonConvert, Convert, KanaMode), its space too, never on Space; such a file is taken even when symbols of its ErgoDox outer keys have no code (they count as unsupported). A block may state its space key (the space on a thumb key); the codegen then adds no space bar.",
+	"_description": "Layout library of the layout analysis, by KeyboardEvent.code. An entry with « keys » is an alphabetic block (3 rows, base characters only), imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks or holds without a letter of their own (Morgenstern's b, re-read on 2026-11-22), from the cmini collection (GPL-3.0 repository), and on 2026-11-17 from genkey's layouts (GPL-3.0 repository) by tools/build/import-genkey-layouts.cjs; the codegen completes it with the US number row and the US Shift pairs (letters: upper case). An entry with « rows » may state « dead_keys » (a character of its rows → a standard accent of layout_formats.js): a KLA file cannot say that a key is dead, so each is stated where the layout types that accent's letters nowhere else (Optimot, BvoFRak and the Spanish QWERTY: ê, á or ü only through ^, ´ or ¨), and the codegen composes it by Unicode normalisation as the Studio's importers do. An entry with « rows » is a whole layout (base, Shift, AltGr, Shift+AltGr of every key its file states), imported on 2026-11-17 from Keyboard Layout Analyzer's built-in layouts (MIT repository) by tools/build/import-kla-layouts.cjs; the codegen takes it as it is. Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each layout comes from; « not_imported » lists the files of these collections left out, with the reason and, for a duplicate, the library layout with the same keys (« same_as »). An entry re-encoded from the layout's official files (« source » optimot, xkeyboard_config, neo_layout or engram, imported on 2026-11-18) states its dead keys as cells ({\"dead\": state}) and their compositions as « dead_rules » (the second key's character, or « dead:<state> » for a dead key, → the output, taken from the layout's XCompose over the libX11 en_US.UTF-8 Compose table, or from its README); a standard accent's state composes by normalisation what its rules leave out, and sequences of three keys or more are left out. The Neo family's four levels are Neo's levels 1, 2, 3 and 5 (Mod3 stands for AltGr), without level 4, which needs Mod4. The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here. A layout with a letter on a thumb key (re-read on 2026-11-19 from the Hands Down, KLAnext and cyanophage files left out for it) types its thumbs on the thumb keys of analysis_model.json (NonConvert, Convert, KanaMode), its space too, never on Space; such a file is taken even when symbols of its ErgoDox outer keys have no code (they count as unsupported). A block may state its space key (the space on a thumb key); the codegen then adds no space bar.",
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
@@ -9341,8 +9341,8 @@
 			"id": "morgenstern",
 			"name": "Morgenstern",
 			"language": "de",
-			"source": "oxeylyzer",
-			"source_path": "static/layouts/german/morgenstern.dof",
+			"source": "cmini",
+			"source_path": "layouts/morgenstern.json",
 			"fingering": "standard",
 			"keys": {
 				"KeyQ": "j",
@@ -9355,6 +9355,8 @@
 				"KeyI": "l",
 				"KeyO": "f",
 				"KeyP": "p",
+				"BracketLeft": ".",
+				"BracketRight": "'",
 				"KeyA": "t",
 				"KeyS": "n",
 				"KeyD": "e",
@@ -9365,6 +9367,7 @@
 				"KeyK": "r",
 				"KeyL": "s",
 				"Semicolon": "w",
+				"Quote": "b",
 				"KeyZ": "q",
 				"KeyX": "m",
 				"KeyC": "ä",
@@ -65849,6 +65852,12 @@
 		},
 		{
 			"source": "oxeylyzer",
+			"source_path": "static/layouts/german/morgenstern.dof",
+			"reason": "a 30-key block of Morgenstern without its b, . and ' (the authors' home row has eleven keys, b right of w); the block comes from cmini, which places the keys of oxeylyzer-2's Morgenstern.dof (Kharlamov and Sagittarius, 2022) and ' right of its .",
+			"same_as": "morgenstern"
+		},
+		{
+			"source": "oxeylyzer",
 			"source_path": "static/layouts/spanish/engram_es.dof",
 			"reason": "a 30-key adaptation of Engram-es (W and K moved into the middle columns, without ¿ ¡ ? ! and the ☆ dead key); the whole layout comes from the Engram repository",
 			"same_as": "engram_es"
@@ -65862,7 +65871,7 @@
 		{
 			"source": "kla",
 			"source_path": "layouts/standard.spanish-dvorak",
-			"reason": "replaced by the official XKB layout of xkeyboard-config, with its dead keys and AltGr level",
+			"reason": "replaced by the official XKB layout of xkeyboard-config, with its dead keys and AltGr level; KLA's file exchanges R and H against it, a slip of its transcription: Jorge Sanz, whom it credits, typed xkeyboard-config's es(dvorak) (his blog, 2011-04-16 and 2011-05-28), whose letters have not changed since it was added in 2005 (commit 2aca64fd)",
 			"same_as": "spanish_dvorak"
 		},
 		{

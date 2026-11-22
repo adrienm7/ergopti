@@ -623,7 +623,8 @@ three keys or more were left out, and the Neo family kept its levels 1, 2, 3 and
 5 (Mod3 as AltGr) without level 4, until 2026-11-20 (below). KLA's AdNW became a duplicate of the official
 one. Ergo-L and bépo already matched their official files (the Kalamine TOML of
 ergol-v1.0.2; bépo 1.1rc2's KLC and XKB). BEO and Morgenstern have no official
-source that could be found and stay letter blocks.
+source that could be found and stay letter blocks (Morgenstern's fuller block
+since 2026-11-22, below).
 
 On 2026-11-20 the engine took a layout's own levels (docs/design/layout-analysis.md,
 « Levels ») and the codegen dead-key rules that enter another state, and
@@ -663,6 +664,25 @@ measures exactly as before: the golden values changed for these eight layouts
 only, and section 18 of `tools/test/test-layout-analysis-engine.cjs` declares
 every four-level layout again with an empty fifth level and finds the same
 metrics and score.
+
+On 2026-11-22 Morgenstern became cmini's block (`layouts/morgenstern.json` at
+0db088e): Oxeylyzer's `morgenstern.dof` keeps ten keys per row and so drops
+the authors' eleventh, b right of w and « . » right of p, as
+oxeylyzer-2's `Morgenstern.dof` (Kharlamov and Sagittarius, 2022) places them;
+cmini adds « ' » right of « . ». Its unsupported share falls from 2.80 % to
+0.26 % of _Effi Briest_ (2.01 % to 0.22 % of _Die Verwandlung_), and its score
+moves from −53.5 to −49.3 on _Effi Briest_, −42.5 to −35.8 on _Die
+Verwandlung_, −121.5 to −117.4 on _Don Quichotte_ and −116.0 to −123.9 on
+_Alice_, whose b it now types and costs; it ranks eighth of the thirteen German
+layouts on both German texts, twelfth before. The golden values changed for
+Morgenstern only. Section 12 of `tools/test/test-layout-analysis-engine.cjs`
+now checks that every letter block types a to z and its language's letters;
+BEO alone is exempt, its Oxeylyzer file being the only one found. The Spanish
+Dvorak needs no change: KLA's file exchanges R and H against xkeyboard-config's
+`es(dvorak)`, whose letters are those of its first commit (2aca64fd, 2005), and
+Jorge Sanz, whom KLA credits, typed that very layout through `setxkbmap`
+(jorgesanz.net, posts of 2011-04-16 and 2011-05-28, read in the Wayback
+Machine), so KLA's exchange is a slip of its transcription.
 
 On 2026-11-19 the library took more collections (section 13 of
 `tools/test/test-layout-analysis-engine.cjs` holds their key cells, a count

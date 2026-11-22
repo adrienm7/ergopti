@@ -2724,6 +2724,46 @@ if (UPDATE_GOLDEN) {
 		}
 }
 
+{
+	// (library-block-own-letters-2026-11-22) A letter block types every letter
+	// of its language. The library held Oxeylyzer's 30-key Morgenstern, whose
+	// file drops the authors' eleventh home-row key: no b, 2 % of a German text
+	// unsupported. It is now cmini's block, b right of w, . and ' above it.
+	const LETTERS = { de: 'äöüß', en: '', es: 'ñ', fr: 'éèàçêù' };
+	// No fuller source of BEO could be found (Oxeylyzer's beo.dof, copied by
+	// its forks, is the only file): its block leaves è ç ê ù to no key.
+	const KNOWN_GAPS = { beo: 'çèêù' };
+	const blocks = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_library.json'), 'utf8')
+	).layouts.filter((entry) => entry.keys && entry.language in LETTERS);
+	check(blocks.length >= MIN_LIBRARY, `block letters: only ${blocks.length} letter blocks`);
+	for (const entry of blocks) {
+		const letters = `abcdefghijklmnopqrstuvwxyz${LETTERS[entry.language]}`;
+		// A thumb letter is typed on JIS, whose board has the three thumb keys.
+		const thumbs = ['NonConvert', 'Convert', 'KanaMode'].some((code) => code in entry.keys);
+		const result = E.analyse(
+			byId.get(entry.id),
+			E.ngramsFromText(letters),
+			thumbs ? { keyboard: 'jis' } : {}
+		);
+		const missing = letters
+			.split('')
+			.filter((letter) => letter in result.coverage.unsupportedChars)
+			.sort()
+			.join('');
+		check(
+			missing === (KNOWN_GAPS[entry.id] || ''),
+			`block letters: ${entry.id} (${entry.source}) leaves « ${missing} » to no key, expected « ${KNOWN_GAPS[entry.id] || ''} »`
+		);
+	}
+	const morgenstern = byId.get('morgenstern');
+	check(
+		['Quote', 'BracketLeft', 'BracketRight'].map((code) => morgenstern.rows[code][0]).join(' ') ===
+			"b . '",
+		"block letters: Morgenstern lacks its b, . and ' right of w and p"
+	);
+}
+
 // =========================================
 // ======= 13/ Similarity of layouts =======
 // =========================================

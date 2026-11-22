@@ -249,15 +249,12 @@ waits for the maintainer's review).
       34 to 40 s. Left: the replay of each touched app-day, still whole (`docs/memory/windows-ahk.md`, « A refresh
       clears and replays whole affected app-days », says why less is not exact). Read the next Studio reads in the
       store's `prefetch.log` to confirm the gain on the real store.
-- [ ] **Library layouts that lose their own characters, what is left (2026-11-20).** Optimot 1.8.0, Neo 2, Bone,
-      KOY, AdNW, Noted, Mine, QWERTZ, the Spanish QWERTY and Dvorak and Engram-es are re-encoded from their
-      official files (`docs/audits/layout-analysers/report.md`, « Layout library »); since 2026-11-20 the Neo family
-      has its seven levels (Mod3 and Mod4 on their own keys, its ¿ ¡ and Mod4 dead ¨ typed) and the Neo family and
-      Optimot their dead-key sequences of three keys or more (`tools/build/import-xkb-layouts.cjs`). Left, for want
-      of a source: BEO (0.99 % of Swann unsupported: è ê ç ; ?) and Morgenstern (2 %: its block has no b) have no
-      official source that could be found, so they stay Oxeylyzer letter blocks; the xkeyboard-config Spanish Dvorak
-      exchanges R and H against KLA's « Spanish Dvorak (Jorge Sanz) », whose author page could not be read
-      (web.archive.org was offline). Russian JCUKEN's 80 % on a French text is genuine.
+- [ ] **Library layouts that lose their own characters, what is left (2026-11-22).** BEO is still Oxeylyzer's
+      letter block, without è ê ç ù (0.99 % of Swann unsupported, with ; and ?): its `beo.dof` is the only file
+      found (Oxeylyzer's forks copy it; no author page, no cmini or oxeylyzer-2 entry). Re-encode it once a fuller
+      source appears, then empty `KNOWN_GAPS` of `test-layout-analysis-engine.cjs` (« library-block-own-letters »),
+      which checks that every letter block types its language's letters (`docs/audits/layout-analysers/report.md`,
+      « Layout library »). Not a loss: Russian JCUKEN's 80 % unsupported on a French text.
 - [ ] **Neo-family levels on the installed and emulated layouts, what is left (2026-11-20).** The Comparer's boards
       show every level (« Level shown »), the exports name what they leave out, and the editor keeps the seven
       levels through save and reload: Mod3 and Mod4 are held custom modifiers of the source, on Caps Lock and the
