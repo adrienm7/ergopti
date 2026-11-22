@@ -99,6 +99,37 @@ of keeping the selection inside the XCTest process. The renewal branch is not
 integrated yet; until it is, `NumberRowSourceProbeTests.swift` still selects
 in process.
 
+## Every timing duration is integer milliseconds (2026-11-22)
+
+TIM-Q1 of the timing engines campaign. A duration of
+`_shared/core/timing/data/constants.toml` is an integer number of
+milliseconds on the three OS; only a distance (`*_mm`) or a factor
+(`*_factor`) holds a fraction.
+
+- Windows `TimingsGet`/`TimingsGetSec` admit only a TOML integer;
+  `TimingsGetNumber` reads a distance or a factor.
+- The Lua reader (`_shared/core/timing/engine/timings_core.lua`): `ms` and
+  `sec` raise on a fraction; `count` reads a distance, a factor or a count.
+- `tools/test/test-timings-registry-liveness.cjs` refuses any other key that
+  is not a TOML integer. No shipped duration held a fraction when the rule
+  landed, so no value changed; a new one is rounded to a whole millisecond and
+  its comment says why that value.
+
+## A reload is timed from its admission, on each OS (2026-11-22)
+
+TIM-Q2 of the timing engines campaign. `[budgets] driver_reload_ms` judges
+three measures that each start once the reload is accepted, and they stay so:
+
+- macOS: from the `hs.reload()` call (`core/lifecycle/engine/reload/guard.lua`);
+- Linux: from the stamp written after the cleanup-debt checks, just before the
+  restart is requested (`core/timing/engine/reload_timing.lua`);
+- Windows: from the successor's launch, after the configuration lease and the
+  workers' stop (`core/timing/engine/reload_timing.ahk`); a reload queued
+  behind a configuration write is not counted while it waits.
+
+The budget measures teardown plus boot; a wait before admission is not the
+reload's cost. Do not move a starting point to the user's request.
+
 ## macOS caches the migration registry's typed parse (2026-11-21)
 
 The maintainer chose to port the Windows registry cache

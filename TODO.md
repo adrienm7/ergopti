@@ -455,9 +455,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     TIM-02 (`TimingsGet` admits only a TOML integer and `TimingsGetNumber` only a TOML number, as the Lua reader
     refuses a quoted value; English errors; the liveness gate refuses a non-integer key a Windows `TimingsGet`
     reads) fixed. The macOS `deferred_work`, `paced_job` and `paced_json` and the Linux `native_sleep` and
-    `native_timer` are OS-specific by their reason. Left: TIM-03 Linux judges no `llm_local_request_ms`
-    (`api_ollama.lua`); TIM-04 `prediction_display_ms` judged on macOS only (the Windows tooltip already freezes a
-    TTFT); TIM-05 no Windows `driver_reload` field-run step. Decisions:
+    `native_timer` are OS-specific by their reason. Then fixed: TIM-03 (the Linux Ollama chat is judged against
+    `llm_local_request_ms`, dispatch to terminal marker), TIM-04 (Windows and Linux judge the first prediction
+    display against `prediction_display_ms`, once per chain; Linux `ai/engine/prediction/display_budget.lua`) and
+    TIM-05 (the Windows developer field run has a `driver_reload` step: resume file, reload owner, the successor
+    records the measured reload and runs the next step; the collector follows the successor). Decided by the
+    maintainer on 2026-11-22 (`docs/memory/maintainer-decisions.md`): TIM-Q1 option 1, implemented (the Lua `ms`
+    and `sec` refuse a fraction, the liveness gate checks every key but `*_mm` and `*_factor`; no shipped value
+    changed), and TIM-Q2 option 1, documented. The questions as asked:
     - TIM-Q1, a fractional duration: the Lua `ms` and `sec` accept 1.5 for a `*_ms` key, Windows now refuses it
       and the gate refuses it only for the keys Windows reads. 1. **(recommended)** Integer milliseconds for every
       duration key on the three: the gate checks every key that is not `*_mm` or `*_factor`, and the Lua `ms`

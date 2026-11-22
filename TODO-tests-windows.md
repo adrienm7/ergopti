@@ -268,7 +268,10 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 
 - [ ] TIM-01, a reload is measured: Reload from the tray, then from a saved setting; the log has « Reload
       completed in N ms (reload request to boot complete). » once per reload, an « Over budget: reload » warning
-      only above 4000 ms, and a plain start of the driver writes neither.
+      only above 4000 ms, and a plain start of the driver writes neither. TIM-04: an AI prediction whose first
+      display takes over 2 s logs « Over budget: prediction.display » once. TIM-05: from a developer driver,
+      `tools/dev/collect-windows-field-report.ps1` reports `driver_reload` pass with the reload's duration, follows
+      the reloaded driver and finishes the run.
 - [ ] EDD-1, a pause stops typing, not configuration: paused, save once from each editor (prompt, paths, hotstrings
       window, layout manager install/select/remove, action picker, model page choice, download and removal, magic key
       capture), from the AI scope restore and the hotstring order rows, and from the AI menu's local server rows with

@@ -1371,6 +1371,9 @@ boot_total_ms = 2500
 # One driver reload, from its request to the next boot's completion. Measured
 # p50 2433 ms (teardown, VM re-exec and boot); 4000 ms leaves the boot budget
 # plus the teardown's 1.5 s.
+# Each driver starts the measure once the reload is admitted (maintainer
+# decision, 2026-11-22): macOS at hs.reload(), Linux at its stamp after the
+# cleanup checks, Windows at the successor's launch.
 # HS: init.lua (through core/lifecycle/engine/reload/guard.lua).
 # LX: core/timing/engine/reload_timing.lua. AHK: core/timing/engine/reload_timing.ahk.
 driver_reload_ms = 4000
