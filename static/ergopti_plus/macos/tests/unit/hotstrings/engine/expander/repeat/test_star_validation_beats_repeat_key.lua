@@ -432,8 +432,8 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 			drain_immediate_timers(hs_stub)
 			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == LITERAL_REPLACEMENT,
 				"the folded literal auto must survive a case-different magic-key change")
-			helpers.assert_eq(effects.rows[1].trigger_label, "a",
-				"the literal auto row must name the configured magic action")
+			helpers.assert_eq(effects.rows[1].trigger_label, "★ (a)",
+				"the literal auto row must name the configured magic action as « ★ (a) »")
 			helpers.assert_true(effects.rows[1].duration >= 0.019
 				and effects.rows[1].duration <= 0.021,
 				"a 10 ms ordinary gate may cover the 2x complex-key policy but must never "
@@ -558,7 +558,7 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 				helpers.assert_true(type(effects.rows) == "table"
 					and effects.rows[1].text == SLOW_REPLACEMENT,
 					"the tooltip must advertise the renamed punctuation action")
-				helpers.assert_eq(effects.rows[1].trigger_label, case.magic)
+				helpers.assert_eq(effects.rows[1].trigger_label, "★ (" .. case.magic .. ")")
 				helpers.assert_eq(press(case.raw, 0.01, case.flags), true,
 					"the one physical composite event must commit the advertised action")
 				helpers.assert_eq(#effects.emitted, 1)

@@ -42,7 +42,7 @@ end
 local function fixture(layout, form, source_override)
 	package.loaded["modules.keymap.layout_emulation"] = nil
 	local M = require("modules.keymap.layout_emulation")
-	local record = { paused = false, magic = nil, now = 0, posted = {} }
+	local record = { paused = false, now = 0, posted = {} }
 	M.init({
 		read_config = function() return { layout = layout } end,
 		default_for = require("menu.engine.manifest_reader").default_for,
@@ -64,7 +64,6 @@ local function fixture(layout, form, source_override)
 			return entry.hs
 		end,
 		keycode_for_char = function(char) return ({ z = 6, c = 8 })[char] end,
-		magic_code = function() return record.magic end,
 		is_active = function() return not record.paused end,
 		autorepeat = function(e) return e.autorepeat == true end,
 		now_ms = function() return record.now end,
@@ -244,13 +243,14 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_eq(on_iso.unicode, "$", "code 10 is the key left of 1 on an ISO keyboard")
 	end)
 
-	helpers.it("lets the physical magic key and a paused driver through", function()
+	-- The magic key is a configured character since 2026-11-21: no physical key
+	-- is handed over, so the emulated Ergopti+ layout types its own ★ there.
+	helpers.it("types the emulated layout's own ★ key and lets a paused driver through", function()
 		local M, record = fixture({ emulated_layout = "ergopti_plus", ergopti_base = true })
 		M.reload()
-		record.magic = "KeyC"
 		local magic = event({}, "c")
 		helpers.assert_true(not M.key_down(magic, KC_C), "kept")
-		helpers.assert_nil(magic.unicode, "the magic key owns its unshifted press")
+		helpers.assert_eq(magic.unicode, "★", "the layout types its ★ key itself")
 		record.paused = true
 		local paused = event({}, "q")
 		M.key_down(paused, KC_Q)

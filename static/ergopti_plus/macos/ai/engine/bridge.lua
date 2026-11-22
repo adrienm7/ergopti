@@ -998,6 +998,8 @@ local function update_preview_body(buf)
 		-- the fallback for a state that has not resolved one yet.
 		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
 			and _state.magic_key or ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
+		-- « ★ (ù) »: the real marker and the key the user presses (2026-11-21).
+		local magic_label = require("hotstrings.engine.magic_key_display").display(magic_key)
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil
@@ -1096,8 +1098,7 @@ local function update_preview_body(buf)
 					-- interceptor that runs on the same key). An autocorrection may also
 					-- accept Enter, but advertising Enter is false whenever that
 					-- terminator is disabled; magic is the action actually resolved.
-					-- « ★ (ù) »: the real marker and the key the user presses.
-					trigger_label = validates_magic and require("hotstrings.engine.magic_key_display").display(magic_key) or "↵",
+					trigger_label = validates_magic and magic_label or "↵",
 					glyph         = glyph,
 					glyph_name_key = glyph_name_key,
 					dimmed        = not m.is_winner,

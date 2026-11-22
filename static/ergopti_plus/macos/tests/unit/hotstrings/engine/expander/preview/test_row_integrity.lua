@@ -198,8 +198,10 @@ helpers.describe("preview: the rows describe the outcome the engine will produce
 		local provider_record = provider_at and code:sub(provider_at, provider_at + 700) or ""
 		helpers.assert_true(provider_record:find('validation_key%s*=%s*"magic"') ~= nil,
 			"a provider must declare the same magic validation action as its interceptor")
+		helpers.assert_true(code:find('local magic_label%s*=%s*require%("hotstrings%.engine%.magic_key_display"%)%.display%(magic_key%)') ~= nil,
+			"the label shows the magic key as « ★ (ù) », the shared display rule")
 		helpers.assert_true(code:find(
-			'trigger_label%s*=%s*validates_magic%s+and%s+magic_key%s+or%s+"↵"') ~= nil,
+			'trigger_label%s*=%s*validates_magic%s+and%s+magic_label%s+or%s+"↵"') ~= nil,
 			"both shipped providers fire from the interceptor on the trigger character, so a "
 				.. "row labelled with the terminator tells the user to press Enter — which destroys "
 				.. "the pending expansion instead of firing it")
