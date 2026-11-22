@@ -7,7 +7,7 @@
  * The maintainer's three layout capabilities, per OS and per surface: install
  * and remove a keyboard layout on the OS and switch between installed ones,
  * emulate a layout without installing it, and tune small changes (layers,
- * AltGr, emulated rows, number row, accented-letter shortcuts, magic key) on
+ * AltGr, emulated rows, number row, accented-letter shortcuts) on
  * top of either the OS layout or the emulated one. For each OS it asserts that
  * every path exists in the driver's code and is wired from the tray menu
  * (menu.toml's layout_menu) and from Ergopti Studio (the page's messages and
@@ -287,7 +287,6 @@ const PATHS = [
 		'AccentedShortcuts_Register()'
 	],
 	['tune', 'windows', 'menu', 'windows/ui/menu/menu_layout.ahk', '_LAY_NumberRowRows('],
-	['tune', 'windows', 'menu', 'windows/core/ui/ui/editors.ahk', 'MagicKeySourceMenuRows('],
 	[
 		'tune',
 		'macos',
@@ -386,7 +385,6 @@ const MENU_ROWS = {
 		'layout_features_altgr',
 		'layout_emulated_rows',
 		'number_row_policy',
-		'magic_key_source',
 		'accented_letters'
 	]
 };

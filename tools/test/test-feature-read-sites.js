@@ -253,16 +253,16 @@ if (!dynamicPrefixes.includes('shortcuts.personal')) {
 }
 const map = buildAhkFeaturesMap(features, dynamicPrefixes);
 
-// Always-on regression for the layout.ahk ctrl_magic_save UnsetItemError class:
+// Always-on regression for the layout.ahk UnsetItemError class (first met on a layout key):
 // the buggy section-prefixed form must be rejected and the correct stripped form
 // accepted. Encodes the exact crash so it can never silently return.
 const SELF_TESTS = [
 	{
-		keys: ['ahk.layout', 'ctrl_magic_save'],
+		keys: ['ahk.layout', 'ergopti_alt_gr'],
 		expectMissing: true,
 		why: 'section-prefixed crash form'
 	},
-	{ keys: ['layout', 'ctrl_magic_save'], expectMissing: false, why: 'correct stripped form' },
+	{ keys: ['layout', 'ergopti_alt_gr'], expectMissing: false, why: 'correct stripped form' },
 	{ keys: ['layout', '__definitely_not_a_feature__'], expectMissing: true, why: 'unknown key' },
 	{
 		keys: ['shortcuts', 'personal'],
@@ -327,7 +327,7 @@ console.log(
 	`\n  Fix: add the feature to _shared/settings/data/features/manifest.toml and run "npm run codegen",`
 );
 console.log(
-	`       or correct the read path. (This is the layout.ahk ctrl_magic_save crash class.)`
+	`       or correct the read path. (This is the layout.ahk UnsetItemError crash class.)`
 );
 console.log('');
 process.exit(1);

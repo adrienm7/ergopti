@@ -20,6 +20,8 @@ const path = require('path');
 const toml = require('smol-toml');
 const { stripComments } = require('../lib/script-source.cjs');
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
+// The ★ key's slots, which open the hotstrings editor by default (2026-11-21).
+const STAR_SLOTS = ['meta_star', 'secondary_star'];
 const PREDICTION_SLOTS = { ahk: 'meta_space', hs: 'secondary_space', linux: 'meta_space' };
 const read = (file) => fs.readFileSync(path.join(SP, file), 'utf8').replace(/^\uFEFF/, '');
 
@@ -43,7 +45,7 @@ function validate(input) {
 	);
 	const identities = new Set();
 	for (const entry of slots) {
-		const contextual = entry.id === 'magic_editor';
+		const contextual = STAR_SLOTS.includes(entry.id);
 		check(
 			entry.default === (contextual ? 'open_hotstrings_editor' : 'none'),
 			`${contextual ? 'editor' : 'neutral'}: ${entry.id} must use its approved initial action`
@@ -52,7 +54,7 @@ function validate(input) {
 			contextual
 				? entry.active_by_default === true && entry.cleared === 'none'
 				: entry.active_by_default === undefined && entry.cleared === undefined,
-			`editor: only the physical magic slot declares conditional activation and explicit clearing`
+			`editor: only the ★ key slots declare conditional activation and explicit clearing`
 		);
 		check(
 			typeof entry.recommended === 'string' && entry.recommended.length > 0,
@@ -81,14 +83,16 @@ function validate(input) {
 					'open_hotstrings_editor'
 		);
 		check(
-			editor.length === 1 && editor[0].id === 'magic_editor',
-			`editor: ${platform} must recommend only the contextual physical magic slot`
+			editor.length === 1 && editor[0].id === (platform === 'hs' ? 'secondary_star' : 'meta_star'),
+			`editor: ${platform} must recommend only its ★ key slot`
 		);
 	}
 	check(
-		JSON.stringify(slots.find((entry) => entry.id === 'magic_editor')?.platforms) ===
-			JSON.stringify(['ahk', 'hs', 'linux']),
-		'editor: the contextual slot must belong to every driver'
+		JSON.stringify(slots.find((entry) => entry.id === 'meta_star')?.platforms) ===
+			JSON.stringify(['ahk', 'linux']) &&
+			JSON.stringify(slots.find((entry) => entry.id === 'secondary_star')?.platforms) ===
+				JSON.stringify(['hs']),
+		'editor: Win+★ belongs to Windows and Linux, Ctrl+★ to macOS'
 	);
 	check(
 		slots.find((entry) => entry.id === 'meta_d')?.recommended === 'open_downloads',
@@ -200,13 +204,13 @@ const mutations = [
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'magic_editor').recommended = 'copy';
+			copy.slots.find((entry) => entry.id === 'meta_star').recommended = 'copy';
 		}
 	],
 	[
 		'editor',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'magic_editor').default = 'none';
+			copy.slots.find((entry) => entry.id === 'secondary_star').default = 'none';
 		}
 	],
 	[

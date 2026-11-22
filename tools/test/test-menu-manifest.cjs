@@ -6528,116 +6528,19 @@ console.log(
 	}
 }
 
-// The complete physical-key family owns every fixed native row, not a lone boundary.
+// The magic key is a configured character (maintainer's decision of 2026-11-21):
+// no menu picks a physical magic key any more, on any driver.
 {
 	const assert = require('node:assert/strict');
-	const fs = require('fs');
-	const { scriptTokens } = require('../lib/script-source.cjs');
-	const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
-	const corpus = JSON.parse(
-		readSourceFile(resolve(SHARED, 'tests/corpus/menus/magic_key_source_family.json'))
-	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
-	assert.deepEqual(menu.magic_key_source_menu, corpus.parent);
-	assert.deepEqual(menu.magic_key_source_children, corpus.children);
+	assert.equal(menu.magic_key_source_menu, undefined, 'no physical magic-key menu frame');
+	assert.equal(menu.magic_key_source_children, undefined, 'no physical magic-key children');
 	assert.deepEqual(
 		menu.layout_menu.filter((row) => row.id === 'magic_key_source'),
-		[{ type: 'list', id: 'magic_key_source' }]
+		[],
+		'the layout menu lists no physical magic-key row'
 	);
-	for (const language of readdirSync(LOCALES_DIR).filter((file) => file.endsWith('.json'))) {
-		const locale = JSON.parse(readSourceFile(resolve(LOCALES_DIR, language)));
-		for (const key of [...corpus.parent, ...corpus.children]
-			.map((row) => row.i18n)
-			.filter(Boolean)
-			.concat(corpus.reason_key))
-			assert.equal(
-				typeof locale[key],
-				'string',
-				`${language}: existing physical-key caption ${key}`
-			);
-	}
-	const sharedRoot = resolve(SHARED, '.');
-	const mac = 'macos/hotstrings/ui/menu/magic_key_source_menu.lua',
-		linux = 'linux/menu/ui/builder/builder.lua';
-	for (const rel of [mac, linux]) {
-		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', rel));
-		const reached = delegatedMenuSources([{ rel, src: source }], sharedRoot).find(
-			(entry) => entry.rel === 'layouts.engine.layers.magic_key_source.menu_rows'
-		);
-		assert(reached, `${rel}: actual native call must reach the real shared renderer`);
-		for (const id of [
-			'magic_key_source_capture',
-			'magic_key_source_automatic',
-			'magic_key_source_candidates'
-		])
-			assert(reached.handlers.has(id), `${rel}: actual callable owner ${id}`);
-		const method = rel === mac ? 'Shared.menu_rows' : 'MagicKeySourceRows.menu_rows';
-		for (const inactive of [
-			source.replace(method + '(', 'Foreign.' + method + '('),
-			source.replace('manifest = ManifestMenu', 'manifest = Foreign.ManifestMenu'),
-			source.replace('manifest = ManifestMenu', 'unowned = ManifestMenu')
-		])
-			assert(
-				!delegatedMenuSources([{ rel, src: inactive }], sharedRoot).some(
-					(entry) => entry.rel === 'layouts.engine.layers.magic_key_source.menu_rows'
-				),
-				`${rel}: foreign receiver or missing renderer port cannot borrow the shared family`
-			);
-	}
-	const native = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/ui/editors.ahk')
-	);
-	function physicalFamily(source) {
-		const tokens = scriptTokens(source, '.ahk');
-		const bodies = [];
-		for (let i = 0; i < tokens.length; i += 1) {
-			if (
-				tokens[i].kind !== 'identifier' ||
-				tokens[i].value !== 'MagicKeySourceMenuRows' ||
-				tokens[i + 1]?.value !== '(' ||
-				tokens[i + 2]?.value !== ')' ||
-				tokens[i + 3]?.value !== '{' ||
-				!/^\s*$/.test(
-					source.slice(source.lastIndexOf('\n', tokens[i].start - 1) + 1, tokens[i].start)
-				)
-			)
-				continue;
-			let depth = 1,
-				end = i + 4;
-			for (; end < tokens.length && depth > 0; end += 1) {
-				if (tokens[end].kind !== 'symbol') continue;
-				if (tokens[end].value === '{') depth += 1;
-				if (tokens[end].value === '}') depth -= 1;
-			}
-			if (depth === 0) bodies.push(tokens.slice(i + 4, end - 1));
-		}
-		if (bodies.length !== 1) return false;
-		return ['magic_key_source_children', 'magic_key_source_menu'].every((frame) =>
-			bodies[0].some(
-				(token, i, body) =>
-					token.kind === 'identifier' &&
-					token.value === 'MenuRenderer_TemplateRows' &&
-					!['.', ':'].includes(body[i - 1]?.value) &&
-					body[i + 1]?.value === '(' &&
-					body[i + 2]?.kind === 'string' &&
-					body[i + 2]?.value === frame &&
-					body[i + 3]?.value === ','
-			)
-		);
-	}
-	assert(physicalFamily(native), 'the actual Windows family must construct both shared templates');
-	for (const invalid of [
-		native.replaceAll('MenuRenderer_TemplateRows(', 'Foreign.MenuRenderer_TemplateRows('),
-		native.replace('MagicKeySourceMenuRows() {', 'if MagicKeySourceMenuRows() {'),
-		native.replace('"magic_key_source_children", Commands', '"foreign_children", Commands')
-	])
-		assert(
-			!physicalFamily(invalid),
-			'foreign/data/conditional native routes cannot credit the genuine family'
-		);
-	console.log(
-		'[OK] physical magic-key family: complete hand hierarchy, all21 existing captions and executed native/shared ownership.'
-	);
+	console.log('[OK] the magic key has no physical-key menu on any driver.');
 }
 
 // Dynamic inert captions are source-bound formats, never behavior or omission ports.
@@ -9810,7 +9713,7 @@ console.log(
 			'_HS_MagicKeyRows() {',
 			[
 				'Map("magic_key_change", MagicKeyEditor)',
-				'Map("magic_key_value", () => ScriptInformation["MagicKey"], "magic_key_ready", () => true)',
+				'Map("magic_key_value", () => MagicKeyShown(ScriptInformation["MagicKey"]), "magic_key_ready", () => true)',
 				'return Rows'
 			]
 		],

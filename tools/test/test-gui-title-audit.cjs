@@ -1720,11 +1720,6 @@ try {
 			kind: 'dialog',
 			title_key: 'menu.profiles.shortcut_title',
 			platforms: ['hs']
-		},
-		magic_key_source_notice: {
-			kind: 'notification',
-			title_key: 'dialog.magic_key_source.title',
-			platforms: ['linux']
 		}
 	});
 	assert.equal(titles.validateNativePresentations(declared), declared);
@@ -1790,10 +1785,6 @@ try {
 	assert.match(
 		withNative.lua,
 		/\["profile_shortcut_dialog"\] = \{ kind = "dialog", title_key = "menu.profiles.shortcut_title", platforms = \{"hs"\} \}/
-	);
-	assert.match(
-		withNative.lua,
-		/\["magic_key_source_notice"\] = \{ kind = "notification", title_key = "dialog.magic_key_source.title", platforms = \{"linux"\} \}/
 	);
 	console.log(
 		'Native declarations: original21 bare captions, separate dialog/notice kinds and unchanged Windows/launcher composers.'

@@ -235,7 +235,6 @@ if (moduleSrc) {
 		errors.push('M.SLOT_GROUPS parsed empty — the menu would render no groups at all');
 
 	for (const prefix of groups) {
-		if (prefix === 'contextual') continue;
 		if (!slotMods.includes(prefix)) {
 			errors.push(
 				`M.SLOT_GROUPS offers the prefix "${prefix}", which SLOT_MODS cannot resolve. Every row in that ` +
@@ -244,14 +243,18 @@ if (moduleSrc) {
 		}
 	}
 
+	// The ★ key's Ctrl slot is an ordinary row of the Ctrl group (2026-11-21),
+	// resolved through its physical-source owner, never a group of its own.
 	if (
-		groups.filter((prefix) => prefix === 'contextual').length !== 1 ||
-		!/if slot_id == MagicPolicy\.SLOT_ID then/.test(moduleSrc) ||
-		!/require\("modules\.shortcuts\.magic_editor"\)/.test(moduleSrc) ||
-		!/MagicPolicy/.test(moduleSrc)
+		groups.includes('contextual') ||
+		!/local STAR_SLOT_ID = require\("shortcuts\.engine\.star_slot_core"\)\.slot\("macos"\)\.id/.test(
+			moduleSrc
+		) ||
+		!/if slot_id == STAR_SLOT_ID then/.test(moduleSrc) ||
+		!/require\("modules\.shortcuts\.star_slot"\)/.test(moduleSrc)
 	) {
 		errors.push(
-			'the one contextual group must resolve through its actual physical-source owner and ordinary action picker'
+			'the ★ key slot must be a row of the Ctrl group, resolved through its physical-source owner'
 		);
 	}
 

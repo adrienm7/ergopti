@@ -236,12 +236,6 @@
 		}
 	},
 	"ports": {
-		"magic_key_source_notice": {
-			"kind": "notification",
-			"platform": "linux",
-			"source": "static/ergopti_plus/linux/menu/ui/builder/builder.lua",
-			"title_key": "dialog.magic_key_source.title"
-		},
 		"profile_shortcut_dialog": {
 			"kind": "dialog",
 			"platform": "hs",
