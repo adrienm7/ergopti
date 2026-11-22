@@ -690,7 +690,7 @@ export default {
 	'Si une partie du site, d’Ergopti Studio ou d’':
 		'If a part of the website, of Ergopti Studio or of ',
 	'vous est difficile ou impossible à utiliser, merci de le signaler : c’est ce qui permet de le corriger. Décrivez la page, ce que vous cherchiez à faire et, si possible, votre navigateur et votre outil d’assistance.':
-		'is hard or impossible for you to use, please report it: that is what lets it be fixed. Describe the page, what you were trying to do and, if possible, your browser and your assistive technology.',
+		'is hard or impossible for you to use, please report it. That is what lets it be fixed. Describe the page, what you were trying to do and, if possible, your browser and your assistive technology.',
 	'en créant une': 'by opening an',
 	sur: 'on',
 	'la page GitHub du projet': 'the project’s GitHub page',
