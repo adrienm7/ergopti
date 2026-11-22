@@ -247,7 +247,30 @@ const PATHS = [
 		'linux',
 		'menu',
 		'linux/ergopti_hotstrings.lua',
-		'require("modules.keymap.layout_registry").restore_session_selection()'
+		'LayoutRegistry.restore_session_selection()'
+	],
+	// A Hyprland configuration reload puts the file's layout back: the daemon
+	// watches the event socket and selects the recorded layout again.
+	[
+		'switch',
+		'linux',
+		'menu',
+		'linux/ergopti_hotstrings.lua',
+		'LayoutRegistry.watch_session_reloads()'
+	],
+	[
+		'switch',
+		'linux',
+		'studio',
+		'linux/modules/keymap/layout_registry.lua',
+		'return watch.start(function() M.restore_session_selection(nil, deps) end)'
+	],
+	[
+		'switch',
+		'linux',
+		'engine',
+		'linux/modules/keymap/hyprland_reload_watch.lua',
+		'M.RELOAD_EVENT = "configreloaded"'
 	],
 	['switch', 'linux', 'menu', 'linux/ui/menu/active_layout_rows.lua', 'function M.rows('],
 	// 2. Emulate without installing: the engine, then the Studio host's port.

@@ -1162,6 +1162,26 @@ function M.restore_session_selection(on_done, deps)
 	end, deps)
 end
 
+--- Selects the recorded layout again after each Hyprland configuration reload:
+--- reading hyprland.conf puts its own kb_layout back over the runtime one the
+--- layout manager set. Started once at the daemon's start, only on Hyprland;
+--- ended by M.shutdown.
+--- @param deps table|nil
+--- @return boolean watching False off Hyprland or when the socket is unreachable.
+function M.watch_session_reloads(deps)
+	if _stopping then return false end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		Logger.error(LOG, "Hyprland reloads cannot be watched: %s.", tostring(deps_err))
+		return false
+	end
+	if M.live_path(resolved) ~= "wayland" then return false end
+	local desktop_is = resolved.desktop_is or require("core.ui.engine.display_server").desktop_is
+	if not desktop_is("hyprland") then return false end
+	local watch = resolved.reload_watch or require("modules.keymap.hyprland_reload_watch")
+	return watch.start(function() M.restore_session_selection(nil, deps) end)
+end
+
 
 
 
@@ -1778,6 +1798,8 @@ function M.shutdown()
 	if not _stopping then _stopping = true; _epoch = _epoch + 1 end
 	local Reapply = package.loaded["modules.keymap.x11_layout_reapply"]
 	if Reapply then Reapply.shutdown() end
+	local ReloadWatch = package.loaded["modules.keymap.hyprland_reload_watch"]
+	if ReloadWatch then ReloadWatch.shutdown() end
 	if _checking_shutdown then return false end
 	_checking_shutdown = true
 	if not _transports_cancelled then

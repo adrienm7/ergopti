@@ -174,8 +174,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       `xkbcomp` names `ergol` once the daemon has started, and after « Désinstaller » a new login keeps the
       desktop's own layouts. With Ergopti emulated, Ctrl+è sends the letter chosen under « Raccourcis sur les lettres
       accentuées » (LCP-07). On Hyprland (LCP-09) the same « Utiliser » puts `ergol` first in
-      `hyprctl getoption input:kb_layout`, the next letters follow it, a number-row choice applies live, a new login
-      selects it again once the daemon has started, and « Désinstaller » takes it out of `kb_layout`; on Sway the
+      `hyprctl getoption input:kb_layout`, the next letters follow it, a number-row choice applies live, a save of
+      `hyprland.conf` (or `hyprctl reload`) puts it back first within a second, a new login selects it again once the
+      daemon has started, and « Désinstaller » takes it out of `kb_layout`; on Sway the
       page says the compositor's own file selects the layout.
 - [ ] <!-- field-point: kde_input_sources_live --> Live layout switch on KDE Plasma: with two layouts in System
       Settings > Keyboard, Layout > « Input sources » switches the active layout at once through the Plasma keyboard

@@ -733,6 +733,32 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		helpers.assert_nil(gnome_state.files[LOCAL_DIR .. gnome_deps.settings.session_selection_file])
 	end)
 
+	-- A Hyprland configuration reload puts hyprland.conf's kb_layout back: the
+	-- recorded layout is selected again on each reload (hyprland-reload-reselect).
+	helpers.it("selects the recorded layout again after a Hyprland configuration reload (hyprland-reload-reselect)", function()
+		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		deps.session_type = function() return "wayland" end
+		deps.desktop_is = function(token) return token == "hyprland" end
+		local handlers = {}
+		deps.reload_watch = { start = function(handler) handlers[#handlers + 1] = handler; return true end }
+		helpers.assert_true(LayoutRegistry.watch_session_reloads(deps), "the watch starts on Hyprland")
+		helpers.assert_eq(#handlers, 1)
+		state.files[LOCAL_DIR .. deps.settings.session_selection_file] = "ergol\n"
+		local before = #state.runs
+		handlers[1]()
+		helpers.assert_eq(state.runs[before + 2].args[2], "activate", "the reload selects the layout again")
+		helpers.assert_eq(arg_value(state.runs[before + 2].args, "--layout-id"), "ergol")
+		for _, desktop in ipairs({ "gnome", "kde", "sway" }) do
+			local Other, other_deps = with_ergol({})
+			other_deps.session_type = function() return "wayland" end
+			other_deps.desktop_is = function(token) return token == desktop end
+			local started = false
+			other_deps.reload_watch = { start = function() started = true; return true end }
+			helpers.assert_eq(Other.watch_session_reloads(other_deps), false, desktop)
+			helpers.assert_eq(started, false, desktop .. " has no Hyprland socket to watch")
+		end
+	end)
+
 	-- Sway, niri, river... select a layout only in their own configuration file:
 	-- the installer says so and the page names it, not a generic failure
 	-- (wlroots-session-reason).

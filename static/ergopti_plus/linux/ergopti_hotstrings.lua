@@ -2598,7 +2598,13 @@ local function main()
 	-- apply-x11 lasts for the X session and Hyprland's runtime layout until its
 	-- configuration is read again: the layout chosen in an earlier session is
 	-- selected again (the layout manager records it). Required inline, as above.
-	if opts.dry_run ~= true then require("modules.keymap.layout_registry").restore_session_selection() end
+	-- A Hyprland configuration reload puts the file's layout back: the recorded
+	-- one is selected again on each (modules/keymap/hyprland_reload_watch.lua).
+	if opts.dry_run ~= true then
+		local LayoutRegistry = require("modules.keymap.layout_registry")
+		LayoutRegistry.restore_session_selection()
+		LayoutRegistry.watch_session_reloads()
+	end
 
 	local function on_click(code)
 		-- A physical button press ends a gesture's click hold, as Windows' mouse

@@ -383,7 +383,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       Hyprland now installs, switches and takes the number-row options live through `hyprctl keyword` with a read-back,
       selected again at the next session; Sway, niri and river are refused with a named reason
       (`layout_manager.failure_session_unsupported`; Sway reports no layout ids, so a refused layout could not be put
-      back). Left in code: re-select after a Hyprland configuration reload (`configreloaded`). Left, real machine
+      back); a Hyprland configuration reload selects the recorded layout again (`configreloaded` on the event
+      socket, `hyprland_reload_watch.lua`). Left, real machine
       only: the steps of TODO-tests-windows.md (remove a Studio DLL from the layout manager, re-save a source under
       another `dll_name`) and TODO-tests-linux.md (an X11 layout loaded again after a new session, the Hyprland
       selection). Decided with the
