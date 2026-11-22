@@ -509,6 +509,7 @@ InstallSendNoOps()
 #Include unit/core/ui/tooltip/test_border_zorder.ahk
 #Include unit/core/ui/tooltip/test_border_ring_region.ahk
 #Include unit/core/ui/tooltip/test_latency_diagnostics.ahk
+#Include unit/core/ui/tooltip/test_first_display_budget.ahk
 #Include unit/core/ui/tooltip/test_border_gdi_ownership.ahk
 #Include unit/core/ui/tooltip/test_measure_gdi_ownership.ahk
 #Include unit/core/ui/tooltip/test_dequeue_regression.ahk

@@ -1394,7 +1394,8 @@ llm_remote_request_ms = 3000
 
 # A streamed prediction: chain start to the tooltip's first display (TTFT).
 # Measured p50 1573 ms, max 1582 ms.
-# HS: core/ui/ui/tooltip/llm.lua.
+# HS: core/ui/ui/tooltip/llm.lua. LX: ai/engine/prediction/display_budget.lua.
+# AHK: core/ui/ui/tooltip/llm.ahk.
 prediction_display_ms = 2000
 
 

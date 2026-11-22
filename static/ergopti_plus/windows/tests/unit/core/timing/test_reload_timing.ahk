@@ -16,7 +16,7 @@
 
 ; Runs Body(Lines) with the formatted log lines captured; everything is put back.
 _RTM_WithLog(Body) {
-	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED, _TimingsCache
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED, _TimingsCache, _LOGGER_DEDUP_KEY
 	Saved := { Sink: _LOGGER_TEST_SINK, Info: _LOGGER_INFO_ENABLED, Warn: _LOGGER_WARN_ENABLED,
 		Error: _LOGGER_ERROR_ENABLED }
 	if (Type(_TimingsCache) != "Map")
@@ -24,6 +24,8 @@ _RTM_WithLog(Body) {
 	Lines := []
 	try {
 		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true, _LOGGER_ERROR_ENABLED := true
+		; A line equal to the previous test's would be withheld by the consecutive dedup.
+		_LOGGER_DEDUP_KEY := ""
 		LoggerSetTestSink((Line) => Lines.Push(Line))
 		Body.Call(Lines)
 	} finally {

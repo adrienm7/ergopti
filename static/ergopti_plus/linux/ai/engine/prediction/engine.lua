@@ -50,6 +50,7 @@ local NavigationSettings = require("ai.engine.settings.navigation_settings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Inference = require("ai.engine.local_servers.inference")
 local Monotonic = require("core.logger.engine.monotonic")
+local DisplayBudget = require("ai.engine.prediction.display_budget")
 local i18n = require("core.i18n.engine.i18n")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 local Json = require("core.text.engine.json")
@@ -1074,6 +1075,8 @@ function M.predict(context, output_context, override, automatic)
 	Logger.info(LOG, "Sending %sprediction request (backend=%s, model=%s, profile=%s, count=%d, context=%d chars).",
 		_suggestion_context.live and "live " or "", M.get_backend(), model, tostring(profile.id), requested,
 		#params.context)
+	-- The first candidates drawn are judged against [budgets] prediction_display_ms.
+	local display_chain = DisplayBudget.start(DisplayBudget.production_ports())
 
 	local function parse_response(raw, batch, extra_deletes)
 		local parsed = {}
@@ -1099,7 +1102,10 @@ function M.predict(context, output_context, override, automatic)
 			Logger.debug(LOG, "Prediction not shown: a hotstring tooltip is shown.")
 			return
 		end
-		if #visible > 0 or meta.loading then show_candidates(visible, meta) end
+		if #visible > 0 or meta.loading then
+			-- Without an overlay nothing was drawn, so there is no display to judge.
+			if show_candidates(visible, meta) and #visible > 0 and _overlay then display_chain.shown() end
+		end
 	end
 
 	local function request_current(verify_focus)

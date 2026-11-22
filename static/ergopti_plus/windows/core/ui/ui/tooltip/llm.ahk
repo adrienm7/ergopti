@@ -1247,7 +1247,18 @@ LLM_TooltipRefreshChainTiming() {
 	if !_LLM_Tooltip_Chain.FirstShowTick {
 		_LLM_Tooltip_Chain.FirstShowTick := now
 		_LLM_Tooltip_Chain.TtftMs := now - _LLM_Tooltip_Chain.StartTick
+		_LLM_TooltipJudgeFirstDisplay(_LLM_Tooltip_Chain.TtftMs)
 	}
+}
+
+; Judges the chain's first display against [budgets] prediction_display_ms, as
+; the macOS and Linux tooltips do, once per chain. Diagnostics only: a budget
+; that cannot be read is logged and the display goes on.
+; @param TtftMs {Number} Chain start to the first display.
+_LLM_TooltipJudgeFirstDisplay(TtftMs) {
+	try PerfBudget_Report("LLM", "prediction.display", TtftMs, TimingsGet("budgets", "prediction_display_ms"))
+	catch as Err
+		try LoggerError("LLM", "The first display could not be judged against its budget: {1}.", Err.Message)
 }
 
 ; Freezes the chain timings WITHOUT repainting. Callers invoke it just before the
@@ -1279,8 +1290,10 @@ LLM_TooltipMarkChainTimingOnly(NowTick) {
 		; would then take the first-show branch in LLM_TooltipRefreshChainTiming and
 		; overwrite TtftMs with a later value — printing an info bar whose TTFT is
 		; greater than the TTLT frozen here.
-		if !_LLM_Tooltip_Chain.FirstShowTick
+		if !_LLM_Tooltip_Chain.FirstShowTick {
 			_LLM_Tooltip_Chain.FirstShowTick := final
+			_LLM_TooltipJudgeFirstDisplay(_LLM_Tooltip_Chain.TtftMs)
+		}
 	}
 }
 

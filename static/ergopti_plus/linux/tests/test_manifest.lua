@@ -776,6 +776,7 @@ return {
 	"tests.unit.menu.llm.test_model_selector_api_listing",
 	"tests.unit.ai.engine.settings.test_navigation_settings",
 	"tests.unit.ai.engine.prediction.test_digit_accept",
+	"tests.unit.ai.engine.prediction.test_display_budget",
 	"tests.unit.ai.engine.prediction.test_inline_autotype",
 	"tests.unit.ai.engine.prediction.test_tooltip_chords_consumed",
 	"tests.unit.ai.engine.prediction.test_engine_canonicals",
