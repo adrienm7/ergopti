@@ -57,11 +57,19 @@ async function main() {
 			mode: 'parallel',
 			prompt: 'Original prompt'
 		};
-		await page.evaluate((seed) => window.init(seed), first);
+		// init() moves the focus to the name field 100 ms after it fills the form.
+		// A timer of the same delay queued after it fires after it, so no later
+		// step types into a field that deferred focus then takes away.
+		const initialize = (seed) =>
+			page.evaluate((value) => {
+				window.init(value);
+				return new Promise((resolve) => setTimeout(resolve, 100));
+			}, seed);
+		await initialize(first);
 		await page.locator('#p-name').fill('Edited');
 		await page.locator('#e-out').fill('Edited prompt');
 		await page.locator('#p-mode').selectOption('batch');
-		await page.evaluate((seed) => window.init(seed), first);
+		await initialize(first);
 		assert.equal(await page.locator('#p-name').inputValue(), 'Edited');
 		assert.equal(await page.locator('#e-out').innerText(), 'Edited prompt');
 		await page.evaluate(() => window.doSave());
@@ -73,13 +81,14 @@ async function main() {
 		assert.equal(save.epoch, 7);
 		assert.equal(save.batch, true);
 		const next = { ...first, edit_id: 'q', epoch: 8, name: 'Next', prompt: 'New source' };
-		await page.evaluate((seed) => window.init(seed), next);
+		await initialize(next);
 		assert.equal(await page.locator('#p-name').inputValue(), 'Next');
-		await page.evaluate((seed) => window.init(seed), first);
+		await initialize(first);
 		assert.equal(await page.locator('#p-name').inputValue(), 'Next');
 		// The token suggestions are a list box the editor owns: the highlight
 		// the arrow keys move is named through aria-activedescendant, so a
 		// screen reader announces it (WCAG 4.1.2).
+		assert.equal(await page.evaluate(() => document.activeElement.id), 'p-name');
 		await page.locator('#e-out').click();
 		await page.keyboard.press('End');
 		await page.keyboard.type(' {');
