@@ -5,8 +5,8 @@
 MODULE: Ergopti+ Page — Sticky Download CTA
 DESCRIPTION:
 A discreet download pill that slides in once the visitor has scrolled past the
-hero and hides again as the real download section comes into view, so it never
-competes with the final call-to-action. OS-aware, like the hero button.
+hero and hides again as the real download section or the footer comes into view, so it
+never competes with the final call-to-action nor covers the footer's links. OS-aware, like the hero button.
 ==============================================================================
 -->
 
@@ -39,6 +39,10 @@ competes with the final call-to-action. OS-aware, like the hero button.
 
 	onMount(() => {
 		const finalCta = document.getElementById('ep-telecharger');
+		// The pill floats over the page's bottom edge: once the footer is in
+		// view it would cover the footer's links, keyboard focus included
+		// (WCAG 2.4.11), so it steps aside.
+		const footer = document.querySelector('footer');
 		let ticking = false;
 		const onScroll = () => {
 			if (ticking) return;
@@ -50,13 +54,19 @@ competes with the final call-to-action. OS-aware, like the hero button.
 				if (finalCta) {
 					nearFinal = finalCta.getBoundingClientRect().top < window.innerHeight * 0.9;
 				}
-				visible = pastHero && !nearFinal;
+				const footerInView =
+					footer !== null && footer.getBoundingClientRect().top < window.innerHeight;
+				visible = pastHero && !nearFinal && !footerInView;
 				ticking = false;
 			});
 		};
 		window.addEventListener('scroll', onScroll, { passive: true });
+		window.addEventListener('resize', onScroll, { passive: true });
 		onScroll();
-		return () => window.removeEventListener('scroll', onScroll);
+		return () => {
+			window.removeEventListener('scroll', onScroll);
+			window.removeEventListener('resize', onScroll);
+		};
 	});
 </script>
 
