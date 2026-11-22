@@ -6,79 +6,105 @@
 --- The decoder's lexical scanners (comment stripping, top-level comma splitting,
 --- continuation depth, trimming) used to slice one character at a time, which
 --- made decoding the 39 KB migration registry take ~100 ms on every boot. They
---- now copy runs of characters no state reacts to in one slice. The counts below
---- are counted string operations, not wall-clock, so they hold on a loaded
---- machine; the semantic cases pin that the shortcuts change no result.
+--- now copy runs of characters no state reacts to in one slice. Each cost case
+--- counts string operations, not wall-clock, so it holds on a loaded machine,
+--- and runs its input at two run lengths: the count must not change when only
+--- the length doubles. A fixed ceiling chose a number; the doubling states the
+--- claim. The semantic cases pin that the shortcuts change no result.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local codec = require("core.text.engine.toml_codec")
 local scanner = require("core.text.engine.toml_codec.record_scanner")
 
---- Counts string.sub calls (the per-character allocation) while `body` runs.
+--- Counts calls of `string[name]` while `body` runs.
+--- @param name string The string function counted, such as "sub".
 --- @param body function
 --- @return integer calls, any result
-local function count_sub_calls(body)
-	local original, calls = string.sub, 0
-	string.sub = function(...) calls = calls + 1; return original(...) end
+local function count_string_calls(name, body)
+	local original, calls = string[name], 0
+	string[name] = function(...) calls = calls + 1; return original(...) end
 	local ok, result = pcall(body)
-	string.sub = original
+	string[name] = original
 	if not ok then error(result, 0) end
 	return calls, result
 end
 
+--- Asserts that a scan costs the same at two run lengths: `run(length)` must
+--- make as many counted calls as `run(2 * length)`. A scan that works one
+--- character at a time doubles its count instead.
+--- @param name string The string function counted.
+--- @param run function The scan over runs of `length` characters; returns its result.
+--- @param check function Asserts the result of one run, given its length.
+--- @param length integer The shorter run length.
+--- @param label string The scan, for the failure message.
+local function assert_length_independent(name, run, check, length, label)
+	local short, short_result = count_string_calls(name, function() return run(length) end)
+	local long, long_result = count_string_calls(name, function() return run(2 * length) end)
+	check(short_result, length)
+	check(long_result, 2 * length)
+	helpers.assert_true(short > 0, label .. ": no string." .. name .. " call was seen, so nothing was measured")
+	helpers.assert_eq(long, short,
+		label .. " grew with run length: " .. short .. " then " .. long .. " string." .. name .. " calls")
+end
+
 helpers.describe("toml codec scanners: cost is bounded by structure, not length", function()
-	helpers.it("decodes a long plain array element with a handful of slices", function()
-		local plain = string.rep("abcdefghij", 500)
-		local document = 'list = ["' .. plain .. '", "' .. plain .. '"]\n'
-		local calls, decoded = count_sub_calls(function() return codec.decode(document) end)
-		helpers.assert_eq(decoded.list[1], plain)
-		-- One slice per character cost over 10 000 calls here.
-		helpers.assert_true(calls < 400, "decode sliced per character: " .. calls .. " sub calls")
+	helpers.it("decodes a long plain array element with the same slices at any length", function()
+		assert_length_independent("sub", function(length)
+			local plain = string.rep("a", length)
+			return codec.decode('list = ["' .. plain .. '", "' .. plain .. '"]\n')
+		end, function(decoded, length)
+			helpers.assert_eq(decoded.list[1], string.rep("a", length))
+		end, 5000, "decode")
 	end)
 
-	helpers.it("strips a comment only outside strings, over long plain runs", function()
-		local plain = string.rep("x", 2000)
-		local calls, stripped = count_sub_calls(function()
-			return codec.strip_inline_comment('name = "' .. plain .. '#kept" # dropped')
-		end)
-		helpers.assert_eq(stripped, 'name = "' .. plain .. '#kept" ')
-		helpers.assert_true(calls < 100, "strip_inline_comment sliced per character: " .. calls)
+	helpers.it("strips a comment only outside strings, at any plain run length", function()
+		assert_length_independent("sub", function(length)
+			return codec.strip_inline_comment('name = "' .. string.rep("x", length) .. '#kept" # dropped')
+		end, function(stripped, length)
+			helpers.assert_eq(stripped, 'name = "' .. string.rep("x", length) .. '#kept" ')
+		end, 2000, "strip_inline_comment")
 	end)
 
-	helpers.it("advances nesting depth over a long line in few steps", function()
-		local plain = string.rep("y", 3000)
-		local calls, depth = count_sub_calls(function()
-			local result = scanner.advance("[" .. plain .. "[" .. plain, 0, nil)
-			return result
-		end)
-		helpers.assert_eq(depth, 2)
-		helpers.assert_true(calls < 100, "advance sliced per character: " .. calls)
+	helpers.it("advances nesting depth over a long line in the same steps at any length", function()
+		assert_length_independent("sub", function(length)
+			local plain = string.rep("y", length)
+			return scanner.advance("[" .. plain .. "[" .. plain, 0, nil)
+		end, function(depth)
+			helpers.assert_eq(depth, 2)
+		end, 3000, "advance")
 	end)
 end)
 
 helpers.describe("toml reader and string decoding: cost is bounded by structure", function()
-	helpers.it("parses a long hotstring entry line with a handful of slices", function()
+	helpers.it("parses a long hotstring entry line with the same slices at any length", function()
 		local reader = require("core.text.engine.toml_codec.reader")
-		local trigger, output = string.rep("t", 800), string.rep("o", 800)
-		local document = '[ok]\n"' .. trigger .. '" = { output = "' .. output .. '", is_word = true }\n'
-		local calls, parsed = count_sub_calls(function() return reader.parse_text(document) end)
-		local entries = parsed.sections.ok.entries
-		helpers.assert_eq(entries[1].trigger, trigger)
-		helpers.assert_eq(entries[1].output, output)
-		helpers.assert_true(entries[1].is_word)
-		helpers.assert_true(calls < 600, "reader sliced per character: " .. calls .. " sub calls")
+		assert_length_independent("sub", function(length)
+			local trigger, output = string.rep("t", length), string.rep("o", length)
+			return reader.parse_text('[ok]\n"' .. trigger .. '" = { output = "' .. output .. '", is_word = true }\n')
+		end, function(parsed, length)
+			local entries = parsed.sections.ok.entries
+			helpers.assert_eq(entries[1].trigger, string.rep("t", length))
+			helpers.assert_eq(entries[1].output, string.rep("o", length))
+			helpers.assert_true(entries[1].is_word)
+		end, 800, "reader")
 	end)
 
 	helpers.it("decodes a plain basic string without a pass over its bytes", function()
 		local basic = require("core.text.engine.toml_codec.basic_string")
-		local original, chars = string.char, 0
-		string.char = function(...) chars = chars + 1; return original(...) end
-		local ok, decoded = pcall(basic.unescape_body, string.rep("plain text ", 400))
-		string.char = original
-		helpers.assert_true(ok)
-		helpers.assert_eq(decoded, string.rep("plain text ", 400))
-		helpers.assert_true(chars < 10, "plain body was rebuilt byte by byte: " .. chars .. " string.char calls")
+		-- An escaped body takes the byte pass, so the counter is seen to reach
+		-- the decoder; a plain body must then cost the same at both lengths.
+		local escaped = count_string_calls("char", function() return basic.unescape_body("a\\u0041") end)
+		helpers.assert_true(escaped > 0, "unescape_body: no string.char call was seen on an escape, so nothing is measured")
+		local short, short_decoded = count_string_calls("char", function()
+			return basic.unescape_body(string.rep("plain text ", 400))
+		end)
+		local long, long_decoded = count_string_calls("char", function()
+			return basic.unescape_body(string.rep("plain text ", 800))
+		end)
+		helpers.assert_eq(short_decoded, string.rep("plain text ", 400))
+		helpers.assert_eq(long_decoded, string.rep("plain text ", 800))
+		helpers.assert_eq(long, short, "plain body was rebuilt byte by byte: " .. short .. " then " .. long .. " string.char calls")
 	end)
 
 	helpers.it("still rejects raw controls, a bare quote and a bad escape", function()

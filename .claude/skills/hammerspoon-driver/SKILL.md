@@ -69,27 +69,25 @@ Regression tests for this class must compare **source indices** (`src:find("loca
 task") < src:find("hs.task.new")`), never merely assert that the using line
 exists — a grep-shaped test stayed green over the live bug.
 
-## The `hs.` purity ratchet counts comments — a docstring can fail CI
+## The `hs.` purity ratchet is a per-file ledger
 
-`tests/meta/architecture/test_port_adapter_coverage.lua` counts every **line** matching
-`%f[%w]hs%.` (and `io.open` / `os.execute`) across `macos/modules/` and
-`macos/lib/` only — `adapters/`, `ui/` and root `init.lua` are outside the scan —
-and fails if the total rises above a baseline. It is a raw line scan with **no
-comment stripping** (`:337-358`), so a docstring that names `hs.timer.new`
-increments the counter exactly like a real call.
+`tests/meta/architecture/test_port_adapter_coverage.lua` counts every code
+**line** matching `%f[%w]hs%.` (and `io.open` / `os.execute`) in three trees —
+modules+lib, `ui/` and the root `init.lua` — outside every `adapters/` folder.
+Comment lines do not count. Each driver file's count must equal its entry in
+`tests/meta/architecture/os_api_purity_ledger.lua`: a rise fails as a
+regression, a fall fails until the entry is lowered to it, and a file absent
+from the ledger may make no such call.
 
-Two consequences:
+- Moving OS-calling code from `ui/` into `modules/` moves entries between two
+  trees; it adds no OS call, so lower one entry and add the other in the same
+  change, and say so.
+- **Never quote the counts from memory.** The failure lists every file whose
+  count differs, measured against admitted.
 
-- Moving OS-calling code from `ui/` into `modules/` raises the count without
-  adding a single OS call. So does documenting a foot-gun.
-- **Never quote the baselines from memory.** Read `LUA_HS_BASELINE` and
-  `LUA_IO_OS_BASELINE` at `:247-248`; they move on nearly every pass and a stale
-  number sends people chasing a delta that does not exist.
-
-Prefer routing the call through an adapter and naming the _adapter_ in the
-comment. If a comment genuinely must name the `hs.` API, bump the baseline **with
-a note saying it is a comment, not a call**, and prove it with
-`git diff -- modules lib`. Never bump silently.
+Prefer routing the call through an adapter. Never raise an entry or add a file
+to make a change pass without a note saying why the call cannot go through a
+port.
 
 Corollary: `adapters/` is the OS-isolation layer, not "exactly the 20 ports".
 Relocating `shell_runner` / `toml_cache` / `json_codec` into `lib/` for folder
