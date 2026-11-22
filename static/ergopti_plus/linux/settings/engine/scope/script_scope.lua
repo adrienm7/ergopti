@@ -51,7 +51,7 @@ function M.alias_names()
 end
 
 --- Makes config.toml's [script] rows win over the saved values at start, and
---- clears the saved value of a row the file lacks (the locale excepted).
+--- clears the saved value of a row the file lacks, the locale included.
 --- Runs before the error window, the log level and i18n read their alias.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
@@ -60,8 +60,8 @@ function M.adopt_configured()
 		aliases = M.alias_names(), storage = require("core.fs.adapters.storage"), logger = Logger, log = "settings.engine.scope.script_scope" })
 end
 
---- Rewrites the config.toml row a menu or wizard change replaces (held or
---- not, the locale only when held), so the next start keeps the change. Call
+--- Rewrites the config.toml row a menu or wizard change replaces, held or
+--- not, so the next start keeps the change. Call
 --- before storing it.
 --- @param path string Canonical script path.
 --- @param value any New value.
@@ -130,8 +130,8 @@ end
 function M.retry_locale() return M.retry_edit(ConfigKeys.KEY.SCRIPT_LOCALE) end
 
 --- Atomically changes one native alias and its config.toml row: the row is
---- written held or not, except the locale's, which is rewritten only when held
---- (script_config_authority.file_owns_absence).
+--- written held or not, the locale's included (maintainer decision of
+--- 2026-11-21, script_config_authority.file_owns_absence).
 --- @param key string Canonical script row.
 --- @param value any Native value admitted by the field owner.
 --- @return boolean committed
