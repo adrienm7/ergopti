@@ -292,11 +292,6 @@ enabled = false
 
 
 
-[hotstrings.magic_key.replace]
-enabled = false
-
-
-
 [hotstrings.magic_key.repeat_corrections]
 enabled = false
 time_activation_seconds = 2

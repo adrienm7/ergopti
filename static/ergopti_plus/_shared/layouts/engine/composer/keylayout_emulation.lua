@@ -26,7 +26,7 @@
 ---    their own switch, the four row switches (layout_rows_policy), the
 ---    number-row ordering and its edge keys (number_row_policy), a pending dead
 ---    key completed by a key the emulation leaves to the OS, the dead-key reset
----    keys and the physical magic key, which keeps its unshifted press.
+---    keys.
 --- 4. Fail fast: an unknown convention, a key code the layout's sets cannot
 ---    reach or an undefined action raise at compile time, never on a key.
 --- 5. The accented-letter shortcuts of Ergopti's own layouts: a chord on the key
@@ -468,7 +468,7 @@ end
 --- @param session table
 --- @param settings table { base, alt_gr, layout = the [layout] table holding the
 ---   emulate_<row> switches, number_row = direct_access_digits,
----   edges = number_row_reorder_edges, magic_code = KeyboardEvent.code|nil,
+---   edges = number_row_reorder_edges,
 ---   accented = M.accented_choices for a layout of the Ergopti family, else nil }
 --- @return table effective { [false] = {mode, reason}, [true] = {mode, reason} }
 function M.configure(session, settings)
@@ -489,7 +489,7 @@ function M.configure(session, settings)
 		error("The accented shortcut choices are a table of letters.")
 	end
 	session.config = { base = settings.base, alt_gr = settings.alt_gr, row_on = row_on,
-		swaps = swaps, magic_code = settings.magic_code, accented = settings.accented }
+		swaps = swaps, accented = settings.accented }
 	session.state = M.NEUTRAL
 	return effective
 end
@@ -643,7 +643,6 @@ function M.decide(session, code, shift, caps, option, ctrl, alt, win, native)
 		return M.PASS, nil
 	end
 	local pending = session.state ~= M.NEUTRAL
-	if not pending and not shift and config.magic_code == code then return M.PASS, nil end
 	if config.base and emulated then
 		if config.swaps[caps == true][code] then shift = not shift end
 		return step_level(session, mac, shift, caps, false)

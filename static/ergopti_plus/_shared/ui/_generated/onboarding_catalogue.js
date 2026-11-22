@@ -139,29 +139,6 @@
 				"uk": "Клавіша ★ та розширення тексту",
 				"zh": "★ 键与文本扩展"
 			},
-			"layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace": {
-				"ar": "تحويل مفتاح إلى مفتاح ★",
-				"cs": "Transformovat klávesu na klávesu ★",
-				"da": "Omdanne en tast til ★-tasten",
-				"de": "Eine Taste in die ★-Taste umwandeln",
-				"en": "Transform a key into the ★ key",
-				"es": "Transformar una tecla en la tecla ★",
-				"fr": "Transformer une touche en touche ★",
-				"he": "להפוך מקש למקש ★",
-				"hi": "किसी कुंजी को ★ में बदलें",
-				"it": "Trasformare un tasto nel tasto ★",
-				"ja": "キーを★キーに変換",
-				"ko": "키를 ★ 키로 변환",
-				"nl": "Een toets omzetten naar de ★-toets",
-				"no": "Gjøre en tast om til ★-tasten",
-				"pl": "Przekształć klawisz w klawisz ★",
-				"pt": "Transformar uma tecla na tecla ★",
-				"ru": "Превратить клавишу в клавишу ★",
-				"sv": "Omvandla en tangent till ★-tangenten",
-				"tr": "Bir tuşu ★ tuşuna dönüştür",
-				"uk": "Перетворити клавішу на клавішу ★",
-				"zh": "将一个键转换为 ★ 键"
-			},
 			"layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections": {
 				"ar": "تصحيح الإيجابيات الكاذبة لمفتاح ★ التكرار (ê→u)",
 				"cs": "Opravy falešných pozitiv opakované klávesy ★ (ê→u)",
@@ -1632,28 +1609,6 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.meta_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.win"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.tap_keys.number_row_left",
 										"value": "screenshot_fullscreen_save",
 										"default": "none",
@@ -2111,17 +2066,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.magic_key.replace.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.magic_key.repeat_corrections.enabled",
 												"value": true,
@@ -3112,28 +3056,6 @@
 							{
 								"items": [
 									{
-										"path": "shortcuts.keyboard.secondary_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.ctrl"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.keyboard.secondary_a",
 										"value": "select_line",
 										"default": "none",
@@ -4101,17 +4023,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
@@ -5171,28 +5082,6 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.meta_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.super"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.tap_keys.number_row_left",
 										"value": "screenshot_fullscreen_save",
 										"default": "none",
@@ -5522,17 +5411,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,

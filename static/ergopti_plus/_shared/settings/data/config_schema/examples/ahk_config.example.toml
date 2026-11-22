@@ -243,9 +243,6 @@ enabled = true
 # ===== 2.5 Magic key group =====
 # ===============================
 
-[hotstrings.magic_key.replace]
-enabled = true
-
 [hotstrings.magic_key.repeat_corrections]
 enabled = true
 time_activation_seconds = 2.0

@@ -1268,9 +1268,13 @@ function assertSeparated(row, where) {
 		'Ctrl + E': en['sg_actions.open_file_manager'],
 		'Ctrl + .': en['sg_actions.open_emoji_picker'],
 		// The named keys read through the key name table, as the menus name them.
-		[`Ctrl + ${en['key_name.caps_lock']}`]: en['sg_actions.toggle_capslock'],
-		'Ctrl + Space': en['sg_actions.llm_generate_prediction']
+		[`Ctrl + ${en['key_name.caps_lock']}`]: en['sg_actions.toggle_capslock']
 	};
+	// No recommendation binds an AI prediction (maintainer's decision of 2026-11-22).
+	assert.ok(
+		!rows.some((candidate) => candidate.action === en['sg_actions.llm_generate_prediction']),
+		'macOS recommends no AI prediction chord'
+	);
 	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
 	// no shortcut the wizard offers any more.
 	assert.ok(!row('Layer + Scroll'), 'macOS no longer offers Layer + Scroll as a shortcut');
@@ -1298,9 +1302,15 @@ function assertSeparated(row, where) {
 	linux.platform = 'linux';
 	goToPage(linux, 'shortcuts');
 	answer(linux, true);
-	const superSpace = checkRows(linux).find((candidate) => candidate.trigger === 'Super + Space');
-	assert.ok(superSpace, 'Linux names its Super + Space chord alone');
-	assert.equal(superSpace.action, en['sg_actions.llm_generate_prediction']);
+	const linuxRows = checkRows(linux);
+	assert.ok(
+		!linuxRows.some((candidate) => candidate.action === en['sg_actions.llm_generate_prediction']),
+		'Linux recommends no AI prediction chord'
+	);
+	assert.ok(
+		!linuxRows.some((candidate) => candidate.trigger === 'Super + Space'),
+		'Super + Space is no recommended chord on Linux'
+	);
 	// Lot CH: the chords spelled their modifiers as English text (« Ctrl + Shift
 	// + V » in every language); each modifier is now a key_name.* segment the
 	// page translates, so no literal segment of the catalogue names one.

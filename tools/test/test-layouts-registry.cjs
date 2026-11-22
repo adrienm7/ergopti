@@ -434,50 +434,39 @@ check('the builder refuses the manifests the extension scanners refuse (shared v
 		);
 		assert.strictEqual(refused, !scenario.valid, scenario.name);
 	}
-	const magicKeys = read('extension_magic_key_vectors.json').cases;
-	assert.ok(magicKeys.length >= 8, 'the magic-key vectors lost their coverage');
-	for (const scenario of magicKeys) {
-		const errors = validateExtensionManifest(parseToml(scenario.manifest).extension || {}, []);
-		assert.strictEqual(errors.length === 0, scenario.valid && scenario.published, scenario.name);
-	}
+	// The magic key is a configured character (2026-11-22): a published layout
+	// that still declares a key typing it is refused.
+	assert.deepStrictEqual(
+		validateExtensionManifest(parseToml('[extension.magic_key]\nkey = "KeyC"\n').extension, []),
+		['magic_key is retired: no layout key is remapped to the magic key']
+	);
 });
 
-check(
-	'every published manifest passes the scanner rules and Ergopti declares its magic key',
-	() => {
-		const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
-		const { parse: parseToml } = require('smol-toml');
-		const ergopti = parseToml(
-			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti', 'manifest.toml'), 'utf8')
+check('every published manifest passes the scanner rules and Ergopti declares no magic key', () => {
+	const index = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
+	const { parse: parseToml } = require('smol-toml');
+	const ergopti = parseToml(
+		fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti', 'manifest.toml'), 'utf8')
+	).extension;
+	assert.strictEqual(ergopti.id, 'ergopti', 'the display name must not rename saved extension ids');
+	assert.strictEqual(
+		ergopti.name,
+		'Ergopti+',
+		'the bundled hotstrings extension includes the plus'
+	);
+	assert.strictEqual(ergopti.magic_key, undefined, 'no layout key is remapped to the magic key');
+	for (const entry of index.layouts) {
+		const manifest = parseToml(
+			fs.readFileSync(path.join(REGISTRY_DIR, entry.extension.id, 'manifest.toml'), 'utf8')
 		).extension;
-		assert.strictEqual(
-			ergopti.id,
-			'ergopti',
-			'the display name must not rename saved extension ids'
-		);
-		assert.strictEqual(
-			ergopti.name,
-			'Ergopti+',
-			'the bundled hotstrings extension includes the plus'
-		);
-		assert.deepStrictEqual(
-			tomlOwnData(ergopti.magic_key),
-			{ key: 'KeyC' },
-			'Ergopti declares the key its layout places the magic key on'
-		);
-		for (const entry of index.layouts) {
-			const manifest = parseToml(
-				fs.readFileSync(path.join(REGISTRY_DIR, entry.extension.id, 'manifest.toml'), 'utf8')
-			).extension;
-			// A binding must name a file the published inventory carries.
-			const stems = entry.extension.files
-				.map((file) => /^hotstrings\/([a-z][a-z0-9_-]*)\.toml$/.exec(file.path))
-				.filter(Boolean)
-				.map((match) => match[1]);
-			assert.deepStrictEqual(validateExtensionManifest(manifest, stems), [], entry.id);
-		}
+		// A binding must name a file the published inventory carries.
+		const stems = entry.extension.files
+			.map((file) => /^hotstrings\/([a-z][a-z0-9_-]*)\.toml$/.exec(file.path))
+			.filter(Boolean)
+			.map((match) => match[1]);
+		assert.deepStrictEqual(validateExtensionManifest(manifest, stems), [], entry.id);
 	}
-);
+});
 
 check(
 	'distance reduction belongs only to Ergopti with its historical rules, metadata and preference ids',
@@ -553,7 +542,7 @@ check(
 	}
 );
 
-check('Ergopti owns suffixes and magic-key replacement with exact historical data', () => {
+check('Ergopti owns suffixes with exact historical data and no magic-key replacement', () => {
 	const { parse } = require('smol-toml');
 	const shared = path.join(ROOT, 'static/ergopti_plus/_shared');
 	const extension = parse(
@@ -564,12 +553,15 @@ check('Ergopti owns suffixes and magic-key replacement with exact historical dat
 		feature_section: 'hotstrings.french_distancesreduction',
 		source: 'common'
 	});
-	assert.deepStrictEqual(tomlOwnData(extension.hotstring_bindings.magickeyreplace), {
-		category: 'magickey',
-		feature_section: 'hotstrings.magic_key',
-		sections: ['replace'],
-		source: 'common'
-	});
+	assert.strictEqual(
+		extension.hotstring_bindings.magickeyreplace,
+		undefined,
+		'the magic-key replacement left on 2026-11-22'
+	);
+	assert.ok(
+		!fs.existsSync(path.join(REGISTRY_DIR, 'ergopti/hotstrings/magickeyreplace.toml')),
+		'its metadata file left with it'
+	);
 	// Captured from the original source before relocation; never generated from the moved file.
 	const suffixSource = fs.readFileSync(
 		path.join(REGISTRY_DIR, 'ergopti/hotstrings/suffixes_a.toml'),
@@ -586,43 +578,17 @@ check('Ergopti owns suffixes and magic-key replacement with exact historical dat
 	const suffixes = parse(suffixSource);
 	assert.deepStrictEqual(suffixes._meta.sections_order, ['suffixes_a']);
 	assert.strictEqual(Object.keys(suffixes.suffixes_a[0]).length, 24);
-	const replacementSource = fs.readFileSync(
-		path.join(REGISTRY_DIR, 'ergopti/hotstrings/magickeyreplace.toml'),
-		'utf8'
-	);
-	const replacementDescription = replacementSource
-		.split('\n')
-		.find((line) => line.startsWith('replace = '));
-	assert.strictEqual(
-		crypto.createHash('sha256').update(replacementDescription).digest('hex'),
-		'445d95e02245d1d65425357db4374315c95e75206038e8b00e22963fa4547861',
-		'the complete independent 21-language replacement description is preserved'
-	);
-	const replacement = parse(replacementSource);
-	assert.deepStrictEqual(replacement._meta.sections_order, ['replace']);
-	assert.strictEqual(Object.keys(replacement._meta.sections.replace).length, 21);
-	assert.strictEqual(
-		replacement.replace,
-		undefined,
-		'replacement remains a native feature, with no fabricated hotstring'
-	);
 	const common = parse(
 		fs.readFileSync(path.join(shared, 'hotstrings/data/catalogue/magickey.toml'), 'utf8')
 	);
 	assert.strictEqual(
 		common._meta.sections.replace,
 		undefined,
-		'the common source no longer owns replacement'
+		'the common source owns no replacement'
 	);
 	assert.deepStrictEqual(
 		common._meta.sections_order,
-		[
-			'replace',
-			'repeat_corrections',
-			'-',
-			'text_expansion_symbols',
-			'text_expansion_symbols_typst'
-		],
+		['repeat_corrections', '-', 'text_expansion_symbols', 'text_expansion_symbols_typst'],
 		'the category retains the canonical relative-order anchors for its bound sections'
 	);
 });

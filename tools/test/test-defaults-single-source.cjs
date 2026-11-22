@@ -292,16 +292,28 @@ async function main() {
 		[...APPROVED_ACTIVE_BY_DEFAULT].sort(),
 		'only approved script-management and ★ key slots may be active by default'
 	);
-	// No shortcut defaults to an AI prediction or to the hotstring editor but
-	// the ★ key's slot (maintainer's decision of 2026-11-21).
+	// No default and no recommendation binds an AI prediction or the hotstring
+	// editor, but the ★ key's slot (maintainer's decisions of 2026-11-21 and
+	// 2026-11-22): the onboarding « recommended » setup applies recommendations.
 	const EDITOR_SLOTS = ['meta_star', 'secondary_star'];
 	for (const entry of manifest.entries) {
-		if (typeof entry.default !== 'string') continue;
 		const name = entry.section + '.' + entry.id;
-		if (entry.default.startsWith('llm_'))
-			assert.fail(`${name}: no shortcut defaults to an AI action (${entry.default})`);
-		if (entry.default === 'open_hotstrings_editor' && !EDITOR_SLOTS.includes(entry.id))
-			assert.fail(`${name}: only the ★ key's slot defaults to the hotstring editor`);
+		const values = [
+			['default', entry.default],
+			['recommended', entry.recommended],
+			...Object.entries(entry.default_per_platform || {}).map(([os, v]) => [`default on ${os}`, v]),
+			...Object.entries(entry.recommended_per_platform || {}).map(([os, v]) => [
+				`recommended on ${os}`,
+				v
+			])
+		];
+		for (const [kind, value] of values) {
+			if (typeof value !== 'string') continue;
+			if (value.startsWith('llm_'))
+				assert.fail(`${name}: no ${kind} binds an AI action (${value})`);
+			if (value === 'open_hotstrings_editor' && !EDITOR_SLOTS.includes(entry.id))
+				assert.fail(`${name}: only the ★ key's slot opens the hotstring editor (${kind})`);
+		}
 	}
 	const numberRow = manifest.entries.find(
 		(entry) => entry.section === 'layout' && entry.id === 'direct_access_digits'

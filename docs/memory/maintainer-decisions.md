@@ -490,8 +490,7 @@ Decided by the maintainer on 2026-11-21 for Windows, macOS and Linux
   one-character input box, never a physical key position: the user-chosen
   physical key (`hotstrings.magic_key_source`, its capture and candidate
   list) and the Windows detection character (`magic_key_source_char`) are
-  gone. The `replace` section keeps only the key the emulated layout declares
-  (`[extension.magic_key]`).
+  gone, and since 2026-11-22 so is the `replace` section (below).
 - Its default follows the layout that types: « ù » on AZERTY, « ; » on
   QWERTY, the manifest default « ★ » elsewhere. One source:
   `_shared/hotstrings/data/magic_key.json` (`layout_families`, probed on the
@@ -520,6 +519,22 @@ Decided by the maintainer on 2026-11-21 for Windows, macOS and Linux
   Ctrl+★ to act as Ctrl+S turns it on. macOS keeps the accented reason: its
   layout file owns the Command layer.
 - No other shortcut defaults to an AI prediction or to the hotstring editor.
+
+Completed by the maintainer on 2026-11-22 (QCM), on the three OS:
+
+- The `replace` section (`hotstrings.magic_key.replace`, « Transformer la
+  touche J en touche ★ ») is gone with its data: the Ergopti extension's
+  `[extension.magic_key]` declaration and `magickeyreplace.toml`, the
+  scanners' and the index builder's reading of it (a published manifest that
+  still declares one is refused), the emulations' remap of that key and its
+  tests. Nothing is remapped to ★: the magic key is only the configured
+  character, and an emulated Ergopti+ layout types its own ★ on KeyC.
+- No recommendation binds an AI prediction either: Win+Space / Super+Space
+  (`meta_space`) and Ctrl+Space on macOS (`secondary_space`) recommend
+  `none`, so the onboarding « recommended » setup no longer assigns them.
+  `tools/test/test-defaults-single-source.cjs` fails on any default or
+  recommendation, per OS included, that binds an `llm_*` action or the
+  hotstring editor outside the ★ key's slots.
 
 ## The Backspace undo counts per host, not per perceived character (2026-11-19)
 

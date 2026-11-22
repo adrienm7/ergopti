@@ -1123,15 +1123,6 @@ description_key = "menu.hotstrings.rolls.paren_quote"
 # ======================================
 
 [[features.hotstrings.magic_key]]
-id = "replace"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.magic_key.replace"
-
-[[features.hotstrings.magic_key]]
 id = "repeat_corrections"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 2.0 }
@@ -2572,18 +2563,18 @@ family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.meta_quote"
 
-# "Generate an AI prediction" on the chord each OS leaves for it; the key is
-# swallowed so the OS never sees it (Win+Space no longer switches the input
-# language on Windows; macOS warns when its own input-source shortcut still
-# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut. The
-# binding is Ergopti's recommendation only: the default stays neutral ("none").
+# The chord each OS leaves for "Generate an AI prediction"; once assigned, the
+# key is swallowed so the OS never sees it (Win+Space no longer switches the
+# input language on Windows; macOS warns when its own input-source shortcut
+# still owns Ctrl+Space). Neither the default nor the recommendation binds it
+# (maintainer's decision of 2026-11-22): the user assigns it.
 [[features.shortcuts.keyboard]]
 id = "secondary_space"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
-recommended = "llm_generate_prediction"
+recommended = "none"
 family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
@@ -2814,7 +2805,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
-recommended = "llm_generate_prediction"
+recommended = "none"
 family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.super_space"

@@ -2042,7 +2042,7 @@ function M.project_hotstring_preferences(saved, groups, get_sections)
 		local projected = {}
 		for _, section in ipairs(sections or {}) do
 			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
-			if HotstringLanguages.section_actionable(Manifest.features(), name, section) then
+			if HotstringLanguages.section_actionable(section) then
 				local selected = supplied and supplied[section.name]
 				if PersonalFiles.components(name) and (not personal_record or personal_record.admitted ~= true) then
 					selected = false
@@ -2082,7 +2082,7 @@ function M.snapshot(state, hotfiles, core_mods)
 		if type(secs) == "table" then
 			section_states[name] = {}
 			for _, sec in ipairs(secs) do
-				if HotstringLanguages.section_actionable(Manifest.features(), name, sec) then
+				if HotstringLanguages.section_actionable(sec) then
 					local is_en = keymap and type(keymap.is_section_enabled) == "function"
 						and keymap.is_section_enabled(name, sec.name) or false
 					section_states[name][sec.name] = is_en

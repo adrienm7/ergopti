@@ -177,9 +177,6 @@ enabled = true
 [hotstrings.rolls.paren_quote]
 enabled = true
 
-[hotstrings.magic_key.replace]
-enabled = true
-
 [hotstrings.magic_key.repeat_corrections]
 enabled = false
 time_activation_seconds = 2.0

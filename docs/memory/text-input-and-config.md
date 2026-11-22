@@ -695,9 +695,8 @@ injection. Menus and bridges consume those defaults rather than redeclaring them
 ### project-magic-key-is-a-character
 
 The magic key is the configured `hotstrings.trigger_char`, never a physical
-key (maintainer's decision of 2026-11-21, `maintainer-decisions.md`). Only an
-emulated layout's declared `[extension.magic_key]` remaps a key, while the
-`replace` section is on; never reintroduce a user-chosen or detected physical
-source. Its layout default and its « ★ (ù) » display live in
+key (maintainer's decisions of 2026-11-21 and 2026-11-22,
+`maintainer-decisions.md`). No key is remapped to it: never reintroduce a
+user-chosen, detected or layout-declared physical source. Its layout default and its « ★ (ù) » display live in
 `_shared/hotstrings/data/magic_key.json`; a driver that shows the magic key
 calls the shared display rule instead of substituting ★ itself.

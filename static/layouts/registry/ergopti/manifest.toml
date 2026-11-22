@@ -6,12 +6,6 @@ name = "Ergopti+"
 version = "2.2.2"
 author = "Adrien Moyaux"
 
-# The physical key (W3C KeyboardEvent.code) the Ergopti layouts turn into the
-# magic key: the one that types j at the QWERTY C position. The user's own
-# choice of key always wins over this declaration.
-[extension.magic_key]
-key = "KeyC"
-
 # The hotstrings written for Ergopti's key positions: distance and SFB
 # reduction, rolls, suffixes and magic-key features. Each keeps its
 # historical category, feature section and common priority tier, so every preference still
@@ -36,12 +30,6 @@ source = "common"
 category = "magickey"
 feature_section = "hotstrings.magic_key"
 sections = ["repeat_corrections"]
-source = "common"
-
-[extension.hotstring_bindings.magickeyreplace]
-category = "magickey"
-feature_section = "hotstrings.magic_key"
-sections = ["replace"]
 source = "common"
 
 [extension.hotstring_bindings.suffixes_a]

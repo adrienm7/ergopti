@@ -1138,9 +1138,9 @@ registered unconditionally with the family in its live criterion
 (`ScriptAltGrKanaChordIsLive`), never inside an `if` on the family
 (`test_altgr_family_follows_layout.ahk` scans every registration). The
 digit-row swap follows the same way, per press on the foreground layout
-(`DigitRowIsSwapped`, `test_layout_digit_row_probe.ahk`). The magic key's
-remap follows only an emulated layout's declared key since 2026-11-21, so no
-OS-layout switch reloads the driver for it.
+(`DigitRowIsSwapped`, `test_layout_digit_row_probe.ahk`). No key is
+remapped to the magic key since 2026-11-22, so no OS-layout switch reloads the
+driver for it.
 
 ### project-number-row-hotkeys-replay-headless
 

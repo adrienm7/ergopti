@@ -153,7 +153,7 @@ local function section_names_for(keymap_api, group_name, excluded)
 	local names = {}
 	for _, section in ipairs(type(sections) == "table" and sections or {}) do
 		if not (excluded and excluded[section.name])
-			and HotstringLanguages.section_actionable(ManifestReader.features(), group_name, section) then
+			and HotstringLanguages.section_actionable(section) then
 			names[#names + 1] = section.name
 		end
 	end

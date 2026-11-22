@@ -67,7 +67,6 @@ function M.register(helpers, shared)
 		Emulation.configure(live, {
 			base = pick(overrides.base, true), alt_gr = pick(overrides.alt_gr, true), layout = layout,
 			number_row = overrides.number_row or "native", edges = overrides.edges == true,
-			magic_code = overrides.magic_key and by_scan[overrides.magic_key] or nil,
 		})
 		return live
 	end

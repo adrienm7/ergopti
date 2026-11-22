@@ -252,9 +252,6 @@ M.features = {
 		path = "hotstrings.rolls.paren_quote", id = "paren_quote", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.paren_quote", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
 	},
 	{
-		path = "hotstrings.magic_key.replace", id = "replace", section = "hotstrings.magic_key", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.magic_key.replace", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
 		path = "hotstrings.magic_key.repeat_corrections", id = "repeat_corrections", section = "hotstrings.magic_key", default = { enabled = false, time_activation_seconds = 2 }, type = "feature", description_key = "menu.hotstrings.magic_key.repeat_corrections", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 2 }, family = "feature",
 	},
 	{
@@ -624,7 +621,7 @@ M.features = {
 		path = "shortcuts.keyboard.meta_quote", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "none", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.secondary_a", id = "secondary_a", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_a", platforms = { "hs" }, recommended = "select_line", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
@@ -687,7 +684,7 @@ M.features = {
 		path = "shortcuts.keyboard.primary_g", id = "primary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "ahk", "linux" }, recommended = "llm_generate_prediction", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "ahk", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screenshot_fullscreen_save", family = "feature",

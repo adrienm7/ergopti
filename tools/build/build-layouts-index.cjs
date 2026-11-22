@@ -93,7 +93,7 @@ const GEOMETRIES = ['iso', 'ansi'];
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 
 // The rules the extension scanners apply to a manifest's historical hotstring
-// bindings and declared magic key (_shared/hotstrings/engine/extensions.lua and
+// bindings (_shared/hotstrings/engine/extensions.lua and
 // windows/hotstrings/engine/catalogue/extension_packs.ahk). A published manifest that
 // breaks them would make every driver refuse its whole extension catalogue, so
 // the build refuses it first; all three replay the same shared vectors.
@@ -102,19 +102,6 @@ const BINDING_SOURCES = ['common'];
 const STEM_RE = /^[a-z][a-z0-9_-]*$/;
 const IDENTIFIER_RE = /^[a-z][a-z0-9_]*$/;
 const FEATURE_SECTION_RE = /^hotstrings\.[a-z][a-z0-9_]*$/;
-const MAGIC_KEY_FIELDS = ['key'];
-const KEY_CODE_RE = /^[A-Z][A-Za-z0-9]*$/;
-const PHYSICAL_KEYS = JSON.parse(
-	fs.readFileSync(shared('layouts', 'data', 'keycodes', 'physical_keys.json'), 'utf8')
-).keys;
-// The keys a .keylayout defines, the table the Windows emulation and the Linux
-// converter resolve a layout's keys through: a declared magic key outside it
-// could never be turned into a scan code or an XKB key.
-const LAYOUT_KEY_CODES = new Set(
-	JSON.parse(fs.readFileSync(shared('layouts', 'data', 'mac_keycodes.json'), 'utf8')).keys.map(
-		(key) => key.code
-	)
-);
 const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
 
 // =============================
@@ -367,7 +354,7 @@ function isPlainObject(value) {
 }
 
 /**
- * Validates the historical hotstring bindings and the magic key of one manifest.
+ * Validates the historical hotstring bindings of one manifest.
  * @param {object} extension - The parsed [extension] table.
  * @param {string[]} hotstringStems - Stems of the pack's hotstrings/*.toml files.
  * @returns {string[]} Every problem found; empty when the manifest is valid.
@@ -414,23 +401,10 @@ function validateExtensionManifest(extension, hotstringStems) {
 			}
 		}
 	}
-	const magicKey = extension.magic_key;
-	if (magicKey !== undefined) {
-		if (!isPlainObject(magicKey)) errors.push('magic_key must be a table');
-		else {
-			for (const key of Object.keys(magicKey)) {
-				if (!MAGIC_KEY_FIELDS.includes(key)) errors.push(`magic_key has unknown field ${key}`);
-			}
-			const code = magicKey.key;
-			if (typeof code !== 'string' || !KEY_CODE_RE.test(code)) {
-				errors.push('magic_key.key must be a KeyboardEvent.code');
-			} else if (!Object.hasOwn(PHYSICAL_KEYS, code) || PHYSICAL_KEYS[code].kind !== 'key') {
-				errors.push(`magic_key.key ${code} is no key of the physical-key registry`);
-			} else if (!LAYOUT_KEY_CODES.has(code)) {
-				errors.push(`magic_key.key ${code} is no key a keyboard layout defines`);
-			}
-		}
-	}
+	// The magic key is a configured character (maintainer's decision of
+	// 2026-11-22): no layout declares a key that types it any more.
+	if (extension.magic_key !== undefined)
+		errors.push('magic_key is retired: no layout key is remapped to the magic key');
 	return errors;
 }
 

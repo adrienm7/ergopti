@@ -47,15 +47,9 @@ Each layout is also an extension in the existing format: the folder named by
 `extension_source` (the layout's own folder by default) holds a
 `manifest.toml` and may hold `hotstrings/*.toml` packs and
 `shortcuts/menu.{ahk,lua}`. Installing a layout makes that content available
-without enabling it. Two optional manifest tables describe the layout itself:
+without enabling it. An optional manifest table describes the layout itself:
 
 ```toml
-# The physical key (W3C KeyboardEvent.code, as named in
-# _shared/layouts/data/keycodes/physical_keys.json) that types the magic key on this
-# layout. The user's own choice of key always wins over it.
-[extension.magic_key]
-key = "KeyC"
-
 # A hotstrings file that supplies rules of a bundled category which only make
 # sense on this layout's geometry. The rules keep their historical category,
 # feature section and common priority tier, so existing preferences still

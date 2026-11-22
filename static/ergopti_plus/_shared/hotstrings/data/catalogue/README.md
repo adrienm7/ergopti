@@ -26,16 +26,13 @@ The hotstrings written for Ergopti's key positions — distance and SFB reductio
 rolls, French suffixes (`french_distancesreduction` section `suffixes_a`) and the
 magic key's repeat corrections (`magickey` section `repeat_corrections`) — live
 in the Ergopti layout extension, `static/layouts/registry/ergopti/hotstrings/`.
-The same extension owns the translated metadata for the native `magickey.replace`
-choice; that metadata file contains no replacement hotstring. The common
-MagicKey source retains its section-order marker for the native gate.
 Its manifest binds
 each file to its historical category, feature section and common priority
 tier (`[extension.hotstring_bindings.<stem>]`), so every existing preference
 still addresses it. Every driver discovers the pack it ships and always lists
 « Hotstrings Ergopti » in the extensions section, even when the Ergopti keyboard
-layout has not been installed. Replacement is controlled there; the physical
-key picker remains in the Layout menu.
+layout has not been installed. No key is remapped to the magic key: it is the
+configured character (`hotstrings.trigger_char`).
 
 ## Language packs
 

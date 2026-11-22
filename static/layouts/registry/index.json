@@ -142,7 +142,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "53ade13c53fc54454432531d552a1dda23dd3e072cf3721fabbb6c5b713096ad",
+				"sha256": "5d0519eceebdd30562f9e00b5eac9de2ad49603c86ccce38ea0580890ab8ce6b",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -155,12 +155,6 @@
 						"file": "ergopti/hotstrings/distancesreduction.toml",
 						"size": 23634,
 						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -189,8 +183,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
@@ -260,7 +254,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "6a1d3105fad09c1ad1121af1e1a7522af799bae9ff74a9a7882d52cdc37a7e85",
+				"sha256": "7958a9b517467d876b07e3b31d8e969f88ba537304dab07484bc3c1adbd33df5",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -273,12 +267,6 @@
 						"file": "ergopti/hotstrings/distancesreduction.toml",
 						"size": 23634,
 						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -307,8 +295,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
@@ -378,7 +366,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "f2f0209c3238628e04b2e225c3070e05c32ed94c5a85229f991d59b69d2f6113",
+				"sha256": "fa14a0d9cdb3f53ba4405e79e15b123153360cb997808efff21aa8c94a91bc5d",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -391,12 +379,6 @@
 						"file": "ergopti/hotstrings/distancesreduction.toml",
 						"size": 23634,
 						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -425,8 +407,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
@@ -496,7 +478,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "fb314aa1db0647ca06558cd280d5b6111587328bd3eea6b1172adfb076ac1aa3",
+				"sha256": "14c8692d040bb173ac2e688d3e97f5fc22ccb5ae9ce33994cc08835c017ca820",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -509,12 +491,6 @@
 						"file": "ergopti/hotstrings/distancesreduction.toml",
 						"size": 23634,
 						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -543,8 +519,8 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},

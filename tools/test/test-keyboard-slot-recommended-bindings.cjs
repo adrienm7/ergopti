@@ -5,7 +5,8 @@
  * MODULE: Keyboard-Slot Defaults and Recommendations Gate
  * DESCRIPTION:
  * Fresh keyboard slots remain neutral. Explicit restoration uses independent
- * recommendations, including one prediction chord per driver. Production owners
+ * recommendations, none of which binds an AI prediction (maintainer's decision
+ * of 2026-11-22). Production owners
  * project manifest defaults rather than maintaining private assignment tables.
  * In-memory mutations prove the gate rejects broken values and projections.
  * ==============================================================================
@@ -102,13 +103,11 @@ function validate(input) {
 		const recommended = slots.filter(
 			(entry) =>
 				entry.platforms.includes(platform) &&
-				((entry.recommended_per_platform || {})[platform] ?? entry.recommended) ===
-					'llm_generate_prediction'
+				String((entry.recommended_per_platform || {})[platform] ?? entry.recommended).startsWith(
+					'llm_'
+				)
 		);
-		check(
-			recommended.length === 1 && recommended[0].id === slot,
-			`prediction: ${platform} must recommend exactly ${slot}`
-		);
+		check(recommended.length === 0, `prediction: ${platform} must recommend no AI action`);
 		const entry = slots.find((candidate) => candidate.id === slot);
 		const owners = Object.keys(PREDICTION_SLOTS).filter((name) => PREDICTION_SLOTS[name] === slot);
 		check(
@@ -230,7 +229,7 @@ const mutations = [
 	[
 		'prediction',
 		(copy) => {
-			copy.slots.find((entry) => entry.id === 'meta_space').recommended = 'none';
+			copy.slots.find((entry) => entry.id === 'meta_space').recommended = 'llm_generate_prediction';
 		}
 	],
 	[

@@ -260,11 +260,6 @@ enabled = false
 
 
 
-[hotstrings.magic_key.replace]
-enabled = false
-
-
-
 [hotstrings.magic_key.repeat_corrections]
 enabled = false
 time_activation_seconds = 2
@@ -952,7 +947,6 @@ sections = [
 	"hotstrings.rolls.left_arrow",
 	"hotstrings.rolls.not_equal",
 	"hotstrings.rolls.paren_quote",
-	"hotstrings.magic_key.replace",
 	"hotstrings.magic_key.repeat_corrections",
 	"hotstrings.magic_key.text_expansion_symbols",
 	"hotstrings.magic_key.text_expansion_symbols_typst",
@@ -1059,7 +1053,6 @@ sections = [
 	"hotstrings.rolls.left_arrow",
 	"hotstrings.rolls.not_equal",
 	"hotstrings.rolls.paren_quote",
-	"hotstrings.magic_key.replace",
 	"hotstrings.magic_key.repeat_corrections",
 	"hotstrings.magic_key.text_expansion_symbols",
 	"hotstrings.magic_key.text_expansion_symbols_typst",
@@ -1159,7 +1152,6 @@ sections = [
 	"hotstrings.rolls.left_arrow",
 	"hotstrings.rolls.not_equal",
 	"hotstrings.rolls.paren_quote",
-	"hotstrings.magic_key.replace",
 	"hotstrings.magic_key.repeat_corrections",
 	"hotstrings.magic_key.text_expansion_symbols",
 	"hotstrings.magic_key.text_expansion_symbols_typst",

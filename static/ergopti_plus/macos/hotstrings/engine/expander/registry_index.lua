@@ -545,7 +545,7 @@ function M.set_category_scope_enabled(targets, enabled, publish, excluded)
 		inventory[id] = {}
 		local skip = excluded and excluded[id] or {}
 		for _, section in ipairs(M.get_sections(id) or {}) do
-			if not skip[section.name] and Languages.section_actionable(ManifestReader.features(), id, section) then
+			if not skip[section.name] and Languages.section_actionable(section) then
 				inventory[id][#inventory[id] + 1] = section.name
 			end
 		end
