@@ -633,8 +633,13 @@ publication's receipt reopen needs it. A single raw `OpenClipboard` then fails
 at random; AutoHotkey's own clipboard calls hide this by waiting up to their
 one-second ClipboardTimeout. Action: open native locks through
 `CB_OpenClipboardWithin`, never a bare `DllCall("User32\OpenClipboard")` that
-must succeed (`CB_IsBusy` and the restore-debt retry stay single-shot by
-design). In tests, "the lock was released" means no window of this process
+must succeed. The paste transport's own leases (`CB_IsBusy`, the plain CAS and
+its authentication, the restore retry) outwait a reader of another process for
+the shorter `CB_PASTE_READER_WAIT_MS`, each lease with its own bound, so a
+Critical hotstring caller is not frozen for a second. A window of this process
+is refused at once (it is a caller lower on the same stack); a windowless
+holder is retried by the CAS and authentication, since some readers open
+without a window. In tests, "the lock was released" means no window of this process
 holds it; a foreign reader may already hold it again. The region custody suite
 reproduces contention with a second-process holder released from the
 capture's `contended` probe. `ClipboardAll()` already waits the same one second
@@ -642,6 +647,18 @@ capture's `contended` probe. `ClipboardAll()` already waits the same one second
 1000 ms), so a failed snapshot means a holder kept the lock for over a second;
 log `CB_DescribeClipboardHolder()` (GetOpenClipboardWindow's process, own flag,
 data owner) with any such failure rather than retrying longer.
+
+The transient-payload formats (`ExcludeClipboardContentFromMonitorProcessing`,
+`CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard` = 0, published
+by `_CB_MarkTransientPublication` inside the payload's own lease) keep paste
+payloads out of Win+V history and cloud sync, but they do not stop the readers:
+measured on 2026-11-22, explorer.exe still opens the clipboard after about half
+of the writes either way, and msrdc.exe (the WSLg/RDP bridge) renders every
+delayed CF_UNICODETEXT, markers or not. A single application open made 0-140 ms
+after a write failed about 1 time in 60-120 in both modes. So neither the markers
+nor a delayed-rendering "the target has pasted" receipt (msrdc renders first)
+can prove the target's own paste; do not rebuild the restore around either
+without new evidence.
 
 ### project-selection-capture-judged-by-physical-generation
 

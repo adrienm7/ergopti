@@ -70,6 +70,18 @@ global CB_RESTORE_RETRY_MS := 50
 ; ClipboardTimeout of one second; raw native locks wait for the same bound.
 global CB_NATIVE_OPEN_TIMEOUT_MS := 1000
 global CB_NATIVE_OPEN_RETRY_MS := 10
+; A paste transport waits at most this long for another process's reader to
+; close the clipboard. Those readers (explorer.exe, clipboard history, the RDP
+; and WSLg bridge) hold it for a few milliseconds after every change; a single
+; refused open used to drop the expansion silently. The bound stays far below
+; the one-second wait that would starve the keyboard hook of a Critical caller.
+global CB_PASTE_READER_WAIT_MS := 100
+; Registered formats that tell clipboard monitors a payload is transient: the
+; Windows clipboard history, cloud clipboard sync and clipboard managers skip
+; it, so a temporary paste payload never lands in Win+V or on another device.
+; https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats
+global CB_TRANSIENT_FORMAT_NAMES := ["ExcludeClipboardContentFromMonitorProcessing",
+	"CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]
 
 ; Claims the one process-wide temporary paste slot before its caller performs
 ; any blocking clipboard snapshot. The returned token is also the regular
@@ -247,6 +259,9 @@ CB_RetryRestoreDebt(ExpectedDebt := 0, *) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	; The restore runs just when the readers woken by the payload arrive; a
+	; single refused open would only re-arm the timer behind them.
+	_CB_OutwaitForeignReader()
 	if NativePlain
 		return _CB_PlainRetryDebt(Debt)
 
@@ -423,7 +438,7 @@ _CB_PlainRetain(Capture) {
 		"capture_mutation", Capture["mutation_id"], "mutation_id", 0, "mutation_sequence", 0,
 		"allocation", 0, "allocation_locked", false, "allocation_unknown", false, "expected_handle", 0, "bytes", 0,
 		"changed", false, "published", false, "lease_unknown", false, "restoration_right", true,
-		"auth_sequence", 0, "failure", 0, "retry_failure", 0)
+		"auth_sequence", 0, "failure", 0, "retry_failure", 0, "reader_refused", false)
 	PreviousCritical := Critical("On")
 	try {
 		if CBClipboardOwner.restore_debt || !CBClipboardOwner.active.Has(Capture["owner_token"])
@@ -464,28 +479,95 @@ _CB_PlainFreeAllocation(Record) {
 	return true
 }
 
+; True while a window of another process holds the clipboard lock. A NULL-window
+; holder is not counted: it may be this very thread's own borrowed lease.
+_CB_ForeignReaderHolds() {
+	Holder := DllCall("User32\GetOpenClipboardWindow", "Ptr")
+	if !Holder
+		return false
+	HolderPid := 0
+	DllCall("User32\GetWindowThreadProcessId", "Ptr", Holder, "UInt*", &HolderPid)
+	return HolderPid != 0 && HolderPid != DllCall("Kernel32\GetCurrentProcessId", "UInt")
+}
+
+; After a refused native open: may a later attempt pass? Only a window of this
+; process is refused for good, since it is a caller lower on this very stack. A
+; windowless holder is retried too: some readers open without a window, and when
+; it is this thread's own NULL lease the retry only spends the bound.
+_CB_RefusalMayPass() {
+	Holder := DllCall("User32\GetOpenClipboardWindow", "Ptr")
+	if !Holder
+		return true
+	HolderPid := 0
+	DllCall("User32\GetWindowThreadProcessId", "Ptr", Holder, "UInt*", &HolderPid)
+	return HolderPid != DllCall("Kernel32\GetCurrentProcessId", "UInt")
+}
+
+; Waits, up to CB_PASTE_READER_WAIT_MS, while a reader of another process holds
+; the clipboard. The caller still makes its own single attempt afterwards.
+_CB_OutwaitForeignReader() {
+	global CB_PASTE_READER_WAIT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Started := A_TickCount
+	while _CB_ForeignReaderHolds() && A_TickCount - Started < CB_PASTE_READER_WAIT_MS
+		Sleep(CB_NATIVE_OPEN_RETRY_MS)
+}
+
+; Marks the payload published under the caller's open lease as transient, so the
+; monitors listed in CB_TRANSIENT_FORMAT_NAMES skip it. Each format carries the
+; DWORD 0 that CanIncludeInClipboardHistory and CanUploadToCloudClipboard read
+; as "no"; the exclusion format only needs to be present.
+_CB_MarkTransientPublication() {
+	global CB_TRANSIENT_FORMAT_NAMES
+	static Formats := 0
+	if !IsObject(Formats) {
+		Registered := []
+		for Name in CB_TRANSIENT_FORMAT_NAMES {
+			MarkerFormat := DllCall("User32\RegisterClipboardFormatW", "Str", Name, "UInt")
+			if !MarkerFormat
+				throw OSError(A_LastError, A_ThisFunc, Name)
+			Registered.Push(MarkerFormat)
+		}
+		Formats := Registered
+	}
+	for MarkerFormat in Formats {
+		Handle := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42, "UPtr", 4, "Ptr")
+		if !Handle
+			throw MemoryError("The transient clipboard marker allocation failed.")
+		; GMEM_ZEROINIT already holds the DWORD 0; ownership moves on success.
+		if !DllCall("User32\SetClipboardData", "UInt", MarkerFormat, "Ptr", Handle, "Ptr") {
+			NativeError := A_LastError
+			DllCall("Kernel32\GlobalFree", "Ptr", Handle, "Ptr")
+			throw OSError(NativeError, A_ThisFunc)
+		}
+	}
+}
+
 ; The return is a real unlocked publisher boundary. It restores its inherited
 ; Critical before authentication, allowing an external copy to win there. No
 ; AHK clipboard getter/setter, callback, wait or logger runs inside the lease.
 _CB_PlainNativeMutationCAS(Record, Text) {
 	Opened := false, PreviousCritical := 0, InCritical := false
+	Record["reader_refused"] := false
 	try {
-		Record["bytes"] := (StrLen(Text) + 1) * 2
-		Record["allocation"] := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42,
-			"UPtr", Record["bytes"], "Ptr")
-		if !Record["allocation"]
-			throw MemoryError("The native plain clipboard allocation failed.")
-		Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Record["allocation"], "Ptr")
-		if !Pointer
-			throw OSError(A_LastError, A_ThisFunc)
-		Record["allocation_locked"] := true
-		StrPut(Text, Pointer, StrLen(Text) + 1, "UTF-16")
-		DllCall("Kernel32\SetLastError", "UInt", 0)
-		Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Record["allocation"], "Int")
-		NativeError := A_LastError
-		if !Unlocked && NativeError
-			throw OSError(NativeError, A_ThisFunc)
-		Record["allocation_locked"] := false
+		; A retry after a reader refusal reuses the payload it already prepared.
+		if !Record["allocation"] {
+			Record["bytes"] := (StrLen(Text) + 1) * 2
+			Record["allocation"] := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42,
+				"UPtr", Record["bytes"], "Ptr")
+			if !Record["allocation"]
+				throw MemoryError("The native plain clipboard allocation failed.")
+			Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Record["allocation"], "Ptr")
+			if !Pointer
+				throw OSError(A_LastError, A_ThisFunc)
+			Record["allocation_locked"] := true
+			StrPut(Text, Pointer, StrLen(Text) + 1, "UTF-16")
+			DllCall("Kernel32\SetLastError", "UInt", 0)
+			Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Record["allocation"], "Int")
+			NativeError := A_LastError
+			if !Unlocked && NativeError
+				throw OSError(NativeError, A_ThisFunc)
+			Record["allocation_locked"] := false
+		}
 
 		PreviousCritical := Critical("On"), InCritical := true
 		if !_CB_PlainRecordCurrent(Record)
@@ -493,11 +575,15 @@ _CB_PlainNativeMutationCAS(Record, Text) {
 		; GetOpen=0 is ambiguous with Open(NULL). The real Windows control proves
 		; that a same-thread NULL borrower refuses this different HWND. A held
 		; own-HWND lease is refused BEFORE Open, since same-HWND reopen succeeds.
-		if DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0 {
+			Record["reader_refused"] := _CB_RefusalMayPass()
 			return Record
+		}
 		Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
-		if !Opened
+		if !Opened {
+			Record["reader_refused"] := _CB_RefusalMayPass()
 			return Record
+		}
 		if !_CB_PlainRecordCurrent(Record) || CBClipboardOwner.mutation_id != Record["capture_mutation"]
 			|| DllCall("User32\GetClipboardSequenceNumber", "UInt") != Record["capture_sequence"]
 			return Record
@@ -520,6 +606,9 @@ _CB_PlainNativeMutationCAS(Record, Text) {
 			Record["published"] := true
 		}
 		Record["allocation_unknown"] := false
+		; Inside the same lease, so no monitor is ever told about an unmarked payload.
+		if Accepted
+			_CB_MarkTransientPublication()
 		Record["mutation_sequence"] := DllCall("User32\GetClipboardSequenceNumber", "UInt")
 		return Record
 	} catch Any as Failure {
@@ -546,13 +635,20 @@ _CB_PlainNativeMutationCAS(Record, Text) {
 ; acquisition never closes a NULL or foreign borrower and never sleeps here.
 _CB_PlainAuthenticate(Record) {
 	Opened := false, Matched := false, Closed := false
+	Record["reader_refused"] := false
 	PreviousCritical := Critical("On")
 	try {
-		if !_CB_PlainRecordCurrent(Record) || DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0
+		if !_CB_PlainRecordCurrent(Record)
 			return false
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") != 0 {
+			Record["reader_refused"] := _CB_RefusalMayPass()
+			return false
+		}
 		Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
-		if !Opened
+		if !Opened {
+			Record["reader_refused"] := _CB_RefusalMayPass()
 			return false
+		}
 		Record["lease_unknown"] := true
 		if !_CB_PlainRecordCurrent(Record)
 			return false
@@ -611,9 +707,26 @@ CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
 		return false
 	Admitted := false
 	try {
-		_CB_PlainNativeMutationCAS(Record, Text)
-		if Record["changed"] && Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
-			&& _CB_PlainAuthenticate(Record) {
+		; Each native lease outwaits a passing reader within its own bound: the
+		; publication itself wakes new readers just before authentication.
+		Started := A_TickCount
+		loop {
+			_CB_PlainNativeMutationCAS(Record, Text)
+			if !_CB_PlainReaderRetryAllowed(Record, Started)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		Authenticated := false
+		if Record["changed"] && Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"]) {
+			Started := A_TickCount
+			loop {
+				Authenticated := _CB_PlainAuthenticate(Record)
+				if Authenticated || !_CB_PlainReaderRetryAllowed(Record, Started)
+					break
+				Sleep(CB_NATIVE_OPEN_RETRY_MS)
+			}
+		}
+		if Authenticated {
 			PreviousCritical := Critical("On")
 			try {
 				if _CB_PlainRecordCurrent(Record) && Record["restoration_right"] && Record["auth_sequence"] {
@@ -635,6 +748,16 @@ CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
 			_CB_PlainRetryDebt(Record)
 		}
 	}
+}
+
+; A lease refused by a holder that may let go (see _CB_RefusalMayPass) is
+; retried until CB_PASTE_READER_WAIT_MS has passed since Started.
+; The 64-bit A_TickCount cannot wrap, so this registry part of the adapter needs
+; no tick helper from the logger.
+_CB_PlainReaderRetryAllowed(Record, Started) {
+	global CB_PASTE_READER_WAIT_MS
+	return Record["reader_refused"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
+		&& _CB_PlainRecordCurrent(Record) && A_TickCount - Started < CB_PASTE_READER_WAIT_MS
 }
 
 ; Native unknown debt must never fall through to the ordinary expected=0
@@ -1255,7 +1378,13 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 ; The probe closes the clipboard again straight away when it succeeds. Leaving it
 ; open would make THIS process the blocker, which is the exact failure the probe
 ; exists to avoid.
+;
+; A window of another process holding the lock is usually a reader woken by the
+; previous change (explorer.exe, clipboard history), gone within milliseconds.
+; The probe outwaits it for CB_PASTE_READER_WAIT_MS before answering busy; an
+; own-process or windowless holder is answered at once.
 CB_IsBusy() {
+	_CB_OutwaitForeignReader()
 	PreviousCritical := Critical("On")
 	try {
 		; A distinct nonzero HWND refuses a NULL caller's borrowed lock. Keep

@@ -226,3 +226,5 @@ Test("ClipboardAll lock: the after probe waits out a foreign clipboard reader (c
 #Include test_plain_paste_snapshot_owner.ahk
 
 #Include test_clipboard_native_open_owner.ahk
+
+#Include test_clipboard_reader_wait.ahk

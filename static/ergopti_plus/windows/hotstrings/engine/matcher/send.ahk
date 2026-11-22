@@ -618,8 +618,12 @@ SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
 	try {
 		; This native CAS owns the complete old snapshot before EmptyClipboard.
 		; A later copy wins without any publication, paste or stale rollback.
-		if !CB_WritePlainSnapshot(Captured, Text, &OwnedSequence)
+		if !CB_WritePlainSnapshot(Captured, Text, &OwnedSequence) {
+			; Nothing was pasted; name the holder so a lost expansion is never silent.
+			try LoggerWarn("Hotstrings", "SendInstant: the clipboard publication was refused ({1}); expansion was not injected.",
+				CB_DescribeClipboardHolder()["summary"])
 			return false
+		}
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If

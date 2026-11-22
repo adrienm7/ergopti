@@ -91,20 +91,21 @@ every maintainer request here.
       rows, the LLM source mutations from the canonical inventory, and the macOS preview menu from the shipped
       `preview_presence_controls`. Each was proved by a source mutation that made it fail. Kept: the handwritten
       canonical LLM rows, the oracle the manifest is compared with.
-- [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
-      driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
-      `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
-      green; the app picker refusal failed once among neighbours (BM_CLICK, now exclusive). Two clipboard fixtures
-      still failed once each, alone in the exclusive phase: `gesture-transform-native-render-focus` current
-      (sends=0) and `sendinstant-native-snapshot-copy` current. On this PC (clipboard history on) explorer.exe and
-      `cbdhsvc` open the clipboard after every write (probe: 40 writes, 492 foreign lock samples from the two).
-      The gesture child alone failed 13 of 40 runs: twice `CB_IsBusy` saw explorer.exe and SendInstant took the
-      clipboard-free path; three times SendInstant returned with no paste and no log, which an instrumented loop
-      put at `CB_WritePlainSnapshot` (its single-shot CAS and `_CB_PlainAuthenticate` both refuse any open
-      lease); seven times Ctrl+V was sent but the Edit never pasted (explorer.exe held the lock just after the
-      paste in 4 of the 6 instrumented cases); once the capture timed out. The production paste can lose an expansion the same way. Decide whether publication
-      waits for readers (bounded, like `CB_OpenClipboardWithin`) before authenticating and pasting, then make the
-      fixtures hold a known reader instead of depending on the desktop's.
+- [ ] **The target's own paste can still lose to Windows' clipboard readers.** Done 2026-11-22: the paste
+      transport's leases (`CB_IsBusy`, the plain CAS and its authentication, the restore retry) outwait a reader
+      of another process for `CB_PASTE_READER_WAIT_MS` (100 ms) instead of refusing on the first try, a refused
+      SendInstant publication is logged with the holder, and the payload carries the clipboard-history and cloud
+      exclusion formats, so expansions no longer land in Win+V
+      (`test_clipboard_reader_wait.ahk`, a known reader process, red on the old code). Left: the application's
+      own single `OpenClipboard` after Ctrl+V. explorer.exe and msrdc.exe (WSLg) still open the clipboard after
+      writes, with or without the exclusion formats, and msrdc renders every delayed text format, so neither the
+      formats nor a delayed-rendering receipt can prove the paste (a single open 0-140 ms after a write failed
+      about 1 time in 60-120). The `gesture-transform-native-render-focus` and `wrap-native-render-focus` current
+      modes still fail that way now and then (sends=1, Edit empty), at the old head too. The TextSend payload
+      (`CB_WriteTextWithReceipt`, LLM and diagnostics) is still published through `A_Clipboard`, without the
+      exclusion formats. macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
+      each reader separately), so the race does not exist there; their transient hints
+      (`org.nspasteboard.TransientType`, `x-kde-passwordManagerHint`) are not set yet.
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
