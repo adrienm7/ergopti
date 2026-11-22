@@ -30,6 +30,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
 
 
 

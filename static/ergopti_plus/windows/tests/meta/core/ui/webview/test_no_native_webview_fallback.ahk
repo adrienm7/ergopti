@@ -25,7 +25,9 @@ global _NNWF_RETIRED := ["WebView_ShouldUseNativeFallback", "WEBVIEW_MIN_AVAIL_R
 	"_UpdateCheck_BuildNative", "_UpdateCheck_FallBackToNative", "_UpdateCheck_NativeTexts", "_UC_Native",
 	"_Updater_BuildChangelogGui", "_Updater_OpenChangelogWindow", "_Updater_ReleaseNotesToPlain",
 	"_Updater_MarkdownToPlain", "_PathsEdNative_", "_ActPickWeb_Available", "_GesturePickProgram",
-	"_CLW_WebView2Available", "_OnbWeb_Available", "_LayMgrWeb_Available", "OllamaWV_WebView2Available"]
+	"_CLW_WebView2Available", "_OnbWeb_Available", "_LayMgrWeb_Available", "OllamaWV_WebView2Available",
+	"_LLM_Menu_ProfilePromptInput", "_PromptEdWeb_Available", "_HCWWeb_Available", "_HCWGui", "_HC_ShowNativeSnapshot",
+	"ManagedNativeFailureWindow", "_LLM_MBW_WebView2Available"]
 
 ; Each production source with its masked code (comments and strings blanked).
 _NNWF_Sources() {
@@ -84,3 +86,25 @@ _NNWF_SuiteAnswersNativeModals() {
 }
 Test("webview fallbacks: the suite answers native modals instead of showing them (webview-no-native-fallback)",
 	_NNWF_SuiteAnswersNativeModals)
+
+; The program parameter had a native editor beside the picker page; without a
+; value from the page the action now saves nothing and opens no window.
+_NNWF_ProgramParameterHasNoNativeEditor() {
+	global _GesturePickedParameter
+	AssertEqual("program", GestureActionParameterSpec("run_program"), "run_program takes a program")
+	Saved := _GesturePickedParameter
+	PreviousDetect := DetectHiddenWindows(true)
+	try {
+		_GesturePickedParameter := 0
+		Before := WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . ProcessExist()).Length
+		AssertFalse(GesturePromptActionParameter("gesture__tap_3", "run_program"),
+			"a program with no value from the page is not saved")
+		AssertEqual(Before, WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . ProcessExist()).Length,
+			"no native program editor may open")
+	} finally {
+		_GesturePickedParameter := Saved
+		DetectHiddenWindows(PreviousDetect)
+	}
+}
+Test("webview fallbacks: a program parameter opens no native editor (webview-no-native-fallback)",
+	_NNWF_ProgramParameterHasNoNativeEditor)

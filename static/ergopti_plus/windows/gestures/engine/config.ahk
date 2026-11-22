@@ -324,8 +324,12 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		}
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
-		if Spec == "program"
-				return _GesturePickProgram(BindingId, ActionName, Title, Existing)
+		; A program is edited in the shared action picker's page only: its native
+		; editor was removed with the picker's other fallbacks (2026-11-21).
+		if Spec == "program" {
+				LoggerError("gestures", "No valid program from the action picker for '{1}': nothing saved.", ActionName)
+				return false
+		}
 		if (Spec = "app")
 				return _GesturePickApplication(BindingId, ActionName, Prompt)
 		if (Spec = "llm_vision")
