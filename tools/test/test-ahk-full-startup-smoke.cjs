@@ -235,6 +235,26 @@ function deferredBuildProbe(build) {
 }
 
 /**
+ * Whether every deferred submenu build stayed off the locale fallbacks. Every
+ * shipped catalogue carries en.json's key set, so a complete active catalogue
+ * never needs one; on CI run 44983580030 the Layout submenu's first label
+ * candidate, a key no catalogue has, loaded the whole French catalogue inside
+ * its build (154 million cycles, 2174 page faults). A build without its probe
+ * line cannot be judged and fails too.
+ * @param {string} configRoot
+ * @returns {string} The first offending build, or '' when there is none.
+ */
+function deferredBuildFallbackProblem(configRoot) {
+	for (const build of deferredMenuBuilds(configRoot)) {
+		if (!build.probe) return `the ${build.list} build logged no probe line to judge`;
+		const loads = build.probe.match(/i18n\.fallback_loads\.[a-z]+\+\d+/g);
+		if (loads)
+			return `the ${build.list} build loaded a locale fallback catalogue (${loads.join(', ')}): ${deferredBuildProbe(build)}`;
+	}
+	return '';
+}
+
+/**
  * Whether every Hotstrings menu build stayed an ordinary menu build: none of
  * its rows may cost more thread cycles than a row of the costliest other menu
  * the same boot built. Cycles ignore the time the thread waited on the
@@ -1074,6 +1094,8 @@ async function main() {
 				!logText(configRoot).includes("Deferred submenu 'hotstrings_menu' built in")
 			)
 				return fail(`${fixture}: no real Hotstrings submenu render was logged`);
+			const fallback = deferredBuildFallbackProblem(configRoot);
+			if (fallback) return fail(`${fixture}: ${fallback}`);
 			const { problem: render, overBound } = hotstringsRenderProblem(fixture, configRoot);
 			if (render && !overBound) return fail(`${fixture}: ${render}`);
 			if (render) {

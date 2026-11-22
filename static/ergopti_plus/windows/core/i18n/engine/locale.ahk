@@ -441,6 +441,30 @@ I18nLookup(Key) {
 	return ""
 }
 
+; Resolve a candidate key from the active catalogue alone, silently: the Windows
+; form of the shared locale core's has() (_shared/core/i18n/engine/core.lua).
+; Every shipped catalogue carries exactly en.json's key set and no blank value
+; (tools/test/test-locale-catalogue-complete.cjs), so a key the loaded active
+; catalogue lacks is absent from the fallbacks too. Probing through I18nLookup
+; made the first candidate miss of a boot load a whole fallback catalogue: the
+; manifest label resolver tries menu.layout.ergopti_base before the folded
+; layout.ergoptibase, and that one miss cost the Layout submenu's first open
+; 150 million cycles and 2000 page faults on CI (run 44983580030). Only an
+; active catalogue that failed to load is answered by the fallbacks.
+; @param Key string Dot-notation locale key.
+; @returns {String} The active translation, or "" when the key is not there.
+I18nProbe(Key) {
+	global _I18nCache, _I18nCacheLoaded
+	; Parse-time #HotIf criteria may ask before the caches exist (see I18nLookup).
+	if !IsSet(_I18nCache) || !IsSet(_I18nCacheLoaded)
+		return ""
+	if !_I18nCacheLoaded
+		_I18nEnsureActiveLoaded()
+	if !_I18nCacheLoaded
+		return I18nLookup(Key)
+	return _I18nCache.Get(Key, "")
+}
+
 ; Joins a translated label to its value the way the active locale spells it
 ; (French spaces the colon, Chinese and Japanese use a full-width one). The Lua
 ; drivers have the same rule in _shared/core/i18n/engine/label_value.lua.

@@ -241,13 +241,24 @@ async function observe(source, root, scenario) {
 							// extension-master-off's first boot, none on its second.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
-							const build = (list, ms, cycles, rows) =>
-								`[INFO] [MenuPopulation] Deferred submenu '${list}' built in ${ms} ms, ${cycles} thread cycle(s) for ${rows} row(s), for the smoke.\n`;
+							// Each build line is followed by its probe; the fallback-load
+							// scenario keeps the CI shape of run 44983580030, where the
+							// Layout submenu loaded the French fallback catalogue.
+							const build = (list, ms, cycles, rows, counters = 'none') =>
+								`[INFO] [MenuPopulation] Deferred submenu '${list}' built in ${ms} ms, ${cycles} thread cycle(s) for ${rows} row(s), for the smoke.\n` +
+								`[INFO] [MenuPopulation] Deferred submenu '${list}' probe: started 2585 ms after process start; counters moved: ${counters}; hot-path segments run: none.\n`;
 							const otherMenus =
 								scenario === 'render-unreferenced'
 									? ''
-									: build('shortcuts_menu', 60, 120000000, 100) +
-										build('personal_menu', 13, 20000000, 40);
+									: build(
+											'shortcuts_menu',
+											60,
+											120000000,
+											100,
+											scenario === 'fallback-load'
+												? 'i18n.fallback_loads.fr+1, i18n.locale_json_parses+1'
+												: 'none'
+										) + build('personal_menu', 13, 20000000, 40);
 							// A paused AI-on boot defers its AI hotkeys and the resume
 							// activates them; the smoke requires both lines (#97).
 							let resume = '';
@@ -760,6 +771,7 @@ async function check(source, root = ROOT) {
 		'slow-render',
 		'stalled-render',
 		'render-unreferenced',
+		'fallback-load',
 		'work-unnamed',
 		'work-doubled',
 		'work-stale',
@@ -810,6 +822,7 @@ async function check(source, root = ROOT) {
 				'first-save-missing',
 				'slow-render',
 				'render-unreferenced',
+				'fallback-load',
 				'work-unnamed',
 				'work-doubled'
 			].includes(scenario)
@@ -834,6 +847,11 @@ async function check(source, root = ROOT) {
 			assert.match(
 				result.diagnostics.join('\n'),
 				/extension-master-off: a one-off stall, not the menu's cost: a Hotstrings menu row cost 1\.57 times a row of shortcuts_menu.*a second boot of the fixture stayed within its bound/
+			);
+		if (scenario === 'fallback-load')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/fresh-config: the shortcuts_menu build loaded a locale fallback catalogue \(i18n\.fallback_loads\.fr\+1\)/
 			);
 		if (scenario === 'render-unreferenced')
 			assert.match(

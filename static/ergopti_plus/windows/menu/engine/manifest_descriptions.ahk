@@ -88,12 +88,14 @@ TryMenuLabelFromDescriptionKey(DescKey, Path := "") {
 				if (Cand == "") {
 						continue
 				}
-				; I18nLookup, never t(): a miss here is this loop's normal control flow,
+				; I18nProbe, never t(): a miss here is this loop's normal control flow,
 				; and t() reports a miss as a user-visible defect. Probing through the
 				; warning accessor made every label emit several false alarms — 281 of the
 				; 282 warned keys in a boot were this loop talking about itself, and they
-				; buried the one genuine miss (i18n-probe-warns-about-itself).
-				Resolved := I18nLookup(Cand)
+				; buried the one genuine miss (i18n-probe-warns-about-itself). Nor
+				; I18nLookup: its first miss loads a whole fallback catalogue, which a
+				; complete active catalogue never needs.
+				Resolved := I18nProbe(Cand)
 				if (Resolved != "") {
 						Label := Resolved
 						break
