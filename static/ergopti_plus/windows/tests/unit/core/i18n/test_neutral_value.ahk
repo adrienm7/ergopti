@@ -1,4 +1,4 @@
-﻿; tests/unit/core/i18n/test_locale_neutral_value.ahk
+﻿; tests/unit/core/i18n/test_neutral_value.ahk
 
 ; ==============================================================================
 ; MODULE: Locale Neutral Value Tests

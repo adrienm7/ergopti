@@ -1,4 +1,4 @@
-﻿; tests/unit/core/ui/webview/test_webview_take_focus.ahk
+﻿; tests/unit/core/ui/webview/test_take_focus.ahk
 
 ; ==============================================================================
 ; MODULE: WebView Keyboard Focus On Open (PCK-16)

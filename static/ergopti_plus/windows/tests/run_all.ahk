@@ -641,7 +641,7 @@ InstallSendNoOps()
 #Include unit/platform/remap/tap_hold/test_tap_hold_migration.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_overlay_and_modifiers.ahk
 #Include unit/core/i18n/test_i18n.ahk
-#Include unit/core/i18n/test_locale_neutral_value.ahk
+#Include unit/core/i18n/test_neutral_value.ahk
 #Include unit/core/i18n/test_probe_is_silent.ahk
 #Include unit/platform/focus/test_window_utils.ahk
 #Include unit/core/network/test_external_url_policy.ahk
@@ -1154,7 +1154,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/ui/webview/test_range_mount.ahk
 #Include unit/core/ui/webview/test_profile_ownership.ahk
 #Include unit/core/ui/webview/test_fit_to_window.ahk
-#Include unit/core/ui/webview/test_webview_take_focus.ahk
+#Include unit/core/ui/webview/test_take_focus.ahk
 #Include unit/core/ui/webview/test_personal_editors_webview_only.ahk
 #Include unit/modules/keystats/metrics/test_metrics_file_urls.ahk
 #Include unit/core/text/toml/test_uridecode_literal_unicode.ahk
