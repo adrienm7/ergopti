@@ -31,13 +31,11 @@
 --- builds the whole submenu imperatively, and this gate pins the manifest's shape
 --- so the two cannot drift further apart while that is true.
 ---
---- CORRECTED 2026-08-04: this note used to say the on/off toggle,
---- layout_features_base/altgr and the hotstrings.magic_key.replace feature path
---- "have no macOS counterpart yet". The replace row does have one, and has for
---- some time — menu_keyboard_layout.lua builds it with its own checked and
---- disabled state. A stale note in a drift gate is worse than no note: it is the
---- paragraph the next person scopes the migration from, and it under-reports what
---- macOS already draws by hand.
+--- CORRECTED 2026-08-04: this note used to say the on/off toggle and
+--- layout_features_base/altgr "have no macOS counterpart yet". A stale note in a
+--- drift gate is worse than no note: it is the paragraph the next person scopes
+--- the migration from. (The replace row it also named left on 2026-11-22: no key
+--- is remapped into the magic key.)
 ---
 --- The AHK half reads both keys generically via MenuRenderer_Build in
 --- infra/manifest_menu.ahk (see hotstrings/ui/menu/hotstrings.ahk,

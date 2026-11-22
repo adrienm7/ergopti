@@ -329,16 +329,16 @@ helpers.describe("hotstring category scope: runtime and persistence acknowledgem
 	-- so the category's « check all » never reaches them.
 	helpers.it("(hotstring-category-owner) excluded bound sections keep their own choice", function()
 		local _, registry = fresh_registry()
-		registry.register_lua_group("magickey", "Magic key", { { name = "own" }, { name = "replace" } })
-		for _, name in ipairs({ "own", "replace" }) do
+		registry.register_lua_group("magickey", "Magic key", { { name = "own" }, { name = "bound" } })
+		for _, name in ipairs({ "own", "bound" }) do
 			hs.settings.set("ergopti." .. registry.section_setting_key("magickey", name), false)
 		end
 		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, function() return true end,
-			{ magickey = { replace = true } }), true)
+			{ magickey = { bound = true } }), true)
 		helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("magickey", "own")), true)
-		helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("magickey", "replace")), false,
+		helpers.assert_eq(hs.settings.get("ergopti." .. registry.section_setting_key("magickey", "bound")), false,
 			"the extension's bound section is not this submenu's")
-		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, nil, "replace"), false,
+		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, nil, "bound"), false,
 			"a malformed exclusion refuses before any write")
 	end)
 

@@ -140,7 +140,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 	end)
 
 	-- The dedicated trigger shortcut is retired: a prediction on demand is the
-	-- llm_generate_prediction action in a keyboard slot (Ctrl+Space recommended),
+	-- llm_generate_prediction action in a keyboard slot the user binds,
 	-- so the trigger submenu opens on its debounce row and prompts for no chord.
 	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
 		local saved_app_picker = package.loaded["apps.engine.picker"]

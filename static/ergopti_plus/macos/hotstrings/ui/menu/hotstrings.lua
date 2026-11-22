@@ -47,7 +47,6 @@ local keymap       = require("hotstrings.engine.expander")
 local hotstrings_config = require("hotstrings.engine.catalogue.config")
 local HotstringLanguages = require("hotstrings.engine.languages")
 local BulkScope = require("hotstrings.engine.bulk_scope")
-local ManifestReader = require("menu.engine.manifest_reader")
 local ProgrammableHotstrings = require("hotstrings.ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
 

@@ -36,9 +36,6 @@ local ORIGINAL_CONFIG = table.concat({
 	"abbreviations = true",
 	"technical_terms = true",
 	"",
-	"[hotstrings.magic_key.replace]",
-	"enabled = false",
-	"",
 	"[llm]",
 	"enabled = true",
 	"",
@@ -502,8 +499,8 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_nil(decoded.hotstrings.trigger_char)
 		helpers.assert_eq(decoded.hotstrings.future, { keep = 1 })
 		helpers.assert_eq(decoded.hotstrings.delays, { dynamichotstrings = 1.5 })
-		local replace = (decoded.hotstrings.magic_key or {}).replace or {}
-		helpers.assert_nil(replace.enabled, "a Windows reader's row is not written here")
+		helpers.assert_nil((decoded.hotstrings.magic_key or {}).replace,
+			"no replace row exists since 2026-11-22: nothing is remapped into the magic key")
 		helpers.assert_eq(decoded.llm.enabled, true)
 		helpers.assert_eq(f.km.repeat_enabled, true)
 		helpers.assert_eq(f.km.trigger, "★")

@@ -44,17 +44,20 @@ helpers.describe("macOS keyboard group scope", function()
 		end, SOURCE)
 	end)
 
-	helpers.it("the group's restore brings its shipped slot back and removes the user's additions", function()
+	-- 2026-11-22: no recommendation binds an AI prediction, so Ctrl+Space is
+	-- emptied; Ctrl+★ keeps its shipped editor action.
+	helpers.it("the group's restore keeps Ctrl+★ and removes the user's additions", function()
 		Fixture.run(function(f)
 			local committed, detail = f.owner.apply("recommended", ctrl_group(f.keyboard))
 			helpers.assert_eq(committed, true, detail)
 			local decoded = Codec.decode(f.files.config)
 			helpers.assert_nil(decoded.shortcuts.keyboard.secondary_j, "a user Ctrl slot is removed")
-			helpers.assert_eq(decoded.shortcuts.keyboard.secondary_space, "llm_generate_prediction",
-				"the shipped Ctrl+Space slot takes its recommended action")
+			helpers.assert_nil(decoded.shortcuts.keyboard.secondary_space,
+				"no recommendation binds an AI prediction to Ctrl+Space")
 			helpers.assert_eq(decoded.shortcuts.keyboard.primary_a, "send_text", "the Cmd group is untouched")
 			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_a__send_text, "cmd")
-			helpers.assert_eq(f.keyboard.get_action("secondary_space"), "llm_generate_prediction")
+			helpers.assert_eq(f.keyboard.get_action("secondary_space"), "none")
+			helpers.assert_eq(f.keyboard.get_action("secondary_star"), "open_hotstrings_editor")
 		end, SOURCE)
 	end)
 end)

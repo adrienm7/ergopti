@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("menu.engine.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers)
 
 --- Provides the real files beneath a shipped scanner root.
 --- @return table Scanner filesystem collaborators.
@@ -47,8 +47,8 @@ local function physical_j()
 	return event
 end
 
-helpers.describe("Shipped Ergopti menu and physical replacement", function()
-	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
+helpers.describe("Shipped Ergopti menu without a physical replacement", function()
+	helpers.it("(ergopti-extension-selection) persists the actual repeat gate, reloads it and rolls back refusals", function()
 		helpers.with_stub_scope({ "hotstrings.engine.expander", "hotstrings.engine.expander.init", "hotstrings.engine.expander.state",
 			"hotstrings.engine.expander.utils", "hotstrings.engine.expander.expander", "ai.engine.bridge",
 			"hotstrings.engine.catalogue.extension_packs", "settings.engine.preferences.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
@@ -94,7 +94,14 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			local Hotstrings = require("hotstrings.ui.menu.hotstrings")
 			local Preferences = require("settings.engine.preferences.preferences")
 			local neutral = Preferences.project_hotstring_preferences({}, Registry.list_groups(), Keymap.get_sections)
-			helpers.assert_eq(neutral.section_states.magickey.replace, false, "fresh canonical absence keeps native replacement opt-in")
+			-- 2026-11-22: the magic key is only the configured character, so the
+			-- Ergopti extension ships no replace section any more.
+			helpers.assert_nil(neutral.section_states.magickey.replace, "no replace section is offered")
+			for _, section in ipairs(Keymap.get_sections("magickey")) do
+				helpers.assert_true(section.name ~= "replace", "the shipped magic key catalogue has no replace section")
+			end
+			helpers.assert_eq(neutral.section_states.magickey.repeat_corrections, false,
+				"fresh canonical absence keeps the repeat section opt-in")
 			local prefs_file = os.tmpname()
 			os.remove(prefs_file)
 			local refuse, saves = false, 0
@@ -114,15 +121,20 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				if refuse then return false end
 				return Preferences.save(prefs_file, ctx.state, ctx.hotfiles, { keymap = Keymap })
 			end
+			-- The extension's magic key row: the repeat section, beside the suffixes.
 			local function row()
+				local suffix = Keymap.get_sections("french_distancesreduction")[1]
+				local locale = require("core.i18n.engine.i18n").get_locale()
+				local suffix_title = suffix.description[locale] or suffix.description.en
 				local by_extension = Hotstrings.bound_sections(ctx)
 				for _, candidate in ipairs(Hotstrings.build_bound_section_rows(ctx, by_extension.ergopti)) do
-					if candidate.label:find("(0)", 1, true) then return candidate end
+					if type(candidate.label) == "string" and candidate.label ~= ""
+						and not candidate.label:find(suffix_title, 1, true) then return candidate end
 				end
 			end
 			local ok, err = pcall(function()
 				local initial = row()
-				helpers.assert_type(initial, "table", "the metadata-only feature draws an actual extension row")
+				helpers.assert_type(initial, "table", "the repeat section draws an actual extension row")
 				local tree = require("menu.ui.builder.builder").generate(ctx, { hotstrings = Hotstrings },
 					setmetatable({}, { __index = function() return function() end end }))
 				local extension_title = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
@@ -144,7 +156,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				end
 				find_extension(tree)
 				helpers.assert_type(extension, "table", "the actual native renderer shows the shipped extension")
-				helpers.assert_type(find(extension.menu, initial.label), "table", "the localized replacement is inside Ergopti")
+				helpers.assert_type(find(extension.menu, initial.label), "table", "the localized repeat row is inside Ergopti")
 				local suffix = Keymap.get_sections("french_distancesreduction")[1]
 				local locale = require("core.i18n.engine.i18n").get_locale()
 				local suffix_title = suffix.description[locale] or suffix.description.en
@@ -155,28 +167,26 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				-- rows commit without consulting the pause owner (edd1-paused-writes).
 				ctx.is_paused = function() error("the extension rows do not read the pause") end
 				helpers.assert_true(initial.action())
-				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true)
+				helpers.assert_eq(Registry.is_section_enabled("magickey", "repeat_corrections"), true)
 				local saved = Preferences.load(prefs_file)
-				helpers.assert_eq(saved.section_states.magickey.replace, true, "the empty native feature is persisted")
-				-- The magic key is a configured character since 2026-11-21: the
-				-- replacement section remaps no physical key on macOS.
+				helpers.assert_eq(saved.section_states.magickey.repeat_corrections, true, "the repeat section is persisted")
+				-- No section remaps a physical key into the magic key (2026-11-22).
 				local event = physical_j(); taps[1].callback(event)
 				helpers.assert_eq(event.text, "j", "no physical key becomes the magic key")
 				helpers.assert_nil(event.remapped)
 				refuse = true
 				helpers.assert_eq(initial.action(), false)
-				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "save refusal rolls back native and cache")
+				helpers.assert_eq(Registry.is_section_enabled("magickey", "repeat_corrections"), true, "save refusal rolls back native and cache")
 				refuse = false
-				helpers.assert_true(Registry.disable_section("magickey", "replace"))
+				helpers.assert_true(Registry.disable_section("magickey", "repeat_corrections"))
 				helpers.assert_true(Registry.apply_hotstring_preferences(saved))
-				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "canonical boot projection restores replacement")
+				helpers.assert_eq(Registry.is_section_enabled("magickey", "repeat_corrections"), true, "canonical boot projection restores the repeat section")
 				helpers.assert_true(initial.action())
 				helpers.assert_true(Registry.enable_section("magickey", "text_expansion_symbols"))
 				local bound = Hotstrings.bound_sections(ctx)
 				helpers.assert_true(Hotstrings.build_extension_bulk_actions(ctx, {}, bound.ergopti)[1].action())
-				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true)
+				helpers.assert_eq(Registry.is_section_enabled("magickey", "repeat_corrections"), true)
 				helpers.assert_true(Hotstrings.build_extension_bulk_actions(ctx, {}, bound.ergopti)[1].action())
-				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), false)
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "repeat_corrections"), false)
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "text_expansion_symbols"), true,
 					"extension bulk disable preserves the unrelated common symbol choice")

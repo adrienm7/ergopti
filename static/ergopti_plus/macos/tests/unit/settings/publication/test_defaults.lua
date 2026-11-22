@@ -66,11 +66,25 @@ helpers.describe("neutral configuration contract", function()
 		helpers.assert_eq(defaults.default_for("llm.generation.temperature"), 0.1)
 	end)
 
+	-- 2026-11-22: no recommendation binds an AI prediction, Ctrl+Space included.
+	helpers.it("recommends no AI prediction on any keyboard slot", function()
+		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
+		helpers.assert_eq(defaults.recommended_for("shortcuts.keyboard.secondary_space"), "none")
+		for _, entry in ipairs(require("_generated.features_manifest").features or {}) do
+			if entry.section == "shortcuts.keyboard" then
+				helpers.assert_true(entry.recommended ~= "llm_generate_prediction",
+					"no keyboard slot recommends an AI prediction: " .. tostring(entry.id))
+			end
+		end
+	end)
+
 	helpers.it("returns detached values and produces explicit sparse deletion intent", function()
 		local defaults = require("settings.engine.publication.defaults").new(require("_generated.features_manifest"))
-		local original = defaults.default_for("hotstrings.magic_key.replace")
+		local original = defaults.default_for("hotstrings.magic_key.repeat_corrections")
 		original.enabled = true
-		helpers.assert_eq(defaults.default_for("hotstrings.magic_key.replace.enabled"), false)
+		helpers.assert_eq(defaults.default_for("hotstrings.magic_key.repeat_corrections.enabled"), false)
+		-- 2026-11-22: no key is remapped into the magic key, so no replace row exists.
+		helpers.assert_eq(pcall(defaults.default_for, "hotstrings.magic_key.replace"), false)
 		local deleted = defaults.operation("shortcuts.enabled", false)
 		helpers.assert_eq(deleted.delete, true)
 		helpers.assert_eq(deleted.value, nil)
