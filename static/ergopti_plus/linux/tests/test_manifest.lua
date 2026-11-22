@@ -378,6 +378,7 @@ return {
 	"tests.unit.ai.engine.ollama.test_api_ollama_payload",
 	"tests.unit.ai.engine.ollama.test_api_ollama_stream_parse",
 	"tests.unit.ai.engine.ollama.test_api_ollama_terminal_receipt",
+	"tests.unit.ai.engine.ollama.test_api_ollama_budget",
 	"tests.unit.settings.test_bridge_persistence",
 	"tests.unit.modules.updater.check.test_changelog_release_sources",
 	"tests.unit.modules.updater.check.test_repository_url",

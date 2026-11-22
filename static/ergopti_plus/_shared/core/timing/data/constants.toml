@@ -1382,7 +1382,8 @@ menu_rebuild_ms = 250
 
 # One request to a local AI server (Ollama, MLX, a local OpenAI-compatible
 # server), request to answer. Measured local time to first token p50 1573 ms.
-# HS: ai/engine/api/ollama.lua. AHK: ai/engine/prediction/request_latency.ahk.
+# HS: ai/engine/api/ollama.lua. LX: ai/engine/api/api_ollama.lua.
+# AHK: ai/engine/prediction/request_latency.ahk.
 llm_local_request_ms = 2000
 
 # One request to a cloud AI provider, request to answer. Measured 706 to 1479 ms;

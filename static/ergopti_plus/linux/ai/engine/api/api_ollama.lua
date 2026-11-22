@@ -15,6 +15,9 @@
 --- 3. Cancel: cancel() kills the curl subprocess and suppresses callbacks.
 --- 4. Timeout: curl's --max-time provides a hard timeout; the Lua side also
 ---    tracks cancellation state.
+--- 5. Budget: a completed chat is judged against [budgets] llm_local_request_ms,
+---    from its dispatch to its terminal marker, as Windows and macOS judge a
+---    local request.
 --- ==============================================================================
 
 local M = {}
@@ -34,6 +37,8 @@ local Timings = require("core.timing.engine.timings")
 local HttpClient = require("core.network.adapters.http_client")
 local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 local Json = require("core.text.engine.json")
+local Monotonic = require("core.logger.engine.monotonic")
+local PerfBudget = require("core.logger.engine.perf_budget")
 
 -- The warmup's HTTP owner: a prediction's own request never waits for it.
 local WARMUP_OWNER = "ollama_model_warmup"
@@ -296,6 +301,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
 	local function dispatch()
 		if not request_current(request) then return false end
+		request.started_ms = Monotonic.now_ms()
 		return HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
 			timeout_ms = Timings.ms("llm", "ollama_request_timeout_ms"),
 			authorized = function() return request_current(request) end,
@@ -316,6 +322,11 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 			elseif request.full_text == "" then
 				finish_request(request, "no response from Ollama")
 			else
+				local elapsed_ms = Monotonic.now_ms() - request.started_ms
+				Logger.debug(LOG, "Ollama completion received (%d chars in %d ms).", #request.full_text, elapsed_ms)
+				PerfBudget.judge(Logger, LOG, "llm.local", elapsed_ms,
+					function() return Timings.ms("budgets", "llm_local_request_ms") end)
+				if not request_current(request) then return end
 				finish_request(request, nil)
 			end
 		end)
