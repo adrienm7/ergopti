@@ -578,13 +578,17 @@ body:has(> main.layout-analysis) {
 }
 
 /* A table row's layout name, a button for the keyboard drawn as the cell's
-   text (the row answers to the pointer too). */
+   text (the row answers to the pointer too). Its box is at least 24 px each
+   way (WCAG 2.5.8): a one- or two-letter name (« Ø ») was a 15 by 20 px target
+   wedged between the rows above and below it. */
 .layout-analysis .la-row-name {
 	background: none;
 	border: 0;
 	border-radius: 2px;
 	color: inherit;
 	font: inherit;
+	min-block-size: 24px;
+	min-inline-size: 24px;
 	padding: 0;
 	text-align: inherit;
 }
