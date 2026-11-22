@@ -539,73 +539,6 @@ const LINUX_AI_PARENT_ALGORITHM =
 /** Proves a Linux AI parent from its real declaration, whole producer and tray caller. */
 
 /** Refuses executable module-root additions and replacement/escaped native exports. */
-/** The new caption import owns only its real magic-key notification receiving seam.
- * This finite Source obligation grants no native effect or additional root-row authority.
- */
-function declaredLinuxNativeCaptionOwner(unit) {
-	const { positions, rootPositions, body } = luaPublicationParser();
-	if (!unit) return false;
-	const imported = 'local NativePresentation = require("menu.engine.native_presentation")';
-	const captured =
-		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
-	const captureAt = rootPositions(unit, captured),
-		importAt = rootPositions(unit, imported);
-	if (captureAt.length !== 1 || importAt.length !== 1 || importAt[0] >= captureAt[0]) return false;
-	const layouts = body(unit, 'local function _build_layouts(ctx)');
-	const provider = body(layouts, 'providers["magic_key_source"] = function()');
-	const signature = 'local function notify(key, level)';
-	const notify = body(provider, signature);
-	const expected = `local function notify(key, level)
- local ok_notifier, Notifier = pcall(require, "platform.focus.application_notifier")
- if ok_notifier then
-  local body = i18n_safe(key)
-  local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
-  local title = receipt and NativePresentationTitle(receipt) or nil
-  if title == nil then return false end
-  Notifier.send(body, { title = title, level = level })
- else
-  Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
- end
-end`;
-	const expectedTokens = scriptTokens(expected, '.lua');
-	const signatureTokens = scriptTokens(signature, '.lua');
-	const expectedBody = expectedTokens.slice(signatureTokens.length, -1);
-	const shape = (tokens, text) =>
-		tokens.map((token) => [
-			token.kind,
-			token.value,
-			token.kind === 'string' ? text.slice(token.start, token.end) : null
-		]);
-	if (
-		!notify ||
-		!isDeepStrictEqual(shape(notify.tokens, notify.text), shape(expectedBody, expected))
-	)
-		return false;
-	const notifyAt = positions(unit, expected);
-	if (notifyAt.length !== 1) return false;
-	const allowed = new Set();
-	const names = new Set([
-		'NativePresentation',
-		'PrepareNativePresentation',
-		'NativePresentationTitle'
-	]);
-	for (const [at, fragment] of [
-		[importAt[0], imported],
-		[captureAt[0], captured],
-		[notifyAt[0], expected]
-	]) {
-		const wanted = scriptTokens(fragment, '.lua');
-		for (let offset = 0; offset < wanted.length; offset++)
-			if (wanted[offset].kind === 'identifier' && names.has(wanted[offset].value))
-				allowed.add(at + offset);
-	}
-	// Only the exact import/capture and authenticated physical provider body may borrow these ports.
-	// Extra shadows, writes, observer arguments, container captures and duplicate owners refuse.
-	return unit.tokens.every(
-		(token, at) => token.kind !== 'identifier' || !names.has(token.value) || allowed.has(at)
-	);
-}
-
 /** Actual captured removal captions belong only to their native command and About handler.
  * These source intervals grant no extra root rows or renderer/native effect authority.
  */
@@ -683,7 +616,6 @@ function closedModuleExport(unit, lex, rootPositions) {
 	if (!unit) return false;
 	const imports = {
 		WindowTitles: 'core.ui.engine.window_titles',
-		NativePresentation: 'menu.engine.native_presentation',
 		NumberRowPolicy: 'layouts.engine.layout.number_row_policy',
 		ParameterLabel: 'shortcuts.engine.action_parameter_label',
 		RowDialect: 'menu.engine.row_dialect',
@@ -696,7 +628,6 @@ function closedModuleExport(unit, lex, rootPositions) {
 		Languages: 'hotstrings.engine.languages',
 		LocaleTable: '_generated.locale_table',
 		MagicKey: 'hotstrings.engine.magic_key',
-		MagicKeySourceRows: 'layouts.engine.layers.magic_key_source',
 		MagicFrame: 'menu.engine.frames.magic_frame',
 		ParentSource: 'menu.engine.frames.parent_source',
 		PersonalInfoSource: 'menu.engine.frames.personal_info_source',
@@ -761,15 +692,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 			const name = tokens[at + 1];
 			if (name?.kind !== 'identifier' || locals.has(name.value)) return false;
 			locals.add(name.value);
-			if (name.value === 'PrepareNativePresentation') {
-				if (!declaredLinuxNativeCaptionOwner(unit) || locals.has('NativePresentationTitle'))
-					return false;
-				locals.add('NativePresentationTitle');
-				at = take(
-					at,
-					'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title'
-				);
-			} else if (name.value === 'ok_mm') {
+			if (name.value === 'ok_mm') {
 				at = take(at, 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")');
 			} else {
 				if (Object.hasOwn(LINUX_UNINSTALL_CAPTION_LOCALS, name.value)) {
@@ -800,8 +723,6 @@ function closedModuleExport(unit, lex, rootPositions) {
 				const value = tokens[at + 3];
 				if (value?.value === 'require') {
 					if (imports[name.value] !== tokens[at + 5]?.value) return false;
-					if (name.value === 'NativePresentation' && !declaredLinuxNativeCaptionOwner(unit))
-						return false;
 					if (
 						tokens[at + 4]?.value !== '(' ||
 						tokens[at + 5]?.kind !== 'string' ||
@@ -939,7 +860,6 @@ function closedSiblingRendererBindings(unit) {
 	const { positions, rootPositions, body } = luaPublicationParser();
 	const imports = {
 		NumberRowPolicy: 'layouts.engine.layout.number_row_policy',
-		MagicKeySourceRows: 'layouts.engine.layers.magic_key_source',
 		ProgrammableMenuPolicy: 'menu.engine.programmable_hotstrings',
 		PersonalFileMenu: 'menu.engine.personal_files'
 	};
@@ -961,7 +881,6 @@ function closedSiblingRendererBindings(unit) {
 		directory_unavailable: 'PersonalFileMenu'
 	};
 	const optionCalls = [
-		'MagicKeySourceRows.menu_rows(Source.resolver(), { manifest = ManifestMenu',
 		'PersonalFileMenu.build({ manifest = ManifestMenu',
 		'PersonalFileMenu.apply_category_admission(rendered, { manifest = ManifestMenu',
 		'require("ui.menu.key_combinations").build(ctx, { manifest = ManifestMenu'

@@ -1,4 +1,6 @@
-// Independent actual physical native-caption binding withdrawal and exact repair controls.
+// Independent actual native caption (removal command) binding withdrawal and exact repair controls.
+// The physical magic key's notice left with the key itself (2026-11-21): Linux holds no native
+// presentation import any more, so only the removal captions are bound here.
 'use strict';
 const assert = require('node:assert/strict');
 const {
@@ -50,86 +52,7 @@ module.exports = function (sources, manifest, menuSources) {
 			name + ': restoring the real app identity owner restores the route'
 		);
 	}
-	const imported = 'local NativePresentation = require("menu.engine.native_presentation")';
-	const captured =
-		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
-	const cases = [
-		[
-			'local function _build_layouts(ctx)',
-			'local function _foreign_layouts(ctx)',
-			'notification cannot borrow a foreign enclosing producer'
-		],
-		[imported, '', 'actual import withdrawal'],
-		[
-			imported,
-			'local NativePresentation = require("foreign.native_presentation")',
-			'foreign import owner'
-		],
-		[imported, imported + '\n' + imported, 'duplicate physical import'],
-		[imported, 'do ' + imported + ' end', 'scoped import cannot supply root authority'],
-		[captured, '', 'actual factory/title capture withdrawal'],
-		[captured, captured + '\n' + captured, 'duplicate factory/title capture'],
-		[
-			captured,
-			captured.replace('NativePresentation.prepare', 'Foreign.prepare'),
-			'foreign factory capture'
-		],
-		[
-			captured,
-			captured.replace('NativePresentation.title', 'Foreign.title'),
-			'foreign title capture'
-		],
-		[
-			captured,
-			captured.replace(
-				'NativePresentation.prepare, NativePresentation.title',
-				'NativePresentation.title, NativePresentation.prepare'
-			),
-			'swapped factory/title roles'
-		],
-		[captured, 'do ' + captured + ' end', 'scoped capture cannot own genuine provider'],
-		[captured, captured + '\nObserve(NativePresentation)', 'extra module observer escape'],
-		[
-			captured,
-			captured + '\nlocal leaked = { PrepareNativePresentation }',
-			'extra captured factory container escape'
-		],
-		[
-			'local function notify(key, level)',
-			'local function notify(key, level) local NativePresentationTitle = Foreign.title',
-			'native receiver local shadow'
-		],
-		[
-			'local function notify(key, level)',
-			'local function notify(key, level) PrepareNativePresentation = Foreign.prepare',
-			'native factory reassignment'
-		],
-		[
-			'PrepareNativePresentation("magic_key_source_notice", "notification")',
-			'PrepareNativePresentation("foreign_notice", "notification")',
-			'foreign declared identity'
-		],
-		[
-			'PrepareNativePresentation("magic_key_source_notice", "notification")',
-			'PrepareNativePresentation("magic_key_source_notice", "dialog")',
-			'foreign declaration kind'
-		],
-		[
-			'local title = receipt and NativePresentationTitle(receipt) or nil',
-			'local title = "invented caption"',
-			'withdrawn actual current receiver'
-		],
-		[
-			'if title == nil then return false end',
-			'if false then return false end',
-			'withdrawn actual title refusal'
-		],
-		[
-			'Notifier.send(body, { title = title, level = level })',
-			'Notifier.send(body, { title = "invented caption", level = level })',
-			'foreign native title delivery'
-		]
-	];
+	const cases = [];
 	// The actual removal caption captures remain owned by their current native receiver.
 	const removalCaptureBlock =
 		'local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")\nlocal uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")\nlocal uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")';
@@ -313,11 +236,6 @@ module.exports = function (sources, manifest, menuSources) {
 					'local function _build_quit(ctx)',
 					'local function _build_quit(ctx)\n\tManifestMenu = nil',
 					'split module reassigns the facade'
-				],
-				[
-					'local function _build_quit(ctx)',
-					'local function _build_quit(ctx)\n\tPrepareNativePresentation = Foreign.prepare',
-					'split module reassigns the native factory'
 				],
 				[
 					'local function _build_quit(ctx)',
