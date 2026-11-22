@@ -93,15 +93,29 @@
 	// (200 % text, wide spacing, a narrow window): what sits under it (the
 	// sticky table of contents, the narrow-screen banner, anchored headings)
 	// offsets by its measured height, --header-offset, not by that minimum.
+	// The new offset is written on the next frame, never inside the observer:
+	// it resizes the Studio shell, which shows or hides the page's classic
+	// scrollbar (WebKit, desktop Chrome on Windows and Linux) and so changes the
+	// header's width in the same rendering step; the browser then reports a
+	// « ResizeObserver loop completed with undelivered notifications » error.
 	$effect(() => {
 		if (!headerElement) throw new Error('Header: the header element is not bound');
 		const root = document.documentElement;
+		let written = '';
+		let frame = 0;
 		const observer = new ResizeObserver(([entry]) => {
-			root.style.setProperty('--header-offset', entry.borderBoxSize[0].blockSize + 'px');
+			const offset = entry.borderBoxSize[0].blockSize + 'px';
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => {
+				if (offset === written) return;
+				written = offset;
+				root.style.setProperty('--header-offset', offset);
+			});
 		});
 		observer.observe(headerElement);
 		return () => {
 			observer.disconnect();
+			cancelAnimationFrame(frame);
 			root.style.removeProperty('--header-offset');
 		};
 	});
