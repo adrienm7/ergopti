@@ -88,7 +88,9 @@ helpers.describe("Linux keyboard group scope", function()
 				source = function() return { generation = 1, status = "unavailable", candidates = {} } end,
 				known_codes = function() return {} end,
 			}
-			package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end, is_customised = function() return false end }
+			package.loaded["hotstrings.engine.magic_key"] = { get = function() return "★" end, is_customised = function() return false end,
+			default = function() return "★" end, marker = function() return "★" end,
+			display = function(char) return char or "★" end, display_text = function(text) return text end }
 			local passed, err = pcall(function()
 				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)

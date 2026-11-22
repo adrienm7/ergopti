@@ -287,7 +287,6 @@ local function run_hold(transition, expected, options)
 			privacy_owners = {},
 			keystats = logger,
 			script_actions = { is_paused = function() return state.paused end },
-			MagicKeySource = { cancel_capture = noop },
 			TapHold = { set_paused = noop, observe_copy_activity = noop },
 			Logger = helpers.make_logger_stub(),
 			engine = { reset = noop },

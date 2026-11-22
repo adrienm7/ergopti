@@ -135,15 +135,6 @@ local function inspect(document, path)
 	if value ~= nil and type(value) ~= _owned[path] then
 		return nil, path, "the value is not a " .. _owned[path]
 	end
-	-- An enum leaf (the physical magic key) holding a value its manifest no
-	-- longer lists is outdated on its own, never read as another choice.
-	local entry = value ~= nil and Manifest.find_entry_by_path(path) or nil
-	if type(entry) == "table" and entry.type == "enum" then
-		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
-		value = ConfigOutdated.canonical_enum_value(entry, value)
-		local fits, detail = ConfigOutdated.manifest_value_fits(entry, value, "linux")
-		if not fits then return nil, path, detail end
-	end
 	return value
 end
 

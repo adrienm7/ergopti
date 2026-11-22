@@ -232,13 +232,9 @@ local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
 		"core.fs.adapters.storage", "hotstrings.ui.hotstring_editor.bridge", "gestures.ui.conflicts",
 		"core.i18n.engine.i18n", "menu.engine.manifest_menu"}
-	local magic_path, editor_directory, editor_source, editor_fs
+	local editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
-	if context.magic_key_source == nil then
-		names[#names + 1] = "modules.shortcuts.star_key_source"
-		names[#names + 1] = "hotstrings.engine.matcher.preferences"
-	end
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, rows = pcall(function()
 		local lfs = require("lfs"); editor_fs = lfs
@@ -254,15 +250,6 @@ local function build_fixture_menu(context)
 		rawset(package.loaded, "core.fs.adapters.storage", nil); rawset(package.loaded, "hotstrings.ui.hotstring_editor.bridge", nil)
 		helpers.assert_eq(require("hotstrings.ui.hotstring_editor.bridge").get_pref("default_section"), "",
 			"the real editor reads the independent neutral default-section source")
-		if context.magic_key_source == nil then
-			magic_path = os.tmpname()
-			local source = assert(io.open(magic_path, "wb"))
-			assert(source:write('[hotstrings]\nmagic_key_source = "auto"\n')); assert(source:close())
-			local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
-			assert(preferences._set_file_for_test(magic_path))
-			context.magic_key_source = helpers.load_module("modules.shortcuts.star_key_source")
-			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
-		end
 		local Paths = require("core.fs.engine.paths")
 		local file = assert(io.open(Paths.shared("tap_hold/data/defaults.toml"), "rb"))
 		local defaults = assert(require("core.text.engine.toml_codec").decode(file:read("*a"))); assert(file:close())
@@ -310,7 +297,6 @@ local function build_fixture_menu(context)
 		local retired, failure = pcall(action)
 		if not retired and cleanup_ok then cleanup_ok, cleanup_error = false, failure end
 	end
-	if magic_path then cleanup(function() assert(os.remove(magic_path)) end) end
 	if editor_directory then cleanup(function()
 		local lfs = editor_fs
 		for file in lfs.dir(editor_directory .. "/" .. FOLDER) do
@@ -616,9 +602,6 @@ helpers.describe("menu certification: published available component rows are ren
 						local label = (kind == "section_header")
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
-						if row.id == "magic_key_source_heading" then
-							label = require("core.i18n.engine.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
-						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
 							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
@@ -1239,59 +1222,6 @@ end)
 
 
 require("tests.lua.menu.native_child_rows").run(helpers, require("menu.engine.manifest_menu"))
-
-helpers.describe("magic key source: actual complete tray provider", function()
-	helpers.it("(magic-key-source-family) native candidate rows preserve file-backed choices and declaration withdrawal", function()
-		local names = { "modules.shortcuts.star_key_source", "hotstrings.engine.matcher.preferences" }
-		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		local path = os.tmpname()
-		local file = assert(io.open(path, "wb")); assert(file:write('[hotstrings]\nmagic_key_source = "KeyJ"\nfuture_setting = "retain"\n')); assert(file:close())
-		local declaration = ManifestMenu.get_root()
-		local child = declaration.magic_key_source_children
-		local ok, err = pcall(function()
-			local preferences = require("hotstrings.engine.matcher.preferences"); assert(preferences._set_file_for_test(path))
-			local Source = require("modules.shortcuts.star_key_source")
-			local changes, deferred = 0, {}
-			Source.init({ is_active = function() return true end, replace_on = function() return true end,
-				magic_key = function() return "★" end, can_type = function() return true end,
-				type_text = function() error("menu construction cannot type") end,
-				dispatch_char = function() error("menu construction cannot dispatch") end,
-				end_selection = function() end, can_capture = function() return true end,
-				key_text = function(code) return code == 36 and "j" or nil end,
-				defer = function(fn) deferred[#deferred + 1] = fn; return true end })
-			local context = full_context(); context.magic_key_source = Source
-			context.on_menu_changed = function() changes = changes + 1 end
-			local label = i18n.get("menu.layout.magic_key_source") .. " : j   (KeyJ)"
-			local heading = assert(find_item(build_full_menu(context), label))
-			helpers.assert_eq(heading.menu[1].title, i18n.get("menu.layout.magic_key_source.capture"))
-			helpers.assert_eq(heading.menu[2].title, "-")
-			helpers.assert_eq(heading.menu[3].title, i18n.get("menu.layout.magic_key_source.auto"))
-			helpers.assert_eq(heading.menu[4].title, "-")
-			helpers.assert_eq(#heading.menu, #Source.resolver().candidates() + 4)
-			helpers.assert_eq(changes, 0)
-			local retained = heading.menu[3].fn
-			declaration.magic_key_source_children = nil
-			helpers.assert_nil(find_item(build_full_menu(context), label), "actual native provider cannot reconstruct the withdrawn family")
-			helpers.assert_eq(retained(), false)
-			helpers.assert_eq(Source.get(), "KeyJ", "withdrawal never enters the genuine native writer")
-			helpers.assert_eq(changes, 0)
-			declaration.magic_key_source_children = child
-			local repaired = assert(find_item(build_full_menu(context), label))
-			repaired.menu[3].fn()
-			helpers.assert_eq(Source.get(), "auto")
-			helpers.assert_eq(changes, 1)
-			file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
-			helpers.assert_eq(bytes, '[hotstrings]\nfuture_setting = "retain"\n', "actual native chooser publishes its neutral default sparsely and preserves the unknown neighbor")
-		end)
-		declaration.magic_key_source_children = child
-		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-		for _, suffix in ipairs({ "", ".tmp" }) do
-			local existing = io.open(path .. suffix, "rb")
-			if existing then assert(existing:close()); assert(os.remove(path .. suffix)) end
-		end
-		if not ok then error(err, 0) end
-	end)
-end)
 
 require("tests.lua.menu.dynamic_caption_contract").register(helpers, "linux")
 

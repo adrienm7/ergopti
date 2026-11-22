@@ -48,7 +48,9 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 			source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
 			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
 		}
-		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end,
+			default = function() return "★" end, marker = function() return "★" end,
+			display = function(char) return char or "★" end, display_text = function(text) return text end }
 		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
 		local ok, err = pcall(function()
 			local shortcuts, config = load_over_config(initial, writes_fail)
@@ -129,12 +131,12 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 			with_actual_logger(function(logger)
 				with_editor(nil, function(shortcuts, _, state)
 					local source = require("modules.shortcuts.star_key_source")
-					local original = source.editor_source
+					local original = source.source
 					local armed, observed = false, 0
 					logger.set_sink(function(line)
 						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
 					end)
-					source.editor_source = function()
+					source.source = function()
 						local facts = original()
 						if armed then
 							armed, observed = false, observed + 1
@@ -159,7 +161,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 			with_actual_logger(function(logger)
 				with_editor(nil, function(shortcuts, _, state)
 					local source = require("modules.shortcuts.star_key_source")
-					local original_admission, original_source = state.options.admission, source.editor_source
+					local original_admission, original_source = state.options.admission, source.source
 					local armed, observed, reads = false, 0, 0
 					logger.set_sink(function(line)
 						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -178,7 +180,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 						end
 						return facts
 					end
-					source.editor_source = function()
+					source.source = function()
 						local facts = original_source()
 						if armed and boundary == "source" then retire() end
 						return facts
@@ -196,12 +198,12 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
 				local source = require("modules.shortcuts.star_key_source")
-				local original = source.editor_source
+				local original = source.source
 				local armed, observed = false, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
 				end)
-				source.editor_source = function()
+				source.source = function()
 					if armed then observed = observed + 1; error("original selected-source callback unavailable") end
 					return original()
 				end
@@ -223,7 +225,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
 				local source = require("modules.shortcuts.star_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local admission, original = state.options.admission, source.source
 				local armed, retired, observed, source_after_loss = false, false, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -238,7 +240,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					end
 					return facts
 				end
-				source.editor_source = function()
+				source.source = function()
 					if retired then source_after_loss = source_after_loss + 1 end
 					return original()
 				end
@@ -291,7 +293,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
 				local source = require("modules.shortcuts.star_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local admission, original = state.options.admission, source.source
 				local armed, replaced, observed, source_after_loss, foreign_calls = false, false, 0, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -307,7 +309,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					end
 					return facts
 				end
-				source.editor_source = function()
+				source.source = function()
 					if replaced then source_after_loss = source_after_loss + 1 end
 					return original()
 				end
@@ -325,7 +327,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
 				local source = require("modules.shortcuts.star_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local admission, original = state.options.admission, source.source
 				local armed, retired, observed, admission_after_loss = false, false, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -334,7 +336,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					if retired then admission_after_loss = admission_after_loss + 1 end
 					return admission()
 				end
-				source.editor_source = function()
+				source.source = function()
 					local facts = original()
 					if armed then
 						armed, retired, observed = false, true, observed + 1

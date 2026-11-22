@@ -157,7 +157,7 @@ local function scenario(options, body)
 			-- Main sizes the expansion delay from the physically held modifiers.
 			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
-			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
+			input_capture_gate = gate,
 			MagicKey = { get = function() return "★" end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
 			wrap_on_type = { on_key = function() return false end, end_selection_window = function() return true end },

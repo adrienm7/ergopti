@@ -52,7 +52,7 @@ local function with_output(body)
 	local ok, err = pcall(function()
 		assert(injector.open_fast_channel(), "the recorded channel opens")
 		local deps = emulation.production_deps({ injector = injector, is_paused = function() return false end,
-			dispatch_char = function() end, magic_evdev = function() return nil end })
+			dispatch_char = function() end })
 		body(deps, rows, injector)
 	end)
 	injector.close_fast_channel()

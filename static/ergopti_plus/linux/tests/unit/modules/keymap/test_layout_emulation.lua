@@ -31,8 +31,7 @@ local KEY_Q, KEY_D, KEY_C, KEY_BACKSLASH, KEY_BACKSPACE, KEY_F1 = 16, 32, 46, 43
 local function fixture(layout, overrides)
 	package.loaded["modules.keymap.layout_emulation"] = nil
 	local M = require("modules.keymap.layout_emulation")
-	local record = { typed = {}, dispatched = {}, shortcuts = {}, keys = {}, now = 0, paused = false, typable = true,
-		magic = nil }
+	local record = { typed = {}, dispatched = {}, shortcuts = {}, keys = {}, now = 0, paused = false, typable = true }
 	local deps = {
 		read_config = function() return { layout = layout } end,
 		default_for = require("menu.engine.manifest_reader").default_for,
@@ -60,7 +59,6 @@ local function fixture(layout, overrides)
 		end,
 		now_ms = function() return record.now end,
 		caps_locked = function() return false end,
-		magic_evdev = function() return record.magic end,
 		is_active = function() return not record.paused end,
 		ergopti_family = function() return "ergopti" end,
 	}
@@ -243,7 +241,7 @@ helpers.describe("layout emulation (Linux consumption)", function()
 			package.loaded["modules.keymap.layout_emulation"] = nil
 			local M = require("modules.keymap.layout_emulation")
 			local deps = M.production_deps({ injector = {}, is_paused = function() return false end,
-				dispatch_char = function() return false end, magic_evdev = function() return nil end, dry_run = false })
+				dispatch_char = function() return false end, dry_run = false })
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, altgr = true }))
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, shift = true, altgr = true }))
 		end)
@@ -274,12 +272,9 @@ helpers.describe("layout emulation (Linux consumption)", function()
 			"another key's repeat is not its own")
 	end)
 
-	helpers.it("lets the physical magic key, a pause and a failed typing through", function()
+	helpers.it("lets a pause and a failed typing through", function()
 		local M, record = fixture({ emulated_layout = "ergopti_plus", ergopti_base = true })
 		M.reload()
-		record.magic = KEY_C
-		helpers.assert_true(not press(M, KEY_C), "the magic key keeps its unshifted press")
-		record.magic = nil
 		record.paused = true
 		helpers.assert_true(not press(M, KEY_Q), "a paused driver passes every key")
 		record.paused = false

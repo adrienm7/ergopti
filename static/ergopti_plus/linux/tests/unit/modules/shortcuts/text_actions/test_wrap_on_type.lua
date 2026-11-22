@@ -780,9 +780,6 @@ local function with_daemon_wrap(body, options)
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end
 				end },
-			MagicKeySource = { cancel_capture = noop, on_key = function()
-				state.automation = state.automation + 1; return false
-			end },
 			TapHold = { set_paused = noop, observe_copy_activity = noop }, shutdown = { request = noop }, perform_reload = noop,
 			engine = { reset = function()
 				if state.on_reset then state.on_reset() end
@@ -793,7 +790,8 @@ local function with_daemon_wrap(body, options)
 			-- The span installs the CapsWord output observer; no CapsWord runs here.
 			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end,
 				set_output_observer = function() return true end },
-			script_chords = { on_key = function() return false end },
+			-- The first automated consumer the consumption callback reaches.
+			script_chords = { on_key = function() state.automation = state.automation + 1; return false end },
 			tap_keys = { on_key = function() return false end }, consume_bound_chord = function() return false end,
 		}
 		env.script_actions = evaluate(span("local script_actions = ScriptActions.new({", "\n\t-- A control can change")

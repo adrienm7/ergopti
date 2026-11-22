@@ -100,7 +100,7 @@ local function with_action(route, mode, action, body)
 				gestures = "gestures.engine.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
-				MagicKeySource = "modules.shortcuts.star_key_source", script_chords = "modules.shortcuts.script_chords",
+				script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "hotstrings.engine.catalogue.config",
 				MagicKey = "hotstrings.engine.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
@@ -112,7 +112,7 @@ local function with_action(route, mode, action, body)
 			first = assert(source:find("\tlocal wrap_on_type = ", 1, true))
 			last = assert(source:find("\n\tprivacy_owners.end_wrap_selection", first, true))
 			environment.wrap_on_type = evaluate(source:sub(first, last - 1) .. "\nreturn wrap_on_type", environment)
-			for _, name in ipairs({ "script_chords", "tap_keys", "MagicKeySource" }) do
+			for _, name in ipairs({ "script_chords", "tap_keys" }) do
 				evaluate(assert(source:match("\n\t(" .. name .. "%.init%b())")), environment)
 			end
 			first = assert(source:find("\tlocal function consume_bound_chord(detail)", 1, true))

@@ -325,12 +325,11 @@ function M.register(helpers, opts)
 				local rows = assert(Answers.rows(index, { { path = "hotstrings.trigger_char", value = value } }, Manifest))
 				helpers.assert_eq(rows[1].value, value, "one valid Unicode scalar retains exact bytes")
 			end
-			local ordinary, why = Answers.rows(index, { { path = "hotstrings.trigger_char", value = "a" } }, Manifest)
-			if driver == "linux" then
-				helpers.assert_nil(ordinary, "Linux still refuses prose characters through its rare-symbol policy")
-				helpers.assert_contains(tostring(why), "refused")
-			else
-				helpers.assert_eq(assert(ordinary)[1].value, "a", "macOS keeps its existing common-character capability")
+			-- Any one character, on every driver: « ù » and « ; » are the layout
+			-- defaults the maintainer chose on 2026-11-21.
+			for _, value in ipairs({ "a", "ù", ";" }) do
+				local ordinary = Answers.rows(index, { { path = "hotstrings.trigger_char", value = value } }, Manifest)
+				helpers.assert_eq(assert(ordinary)[1].value, value, "a common character is a valid trigger")
 			end
 		end)
 

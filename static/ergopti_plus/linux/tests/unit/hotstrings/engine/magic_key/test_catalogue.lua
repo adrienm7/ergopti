@@ -170,7 +170,7 @@ helpers.describe("magic-key transactional publication", function()
 			adopt = function(_, document) current = document.hotstrings.trigger_char or "★"; return true end,
 			restore = function(_, snapshot) current = snapshot.value; return true end,
 		}
-		local Magic = { get = function() return current end, default = function() return "★" end,
+		local Magic = { get = function() return current end, default = function() return "★" end, marker = function() return "★" end,
 			validate = function(value) return value == "★" or value == "§" end }
 		local owner = require("hotstrings.engine.catalogue.scope").new_magic({ path = path, backup_path = path .. ".bak",
 			config = Config, preferences = Preferences, magic_key = Magic, reload = function() return accept_reload == true end,
@@ -219,7 +219,7 @@ helpers.describe("magic-key transactional publication", function()
 		local preferences = { acquire = function() return true end, release = function() return true end,
 			snapshot = function() return {} end, adopt = function(_, doc) trigger = doc.hotstrings.trigger_char; return true end,
 			restore = function() trigger = "★"; return true end }
-		local magic = { get = function() return trigger end, default = function() return "★" end,
+		local magic = { get = function() return trigger end, default = function() return "★" end, marker = function() return "★" end,
 			validate = function() return true end }
 		local dynamic = { user_code_time_activation = function() return 1 end,
 			user_code_scope_snapshot = function() return {} end, user_code_scope_current = function() return true end,

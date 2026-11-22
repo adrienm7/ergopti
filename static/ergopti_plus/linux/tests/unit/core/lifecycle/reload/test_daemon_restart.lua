@@ -326,7 +326,7 @@ helpers.describe("Main early pause restoration", function()
 						set_script_paused = function() end,
 						on_app_focus = function() end,
 					}, engine = { reset = function() end },
-					MagicKeySource = { cancel_capture = function() end }, perform_reload = function() end,
+					perform_reload = function() end,
 					shutdown = { request = function() end },
 					TapHold = { set_paused = function(paused)
 						helpers.assert_eq(pause_steps, { "roi" }, "pause retires ROI before native remapping")

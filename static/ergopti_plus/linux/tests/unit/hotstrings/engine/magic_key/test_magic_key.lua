@@ -135,13 +135,13 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		restore_manifest(); restore_storage()
 	end)
 
-	helpers.it("does not revive an unsafe key persisted by an older version", function()
-		local _, restore_storage = stub_storage({ stored = "e" })
+	helpers.it("does not revive an invalid key persisted by an older version", function()
+		local _, restore_storage = stub_storage({ stored = "ab" })
 		local restore_manifest = stub_manifest("★")
 		local magic = load_magic_key()
 
 		helpers.assert_eq(magic.get(), "★",
-			"an unsafe legacy value must fail closed to the validated shipped key")
+			"an invalid legacy value must fail closed to the validated shipped key")
 		helpers.assert_eq(magic.is_customised(), false,
 			"an ignored legacy value must not be advertised as active")
 
@@ -149,7 +149,7 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 	end)
 
 	helpers.it("warns once, never an ERROR, about that key and offers it (config-outdated-magic-key)", function()
-		local _, restore_storage = stub_storage({ stored = "e" })
+		local _, restore_storage = stub_storage({ stored = "ab" })
 		local restore_manifest = stub_manifest("★")
 		local Logger = require("core.logger.engine.shim")
 		local real_warn, real_error, warnings, errors = Logger.warn, Logger.error, {}, {}
@@ -166,7 +166,7 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		Logger.warn, Logger.error = real_warn, real_error
 		restore_manifest(); restore_storage()
 		if not ok then error(err, 0) end
-		local source = '[hotstrings]\ntrigger_char = "e"\n'
+		local source = '[hotstrings]\ntrigger_char = "ab"\n'
 		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("settings.ui.menu.unused_keys_cleanup").collect)
 		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the key the reader ignores")
 		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "trigger_char" })
@@ -302,7 +302,7 @@ helpers.describe("magic key: setting and resetting", function()
 		local announced = nil
 		magic.init(function(value) announced = value end)
 
-		local ok = magic.set(".")
+		local ok = magic.set("ab")
 		helpers.assert_true(not ok, "a refused key must report the refusal")
 		helpers.assert_eq(0, storage.writes, "and must not reach storage at all")
 		helpers.assert_eq(nil, announced, "nor announce a change that did not happen")
@@ -470,7 +470,8 @@ helpers.describe("Magic trigger declared native provider", function()
 		helpers.it("keeps actual customised reset and native reset callback in " .. language, function()
 			with_magic_frame(language, "§", nil, function(rows, effects, storage)
 				helpers.assert_eq(#rows, 2)
-				helpers.assert_eq(rows[1].label, language == "en" and "Magic key: §" or "Touche magique : §")
+				-- Shown as « ★ (§) », never the configured character alone.
+				helpers.assert_eq(rows[1].label, language == "en" and "Magic key: ★ (§)" or "Touche magique : ★ (§)")
 				helpers.assert_eq(rows[2].label, language == "en" and "    Restore the default key" or "    Rétablir la touche par défaut")
 				rows[2].action()
 				helpers.assert_eq(storage.deletes, 1); helpers.assert_eq(effects.redraws, 1)
