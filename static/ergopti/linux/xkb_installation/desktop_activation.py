@@ -10,12 +10,13 @@ The module therefore owns four responsibilities:
 
 - refuse, or drop back to, the desktop user before touching any session state;
 - apply the layout on the desktop that owns the setting (GNOME-based sessions
-  through gsettings, KDE Plasma through kwriteconfig, X11 through setxkbmap)
-  and report each outcome, without pretending a write into a setting nobody
-  reads is an activation;
+  through gsettings, KDE Plasma through kwriteconfig, Hyprland through
+  ``hyprctl keyword``, X11 through setxkbmap) and report each outcome, without
+  pretending a write into a setting nobody reads is an activation;
 - print an exact, copy-pasteable instruction for every other session, because
-  wlroots compositors (Sway, Hyprland, niri, river, ...) have no shared setting
-  and can only be configured from their own configuration file;
+  the other wlroots compositors (Sway, niri, river, ...) expose no setting
+  another program can both write and read back, and can only be configured
+  from their own configuration file;
 - prove, with the real compilers, that the installed layout resolves, binds
   the custom key type to its keys and carries the Ctrl level, alone and next
   to another layout; a compiler's own diagnostics are printed whenever a check
@@ -29,6 +30,7 @@ does not verify is a failed installation.
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
@@ -880,6 +882,117 @@ def apply_kde(specs: list[LayoutSpec], tokens: set[str]) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Hyprland
+# ---------------------------------------------------------------------------
+
+# Hyprland is the one wlroots-family compositor whose keyboard setting another
+# program can write and read back at runtime (``hyprctl keyword`` and
+# ``hyprctl getoption``); it compiles the layout with libxkbcommon, which reads
+# the user XKB tree. The runtime value lasts until Hyprland reloads its
+# configuration file or a new session starts. Sway accepts a runtime layout
+# but reports only layout descriptions, never the configured ids, so a
+# refused selection could not be put back there: it keeps the printed snippet.
+HYPRLAND_TOKEN = "hyprland"
+HYPRLAND_LAYOUT_OPTION = "input:kb_layout"
+HYPRLAND_VARIANT_OPTION = "input:kb_variant"
+# What ``hyprctl getoption`` prints for an option holding the empty string.
+HYPRLAND_EMPTY_VALUE = "[[EMPTY]]"
+
+
+def is_hyprland_session(tokens: set[str]) -> bool:
+    return HYPRLAND_TOKEN in tokens
+
+
+def hyprland_get(option: str) -> str | None:
+    """The string value of a Hyprland option, ``None`` when it cannot be read."""
+    raw = run_capture(["hyprctl", "-j", "getoption", option])
+    if raw is None:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    value = data.get("str") if isinstance(data, dict) else None
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return "" if value == HYPRLAND_EMPTY_VALUE else value
+
+
+def hyprland_set(option: str, value: str, label: str) -> bool:
+    """Sets one Hyprland option at runtime and proves it by reading it back."""
+    output = run_capture(["hyprctl", "keyword", option, value])
+    accepted = output is not None and output.strip() == "ok" and hyprland_get(option) == value
+    print(f"   {'✅' if accepted else '❌'} {label} ({option} = {value!r})")
+    return accepted
+
+
+def hyprland_read_layouts() -> tuple[str, str] | None:
+    """The ``kb_layout`` and ``kb_variant`` lists, ``None`` when either is unreadable."""
+    layouts = hyprland_get(HYPRLAND_LAYOUT_OPTION)
+    variants = hyprland_get(HYPRLAND_VARIANT_OPTION)
+    if layouts is None or variants is None:
+        return None
+    return layouts, variants
+
+
+def hyprland_write_layouts(layout_list: str, variant_list: str, label: str) -> bool:
+    """Writes both aligned lists, in the order that never pairs a layout with a
+    variant it lacks.
+
+    Each write recompiles the keymap at once. Going from (us / intl) to
+    (ergol,us / ,intl), writing the variants first keeps ``us`` without a
+    variant; coming back, writing the layouts first keeps ``us`` with
+    ``,intl``. So the variant list goes first when its first entry is empty,
+    the layout list first otherwise."""
+    steps = [
+        (HYPRLAND_VARIANT_OPTION, variant_list),
+        (HYPRLAND_LAYOUT_OPTION, layout_list),
+    ]
+    if variant_list.split(",")[0] != "":
+        steps.reverse()
+    return all(hyprland_set(option, value, label) for option, value in steps)
+
+
+def apply_hyprland(specs: list[LayoutSpec]) -> bool:
+    """Put the layouts first in Hyprland's runtime layout list."""
+    current = hyprland_read_layouts()
+    if current is None:
+        print("   ⚠️  Hyprland : lecture de input:kb_layout impossible (hyprctl), étape ignorée.")
+        return False
+    merged, changed = merge_layout_specs(parse_kde_layouts(*current), specs)
+    if not changed:
+        print("   ✅ Hyprland : la disposition est déjà en première position.")
+        return True
+    layout_list, variant_list = format_kde_layouts(merged)
+    return hyprland_write_layouts(layout_list, variant_list, "Hyprland : dispositions")
+
+
+def deactivate_hyprland(owned: Callable[[LayoutSpec], bool]) -> CleanupStatus:
+    """Drop the owned layouts from Hyprland's runtime list.
+
+    A list that keeps an id whose files are gone makes the next keymap reload
+    fail. Outside a Hyprland session, or without hyprctl, nothing is owed."""
+    if not is_hyprland_session(desktop_tokens()) or shutil.which("hyprctl") is None:
+        return CleanupStatus.ABSENT
+    current = hyprland_read_layouts()
+    if current is None:
+        return CleanupStatus.FAILED
+    kept, removed = remove_layout_specs(parse_kde_layouts(*current), owned)
+    if not removed:
+        return CleanupStatus.ABSENT
+    if not kept:
+        # An empty list is Hyprland's own default, "us": say it explicitly.
+        kept = [LayoutSpec("us")]
+    layout_list, variant_list = format_kde_layouts(kept)
+    if hyprland_write_layouts(
+        layout_list, variant_list, "Hyprland : dispositions Ergopti retirées"
+    ):
+        return CleanupStatus.CHANGED
+    return CleanupStatus.FAILED
+
+
+# ---------------------------------------------------------------------------
 # X11
 # ---------------------------------------------------------------------------
 
@@ -1089,7 +1202,7 @@ def apply_x11_user_tree(
 
 
 # ---------------------------------------------------------------------------
-# Wayland live replacement (GNOME, KDE)
+# Wayland live replacement (GNOME, KDE, Hyprland)
 # ---------------------------------------------------------------------------
 
 # A compositor compiles a keymap again when the selected layout id changes;
@@ -1183,12 +1296,16 @@ def live_slots(layout_id: str) -> tuple[str, str]:
 
 
 def wayland_live_desktop(environ: dict[str, str] | None = None) -> str | None:
-    """``gnome`` or ``kde`` when this Wayland session selects layouts through a
-    setting this module can write and read back; ``None`` for every other session."""
+    """``gnome``, ``kde`` or ``hyprland`` when this Wayland session selects layouts
+    through a setting this module can write and read back; ``None`` for every
+    other session."""
     if session_type(environ) != "wayland":
         return None
-    owner = owning_desktop(desktop_tokens(environ))
-    return owner if owner in ("gnome", "kde") else None
+    tokens = desktop_tokens(environ)
+    owner = owning_desktop(tokens)
+    if owner in ("gnome", "kde"):
+        return owner
+    return HYPRLAND_TOKEN if is_hyprland_session(tokens) else None
 
 
 @dataclass
@@ -1229,10 +1346,27 @@ def _read_kde_selection(slots: tuple[str, str]) -> DesktopSelection | None:
     return DesktopSelection("kde", values, in_use)
 
 
+def _read_hyprland_selection(slots: tuple[str, str]) -> DesktopSelection | None:
+    current = hyprland_read_layouts()
+    if current is None:
+        return None
+    layouts = parse_kde_layouts(*current)
+    in_use = next(
+        (spec.layout for spec in layouts if spec.layout in slots and not spec.variant), None
+    )
+    return DesktopSelection(
+        HYPRLAND_TOKEN,
+        {HYPRLAND_LAYOUT_OPTION: current[0], HYPRLAND_VARIANT_OPTION: current[1]},
+        in_use,
+    )
+
+
 def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelection | None:
     """The current setting, or ``None`` when it cannot be read (never overwritten then)."""
     if desktop == "gnome":
         return _read_gnome_selection(slots)
+    if desktop == HYPRLAND_TOKEN:
+        return _read_hyprland_selection(slots)
     return _read_kde_selection(slots)
 
 
@@ -1353,8 +1487,23 @@ def _kde_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) 
     return True
 
 
+def _hyprland_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+    current = parse_kde_layouts(
+        selection.values[HYPRLAND_LAYOUT_OPTION], selection.values[HYPRLAND_VARIANT_OPTION]
+    )
+    kept, _ = remove_layout_specs(current, lambda spec: spec.layout in slots and not spec.variant)
+    layout_list, variant_list = format_kde_layouts([LayoutSpec(slot)] + kept)
+    return hyprland_write_layouts(layout_list, variant_list, "Hyprland : disposition " + slot)
+
+
 def restore_desktop_selection(selection: DesktopSelection) -> bool:
     """Writes back the setting read before a refused live selection."""
+    if selection.desktop == HYPRLAND_TOKEN:
+        return hyprland_write_layouts(
+            selection.values[HYPRLAND_LAYOUT_OPTION],
+            selection.values[HYPRLAND_VARIANT_OPTION],
+            "Hyprland : réglage précédent rétabli",
+        )
     if selection.desktop == "gnome":
         restored = True
         for key in (GNOME_KEY, GNOME_MRU_KEY):
@@ -1428,6 +1577,8 @@ def select_live_slot(
             restore_desktop_selection(selection)
             return False, WAYLAND_GNOME_EXTENSION_MISSING
         selected = state == GNOME_SWITCH_SWITCHED
+    elif selection.desktop == HYPRLAND_TOKEN:
+        selected = _hyprland_select(slot, slots, selection)
     else:
         selected = _kde_select(slot, slots, selection)
     if not selected:
@@ -1958,6 +2109,11 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                         failed = True
                 else:
                     failed = True
+    hyprland_status = deactivate_hyprland(owned)
+    if hyprland_status is CleanupStatus.FAILED:
+        failed = True
+    elif hyprland_status is CleanupStatus.CHANGED:
+        changed = True
     if failed:
         return CleanupStatus.FAILED
     return CleanupStatus.CHANGED if changed else CleanupStatus.ABSENT
@@ -2004,9 +2160,13 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
         kde_applied = apply_kde(specs, tokens)
     else:
         print(f"   ℹ️  Réglage KDE ignoré : le bureau « {desktop} » ne le lit pas.")
+    hyprland_applied = is_hyprland_session(tokens) and apply_hyprland(specs)
     x11_applied = apply_x11(primary, environ)
     handled = (
-        (gnome_applied and owner == "gnome") or (kde_applied and owner == "kde") or x11_applied
+        (gnome_applied and owner == "gnome")
+        or (kde_applied and owner == "kde")
+        or hyprland_applied
+        or x11_applied
     )
     if not handled:
         for line in manual_instructions(primary, tokens, kind):
@@ -2023,4 +2183,4 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
             "   ⚠️  Disposition non activée automatiquement : appliquez les instructions ci-dessus."
         )
     print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
-    return gnome_applied or kde_applied or x11_applied
+    return gnome_applied or kde_applied or hyprland_applied or x11_applied

@@ -379,9 +379,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **[CODE] Layout capabilities left open (maintainer request 2026-11-19, « installer, retirer, émuler, petits
       changements sur les 3 OS »).** The audit and its matrix are in
       [platform-parity-audit.md](docs/platform-parity-audit.md#layout-capabilities--november-19-2026); every gap it
-      listed is fixed (LCP-05 to LCP-08) and `test-layout-capability-contract.cjs` pins each path. Left, real machine
+      listed is fixed (LCP-05 to LCP-08) and `test-layout-capability-contract.cjs` pins each path. LCP-09 (2026-11-22):
+      Hyprland now installs, switches and takes the number-row options live through `hyprctl keyword` with a read-back,
+      selected again at the next session; Sway, niri and river are refused with a named reason
+      (`layout_manager.failure_session_unsupported`; Sway reports no layout ids, so a refused layout could not be put
+      back). Left in code: re-select after a Hyprland configuration reload (`configreloaded`). Left, real machine
       only: the steps of TODO-tests-windows.md (remove a Studio DLL from the layout manager, re-save a source under
-      another `dll_name`) and TODO-tests-linux.md (an X11 layout loaded again after a new session). Decided with the
+      another `dll_name`) and TODO-tests-linux.md (an X11 layout loaded again after a new session, the Hyprland
+      selection). Decided with the
       recommended option: under an emulated layout of another family, the accented keys keep that layout's Command
       level on Windows and Linux; macOS draws no letter picker and says so in its reason.
 

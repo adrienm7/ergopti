@@ -45,7 +45,9 @@ const FAILURE_KEYS = Object.freeze({
 	provided_by_bundle: 'layout_manager.failure_provided_by_bundle',
 	foreign_file: 'layout_manager.failure_foreign_file',
 	download_failed: 'layout_manager.failure_download',
-	python_missing: 'layouts.linux_needs_python'
+	python_missing: 'layouts.linux_needs_python',
+	// Linux: a compositor that selects its layout only in its own file (Sway, niri...).
+	session_unsupported: 'layout_manager.failure_session_unsupported'
 });
 
 // The DLL name of a Windows keyboard layout (KbdRegister_Constant("dll_name")).

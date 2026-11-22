@@ -313,7 +313,7 @@ technical = "macOS toggles the Caps Lock lock in the HID system before any event
 
 [reasons."platform_reason.number_row_live_session"]
 kind = "os_api"
-technical = "Linux applies the number-row choice live only where the session lets a client change the active layout: X11 (setxkbmap) and GNOME or KDE on Wayland; other Wayland compositors keep the layout until it is reinstalled."
+technical = "Linux applies the number-row choice live only where the session lets a client change the active layout and read it back: X11 (setxkbmap), and GNOME, KDE or Hyprland (hyprctl keyword and getoption) on Wayland; Sway reports layout descriptions only, never the configured ids, so a refused layout could not be put back, and niri, river and the other compositors select a layout only in their own configuration file."
 
 
 

@@ -978,21 +978,34 @@ function M.install(id, on_done, deps)
 	return true
 end
 
---- Records the layout this daemon just loaded into the X server.
+--- Whether this session forgets a selected layout when it ends: the X server
+--- (apply-x11 lasts for one X session, Xorg reads no user XKB tree) and Hyprland
+--- (its runtime kb_layout lasts until it reads its configuration file again).
+--- GNOME and KDE keep the selection in their own setting.
+--- @param deps table Resolved collaborators.
+--- @return boolean
+local function selection_is_transient(deps)
+	local path = M.live_path(deps)
+	if path == "x11" then return true end
+	local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
+	return path == "wayland" and desktop_is("hyprland")
+end
+
+--- Records the layout this daemon just selected in a session that forgets it.
 --- @param deps table Resolved collaborators.
 --- @param id string
-local function remember_x11_selection(deps, id)
-	local ok, err = deps.write(deps.local_dir .. deps.settings.x11_selection_file, id .. "\n")
+local function remember_session_selection(deps, id)
+	local ok, err = deps.write(deps.local_dir .. deps.settings.session_selection_file, id .. "\n")
 	if not ok then
-		Logger.warn(LOG, "The X11 layout '%s' is loaded but not recorded for the next session: %s.", id, tostring(err))
+		Logger.warn(LOG, "The layout '%s' is selected but not recorded for the next session: %s.", id, tostring(err))
 	end
 end
 
---- Forgets the recorded X11 layout when it is `id`.
+--- Forgets the recorded session layout when it is `id`.
 --- @param deps table Resolved collaborators.
 --- @param id string
-local function forget_x11_selection(deps, id)
-	local path = deps.local_dir .. deps.settings.x11_selection_file
+local function forget_session_selection(deps, id)
+	local path = deps.local_dir .. deps.settings.session_selection_file
 	local text = deps.read(path)
 	if type(text) == "string" and TextUtils.trim(text) == id and not deps.delete(path) then
 		Logger.warn(LOG, "Cannot delete %s.", path)
@@ -1054,7 +1067,7 @@ function M.uninstall(id, on_done, deps)
 			return
 		end
 		if _active == id then _active = "" end
-		forget_x11_selection(deps, id)
+		forget_session_selection(deps, id)
 		Logger.success(LOG, "Uninstalled the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
@@ -1088,20 +1101,22 @@ function M.select(id, on_done, deps)
 	-- No X11 desktop setting reads the user tree: the layout is compiled into
 	-- the running server instead, and kept there when the desktop puts its own back.
 	local x11 = M.live_path(deps) == "x11"
+	local transient = selection_is_transient(deps)
 	local args = x11 and { "apply-x11", "--layout-id", id } or { "activate", "--layout-id", id }
-	run_installer(deps, args, function(ok, report, detail)
+	run_installer(deps, args, function(ok, report, detail, live_code)
 		if not current(epoch) then return end
 		_busy = nil
 		if not ok then
 			Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
-			on_done(false, M.FAILURE_SELECT, detail, user_message(deps, report))
+			-- A compositor that selects its layout only in its own file (Sway,
+			-- niri, river...) is named: the page says why, the layout stays installed.
+			local code = live_code == M.FAILURE_SESSION and M.FAILURE_SESSION or M.FAILURE_SELECT
+			on_done(false, code, detail, user_message(deps, report))
 			return
 		end
 		_active = id
-		if x11 then
-			remember_x11_selection(deps, id)
-			if deps.keep_x11_layout then deps.keep_x11_layout(id) end
-		end
+		if transient then remember_session_selection(deps, id) end
+		if x11 and deps.keep_x11_layout then deps.keep_x11_layout(id) end
 		Logger.success(LOG, "Activated the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
@@ -1112,36 +1127,38 @@ end
 
 
 
---- Loads into the X server, at the daemon's start, the layout recorded by the
---- last X11 selection (registry x11_selection_file): apply-x11 lasts for the session
---- only, and Xorg reads no user XKB tree. Nothing runs on another session, when
---- nothing is recorded, or when the recorded layout is no longer installed.
+--- Selects again, at the daemon's start, the layout recorded by the last
+--- selection in a session that forgets it (registry session_selection_file):
+--- apply-x11 lasts for one X session, and Hyprland's runtime kb_layout until its
+--- configuration file is read again. Nothing runs on GNOME, KDE or another
+--- session, when nothing is recorded, or when the recorded layout is no longer
+--- installed.
 --- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
 --- runs once when a selection was dispatched.
 --- @param on_done function|nil
 --- @param deps table|nil
 --- @return boolean dispatched
-function M.restore_x11_selection(on_done, deps)
+function M.restore_session_selection(on_done, deps)
 	if _stopping then return false end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then
-		Logger.error(LOG, "The X11 layout of the last session cannot be loaded: %s.", tostring(deps_err))
+		Logger.error(LOG, "The layout of the last session cannot be selected again: %s.", tostring(deps_err))
 		return false
 	end
-	if M.live_path(resolved) ~= "x11" then return false end
-	local path = resolved.local_dir .. resolved.settings.x11_selection_file
+	if not selection_is_transient(resolved) then return false end
+	local path = resolved.local_dir .. resolved.settings.session_selection_file
 	local text = resolved.read(path)
 	if type(text) ~= "string" then return false end
 	local id = TextUtils.trim(text)
 	local record = read_installed(resolved)
 	if not (Registry.is_valid_id(id) and record and record.layouts[id]) then
-		Logger.warn(LOG, "The X11 layout recorded for this session ('%s') is not installed: it is forgotten.", id)
+		Logger.warn(LOG, "The layout recorded for this session ('%s') is not installed: it is forgotten.", id)
 		if not resolved.delete(path) then Logger.warn(LOG, "Cannot delete %s.", path) end
 		return false
 	end
-	Logger.info(LOG, "Loading the '%s' layout selected in an earlier X11 session…", id)
+	Logger.info(LOG, "Selecting again the '%s' layout chosen in an earlier session…", id)
 	return M.select(id, on_done or function(ok, _, detail)
-		if not ok then Logger.error(LOG, "The X11 layout '%s' was not loaded again: %s.", id, tostring(detail)) end
+		if not ok then Logger.error(LOG, "The layout '%s' was not selected again: %s.", id, tostring(detail)) end
 	end, deps)
 end
 
@@ -1162,9 +1179,11 @@ local function session_type()
 end
 
 --- How this session loads a user layout live: "x11" (the server's keymap is
---- replaced), "wayland" (GNOME or KDE select it through their own setting), or nil
---- with the declared session type. The installer decides again from the full
---- desktop identity and refuses with session_unsupported where it has no path.
+--- replaced), "wayland" (GNOME, KDE or Hyprland select it through their own
+--- setting), or nil with the declared session type. Sway, niri, river and the
+--- other compositors select a layout only in their own configuration file. The
+--- installer decides again from the full desktop identity and refuses with
+--- session_unsupported where it has no path.
 --- @param deps table|nil { session_type, desktop_is } (tests replace them).
 --- @return string|nil path
 --- @return string session
@@ -1174,7 +1193,7 @@ function M.live_path(deps)
 	if session == "x11" then return "x11", session end
 	if session == "wayland" then
 		local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
-		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
+		if desktop_is("gnome") or desktop_is("kde") or desktop_is("hyprland") then return "wayland", session end
 	end
 	return nil, session
 end
@@ -1198,9 +1217,9 @@ end
 --- Applies the number-row options to an installed layout and loads it into the
 --- running session: the layout is converted again with the options, then on X11
 --- installed in the user XKB tree and compiled into the running server (apply-x11),
---- and on GNOME or KDE Wayland installed under the live slot the desktop does not use
---- and selected through the desktop setting (apply-wayland). Either succeeds only once
---- the keymap read back from the session (the server, or XWayland which receives the
+--- and on GNOME, KDE or Hyprland Wayland installed under the live slot the desktop
+--- does not use and selected through the desktop setting (apply-wayland). Either
+--- succeeds only once the keymap read back from the session (the server, or XWayland which receives the
 --- compositor's) holds the new cells. Nothing is written where the session has no live
 --- path; the stored choice is kept by the caller.
 --- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
@@ -1276,6 +1295,7 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				if selection_is_transient(deps) then remember_session_selection(deps, base) end
 				finish(true, { id = base, rows = report, slot = applied_report.slot })
 			end)
 			return
@@ -1294,7 +1314,7 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
-				remember_x11_selection(deps, base)
+				remember_session_selection(deps, base)
 				-- GNOME and Plasma under X11 put their own layouts back on a new
 				-- keyboard (W4): keep this one loaded from now on.
 				if deps.keep_x11_layout then deps.keep_x11_layout(base) end

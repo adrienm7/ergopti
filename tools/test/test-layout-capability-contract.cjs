@@ -208,28 +208,46 @@ const PATHS = [
 		'linux/modules/keymap/layout_registry.lua',
 		'{ "apply-x11", "--layout-id", id }'
 	],
-	// apply-x11 lasts for the session: the selection is recorded and loaded
-	// again at the daemon's next start.
+	// Hyprland selects a user-tree layout through its runtime setting
+	// (hyprctl keyword, read back with hyprctl getoption).
 	[
 		'switch',
 		'linux',
 		'studio',
 		'linux/modules/keymap/layout_registry.lua',
-		'remember_x11_selection(deps, id)'
+		'desktop_is("hyprland")'
+	],
+	// A compositor that selects its layout only in its own file is named.
+	[
+		'switch',
+		'linux',
+		'studio',
+		'linux/modules/keymap/layout_registry.lua',
+		'live_code == M.FAILURE_SESSION and M.FAILURE_SESSION or M.FAILURE_SELECT'
+	],
+	// apply-x11 lasts for the session and Hyprland's runtime layout until its
+	// configuration is read again: the selection is recorded and selected again
+	// at the daemon's next start.
+	[
+		'switch',
+		'linux',
+		'studio',
+		'linux/modules/keymap/layout_registry.lua',
+		'if transient then remember_session_selection(deps, id) end'
 	],
 	[
 		'switch',
 		'linux',
 		'studio',
 		'linux/modules/keymap/layout_registry.lua',
-		'function M.restore_x11_selection('
+		'function M.restore_session_selection('
 	],
 	[
 		'switch',
 		'linux',
 		'menu',
 		'linux/ergopti_hotstrings.lua',
-		'require("modules.keymap.layout_registry").restore_x11_selection()'
+		'require("modules.keymap.layout_registry").restore_session_selection()'
 	],
 	['switch', 'linux', 'menu', 'linux/ui/menu/active_layout_rows.lua', 'function M.rows('],
 	// 2. Emulate without installing: the engine, then the Studio host's port.

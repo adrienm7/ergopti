@@ -44,6 +44,7 @@
 		"layout_manager.result_selected",
 		"layout_manager.result_failed",
 		"layout_manager.failure_busy",
+		"layout_manager.failure_session_unsupported",
 		"layout_manager.failure_provided_by_bundle",
 		"layout_manager.failure_foreign_file",
 		"layout_manager.failure_download",

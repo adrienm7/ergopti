@@ -5,7 +5,7 @@
 Status (2026-10-30): applied on Linux by rebuilding the layout. Linux reads
 `layout.direct_access_digits` and `layout.number_row_reorder_edges` from
 `config.toml`, converts the installed `.keylayout` again with them and loads the
-result into the running session, on X11 and on GNOME or KDE Wayland. macOS applies
+result into the running session, on X11 and on GNOME, KDE or Hyprland Wayland. macOS applies
 them the same way since fc5d3a11df: it rebuilds the `.keylayout` and replaces it live. The whole design, for the three OS, is
 `docs/design/layout-option-emulation.md`; this note records the Linux choices.
 
@@ -38,9 +38,10 @@ CapsWord are untouched. The dormant hook owner stays unreachable (nothing passes
   installed copy with the options and hands it to the user installer:
   - X11: `install --allow-xorg` then `apply-x11`, which compiles the layout from
     the user tree into the running server;
-  - GNOME or KDE on Wayland: `apply-wayland`, which alternates between the
-    layout's id and `<id>_live` so the compositor sees a new id, moves the
-    desktop setting with a read-back and puts it back on any refusal;
+  - GNOME, KDE or Hyprland on Wayland: `apply-wayland`, which alternates between
+    the layout's id and `<id>_live` so the compositor sees a new id, moves the
+    desktop setting (Hyprland: `hyprctl keyword input:kb_layout`) with a
+    read-back and puts it back on any refusal;
   - any other session: refused before anything is written.
 - Both installer commands succeed only once the session's keymap, read back with
   `xkbcomp -xkb $DISPLAY -` (the server, or XWayland which receives the

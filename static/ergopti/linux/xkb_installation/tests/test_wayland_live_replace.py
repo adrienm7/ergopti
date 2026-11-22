@@ -1,11 +1,11 @@
-"""The live replacement of a layout on a GNOME or KDE Wayland session.
+"""The live replacement of a layout on a GNOME, KDE or Hyprland Wayland session.
 
 ``apply-wayland`` installs a new build under the live slot the desktop does not
 use, moves the desktop setting to it and succeeds only once XWayland, which
 receives the compositor's keymap, holds that slot with the installed cells.
 
-No GNOME or KDE runs here. The desktop setting is a fake ``gsettings`` (or
-``kreadconfig6``/``kwriteconfig6``) backed by files, the Ergopti GNOME Shell
+No GNOME, KDE or Hyprland runs here. The desktop setting is a fake ``gsettings``
+(or ``kreadconfig6``/``kwriteconfig6``, or ``hyprctl``) backed by files, the Ergopti GNOME Shell
 extension a fake ``gdbus`` that activates a listed source, and the compositor
 a stand-in that, like mutter and KWin, compiles the active layout (GNOME: the
 one the extension activated; KDE: the first listed) when it changes and hands
@@ -94,6 +94,22 @@ else:
     print(path.read_text() if path.exists() else "")
 """
 
+# hyprctl -j getoption input:<name> | hyprctl keyword input:<name> <value>
+FAKE_HYPRCTL = """#!/usr/bin/env python3
+import json, os, pathlib, sys
+store = pathlib.Path(os.environ["FAKE_DESKTOP_STORE"])
+args = sys.argv[1:]
+if args[:2] == ["-j", "getoption"]:
+    path = store / ("hypr-" + args[2].split(":")[1])
+    value = path.read_text() if path.exists() else ""
+    print(json.dumps({"option": args[2], "str": value or "[[EMPTY]]", "set": True}))
+elif args[:1] == ["keyword"]:
+    (store / ("hypr-" + args[1].split(":")[1])).write_text(args[2])
+    print("ok")
+else:
+    sys.exit(1)
+"""
+
 
 class FakeCompositor:
     """Compiles the first layout of the desktop setting into the Xvfb server each
@@ -110,7 +126,9 @@ class FakeCompositor:
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _value(self) -> str | None:
-        name = "gnome-active" if self.desktop == "gnome" else "kde-LayoutList"
+        name = {"gnome": "gnome-active", "kde": "kde-LayoutList", "hyprland": "hypr-kb_layout"}[
+            self.desktop
+        ]
         path = self.store / name
         return path.read_text() if path.exists() else None
 
@@ -158,6 +176,7 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             ("gdbus", FAKE_GDBUS),
             ("kreadconfig6", FAKE_KCONFIG),
             ("kwriteconfig6", FAKE_KCONFIG),
+            ("hyprctl", FAKE_HYPRCTL),
         ):
             path = self.bin / name
             path.write_text(text, encoding="utf-8")
@@ -315,6 +334,38 @@ class WaylandLiveReplaceTests(unittest.TestCase):
             self.assertEqual(compositor.loads, ["ergol_live"])
         self.assertEqual((self.store / "kde-LayoutList").read_text(), "ergol_live,us")
         self.assertEqual((self.store / "kde-VariantList").read_text(), ",")
+
+    def test_hyprland_moves_its_runtime_layout_and_is_read_back(self) -> None:
+        """hyprland-live-select: each build alternates the slot in kb_layout, the
+        other layouts and their variants kept, and XWayland holds the new cells."""
+        (self.store / "hypr-kb_layout").write_text("us,ergol")
+        (self.store / "hypr-kb_variant").write_text("intl,")
+        with XvfbServer() as server, FakeCompositor(
+            self.store, "hyprland", self.root, server.display
+        ) as compositor:
+            environ = self.environ(server, "Hyprland")
+            for slot, digit in (("ergol_live", "7"), ("ergol", "8")):
+                self.rewrite_first_digit(digit)
+                report = self.apply(environ)
+                self.assertTrue(report["ok"], report)
+                self.assertEqual(report["slot"], slot)
+                self.assertEqual(server.levels("AE01")[0], digit)
+                self.assertEqual((self.store / "hypr-kb_layout").read_text(), slot + ",us")
+                self.assertEqual((self.store / "hypr-kb_variant").read_text(), ",intl")
+            self.assertEqual(compositor.loads, ["ergol_live", "ergol"])
+
+    def test_a_hyprland_that_does_not_reload_gets_its_setting_back(self) -> None:
+        (self.store / "hypr-kb_layout").write_text("us")
+        (self.store / "hypr-kb_variant").write_text("intl")
+        with XvfbServer() as server, FakeCompositor(
+            self.store, "hyprland", self.root, server.display
+        ) as compositor:
+            compositor.ignore = True
+            report = self.apply(self.environ(server, "Hyprland"))
+            self.assertFalse(report["ok"], report)
+            self.assertEqual(report["code"], desktop_activation.WAYLAND_NOT_LOADED)
+        self.assertEqual((self.store / "hypr-kb_layout").read_text(), "us")
+        self.assertEqual((self.store / "hypr-kb_variant").read_text(), "intl")
 
     def test_other_sessions_are_refused_before_anything_is_written(self) -> None:
         (self.store / "gnome-sources").write_text("[('xkb', 'ergol')]")

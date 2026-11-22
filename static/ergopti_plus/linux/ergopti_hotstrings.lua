@@ -2595,9 +2595,10 @@ local function main()
 		dispatch_char = function(char, code) on_char(char, code) end,
 		dry_run = opts.dry_run == true,
 	})
-	-- apply-x11 lasts for the X session: the layout chosen in an earlier one is
-	-- loaded again (the layout manager records it). Required inline, as above.
-	if opts.dry_run ~= true then require("modules.keymap.layout_registry").restore_x11_selection() end
+	-- apply-x11 lasts for the X session and Hyprland's runtime layout until its
+	-- configuration is read again: the layout chosen in an earlier session is
+	-- selected again (the layout manager records it). Required inline, as above.
+	if opts.dry_run ~= true then require("modules.keymap.layout_registry").restore_session_selection() end
 
 	local function on_click(code)
 		-- A physical button press ends a gesture's click hold, as Windows' mouse

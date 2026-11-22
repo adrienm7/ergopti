@@ -170,10 +170,13 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       retirer des dispositions… » install Ergo-L, then « Utiliser »: the next typed letters follow Ergo-L with no
       sudo, `xkbcomp -xkb $DISPLAY -` names `ergol`, plugging a keyboard keeps it (GNOME and Plasma under X11), and
       « Désinstaller » takes it out of `~/.config/xkb`. In Studio, « Installer » a source does the same. After a new
-      login the daemon loads the layout last selected again (LCP-08, `x11_selection.txt` in the layouts folder):
+      login the daemon loads the layout last selected again (LCP-08, `session_selection.txt` in the layouts folder):
       `xkbcomp` names `ergol` once the daemon has started, and after « Désinstaller » a new login keeps the
       desktop's own layouts. With Ergopti emulated, Ctrl+è sends the letter chosen under « Raccourcis sur les lettres
-      accentuées » (LCP-07).
+      accentuées » (LCP-07). On Hyprland (LCP-09) the same « Utiliser » puts `ergol` first in
+      `hyprctl getoption input:kb_layout`, the next letters follow it, a number-row choice applies live, a new login
+      selects it again once the daemon has started, and « Désinstaller » takes it out of `kb_layout`; on Sway the
+      page says the compositor's own file selects the layout.
 - [ ] <!-- field-point: kde_input_sources_live --> Live layout switch on KDE Plasma: with two layouts in System
       Settings > Keyboard, Layout > « Input sources » switches the active layout at once through the Plasma keyboard
       daemon (`org.kde.keyboard /Layouts setLayout`), on Wayland and on X11; the daemon's `getLayout` answers the

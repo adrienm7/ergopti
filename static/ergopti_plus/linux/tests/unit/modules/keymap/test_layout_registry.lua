@@ -679,7 +679,7 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		deps.session_type = function() return "x11" end
 		deps.keep_x11_layout = function() end
 		helpers.assert_true(run(function(done) LayoutRegistry.select("ergol", done, deps) end).ok)
-		helpers.assert_eq(state.files[LOCAL_DIR .. deps.settings.x11_selection_file], "ergol\n",
+		helpers.assert_eq(state.files[LOCAL_DIR .. deps.settings.session_selection_file], "ergol\n",
 			"the X11 selection is recorded for the next session")
 		-- A new session: the module starts again, nothing in memory, the file kept.
 		LayoutRegistry._reset()
@@ -692,34 +692,88 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		local kept = {}
 		deps.keep_x11_layout = function(id) kept[#kept + 1] = id end
 		local before = #state.runs
-		local result = run(function(done) helpers.assert_true(LayoutRegistry.restore_x11_selection(done, deps)) end)
+		local result = run(function(done) helpers.assert_true(LayoutRegistry.restore_session_selection(done, deps)) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
 		helpers.assert_eq(state.runs[before + 2].args[2], "apply-x11")
 		helpers.assert_eq(arg_value(state.runs[before + 2].args, "--layout-id"), "ergol")
 		helpers.assert_eq(kept, { "ergol" }, "the restored layout is kept against the desktop too")
 	end)
 
+	-- Hyprland's runtime kb_layout lasts until it reads its configuration again:
+	-- the selection is recorded and selected again at the next start, as on X11
+	-- (hyprland-live-select). GNOME and KDE keep it in their own setting.
+	helpers.it("selects a layout on Hyprland and selects it again at the next daemon start (hyprland-live-select)", function()
+		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		deps.session_type = function() return "wayland" end
+		deps.desktop_is = function(token) return token == "hyprland" end
+		local kept = {}
+		deps.keep_x11_layout = function(id) kept[#kept + 1] = id end
+		helpers.assert_true(run(function(done) LayoutRegistry.select("ergol", done, deps) end).ok)
+		helpers.assert_eq(state.runs[2].args[2], "activate", "Hyprland's own setting selects the layout")
+		helpers.assert_eq(state.files[LOCAL_DIR .. deps.settings.session_selection_file], "ergol\n",
+			"the Hyprland selection is recorded for the next session")
+		helpers.assert_eq(kept, {}, "no X server to keep the layout in")
+		LayoutRegistry._reset()
+		local runs = { OK_RUN, INSTALLED_RUN }
+		deps.run = function(program, args, _, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args }
+			callback(assert(table.remove(runs, 1), "unexpected process run"))
+			return true
+		end
+		local before = #state.runs
+		local result = run(function(done) helpers.assert_true(LayoutRegistry.restore_session_selection(done, deps)) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(state.runs[before + 2].args[2], "activate")
+		helpers.assert_eq(arg_value(state.runs[before + 2].args, "--layout-id"), "ergol")
+		-- GNOME keeps its own setting: nothing is recorded there.
+		local Gnome, gnome_deps, gnome_state = with_ergol({ OK_RUN, INSTALLED_RUN })
+		gnome_deps.session_type = function() return "wayland" end
+		gnome_deps.desktop_is = function(token) return token == "gnome" end
+		helpers.assert_true(run(function(done) Gnome.select("ergol", done, gnome_deps) end).ok)
+		helpers.assert_nil(gnome_state.files[LOCAL_DIR .. gnome_deps.settings.session_selection_file])
+	end)
+
+	-- Sway, niri, river... select a layout only in their own configuration file:
+	-- the installer says so and the page names it, not a generic failure
+	-- (wlroots-session-reason).
+	helpers.it("names a compositor that selects its layout only in its own file (wlroots-session-reason)", function()
+		local refused = { exit_code = 3, stderr = "", stdout = '{"ok": false, "verified": null, '
+			.. '"detail": "this compositor selects its layout only in its own configuration file", "code": "session_unsupported"}\n' }
+		local LayoutRegistry, deps = with_ergol({ OK_RUN, refused })
+		deps.session_type = function() return "wayland" end
+		deps.desktop_is = function(token) return token == "sway" end
+		local result = run(function(done) LayoutRegistry.select("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_SESSION)
+		local other = { exit_code = 3, stderr = "", stdout = '{"ok": false, "verified": null, "detail": "refused"}\n' }
+		local Gnome, gnome_deps = with_ergol({ OK_RUN, other })
+		gnome_deps.session_type = function() return "wayland" end
+		gnome_deps.desktop_is = function(token) return token == "gnome" end
+		helpers.assert_eq(run(function(done) Gnome.select("ergol", done, gnome_deps) end).detail,
+			LayoutRegistry.FAILURE_SELECT, "a desktop with a setting that refused keeps the generic failure")
+	end)
+
 	helpers.it("restores nothing off X11, without a record or for a layout no longer installed (x11-layout-restore)", function()
 		local LayoutRegistry, deps, state = with_ergol({})
-		local path = LOCAL_DIR .. deps.settings.x11_selection_file
+		local path = LOCAL_DIR .. deps.settings.session_selection_file
 		deps.session_type = function() return "wayland" end
 		deps.desktop_is = function(token) return token == "gnome" end
 		state.files[path] = "ergol\n"
-		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "Wayland desktops keep their own setting")
+		helpers.assert_eq(LayoutRegistry.restore_session_selection(nil, deps), false, "Wayland desktops keep their own setting")
 		deps.session_type = function() return "x11" end
 		state.files[path] = nil
-		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "no record, nothing to load")
+		helpers.assert_eq(LayoutRegistry.restore_session_selection(nil, deps), false, "no record, nothing to load")
 		state.files[path] = "bepo\n"
-		helpers.assert_eq(LayoutRegistry.restore_x11_selection(nil, deps), false, "a layout no longer installed is not loaded")
+		helpers.assert_eq(LayoutRegistry.restore_session_selection(nil, deps), false, "a layout no longer installed is not loaded")
 		helpers.assert_nil(state.files[path], "and its record is forgotten")
 		helpers.assert_eq(#state.runs, 0, "no installer child ran")
 	end)
 
 	helpers.it("forgets the X11 selection when its layout is uninstalled (x11-layout-restore)", function()
 		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
-		state.files[LOCAL_DIR .. deps.settings.x11_selection_file] = "ergol\n"
+		state.files[LOCAL_DIR .. deps.settings.session_selection_file] = "ergol\n"
 		helpers.assert_true(run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end).ok)
-		helpers.assert_nil(state.files[LOCAL_DIR .. deps.settings.x11_selection_file])
+		helpers.assert_nil(state.files[LOCAL_DIR .. deps.settings.session_selection_file])
 	end)
 
 	helpers.it("installs a registry layout and a composed one on X11 with the Xorg permission only there (x11-layout-install)", function()
@@ -842,8 +896,8 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 	end)
 
 	helpers.it("refuses a session that cannot load a user layout live before anything is written (layout-rows-live)", function()
-		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "hyprland" }, { "wayland", "" }, { "tty", "gnome" },
-			{ "", "kde" } }) do
+		for _, case in ipairs({ { "wayland", "sway" }, { "wayland", "niri" }, { "wayland", "" }, { "tty", "gnome" },
+			{ "", "kde" }, { "x11-less", "hyprland" } }) do
 			local session = case[1]
 			local LayoutRegistry, deps, state = with_ergol(session, {}, case[2])
 			local before = {}
@@ -856,8 +910,8 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 		end
 	end)
 
-	helpers.it("selects the new build through the GNOME or KDE setting on Wayland (layout-rows-live)", function()
-		for _, desktop in ipairs({ "ubuntu:gnome", "kde" }) do
+	helpers.it("selects the new build through the GNOME, KDE or Hyprland setting on Wayland (layout-rows-live)", function()
+		for _, desktop in ipairs({ "ubuntu:gnome", "kde", "hyprland" }) do
 			local WAYLAND_RUN = { exit_code = 0, stdout = '{"ok": true, "verified": true, "slot": "ergol_live", "detail": "loaded"}\n', stderr = "" }
 			local LayoutRegistry, deps, state = with_ergol("wayland", { OK_RUN, WAYLAND_RUN }, desktop)
 			local result = run(function(done) LayoutRegistry.apply_rows(nil, ROWS, done, deps) end)
@@ -872,6 +926,9 @@ helpers.describe("layout manager (Linux): number-row options, live", function()
 				"GNOME switches through the Ergopti extension, with no settle time (gnome-runtime-switch)")
 			helpers.assert_eq(levels_of(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], "AE01")[1], "EuroSign")
 			helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol")
+			-- Only Hyprland forgets the runtime selection at the next session (hyprland-live-select).
+			helpers.assert_eq(state.files[LOCAL_DIR .. deps.settings.session_selection_file],
+				desktop == "hyprland" and "ergol\n" or nil, desktop)
 		end
 	end)
 
