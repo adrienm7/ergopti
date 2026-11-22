@@ -25,7 +25,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "91f88ff08985552161ffc6363988393b35fa185270e2a255c619ffb1167f1462"
+					"sha256": "7facf8b3aefb7b6090091891d9e1f1aea304230f42f040a12fd47f3a8a7514d3"
 				}
 			],
 			"macos": [
@@ -44,7 +44,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "3a12e6c8b016d5eabf01e51d6d8ba9dc3818e56be3490029f7572a681a58ac6e"
+					"sha256": "4e3deffeb11f0e2a609a5c139e15817c78bd0d429baa3b69c1602a55603eae07"
 				}
 			]
 		}
@@ -87,7 +87,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
@@ -99,7 +99,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "3a12e6c8b016d5eabf01e51d6d8ba9dc3818e56be3490029f7572a681a58ac6e"
+					"sha256": "4e3deffeb11f0e2a609a5c139e15817c78bd0d429baa3b69c1602a55603eae07"
 				}
 			]
 		}
@@ -130,7 +130,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "91f88ff08985552161ffc6363988393b35fa185270e2a255c619ffb1167f1462"
+					"sha256": "7facf8b3aefb7b6090091891d9e1f1aea304230f42f040a12fd47f3a8a7514d3"
 				}
 			],
 			"macos": [
@@ -142,7 +142,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				}
 			],
 			"linux": [
@@ -154,7 +154,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "3a12e6c8b016d5eabf01e51d6d8ba9dc3818e56be3490029f7572a681a58ac6e"
+					"sha256": "4e3deffeb11f0e2a609a5c139e15817c78bd0d429baa3b69c1602a55603eae07"
 				}
 			]
 		}
@@ -194,7 +194,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				}
 			],
 			"linux": [
@@ -249,7 +249,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				}
 			],
 			"linux": [
@@ -296,7 +296,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				}
 			],
 			"linux": [
@@ -348,7 +348,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "4fc49b37d5f8b44b673667a4563af94617d7c179dba892b2a25afa1cb45d6a62"
+					"sha256": "e2c052f65c73061226cf5634a438813bf5d194c30b5f925241727077324bff89"
 				}
 			],
 			"linux": [
@@ -360,7 +360,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "3a12e6c8b016d5eabf01e51d6d8ba9dc3818e56be3490029f7572a681a58ac6e"
+					"sha256": "4e3deffeb11f0e2a609a5c139e15817c78bd0d429baa3b69c1602a55603eae07"
 				}
 			]
 		}
