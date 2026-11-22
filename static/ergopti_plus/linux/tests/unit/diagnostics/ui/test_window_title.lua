@@ -10,6 +10,8 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
+local MACOS_ONLY_APPS = { permission_dialog = true, token_prompt = true }
+
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
 		local names = { "lgi", "core.ui.ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
@@ -140,7 +142,9 @@ helpers.describe("shared application native window titles", function()
 							locale .. " native " .. app .. " title")
 						helpers.assert_true(manager._destroy_gtk_window(app), "exact controlled child/signal/window retirement")
 					else
-						helpers.assert_eq(app, "permission_dialog", "only the macOS permission-repair dialog lacks a GTK owner")
+						-- Only macOS opens these two pages: the permission repair and the
+						-- Hugging Face login of the token page (PCK-18 retired its Linux bridge).
+						helpers.assert_true(MACOS_ONLY_APPS[app] == true, app .. " has a GTK owner unless only macOS opens it")
 					end
 				end
 			end
