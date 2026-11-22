@@ -9,7 +9,7 @@ named constraint changes; a change of mind comes from the maintainer.
 
 The maintainer chose to port the Windows registry cache
 (`windows/settings/engine/publication/registry_cache.ahk`) to macOS before the
-Mac measurement: `macos/settings/adapters/registry_cache.lua`, handed to
+Mac measurement: `macos/settings/engine/registry_cache.lua`, handed to
 `config_migrate.run` as its `registry_loader` by `init.lua`. Its contract, which
 a later change must keep:
 
@@ -107,7 +107,7 @@ absent row; any shipped code differs from it, so it is written. Consequences:
 - Callers that needed a last-resort language read `locales.system_fallback`,
   never the manifest default.
 
-Tests: `test_locale_neutral_value.ahk` and the `locale-neutral-2026-11-21`
+Tests: `test_neutral_value.ahk` and the `locale-neutral-2026-11-21`
 cases of `_shared/tests/lua/settings/script_config_authority_contract.lua`
 (macOS and Linux).
 

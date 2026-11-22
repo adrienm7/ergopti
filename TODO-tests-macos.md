@@ -267,7 +267,7 @@ Hands needed:
       it.
 - [ ] <!-- field-point: migrations_registry_parse --> Boot cost of `migrations.toml`
       ([report](docs/audits/performance/linux/2026_11_11/report.md)): with the typed registry cache
-      (`settings/adapters/registry_cache.lua`, 2026-11-21), the log's « Registry parse cache miss » line on the
+      (`settings/engine/registry_cache.lua`, 2026-11-21), the log's « Registry parse cache miss » line on the
       first boot after an update and « hit, validated in N ms » on the next; the hit, native hashing included,
       against the miss (10.9 KB, 2.3-2.5 ms of decode and validation under lua5.4 on WSL).
 - [ ] <!-- field-point: hotstrings_boot_publication --> Hotstrings category boot publication and

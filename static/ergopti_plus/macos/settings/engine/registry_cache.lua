@@ -1,4 +1,4 @@
---- settings/adapters/registry_cache.lua
+--- settings/engine/registry_cache.lua
 
 --- ==============================================================================
 --- MODULE: Shipped Registry Parse Cache (Hammerspoon)
@@ -31,7 +31,7 @@ local FsDir = require("core.fs.engine.dir")
 local Migrate = require("settings.engine.migration.migrate")
 local NativePath = require("core.fs.engine.native_path")
 local TomlCodec = require("core.text.engine.toml_codec")
-local LOG = "settings.adapters.registry_cache"
+local LOG = "settings.engine.registry_cache"
 
 
 
@@ -49,7 +49,7 @@ local LOG = "settings.adapters.registry_cache"
 local IDENTITY_MODULES = {
 	"core.text.engine.table_util",
 	"core.text.engine.utils_core",
-	"settings.adapters.registry_cache",
+	"settings.engine.registry_cache",
 }
 
 -- Value tags of the typed payload.
@@ -189,9 +189,10 @@ end
 
 
 
+
 -- =====================================
 -- =====================================
--- ======= 3/ Envelope & identity ======
+-- ======= 3/ Envelope, identity =======
 -- =====================================
 -- =====================================
 

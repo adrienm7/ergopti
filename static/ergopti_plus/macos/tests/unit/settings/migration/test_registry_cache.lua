@@ -51,10 +51,10 @@ local function fixture(name)
 	local f = { cache_path = scratch, logs = {}, parser_suffix = "", source_suffix = "", parses = 0 }
 	local oracle = Digest.create()
 	f.hash = oracle.for_bytes
-	package.loaded["settings.adapters.registry_cache"] = nil
+	package.loaded["settings.engine.registry_cache"] = nil
 	local Logger = require("core.logger.engine.logger")
 	local Codec = require("core.text.engine.toml_codec")
-	local Cache = require("settings.adapters.registry_cache")
+	local Cache = require("settings.engine.registry_cache")
 	f.cache = Cache
 	local saved = { info = Logger.info, warn = Logger.warn, decode = Codec.decode }
 	Logger.info = function(_, message, ...) f.logs[#f.logs + 1] = "INFO " .. string.format(message, ...) end
@@ -225,7 +225,7 @@ helpers.describe("Registry parse cache", function()
 		helpers.assert_eq(result.detail, "the loader refused", "the loader's refusal is the run's")
 		-- The boot is the production source that hands the loader to the run.
 		local boot = helpers.read_driver_source("registry_loader = registry_loader")
-		helpers.assert_true(boot ~= nil and boot:find('require("settings.adapters.registry_cache")', 1, true) ~= nil, "the boot wires the cache")
+		helpers.assert_true(boot ~= nil and boot:find('require("settings.engine.registry_cache")', 1, true) ~= nil, "the boot wires the cache")
 	end)
 
 	helpers.it("refuses a second initialization", function()

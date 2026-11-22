@@ -1618,7 +1618,7 @@ shell_captured_output_bytes = 4194304
 # Largest typed payload the macOS migration registry cache admits; the
 # registry's is about 3 KB, so a larger cache file is forged or corrupt and is
 # refused. Windows keeps the same bound as its codec's MAX_BYTES.
-# HS: settings/adapters/registry_cache.lua. AHK: settings/engine/publication/registry_cache.ahk.
+# HS: settings/engine/registry_cache.lua. AHK: settings/engine/publication/registry_cache.ahk.
 registry_cache_payload_bytes = 4194304
 
 # One read from the Linux persistent sqlite3 child's output or diagnostics

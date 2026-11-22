@@ -1414,8 +1414,8 @@ do
 			tostring(import_outcome))
 	end
 	-- The registry's typed parse cache skips its 30 ms decode on an unchanged
-	-- build; validation still runs on a hit (settings/adapters/registry_cache.lua).
-	local RegistryCache = require("settings.adapters.registry_cache")
+	-- build; validation still runs on a hit (settings/engine/registry_cache.lua).
+	local RegistryCache = require("settings.engine.registry_cache")
 	local home = os.getenv("HOME")
 	local registry_loader = nil
 	if type(home) == "string" and home ~= "" then

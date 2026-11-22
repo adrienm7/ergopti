@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 helpers.provide_timings()
 local Migrate = require("settings.engine.migration.migrate")
 local TomlCodec = require("core.text.engine.toml_codec")
-local Cache = require("settings.adapters.registry_cache")
+local Cache = require("settings.engine.registry_cache")
 
 local ROUNDS = tonumber(arg and arg[1]) or 21
 local IDENTITY = string.rep("a", 64)
