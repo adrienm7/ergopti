@@ -32,9 +32,9 @@ local Logger = require("core.logger.engine.shim")
 local LOG = "modules.keymap.hyprland_reload_watch"
 -- The event Hyprland sends after reading its configuration file.
 M.RELOAD_EVENT = "configreloaded"
--- Event lines carry window titles of any length; a partial line longer than
--- this is no reload event and is dropped up to its newline.
-local MAX_PENDING_BYTES = 4096
+-- Event lines carry window titles; a partial line longer than the longest title
+-- the driver reads is no reload event and is dropped up to its newline.
+local MAX_PENDING_BYTES = require("core.timing.engine.timings").count("limits", "window_title_bytes")
 
 --- The event socket of the running Hyprland instance.
 --- @param getenv function getenv(name) -> string|nil

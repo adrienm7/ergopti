@@ -23,6 +23,7 @@ RegistryLimitsCount(Section, Key) {
 		"process_output_bytes", 65536,
 		"proc_cmdline_bytes", 65536,
 		"declaration_file_bytes", 65536,
+		"window_title_bytes", 2048,
 		"changelog_source_bytes", 4194304,
 		"journal_recovery_turn_bytes", 65536,
 		"layer_file_bytes", 65536,
