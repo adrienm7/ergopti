@@ -596,6 +596,21 @@
 	outline-offset: 2px;
 }
 
+/* At 200 % text in a 320 px window one word can be wider than its box
+   (« dispositions », « Changements », « téléchargements ») and scroll the
+   page sideways (WCAG 1.4.10): it breaks inside its box instead. A heading,
+   a legend or a label may break anywhere, which also lets its box shrink
+   in a flex row; a button only breaks a word that would pass its edge, so
+   the tools' tables keep their column widths. Zero specificity: a page's
+   own rule wins. */
+:where(h1, h2, h3, h4, h5, h6, legend, label) {
+	overflow-wrap: anywhere;
+}
+
+:where(button) {
+	overflow-wrap: break-word;
+}
+
 /* Text a screen reader reads and the eye does not see: the h1 of a window
    whose title is its title bar, so its outline starts at the top level. */
 .theme-sr-only {

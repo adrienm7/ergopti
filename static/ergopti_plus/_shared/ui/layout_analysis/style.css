@@ -1495,6 +1495,9 @@ body:has(> main.layout-analysis) {
 	font-size: 1.25em;
 	font-variant-numeric: tabular-nums;
 	font-weight: 600;
+	/* « -13,6 points » keeps its unit on a no-break space: at 200 % text in a
+	   phone's tile it breaks rather than scrolling the page (WCAG 1.4.10). */
+	overflow-wrap: anywhere;
 }
 
 .layout-analysis .la-leader-name,
