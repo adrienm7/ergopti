@@ -24,6 +24,12 @@ module.exports = [
 		id: 'numeric_prompt',
 		bridge: 'numeric_prompt_bridge',
 		host: function (message) {
+			// The host reads the typed text with the shared entry grammar and
+			// answers a value out of range with its refusal.
+			if (message && message.action === 'save') {
+				window.show_refusal('Saisissez un nombre de 0 à 1,3.');
+				return;
+			}
 			if (message !== 'ready') return;
 			window.receive_prompt({
 				title: 'Température',
