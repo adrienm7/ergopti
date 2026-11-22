@@ -56,6 +56,8 @@ local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
 	"platform.remap",
 	"platform.remap.tap_hold_file",
+	-- Initialized once per boot: a real reload starts a fresh Lua state.
+	"settings.adapters.registry_cache",
 	"menu.ui",
 	"ai.ui.menu",
 	"ai.engine.local_servers.mlx_deps_checker",

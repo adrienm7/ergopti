@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.logger")
+local FsDir = require("core.fs.engine.dir")
 local Migrate = require("settings.engine.migration.migrate")
 local TomlCodec = require("core.text.engine.toml_codec")
 local LOG = "settings.adapters.registry_cache"
@@ -305,10 +306,15 @@ local function native_write(path, bytes)
 	return true
 end
 
---- Lists a folder's entries through Hammerspoon.
+--- Lists a folder's entries through the shared directory wrapper; an
+--- unreadable folder is an error, never an empty listing that fences nothing.
 local function native_list_dir(dir)
+	local entries, listed, detail = FsDir.try_entries(dir)
+	if not listed then
+		error("registry parser identity could not list '" .. dir .. "' (" .. tostring(detail) .. ")", 0)
+	end
 	local names = {}
-	for name in hs.fs.dir(dir) do
+	for _, name in ipairs(entries) do
 		if name ~= "." and name ~= ".." then names[#names + 1] = name end
 	end
 	return names
