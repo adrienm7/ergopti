@@ -5242,15 +5242,22 @@ var LayoutEditorPage = (function () {
 			}
 		}
 
-		// The board's key unit follows the editor's width: refit the labels when it changes.
+		// The board's key unit follows the editor's width: refit the labels when it
+		// changes. The refit runs on the next frame, never inside the observer: it
+		// writes layout, which raised « ResizeObserver loop completed with
+		// undelivered notifications ».
 		if (typeof ResizeObserver === 'function') {
 			let lastWidth = -1;
+			let frame = 0;
 			new ResizeObserver((entries) => {
 				const width = Math.round(entries[0].contentRect.width);
-				if (width === lastWidth) return;
-				lastWidth = width;
-				fitLegends();
-				placeScoreChip();
+				cancelAnimationFrame(frame);
+				frame = requestAnimationFrame(() => {
+					if (width === lastWidth) return;
+					lastWidth = width;
+					fitLegends();
+					placeScoreChip();
+				});
 			}).observe(root);
 		}
 
