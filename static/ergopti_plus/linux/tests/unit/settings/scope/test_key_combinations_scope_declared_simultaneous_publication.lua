@@ -279,7 +279,7 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    s.delay_selection=' ';helpers.assert_true(delay_row().fn())
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.simultaneous_threshold_ms,nil)
    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
-   helpers.assert_eq(s.errors,0)
+   helpers.assert_eq(s.errors,nil,"a reset shows no refusal")
   end,true)
  end)
  for _,typed in ipairs({'3.5','1001','0x10'}) do
