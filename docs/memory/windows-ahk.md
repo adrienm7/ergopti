@@ -1454,6 +1454,23 @@ serialize bridge payloads with the shared adapter, reject stale generations,
 and release native handlers on teardown. A page loading is not proof that its
 bridge is alive.
 
+### project-webview-windows-refuse-never-substitute
+
+A WebView window has no native form (maintainer decision 2026-11-21). It calls
+`WebView_RequireAvailable(Surface)` before building any Gui and
+`WebView_RefuseUnavailable(Surface, Reason)` when the controller cannot be
+created, both in `core/ui/engine/webview/availability.ahk`; `WebViewHost.TryOpen`
+and `_Build` already do. Each host file `#Include`s that owner itself, so a
+private test child that includes the host by symbol gets the genuine admission
+beside its fake `WebView2` class and loader marker. The unit suite never loads
+the vendored binding: every WebView entry reached by a test refuses, and the
+suite's `MsgBox` and `InputBox` stubs (`tests/test_framework.ahk`) keep that off
+the desktop. Before this, each refusal path was a native fallback window that
+appeared during agents' runs. `test_no_native_webview_fallback.ahk` refuses a
+retired fallback symbol and a host that creates a controller without the
+shared admission. Action: a new WebView window follows the same two calls and
+gets a refusal test with WebView2 absent; never add a native substitute.
+
 ### project-webview2-fill-reads-the-parent-control
 
 `Controller.Fill()` copies the client rect of the controller's parent window.

@@ -1173,6 +1173,34 @@ at ERROR through the central logger; it never builds a native form. Do not
 bring a native editor back for these two windows. Linux already opens both
 through its WebKitGTK webview manager only.
 
+## No WebView window has a native fallback (2026-11-21)
+
+Decided by the maintainer on 2026-11-21 (« on voit ui non webview notamment
+des providers llm. avant c'était un fallback si pas assez de ram mais on veut
+les supprimer »): every Windows window that has a shared WebView page opens
+that page only. The native AutoHotkey forms that stood in for it when
+WebView2 was missing, below `WEBVIEW_MIN_RUNTIME_VERSION`, failed to create,
+or when free RAM was under the former 1536 MiB threshold were removed: the
+model browser ListView, the action picker ListBox and its program picker, the
+folders single-field dialog, the update prompt's plain-text notes, the native
+Versions window, the native update-check window, the diagnostics TreeView, the
+profile prompt wizard, the hotstring settings window and the download failure
+window. The RAM gate (`WebView_ShouldUseNativeFallback`) is gone with them.
+A window asks `WebView_RequireAvailable` before it builds anything and calls
+`WebView_RefuseUnavailable` when creation fails
+(`core/ui/engine/webview/availability.ahk`): one localized message says to
+update a runtime that is too old (`webview.runtime_too_old`) or to install or
+repair WebView2 (`webview.required`), and the reason is logged at ERROR.
+Native UI that is the only UI by design stays: tray menus, native message and
+input boxes, file and folder pickers, the keyboard-slot ListBox, the bundled
+apps' windows, the tooltips and the WPM widget, the API-test progress window
+and the fatal pre-boot modal. The error window, which reports a crash, still
+announces the error through a notification when WebView2 cannot open: it is
+not a window and the error must not be lost. macOS (Hammerspoon `hs.webview`, always present)
+and Linux (WebKitGTK webview manager, which logs and opens nothing when it is
+absent) have no native duplicate of a WebView page. Do not bring a native
+substitute back for a WebView window.
+
 ## Metrics rows store UTC and their recorded offset (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (KMD-1): every raw `events_*` row

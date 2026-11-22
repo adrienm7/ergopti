@@ -126,11 +126,11 @@ would skip `FinalExit`. `quit-over-a-log-flush` is the live check. Windows may e
 the process right after a vetoed logoff, so that retry is best effort. Action: a
 new shutdown gate that settles by itself uses this retry and logs no error.
 
-### project-live-checks-versions-window-needs-memory
+### project-live-checks-versions-window-needs-webview2
 
-`Changelog_Open` opens its WebView2 form only when `WebView_ShouldUseNativeFallback()`
-is false; below its free-memory threshold it opens the native window and there
-is no page to read. The check reports that as not executed.
+`Changelog_Open` has no native form (2026-11-21): when `WebView_UnavailableReason()`
+names a reason it refuses with the WebView2 message and there is no page to
+read. The check reports that as not executed; free memory no longer matters.
 
 ### project-an-isolated-driver-writes-no-machine-touchpad-key
 
