@@ -32,8 +32,7 @@ Test("magic key: the boot resolves the source from the emulated layout's declara
 	_MKH_BootCase)
 
 _MKH_BootCase() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Code := _StripFullLineComments(FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8"))
+	Code := _DriverSourceNoComments()
 	AssertFalse(InStr(Code, "LayoutRegistry_DetectMagicKeyScan"), "the OS layout is never probed for a source character")
 	AssertFalse(InStr(Code, "LayoutRegistry_ShippedMagicKey"), "the shipped position is no fallback")
 	AssertFalse(InStr(Code, "magic_key_save.ahk"), "the save rule is not included")
