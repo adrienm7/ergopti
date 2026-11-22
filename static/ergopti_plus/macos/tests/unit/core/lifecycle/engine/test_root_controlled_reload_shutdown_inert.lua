@@ -57,7 +57,7 @@ local MODULE_NAMES = {
 	"platform.remap",
 	"platform.remap.tap_hold_file",
 	-- Initialized once per boot: a real reload starts a fresh Lua state.
-	"settings.adapters.registry_cache",
+	"settings.engine.registry_cache",
 	"menu.ui",
 	"ai.ui.menu",
 	"ai.engine.local_servers.mlx_deps_checker",
@@ -69,12 +69,29 @@ local MODULE_NAMES = {
 	"ui.onboarding",
 }
 
+-- The stubbed hs module has no source file; every other name is a real module
+-- whose per-boot state the fixture resets.
+local VIRTUAL_MODULE_NAMES = { hs = true }
+
+--- Raises when a reset name no longer resolves: a moved module leaves a stale
+--- name here, its state then survives into the next boot of the same Lua state
+--- and a once-per-boot initializer refuses the second boot.
+local function assert_reset_names_resolve()
+	for _, name in ipairs(MODULE_NAMES) do
+		if not VIRTUAL_MODULE_NAMES[name] then
+			local path, missing = package.searchpath(name, package.path)
+			helpers.assert_not_nil(path, "stale per-boot module name " .. name .. ": " .. tostring(missing))
+		end
+	end
+end
+
 local function run_isolated(options, assertions)
 	if type(options) == "function" then
 		assertions = options
 		options = {}
 	end
 	options = options or {}
+	assert_reset_names_resolve()
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
 	local saved_globals = {
