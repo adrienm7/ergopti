@@ -74,6 +74,31 @@ Validated by the maintainer in the 2026-11-21 to 2026-11-22 review (TODO
   timeout risk to every key); the Linux `migrations.toml` parse stays uncached
   (about 7 ms cold under LuaJIT).
 
+## Configuration rows outside a reload are validated (2026-11-21)
+
+Validated by the maintainer in the QCM of 2026-11-21 (TODO « Configuration
+rows outside a reload »), as the agent implemented them: on macOS and Linux an
+absent `[script]` row clears its native value at the next start and every
+menu change writes the row (question 1, option a); an external edit of
+`config.toml` while Linux runs keeps today's behaviour, the hotstrings
+rescanned and every other row waiting for a reload (question 2, option a).
+The mechanism is in « An absent `[script]` row reads as its default on macOS
+and Linux, the locale excepted » below.
+
+## The reviewed number-row test image is renewed (2026-11-21)
+
+Decided by the maintainer in the QCM of 2026-11-21 (TODO « Renew the reviewed
+number-row test image »): the renewal the agent prepared on 2026-11-19 is
+accepted. It moves the reviewed test image of
+`number_row_current_test_causal.py` to the one of 685cec9b89
+(`CURRENT_TEST_SHA`, `CURRENT_TEST_BLOB`, `CURRENT_ASSERTION_LINE`, the
+matching values in `test_number_row_current_test_causal.py` and the test row
+of `fixtures/number-row-current-test/build-inputs.json.raw` with
+`ROSTER_SHA`), with a new approval record for the published commit, instead
+of keeping the selection inside the XCTest process. The renewal branch is not
+integrated yet; until it is, `NumberRowSourceProbeTests.swift` still selects
+in process.
+
 ## macOS caches the migration registry's typed parse (2026-11-21)
 
 The maintainer chose to port the Windows registry cache
@@ -1839,8 +1864,9 @@ is adopted. What an absent row means is settled by the entry below (2026-11-21).
 
 ## An absent `[script]` row reads as its default on macOS and Linux, the locale excepted (2026-11-21)
 
-Decided by the agent on 2026-11-21, to review by the maintainer (TODO
-« Configuration rows outside a reload », question 1, option a). A `[script]`
+Decided by the agent on 2026-11-21 and validated by the maintainer the same
+day (TODO « Configuration rows outside a reload », question 1, option a;
+« Configuration rows outside a reload are validated » above). A `[script]`
 row that a restored or hand-edited `config.toml` lacks (`log_level`,
 `show_error_dialog`, `reading_font`, `reading_spacing`) clears its native alias
 at the next start, so its owner reads the manifest default, as Windows reads an
@@ -1856,7 +1882,8 @@ the former exception (`NATIVE_KEPT_WHEN_ABSENT`) is gone from
 `script_config_authority.lua`.
 
 Question 2 (an external edit of `config.toml` while Linux runs), decided by the
-agent on 2026-11-21, to review by the maintainer: option a, today's behaviour.
+agent on 2026-11-21 and validated by the maintainer the same day: option a,
+today's behaviour.
 The Linux watcher rescans the hotstrings on any `.toml` change and every other
 row waits for a reload, as on macOS (whose watchers drop config.toml) and
 Windows (no watcher). Reasoning: no OS re-reads the whole file live, a full

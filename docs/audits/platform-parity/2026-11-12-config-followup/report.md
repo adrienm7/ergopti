@@ -86,8 +86,8 @@ Questions for the maintainer are in TODO.md (« Maintainer decisions pending »)
 
 ## Absent `[script]` rows (November 21, 2026)
 
-Both questions were decided by the agent, to review by the maintainer
-([decision](../../../memory/maintainer-decisions.md)). An absent `[script]` row
+Both questions were decided by the agent and validated by the maintainer on
+November 21, 2026 ([decision](../../../memory/maintainer-decisions.md)). An absent `[script]` row
 (`log_level`, `show_error_dialog`, `reading_font`, `reading_spacing`) now clears
 its native alias at the next start on macOS and Linux, as Windows reads an
 absent row, and every menu change writes the row whether the file held it or

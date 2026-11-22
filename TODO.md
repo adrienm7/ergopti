@@ -538,9 +538,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       selects through the launcher's headless role, and refusals name `system_current_layout_stale` or
       `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
       its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
-      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added. Prepared,
-      held for that review: 685cec9b89 (branch `agent/macos-number-row-xctest-review-candidate`, review notes in its
-      message) drops the suite's private copy of the fixture (lines 19-72: the 5 s bound, the observed-selection
+      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added. Renewal
+      accepted by the maintainer on 2026-11-21, pending integration: 685cec9b89 (branch
+      `agent/macos-number-row-xctest-review-candidate`, review notes in its message) drops the suite's private copy of the fixture (lines 19-72: the 5 s bound, the observed-selection
       loop, `selectAndObserve`'s in-process `TISSelectInputSource`, the restoration-observed guard) for
       `KeyboardSourceSelectionFixture.withSelectedSource`, which runs the same phases (`original.capture`, `select`,
       `restore.inner`, `restore.outer`) and refusal messages; the twelve methods and every assertion stay, the causal
@@ -760,17 +760,8 @@ Each question names the default kept meanwhile; an answer moves into the item or
 
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
-- [ ] **Renew the reviewed number-row test image (prepared by the agent on 2026-11-19, to review by the
-      maintainer).** `number_row_current_test_causal.py` says no transcript or approval may select another test
-      image, and its approval record needs a published source commit and a source review hash, so the agent did not
-      renew `CURRENT_TEST_SHA`. Kept meanwhile: `NumberRowSourceProbeTests.swift` selects in the XCTest process.
-      To accept 685cec9b89 (see the [CI] number-row item), review it, then set `CURRENT_TEST_SHA`
-      `769b8165854f4dd4d7b854385adca1f273c5d3149f5fbdece4b524fd7d9d64ca`, `CURRENT_TEST_BLOB` `7b09f33223`
-      (full id from `git hash-object`) and `CURRENT_ASSERTION_LINE` 339 there and in
-      `test_number_row_current_test_causal.py` (its `TEST_SHA`, `TEST_BLOB`, line 435 of its controlled log), the
-      test row of `fixtures/number-row-current-test/build-inputs.json.raw` with `ROSTER_SHA`, and issue the new
-      approval record for the published commit. Or keep the in-process selection and accept its rare stale restores.
-
+- [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending
+      integration.
 - [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
       maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
       most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
@@ -795,12 +786,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
       and corner mark); ISO ticks for split and ortholinear boards.
-- [ ] **Configuration rows outside a reload (decided by the agent on 2026-11-21, to review by the maintainer)**
-      ([configuration follow-up](docs/audits/platform-parity/2026-11-12-config-followup/report.md),
-      [decision](docs/memory/maintainer-decisions.md)). (1) Option a, on macOS and Linux: a `[script]` row
-      (log level, error window, reading font and spacing) absent from config.toml clears its native value at the
-      next start, and every menu change writes the row, the locale included since its neutral value became the absent row (maintainer decision of 2026-11-21). (2) Option a:
-      today's behaviour, no code change. Confirm or change.
 - [ ] **A French chat corpus?** The chat corpus shipped on 2026-11-21 is English only (Taskmaster-1's written
       dialogs, CC BY 4.0); Tatoeba's sentences stay the French conversational register. Candidates, none cleared,
       none downloaded: CoMeRe (Ortolang, chats and forums; licence per sub-corpus, unchecked; pseudonymised user
