@@ -19,7 +19,7 @@ topics routed by `docs/memory/README.md` record it at least eight times:
 `project-ahk-isset-requires-variable-load-crash`.
 
 Run `node tools/test/find-false-greens.cjs` first. It reports patterns 1, 2, 3,
-5 and 7 mechanically. Patterns 4 and 6 need human judgement and are the two that
+5, 7, 8 and 9 mechanically. Patterns 4 and 6 need human judgement and are the two that
 have actually shipped bugs here — read those sections even when the tool is
 green.
 
@@ -204,6 +204,39 @@ the message only to describe the failure or for a presence check.
 that sets a literal `true`, or stores the message with other text, is not
 reported.
 
+## 8. The bare `try` — an empty catch around the assertions
+
+AutoHotkey v2 runs a `try` with neither `catch` nor `finally` as if it had an
+empty catch. A test body wrapped in one to guarantee its cleanup therefore
+discards every exception it raises, including the one a failed assertion
+throws, and stays green whatever the driver does. Nine tests of
+`test_apply_config_toml.ahk` passed that way while two of their expectations
+were wrong.
+
+```ahk
+try {
+    AssertEqual(1, ApplyConfigToml(Features, Path))   ; can never fail
+}
+_FM_EndIsolated(OldFeatures)
+```
+
+Put the cleanup in `finally` (`} finally {`, or `finally Cleanup()` after a
+single statement), or drop the `try` when nothing needs restoring.
+`find-false-greens.cjs` reports it as `bare-try` (baseline 0): the braced
+form and `try Statement` on the same or next line, with an assertion being any
+call whose name contains `Assert` or `Expect` or a suite helper whose body
+asserts.
+
+## 9. The pcall that drops its status — the Lua counterpart
+
+`pcall(function() helpers.assert_eq(…) end)` used as a statement, or a
+`local ok = pcall(…)` whose `ok` nothing reads before it is reassigned, swallows
+the error a failed assertion raises. Read the status (`assert_true(ok, err)`)
+or call the function directly. `find-false-greens.cjs` reports it as
+`pcall-swallow` (baseline 0). Its two first sites were Linux teardown calls,
+which now read the status: a failed permission restore counts as a failure,
+and a refused expected-failure marker writes its cause to stderr.
+
 ## The ratchet
 
 ```bash
@@ -212,7 +245,7 @@ node ./tools/test/find-false-greens.cjs --update-baseline  # only when the count
 ```
 
 It runs inside `npm run test:js`, so a new tautology or a new unguarded absence
-assertion fails the gate. It detects patterns 1, 2, 3, 5 and 7; patterns 4 and 6 need
+assertion fails the gate. It detects patterns 1, 2, 3, 5, 7, 8 and 9; patterns 4 and 6 need
 human judgement and the tool says so rather than pretending otherwise.
 
 The baseline in `tools/test/false-greens-baseline.json` is a **debt ledger, not an
