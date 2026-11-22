@@ -393,7 +393,7 @@ _CFGFM_PendingLeaseGap() {
 _CFGFM_ActualPendingSnapshot() {
 	global ConfigurationFile, CONFIG_SAVE_OK, CONFIG_SAVE_FAILED, _DriverReady
 	global CONFIG_SAVE_DEFERRED, CONFIG_FULL_SAVE_RETRY_DELAY_MS
-	ExistingOwner := 0, PublicationDebt := false, TimerFn := 0
+	ExistingOwner := 0, PublicationDebt := false, TimerFn := 0, PreLeaseFn := 0
 PENDING_BLOCK
 	return CONFIG_SAVE_OK
 }

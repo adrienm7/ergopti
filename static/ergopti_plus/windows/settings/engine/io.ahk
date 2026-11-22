@@ -1790,14 +1790,14 @@ ConfigFullStateCanPersist() {
 }
 
 SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
-		ExistingOwner := 0, CollectFn := 0, &RequestedGeneration := 0) {
+		ExistingOwner := 0, CollectFn := 0, &RequestedGeneration := 0, PreLeaseFn := 0) {
 		InheritedCritical := A_IsCritical
 		if InheritedCritical {
 			; Collectors traverse live state and writers perform durable TOML I/O.
 			; The path owner supplies serialization without freezing input dispatch.
 			Critical("Off")
 			try return SaveFullConfig(WriterFn, TimerFn, RegisterRequest,
-				ExistingOwner, CollectFn, &RequestedGeneration)
+				ExistingOwner, CollectFn, &RequestedGeneration, PreLeaseFn)
 			finally Critical(InheritedCritical)
 		}
 		global ConfigurationFile
@@ -1920,6 +1920,10 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 					? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 			OwnerToken := ExistingOwner
 		} else {
+			; PreLeaseFn mirrors, in behavioural tests, a timer thread that interrupts
+			; this caller here, between its pending check and its claim.
+			if HasMethod(PreLeaseFn, "Call")
+				PreLeaseFn.Call(BoundPath)
 			OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath, "full")
 		}
 		if !(OwnerToken is Object) {
@@ -1941,6 +1945,18 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 					try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
 					return CONFIG_SAVE_FAILED
 				}
+				; The pending check above ran before the claim. A deferred retry that
+				; interrupted in between may have written and acknowledged this very
+				; generation, which also retires its intent: the boot-intent check
+				; below then read as "not admitted yet" and a drain reported DEFERRED
+				; for committed work (startup smoke under load, 2026-11-22). Re-read
+				; it now that no other writer can run.
+				PreviousCritical := Critical("On")
+				try SettledMeanwhile := _ConfigFullSaveCoordinatorDataAdmitted(State)
+					&& State.requested_generation <= State.settled_generation
+				finally Critical(PreviousCritical)
+				if SettledMeanwhile
+					return CONFIG_SAVE_OK
 				TargetGeneration := _ConfigFullSaveCapture()
 				if PublicationDebt {
 					Reconciled := _ConfigPublicationReconcileFullSave(BoundPath, OwnerToken)
@@ -2035,8 +2051,8 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 ; barrier use this entry so neither invents a fresh generation while checking
 ; whether work remains.
 _ConfigDrainFullSave(WriterFn := 0, TimerFn := 0, ExistingOwner := 0,
-		CollectFn := 0) {
-	return SaveFullConfig(WriterFn, TimerFn, false, ExistingOwner, CollectFn)
+		CollectFn := 0, PreLeaseFn := 0) {
+	return SaveFullConfig(WriterFn, TimerFn, false, ExistingOwner, CollectFn, , PreLeaseFn)
 }
 
 ; Resolves every accepted in-memory save before process death. Optional boot

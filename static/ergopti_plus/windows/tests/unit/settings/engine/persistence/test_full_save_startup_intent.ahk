@@ -72,6 +72,61 @@ Test("startup full-save acknowledgment: pending boot generation drains exactly o
 Test("startup full-save acknowledgment: actual writer refusal cannot publish ready", _CFGFS_StartupObserver.Bind("writer-refused"))
 Test("startup full-save acknowledgment: dropped optional boot generation cannot publish ready", _CFGFS_StartupObserver.Bind("optional-abandoned"))
 
+; A deferred retry that interrupts the drain between its pending check and its
+; lease claim writes and acknowledges the same generation. The drain must report
+; the committed work, not DEFERRED: under load the startup smoke failed with
+; "did not acknowledge its existing generation" (2026-11-22). The real default
+; collector and native writer run, as in production; only the interrupting
+; thread is played by PreLeaseFn.
+_CFGFS_StartupObserverInterruptedDrain() {
+	global Features, _LLM_Menu_Loaded, _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	PreviousFeatures := Features, HadLoaded := IsSet(_LLM_Menu_Loaded)
+	PreviousLoaded := HadLoaded ? _LLM_Menu_Loaded : false
+	PreviousRejected := _ConfigBootRejectedOverrides, PreviousOutdated := _ConfigBootOutdatedEntries
+	Dir := A_Temp . "\ergopti-interrupted-drain-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Dir), Path := Dir . "\config.toml"
+	Interruptions := 0
+	Interrupt(BoundPath) {
+		Interruptions += 1
+		AssertEqual(CONFIG_SAVE_OK, _ConfigDrainFullSave(0, _CFGFS_Timer),
+			"the interrupting retry writes and acknowledges the pending generation")
+	}
+	Drain() {
+		return _ConfigDrainFullSave(0, _CFGFS_Timer, 0, 0, Interrupt)
+	}
+	try {
+		Features := ManifestBuildFeaturesMap()
+		_LLM_Menu_Loaded := false
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_CFGFS_Prepare(Path)
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, _CFGFS_Timer), "the actual default full save establishes a current source")
+		Generation := _ConfigFullSaveRequest(true, Path)
+		AssertTrue(Generation > 0)
+		AssertTrue(_ConfigFullSaveHasPending())
+		AssertTrue(_StartupSmokeRequireFullSaveAcknowledged(Drain),
+			"a drain whose generation another writer committed reports it committed")
+		AssertEqual(1, Interruptions, "the retry interrupted the drain before its claim")
+		State := _ConfigFullSaveCoordinator()
+		AssertEqual(Generation, State.committed_generation)
+		AssertEqual(Generation, State.requested_generation, "the drain creates no request of its own")
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		Features := PreviousFeatures
+		_LLM_Menu_Loaded := HadLoaded ? PreviousLoaded : unset
+		_ConfigBootRejectedOverrides := PreviousRejected
+		_ConfigBootOutdatedEntries := PreviousOutdated
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		DirDelete(Dir, true)
+	}
+}
+
+Test("startup full-save acknowledgment: a drain interrupted before its claim reports the committed generation (interrupted-full-save-drain)",
+	_CFGFS_StartupObserverInterruptedDrain)
+
 ; Exercise the public producer rather than pre-registering its obligation.
 ; Keep genuine native leases live, and use the ordinary native writer on repair.
 _CFGFS_DirectIntentBeforeBootRefusal(Explicit) {
