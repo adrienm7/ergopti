@@ -33,7 +33,15 @@ class _LMOC_Core {
 	WebMessageReceived(Callback) => {Callback: Callback}
 	NavigationCompleted(Callback) => {Callback: Callback}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	Navigate(Url) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMOC_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMOC_Require(!HasProp(this, "Navigated"), "The seed precedes the navigation.")
+	}
+	Navigate(Url) {
+		this.Navigated := true
+	}
 }
 class _LMOC_Controller {
 	__New(Hwnd) {

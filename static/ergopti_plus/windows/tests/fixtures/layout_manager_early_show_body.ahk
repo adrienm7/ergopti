@@ -88,7 +88,15 @@ class _LMSO_Core {
 		return _LMSO_Subscription(Callback, Controller)
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	Navigate(Url) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMSO_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMSO_Require(!HasProp(this, "Navigated"), "The seed precedes the navigation.")
+	}
+	Navigate(Url) {
+		this.Navigated := true
+	}
 }
 
 ; Passive subscription deletion observes the same unsubscribe-before-Close
