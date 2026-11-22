@@ -132,6 +132,10 @@ UninstallCommit(*) {
 _LifecycleForceReleaseHeldInput(*) {
 	return 1
 }
+; The keep-awake stop that credits a running session at exit (SNU-11).
+StopActivitySimulation(*) {
+	return true
+}
 KL_Stop(*) {
 	return true
 }
