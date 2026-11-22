@@ -33,26 +33,10 @@ DEPENDENCIES = (
 PAGE = "static/ergopti_plus/_shared/ui/metrics_apps/index.html"
 CALLER = "static/ergopti_plus/macos/ui/metrics_apps/init.lua"
 
-# Ordered admission contract for the actual page; every declared asset is hashed below.
-PAGE_SCRIPTS = (
-    "../vendor/chart.umd.js",
-    "../metrics_chart_values.js",
-    "../host_bridge.js",
-    "../dom_utils.js",
-    "../a11y_prefs.js",
-    "../theme_tokens.js",
-    "../i18n.js",
-    "../metrics_rebuild_banner.js",
-    "../metrics_freshness.js",
-    "../_generated/metrics_general_category_aliases.js",
-    "../metrics_calendar.js",
-    "../metrics_manifest_keys.js",
-    "helpers.js",
-    "state.js",
-    "main.js",
-    "charts.js",
-    "modal.js",
-)
+# The page's own declarations are the script census: each one is hashed below,
+# so any script a page change adds, drops, renames or reorders moves the digest.
+# A copied list fell behind the page when page_locale.js joined every head.
+CHART_VENDOR = "../vendor/chart.umd.js"
 
 
 class PageAssets(HTMLParser):
@@ -78,8 +62,11 @@ def source_identity(repo):
     page = repo / PAGE
     parser = PageAssets()
     parser.feed(page.read_text(encoding="utf-8"))
-    require(tuple(parser.scripts) == PAGE_SCRIPTS, "page script census differs")
-    require("script.js" not in parser.scripts, "legacy dashboard cannot qualify the loaded page")
+    scripts = parser.scripts
+    require(len(scripts) == len(set(scripts)), "page declares a script twice")
+    # page_contract reads the Chart.js version from this file: the page must load it
+    require(CHART_VENDOR in scripts, "page does not load the measured Chart.js")
+    require("script.js" not in scripts, "legacy dashboard cannot qualify the loaded page")
     paths = {repo / name for name in (*DEPENDENCIES, PAGE)}
     for name in parser.paths:
         require(not re.match(r"^[a-zA-Z]+:|^/", name), "page asset is not a local declaration")
@@ -94,7 +81,9 @@ def source_identity(repo):
             path.is_file() and not path.is_symlink(), "source missing or redirected: " + str(path)
         )
         sources[str(path.relative_to(repo))] = hashlib.sha256(path.read_bytes()).hexdigest()
-    encoded = json.dumps(sources, sort_keys=True, separators=(",", ":")).encode()
+    # The declared order is part of the identity: the page runs its scripts in it
+    identity = {"scripts": scripts, "sources": sources}
+    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
     return sources, hashlib.sha256(encoded).hexdigest()
 
 
@@ -106,7 +95,7 @@ def page_contract(repo):
         source,
     )
     require(queries == ["typeof window.publishMetricsAppsData"], "native readiness query differs")
-    vendor = repo / "static/ergopti_plus/_shared/ui/vendor/chart.umd.js"
+    vendor = (repo / PAGE).parent / CHART_VENDOR
     versions = re.findall(r"Chart\.js v([0-9.]+)", vendor.read_text(encoding="utf-8"))
     require(len(versions) == 1, "actual Chart version unavailable")
     return queries[0], versions[0]

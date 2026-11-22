@@ -12,6 +12,22 @@ from unittest.mock import Mock, patch
 import macos_metrics_apps_page as probe
 import macos_tooltip_canvas as supervisor
 
+# An ordinary page declaration for the source fixture; the probe takes the census
+# from whatever page it reads, and the actual page test below reads the real one.
+FIXTURE_SCRIPTS = (
+    probe.CHART_VENDOR,
+    "../host_bridge.js",
+    "../page_locale.js",
+    "../i18n.js",
+    "../_generated/metrics_general_category_aliases.js",
+    "../metrics_manifest_keys.js",
+    "helpers.js",
+    "state.js",
+    "main.js",
+    "charts.js",
+    "modal.js",
+)
+
 
 def snapshot(
     editor=60000, browser=120000, edited=False, filtered=False, *, empty=False, selection=None
@@ -216,9 +232,7 @@ class MetricsAppsPageControls(unittest.TestCase):
         repo = self.root / "repo"
         page = repo / probe.PAGE
         page.parent.mkdir(parents=True)
-        # The probe's ordered census is the one admission contract; the actual
-        # page test below proves it still matches the shipped HTML.
-        scripts = list(probe.PAGE_SCRIPTS)
+        scripts = list(FIXTURE_SCRIPTS)
         page.write_text(
             "".join(f'<script src="{name}"></script>' for name in scripts)
             + '<link rel="stylesheet" href="style.css">'
@@ -431,15 +445,23 @@ class MetricsAppsPageControls(unittest.TestCase):
         self.assertTrue(all(not Path(name).is_absolute() for name in sources))
         page = repo / probe.PAGE
         declared = page.read_text()
+        # The page is the census: a dropped or reordered script is a new identity
         for changed in (
             declared.replace('<script src="../metrics_manifest_keys.js"></script>', ""),
             declared.replace('<script src="state.js"></script>', ""),
-            declared.replace('src="state.js"', 'src="main.js"'),
-            declared.replace('src="state.js"', 'src="unexpected.js"'),
             declared.replace('src="state.js"', 'src="charts.js"').replace(
                 '<script src="charts.js"></script><script src="modal.js">',
                 '<script src="state.js"></script><script src="modal.js">',
             ),
+        ):
+            page.write_text(changed)
+            with self.subTest(page=changed):
+                self.assertNotEqual(probe.source_identity(repo)[1], digest)
+        for changed in (
+            declared.replace('src="state.js"', 'src="main.js"'),
+            declared.replace('src="state.js"', 'src="unexpected.js"'),
+            declared.replace(f'<script src="{probe.CHART_VENDOR}"></script>', ""),
+            declared.replace('src="state.js"', 'src="script.js"'),
         ):
             page.write_text(changed)
             with self.subTest(page=changed), self.assertRaises(ValueError):
