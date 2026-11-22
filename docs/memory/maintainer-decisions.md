@@ -5,6 +5,25 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Pending leaf rows are sealed; frame receipts keep every check (2026-11-22)
+
+The maintainer chose sealed rows (QCM 2026-11-22) over a faster frame that
+took its pending receipts only after the provider ran: that version no longer
+refused a provider editing a nested row of an earlier pending leaf, and was
+dropped. The contract a later change must keep:
+
+- `MenuPopulation.Fill` keeps a leaf's remaining rows in `MenuSealedRows`
+  (`windows/menu/engine/population.ahk`): one store, keyed by the ticket's
+  identity, holds a deep copy no caller references and only hands out fresh
+  copies; `Complete` and `CompleteReplayIdentity` read through it;
+- `MenuRenderer_AppendFrameData` takes its pending receipts before the
+  provider and checks them after every foreign call. A receipt holds each
+  ticket's stamp, which changes when the store is dropped or written again
+  and falls to 0 when a callable or menu of its rows gains an own property;
+- speed comes from sealing, never from checking less: do not move the capture
+  after the provider or skip a check to save cycles. The startup smoke fails a
+  Shortcuts build whose probe moves `menu.frame_pending_open_rows`.
+
 ## macOS caches the migration registry's typed parse (2026-11-21)
 
 The maintainer chose to port the Windows registry cache
