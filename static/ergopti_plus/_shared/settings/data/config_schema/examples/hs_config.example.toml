@@ -220,7 +220,6 @@ chatgpt_url = "https://chat.openai.com"
 
 [shortcuts.keys]
 cmd_shift_v = true
-cmd_star = true
 ctrl_a = true
 ctrl_d = true
 ctrl_e = true

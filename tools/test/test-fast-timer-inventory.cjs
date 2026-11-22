@@ -139,10 +139,6 @@ const INVENTORY = {
 		'_LLM_Menu_ApiTestProgressHide when the probe answers, times out or is cancelled. ' +
 		'150 ms keeps the elapsed-time label and bar moving smoothly; a slower pulse makes ' +
 		'the probe look frozen while it waits on the provider.',
-	'core/ui/ui/editors.ahk:MagicKeyCapturePoll':
-		'Armed only while the « Press the key… » capture of the magic key is open, and stopped ' +
-		'when it closes. 10 ms reads the physical key state so a short tap is not missed; the ' +
-		'period is timings [ui] magic_key_capture_poll_ms.',
 	'modules/shortcuts/capsword_auto_off.ahk:Callbacks':
 		'Armed only while CapsWord is on and set to end on pointer motion; one cursor read per ' +
 		'tick. 100 ms (timings [ui] capsword_check_interval_ms) ends the word before the next ' +

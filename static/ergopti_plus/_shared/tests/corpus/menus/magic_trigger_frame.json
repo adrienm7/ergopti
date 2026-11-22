@@ -27,17 +27,17 @@
 			"language": "en",
 			"value": "§",
 			"customised": true,
-			"windows": ["Magic key: §"],
-			"macos": ["Magic key: §"],
-			"linux": ["Magic key: §", "    Restore the default key"]
+			"windows": ["Magic key: ★ (§)"],
+			"macos": ["Magic key: ★ (§)"],
+			"linux": ["Magic key: ★ (§)", "    Restore the default key"]
 		},
 		{
 			"language": "fr",
 			"value": "§",
 			"customised": true,
-			"windows": ["Touche magique : §"],
-			"macos": ["Touche magique : §"],
-			"linux": ["Touche magique : §", "    Rétablir la touche par défaut"]
+			"windows": ["Touche magique : ★ (§)"],
+			"macos": ["Touche magique : ★ (§)"],
+			"linux": ["Touche magique : ★ (§)", "    Rétablir la touche par défaut"]
 		}
 	],
 	"macos_paused": { "disabled": true, "action_present": false, "row_present": true },
