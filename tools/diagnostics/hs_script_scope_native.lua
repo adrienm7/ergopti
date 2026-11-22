@@ -171,6 +171,8 @@ function M.run(receipt_path, destination, nonce)
 			local provider = aliases[row.path].native
 			local effective = row.publication.value
 			if rawequal(provider, I18n) then
+				-- The stored neutral locale "" reads as the system language (2026-11-21).
+				if effective == "" then effective = I18n.detect_system_locale() end
 				assert(result.runtime_views.applied.locale == effective and result.runtime_views.applied.locale_backend == effective)
 			elseif rawequal(provider, Logger) then assert(result.runtime_views.applied.log_level == Logger.LEVELS[effective])
 			elseif rawequal(provider, Dialog) then assert(result.runtime_views.applied.error_dialog == effective)

@@ -71,6 +71,25 @@ def scalar(value):
     return type(value) is bool or type(value) is str and 0 < len(value) <= 128 and "\0" not in value
 
 
+# The locale's neutral value: "" is the absent row, which the native owner
+# resolves to the system language, else English (maintainer decision of
+# 2026-11-21, manifest.toml [[features.script]] id = "locale"). The Script
+# participant stores it as such, so it is the one empty value a planned or
+# offered native cell may carry; the runtime views still read a resolved locale.
+NEUTRAL_LOCALE = ""
+LOCALE_PATH = "script.locale"
+
+
+def stored_scalar(value, path=None):
+    """Whether a planned or offered native cell is one declared scalar.
+
+    The path, when known, confines the empty neutral value to the locale row.
+    """
+    if type(value) is str and value == NEUTRAL_LOCALE:
+        return path is None or path == LOCALE_PATH
+    return scalar(value)
+
+
 def view(value):
     if not isinstance(value, dict) or set(value) != VIEW_FIELDS:
         raise ValueError("The native script runtime view is incomplete")
@@ -125,7 +144,7 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
             not isinstance(cell, dict)
             or set(cell) != {"present", "value"}
             or cell["present"] is not True
-            or not scalar(cell["value"])
+            or not stored_scalar(cell["value"], row["path"])
         ):
             raise ValueError("The native script planned scalar is invalid")
         paths.add(row["path"])
@@ -181,7 +200,7 @@ def validate_claim(result, nonce, pid, executable, bundle_id):
         if row["before"] != {"present": False} or type(row["before"].get("present")) is not bool:
             raise ValueError("The private native settings claim was not initially absent")
         values = row["allowed_values"]
-        if type(values) is not list or len(values) != 1 or not scalar(values[0]):
+        if type(values) is not list or len(values) != 1 or not stored_scalar(values[0]):
             raise ValueError("The private native settings claim has no exact offered scalar")
         if suffix == "sdk_primitive" and values != [nonce]:
             raise ValueError("The private SDK primitive has a foreign offered value")

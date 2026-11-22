@@ -668,7 +668,7 @@ class NativeScriptFixture(NativeFixture):
         aliases = []
         for index, (declared, value) in enumerate(
             (
-                ("script.locale", "fr"),
+                ("script.locale", script_probe.NEUTRAL_LOCALE),
                 ("script.log_level", "INFO"),
                 ("script.show_error_dialog", True),
                 ("script.reading_font", "default"),
@@ -769,7 +769,7 @@ class NativeScriptOwnershipTests(unittest.TestCase):
     def test_script_participant_receipt_requires_exact_native_retirement_and_alias_cleanup(self):
         with tempfile.TemporaryDirectory() as root:
             fixture = NativeScriptFixture(Path(root))
-            fixture.leftover = "fr"
+            fixture.leftover = script_probe.NEUTRAL_LOCALE
             summary = fixture.observe(self, "script_scope")
             self.assertEqual(summary["measurement"]["alias_count"], 5)
             self.assertTrue(summary["measurement"]["participant_inverse"])
@@ -824,7 +824,7 @@ class NativeScriptOwnershipTests(unittest.TestCase):
     def test_malformed_claim_still_retires_native_owner_and_restores_only_startup_key(self):
         with tempfile.TemporaryDirectory() as root:
             fixture = NativeScriptFixture(Path(root))
-            fixture.leftover = "fr"
+            fixture.leftover = script_probe.NEUTRAL_LOCALE
             fixture.claim_mutation = lambda r: r.update(nonce="b" * 32)
             with self.assertRaisesRegex(RuntimeError, "identity differs"):
                 fixture.observe(self, "script_scope")
@@ -832,7 +832,35 @@ class NativeScriptOwnershipTests(unittest.TestCase):
             self.assertEqual(
                 fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
             )
-            self.assertEqual(fixture.preferences[f"ergopti.scope_probe.{NONCE}.alias_1"], "fr")
+            self.assertEqual(
+                fixture.preferences[f"ergopti.scope_probe.{NONCE}.alias_1"],
+                script_probe.NEUTRAL_LOCALE,
+            )
+
+    def test_claim_offers_exactly_one_scalar_and_the_neutral_locale_is_one(self):
+        # The neutral locale "" (2026-11-21) is the manifest's recommended value,
+        # so the claim and the planned locale cell carry it; exactness still holds.
+        alias = f"ergopti.scope_probe.{NONCE}.alias_2"
+        offers = [[], ["INFO", "DEBUG"], [None], [1], [["INFO"]], ["\0"]]
+        for offered in offers:
+            with self.subTest(offered=offered), tempfile.TemporaryDirectory() as root:
+                fixture = NativeScriptFixture(Path(root))
+                fixture.claim_mutation = lambda claim, offered=offered: next(
+                    row for row in claim["entries"] if row["key"] == alias
+                ).update(allowed_values=offered)
+                with self.assertRaisesRegex(RuntimeError, "no exact offered scalar"):
+                    fixture.observe(self, "script_scope")
+                self.assertEqual(fixture.owners, [])
+
+    def test_only_the_locale_row_may_plan_the_empty_neutral_value(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeScriptFixture(Path(root))
+            fixture.feature_mutation = lambda receipt: receipt["aliases"][1]["publication"].update(
+                value=""
+            )
+            with self.assertRaisesRegex(ValueError, "planned scalar is invalid"):
+                fixture.observe(self, "script_scope")
+            self.assertEqual(fixture.owners, [])
 
     def test_required_script_summary_rejects_unknown_identity_false_fields_and_cleanup_debt(self):
         with tempfile.TemporaryDirectory() as root:
