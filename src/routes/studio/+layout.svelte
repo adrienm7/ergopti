@@ -276,6 +276,9 @@ stays one row and the workspace keeps the screen (WCAG 1.4.4, 1.4.10).
 			gap: 0.4em;
 			margin: 0.3rem 16px 0.3rem 0;
 			min-width: 0;
+			/* The tab's name (« Optimiser ») breaks rather than passing the
+			   button and the window's edge at 200 % text (WCAG 1.4.10). */
+			overflow-wrap: anywhere;
 			padding: 0.3rem 0.6rem;
 		}
 

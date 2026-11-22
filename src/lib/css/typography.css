@@ -37,6 +37,9 @@ pre {
 	margin: 0 auto;
 	/* background: linear-gradient(to right, transparent, rgba(0,0,0, 0.3) 50%, transparent 100%); */
 	max-width: min(820px, 58ch);
+	/* At 200 % text in a 320 px window « programmation » is wider than the
+	   box and would scroll the page sideways (WCAG 1.4.10). */
+	overflow-wrap: break-word;
 	padding: 20px;
 	text-align: center;
 }

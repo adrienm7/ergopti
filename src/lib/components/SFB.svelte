@@ -77,6 +77,10 @@
 		font-weight: normal;
 		line-height: 1.35;
 		max-width: 600px;
+		/* At 200 % text in a 320 px window « successivement » is wider than
+		   the box; placed on the page's body, past the article column that
+		   hides overflow, it would scroll the page sideways (WCAG 1.4.10). */
+		overflow-wrap: break-word;
 		padding: 20px;
 		position: relative;
 		visibility: hidden;
