@@ -31,8 +31,8 @@ const TAP_KEYS_JSON = ROOT + '_shared/shortcuts/data/actions/tap_keys.json';
 const SCRIPT_CHORDS = ROOT + '_shared/shortcuts/data/actions/script_chords.json';
 const BRIGHTNESS = ROOT + '_shared/shortcuts/data/actions/brightness.json';
 const SHARED_SEND_INPUT = ROOT + '_shared/platform/input/send_input.lua';
-const MAGIC_CORE_LUA = ROOT + '_shared/shortcuts/engine/magic_editor_core.lua';
-const MAGIC_CORE_AHK = ROOT + '_shared/shortcuts/data/magic_editor.ahk';
+const STAR_CORE_LUA = ROOT + '_shared/shortcuts/engine/star_slot_core.lua';
+const STAR_CORE_AHK = ROOT + '_shared/shortcuts/data/star_slot.ahk';
 const DEBUG_REPORT = ROOT + '_shared/diagnostics/engine/healthcheck/report.lua';
 
 const LINUX_GESTURES = ROOT + 'linux/gestures/engine/manager.lua';
@@ -51,7 +51,7 @@ const MACOS_GESTURES_MENU = ROOT + 'macos/gestures/ui/menu/gestures.lua';
 const MACOS_PROFILES = ROOT + 'macos/ai/engine/settings/profiles.lua';
 const MACOS_API_PANEL = ROOT + 'macos/ai/ui/menu/panels/api_panel.lua';
 const MACOS_KEYBOARD_SHORTCUTS = ROOT + 'macos/modules/shortcuts/keyboard_shortcuts.lua';
-const MACOS_MAGIC_EDITOR = ROOT + 'macos/modules/shortcuts/magic_editor.lua';
+const MACOS_STAR_SLOT = ROOT + 'macos/modules/shortcuts/star_slot.lua';
 const MACOS_TAP_KEYS = ROOT + 'macos/modules/shortcuts/tap_keys.lua';
 const MACOS_REMAP = ROOT + 'macos/platform/remap/config.lua';
 const MACOS_REMAP_ACTIONS = ROOT + 'macos/platform/remap/data/actions.json';
@@ -68,7 +68,7 @@ const WIN_PROFILES_MENU = ROOT + 'windows/ai/ui/menu/profiles.ahk';
 const WIN_PROFILE_ORDER = ROOT + 'windows/ai/engine/api/option_validation.ahk';
 const WIN_SHORTCUTS_MENU = ROOT + 'windows/ui/menu/menu_shortcuts.ahk';
 const WIN_API_ENTRIES = ROOT + 'windows/ai/ui/menu/api_entries.ahk';
-const WIN_MAGIC_EDITOR = ROOT + 'windows/infra/magic_editor.ahk';
+const WIN_STAR_SLOT = ROOT + 'windows/infra/star_slot.ahk';
 const WIN_TAP_KEYS = ROOT + 'windows/infra/tap_keys.ahk';
 const WIN_PROXY_OVERRIDE = ROOT + 'windows/core/network/proxy_override.ahk';
 const WIN_PROXY_PARSE = ROOT + 'windows/core/network/adapters/proxy_override.ahk';
@@ -181,26 +181,26 @@ function inputProbeReasons() {
 }
 
 /**
- * Every reason the physical magic editor's row can show: the decision reasons
+ * Every reason the ★ key slot's row can show: the decision reasons
  * of the shared Lua core and its AutoHotkey port, the source-selection reasons,
  * and the macOS owner's own early answers.
  * @returns {string[]}
  */
-function magicEditorReasons() {
+function starSlotReasons() {
 	return [
-		...capture(ctx.read(MAGIC_CORE_LUA), /decision\.reason = "(\w+)"/g, MAGIC_CORE_LUA),
-		...capture(ctx.read(MAGIC_CORE_LUA), /return nil, "(\w+)"/g, MAGIC_CORE_LUA),
+		...capture(ctx.read(STAR_CORE_LUA), /decision\.reason = "(\w+)"/g, STAR_CORE_LUA),
+		...capture(ctx.read(STAR_CORE_LUA), /return nil, "(\w+)"/g, STAR_CORE_LUA),
 		...capture(
-			ctx.read(MAGIC_CORE_AHK),
+			ctx.read(STAR_CORE_AHK),
 			/(?:"reason", |Decision\["reason"\] := )"(\w+)"/g,
-			MAGIC_CORE_AHK
+			STAR_CORE_AHK
 		),
 		// The source selection's last reason is a ternary chain.
-		...capture(ctx.read(MAGIC_CORE_AHK), /[?:] "(source_\w+)"/g, MAGIC_CORE_AHK),
+		...capture(ctx.read(STAR_CORE_AHK), /[?:] "(source_\w+)"/g, STAR_CORE_AHK),
 		...capture(
-			functionBody(MACOS_MAGIC_EDITOR, 'function M.reason('),
+			functionBody(MACOS_STAR_SLOT, 'function M.reason('),
 			/return "(\w+)"/g,
-			MACOS_MAGIC_EDITOR
+			MACOS_STAR_SLOT
 		)
 	];
 }
@@ -423,11 +423,11 @@ module.exports = [
 		keys: () => ctx.keysOf('menu.llm.api_prompt_field_invalid.', apiAddressFields().optional)
 	},
 	{
-		prefix: 'menu.shortcuts.keyboard.magic_editor_reason.',
-		files: [MACOS_KEYBOARD_SHORTCUTS, WIN_MAGIC_EDITOR],
+		prefix: 'menu.shortcuts.keyboard.star_slot_reason.',
+		files: [MACOS_KEYBOARD_SHORTCUTS, WIN_STAR_SLOT],
 		source:
-			'the decision and source reasons of the shared magic editor policy (Lua and AHK) and M.reason()',
-		keys: () => ctx.keysOf('menu.shortcuts.keyboard.magic_editor_reason.', magicEditorReasons())
+			'the decision and source reasons of the shared ★ key slot policy (Lua and AHK) and M.reason()',
+		keys: () => ctx.keysOf('menu.shortcuts.keyboard.star_slot_reason.', starSlotReasons())
 	},
 	{
 		prefix: 'menu.shortcuts.tap_keys.',

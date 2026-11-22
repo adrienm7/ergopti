@@ -15,7 +15,7 @@
 	"windows.limit": 182,
 	"windows.enum_name": 123,
 	"windows.color": 3,
-	"macos+linux.lua_function": 104,
+	"macos+linux.lua_function": 102,
 	"macos+linux.lua_table": 17,
 	"cross_driver_names": 44,
 	"cross_driver_divergent": 12
