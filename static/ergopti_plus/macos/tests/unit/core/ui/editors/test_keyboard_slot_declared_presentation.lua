@@ -334,7 +334,7 @@ end)
 
 helpers.describe("keyboard slot presentation saved-locale initialization", function()
 	helpers.it("keeps genuine factory owners through persisted locale initialization and receives the original captions", function()
-		local retained_state
+		local retained_state, config_path
 		local cleanup_failures = {}
 		fixture(function(state, builder, _, locale, _, open, ready, core, i18n)
 			retained_state = state
@@ -351,6 +351,10 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			helpers.assert_eq(state.creates, 0)
 
 			-- Seed the real saved setting, then use root boot's backend wiring and initializer.
+			-- A locale choice writes its config.toml row, which needs the file
+			-- (locale-neutral-2026-11-21).
+			config_path = require("settings.engine.paths").get("ConfigTomlPath")
+			local config = assert(io.open(config_path, "wb")); assert(config:write("")); assert(config:close())
 			helpers.assert_eq(i18n.persist_locale("de"), true)
 			helpers.assert_eq(Storage.get("i18n_locale"), "de")
 			helpers.assert_eq(i18n.get_locale(), "fr", "persistence alone must not change the active locale")
@@ -389,6 +393,7 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			state.views[1].on_navigation("didFinishNavigation", state.views[1])
 			helpers.assert_true(state.scheduler.activeCount() > 0)
 		end, cleanup_failures)
+		if config_path then os.remove(config_path) end
 		helpers.assert_eq(#cleanup_failures, 0)
 		helpers.assert_eq(retained_state.views[1].deletes, 1)
 		helpers.assert_eq(retained_state.scheduler.activeCount(), 0)

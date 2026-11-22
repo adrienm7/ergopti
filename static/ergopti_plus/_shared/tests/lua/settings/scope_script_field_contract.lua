@@ -157,7 +157,11 @@ return function(helpers, driver)
 				end)
 			elseif driver == "macos" then
 				helpers.it("refuses the existing locale reload instead of cancelling or replaying it", function()
-					with_native(kind, function(native, backend)
+					-- A locale choice writes its config.toml row, which needs the
+					-- file (locale-neutral-2026-11-21).
+					local config_path = require("settings.engine.paths").get("ConfigTomlPath")
+					local config = assert(io.open(config_path, "wb")); assert(config:write("")); assert(config:close())
+					local ok, err = pcall(with_native, kind, function(native, backend)
 						local timers = hs.timer.__timers
 						local before = #timers
 						helpers.assert_eq(native.set_locale("en"), true)
@@ -170,6 +174,8 @@ return function(helpers, driver)
 						helpers.assert_eq(scheduled.running, true)
 						for index = #timers, before + 1, -1 do timers[index]:stop(); timers[index] = nil end
 					end)
+					os.remove(config_path)
+					if not ok then error(err, 0) end
 				end)
 			end
 			helpers.it("forgets only finalized native inverse data and acknowledges repeat cleanup", function()

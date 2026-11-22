@@ -454,7 +454,21 @@ end)
 
 
 helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", function()
-	helpers.before_each(reset_state)
+	-- A locale choice writes its config.toml row (locale-neutral-2026-11-21),
+	-- and an owned rewrite of an absent file is refused, so every case starts
+	-- from an existing config.toml without a locale row. A case that needs
+	-- other bytes points ConfigTomlPath at its own file.
+	local config_path = os.tmpname()
+	local Paths = require("settings.engine.paths")
+	local prior_paths_get = Paths.get
+	Paths.get = function(key)
+		if key == "ConfigTomlPath" then return config_path end
+		return prior_paths_get(key)
+	end
+	helpers.before_each(function()
+		reset_state()
+		local file = assert(io.open(config_path, "wb")); assert(file:write("")); assert(file:close())
+	end)
 
 	helpers.it("restores configured locale bytes when native persistence refuses", function()
 		local path = os.tmpname()
@@ -1115,14 +1129,41 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 			"unknown locale must not be persisted")
 	end)
 
-	helpers.it("set_locale() is a no-op when the same locale is already active", function()
+	helpers.it("set_locale() is a no-op when the active locale is the saved one", function()
+		hs.settings.set("ergopti.i18n_locale", "fr")
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
-		i18n.set_locale("fr")  -- already the default
+		local timers = #hs.timer.__timers
+		helpers.assert_true(i18n.set_locale("fr"))
 
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
-			"same locale must not re-persist")
+		helpers.assert_eq(#hs.timer.__timers, timers, "the saved locale schedules no reload")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_eq(actual, "", "the saved locale is not rewritten")
+	end)
+
+	-- The maintainer's decision of 2026-11-21: the language shown while nothing
+	-- is saved is the neutral value, so choosing it is an explicit choice that
+	-- is saved and written, French included.
+	helpers.it("set_locale() writes the shown locale while nothing is saved (locale-neutral-2026-11-21)", function()
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		helpers.assert_true(i18n.set_locale("fr"))
+
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "fr", "the choice is saved")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_contains(actual, 'locale = "fr"')
+	end)
+
+	helpers.it("refuses a locale choice while config.toml is absent", function()
+		os.remove(config_path)
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		helpers.assert_eq(i18n.set_locale("de"), false)
+
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"), "nothing is saved without a written row")
 	end)
 
 	helpers.it("persist_locale() writes to settings without changing in-memory locale", function()
@@ -1180,6 +1221,9 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.assert_eq(i18n.get_locale(), "fr",
 			"unknown code must not change locale")
 	end)
+
+	Paths.get = prior_paths_get
+	os.remove(config_path)
 end)
 
 
