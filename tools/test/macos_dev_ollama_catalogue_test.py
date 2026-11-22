@@ -41,6 +41,8 @@ INPUTS = (
     OFFICIAL_RELEASE,
     SHARED + "/updater/data/channels.json",
     SHARED + "/core/text/data/identifiers.json",
+    # The installer's free-space margin (OLL-04) lives in the shared registry.
+    SHARED + "/core/timing/data/constants.toml",
     SHARED + "/ai/adapters/python/managed_ollama_runtime.py",
     SHARED + "/core/network/adapters/python_network_proxy_policy.py",
     SHARED + "/ai/adapters/python/managed_source_alias.py",

@@ -751,6 +751,8 @@ class Receiver:
             "macos/ai/engine/managed-python-release.sh",
             "macos/ai/engine/managed-python-downloads.json",
             "_shared/core/text/data/identifiers.sh",
+            # The installer reads its free-space margin here (OLL-04).
+            "_shared/core/timing/data/constants.toml",
         ]
         for relative in relatives:
             self.copy_source("static/ergopti_plus/" + relative, payload / relative)

@@ -16,6 +16,7 @@ import signal
 import ssl
 import unittest
 import tempfile
+import tomllib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -729,6 +730,32 @@ class FatalFailureObservationControls(unittest.TestCase):
 
 
 class PayloadDependencyControls(unittest.TestCase):
+    def test_the_payload_installer_reads_its_free_space_margin(self):
+        # CI run 44983580030 refused prepare/runtime_install with os/missing:
+        # the payload lacked the registry the installer reads before download.
+        with tempfile.TemporaryDirectory(prefix="ergopti-ollama-payload-") as directory:
+            root = Path(directory)
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root = ROOT
+            subject.source_hashes = {}
+            subject.receiving_catalogue = Mock(
+                side_effect=lambda destination, _: destination.write_text("{}\n")
+            )
+            payload = subject.payload(root / "OwnedPayload.app")
+            runtime = RECEIVING.load(
+                "payload_margin_ollama_runtime",
+                payload / "macos/ai/engine/ollama/managed_ollama_runtime.py",
+            )
+            registry = tomllib.loads(
+                (ROOT / "static/ergopti_plus/_shared/core/timing/data/constants.toml").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                runtime.free_space_margin(),
+                registry["limits"]["ollama_install_free_space_margin_bytes"],
+            )
+
     def test_original_redirect_policy_is_copied_and_hash_bound_before_bootstrap_download(self):
         with tempfile.TemporaryDirectory(prefix="ergopti-ollama-payload-") as directory:
             root = Path(directory)
