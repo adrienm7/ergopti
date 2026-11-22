@@ -1004,6 +1004,34 @@ const cases = [
 	],
 	[
 		'windows',
+		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nCaption := WindowTitle(Title)\nOpen := true, OpenCaption := Caption\ntry return InputBox(Prompt, Caption, Options, Default)\n}',
+		0,
+		'the one-at-a-time input delegate names its composed caption once',
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nCaption := WindowTitle(Title)\nCaption := Title\nreturn InputBox(Prompt, Caption, Options, Default)\n}',
+		1,
+		'a named caption reassigned after its composition bypasses the shared caption',
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nCaption := WindowTitle(Title) . " (2)"\nreturn InputBox(Prompt, Caption, Options, Default)\n}',
+		1,
+		'a named caption extended after its composition bypasses the shared caption',
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
+	],
+	[
+		'windows',
+		'Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {\nCaption := Title\nreturn InputBox(Prompt, Caption, Options, Default)\n}',
+		1,
+		'a named caption never composed bypasses the shared caption',
+		'static/ergopti_plus/windows/core/ui/engine/native_dialogs.ahk'
+	],
+	[
+		'windows',
 		'Ui_MsgBox(Text, Title, Options) {\nreturn MsgBox(Text, Title, Options)\n}',
 		1,
 		'central delegate itself cannot drop policy',

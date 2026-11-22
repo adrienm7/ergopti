@@ -330,12 +330,31 @@ function auditSource(source, lua, locales, relative = '', names = []) {
 				.filter((s) => s.start < i && i < s.end)
 				.sort((a, b) => a.end - a.start - (b.end - b.start))[0];
 			const caption = call.args[name === '_Ui_FolderSelect' ? 3 : name === 'FileSelect' ? 2 : 1];
-			const composed =
-				caption?.length === 4 &&
-				caption[0].value === 'WindowTitle' &&
-				caption[1].value === '(' &&
-				caption[2].value === 'Title' &&
-				caption[3].value === ')';
+			const isComposedTitle = (expr) =>
+				expr.length === 4 &&
+				!expr.some((n) => n.string) &&
+				expr[0].value === 'WindowTitle' &&
+				expr[1].value === '(' &&
+				expr[2].value === 'Title' &&
+				expr[3].value === ')';
+			// A delegate that also needs the caption elsewhere (the one-at-a-time
+			// InputBox finds its open window by it) may name it once: a single
+			// local whose only assignment in the delegate is WindowTitle(Title).
+			const namedOnce = (expr) => {
+				if (!scope || expr?.length !== 1 || expr[0].string) return false;
+				const local = expr[0].value;
+				const sites = [];
+				for (let k = scope.start; k + 1 < scope.end; k++)
+					if (!ts[k].string && ts[k].value === local && /^[.:+]=$/.test(ts[k + 1].value))
+						sites.push(k);
+				if (sites.length !== 1 || ts[sites[0] + 1].value !== ':=') return false;
+				const after = ts[sites[0] + 6];
+				return (
+					isComposedTitle(ts.slice(sites[0] + 2, sites[0] + 6)) &&
+					(!after || after.line !== ts[sites[0]].line || after.value === ',')
+				);
+			};
+			const composed = Boolean(caption) && (isComposedTitle(caption) || namedOnce(caption));
 			if (
 				relative !== 'windows/core/ui/engine/native_dialogs.ahk' ||
 				scope?.name !== (name === '_Ui_FolderSelect' ? 'Ui_DirSelect' : 'Ui_' + name) ||
