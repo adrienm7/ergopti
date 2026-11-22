@@ -29,6 +29,9 @@ INPUTS = (
 )
 GENERIC = "Managed Ollama runtime admission refused.\n"
 MISSING = "OLLAMA_MANAGED_CATALOGUE_MISSING\n"
+# A generic install refusal names its class on stdout for the driver
+# (deps_checker.lua); every other refusal keeps stdout empty.
+EVIDENCE = "OLLAMA_INSTALL_FAILURE phase=install reason=%s\n"
 OBSERVATIONS = []
 ACTIVE_FENCE = None
 
@@ -220,7 +223,6 @@ class CatalogueRefusalTests(unittest.TestCase):
             before_originals,
         )
         self.assertEqual(fence["inputs_calls"], 1)
-        self.assertEqual(out.getvalue(), "")
         OBSERVATIONS.append(
             {
                 "case": self._testMethodName,
@@ -239,14 +241,18 @@ class CatalogueRefusalTests(unittest.TestCase):
                 "source_and_namespace_unchanged": True,
             }
         )
+        self.stdout = out.getvalue()
         return status, err.getvalue(), thrown, fence
 
-    def cli_refusal(self, action="install", *, expected=GENERIC, admission="darwin_model"):
+    def cli_refusal(
+        self, action="install", *, expected=GENERIC, evidence=None, admission="darwin_model"
+    ):
         status, stderr, thrown, fence = self.receive(action, admission=admission)
         self.assertIsNone(thrown)
         self.assertIs(type(status), int)
         self.assertEqual(status, 78)
         self.assertEqual(stderr, expected)
+        self.assertEqual(self.stdout, "" if evidence is None else EVIDENCE % evidence)
         return fence
 
     def test_actual_host_import_has_no_native_effect_and_original_actions(self):
@@ -283,7 +289,7 @@ class CatalogueRefusalTests(unittest.TestCase):
 
     def test_missing_contract_remains_generic(self):
         self.contract.unlink()
-        fence = self.cli_refusal()
+        fence = self.cli_refusal(evidence="oserror errno=ENOENT")
         self.assertEqual(fence["catalogue_reads"], 0)
         self.assertIn("FileNotFoundError", fence["input_errors"])
 
@@ -291,30 +297,30 @@ class CatalogueRefusalTests(unittest.TestCase):
         self.catalogue.write_bytes(b"independent unreadable metadata")
         self.catalogue.chmod(0)
         self.addCleanup(self.catalogue.chmod, 0o600)
-        fence = self.cli_refusal()
+        fence = self.cli_refusal(evidence="oserror errno=EACCES")
         self.assertEqual(fence["catalogue_reads"], 1)
         self.assertIn("PermissionError", fence["input_errors"])
 
     def test_genuine_directory_catalogue_remains_generic(self):
         self.catalogue.mkdir()
-        fence = self.cli_refusal()
+        fence = self.cli_refusal(evidence="oserror errno=EISDIR")
         self.assertEqual(fence["catalogue_reads"], 1)
         self.assertIn("IsADirectoryError", fence["input_errors"])
 
     def test_genuine_malformed_present_catalogue_remains_generic(self):
         self.catalogue.write_bytes(b"{not valid JSON")
-        fence = self.cli_refusal()
+        fence = self.cli_refusal(evidence="metadata")
         self.assertEqual(fence["catalogue_reads"], 1)
         self.assertIn("RuntimeRefusal", fence["input_errors"])
 
     def test_genuine_empty_present_catalogue_remains_generic(self):
         self.catalogue.write_bytes(b"")
-        fence = self.cli_refusal()
+        fence = self.cli_refusal(evidence="metadata")
         self.assertEqual(fence["catalogue_reads"], 1)
         self.assertIn("RuntimeRefusal", fence["input_errors"])
 
     def test_linux_unsupported_stays_generic_before_metadata_read(self):
-        fence = self.cli_refusal(admission="linux")
+        fence = self.cli_refusal(evidence="unavailable", admission="linux")
         self.assertEqual(fence["catalogue_reads"], 0)
         self.assertIn("RuntimeRefusal", fence["input_errors"])
 
