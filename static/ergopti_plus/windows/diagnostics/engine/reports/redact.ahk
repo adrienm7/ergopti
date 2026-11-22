@@ -361,28 +361,46 @@ _Redact_AcceptConfigDir(Rules, Known, Text, First, Last) {
 	return Map("text", Out, "last", Index - 1)
 }
 
-; Masks the folder and file names under the configuration directory, in every
-; spelling of the directory.
-; @param Text {String}
-; @param Rules {Map}
-; @param Dir {String} The directory as the text spells it.
-; @param Folded {Boolean}
-; @returns {String}
-_Redact_MaskConfigDir(Text, Rules, Dir, Folded) {
+; The distinct spellings of a folder, both slash styles, in the order they are
+; searched; none when the folder is empty once its trailing separators go.
+; @param Dir {String}
+; @returns {Array}
+_Redact_Spellings(Dir) {
 	Dir := RegExReplace(Dir, "[/\\]+$")
+	Spellings := []
 	if (Dir == "")
-		return Text
-	Known := Map()
-	for Name in Rules["config_known_names"]
-		Known[_Redact_AsciiLower(Name)] := true
+		return Spellings
 	Seen := Map()
 	for Spelling in [Dir, StrReplace(Dir, "\", "/"), StrReplace(Dir, "/", "\")] {
 		if Seen.Has(Spelling)
 			continue
 		Seen[Spelling] := true
-		Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptConfigDir.Bind(Rules, Known))
+		Spellings.Push(Spelling)
 	}
-	return Text
+	return Spellings
+}
+
+; Appends the passes that mask the folder and file names under the
+; configuration directory, in every spelling of the directory.
+; @param Passes {Array} The prepared passes, extended in place.
+; @param Rules {Map}
+; @param Known {Map} The lower-cased names the product ships.
+; @param Dir {String} The directory as the text spells it.
+; @param Folded {Boolean}
+_Redact_AddConfigDirPasses(Passes, Rules, Known, Dir, Folded) {
+	for Spelling in _Redact_Spellings(Dir)
+		Passes.Push({ Needle: Spelling, Folded: Folded, Accept: _Redact_AcceptConfigDir.Bind(Rules, Known) })
+}
+
+; Appends the passes that replace the home folder, in both slash styles, by its
+; placeholder.
+; @param Passes {Array} The prepared passes, extended in place.
+; @param Rules {Map}
+; @param Home {String}
+; @param Folded {Boolean}
+_Redact_AddHomePasses(Passes, Rules, Home, Folded) {
+	for Spelling in _Redact_Spellings(Home)
+		Passes.Push({ Needle: Spelling, Folded: Folded, Accept: _Redact_AcceptHome.Bind(Rules) })
 }
 
 ; Replaces the home folder, in both slash styles, by its placeholder.
@@ -392,15 +410,20 @@ _Redact_MaskConfigDir(Text, Rules, Dir, Folded) {
 ; @param Folded {Boolean}
 ; @returns {String}
 _Redact_Home(Text, Rules, Home, Folded) {
-	Home := RegExReplace(Home, "[/\\]+$")
-	if (Home == "")
-		return Text
-	Seen := Map()
-	for Spelling in [Home, StrReplace(Home, "\", "/"), StrReplace(Home, "/", "\")] {
-		if Seen.Has(Spelling)
-			continue
-		Seen[Spelling] := true
-		Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptHome.Bind(Rules))
+	Passes := []
+	_Redact_AddHomePasses(Passes, Rules, Home, Folded)
+	return _Redact_RunPasses(Text, Passes)
+}
+
+; Runs prepared passes in order. A pass whose needle the text does not hold
+; leaves the text as it is, so it is skipped with one native search.
+; @param Text {String}
+; @param Passes {Array} { Needle, Folded, Accept } per pass.
+; @returns {String}
+_Redact_RunPasses(Text, Passes) {
+	for Pass in Passes {
+		if InStr(Text, Pass.Needle, Pass.Folded ? false : true)
+			Text := _Redact_Replace(Text, Pass.Needle, Pass.Folded, Pass.Accept)
 	}
 	return Text
 }
@@ -430,43 +453,79 @@ _Redact_AcceptAccount(Rules, Text, First, Last) {
 ;   its paths compare case-insensitively.
 ; @returns {String}
 Redact_Apply(Text, Rules, Context) {
+	return Redact_ApplyPrepared(Text, Redact_Prepare(Rules, Context))
+}
+
+; Resolves the rules and the context once into the ordered passes every text
+; goes through: the shipped names, the folder spellings and the account-name
+; length depend on them alone. A caller redacting many texts with one context
+; (the logger, one flush of lines) prepares once instead of once per text.
+; @param Rules {Map} Parsed _shared/diagnostics/data/redaction.json.
+; @param Context {Map} As Redact_Apply takes it.
+; @returns {Array} The passes Redact_ApplyPrepared runs.
+; @throws {TypeError|ValueError} On rules Redact_Apply refuses.
+Redact_Prepare(Rules, Context) {
 	if !(Rules is Map)
 		throw TypeError("redact: Rules must be the parsed redaction.json.")
+	Redact_PrepareCount(1)
 	Folded := Context.Get("case_insensitive", false) ? true : false
+	Passes := []
 	for Token in Rules["token_prefixes"] {
-		; Validated before scanning, so a bad rule fails even on text that never
-		; contains its prefix
+		; Validated here, so a bad rule fails even on text that never contains
+		; its prefix
 		if !(Token["charset"] == "alnum" || Token["charset"] == "word"
 			|| Token["charset"] == "word_dash" || Token["charset"] == "jwt")
 			throw ValueError("redact: unknown charset '" . Token["charset"] . "'.")
-		Text := _Redact_Replace(Text, Token["prefix"], false,
-			_Redact_AcceptToken.Bind(Rules, Token))
+		Passes.Push({ Needle: Token["prefix"], Folded: false, Accept: _Redact_AcceptToken.Bind(Rules, Token) })
 	}
-	Text := _Redact_Replace(Text, "://", false, _Redact_AcceptUrlCredential.Bind(Rules))
-	Text := _Redact_Replace(Text, "bearer", true, _Redact_AcceptBearer.Bind(Rules))
+	Passes.Push({ Needle: "://", Folded: false, Accept: _Redact_AcceptUrlCredential.Bind(Rules) })
+	Passes.Push({ Needle: "bearer", Folded: true, Accept: _Redact_AcceptBearer.Bind(Rules) })
 	for Key in Rules["secret_keys"]
-		Text := _Redact_Replace(Text, Key, true, _Redact_AcceptKeyValue.Bind(Rules))
+		Passes.Push({ Needle: Key, Folded: true, Accept: _Redact_AcceptKeyValue.Bind(Rules) })
 
 	for Setting in ["path_name_max_words", "config_placeholder", "config_name_placeholder", "config_known_names"] {
 		if !Rules.Has(Setting)
 			throw ValueError("redact: the rules lack the path name and configuration directory settings.")
 	}
+	Known := Map()
+	for Name in Rules["config_known_names"]
+		Known[_Redact_AsciiLower(Name)] := true
 	; The directory is searched as it is spelled, then as the home pass leaves it
 	; (a log written earlier already holds "~" for the home folder)
 	ConfigDir := Context.Get("config_dir", "")
 	Home := Context.Get("home", "")
 	if (ConfigDir != "")
-		Text := _Redact_MaskConfigDir(Text, Rules, ConfigDir, Folded)
-	Text := _Redact_Home(Text, Rules, Home, Folded)
+		_Redact_AddConfigDirPasses(Passes, Rules, Known, ConfigDir, Folded)
+	_Redact_AddHomePasses(Passes, Rules, Home, Folded)
 	if (ConfigDir != "")
-		Text := _Redact_MaskConfigDir(Text, Rules, _Redact_Home(ConfigDir, Rules, Home, Folded), Folded)
+		_Redact_AddConfigDirPasses(Passes, Rules, Known, _Redact_Home(ConfigDir, Rules, Home, Folded), Folded)
 
 	for Marker in Rules["foreign_home_markers"]
-		Text := _Redact_Replace(Text, Marker, true, _Redact_AcceptForeignHome.Bind(Rules))
-	Text := _Redact_Replace(Text, "@", false, _Redact_AcceptEmail.Bind(Rules))
+		Passes.Push({ Needle: Marker, Folded: true, Accept: _Redact_AcceptForeignHome.Bind(Rules) })
+	Passes.Push({ Needle: "@", Folded: false, Accept: _Redact_AcceptEmail.Bind(Rules) })
 
 	User := Context.Get("user", "")
 	if (User != "" && _Redact_CodePointCount(User) >= Rules["min_account_name_length"])
-		Text := _Redact_Replace(Text, User, Folded, _Redact_AcceptAccount.Bind(Rules))
-	return Text
+		Passes.Push({ Needle: User, Folded: Folded, Accept: _Redact_AcceptAccount.Bind(Rules) })
+	return Passes
+}
+
+; Redacts one text with passes Redact_Prepare resolved.
+; @param Text {String}
+; @param Passes {Array} A Redact_Prepare result.
+; @returns {String}
+Redact_ApplyPrepared(Text, Passes) {
+	if !(Passes is Array)
+		throw TypeError("redact: the passes must come from Redact_Prepare.")
+	return _Redact_RunPasses(Text, Passes)
+}
+
+; How many times rules and a context were prepared since the process started,
+; so a caller that redacts many texts can prove it prepared them once.
+; @param Added {Integer} Preparations to record, 0 to only read.
+; @returns {Integer}
+Redact_PrepareCount(Added := 0) {
+	static Count := 0
+	Count += Added
+	return Count
 }

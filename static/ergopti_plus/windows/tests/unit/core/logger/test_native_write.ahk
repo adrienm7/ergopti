@@ -586,6 +586,36 @@ _LNWPrivacyIdentities() {
 }
 Test("Logger privacy: an email, a URL credential and another account's folder are masked at write time", _LNWPrivacyIdentities)
 
+; boot-log-redaction-prepare-2026-11-22: the redactor resolved its rules and
+; context (the shipped names, every folder spelling) once per record, about a
+; millisecond a line on the main thread, about 300 ms of the boot's first flush.
+; A batch prepares them once and still redacts every record as Redact_Apply does.
+_LNWPrivacyBatchPreparesOnce() {
+	global _SharedDir, _ConfigDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"], _ConfigDir]
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		_ConfigDir := "D:\Private Folder\Ergopti\"
+		Config := _LoggerPrivacyConfig()
+		Records := [], Blob := "", Expected := ""
+		loop 6 {
+			Prefix := "2026-10-10 09:00:0" . A_Index . ":123 [INFO] [logger] "
+			Body := "line " . A_Index . " of privacy-user in C:\Users\privacy-user\x and " . _ConfigDir . "Secret Pack\p.toml"
+			Records.Push(Prefix . Body)
+			Blob .= Prefix . Body . "`r`n"
+			Expected .= Prefix . Redact_Apply(Body, Config["rules"], Config["context"]) . "`r`n"
+		}
+		Before := Redact_PrepareCount()
+		Masked := _LoggerPrivacyBlob(Blob, Config, Records)
+		AssertEqual(Before + 1, Redact_PrepareCount(), "a batch of six records prepares the redactor once")
+		AssertEqual(Expected, Masked, "every record is redacted as Redact_Apply redacts it")
+		AssertFalse(InStr(Masked, "Secret Pack", true), "a name under the configuration directory reached the batch")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2], _ConfigDir := Saved[3]
+	}
+}
+Test("Logger privacy: a batch prepares the redactor once (boot-log-redaction-prepare-2026-11-22)", _LNWPrivacyBatchPreparesOnce)
+
 _LNWPrivacyRegister() {
 	local PrivacyUser
 	for PrivacyUser in ["privacy-user", "2026", "ERROR", "logger"]

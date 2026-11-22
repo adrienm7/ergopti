@@ -433,8 +433,11 @@ _LoggerPrivacyAdmitted() {
 
 /** Preserves core metadata while applying canonical redaction to every body. */
 _LoggerPrivacyBlob(Blob, Config, Records := 0) {
+	; One preparation serves the whole batch: preparing per record cost about a
+	; millisecond a line, about 300 ms of the boot's first flush on the main thread.
+	Passes := Redact_Prepare(Config["rules"], Config["context"])
 	if !(Records is Array)
-		return Redact_Apply(Blob, Config["rules"], Config["context"])
+		return Redact_ApplyPrepared(Blob, Passes)
 	Original := "", Result := ""
 	for Record in Records {
 		if !(Record is String)
@@ -443,11 +446,11 @@ _LoggerPrivacyBlob(Blob, Config, Records := 0) {
 		; Only the first prefix belongs to this detached queue entry. A body may
 		; contain newlines and prefix-like text, which remain untrusted together.
 		if RegExMatch(Record, "s)^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(?::[0-9]{3})? \[(?:DEBUG|TRACE|DONE|INFO|START|SUCCESS|WARNING|ERROR)\] \[[^\]\r\n]+\] )(.*)$", &Parts)
-			Result .= Parts[1] . Redact_Apply(Parts[2], Config["rules"], Config["context"]) . "`r`n"
+			Result .= Parts[1] . Redact_ApplyPrepared(Parts[2], Passes) . "`r`n"
 		else if RegExMatch(Record, "^===== [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3} " . Chr(0x2014) . " ErgoptiPlus session opened =====$")
 			Result .= Record . "`r`n"
 		else
-			Result .= Redact_Apply(Record, Config["rules"], Config["context"]) . "`r`n"
+			Result .= Redact_ApplyPrepared(Record, Passes) . "`r`n"
 	}
 	if !(Original == Blob)
 		throw Error("Logger batch differs from its source-owned entries.")
