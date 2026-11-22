@@ -635,7 +635,9 @@ FEATURES & RATIONALE:
 		font-size: 0.9rem;
 		line-height: 1.6;
 		margin: 18px auto 0;
-		max-width: 640px;
+		/* Also in ch: 640 px held 81 characters of English in a narrow font,
+		   past the 80 of WCAG 1.4.8 (a ch, a digit, is wider than a letter). */
+		max-width: min(640px, 60ch);
 		text-align: center;
 	}
 
