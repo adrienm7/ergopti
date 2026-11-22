@@ -3,11 +3,11 @@
 ; ==============================================================================
 ; MODULE: Action & Slot Pickers (GUI dialogs)
 ; DESCRIPTION:
-; Searchable GUI pickers for assigning actions to script/keyboard shortcut slots
-; (ShowKeyboardSlotPicker, ShowActionPicker, ShowKeyboardShortcutPicker) and the
-; config-paths editor (FilePathsEditor). Extracted verbatim from ErgoptiPlus.ahk
-; (the entry-point decomposition) and #Include'd in place; functions are hoisted so
-; their menu call sites are unaffected.
+; Pickers for assigning actions to keyboard shortcut slots and the config-paths
+; editor entry. ShowKeyboardSlotPicker is a native ListBox, its only form.
+; ShowActionPicker and FilePathsEditor open shared WebView pages only and refuse
+; without WebView2: their native fallbacks were removed (maintainer decision
+; 2026-11-21). Functions are hoisted so their menu call sites are unaffected.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
@@ -76,121 +76,12 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 				throw TypeError("Picker items are an Array.", -1, Type(Items))
 		if (Items is Array) && (Slot is Map)
 				throw ValueError("A picker slot already brings its own items.", -1)
-		; Prefer the shared WebView2 picker (identical UI to macOS and Linux). It
-		; receives the ordered items of the generated catalogue, headings already
-		; localized with their level; the page injects its own native/none rows.
-		; The native searchable ListBox below remains as an automatic fallback.
+		; The shared WebView2 picker is the only one (identical UI to macOS and
+		; Linux). It receives the ordered items of the generated catalogue,
+		; headings already localized with their level; the page injects its own
+		; native/none rows. Without WebView2 it refuses with the shared message.
 		PickerItems := (Slot is Map) ? Slot["items"] : (Items is Array) ? Items : GestureActionPickerItems()
-		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId, AfterClose)
-				return
-		AllItems := []
-		_PushItem(Id, Label, Cat) {
-				AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
-		}
-		if ShowNative
-				_PushItem("__native__", t("tap_hold.tap.none"), "")
-		_PushItem("none", t("dialog.action_picker.disabled"), "")
-		; The ListBox has one level of grouping: every heading, whatever its
-		; level, starts the category the rows below it are shown under.
-		CurrentCat := ""
-		for _, Item in PickerItems {
-				if Item.HasOwnProp("Id") && Item.Id == "run_program"
-						&& (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
-				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
-						continue
-				; A ListBox cannot grey a row, so this fallback leaves it out.
-				if (Item.Type = "heading")
-						CurrentCat := Item.Text
-				else if !Item.HasOwnProp("Disabled")
-						_PushItem(Item.Id, Item.Label, CurrentCat)
-		}
-		BuildListRows(Items) {
-				Ids := []
-				Labels := []
-				LastCat := Chr(0)
-				for Item in Items {
-						if (Item.Cat != "" and Item.Cat != LastCat) {
-								Ids.Push("")
-								Labels.Push("▸ " . Item.Cat)
-								LastCat := Item.Cat
-						}
-						Ids.Push(Item.Id)
-						Labels.Push("    " . Item.Label)
-				}
-				return { Ids: Ids, Labels: Labels }
-		}
-		Rows := BuildListRows(AllItems)
-		FilteredIds := Rows.Ids
-		SelectedIdx := 0
-		LookupId := (Current == "") ? "__native__" : Current
-		for i, Id in FilteredIds {
-				if (Id == LookupId) {
-						SelectedIdx := i
-						break
-				}
-		}
-		W := Gui_Create("", Title)
-		W.OnEvent("Close", _ActionPickerNativeClose)
-		W.OnEvent("Escape", _ActionPickerNativeClose)
-		Gui_SetFont(W, "s10", "Segoe UI")
-		W.MarginX := 12
-		W.MarginY := 12
-		W.Add("Text", "xm", t("dialog.action_picker.label"))
-		SearchEdit := W.Add("Edit", "xm w340")
-		LB := W.Add("ListBox", "xm w340 r20", Rows.Labels)
-		if (SelectedIdx > 0)
-				LB.Choose(SelectedIdx)
-		W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", ConfirmPick)
-		W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
-		W.Show()
-		SearchEdit.OnEvent("Change", FilterList)
-		FilterList(*) {
-				Query := StrLower(SearchEdit.Value)
-				Matched := []
-				if (Query == "") {
-						Matched := AllItems
-				} else {
-						for Item in AllItems {
-								if InStr(StrLower(Item.Label), Query)
-										Matched.Push(Item)
-						}
-				}
-				NewRows := BuildListRows(Matched)
-				FilteredIds := NewRows.Ids
-				LB.Delete()
-				LB.Add(NewRows.Labels)
-				for i, Id in FilteredIds {
-						if (Id != "") {
-								LB.Choose(i)
-								break
-						}
-				}
-		}
-		ConfirmPick(*) {
-				Idx := LB.Value
-				if (Idx = 0)
-						return
-				ChosenId := FilteredIds[Idx]
-				if (ChosenId == "")
-						return
-				Mapped := (ChosenId == "__native__") ? "" : ChosenId
-				if HasMethod(AfterClose, "Call") {
-						; A refused pick keeps this dialog open for another pick.
-						if !_ActionPickerSlotCommitted(OnConfirm, Mapped)
-								return
-						W.Destroy()
-						AfterClose.Call(Mapped)
-						return
-				}
-				; A refused assignment (false) keeps the dialog open for a retry,
-				; as the WebView picker does (PCK-15).
-				Result := OnConfirm(Mapped)
-				if (Result is Integer) && Result == 0 {
-						try LoggerWarn("ActionPicker", "The pick '{1}' was refused. The picker stays open.", Mapped)
-						return
-				}
-				W.Destroy()
-		}
+		return _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId, AfterClose)
 }
 
 ; Commits a slot's pick while its picker is open (ShowActionPicker's Slot).
@@ -219,38 +110,7 @@ ShowKeyboardShortcutPicker(SlotId) {
 }
 
 FilePathsEditor(*) {
-		global _ConfigDir, _PathsFile
-		; Prefer the shared WebView2 editor (identical UI to macOS); the native
-		; single-field dialog below remains as an automatic fallback.
-		if _PathsEdWeb_TryOpen()
-				return
-		W := Gui_Create(, t("dialog.config_folder.window_title"))
-		_PathsEdNative_BindCancellation(W)
-		Gui_SetFont(W, "s10", "Segoe UI")
-		W.MarginX := 12
-		W.MarginY := 12
-		W.Add("Text", "xm w400", t("dialog.config_folder.label"))
-		DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
-		W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => _PathsEdNative_Browse(W, DirEdit))
-		ConfirmPath(*) {
-				N := StrReplace(Trim(DirEdit.Value), "/", "\")
-				if (N == "")
-						N := _DefaultConfigDir
-				if !RegExMatch(N, "\\$")
-						N .= "\"
-				if (N == _ConfigDir) {
-						W.Destroy()
-						return
-				}
-				; Shares the single hardened writer with the WebView2 editor. This used
-				; to be a verbatim copy of that block from before it was hardened: an
-				; unprotected FileOpen and an `if f` with no else, so a read-only or
-				; locked target discarded the user's chosen directory in silence and the
-				; the writer's owned Reload dropped them back into the OLD one with no
-				; error shown.
-				if !_PathsFile_Write(N)
-						return
-		}
-		W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", ConfirmPath)
-		W.Show("Center")
+		; The shared WebView2 editor is the only one (identical UI to macOS); without
+		; WebView2 it refuses with the shared message.
+		return _PathsEdWeb_TryOpen()
 }

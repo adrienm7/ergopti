@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 
 ; Configured into the updater's staging producer by root boot, never the page.
 ; @param Failure {Map} Native valid/reason/receipt envelope from the staging parser.
@@ -45,24 +46,17 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 	RenderWork := 0
 	RenderBudget := 0
 	TimerFn := SetTimer
-	NativeMode := false
 	TerminalClosedFn := 0
-	FallbackFn := 0
 
-	static Show(Receipt, Owner, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0, SafeReport := false, TitleKey := "download_window.window_title", FallbackFn := 0, ClosedFn := 0) {
+	static Show(Receipt, Owner, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0, SafeReport := false, TitleKey := "download_window.window_title", ClosedFn := 0) {
 		_ManagedNetworkWindows_RequireInitialized()
 		Existing := ManagedDownloadFailureWindow.Current
-		if IsObject(Existing) && Existing.NativeMode {
-			Existing.Close()
-			Existing := ManagedDownloadFailureWindow.Current
-		}
 		if IsObject(Existing) && !Existing.ResetDone && !Existing.Cancelled {
 			PublishFn := SafeReport ? Existing.Failure.PublishReport.Bind(Existing.Failure) : Existing.Failure.Publish.Bind(Existing.Failure)
 			if Existing.Building || !PublishFn.Call(Receipt, Owner, IsCurrentFn, RetryFn, OwnedFolderFn)
 				return false
 			OldClosed := Existing.TerminalClosedFn
 			Existing.TerminalClosedFn := ClosedFn
-			Existing.FallbackFn := FallbackFn
 			Existing.Opts["Title"] := t(TitleKey)
 			if HasMethod(OldClosed, "Call")
 				OldClosed.Call()
@@ -76,21 +70,35 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		Host.Failure := ManagedDownloadFailureSession()
 		Host.Opts := Map("Title", t(TitleKey), "NoActivate", true)
 		Host.TerminalClosedFn := ClosedFn
-		Host.FallbackFn := FallbackFn
 		PublishFn := SafeReport ? Host.Failure.PublishReport.Bind(Host.Failure) : Host.Failure.Publish.Bind(Host.Failure)
 		if !PublishFn.Call(Receipt, Owner, IsCurrentFn, RetryFn, OwnedFolderFn)
 			return false
+		; No native window stands in for the page (maintainer decision
+		; 2026-11-21): without WebView2 the failure stays visible as a notice.
+		if (WebView_UnavailableReason() != "") {
+			ManagedNetworkFailureWindows_ShowNotice(Host.Failure.Report["message_key"], Host.Failure.IsCurrentFn)
+			Host.Failure.Close()
+			return false
+		}
 		if !Host._ReserveCurrent(Existing) {
 			Host.Failure.Close()
 			return false
 		}
+		MessageKey := Host.Failure.Report["message_key"], ProducerCurrent := Host.Failure.IsCurrentFn
 		try Built := Host._Build()
 		catch Any as Err {
 			LoggerWarn("ManagedDownload", "The failure window could not be built (error_type={1}).", Type(Err))
-			return Host._InitialFallback()
+			Built := false
 		}
-		if !Built || Host.Cancelled || !Host._FailureIsCurrent(Owner, Host.Failure.Epoch)
-			return Host._InitialFallback()
+		if !Built || Host.Cancelled || !Host._FailureIsCurrent(Owner, Host.Failure.Epoch) {
+			UserClosed := Host.CloseRequested
+			Host.Close()
+			; No native window stands in for the page (maintainer decision
+			; 2026-11-21): a failure the page could not show stays a notice.
+			if !Built && !UserClosed
+				ManagedNetworkFailureWindows_ShowNotice(MessageKey, ProducerCurrent)
+			return false
+		}
 		PreviousCritical := Critical("On")
 		try {
 			Admitted := ManagedDownloadFailureWindow.Current == Host && !WebViewHost._Instances.Has("download_window")
@@ -284,7 +292,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 				this._CancelRenderAcknowledgement(Work)
 				return true
 			}
-			this._SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch, Work)
+			this._SurfaceNotice(ExpectedWindowEpoch, Owner, FailureEpoch, Work)
 			return false
 		}
 		try Accepted := this.Failure.Handle(Payload, CurrentFn)
@@ -369,7 +377,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		try this.TimerFn.Call(Work.ack_timer, -Remaining)
 		catch Any as Err {
 			LoggerWarn("ManagedDownload", "The rendering deadline could not be registered (error_type={1}).", Type(Err))
-			this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+			this._SurfaceNotice(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
 			return false
 		}
 		return true
@@ -411,28 +419,24 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		if Remaining > 0 {
 			try this.TimerFn.Call(Work.ack_timer, -Remaining)
 			catch
-				return this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+				return this._SurfaceNotice(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
 			return false
 		}
 		; Pause suppresses the notice, never retirement of expired action consent.
-		return this._SurfaceFallback(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
+		return this._SurfaceNotice(Work.window_epoch, Work.owner, Work.failure_epoch, Work)
 	}
 
 	_ScriptSettled(ExpectedWindowEpoch, Owner, FailureEpoch, NativeSucceeded) {
 		if !NativeSucceeded
-			this._SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch)
+			this._SurfaceNotice(ExpectedWindowEpoch, Owner, FailureEpoch)
 	}
 
-	_SurfaceFallback(ExpectedWindowEpoch, Owner, FailureEpoch, ExpectedWork := 0) {
+	; A page that cannot render its failure closes, and the failure stays a notice.
+	_SurfaceNotice(ExpectedWindowEpoch, Owner, FailureEpoch, ExpectedWork := 0) {
 		Detached := this._DetachForClose(ExpectedWindowEpoch, Owner, FailureEpoch, ExpectedWork)
 		if !IsObject(Detached)
 			return false
-		Fallback := this.FallbackFn
-		if HasMethod(Fallback, "Call")
-			Detached.closed_fn := 0
 		this._FinishClose(Detached)
-		if HasMethod(Fallback, "Call")
-			return _ManagedNetworkWindows_True(Fallback.Call())
 		; The captured producer admission is separate from the retired presentation.
 		return ManagedNetworkFailureWindows_ShowNotice(Detached.message_key, Detached.producer_current)
 	}
@@ -457,7 +461,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		if this._CaptureDocument(Source, ExpectedWindowEpoch)
 			this._FlushQueue()
 		else
-			this._SurfaceFallback(ExpectedWindowEpoch, this.Failure.Owner, this.Failure.Epoch)
+			this._SurfaceNotice(ExpectedWindowEpoch, this.Failure.Owner, this.Failure.Epoch)
 	}
 
 	; All private consent and work is detached before any cancellation or native call.
@@ -510,14 +514,6 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		} finally {
 			Critical(PreviousCritical)
 		}
-	}
-
-	_InitialFallback() {
-		Fallback := this.FallbackFn
-		if HasMethod(Fallback, "Call")
-			this.TerminalClosedFn := 0
-		this.Close()
-		return HasMethod(Fallback, "Call") ? _ManagedNetworkWindows_True(Fallback.Call()) : false
 	}
 
 	Close() {
@@ -593,11 +589,10 @@ class ManagedNetworkTerminalFailure {
 		CurrentFn := () => ManagedNetworkTerminalFailure.Current(Scope, Owner)
 		ClosedFn := () => ManagedNetworkTerminalFailure.Invalidate(Scope, Owner)
 		Retry := HasMethod(RetryFn, "Call") ? () => ManagedNetworkTerminalFailure.Retry(Scope, Owner, RetryFn) : 0
-		Fallback := () => ManagedNativeFailureWindow.ShowReport(Owner.Report, Owner, CurrentFn, Owner.TitleKey, Retry, ClosedFn)
 		try {
 			Accepted := HasMethod(PresentFn, "Call")
-				? PresentFn.Call(Owner.Report, Owner, CurrentFn, Retry, ClosedFn, Fallback)
-				: ManagedDownloadFailureWindow.Show(Owner.Report, Owner, CurrentFn, Retry, 0, true, TitleKey, Fallback, ClosedFn)
+				? PresentFn.Call(Owner.Report, Owner, CurrentFn, Retry, ClosedFn)
+				: ManagedDownloadFailureWindow.Show(Owner.Report, Owner, CurrentFn, Retry, 0, true, TitleKey, ClosedFn)
 		} catch {
 			Accepted := false
 		}
@@ -612,84 +607,5 @@ class ManagedNetworkTerminalFailure {
 		if !this.Current(Scope, Owner) || !this.Retire(Scope, Owner)
 			return false
 		return _ManagedNetworkWindows_True(RetryFn.Call())
-	}
-}
-
-; The native fallback shares manifest geometry, singleton and exact action
-; session with the WebView presenter. Only captured native controls can act.
-class ManagedNativeFailureWindow extends ManagedDownloadFailureWindow {
-	NativeMode := true
-	NativeButtons := []
-
-	static ShowReport(Report, Owner, CurrentFn, TitleKey, RetryFn := 0, ClosedFn := 0) {
-		if !ManagedNetworkFailureWindows_CanonicalReport(Report) || !_ManagedNetworkWindows_Current(CurrentFn)
-			return false
-		Previous := ManagedDownloadFailureWindow.Current
-		if IsObject(Previous)
-			Previous.Close()
-		if !_ManagedNetworkWindows_Current(CurrentFn)
-			return false
-		WebViewHost._LoadManifest()
-		Host := ManagedNativeFailureWindow()
-		Host.AppId := "download_window"
-		Host.Opts := Map("Title", t(TitleKey))
-		Host.Failure := ManagedDownloadFailureSession()
-		Host.TerminalClosedFn := ClosedFn
-		if !Host.Failure.PublishReport(Report, Owner, CurrentFn, RetryFn) || !Host._ReserveCurrent(0) {
-			Host.Close()
-			return false
-		}
-		try {
-			Host.Building := true
-			Geo := Host._Geometry()
-			Host.Epoch += 1
-			Host.ResetDone := false
-			Host.Gui := Host._NewWindow(Geo.min_w . "x" . Geo.min_h)
-			Host.Gui.MarginX := 20
-			Host.Gui.MarginY := 16
-			Host.Gui.Add("Text", "xm ym w" . (Geo.w - 40) . " h140", t(Host.Failure.Report["message_key"]))
-			for Action in Host.Failure.Report["actions"] {
-				Button := Host.Gui.Add("Button", "xm y+8 w" . (Geo.w - 40) . " h30", t(Action["label_key"]))
-				Host.NativeButtons.Push(Button)
-				Payload := Map("action", "failure_action", "id", Action["id"], "session", Host.Failure.Id, "epoch", Host.Failure.Epoch)
-				Button.OnEvent("Click", Host.NativeAction.Bind(Host, Host.Epoch, Host.Gui, Button, Payload))
-			}
-			Host.Gui.OnEvent("Close", (*) => Host.Close())
-			Host.Gui.OnEvent("Escape", (*) => Host.Close())
-			Host.Building := false
-			if !_ManagedNetworkWindows_Current(CurrentFn) || ManagedDownloadFailureWindow.Current != Host
-				throw Error("The terminal native owner was replaced while building.")
-			if WebViewHost._Instances.Has(Host.AppId)
-				throw Error("The terminal native singleton was replaced while building.")
-			WebViewHost._Instances[Host.AppId] := Host
-			Host.Gui.Show("NoActivate w" . Geo.w . " h" . Geo.h . " Center")
-			if !Host.NativeCurrent(Host.Epoch, Host.Gui)
-				throw Error("The terminal native owner was replaced while showing.")
-			return true
-		} catch {
-			Host.Building := false
-			Host.Close()
-			return false
-		}
-	}
-
-	NativeCurrent(Epoch, Gui) {
-		return !this.Cancelled && !this.ResetDone && !this.Building && !A_IsSuspended
-			&& this.Epoch == Epoch && this.Gui == Gui && ManagedDownloadFailureWindow.Current == this
-			&& WebViewHost._Instances.Get(this.AppId, 0) == this
-	}
-
-	NativeAction(Epoch, Gui, Button, Payload, Sender, *) {
-		if Sender != Button || !this.NativeCurrent(Epoch, Gui)
-			return false
-		Owner := this.Failure.Owner
-		FailureEpoch := this.Failure.Epoch
-		CurrentFn := () => this.NativeCurrent(Epoch, Gui) && this.Failure.IsCurrent(Owner, FailureEpoch)
-		try Accepted := this.Failure.Handle(Payload, CurrentFn)
-		catch
-			Accepted := false
-		if this.Failure.Owner == 0 && this.Failure.Epoch == FailureEpoch + 1
-			this.Close()
-		return Accepted
 	}
 }

@@ -52,7 +52,7 @@ class _CWOC_Controller {
 }
 class _CWOC_Environment {
 	__New(Mode) {
-		this.Mode := Mode, this.Controllers := [], this.Calls := 0, this.ActorDone := false, this.Reopened := false, this.Fallbacks := 0, this.Fetches := 0
+		this.Mode := Mode, this.Controllers := [], this.Calls := 0, this.ActorDone := false, this.Reopened := false, this.Refusals := 0, this.Fetches := 0
 	}
 	CreateCoreWebView2ControllerAsync(Hwnd) {
 		this.Calls += 1
@@ -192,18 +192,18 @@ _CWOC_OpenGeneration(Mode) {
 	PreviousCritical := Critical("Off")
 	Environment := _CWOC_Environment(Mode)
 	global _CWOC_CurrentEnvironment := Environment
-	_CWOC_Require(!_Updater_OpenChangelogWindow.HasOwnProp("Call") && !_CLW_FetchAndInject.HasOwnProp("Call"), "effect guards begin from the real functions")
+	_CWOC_Require(!WebView_RefuseUnavailable.HasOwnProp("Call") && !_CLW_FetchAndInject.HasOwnProp("Call"), "effect guards begin from the real functions")
 	PreviousRegister := Gui.Prototype.GetOwnPropDesc("OnEvent")
 	ShowState := {Fired: false, Close: Mode == "show-close", Register: PreviousRegister.Call,
 		Window: 0, Hwnd: 0, Subclass: 0, ActiveCallbacks: 0, NativeShows: 0, NativeCloses: 0,
 		OwnerAbsent: false, CloseEntered: false, CriticalAtShow: -1, Failure: 0}
 	if InStr(Mode, "show-") == 1
 		Gui.Prototype.DefineProp("OnEvent", {Call: _CWOC_ShowRegister.Bind(ShowState)})
-	_Updater_OpenChangelogWindow.DefineProp("Call", {Call: _CWOC_NativeFallback})
+	WebView_RefuseUnavailable.DefineProp("Call", {Call: _CWOC_Refusal})
 	_CLW_FetchAndInject.DefineProp("Call", {Call: _CWOC_RejectFetch})
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_CWOC_Require(_CLW_WebView2Available(), "the genuine vendored SDK loader must be present")
+		_CWOC_Require(WebView_UnavailableReason() == "", "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		try {
 			if InStr(Mode, "native-fault-") == 1
@@ -255,7 +255,7 @@ _CWOC_OpenGeneration(Mode) {
 			if !InStr(Mode, "refusal")
 				_CWOC_Equal(1, Environment.Controllers[1].Closed, "the exact late-created controller must retire once")
 		}
-		_CWOC_Equal(Mode == "cold-refusal" ? 1 : 0, Environment.Fallbacks, "only a current initial refusal may open the native fallback")
+		_CWOC_Equal(Mode == "cold-refusal" ? 1 : 0, Environment.Refusals, "only a current initial refusal may refuse, and once")
 		_CWOC_Equal(0, Environment.Fetches, "the constructor component must not fetch releases")
 	} finally {
 		if InStr(Mode, "show-") == 1
@@ -265,7 +265,7 @@ _CWOC_OpenGeneration(Mode) {
 		for Controller in Environment.Controllers
 			if !Controller.Closed
 				Controller.Close()
-		_Updater_OpenChangelogWindow.DeleteProp("Call")
+		WebView_RefuseUnavailable.DeleteProp("Call")
 		_CLW_FetchAndInject.DeleteProp("Call")
 		_CWOC_CurrentEnvironment := 0
 		_WebView_SharedEnv := PreviousEnv, _WebView_SharedEnvRetired := PreviousRetired
@@ -276,10 +276,12 @@ _CWOC_OpenGeneration(Mode) {
 _CWOC_PublicOpen() {
 	Changelog_Open(UpdateChannels_Ids()[1])
 }
-_CWOC_NativeFallback(Self, Channel, Request) {
+; The shared refusal, counted instead of shown: there is no native Versions window.
+_CWOC_Refusal(Self, Surface, Reason, VersionFn := 0) {
 	global _CWOC_CurrentEnvironment
-	_CWOC_Require(Self == _Updater_OpenChangelogWindow && _Updater_RequestMayPublish(Request), "the native fallback retains actual updater provenance")
-	_CWOC_CurrentEnvironment.Fallbacks += 1
+	_CWOC_Require(Self == WebView_RefuseUnavailable && Surface == "Versions window", "the refusal names the Versions window")
+	_CWOC_CurrentEnvironment.Refusals += 1
+	return false
 }
 _CWOC_RejectFetch(Self, Args*) {
 	global _CWOC_CurrentEnvironment

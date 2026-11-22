@@ -11,12 +11,14 @@
 #Requires AutoHotkey v2.0
 
 global _UCSO := {Mode: A_Args[1], Windows: [], Controllers: [], Pending: 0,
-	Boundary: 0, Failure: 0, RequestB: 0, EpochB: 0, Events: []}
+	Boundary: 0, Failure: 0, RequestB: 0, EpochB: 0, Events: [], Refusals: []}
 global _VendorDir := A_Args[2], _I18nLocale := "en"
 ; The real environment getter and fallback policy take their warm-cache path.
 global _WebView_SharedEnv := {Passive: true}
 
 t(Key) => Key
+; The shared refusal's message box, recorded instead of shown.
+Ui_MsgBox(Text, Title := "", Options := "") => (_UCSO.Refusals.Push(Text), "")
 _Updater_ActivateCachedRelease(*) => false
 
 _UCSO_Require(Condition, Message) {
@@ -144,7 +146,7 @@ _UCSO_OnError(Failure, *) {
 
 _UCSO_Main() {
 	global _UCSO, _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub
-	global _UC_ResetDone, _UC_WindowEpoch, _UC_RequestId, _UC_RetiredHosts, _UC_PendingHost, _UC_Native
+	global _UC_ResetDone, _UC_WindowEpoch, _UC_RequestId, _UC_RetiredHosts, _UC_PendingHost
 	Persistent(true)
 	Thread("Interrupt", 0)
 	OnError(_UCSO_OnError)
@@ -160,15 +162,17 @@ _UCSO_Main() {
 				&& DllCall("User32\IsWindow", "Ptr", _UCSO.Windows[1].hwnd, "Int"),
 				"a refused late controller close must retain its exact HWND and cleanup record")
 			_UCSO_Require(!IsSet(_UC_Gui) && !IsSet(_UC_Controller) && !IsSet(_UC_WebView)
-				&& !IsSet(_UC_MsgSub) && !_UC_Native
+				&& !IsSet(_UC_MsgSub)
 				&& !DllCall("User32\IsWindowVisible", "Ptr", _UCSO.Windows[1].hwnd, "Int"),
-				"a cleanup debt must retain no live global alias or visible fallback")
+				"a cleanup debt must retain no live global alias or visible window")
 			_UCSO_Require(_UpdateCheck_CloseWindow(), "a later close must retry the retained controller")
 		}
 		if _UCSO.Mode == "startup-current-reject" {
-			_UCSO_Require(Accepted && _UC_Native && !_UC_ResetDone && IsSet(_UC_Gui)
+			_UCSO_Require(!Accepted && _UC_ResetDone && !IsSet(_UC_Gui) && _UC_RequestId == 0
 				&& !IsSet(_UC_Controller) && !DllCall("User32\IsWindow", "Ptr", _UCSO.Windows[1].hwnd, "Int"),
-				"a current factory refusal must retire its host before constructing the native fallback")
+				"a current factory refusal must retire its host, drop its check and build no native window")
+			_UCSO_Require(_UCSO.Refusals.Length == 1 && _UCSO.Refusals[1] == "webview.required",
+				"a current factory refusal must show the shared WebView2 message once")
 		} else if _UCSO.Mode == "startup-current" {
 			_UCSO_Require(Accepted && _UC_Controller == _UCSO.Controllers[1]
 				&& _UC_WebView == _UCSO.Controllers[1].CoreWebView2 && IsSet(_UC_MsgSub),

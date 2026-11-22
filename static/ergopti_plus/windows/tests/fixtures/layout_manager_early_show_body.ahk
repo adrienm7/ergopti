@@ -237,7 +237,7 @@ _LMSO_OpenGeneration(Mode) {
 		Environment: Environment, Failure: 0, Register: PreviousRegister.Call}
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present.")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine vendored SDK loader must be present.")
 		Gui.Prototype.DefineProp("OnEvent", {Call: _LMSO_RegisterEvent})
 		OnMessage(0x18, _LMSO_ShowMessage)
 		Thread("Interrupt", 0)
@@ -364,7 +364,7 @@ _LMSO_SettingsGeneration(Mode) {
 		if Mode == "subscription-destroy-throw"
 			Gui.Prototype.DefineProp("Destroy", {Call: _LMSO_DestroyAfterNative})
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		try Started := LayoutManager_Open()
 		catch Any as Failure
@@ -484,7 +484,7 @@ _LMSO_NavigationGeneration(Mode) {
 	Started := false, OpeningFailure := 0, Threw := false
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine SDK loader must be available")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine SDK loader must be available")
 		Thread("Interrupt", 0)
 		try Started := LayoutManager_Open()
 		catch Any as Failure {

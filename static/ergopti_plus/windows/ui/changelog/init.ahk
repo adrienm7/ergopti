@@ -27,6 +27,8 @@
 ;    posts restore_backup; the driver reloads on the restored configuration.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
 
 
@@ -136,12 +138,10 @@ _CLW_OpenCapturedRequest(Channel, Request) {
 	_CLW_Ready   := false
 	_CLW_Queue   := []
 
-	; Bail early if WebView2 is unavailable, or if free RAM is too low to absorb
-	; the Chromium cold start — fall back to the lighter native changelog window.
-	if (!_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()) {
-		_Updater_OpenChangelogWindow(Channel, Request)
-		return
-	}
+	; There is no native Versions window: without WebView2 the opening refuses
+	; in words before building anything (maintainer decision 2026-11-21).
+	if !WebView_RequireAvailable("Versions window")
+		return false
 
 	_CLW_BuildWindow(Channel, Request)
 }
@@ -246,9 +246,10 @@ _CLW_BuildWindow(Channel, Request) {
 			if SavedGui
 				SavedGui.Destroy()
 		}
-		; The epoch belongs to this retirement, before any abort/COM/native callout.
+		; The epoch belongs to this retirement, before any abort/COM/native callout:
+		; only this exact failed opening refuses, a newer one speaks for itself.
 		if SavedGui && ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
-			_Updater_OpenChangelogWindow(Channel, Request)
+			WebView_RefuseUnavailable("Versions window", Err.Message)
 		return false
 	}
 	RequestCurrent := _Updater_RequestMayPublish(Request)
@@ -1402,16 +1403,6 @@ _CLW_ReleaseActiveRequest(Context) {
 _CLW_AbortRequest(Request) {
 	if IsObject(Request)
 		try Request.Abort()
-}
-
-/**
- * Returns true when WebView2 is available and the loader DLL exists.
- * @returns {boolean}
- */
-_CLW_WebView2Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
 }
 
 /**

@@ -20,15 +20,16 @@
 ;    window's GitHub report.
 ; 5. An offered release carries its body with the repository identity the page's
 ;    link policy needs: the page shows the changelog in place, and a clicked link
-;    goes through the allowlist of every manual URL (_Updater_OpenManualUrl). The
-;    native window keeps What's new: its text controls render no Markdown.
+;    goes through the allowlist of every manual URL (_Updater_OpenManualUrl).
 ; 3. One window, bound to the manual check it shows and to an epoch: a late
 ;    answer of another check, or a message of a closed window, is inert.
-; 4. Without WebView2, or when its WebView cannot be created, the same answer
-;    is a native, centered window with the same texts and buttons.
+; 4. Without WebView2, or when its WebView cannot be created, the window
+;    refuses with the shared WebView2 message: it has no native form
+;    (maintainer decision 2026-11-21).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 #Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 ; Geometry is resolved at open time by the existing WebViewHost manifest owner.
@@ -66,12 +67,11 @@ global _UC_RequestId := 0
 global _UC_State     := 0
 global _UC_Release   := 0
 
-; The open window: host Gui, WebView2 or the native fallback
+; The open window: host Gui and its WebView2
 global _UC_Gui         := unset
 global _UC_Controller  := unset
 global _UC_WebView     := unset
 global _UC_MsgSub      := unset
-global _UC_Native      := false
 global _UC_WindowEpoch := 0
 global _UC_ResetDone   := true
 global _UC_RetiredHosts := []
@@ -251,57 +251,6 @@ _UpdateCheck_StateJson(State) {
 	return Json . '}'
 }
 
-; A translation with its named placeholders filled, as the page composes it.
-; @param Key {String}
-; @param Values {Map} placeholder name -> value
-; @returns {String}
-_UpdateCheck_Text(Key, Values := 0) {
-	Text := t(Key)
-	if (Values is Map) {
-		for Name, Value in Values
-			Text := StrReplace(Text, "{" . Name . "}", Value)
-	}
-	return Text
-}
-
-; The texts of the native window, composed like the page's: two lines, today's
-; log for a failure, one line per other channel.
-; @param State {Map}
-; @returns {Map} { line1, line2, logged, others: Array of { text, channel } }
-_UpdateCheck_NativeTexts(State) {
-	Phase := State["state"]
-	Channel := _Updater_ChannelLabel(State["channel"])
-	Line1 := "", Line2 := "", Logged := ""
-	switch Phase {
-		case "checking":
-			Line1 := _UpdateCheck_Text("update_check.checking", Map("channel", Channel))
-		case "up_to_date":
-			Line1 := State["current"]
-			Line2 := _UpdateCheck_Text("update_check.is_latest", Map("channel", Channel))
-		case "available":
-			Line1 := State["latest"]
-			Line2 := _UpdateCheck_Text("update_check.available",
-				Map("current", State["current"], "channel", Channel))
-		case "no_release":
-			Line1 := State["current"]
-			Line2 := _UpdateCheck_Text("updater.no_release_on_channel", Map("channel", Channel))
-		case "error":
-			Line1 := t("update_check.error_heading")
-			Line2 := _UpdateCheck_Text(State["reason_key"], Map("channel", Channel,
-				"tag", State.Get("latest", ""), "current", State.Get("current", "")))
-			Logged := _UpdateCheck_Text("update_check.logged_in", Map("path", State["log_path"]))
-	}
-	Others := []
-	if (Phase == "up_to_date" or Phase == "available" or Phase == "no_release") {
-		for Entry in State.Get("others", []) {
-			Others.Push({ text: _UpdateCheck_Text("update_check.also_available",
-				Map("channel", _Updater_ChannelLabel(Entry["channel"]), "tag", Entry["tag"])),
-				channel: Entry["channel"] })
-		}
-	}
-	return Map("line1", Line1, "line2", Line2, "logged", Logged, "others", Others)
-}
-
 
 
 
@@ -400,7 +349,7 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 	return Outcome
 }
 
-; A native button retains the answer it displays, not whatever a timer finds
+; An action retains the answer the page displays, not whatever a timer finds
 ; later. Direct synchronous callers capture the same owner at their entry.
 _UpdateCheck_CaptureActionOwner() {
 	global _UC_WindowEpoch, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
@@ -482,7 +431,7 @@ _UpdateCheck_NewWindow() {
 ; @param Current {Func|0} Optional exact-state publication predicate.
 ; @returns {Boolean} shown
 _UpdateCheck_Present(State, Reopen := false, Current := 0) {
-	global _UC_State, _UC_ResetDone, _UC_Native, _UC_WindowEpoch, _UC_PresentFn, _UC_Gui
+	global _UC_State, _UC_ResetDone, _UC_WindowEpoch, _UC_PresentFn, _UC_Gui
 	PreviousCritical := Critical("On")
 	try {
 		if IsObject(Current) && !Current.Call()
@@ -494,15 +443,11 @@ _UpdateCheck_Present(State, Reopen := false, Current := 0) {
 		return Accepted && (!IsObject(Current) || Current.Call())
 	}
 	if !_UC_ResetDone {
-		if _UC_Native
-			_UpdateCheck_BuildNative()
-		else {
-			Epoch := _UC_WindowEpoch
-			Json := _UpdateCheck_StateJson(State)
-			if IsObject(Current) && !Current.Call()
-				return false
-			_UpdateCheck_Send(Epoch, Json)
-		}
+		Epoch := _UC_WindowEpoch
+		Json := _UpdateCheck_StateJson(State)
+		if IsObject(Current) && !Current.Call()
+			return false
+		_UpdateCheck_Send(Epoch, Json)
 		if IsObject(Current) && !Current.Call()
 			return false
 		; A result updates the window where it is; only the user's new click
@@ -515,29 +460,26 @@ _UpdateCheck_Present(State, Reopen := false, Current := 0) {
 	return Accepted && (!IsObject(Current) || Current.Call())
 }
 
-; Opens the window: the shared page in WebView2, or its native counterpart.
+; Opens the window: the shared page in WebView2. Without WebView2 it refuses
+; with the shared message; there is no native form.
 ; @returns {Boolean} opened
 _UpdateCheck_Open() {
 	global _VendorDir, _SharedDir, _I18nLocale, UC_VHOST, UC_HOST_ACCESS_ALLOW
-	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
-	global _UC_PendingHost
+	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch
+	global _UC_PendingHost, _UC_RequestId
 	Owner := _UpdateCheck_CaptureActionOwner()
 	LoggerStart("UpdateCheck", "Opening the update-check window…")
 	if !_UpdateCheck_ActionCurrent(Owner)
 		return false
 	_UC_WindowEpoch += 1
 	Epoch := _UC_WindowEpoch
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-		&& !WebView_ShouldUseNativeFallback()
+	; A refused window drops its check: a late answer may not refuse again.
+	if !WebView_RequireAvailable("update-check window") {
+		_UC_RequestId := 0
+		return false
+	}
 	if Epoch != _UC_WindowEpoch
 		return false
-	if !UseWV {
-		_UC_Native := true
-		_UC_ResetDone := false
-		_UpdateCheck_BuildNative()
-		LoggerSuccess("UpdateCheck", "Update-check window opened (native, without WebView2).")
-		return Epoch == _UC_WindowEpoch && !_UC_ResetDone
-	}
 	Geo := WebViewHost.AppGeometry("update_check")
 	G := _UpdateCheck_NewWindow()
 	Host := {gui: G, controller: 0, view: 0, subscription: 0, closing: false,
@@ -550,11 +492,10 @@ _UpdateCheck_Open() {
 		} else {
 			_UC_PendingHost := Host
 			_UC_Gui := G
-			_UC_Native := false
 			_UC_ResetDone := false
 		}
 	} finally Critical(PreviousCritical)
-	Failed := false
+	Failed := false, FailureReason := ""
 	try {
 		if !_UpdateCheck_StartupCurrent(Host)
 			return false
@@ -616,6 +557,7 @@ _UpdateCheck_Open() {
 		return _UpdateCheck_StartupCurrent(Host)
 	} catch as Err {
 		Failed := _UpdateCheck_StartupCurrent(Host)
+		FailureReason := Err.Message
 		LoggerError("UpdateCheck", "WebView2 could not be created for the update-check window: {1}", Err.Message)
 	} finally {
 		PreviousCritical := Critical("On")
@@ -638,14 +580,15 @@ _UpdateCheck_Open() {
 			try Host.gui.Hide()
 		_UpdateCheck_RetireHosts()
 	}
-	if Failed && IsObject(Host.gui) {
-		; A refused controller close still owns its HWND. Leave its record
-		; retryable; a later presentation may open a separate current host.
-		if Epoch == _UC_WindowEpoch
-			_UC_ResetDone := true
+	if !Failed
 		return false
-	}
-	return Failed ? _UpdateCheck_FallBackToNative(Epoch, G) : false
+	; The environment's boot pumps messages: a window the user closed meanwhile
+	; stays closed and a window opened since then speaks for itself. A refused
+	; controller close still owns its HWND: its record stays retryable.
+	Owned := Epoch == _UC_WindowEpoch && !_UC_ResetDone
+	if Owned
+		_UC_ResetDone := true, _UC_RequestId := 0
+	return (Owned && !IsObject(Host.gui)) ? WebView_RefuseUnavailable("update-check window", FailureReason) : false
 }
 
 _UpdateCheck_StartupCurrent(Host) {
@@ -663,121 +606,11 @@ _UpdateCheck_QueueHost(Host) {
 	_UC_RetiredHosts.Push(Host)
 }
 
-; Replaces a WebView2 host whose WebView could not be created (no Evergreen
-; runtime, a boot timeout, another window still booting the shared environment)
-; with the native window. The check and its state stay: the check's answer
-; arrives later, and only a window still showing that check receives it.
-; @param Epoch {Integer} The epoch of the window being opened.
-; @param HostGui {Gui} The WebView2 host, which holds no WebView.
-; @param BuildFn {Func|Integer} Replacement of _UpdateCheck_BuildNative (tests only).
-; @returns {Boolean} opened
-_UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
-	global _UC_Gui, _UC_ResetDone, _UC_WindowEpoch, _UC_Native, _UC_Controller, _UC_WebView, _UC_MsgSub
-	try HostGui.Destroy()
-	; The environment's boot pumps messages: a window the user closed meanwhile
-	; stays closed, and a window opened since then is not replaced
-	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) {
-		LoggerDone("UpdateCheck", "The update-check window was closed while WebView2 was starting.")
-		return false
-	}
-	_UC_Gui := unset
-	_UC_Controller := unset
-	_UC_WebView := unset
-	_UC_MsgSub := unset
-	_UC_Native := true
-	Build := HasMethod(BuildFn, "Call") ? BuildFn : _UpdateCheck_BuildNative
-	Build.Call()
-	LoggerSuccess("UpdateCheck", "Update-check window opened (native, WebView2 could not be created).")
-	return true
-}
-
-; Builds (or rebuilds) the native window for the current state: every text and
-; button centered, like the page.
-_UpdateCheck_BuildNative() {
-	global _UC_Gui, _UC_State
-	Owner := _UpdateCheck_CaptureActionOwner()
-	Previous := IsSet(_UC_Gui) ? _UC_Gui : 0
-	Texts := _UpdateCheck_NativeTexts(_UC_State)
-	Phase := _UC_State["state"]
-	Geo := WebViewHost.AppGeometry("update_check")
-	Width := Geo.w - 40
-	G := _UpdateCheck_NewWindow()
-	G.MarginX := 20
-	G.MarginY := 16
-	Gui_SetFont(G, "s12 bold", "Segoe UI")
-	G.Add("Text", "xm w" . Width . " Center", Texts["line1"])
-	Gui_SetFont(G, "s10 norm", "Segoe UI")
-	if (Texts["line2"] != "")
-		G.Add("Text", "xm y+6 w" . Width . " Center", Texts["line2"])
-	if (Texts["logged"] != "")
-		G.Add("Text", "xm y+8 w" . Width . " Center", Texts["logged"])
-	for Other in Texts["others"] {
-		G.Add("Text", "xm y+10 w" . Width . " Center", Other.text)
-		SwitchButton := G.Add("Button", "xm y+4", t("update_check.switch_channel"))
-		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
-		_UpdateCheck_CenterRow([SwitchButton], Geo.w)
-	}
-	CheckOnly := _UC_State.Get("check_only", false)
-	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", CheckOnly ? t("update_check.check_only") : "")
-	Row := []
-	if (Phase == "available") {
-		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
-		WhatsNew.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "whats_new", ""))
-		_UpdateCheck_CenterRow([WhatsNew], Geo.w)
-	}
-	if (Phase == "error") {
-		Row.Push(G.Add("Button", "xm y+12", t("healthcheck.toolbar.report")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "report", ""))
-		Row.Push(G.Add("Button", "x+8 yp", t("update_check.open_log")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "open_log", ""))
-	}
-	Row.Push(G.Add("Button", (Row.Length ? "x+8 yp" : "xm y+12"), t("common.close")))
-	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "close", ""))
-	if (Phase == "available" && !CheckOnly) {
-		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
-	}
-	_UpdateCheck_CenterRow(Row, Geo.w)
-	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow(Owner.epoch))
-	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow(Owner.epoch))
-	; No position: Gui.Show centers the window on the screen; the texts span
-	; the canonical width with the margins, so the native height fits its content
-	G.Show("AutoSize")
-	_UC_Gui := G
-	if Previous {
-		try Previous.Destroy()
-	}
-}
-
-; Gives a row of buttons one width and centers it in the window.
-; @param Buttons {Array}
-; @param Width {Integer} The current manifest-owned width.
-_UpdateCheck_CenterRow(Buttons, Width) {
-	if (Buttons.Length == 0)
-		return
-	Shared := Gui_HarmoniseButtonWidths(Buttons)
-	Gap := 8
-	Total := Buttons.Length * Shared + (Buttons.Length - 1) * Gap
-	X := Max(0, (Width - Total) // 2)
-	for Button in Buttons {
-		Button.Move(X)
-		X += Shared + Gap
-	}
-}
-
-; A click in the native window, on its own stack like a page message. A Gui
-; event bypasses native Suspend: whether the driver was paused is read here.
-_UpdateCheck_NativeClick(Owner, Name, Channel, *) {
-	if !_UpdateCheck_ActionCurrent(Owner)
-		return
-	SetTimer(_UpdateCheck_Act.Bind(Owner.epoch, Name, Channel, A_IsSuspended, 0, Owner), -1)
-}
-
 ; Closes the window: the controller first, while its host window lives, then
 ; the window.
 _UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_State
-	global _UC_Release, _UC_RequestId, _UC_Native, _UC_RetiredHosts, _UC_PendingHost
+	global _UC_Release, _UC_RequestId, _UC_RetiredHosts, _UC_PendingHost
 	PreviousCritical := Critical("On")
 	try {
 		if IsSet(ExpectedEpoch) && ExpectedEpoch != _UC_WindowEpoch
@@ -804,7 +637,6 @@ _UpdateCheck_CloseWindow(ExpectedEpoch := unset) {
 			_UC_State := 0
 			_UC_Release := 0
 			_UC_RequestId := 0
-			_UC_Native := false
 			_UC_Gui := unset
 			_UC_Controller := unset
 			_UC_WebView := unset
@@ -871,8 +703,8 @@ _UpdateCheck_RetireHosts() {
 ; @param Epoch {Integer}
 ; @param Json {String}
 _UpdateCheck_Send(Epoch, Json) {
-	global _UC_WebView, _UC_WindowEpoch, _UC_ResetDone, _UC_Native
-	if _UC_ResetDone || _UC_Native || (Epoch != _UC_WindowEpoch) || !IsSet(_UC_WebView)
+	global _UC_WebView, _UC_WindowEpoch, _UC_ResetDone
+	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) || !IsSet(_UC_WebView)
 		return
 	WebView_RunScriptAsync(_UC_WebView, "if(window.receiveUpdateCheck)window.receiveUpdateCheck(" . Json . ")",
 		"UpdateCheck")
@@ -932,7 +764,7 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, Act
 	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner, Url)
 }
 
-; Performs one action and answers it, in the page or the native window.
+; Performs one action and answers it in the page.
 ; @param Epoch {Integer}
 ; @param Name {String}
 ; @param Channel {String}
@@ -941,7 +773,7 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, Act
 ; @param ActionOwner {Object} Optional exact answer retained by the event source.
 ; @param Url {String} The clicked link of an open_url action.
 _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset, Url := "") {
-	global _UC_WindowEpoch, _UC_ResetDone, _UC_Native, _UC_Gui
+	global _UC_WindowEpoch, _UC_ResetDone
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
 		return
 	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
@@ -957,17 +789,6 @@ _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, Act
 	}
 	if Outcome["closed"] || !_UpdateCheck_ActionCurrent(Owner)
 		return
-	if _UC_Native {
-		Status := ""
-		if !Outcome["ok"]
-			Status := t("healthcheck.status.failed")
-		else if (Name == "report")
-			Status := t("notify.report_bug_body")
-		if !_UpdateCheck_ActionCurrent(Owner)
-			return
-		try _UC_Gui["Status"].Text := Status
-		return
-	}
 	_UpdateCheck_Send(Epoch, '{"type":"action","action":' . JsonStringLiteral(Name)
 		. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 		. ',"missing":' . (Outcome["missing"] ? "true" : "false") . '}')

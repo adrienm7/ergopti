@@ -314,18 +314,18 @@ class _HCSO_Collection {
 	}
 }
 
-_HCSO_NativeCollection(State) {
+; No native collection control outlives the page any more (2026-11-21): epoch
+; zero, which only those controls used, authorizes no collection action either.
+_HCSO_EpochZeroCollection(State) {
 	global _HC_Collection
 	SavedCollection := _HC_Collection
 	try {
 		_HC_Collection := _HCSO_Collection()
-		for Action in ["collection_cancel", "collection_guided", "collection_skip", "collection_open"] {
-			AssertTrue(_HC_NativeCollectionAction(Action))
-			AssertEqual(Action, _HC_Collection.Calls[-1], "native collection controls retain their independent owner")
-		}
-		AssertEqual(4, _HC_Collection.Calls.Length)
+		for Action in ["collection_cancel", "collection_guided", "collection_skip", "collection_open"]
+			_HC_PerformPageAction(0, Map("action", Action), HealthCheck_Config())
+		AssertEqual(0, _HC_Collection.Calls.Length, "epoch zero cannot drive the collection")
 		AssertEqual(0, State["original_view"].Scripts.Length)
 	} finally _HC_Collection := SavedCollection
 }
-Test("HealthCheck: native collection controls retain epoch-zero authority (healthcheck-session-owner)",
-	_HCSO_With.Bind(_HCSO_NativeCollection))
+Test("HealthCheck: epoch zero drives no collection action without a page (healthcheck-session-owner)",
+	_HCSO_With.Bind(_HCSO_EpochZeroCollection))

@@ -542,9 +542,10 @@ LiveCmdAppClose(Args) {
  */
 LiveCmdVersionsTabs(Args) {
 	global _CLW_WebView
-	; Under memory pressure the driver opens its lighter native window instead.
-	if !_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()
-		throw Error("native fallback: the driver would open its native Versions window (WebView2 missing or free memory too low)")
+	; Without WebView2 the driver refuses the window; there is no page to read.
+	Reason := WebView_UnavailableReason()
+	if (Reason != "")
+		throw Error("WebView2 unavailable: the driver would refuse the Versions window (" . Reason . ")")
 	Changelog_Open(Args.Length >= 1 ? Args[1] : "stable")
 	LiveWaitFor(() => IsSet(_CLW_WebView) && IsObject(_CLW_WebView), "the Versions window", 30000)
 	Count := () => _LiveScript("document.querySelectorAll('#release-list .release-item').length")

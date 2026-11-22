@@ -7,6 +7,8 @@
 ; The host owns the path, scan and source bytes; page messages name actions only.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 #Include ../../core/ui/engine/webview/utils.ahk
 
 class ConfigCleanupSession {
@@ -128,6 +130,10 @@ class ConfigCleanupWindow extends WebViewHost {
 				return false
 			return WMPresentWindow(Existing.Gui)
 		}
+		; The page is the only cleanup window: without WebView2 the user is told how
+		; to recover (maintainer decision 2026-11-21).
+		if !WebView_RequireAvailable("configuration cleanup window")
+			return false
 		WebViewHost._LoadManifest()
 		Host := ConfigCleanupWindow()
 		Host.AppId := "config_cleanup"

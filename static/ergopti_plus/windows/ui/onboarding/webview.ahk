@@ -24,6 +24,8 @@
 ; Functions/globals are hoisted; #Include'd from ui/onboarding/init.ahk.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 ; French keyboard LANGID (low word of the HKL). When the active OS layout is
 ; French we hint the frontend (system_layout = "french") so the hotstrings page
 ; proposes the "u-grave" trigger character when no configuration names one.
@@ -83,17 +85,6 @@ global _OnbWeb_SessionEpoch := 0
 ; =========================================
 ; ==============================================================
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-; Unlike the model_browser gate, onboarding intentionally does NOT apply the
-; low-RAM native fallback (WebView_ShouldUseNativeFallback): the first-run wizard
-; is a one-off and the shared webview UX is wanted even on a RAM-starved machine.
-; Chromium may cold-boot slowly under pressure, but that cost is paid once.
-_OnbWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
 ; The wizard's size from _shared/ui/apps.manifest.json, as every driver reads
 ; it, bounded by the primary monitor's work area so the footer buttons stay on
 ; screen: the page scrolls its content instead.
@@ -118,10 +109,10 @@ _Onboarding_TryWeb() {
 	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
 	global _ob_gui, _ob_locale, _VendorDir, _SharedDir
 
-	if !_OnbWeb_Available() {
-		try LoggerError("Onboarding", "The wizard cannot be shown: WebView2 is unavailable ({1}).", _OnbWeb_UnavailableReason())
+	; The wizard has no native form: without WebView2 the user is told how to
+	; recover instead of seeing nothing (maintainer decision 2026-11-21).
+	if !WebView_RequireAvailable("onboarding wizard")
 		return false
-	}
 	; Singleton — bring the existing wizard window to the front instead of
 	; opening a second one. Every sibling WebView2 host (paths_editor,
 	; personal_info_editor, prompt_editor, hotstrings_config_window) has this
@@ -259,17 +250,6 @@ _Onboarding_TryWeb() {
 	return true
 }
 
-; Returns a short human-readable reason why the WebView2 path is unavailable,
-; used purely for the log line so the cause is visible at a glance.
-_OnbWeb_UnavailableReason() {
-	global _VendorDir
-	if !IsSet(WebView2)
-		return "WebView2 binding not loaded"
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	if !FileExist(loader)
-		return "WebView2Loader.dll missing"
-	return "unknown"
-}
 
 
 

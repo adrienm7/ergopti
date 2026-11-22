@@ -151,16 +151,14 @@ function ahkBody(source, name) {
 	return [];
 }
 
-/** Requires both actual hosts to consume the app's canonical dimensions. */
+/** Requires the WebView host, the window's only form, to consume the app's canonical dimensions. */
 function resolvesUpdateGeometry(source) {
 	const contains = (tokens, sequence) =>
 		tokens.some((_, i) => sequence.every((value, j) => tokens[i + j] === value));
 	const resolve = ['Geo', ':=', 'WebViewHost', '.', 'AppGeometry', '(', '"update_check"', ')'];
 	const web = ahkBody(source, '_UpdateCheck_Open');
-	const native = ahkBody(source, '_UpdateCheck_BuildNative');
 	return (
 		contains(web, resolve) &&
-		contains(native, resolve) &&
 		contains(web, [
 			'G',
 			'.',
@@ -200,8 +198,7 @@ function resolvesUpdateGeometry(source) {
 			'.',
 			'h',
 			')'
-		]) &&
-		contains(native, ['Width', ':=', 'Geo', '.', 'w', '-'])
+		])
 	);
 }
 
@@ -210,10 +207,6 @@ _UpdateCheck_Open() {
  Geo := WebViewHost.AppGeometry("update_check")
  G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
  G.Show("w" . Geo.w . " h" . Geo.h)
-}
-_UpdateCheck_BuildNative() {
- Geo := WebViewHost.AppGeometry("update_check")
- Width := Geo.w - 40
 }
 `;
 assert.equal(
@@ -226,10 +219,6 @@ for (const [name, source] of [
 	['height mirror', updateGeometryFixture.replaceAll('Geo.h', '440')],
 	['width mirror', updateGeometryFixture.replaceAll('Geo.w', '480')],
 	['missing web owner', updateGeometryFixture.replace('_UpdateCheck_Open()', 'Sibling()')],
-	[
-		'missing native owner',
-		updateGeometryFixture.replace('_UpdateCheck_BuildNative()', 'Sibling()')
-	],
 	['commented example', `/*${updateGeometryFixture}*/`],
 	['quoted example', `Example := '${updateGeometryFixture}'`],
 	[

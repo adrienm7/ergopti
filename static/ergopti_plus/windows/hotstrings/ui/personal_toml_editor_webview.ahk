@@ -27,6 +27,8 @@
 ; neighbour list in ErgoptiPlus.ahk.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 ; Virtual host mapped to the _shared tree so the editor loads from a stable
 ; origin (https://<host>/…) instead of an opaque file:// origin — file:// pages
 ; are unique security origins and the chrome.webview JS->AHK channel does not
@@ -68,16 +70,6 @@ global _HsEdWeb_OpeningSource := false
 ; =========================================
 ; ==============================================================
 
-; Returns true when the WebView2 runtime binding + loader DLL are present. Like
-; onboarding (and unlike model_browser) the editor does not apply the low-RAM
-; native fallback: it has no native form, so a WebView2.create failure refuses
-; the opening instead.
-_HsEdWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
 ; Attempts to show the editor in a WebView2 window. Returns true once this
 ; request is settled (shown, focused or superseded by a newer opening), false
 ; when WebView2 could not open it. Singleton: focuses an already-open editor
@@ -90,11 +82,10 @@ _HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 	global _HsEdWeb_MsgSub, _HsEdWeb_NavSub, _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
-	FailureReason := ""
-	if !_HsEdWeb_Available() {
-		FailureReason := "the WebView2 binding or WebView2Loader.dll is missing from " . _VendorDir
+	; The editor has no native form: an unusable runtime refuses the opening.
+	FailureReason := WebView_UnavailableReason()
+	if (FailureReason != "")
 		return false
-	}
 
 	; Focus only the captured singleton; presentation may pump native events.
 	if (_HsEdWeb_Gui != 0) {

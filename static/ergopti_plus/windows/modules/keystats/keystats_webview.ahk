@@ -25,6 +25,8 @@
 ;    initialiser sets KLWV.available to false in that case.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 #Requires Autohotkey v2.0+
 #Include keystats_webview_range_script.ahk
 #Include keystats_webview_range_mount.ahk
@@ -116,14 +118,10 @@ KLWV_IsAvailable() {
 		; that happens lazily on first KLWV_Open.
 		if KLWV.HasOwnProp("available") && KLWV.available != ""
 				return KLWV.available
-		KLWV.available := false
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		if !FileExist(loader)
-				return false
-		if !IsSet(WebView2)
-				return false
-		KLWV.available := true
-		return true
+		; Without WebView2 the dashboard opens in Edge's app mode: the same shared
+		; page in a browser, never a native AutoHotkey form.
+		KLWV.available := WebView_UnavailableReason() == ""
+		return KLWV.available
 }
 
 

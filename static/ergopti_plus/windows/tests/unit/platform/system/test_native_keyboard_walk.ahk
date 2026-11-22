@@ -173,17 +173,6 @@ _NKWT_HotstringSettings() {
 }
 Test("a11y keyboard walk: the hotstring settings window (a11y-keyboard-2026-11-18)", _NKWT_HotstringSettings)
 
-_NKWT_PathsEditor() {
-	_NKWT_AssertWindowsWalk("configuration folder editor", () => _NKWT_WithoutWebView(FilePathsEditor))
-}
-Test("a11y keyboard walk: the configuration folder editor (a11y-keyboard-2026-11-18)", _NKWT_PathsEditor)
-
-_NKWT_ActionPicker() {
-	_NKWT_AssertWindowsWalk("action picker",
-		() => _NKWT_WithoutWebView(() => ShowActionPicker("Action", "", (Id) => 0)))
-}
-Test("a11y keyboard walk: the action picker (a11y-keyboard-2026-11-18)", _NKWT_ActionPicker)
-
 _NKWT_KeyboardSlotPicker() {
 	_NKWT_AssertWindowsWalk("keyboard shortcut slot picker", () => ShowKeyboardSlotPicker("primary_"))
 }
@@ -207,9 +196,3 @@ _NKWT_EncryptorDropWindow() {
 	_NKWT_AssertWindowsWalk("Encryptor drop window", () => Encryptor_ShowDropWindow(BundledAppUi_Ports()))
 }
 Test("a11y keyboard walk: the Encryptor drop window (a11y-keyboard-2026-11-18)", _NKWT_EncryptorDropWindow)
-
-_NKWT_UpdatePrompt() {
-	Release := {Tag: "v0.0.0-a11y", PublishedAt: "2026-11-18T00:00:00Z", Body: "", Url: ""}
-	_NKWT_AssertWindowsWalk("update prompt", () => _NKWT_WithoutWebView(() => Updater_ShowUpdatePrompt(Release)))
-}
-Test("a11y keyboard walk: the update prompt (a11y-keyboard-2026-11-18)", _NKWT_UpdatePrompt)

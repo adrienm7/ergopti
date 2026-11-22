@@ -458,14 +458,30 @@ _WVT_EachLocale(Check, Args*) {
 }
 
 ; Captures the captions Body builds while the native show step is replaced.
+; The suite has no WebView2: the admission is admitted here and the controller
+; factory refuses, so the host is built up to its caption and then refused,
+; as on a machine whose runtime fails (no native substitute opens).
 _WVT_WithCapturedCaptions(Body) {
 	global _WVT_Captions
 	_WVT_Captions := []
 	PreviousShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
+	PreviousCreate := WebViewHost.Prototype.GetOwnPropDesc("_CreateController")
 	WebViewHost.Prototype.DefineProp("_ShowWindow", {Call: _WVT_CaptureCaption})
+	WebViewHost.Prototype.DefineProp("_CreateController", {Call: _WVT_RefuseController})
+	WebView_UnavailableReason.DefineProp("Call", {Call: (*) => ""})
+	TestMsgBoxResponder((*) => "")
 	try Body.Call()
-	finally WebViewHost.Prototype.DefineProp("_ShowWindow", PreviousShow)
+	finally {
+		TestMsgBoxResponder("")
+		WebView_UnavailableReason.DeleteProp("Call")
+		WebViewHost.Prototype.DefineProp("_CreateController", PreviousCreate)
+		WebViewHost.Prototype.DefineProp("_ShowWindow", PreviousShow)
+	}
 	return _WVT_Captions
+}
+
+_WVT_RefuseController(*) {
+	throw Error("controlled title-test controller refusal")
 }
 
 ; The caption names the product once, then the window's translated name.

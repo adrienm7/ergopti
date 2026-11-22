@@ -1562,12 +1562,12 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/core/text/test_toml_batchwrite_atomic.ahk
 #Include unit/core/text/toml/test_batchwrite_exact_subtree.ahk
 #Include meta/core/ui/webview/test_webview2_temp_leak.ahk
+#Include meta/core/ui/webview/test_no_native_webview_fallback.ahk
 #Include meta/modules/keystats/test_keystats_webview_fallback.ahk
 #Include meta/core/ui/windows/test_graphics_renderer_createwindow_catch.ahk
 #Include meta/ai/servers/test_ollama_webview_executescript_deferred.ahk
 #Include meta/ai/servers/test_ollama_webview_callback_epoch.ahk
 #Include meta/modules/keystats/test_keystats_webview_executescript_deferred.ahk
-#Include meta/core/ui/webview/test_low_ram_native_fallback.ahk
 #Include meta/platform/input/dispatch/test_hookdispatcher_swallow.ahk
 #Include meta/ai/api/test_json_parser_silent_fail.ahk
 #Include meta/core/text/test_json_unicode_escape.ahk
@@ -2329,7 +2329,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/updater/test_updater_onjson_callback_catch.ahk
 #Include meta/core/ui/webview/test_bridge_suspend_guard.ahk
 #Include meta/modules/updater/test_changelog_close_order.ahk
-#Include meta/modules/updater/test_updater_changelog_install_closegui.ahk
 ; MCSetPos/MCGetPos bare-try-no-catch fix (F32).
 #Include meta/gestures/test_mouse_control_error_logging.ahk
 ; TooltipRHide bare-try-no-catch + TooltipRShow OutputDebug-instead-of-Logger fix (F50).

@@ -29,6 +29,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
@@ -856,11 +857,6 @@ _LayMgrWeb_SeedScript() {
 	return "window._i18n_locale=" . JsonStringLiteral(_I18nLocale) . ";" . ReadingPrefs_SeedScript()
 }
 
-_LayMgrWeb_Available() {
-	global _VendorDir
-	return IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-}
-
 /**
  * Creates the native layout window before attaching its WebView controller.
  * @returns {Gui} The window with the shared-policy translated caption.
@@ -878,11 +874,8 @@ LayoutManager_Open(*) {
 	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _VendorDir, _SharedDir, LAYMGR_VHOST
 	global LAYMGR_HOST_ACCESS_ALLOW
 	_LayMgrWeb_RetryRetiredHosts()
-	if !_LayMgrWeb_Available() {
-		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
-		Ui_MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
+	if !WebView_RequireAvailable("layout manager")
 		return false
-	}
 	if (_LayMgrWeb_Gui != 0) {
 		WMPresentWindow(_LayMgrWeb_Gui)
 		return true

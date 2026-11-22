@@ -29,6 +29,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 
 ; The window's size: the manifest's error_dialog entry
 ; (_shared/ui/apps.manifest.json), pinned by test-webview-geometry-single-source.
@@ -357,17 +358,19 @@ _ErrorDialog_Open(Record) {
 		}
 		if !_ErrorDialog_IsCurrent(Epoch)
 			return false
-		UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-			&& !WebView_ShouldUseNativeFallback()
+		; Free RAM never decides: only a missing or refused WebView2 does. The
+		; error then stays visible as a notification, not as a native window.
+		Unavailable := WebView_UnavailableReason()
 		if !_ErrorDialog_IsCurrent(Epoch)
 			return false
-		if !UseWV {
+		if (Unavailable != "") {
 			Heading := t("error_dialog.heading")
 			if !_ErrorDialog_IsCurrent(Epoch)
 				return false
 			NotifierSend(Heading . "`n`n" . Record["message"], Map("level", "error"))
 			if _ErrorDialog_IsCurrent(Epoch)
-				LoggerWarn("ErrorDialog", "WebView2 is unavailable; the error was announced by a notification.")
+				LoggerWarn("ErrorDialog", "WebView2 is unavailable ({1}); the error was announced by a notification.",
+					Unavailable)
 			return false
 		}
 		G := _ErrorDialog_NewWindow()

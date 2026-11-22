@@ -31,7 +31,7 @@ global _WebView_SharedEnvRetired := false
 
 ; A lost or wedged WebView2 COM completion must not freeze AHK's only
 ; interpreter indefinitely. The host catches the propagated TimeoutError and
-; opens its native fallback, leaving the rest of the driver responsive.
+; refuses with the shared WebView2 message, leaving the driver responsive.
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
 
@@ -134,8 +134,8 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	; `await()` pumps the message queue. A re-entrant second caller therefore
 	; cannot wait here: its Sleep loop runs on AHK's only interpreter and prevents
 	; the first await from receiving the completion that would clear this flag.
-	; Fail this second open immediately so its normal native/unavailable fallback
-	; runs; the first owner publishes the shared environment when it completes.
+	; Fail this second open immediately so its normal refusal runs; the first
+	; owner publishes the shared environment when it completes.
 	if _WebView_SharedEnvCreating {
 		if _WebView_SharedEnvBackground && !_WebView_SharedEnvBackgroundAwaiting
 				&& IsObject(_WebView_SharedEnvBootPromise) {
@@ -158,7 +158,7 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	try LoggerTrace("WebView", "Booting the shared WebView2 environment…")
 	try {
 		; The finite await pumps messages until the environment is ready, then
-		; throws to the caller's native fallback if WebView2 never completes.
+		; throws to the caller's refusal if WebView2 never completes.
 		if HasMethod(CreateEnvironmentFn, "Call")
 			BootPromise := CreateEnvironmentFn.Call(0, WEBVIEW_SHARED_UDIR, "", loader)
 		else
@@ -208,120 +208,7 @@ _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 
 #Include browser_warmup.ahk
 
-
-; Below this much free physical RAM (MiB), a WebView window that has a native
-; equivalent skips the Edge/Chromium cold start and uses that native view
-; instead. Chromium needs real headroom to boot; on a thrashing machine the cold
-; start costs many seconds, so a plain native view beats a styled WebView that
-; takes a minute to appear. Tunable -- raise it to prefer native more often,
-; lower it to prefer the richer WebView.
-global WEBVIEW_MIN_AVAIL_RAM_MB := 1536
-
-; Returns available physical RAM in MiB, or -1 when the OS query fails.
-WebView_AvailRamMb() {
-	MemStatus := Buffer(64, 0)
-	NumPut("UInt", 64, MemStatus, 0)   ; dwLength -- required before the call
-	if !DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus)
-		return -1
-	return NumGet(MemStatus, 16, "UInt64") / 1048576   ; ullAvailPhys
-}
-
-; The oldest Evergreen runtime the pages run on: the first with
-; SetVirtualHostNameToFolderMapping (ICoreWebView2_3), which every page needs.
-global WEBVIEW_MIN_RUNTIME_VERSION := "87.0.664.8"
-; The runtime's EdgeUpdate client, where Microsoft documents its version.
-global WEBVIEW_RUNTIME_CLIENT := "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-
-; The installed Evergreen runtime's version, per machine then per user.
-; @returns {String} "" when none is installed.
-WebView_RuntimeVersion() {
-	global WEBVIEW_RUNTIME_CLIENT
-	for Root in ["HKLM\SOFTWARE\WOW6432Node\", "HKLM\SOFTWARE\", "HKCU\Software\"] {
-		Version := RegRead(Root . WEBVIEW_RUNTIME_CLIENT, "pv", "")
-		if (Version != "" && Version != "0.0.0.0")
-			return Version
-	}
-	return ""
-}
-
-; True for a runtime below the minimum: the pages would break on a missing
-; interface. No runtime at all is not decided here: creating the web view
-; fails and the window refuses with the WebView2-required message.
-; @param VersionFn {Func} Test seam, WebView_RuntimeVersion by default.
-; @returns {Boolean} True when the runtime is too old.
-WebView_RuntimeIsRefused(VersionFn := 0) {
-	global WEBVIEW_MIN_RUNTIME_VERSION
-	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
-	return Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0
-}
-
-/**
- * Says why no WebView page can open on this machine. Every WebView window asks
- * before it builds anything: there is no native form to open instead
- * (maintainer decision 2026-11-21).
- * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
- * @returns {String} "" when WebView2 can be tried, else the reason, for the log.
- */
-WebView_UnavailableReason(VersionFn := 0) {
-	global _VendorDir, WEBVIEW_MIN_RUNTIME_VERSION
-	if !IsSet(WebView2)
-		return "the WebView2 binding is not loaded"
-	if !IsSet(_VendorDir) || !FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-		return "WebView2Loader.dll is missing"
-	if WebView_RuntimeIsRefused(VersionFn)
-		return "the WebView2 Runtime is below " . WEBVIEW_MIN_RUNTIME_VERSION
-	return ""
-}
-
-/**
- * Admits a WebView window, or refuses it with the WebView2 message.
- * @param {String} Surface English name of the window, for the log.
- * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
- * @returns {Boolean} True when the window may try WebView2.
- */
-WebView_RequireAvailable(Surface, VersionFn := 0) {
-	Reason := WebView_UnavailableReason(VersionFn)
-	return Reason == "" ? true : WebView_RefuseUnavailable(Surface, Reason, VersionFn)
-}
-
-/**
- * Refuses a WebView window that could not open: logs the reason at ERROR and
- * tells the user once, in the one localized message that says how to recover
- * (update a runtime that is too old, else install or repair WebView2).
- * No window has a native substitute (maintainer decisions 2026-11-11 and
- * 2026-11-21).
- * @param {String} Surface English name of the window, for the log.
- * @param {String} Reason What failed, for the log.
- * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
- * @returns {Boolean} Always false: nothing opened.
- */
-WebView_RefuseUnavailable(Surface, Reason, VersionFn := 0) {
-	global WEBVIEW_MIN_RUNTIME_VERSION
-	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
-	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
-	Text := (Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0)
-		? StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
-		: t("webview.required")
-	Ui_MsgBox(Text, t("common.error_title"), "Iconx")
-	return false
-}
-
-; True when a WebView window should use its native fallback: the runtime is too
-; old, or free RAM is too low to comfortably boot Chromium. An unknown reading
-; never gates (returns false), leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
-	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
-	; A warm environment already owns the browser process; this open needs only
-	; a controller, so the cold-start RAM heuristic must not suppress it.
-	if _WebView_SharedEnv
-		return false
-	if (HasMethod(RefusedFn, "Call") ? RefusedFn.Call() : WebView_RuntimeIsRefused())
-		return true
-	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
-	if Avail < 0
-		return false
-	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
-}
+#Include availability.ahk
 
 
 
@@ -330,7 +217,7 @@ WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
 ; WebViewHost — factory class that consolidates the WebView2 lifecycle shared by
 ; every short-lived UI window. Each module that used to reimplement ~200 lines of
 ; identical boilerplate (Gui creation, show-before-create, WebView2.create +
-; fallback, settings hardening, subscriptions, vhost mapping, i18n seed,
+; refusal, settings hardening, subscriptions, vhost mapping, i18n seed,
 ; navigation, queue-based eval, resize → Fill, safe teardown) now calls
 ; WebViewHost.TryOpen(AppId, Opts) and keeps only its business logic.
 ;
@@ -371,8 +258,9 @@ class WebViewHost {
 
 		; --------------------------------------------------------------------------
 		; Factory: opens (or reuses) a WebView2 window for AppId.
-		; Returns a host for an opened or user-cancelled request, or "" on fallback.
-		; The caller checks the return value: if falsy, build the native fallback.
+		; Returns a host for an opened or user-cancelled request, or "" after the
+		; shared refusal (WebView2 missing, too old or failed). There is no native
+		; window to build instead (maintainer decision 2026-11-21).
 		;
 		; Opts keys (all optional unless noted):
 		;   Title                — brandless contextual caption label; default is the
@@ -395,6 +283,9 @@ class WebViewHost {
 		;                          not fence (_PauseFenced)
 		; --------------------------------------------------------------------------
 		static TryOpen(AppId, Opts) {
+				; Admission first: no window may appear before WebView2 is known usable.
+				if !WebView_RequireAvailable(AppId)
+						return ""
 				; ── Load manifest if not cached ──────────────────────────────────────
 				; The cache holds "" until loaded, then a Map. AHK v2 ``IsSet`` accepts
 				; only a plain variable (never a property expression), so the not-loaded
@@ -434,7 +325,7 @@ class WebViewHost {
 						return Existing
 				}
 
-				; _Build retires this exact reservation on fallback, cancellation or
+				; _Build retires this exact reservation on refusal, cancellation or
 				; failure. A late return cannot overwrite a replacement's ownership.
 				if !Host._Build()
 						return Host.CloseRequested ? Host : ""
@@ -554,7 +445,7 @@ class WebViewHost {
 		; --------------------------------------------------------------------------
 		; Internal: builds Gui, creates WebView2 controller, hardens settings,
 		; sets up the bridge, maps vhost, seeds i18n, navigates, and fills.
-		; Returns true on success, false on fallback.
+		; Returns true on success, false after a refusal or a cancellation.
 		; --------------------------------------------------------------------------
 		_Build() {
 				if this.BuildActive || this.ResetDone
@@ -579,12 +470,12 @@ class WebViewHost {
 		}
 
 		/**
-		 * Whether the WebView2 binding and its loader are present.
+		 * Whether WebView2 can open a page: the shared admission, a test seam here.
 		 * @param {string} Loader - Absolute path to WebView2Loader.dll.
 		 * @returns {boolean}
 		 */
 		_RuntimeAvailable(Loader) {
-				return IsSet(WebView2) && FileExist(Loader)
+				return WebView_UnavailableReason() == ""
 		}
 
 		/**
@@ -597,6 +488,13 @@ class WebViewHost {
 		_BuildOwned() {
 				global _VendorDir, _SharedDir, _I18nLocale
 				this.Epoch += 1
+
+				; No window before WebView2 is known usable: an unusable runtime would
+				; otherwise flash an empty host on the desktop, as it did in the suite.
+				if !this._RuntimeAvailable(_VendorDir . "\64bit\WebView2Loader.dll") {
+						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
+						return false
+				}
 
 				Opts  := this.Opts
 				Geo   := this._Geometry()
@@ -623,17 +521,12 @@ class WebViewHost {
 
 				; ── WebView2 create ──────────────────────────────────────────────────
 				loader := _VendorDir . "\64bit\WebView2Loader.dll"
-				if !this._RuntimeAvailable(loader) {
-						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
-						return false
-				}
 				try {
 						this.Controller := this._CreateController(Placeholder.Hwnd, loader)
 				} catch as Err {
 						if this.CloseRequested
 								return false
-						try LoggerError("WebViewHost", "WebView2 create failed for '{1}': {2} — falling back.", this.AppId, Err.Message)
-						return false
+						return WebView_RefuseUnavailable(this.AppId, Err.Message)
 				}
 
 				if this.CloseRequested

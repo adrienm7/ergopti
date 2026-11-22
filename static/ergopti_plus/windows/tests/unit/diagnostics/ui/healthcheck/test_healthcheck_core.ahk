@@ -440,7 +440,7 @@ _TestHC_FunctionsExist() {
 Test("HealthCheck: core functions are defined (core.ahk included in run_all)",
 	_TestHC_FunctionsExist)
 
-_TestHC_NativeSnapshotText() {
+_TestHC_ShareDocumentText() {
 	global _I18nCache, _I18nCacheLoaded
 	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded
 	try {
@@ -450,68 +450,65 @@ _TestHC_NativeSnapshotText() {
 			"healthcheck.export.privacy_notice", "Only approved technical facts are shared")
 		_I18nCacheLoaded := true
 		Snapshot := Map("driver", "windows", "generated_at", "2026-10-09T09:10:36Z", "sections", Map())
-		Text := _HC_NativeSnapshotText(Snapshot)
+		Text := HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])["text"]
 		Config := HealthCheck_Config()
 		AssertContains(Text, Config["schema"]["export_strings"][Config["schema"]["share_policy"]["notice_key"]],
-			"Native fallback uses canonical English without consulting the UI notice override.")
+			"The quick export uses canonical English without consulting the UI notice override.")
 		AssertContains(Text, "driver-suites: not_run")
 		AssertContains(Text, "page-model-checks: not_collected")
 		AssertContains(Text, '"driver":"windows"')
 		AssertContains(Text, '"generated_at":"2026-10-09T09:10:36Z"')
-		AssertEqual(0, InStr(Text, "%s"), "the native fallback must interpolate the locale placeholder")
+		AssertEqual(0, InStr(Text, "%s"), "the quick export must interpolate the locale placeholder")
 	} finally {
 		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded
 	}
 }
-Test("HealthCheck: native quick export formats the unexecuted-test reason", _TestHC_NativeSnapshotText)
+Test("HealthCheck: the quick export formats the unexecuted-test reason", _TestHC_ShareDocumentText)
 
-_TestHC_StructuredNativeFallback() {
-	Snapshot := Map("driver", "windows", "generated_at", "2026-10-01T21:35:37Z",
-		"sections", Map(
-			"system", Map("ram_free", 1512222720, "keyboard_layout", "0xFC06040C"),
-			"issues", Map("recent", ["first warning", "second warning"], "warn_count", 2)))
-	Window := _HC_NewWindow()
-	try {
-		Tree := _HC_ShowNativeSnapshot(Window, Snapshot)
-		Assert(Window.NativeDiagnostics == Tree,
-			"the window must own the native control for resize and destruction")
-		Summary := Tree.GetNext(0)
-		AssertEqual(t("healthcheck.section.summary"), Tree.GetText(Summary))
-		System := Tree.GetNext(Summary)
-		AssertEqual(t("healthcheck.section.system"), Tree.GetText(System),
-			"sections must follow the shared schema, not Map's key order")
-		Item := Tree.GetChild(System)
-		; Each field joins its label to its value with the locale's common.label_value.
-		Join := t("common.label_value")
-		AssertEqual(StrReplace(StrReplace(Join, "{1}", t("healthcheck.field.keyboard_layout")), "{2}", "0xFC06040C"),
-			Tree.GetText(Item))
-		Item := Tree.GetNext(Item)
-		AssertEqual(StrReplace(StrReplace(Join, "{1}", t("healthcheck.field.ram_free")), "{2}", "1512222720"),
-			Tree.GetText(Item))
-		Issues := Tree.GetNext(System)
-		AssertEqual(t("healthcheck.section.issues"), Tree.GetText(Issues))
-		Node := Tree.GetChild(Issues)
-		while Node && Tree.GetText(Node) != t("healthcheck.field.recent")
-			Node := Tree.GetNext(Node)
-		Assert(Node != 0, "recent issues must be a separate expandable field")
-		First := Tree.GetChild(Node)
-		AssertEqual(StrReplace(StrReplace(Join, "{1}", "1"), "{2}", "first warning"), Tree.GetText(First))
-		AssertEqual(StrReplace(StrReplace(Join, "{1}", "2"), "{2}", "second warning"), Tree.GetText(Tree.GetNext(First)),
-			"each log record must be readable separately")
-		AssertEqual(0, Tree.GetNext(Issues), "absent sections must not create empty headings")
-		_HC_OnSize(Tree, Window, 0, 720, 520)
-		Tree.GetPos(, , &Width, &Height)
-		AssertEqual(720, Width, "the native view must resize with the host")
-		AssertEqual(520 - HC_NATIVE_EXPORT_ROW, Height, "the native toolbar remains outside the resized tree")
-		AssertTrue(Window.NativeCollection["start"].Enabled, "Native Diagnostics retains the one-click collection action.")
-		Window.NativeCollection["progress"].GetPos(, &ProgressY)
-		AssertTrue(ProgressY + 24 <= 520, "the actual native progress control remains within the host")
-	} finally {
-		Window.Destroy()
-	}
+; Every top-level window this process owns, hidden ones included.
+_TestHC_OwnWindows() {
+	PreviousDetect := DetectHiddenWindows(true)
+	try return WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . ProcessExist())
+	finally DetectHiddenWindows(PreviousDetect)
 }
-Test("HealthCheck: real browser failure retains schema-ordered native sections and separate logs",
-	_TestHC_StructuredNativeFallback)
+
+; The diagnostics TreeView that stood in for the page is gone (maintainer
+; decision 2026-11-21): the suite never loads WebView2, so the opening refuses
+; in words before any probe or host runs.
+_TestHC_WebViewOnly() {
+	global _HC_Gui, _HC_Opening, _LOGGER_TEST_SINK
+	HadGui := IsSet(_HC_Gui)
+	Shown := [], Logs := [], Before := Map()
+	for Hwnd in _TestHC_OwnWindows()
+		Before[Hwnd] := true
+	PreviousSink := _LOGGER_TEST_SINK
+	try {
+		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Text), ""))
+		_LoggerFlushRepeats(true)
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		HealthCheck_ShowWindow()
+		_LoggerFlushRepeats(true)
+	} finally {
+		LoggerSetTestSink(PreviousSink)
+		TestMsgBoxResponder("")
+	}
+	AssertFalse(_HC_Opening, "the refused opening must release its in-progress flag")
+	Created := 0
+	for Hwnd in _TestHC_OwnWindows()
+		if !Before.Has(Hwnd)
+			Created += 1
+	AssertEqual(0, Created, "no native diagnostics window may be built")
+	AssertEqual(HadGui, IsSet(_HC_Gui), "a refusal publishes no diagnostics host")
+	AssertEqual(1, Shown.Length, "the user is told exactly once")
+	AssertEqual(t("webview.required"), Shown[1], "the message is the shared WebView2-required text")
+	Errors := 0
+	for Line in Logs
+		if InStr(Line, "[ERROR]") && InStr(Line, "The diagnostics window cannot open: WebView2 is required")
+			Errors += 1
+	AssertEqual(1, Errors, "the refusal is logged once at ERROR")
+}
+Test("HealthCheck: an absent WebView2 refuses once and builds no native diagnostics window (healthcheck-webview-only)",
+	_TestHC_WebViewOnly)
 
 /** Replay the actual poll with a deterministic tick and a recording request. */
 _TestHC_ProbeRollover(Started, Elapsed, Completed := false, Cancellation := "", AbortAllowed := true) {

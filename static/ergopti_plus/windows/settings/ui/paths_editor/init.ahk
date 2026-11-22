@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; Renders the folders editor (configuration folder and logs folder) on Windows
 ; via WebView2, loading the shared frontend at _shared/ui/paths_editor/ so every
-; driver shows an identical UI. Replaces the single-field native dialog
-; (FilePathsEditor).
+; driver shows an identical UI. It is the only folders editor (FilePathsEditor):
+; without WebView2 it refuses with the shared message (decision 2026-11-21).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
@@ -14,11 +14,12 @@
 ; 2. JS<->AHK bridge — the page posts {action} messages (ready/browse/save/
 ;    cancel); the host pushes initData and folder-pick results back.
 ; 3. Live reload — saving a changed config directory rewrites paths.toml and
-;    reloads the script, exactly like the native dialog did.
+;    reloads the script.
 ; 4. Singleton — a second open focuses the existing window.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
 
 
 
@@ -56,15 +57,10 @@ global _PathsEdWeb_RetiredHosts := []
 global PATHSED_VHOST             := "ergopti.paths"
 global PATHSED_HOST_ACCESS_ALLOW := 1
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-_PathsEdWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
-; Attempts to show the paths editor in a WebView2 window. Returns true on success
-; (the caller must NOT also build the native dialog), false to fall back.
+; Shows the paths editor in a WebView2 window. There is no native form: an
+; unavailable or failed WebView2 shows the shared refusal.
+; @returns {Boolean} True when the editor opened or a newer request consumed
+;     this one, false when it was refused.
 _PathsEdWeb_TryOpen() {
 	global _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView
 	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
@@ -74,7 +70,7 @@ _PathsEdWeb_TryOpen() {
 	_PathsEdWeb_RetryRetiredHosts()
 	if _PathsEdWeb_SessionEpoch != EntryEpoch
 		return true
-	if !_PathsEdWeb_Available()
+	if !WebView_RequireAvailable("paths editor")
 		return false
 
 	; Singleton — bring the existing editor to the front.
@@ -117,7 +113,7 @@ _PathsEdWeb_TryOpen() {
 		} catch as Err {
 			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try LoggerError("PathsEditor", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
+			try LoggerError("PathsEditor", "WebView2 create failed: {1}.", Err.Message)
 			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
 			; Capture the exact GUI even though no controller was ever created.
@@ -128,10 +124,11 @@ _PathsEdWeb_TryOpen() {
 			ResetReceipt := false
 			_PathsEdWeb_Reset(g, SessionEpoch, &ResetReceipt)
 			PreviousCritical := Critical("On")
-			try FallbackReady := ResetReceipt && !IsObject(Host.gui) && _PathsEdWeb_Gui == 0 && _PathsEdWeb_ResetDone
+			try RefusalOwned := ResetReceipt && !IsObject(Host.gui) && _PathsEdWeb_Gui == 0 && _PathsEdWeb_ResetDone
 				&& _PathsEdWeb_SessionEpoch == SessionEpoch + 1
 			finally Critical(PreviousCritical)
-			return !FallbackReady
+			; Only this exact failed opening refuses; a newer one speaks for itself.
+			return RefusalOwned ? WebView_RefuseUnavailable("paths editor", Err.Message) : true
 		}
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
@@ -301,40 +298,6 @@ _PathsEdWeb_Browse(Target := "config", PickFn := Ui_DirSelect, EvalFn := _PathsE
 		. _PathsEdWeb_JsStr(Fwd) . "," . _PathsEdWeb_JsStr(Target) . ")")
 }
 
-; The default Gui Close action only hides the window and keeps its controls
-; alive. Explicit cancellation retires that HWND while a folder modal pumps.
-_PathsEdNative_BindCancellation(Window) {
-	for EventName in ["Close", "Escape"]
-		Window.OnEvent(EventName, _PathsEdNative_Cancel)
-}
-
-_PathsEdNative_Cancel(Window, *) {
-	Window.Destroy()
-	return true
-}
-
-; The native fallback owns a concrete control rather than a WebView epoch.
-; Closing its window while the picker pumps must not write the dead control.
-_PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
-	try Hwnd := Window.Hwnd
-	catch
-		return false
-	if !Hwnd || !ExistsFn.Call(Hwnd)
-		return false
-	Picked := PickFn.Call("*" . StrReplace(Trim(Edit.Value), "/", "\"), 1,
-		t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
-	if Picked == ""
-		return false
-	try {
-		if Window.Hwnd != Hwnd || !ExistsFn.Call(Hwnd)
-			return false
-	} catch {
-		return false
-	}
-	Edit.Value := StrReplace(Picked, "\", "/")
-	return true
-}
-
 ; The LogsDirPath a save must store: "" for the default, the resolved folder
 ; otherwise, or 0 to keep the stored one when the page sent no logs folder.
 ; A folder that is not absolute is refused, as on macOS and Linux: the boot
@@ -367,7 +330,7 @@ _PathsEdWeb_PrepareLogsFolder(Override) {
 		throw ValueError("the logs folder '" . Override . "' cannot be created (" . Err.Message . ")")
 }
 
-; Persists the chosen folders and reloads, mirroring the native dialog.
+; Persists the chosen folders and reloads.
 ; @param ConfigDir {String} Configuration folder from the page.
 ; @param LogsDir {String|Integer} Logs folder from the page, or 0 to keep it.
 _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {

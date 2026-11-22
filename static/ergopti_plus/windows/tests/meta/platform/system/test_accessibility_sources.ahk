@@ -41,9 +41,6 @@ _A11yS_LabelPrecedes(FileName, LabelKey, ControlNeedle) {
 _A11yS_FieldsAreLabelled() {
 	_A11yS_LabelPrecedes("editors.ahk", "dialog.gpt_link.label", 'GuiToShow.Add("Edit"')
 	_A11yS_LabelPrecedes("input_probe.ahk", "input_probe.field_label", "Window.AddEdit(")
-	_A11yS_LabelPrecedes("changelog.ahk", "healthcheck.field.channel", 'G.Add("DropDownList"')
-	Src := _DriverFileSource("changelog.ahk")
-	Assert(InStr(Src, 'A11ySystem_SetAccessibleName(RightPaneEdit.Hwnd'), "the release notes must be named")
 }
 Test("a11y sources: the unlabelled native fields have a label (a11y-native-2026-11-17)", _A11yS_FieldsAreLabelled)
 
@@ -93,7 +90,8 @@ _A11yS_FontSizesFollowTheTextScale() {
 		}
 	}
 	Assert(Scanned > 100, "the census must reach the driver's sources, scanned " . Scanned)
-	Assert(Routed >= 19, "the native windows must still set their fonts through Gui_SetFont, found " . Routed)
+	; The native fallbacks of WebView windows went on 2026-11-21, with their font calls.
+	Assert(Routed >= 10, "the native windows must still set their fonts through Gui_SetFont, found " . Routed)
 	AssertEqual(0, Offenders.Length, "a font size must go through Gui_SetFont: " . (Offenders.Length ? Offenders[1] : ""))
 }
 Test("a11y sources: native font sizes go through Gui_SetFont (a11y-text-scale-2026-11-18)",

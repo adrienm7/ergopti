@@ -4,7 +4,7 @@
 ; MODULE: Changelog Opening Generation Tests
 ; DESCRIPTION:
 ; Exercises the real GUI, public request and SDK await across close and reopen.
-; Browser COM and native fallback effects are passive; fetching is refused.
+; Browser COM and the WebView2 refusal are passive; fetching is refused.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -17,7 +17,7 @@ _CWOC_Source(Root) {
 		"The shared native diagnostics source must expose its exact fixture footer.")
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
 	Source := StrReplace(Source, "_EDOS_", "_CWOC_")
-	for Symbol in ["_Updater_NewRequestContext", "_Updater_OpenChangelogWindow", "WMPresentWindow"] {
+	for Symbol in ["_Updater_NewRequestContext", "_Updater_StartObservedInstall", "WMPresentWindow"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The changelog child requires its genuine whole owner: " . Symbol)
 		Source .= "#Include " . Owner . "`n"

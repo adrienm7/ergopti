@@ -153,7 +153,7 @@ function checkWindowsInstallCallers() {
 	);
 	const chosen = ahkCallers('ReleaseInstall_Start');
 	expect(
-		same(chosen, ['_CLW_OnWebMessage', '_Updater_InstallChosenRelease']),
+		same(chosen, ['_CLW_OnWebMessage']),
 		`Windows: a chosen release is installed from an unreviewed place: ${chosen.join(', ')}`
 	);
 	for (const [file, name] of [

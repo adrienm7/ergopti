@@ -562,18 +562,16 @@ LayoutEditorWindow_OpenOnNav(*) {
 	return true
 }
 
-; The window's host, opened or brought to the front, or "" when WebView2 is unavailable.
+; The window's host, opened or brought to the front, or "" after the shared
+; WebView2 refusal, which already told the user and logged the reason.
 ; The Studio is configuration: it saves, installs and emulates while paused, as
 ; on macOS and Linux (EDD-1, LTP-03).
 _LayEdWin_TryOpen() {
-	Host := WebViewHost.TryOpen("layout_editor_window", Map(
+	return WebViewHost.TryOpen("layout_editor_window", Map(
 		"Title", t("layout_editor.title"),
 		"RunsWhilePaused", true,
 		"OnReady", _LayEdWin_OnReady,
 		"OnMessage", _LayEdWin_OnMessage))
-	if !Host
-		LoggerError("LayoutEditorWindow", "The layout editor could not open: WebView2 is unavailable.")
-	return Host
 }
 
 ; Sends the page the tab an entry asked for, once.

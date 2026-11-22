@@ -79,17 +79,22 @@ _TUCM_OtherChannelsKeptBeforeSelection() {
 Test("update check window: the other channels come from the whole release list (update-check-window)",
 	_TUCM_OtherChannelsKeptBeforeSelection)
 
-; Closing the window on a WebView2 failure dropped the check, so its answer was
-; discarded and the click showed nothing: the failure opens the native window.
-_TUCM_WebViewFailureFallsBackToNative() {
+; There is no native update-check window (maintainer decision 2026-11-21): a
+; WebView2 creation failure refuses with the shared message and drops its check,
+; so a late answer cannot open a second refusal.
+_TUCM_WebViewFailureRefuses() {
 	Body := _DriverFuncBody("_UpdateCheck_Open")
+	Assert(Body != "", "_UpdateCheck_Open must exist")
+	Assert(InStr(Body, 'WebView_RequireAvailable("update-check window")') > 0,
+		"the window must ask the shared admission before building anything")
 	CatchAt := InStr(Body, "catch as Err")
 	Assert(CatchAt > 0, "_UpdateCheck_Open must catch a WebView2 creation failure")
 	Tail := SubStr(Body, CatchAt)
-	Assert(InStr(Tail, "_UpdateCheck_FallBackToNative(Epoch, G)") > 0,
-		"a WebView2 creation failure must fall back to the native window")
-	AssertEqual(0, InStr(Tail, "_UpdateCheck_CloseWindow("),
-		"a WebView2 creation failure must not close the window and drop the check")
+	Assert(InStr(Tail, 'WebView_RefuseUnavailable("update-check window", FailureReason)') > 0,
+		"a WebView2 creation failure must refuse with the shared message")
+	Assert(InStr(Tail, "_UC_RequestId := 0") > 0, "a refused window drops its check")
+	for Name in ["_UpdateCheck_FallBackToNative", "_UpdateCheck_BuildNative", "_UpdateCheck_NativeTexts"]
+		AssertEqual("", _DriverFuncBodyOrEmpty(Name), Name . " must not come back")
 }
-Test("update check window: a WebView2 failure keeps the check in a native window (update-check-window)",
-	_TUCM_WebViewFailureFallsBackToNative)
+Test("update check window: a WebView2 failure refuses instead of opening a native window (update-check-window)",
+	_TUCM_WebViewFailureRefuses)

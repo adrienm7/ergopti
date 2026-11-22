@@ -21,6 +21,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
 
 
 
@@ -57,13 +58,6 @@ global _PiEdWeb_RetiredHosts := []
 global PIED_VHOST             := "ergopti.personalinfo"
 global PIED_HOST_ACCESS_ALLOW := 1
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-_PiEdWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
 ; Attempts to show the editor in a WebView2 window. Returns true once this
 ; request is settled (shown, focused or superseded by a newer opening), false
 ; when WebView2 could not open it.
@@ -78,11 +72,9 @@ _PiEdWeb_TryOpen(&FailureReason := "") {
 	_PiEdWeb_RetryRetiredHosts()
 	if _PiEdWeb_SessionEpoch != EntryEpoch
 		return true
-	FailureReason := ""
-	if !_PiEdWeb_Available() {
-		FailureReason := "the WebView2 binding or WebView2Loader.dll is missing from " . _VendorDir
+	FailureReason := WebView_UnavailableReason()
+	if (FailureReason != "")
 		return false
-	}
 
 	if (_PiEdWeb_Gui != 0) {
 		WMPresentWindow(_PiEdWeb_Gui)

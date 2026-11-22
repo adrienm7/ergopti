@@ -10,6 +10,8 @@
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
 #Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 
@@ -1373,6 +1375,10 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 			_Updater_CloseGui(_Updater_PromptGui)
 		return
 	}
+	; The notes pane is the shared release-notes page: without WebView2 the
+	; prompt refuses in words instead of showing a plain-text substitute.
+	if !WebView_RequireAvailable("update prompt")
+		return
 	G := Gui_Create("+Resize +MinSize720x420", t("updater.update_window_title"))
 	_Updater_PromptGui := G
 	Gui_SetFont(G, "s11 bold", "Segoe UI")
@@ -1414,45 +1420,24 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 
 	; Spin up WebView2 after Show() (Hwnd is valid then) and load the shared
 	; release-notes page: the release's changelog, rendered like the Versions window.
-	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
-	if UseWV {
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		WVC := unset
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	try {
+		; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
+		; second Chromium process boots and reopens are near-instant.
+		WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
+		G.WVC := WVC
 		try {
-			; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
-			; second Chromium process boots and reopens are near-instant.
-			WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
-			G.WVC := WVC
-		} catch as Err {
-			try LoggerWarn("Updater", "WebView2 create failed in update prompt: {1}.", Err.Message)
-			UseWV := false
+			s := WVC.CoreWebView2.Settings
+			s.AreDevToolsEnabled              := false
+			s.AreDefaultContextMenusEnabled   := false
+			s.IsStatusBarEnabled              := false
+			s.AreBrowserAcceleratorKeysEnabled := false
 		}
-		if UseWV and IsSet(WVC) {
-			try {
-				s := WVC.CoreWebView2.Settings
-				s.AreDevToolsEnabled              := false
-				s.AreDefaultContextMenusEnabled   := false
-				s.IsStatusBarEnabled              := false
-				s.AreBrowserAcceleratorKeysEnabled := false
-			}
-			WVC.Fill()
-			try {
-				G.WVSub := _Updater_NavigateReleaseNotes(WVC, Release)
-			} catch as Err {
-				try LoggerWarn("Updater", "Update prompt shows the native notes instead: {1}.", Err.Message)
-				try WVC.Close()
-				G.WVC := 0
-				UseWV := false
-			}
-		}
-	}
-	if (!UseWV or !IsSet(WVC)) {
-		; Fallback: replace the placeholder with a plain read-only Edit showing the
-		; changelog section (or the localized empty-notes message).
-		BodyPane.GetPos(&bx, &by, &bw, &bh)
-		BodyText := _Updater_ReleaseNotesToPlain(Release.Body)
-		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
-			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
+		WVC.Fill()
+		G.WVSub := _Updater_NavigateReleaseNotes(WVC, Release)
+	} catch as Err {
+		_Updater_CloseGui(G)
+		return WebView_RefuseUnavailable("update prompt", Err.Message)
 	}
 	; WebView2 creation/navigation can pump the suspend reactor. A prompt owned
 	; by an async request must not survive if its generation changed mid-build.

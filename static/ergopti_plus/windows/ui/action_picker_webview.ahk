@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; Renders the action chooser on Windows via WebView2, loading the shared frontend
 ; at _shared/ui/action_picker/ so the AHK and Hammerspoon drivers show an
-; identical searchable, categorised picker. Backs ShowActionPicker
-; (ui/action_picker/init.ahk), whose native ListBox remains as a fallback.
-; fallback when the WebView2 runtime is unavailable.
+; identical searchable, categorised picker. It is the only UI of
+; ShowActionPicker (ui/action_picker/init.ahk): without WebView2 the picker
+; refuses with the shared message (maintainer decision 2026-11-21).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
@@ -15,14 +15,14 @@
 ;    that breaks the JS->AHK channel, so the document is served over https).
 ; 2. Caller-agnostic — _ActPickWeb_TryOpen takes a pre-built action list
 ;    ({Id,Label,Cat}) + the OnConfirm callback that every ShowActionPicker call
-;    site already supplies; the synthetic "native" pick maps back to "" exactly
-;    like the native dialog did.
+;    site already supplies; the synthetic "native" pick maps back to "".
 ; 3. Safe teardown — subscription handles are released BEFORE Controller.Close()
 ;    (their __Delete unsubscribes on the live controller; reversing the order
 ;    raises a COM error that, uncaught in the Close thread, quits the script).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\core\ui\engine\webview\availability.ahk
 
 
 
@@ -79,15 +79,9 @@ global ACTPICK_HOST_ACCESS_ALLOW := 1
 global ACTPICK_WIDTH  := 460
 global ACTPICK_HEIGHT := 560
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-_ActPickWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
-; Attempts to show the action picker in a WebView2 window. Returns true on success
-; (the caller must NOT also build the native ListBox), false to fall back.
+; Shows the action picker in a WebView2 window. There is no native form: an
+; unavailable or failed WebView2 shows the shared refusal. Returns true when the
+; picker opened or a newer request consumed this one, false when it was refused.
 ; Items is an ordered array of headings ({ Type:"heading", Level, Text }) and
 ; actions ({ Type:"action", Id, Label }); Current is the assigned id ("" means the
 ; synthetic native pick); OnConfirm(id) is invoked with the chosen id. With
@@ -103,11 +97,11 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_RetryRetiredHosts()
 	if _ActPickWeb_SessionEpoch != EntryEpoch
 		return true
-	if !_ActPickWeb_Available()
+	if !WebView_RequireAvailable("action picker")
 		return false
 
 	; Singleton — a second open replaces the previous picker (its callback is
-	; superseded), matching the native dialog which only ever shows one.
+	; superseded): only one picker ever shows.
 	if (_ActPickWeb_Gui != 0) {
 		RetiredEpoch := _ActPickWeb_SessionEpoch + !_ActPickWeb_ResetDone
 		_ActPickWeb_Close()
@@ -171,15 +165,16 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		} catch as Err {
 			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try LoggerError("ActionPicker", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
+			try LoggerError("ActionPicker", "WebView2 create failed: {1}.", Err.Message)
 			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			ClosedForFallback := _ActPickWeb_Close(g, SessionEpoch)
+			ClosedForRefusal := _ActPickWeb_Close(g, SessionEpoch)
 			; Cleanup may admit a successor; only this exact failed opening
-			; may request the native fallback.
-			return !((ClosedForFallback is Integer) && ClosedForFallback == 1
+			; refuses, a newer one speaks for itself.
+			return ((ClosedForRefusal is Integer) && ClosedForRefusal == 1
 				&& _ActPickWeb_SessionEpoch == SessionEpoch + 1
 				&& _ActPickWeb_ResetDone && _ActPickWeb_Gui == 0)
+				? WebView_RefuseUnavailable("action picker", Err.Message) : true
 		}
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
@@ -253,8 +248,8 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		return true
 	} finally {
 		if !Installed {
-			; A revoked open is consumed: never Reset a replacement or ask the
-			; public caller to reopen its native fallback after the user canceled.
+			; A revoked open is consumed: never Reset a replacement or refuse
+			; after the user canceled.
 			if IsObject(Host) {
 				DestroyFailedHost := _ActPickWeb_StartupCurrent(SessionEpoch, g)
 				try _ActPickWeb_Reset(DestroyFailedHost, g, , SessionEpoch)

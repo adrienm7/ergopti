@@ -18,14 +18,16 @@
 ;    schema's allowlist: the host opens only the paths it collected, by id.
 ; 3. The page asks for the first snapshot with "ready"; the probes start then
 ;    and push their answers into the same window only.
-; 4. Diagnostics attempt the shared page even under memory pressure. When
-;    WebView2 is unavailable, a native tree preserves translated sections and
-;    separate values instead of dumping the plain-text export into an Edit.
+; 4. The shared page is the only diagnostics window: without WebView2 the
+;    opening refuses with the shared message, before any probe or host runs
+;    (maintainer decision 2026-11-21).
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; diagnostics/ui/healthcheck/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================
+
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
 
 #Include %A_LineFile%\..\..\..\adapters\control.ahk
 
@@ -640,10 +642,6 @@ _HealthCheck_SortedLines(Text) {
 global HC_WIDTH  := 1060
 global HC_HEIGHT := 720
 
-; The fallback export row is reserved below the structured tree.
-global HC_NATIVE_EXPORT_ROW := 102
-global HC_NATIVE_EXPORT_MARGIN := 6
-
 ; Virtual host for the shared page — maps _SharedDir so relative assets
 ; (style.css, script.js, ../dom_utils.js) and the locale files resolve over https.
 global HC_VHOST             := "ergopti.healthcheck"
@@ -740,6 +738,10 @@ HealthCheck_ShowWindow() {
 	_HC_CloseDuringOpen := false
 	try {
 		LoggerStart("Healthcheck", "Opening the diagnostics window…")
+		; The diagnostics page is the only diagnostics window: without WebView2
+		; the user is told how to recover, before any probe or host runs.
+		if !WebView_RequireAvailable("diagnostics window")
+			return
 		_HC_OpenStarted := _HealthCheck_NowMs()
 		Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
@@ -774,86 +776,75 @@ HealthCheck_ShowWindow() {
 			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
 		_HC_OpenTimingMark("host", Timing)
 
-		UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-		if UseWV {
-			loader := _VendorDir . "\64bit\WebView2Loader.dll"
-			WVC := 0
-			try {
-				Environment := WebView_SharedEnvironment(loader)
-				_HC_OpenTimingMark("environment", Timing)
-				WVC := Reuse ? _HC_Controller : WebView2.create(ContentCtl.Hwnd, , Environment)
-				_HC_OpenTimingMark("controller_create", Timing)
-				WVC.IsVisible := false
-				; Virtual-host subresources survive navigation, including same-size edits.
-				WebView_ClearDocumentCache(WVC.CoreWebView2)
-				_HC_OpenTimingMark("document_cache", Timing)
-				G.WVC := WVC
-			} catch as Err {
-				if Reuse
-					_HC_Reset()
-				else if WVC
-					WVC.Close()
-				WVC := 0
-				G.WVC := 0
-				LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing structured native diagnostics.", Err.Message)
-			}
-
-			_HC_OpenTimingMark("controller", Timing)
-			if WVC {
-				_HC_Controller := WVC
-				_HC_WebView    := WVC.CoreWebView2
-				_HC_ResetDone  := false
-				_HC_ReuseKey := ReuseKey
-				_HC_WindowEpoch += 1
-				WindowEpoch := _HC_WindowEpoch
-				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
-				Snapshot["export_revision"] := 1
-				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false,
-					"page_url", PageUrl)
-
-				try {
-					s := _HC_WebView.Settings
-					s.AreDevToolsEnabled              := false
-					s.AreDefaultContextMenusEnabled   := false
-					s.IsStatusBarEnabled              := false
-					s.AreBrowserAcceleratorKeysEnabled := false
-				}
-
-				; The locale base and code before the page scripts run: i18n.js fetches
-				; the strings through the virtual host
-				if !Reuse
-					try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
-						"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
-						. ReadingPrefs_SeedScript())
-
-				; The subscription is bound to this window's epoch, so a late message of
-				; a closed window cannot reach its replacement through the globals.
-				_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
-				_HC_OpenTimingMark("bindings", Timing)
-
-				; Map the virtual host BEFORE navigating.
-				try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
-				try _HC_WebView.Navigate(PageUrl)
-				try _HC_Controller.Fill()
-				if !_HC_CloseDuringOpen
-					WebView_TakeFocus(_HC_Controller)
-				if _HC_CloseDuringOpen
-					_HealthCheck_CloseGui(G, false)
-				LoggerInfo("Healthcheck", "Diagnostics controller prepared in {1} ms (reused={2}).",
-					Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
-				_HC_OpenTimingMark("navigate", Timing)
-
-				LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
-				return
-			}
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		WVC := 0
+		try {
+			Environment := WebView_SharedEnvironment(loader)
+			_HC_OpenTimingMark("environment", Timing)
+			WVC := Reuse ? _HC_Controller : WebView2.create(ContentCtl.Hwnd, , Environment)
+			_HC_OpenTimingMark("controller_create", Timing)
+			WVC.IsVisible := false
+			; Virtual-host subresources survive navigation, including same-size edits.
+			WebView_ClearDocumentCache(WVC.CoreWebView2)
+			_HC_OpenTimingMark("document_cache", Timing)
+			G.WVC := WVC
+		} catch as Err {
+			if Reuse
+				_HC_Reset()
+			else if WVC
+				WVC.Close()
+			G.WVC := 0
+			; No native view stands in for the page: retire the host and refuse.
+			_HC_Close()
+			WebView_RefuseUnavailable("diagnostics window", Err.Message)
+			return
 		}
 
-		ContentCtl.Visible := false
-		; No page runs probes here: the configuration is collected now
-		HealthCheck_CompleteConfiguration(Snapshot, HealthCheck_Config()["schema"])
-		_HC_ShowNativeSnapshot(G, Snapshot)
-		_HC_OpenTimingMark("native_controls", Timing)
-		LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
+		_HC_OpenTimingMark("controller", Timing)
+		_HC_Controller := WVC
+		_HC_WebView    := WVC.CoreWebView2
+		_HC_ResetDone  := false
+		_HC_ReuseKey := ReuseKey
+		_HC_WindowEpoch += 1
+		WindowEpoch := _HC_WindowEpoch
+		PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
+		Snapshot["export_revision"] := 1
+		_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false,
+			"page_url", PageUrl)
+
+		try {
+			s := _HC_WebView.Settings
+			s.AreDevToolsEnabled              := false
+			s.AreDefaultContextMenusEnabled   := false
+			s.IsStatusBarEnabled              := false
+			s.AreBrowserAcceleratorKeysEnabled := false
+		}
+
+		; The locale base and code before the page scripts run: i18n.js fetches
+		; the strings through the virtual host
+		if !Reuse
+			try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
+				"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
+				. ReadingPrefs_SeedScript())
+
+		; The subscription is bound to this window's epoch, so a late message of
+		; a closed window cannot reach its replacement through the globals.
+		_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
+		_HC_OpenTimingMark("bindings", Timing)
+
+		; Map the virtual host BEFORE navigating.
+		try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
+		try _HC_WebView.Navigate(PageUrl)
+		try _HC_Controller.Fill()
+		if !_HC_CloseDuringOpen
+			WebView_TakeFocus(_HC_Controller)
+		if _HC_CloseDuringOpen
+			_HealthCheck_CloseGui(G, false)
+		LoggerInfo("Healthcheck", "Diagnostics controller prepared in {1} ms (reused={2}).",
+			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2), Reuse ? 1 : 0)
+		_HC_OpenTimingMark("navigate", Timing)
+
+		LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
 	} finally {
 		if IsSet(Timing)
 			HotPath_RecordLatency("Diagnostics.total", _HealthCheck_NowMs() - _HC_OpenStarted, 5)
@@ -865,142 +856,13 @@ HealthCheck_ShowWindow() {
 	}
 }
 
-; Builds a readable native view when the installed browser really cannot open.
-; @param G {Gui} The diagnostics host window.
-; @param Snapshot {Map} The same snapshot supplied to the shared page.
-_HC_ShowNativeSnapshot(G, Snapshot) {
-	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
-	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW) . " +HScroll")
-	G.NativeDiagnostics := Tree
-	_HC_NativeCollectionControls(G)
-	NativeSave := G.Add("Button", "x452 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + 32)
-		. " w170", t("healthcheck.toolbar.save"))
-	G.NativeCollection["save"] := NativeSave
-	NativeSave.OnEvent("Click", _HC_NativeSaveSnapshot.Bind(Snapshot))
-	Summary := Tree.Add(t("healthcheck.section.summary"), 0, "Bold Expand")
-	_HC_NativeAddValue(Tree, t("healthcheck.export.driver"), Snapshot["driver"], Summary)
-	_HC_NativeAddValue(Tree, t("healthcheck.export.generated"), Snapshot["generated_at"], Summary)
-	for Definition in HealthCheck_Config()["schema"]["sections"] {
-		Id := Definition["id"]
-		if !Snapshot["sections"].Has(Id) || !_HealthCheck_Applies(Definition)
-			continue
-		Section := Snapshot["sections"][Id]
-		Parent := Tree.Add(t("healthcheck.section." . Id), 0, "Bold Expand")
-		if Definition.Has("fields") {
-			for Field in Definition["fields"] {
-				Key := Field["id"]
-				if Section.Has(Key) && _HealthCheck_Applies(Field)
-					_HC_NativeAddValue(Tree, t("healthcheck.field." . Key), Section[Key], Parent)
-			}
-		} else {
-			for Key, Value in Section
-				_HC_NativeAddValue(Tree, Key, Value, Parent)
-		}
-	}
-	return Tree
-}
-
-/** Keeps collection available when the browser runtime cannot create a page. */
-_HC_NativeCollectionControls(G) {
-	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
-	Top := HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN
-	Controls := Map()
-	for Row in [
-		["start", "collect_windows", "healthcheck.collection.start", 8, 0, 300],
-		["cancel", "collection_cancel", "common.cancel", 320, 0, 120],
-		["open", "collection_open", "healthcheck.collection.open", 452, 0, 170],
-		["guided", "collection_guided", "healthcheck.collection.guided", 8, 32, 300],
-		["skip", "collection_skip", "healthcheck.collection.skip", 320, 32, 120]] {
-		Button := G.AddButton("x" . Row[4] . " y" . (Top + Row[5]) . " w" . Row[6], t(Row[3]))
-		Button.OnEvent("Click", _HC_NativeCollectionAction.Bind(Row[2]))
-		Controls[Row[1]] := Button
-	}
-	Controls["progress"] := G.AddText("x8 y" . (Top + 64) . " w" . (HC_WIDTH - 16) . " h24")
-	G.NativeCollection := Controls
-	_HC_NativeCollectionUpdate(G)
-}
-
-_HC_NativeCollectionAction(Action, *) {
-	global _HC_Gui
-	try _HC_PerformPageAction(0, Map("action", Action), HealthCheck_Config())
-	catch as Err {
-		LoggerError("DiagnosticsCollection", "The native diagnostic collection action failed.")
-		if IsSet(_HC_Gui) && _HC_Gui.HasProp("NativeCollection")
-			_HC_Gui.NativeCollection["progress"].Text := t("healthcheck.collection.failed")
-		return false
-	}
-	return true
-}
-
-/** Projects the retained owner; closing this view never abandons cleanup. */
-_HC_NativeCollectionUpdate(G) {
-	global _HC_Collection
-	Value := IsObject(_HC_Collection) ? _HC_Collection.Result : Map("phase", "idle")
-	Controls := G.NativeCollection
-	Phase := Value.Get("phase", "idle")
-	Active := Value.Get("owner_pending", false) || (Phase != "idle" && Phase != "completed" && Phase != "failed")
-	Controls["start"].Enabled := !Active
-	Controls["cancel"].Enabled := Active
-	Controls["open"].Enabled := Value.Get("archive_created", false) || Value.Get("folder_available", false)
-	Controls["guided"].Enabled := Phase == "guided"
-	Controls["skip"].Enabled := Phase == "guided"
-	Progress := StrReplace(t("healthcheck.deep_tests.progress"), "%s", Value.Get("completed", 0), , , 1)
-	Progress := StrReplace(Progress, "%s", Value.Get("total", 0), , , 1)
-	Controls["progress"].Text := Phase == "idle" ? "" : Phase == "completed" ? t("healthcheck.collection.complete")
-		: Phase == "failed" ? t("healthcheck.collection.failed")
-		: Progress
-}
-
-/** Formats the quick native report with an explicit unexecuted-test status. */
-_HC_NativeSnapshotText(Snapshot) {
-	return HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])["text"]
-}
-
-/** Exports the captured quick fallback without browser-dependent checks. */
-_HC_NativeSaveSnapshot(Snapshot, *) {
-	Config := HealthCheck_Config()
-	Name := Config["schema"]["report"]["name_prefix"] . "windows-" . FormatTime(A_NowUTC, "yyyyMMdd-HHmmss")
-		. Config["schema"]["report"]["name_suffix"]
-	Text := _HC_NativeSnapshotText(Snapshot)
-	Validated := HealthCheck_ValidateAction(Map("action", "save", "text", Text, "name", Name),
-		Map("schema", Config["schema"], "templates", Config["templates"], "driver", "windows"))
-	if !Validated.Has("action")
-		throw Error("The native diagnostic export was refused.")
-	return HealthCheck_PerformAction(Validated["action"], Snapshot["sections"]["paths"], Config, 0, Snapshot)
-}
-
-; Keeps arrays and records expandable, including each recent log entry.
-; @param Tree {Gui.TreeView} The native diagnostics view.
-; @param Label {String} The translated field name or record key.
-; @param Value {Any} The snapshot value.
-; @param Parent {Integer} The enclosing section or record.
-_HC_NativeAddValue(Tree, Label, Value, Parent) {
-	if Value is Array || Value is Map {
-		Node := Tree.Add(Label, Parent, "Expand")
-		for Key, Item in Value
-			_HC_NativeAddValue(Tree, String(Key), Item, Node)
-		return Node
-	}
-	return Tree.Add(LabelValue(Label, _HealthCheck_PlainValue(Value)), Parent)
-}
-
 ; Keeps the page filling the window when it is resized.
 ; @param ContentCtl {Gui.Text} The WebView2 host control.
 _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
-	global _HC_Controller, _HC_ResetDone, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
+	global _HC_Controller, _HC_ResetDone
 	if (MinMax == -1)
 		return
 	ContentCtl.Move(0, 0, Width, Height)
-	if GuiObj.HasProp("NativeDiagnostics") {
-		GuiObj.NativeDiagnostics.Move(0, 0, Width, Height - HC_NATIVE_EXPORT_ROW)
-		if GuiObj.HasProp("NativeCollection") {
-			for Name, Control in GuiObj.NativeCollection {
-				Offset := Name == "progress" ? 64 : Name == "guided" || Name == "skip" || Name == "save" ? 32 : 0
-				Control.Move(, Height - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN + Offset)
-			}
-			GuiObj.NativeCollection["progress"].Move(, , Width - 16)
-		}
-	}
 	if !_HC_ResetDone && IsSet(_HC_Controller)
 		try _HC_Controller.Fill()
 }
@@ -1148,15 +1010,11 @@ _HC_ArchiveCleanupMetadata(Session) {
 ; @param Config {Map} From HealthCheck_Config().
 _HC_PerformPageAction(WindowEpoch, Action, Config) {
 	global _HC_Session
-	; Native collection controls outlive the page; no other action has epoch zero.
-	CollectionAction := Map("collect_windows", 1, "collection_cancel", 1,
-		"collection_guided", 1, "collection_skip", 1, "collection_open", 1).Has(Action["action"])
-	if WindowEpoch != 0 || !CollectionAction {
-		Session := _HC_Session
-		if !_HC_SessionCurrent(WindowEpoch, Session)
-			return
-		Snapshot := Session["snapshot"]
-	}
+	; Only the current page acts: no native control outlives it any more.
+	Session := _HC_Session
+	if !_HC_SessionCurrent(WindowEpoch, Session)
+		return
+	Snapshot := Session["snapshot"]
 	switch Action["action"] {
 		case "collect_windows":
 			HealthCheck_CollectWindows()

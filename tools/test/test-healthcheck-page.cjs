@@ -536,10 +536,16 @@ function init(page, detailed) {
 		path.join(SHARED, '..', 'windows', 'diagnostics', 'ui', 'healthcheck', 'core.ahk'),
 		'utf8'
 	);
+	// No native view stands in for the page (maintainer decision 2026-11-21).
 	if (/\bWebView_ShouldUseNativeFallback\s*\(/.test(host))
-		fail('installed WebView2 diagnostics must be attempted under memory pressure');
-	if (!host.includes('_HC_ShowNativeSnapshot(G, Snapshot)') || !host.includes('G.Add("TreeView"'))
-		fail('a real WebView2 failure must leave structured native diagnostics');
+		fail('diagnostics must not be gated on free memory');
+	if (host.includes('_HC_ShowNativeSnapshot') || host.includes('"TreeView"'))
+		fail('a WebView2 failure must refuse, not build a native diagnostics view');
+	if (
+		!host.includes('WebView_RequireAvailable("diagnostics window")') ||
+		!host.includes('WebView_RefuseUnavailable("diagnostics window", Err.Message)')
+	)
+		fail('the diagnostics window must admit and refuse through the shared WebView owner');
 	if (/EditCtl[\s\S]*?HealthCheck_FormatPlain\(Snapshot\)/.test(host))
 		fail('the diagnostics window must not fall back to a raw-text report');
 }

@@ -1,5 +1,5 @@
 {
-	"description": "Release-body changelog extraction vectors. Replayed by tools/test/test-release-body-sections.cjs through splitReleaseBody (_shared/ui/changelog/release_body.js) and by the Windows AHK suite through _Updater_ReleaseNotesChangelog (modules/updater/changelog.ahk), which ports that extraction for the native notes view. body and changelog are line arrays joined with a line feed. Cover every body format CI has published: section markers, the folded changelog after the downloads (de5ef9ebf), the changelog-first body with a jump link, and the oldest body without a Downloads heading.",
+	"description": "Release-body changelog extraction vectors. Replayed by tools/test/test-release-body-sections.cjs through splitReleaseBody (_shared/ui/changelog/release_body.js). body and changelog are line arrays joined with a line feed. Cover every body format CI has published: section markers, the folded changelog after the downloads (de5ef9ebf), the changelog-first body with a jump link, and the oldest body without a Downloads heading.",
 	"vectors": [
 		{
 			"id": "marked",

@@ -1,11 +1,11 @@
-﻿; tests/unit/modules/updater/test_update_check_native_consent.ahk
+﻿; tests/unit/modules/updater/test_update_check_geometry_startup.ahk
 
 ; ==============================================================================
-; MODULE: Native Update Check Consent Tests
+; MODULE: Update Check Geometry And Startup Tests
 ; DESCRIPTION:
-; A private child drives real native buttons and the existing deferred action
-; timer. The genuine logger sink publishes a new public result at the callout;
-; activation is a passive terminal download port and never installs anything.
+; A private child reads the canonical window geometry and drives the WebView
+; host's startup ownership with a passive browser. The native update-check
+; window and its consent buttons were removed (maintainer decision 2026-11-21).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -26,7 +26,7 @@ _UCNO_ChildSource(Fixture) {
 	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Source .= 'global _SharedDir := "' . _SharedDir . '"`n'
-	for Symbol in ["JsonParse", "WebView_AvailRamMb", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "UpdateCheck_Begin", "UpdateChannels_Field", "WMPresentWindow"] {
+	for Symbol in ["JsonParse", "WebView_SharedEnvironment", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "UpdateCheck_Begin", "UpdateChannels_Field", "WMPresentWindow"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The consent child needs the unique whole owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"
@@ -73,8 +73,7 @@ _UCNO_Case(Mode) {
 	Directory := A_Temp . "\ergopti_update_consent_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	FSCreateDirectoryExclusiveStrict(Directory)
 	Script := Directory . "\subject.ahk"
-	Fixture := InStr(Mode, "startup-") == 1 ? "update_check_startup_owner_body.ahk"
-		: (Mode == "geometry" ? "update_check_geometry_body.ahk" : "update_check_native_consent_body.ahk")
+	Fixture := InStr(Mode, "startup-") == 1 ? "update_check_startup_owner_body.ahk" : "update_check_geometry_body.ahk"
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
@@ -138,18 +137,8 @@ _UCNO_Case(Mode) {
 		throw ExportFailure
 }
 
-Test("Update consent: native current and closed actions keep their owner (update-check-native-consent)", _UCNO_Case.Bind("current-close"))
-Test("Update consent: old native action cannot install its successor (update-check-native-consent)", _UCNO_Case.Bind("replaced"))
-Test("Update consent: fresh successor native button remains usable (update-check-native-consent)", _UCNO_Case.Bind("successor-current"))
-
-Test("Update geometry: canonical owner sizes native fallback and refuses invalid entries (update-check-geometry-source)",
+Test("Update geometry: the canonical owner refuses invalid entries and never starts WebView2 (update-check-geometry-source)",
 	_UCNO_Case.Bind("geometry"))
-
-
-Test("Update result: closing at the log boundary revokes publication (update-check-result-owner)",
-	_UCNO_Case.Bind("result-close"))
-Test("Update result: replacement keeps its own state (update-check-result-owner)",
-	_UCNO_Case.Bind("result-replaced"))
 
 for _UCNO_StartupMode in ["startup-current", "startup-close", "startup-reopen", "startup-reopen-reject",
 	"startup-current-reject", "startup-close-retire-refusal", "startup-current-partial-refusal"]

@@ -204,7 +204,7 @@ _OWOC_OpenGeneration(Mode) {
 		Gui.Prototype.DefineProp("OnEvent", {Call: _OWOC_ShowRegister.Bind(ShowState)})
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_OWOC_Require(_OnbWeb_Available(), "the genuine vendored SDK loader must be present")
+		_OWOC_Require((WebView_UnavailableReason() == ""), "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		try Started := _Onboarding_TryWeb()
 		finally {

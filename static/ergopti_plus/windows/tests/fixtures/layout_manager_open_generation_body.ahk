@@ -104,7 +104,7 @@ _LMOC_OpenGeneration(Mode) {
 	Environment := _LMOC_Environment(Mode)
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMOC_Require(_LayMgrWeb_Available(), "the genuine vendored SDK loader must be present")
+		_LMOC_Require((WebView_UnavailableReason() == ""), "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		Started := LayoutManager_Open()
 		if Mode == "cold-success" {

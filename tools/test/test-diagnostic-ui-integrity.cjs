@@ -348,12 +348,11 @@ report(
 	'a WMI query or a RunWait runs on the AHK thread'
 );
 report(
-	'Windows: browser failure retains structured native diagnostics',
-	/_HC_ShowNativeSnapshot\(G, Snapshot\)/.test(winCore) &&
-		/G\.Add\("TreeView"/.test(winCore) &&
-		/HealthCheck_Config\(\)\["schema"\]\["sections"\]/.test(winCore) &&
+	'Windows: a browser failure refuses instead of building a native view',
+	!/_HC_ShowNativeSnapshot|"TreeView"/.test(winCore) &&
+		/WebView_RefuseUnavailable\("diagnostics window", Err\.Message\)/.test(winCore) &&
 		!/_HealthCheck_LoadDocs/.test(winCore),
-	'no schema-driven native view'
+	'a native diagnostics view is back or the shared refusal is missing'
 );
 
 const linuxBridge = withoutComments(read('linux/diagnostics/ui/healthcheck/bridge.lua'));

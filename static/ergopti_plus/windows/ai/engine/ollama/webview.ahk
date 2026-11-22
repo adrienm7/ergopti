@@ -22,6 +22,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
 
 
 
@@ -271,10 +272,8 @@ OllamaWV_Create(kind, subtitle) {
 	} finally Critical(PreviousCritical)
 	_OllamaWV_RetireDelivery(RetiredDelivery)
 
-	if !OllamaWV_WebView2Available() {
-		LoggerError("LLM", "WebView2 not available — cannot show install window.")
+	if !WebView_RequireAvailable("model download window")
 		return
-	}
 
 	; -DPIScale: tell AHK to treat all coordinates as logical pixels (no auto-scaling).
 	; Without this, AHK v2 in PerMonitorV2 mode interprets Gui dimensions as physical
@@ -371,19 +370,6 @@ OllamaWV_Create(kind, subtitle) {
 
 	; Queue the initial setKind so it fires once the page is ready
 	OllamaWV_EvalJS("setKind(" OllamaWV_JSStr(kind) "," OllamaWV_JSStr("") "," OllamaWV_JSStr(subtitle) ")")
-}
-
-/**
- * Returns true when the WebView2 loader DLL and class are present.
- * @returns {boolean}
- */
-OllamaWV_WebView2Available() {
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	if !FileExist(loader)
-		return false
-	if !IsSet(WebView2)
-		return false
-	return true
 }
 
 /**

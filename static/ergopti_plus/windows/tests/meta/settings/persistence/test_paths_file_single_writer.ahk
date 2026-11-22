@@ -104,8 +104,9 @@ _PFSW_CallersSkipReloadOnFailure() {
 		}
 		Pos += StrLen("_PathsFile_Write(")
 	}
-	Assert(Checked >= 2,
-		"expected at least two call sites to police (found " . Checked . ") — both the WebView2 editor and the action picker must go through the shared writer")
+	; The native single-field dialog was removed (2026-11-21): the WebView2 editor is the one caller.
+	Assert(Checked >= 1,
+		"expected the WebView2 editor's call site to police (found " . Checked . ") — it must go through the shared writer")
 }
 
 

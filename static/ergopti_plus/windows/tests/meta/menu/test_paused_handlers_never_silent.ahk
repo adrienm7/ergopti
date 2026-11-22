@@ -153,7 +153,7 @@ Test("pause: no configuration handler refuses a click in silence while paused (p
 ; regression of a refusal that the paused driver used to make (EDD-1).
 _PHNS_ConfigurationHandlersReadNoPause() {
 	for Fn in ["_PromptEdWeb_OnWebMessage", "_PromptEdWeb_Save", "_PromptEdWeb_ApplyProfileForContext",
-			"_PathsEdWeb_OnWebMessage", "_PathsEdWeb_Browse", "_PathsEdWeb_Save", "_PathsEdNative_Browse",
+			"_PathsEdWeb_OnWebMessage", "_PathsEdWeb_Browse", "_PathsEdWeb_Save",
 			"FilePathsEditor", "_HCWWeb_OnWebMessage", "_HCWWeb_Dispatch",
 			"_LayMgrWeb_OnWebMessage", "_LayMgrWeb_CommandCurrent", "_LAY_BuildLayoutMenu",
 			"_ActPickWeb_OnWebMessage", "_ActPickWeb_Confirm", "_ActPickWeb_ProgramCapture",
