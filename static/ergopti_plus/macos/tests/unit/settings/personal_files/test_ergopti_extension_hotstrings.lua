@@ -119,8 +119,8 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local magickey, sources = Packs.route("magickey", "/bundled/magickey.toml")
 		helpers.assert_eq(magickey, "/bundled/magickey.toml", "the magic key keeps its bundled file")
 		helpers.assert_eq(#sources, bindings.category.magickey)
-		helpers.assert_eq(sources[1].sections, { "replace" })
-		helpers.assert_eq(sources[2].sections, { "repeat_corrections" })
+		-- The magic-key replacement left on 2026-11-22: only the repeat corrections are bound.
+		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
 		local unbundled = Packs.unbundled_routes({ magickey = true })
 		helpers.assert_eq(#unbundled, bindings.whole, "every whole category loads without a bundled copy")
 
@@ -128,7 +128,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		for _, case in ipairs({
 			{ path = sfbs, section = "comma", trigger = ",t", output = "pt" },
 			{ path = rolls, section = "hc", trigger = "hc", output = "wh" },
-			{ path = sources[2].path, section = "repeat_corrections", trigger = "ccê", output = "ccu" },
+			{ path = sources[1].path, section = "repeat_corrections", trigger = "ccê", output = "ccu" },
 		}) do
 			local found_entry = entry(case.path, case.section, case.trigger)
 			helpers.assert_true(found_entry ~= nil, case.trigger)
@@ -164,8 +164,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 			"the user's copy of a category an extension binds whole is an explicit override")
 		helpers.assert_eq(with_fixes[1], fixes, "a user's magickey.toml keeps the repeat corrections it declares itself")
 		helpers.assert_eq(with_fixes.n, 2)
-		helpers.assert_eq(#with_fixes[2], 1)
-		helpers.assert_eq(with_fixes[2][1].sections, { "replace" }, "the extension supplies only the missing native feature")
+		helpers.assert_eq(#with_fixes[2], 0, "the extension has nothing left to supply")
 		helpers.assert_eq(without_fixes, others)
 		helpers.assert_eq(#sources, 1, "the extension supplies the repeat corrections a user's copy lacks")
 		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
@@ -211,7 +210,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		local without = sections_of(false)
 		Packs._reset()
 
-		helpers.assert_eq(names, { "replace", "repeat_corrections", "text_expansion_symbols", "text_expansion_symbols_typst" },
+		helpers.assert_eq(names, { "repeat_corrections", "text_expansion_symbols", "text_expansion_symbols_typst" },
 			"the section the extension binds keeps the place the magic key's order gives it")
 		helpers.assert_eq(type(descriptions.repeat_corrections), "table",
 			"with the localized description of the extension's file, not its raw id")
@@ -396,11 +395,8 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			for _, mapping in ipairs(state.mappings) do helpers.assert_true(mapping.group ~= "french_distancesreduction") end
 			local common = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"
 			local _, sources = Packs.route("magickey", common)
-			helpers.assert_eq(#sources, 2)
-			helpers.assert_eq(sources[1].sections, { "replace" })
-			local replacement = TomlCodec.decode(assert(real_io().read_file(sources[1].path)))
-			helpers.assert_eq(replacement._meta.sections.replace.en, "Transform a key into the ★ key")
-			helpers.assert_nil(replacement.replace, "native replacement owns no fabricated mapping")
+			helpers.assert_eq(#sources, 1, "no replacement source is bound any more")
+			helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
 			Packs._reset()
 			Packs.discover(roots(false), real_io())
 			helpers.assert_nil(Packs.route("french_distancesreduction", nil))
