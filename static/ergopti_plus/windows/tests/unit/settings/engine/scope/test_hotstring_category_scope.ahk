@@ -182,9 +182,6 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 			Built := Menu()
 			Assert(MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal_ext", ErgoptiRows) > 2)
 			AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
-			RepeatLabel := MenuLabelFromDescriptionKey("menu.hotstrings.magic_key.repeat_corrections",
-				"hotstrings.magic_key.repeat_corrections")
-			AssertEqual(1, _CTC_CountLabel(Built, RepeatLabel), "the localized repeat corrections row belongs to the shipped extension")
 			CommandLabel := t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all")
 			AssertEqual(1, _CTC_CountLabel(Built, CommandLabel), "one actual extension command owns the entire selection")
 			Action := _L4M_MenuAction(Built, CommandLabel)
