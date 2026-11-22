@@ -423,7 +423,10 @@ async function run() {
 		);
 	});
 	await check('local requests settle before the page is left', async () => {
-		const request = { url: () => 'http://127.0.0.1:1/ergopti_plus/_shared/ui/markdown.js' };
+		const request = {
+			url: () => 'http://127.0.0.1:1/ergopti_plus/_shared/ui/markdown.js',
+			frame: () => ({ page: () => ({ isClosed: () => false }) })
+		};
 		const inflight = new Set([request]);
 		let settled = false;
 		const settle = smoke.settleNetwork(inflight, { quietMs: 40, timeoutMs: 2000 }).then(() => {
@@ -438,6 +441,23 @@ async function run() {
 			() => smoke.settleNetwork(new Set([request]), { quietMs: 40, timeoutMs: 120 }),
 			/never settled: .*markdown\.js/
 		);
+	});
+	await check('a request its closed page cut off does not hold the next page', async () => {
+		// Playwright reports no requestfinished or requestfailed for it.
+		const page = { closed: false, isClosed: () => page.closed };
+		const cutOff = {
+			url: () => 'http://127.0.0.1:1/dev/img/logo/logo.svg',
+			frame: () => ({ page: () => page })
+		};
+		await assert.rejects(
+			() => smoke.settleNetwork(new Set([cutOff]), { quietMs: 40, timeoutMs: 120 }),
+			/never settled: .*logo\.svg/,
+			'an open page still holds its request'
+		);
+		page.closed = true;
+		const inflight = new Set([cutOff]);
+		await smoke.settleNetwork(inflight, { quietMs: 40, timeoutMs: 2000 });
+		assert.equal(inflight.size, 0, 'the closed page request left the set');
 	});
 	await check('owned browser retirement runs on success and assertion failure', async () => {
 		for (const failure of [false, true]) {

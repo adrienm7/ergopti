@@ -248,12 +248,17 @@ async function settleFrames(page) {
 /**
  * Wait until no local request has been in flight for a short quiet period, so
  * the scripts a frame loads after its load event finish before the page is left.
+ * A request of a page already closed is dropped: Playwright reports neither
+ * requestfinished nor requestfailed for a request that page.close() cut off, so
+ * an image a closing page had just asked for (the header menu's logo once the
+ * menu opens) would otherwise hold a context-wide set until the deadline.
  * @param {Set<Object>} inflight Local requests started and not yet settled.
  */
 async function settleNetwork(inflight, { quietMs = 300, timeoutMs = 15000 } = {}) {
 	const deadline = Date.now() + timeoutMs;
 	let quietSince = Date.now();
 	for (;;) {
+		for (const request of inflight) if (request.frame().page().isClosed()) inflight.delete(request);
 		if (inflight.size) quietSince = Date.now();
 		else if (Date.now() - quietSince >= quietMs) return;
 		if (Date.now() > deadline)

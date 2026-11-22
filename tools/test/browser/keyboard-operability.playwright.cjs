@@ -418,9 +418,8 @@ async function openRoute(context, inflight, origin, basePath, route) {
 	assert.ok(response?.ok(), 'Route refused: ' + route);
 	await page.locator('main').first().waitFor({ state: 'visible' });
 	await smoke.settleFrames(page);
-	// A request of a page already closed never finishes: the frames the walk
-	// scrolled into view on the previous page would hold the set forever.
-	for (const request of inflight) if (request.frame().page().isClosed()) inflight.delete(request);
+	// settleNetwork drops the requests of the previous, closed page: the frames
+	// the walk scrolled into view there never finish.
 	await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
 	// Lazy frames load when scrolled to: loaded during the walk, they grew the
 	// page under a focused element and moved it out of the window. They are
