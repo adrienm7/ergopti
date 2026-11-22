@@ -20,8 +20,9 @@
  * FEATURES & RATIONALE:
  * 1. Keys are extracted from source, so a new menu row is covered the day it
  *    lands rather than the day someone remembers this file.
- * 2. A floor on the extracted count: a regex that stops matching would report
- *    zero missing keys and read exactly like success.
+ * 2. The extracted count equals a second, looser count of the same calls: a
+ *    regex that stops matching would report zero missing keys and read
+ *    exactly like success.
  * ==============================================================================
  */
 
@@ -31,6 +32,7 @@ const fs = require('fs');
 const path = require('path');
 // The Linux tray root is read with its split section modules folded back in.
 const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
+const { compareKnownDebt } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE = path.join(
@@ -55,25 +57,22 @@ const EN = path.join(
 	'en.json'
 );
 
-// Measured at 30 calls when this landed. Set below that so ordinary growth does
-// not trip it, far enough above zero that a broken extraction fails loudly.
-const MIN_CALLS = 20;
-
 const src = readSourceFile(SOURCE);
 const en = JSON.parse(fs.readFileSync(EN, 'utf8'));
 
-// Accented literals still hardcoded in the builder. Exactly one is legitimate —
-// the "Français" row of the language picker, which is written in its own
-// language on purpose, like every other entry in that list. The ratchet only
-// turns down; NEVER raise it to let a new French label through.
-const FRENCH_LITERAL_BASELINE = 1;
+// Accented literals still hardcoded in the builder, keyed by the literal, each
+// with the reason it stays. The count of 1 admitted the "Français" row of the
+// language picker until that row moved out of the builder; on 2026-11-22 the
+// builder held none, so the ledger is empty. It only shrinks: NEVER add an
+// entry to let a new French label through.
+const FRENCH_LITERAL_LEDGER = {};
 const FRENCH = /[éèêëàâçûùôîïœÉÈÀÇÎÔÛ]/;
 
 const frenchLiterals = [];
 src.split(/\r?\n/).forEach((line, i) => {
 	if (/^\s*--/.test(line)) return;
 	for (const m of line.matchAll(/"([^"\n]{2,})"/g)) {
-		if (FRENCH.test(m[1])) frenchLiterals.push(`${i + 1}: ${JSON.stringify(m[1])}`);
+		if (FRENCH.test(m[1])) frenchLiterals.push({ line: i + 1, literal: m[1] });
 	}
 });
 
@@ -118,10 +117,15 @@ const distinct = [...new Set(calls)];
 const missing = distinct.filter((k) => !Object.prototype.hasOwnProperty.call(en, k));
 
 const failures = [];
-if (calls.length < MIN_CALLS) {
+// A second, looser count of the same calls: every call that opens on a string
+// literal, less those that compose it. The key regex must find each one, so a
+// regex that stops matching fails here instead of reporting zero missing keys.
+const literalOpenings = [...src.matchAll(/i18n_safe\(\s*"/g)].length;
+const composedOpenings = [...src.matchAll(/i18n_safe\(\s*"[^"\n]*"\s*\.\./g)].length;
+if (calls.length === 0 || calls.length !== literalOpenings - composedOpenings) {
 	failures.push(
-		`only ${calls.length} i18n_safe() call(s) found (expected at least ${MIN_CALLS}) — ` +
-			'the extraction is broken, not the menu'
+		`the key extraction found ${calls.length} i18n_safe() call(s), but ${literalOpenings - composedOpenings} ` +
+			'open on a whole string literal — the extraction is broken, not the menu'
 	);
 }
 for (const k of missing) {
@@ -129,11 +133,20 @@ for (const k of missing) {
 		`menu/ui/builder/builder.lua asks for "${k}", which en.json does not define — it would render as the raw key`
 	);
 }
-if (frenchLiterals.length > FRENCH_LITERAL_BASELINE) {
+const { added: newFrench, fixed: goneFrench } = compareKnownDebt(
+	frenchLiterals.map((f) => f.literal),
+	FRENCH_LITERAL_LEDGER
+);
+for (const literal of newFrench) {
+	const lines = frenchLiterals.filter((f) => f.literal === literal).map((f) => f.line);
 	failures.push(
-		`hardcoded French literals rose to ${frenchLiterals.length} (baseline ${FRENCH_LITERAL_BASELINE}):\n      ` +
-			frenchLiterals.join('\n      ') +
-			'\n    Route the label through i18n_safe with a key defined in en.json.'
+		`hardcoded French literal ${JSON.stringify(literal)} (line ${lines.join(', ')}) is not in FRENCH_LITERAL_LEDGER. ` +
+			'Route the label through i18n_safe with a key defined in en.json.'
+	);
+}
+for (const literal of goneFrench) {
+	failures.push(
+		`${JSON.stringify(literal)} is no longer in the builder; remove it from FRENCH_LITERAL_LEDGER.`
 	);
 }
 
@@ -155,6 +168,6 @@ if (failures.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] Every Linux menu key resolves (${calls.length} call(s), ${distinct.length} distinct); ` +
-		`${frenchLiterals.length}/${FRENCH_LITERAL_BASELINE} accented literal(s), ` +
+		`${frenchLiterals.length} accented literal(s), each in FRENCH_LITERAL_LEDGER, ` +
 		`${inlineTitles.length}/${INLINE_TITLE_BASELINE} inline label(s).\x1b[0m`
 );

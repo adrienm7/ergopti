@@ -43,6 +43,7 @@
 
 require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
 const { driverNames } = require('../lib/driver-roots.cjs');
+const { compareKnownDebt, reportKnownDebt } = require('./lib/known-debt.cjs');
 
 const fs = require('fs');
 const assert = require('node:assert/strict');
@@ -56,8 +57,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
 const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'settings', 'data', 'features', 'manifest.toml');
 
-// Frozen baseline — config surfaces a driver touches that the manifest does not
-// declare for it. Drive to zero; NEVER raise.
+// Known debt — config surfaces a driver touches that the manifest does not
+// declare for it, each with the reason it is still there. The ledger may only
+// shrink: a new surface fails, and so does an entry whose surface is gone.
 // History: 11 (2026-08-02, first measurement. Ten are Linux; the eleventh is
 //            macOS — ui/onboarding/init.lua persists [hotstrings] enabled,
 //            a key the manifest has never declared, and its own comment says
@@ -68,7 +70,15 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'settings', 'data', 'features
 // 2026-09-28: 7 -> 5 after reading the scope-owned hotstring namespaces.
 // 2026-09-29: 5 -> 3 once the setup wizard wrote catalogue paths only: the
 // Linux [hotstrings] enabled answer and [script] onboarding_done are gone.
-const BASELINE = 3;
+// 2026-11-22: the count of 3 became the named ledger below.
+const UNDECLARED_LEDGER = {
+	'linux info':
+		'[info] of personal_info.toml (hotstrings/engine/dynamic/manager.lua): a secondary file, not config.toml, which the row scan cannot tell apart',
+	'linux linux.action_parameters':
+		'pre-2026-08-06 name of [gesture_parameters], read once on load by gestures/engine/manager.lua and never written',
+	'linux linux.gestures':
+		'pre-2026-08-06 name of [gestures], read once on load by gestures/engine/manager.lua and never written'
+};
 
 // The older macOS `[llm.profiles] user_profiles` array has a reader that imports it into
 // `llm.user_profiles` and a row that deletes it (settings/engine/preferences/preferences.lua). It names the key
@@ -78,6 +88,14 @@ const BASELINE = 3;
 const RETIRING_SURFACES = new Set(['macos llm.profiles.user_profiles']);
 
 const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
+
+// The ledger comparison itself: a new item and a fixed entry both surface, and
+// an entry without a reason is refused rather than read as an allowance.
+assert.deepEqual(compareKnownDebt(['kept', 'new'], { kept: 'why', gone: 'why' }), {
+	added: ['new'],
+	fixed: ['gone']
+});
+assert.throws(() => compareKnownDebt([], { silent: ' ' }), /has no reason/);
 
 /**
  * Parses the manifest into the set of "section.key" paths declared per platform,
@@ -1282,18 +1300,20 @@ if (process.argv.includes('--measure')) {
 	process.exit(0);
 }
 
-if (undeclared.length > BASELINE) {
-	console.error(
-		`\x1b[31m[ERROR] Undeclared driver config surfaces rose to ${undeclared.length} (baseline ${BASELINE}).\x1b[0m`
-	);
-	for (const u of undeclared) console.error(`  ${u.driver.padEnd(8)} ${u.surface}`);
-	console.error(
-		'\n  A config key the driver persists but the manifest has never heard of has no\n' +
+if (
+	!reportKnownDebt({
+		label: 'Undeclared driver config surface',
+		found: undeclared.map((u) => `${u.driver} ${u.surface}`),
+		ledger: UNDECLARED_LEDGER,
+		ledgerName: 'UNDECLARED_LEDGER',
+		advice:
+			'  A config key the driver persists but the manifest has never heard of has no\n' +
 			'  default, no type, no schema entry and no menu row — it is invisible to every\n' +
 			'  gate in this repo. Declare it in manifest.toml with the right platforms, or\n' +
 			'  point the driver at the canonical key that already means the same thing.\n' +
-			'  Do NOT raise the baseline.'
-	);
+			'  Do NOT add it to the ledger.'
+	})
+) {
 	console.error(
 		'  Run `node tools/test/test-driver-config-surface-is-declared.cjs --measure` to list them.'
 	);
@@ -1301,5 +1321,5 @@ if (undeclared.length > BASELINE) {
 }
 
 console.log(
-	`\x1b[32m[OK] Driver config surfaces declared in the manifest (${undeclared.length}/${BASELINE} undeclared).\x1b[0m`
+	`\x1b[32m[OK] Driver config surfaces declared in the manifest (${undeclared.length} undeclared, each named in UNDECLARED_LEDGER).\x1b[0m`
 );

@@ -37,6 +37,7 @@ const path = require('path');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
 const { isDriverMarkerPath } = require('../lib/driver-roots.cjs');
+const { reportKnownDebt } = require('./lib/known-debt.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_PREFIX = 'static/ergopti_plus/';
@@ -52,8 +53,8 @@ const VENDOR_WORDS =
 const EXEMPT =
 	/[/\\](platform|adapters|vendor|tests|docs|core|settings|tray|ai|apps|clipboard|diagnostics|hotstrings)[/\\]/;
 
-// Frozen baseline — driver-tree paths naming an OS or vendor outside the seam.
-// Drive to zero; NEVER raise it.
+// Known debt — driver-tree paths naming an OS or vendor outside the seam, each
+// with the reason it is still there. The ledger may only shrink.
 // History: 3 (2026-08-02, first measurement, immediately after the platform/remap
 //             extraction removed modules/karabiner, modules/kanata and
 //             modules/tap_holds. The three that remain each need a placement
@@ -66,7 +67,9 @@ const EXEMPT =
 //          1 (2026-09-24, Linux retired kanata for the in-daemon tap-hold engine
 //             under platform/remap/, which deleted kanata_generator.lua and its
 //             golden fixture. webkit_host.lua is the one left.)
-const PATH_BASELINE = 1;
+//          0 (2026-11-22, measured when the count became this ledger: core/ is
+//             exempt, so webkit_host.lua no longer counted and the 1 was slack.)
+const PATH_LEDGER = {};
 
 /**
  * Every staged driver file, excluding local runtime residue.
@@ -227,17 +230,19 @@ if (union.length === 0) {
 		'\x1b[31m[ERROR] Convention P: no tracked platform/ sub-folders found — the candidate has no subjects.\x1b[0m'
 	);
 }
-if (offenders.length > PATH_BASELINE) {
-	failed = true;
-	console.error(
-		`\x1b[31m[ERROR] Convention P: ${offenders.length} path(s) name an OS or vendor outside platform/ (baseline ${PATH_BASELINE}).\x1b[0m`
-	);
-	for (const o of offenders) console.error('  ' + o);
-	console.error(
-		'\n  platform/ is the only word in the tree that means "this differs by OS". A vendor\n' +
+if (
+	!reportKnownDebt({
+		label: 'Convention P: path names an OS or vendor outside platform/',
+		found: offenders,
+		ledger: PATH_LEDGER,
+		ledgerName: 'PATH_LEDGER',
+		advice:
+			'  platform/ is the only word in the tree that means "this differs by OS". A vendor\n' +
 			'  name anywhere else is how one concern ends up with three parents and three\n' +
-			'  readers. Do NOT raise the baseline.'
-	);
+			'  readers. Do NOT add it to the ledger.'
+	})
+) {
+	failed = true;
 }
 if (missing.length > 0) {
 	failed = true;
@@ -259,5 +264,5 @@ if (failed) {
 }
 
 console.log(
-	`\x1b[32m[OK] Convention P: ${offenders.length}/${PATH_BASELINE} vendor-named path(s), platform/ symmetrical across ${DRIVERS.length} drivers (${union.join(', ')}).\x1b[0m`
+	`\x1b[32m[OK] Convention P: ${offenders.length} vendor-named path(s), each in PATH_LEDGER, platform/ symmetrical across ${DRIVERS.length} drivers (${union.join(', ')}).\x1b[0m`
 );
