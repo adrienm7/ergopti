@@ -33,10 +33,6 @@ global ScriptInformation := Map(
 		; The magic key's default for the layout that types (ReadScriptConfig):
 		; what an absent trigger_char means, and what the editor names as default.
 		"MagicKeyDefault", _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_TRIGGER_CHAR),
-		; The scan code of the key the emulated layout declares as its magic key,
-		; "" for none; resolved once at boot by LayoutRegistry_MagicKeySource
-		; (ErgoptiPlus.ahk) before any hotkey registers on it.
-		"MagicKeySourceScan", "",
 		; Manual override for the AltGr-as-Kana / custom-remap detection. The
 		; manifest default is "auto": HotstringEngineInit() detects the family via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [script]) wins when

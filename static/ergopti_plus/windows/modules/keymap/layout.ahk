@@ -926,14 +926,6 @@ _DeadKeyDispatch(BareChar, Mapping, *) {
 	}
 }
 
-; The magic key's remap (LayoutRegistry_MagicKeyHotkeys): the plain press of
-; the key the emulated layout declares types the configured magic key; Shift,
-; AltGr and every chord find the emulated layout's hotkeys.
-if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"] {
-	for _MagicKeyHotkey in LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"])
-		Hotkey(_MagicKeyHotkey, _RemapEmit.Bind("{Text}" . ScriptInformation["MagicKey"],
-			ScriptInformation["MagicKey"]), "I2")
-}
 
 
 

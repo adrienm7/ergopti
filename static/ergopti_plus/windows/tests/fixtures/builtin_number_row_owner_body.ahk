@@ -1,4 +1,4 @@
-﻿; tests/fixtures/builtin_number_row_magic_body.ahk
+﻿; tests/fixtures/builtin_number_row_owner_body.ahk
 
 ; Genuine XML tables and all competing built-in producers. Only registration
 ; and output are ports; no native DLL, host key or foreground window is touched.
@@ -6,9 +6,8 @@ global _SharedDir := A_Args[3], _StaticDir := A_Args[8], _DriverDir := A_Args[9]
 global _LRPN_Scan := A_Args[5], _LRPN_Row := A_Args[6] == "on", _LRPN_Caps := A_Args[7] == "on"
 global Features := Map("layout", Map("ergopti_base", true, "ergopti_variant", "ergopti", "emulated_layout", "",
 	"direct_access_digits", "native", "emulate_number_row", _LRPN_Row,
-	"emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", true))))
-global ScriptInformation := Map("MagicKeySourceScan", _LRPN_Scan, "MagicKey", Chr(0x2605))
+	"emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map("MagicKey", Chr(0x2605))
 global CategoryEnabled := Map("Layout", true), LayerEnabled := false, KLE_Model := 0, KLE_Id := ""
 global _LRPN_Current := 0, _LRPN_Entries := Map(), _LRPN_Emits := [], _LRPN_Registrations := 0
 
@@ -181,9 +180,8 @@ _LRPN_Check() {
 	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
 	_LRPN_LoadTables()
 	_LRPN_Require(NumberRowEffectiveMode() == "native", "independent static ordering owners must be inert in this scenario")
-	_LRPN_Require(!KeylayoutEmulation_IsActive(), "the helper must admit magic without requiring a registry emulation")
+	_LRPN_Require(!KeylayoutEmulation_IsActive(), "the built-in row types without a registry emulation")
 	RegisterLayoutRowPassthrough(Hotkey, HotIf)
-	_LRPCM_RegisterMagic()
 	RegisterShiftLayer()
 	Before := _LRPN_Registrations
 	RegisterBuiltinNumberRow()
@@ -191,16 +189,6 @@ _LRPN_Check() {
 	RegisterCapsLockLayer()
 	_LRPN_Require(_LRPN_Current == 0, "every real producer must reset its registration criterion")
 	Golden := JsonParse(FSReadStrict(_DriverDir . "\tests\fixtures\ergopti_emulation_golden.json"))
-	MagicKind := _LRPN_Caps ? "new" : "remap"
-	MagicText := (_LRPN_Caps ? "" : "{Text}") . ScriptInformation["MagicKey"]
-	for Family in ["plain", "altgr", "kana"] {
-		_ALTGR_KANA_FIXUP := Family == "kana"
-		_ALTGR_LAYOUT_PROBE := Map("hkl", 0x7E570409, "valid", true, "source", "probe",
-			"kana", Family == "kana", "altgr_level", Family == "altgr", "rmenu_sc", Family == "kana" ? 0 : 0xE038,
-			"altgr_vk", Family == "kana" ? 0xDF : 0xA5)
-		_LRPN_Output(_LRPN_Scan, MagicKind, MagicText)
-		_LRPN_Require(!(_LRPN_Select(_LRPN_Scan . " Up") is Map), "a chosen full-stroke magic press owns no synthetic digit release")
-	}
 	; The sibling digit keeps its real paired Down/Up only while that owner wins.
 	if !_LRPN_Row
 		_LRPN_Output("SC003", "native", "SC003")
@@ -217,10 +205,7 @@ _LRPN_Check() {
 		_LRPN_Output("+" . _LRPN_Scan, "new", Golden["levels"]["shift"][_LRPN_Scan]["text"])
 	else
 		_LRPN_Output("+" . _LRPN_Scan, "native", _LRPN_Scan)
-	Features["layout"]["ergopti_base"] := false
-	_LRPN_Output(_LRPN_Scan, MagicKind, MagicText)
-	Features["layout"]["ergopti_base"] := true
-	Features["hotstrings"]["magic_key"]["replace"]["enabled"] := false
+	; No key is remapped to the magic key (2026-11-22): the row types its own key.
 	if !_LRPN_Row
 		_LRPN_Output(_LRPN_Scan, "native", _LRPN_Scan)
 	else if _LRPN_Caps
@@ -234,7 +219,7 @@ _LRPN_Check() {
 
 try {
 	_LRPN_Check()
-	FileAppend("PASS builtin-number-row-magic-owner", "*")
+	FileAppend("PASS builtin-number-row-owner", "*")
 	ExitApp(0)
 } catch as Err {
 	FileAppend(Err.Message . "`n" . Err.Stack, "**")

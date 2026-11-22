@@ -89,10 +89,10 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 			"the menu's spelling reaches the same file")
 		AssertEqual(Registry . "rolls.toml", HotstringsBundledTomlPath("rolls"))
 		AssertEqual(Registry . "repeatcorrections.toml", HotstringsBoundTomlPath("magickey", "repeat_corrections"))
-		AssertEqual(Registry . "magickeyreplace.toml", HotstringsBoundTomlPath("magickey", "replace"))
 		AssertEqual(Registry . "suffixes_a.toml", HotstringsBundledTomlPath("french_distancesreduction"))
 		AssertEqual(_EHX_FileEntries(Registry . "suffixes_a.toml"), CountTomlSection("french_distancesreduction", "suffixes_a"))
-		AssertEqual(0, CountTomlSection("magickey", "replace"), "the native feature owns no fabricated mapping")
+		AssertEqual("", HotstringsBoundTomlPath("magickey", "replace"),
+			"no extension binds the retired J → ★ remap (2026-11-22)")
 		AssertEqual("", HotstringsBoundTomlPath("magickey", "text_expansion_symbols"),
 			"the other magic key sections stay bundled")
 		Assert(InStr(HotstringsBundledTomlPath("magickey"), "\hotstrings\data\catalogue\magickey.toml"))
@@ -116,7 +116,7 @@ _EHX_ShippedGroupsLoadFromTheExtension() {
 		AssertEqual("ergopti", Route["section_extensions"]["repeat_corrections"],
 			"the repeat corrections name the extension whose submenu lists them")
 		AssertEqual("ergopti", _HotstringBoundSources["rolls"]["extension"])
-		AssertEqual("ergopti", Route["section_extensions"]["replace"])
+		AssertFalse(Route["section_extensions"].Has("replace"), "the retired remap names no extension")
 		AssertEqual("ergopti", _HotstringBoundSources["frenchdistancesreduction"]["extension"])
 	}
 }

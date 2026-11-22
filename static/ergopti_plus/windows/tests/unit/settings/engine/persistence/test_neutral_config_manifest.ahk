@@ -14,8 +14,8 @@ _NeutralConfigManifestProjections() {
 		AssertEqual(Action, ManifestRecommendedFor("shortcuts.script_control." . Slot), Slot . " keeps its preset")
 	}
 	State := ManifestBuildFeaturesMap()
-	State["hotstrings"]["magic_key"]["replace"]["enabled"] := true
-	AssertEqual(ManifestDefaultFor("hotstrings.magic_key.replace.enabled"), false,
+	State["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] := true
+	AssertEqual(ManifestDefaultFor("hotstrings.magic_key.repeat_corrections.enabled"), false,
 		"runtime edits must not mutate the canonical neutral baseline")
 }
 Test("neutral-config: manifest projections preserve recommended intent", _NeutralConfigManifestProjections)

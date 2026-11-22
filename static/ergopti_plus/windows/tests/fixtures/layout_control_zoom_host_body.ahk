@@ -5,9 +5,8 @@
 global _SharedDir := A_Args[3], _LRCZ_Sc := A_Args[5], _LRCZ_Mode := A_Args[6]
 global _LRCZ_Emits := [], _LRCZ_Exes := Map("word", "WINWORD.EXE", "excel", "EXCEL.EXE", "other", "notepad.exe")
 global Features := Map("layout", Map("ergopti_base", true,
-	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC02E", "MagicKeySourceChosen", false)
+	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 
 OutputHostResolve() {
 	global _LRCZ_Mode, _LRCZ_Exes

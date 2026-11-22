@@ -16,14 +16,11 @@
 ; sections are live-eligible BY DEFAULT.
 ;
 ; The exceptions kept reload-only:
-;   1. Ê deadkey and "…" multiple-punctuation — now HSE raw-callback hotstrings
+;   Ê deadkey and "…" multiple-punctuation — now HSE raw-callback hotstrings
 ;      (migrated off the native AHK Hotstring() engine), so RegisterAllHotstrings
 ;      DOES re-register them on a live rebuild. They are kept reload-only as a
 ;      conservative default: their context-conditional dispatch is new on the HSE
 ;      path, so toggling them takes the proven Reload route until verified live.
-;   2. magic_key.replace — the magic-key remap (J → ★). It lives under
-;      "hotstrings.*" but is a LAYOUT feature (modules/keymap/layout.ahk RemapKey at
-;      boot), so a hotstring rebuild does nothing for it.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Inverted model: everything is live unless explicitly blocklisted. A new
@@ -54,7 +51,6 @@
 global _HS_RELOAD_ONLY_GROUPS := Map(
 	"distancesreduction.dead_key_e_circumflex",  true,  ; HSE raw-callback; reload-only (conservative)
 	"autocorrection.multiple_punctuation_marks", true,  ; HSE raw-callback; reload-only (conservative)
-	"magickey.replace",                          true,  ; layout remap (J -> star), not a hotstring
 )
 
 

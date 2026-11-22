@@ -82,9 +82,6 @@ _HLP_EverySectionShipsDisabled() {
 		for Id, Node in Sections {
 			if !(Node is Map) or !Node.Has("enabled")
 				continue
-			; The J→★ key remap sits under magic_key but is a key assignment.
-			if (Category == "magic_key" and Id == "replace")
-				continue
 			AssertEqual(false, Node["enabled"], "hotstrings." . Category . "." . Id . " must ship disabled")
 			Checked++
 		}

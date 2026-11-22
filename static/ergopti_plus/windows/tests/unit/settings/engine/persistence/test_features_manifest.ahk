@@ -521,9 +521,6 @@ TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
 	Assert(Trim(Code) != "", "the complete actual keymap module must be readable and nonempty")
 	Assert(!InStr(Code, "OpenPersonalEditor()"),
 		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
-	AssertEqual("SC02E", LayoutRegistry_MagicKeyHotkeys("SC02E")[1] . "",
-		"the declared magic key reserves its plain press alone, never an editor chord")
-	AssertEqual(1, LayoutRegistry_MagicKeyHotkeys("SC02E").Length)
 	Personal := _StripFullLineComments(_DriverFuncBody("_HS_PersonalRows"))
 	Assert(Personal != "", "the actual personal-hotstring provider must be readable")
 	Assert(!InStr(Personal, '"menu.hotstrings.shortcut_prefix"'),

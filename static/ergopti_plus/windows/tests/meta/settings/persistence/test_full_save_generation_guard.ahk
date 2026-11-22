@@ -98,7 +98,7 @@ Test("config full save meta: callers classify all outcomes (config-full-save-gen
 
 ; The optional old-boot canonicalizer must not report the terminal owner's refusal.
 _CFGFM_OptionalBootSaveBlock(Entry) {
-	StartText := 'BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])'
+	StartText := "_TrayRootBootDetailsPending := true"
 	EndText := 'BootProfile_StageBegin("keyboard hook")'
 	Start := InStr(Entry, StartText, true)
 	if !Start || InStr(Entry, StartText, true, Start + StrLen(StartText))
@@ -107,7 +107,7 @@ _CFGFM_OptionalBootSaveBlock(Entry) {
 	if !End
 		return ""
 	Code := _DriverMaskNonCode(&Entry)
-	if SubStr(Code, Start, 17) != "BootProfile_Stage"
+	if SubStr(Code, Start, StrLen(StartText)) != StartText
 		return ""
 	return Trim(_StripFullLineComments(SubStr(Entry, Start + StrLen(StartText),
 		End - Start - StrLen(StartText))), " `t`r`n")

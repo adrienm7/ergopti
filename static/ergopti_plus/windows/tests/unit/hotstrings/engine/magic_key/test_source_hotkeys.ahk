@@ -3,37 +3,30 @@
 ; ==============================================================================
 ; MODULE: Magic Key Hotkey Tests (Windows)
 ; DESCRIPTION:
-; The magic key is a configured character (maintainer's decision of
-; 2026-11-21). The only key layout.ahk remaps is the one the emulated layout
-; declares, and only its plain press: the old plan bound every level of it
-; through RemapKey with a source character, plus a modifiers + ★ → modifiers +
-; S save on every chord, and a key the user chose from the Layout menu.
+; The magic key is only the configured character (maintainer's decisions of
+; 2026-11-21 and 2026-11-22): no hotkey turns any key into it. The replace
+; section remapped the key an emulated layout declared ([extension.magic_key])
+; to the configured character; before that, a key the user chose, a key
+; detected on the OS layout and a modifiers + ★ → modifiers + S save did too.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-Test("magic key: layout.ahk registers only the declared key's plain press (magic-key-character)",
-	_MKH_RegistrationCase)
+Test("magic key: no hotkey remaps any key to the magic key (magic-key-character)",
+	_MKH_NoRemapCase)
 
-_MKH_RegistrationCase() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Code := _StripFullLineComments(FileRead(WindowsDir . "\modules\keymap\layout.ahk", "UTF-8"))
-	Assert(InStr(Code, 'LayoutRegistry_MagicKeyHotkeys(ScriptInformation["MagicKeySourceScan"])') > 0,
-		"the magic key's hotkeys come from LayoutRegistry_MagicKeyHotkeys")
-	Assert(!RegExMatch(Code, "(?:RemapKey)\([^)\n]*MagicKeySource"),
-		"the declared key is no RemapKey: Shift, AltGr and the chords stay the emulated layout's")
-	Assert(!InStr(Code, "_MagicKeySave") && !InStr(Code, "CTRL_MAGIC_SAVE"),
-		"no modifiers + ★ → modifiers + S save is registered")
-	Assert(!InStr(Code, "MagicKeySourceChosen") && !InStr(Code, "MagicKeySourceChar"),
-		"no key chosen by the user nor detected on the OS layout")
-}
-
-Test("magic key: the boot resolves the source from the emulated layout's declaration alone (magic-key-character)",
-	_MKH_BootCase)
-
-_MKH_BootCase() {
+_MKH_NoRemapCase() {
 	Code := _DriverSourceNoComments()
-	AssertFalse(InStr(Code, "LayoutRegistry_DetectMagicKeyScan"), "the OS layout is never probed for a source character")
-	AssertFalse(InStr(Code, "LayoutRegistry_ShippedMagicKey"), "the shipped position is no fallback")
-	AssertFalse(InStr(Code, "magic_key_save.ahk"), "the save rule is not included")
+	for Retired in ["LayoutRegistry_MagicKeySource", "LayoutRegistry_MagicKeyHotkeys",
+			"LayoutRegistry_DeclaredMagicKey", "HotstringExtensions_MagicKey", "_KLE_MagicKeyOwnsKey",
+			"MagicKeySourceScan", "_MagicKeySave", "LayoutRegistry_DetectMagicKeyScan"]
+		AssertFalse(InStr(Code, Retired), Retired . " left with the magic key remap")
+	AssertFalse(RegExMatch(Code, '\["replace"\]\["enabled"\]'), "no code reads the retired replace section")
+	AssertFalse(RegExMatch(Code, '(?:Hotkey|RemapKey)\([^\n]*ScriptInformation\["MagicKey"\]'),
+		"no hotkey binds a key to the configured magic key")
 }
+
+Test("magic key: the manifest declares no replace section (magic-key-character)", () => (
+	AssertFalse(ManifestFindEntryByPath("hotstrings.magic_key.replace") is Map,
+		"the J → ★ remap is no feature any more"),
+	AssertFalse(ManifestBuildFeaturesMap()["hotstrings"]["magic_key"].Has("replace"))))

@@ -61,10 +61,8 @@ TestHSLT_BlocklistPinsTheReloadOnlySections() {
 		"the deadkey is native-engine and must reload")
 	AssertTrue(_HS_IsReloadOnlyGroup("autocorrection.multiple_punctuation_marks"),
 		"the multiple-punctuation rule is native-engine and must reload")
-	; magic_key.replace lives under "hotstrings.*" but is a LAYOUT remap (J -> star)
-	; applied by modules/keymap/layout.ahk, so RegisterAllHotstrings never touches it.
-	AssertTrue(_HS_IsReloadOnlyGroup("magickey.replace"),
-		"the magic-key remap is a layout feature and must reload")
+	; The J → ★ remap left with the replace section (2026-11-22).
+	AssertFalse(_HS_IsReloadOnlyGroup("magickey.replace"), "no retired remap stays blocklisted")
 }
 Test("HSLT blocklist pins the reload-only sections",
 	TestHSLT_BlocklistPinsTheReloadOnlySections)
@@ -80,7 +78,7 @@ TestHSLT_BlocklistRejectsEverythingElse() {
 	AssertFalse(_HS_IsReloadOnlyGroup("magickey.text_expansion_symbols_typst"))
 
 	; The magic-key text-expansion sections ARE registered by RegisterAllHotstrings
-	; (siblings of the reload-only magickey.replace), so they rebuild live.
+	; so they rebuild live.
 	AssertFalse(_HS_IsReloadOnlyGroup("magickey.text_expansion"),
 		"magic_key.text_expansion is a real hotstring section -> live")
 	AssertFalse(_HS_IsReloadOnlyGroup("magickey.repeat_corrections"))

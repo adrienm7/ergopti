@@ -241,22 +241,18 @@ _MET_ActualSourceOwner() {
 	global Features, ScriptInformation, KLE_Model, TapHold
 	Saved := [Features, ScriptInformation, KLE_Model, TapHold]
 	try {
-		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", "native", "emulated_layout", ""),
-			"hotstrings", Map("magic_key", Map("replace", Map("enabled", true))))
-		ScriptInformation := Map("MagicKey", Chr(0x2605), "MagicKeySourceScan", "SC024")
+		Features := Map("layout", Map("ergopti_base", false, "direct_access_digits", "native", "emulated_layout", ""))
+		ScriptInformation := Map("MagicKey", Chr(0x2605))
 		KLE_Model := 0, TapHold := Map("keys", Map())
 		Table := StarSlotPhysicalCatalogue(_SharedDir), Known := _MET_Options()["known_codes"]
 		Us := _MET_Layout("00000409")
+		; No key is remapped to the magic key (2026-11-22): a configured ★ makes
+		; no US key type it, where the replace section turned KeyJ into ★.
 		Receipt := _StarSlotCurrentSource(1, Table, Us)
-		AssertEqual("KeyJ", StarSlotSelectSource(Receipt, Known)["source"]["code"],
-			"the declared key the remap turns into ★ is the slot's key")
-		Features["hotstrings"]["magic_key"]["replace"]["enabled"] := false
-		Receipt := _StarSlotCurrentSource(2, Table, Us)
 		AssertEqual("source_missing", StarSlotSelectSource(Receipt, Known)["reason"],
-			"without the remap the US layout types no ★")
-		Features["hotstrings"]["magic_key"]["replace"]["enabled"] := true
+			"the US layout types no ★, whatever the magic key")
 		ScriptInformation["MagicKey"] := Chr(0xF9)
-		Receipt := _StarSlotCurrentSource(3, Table, Us)
+		Receipt := _StarSlotCurrentSource(2, Table, Us)
 		AssertEqual("source_missing", StarSlotSelectSource(Receipt, Known)["reason"],
 			"a configured ù moves no Win+★: the slot follows the real ★")
 	} finally {
@@ -277,9 +273,8 @@ _MET_BaseTablesOncePerProbe() {
 	_TestEnsureErgoptiLayout()
 	Saved := [Features, ScriptInformation, KLE_Model, TapHold]
 	try {
-		Features := Map("layout", Map("ergopti_base", true, "direct_access_digits", "native", "emulated_layout", ""),
-			"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-		ScriptInformation := Map("MagicKey", ";", "MagicKeySourceScan", "SC024")
+		Features := Map("layout", Map("ergopti_base", true, "direct_access_digits", "native", "emulated_layout", ""))
+		ScriptInformation := Map("MagicKey", ";")
 		KLE_Model := 0, TapHold := Map("keys", Map())
 		Hkl := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
 		Full := StarSlotPhysicalCatalogue(_SharedDir)

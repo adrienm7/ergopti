@@ -5,9 +5,8 @@
 global _SharedDir := A_Args[3], _LRCC_Index := Integer(A_Args[5]), _LRCC_Row := A_Args[6] == "on"
 global _LRCC_Microsoft := false, _LRCC_Emits := []
 global Features := Map("layout", Map("ergopti_base", true,
-	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC02E", "MagicKeySourceChosen", false)
+	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 
 MicrosoftApps() => _LRCC_Microsoft
 HotPath_Now() => 0

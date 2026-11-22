@@ -1327,23 +1327,6 @@ global _DriverMenuReady := false
 ; first, once input is ready (menu/engine/reload_replay.ahk).
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
-BootProfile_StageBegin("magic key source")
-; The key the active emulated layout declares as its magic key
-; (LayoutRegistry_MagicKeySource): the emulated registry layout's, or the
-; built-in Ergopti emulation's. A layout is emulated only while the base layer
-; is on (_KLE_BaseCriterion). Without one no key is remapped: the magic key is
-; the configured character, typed by whatever key types it.
-_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
-	"declared", LayoutRegistry_DeclaredMagicKey(
-		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
-			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
-		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"keycodes", LayoutRegistry_Keycodes()))
-ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
-LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
-
-BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
 ; This canonicalizer is optional once a terminal transition owns the old boot.
 ; Recheck after refusal because schema admission and queue setup can yield.
 if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {

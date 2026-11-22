@@ -243,14 +243,11 @@ _StarSlotAdmission() {
  *   a key first needs it, instead of once per catalogue key.
  */
 _StarSlotEffectivePlain(Probe, Code, Scan, Native) {
-	global Features, ScriptInformation, KLE_Model, KLE_KeyCodes, KLE_LevelIndex, KEYLAYOUT_NEUTRAL_STATE, TapHold
+	global Features, KLE_Model, KLE_KeyCodes, KLE_LevelIndex, KEYLAYOUT_NEUTRAL_STATE, TapHold
 	Numeric := Integer("0x" . SubStr(Scan, 3))
 	TapId := TapHoldResolveKeyIdFromVkSc(0, Numeric)
 	if TapId != "" && TapHoldIsActive(TapHold, TapId)
 		return { Count: 0, Text: "" }
-	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
-			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
-		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
 	; « Also reorder the three edge keys » types the other level.
 	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
 	if Edge != ""
@@ -338,11 +335,9 @@ _StarSlotExplicitClaim(Source, Hkl) {
 
 /** Captures the actual immutable recipe that proved this physical source. */
 _StarSlotSourceSignature() {
-	global Features, ScriptInformation, KLE_Id
+	global Features, KLE_Id
 	Layout := Features["layout"]
-	return ScriptInformation["MagicKey"] . "|" . ScriptInformation["MagicKeySourceScan"]
-		. "|" . Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
-		. "|" . Layout[ConfigLeaf.ERGOPTI_BASE] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
+	return Layout[ConfigLeaf.ERGOPTI_BASE] . "|" . Layout[ConfigLeaf.DIRECT_ACCESS_DIGITS]
 		. "|" . Layout[ConfigLeaf.EMULATED_LAYOUT] . "|" . KLE_Id
 }
 

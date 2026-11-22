@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays the independent shared corpus through the native policy port. A
 ; refused scope cannot emit a partial batch, and every valid category/section
-; choice matches both Lua drivers, including the extension's native replacement.
+; choice matches both Lua drivers, including the extension's bound sections.
 ; ==============================================================================
 
 _HSCS_CheckVector(Vector) {
@@ -50,53 +50,53 @@ for _HSCS_Vector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\bu
 
 ; Independent bound-leaf batches match the shared extension-selection contract.
 _HSCS_BoundVector(Enabled) {
-	Bindings := [Map("group", "magickey", "section", "replace"),
+	Bindings := [Map("group", "magickey", "section", "text_expansion"),
 		Map("group", "magickey", "section", "repeat_corrections")]
 	Expected := Enabled ? [Map("group", "rolls", "enabled", true),
 		Map("group", "rolls", "section", "hc", "enabled", true),
 		Map("group", "magickey", "enabled", true),
-		Map("group", "magickey", "section", "replace", "enabled", true),
+		Map("group", "magickey", "section", "text_expansion", "enabled", true),
 		Map("group", "magickey", "section", "repeat_corrections", "enabled", true)]
-		: [Map("group", "magickey", "section", "replace", "enabled", false),
+		: [Map("group", "magickey", "section", "text_expansion", "enabled", false),
 		Map("group", "magickey", "section", "repeat_corrections", "enabled", false)]
 	_HSCS_CheckVector(Map("inventory", Map("rolls", ["hc"],
-		"magickey", ["replace", "repeat_corrections", "symbols"]),
+		"magickey", ["text_expansion", "repeat_corrections", "symbols"]),
 		"targets", Enabled ? ["rolls"] : [], "enabled", Enabled,
 		"bound_sections", Bindings, "expected", Expected))
 	AssertEqual(2, Bindings.Length)
-	AssertEqual("replace", Bindings[1]["section"], "the bound catalogue remains unchanged")
+	AssertEqual("text_expansion", Bindings[1]["section"], "the bound catalogue remains unchanged")
 }
 for _HSCS_Enabled in [true, false]
 	Test("hotstring-extension-scope: exact bound batch " . _HSCS_Enabled, _HSCS_BoundVector.Bind(_HSCS_Enabled))
 
 _HSCS_BoundRefusal(Bound, ExpectedReason) {
-	_HSCS_CheckVector(Map("inventory", Map("magickey", ["replace"]), "targets", [],
+	_HSCS_CheckVector(Map("inventory", Map("magickey", ["text_expansion"]), "targets", [],
 		"enabled", true, "bound_sections", Bound, "refusal", ExpectedReason))
 }
 Test("hotstring-extension-scope: missing native category refuses without a partial batch",
-	_HSCS_BoundRefusal.Bind([Map("group", "missing", "section", "replace")], "unknown-category"))
+	_HSCS_BoundRefusal.Bind([Map("group", "missing", "section", "text_expansion")], "unknown-category"))
 Test("hotstring-extension-scope: missing section refuses without a partial batch",
 	_HSCS_BoundRefusal.Bind([Map("group", "magickey", "section", "missing")], "invalid-section"))
 Test("hotstring-extension-scope: duplicate bound section refuses without a partial batch",
-	_HSCS_BoundRefusal.Bind([Map("group", "magickey", "section", "replace"),
-		Map("group", "magickey", "section", "replace")], "invalid-section"))
+	_HSCS_BoundRefusal.Bind([Map("group", "magickey", "section", "text_expansion"),
+		Map("group", "magickey", "section", "text_expansion")], "invalid-section"))
 Test("hotstring-extension-scope: malformed bound scope refuses without a partial batch",
 	_HSCS_BoundRefusal.Bind(false, "invalid-request"))
 
 _HSCS_DenseAndOverlappingBindings() {
 	Hole := [], Hole.Length := 1
-	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["replace"]), Hole, true, &Reason))
+	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["text_expansion"]), Hole, true, &Reason))
 	AssertEqual("invalid-request", Reason)
-	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["replace"]), [], true, &Reason, Hole))
+	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", ["text_expansion"]), [], true, &Reason, Hole))
 	AssertEqual("invalid-request", Reason)
 	AssertFalse(HotstringsCategoryScopePlan(Map("magickey", Hole), [], true, &Reason,
-		[Map("group", "magickey", "section", "replace")]))
+		[Map("group", "magickey", "section", "text_expansion")]))
 	AssertEqual("unknown-category", Reason)
-	_HSCS_CheckVector(Map("inventory", Map("magickey", ["replace"]),
+	_HSCS_CheckVector(Map("inventory", Map("magickey", ["text_expansion"]),
 		"targets", ["magickey"], "enabled", true,
-		"bound_sections", [Map("group", "magickey", "section", "replace")],
+		"bound_sections", [Map("group", "magickey", "section", "text_expansion")],
 		"expected", [Map("group", "magickey", "enabled", true),
-			Map("group", "magickey", "section", "replace", "enabled", true)]))
+			Map("group", "magickey", "section", "text_expansion", "enabled", true)]))
 }
 Test("hotstring-extension-scope: dense arrays and overlapping ownership retain strict validation",
 	_HSCS_DenseAndOverlappingBindings)
@@ -123,7 +123,6 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 		Fixture.source := '[category_enabled]`nhotstrings = false`nmagic_key = ' . InitialChoice . '`n'
 			. 'rolls = ' . InitialChoice . '`ndistances_reduction = ' . InitialChoice . '`n'
 			. 'sfbs_reduction = ' . InitialChoice . '`nfrench_distancesreduction = ' . InitialChoice . '`n'
-			. '[hotstrings.magic_key.replace]`nenabled = ' . InitialChoice . '`n'
 			. '[hotstrings.magic_key.repeat_corrections]`nenabled = ' . InitialChoice . '`n'
 			. '[hotstrings.magic_key.text_expansion_symbols]`nenabled = true`n'
 			. '[hotstrings.magic_key.text_expansion_symbols_typst]`nenabled = true`n'
@@ -182,10 +181,10 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 			Assert(ErgoptiRows is Array, "the shipped pack is present without installing its layout")
 			Built := Menu()
 			Assert(MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal_ext", ErgoptiRows) > 2)
-			AssertEqual(0, CountTomlSection("magickey", "replace"), "the real native replacement is a metadata-only section")
 			AssertEqual(24, CountTomlSection("french_distancesreduction", "suffixes_a"))
-			ReplacementLabel := MenuLabelFromDescriptionKey("menu.hotstrings.magic_key.replace", "hotstrings.magic_key.replace")
-			AssertEqual(1, _CTC_CountLabel(Built, ReplacementLabel), "the localized native replacement row belongs to the shipped extension")
+			RepeatLabel := MenuLabelFromDescriptionKey("menu.hotstrings.magic_key.repeat_corrections",
+				"hotstrings.magic_key.repeat_corrections")
+			AssertEqual(1, _CTC_CountLabel(Built, RepeatLabel), "the localized repeat corrections row belongs to the shipped extension")
 			CommandLabel := t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all")
 			AssertEqual(1, _CTC_CountLabel(Built, CommandLabel), "one actual extension command owns the entire selection")
 			Action := _L4M_MenuAction(Built, CommandLabel)
@@ -198,10 +197,10 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 			if LateRefusal {
 				AssertEqual("pending", Receipt["status"])
 				Parsed := TOML_ParseFreshFile(Fixture.path)
-				for Name in ["replace", "repeat_corrections"]
+				for Name in ["repeat_corrections"]
 					_HSCS_AssertSparseSelection(Parsed, "hotstrings.magic_key." . Name, "enabled",
 						"hotstrings.magic_key." . Name . ".enabled", Enabled)
-				AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.replace")["enabled"],
+				AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.repeat_corrections")["enabled"],
 					"pending publication leaves the real runtime's desired feature map unchanged")
 				AssertTrue(Parsed["category_enabled"]["magic_key"], "closing bound leaves retains the category gate")
 				for Name in ["text_expansion_symbols", "text_expansion_symbols_typst"]
@@ -235,7 +234,7 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 		Available := true
 		Fixture.source .= '[hotstrings.groups]`n"ext:sample:words" = false`n"ext:foreign:words" = true`n'
 			. '[hotstrings.modules."ext:sample:words"]`nwanted = false`nhidden = true`n'
-			. '[hotstrings.magic_key.replace]`nenabled = true`n'
+			. '[hotstrings.magic_key.repeat_corrections]`nenabled = true`n'
 		OriginalRules := FSReadUtf8Exact(SourcePath)
 		Launch(_Success, Borrowed, Refused) {
 			Launches += 1, Bundle := Borrowed, Refusal := Refused
@@ -274,7 +273,8 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 						"all pack-owned sections share the group transaction")
 				}
 				AssertTrue(Parsed["hotstrings.groups"]["ext:foreign:words"])
-				AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "a different extension cannot alter replacement")
+				AssertTrue(Parsed["hotstrings.magic_key.repeat_corrections"]["enabled"],
+					"a different extension cannot alter the Ergopti repeat corrections")
 				Refusal.Call("native pack-owned selection refused")
 				AssertEqual("refused", Receipt["status"])
 				AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
@@ -359,7 +359,7 @@ _HSCS_ClickBulk(Built, Enabled) {
 _HSCS_CategoryMenuLive(Enabled) {
 	Source := '[category_enabled]`nhotstrings = true`nrolls = ' . (Enabled ? "false" : "true")
 		. '`nautocorrection = true`n[hotstrings.rolls.hc]`nenabled = ' . (Enabled ? "false" : "true")
-		. '`ntime_activation_seconds = 0.75`n[hotstrings.magic_key.replace]`nenabled = true`n'
+		. '`ntime_activation_seconds = 0.75`n[hotstrings.magic_key.repeat_corrections]`nenabled = true`n'
 		. '[private]`ncredential = "retain-fixture-value"`n'
 	_HSCS_WithLiveConfig(Source, Map("Hotstrings", true, "Rolls", !Enabled, "MagicKey", true), Check)
 	Check(Fixture, Options, Calls) {
@@ -378,7 +378,7 @@ _HSCS_CategoryMenuLive(Enabled) {
 		for Entry in ManifestFeaturesForSection("hotstrings.rolls")
 			AssertEqual(Enabled, _HSCS_Stored(Parsed, Entry["path"]), "every own section is selected: " . Entry["path"])
 		AssertEqual(0.75, Parsed["hotstrings.rolls.hc"]["time_activation_seconds"])
-		AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "an unrelated choice is retained")
+		AssertTrue(Parsed["hotstrings.magic_key.repeat_corrections"]["enabled"], "an unrelated choice is retained")
 		AssertEqual("retain-fixture-value", Parsed["private"]["credential"])
 		AssertEqual(Enabled, CategoryEnabled["Rolls"], "the live gate is published with the write")
 		Desired := MasterGateDesiredFeatures(Features)
@@ -391,17 +391,13 @@ _HSCS_CategoryMenuLive(Enabled) {
 
 ; A section an extension binds is drawn in that extension's submenu, so the
 ; category's own « check all » never switches it (maintainer report 2026-10-17).
-; Magic key also holds a reload-only section, so this selection reloads.
+; Magic key holds no reload-only section since the J → ★ remap left
+; (2026-11-22), so this selection applies in-process.
 _HSCS_CategoryMenuKeepsBoundSections() {
 	global _HotstringBoundSources
 	Sections := ManifestFeaturesForSection("hotstrings.magic_key")
 	Assert(Sections.Length > 2, "magic key declares several sections")
-	BoundPath := ""
-	for Entry in Sections
-		if Entry["path"] != "hotstrings.magic_key.replace" {
-			BoundPath := Entry["path"]
-			break
-		}
+	BoundPath := Sections[1]["path"]
 	Parts := StrSplit(BoundPath, ".")
 	Source := '[category_enabled]`nhotstrings = true`nmagic_key = true`n[' . BoundPath . ']`nenabled = false`n'
 	SavedBound := _HotstringBoundSources
@@ -411,8 +407,8 @@ _HSCS_CategoryMenuKeepsBoundSections() {
 	finally _HotstringBoundSources := SavedBound
 	Check(Fixture, Options, Calls) {
 		AssertTrue(ToggleCategoryAllSections("MagicKey", true, Options))
-		AssertEqual(0, Calls.live, "the J-to-star replacement is reload-only")
-		AssertEqual(1, Calls.reload)
+		AssertEqual(1, Calls.live, "every magic key section is a hotstring section")
+		AssertEqual(0, Calls.reload)
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		AssertFalse(_HSCS_Stored(Parsed, BoundPath), "the extension's bound section is not this submenu's")
 		for Entry in Sections

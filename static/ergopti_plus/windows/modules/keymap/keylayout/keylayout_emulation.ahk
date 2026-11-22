@@ -293,25 +293,9 @@ _KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 		return false
 	if KLE_State != KEYLAYOUT_NEUTRAL_STATE
 		return true
-	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
-		return false
 	; A row switched off is the OS layout's (LayoutRowIsEmulated).
 	return KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && LayoutRowIsEmulated(Sc)
 		&& !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
-}
-
-; The magic key is an Ergopti feature tied to the layout that declares it: when
-; the active layout declares its key (the built-in Ergopti emulation), that
-; key's unshifted level belongs to the magic-key remap
-; (modules/keymap/layout.ahk), as the independent digit row belongs to its own
-; override. An emulated layout that declares none, such as Ergo-L, keeps its
-; own character there. Shift, AltGr and the shortcut chords always keep the
-; emulated layout's characters.
-_KLE_MagicKeyOwnsKey(Sc) {
-	global Features, ScriptInformation
-	return ScriptInformation["MagicKeySourceScan"] != ""
-		&& Sc == ScriptInformation["MagicKeySourceScan"]
-		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 }
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {

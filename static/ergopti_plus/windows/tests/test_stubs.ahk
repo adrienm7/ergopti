@@ -76,9 +76,6 @@ ResetHotstringRecorders() {
 global ScriptInformation := Map(
     "MagicKey", "★",
     "MagicKeyDefault", "★",
-    ; The key the built-in Ergopti emulation declares as its magic key, as the
-    ; boot resolves it (LayoutRegistry_MagicKeySource).
-    "MagicKeySourceScan", "SC02E",
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",
@@ -196,7 +193,6 @@ global Features := Map(
             "multiple_punctuation_marks", Map("enabled", true),
         ),
         "magic_key", Map(
-            "replace",                      Map("enabled", true),
             "repeat_corrections",           Map("enabled", true),
             "text_expansion",               Map("enabled", true),
             "text_expansion_auto",          Map("enabled", true),

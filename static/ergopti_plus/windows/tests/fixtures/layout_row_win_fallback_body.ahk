@@ -6,9 +6,8 @@ global _SharedDir := A_Args[3]
 global _LRPW_Row := A_Args[5], _LRPW_Mode := A_Args[6]
 global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", true,
-	"emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC039")
+	"emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 global RemappedList := Map(), KeyboardShortcutAssignments := Map(), LayerEnabled := false
 global _LRPW_Emits := []
 
@@ -37,10 +36,6 @@ _LRPW_Run() {
 	global _LRPW_Row, _LRPW_Mode, Features, ScriptInformation, KeyboardShortcutAssignments, _LRPW_Emits
 	Scan := Map("number", "SC002", "top", "SC010", "home", "SC01E", "bottom", "SC02C")[_LRPW_Row]
 	Features["layout"]["emulate_" . _LRPW_Row . "_row"] := _LRPW_Mode == "on"
-	if SubStr(_LRPW_Mode, 1, 6) == "magic-" {
-		Features["hotstrings"]["magic_key"]["replace"]["enabled"] := true
-		ScriptInformation["MagicKeySourceScan"] := _LRPW_Mode == "magic-source" ? Scan : "SC039"
-	}
 	; This is the production caller: the broker must receive its live admission,
 	; rather than a test registering the expected predicate on its behalf.
 	RemapKey(Scan, "z")
@@ -55,8 +50,6 @@ _LRPW_Run() {
 	if _LRPW_Mode == "legacy"
 		StarSlotRecordLegacy(Scan, (*) => _LRPW_Emits.Push("legacy"))
 	State["initialized"] := true
-	; The declared magic key owns its plain press alone (2026-11-21): its Win
-	; chord follows the native row like any other key of it.
 	ExpectedKind := _LRPW_Mode == "ordinary" ? "ordinary" : _LRPW_Mode == "legacy" ? "legacy"
 		: _LRPW_Mode == "on" ? "layout" : ""
 	Winner := _StarSlotBrokerWinner(Scan)
