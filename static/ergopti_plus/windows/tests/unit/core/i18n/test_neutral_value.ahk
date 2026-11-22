@@ -98,6 +98,9 @@ _TLNV_ChoiceCreatesAnAbsentConfig() {
 		_I18nLocale := "fr", _I18nConfiguredLocale := ""
 		Quiet := (*) => 0
 		AssertFalse(FileExist(ConfigurationFile) != "", "config.toml starts absent")
+		; The boot admits the absent file before any change, as ErgoptiPlus.ahk does.
+		ConfigMigrateBoot(ConfigurationFile)
+		AssertFalse(FileExist(ConfigurationFile) != "", "the boot admission creates nothing")
 		AssertTrue(I18nSetLocale("de", 0, Quiet, Quiet), "the choice is saved")
 		AssertTrue(FileExist(ConfigurationFile) != "", "config.toml is created")
 		AssertTrue(InStr(FileRead(ConfigurationFile, "UTF-8"), 'locale = "de"') > 0, "with the locale row")
