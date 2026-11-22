@@ -38,14 +38,6 @@
  * and a reason key with no English text, then writes the action x OS table of
  * _shared/shortcuts/data/actions/README.md from them.
  *
- * WHY A CHORD REASON:
- * A key-combination chord on Windows and Linux runs from the driver's own key
- * engine, not from Karabiner as on macOS, and some actions it cannot run there
- * (decision KCD-2 of 2026-11-21). `chord_reason_<driver>` names the
- * platform_reason.* key the chord picker shows on such an action, greyed. Only a
- * driver the row claims may carry one; the drivers' refusal lists are pinned to
- * these rows by test-chord-refused-actions-single-source.cjs.
- *
  * WHY STRICT:
  * Every field, platform token, parameter kind and requirement token is checked.
  * A field this generator does not know would otherwise be dropped on the floor,
@@ -142,9 +134,7 @@ const SG_FIELDS = new Set([
 	'reason_linux',
 	'equivalent_ahk',
 	'equivalent_hs',
-	'equivalent_linux',
-	'chord_reason_ahk',
-	'chord_reason_linux'
+	'equivalent_linux'
 ]);
 const AX_FIELDS = new Set([
 	'platform',
@@ -255,19 +245,6 @@ function validateFamily(family, allowed, name) {
 		}
 		for (const driver of PLATFORMS) {
 			validateAbsence(row, driver, claimed, where);
-			const chordReason = row[`chord_reason_${driver}`];
-			if (chordReason !== undefined) {
-				if (!claimed.includes(driver)) {
-					throw new Error(
-						`${where}: chord_reason_${driver} on an action that does not claim ${driver}`
-					);
-				}
-				if (typeof chordReason !== 'string' || !/^platform_reason\.[a-z0-9_]+$/.test(chordReason)) {
-					throw new Error(
-						`${where}: chord_reason_${driver} must name a ${REASON_KEY_PREFIX}* locale key`
-					);
-				}
-			}
 			const tokens = row[`requires_${driver}`];
 			if (tokens === undefined) continue;
 			if (!claimed.includes(driver)) {
@@ -407,8 +384,6 @@ function buildModel(data, platform) {
 			if (row.confirm === true) entry.confirm = true;
 			const req = row[`requires_${platform}`];
 			if (req) entry.requires = [...req];
-			const chordReason = row[`chord_reason_${platform}`];
-			if (chordReason) entry.chordReason = chordReason;
 			actions[id] = entry;
 		}
 	}
@@ -581,14 +556,13 @@ function buildSharedLuaModel(data) {
 	const actions = {};
 	for (const model of models) {
 		for (const [id, entry] of Object.entries(model.actions)) {
-			const { requires, chordReason, ...common } = entry;
+			const { requires, ...common } = entry;
 			const known = actions[id];
-			if (!known) actions[id] = { common, platforms: [], requires: {}, chordReasons: {} };
+			if (!known) actions[id] = { common, platforms: [], requires: {} };
 			else if (JSON.stringify(known.common) !== JSON.stringify(common))
 				throw new Error(`action "${id}" differs between the Lua drivers`);
 			actions[id].platforms.push(model.platform);
 			if (requires) actions[id].requires[model.platform] = requires;
-			if (chordReason) actions[id].chordReasons[model.platform] = chordReason;
 		}
 	}
 	return { sgItems, axItems, actions };
@@ -627,7 +601,7 @@ function renderSharedLua(shared, refresh) {
 	out.push('\t},');
 	out.push('\tactions = {');
 	for (const id of Object.keys(shared.actions).sort()) {
-		const { common, platforms, requires, chordReasons } = shared.actions[id];
+		const { common, platforms, requires } = shared.actions[id];
 		const parts = [`family = ${luaQ(common.family)}`, `label_key = ${luaQ(common.labelKey)}`];
 		if (common.parameter) parts.push(`parameter = ${luaQ(common.parameter)}`);
 		if (common.confirm) parts.push('confirm = true');
@@ -636,11 +610,6 @@ function renderSharedLua(shared, refresh) {
 		if (required.length)
 			parts.push(
 				`requires = { ${required.map((p) => `${p} = ${luaList(requires[p])}`).join(', ')} }`
-			);
-		const chorded = Object.keys(chordReasons);
-		if (chorded.length)
-			parts.push(
-				`chord_reason = { ${chorded.map((p) => `${p} = ${luaQ(chordReasons[p])}`).join(', ')} }`
 			);
 		out.push(`\t\t[${luaQ(id)}] = { ${parts.join(', ')} },`);
 	}
@@ -756,7 +725,6 @@ function renderAhk(model, refresh) {
 			`Confirm: ${a.confirm ? 'true' : 'false'}`
 		];
 		if (a.requires) parts.push(`Requires: [${a.requires.map(ahkQ).join(', ')}]`);
-		if (a.chordReason) parts.push(`ChordReason: ${ahkQ(a.chordReason)}`);
 		out.push(`\tActions[${ahkQ(id)}] := { ${parts.join(', ')} }`);
 	}
 	out.push('\treturn Catalogue');

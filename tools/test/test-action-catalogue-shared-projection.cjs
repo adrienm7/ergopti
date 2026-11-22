@@ -109,7 +109,6 @@ function expectedCatalogue(model) {
 		if (action.parameter) entry.parameter = action.parameter;
 		if (action.confirm) entry.confirm = true;
 		if (action.requires) entry.requires = [...action.requires];
-		if (action.chordReason) entry.chord_reason = action.chordReason;
 		catalogue.actions[id] = entry;
 	}
 	if (model.karabinerAliases) catalogue.karabiner_aliases = { ...model.karabinerAliases };

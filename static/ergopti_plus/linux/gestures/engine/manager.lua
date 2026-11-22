@@ -991,16 +991,6 @@ function M.get_action_label(action_name)
 	return i18n.get(meta.label_key)
 end
 
---- The platform_reason.* key a key chord's picker greys an action with: the
---- chord_reason_linux of actions.toml (decision KCD-2 of 2026-11-21: macOS runs
---- a program launch and the monitor Alt-Tab in a chord through Karabiner).
---- @param action_name string A catalogue action id.
---- @return string|nil reason_key Nil when a Linux chord can run the action.
-function M.get_action_chord_reason(action_name)
-	local meta = Catalogue.actions[action_name]
-	return meta and meta.chord_reason or nil
-end
-
 --- Returns the action ids the picker lists, in catalogue order, the
 --- modifier-chord block expanded. "none" is included: it is a valid binding.
 --- @return table
@@ -1642,7 +1632,13 @@ function M.get_action_parameter(binding, action_name)
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
-local function binding_action(binding)
+--- The action a binding runs, its section and slot. A key combination's
+--- binding also runs the chord of the pair that owns it (maintainer decision
+--- KCD-2 of 2026-11-22): asked for an expected action its tap does not run,
+--- it answers the chord, section "key_combination_chords".
+--- @param binding string
+--- @param expected string|nil The action the caller is about to run.
+local function binding_action(binding, expected)
 	if M.DEFAULT_GESTURES[binding] ~= nil then return M.get_action(binding), "gestures", binding end
 	local tap_id = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
 	if tap_id then
@@ -1659,9 +1655,35 @@ local function binding_action(binding)
 			local id = binding:sub(#descriptor[1] + 1)
 			local loaded, provider = pcall(require, descriptor[2])
 			if not loaded or type(provider) ~= "table" or type(provider.get_action) ~= "function" then return nil end
-			return provider.get_action(id), descriptor[3], id
+			local action = provider.get_action(id)
+			if descriptor[3] == "key_combination_taps" and expected ~= nil and action ~= expected
+				and type(provider.get_chord) == "function" and provider.get_chord(id) == expected then
+				return expected, "key_combination_chords", id
+			end
+			return action, descriptor[3], id
 		end
 	end
+	return nil
+end
+
+--- The action the canonical document stores for a binding's slot: [gestures],
+--- a [shortcuts] section, or a chord's [mod_combos.config.<pair>] combo.
+local function stored_action(config, section, id)
+	if section == "gestures" then return type(config.gestures) == "table" and config.gestures[id] or nil end
+	if section == "key_combination_chords" then
+		local combos = type(config.mod_combos) == "table" and config.mod_combos.config or nil
+		local row = type(combos) == "table" and combos[id] or nil
+		return type(row) == "table" and row.combo or nil
+	end
+	local actions = type(config.shortcuts) == "table" and config.shortcuts[section] or nil
+	return type(actions) == "table" and actions[id] or nil
+end
+
+--- The owner guard of a key combination's tap or chord, nil for another binding.
+local function combination_guard(binding, section, action)
+	local KeyCombinations = require("modules.shortcuts.key_combinations")
+	if section == "key_combination_taps" then return KeyCombinations.capture_action(binding, action) end
+	if section == "key_combination_chords" then return KeyCombinations.capture_chord(binding, action) end
 	return nil
 end
 
@@ -1670,11 +1692,11 @@ local function capture_program(binding)
 	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
 	local FileSystem = require("core.fs.adapters.file_system")
 
-	local runtime, section, id = binding_action(binding)
+	local runtime, section, id = binding_action(binding, "run_program")
 	if runtime ~= "run_program" then return nil end
 	local pair_guard
-	if section == "key_combination_taps" then
-		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, "run_program")
+	if section == "key_combination_taps" or section == "key_combination_chords" then
+		pair_guard = combination_guard(binding, section, "run_program")
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local scalar = M.get_action_parameter(binding, "run_program")
@@ -1684,16 +1706,14 @@ local function capture_program(binding)
 	local decoded, config = pcall(TomlCodec.decode, content)
 	if not decoded or type(config) ~= "table" then return nil end
 	local parameters = config[CONFIG_SECTION_PARAMS]
-	local actions = section == "gestures" and config.gestures
-		or type(config.shortcuts) == "table" and config.shortcuts[section]
-	if type(actions) ~= "table" or actions[id] ~= "run_program" or type(parameters) ~= "table"
+	if stored_action(config, section, id) ~= "run_program" or type(parameters) ~= "table"
 		or parameters[parameter_key(binding, "run_program")] ~= scalar then return nil end
 	local revision = _program_revision
 	return scalar, function()
 		local paused_ok, paused = pcall(_is_paused)
 		if pair_guard and pair_guard() ~= true then return false end
 		if not paused_ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
-			or M.get_action_parameter(binding, "run_program") ~= scalar or binding_action(binding) ~= "run_program" then return false end
+			or M.get_action_parameter(binding, "run_program") ~= scalar or binding_action(binding, "run_program") ~= "run_program" then return false end
 		local current, current_status = FileSystem.read_with_status(_config_path)
 		return current_status == "ok" and current == content
 	end
@@ -1748,11 +1768,11 @@ end
 --- Captures canonical action ownership and the current physical input generation.
 local function capture_window(binding)
 	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
-	local action, section, id = binding_action(binding)
+	local action, section, id = binding_action(binding, "alt_tab_monitor")
 	if action ~= "alt_tab_monitor" then return nil end
 	local pair_guard
-	if section == "key_combination_taps" then
-		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
+	if section == "key_combination_taps" or section == "key_combination_chords" then
+		pair_guard = combination_guard(binding, section, action)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local FileSystem = require("core.fs.adapters.file_system")
@@ -1766,7 +1786,7 @@ local function capture_window(binding)
 		return function()
 			local ok, paused = pcall(_is_paused)
 			if not ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
-				or binding_action(binding) ~= "alt_tab_monitor" or tap_guard() ~= true then return false end
+				or binding_action(binding, "alt_tab_monitor") ~= "alt_tab_monitor" or tap_guard() ~= true then return false end
 			local current = Keyboard.physical_source_receipt()
 			return type(current) == "table" and current.ready == true and current.generation == physical.generation
 		end, path
@@ -1775,15 +1795,13 @@ local function capture_window(binding)
 	if status ~= "ok" or type(content) ~= "string" then return nil end
 	local decoded, config = pcall(TomlCodec.decode, content)
 	if not decoded or type(config) ~= "table" then return nil end
-	local actions = section == "gestures" and config.gestures
-		or type(config.shortcuts) == "table" and config.shortcuts[section]
-	if type(actions) ~= "table" or actions[id] ~= "alt_tab_monitor" then return nil end
+	if stored_action(config, section, id) ~= "alt_tab_monitor" then return nil end
 	local revision = _program_revision
 	return function()
 		local ok, paused = pcall(_is_paused)
 		if pair_guard and pair_guard() ~= true then return false end
 		if not ok or paused ~= false or revision ~= _program_revision or not admit_mutation()
-			or binding_action(binding) ~= "alt_tab_monitor" then return false end
+			or binding_action(binding, "alt_tab_monitor") ~= "alt_tab_monitor" then return false end
 		local current = Keyboard.physical_source_receipt()
 		if type(current) ~= "table" or current.ready ~= true or current.generation ~= physical.generation then return false end
 		local text, current_status = FileSystem.read_with_status(_config_path)

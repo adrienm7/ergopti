@@ -11,9 +11,6 @@
  * (KEY_COMBINATION_CHORD_REFUSED_ACTIONS) to it, and pins the actions Windows and
  * Linux refuse beyond it (their chords have no native receiving for them) to
  * one list, so the read, the menu and the bulk copy refuse the same actions.
- * Those extra actions are exactly the rows of actions.toml that carry
- * chord_reason_ahk and chord_reason_linux, the reason each chord picker greys
- * them with (decision KCD-2 of 2026-11-21: macOS runs them through Karabiner).
  * ==============================================================================
  */
 
@@ -21,7 +18,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const toml = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PLUS = path.join(ROOT, 'static', 'ergopti_plus');
@@ -105,20 +101,13 @@ if (JSON.stringify(sorted(linux.extra)) !== JSON.stringify(sorted(windowsExtra))
 			`Windows ${JSON.stringify(sorted(windowsExtra))}`
 	);
 }
-const catalogue = toml.parse(read('_shared/shortcuts/data/actions/actions.toml'));
-for (const [driver, refused] of [
-	['ahk', windowsExtra],
-	['linux', linux.extra]
-]) {
-	const reasoned = Object.entries(catalogue.sg_actions)
-		.filter(([, row]) => row[`chord_reason_${driver}`] !== undefined)
-		.map(([id]) => id);
-	if (JSON.stringify(sorted(reasoned)) !== JSON.stringify(sorted(refused))) {
-		failures.push(
-			`actions.toml gives chord_reason_${driver} to ${JSON.stringify(sorted(reasoned))}, ` +
-				`but that driver refuses ${JSON.stringify(sorted(refused))} beyond the shared list`
-		);
-	}
+// Maintainer decision KCD-2 of 2026-11-22: a chord runs every action macOS
+// runs in one, so neither driver refuses anything beyond the shared list.
+if (windowsExtra.length || linux.extra.length) {
+	failures.push(
+		`a chord must run every action but the shared refusals (KCD-2): Windows also refuses ` +
+			`${JSON.stringify(sorted(windowsExtra))}, Linux ${JSON.stringify(sorted(linux.extra))}`
+	);
 }
 const macosSources = [
 	'macos/ui/menu/menu_tap_holds.lua',

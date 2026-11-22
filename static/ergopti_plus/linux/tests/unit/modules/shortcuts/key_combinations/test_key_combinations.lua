@@ -285,6 +285,46 @@ helpers.describe("combination binding canonical program dispatch",function()
 		if not ok then error(err,0) end
 	end)
 end)
+-- KCD-2 (maintainer decision of 2026-11-22): a pair's chord runs a program
+-- under the binding of the pair that owns it, its table [mod_combos.config.<pair>].
+helpers.describe("(kcd-2-chord-runs) combination chord program dispatch",function()
+	helpers.it("(kcd-2-chord-runs) runs a chord's program and blocks a source change",function()
+		local scalar = '{"version":1,"executable":"/controlled/program","arguments":[]}'
+		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab="copy"\n[mod_combos.config.caps_lock_then_tab]\ncombo="run_program"\n[gesture_parameters]\n' .. binding .. '__run_program=\'' .. scalar .. '\'\n'
+		local bytes, captured, admission, chord_current = text, nil, nil, true
+		local config_path = os.tmpname()
+		local file = assert(io.open(config_path, "wb")); assert(file:write(bytes)); assert(file:close())
+		local ok,err = pcall(function()
+			protected_modules({ ["gestures.engine.manager"]=false,
+				["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+				["modules.shortcuts.key_combinations"]={ get_action=function() return "copy" end,
+					get_chord=function(pair) return pair=="caps_lock_then_tab" and "run_program" or "none" end,
+					capture_action=function() return nil end,
+					capture_chord=function(slot,action)
+						if slot~=binding or action~="run_program" then return nil end
+						return function() return chord_current end
+					end },
+				["gestures.engine.program_owner"]={new=function(capture) return {
+					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
+				} end},
+				["adapters.window_switch"]={new=function() return {stop=function() return true end} end},
+				["gestures.ui.conflicts"]={notify_boot=function() end},
+			},function()
+				local manager = require("gestures.engine.manager")
+				manager.init({persist=true,enabled=false,config_path=config_path,is_paused=function() return false end})
+				helpers.assert_true(manager.run_program(binding),"the chord's program starts")
+				helpers.assert_eq(captured,scalar)
+				chord_current = false
+				assert_false(admission(),"a chord the owner no longer runs cannot keep its launch")
+				chord_current = true
+				bytes = bytes .. "\n# edited after capture\n"
+				assert_false(admission(),"a changed source cannot keep the launch")
+			end)
+		end)
+		os.remove(config_path)
+		if not ok then error(err,0) end
+	end)
+end)
 helpers.describe("pair native receipt refusal boundaries",function()
 	helpers.it("never invokes action or modal after a refused real hook output port",function()
 		local state = make(); local actions, modal = 0,0

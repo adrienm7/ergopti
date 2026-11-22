@@ -109,7 +109,7 @@ function render(table, { parity, locales }) {
 		'Every user-facing feature and setting (`manifest.toml`), bindable action (`actions.toml`), navigation layer entry (`layer_actions.toml`) and interactive menu row (`menu_manifest.json`), with its status on each OS. Regenerate with `node tools/codegen/codegen-platform-parity.cjs`; `tools/test/test-linux-feature-parity.cjs` fails when this file is stale or a rule below breaks.',
 		'',
 		'- ✓ **supported**: the catalogue declares it there, and the linked production file is its owner: the file of that driver whose code spells the entry the most often (`+n`: other files that spell it). « (declared) » marks an owner `platform_parity.toml` names because the entry is read generically (a section loop, a slot prefix, a data-driven layer). An owner is source evidence, not proof that the feature works on a real machine.',
-		'- ◐ **degraded**: supported, but only on some sessions, hardware or slots of that OS; the reason says which.',
+		'- ◐ **degraded**: supported, but only on some sessions or hardware of that OS; the reason says which.',
 		'- — **unavailable**: the catalogue leaves that OS out. The key is the reason the menu shows, present in all 21 locales; the technical reason and its class are in the reason list below.',
 		'',
 		'The gate checks that every non-supported cell has a reason key present in the 21 locales and a technical reason, that every supported or degraded cell has an owner on that OS (or a recorded PPT-nn finding), and that no menu row bound to a feature shows on an OS where the feature is unavailable.',

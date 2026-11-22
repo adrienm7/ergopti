@@ -904,26 +904,18 @@ KeyCombinationSlotRows(PairId, PairLabel) {
 }
 
 ; The chord picker's items: the catalogue's, without the actions no chord runs
-; on any OS (the one-shot Shift), and with the actions only a Windows chord
-; cannot run greyed, each with the reason actions.toml gives it as
-; chord_reason_ahk (decision KCD-2 of 2026-11-21: macOS runs them through
-; Karabiner). KEY_COMBINATION_CHORD_REFUSED_ACTIONS still refuses both kinds.
+; on any OS (KEY_COMBINATION_CHORD_REFUSED_ACTIONS, the one-shot Shift). A
+; program launch and the monitor Alt-Tab run in a chord on the three OS
+; (maintainer decision KCD-2 of 2026-11-22).
 ; @param Items {Array} Replaces GestureActionPickerItems() in tests.
 ; @returns {Array} Picker items.
 KeyCombinationChordPickerItems(Items := 0) {
-	global KEY_COMBINATION_CHORD_REFUSED_ACTIONS, GESTURE_ACTION_CATALOGUE
+	global KEY_COMBINATION_CHORD_REFUSED_ACTIONS
 	Source := (Items is Array) ? Items : GestureActionPickerItems()
-	Actions := GESTURE_ACTION_CATALOGUE.Actions
 	Kept := []
 	for _, Item in Source {
-		if (Item.Type != "action") || !KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Item.Id) {
+		if (Item.Type != "action") || !KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Item.Id)
 			Kept.Push(Item)
-			continue
-		}
-		if !Actions.Has(Item.Id) || !Actions[Item.Id].HasOwnProp("ChordReason")
-			continue
-		Kept.Push({ Type: "action", Id: Item.Id, Label: Item.Label, Disabled: true,
-			Hint: t(Actions[Item.Id].ChordReason) })
 	}
 	return Kept
 }
@@ -1152,8 +1144,10 @@ class KeyCombinationChordPolicy {
 ; How often the wait looks at its key, and the level the keys are sent again at.
 global KEY_COMBINATION_CHORD_POLL_MS := 5
 global KEY_COMBINATION_CHORD_REPLAY_LEVEL := 1
-; Actions a chord cannot hold: they need the key's own press or release. As Linux.
-global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true, "run_program", true, "alt_tab_monitor", true)
+; Actions a chord cannot hold: they need the key's own press or release. The
+; shared list (CHORD_REFUSED_EVERYWHERE); a program launch and the monitor
+; Alt-Tab run in a chord (maintainer decision KCD-2 of 2026-11-22).
+global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true)
 
 ; Pair id -> action, the delay and symmetry in force, and the switch of the chords.
 global KeyCombinationChords := Map()

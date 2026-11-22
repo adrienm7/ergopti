@@ -49,12 +49,11 @@ local function declared_settings()
 end
 local M, instance = {}, nil
 -- Actions no chord runs: the shared list (the one-shot Shift, refused in a
--- chord on every OS by the maintainer decision of 2026-11-06); a program launch and
--- the monitor Alt-Tab have no third-slot native receiving here. Windows refuses
--- the same three (KEY_COMBINATION_CHORD_REFUSED_ACTIONS). The read and the
--- menu admit from this one list.
+-- chord on every OS by the maintainer decision of 2026-11-06). A program launch
+-- and the monitor Alt-Tab run in a chord, through the chord's own owner guard
+-- (maintainer decision KCD-2 of 2026-11-22). Windows refuses the same list
+-- (KEY_COMBINATION_CHORD_REFUSED_ACTIONS). The read and the menu admit from it.
 local CHORD_REFUSED_ACTIONS = TableUtil.shallow_copy(Shared.CHORD_REFUSED_EVERYWHERE)
-CHORD_REFUSED_ACTIONS.run_program, CHORD_REFUSED_ACTIONS.alt_tab_monitor = true, true
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})

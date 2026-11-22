@@ -71,12 +71,7 @@ function M.build(ctx,ui)
 		local binding=Shared.BINDING_SCOPE.."__"..pair
 		local items={}
 		for _,row in ipairs(actions.get_picker_items()) do
-			if row.type~="action" or pairs.validate_slot(kind,pair,row.id)==true then items[#items+1]=row
-			elseif kind=="combo" and actions.get_action_chord_reason(row.id) then
-				-- KCD-2 (2026-11-21): greyed with its reason, as macOS runs it in a chord.
-				row.disabled,row.hint=true,t(actions.get_action_chord_reason(row.id))
-				items[#items+1]=row
-			end
+			if row.type~="action" or pairs.validate_slot(kind,pair,row.id)==true then items[#items+1]=row end
 		end
 		return ui.open_picker(label,current,binding,function(action,picked)
 			local checked,current=pcall(source.guard)

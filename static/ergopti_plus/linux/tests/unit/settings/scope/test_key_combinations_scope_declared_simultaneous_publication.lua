@@ -103,7 +103,7 @@ helpers.describe("declared Linux simultaneous publication through original owner
    helpers.assert_eq(s.pairs.get_chord(pair),'caps_word')
   end,true)
  end)
- for _,action in ipairs({"one_shot_shift","run_program","alt_tab_monitor","unknown_action"}) do
+ for _,action in ipairs({"one_shot_shift","unknown_action"}) do
   helpers.it("refuses unqualified simultaneous action "..action,function()
    with_public_owner(function(s)
     helpers.assert_eq(s.scope.edit({{section="mod_combos.config."..pair,key="combo",value=action}}),false)
@@ -333,28 +333,26 @@ end)
 
 
 
--- Decision KCD-2 of 2026-11-21: macOS runs both in a chord through Karabiner,
--- so the Linux chord picker lists them greyed, with the platform reason.
-helpers.describe("unjoined third-slot native receiving is unavailable",function()
+-- Decision KCD-2 of 2026-11-22: a program launch and the monitor Alt-Tab run
+-- in a chord on the three OS, so the Linux chord picker offers them.
+helpers.describe("third-slot program launch and monitor Alt-Tab",function()
  for _,action in ipairs({"run_program","alt_tab_monitor"}) do
-  helpers.it("(kcd-2-chord-reason) the chord picker greys third-slot "..action.." with its platform reason",function()
+  helpers.it("(kcd-2-chord-runs) the chord picker offers third-slot "..action,function()
    with_menu(function(s)
     helpers.assert_true(s.gestures.is_assignable(action))
-    helpers.assert_true(s.pairs.validate_slot("tap",pair,action))
-    helpers.assert_eq(s.pairs.validate_slot("combo",pair,action),false)
-    helpers.assert_eq(s.pairs.capture_action(binding,action),nil)
+    helpers.assert_true(s.pairs.validate_slot("combo",pair,action))
     local row=find_menu(s.build(),'caps_lock + tab')
     local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('dialog.action_picker.disabled')))
     helpers.assert_true(chord.fn())
     local listed
     for _,item in ipairs(s.picker.items) do if item.id==action then listed=item end end
     helpers.assert_true(listed~=nil,action.." stays listed")
-    helpers.assert_eq(listed.disabled,true)
-    local reason=s.translate("platform_reason.chord_runs_no_program_or_monitor_switch")
-    helpers.assert_true(reason~="platform_reason.chord_runs_no_program_or_monitor_switch","the reason is translated")
-    helpers.assert_eq(listed.hint,reason)
-    helpers.assert_eq(s.picker.confirm(action),false)
-    helpers.assert_eq(s.bytes[path],source);helpers.assert_eq(s.publications,0)
+    helpers.assert_true(listed.disabled~=true,action.." is pickable")
+    if action=="alt_tab_monitor" then
+     helpers.assert_true(s.picker.confirm(action))
+     helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,action)
+     helpers.assert_eq(s.pairs.get_chord(pair),action)
+    end
    end,true)
   end)
  end

@@ -684,23 +684,49 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
 }
 Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)
 
-; Decision KCD-2 of 2026-11-21: the chord picker greys a program launch and the
-; monitor Alt-Tab with their platform reason (macOS runs them through Karabiner)
-; and leaves out the one-shot Shift, which no chord runs on any OS.
-_KCCE_ChordPickerGreysWindowsOnlyRefusals() {
+; Decision KCD-2 of 2026-11-22: a program launch and the monitor Alt-Tab run
+; in a chord, as on macOS and Linux; only the one-shot Shift stays out.
+_KCCE_ChordPickerOffersProgramAndMonitorSwitch() {
 	Items := Map()
 	for _, Item in KeyCombinationChordPickerItems()
 		if (Item.Type == "action")
 			Items[Item.Id] := Item
-	Reason := t("platform_reason.chord_runs_no_program_or_monitor_switch")
-	AssertTrue(Reason != "platform_reason.chord_runs_no_program_or_monitor_switch", "the reason is translated")
 	for _, Id in ["run_program", "alt_tab_monitor"] {
 		AssertTrue(Items.Has(Id), Id . " stays listed")
-		AssertTrue(Items[Id].HasOwnProp("Disabled") && Items[Id].Disabled, Id . " is greyed")
-		AssertEqual(Reason, Items[Id].Hint, Id . " says why")
+		AssertFalse(Items[Id].HasOwnProp("Disabled") && Items[Id].Disabled, Id . " is pickable")
 	}
 	AssertFalse(Items.Has("one_shot_shift"), "the one-shot Shift is left out")
 	AssertTrue(Items.Has("copy") && !Items["copy"].HasOwnProp("Disabled"), "a chord action stays pickable")
 }
-Test("key combination chords: the chord picker greys the Windows-only refusals with their reason (kcd-2-chord-reason)",
-	_KCCE_ChordPickerGreysWindowsOnlyRefusals)
+Test("key combination chords: the chord picker offers a program launch and the monitor Alt-Tab (kcd-2-chord-runs)",
+	_KCCE_ChordPickerOffersProgramAndMonitorSwitch)
+
+_KCCE_ChordRunsProgramAndMonitorSwitch() {
+	for _, Action in ["run_program", "alt_tab_monitor"]
+		_KCCE_With(Map("caps_lock_then_tab", Action), false, _KCCE_ChordRunsBody.Bind(Action))
+}
+_KCCE_ChordRunsBody(Action, World, Ports) {
+	AssertEqual(Action, KeyCombinationChordOf("caps_lock_then_tab"), "the read keeps the chord")
+	AssertEqual("wait", _KCCE_Press(World, Ports, "caps_lock"), "the first key waits")
+	World.Now += 50
+	AssertEqual("chord", _KCCE_Press(World, Ports, "tab"), "the second key fires the chord")
+	AssertEqual("caps_lock+tab=" . Action, World.Actions[1], "the chord runs the action once")
+	World.Held.Delete("tab"), World.Held.Delete("caps_lock")
+	KeyCombinationChordTick(Ports)
+}
+Test("key combination chords: a chord runs a program launch and the monitor Alt-Tab (kcd-2-chord-runs)",
+	_KCCE_ChordRunsProgramAndMonitorSwitch)
+
+; The program owner admits a pair's binding and reads a chord's program from
+; its [mod_combos.config.<pair>] table, so the chord's launch is not refused.
+_KCCE_ProgramOwnerAdmitsAChord() {
+	AssertTrue(ProgramActions_BindingSupported(KeyCombinationBindingId("caps_lock_then_tab")),
+		"a key combination's binding may run a program")
+	Document := TOML_ParseDocument('[mod_combos.config.caps_lock_then_tab]`ncombo = "run_program"`n'
+		. '[shortcuts.key_combination_taps]`ntab_then_caps_lock = "run_program"`n')
+	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "mod_combos.config", "caps_lock_then_tab"))
+	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "key_combination_taps", "tab_then_caps_lock"))
+	AssertEqual("", _ProgramActions_StoredAction(Document, "mod_combos.config", "tab_then_caps_lock"))
+}
+Test("key combination chords: the program owner admits a chord's launch (kcd-2-chord-runs)",
+	_KCCE_ProgramOwnerAdmitsAChord)
