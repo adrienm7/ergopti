@@ -30,8 +30,8 @@ terminal): coverage table, verdicts and what no run can test in
       VoiceOver on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a
       focus move, and Escape closes the window. With Wi-Fi off, check again: the window names the offline cause, not
       « Could not reach GitHub »; behind a proxy that asks for authentication, it names the proxy (UPD-13); an
-      exhausted rate limit is named (UPD-06); a working network still offers or confirms the release. Install an offered update and close its download panel: the download goes on and the install prompt
-      comes back (UPD-05). In the Versions window, install a release with the network down: the failure names the
+      exhausted rate limit is named (UPD-06); a working network still offers or confirms the release. Install an
+      offered update and close its download panel: the download goes on and the install prompt comes back (UPD-05). In the Versions window, install a release with the network down: the failure names the
       cause and no `.ergopti-release-install-` folder stays beside the app (UPD-11).
 - [ ] <!-- field-point: pickers_prompts --> **Pickers and prompts (PCK-01, PCK-02, PCK-05, PCK-10, PCK-14,
       2026-11-21):** AI > API > ➕ a provider: the Token step shows dots, never the key, and a key pasted with a
@@ -39,11 +39,6 @@ terminal): coverage table, verdicts and what no run can test in
       Escape. Temperature accepts « 0,8 » and refuses « 1e-1 » with « Enter a number from 0 to 1.3. ». In the prompt
       editor, a prompt that ends with blank lines saves and reopens with them. The model selector and the physical
       shortcuts window close on Escape (PCK-19); in Hebrew, the action picker lays out right to left (PCK-22).
-- [ ] <!-- field-point: update_windows --> **Updates window (UPD-03, UPD-04, UPD-06, 2026-11-21):** with VoiceOver
-      on, About > Check for updates: VoiceOver reads « Checking for updates… » then the answer without a focus move,
-      and Escape closes the window. Then on a network whose proxy refuses api.github.com (or with a dead proxy set in
-      System Settings), check again and note the sentence: « Could not reach GitHub » today, where Windows names the
-      proxy (UPD-06).
 - [ ] <!-- field-point: layout_tool_pages --> **Layout manager and Ergopti Studio (LTP-02, LTP-06, LTP-07,
       2026-11-21):** with VoiceOver on and the interface in English, open Layout > « Install or remove layouts… »:
       VoiceOver reads the window in English, not with a French voice, and so does Ergopti Studio. Tab to « Use » or
@@ -60,17 +55,15 @@ red step with its `proves` line in `static/ergopti_plus/macos/diagnostics/data/f
 
 Field run, no person needed (read the next report):
 
-- [ ] <!-- field-point: metrics_views --> **Metrics dashboards (MET-06, MET-07, MET-11, MET-12, 2026-11-21):** with VoiceOver on and
-      the interface in English, open Metrics > typing dashboard and change the dates: VoiceOver reads « Reading the
-      selected period… » without a focus move and the table loader says the same (no French text); numbers read
-      `12,345` and `1.2M` (in French `12 345` and `1,2 M`), in the apps dashboard too. A read that fails or takes over
-      2 min says so above the table, which keeps the previous period (MET-06). With `db.sqlite` moved aside, both
-      dashboards say the history is incomplete and the next open, with the store back, shows it in full (MET-11).
-      Hovering a card definition reads it in English (MET-12).
-      2 min says so above the table, which keeps the previous period (MET-06). A past range with no typing reads
-      « No data » on every card (MET-13); Tab reaches the activity calendar's « Chart values » and VoiceOver reads each
-      day and its count (MET-16); a failed Reset says so in the status line (MET-19).
-      2 min says so above the table, which keeps the previous period (MET-06).
+- [ ] <!-- field-point: metrics_views --> **Metrics dashboards (MET-06, MET-07, MET-11 to MET-13, MET-16, MET-19,
+      2026-11-21):** with VoiceOver on and the interface in English, open Metrics > typing dashboard and change the
+      dates: VoiceOver reads « Reading the selected period… » without a focus move and the table loader says the same
+      (no French text); numbers read `12,345` and `1.2M` (in French `12 345` and `1,2 M`), in the apps dashboard too.
+      A read that fails or takes over 2 min says so above the table, which keeps the previous period (MET-06). With
+      `db.sqlite` moved aside, both dashboards say the history is incomplete and the next open, with the store back,
+      shows it in full (MET-11). Hovering a card definition reads it in English (MET-12). A past range with no typing
+      reads « No data » on every card (MET-13); Tab reaches the activity calendar's « Chart values » and VoiceOver
+      reads each day and its count (MET-16); a failed Reset says so in the status line (MET-19).
 - [ ] <!-- field-point: small_native_units --> **Keep-awake and Karabiner dialogs (SNU-04 to SNU-06,
       2026-11-21):** start keep-awake, pause Ergopti after 1 min, resume: the log holds « Keep-awake stopped by the
       driver's pause or shutdown. » and the typing dashboard counts that minute of keep-awake time. With the network
@@ -301,6 +294,7 @@ Hands needed:
       instead of the logo, VoiceOver reads « Ergopti+ (paused, icon file missing, reinstall Ergopti+) » in the
       configured language, and the log holds one error naming the file, not one per pause; resume: the logo comes
       back. Put the file back.
-- [ ] Screen-reader switch of the previews (2026-11-21): with VoiceOver on, Hotstrings > Preview bubbles >
-      « Read previews to the screen reader » ticked by default: a preview and a finished AI prediction are said;
-      untick it: both still draw and nothing is said; tick it again: said again, without a restart.
+- [ ] <!-- field-point: preview_screen_reader --> Screen-reader switch of the previews (2026-11-21): with
+      VoiceOver on, Hotstrings > Preview bubbles > « Read previews to the screen reader » ticked by default: a
+      preview and a finished AI prediction are said; untick it: both still draw and nothing is said; tick it again:
+      said again, without a restart.

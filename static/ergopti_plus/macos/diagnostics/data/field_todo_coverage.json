@@ -955,6 +955,12 @@
 			"not_testable": "Needs a copy of the app with a logo file moved away, a pause and VoiceOver: the field run must not damage the installed app and reads no screen reader."
 		},
 		{
+			"id": "preview_screen_reader",
+			"title": "Screen-reader switch of the previews: a preview and a finished prediction said, or only drawn",
+			"checks": [],
+			"not_testable": "Needs a person with VoiceOver typing a preview and an AI prediction while toggling the menu switch: the field run types no hotstring and reads no screen reader."
+		},
+		{
 			"id": "small_native_units",
 			"title": "Keep-awake credited across a pause and the Karabiner dialogs’ failure texts (SNU-04 to SNU-06)",
 			"checks": [],
