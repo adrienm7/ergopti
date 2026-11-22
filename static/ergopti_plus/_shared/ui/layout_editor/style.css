@@ -739,7 +739,10 @@ body {
 	}
 }
 
-.le-key {
+/* Under the page as a selector, so the editor's generic button rule
+   (.layout-editor button: 4 px by 10 px padding) does not take 20 px of a
+   40 px key from its legend, which a reader's text spacing then cut. */
+.layout-editor .le-key {
 	align-items: stretch;
 	border-radius: 6px;
 	display: flex;
