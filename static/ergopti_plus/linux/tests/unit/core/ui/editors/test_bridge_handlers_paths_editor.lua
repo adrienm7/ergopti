@@ -882,7 +882,10 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			helpers.assert_eq(observed.captured.hidden, 0)
 			helpers.assert_eq(observed.captured.restarts, 0)
 			helpers.assert_eq(observed.captured.errors, { "onboarding.error.write_failed" })
-			helpers.assert_true(observed.config_original)
+			-- The rollback re-chooses the runtime locale, and a chosen locale is
+			-- always written (locale-neutral-2026-11-21): the wizard's own rows
+			-- stay unwritten and only the snapshot's locale row is added.
+			helpers.assert_eq(observed.config_raw, '[gestures]\nenabled = false\n[future]\nvalue = "retained"\n\n[script]\nlocale = "fr"\n')
 			helpers.assert_eq(require("core.text.engine.json").decode(observed.storage_raw),
 				{ locale = "fr", future = { retained = true } },
 				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")

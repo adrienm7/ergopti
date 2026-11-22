@@ -312,13 +312,15 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/" .. FOLDER))
 		helpers.assert_true(made == true or made == 0)
 		local config = root .. "/config/config.toml"
-		if options.config then
+		if options.config or options.config_dir then
 			local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
 			assert(created == true or created == 0)
+		end
+		if options.config then
 			local cf = assert(io.open(config, "wb")); assert(cf:write(options.config)); assert(cf:close())
 		end
 		local path = root .. "/" .. FOLDER .. "/storage.json"
-		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
+		local seed = options.seed or '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
 		local original_rename = os.rename
@@ -358,7 +360,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.remove(helpers.stage_path(path)); os.remove(path)
 		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak")
-		if options.config then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
+		if options.config or options.config_dir then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
@@ -515,23 +517,35 @@ helpers.describe("i18n explicit wizard persistence", function()
 		helpers.assert_eq(observed, { accepted = true, active = "en", config = '[script]\nlocale = "en"\n', stored = "en" })
 	end)
 
-	helpers.it("(locale-atomic) never creates an absent source", function()
-		local observed = with_owned_store({}, function(i18n)
+	-- A chosen locale is always written (maintainer decision of 2026-11-21, the
+	-- locale's neutral value is the absent row): an absent config.toml is
+	-- created in its folder, and a folder that is missing refuses the choice
+	-- rather than keeping a locale the next start would clear.
+	helpers.it("(locale-neutral-2026-11-21) writes a chosen locale into an absent source", function()
+		local observed = with_owned_store({ config_dir = true }, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, config = '\n[script]\nlocale = "en"\n', active = "en" })
+	end)
+
+	helpers.it("(locale-neutral-2026-11-21) refuses a choice whose configuration folder is absent", function()
+		local observed = with_owned_store({}, function(i18n, path, seed)
 			local accepted = i18n.persist_locale("en")
 			local file = io.open(require("settings.engine.paths").config("config.toml"), "rb")
 			if file then file:close() end
-			return { accepted = accepted, absent = file == nil, active = i18n.get_locale() }
+			return { accepted = accepted, absent = file == nil, active = i18n.get_locale(), unchanged = read(path) == seed }
 		end)
-		helpers.assert_eq(observed, { accepted = true, absent = true, active = "en" })
+		helpers.assert_eq(observed, { accepted = false, absent = true, active = "fr", unchanged = true })
 	end)
 
-	helpers.it("(locale-atomic) leaves an existing source without a locale row unchanged", function()
+	helpers.it("(locale-neutral-2026-11-21) writes the chosen locale into a source without a locale row", function()
 		local initial = '[script]\nlog_level = "INFO"\n'
 		local observed = with_owned_store({ config = initial }, function(i18n)
 			local accepted = i18n.persist_locale("en")
 			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
 		end)
-		helpers.assert_eq(observed, { accepted = true, config = initial, active = "en" })
+		helpers.assert_eq(observed, { accepted = true, config = '[script]\nlocale = "en"\nlog_level = "INFO"\n', active = "en" })
 	end)
 
 	helpers.it("(locale-atomic) preserves a concurrent edit and compensates storage", function()
@@ -582,14 +596,16 @@ helpers.describe("i18n explicit wizard persistence", function()
 
 	for _, code in ipairs({ "fr", "en" }) do
 		helpers.it("(wizard-locale-ack) reads back the acknowledged " .. code .. " selection", function()
-			local observed, attempts = with_owned_store({}, function(i18n, path)
+			local observed, attempts = with_owned_store({ config_dir = true }, function(i18n, path)
 				local accepted = i18n.persist_locale(code)
 				return { accepted = accepted, locale = i18n.get_locale(),
-					stored = require("core.text.engine.json").decode(read(path)) }
+					stored = require("core.text.engine.json").decode(read(path)),
+					config = read(require("settings.engine.paths").config("config.toml")) }
 			end)
 			helpers.assert_true(observed.accepted)
 			helpers.assert_eq(observed.locale, code)
 			helpers.assert_eq(observed.stored, { locale = code, future = { retained = true } })
+			helpers.assert_eq(observed.config, '\n[script]\nlocale = "' .. code .. '"\n')
 			helpers.assert_eq(attempts, 1)
 		end)
 	end
@@ -605,10 +621,21 @@ helpers.describe("i18n explicit wizard persistence", function()
 	end)
 
 	helpers.it("(wizard-locale-ack) leaves the ordinary same-locale menu setter unchanged", function()
-		local observed, attempts = with_owned_store({ rename = "false" }, function(i18n, path, seed)
+		local saved = '{"locale":"fr","future":{"retained":true}}\n'
+		local observed, attempts = with_owned_store({ rename = "false", seed = saved }, function(i18n, path, seed)
 			return { accepted = i18n.set_locale("fr"), unchanged = read(path) == seed }
 		end)
 		helpers.assert_eq(observed, { accepted = true, unchanged = true })
 		helpers.assert_eq(attempts, 0)
+	end)
+
+	-- The language shown while nothing is saved becomes a written choice
+	-- (locale-neutral-2026-11-21), so the same-locale setter reaches storage.
+	helpers.it("(locale-neutral-2026-11-21) writes the shown locale chosen while nothing is saved", function()
+		local observed, attempts = with_owned_store({ rename = "false" }, function(i18n, path, seed)
+			return { accepted = i18n.set_locale("fr"), locale = i18n.get_locale(), unchanged = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = false, locale = "fr", unchanged = true })
+		helpers.assert_eq(attempts, 1, "an unsaved shown locale is persisted, not skipped")
 	end)
 end)
