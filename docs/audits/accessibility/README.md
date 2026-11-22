@@ -718,8 +718,10 @@ built pages' HTML found « tracking » twice (reworded) and otherwise only
 names (the model families, « Window Spy », the menu's « Dossier Logs »,
 Slack) and a list of letter groups.
 
-The accessibility statement and the settings dialog stay French without the
-21 locales (decided by the agent, TODO.md « Maintainer decisions pending »).
+The accessibility statement and the settings dialog were kept French by this
+pass; the maintainer had them translated through the Ergopti+ `t()` dictionary
+on 2026-11-21 (`docs/memory/maintainer-decisions.md`, « The site reads in
+English where Ergopti+ does »).
 
 ### Gates and host
 

@@ -24,6 +24,56 @@ dropped. The contract a later change must keep:
   after the provider or skip a check to save cycles. The startup smoke fails a
   Shortcuts build whose probe moves `menu.frame_pending_open_rows`.
 
+## The Optimiser's change penalty starts free, at 0 (2026-11-21 to 2026-11-22)
+
+Decided by the maintainer in the 2026-11-21 to 2026-11-22 review (TODO
+« Optimizer change penalty »): the change penalty stays « Libre », weight 0,
+chosen first, so a run moves what pays until the reader asks otherwise. The
+other values stay as the agent built them on 2026-11-19 (`score_weights.json`
+`change_penalty`: presets « few changes » 3, « balanced » 1, « free » 0, the
+slider up to 5, a limit of 6 when switched on, a letter and its capital one
+unit); `docs/design/layout-optimizer.md`, « Change penalty », measures them.
+
+## Agent decisions of 2026-11-14 to 2026-11-17 validated as they are (2026-11-21 to 2026-11-22)
+
+Validated by the maintainer in the 2026-11-21 to 2026-11-22 review (TODO
+« Agent decisions to review »), each implemented as written:
+
+- a transform whose field changed after its Ctrl+C puts the saved clipboard
+  back over what the copy's own wait left (the selection);
+- one `sticky_altgr` covers AltGr and Kana (Windows sends the layout's own
+  AltGr key, Kana on a Kana-style layout); the shipped AltGr key keeps its Tab
+  tap; the compilers keep AltGr in a KLC when Kana's key is Right Alt;
+- the value limits of `docs/design/value-validation-inventory.md`
+  (« Migration status »): LLM temperature 0 to 1.3, context length 80 to
+  4000, CapsWord idle timeout at most 3600 s, URLs at most 2048 characters,
+  the updater interval on its snap-to-preset rule,
+  `tap_holds.sticky_timeout_ms` up to 2147483647 ms, and each family's row
+  decision;
+- Ergopti Studio: one page per window; its menu row right after « Keyboard
+  layout »; the editor's tab bar placement; the key-colour selector and its
+  green-to-red scale; the Comparer's colours, folding and share wording; one
+  fingering profile per keyboard model (version 1 profiles not carried over);
+  app downloads land in the Downloads folder (Hammerspoon and WebKitGTK have
+  no save dialog); the KLA JSON and Kalamine TOML exports; the source's `nav`
+  layer as the one navigation source, `layers.toml` its compiled form with a
+  `# source:` and `# body-fnv1a32:` header;
+- Linux: the GNOME extension's `org.ergopti.InputSource1` admits any client of
+  the session bus; GTK 3 Compose sets `GTK_IM_MODULE` only, from the user
+  installer only;
+- pause: a dead key pending in the system's own layout (no emulation) stays
+  the OS's state; the macOS and Linux pause and resume notices stay;
+- Windows notifications go through `NotifierSend`, silent by default like the
+  macOS and Linux adapters; only the update offer, the AI notices and the
+  composer check keep the system sound;
+- parity: GSD-1, the macOS live x1 swipe fires twice for a touch going right
+  then back left (Windows and Linux once); HCD-3, macOS and Linux type one
+  field for the named personal tags, as Windows;
+- performance: no `input.latency` span on Windows (its InputHook callbacks
+  carry no event time, and a second permanent low-level hook would add a hook
+  timeout risk to every key); the Linux `migrations.toml` parse stays uncached
+  (about 7 ms cold under LuaJIT).
+
 ## macOS caches the migration registry's typed parse (2026-11-21)
 
 The maintainer chose to port the Windows registry cache
