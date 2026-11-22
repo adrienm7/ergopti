@@ -295,6 +295,5 @@ return {
 	with_collision_scope = with_collision_scope,
 	COLLISION_BASE = COLLISION_BASE,
 	NO_TAP_HOLDS = NO_TAP_HOLDS,
-	magic_collision_file_read = magic_collision_file_read,
 	with_prediction_preflight = with_prediction_preflight,
 }

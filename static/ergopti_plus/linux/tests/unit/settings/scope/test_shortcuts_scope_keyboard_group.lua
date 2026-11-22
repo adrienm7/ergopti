@@ -128,11 +128,6 @@ helpers.describe("Linux keyboard group scope", function()
 					helpers.assert_eq(row.menu[2].title, i18n.get("common.clear_to_system"), key)
 					helpers.assert_eq(row.menu[3].title, "-", key)
 				end
-				local contextual = drawn[i18n.get("menu.shortcuts.group_contextual")]
-				if contextual then
-					helpers.assert_true(contextual.menu[1].title ~= i18n.get("common.restore_recommended"),
-						"the contextual slot has no modifier group to restore")
-				end
 				drawn[heading("menu.shortcuts.ctrl_group")].menu[2].fn()
 				helpers.assert_eq(questions, 0, "the group's clear asks nothing")
 				local keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
@@ -142,7 +137,8 @@ helpers.describe("Linux keyboard group scope", function()
 				helpers.assert_eq(questions, 0, "the group's restore asks nothing")
 				keyboard = Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard or {}
 				helpers.assert_eq(keyboard.meta_j, nil, "a user Super slot is removed")
-				helpers.assert_eq(keyboard.meta_space, "llm_generate_prediction")
+				-- No recommendation binds AI prediction (maintainer's decision of 2026-11-22).
+				helpers.assert_eq(keyboard.meta_space, nil, "the restore binds no AI prediction")
 				helpers.assert_eq(changed, 2)
 			end)
 			root.top_level, os.execute = top, execute

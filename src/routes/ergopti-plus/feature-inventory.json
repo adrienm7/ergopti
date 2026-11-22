@@ -951,21 +951,6 @@
 		"reason": null
 	},
 	{
-		"path": "hotstrings.magic_key.replace",
-		"family": "feature",
-		"labels": {
-			"fr": "hotstrings.magic_key.replace",
-			"en": "hotstrings.magic_key.replace"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": true,
-			"linux": true
-		},
-		"reason_key": null,
-		"reason": null
-	},
-	{
 		"path": "hotstrings.magic_key.repeat_corrections",
 		"family": "feature",
 		"labels": {

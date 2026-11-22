@@ -13,6 +13,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `llm.models.mlx` (setting; declared: macos; reason: `platform_reason.llm_mlx_is_apple_silicon`)
 - [ ] `llm.navigation.arrow_nav_enabled` (setting; declared: macos; reason: `platform_reason.arrow_navigation_is_macos`)
 - [ ] `shortcuts.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
+- [ ] `shortcuts.keyboard.secondary_star` (feature; declared: macos; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
 - [ ] `shortcuts.keyboard.secondary_space` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_a` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_d` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -121,12 +122,10 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `ui.menubar_icon` (setting; declared: macos; reason: `platform_reason.layout_bundle_and_menubar_are_macos`)
 - [ ] `tap_holds.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 48 paths not declared
+## macos — 50 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
-- [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
 - [ ] `shortcuts.wrap_text_if_selected` (feature; declared: windows, linux; reason: `platform_reason.wrap_selection_is_a_shortcut_key_on_macos`)
 - [ ] `shortcuts.search.search_engine` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -135,6 +134,8 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.a_grave.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
 - [ ] `shortcuts.a_grave.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.star.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.star.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
 - [ ] `shortcuts.e_acute.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
 - [ ] `shortcuts.e_acute.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
 - [ ] `shortcuts.e_circ.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
@@ -144,6 +145,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_left_alt` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.left_alt_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
+- [ ] `shortcuts.keyboard.meta_star` (feature; declared: windows, linux; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
 - [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -162,11 +164,11 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.meta_quote` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.primary_g` (feature; declared: linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_space` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `layout.ctrl_magic_save` (feature; declared: windows, linux; reason: `platform_reason.ctrl_magic_save_is_cmd_star_on_macos`)
 - [ ] `category_enabled.hotstrings` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.tap_holds` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
+- [ ] `category_enabled.key_combinations` (setting; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `network.proxy_override` (setting; declared: windows; reason: `platform_reason.proxy_override_is_native_settings`)
 - [ ] `category_enabled.autocorrection` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.distances_reduction` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -174,11 +176,10 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 61 paths not declared
+## linux — 60 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
-- [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
 - [ ] `llm.models.user_models` (setting; declared: macos; reason: `platform_reason.llm_saved_user_models_are_macos`)
 - [ ] `llm.models.mlx` (setting; declared: macos; reason: `platform_reason.llm_mlx_is_apple_silicon`)
@@ -187,6 +188,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
+- [ ] `shortcuts.keyboard.secondary_star` (feature; declared: macos; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
 - [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -231,7 +233,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `network.proxy_override` (setting; declared: windows; reason: `platform_reason.proxy_override_is_native_settings`)
 - [ ] `ui.menubar_icon` (setting; declared: macos; reason: `platform_reason.layout_bundle_and_menubar_are_macos`)
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `category_enabled.autocorrection` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.distances_reduction` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.sfbs_reduction` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -538,12 +539,12 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layout_menu.compose_input_method` (hide): Linux only: Compose sequences come from ~/.XCompose, which GTK 3 reads only in part without an input method. macOS and Windows type every character through their own layouts.
 - [ ] `layout_menu.layout_system_install` (hide): Windows only: this row downloads the Ergopti keyboard layout installer for Windows, an unsigned package published with every release that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Install or remove layouts… » (Wayland) or with install.sh (X11).
 - [ ] `layout_menu.accented_letters` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
-- [ ] `layout_menu.layout.ctrl_magic_save` (hide): Not on macOS: macOS keeps this setting among its shortcuts (Cmd+★ → Cmd+S). On all three systems the rule is the same: the magic key with modifiers sends the same modifiers + S.
 - [ ] `layout_menu.base_layouts` (hide): Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.
 - [ ] `accented_letters_group.e_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
 - [ ] `accented_letters_group.e_circ` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
 - [ ] `accented_letters_group.e_acute` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
 - [ ] `accented_letters_group.a_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
+- [ ] `accented_letters_group.star` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. The emulation of a layout on macOS takes the chord from that layer too (Ergopti’s gives Cmd+è, ê, é, à as Cmd+Z, X, C, V), and macOS offers no menu to choose another letter. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. Under an emulated Ergopti layout, Windows and Linux apply the letter chosen here too.
 - [ ] `hotstrings_menu.hotstrings_reload` (hide): Linux only: its daemon watches the hotstring files, so they can change while it runs, and this row reloads the catalogue from disk. Windows and macOS load the catalogue at launch and reload it with the Reload row.
 - [ ] `gestures_menu.auto_configure` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.manual_tutorial` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.

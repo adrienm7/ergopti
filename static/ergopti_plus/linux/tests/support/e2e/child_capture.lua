@@ -42,17 +42,12 @@ function M.run(command)
 	return output, nil
 end
 
---- Distinguishes clean scenarios from the single deliberately broken Writer.
---- A known failed SYN remains debt: process exit does not certify wire cleanup.
+--- Accepts only a scenario whose child exited cleanly after its screen: the
+--- deliberately broken Writer scenario left with the physical magic key.
 --- @param output string
 --- @param status integer|nil Actual wait status.
---- @param injected_failure boolean Whether this scenario deliberately refuses SYN.
 --- @return boolean accepted
-function M.accepted(output, status, injected_failure)
-	if injected_failure then
-		local settled = output:match("\nE2E_EXPECTED_FAILURE injection output_debt=true signals_settled=(%a+)\n$")
-		return status == 1 and (settled == "true" or settled == "false")
-	end
+function M.accepted(output, status)
 	return status == 0 and output:match("\nE2E_CLEAN_EXIT\n$") ~= nil
 end
 

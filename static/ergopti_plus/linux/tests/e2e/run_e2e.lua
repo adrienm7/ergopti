@@ -682,15 +682,7 @@ do
 	local output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
 	os.remove(child)
 	assert_true("a child error after a forged clean screen is rejected", status == 23
-		and not ChildCapture.accepted(output, status, false))
-	child = os.tmpname()
-	file = assert(io.open(child, "wb"))
-	assert(file:write([[print('SCREEN "misleading"'); print("E2E_EXPECTED_FAILURE injection output_debt=false signals_settled=true"); os.exit(1)]]))
-	assert(file:close())
-	output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
-	os.remove(child)
-	assert_true("exit one without the injected Writer debt is rejected", status == 1
-		and not ChildCapture.accepted(output, status, true))
+		and not ChildCapture.accepted(output, status))
 end
 
 do
@@ -731,7 +723,7 @@ do
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
 			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
-			local completed = ChildCapture.accepted(output, status, false)
+			local completed = ChildCapture.accepted(output, status)
 			if scenario.queue_ai then
 				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
 				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
@@ -807,7 +799,7 @@ do
 	local agent = rows_fh and rows_fh:read("*l") or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
-	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
+	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status)
 	if rows_child_accepted and rows and rows > 100 and rows <= MENU_ROW_CEILING then
 		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
 	else

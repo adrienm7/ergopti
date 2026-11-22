@@ -346,15 +346,16 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			end
 		end
 		helpers.assert_eq(actual, expected, "all independent historical rules retain source order")
-		local replacement = catalogue.categories.magickey.sections.replace
-		helpers.assert_true(replacement ~= nil, "the metadata-only native feature is admitted")
-		helpers.assert_eq(replacement.count, 0)
-		helpers.assert_eq(replacement.extension, { id = "ergopti", name = "Ergopti+" })
+		-- Nothing is remapped to ★ (maintainer's decision of 2026-11-22): the
+		-- extension binds no replace section, only the repeat corrections.
+		helpers.assert_nil(catalogue.categories.magickey.sections.replace, "no replace section ships")
+		local repeats = catalogue.categories.magickey.sections.repeat_corrections
+		helpers.assert_eq(repeats.extension, { id = "ergopti", name = "Ergopti+" })
 		local Reader = require("core.text.engine.toml_codec.reader")
-		local parsed, committed = Reader.parse(Extensions.bound_source(discovered, "magickey", "replace"))
+		local parsed, committed = Reader.parse(Extensions.bound_source(discovered, "magickey", "repeat_corrections"))
 		helpers.assert_true(committed)
-		helpers.assert_eq(parsed.sections.replace.description.en, "Transform a key into the ★ key")
-		helpers.assert_eq(catalogue.categories.magickey.sections_order[1], "replace")
+		helpers.assert_type(parsed.sections.repeat_corrections, "table")
+		helpers.assert_nil(Extensions.bound_source(discovered, "magickey", "replace"), "no replace source is bound")
 		local french_source = Paths.shared("hotstrings/data/catalogue/french/autocorrection.toml")
 		helpers.assert_true(exists(french_source), "the common French resolver still reaches its actual source")
 		local french_directory = assert(french_source:match("^(.*)/[^/]+$"))
@@ -371,6 +372,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 		local without = load(false)
 		helpers.assert_nil(without.categories.french_distancesreduction)
 		helpers.assert_nil(without.categories.magickey.sections.replace)
+		helpers.assert_nil(without.categories.magickey.sections.repeat_corrections)
 	end)
 end)
 
@@ -386,7 +388,7 @@ helpers.describe("Single shipped source binding admission", function()
 			local selected = route == "absolute" and canonical or "../_shared/hotstrings/data/catalogue/magickey.toml"
 			helpers.assert_true(Loader.same_file(selected, canonical), "the native filesystem proves the actual shipped route")
 			local choices = os.tmpname()
-			write(choices, '[hotstrings]\ngroups = { magickey = true }\n[hotstrings.modules.magickey]\nreplace = false\n')
+			write(choices, '[hotstrings]\ngroups = { magickey = true }\n[hotstrings.modules.magickey]\nrepeat_corrections = false\n')
 			helpers.assert_true(Config._set_config_file_for_test(choices))
 			local ok, err = pcall(function()
 				helpers.assert_true(Config.init(require("hotstrings.engine.matcher").new(), selected))
@@ -398,20 +400,19 @@ helpers.describe("Single shipped source binding admission", function()
 					helpers.assert_eq(name, "magickey", "single logical selection admits no foreign extension category")
 				end
 				helpers.assert_eq(count, 1)
-				helpers.assert_eq(categories.magickey.sections.replace.count, 0)
-				helpers.assert_eq(categories.magickey.sections.replace.extension.id, "ergopti")
-				helpers.assert_eq(categories.magickey.sections.replace.description.en, "Transform a key into the ★ key")
+				helpers.assert_nil(categories.magickey.sections.replace, "no replace section ships")
+				helpers.assert_eq(categories.magickey.sections.repeat_corrections.extension.id, "ergopti")
 				helpers.assert_eq(categories.magickey.sections.repeat_corrections.count, 14)
-				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), false)
+				helpers.assert_eq(Config.is_section_enabled("magickey", "repeat_corrections"), false)
 				-- The category's « check all » never reaches a section an extension
 				-- binds and draws in its own submenu (2026-10-17); the section's own
-				-- toggle still opens the registered metadata-only gate.
+				-- toggle still opens it.
 				helpers.assert_true(Config.set_all_sections("magickey", true))
-				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), false,
+				helpers.assert_eq(Config.is_section_enabled("magickey", "repeat_corrections"), false,
 					"a category selection leaves the extension-bound section to its extension")
-				helpers.assert_true(Config.toggle_section("magickey", "replace"))
-				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), true,
-					"the actual registered metadata-only native gate opens after exact selection ACK")
+				helpers.assert_true(Config.toggle_section("magickey", "repeat_corrections"))
+				helpers.assert_eq(Config.is_section_enabled("magickey", "repeat_corrections"), true,
+					"the extension-bound section opens after exact selection ACK")
 				helpers.assert_eq(#Config.personal_file_sources(), 0, "a shipped source grants no personal adoption authority")
 			end)
 			Config._set_config_file_for_test(nil)
@@ -481,7 +482,8 @@ helpers.describe("Offline shipped hotstring binding root", function()
 			local root = Registry.shipped_extension_root()
 			helpers.assert_type(root, "table")
 			helpers.assert_true(exists(root.pack .. "/manifest.toml"))
-			helpers.assert_true(exists(root.pack .. "/hotstrings/magickeyreplace.toml"))
+			helpers.assert_true(exists(root.pack .. "/hotstrings/repeatcorrections.toml"))
+			helpers.assert_eq(exists(root.pack .. "/hotstrings/magickeyreplace.toml"), false, "no replace source ships")
 			helpers.assert_eq(observed.updater, 0); helpers.assert_eq(observed.network, 0)
 			helpers.assert_eq(#observed.reads, 2, "offline resolution reads only its two actual defaults")
 			helpers.assert_eq(observed.reads[1], Paths.shared("layouts/data/defaults.json"))

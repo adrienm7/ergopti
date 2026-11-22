@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("menu.engine.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers)
 
 --- Finds an exact rendered row anywhere in the native menu tree.
 --- @param rows table Rendered native rows.
@@ -51,7 +51,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 			local Choices = require("tests.support.hotstring_choices")
 			local source = '[hotstrings]\n'
 				.. 'groups = { magickey = true, french_distancesreduction = true }\n'
-				.. '[hotstrings.modules.magickey]\nreplace = false\ntext_expansion_symbols = true\n'
+				.. '[hotstrings.modules.magickey]\nrepeat_corrections = false\ntext_expansion_symbols = true\n'
 				.. '[hotstrings.modules.french_distancesreduction]\nsuffixes_a = true\n'
 			with_private_choices(Config, source, function(path)
 				local Preferences = require("hotstrings.engine.matcher.preferences")
@@ -60,35 +60,37 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed, "the real bundled and shipped extension catalogue initializes")
 				local category = Config.get_category("magickey")
-				helpers.assert_eq(category.sections.replace.count, 0, "native replacement has no fabricated mapping")
-				helpers.assert_eq(category.sections.replace.extension.id, "ergopti")
+				-- Nothing is remapped to ★ any more (maintainer's decision of 2026-11-22).
+				helpers.assert_nil(category.sections.replace, "no replace section ships")
+				local bound = category.sections.repeat_corrections
+				helpers.assert_eq(bound.extension.id, "ergopti")
 				helpers.assert_eq(Config.get_category("french_distancesreduction").count, 24)
 				local I18n = require("core.i18n.engine.i18n")
-				local description = category.sections.replace.description
+				local description = bound.description
 				local label = description[I18n.get_locale()] or description.en
 				local Builder = require("menu.ui.builder.builder")
 				local ctx = { config = Config, paused = false }
 				local function extension()
 					return find_row(Builder.build(ctx), string.format(I18n.get("menu.extensions.hotstrings_of"), "Ergopti+"))
 				end
-				local item = find_row(assert(extension()).menu, label .. " (0)")
+				local item = find_row(assert(extension()).menu, label .. " (" .. bound.count .. ")")
 				helpers.assert_type(item, "table", "the actual translated bound feature is inside Ergopti")
-				helpers.assert_nil(find_row(extension().menu, "replace (0)"))
 				helpers.assert_true(item.fn())
 				helpers.assert_eq(Config.is_group_enabled("magickey"), true)
-				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), true,
-					"the real callback must publish the effective native gate before typing")
+				helpers.assert_eq(Config.is_section_enabled("magickey", "repeat_corrections"), true,
+					"the real callback publishes the bound section")
 				local saved = require("core.text.engine.toml_codec").decode(Choices.read(path))
-				helpers.assert_eq(saved.hotstrings.modules.magickey.replace, true)
+				helpers.assert_eq(saved.hotstrings.modules.magickey.repeat_corrections, true)
+				helpers.assert_nil(saved.hotstrings.modules.magickey.replace)
 				local disable = find_row(extension().menu, I18n.get("menu.hotstrings.uncheck_all"))
 				helpers.assert_true(disable.fn())
-				helpers.assert_eq(Config.is_section_checked("magickey", "replace"), false)
+				helpers.assert_eq(Config.is_section_checked("magickey", "repeat_corrections"), false)
 				helpers.assert_eq(Config.is_section_checked("magickey", "text_expansion_symbols"), true,
 					"the extension does not own common symbol choices")
 				helpers.assert_eq(Config.is_group_enabled("magickey"), true, "an extension does not close another category")
 				local enable = find_row(extension().menu, I18n.get("menu.hotstrings.check_all"))
 				helpers.assert_true(enable.fn())
-				helpers.assert_eq(Config.is_section_checked("magickey", "replace"), true)
+				helpers.assert_eq(Config.is_section_checked("magickey", "repeat_corrections"), true)
 				helpers.assert_eq(Config.is_section_checked("french_distancesreduction", "suffixes_a"), true)
 				-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 				local before = Choices.read(path); ctx.paused = true

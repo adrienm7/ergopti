@@ -93,7 +93,6 @@ two disagree in either direction.
 | `hotstrings.rolls.left_arrow`                                 | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.not_equal`                                  | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.rolls.paren_quote`                                | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.magic_key.replace`                                | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.magic_key.repeat_corrections`                     | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.magic_key.text_expansion_symbols`                 | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.magic_key.text_expansion_symbols_typst`           | —               | `evdev`, `uinput`                      | —                    |
