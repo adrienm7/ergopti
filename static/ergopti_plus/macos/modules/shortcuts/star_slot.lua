@@ -107,7 +107,6 @@ local function attempt_matches(attempt)
 		or spec.context ~= context or spec.action ~= attempt.action
 		or spec.configuration_generation ~= attempt.configuration
 		or spec.is_current ~= ports.is_current or spec.is_action ~= ports.is_action
-		or context.legacy_present ~= attempt.legacy_present
 		or context.assignment_unavailable ~= attempt.assignment_unavailable
 		or Probe.current_source_id ~= ports.source_id then return false end
 	for _, name in ipairs({ "paused", "inhibited" }) do
@@ -185,7 +184,7 @@ end
 local function deliver()
 	local decision, spec, handle, epoch = _decision, _spec, _handle, _generation
 	if _acquisition_depth ~= 0 or not decision or not spec or handle == nil
-		or spec.context.legacy_present or spec.context.assignment_unavailable then return false end
+		or spec.context.assignment_unavailable then return false end
 	local context, action, configuration = spec.context, spec.action, spec.configuration_generation
 	local ports = {
 		is_current = spec.is_current, execute = spec.execute,
@@ -196,7 +195,7 @@ local function deliver()
 		if not probe_current() or not _started or _spec ~= spec or _decision ~= decision or _handle ~= handle
 			or _generation ~= epoch or _acquisition_depth ~= 0 or _cancel_depth ~= 0
 			or spec.context ~= context or spec.action ~= action or spec.configuration_generation ~= configuration
-			or context.legacy_present or context.assignment_unavailable
+			or context.assignment_unavailable
 			or spec.is_current ~= ports.is_current or spec.execute ~= ports.execute
 			or Probe.current_source_id ~= source_id then return false end
 		for _, name in ipairs({ "paused", "inhibited" }) do
@@ -240,13 +239,13 @@ function M.refresh()
 	if deferred and released then return true end
 	if not cancelled or not released then return false end
 	if not probe_current() then return false end
-	if not _started or _spec.action == "none" or _spec.context.legacy_present
+	if not _started or _spec.action == "none"
 		or _spec.context.assignment_unavailable then return true end
 	local spec, context = _spec, _spec.context
 	local attempt = {
 		generation = _generation, spec = spec, context = context,
 		action = spec.action, configuration = spec.configuration_generation,
-		legacy_present = context.legacy_present, assignment_unavailable = context.assignment_unavailable,
+		assignment_unavailable = context.assignment_unavailable,
 		ports = {
 			source_id = original_source_id, is_current = spec.is_current, is_action = spec.is_action,
 			paused = context.paused, inhibited = context.inhibited,
@@ -332,7 +331,7 @@ function M.reason()
 	if not admission.master then return "shortcuts_disabled" end
 	if admission.paused then return "paused" end
 	if admission.inhibited then return "inhibited" end
-	if _spec.context.legacy_present or _spec.context.assignment_unavailable then return "explicit_assignment" end
+	if _spec.context.assignment_unavailable then return "explicit_assignment" end
 	if _decision then return _decision.reason end
 	return "source_unavailable"
 end

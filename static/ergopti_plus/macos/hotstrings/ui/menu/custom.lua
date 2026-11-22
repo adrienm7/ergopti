@@ -19,9 +19,6 @@ local DeferredWork = require("core.timing.engine.deferred_work")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local Logger = require("core.logger.engine.logger")
 local Labels = require("menu.engine.labels")
-local text_utils = require("core.text.engine.utils")
-local dialog = require("core.ui.engine.dialog_util")
-local Chord = require("keyboard.engine.chord")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local ManifestMenu = require("menu.engine.manifest_menu")
 local TableUtil = require("core.text.engine.table_util")
@@ -365,100 +362,6 @@ function M.build_custom(ctx, counts)
 	local title_str  = base_title .. " (" .. fmt_count(total_count) .. ")"
 
 
-	-- =====================
-	-- Shortcut helpers
-	-- =====================
-
-	local function default_sc()
-		return { mods = {"ctrl"}, key = state.trigger_char }
-	end
-
-	-- Coerce sc.mods to a table so that a persisted scalar string (e.g. mods="ctrl"
-	-- written by an AHK-migrated config) never crashes table.concat/ipairs (M-13).
-	local function coerce_mods(mods)
-		if type(mods) == "table" then return mods end
-		if type(mods) == "string" and mods ~= "" then return { mods } end
-		return {}
-	end
-
-	local function sc_is_default(sc)
-		if not sc or sc == false or type(sc) ~= "table" then return false end
-		local def = default_sc()
-		if sc.key ~= def.key then return false end
-		local m = coerce_mods(sc.mods)
-		if #m ~= 1 then return false end
-		return m[1] == "ctrl"
-	end
-
-	local function sc_label()
-		local sc = state.custom_editor_shortcut
-		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
-		if type(sc) ~= "table" then return i18n.get("menu.shortcuts.keyboard.star_slot_reason.explicit_assignment") end
-		if sc_is_default(sc) then
-			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"),
-				require("hotstrings.engine.magic_key_display").display(state.trigger_char))
-		end
-		local mods_str = table.concat(coerce_mods(sc.mods), "+")
-		return mods_str ~= "" and (mods_str .. " + " .. tostring(sc.key or "?"):upper())
-				or tostring(sc.key or "?"):upper()
-	end
-
-	--- Applies the editor shortcut. While paused it is saved at once and the
-	--- hotkey moves on resume (EDD-1, the maintainer's decision of 2026-11-14):
-	--- the menu's resume listener binds the saved chord.
-	local function apply_shortcut(mods, key)
-		local editor = ctx.hotstring_editor
-		local live_pause = type(ctx.is_paused) == "function" and ctx.is_paused() or paused
-		if type(live_pause) ~= "boolean" then return false end
-		if not live_pause then
-			local committed = KeymapLifecycle.commit_mutation(ctx,
-				"change personal hotstring editor shortcut", function()
-					if mods and key then
-						if not editor or type(editor.set_shortcut) ~= "function" then return false end
-						return editor.set_shortcut(mods, key)
-					end
-					if not editor or type(editor.clear_shortcut) ~= "function" then return false end
-					return editor.clear_shortcut()
-				end)
-			if not committed then return false end
-		end
-		state.custom_editor_shortcut = mods and key and { mods = mods, key = key } or false
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
-		return true
-	end
-
-	-- Shortcut item: clicking it opens the customisation dialog directly
-	local function sc_fn()
-		local current_str = ""
-		if type(state.custom_editor_shortcut) == "table" then
-			-- coerce_mods guards against a persisted scalar string .mods (M-13):
-			-- concatenating that field directly here would throw, same as the
-			-- sc_is_default/sc_label call sites it already protects (PF-7 fix).
-			current_str = table.concat(coerce_mods(state.custom_editor_shortcut.mods), "+")
-				.. "+" .. tostring(state.custom_editor_shortcut.key or "")
-		end
-		local ok_label = i18n.get("button.ok")
-		local ok_p, btn, raw = pcall(dialog.text_prompt,
-			i18n.get("hotstrings.shortcut_custom"),
-			i18n.get("menu.hotstrings.shortcut_prompt"),
-			current_str, ok_label, i18n.get("common.cancel")
-		)
-		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
-		raw = text_utils.trim(raw):lower()
-		if raw == "" then return apply_shortcut(nil, nil) end
-		local chord_input = raw:find("+", 1, true) and raw or ("ctrl+" .. raw)
-		local parsed = Chord.parse(chord_input)
-		if not parsed then
-			-- The refusal names the accepted form, as every other shortcut prompt does.
-			Logger.warn("menu_hotstrings_custom", "Typed editor shortcut refused: it is not a chord.")
-			pcall(dialog.block_alert, i18n.get("shortcut_utils.format_invalid"),
-				i18n.get("shortcut_utils.format_hint"), ok_label)
-			return false
-		end
-		return apply_shortcut(parsed.mods, parsed.key)
-	end
-
 	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
 	local function default_section_label()
 		if not state.custom_default_section then return i18n.get("menu.hotstrings.default_none") end
@@ -605,14 +508,6 @@ function M.build_custom(ctx, counts)
 				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 			end
-	local legacy_rows = {}
-	if state.custom_editor_shortcut ~= nil then
-		local declared_legacy = ManifestMenu.template_rows("hotstring_personal_legacy_shortcut",
-			{ personal_legacy_shortcut = sc_fn },
-			{ personal_shortcut_label = sc_label, personal_legacy_ready = function() return true end }, {})
-		if type(declared_legacy) ~= "table" or #declared_legacy ~= 1 then return nil end
-		legacy_rows[1] = declared_legacy[1]
-	end
 	local default_parent = ManifestMenu.template_rows("hotstring_personal_default_parent", {},
 		{ personal_default_label = default_section_label },
 		{ personal_default_caption = function() return cat_menu end })
@@ -631,8 +526,6 @@ function M.build_custom(ctx, counts)
 	}, {
 		["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 		["personal_default_parent"] = function() return default_parent end,
-		["personal_legacy_before"] = function() return editor_row and legacy_rows or {} end,
-		["personal_legacy_after"] = function() return not editor_row and legacy_rows or {} end,
 	})
 	if type(controls) ~= "table" then return nil end
 	if paused then

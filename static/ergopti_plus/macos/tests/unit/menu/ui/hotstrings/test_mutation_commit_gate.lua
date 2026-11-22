@@ -152,7 +152,6 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 				keymap = true,
 				hotstrings = { personal = true, custom = true },
 				trigger_char = "★",
-				custom_editor_shortcut = false,
 				custom_default_section = false,
 				custom_close_on_add = false,
 			}

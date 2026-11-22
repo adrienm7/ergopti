@@ -2212,22 +2212,6 @@
 		}
 	},
 	{
-		"path": "hotstring_personal_legacy_shortcut.personal_legacy_shortcut",
-		"visibility": "hide",
-		"labels": { "fr": "Raccourci : Win + ", "en": "Shortcut: Win + " },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.",
-				"fr": "Les autres pilotes portent cette commande sous une ligne qui leur est propre : chaque pilote présente la valeur, la réinitialisation ou les variantes d’un réglage dans sa propre ligne, car les boîtes à outils de menus natives diffèrent. C’est une différence de présentation, pas une commande manquante."
-			},
-			"linux": {
-				"en": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.",
-				"fr": "Les autres pilotes portent cette commande sous une ligne qui leur est propre : chaque pilote présente la valeur, la réinitialisation ou les variantes d’un réglage dans sa propre ligne, car les boîtes à outils de menus natives diffèrent. C’est une différence de présentation, pas une commande manquante."
-			}
-		}
-	},
-	{
 		"path": "hotstrings_magic_trigger_frame.magic_key_config_native",
 		"visibility": "hide",
 		"labels": { "fr": "Touche magique : ", "en": "Magic key: " },

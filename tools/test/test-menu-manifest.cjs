@@ -8087,9 +8087,7 @@ console.log(
 			'personal_editor',
 			'hotstring_file_commands',
 			'hotstrings_parameter_boundary',
-			'personal_legacy_before',
 			'personal_default_parent',
-			'personal_legacy_after',
 			'hotstring_personal_close',
 			'hotstrings_parameter_boundary'
 		],
@@ -8122,8 +8120,6 @@ console.log(
 			null,
 			'personal_open_present',
 			'personal_controls_head_boundary',
-			null,
-			null,
 			null,
 			'personal_preferences_present',
 			'personal_controls_tail_boundary'

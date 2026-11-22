@@ -1992,30 +1992,6 @@
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"
 		},
-		"menu.hotstrings.shortcut_default_ctrl": {
-			"reason": "keyboard-key-name",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"es",
-				"fr",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
-		},
 		"menu.hotstrings.title": {
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv"]

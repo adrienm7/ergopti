@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Paused Global-Hotkey Ownership Regression
 --- DESCRIPTION:
---- Exercises the real Hotstring Editor hotkey closure under the canonical pause
---- predicate, then inventories the whole direct hs.hotkey.new class. A raw native
---- handle without lifecycle ownership remains callable after feature layers stop.
+--- Checks that the hotstring editor owns no global hotkey, then inventories the
+--- whole direct hs.hotkey.new class. A raw native handle without lifecycle
+--- ownership remains callable after feature layers stop.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,47 +37,12 @@ local function count_occurrences(source, needle)
 end
 
 helpers.describe("audit pause fence: global hotkey ownership", function()
-	helpers.it("audit pause fence: blocks the real editor shortcut callback while paused", function()
-		local captured_callback
-		local native_hotkey = { enabled = false }
-		function native_hotkey:enable() self.enabled = true; return self end
-		function native_hotkey:disable() self.enabled = false; return self end
-		function native_hotkey:delete() self.enabled = false end
-
-		local paused = true
-		package.loaded["modules.shortcuts.script_control"] = {
-			is_paused = function() return paused end,
-		}
-
-		package.loaded["platform.input.hotkey_registrar"] = nil
-		local Editor = helpers.load_with_stubs("hotstrings.ui.hotstring_editor", {
-			hotkey = {
-				bind = function(_mods, _key, callback)
-					captured_callback = callback
-					native_hotkey:enable()
-					return native_hotkey
-				end,
-			},
-		})
-		local Hotkeys = require("platform.input.hotkey_registrar")
-		Hotkeys.set_delivery_guard(function() return not paused end)
-
-		local opens = 0
-		Editor.open = function() opens = opens + 1 end
-		Editor.set_shortcut({ "cmd", "alt" }, "h")
-		helpers.assert_true(native_hotkey.enabled and type(captured_callback) == "function",
-			"the positive-control hotkey must be armed with the production closure")
-
-		if native_hotkey.enabled then captured_callback() end
-		local opens_while_paused = opens
-		paused = false
-		if native_hotkey.enabled then captured_callback() end
-		Editor.clear_shortcut()
-
-		helpers.assert_eq(opens_while_paused, 0,
-			"a native global shortcut must not open Ergopti UI during pause")
-		helpers.assert_eq(opens, 1,
-			"the same shortcut must remain functional after the pause predicate clears")
+	-- The editor's own global shortcut left on 2026-11-21: Ctrl+★ opening it is
+	-- the secondary_star keyboard slot, fenced by the keyboard owner's pause.
+	helpers.it("audit pause fence: the hotstring editor binds no global hotkey of its own", function()
+		local Editor = helpers.load_with_stubs("hotstrings.ui.hotstring_editor")
+		helpers.assert_nil(Editor.set_shortcut, "the editor owns no global shortcut")
+		helpers.assert_nil(Editor.clear_shortcut, "the editor owns no global shortcut")
 	end)
 
 	helpers.it("audit pause fence: keeps the entire direct hs.hotkey.new class under explicit review", function()

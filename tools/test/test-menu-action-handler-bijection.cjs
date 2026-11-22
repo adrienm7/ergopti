@@ -411,46 +411,10 @@ function nativeFunctionReferenceKeys(source) {
 		) + ' end'
 	])
 		assert.equal(nativeFunctionReferenceKeys(changed).has('actual_row'), false);
+	// The legacy editor shortcut row left with the configured-character magic key
+	// (2026-11-21): the personal menu binds no shortcut command of its own.
 	const actual = fs.readFileSync(path.join(SP, 'macos/hotstrings/ui/menu/custom.lua'), 'utf8');
-	assert.equal(nativeFunctionReferenceKeys(actual).has('personal_legacy_shortcut'), true);
-	for (const changed of [
-		actual.replace('local legacy_rows = {}', 'local sc_fn\n\tlocal legacy_rows = {}'),
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			String.raw`{ personal_legacy_shortcut = sc_fn, ["personal_legacy_short\099ut"] = nil }`
-		),
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			'{ personal_legacy_shortcut = sc_fn, [ [=[personal_legacy_shortcut]=] ] = nil }'
-		),
-		actual.replace('local legacy_rows = {}', 'local other, sc_fn\n\tlocal legacy_rows = {}'),
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			'{ personal_legacy_shortcut = sc_fn, personal_legacy_shortcut = nil }'
-		),
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			'{ personal_legacy_shortcut = sc_fn, ["personal_legacy_shortcut"] = nil }'
-		),
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			'{ personal_legacy_shortcut = sc_fn, [chosen] = nil }'
-		)
-	])
-		assert.equal(nativeFunctionReferenceKeys(changed).has('personal_legacy_shortcut'), false);
-
-	for (const changed of [
-		actual.replace(
-			'{ personal_legacy_shortcut = sc_fn }',
-			'{ personal_legacy_shortcut = "sc_fn" }'
-		),
-		actual.replace('local function sc_fn()', 'local function withdrawn_sc_fn()'),
-		actual.replace(
-			'ManifestMenu.template_rows("hotstring_personal_legacy_shortcut"',
-			'Foreign.ManifestMenu.template_rows("hotstring_personal_legacy_shortcut"'
-		)
-	])
-		assert.equal(nativeFunctionReferenceKeys(changed).has('personal_legacy_shortcut'), false);
+	assert.equal(nativeFunctionReferenceKeys(actual).has('personal_legacy_shortcut'), false);
 }
 
 // Independently authored binding controls preserve necessary static evidence.

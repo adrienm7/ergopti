@@ -32,7 +32,6 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 			llm_backend = "mlx",
 			llm_model = "committed-display-model",
 			chatgpt_url = "https://committed.example.test/",
-			custom_editor_shortcut = false,
 			keystats_enabled = false,
 			keystats_encrypt = false,
 		}
@@ -41,8 +40,6 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 			backend_labels = {},
 			display_labels = {},
 			chatgpt_urls = {},
-			editor_clears = 0,
-			editor_sets = 0,
 		}
 		local deps = {
 			keymap = {
@@ -55,8 +52,6 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 				end,
 			},
 			hotstring_editor = {
-				clear_shortcut = function() observed.editor_clears = observed.editor_clears + 1 end,
-				set_shortcut = function() observed.editor_sets = observed.editor_sets + 1 end,
 			},
 			core_mods = {
 				llm = {
@@ -98,13 +93,11 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 		state.llm_backend = "api"
 		state.llm_model = "rejected-display-model"
 		state.chatgpt_url = "https://rejected.example.test/"
-		state.custom_editor_shortcut = { mods = { "cmd" }, key = "x" }
 
 		helpers.assert_eq(save(), false)
 		helpers.assert_eq(state.llm_backend, "mlx")
 		helpers.assert_eq(state.llm_model, "committed-display-model")
 		helpers.assert_eq(state.chatgpt_url, "https://committed.example.test/")
-		helpers.assert_eq(state.custom_editor_shortcut, false)
 		helpers.assert_eq(observed.core_backends, { "mlx" },
 			"rollback must restore the core LLM backend before downstream setters")
 		helpers.assert_eq(observed.backend_labels, { "MLX 🚀" },
@@ -113,10 +106,6 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 			"rollback must restore the committed model display label")
 		helpers.assert_eq(observed.chatgpt_urls, { "https://committed.example.test/" },
 			"rollback must restore the live ChatGPT URL")
-		helpers.assert_eq(observed.editor_clears, 1,
-			"a committed false editor shortcut must clear the rejected live binding")
-		helpers.assert_eq(observed.editor_sets, 0,
-			"rollback must not recreate a shortcut whose committed value is false")
 	end)
 end)
 

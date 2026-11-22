@@ -253,7 +253,6 @@ local NESTED_KEY_MAP = {
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
 	terminator_consume       = { sec = "hotstrings", key = "terminator_consume"         },
 	sections_order_overrides = { sec = "hotstrings", key = ConfigKeys.LEAF.ORDER_OVERRIDES            },
-	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables

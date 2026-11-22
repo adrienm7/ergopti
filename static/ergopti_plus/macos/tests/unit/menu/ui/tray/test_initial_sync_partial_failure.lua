@@ -26,25 +26,6 @@ local boot = require("tests.support.menu_boot_fixture").boot
 -- ================================================
 
 helpers.describe("initial sync isolates one refused owner (R5)", function()
-	helpers.it("keeps every saved feature when the editor shortcut cannot bind", function()
-		local fixture = boot({ editor_bind = false })
-		helpers.assert_not_nil(fixture.menu,
-			"one refused hotkey must not abort the whole menubar")
-		helpers.assert_eq(fixture.state.gestures, true, "Gestures must keep its saved ON")
-		helpers.assert_eq(fixture.state.keystats_enabled, true, "Metrics must keep its saved ON")
-		helpers.assert_eq(fixture.state.llm_enabled, true, "AI must keep its saved ON")
-		helpers.assert_true(fixture.has_error("hotstring_editor.set_shortcut"),
-			"the refused owner must be named by an ERROR")
-
-		helpers.assert_eq(fixture.save_prefs(), true)
-		local written = fixture.saves[#fixture.saves]
-		helpers.assert_eq(written.gestures, true)
-		helpers.assert_eq(written.keystats_enabled, true)
-		helpers.assert_eq(written.llm_enabled, true)
-		helpers.assert_eq(written.custom_editor_shortcut, { mods = { "ctrl" }, key = "k" },
-			"the next save must not replace the saved chord with a default")
-	end)
-
 	helpers.it("demotes only Gestures in memory and never saves before seeding", function()
 		local fixture = boot({ gestures_enable = false })
 		helpers.assert_not_nil(fixture.menu)

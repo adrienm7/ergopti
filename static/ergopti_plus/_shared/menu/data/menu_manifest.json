@@ -5306,15 +5306,7 @@
 		},
 		{
 			"type": "list",
-			"id": "personal_legacy_before"
-		},
-		{
-			"type": "list",
 			"id": "personal_default_parent"
-		},
-		{
-			"type": "list",
-			"id": "personal_legacy_after"
 		},
 		{
 			"type": "include",
@@ -5463,23 +5455,6 @@
 			"caption_getter": "personal_default_label",
 			"caption_layout": "prefix",
 			"caption_joiner": ""
-		}
-	],
-	"hotstring_personal_legacy_shortcut": [
-		{
-			"type": "command",
-			"id": "personal_legacy_shortcut",
-			"i18n": "menu.hotstrings.shortcut_prefix",
-			"caption_getter": "personal_shortcut_label",
-			"caption_layout": "prefix",
-			"caption_joiner": "",
-			"disabled_when": [
-				"personal_legacy_ready"
-			],
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
 		}
 	],
 	"hotstrings_magic_trigger_frame": [

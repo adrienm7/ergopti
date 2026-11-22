@@ -358,7 +358,3 @@ swipe_5_down = 3.5
 
 [hotstrings.editor]
 close_on_add = false
-
-[hotstrings.editor.shortcut]
-key = "★"
-mods = ["ctrl"]

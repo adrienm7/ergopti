@@ -86,7 +86,6 @@ local function custom_fixture(outcome, action_kind)
 		keymap = false,
 		hotstrings = { personal = group_enabled, custom = group_enabled },
 		trigger_char = "★",
-		custom_editor_shortcut = false,
 		custom_default_section = false,
 		custom_close_on_add = false,
 	}

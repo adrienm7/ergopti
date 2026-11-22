@@ -519,7 +519,6 @@ class MenuCommand {
 	static PERSONAL_FILE_UNAVAILABLE := "personal_file_unavailable"
 	static PERSONAL_HOTSTRING_OPEN_EDITOR := "personal_hotstring_open_editor"
 	static PERSONAL_INFO_EDITOR_OPEN := "personal_info_editor_open"
-	static PERSONAL_LEGACY_SHORTCUT := "personal_legacy_shortcut"
 	static PERSONAL_SECTION_TOGGLE := "personal_section_toggle"
 	static PHYSICAL_SHORTCUTS_EDITOR := "physical_shortcuts_editor"
 	static PREVIEW_AI_ENABLED := "preview_ai_enabled"

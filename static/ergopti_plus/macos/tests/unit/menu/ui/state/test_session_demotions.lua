@@ -111,11 +111,11 @@ helpers.describe("session demotions keep config.toml values", function()
 	helpers.it("compares table values structurally", function()
 		local registry = load_subject().new()
 		registry.record({
-			feature = "hotstring_editor", key = "custom_editor_shortcut",
-			persisted = { mods = { "ctrl" }, key = "k" }, demoted = false,
+			feature = "llm", key = "llm_profile_shortcuts",
+			persisted = { basic = { mods = { "ctrl" }, key = "1" } }, demoted = false,
 		})
-		local view = registry.persisted_view({ custom_editor_shortcut = false })
-		helpers.assert_eq(view.custom_editor_shortcut, { mods = { "ctrl" }, key = "k" })
+		local view = registry.persisted_view({ llm_profile_shortcuts = false })
+		helpers.assert_eq(view.llm_profile_shortcuts, { basic = { mods = { "ctrl" }, key = "1" } })
 	end)
 
 	helpers.it("rejects a record without a feature or a state key", function()

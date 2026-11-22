@@ -530,21 +530,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		try("hotstrings", "dyn_hot_mod.set_trigger_char", dyn_hot_mod.set_trigger_char, state.trigger_char)
 	end
 
-	local sc = state.custom_editor_shortcut
-	local editor_handoff_committed = true
-	if sc == nil then
-		-- Canonical absence belongs to the ordinary contextual slot. Retire an
-		-- acknowledged legacy owner before that slot may acquire a replacement.
-		if type(hotstring_editor.clear_shortcut) == "function" then
-			editor_handoff_committed = try_exact("hotstring_editor", "hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
-		end
-	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
-		if type(hotstring_editor.set_shortcut) == "function" then
-			try_exact("hotstring_editor", "hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key)
-		end
-	elseif sc == false and type(hotstring_editor.clear_shortcut) == "function" then
-		try_exact("hotstring_editor", "hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
-	end
 
 
 	local kl = core_mods.keystats
@@ -808,7 +793,6 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	local shortcut_owner = core_mods and core_mods.shortcuts_mod
 	if shortcut_owner and type(shortcut_owner.configure_star_slot) == "function" then
 		try_exact("shortcuts", "shortcuts.configure_star_slot", shortcut_owner.configure_star_slot, {
-			legacy_present = sc ~= nil or not editor_handoff_committed,
 			paused = function() return shortcut_owner.is_paused() == true end,
 			inhibited = function() return shortcut_owner.has_bindings_pause_debt() == true end,
 		})

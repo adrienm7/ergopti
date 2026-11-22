@@ -24,8 +24,6 @@ local Logger        = require("core.logger.engine.logger")
 local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
 local Paths         = require("core.fs.engine.paths")
-local Chord         = require("keyboard.engine.chord")
-local Hotkeys       = require("platform.input.hotkey_registrar")
 local FileSystem    = require("core.fs.adapters.file_system")
 local DeferredWork  = require("core.timing.engine.deferred_work")
 local SaveValidation = require("hotstrings.ui.hotstring_editor.save_validation")
@@ -76,9 +74,6 @@ local function owner_is_current(owner)
 	end
 	return false
 end
-local _hotkey          = nil
-local _hotkey_chord    = nil
-local _retired_hotkeys = {}
 local _is_focused      = false
 local _pending_mode    = "menu"
 local _file_ready      = false
@@ -779,65 +774,6 @@ function M.set_ui_prefs(prefs)
 	if type(prefs.default_section) == "string" or prefs.default_section == nil then 
 		_prefs.default_section = prefs.default_section 
 	end
-end
-
-
-
--- ====================================
--- ===== 5.1) Shortcut Management =====
--- ====================================
-
---- Binds a global hotkey to open the editor.
---- @param mods table Array of modifier keys (e.g., {"cmd", "alt"}).
---- @param key string The character key.
-function M.set_shortcut(mods, key)
-	local chord, chord_err = Chord.format(mods, key)
-	if not chord then
-		Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
-		return false
-	end
-	if _hotkey and _hotkey_chord == chord then return true end
-
-	-- Bind the candidate before releasing the acknowledged handle. Native bind
-	-- refusal must leave the previous shortcut fully live.
-	-- Toggle: close only an editor the user is looking at. A covered editor
-	-- may hold typed text, so the shortcut presents it instead.
-	local candidate = Hotkeys.bind(chord, function()
-		if _webview and _is_focused then M.close() else M.open("shortcut") end
-	end)
-	if not candidate then return false end
-
-	local previous = _hotkey
-	if previous and Hotkeys.unbind(previous) ~= true then
-		-- unbind() fences delivery before attempting the native delete. Roll the
-		-- candidate back and re-enable the exact prior owner before reporting failure.
-		if Hotkeys.unbind(candidate) ~= true then
-			_retired_hotkeys[#_retired_hotkeys + 1] = candidate
-		end
-		Hotkeys.setEnabled(previous, true)
-		return false
-	end
-	_hotkey = candidate
-	_hotkey_chord = chord
-	return true
-end
-
---- Unbinds the global hotkey if set.
-function M.clear_shortcut()
-	for index = #_retired_hotkeys, 1, -1 do
-		if Hotkeys.unbind(_retired_hotkeys[index]) == true then
-			table.remove(_retired_hotkeys, index)
-		end
-	end
-	if not _hotkey then return true end
-	if Hotkeys.unbind(_hotkey) ~= true then
-		Hotkeys.setEnabled(_hotkey, true)
-		Logger.error(LOG, "Editor shortcut release did not commit; handle retained for retry.")
-		return false
-	end
-	_hotkey = nil
-	_hotkey_chord = nil
-	return true
 end
 
 return M

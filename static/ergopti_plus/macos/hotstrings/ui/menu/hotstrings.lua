@@ -76,7 +76,6 @@ M.DEFAULT_STATE = {
 	-- Editor & UI preferences — owned by this menu module.
 	custom_close_on_add           = false,
 	custom_default_section        = nil,
-	custom_editor_shortcut        = nil,
 	sections_order_overrides      = {},
 	terminator_states             = {},
 	terminator_consume            = {},

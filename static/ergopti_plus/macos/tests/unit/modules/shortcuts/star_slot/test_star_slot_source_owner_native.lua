@@ -221,16 +221,18 @@ helpers.describe("★ key slot: native source and ordinary ownership", function(
 		end)
 	end)
 
-	helpers.it("keeps every present legacy choice outside conditional acquisition", function()
-		for _, legacy in ipairs({ false, { mods = { "ctrl", "fn" }, key = "ù" } }) do
-			with_fixture(function(subject, registrar, _, state, spec)
-				spec.context.legacy_present = legacy ~= nil
-				helpers.assert_eq(subject.start(spec), true)
-				helpers.assert_eq(#state.requests, 0)
-				helpers.assert_eq(registrar.live_count(), 0)
-				helpers.assert_eq(subject.stop(), true)
-			end)
-		end
+	-- The legacy editor shortcut left on 2026-11-21: Ctrl+★ is this slot alone,
+	-- so no former editor choice can hold it back.
+	helpers.it("owns Ctrl+★ alone, whatever a former editor shortcut said", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			spec.context.legacy_present = true
+			helpers.assert_eq(subject.start(spec), true)
+			helpers.assert_eq(#state.requests, 1)
+			respond()
+			helpers.assert_eq(native.hotkey._bound[1].key, 8)
+			helpers.assert_eq(registrar.live_count(), 1)
+			helpers.assert_eq(subject.stop(), true)
+		end)
 	end)
 
 

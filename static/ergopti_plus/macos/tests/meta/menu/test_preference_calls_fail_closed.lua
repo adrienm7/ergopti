@@ -277,9 +277,10 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- Hotstring section ordering adds one protected publisher in menu_hotstrings:
 	-- its refused save restores the prior override and never rebuilds the menu.
 	-- The remove/status/receipt/fallback mutations below pin that added call.
-	-- The physical magic key's menu left with the configured-character magic
-	-- key (2026-11-21): one call less.
-	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1 - 1,
+	-- The physical magic key's menu and the personal menu's legacy editor
+	-- shortcut left with the configured-character magic key (2026-11-21): two
+	-- calls less.
+	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1 - 2,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

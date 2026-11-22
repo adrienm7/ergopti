@@ -1315,8 +1315,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			}, {
 				["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 				["personal_default_parent"] = function() return default_parent end,
-				["personal_legacy_before"] = function() return {} end,
-				["personal_legacy_after"] = function() return {} end,
 			})
 			if type(controls) ~= "table" then return {} end
 			local rows = ManifestMenu.template_rows("hotstring_personal_content_frame", {}, {

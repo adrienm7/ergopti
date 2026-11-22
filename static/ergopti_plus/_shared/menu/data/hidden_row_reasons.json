@@ -61,7 +61,6 @@
 	"hotstring_personal_none": "platform_reason.menu_container_rows_are_built_per_driver",
 	"hotstring_personal_file_frame": "platform_reason.menu_container_rows_are_built_per_driver",
 	"hotstring_personal_directory_frame": "platform_reason.menu_container_rows_are_built_per_driver",
-	"hotstring_personal_legacy_shortcut": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"hotstrings_magic_trigger_frame": "platform_reason.menu_container_rows_are_built_per_driver",
 	"hotstrings_magic_trigger_reset": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"keyboard_group_frame": "platform_reason.chord_families_are_each_platforms",

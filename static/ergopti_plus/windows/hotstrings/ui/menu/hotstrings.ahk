@@ -1044,7 +1044,7 @@ _HS_PersonalRows(Options := unset) {
 				"personal_preferences_present", (*) => true, "personal_controls_ready", (*) => true,
 				MenuCommand.PERSONAL_CLOSE_ON_ADD, (*) => _EditorCloseOnAddEnabled()),
 			Map("personal_editor", (*) => EditorRow is Map ? [EditorRow] : [],
-				"personal_default_parent", (*) => DefaultParent, "personal_legacy_before", (*) => [], "personal_legacy_after", (*) => []))
+				"personal_default_parent", (*) => DefaultParent))
 		if !(Controls is Array)
 			return []
 		SectionRows := []

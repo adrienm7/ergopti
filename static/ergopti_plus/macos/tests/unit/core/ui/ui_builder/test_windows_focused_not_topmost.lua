@@ -476,9 +476,9 @@ helpers.describe("ui-focus-not-topmost: toggles present a covered window (macOS)
 			"the add-hotstring entry must not close a covered editor that may hold typed text")
 
 		local editor = helpers.read_driver_unit("function M.is_editor_focused()")
+		-- The editor's own global shortcut left on 2026-11-21: Ctrl+★ is the
+		-- secondary_star slot, whose action opens the editor through its owner.
 		helpers.assert_true(editor ~= nil, "the hotstring editor must exist")
-		helpers.assert_true(editor:find("if _webview and _is_focused then M.close() else M.open(\"shortcut\") end",
-			1, true) ~= nil, "the editor shortcut must present a covered editor instead of closing it")
 	end)
 
 end)

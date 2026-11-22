@@ -458,7 +458,7 @@ const OPENS_SUBMENU = {
 					owner_signature: '_HS_PersonalRows(Options := unset) {',
 					call: 'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", DefaultChild, Map("personal_default_label", (*) => CurDefaultLabel))',
 					handoff: 'DefaultParent := [DefaultCaption]',
-					consumer: '"personal_default_parent", (*) => DefaultParent,'
+					consumer: '"personal_default_parent", (*) => DefaultParent)'
 				}
 			},
 			native_sources: {
@@ -466,12 +466,6 @@ const OPENS_SUBMENU = {
 				hs: 'macos/hotstrings/ui/menu/custom.lua',
 				linux: 'linux/menu/ui/builder/builder.lua'
 			}
-		},
-		{
-			menu: 'hotstring_personal_legacy_shortcut',
-			platforms: ['hs'],
-			kind: 'compose',
-			native_sources: { hs: 'macos/hotstrings/ui/menu/custom.lua' }
 		},
 		'personal_hotstring_commands',
 		'personal_file_controls',
@@ -2232,8 +2226,8 @@ const {
 			'\n}\n',
 		source.replace('DefaultParent := [DefaultCaption]', 'DefaultParent := []'),
 		source.replace(
-			'"personal_default_parent", (*) => DefaultParent,',
-			'"personal_default_parent", (*) => [],'
+			'"personal_default_parent", (*) => DefaultParent)',
+			'"personal_default_parent", (*) => [])'
 		),
 		source.replace(
 			'MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption"',

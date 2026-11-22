@@ -59,19 +59,18 @@ local function format_message(fmt, ...)
 end
 
 --- Returns the saved config.toml flat state every case starts from.
---- @return table saved Every feature ON, with a hotstring-editor chord.
+--- @return table saved Every feature ON.
 local function saved_config()
 	return {
 		gestures = true,
 		keystats_enabled = true,
 		llm_enabled = true,
 		shortcuts = true,
-		custom_editor_shortcut = { mods = { "ctrl" }, key = "k" },
 	}
 end
 
 --- Boots ui.menu.start once over in-memory boundaries.
---- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, editor_bind, gestures_enable,
+--- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, gestures_enable,
 --- gestures_query, keystats_start; generate(ctx, actions) returns the menu tree, and
 --- before_start() runs on the reset stubs just before ui.menu.start.
 --- @return table fixture Live state, saves, log records and the menu ctx.
@@ -151,11 +150,6 @@ function M.boot(opts)
 	}
 	package.loaded["hotstrings.ui.hotstring_editor"] = {
 		set_update_menu = noop,
-		set_shortcut = function()
-			if opts.editor_bind == false then return false end
-			return true
-		end,
-		clear_shortcut = function() return true end,
 	}
 	package.loaded["menu.ui.builder.builder"] = {
 		generate = function(ctx, _menu_mods, actions)

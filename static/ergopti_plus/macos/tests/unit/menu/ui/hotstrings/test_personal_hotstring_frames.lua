@@ -57,7 +57,7 @@ local function with_personal_frame(body, options)
 		}
 		local context = {
 			state = { hotstrings = {}, trigger_char = "★", custom_default_section = options.empty and false or "beta",
-				custom_close_on_add = false, custom_editor_shortcut = options.legacy and { mods = { "ctrl" }, key = "j" } or nil },
+				custom_close_on_add = false },
 			paused = options.paused == true, hotfiles = { "personal" }, hotfile_paths = {},
 			get_group_name = function(value) return value end,
 			applyTriggerChar = function(value) return value end,
@@ -121,7 +121,7 @@ local function find(rows, title)
 end
 
 helpers.describe("personal hotstrings complete shared frames", function()
-	helpers.it("retains duplicate source choices and editor-dependent legacy order", function()
+	helpers.it("retains duplicate source choices and draws no legacy editor shortcut", function()
 		with_personal_frame(function(f)
 			local parent = assert(f.build())
 			local rows = parent.submenu
@@ -133,28 +133,17 @@ helpers.describe("personal hotstrings complete shared frames", function()
 			helpers.assert_eq(default.menu[4].title, "Repeated")
 			helpers.assert_eq(default.menu[3].checked == true, false)
 			helpers.assert_eq(default.menu[4].checked, true)
-			local titles = {}
-			for _, row in ipairs(rows) do titles[#titles + 1] = row.title end
-			local legacy = f.translate("menu.hotstrings.shortcut_prefix") .. "ctrl + J"
-			local legacy_index, default_index
-			for index, title in ipairs(titles) do
-				if title == legacy then legacy_index = index end
-				if title == default.title then default_index = index end
+			-- Ctrl+★ opening the editor is the ordinary secondary_star slot since
+			-- 2026-11-21: the personal menu draws no shortcut row of its own.
+			local prefix = f.translate("menu.hotstrings.shortcut_prefix")
+			for _, row in ipairs(rows) do
+				helpers.assert_true(type(row.title) ~= "string" or row.title:sub(1, #prefix) ~= prefix,
+					"no legacy editor shortcut row: " .. tostring(row.title))
 			end
-			helpers.assert_eq(default_index, legacy_index + 1)
 			helpers.assert_type(find(rows, "Repeated (2)"), "table")
 			helpers.assert_type(find(rows, "Repeated (3)"), "table")
 			helpers.assert_eq(f.calls.saves, 0); helpers.assert_eq(f.calls.updates, 0)
-			local editor = f.root.personal_hotstring_commands
-			f.root.personal_hotstring_commands = {}
-			local no_editor = assert(f.build()).submenu
-			for index, row in ipairs(no_editor) do
-				if row.title == default.title then
-					helpers.assert_eq(no_editor[index + 1].title, legacy)
-				end
-			end
-			f.root.personal_hotstring_commands = editor
-		end, { legacy = true })
+		end)
 	end)
 	helpers.it("preserves empty default choices and the acknowledged native callbacks", function()
 		with_personal_frame(function(f)
@@ -176,7 +165,7 @@ helpers.describe("personal hotstrings complete shared frames", function()
 			local rows = assert(f.build()).submenu
 			local default = find(rows, f.translate("menu.hotstrings.default_category_prefix") .. "Repeated")
 			local close = find(rows, f.translate("menu.hotstrings.close_on_add"))
-			for _, key in ipairs({ "hotstring_personal_default_frame", "hotstring_personal_controls_frame", "hotstring_personal_content_frame", "hotstrings_parameter_boundary", "hotstring_personal_default_parent", "hotstring_personal_legacy_shortcut" }) do
+			for _, key in ipairs({ "hotstring_personal_default_frame", "hotstring_personal_controls_frame", "hotstring_personal_content_frame", "hotstrings_parameter_boundary", "hotstring_personal_default_parent" }) do
 				local original = f.root[key]; f.root[key] = nil
 				helpers.assert_eq(f.build(), nil, "missing whole declaration refuses the personal provider")
 				f.root[key] = original; helpers.assert_type(f.build(), "table")
@@ -189,7 +178,7 @@ helpers.describe("personal hotstrings complete shared frames", function()
 			f.root.hotstring_personal_close = closed
 			helpers.assert_eq(f.calls.saves, 0); helpers.assert_eq(f.calls.updates, 0)
 			helpers.assert_eq(f.calls.defaults, 0); helpers.assert_eq(f.calls.closes, 0)
-		end, { legacy = true })
+		end)
 	end)
 	helpers.it("projects genuine French literal hand captions without source mutation", function()
 		with_personal_frame(function(f)

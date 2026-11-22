@@ -4478,15 +4478,7 @@ present_when = "personal_controls_head_boundary"
 
 [[menu.hotstring_personal_controls_frame]]
 type = "list"
-id = "personal_legacy_before"
-
-[[menu.hotstring_personal_controls_frame]]
-type = "list"
 id = "personal_default_parent"
-
-[[menu.hotstring_personal_controls_frame]]
-type = "list"
-id = "personal_legacy_after"
 
 [[menu.hotstring_personal_controls_frame]]
 type = "include"
@@ -4608,17 +4600,6 @@ i18n = "menu.hotstrings.default_category_prefix"
 caption_getter = "personal_default_label"
 caption_layout = "prefix"
 caption_joiner = ""
-
-[[menu.hotstring_personal_legacy_shortcut]]
-type = "command"
-id = "personal_legacy_shortcut"
-i18n = "menu.hotstrings.shortcut_prefix"
-caption_getter = "personal_shortcut_label"
-caption_layout = "prefix"
-caption_joiner = ""
-disabled_when = ["personal_legacy_ready"]
-platforms = ["hs"]
-unavailable = "hide"
 
 # Complete Magic trigger provider: native snapshot and handlers, shared caption/order.
 [[menu.hotstrings_magic_trigger_frame]]
