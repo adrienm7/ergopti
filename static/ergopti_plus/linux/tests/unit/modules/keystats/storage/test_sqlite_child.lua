@@ -36,10 +36,19 @@ local function scratch_db()
 	return dir .. "/metrics.sqlite", dir
 end
 
---- Whether a process id is alive (not a zombie).
+--- Whether a process id is alive (not a zombie), read from the kernel's
+--- /proc/<pid>/stat rather than `ps -p`: BusyBox ps (Alpine) has no -p, and
+--- the first letter of its usage error read as a live state.
 local function alive(pid)
-	local state = sh("ps -o stat= -p " .. tostring(pid)):match("^%s*(%S)")
-	return state ~= nil and state ~= "Z"
+	local file = io.open("/proc/" .. tostring(pid) .. "/stat", "r")
+	if not file then return false end
+	local stat = file:read("*a")
+	file:close()
+	-- The command name in parentheses may hold spaces or parentheses: the state
+	-- is the field after the last ")".
+	local state = stat:match("^.*%)%s+(%a)")
+	assert(state, "unreadable /proc/" .. tostring(pid) .. "/stat")
+	return state ~= "Z" and state ~= "X"
 end
 
 --- Records every log line of the shim logger the writer and the child use.
