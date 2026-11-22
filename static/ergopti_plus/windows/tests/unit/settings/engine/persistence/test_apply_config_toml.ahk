@@ -22,8 +22,9 @@ TestFMv2_ApplyNonexistentFileReturnsZero() {
 		_CMJFixtureReadonly(MissingPath)
 		Applied := ApplyConfigToml(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: missing file silently returns 0", TestFMv2_ApplyNonexistentFileReturnsZero)
 
@@ -36,8 +37,9 @@ TestFMv2_ApplyUniversalScriptOverride() {
 		AssertEqual(1, Applied)
 		AssertEqual("en", Features["script"]["locale"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
 
@@ -50,8 +52,9 @@ TestFMv2_ApplyLayoutOverride() {
 		AssertEqual(1, Applied)
 		AssertEqual(false, Features["layout"]["ergopti_base"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: [layout] lands on Features[layout]",
 	TestFMv2_ApplyLayoutOverride)
@@ -67,12 +70,17 @@ TestFMv2_RejectsScalarTypeConfusion() {
 			. "[llm.navigation]`r`nval_modifiers = " . '"alt"' . "`r`n"
 			. "[hotstrings.french_autocorrection.accents]`r`nenabled = "
 			. '"false"' . "`r`ntime_activation_seconds = " . '"0.5"' . "`r`n")
+		; The shipped locale is the neutral value (follow the system), so the
+		; boolean is compared with whatever the manifest put there.
+		LocaleBefore := Features["script"]["locale"]
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"wrongly typed scalars must never replace manifest-owned values")
 		AssertEqual(false, Features["layout"]["ergopti_base"],
 			"the string 'false' must not become a truthy boolean feature")
-		AssertEqual("fr", Features["script"]["locale"])
+		Assert(LocaleBefore is String, "the shipped locale is a string")
+		AssertEqual(LocaleBefore, Features["script"]["locale"],
+			"the boolean true must leave the shipped locale in place")
 		AssertEqual("INFO", Features["script"]["log_level"])
 		Assert(Features["llm"]["generation"]["context_length"] is Integer)
 		Assert(Features["shortcuts"]["keyboard"]["primary_b"] is String)
@@ -289,8 +297,9 @@ TestFMv2_ApplyNestedSubSection() {
 		AssertEqual(true, Entry["enabled"])
 		AssertEqual(1.25, Entry["time_activation_seconds"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
@@ -498,8 +507,9 @@ TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {
 		AssertEqual(true, Entry["enabled"])
 		AssertEqual(0.75, Entry["time_activation_seconds"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: hotstrings.personal.<user-chosen-name> is applied, not skipped as unknown",
 	TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped)
@@ -518,8 +528,9 @@ TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped() {
 		AssertTrue(Features["hotstrings"]["personal"].Has("professionalvocabulary"))
 		AssertEqual(false, Features["hotstrings"]["personal"]["professionalvocabulary"]["enabled"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: a second hotstrings.personal.<user-chosen-name> section is also applied",
 	TestFMv2_ApplyPersonalHotstringAnotherUserChosenNameNotSkipped)
@@ -579,8 +590,9 @@ TestFMv2_ApplyArrayValue() {
 		AssertEqual("alt", Arr[1])
 		AssertEqual("ctrl", Arr[2])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: coerces single-line array literals", TestFMv2_ApplyArrayValue)
 
@@ -588,12 +600,15 @@ TestFMv2_ApplyEmptyFileNoChange() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("empty", "")
+		Shipped := ManifestBuildFeaturesMap()
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied)
-		AssertEqual("fr", Features["script"]["locale"])
+		AssertEqual(Shipped["script"]["locale"], Features["script"]["locale"],
+			"an empty file leaves the shipped locale in place")
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: empty file applies no overrides", TestFMv2_ApplyEmptyFileNoChange)
 
@@ -612,8 +627,9 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 		AssertEqual(1, Applied)
 		AssertEqual("de", Features["script"]["locale"])
 		FileDelete(Path)
+	} finally {
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)
