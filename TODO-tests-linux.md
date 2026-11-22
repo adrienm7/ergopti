@@ -219,6 +219,7 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       a Backspace after one second still undoes. 5. Any key (Escape, a letter) between the expansion and the
       Backspace: plain Backspace. 6. Option off: Backspace deletes the last character every time; on again, the
       undo returns without a restart. A custom window (e.g. 750) typed in the free entry is kept after a restart.
-- [ ] Screen-reader switch of the previews (2026-11-21): with Orca on, Hotstrings > Preview bubbles >
-      « Read previews to the screen reader » ticked by default: a preview and a finished AI prediction are said;
-      untick it: both still draw and nothing is said; tick it again: said again, without a restart.
+- [ ] <!-- field-point: preview_announcements --> Screen-reader switch of the previews (2026-11-21): with Orca
+      on, Hotstrings > Preview bubbles > « Read previews to the screen reader » ticked by default: a preview and a
+      finished AI prediction are said; untick it: both still draw and nothing is said; tick it again: said again,
+      without a restart.

@@ -161,6 +161,12 @@
 			"not_testable": "Needs a person with Orca at the dashboards and a metrics store made unreadable then restored: the field report neither listens to a screen reader nor damages the metrics store."
 		},
 		{
+			"id": "preview_announcements",
+			"title": "Screen-reader switch of the previews: a preview and a finished prediction said by Orca, silent when unticked",
+			"checks": [],
+			"not_testable": "Needs a person listening to Orca while previews and predictions draw: the field report neither listens to a screen reader nor types hotstrings into a focused window."
+		},
+		{
 			"id": "tray_icon_missing",
 			"title": "Missing tray logo: the warning sign, its Orca name and one logged error (TRAY-05)",
 			"checks": [],
