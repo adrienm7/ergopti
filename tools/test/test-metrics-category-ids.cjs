@@ -198,8 +198,9 @@ check(
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
 	// a11y_prefs.js leads the head (the reading preferences apply before the first
-	// paint) and metrics_chart_values.js follows Chart.js.
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 17);
+	// paint), page_locale.js sets the root language and direction, and
+	// metrics_chart_values.js follows Chart.js.
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 18);
 	assert.ok(page.scripts.includes('../metrics_calendar.js'));
 	assert.ok(page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('helpers.js'));
 	assert.equal(

@@ -406,8 +406,8 @@ test('loaded HTML admits the exact Lua readiness query and paints normal native 
 	const f = loadMetricsAppsPage();
 	assert.equal(
 		f.scripts.length,
-		18,
-		'all seventeen external scripts (a11y_prefs.js and metrics_chart_values.js included) and the actual inline script execute'
+		19,
+		'all eighteen external scripts (a11y_prefs.js, page_locale.js and metrics_chart_values.js included) and the actual inline script execute'
 	);
 	assert.equal(f.scripts.includes('script.js'), false, 'the legacy dashboard is not loaded');
 	const lua = fs.readFileSync(
@@ -524,8 +524,9 @@ test('defensive order control exposes native publishers only after the final ext
 	});
 	const external = phases.filter(({ name }) => name !== '#inline');
 	// a11y_prefs.js leads the head (the reading preferences apply before the first
-	// paint) and metrics_chart_values.js follows Chart.js.
-	assert.equal(external.length, 17);
+	// paint), page_locale.js sets the root language and direction, and
+	// metrics_chart_values.js follows Chart.js.
+	assert.equal(external.length, 18);
 	assert.equal(external[external.length - 1].name, 'modal.js');
 	for (const phase of external.slice(0, -1)) {
 		assert.equal(
