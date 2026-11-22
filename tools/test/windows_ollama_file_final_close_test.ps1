@@ -10,6 +10,11 @@ $nodes=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.IfStateme
 if ($nodes.Count -ne 1) {throw 'Actual CLI finalizer missing or ambiguous.'}
 $body=$nodes[0].Clauses[0].Item2.Extent.Text
 $body=$body.Substring(1,$body.Length-2)
+# The refusal receipt carries the actual evidence classifier (OLL-05), a pure
+# function the catch calls, so it is defined from the helper, not modeled.
+$evidence=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-OllamaFailureEvidence'},$false))
+if ($evidence.Count -ne 1) {throw 'Actual failure evidence classifier missing or ambiguous.'}
+. ([scriptblock]::Create($evidence[0].Extent.Text))
 $Action='publish';$ManagedRoot='Z:\owned';$TicketId='1'*32;$StageIdentity='11111111:0000000000000001';$ManifestSha256='2'*64
 $script:closeCalls=0
 function Open-OllamaManagedRoot($Path,$Create) {

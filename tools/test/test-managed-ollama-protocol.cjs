@@ -321,6 +321,12 @@ function receiveWindowsFilePort() {
 			assert.equal(fact.cleanup_pending, true);
 			assert.equal(fact.error, 'Injected exact final root close refusal.');
 			assert.equal(fact.ticket, '1'.repeat(32));
+			// The refusal names its class for the driver's classifier (OLL-05).
+			assert.equal(
+				fact.failure_evidence,
+				'stage=publish reason=install System.Management.Automation.RuntimeException ' +
+					'hresult=0x80131501 Injected exact final root close refusal.'
+			);
 			assert.ok(!Object.hasOwn(fact, 'executable'));
 			assert.deepEqual(fact.publication_receipt, {
 				ticket: '1'.repeat(32),
