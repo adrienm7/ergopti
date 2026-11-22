@@ -164,7 +164,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 			"the user's copy of a category an extension binds whole is an explicit override")
 		helpers.assert_eq(with_fixes[1], fixes, "a user's magickey.toml keeps the repeat corrections it declares itself")
 		helpers.assert_eq(with_fixes.n, 2)
-		helpers.assert_eq(#with_fixes[2], 0, "the extension has nothing left to supply")
+		helpers.assert_nil(with_fixes[2], "the extension has nothing left to supply")
 		helpers.assert_eq(without_fixes, others)
 		helpers.assert_eq(#sources, 1, "the extension supplies the repeat corrections a user's copy lacks")
 		helpers.assert_eq(sources[1].sections, { "repeat_corrections" })
