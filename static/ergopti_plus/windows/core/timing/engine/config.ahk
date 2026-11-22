@@ -50,7 +50,7 @@ TimingsLoadShared(SharedDir := "") {
 		Path := Dir . "\core\timing\data\constants.toml"
 		c    := ParseTomlFile(Path)
 		if !c.Count {
-				throw Error("_shared/core/timing/data/constants.toml introuvable ou vide : " . Path)
+				throw Error("_shared/core/timing/data/constants.toml is missing or empty: " . Path)
 		}
 		_TimingsCache := c
 		try LoggerInfo("Timings", "Shared timings registry loaded ({1} section(s)).", c.Count)
@@ -59,6 +59,9 @@ TimingsLoadShared(SharedDir := "") {
 ; Fetch a required ``[Section] Key`` timing (an integer number of milliseconds)
 ; from the loaded registry. Throws when the registry is not loaded or the key is
 ; absent so a typo / truncated registry aborts loudly instead of returning "".
+; A value that is not a TOML integer (a quoted "500", a 1.5) throws too: the
+; Lua reader (_shared/core/timing/engine/timings_core.lua) refuses a quoted
+; value, and Integer() used to accept it here and truncate a float.
 ; @param Section TOML section name (e.g. "keystats").
 ; @param Key Key within that section (e.g. "think_pause_ms").
 ; @return Integer The value in milliseconds.
@@ -68,15 +71,15 @@ TimingsGet(Section, Key) {
 				throw Error(Format("TimingsGet('{1}','{2}') called before TimingsLoadShared() — registry not loaded.", Section, Key))
 		}
 		Val := IniCacheGet(_TimingsCache, Section, Key)
-		if (Val == "_") {
-				throw Error(Format("_shared/core/timing/data/constants.toml — clé manquante : [{1}] {2}", Section, Key))
+		if !(Val is Integer) {
+				throw Error(Format("_shared/core/timing/data/constants.toml — missing or non-integer key [{1}] {2}", Section, Key))
 		}
-		return Integer(Val)
+		return Val
 }
 
 ; Fetch a required ``[Section] Key`` number that is not a millisecond count
-; (a distance in millimetres, a factor). TimingsGet truncates to an integer,
-; which would turn 1.5 mm into 1.
+; (a distance in millimetres, a factor). TimingsGet admits only an integer,
+; and 1.5 mm is a float. A quoted value throws, as it does in the Lua reader.
 ; @param Section TOML section name (e.g. "gestures").
 ; @param Key Key within that section (e.g. "swipe_minimum_mm").
 ; @return Number The value as written.
@@ -86,7 +89,7 @@ TimingsGetNumber(Section, Key) {
 				throw Error(Format("TimingsGetNumber('{1}','{2}') called before TimingsLoadShared() — registry not loaded.", Section, Key))
 		}
 		Val := IniCacheGet(_TimingsCache, Section, Key)
-		if (Val == "_") || !IsNumber(Val) {
+		if !(Val is Number) {
 				throw Error(Format("_shared/core/timing/data/constants.toml — missing or non-numeric key [{1}] {2}", Section, Key))
 		}
 		return Val + 0

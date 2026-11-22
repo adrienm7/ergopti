@@ -34,6 +34,9 @@
  *    a missing key fails here, before the fail-fast reader throws at boot on
  *    the one driver that executes that line.
  * 3. The walk is floored and the gate proves it can fail on synthetic inputs.
+ * 3a. A key the Windows driver reads with TimingsGet or TimingsGetSec holds a
+ *    TOML integer: that reader refuses any other value at runtime, where it
+ *    used to truncate a float or accept a quoted number the Lua reader refuses.
  * 4. [limits] holds the byte caps (a child process's output, a declaration file,
  *    a feed, an identifier). Each key ends in `_bytes` and holds a positive
  *    integer, and a Lua or JavaScript `*_BYTES` constant may not retype the
@@ -146,8 +149,22 @@ function analyse(registry, sources, pins, pinGateTexts) {
 	}
 	for (const source of sources) {
 		for (const m of source.text.matchAll(READER_CALL)) {
-			const [, section, key] = m;
-			if (registry[section] && Object.hasOwn(registry[section], key)) continue;
+			const [call, section, key] = m;
+			if (registry[section] && Object.hasOwn(registry[section], key)) {
+				if (
+					source.rel.endsWith('.ahk') &&
+					call.startsWith('TimingsGet') &&
+					!Number.isInteger(registry[section][key])
+				) {
+					const line = source.text.slice(0, m.index).split('\n').length;
+					errors.push(
+						`${source.rel}:${line}: reads [${section}].${key} with TimingsGet, which admits ` +
+							`only a TOML integer, but the registry holds ${JSON.stringify(registry[section][key])}. ` +
+							'Fix: write an integer, or read a distance or factor with TimingsGetNumber.'
+					);
+				}
+				continue;
+			}
 			const line = source.text.slice(0, m.index).split('\n').length;
 			errors.push(
 				`${source.rel}:${line}: reads [${section}].${key}, which ${REGISTRY_REL} does not ` +
@@ -275,6 +292,23 @@ function selfTest() {
 			[]
 		),
 		1
+	);
+	expectErrors(
+		'a Windows TimingsGet of a non-integer value',
+		analyse(
+			{ gestures: { tap_ms: 1.5, gap_ms: '500', step_mm: 1.5 } },
+			[
+				{
+					rel: 'w.ahk',
+					text:
+						'A := TimingsGet("gestures", "tap_ms")\nB := TimingsGetSec("gestures", "gap_ms")\n' +
+						'C := TimingsGetNumber("gestures", "step_mm")\n'
+				}
+			],
+			[],
+			[]
+		),
+		2
 	);
 	const limitsRegistry = { limits: { cap_bytes: 65536 } };
 	const retyped = { rel: 'linux/a.lua', text: 'local MAX_OUTPUT_BYTES = 65536\n' };
