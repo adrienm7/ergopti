@@ -741,7 +741,12 @@ local function publish_expected_failure()
 	return true
 end
 os.exit = function(code, ...)
-	if code == 1 then pcall(publish_expected_failure) end
+	if code == 1 then
+		-- The exit stays 1 either way; a refused phase check still names itself,
+		-- since the parent reports a missing marker without its cause.
+		local published, publish_error = pcall(publish_expected_failure)
+		if not published then io.stderr:write(tostring(publish_error), "\n") end
+	end
 	return system_exit(code, ...)
 end
 local main_ok, main_error = pcall(dofile, "ergopti_hotstrings.lua")

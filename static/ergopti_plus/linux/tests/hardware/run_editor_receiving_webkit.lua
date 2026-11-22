@@ -308,7 +308,13 @@ if not ran then
 	print("  FAIL the flow raised: " .. tostring(err))
 end
 pcall(Manager.shutdown)
-pcall(chmod, "755", "644")
+-- A restore that fails leaves the profile unreadable to the removal below, so
+-- it fails the run rather than vanishing inside the pcall.
+local restored, restore_error = pcall(chmod, "755", "644")
+if not restored then
+	_failures = _failures + 1
+	print("  FAIL the personal modes were not restored: " .. tostring(restore_error))
+end
 sh("rm -rf " .. quote(profile))
 check(_checks == EXPECTED_CHECKS, string.format("every check ran (%d of %d)", _checks, EXPECTED_CHECKS))
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))

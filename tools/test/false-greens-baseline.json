@@ -7,5 +7,5 @@
 	"unfloored-scan": 0,
 	"message-witness": 0,
 	"bare-try": 0,
-	"pcall-swallow": 2
+	"pcall-swallow": 0
 }
