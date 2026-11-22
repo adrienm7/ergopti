@@ -18,7 +18,7 @@ Edit `_shared/settings/data/features/behaviors.json` after reviewing the named o
 
 ## hotstrings.repeat_fallback
 
-- windows: [static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk](../static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2`.
+- windows: [static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk](../static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `200b523c95b96f2af3fb9323898e5594fdaef329f30d9ce081eb676980c0dd47`.
 - macos: [static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua](../static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua) — `function M.try_repeat_feature`, SHA-256 `9e5a94bb1a63d0fd8b546ed27c980c68f6d07cd52d4aed1336b72f6d3ee18989`.
 - linux: [static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua](../static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua) — `function M.resolve`, SHA-256 `fdb04b78a2858b8745045e5331bb96d7a08cbea67cd41ebd9a812bd3da2d4516`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `39497c0400485b16a4c2a98f783ead1a9213c3d7baf4b90952ebef50827bfda4`.
 
@@ -30,7 +30,7 @@ Edit `_shared/settings/data/features/behaviors.json` after reviewing the named o
 
 ## hotstrings.repeat_activation_window
 
-- windows: [static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk](../static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2`.
+- windows: [static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk](../static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `200b523c95b96f2af3fb9323898e5594fdaef329f30d9ce081eb676980c0dd47`.
 - macos: [static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua](../static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua) — `function M.try_repeat_feature`, SHA-256 `9e5a94bb1a63d0fd8b546ed27c980c68f6d07cd52d4aed1336b72f6d3ee18989`; [static/ergopti_plus/macos/hotstrings/engine/expander/init.lua](../static/ergopti_plus/macos/hotstrings/engine/expander/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `afb0c653cfa21b461d8b62440406bd0554ca1694f6702fc9796b9ad4c6a107e6`.
 - linux: [static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua](../static/ergopti_plus/linux/hotstrings/engine/repeat_key.lua) — `function M.resolve`, SHA-256 `fdb04b78a2858b8745045e5331bb96d7a08cbea67cd41ebd9a812bd3da2d4516`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `39497c0400485b16a4c2a98f783ead1a9213c3d7baf4b90952ebef50827bfda4`.
 

@@ -25,7 +25,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2"
+					"sha256": "200b523c95b96f2af3fb9323898e5594fdaef329f30d9ce081eb676980c0dd47"
 				}
 			],
 			"macos": [
@@ -130,7 +130,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "c67009a6b9c9982eecf3ee9fea40face2f218816e4e99906e6358138ff43bfe2"
+					"sha256": "200b523c95b96f2af3fb9323898e5594fdaef329f30d9ce081eb676980c0dd47"
 				}
 			],
 			"macos": [
