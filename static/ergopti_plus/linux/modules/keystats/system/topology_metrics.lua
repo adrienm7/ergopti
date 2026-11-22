@@ -1,4 +1,4 @@
---- modules/keystats/topology_metrics.lua
+--- modules/keystats/system/topology_metrics.lua
 
 --- ==============================================================================
 --- MODULE: Window Topology And Capture Presence (Linux)
@@ -30,7 +30,7 @@ local Timings = require("core.timing.engine.timings")
 local Topology = require("metrics.engine.system.window_topology")
 local Capture = require("metrics.engine.capture_presence")
 
-local LOG = "modules.keystats.topology_metrics"
+local LOG = "modules.keystats.system.topology_metrics"
 
 --- Most /proc entries one capture scan reads.
 M.MAX_PROCESSES = 4096

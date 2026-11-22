@@ -501,7 +501,7 @@ helpers.describe("keystats", function()
 
     it("linux-unmeasured-kpis: the dashboard payload names each unmeasured KPI with its reason", function()
       keystats.init({ sqlite_path = fresh_db() })
-      local SystemMetrics = require("modules.keystats.system_metrics")
+      local SystemMetrics = require("modules.keystats.system.system_metrics")
       local availability = SystemMetrics.space_change_availability()
       local unmeasured = keystats.get_dashboard_payload({ include_prefetch = false }).driver_meta.unmeasured
       helpers.assert_true(type(unmeasured) == "table", "the payload carries the unmeasured map")

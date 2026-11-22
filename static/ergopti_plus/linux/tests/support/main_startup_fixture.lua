@@ -237,7 +237,7 @@ function M.run(options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
-		elseif name == "modules.keystats.topology_metrics" then
+		elseif name == "modules.keystats.system.topology_metrics" then
 			-- Window topology binds its X11 source at startup and closes its capture interval at stop.
 			return { bind_topology_source = noop, daemon_tick = noop, daemon_stop = noop }
 		elseif name == "infra.personal_shortcuts" then

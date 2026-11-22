@@ -123,7 +123,7 @@ local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
 local SystemMetrics = nil
-local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keystats.system_metrics")
+local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keystats.system.system_metrics")
 if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
 
 -- The nine n-gram families, over the shared driver-agnostic accumulators.

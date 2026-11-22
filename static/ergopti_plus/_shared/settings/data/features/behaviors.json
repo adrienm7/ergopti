@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "39497c0400485b16a4c2a98f783ead1a9213c3d7baf4b90952ebef50827bfda4"
+			"sha256": "4e3deffeb11f0e2a609a5c139e15817c78bd0d429baa3b69c1602a55603eae07"
 		},
 		{
 			"id": "windows-dead-legacy",

@@ -1,4 +1,4 @@
---- modules/keystats/system_metrics.lua
+--- modules/keystats/system/system_metrics.lua
 
 --- ==============================================================================
 --- MODULE: System Metrics (Linux)
@@ -53,7 +53,7 @@ local Calendar = require("modules.keystats.calendar")
 local TableUtil = require("core.text.engine.table_util")
 local StorageOwned = require("core.fs.engine.storage_owned")
 
-local LOG = "modules.keystats.system_metrics"
+local LOG = "modules.keystats.system.system_metrics"
 
 -- How often the machine's state is read, in milliseconds. Battery and lock
 -- state move on a scale of minutes; sampling faster spends subprocesses to

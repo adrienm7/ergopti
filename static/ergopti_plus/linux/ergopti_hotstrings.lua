@@ -313,7 +313,7 @@ local RepeatKey         = require("hotstrings.engine.repeat_key")
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
-local system_metrics = RuntimeGuard.optional_require("modules.keystats.system_metrics")
+local system_metrics = RuntimeGuard.optional_require("modules.keystats.system.system_metrics")
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
@@ -596,7 +596,7 @@ local shutdown = ShutdownCoordinator.new({
 			-- Before the final flush, so an open capture interval ends in it, as on Windows.
 			name = "capture presence interval",
 			stop = function()
-				require("modules.keystats.topology_metrics").daemon_stop()
+				require("modules.keystats.system.topology_metrics").daemon_stop()
 				return true
 			end,
 		},
@@ -3607,7 +3607,7 @@ local function main()
 			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
 				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
 		end
-		require("modules.keystats.topology_metrics").bind_topology_source(sources.topology,
+		require("modules.keystats.system.topology_metrics").bind_topology_source(sources.topology,
 			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
 		if not sources.topology then
 			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
@@ -3762,12 +3762,12 @@ local function main()
 		-- module owns its sampler (this loop is at LuaJIT's upvalue limit) and
 		-- decides which probe is due; reachability answers later through libuv.
 		RuntimeGuard.call("network metrics sampler", function()
-			require("modules.keystats.network_metrics").daemon_tick(keystats.record_network_event)
+			require("modules.keystats.system.network_metrics").daemon_tick(keystats.record_network_event)
 		end)
 		-- Window moves, resizes and monitor changes (X11, in process) and the
 		-- capture-program presence (procfs); the module paces both readings.
 		RuntimeGuard.call("topology metrics sampler", function()
-			require("modules.keystats.topology_metrics").daemon_tick(keystats.record_topology_event)
+			require("modules.keystats.system.topology_metrics").daemon_tick(keystats.record_topology_event)
 		end)
 
 		-- The WPM readouts' clock: the floating widget and the tray readout each

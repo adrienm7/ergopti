@@ -1,4 +1,4 @@
---- modules/keystats/network_metrics.lua
+--- modules/keystats/system/network_metrics.lua
 
 --- ==============================================================================
 --- MODULE: Connectivity Transitions (Linux)
@@ -27,7 +27,7 @@ local Logger = require("core.logger.engine.shim")
 local Timings = require("core.timing.engine.timings")
 local Transitions = require("metrics.engine.system.network_transitions")
 
-local LOG = "modules.keystats.network_metrics"
+local LOG = "modules.keystats.system.network_metrics"
 
 --- ARPHRD values of tunnel interfaces (linux/if_arp.h) and IFF_UP (linux/if.h).
 local ARPHRD_PPP, ARPHRD_NONE, IFF_UP = 512, 65534, 0x1

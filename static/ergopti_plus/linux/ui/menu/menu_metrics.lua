@@ -72,11 +72,11 @@ local function _availability_rows(k)
 	if type(k.tap_click_availability) == "function" then
 		add("menu.metrics.touchpad_taps", k.tap_click_availability())
 	end
-	local ok, SystemMetrics = pcall(require, "modules.keystats.system_metrics")
+	local ok, SystemMetrics = pcall(require, "modules.keystats.system.system_metrics")
 	if ok and type(SystemMetrics.space_change_availability) == "function" then
 		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
 	end
-	local loaded, TopologyMetrics = pcall(require, "modules.keystats.topology_metrics")
+	local loaded, TopologyMetrics = pcall(require, "modules.keystats.system.topology_metrics")
 	if loaded and type(TopologyMetrics.window_topology_availability) == "function" then
 		add("menu.metrics.window_topology", TopologyMetrics.window_topology_availability())
 	end

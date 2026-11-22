@@ -39,7 +39,7 @@ local function with_recorder(transitions, script)
 		bump_rev = function() return true end,
 	}, { __index = Fakes.sqlite_writer() })
 	require("tests.support.sqlite_flush_fake").attach(fake_writer)
-	local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics" }
+	local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system.system_metrics" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local taken = 0
@@ -341,7 +341,7 @@ end)
 
 for _, failure in ipairs({ "migration", "registration", "migration_throw", "registration_throw", "open_refused", "open_throw", "open_unavailable" }) do
 	it("metrics do not use SQLite after failed " .. failure, function()
-		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system_metrics", "modules.keystats.text_migration" }
+		local names = { "modules.keystats.sqlite_writer", "modules.keystats.keystats", "modules.keystats.system.system_metrics", "modules.keystats.text_migration" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local starts, closes, registers, migrations, resumes, conversions = 0, 0, 0, 0, 0, 0
 		local writer = setmetatable({
