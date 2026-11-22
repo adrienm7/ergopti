@@ -20,7 +20,8 @@ local helpers = require("tests.helpers")
 local function category_delay_action(config, answer)
 	helpers.load_with_stubs("core.logger.engine.logger")
 	package.loaded["core.ui.engine.dialog_util"] = {
-		text_prompt = function() return "OK", answer end,
+		-- The prompt answers with the very OK label the action compares.
+		text_prompt = function(_, _, _, ok_label) return ok_label, answer end,
 	}
 	package.loaded["hotstrings.engine.catalogue.config"] = config
 	package.loaded["menu.engine.manifest_reader"] = {
@@ -78,9 +79,13 @@ local function category_delay_action(config, answer)
 		end
 	end
 	helpers.assert_type(delays, "table")
+	-- The magic key row: a category delay, read through resolve() and
+	-- written through the override store.
+	local caption = require("core.i18n.engine.i18n").get("menu.hotstrings.delay_magic_key")
 	local target
 	for _, row in ipairs(delays) do
-		if type(row.fn) == "function" or type(row.action) == "function" then
+		local text = row.title or row.label
+		if type(text) == "string" and text:sub(1, #caption) == caption then
 			target = row.fn or row.action
 		end
 	end
