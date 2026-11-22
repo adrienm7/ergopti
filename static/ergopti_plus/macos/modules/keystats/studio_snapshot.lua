@@ -19,11 +19,18 @@
 
 local M = {}
 
-local FileSystem = require("core.fs.adapters.file_system")
+--- The file-system owner, resolved at each call: the keystats log manager
+--- retires the saved read during its own init, and binding the owner then
+--- would freeze whichever adapter was current for the rest of the session.
+--- @return table FileSystem The current core.fs.adapters.file_system owner.
+local function file_system()
+	return require("core.fs.adapters.file_system")
+end
 
 --- The snapshot ports studio_ngrams.read takes.
 --- @return table { read = function(path) -> content, status, write = function(path, text) -> boolean }.
 function M.ports()
+	local FileSystem = file_system()
 	return {
 		read = function(path)
 			local content, status = FileSystem.read_with_status(path)
@@ -38,7 +45,7 @@ end
 --- @return boolean retired True when no saved read remains.
 function M.retire(store_path)
 	if store_path == nil then return true end
-	return require("metrics.engine.view.studio_ngrams").retire_snapshot(store_path, FileSystem.delete)
+	return require("metrics.engine.view.studio_ngrams").retire_snapshot(store_path, file_system().delete)
 end
 
 return M
