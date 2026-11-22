@@ -1564,7 +1564,7 @@ try {
 		DevSourceWatcher_Start(_DriverDir, DevSource_GitDir(DevSource_Root()), ReloadPreservingSuspend)
 		; The collector's field run (diagnostics/engine/field_run/field_run.ahk) is optional too: the
 		; driver keeps running without it.
-		try FieldRun_Start(DevSource_Root())
+		try FieldRun_Start(DevSource_Root(), () => ReloadPreservingSuspend())
 		catch as _FieldRunErr
 			LoggerError("FieldRun", "The developer field run could not start: {1}.", _FieldRunErr.Message)
 	}

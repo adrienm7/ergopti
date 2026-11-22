@@ -172,7 +172,8 @@ check('the Windows driver implements the protocol from the declarations', () => 
 	const runners = code.match(/^FieldRun_Runners\(\) \{\n([\s\S]*?)^\}$/m);
 	assert(runners, 'no FieldRun_Runners');
 	for (const step of read(protocol.steps_file.windows).steps)
-		assert(runners[1].includes(`"${step.check}", `), `no runner for the check ${step.check}`);
+		if (step.kind === 'field_check')
+			assert(runners[1].includes(`"${step.check}", `), `no runner for the check ${step.check}`);
 	const verdicts = [
 		...code.matchAll(/(?:Done\.Call\(|this\.Settle\(Token, |Verdict := )"([a-z_]+)"/g),
 		...code.matchAll(/\? "([a-z_]+)" : "([a-z_]+)", (?:\[|Codes)/g)
@@ -191,7 +192,10 @@ check('the Windows driver implements the protocol from the declarations', () => 
 		/if \(DevSource_Root\(\) != ""\) \{\n([\s\S]*?)\n\t\}\n\} catch as _DevSourceErr/
 	);
 	assert(
-		devBlock && /try FieldRun_Start\(DevSource_Root\(\)\)/.test(devBlock[1]),
+		devBlock &&
+			/try FieldRun_Start\(DevSource_Root\(\), \(\) => ReloadPreservingSuspend\(\)\)/.test(
+				devBlock[1]
+			),
 		'developer mode only'
 	);
 	assert.equal(main.split('FieldRun_Start(').length, 2, 'started once');
@@ -214,7 +218,8 @@ check('the Linux field run declares its steps and repeats no protocol key', () =
 check('every reload step writes the declared resume document', () => {
 	const sources = {
 		macos: 'static/ergopti_plus/macos/diagnostics/engine/field_run/field_run.lua',
-		linux: 'static/ergopti_plus/linux/diagnostics/engine/field_run/field_run.lua'
+		linux: 'static/ergopti_plus/linux/diagnostics/engine/field_run/field_run.lua',
+		windows: 'static/ergopti_plus/windows/diagnostics/engine/field_run/field_run.ahk'
 	};
 	let drivers = 0;
 	for (const [os, relative] of Object.entries(protocol.steps_file)) {
@@ -223,6 +228,21 @@ check('every reload step writes the declared resume document', () => {
 		drivers++;
 		assert(os in sources, `${os} declares a reload step this gate cannot read`);
 		const source = fs.readFileSync(path.join(ROOT, sources[os]), 'utf8');
+		if (os === 'windows') {
+			// The AutoHotkey session method, up to the next method at the same indent.
+			const method = source.match(/^\tReloadStep\(Token\) \{\n([\s\S]*?)^\t\}$/m);
+			assert(method, `${sources[os]} has no reload step`);
+			const publish = method[1].match(/this\.Publish\(ResumePath, Map\(([\s\S]*?)\)\)\n/);
+			assert(publish, `${sources[os]}: the reload step publishes no resume document`);
+			for (const key of protocol.documents.resume)
+				assert.match(publish[1], new RegExp(`"${key}",`), `${os} resume document lacks ${key}`);
+			const reloadAt = method[1].indexOf('this.Deps["reload"].Call()');
+			assert(
+				reloadAt > method[1].indexOf(publish[0]),
+				`${os} asks for the reload before the resume`
+			);
+			continue;
+		}
 		const body = source.match(/^function Session:reload_step\([^)]*\)\n([\s\S]*?)^end$/m);
 		assert(body, `${sources[os]} has no reload step`);
 		// The resume document is the publish whose path is the resume file.
@@ -235,7 +255,7 @@ check('every reload step writes the declared resume document', () => {
 		const reloadAt = body[1].search(/pcall\(ports\.reload(?:_driver)?,/);
 		assert(reloadAt > body[1].indexOf(publish[0]), `${os} asks for the reload before the resume`);
 	}
-	assert.equal(drivers, 2, 'macOS and Linux each declare a reload step');
+	assert.equal(drivers, 3, 'macOS, Linux and Windows each declare a reload step');
 });
 
 console.log(`[OK] field run protocol (${checks} checks).`);

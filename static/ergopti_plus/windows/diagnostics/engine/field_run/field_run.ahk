@@ -26,6 +26,13 @@
 ;    as "redacted", so no path, URL or user text reaches a result file.
 ; 5. Each file is replaced whole (a staged copy then one rename), so the
 ;    collector never reads half a result.
+; 6. A "reload" step reloads the driver on purpose, as macOS and Linux do: it
+;    writes the run's state to the resume file and asks the reload owner
+;    (ReloadPreservingSuspend). The successor reads the resume file once at its
+;    start, records the step with the reload's duration
+;    (core/timing/engine/reload_timing.ahk, launch to boot complete) and runs
+;    the next step. A reload refused, or accepted and never started, fails by
+;    name; a run with no usable resume file is closed as interrupted.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -69,7 +76,7 @@ FieldRun_LoadProtocol(Path) {
 			"verdicts", "reasons", "step_kinds", "folder", "steps_file", "all_steps"]
 		if !Spec.Has(Key)
 			throw Error("The field run protocol lacks " . Key . ".")
-	for Kind in ["ready", "request", "refused", "running", "results", "accepted", "done"]
+	for Kind in ["ready", "request", "refused", "running", "results", "accepted", "done", "resume"]
 		if !(Spec["files"] is Map) || !RegExMatch(Spec["files"].Get(Kind, ""), "^[A-Za-z0-9_.]+$")
 			throw Error("The field run file " . Kind . " must be a plain name.")
 	if !(Spec["max_request_bytes"] is Integer) || Spec["max_request_bytes"] < 128
@@ -126,9 +133,10 @@ FieldRun_LoadSteps(Path, Spec, Runners) {
 		Id := (Step is Map) ? Step.Get("id", "") : ""
 		if !RegExMatch(Id, Spec["step_id_pattern"]) || Id == Spec["all_steps"] || ById.Has(Id)
 			throw Error("The field run step identity " . Id . " is invalid or repeated.")
-		if !Spec["kind_set"].Has(Step.Get("kind", "")) || Step["kind"] != "field_check"
+		Kind := Step.Get("kind", "")
+		if !Spec["kind_set"].Has(Kind) || (Kind != "field_check" && Kind != "reload")
 			throw Error("The field run step " . Id . " has a kind this driver does not run.")
-		if !Runners.Has(Step.Get("check", ""))
+		if (Kind == "field_check") && !Runners.Has(Step.Get("check", ""))
 			throw Error("The field run step " . Id . " names a check without a runner.")
 		if !(Step.Get("deadline_seconds", "") is Integer) || Step["deadline_seconds"] <= 0
 			throw Error("The field run step " . Id . " has no positive deadline.")
@@ -285,7 +293,9 @@ class FieldRunSession {
 	 * @param {Map} Steps - From FieldRun_LoadSteps.
 	 * @param {String} Folder - The field run folder of the clone.
 	 * @param {Integer} Pid - This process.
-	 * @param {Map} Deps - "poll_ms", "runners".
+	 * @param {Map} Deps - "poll_ms", "runners", "reload" (asks the reload, true when
+	 *   accepted) and "reload_ms" (the reload this boot completed: -1 while the
+	 *   boot runs, "" when unmeasured, else its duration).
 	 */
 	__New(Spec, Steps, Folder, Pid, Deps) {
 		this.Spec := Spec
@@ -296,6 +306,7 @@ class FieldRunSession {
 		this.Run := 0
 		this.PollTimer := 0
 		this.Started := false
+		this.ResumeRead := false
 	}
 
 	Path(Kind) {
@@ -308,7 +319,11 @@ class FieldRunSession {
 			throw Error("The field run session cannot be started twice.")
 		this.Started := true
 		FSEnsureDirectoryStrict(this.Path("results"))
-		this.CloseInterrupted()
+		Resumed := this.ReadResume()
+		if !IsObject(Resumed)
+			this.CloseInterrupted()
+		; Held before the poll starts, so no request is taken while it waits.
+		this.Run := Resumed
 		; A request left from an earlier session was written for a driver that is gone
 		if FileExist(this.Path("request")) {
 			LoggerWarn(FIELD_RUN_TAG, "A stale field run request was left by an earlier session; removed.")
@@ -322,16 +337,183 @@ class FieldRunSession {
 		; Published last: it is the collector's readiness receipt
 		this.Publish(this.Path("ready"), Map("schema", this.Spec["schema"], "driver", "windows",
 			"pid", this.Pid, "steps", Ids))
+		; Consumed only now, so a collector always finds the resume file or this
+		; successor's readiness while it follows the reload.
+		if (this.ResumeRead)
+			FSDelete(this.Path("resume"))
+		if IsObject(Resumed)
+			SetTimer(ObjBindMethod(this, "Resume"), -1)
 	}
 
-	/** Stops watching; a running run is closed as interrupted. */
+	/** Stops watching; a running run is closed as interrupted, unless its own reload stops it. */
 	Stop() {
 		if this.PollTimer
 			SetTimer(this.PollTimer, 0)
 		this.PollTimer := 0
-		if IsObject(this.Run)
+		if IsObject(this.Run) && this.Run.Reloading {
+			; The resume file carries the run on in the successor, and the running
+			; marker stays for the successor to match it against.
+			if this.Run.ActiveStep && this.Run.ActiveStep.Timer
+				SetTimer(this.Run.ActiveStep.Timer, 0)
+			LoggerInfo(FIELD_RUN_TAG, "Field run {1} suspended for its timed reload.", this.Run.Request["request_id"])
+			this.Run := 0
+		} else if IsObject(this.Run)
 			this.Finish(true, "teardown")
-		FSDelete(this.Path("ready"))
+		; A successor may already have published its own readiness: only ours is withdrawn.
+		ReadyPid := 0
+		try {
+			Ready := JsonParse(FSReadUtf8Exact(this.Path("ready")))
+			ReadyPid := (Ready is Map) ? Ready.Get("pid", 0) : 0
+		}
+		if (ReadyPid == this.Pid)
+			FSDelete(this.Path("ready"))
+	}
+
+	/**
+	 * Reads the resume file a timed reload left. An unusable one closes its run
+	 * as interrupted, so its collector stops waiting.
+	 * @returns {Object|Integer} The suspended run to carry on, or 0.
+	 */
+	ReadResume() {
+		Path := this.Path("resume")
+		this.ResumeRead := false
+		if !FileExist(Path)
+			return 0
+		this.ResumeRead := true
+		Resume := 0, Running := 0
+		try Resume := JsonParse(FSReadUtf8Exact(Path))
+		try Running := JsonParse(FSReadUtf8Exact(this.Path("running")))
+		Usable := (Resume is Map) && Resume.Get("schema", 0) == this.Spec["schema"]
+			&& RegExMatch(Resume.Get("request_id", ""), this.Spec["request_id_pattern"])
+			&& (Running is Map) && Running.Get("request_id", "") == Resume["request_id"]
+			&& (Resume.Get("steps", 0) is Array) && (Resume.Get("index", "") is Integer)
+			&& (Resume.Get("deadline_seconds", "") is Integer) && (Resume.Get("elapsed_ms", "") is Integer)
+			&& Resume["elapsed_ms"] >= 0 && (Resume.Get("started_at", 0) is String)
+			&& (Resume.Get("verdicts", 0) is Map) && (Resume.Get("order", 0) is Array)
+			&& (Resume.Get("codes", 0) is Array)
+		Steps := []
+		if Usable {
+			for Id in Resume["steps"] {
+				if !(Id is String) || !this.Steps["by_id"].Has(Id) {
+					Usable := false
+					break
+				}
+				Steps.Push(this.Steps["by_id"][Id])
+			}
+		}
+		if Usable
+			Usable := Resume["index"] >= 1 && Resume["index"] <= Steps.Length
+				&& Steps[Resume["index"]]["kind"] == "reload" && Steps[Resume["index"]]["id"] == Resume.Get("step", "")
+		if Usable {
+			for Id, Verdict in Resume["verdicts"]
+				if !this.Steps["by_id"].Has(Id) || !this.Spec["verdict_set"].Has(Verdict)
+					Usable := false
+		}
+		if !Usable {
+			LoggerWarn(FIELD_RUN_TAG, "An unusable field run resume file was left; the run is closed as interrupted.")
+			return 0
+		}
+		Request := Map("request_id", Resume["request_id"], "steps", Steps,
+			"deadline_seconds", Resume["deadline_seconds"])
+		StartTick := A_TickCount - Resume["elapsed_ms"]
+		Verdicts := Map()
+		for Id, Verdict in Resume["verdicts"]
+			Verdicts[Id] := Verdict
+		Order := []
+		for Id in Resume["order"]
+			Order.Push(Id)
+		Codes := []
+		for Code in Resume["codes"]
+			Codes.Push(Code)
+		return {Request: Request, Dir: this.Path("results") . "\" . Request["request_id"], Index: Resume["index"],
+			Verdicts: Verdicts, Order: Order, StartedAt: Resume["started_at"], StartTick: StartTick,
+			DeadlineTick: StartTick + Request["deadline_seconds"] * 1000, ActiveStep: 0, Reloading: false,
+			ResumeCodes: Codes, ResumeSince: A_TickCount}
+	}
+
+	/**
+	 * Carries on the run its timed reload suspended once this boot is complete:
+	 * records the reload step with its duration and runs the next step.
+	 */
+	Resume() {
+		Active := this.Run
+		if !IsObject(Active) || Active.ActiveStep
+			return
+		Step := Active.Request["steps"][Active.Index]
+		ReloadMs := this.Deps["reload_ms"].Call()
+		; The boot still runs: the reload is judged at its completion.
+		if (ReloadMs is Integer) && ReloadMs < 0 && TickElapsed(Active.ResumeSince) < Step["deadline_seconds"] * 1000 {
+			SetTimer(ObjBindMethod(this, "Resume"), -this.Deps["poll_ms"])
+			return
+		}
+		Measured := (ReloadMs is Integer) && ReloadMs >= 0
+		this.Publish(this.Path("running"), Map("schema", this.Spec["schema"], "request_id", Active.Request["request_id"]))
+		; The restart counts against the request deadline.
+		if Measured {
+			Active.StartTick -= ReloadMs
+			Active.DeadlineTick -= ReloadMs
+		}
+		Codes := ["reloaded"]
+		for Code in Active.ResumeCodes
+			Codes.Push(Code)
+		if !Measured
+			Codes.Push("reload_unmeasured")
+		LoggerInfo(FIELD_RUN_TAG, "Field run {1} resumed after its timed reload ({2}).", Active.Request["request_id"],
+			Measured ? ReloadMs . " ms" : "unmeasured")
+		Token := {Step: Step, Settled: false, StartTick: A_TickCount - (Measured ? ReloadMs : 0),
+			StartedAt: _FieldRun_IsoNow(), DeadlineMs: Step["deadline_seconds"] * 1000, Timer: 0}
+		Active.ActiveStep := Token
+		this.Settle(Token, Codes.Length > 1 ? "fail" : "pass", Codes)
+	}
+
+	/**
+	 * The timed reload: writes the run's state to the resume file and asks the
+	 * reload owner. The successor records the step (Resume); a reload refused,
+	 * or accepted and never started within the step's deadline, is recorded here.
+	 * @param {Object} Token - The step's settlement token.
+	 */
+	ReloadStep(Token) {
+		Active := this.Run
+		Ids := []
+		for Item in Active.Request["steps"]
+			Ids.Push(Item["id"])
+		ResumePath := this.Path("resume")
+		try this.Publish(ResumePath, Map("schema", this.Spec["schema"], "request_id", Active.Request["request_id"],
+			"index", Active.Index, "step", Token.Step["id"], "steps", Ids,
+			"deadline_seconds", Active.Request["deadline_seconds"], "started_at", Active.StartedAt,
+			"elapsed_ms", TickElapsed(Active.StartTick), "verdicts", Active.Verdicts, "order", Active.Order,
+			"codes", []))
+		catch as Err {
+			LoggerError(FIELD_RUN_TAG, "The field run resume file could not be written: {1}", Err.Message)
+			return this.Settle(Token, "fail", ["resume_unwritten"])
+		}
+		Active.Reloading := true
+		LoggerInfo(FIELD_RUN_TAG, "Field run step {1}/{2} '{3}': asking for the timed reload.", Active.Index,
+			Active.Request["steps"].Length, Token.Step["id"])
+		Accepted := false
+		try Accepted := this.Deps["reload"].Call()
+		catch as Err
+			LoggerError(FIELD_RUN_TAG, "The timed reload raised: {1}", Err.Message)
+		if !((Accepted is Integer) && Accepted == 1) {
+			Active.Reloading := false
+			FSDelete(ResumePath)
+			LoggerError(FIELD_RUN_TAG, "The timed reload was refused.")
+			return this.Settle(Token, "fail", ["reload_refused"])
+		}
+		Token.Timer := this.ReloadNotStarted.Bind(this, Token)
+		SetTimer(Token.Timer, -Token.DeadlineMs)
+	}
+
+	; The reload was accepted but this instance never stopped within the step's deadline.
+	ReloadNotStarted(Token) {
+		Active := this.Run
+		if !IsObject(Active) || !Active.Reloading || Active.ActiveStep !== Token
+			return
+		Active.Reloading := false
+		FSDelete(this.Path("resume"))
+		LoggerError(FIELD_RUN_TAG, "The timed reload was accepted but never stopped this driver.")
+		Token.Timer := 0
+		this.Settle(Token, "timeout", ["reload_not_started"])
 	}
 
 	/** Closes the run an earlier session of this driver left open. */
@@ -396,7 +578,7 @@ class FieldRunSession {
 			Ids.Push(Step["id"])
 		this.Run := {Request: Request, Dir: Dir, Index: 0, Verdicts: Map(), Order: [],
 			StartedAt: _FieldRun_IsoNow(), StartTick: A_TickCount,
-			DeadlineTick: A_TickCount + Request["deadline_seconds"] * 1000, ActiveStep: 0}
+			DeadlineTick: A_TickCount + Request["deadline_seconds"] * 1000, ActiveStep: 0, Reloading: false}
 		this.Publish(this.Path("running"), Map("schema", this.Spec["schema"], "request_id", Request["request_id"]))
 		this.Publish(Dir . "\" . this.Spec["files"]["accepted"], Map("schema", this.Spec["schema"],
 			"request_id", Request["request_id"], "pid", this.Pid, "steps", Ids,
@@ -423,6 +605,8 @@ class FieldRunSession {
 		LoggerInfo(FIELD_RUN_TAG, "Field run step {1}/{2} '{3}' started.", Active.Index, Active.Request["steps"].Length, Step["id"])
 		if LeftMs <= 0
 			return this.Settle(Token, "timeout", ["request_deadline"])
+		if (Step["kind"] == "reload")
+			return this.ReloadStep(Token)
 		Token.Timer := this.Settle.Bind(this, Token, "timeout", ["deadline_" . Floor(DeadlineMs / 1000) . "s"])
 		SetTimer(Token.Timer, -DeadlineMs)
 		Runner := this.Deps["runners"][Step["check"]]
@@ -517,8 +701,9 @@ class FieldRunSession {
 /**
  * Starts the developer field run of a driver run from a clone.
  * @param {String} CloneRoot - DevSource_Root().
+ * @param {Func} ReloadFn - The reload owner a reload step asks, true when accepted.
  */
-FieldRun_Start(CloneRoot) {
+FieldRun_Start(CloneRoot, ReloadFn) {
 	global _FieldRun, _SharedDir
 	if IsObject(_FieldRun)
 		throw Error("The field run already has an owner.")
@@ -530,7 +715,8 @@ FieldRun_Start(CloneRoot) {
 	Steps := FieldRun_LoadSteps(CloneRoot . "\" . StrReplace(Spec["steps_file"]["windows"], "/", "\"), Spec, Runners)
 	Folder := CloneRoot . "\" . StrReplace(Spec["folder"]["clone"], "/", "\")
 	Session := FieldRunSession(Spec, Steps, Folder, ProcessExist(),
-		Map("poll_ms", TimingsGet("ui", "field_run_poll_ms"), "runners", Runners))
+		Map("poll_ms", TimingsGet("ui", "field_run_poll_ms"), "runners", Runners, "reload", ReloadFn,
+			"reload_ms", ReloadTimingResult))
 	_FieldRun := Session
 	Session.Start()
 	LoggerSuccess(FIELD_RUN_TAG, "Developer field run ready ({1} step(s)).", Steps["steps"].Length)

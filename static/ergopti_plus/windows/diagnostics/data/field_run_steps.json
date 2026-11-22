@@ -1,5 +1,5 @@
 {
-	"_comment": "The Windows developer field run's steps, run by diagnostics/engine/field_run/field_run.ahk under the shared protocol (_shared/diagnostics/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each step is a Debug tray check run without its window: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
+	"_comment": "The Windows developer field run's steps, run by diagnostics/engine/field_run/field_run.ahk under the shared protocol (_shared/diagnostics/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each field_check step is a Debug tray check run without its window, and the reload step reloads the driver and resumes the run in its successor: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
 	"deadline_seconds": { "default": 300, "min": 30, "max": 1800 },
 	"steps": [
 		{
@@ -22,6 +22,12 @@
 			"check": "composer",
 			"deadline_seconds": 90,
 			"proves": "The layout composer installs, enables and removes its check layout through the real path."
+		},
+		{
+			"id": "driver_reload",
+			"kind": "reload",
+			"deadline_seconds": 60,
+			"proves": "The driver reloads on request through its reload owner and the successor's field run resumes at the next step; the reload's duration, the successor's launch to its boot completion, is named."
 		}
 	]
 }

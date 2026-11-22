@@ -27,6 +27,10 @@
 
 #Requires AutoHotkey v2.0
 
+; What ReloadTimingComplete found: -1 until it ran (the boot is not complete),
+; then the reload's duration in ms, or "" when this boot follows no measured reload.
+global _ReloadTimingResult := -1
+
 
 
 
@@ -90,6 +94,8 @@ ReloadTimingTakeInherited() {
 ; @param NowTick {Integer} The boot completion tick, A_TickCount in production.
 ; @returns {Integer|String} The reload's duration in ms, "" when unmeasured.
 ReloadTimingComplete(Inherited, NowTick := A_TickCount) {
+	global _ReloadTimingResult
+	_ReloadTimingResult := ""
 	if (Inherited == "")
 		return ""
 	if !RegExMatch(Inherited, "^\d{1,18}$") {
@@ -102,7 +108,17 @@ ReloadTimingComplete(Inherited, NowTick := A_TickCount) {
 			-ReloadMs)
 		return ""
 	}
+	; Published before the budget is read, so a refused read keeps the measure.
+	_ReloadTimingResult := ReloadMs
 	LoggerInfo("Lifecycle", "Reload completed in {1} ms (reload request to boot complete).", ReloadMs)
 	PerfBudget_Report("Lifecycle", "reload", ReloadMs, TimingsGet("budgets", "driver_reload_ms"))
 	return ReloadMs
+}
+
+; The reload this boot completed, for the developer field run's reload step.
+; @returns {Integer|String} -1 while the boot runs, the duration in ms, or ""
+;   when this boot follows no measured reload.
+ReloadTimingResult() {
+	global _ReloadTimingResult
+	return _ReloadTimingResult
 }

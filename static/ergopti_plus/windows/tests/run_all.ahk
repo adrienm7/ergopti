@@ -479,6 +479,7 @@ InstallSendNoOps()
 #Include unit/core/logger/test_shutdown_sinks.ahk
 #Include unit/platform/input/dispatch/test_wall_clock_snapshot.ahk
 #Include unit/platform/input/dispatch/test_field_run_utc.ahk
+#Include unit/diagnostics/engine/field_run/test_reload_step.ahk
 #Include unit/core/network/adapters/test_promise_timeout_budget.ahk
 #Include unit/core/logger/test_format_failure_is_visible.ahk
 #Include unit/core/logger/test_contract.ahk

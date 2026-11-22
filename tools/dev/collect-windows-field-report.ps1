@@ -585,6 +585,22 @@ function Invoke-FieldRun {
 			break
 		}
 		if (-not (Get-Process -Id $DriverPid -ErrorAction SilentlyContinue)) {
+			# The reload step replaces the driver: follow the successor its readiness
+			# names, and wait while the resume file still carries the run.
+			$Successor = 0
+			if (Test-Path -LiteralPath $Ready -PathType Leaf) {
+				try { $Successor = [int](Get-Content -Raw -Encoding UTF8 -LiteralPath $Ready | ConvertFrom-Json).pid }
+				catch { $Successor = 0 }
+			}
+			if ($Successor -gt 0 -and $Successor -ne $DriverPid -and (Get-Process -Id $Successor -ErrorAction SilentlyContinue)) {
+				Log "The developer driver reloaded (pid $DriverPid, then $Successor); following it."
+				$DriverPid = $Successor
+				continue
+			}
+			if (Test-Path -LiteralPath (Join-Path $Folder $Files.resume) -PathType Leaf) {
+				Start-Sleep -Seconds $FieldRunPollSeconds
+				continue
+			}
 			Log 'The developer driver is gone; keeping the partial results.'
 			$Lines.Add('check=field_run verdict=fail codes=driver_gone')
 			break
