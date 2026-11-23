@@ -181,7 +181,7 @@ end
 --- @return string|nil url Nil when the icon cannot be encoded.
 local function app_icon_url(bundle_path)
 	local ok, url = pcall(function()
-		local image = bundle_path ~= nil and hs.image.iconForFile(bundle_path)
+		local image = bundle_path ~= nil and require("adapters.accessibility_permission").app_icon(bundle_path)
 			or hs.image.imageFromName("NSApplicationIcon")
 		return image and image:encodeAsURLString() or nil
 	end)

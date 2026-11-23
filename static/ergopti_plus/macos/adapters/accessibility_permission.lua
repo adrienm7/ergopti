@@ -218,6 +218,15 @@ function M.grant_app_path()
 	return require("clipboard.adapters.accessibility_copies").app_path(path)
 end
 
+--- Returns the Finder icon of an app, for the steps that name it: the
+--- runtime's own icon is Hammerspoon's, not ErgoptiPlus'.
+--- @param path string Absolute .app path.
+--- @return userdata|nil image Nil when macOS has no icon for it.
+function M.app_icon(path)
+	assert(type(path) == "string" and path ~= "", "accessibility_permission: app_icon needs a path")
+	return hs.image.iconForFile(path)
+end
+
 --- Finds the other registered copies of this app whose signature differs: the
 --- Accessibility switch the user turns on can be theirs.
 --- @param on_done function fn(paths|nil, detail) once the probe has exited.
