@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Běhové prostředí",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webové zobrazovací jádro",
+	"menu.shortcuts.star.letter": "Písmeno, které následují zkratky na klávese ★",
 	"remap.category.combinations": "Kombinace kláves",
 	"remap.category.editing": "Úpravy",
 	"remap.category.keyboard_shortcuts": "Klávesové zkratky",

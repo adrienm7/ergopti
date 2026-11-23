@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "运行时",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "网页视图引擎",
+	"menu.shortcuts.star.letter": "★ 键上的快捷键所对应的字母",
 	"remap.category.combinations": "组合键",
 	"remap.category.editing": "编辑",
 	"remap.category.keyboard_shortcuts": "键盘快捷键",

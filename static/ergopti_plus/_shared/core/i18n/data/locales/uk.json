@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Середовище виконання",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Рушій веб-подань",
+	"menu.shortcuts.star.letter": "Літера, якій відповідають сполучення на клавіші ★",
 	"remap.category.combinations": "Комбінації клавіш",
 	"remap.category.editing": "Редагування",
 	"remap.category.keyboard_shortcuts": "Гарячі клавіші",

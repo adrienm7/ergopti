@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Ambiente di esecuzione",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Motore delle viste web",
+	"menu.shortcuts.star.letter": "Lettera seguita dalle scorciatoie sul tasto ★",
 	"remap.category.combinations": "Combinazioni",
 	"remap.category.editing": "Modifica",
 	"remap.category.keyboard_shortcuts": "Scorciatoie da tastiera",

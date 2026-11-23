@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Ambiente de execução",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Motor de vistas web",
+	"menu.shortcuts.star.letter": "Letra que os atalhos da tecla ★ seguem",
 	"remap.category.combinations": "Combinações",
 	"remap.category.editing": "Edição",
 	"remap.category.keyboard_shortcuts": "Atalhos de teclado",

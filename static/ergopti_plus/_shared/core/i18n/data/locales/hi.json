@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "रनटाइम",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "वेब व्यू इंजन",
+	"menu.shortcuts.star.letter": "वह अक्षर जिसका अनुसरण ★ कुंजी के शॉर्टकट करते हैं",
 	"remap.category.combinations": "कुंजी संयोजन",
 	"remap.category.editing": "संपादन",
 	"remap.category.keyboard_shortcuts": "कीबोर्ड शॉर्टकट",

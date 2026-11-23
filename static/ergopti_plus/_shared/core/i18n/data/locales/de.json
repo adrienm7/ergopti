@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Laufzeitumgebung",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web-Ansichts-Engine",
+	"menu.shortcuts.star.letter": "Buchstabe, dem die Tastenkürzel auf der Taste ★ folgen",
 	"remap.category.combinations": "Tastenkombinationen",
 	"remap.category.editing": "Bearbeiten",
 	"remap.category.keyboard_shortcuts": "Tastenkürzel",

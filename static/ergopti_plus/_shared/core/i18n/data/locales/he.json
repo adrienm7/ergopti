@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "סביבת הריצה",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "מנוע תצוגת האינטרנט",
+	"menu.shortcuts.star.letter": "האות שהקיצורים במקש ★ עוקבים אחריה",
 	"remap.category.combinations": "צירופי מקשים",
 	"remap.category.editing": "עריכה",
 	"remap.category.keyboard_shortcuts": "קיצורי מקלדת",

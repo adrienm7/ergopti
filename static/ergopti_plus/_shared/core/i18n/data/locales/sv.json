@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Körmiljö",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webbvymotor",
+	"menu.shortcuts.star.letter": "Bokstav som kortkommandona på tangenten ★ följer",
 	"remap.category.combinations": "Tangentkombinationer",
 	"remap.category.editing": "Redigering",
 	"remap.category.keyboard_shortcuts": "Kortkommandon",

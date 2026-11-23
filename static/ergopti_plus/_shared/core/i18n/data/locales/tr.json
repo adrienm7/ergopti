@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Çalışma ortamı",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web görünümü motoru",
+	"menu.shortcuts.star.letter": "★ tuşundaki kısayolların izlediği harf",
 	"remap.category.combinations": "Tuş kombinasyonları",
 	"remap.category.editing": "Düzenleme",
 	"remap.category.keyboard_shortcuts": "Klavye kısayolları",

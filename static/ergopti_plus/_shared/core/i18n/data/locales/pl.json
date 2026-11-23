@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Środowisko uruchomieniowe",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Silnik widoku WWW",
+	"menu.shortcuts.star.letter": "Litera, za którą idą skróty na klawiszu ★",
 	"remap.category.combinations": "Kombinacje klawiszy",
 	"remap.category.editing": "Edycja",
 	"remap.category.keyboard_shortcuts": "Skróty klawiszowe",

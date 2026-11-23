@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "런타임",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "웹 보기 엔진",
+	"menu.shortcuts.star.letter": "★ 키의 단축키가 따르는 글자",
 	"remap.category.combinations": "키 조합",
 	"remap.category.editing": "편집",
 	"remap.category.keyboard_shortcuts": "키보드 단축키",

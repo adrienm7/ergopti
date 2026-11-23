@@ -1136,6 +1136,7 @@
 	"healthcheck.field.runtime": "Moteur d’exécution",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Moteur des fenêtres web",
+	"menu.shortcuts.star.letter": "Lettre que suivent les raccourcis sur la touche ★",
 	"remap.category.combinations": "Combinaisons",
 	"remap.category.editing": "Édition",
 	"remap.category.keyboard_shortcuts": "Raccourcis clavier",

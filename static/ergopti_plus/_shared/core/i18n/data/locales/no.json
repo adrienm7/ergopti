@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Kjøremiljø",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Nettvisningsmotor",
+	"menu.shortcuts.star.letter": "Bokstav som snarveiene på tasten ★ følger",
 	"remap.category.combinations": "Tastekombinasjoner",
 	"remap.category.editing": "Redigering",
 	"remap.category.keyboard_shortcuts": "Hurtigtaster",

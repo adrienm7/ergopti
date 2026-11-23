@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "Runtime",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Webweergave-engine",
+	"menu.shortcuts.star.letter": "Letter die de sneltoetsen op de toets ★ volgen",
 	"remap.category.combinations": "Toetscombinaties",
 	"remap.category.editing": "Bewerken",
 	"remap.category.keyboard_shortcuts": "Sneltoetsen",

@@ -1136,6 +1136,7 @@
 	"healthcheck.field.runtime": "Runtime",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web view engine",
+	"menu.shortcuts.star.letter": "Letter the shortcuts on the ★ key follow",
 	"remap.category.combinations": "Key combinations",
 	"remap.category.editing": "Editing",
 	"remap.category.keyboard_shortcuts": "Keyboard shortcuts",

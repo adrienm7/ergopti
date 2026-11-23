@@ -1141,6 +1141,7 @@
 	"healthcheck.field.runtime": "ランタイム",
 	"healthcheck.field.karabiner": "Karabiner-Elements",
 	"healthcheck.field.webview": "Web ビューエンジン",
+	"menu.shortcuts.star.letter": "★ キーのショートカットが従う文字",
 	"remap.category.combinations": "キーの組み合わせ",
 	"remap.category.editing": "編集",
 	"remap.category.keyboard_shortcuts": "キーボードショートカット",
