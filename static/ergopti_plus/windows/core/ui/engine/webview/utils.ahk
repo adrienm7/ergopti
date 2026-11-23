@@ -199,7 +199,8 @@ _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 	global _WebView_SharedEnvBootPromise, _WebView_SharedEnvBackground, _WebView_SharedEnvRetired
 	if (_WebView_SharedEnvBootPromise !== BootPromise)
 		return
-	if Succeeded && !_WebView_SharedEnvRetired
+	; A retired ownership never takes a late environment.
+	if (!_WebView_SharedEnvRetired && Succeeded)
 		_WebView_SharedEnv := Value
 	_WebView_SharedEnvBootPromise := 0
 	_WebView_SharedEnvCreating := false

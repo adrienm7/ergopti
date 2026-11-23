@@ -93,16 +93,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; projection, keyed by the keystats folder stamp. It starts empty at its
 	; declaration and the editor window fills it after a complete worker read;
 	; an empty cache only means the next read starts a worker.
-	"ui/layout_manager/editor_window.ahk", true,
-	; _ReloadTimingResult — the boot's own verdict, not injected state: -1 at its
-	; declaration, then written once by ReloadTimingComplete when the boot is
-	; complete. Its readers treat -1 as "not judged yet"; there is no init to wait on.
-	"core/timing/engine/reload_timing.ahk", true,
-	; _WebView_SharedEnv and its creation flags — a lazy cache of the one WebView2
-	; environment every window shares: empty at declaration, created by the first
-	; window that needs it and retired at shutdown. The low-RAM refusal flag that
-	; once read as its guard left with the native fallbacks.
-	"core/ui/engine/webview/utils.ahk", true
+	"ui/layout_manager/editor_window.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
