@@ -36,6 +36,33 @@ function M.install(hs, shared)
 		end
 		function db:nrows(sql)
 			assert(live, "closed boot SQLite handle")
+			-- The day-by-day publication reads each staged table's columns; the
+			-- model answers from the shared schema it already parsed.
+			local info_table = sql:match("^PRAGMA temp%.table_info%(([%w_]+)%);?$")
+			if info_table and definitions[info_table] then
+				local columns, items, depth, start = {}, {}, 0, 1
+				local body = definitions[info_table]:match("^CREATE TABLE [%w_]+ %((.*)%)$")
+				-- Split on top-level commas only: a key list is one item.
+				for position = 1, #body do
+					local char = body:sub(position, position)
+					if char == "(" then depth = depth + 1
+					elseif char == ")" then depth = depth - 1
+					elseif char == "," and depth == 0 then
+						items[#items + 1] = body:sub(start, position - 1); start = position + 1
+					end
+				end
+				items[#items + 1] = body:sub(start)
+				for _, item in ipairs(items) do
+					local name = item:gsub("%-%-[^\n]*", ""):match("^%s*([%w_]+)")
+					local keyword = name and name:upper()
+					if name and keyword ~= "PRIMARY" and keyword ~= "UNIQUE" and keyword ~= "FOREIGN"
+						and keyword ~= "CHECK" and keyword ~= "CONSTRAINT" and not name:match("^%d") then
+						columns[#columns + 1] = { name = name }
+					end
+				end
+				local index = 0
+				return function() index = index + 1; return columns[index] end
+			end
 			local row
 			if sql:match("^PRAGMA data_version") then row = { data_version = 1 }
 			elseif sql:match("^PRAGMA foreign_keys") then row = { foreign_keys = 0 }
