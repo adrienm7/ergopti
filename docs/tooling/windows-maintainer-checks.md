@@ -61,7 +61,7 @@ single-owner mutex.
 | Check                                   | TODO line                                                      | Also covered by                                                         |
 | --------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `reload-click-joins`                    | Menu-click replay; item 142                                    | `test_menu_reload_replay.ahk`                                           |
-| `reload-command`                        | Local reload command (idle, paused, during a reload)           | `test_driver_control.ahk`                                               |
+| `reload-command`                        | Local reload command (idle, paused, during a reload); TIM-01   | `test_driver_control.ahk`                                               |
 | `menu-click-replay`                     | Menu-click replay                                              | `test_menu_reload_replay*.ahk`                                          |
 | `reload-over-a-log-flush`               | Menu-click replay                                              | `test_reload_terminal_pending.ahk`                                      |
 | `quit-over-a-log-flush`                 | Quit landing on a log flush                                    | `test_quit_admission.ahk`                                               |

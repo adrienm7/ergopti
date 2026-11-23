@@ -547,10 +547,31 @@ const CHECKS = [
 				return fail(`during a reload: ${driverCount(session)} drivers run afterwards`);
 			if (session.logLines('joined the reload in flight').length < 1)
 				return fail('during a reload: the request was not logged as joined');
+			// TIM-01: one measure per reload and none for the plain first start; the
+			// over-budget warning only above the declared budget.
+			const measured = session
+				.logLines('Reload completed in ')
+				.map((line) => Number(/Reload completed in (\d+) ms/.exec(line)?.[1]));
+			if (measured.length !== 3 || measured.some((ms) => !Number.isFinite(ms)))
+				return fail(`TIM-01: ${measured.length} reload measures for 3 reloads`);
+			const budget = Number(
+				/^driver_reload_ms\s*=\s*(\d+)/m.exec(
+					fs.readFileSync(
+						path.join(live.ROOT, 'static/ergopti_plus/_shared/core/timing/data/constants.toml'),
+						'utf8'
+					)
+				)?.[1]
+			);
+			const warned = session.logLines('Over budget: reload').length;
+			const over = measured.filter((ms) => ms > budget).length;
+			if (!Number.isFinite(budget) || warned !== over)
+				return fail(
+					`TIM-01: ${warned} over-budget warnings for ${over} reloads over ${budget} ms (${measured.join(', ')} ms)`
+				);
 			const errors = session.loggedErrors();
 			if (errors.length > 0) return fail(`the log holds an error: ${errors[0]}`);
 			return pass(
-				`idle completed (pid ${first} -> ${pid}); paused completed and stayed paused; a request during a reload joined it (${during.result || 'result not read'}); one driver each time`
+				`idle completed (pid ${first} -> ${pid}); paused completed and stayed paused; a request during a reload joined it (${during.result || 'result not read'}); one driver each time; reloads measured ${measured.join(', ')} ms (budget ${budget} ms, ${warned} warning(s))`
 			);
 		}
 	},
@@ -1846,10 +1867,12 @@ const CHECKS = [
 				'shortcuts = true',
 				'[llm]',
 				"trigger_shortcut = '^!a'",
+				// Values other than the defaults: the first boot's full save drops a
+				// value equal to its default, so only these prove the climb kept them.
 				'[hotstrings]',
-				'cascade_max_arrows = 3',
+				'cascade_max_arrows = 5',
 				'[hotstrings.dynamic]',
-				'enabled = false',
+				'enabled = true',
 				'[hotstrings.order_overrides]',
 				'magickey = ["text_expansion", "replace"]',
 				'[shortcuts.keyboard]',
@@ -1859,7 +1882,9 @@ const CHECKS = [
 			].join('\n');
 			const session = context.newSession('oldconfig');
 			session.seed('autohotkey/config.toml', old);
-			await session.start();
+			const booted = await session.start();
+			// A first boot saves its full state late: read the file once it settled.
+			await session.quiesce(booted, { quietMs: 8000 });
 			const config = live.configSnapshot(session);
 			const backups = backupNames(session, /^config\.pre-v/);
 			const problems = [];
@@ -1870,8 +1895,8 @@ const CHECKS = [
 				[KEY._META_SCHEMA_VERSION]: String(version),
 				'shortcuts.keyboard.primary_g': '"open_hotstrings_editor"',
 				'shortcuts.keyboard.meta_e': '"search_web"',
-				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'false',
-				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '3',
+				[KEY.HOTSTRINGS_DYNAMIC_ENABLED]: 'true',
+				[KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]: '5',
 				// The v20 -> v21 step copies the neutral order to the French group id.
 				'hotstrings.order_overrides.french_magickey': '["text_expansion","replace"]',
 				'llm.trigger_shortcut': '"^!a"'
