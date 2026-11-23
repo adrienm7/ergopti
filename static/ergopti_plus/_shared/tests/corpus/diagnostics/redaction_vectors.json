@@ -118,8 +118,8 @@
 		{
 			"id": "source_locations_are_not_email_addresses",
 			"context": {},
-			"input": "trail refused-destination@OwnedRuntimeFirstInstallOwner.swift:62 and at init@state.lua:579, but jane@corp.example.com stays private.",
-			"expected": "trail refused-destination@OwnedRuntimeFirstInstallOwner.swift:62 and at init@state.lua:579, but <email> stays private."
+			"input": "trail refused-destination@OwnedRuntimeFirstInstallOwner.swift:62 and at init@state.lua:579, but jane@corp.example.com, ana@atelier.studio, bo@mail.app: and li@dev.java stay private.",
+			"expected": "trail refused-destination@OwnedRuntimeFirstInstallOwner.swift:62 and at init@state.lua:579, but <email>, <email>, <email>: and <email> stay private."
 		},
 		{
 			"id": "url_credentials",

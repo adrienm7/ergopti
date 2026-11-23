@@ -229,8 +229,8 @@
 
 	/**
 	 * Replaces e-mail addresses: a local part, an @, and a dotted domain ending
-	 * in a top-level label of at least two letters that is not a source file
-	 * extension (rules.not_email_extensions).
+	 * in a top-level label of at least two letters, unless a colon and a digit
+	 * follow it: that is a source location such as File.swift:62.
 	 * @param {string} text
 	 * @param {object} rules
 	 * @returns {string}
@@ -253,8 +253,8 @@
 				})
 			)
 				return null;
-			// A source file such as File.swift:62 is not a domain (rules.not_email_extensions)
-			if (rules.not_email_extensions.indexOf(tld.toLowerCase()) !== -1) return null;
+			// A colon and a digit right after it make a source location (File.swift:62)
+			if (/^:[0-9]$/.test(source.substring(stop + 1, stop + 3))) return null;
 			return { text: rules.email_placeholder, last: stop, first: start };
 		});
 	}
