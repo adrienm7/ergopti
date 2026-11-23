@@ -551,6 +551,15 @@ const GENERATORS = [
 		outputs: ['docs/platform-parity-table.md']
 	},
 	{
+		// The only binary output: it is rewritten only when its decoded pixels change.
+		script: 'codegen/codegen-macos-app-icon.cjs',
+		precommitInputs: [
+			'static/img/logo/logo_simple_square.svg',
+			'tools/codegen/codegen-macos-app-icon.cjs'
+		],
+		outputs: ['static/img/logo/logo_macos_app_icon.png']
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']

@@ -698,6 +698,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-appimage-container-path.cjs"],
 			"repro": "npm run test:linux-appimage-container-path"
+		},
+		{
+			"id": "macos-app-icon-shape",
+			"ordinal": 727,
+			"name": "macOS app icon is built from the shaped master so macOS 26 shows it in its own rounded shape",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-app-icon-shape.cjs"],
+			"repro": "npm run test:macos-app-icon-shape"
 		}
 	]
 }

@@ -112,6 +112,23 @@ strip `docs.json`/`lua.json` from the embedded Hammerspoon: `_coresetup.lua`
 requires `hs.doc` at startup, which registers both files. Ollama is not
 bundled either (the guard rejects `Tools/Ollama` in the build script).
 
+### project-macos-app-icon-follows-the-grid
+
+macOS 26 draws a bundled app icon in its own rounded shape only when no pixel
+lies outside the app icon grid's body (1024 px canvas, 824 px continuous-corner
+body, transparent 100 px margin); otherwise Finder, the Dock and Quick Look
+shrink it onto a gray or white rounded plate. The full-bleed square logo did
+exactly that (field report 2026-11-23). `ErgoptiPlus.icns`, shared by the
+launcher and the embedded Hammerspoon, is built from
+`static/img/logo/logo_macos_app_icon.png`, which
+`tools/codegen/codegen-macos-app-icon.cjs` renders from
+`logo_simple_square.svg`; change the logo there and regenerate, never feed
+`build_icon` a square image. The body must stay opaque: a translucent seam or a
+drop shadow outside the body counts as content past the shape.
+`test-macos-app-icon-shape.cjs` pins both. If a macOS 26 Mac still shows the
+plate, the next step is an Icon Composer `.icon` compiled by Xcode 26 `actool`
+into `Assets.car` with `CFBundleIconName`, keeping the `.icns` for macOS 11-15.
+
 ### project-macos-python-is-chosen-by-its-slices
 
 `/usr/bin/python3` is the xcode-select shim: it runs the python3 of the active

@@ -612,12 +612,17 @@ assemble_app() {
 # ===========================================
 # ===========================================
 
-# Convert the existing logo PNG into a .icns icon set. iconutil only accepts
+# Convert the app icon master into a .icns icon set. iconutil only accepts
 # a .iconset folder containing multiple sizes named per Apple's convention,
 # so we synthesize them with sips on the fly.
+#
+# The master is logo_macos_app_icon.png (tools/codegen/codegen-macos-app-icon.cjs):
+# the logo clipped to the 824 px rounded body of the 1024 px app icon grid. The
+# full-bleed square logo it replaces made macOS 26 shrink the icon onto a white
+# rounded plate in Finder and Quick Look (field report 2026-11-23).
 build_icon() {
-	log "Generating ErgoptiPlus.icns from logo_simple_square.png"
-	local src="$REPO_ROOT/static/img/logo/logo_simple_square.png"
+	log "Generating ErgoptiPlus.icns from logo_macos_app_icon.png"
+	local src="$REPO_ROOT/static/img/logo/logo_macos_app_icon.png"
 	[ -f "$src" ] || fail "icon source missing: $src"
 	local iconset="$BUILD_DIR/ErgoptiPlus.iconset"
 	rm -rf "$iconset"

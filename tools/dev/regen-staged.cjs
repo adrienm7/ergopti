@@ -36,6 +36,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_ROOTS = [
 	'static/ergopti_plus/_shared/',
 	'static/corpus/',
+	'static/img/logo/',
 	'tools/codegen/',
 	'tools/build/',
 	'tools/lib/'
