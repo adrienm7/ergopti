@@ -61,7 +61,7 @@
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "a3431b291274f7c76ec54d4652e9e63ea4316c02fe8bf202bbc7197b434269e7",
 		"static/ergopti_plus/windows/tests/run_all.ahk": "374178efd39328e05c8757fe400ab3b9e02ddd95b8c153a246e705d0a6561848",
 		"static/ergopti_plus/windows/tests/test_framework.ahk": "f833ab4904f2e0c4a22bd69f539b12d6ca383f160b436fe307860afc51ebffc4",
-		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "dbd5c7a93757a925a61bcb2505adf9e53c46e329872a18584604a7a225957bfd",
+		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "3470bd8a6b62931e4ee00e015156d875aef5b92dfdbb0b72f031eb0be016569d",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
 		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": "7b18aa55409e939a0e5a7685f041bf2a7a72867c97cfca2018ceae1eb414a5b1",
 		"tools/test/validate-ahk-suite-manifest.cjs": "e62e82e1c0bbe89ce7d1dc22ceed4e88fbd2458bf77e625e1111cdc342021b2f"
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "8be13550d979b1a7e8bdf0744bdeac5a9b7c6f3c",
+	"source_pin_base": "5af03f1a0501555e4dbff9352812c1e9829ff315",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
