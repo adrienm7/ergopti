@@ -800,6 +800,33 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       shared root by `build_stamp.txt` has been out for one full release cycle. The structure step that moves
       `linux/infra/version.lua` (also required by v1.0.9) must add that probe too.
 
+## Test quality gates (maintainer request, 2026-11-23)
+
+The suites have unit, integration and end-to-end tests, but nothing measures how much of the code they run or
+whether they catch a change: no line coverage tool and no mutation testing exist (« coverage » in the CI files means
+the list of mandatory jobs, `.github/linux-ci-coverage.json`). Only a few fixes were proved by a hand-made source
+mutation (see Next session). Target, red in CI otherwise: 100 % of lines covered and 100 % of mutants killed, an
+equivalent mutant being allowed only in a reviewed list that says why.
+
+- [ ] **[CI] Line coverage per language, in CI.** One report per language, merged per driver:
+  - Lua (macOS, Linux, shared): LuaCov under the existing runners (`tests/run.lua`), LuaJIT included;
+  - JavaScript (tools, shared UI pages, site): c8 over the `tools/test/features` suites;
+  - Swift (launcher): `swift test --enable-code-coverage` and `llvm-cov export`;
+  - Python: coverage.py; Go (`native_http`): `go test -coverprofile`;
+  - AutoHotkey: no coverage tool exists; instrument the sources in a copy (a counter call per statement) and
+    run `run_all.ahk` on that copy.
+- [ ] **[CI] Coverage gate.** Fails the lane below 100 %. Since today's figure is unknown, start with a per-file
+      ratchet (a baseline that may only rise, as the existing `*-baseline.json` gates do), then lower nothing and
+      raise each file to 100 %; generated files and vendored code are excluded by the generator registry and the
+      vendor list, never by hand.
+- [ ] **[CI] Mutation testing.** Stryker for JavaScript, mutmut for Python, a Go mutator (gremlins) for
+      `native_http`, Muter for Swift; Lua and AutoHotkey have no mature tool, so a repository mutator (operator,
+      boolean, comparison, return-value and removed-call mutants over a tokenized copy) runs their suites per
+      mutant. Mutants run on the files a change touches in each push and on the whole tree nightly, since a full
+      run is long.
+- [ ] **[CI] Mutation gate.** 100 % of mutants killed, red otherwise, with the same ratchet as coverage until then;
+      every surviving mutant is either killed by a new test or listed as equivalent with its reason.
+
 ## CI acceptance
 
 Each closes on a named green hosted or native run, recorded here.
