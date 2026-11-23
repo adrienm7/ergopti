@@ -29,6 +29,9 @@ no longer exist on dev.
 - Put that commit in the prompt as the first instruction, before any reading:
   `git switch -C <branch> <commit>`, then
   `git merge-base --is-ancestor <commit> HEAD` must succeed.
+- Tell an agent that commits to install the hooks first (`npm ci`, or
+  `npx husky install` after `--ignore-scripts`) and to check that
+  `git config core.hooksPath` prints `.husky` (skill `commit-and-push`).
 - When a worktree agent reports, check its base the same way before
   integrating; a branch that does not contain that commit is redone on it,
   never merged.

@@ -30,6 +30,15 @@ with `git switch -C <branch> <commit>` as its first step, and check
 `git merge-base --is-ancestor <commit> HEAD` on its branch before integrating
 (skill `orchestrate-pass`).
 
+### feedback-hooks-installed-before-committing
+
+`npm ci --ignore-scripts` skips Husky's `prepare`, so the pre-commit hook
+(format, regeneration of staged sources' projections, lint) and the
+commit-msg identity check never ran in a cloud session and its agents
+(2026-11-23); CI then found an unformatted file and a stale parity table.
+Action: before the first commit in any checkout or worktree, check
+`git config core.hooksPath` is `.husky`, else run `npx husky install`.
+
 ### project-stable-version-release-as
 
 ci.yml's `Compute tag and version` numbers the next stable tag from the

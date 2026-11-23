@@ -80,6 +80,17 @@ first commit in any new checkout or container:
 `tools/lint/check-commit-identity.cjs` enforces both rules in the `commit-msg`
 hook and in CI over every pushed range.
 
+## The hooks must be installed
+
+The pre-commit hook formats the staged files, regenerates the projections of
+staged sources and runs the convention lint; `commit-msg` checks the identity.
+They run only once Husky is installed, which `npm ci` does through `prepare`.
+`npm ci --ignore-scripts` skips it: on 2026-11-23 a cloud session and its
+agents committed for hours without hooks, and CI found the unformatted test
+and the stale parity table. Before the first commit in any checkout, worktree
+or container, check that `git config core.hooksPath` prints `.husky`; if not,
+run `npx husky install`.
+
 ## Linear history
 
 `main` and `dev` must stay perfectly linear — no `Merge branch '…'` commits.
