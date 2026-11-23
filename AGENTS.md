@@ -20,6 +20,11 @@ skills and durable technical knowledge in routed memory.
   workspace is inactive; never delete conversation history databases.
 - Never push `dev` or `main` without explicit authorization in the current
   conversation. Commits and green tests do not imply push permission.
+- Base all work on the latest `dev`: every branch, worktree and delegated
+  agent starts from a freshly fetched `origin/dev`. `main` is the stable
+  release, often weeks behind, and tools that create worktrees from the
+  remote's default branch start on it; switch such a worktree to `dev` before
+  reading code (skill `orchestrate-pass`).
 - Never stop, edit-and-resume or relaunch a running multi-agent workflow to add
   a new requirement; route it to a follow-up run (skill
   `workflow-change-control`).

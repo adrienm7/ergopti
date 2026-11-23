@@ -19,6 +19,17 @@ Native qualification remains distinct from integration: if the maintainer
 explicitly requests integration before device receiving, preserve the missing
 receiving in TODO and the handover rather than reporting a native pass.
 
+### feedback-agents-start-from-dev
+
+The maintainer (2026-11-23): all work is based on `dev`, always the newest
+Ergopti. Claude Code's `isolation: "worktree"` creates the agent's worktree
+from the remote's default branch, `main`, which was three weeks and one tree
+reorganization behind dev; three agents read stale paths. Action: fetch
+`origin/dev` before delegating, give each agent the exact commit to start from
+with `git switch -C <branch> <commit>` as its first step, and check
+`git merge-base --is-ancestor <commit> HEAD` on its branch before integrating
+(skill `orchestrate-pass`).
+
 ### project-stable-version-release-as
 
 ci.yml's `Compute tag and version` numbers the next stable tag from the

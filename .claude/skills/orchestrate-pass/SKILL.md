@@ -14,6 +14,25 @@ Discover the work list in your own context (list the files, find the sites, scop
 the diff), _then_ parallelise over it. Fanning out before you know the shape
 produces agents that each rediscover the same landscape.
 
+## Base every agent on the latest dev
+
+The work always targets `dev`, the newest Ergopti. `main` is the stable
+release and can be weeks behind, with another tree layout. Worktree isolation
+(`isolation: "worktree"` in Claude Code, and other agents' worktree features)
+creates the worktree from the remote's default branch, which is `main`: on
+2026-11-23 three agents started on a main three weeks old and found paths that
+no longer exist on dev.
+
+- Before spawning, fetch: `git fetch origin dev`, and note the exact commit to
+  build on (the tip of `origin/dev`, or of the branch that integrates the
+  agents' commits when it is ahead of dev).
+- Put that commit in the prompt as the first instruction, before any reading:
+  `git switch -C <branch> <commit>`, then
+  `git merge-base --is-ancestor <commit> HEAD` must succeed.
+- When a worktree agent reports, check its base the same way before
+  integrating; a branch that does not contain that commit is redone on it,
+  never merged.
+
 ## Read-only fan-out, sequential writes
 
 Agents research and verify. **You** implement, one commit at a time. Parallel
