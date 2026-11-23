@@ -104,6 +104,10 @@ const MAGIC_KEY_CONFIG = [
 	'[category_enabled]',
 	'hotstrings = true',
 	'french_magickey = true',
+	// Pinned: the default follows the OS layout family (';' on US QWERTY), and the
+	// checks type ★.
+	'[hotstrings]',
+	'trigger_char = "★"',
 	'[hotstrings.french_magickey.text_expansion]',
 	'enabled = true',
 	'[hotstrings.french_magickey.text_expansion_auto]',
@@ -186,6 +190,10 @@ function englishLocale() {
 
 /** A literal text as a regular expression that matches only it. */
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The layout category's tray parent, named by its locale key so a caption change follows. */
+const LAYOUT_MENU_KEY = 'menu.layout.title';
+const LAYOUT_MENU = englishLocale()[LAYOUT_MENU_KEY];
 
 /** Collapses every run of white space, so a dialog's line breaks compare as spaces. */
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
@@ -968,7 +976,7 @@ const CHECKS = [
 					`row-${order}`,
 					`[layout]\ndirect_access_digits = "${order}"\nnumber_row_reorder_edges = true\n`
 				);
-				const rows = (await session.run('rows', ['.', 'Keyboard layout'])).split(' | ');
+				const rows = (await session.run('rows', ['.', escapeRegExp(LAYOUT_MENU)])).split(' | ');
 				const pick = (pattern) => rows.find((row) => pattern.test(row)) || '';
 				const wanted = pick(order === 'digits' ? /Digits first/ : /Symbols first/);
 				const other = pick(order === 'digits' ? /Symbols first/ : /Digits first/);
@@ -1273,7 +1281,7 @@ const CHECKS = [
 				['Gestures', 're:Gestures$', /^(gestures|category_enabled)/, 'Enable gestures'],
 				[
 					'Keyboard layout',
-					're:Keyboard layout$',
+					`t:${LAYOUT_MENU_KEY}`,
 					/^(layout|category_enabled)/,
 					'Enable the layout'
 				],
@@ -2101,7 +2109,7 @@ const CHECKS = [
 	{
 		id: 'layout-emulation-row',
 		title:
-			'Keyboard layout > Layout to emulate: lists None, Ergopti, Ergopti➕ and the registry; a choice restarts on it; None types the system layout; a missing stored layout stays named',
+			'Layouts and emulation > Layout to emulate: lists None, Ergopti, Ergopti➕ and the registry; a choice restarts on it; None types the system layout; a missing stored layout stays named',
 		async run(context) {
 			const skip = context.otherDriverReason();
 			if (skip) return notExecuted(skip);
@@ -2110,7 +2118,7 @@ const CHECKS = [
 			const head = locale['common.label_value']
 				.split('{2}')[0]
 				.replace('{1}', locale['menu.layout.emulated_layout']);
-			const menu = ['re:Keyboard layout$', `re:^${escapeRegExp(head)}`];
+			const menu = [`t:${LAYOUT_MENU_KEY}`, `re:^${escapeRegExp(head)}`];
 			const none = locale['onboarding.layout.emulated_none'];
 			const builtIn = [
 				none,
@@ -2483,6 +2491,9 @@ const CHECKS = [
 								'autocorrection = true',
 								'[hotstrings]',
 								`cascade_max_arrows = ${arrows}`,
+								// The magic key defaults to the OS layout family's key (';' on US
+								// QWERTY): the ★ end character exists only when it is configured.
+								'trigger_char = "★"',
 								`[hotstrings.autocorrection.${brand.section}]`,
 								'enabled = true',
 								'time_activation_seconds = 0',
@@ -2564,7 +2575,7 @@ const CHECKS = [
 	{
 		id: 'backspace-undo-hosts',
 		title:
-			'An immediate Backspace after sru + Space restores sru in an edit, in Notepad and in a console',
+			'An immediate Backspace after sru + Space restores sru and its Space in an edit, in Notepad and in a console',
 		async run(context) {
 			const skip = context.otherDriverReason();
 			if (skip) return notExecuted(skip);
@@ -2574,7 +2585,9 @@ const CHECKS = [
 			const { session } = await bootEnglish(
 				context,
 				'undo',
-				`[category_enabled]\nhotstrings = true\nfrench_autocorrection = true\n[hotstrings.french_autocorrection.${bundled.section}]\nenabled = true\n`
+				// Each target is read between the Space and the Backspace, which takes
+				// longer than the default 500 ms undo window: the longest one is set.
+				`[category_enabled]\nhotstrings = true\nfrench_autocorrection = true\n[hotstrings]\nbackspace_restore_window_ms = 10000\n[hotstrings.french_autocorrection.${bundled.section}]\nenabled = true\n`
 			);
 			await session.run('pump', ['3000']);
 			const typeKeys = (steps) =>
@@ -2600,13 +2613,14 @@ const CHECKS = [
 				if (value !== expected) problems.push(`${label} holds "${value}", "${expected}" expected`);
 			};
 			// Each target is read after the expansion and after the Backspace: an
-			// expansion that never fired would leave sru on screen as well.
+			// expansion that never fired would leave sru on screen as well. The
+			// terminator comes back after the trigger (backspace_restore_vectors.json).
 			await session.run('edit_open');
 			try {
 				typeKeys(word);
 				judge('edit after the Space', await session.run('edit_value'), 'sur ');
 				typeKeys(backspace);
-				judge('edit after the Backspace', await session.run('edit_value'), 'sru');
+				judge('edit after the Backspace', await session.run('edit_value'), 'sru ');
 			} finally {
 				await session.run('edit_close');
 			}
@@ -2623,7 +2637,7 @@ const CHECKS = [
 				typeKeys(word);
 				judge('Notepad after the Space', await session.run('app_value'), 'sur ');
 				typeKeys(backspace);
-				judge('Notepad after the Backspace', await session.run('app_value'), 'sru');
+				judge('Notepad after the Backspace', await session.run('app_value'), 'sru ');
 			});
 			// A console line is read once entered, so one console proves the expansion and
 			// another the restoration. conhost reports its client as the window's owner,
@@ -2635,7 +2649,7 @@ const CHECKS = [
 			});
 			await inApp('console', 'undo-console-restoration.txt', async () => {
 				typeKeys([...word, ...backspace, ...enter]);
-				judge('console after the Backspace', await session.run('app_value'), 'sru');
+				judge('console after the Backspace', await session.run('app_value'), 'sru ');
 			});
 			const errors = session.loggedErrors();
 			if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
