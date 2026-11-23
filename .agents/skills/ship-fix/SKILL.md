@@ -32,6 +32,23 @@ Check whether the same mistake exists at sibling call sites. Per
 `docs/memory/windows-ahk.md`, the recurring pattern here is the ONE missed
 sibling site — audit the whole class.
 
+### Check the other two operating systems
+
+A bug reported on one OS is checked on Windows, macOS and Linux before the fix
+is done, every time (`AGENTS.md`, Delivery). The drivers share data and
+engines and port each other's code, so the same mistake often sits in a
+sibling file: a placeholder the macOS i18n engine never filled, a default a
+shared manifest sets for all three. For each other OS, find the code that does
+the same job and conclude one of:
+
+- the same bug exists: fix it there too, with its own regression test;
+- the code differs in a way that rules the bug out: name the file and line
+  that proves it;
+- the feature does not exist there: say why (for example a macOS-only runtime).
+
+Write the three conclusions in the commit message and the report to the
+maintainer. « Not checked » is not a conclusion.
+
 ## 3. Write the regression test
 
 It must **fail before the fix and pass after it**. Write and run the targeted
