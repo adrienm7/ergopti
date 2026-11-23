@@ -754,7 +754,10 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			-- default_config_dir() is where the storage adapter keeps storage.json.
 			package.loaded["settings.engine.paths"] = { config_home = function() return root end,
 				default_config_dir = function() return root .. "/" .. FOLDER end,
-				config = function(name) return root .. "/config/" .. name end }
+				config = function(name) return root .. "/config/" .. name end,
+				-- The fixture's configuration folder exists: a chosen locale has
+				-- no default folder to create (paths.prepare_default_config_dir).
+				prepare_default_config_dir = function() return true end }
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
 			package.loaded["settings.engine.scope.script_scope"] = nil

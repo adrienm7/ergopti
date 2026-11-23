@@ -378,10 +378,13 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 		end)
 	end)
 
-	helpers.it("(remap-multisource) cannot borrow a foreign source's ordered prefix", function()
+	-- A pair combines keys from any keyboard, as on Windows and macOS
+	-- (maintainer decision KCD-7 of 2026-11-21).
+	helpers.it("(remap-multisource) combines a foreign source's ordered prefix into its pair", function()
 		Fixture.with_session({}, function(s)
 			s.edge("a", 58, 1, 0); s.edge("b", 15, 1, 10); s.edge("b", 15, 0, 100)
-			helpers.assert_eq(s.action, nil); helpers.assert_eq(s.armed, nil)
+			helpers.assert_eq(s.action, "one_shot_shift"); helpers.assert_eq(s.binding, "combination__caps_lock_then_tab")
+			helpers.assert_eq(s.armed, true)
 		end)
 	end)
 

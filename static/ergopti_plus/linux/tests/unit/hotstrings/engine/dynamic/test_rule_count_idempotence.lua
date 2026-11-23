@@ -36,8 +36,9 @@ n = "last_name"
 					trigger_char = trigger,
 					personal_info_path = path,
 				}), phase .. " must initialise successfully")
-				helpers.assert_eq(manager.get_rules_count(), 5,
-					phase .. " must publish two personal rules plus three date rules")
+				-- Each letter registers its lower and its upper case (HCD-5).
+				helpers.assert_eq(manager.get_rules_count(), 7,
+					phase .. " must publish two personal letters in both cases plus three date rules")
 				helpers.assert_eq(manager.get_rules_count(), #engine.get_rules(),
 					phase .. " count must describe the active engine snapshot")
 			end

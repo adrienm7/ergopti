@@ -504,7 +504,12 @@ assert(next(manager.get_info()) == nil)
       local uppercase_rows = dh.preview_candidates("@NÉ")
       local rows = dh.preview_candidates("@né")
       local combo_fired, combo_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@né\\", "\\")
+      -- Each letter's case cases its own field (HCD-5): keep the lowercase
+      -- combo's injection before the uppercase one replaces it.
+      local lowercase_injection = combo_injection
       local uppercase_fired, uppercase_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
+      local uppercase_injection = combo_injection
+      combo_injection = lowercase_injection
 
       package.loaded["hotstrings.engine.injector"] = previous_injector
       os.remove(path)
@@ -521,6 +526,8 @@ assert(next(manager.get_info()) == nil)
       helpers.assert_eq(#uppercase_rows, 1, "uppercase accented combo is offered before typing the trigger")
       helpers.assert_true(uppercase_fired == true, "uppercase accented combo fires")
       helpers.assert_eq(uppercase_event.backspace_count, 4)
+      helpers.assert_eq(uppercase_injection.values[1], "DURAND", "an upper letter types its field in capitals")
+      helpers.assert_eq(uppercase_injection.values[2], "ÉLODIE", "an upper accented letter types its field in capitals")
       helpers.assert_eq(#fields, 2, "the mixed ASCII/NFC combo resolves both aliases")
       helpers.assert_eq(fields[1], "last_name", "the mixed combo preserves its first field")
       helpers.assert_eq(fields[2], "first_name", "the mixed combo preserves its NFC field")
@@ -582,11 +589,12 @@ assert(next(manager.get_info()) == nil)
       local exact_rows = dh.preview_candidates("@nİ")
       local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nİ\\", "\\")
       package.loaded["hotstrings.engine.injector"] = previous; os.remove(path)
-      helpers.assert_eq(single_preview, "Durand"); helpers.assert_true(single_fired); helpers.assert_eq(single, "Durand")
+      -- « É » is an upper letter: its field types in capitals (HCD-5).
+      helpers.assert_eq(single_preview, "DURAND"); helpers.assert_true(single_fired); helpers.assert_eq(single, "DURAND")
       helpers.assert_eq(#rejected_rows, 0); helpers.assert_eq(rejected, false)
       helpers.assert_eq(#collision_rows, 0); helpers.assert_eq(collision_fired, false)
       helpers.assert_eq(#exact_rows, 1); helpers.assert_true(exact_fired)
-      helpers.assert_eq(injected[1], { "Durand", "Élodie" }, "exact İ remains distinct from the invalid decomposed key")
+      helpers.assert_eq(injected[1], { "Durand", "ÉLODIE" }, "exact İ remains distinct from the invalid decomposed key, in capitals as an upper letter")
     end)
 
     helpers.it("independent: an upper final sigma types its field in capitals, alone or in a combo (hcd-5-tag-case)", function()
@@ -638,7 +646,8 @@ assert(next(manager.get_info()) == nil)
       local ambiguous = dh.preview_candidates("@nТ")
       local ambiguous_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nТ\\", "\\")
       package.loaded["hotstrings.engine.injector"] = previous; os.remove(path)
-      helpers.assert_eq(#rows, 1); helpers.assert_true(fired); helpers.assert_eq(injected[1], { "Demos", "Anna" })
+      -- The upper sigma types its field in capitals (HCD-5).
+      helpers.assert_eq(#rows, 1); helpers.assert_true(fired); helpers.assert_eq(injected[1], { "Demos", "ANNA" })
       helpers.assert_eq(#preferred, 0); helpers.assert_eq(preferred_fired, false)
       helpers.assert_eq(#ambiguous, 0); helpers.assert_eq(ambiguous_fired, false)
       helpers.assert_eq(#injected, 1, "ambiguous aliases cannot shift fields")
@@ -667,8 +676,9 @@ assert(next(manager.get_info()) == nil)
       helpers.assert_eq(#upper_rows, 1); helpers.assert_true(upper_fired)
       helpers.assert_eq(#angstrom_rows, 1); helpers.assert_true(angstrom_fired)
       helpers.assert_eq(#angstrom_upper, 1); helpers.assert_true(angstrom_upper_fired)
-      helpers.assert_eq(injected[1], { "Durand", "Kelvin" }); helpers.assert_eq(injected[2], injected[1])
-      helpers.assert_eq(injected[3], injected[1]); helpers.assert_eq(injected[4], injected[1])
+      -- An upper alias letter types its field in capitals (HCD-5).
+      helpers.assert_eq(injected[1], { "Durand", "Kelvin" }); helpers.assert_eq(injected[2], { "Durand", "KELVIN" })
+      helpers.assert_eq(injected[3], injected[1]); helpers.assert_eq(injected[4], injected[2])
     end)
 
   end)
