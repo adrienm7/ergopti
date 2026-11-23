@@ -118,8 +118,8 @@ _ACS_StarCase() {
 		KeyboardShortcutAssignments := Map("meta_star", "none")
 		AssertEqual("s", AccentedShortcutResolve("#SC02E", Keys), "a cleared star slot leaves Win+star to the letter")
 	} finally {
-		if Had
-			KeyboardShortcutAssignments := Saved
+		; An unset table stays unset: a later full save reads it with its defaults.
+		KeyboardShortcutAssignments := Had ? Saved : unset
 	}
 	AssertEqual(0, AccentedShortcutKeysForLayout(1, _ACS_AzertyScanCode).Get(0x2E, 0),
 		"AZERTY types no star: the configured magic key never becomes the star key")
