@@ -178,13 +178,14 @@ Test("configuration snapshot: quoted empty and literal namespaces cannot alias r
 _FMS_DeletedSourceKeepsAdmittedBootGeneration(Path) {
 	global _ParseTomlCache
 	Cache := ParseConfigTomlFile(Path)
-	AssertTrue(IniCacheGet(Cache, "layout", "ergopti_base"))
+	AssertEqual(false, IniCacheGet(Cache, "layout", "ergopti_base"))
 	Snapshot := ConfigTomlReadSnapshot(Path)
 	AssertTrue(Snapshot.Present, "presence belongs to the successful admitted read")
 	FileDelete(Path)
 	Target := ManifestBuildFeaturesMap()
+	AssertTrue(Target["layout"]["ergopti_base"], "the retained value must differ from the manifest default")
 	AssertEqual(1, ApplyConfigToml(Target, Path), "external deletion cannot bypass the retained boot generation")
-	AssertTrue(Target["layout"]["ergopti_base"])
+	AssertFalse(Target["layout"]["ergopti_base"])
 	Assert(ParseConfigTomlFile(Path) == Cache, "publication must use admitted presence, not a later FileExist shortcut")
 	_ParseTomlCache.Delete(Path)
 	Fresh := ConfigTomlReadSnapshot(Path)
@@ -193,7 +194,8 @@ _FMS_DeletedSourceKeepsAdmittedBootGeneration(Path) {
 	AssertEqual(0, ApplyConfigToml(ManifestBuildFeaturesMap(), Path))
 }
 _FMS_DeletionBetweenConsumersKeepsOneGeneration() {
-	_FMS_WithSource("deleted_generation", '[layout]`nergopti_base = true`n', _FMS_DeletedSourceKeepsAdmittedBootGeneration)
+	; The retained file holds the opposite of the manifest default.
+	_FMS_WithSource("deleted_generation", '[layout]`nergopti_base = false`n', _FMS_DeletedSourceKeepsAdmittedBootGeneration)
 }
 Test("configuration snapshot: external deletion cannot split bootstrap consumer generations (config-semantic-snapshot)",
 	_FMS_DeletionBetweenConsumersKeepsOneGeneration)
@@ -246,7 +248,8 @@ _FMS_DynamicEmptyNameIsDistinct(Path) {
 	AssertEqual(2, ApplyConfigToml(Target, Path))
 	AssertFalse(Target["hotstrings"]["personal"][""]["enabled"])
 	AssertEqual(0, Target["hotstrings"]["personal"][""]["time_activation_seconds"])
-	AssertFalse(Target["layout"]["ergopti_base"], "the empty personal name remains inside its declared dynamic owner")
+	AssertEqual(ManifestBuildFeaturesMap()["layout"]["ergopti_base"], Target["layout"]["ergopti_base"],
+		"the empty personal name remains inside its declared dynamic owner")
 }
 _FMS_DynamicQuotedNamesDoNotBorrowStaticPaths() {
 	_FMS_WithSource("dynamic_literals", '[hotstrings.personal."work.notes"]`nenabled = "false"`ntime_activation_seconds = -1`n[hotstrings.personal.""]`nenabled = 2`ntime_activation_seconds = true`n[hotstrings.personal."literal.ok"]`nenabled = true`ntime_activation_seconds = 0.125`n',

@@ -251,7 +251,10 @@ Test("config cleanup: retired table-array generations refuse partial flat owners
 _CUK_RetiredWarningAndRuntimeNeutrality() {
 	Folder := _CUK_RetiredNewDir()
 	Path := Folder . "\config.toml"
-	Source := "[ahk.layout]`nergopti_base = true`n"
+	; The retired entry holds the value the manifest default is not, so a loader
+	; that applied it would change the runtime setting.
+	Neutral := ManifestBuildFeaturesMap()["layout"]["ergopti_base"]
+	Source := "[ahk.layout]`nergopti_base = " . (Neutral ? "false" : "true") . "`n"
 	Lines := []
 	LoggerSetTestSink((Line) => Lines.Push(Line))
 	try {
@@ -260,7 +263,7 @@ _CUK_RetiredWarningAndRuntimeNeutrality() {
 		_CMJFixtureReadonly(Path)
 		AssertEqual(0, ApplyConfigToml(Target, Path, &Rejected))
 		AssertEqual(0, Rejected)
-		AssertEqual(false, Target["layout"]["ergopti_base"])
+		AssertEqual(Neutral, Target["layout"]["ergopti_base"], "a retired entry leaves the runtime neutral")
 		Errors := 0, Named := 0
 		for Line in Lines {
 			if InStr(Line, "[ERROR]")

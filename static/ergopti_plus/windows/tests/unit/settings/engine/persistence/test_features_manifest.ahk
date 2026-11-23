@@ -189,8 +189,12 @@ TestFMv2_LayoutDefaults() {
 	AssertTrue(Built["layout"].Has("direct_access_digits"))
 	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
 	AssertTrue(Built["layout"].Has("ergopti_variant"))
-	AssertEqual(false, Built["layout"]["ergopti_base"])
-	AssertEqual("none", Built["layout"]["ergopti_variant"])
+	; The layer switches default on and the selection, « None » by default, is
+	; their only gate (maintainer decision of 2026-11-23).
+	AssertEqual(true, Built["layout"]["ergopti_base"], "the base layer switch defaults on")
+	AssertEqual(true, Built["layout"]["ergopti_alt_gr"], "the AltGr layer switch defaults on")
+	AssertEqual("none", Built["layout"]["ergopti_variant"], "no layout is selected by default, so nothing is emulated")
+	AssertEqual("", Built["layout"]["emulated_layout"], "no registry layout is selected by default")
 }
 Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
 	TestFMv2_LayoutDefaults)

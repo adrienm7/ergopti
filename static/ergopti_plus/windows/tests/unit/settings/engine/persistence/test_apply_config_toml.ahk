@@ -62,8 +62,12 @@ Test("ApplyConfigToml: [layout] lands on Features[layout]",
 TestFMv2_RejectsScalarTypeConfusion() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
+		; A switch that defaults off, so a truthy string would show: the layer
+		; switches default on since the maintainer decision of 2026-11-23.
+		AssertEqual(false, Features["layout"]["number_row_reorder_edges"],
+			"the type-confusion probe needs a layout switch that defaults off")
 		Path := _FM_WriteFixture("type_confusion",
-			"[layout]`r`nergopti_base = " . '"false"' . "`r`n"
+			"[layout]`r`nnumber_row_reorder_edges = " . '"false"' . "`r`n"
 			. "[script]`r`nlocale = true`r`nlog_level = " . '"LOUD"' . "`r`n"
 			. "[llm.generation]`r`ncontext_length = " . '"500"' . "`r`n"
 			. "[shortcuts.keyboard]`r`nprimary_b = 7`r`n"
@@ -76,7 +80,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"wrongly typed scalars must never replace manifest-owned values")
-		AssertEqual(false, Features["layout"]["ergopti_base"],
+		AssertEqual(false, Features["layout"]["number_row_reorder_edges"],
 			"the string 'false' must not become a truthy boolean feature")
 		Assert(LocaleBefore is String, "the shipped locale is a string")
 		AssertEqual(LocaleBefore, Features["script"]["locale"],
@@ -259,12 +263,15 @@ TestFMv2_DriverNamespacedSectionIsRejected() {
 	OldFeatures := _FM_BeginIsolated()
 	Captured := []
 	try {
+		; The remnant holds the value the manifest default is not, so a loader
+		; that applied it would change the setting.
+		Default := ManifestBuildFeaturesMap()["layout"]["ergopti_base"]
 		Path := _FM_WriteFixture("ahk_layout",
-			"[ahk.layout]`r`nergopti_base = true`r`n")
+			"[ahk.layout]`r`nergopti_base = " . (Default ? "false" : "true") . "`r`n")
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
-		AssertEqual(false, Features["layout"]["ergopti_base"],
+		AssertEqual(Default, Features["layout"]["ergopti_base"],
 			"the manifest default must survive an [ahk.layout] section")
 		Joined := ""
 		for Line in Captured
