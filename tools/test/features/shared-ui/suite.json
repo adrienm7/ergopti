@@ -725,6 +725,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-studio-try.cjs"],
 			"repro": "npm run test:studio-try"
+		},
+		{
+			"id": "hotstring-editor-collapsed-sections",
+			"ordinal": 725,
+			"name": "the personal hotstring editor opens every category collapsed, while a fold click, a search, a new entry and a host refresh still show the right rows",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-collapsed-sections.cjs"],
+			"repro": "npm run test:hotstring-editor-collapsed-sections"
 		}
 	]
 }

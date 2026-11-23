@@ -142,10 +142,13 @@ module.exports = [
 					auto_close: false,
 					default_priority: 50,
 					open_mode: 'menu',
+					// Categories open collapsed; these two carry the fold state a
+					// click leaves, so the audit reaches the rows and their controls.
 					sections: [
 						{
 							name: 'signatures',
 							description: 'Signatures',
+							_exp: true,
 							entries: [
 								entry('sig★', 'Cordialement,\nCamille Martin', { is_word: true }),
 								entry('adr★', '12 rue des Lilas, 69003 Lyon', { auto_expand: true })
@@ -154,6 +157,7 @@ module.exports = [
 						{
 							name: 'code',
 							description: 'Code',
+							_exp: true,
 							entries: [
 								entry('cl★', 'console.log({context});', { is_case_sensitive: true }),
 								entry('fn★', 'function () {}', { final_result: true, priority: 80 })

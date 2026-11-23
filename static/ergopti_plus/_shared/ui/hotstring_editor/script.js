@@ -956,9 +956,20 @@ function handleRowClick(e, si, ei) {
 	showEditEntry(si, ei, field);
 }
 
+/**
+ * Tells whether a section shows its entries. A section starts collapsed: only
+ * an explicit fold choice made in this window, or a section the user just
+ * created or added to, opens it.
+ * @param {Object} s - The section.
+ * @returns {boolean} True when the section is expanded.
+ */
+function isSectionExpanded(s) {
+	return s._exp === true;
+}
+
 function togSec(si) {
 	if (D.sections[si]) {
-		D.sections[si]._exp = D.sections[si]._exp === false;
+		D.sections[si]._exp = !isSectionExpanded(D.sections[si]);
 		render();
 	}
 }
@@ -1031,7 +1042,7 @@ function render() {
 
 		const cnt = allEntries.length;
 		// Force-expand while searching so matches are always visible.
-		const exp = searching ? true : s._exp !== false;
+		const exp = searching ? true : isSectionExpanded(s);
 
 		html += '<li class="sec-card" id="sc-' + si + '">';
 		html += '<header class="sec-head' + (exp ? ' open' : '') + '">';
@@ -1437,8 +1448,12 @@ function saveEntry(andNew) {
 		if (prio !== null) entry.priority = prio;
 
 		const si = edEntry.si;
-		if (edEntry.ei === null) D.sections[si].entries.push(entry);
-		else D.sections[si].entries[edEntry.ei] = entry;
+		if (edEntry.ei === null) {
+			D.sections[si].entries.push(entry);
+			// Sections start collapsed; open this one so the new row is visible
+			// (the shortcut mode adds to a section the user never opened).
+			D.sections[si]._exp = true;
+		} else D.sections[si].entries[edEntry.ei] = entry;
 
 		D.sections[si].entries.sort(compareTriggers);
 
