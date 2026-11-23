@@ -298,4 +298,114 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 			"no offer without the facade that performs it")
 		package.loaded["ai.ui.owned_runtime_install"] = nil
 	end)
+
+	-- Each block whose fix this menu offers, with the facade that performs it.
+	local GATED = {
+		{ reason = "runtime_not_installed", explanation = "menu.tapholds.owned_not_installed",
+			fix = "menu.tapholds.owned_install", facade = "install_owned_runtime" },
+		{ reason = "virtual_hid_absent", explanation = "menu.tapholds.owned_not_installed",
+			fix = "menu.tapholds.owned_install", facade = "install_owned_runtime" },
+		{ reason = "runtime_job_not_loaded", explanation = "menu.tapholds.owned_service_stopped",
+			fix = "menu.tapholds.owned_repair", facade = "repair_owned_runtime" },
+		{ reason = "virtual_hid_incompatible", explanation = "menu.tapholds.vhid_incompatible",
+			fix = "menu.tapholds.vhid_update", facade = "update_virtual_hid_driver" },
+	}
+
+	--- Builds the whole Tap-Holds row over an owned boot.
+	--- @param status table Owned runtime status.
+	--- @param extra table|nil Facade fields added to the double.
+	--- @return table built The parent row, its submenu in `submenu`.
+	local function owned_build(status, extra)
+		local fields = {
+			owned_runtime_selected = function() return true end,
+			get_close_other_instances = function() return false end,
+			set_close_other_instances = function() return true end,
+			owned_runtime_status = function() return status end,
+		}
+		for name, value in pairs(extra or {}) do fields[name] = value end
+		local menu, karabiner = menu_over_double(true, fields)
+		local built = menu.build({ karabiner = karabiner, updateMenu = function() end })
+		helpers.assert_true(type(built) == "table" and type(built.submenu) == "table",
+			"the Tap-Holds submenu must build")
+		return built
+	end
+
+	--- Finds the first row with this title.
+	--- @param rows table Rendered submenu rows.
+	--- @param title string Title.
+	--- @return table|nil row
+	local function titled(rows, title)
+		for _, row in ipairs(rows) do if row.title == title then return row end end
+		return nil
+	end
+
+	helpers.it("greys every row but the block and its fix while the runtime waits for that fix (tap-holds-install-gate)", function()
+		-- The submenu kept a ticked switch and live settings, so the user believed
+		-- tap-holds worked on a Mac where their runtime was not even installed.
+		for _, case in ipairs(GATED) do
+			local built = owned_build({ state = "unavailable", reason = case.reason },
+				{ [case.facade] = function() return true end })
+			local rows = built.submenu
+			local explanation_at, fix_at
+			for index, row in ipairs(rows) do
+				if row.title == case.explanation then explanation_at = index end
+				if row.title == case.fix then fix_at = index end
+			end
+			helpers.assert_true(explanation_at ~= nil, case.reason .. ": the block is explained")
+			helpers.assert_eq(rows[explanation_at].disabled, true, case.reason)
+			helpers.assert_eq(fix_at, explanation_at + 1, case.reason .. ": its fix follows")
+			helpers.assert_true(type(rows[fix_at].fn) == "function" and rows[fix_at].disabled ~= true,
+				case.reason .. ": the fix stays clickable")
+			local greyed = 0
+			for index, row in ipairs(rows) do
+				if row.title ~= "-" and index ~= explanation_at and index ~= fix_at then
+					local name = case.reason .. ": " .. tostring(row.title)
+					helpers.assert_eq(row.disabled, true, name .. " must be greyed")
+					helpers.assert_nil(row.fn, name .. " must not run")
+					helpers.assert_nil(row.menu, name .. " must open nothing")
+					helpers.assert_nil(row.checked, name .. " must not read as on")
+					greyed = greyed + 1
+				end
+			end
+			helpers.assert_true(greyed > 3, case.reason .. ": the other rows stay visible, greyed")
+			local switch = titled(rows, "menu.tapholds.enable")
+			helpers.assert_true(switch ~= nil, case.reason .. ": the switch stays visible")
+			helpers.assert_true(built.checked ~= true, case.reason .. ": the parent row must not read as on")
+		end
+	end)
+
+	helpers.it("keeps the fix live and names no category-off cause when the switch is off (tap-holds-install-gate)", function()
+		local built = owned_build({ state = "unavailable", reason = "runtime_not_installed" }, {
+			install_owned_runtime = function() return true end,
+			get_tap_holds_enabled = function() return false end,
+		})
+		local fix = titled(built.submenu, "menu.tapholds.owned_install")
+		helpers.assert_true(fix ~= nil and type(fix.fn) == "function", "the install stays clickable")
+		for _, row in ipairs(built.submenu) do
+			helpers.assert_true(type(row.title) ~= "string" or not row.title:find("menu.category_off_reason", 1, true),
+				tostring(row.title) .. " must not ask to tick the greyed switch")
+		end
+		helpers.assert_true(built.checked ~= true)
+	end)
+
+	helpers.it("leaves the submenu live for a block without a fix row here (tap-holds-install-gate)", function()
+		-- The consent row is the fix of a running user Karabiner; the others have
+		-- no fix in this menu, and greying everything would leave a dead end.
+		local cases = {
+			{ { state = "unavailable", reason = "other_karabiner_running" }, {} },
+			{ { state = "unavailable", reason = "artifact_fetch_failed" }, {} },
+			{ { state = "unavailable", reason = "runtime_not_installed" }, {} },
+			{ { state = "ready" }, { install_owned_runtime = function() return true end } },
+		}
+		for _, case in ipairs(cases) do
+			local built = owned_build(case[1], case[2])
+			local name = tostring(case[1].reason or case[1].state)
+			local switch = titled(built.submenu, "menu.tapholds.enable")
+			helpers.assert_true(switch ~= nil and type(switch.fn) == "function", name .. ": the switch stays live")
+			helpers.assert_eq(switch.checked, true, name)
+			local consent = titled(built.submenu, "menu.tapholds.close_other_karabiner")
+			helpers.assert_true(consent ~= nil and type(consent.fn) == "function", name .. ": the consent row stays live")
+			helpers.assert_eq(built.checked, true, name .. ": the parent row keeps its tick")
+		end
+	end)
 end)

@@ -1241,19 +1241,23 @@ function M._explained_owned_reasons()
 	return reasons
 end
 
---- The disabled row that explains why the owned runtime does not run.
+--- The disabled row that explains why the owned runtime does not run, then
+--- the one row that fixes it when this menu holds that fix: the install, the
+--- service repair or the driver update.
 --- @param karabiner table Remap facade.
 --- @return table rows Empty unless the owner reports a block the user can act on.
+--- @return boolean offers_fix True when a fix row follows the explanation.
 local function owned_runtime_block_rows(karabiner)
-	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
+	if type(karabiner.owned_runtime_status) ~= "function" then return {}, false end
 	local ok, status = pcall(karabiner.owned_runtime_status)
 	-- A refused quit of the user's Karabiner settles as failed, the other blocks as unavailable.
 	if not ok or type(status) ~= "table" or (status.state ~= "unavailable" and status.state ~= "failed") then
-		return {}
+		return {}, false
 	end
 	local rows_fn = BLOCK_ROWS[status.reason]
-	if not rows_fn then return {} end
+	if not rows_fn then return {}, false end
 	local rows = rows_fn() or {}
+	local explanation_count = #rows
 	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
 		and type(karabiner.update_virtual_hid_driver) == "function" then
 		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
@@ -1303,6 +1307,31 @@ local function owned_runtime_block_rows(karabiner)
 			end,
 		}) or {}) do rows[#rows + 1] = row end
 	end
+	return rows, #rows > explanation_count
+end
+
+--- Greys every row of a finished Tap-Holds submenu but the block and its fix,
+--- without its tick, its click or its submenu: while the owned runtime waits
+--- for that fix no setting here can take effect, and a ticked switch or a live
+--- key row read as tap-holds that work (maintainer, 2026-11-23). The block
+--- explanation says why, as the karabiner_off_hint row leads the key rows
+--- greyed with « Ergopti uses Karabiner » off. The finished rows are only
+--- read: the shared renderer draws each greyed row from row data.
+--- @param block_rows table Row data of the block and its fix.
+--- @param children table Finished submenu rows, left untouched.
+--- @return table rows The gated submenu.
+local function grey_all_but_runtime_fix(block_rows, children)
+	local kept = {}
+	for _, row in ipairs(block_rows) do kept[row.label] = true end
+	local rows = {}
+	for _, child in ipairs(children) do
+		if child.title == "-" or kept[child.title] then
+			rows[#rows + 1] = child
+		elseif type(child.title) == "string" then
+			rows[#rows + 1] = ManifestMenu.render_rows({ { label = child.title, disabled = true } },
+				"tap_hold_owned_block")[1]
+		end
+	end
 	return rows
 end
 
@@ -1317,6 +1346,11 @@ end
 --- The manifest's `tapholds_toggle` row is the Tap-Holds feature switch. It
 --- never touches the remap engine itself, which the driver keeps running on
 --- its own: off only stops generating the per-key rules, like a pause.
+---
+--- While Ergopti's own runtime waits for a fix this menu offers (install it,
+--- repair its service, update its driver), that block and its fix row are the
+--- only live rows: every other row is greyed and unticked, the parent row
+--- included, since nothing else can work until then.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A provider row carrying the rendered submenu, or nil.
 function M.build(ctx)
@@ -1333,6 +1367,8 @@ function M.build(ctx)
 	local enabled = karabiner.get_enabled()
 	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
 		and karabiner.get_tap_holds_enabled() == true
+	-- Read once: the gate and the rows it keeps live must name the same block.
+	local block_rows, blocked_on_fix = owned_runtime_block_rows(karabiner)
 
 	-- The key lists build their trees on demand, inside the renderer's isolated
 	-- provider call: an unreadable key catalogue then costs the key rows and is
@@ -1344,7 +1380,7 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
-			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
+			for _, row in ipairs(block_rows) do rows[#rows + 1] = row end
 			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
 			for _, row in ipairs(user_karabiner_closed_rows(karabiner)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
@@ -1388,13 +1424,19 @@ function M.build(ctx)
 	render_ctx.commands = commands
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters["tapholds_enabled"] = function() return tap_holds_on end
+	-- Behind a block with its fix the switch reads on for the renderer: its
+	-- category-off rule would otherwise tell the user to tick the first row,
+	-- which the gate greys, and grey the fix row. The gate unticks it below.
+	render_ctx.state_getters["tapholds_enabled"] = function() return tap_holds_on or blocked_on_fix end
 
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
 	local children = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
-	local row = receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
+	if blocked_on_fix then children = grey_all_but_runtime_fix(block_rows, children) end
+	local row = receive(children, {
+		tapholds_enabled = function() return (tap_holds_on and not blocked_on_fix) or nil end,
+	})
 
 	-- The AI title's dot (maintainer, 2026-11-23), read again live by the watch:
 	-- a pause or the switch changing after this build repaints it too.
