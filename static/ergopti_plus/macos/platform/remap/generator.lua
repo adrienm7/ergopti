@@ -2251,17 +2251,14 @@ end
 
 --- Whether the key-combination rules are generated for a state.
 ---
---- Reads one optional Boolean switch of a remap state; absent is on.
---- @param state table Remap state.
---- @param field string The state field.
---- @param caller string Named by the error.
+--- Reads one optional Boolean switch of a remap state; absent is on. Each
+--- caller reads its field by name, so the requirement gate sees the read.
+--- @param value any The state field's value.
+--- @param field string The state field, named by the error.
 --- @return boolean
-local function state_switch(state, field, caller)
-	if type(state) ~= "table" then error(caller .. " needs a remap state", 3) end
-	if type(state[field]) == "boolean" then return state[field] end
-	if state[field] ~= nil then
-		error(field .. " must be a boolean or absent, got " .. type(state[field]), 3)
-	end
+local function state_switch(value, field)
+	if type(value) == "boolean" then return value end
+	if value ~= nil then error(field .. " must be a boolean or absent, got " .. type(value), 3) end
 	return true
 end
 
@@ -2275,7 +2272,8 @@ end
 --- @param state table Remap state (key_combinations_enabled).
 --- @return boolean
 function M.key_combinations_enabled(state)
-	return state_switch(state, "key_combinations_enabled", "key_combinations_enabled")
+	if type(state) ~= "table" then error("key_combinations_enabled needs a remap state", 2) end
+	return state_switch(state.key_combinations_enabled, "key_combinations_enabled")
 end
 
 --- Whether the chord slots are generated for a state: [mod_combos] enabled
@@ -2284,7 +2282,8 @@ end
 --- @param state table Remap state (mod_combos_enabled).
 --- @return boolean
 function M.chords_enabled(state)
-	return state_switch(state, "mod_combos_enabled", "chords_enabled")
+	if type(state) ~= "table" then error("chords_enabled needs a remap state", 2) end
+	return state_switch(state.mod_combos_enabled, "mod_combos_enabled")
 end
 
 -- The CapsWord exits [shortcuts.caps_word] now decides: the word delimiters a
