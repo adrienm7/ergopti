@@ -1775,6 +1775,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/input/test_hotkey_registrar_aliases.ahk
 #Include unit/platform/input/test_hotkey_registrar_modifier_keys.ahk
 #Include unit/hotstrings/engine/magic_key/test_star_slot.ahk
+#Include unit/core/ui/editors/test_magic_key_capture_settlement.ahk
+#Include unit/core/ui/editors/test_magic_key_startup_close.ahk
 #Include unit/platform/remap/key_combinations/test_keyboard_slot_win_space.ahk
 #Include unit/platform/remap/key_combinations/test_keyboard_slot_neutral_roles.ahk
 #Include unit/ai/actions/test_trigger_shortcut_retired.ahk
