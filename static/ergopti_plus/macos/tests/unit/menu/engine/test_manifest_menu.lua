@@ -685,7 +685,17 @@ local function observe_actual_fixed_parent(id, module, context, manifest, transl
 	assert(parent); kind = parent.type
 	local ok, detail = xpcall(function()
 		local row = assert(module.build(context))
-		helpers.assert_eq(row.label, translator.get(caption)); helpers.assert_nil(row.action)
+		-- The Tap-Holds title may carry its runtime status dot (menu/ui/title_status.lua).
+		local label, dotted = translator.get(caption), {}
+		if id == "tap_holds" then
+			local TitleStatus = require("menu.ui.title_status")
+			for _, status in ipairs({ TitleStatus.READY, TitleStatus.WARMING, TitleStatus.UNREACHABLE }) do
+				local glyph = TitleStatus.dot(status)
+				if glyph then dotted[label .. " " .. glyph] = true end
+			end
+		end
+		if not dotted[row.label] then helpers.assert_eq(row.label, label) end
+		helpers.assert_nil(row.action)
 		helpers.assert_true(rawequal(row.submenu, completed), "the exact genuine completed child must reach its declared parent")
 		helpers.assert_true(#completed > 0, "a positive factory must build actual child rows")
 		if expected then helpers.assert_eq(row.checked, true) else helpers.assert_nil(row.checked) end
