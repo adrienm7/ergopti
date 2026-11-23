@@ -167,7 +167,7 @@ _MBPT_ChildSource(Directory) {
 		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
 		"AppPicker_SelectionsEqual", "UpdateChannels_Ids", "UpdateSchedule_Timing",
 		"Updater_LoadChannel", "LLM_ModelBrowser_Show", "LLM_AuxInvalidate", "OllamaWV_Close", "LLM_Deps_Cancel",
-		"WMHandleExists", "WPMTrayReadout_LoadConfig", "TimerSetCallback"] {
+		"WMHandleExists", "WPMTrayReadout_LoadConfig", "TimerSetCallback", "GetForegroundKeyboardLayout"] {
 		Root := Symbol == "LLM_DisplayIndentValues" ? _DriverDir . "\..\_shared" : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, Root)
 		AssertTrue(Owner != "", "The model-selection child requires its whole genuine owner: " . Symbol)
@@ -177,7 +177,7 @@ _MBPT_ChildSource(Directory) {
 		if Symbol == "LLM_Defaults_Load"
 			Code .= "LLM_Defaults_Load()`n"
 	}
-	AssertEqual(29, Owners.Count, "All window, data, configuration, menu and runtime owners must be included")
+	AssertEqual(30, Owners.Count, "All window, data, configuration, menu and runtime owners must be included")
 	; Dependency cancellation restores this genuine entry-point constant. Borrow
 	; its unchanged declaration without executing the driver's auto-start graph.
 	EntrySource := _DriverSourceConcat()
@@ -220,6 +220,7 @@ _MBPT_StageAssets(Directory) {
 	; does not claim every reserved policy is read on its successful cold path.
 	Assets := ["ai\data\defaults.json", "ai\data\models.json", "hotstrings\data\catalogue\_index.toml", "core\i18n\data\locales\fr.json", "core\i18n\data\locales\en.json",
 		"ai\data\backends.json", "menu\data\menu_manifest.json", "diagnostics\data\redaction.json", "layouts\data\keycodes\physical_keys.json",
+		"hotstrings\data\magic_key.json",
 		"settings\data\config_schema\migrations.toml", "settings\data\config_schema\config.schema.json",
 		"settings\data\config_schema\tap_hold.schema.json", "settings\data\config_schema\SCHEMA.md",
 		"settings\data\config_schema\examples\hs_tap_hold.example.toml", "settings\data\config_schema\examples\personal_info.example.toml",

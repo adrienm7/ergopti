@@ -167,7 +167,8 @@ _MAD_CopyShared() {
 	global _MAD, _MAD_Root, _MAD_SourceShared, _SharedDir
 	Files := _MAD_PageAssets()
 	for Relative in ["core\i18n\data\locales\fr.json", "core\i18n\data\locales\en.json",
-		"diagnostics\data\redaction.json", "core\timing\data\constants.toml"]
+		"diagnostics\data\redaction.json", "core\timing\data\constants.toml",
+		"hotstrings\data\magic_key.json"]
 		Files.Push(Relative)
 	; Every schema the reader chains (schema, media, purge) comes from the
 	; shared folder itself: a hand-kept list missed purge_schema.sql, so the

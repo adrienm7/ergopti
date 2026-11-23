@@ -75,7 +75,7 @@ _MAD_Source(Root, OwnerReceipt) {
 		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "WebView_RunScriptAsync", "WebView_SameCore",
 		"ConfigTransitionNormalizeConfigDir", "ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned",
 		"PLC_CreateProcessWithInheritedHandles", "WMHandleExists",
-		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
+		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "MagicKeyMarker", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
 		"KL_WriteAtomic", "KL_AppCat_Init", "KL_Hook_HasPendingInput", "KL_Watchers_IdleTick", "SQLite_Open", "KeystatsWalkerLoadTimings", "KLW_WalkTypingEntry",
 		"KLW_BuildBatchSql", "KLR_ListLedgerPaths", "KLR_BuildDatabase", "KLR_CacheAttach", "KLR_BeginPartialRead",
 		"KLR_BuildColdCandidateAuto", "KLR_ReadManifest", "KLR_BuildManifestJson", "KLR_BuildRangeSplitTodayJson",
@@ -120,7 +120,7 @@ _MAD_Native() {
 	Script := Root . "\subject.ahk"
 	SourceOwners := []
 	AssertTrue(FSWriteCreateDurable(Script, _MAD_Source(Root . "\store", SourceOwners)))
-	AssertEqual(44, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
+	AssertEqual(45, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
 	Hash := CryptoSha256Bytes(FSReadBytesStrict(Script))
 	RuntimeHash := CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 	_TestPrint("# apps-dom-source-built " . KL_JsonEncode(Map("source_sha256", Hash,

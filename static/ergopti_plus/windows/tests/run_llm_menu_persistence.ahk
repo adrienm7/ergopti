@@ -24,6 +24,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/text/engine/json.ahk
+#Include ../hotstrings/engine/magic_key_rules.ahk
 #Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../core/i18n/engine/i18n.ahk
@@ -71,6 +72,7 @@ global _LLM_Menu_Loaded := false
 #Include ../ai/ui/menu/transactions.ahk
 #Include ../ai/ui/menu/models/models.ahk
 #Include ../ai/ui/menu/profiles.ahk
+#Include ../ai/ui/prompt_editor/init.ahk
 #Include ../ai/ui/menu/hotkey_identity.ahk
 #Include ../ai/ui/menu/persist.ahk
 ; The native AI tray owner catches the real staged-root exception classes.
