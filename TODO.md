@@ -40,6 +40,37 @@ every maintainer request here.
   live only in the TODO-tests files. Never commit a non-anonymized field report, never cancel a CI run you did not
   start, never use `git stash`, `reset` or `clean` as shortcuts.
 
+## Handover (state on 2026-11-24 00:45 Paris, read first)
+
+Everything is on `dev` (tip `78fa30d1fa`); `v1.0.10-dev.178` is published. Stable `v1.0.10` waits for the
+maintainer, who will try `dev.178` on the Mac first: never push `main` without their explicit go.
+
+- [ ] **[CI] Read the two runs queued on `dev`** (`88310973bc`, then `78fa30d1fa`) and turn any red green. Never
+      verified on a runner yet: the Swift lease fix (`fix(macos): keep the inner's FENCED queued behind a socket
+    hang-up`, new XCTest `testParentEOFKeepsFencedQueuedBehindHangupAfterStaleReadyRead`, no Swift toolchain in the
+      cloud container), the Windows `TEST_NATIVE_SETTLE_TIMEOUT_MS` waits (15 AHK tests), the Ubuntu APT and
+      Playwright download retries, and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by
+      Runner » is GitHub capacity: rerun the failed jobs, do not move it to Intel.
+- [ ] **[CI] Same 5xx retry for the other CI scripts that read the GitHub API** (`tools/ci/run-timing.cjs`,
+      `site-deploy-admission.cjs`, `validate-js-feature-results.cjs`), as `readWithServerRetry` in
+      `tools/ci/site-verdict.cjs` now does; one 502 cost a whole verdict on 2026-11-23.
+- [ ] **[Windows] Short waits left after the flaky-test pass:** child fixtures that cannot read the test constant
+      (`tests/fixtures/user_command_lifecycle_owner_body.ahk:137`, `worker_live_foreground_body.ahk:71`) and the named
+      per-file limits (`SRTOW_*`, `_UER_NATIVE_WAIT_MS`, `_TDCR_NATIVE_WAIT_MS`, `CALO_READER_WAIT_MS`,
+      `CRH_OPEN_WAIT_MS`, `PWRS_CAPTURE_TIMEOUT_MS`). Production `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` (500 ms) is
+      kept on purpose; revisit only if a forced-termination test flakes alone. Linux hardware lane
+      `tests/hardware/http_empty_headers.lua` keeps 3 s per request and 20 s in its Python harness.
+- [ ] **[macOS] Owned runtime artifact.** The admin-shell helper changes of 2026-11-23 (stale runtime retirement
+      before install, refusal note `refused-<case>:<file>:<line>`) only reach users once the maintainer rebuilds
+      and republishes the runtime (`16.3.0-ergopti.7`); `vendor/remap-runtime/manifest.json` is theirs to move.
+- [ ] **[macOS] Check `dev.178` on the Mac** (then move what stays open to TODO-tests-macos.md with its field
+      point): no hammer icon in the menu bar, rounded icon in Quick Look, Accessibility guidance names
+      ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not
+      installed, AltGr and Shift+AltGr are emulated once a layout is chosen, no « Aggregate cache recovery failed »
+      or `%s` in the log.
+- [ ] **[Maintainer] Questions left open:** the Tap-Holds warning dot stays the shared yellow 🟡 (orange asked
+      once, not confirmed); keystats day-by-day aggregate publication shipped, review welcome.
+
 ## Next session (state on 2026-11-17, read first)
 
 - **Goal unchanged:** a fully green `dev` CI, then publish dev prerelease 176; then empty this file.
