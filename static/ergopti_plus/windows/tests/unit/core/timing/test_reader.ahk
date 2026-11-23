@@ -1,4 +1,4 @@
-﻿; tests/unit/core/timing/test_timings_reader.ahk
+﻿; tests/unit/core/timing/test_reader.ahk
 
 ; ==============================================================================
 ; MODULE: Timings Reader Value Types (Windows)

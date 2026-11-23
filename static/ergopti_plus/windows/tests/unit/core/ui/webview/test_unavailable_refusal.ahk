@@ -1,4 +1,4 @@
-﻿; tests/unit/core/ui/webview/test_webview_unavailable_refusal.ahk
+﻿; tests/unit/core/ui/webview/test_unavailable_refusal.ahk
 
 ; ==============================================================================
 ; MODULE: WebView Unavailable Refusal Tests

@@ -1,4 +1,4 @@
-﻿; tests/unit/hotstrings/engine/personal/test_personal_tag_case.ahk
+﻿; tests/unit/hotstrings/engine/personal/test_tag_case.ahk
 
 ; ==============================================================================
 ; MODULE: Personal @-Tag Case (hcd-5-tag-case)

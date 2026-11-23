@@ -557,7 +557,7 @@ InstallSendNoOps()
 ; and reads only globals, so the tests drive the REAL function against fixture
 ; personal-info maps rather than asserting on its source.
 #Include unit/hotstrings/engine/personal/test_info_combo_resolver.ahk
-#Include unit/hotstrings/engine/personal/test_personal_tag_case.ahk
+#Include unit/hotstrings/engine/personal/test_tag_case.ahk
 #Include unit/settings/engine/persistence/test_master_gates.ahk
 #Include unit/hotstrings/engine/engine/test_domain_registry.ahk
 #Include unit/hotstrings/engine/engine/test_domain_expander.ahk
@@ -1112,7 +1112,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/lifecycle/engine/reload/test_worker_identity.ahk
 #Include unit/core/lifecycle/engine/reload/test_deferral.ahk
 #Include unit/core/timing/test_reload_timing.ahk
-#Include unit/core/timing/test_timings_reader.ahk
+#Include unit/core/timing/test_reader.ahk
 #Include unit/core/lifecycle/engine/test_dev_source.ahk
 #Include unit/menu/test_tray_menu_separator_popup.ahk
 #Include unit/menu/test_deferred_children.ahk
@@ -1168,7 +1168,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/core/ui/webview/test_fit_to_window.ahk
 #Include unit/core/ui/webview/test_take_focus.ahk
 #Include unit/core/ui/webview/test_personal_editors_webview_only.ahk
-#Include unit/core/ui/webview/test_webview_unavailable_refusal.ahk
+#Include unit/core/ui/webview/test_unavailable_refusal.ahk
 #Include unit/core/ui/webview/test_model_browser_webview_only.ahk
 #Include unit/core/ui/webview/test_prompt_editor_webview_only.ahk
 #Include unit/core/ui/webview/test_hotstrings_config_webview_only.ahk

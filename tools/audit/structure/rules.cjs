@@ -216,11 +216,11 @@ const LOGIC_FEATURES = [
 	['tap_hold', /^(tap_hold|one_shot_shift)/],
 	[
 		'keyboard',
-		/^(chord|tap_keys|sticky_modifiers|altgr|script_altgr|script_chord|capsword|caps_word|capslock|key_combination|nav_layer|wrap_pair|wrap_symbols|magic_editor|composed_text|suppressive_inputhook|slot_roles|remap|layers_loader|desktop_navigation)/
+		/^(chord|tap_keys|sticky_modifiers|altgr|script_altgr|script_chord|capsword|caps_word|capslock|key_combination|nav_layer|wrap_pair|wrap_symbols|magic_editor|star_slot|composed_text|suppressive_inputhook|slot_roles|remap|layers_loader|desktop_navigation)/
 	],
 	[
 		'layouts',
-		/^(layout|keyboard_layout|keylayout|xkb_|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|managed_python)/
+		/^(layout|keyboard_layout|keylayout|hyprland_|xkb_|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|managed_python)/
 	],
 	[
 		'hotstrings',
