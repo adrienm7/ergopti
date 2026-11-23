@@ -311,6 +311,44 @@ FSFlushFileBuffers(FileObject) {
 		return false
 }
 
+; Opens a change notification on a folder (FindFirstChangeNotificationW), read
+; later without waiting by FSChangeNotificationTaken.
+; @param Dir {String} Absolute folder path.
+; @param Subtree {Boolean} Whether changes in subfolders count.
+; @param Filter {Integer} FILE_NOTIFY_CHANGE_* flags.
+; @returns {Integer} The notification handle.
+; @throws {OSError} When Windows refuses the notification.
+FSChangeNotificationOpen(Dir, Subtree, Filter) {
+	Handle := DllCall("FindFirstChangeNotificationW", "Str", Dir, "Int", Subtree, "UInt", Filter, "Ptr")
+	if (Handle == -1)
+		throw OSError(A_LastError, -1, "FindFirstChangeNotificationW " . Dir)
+	return Handle
+}
+
+; Whether the folder changed since the notification was opened or last taken,
+; re-arming it when it did, so a change after this call is seen next time.
+; @param Handle {Integer} FSChangeNotificationOpen's handle.
+; @returns {Boolean}
+; @throws {OSError} When the wait or the re-arm fails.
+FSChangeNotificationTaken(Handle) {
+	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
+	Result := DllCall("WaitForSingleObject", "Ptr", Handle, "UInt", 0, "UInt")
+	if (Result == PLC_WAIT_TIMEOUT)
+		return false
+	if (Result != PLC_WAIT_OBJECT_0)
+		throw OSError(A_LastError, -1, "WaitForSingleObject on a change notification")
+	if !DllCall("FindNextChangeNotification", "Ptr", Handle, "Int")
+		throw OSError(A_LastError, -1, "FindNextChangeNotification")
+	return true
+}
+
+; Closes a change notification.
+; @param Handle {Integer} FSChangeNotificationOpen's handle.
+; @returns {Boolean} False when Windows refused (A_LastError holds why).
+FSChangeNotificationClose(Handle) {
+	return DllCall("FindCloseChangeNotification", "Ptr", Handle, "Int") != 0
+}
+
 ; Appends content to a file, creating it if it does not exist.
 ; @param Path    {String} Absolute path to the file.
 ; @param Content {String} UTF-8 content to append.

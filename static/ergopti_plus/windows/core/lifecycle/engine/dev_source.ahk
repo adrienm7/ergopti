@@ -261,10 +261,7 @@ DevSourceWatcher_Start(DriverDir, GitDir, ReloadFn, ArmFn := SetTimer, NowFn := 
 	if (GitDir != "") && !InStr(FileExist(GitDir), "D")
 		throw Error("The developer source watcher needs the clone's gitdir: " . GitDir)
 	; Armed before the first snapshot, so a save during it is still seen.
-	Notification := DllCall("FindFirstChangeNotificationW", "Str", DriverDir, "Int", true,
-		"UInt", DEV_SOURCE_CHANGE_FILTER, "Ptr")
-	if (Notification == -1)
-		throw OSError(A_LastError, -1, "FindFirstChangeNotificationW " . DriverDir)
+	Notification := FSChangeNotificationOpen(DriverDir, true, DEV_SOURCE_CHANGE_FILTER)
 	_DevSourceWatcher := Map("dir", DriverDir, "git_dir", GitDir, "notification", Notification,
 		"snapshot", DevSource_Snapshot(DriverDir), "burst", Map(), "last_change", 0,
 		"git_hold", "", "git_hold_since", 0, "git_hold_reported", false,
@@ -284,7 +281,7 @@ DevSourceWatcher_Stop() {
 	if !(_DevSourceWatcher is Map)
 		return
 	_DevSourceWatcher["arm"](_DevSourceWatcherTick, 0)
-	if !DllCall("FindCloseChangeNotification", "Ptr", _DevSourceWatcher["notification"], "Int")
+	if !FSChangeNotificationClose(_DevSourceWatcher["notification"])
 		LoggerWarn("DevSource", "Developer source watcher could not close its change notification: Win32 {1}.",
 			A_LastError)
 	if (_DevSourceWatcher["git_hold"] != "")
@@ -303,7 +300,7 @@ _DevSourceWatcherTick() {
 	Watcher := _DevSourceWatcher
 	Now := Watcher["now"]()
 	; A pending burst walks on every tick: its quiet tick is what settles it.
-	if !_DevSourceTreeChanged(Watcher) && (Watcher["burst"].Count == 0)
+	if !FSChangeNotificationTaken(Watcher["notification"]) && (Watcher["burst"].Count == 0)
 		return
 	Snapshot := DevSource_Snapshot(Watcher["dir"])
 	Changed := DevSource_SnapshotChanges(Watcher["snapshot"], Snapshot)
@@ -333,23 +330,6 @@ _DevSourceWatcherTick() {
 		LoggerInfo("DevSource", "{1} saved source files settled across the tree (first {2}); reloading the driver.",
 			Burst.Count, First)
 	Watcher["reload"]()
-}
-
-; Whether the tree changed since the last tick, re-arming the notification
-; before the walk that follows, so a change during that walk is not lost.
-; @param Watcher {Map} The running watcher.
-; @returns {Boolean}
-; @throws {OSError} When the wait or the re-arm fails.
-_DevSourceTreeChanged(Watcher) {
-	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
-	Result := DllCall("WaitForSingleObject", "Ptr", Watcher["notification"], "UInt", 0, "UInt")
-	if (Result == PLC_WAIT_TIMEOUT)
-		return false
-	if (Result != PLC_WAIT_OBJECT_0)
-		throw OSError(A_LastError, -1, "WaitForSingleObject on the source change notification")
-	if !DllCall("FindNextChangeNotification", "Ptr", Watcher["notification"], "Int")
-		throw OSError(A_LastError, -1, "FindNextChangeNotification")
-	return true
 }
 
 ; Whether no Git operation holds the pending reload. The hold is paired: its
