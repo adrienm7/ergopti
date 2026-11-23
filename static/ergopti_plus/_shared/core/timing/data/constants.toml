@@ -1506,12 +1506,6 @@ proc_cmdline_bytes = 65536
 # LX: ai/engine/ollama/managed_ollama_environment.lua.
 declaration_file_bytes = 65536
 
-# Longest window title the Linux focus workers report: a longer one is refused,
-# never truncated into a different identity. The Hyprland event watch keeps no
-# longer partial line either: a reload event is a short line, and a window
-# event's title is never longer than this.
-# LX: platform/focus/compositor_focus.lua, modules/keymap/hyprland_reload_watch.lua.
-window_title_bytes = 2048
 
 # Largest changelog feed the Linux changelog window downloads (ten releases'
 # rendered notes, about 0.5 MB today).

@@ -34,7 +34,7 @@ M.REPORTERS = { gnome = "GNOME Shell", kde = "KWin", cosmic = "cosmic-comp" }
 -- Bounds of one reported window's class and title, for every worker: an
 -- oversized one is refused, never truncated into a different identity.
 M.MAX_CLASS_BYTES = 256
-M.MAX_TITLE_BYTES = require("core.timing.engine.timings").count("limits", "window_title_bytes")
+M.MAX_TITLE_BYTES = 2048
 -- Bounds every synchronous bus call the worker makes.
 M.CALL_TIMEOUT_MS = 500
 

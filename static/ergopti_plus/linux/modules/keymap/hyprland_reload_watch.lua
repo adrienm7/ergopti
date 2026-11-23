@@ -33,8 +33,9 @@ local LOG = "modules.keymap.hyprland_reload_watch"
 -- The event Hyprland sends after reading its configuration file.
 M.RELOAD_EVENT = "configreloaded"
 -- Event lines carry window titles; a partial line longer than the longest title
--- the driver reads is no reload event and is dropped up to its newline.
-local MAX_PENDING_BYTES = require("core.timing.engine.timings").count("limits", "window_title_bytes")
+-- the focus workers read (platform.focus.compositor_focus) is no reload event
+-- and is dropped up to its newline.
+local MAX_PENDING_BYTES = require("platform.focus.compositor_focus").MAX_TITLE_BYTES
 
 --- The event socket of the running Hyprland instance.
 --- @param getenv function getenv(name) -> string|nil
