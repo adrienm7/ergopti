@@ -225,13 +225,16 @@ Test("hotstrings: the shortest @ combo produces a preview candidate (at-triggers
 ; The INVARIANT is unchanged and is what these two tests assert: preview and fire
 ; answer the same question. So both are asked, of the same tag, in the same test.
 _PIPP_ResolvableComboIsPreviewedAndFires() {
-	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation
+	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation, LastSentCharacterKeyTime
 	Saved := _PIPP_Setup()
 	try {
 		MK := ScriptInformation["MagicKey"]
 		_PIPP_RegisterAtTriggers()
 		HSE_Buffer := "@npn"
 		HSE_StartIsWordBoundary := true
+		; The resolved tag carries the dynamic category's expansion delay (HCD-4):
+		; its last letter was typed just now, so the delay is still open.
+		LastSentCharacterKeyTime[HSE_TimeGateReferenceChar("@npn" . MK, true)] := A_TickCount
 
 		Row := _PIPP_CandidateFor(_PrefixCollectCandidates(), "@npn" . MK)
 		Assert(IsObject(Row),

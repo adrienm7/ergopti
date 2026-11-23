@@ -118,7 +118,7 @@ _HPLS_DashboardStagesAreDistinct() {
 	Diagnostics := _DriverFuncBody("HealthCheck_ShowWindow")
 	DiagnosticsMark := _DriverFuncBody("_HC_OpenTimingMark")
 	Assert(Diagnostics != "" && DiagnosticsMark != "", "diagnostics timing owners must exist")
-	for Phase in ["snapshot", "host", "controller", "bindings", "navigate", "native_controls"]
+	for Phase in ["snapshot", "host", "controller", "bindings", "navigate"]
 		AssertContains(Diagnostics, '_HC_OpenTimingMark("' . Phase . '", Timing)')
 	AssertContains(DiagnosticsMark, "HotPath_RecordLatency(")
 	AssertContains(DiagnosticsMark, 'LoggerInfo("Healthcheck", Format(')

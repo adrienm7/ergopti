@@ -341,7 +341,8 @@ _FMS_InlineLiteralSpellingsKeepBooleanIntent(Path) {
 	AssertEqual(2, Migrated, "only actual bare one leaves carry legacy Boolean intent")
 	AssertEqual(3, Outdated.Count, "signed-zero integers cannot invent legacy Boolean intent")
 	AssertFalse(Target["layout"]["number_row_reorder_edges"])
-	AssertFalse(Target["layout"]["emulate_bottom_row"])
+	; An outdated -0 leaves the switch at its default, which is on.
+	AssertTrue(Target["layout"]["emulate_bottom_row"])
 	AssertTrue(Target["layout"]["ergopti_alt_gr"])
 	AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
 	AssertEqual(0.125, Target["hotstrings"]["autocorrection"]["names"]["time_activation_seconds"])

@@ -122,7 +122,7 @@ _KASP_TickFromRegistry() {
 	Section := _TimingsCache["keep_awake"]
 	SavedMin := Section["tick_min_ms"], SavedMax := Section["tick_max_ms"]
 	try {
-		Section["tick_min_ms"] := "777", Section["tick_max_ms"] := "777"
+		Section["tick_min_ms"] := 777, Section["tick_max_ms"] := 777
 		AssertEqual(777, AwakeNextTickMs(), "the jitter tick follows the shared [keep_awake] bounds")
 	} finally {
 		Section["tick_min_ms"] := SavedMin, Section["tick_max_ms"] := SavedMax
@@ -198,7 +198,7 @@ _KASP_SurvivesOffset(OffsetPx, RadiusPx) {
 	SavedX := AwakeOriginX, SavedY := AwakeOriginY
 	Result := { Survived: false }
 	try {
-		Section["jitter_px"] := String(RadiusPx)
+		Section["jitter_px"] := RadiusPx
 		_KASP_WithSession(1000, _KASP_CheckOffset.Bind(OffsetPx, Result))
 	} finally {
 		Section["jitter_px"] := SavedRadius
