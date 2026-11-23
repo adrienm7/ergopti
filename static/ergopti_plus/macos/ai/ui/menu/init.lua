@@ -59,7 +59,7 @@ local ManifestMenu     = require("menu.engine.manifest_menu")
 local mlx_deps_checker    = require("ai.engine.local_servers.mlx_deps_checker")
 local runtime_install_offer = require("ai.ui.menu.runtime_install_offer")
 local ShellRunner         = require("core.process.adapters.shell_runner")
-local TimerScheduler      = require("core.events.timer_scheduler")
+local TitleStatus         = require("menu.ui.title_status")
 local Timings             = require("core.timing.engine.timings")
 
 local LOG = "menu_llm"
@@ -206,53 +206,11 @@ local _llm_health_generation = 0
 -- that painted the dot, so this watch re-reads the readiness of the active
 -- backend, whichever it is, and repaints only when the dot would differ.
 local HEALTH_WATCH_SEC = Timings.sec("llm", "ai_health_watch_ms")
-local _health_watch = { handle = nil, painted = nil, read = nil, repaint = nil }
-
---- Stops the health watch; the next AI menu build re-arms it when needed.
-local function stop_health_watch()
-	local handle = _health_watch.handle
-	_health_watch.handle = nil
-	_health_watch.read = nil
-	_health_watch.repaint = nil
-	if handle then TimerScheduler.cancel(handle) end
-end
-
---- One watch tick: repaints the AI title once when its dot is out of date.
-local function check_health_watch()
-	local read, repaint = _health_watch.read, _health_watch.repaint
-	if type(read) ~= "function" or type(repaint) ~= "function" then return end
-	local ok, now = pcall(read)
-	if not ok then
-		Logger.error(LOG, "The AI health watch could not read the backend: %s.", tostring(now))
-		return
-	end
-	if now == _health_watch.painted then return end
-	Logger.debug(LOG, "AI health changed from %s to %s: repainting the AI title.",
-		tostring(_health_watch.painted), tostring(now))
-	-- Recorded before the repaint, so a coalesced rebuild never repaints twice
-	_health_watch.painted = now
-	if now == nil then stop_health_watch() end
-	local repainted, err = pcall(repaint)
-	if not repainted then Logger.error(LOG, "The AI title repaint failed: %s.", tostring(err)) end
-end
-
---- Keeps the dot of the AI title in step with the backend after this build.
---- @param painted string|nil The status this build painted; nil stops the watch.
---- @param read function Returns the status the dot should show now.
---- @param repaint function Rebuilds the menu.
-local function watch_health(painted, read, repaint)
-	_health_watch.painted = painted
-	if painted == nil then stop_health_watch(); return end
-	_health_watch.read = read
-	_health_watch.repaint = repaint
-	if _health_watch.handle then return end
-	local handle, committed = TimerScheduler.every(HEALTH_WATCH_SEC, check_health_watch)
-	if committed ~= true then
-		Logger.error(LOG, "The AI health watch could not start: the AI title dot follows menu rebuilds only.")
-		return
-	end
-	_health_watch.handle = handle
-end
+-- The watch is the one every status title shares (menu/ui/title_status.lua).
+local _health_watch = TitleStatus.new_watch("AI", HEALTH_WATCH_SEC)
+local stop_health_watch = _health_watch.stop
+local check_health_watch = _health_watch.check
+local watch_health = _health_watch.watch
 M.__check_health_watch_for_test = check_health_watch
 M.__watch_health_for_test = watch_health
 M.__stop_health_watch_for_test = stop_health_watch

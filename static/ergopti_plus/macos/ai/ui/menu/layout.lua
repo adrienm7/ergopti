@@ -130,26 +130,11 @@ end
 --- The backend health dot the AI title carries for a status, read from the
 --- ``health_dot`` table of the manifest's top-level ``llm`` entry: the same
 --- declaration drives the Windows and Linux titles, so no driver owns a glyph.
+--- The reader is the one every status title shares (menu/ui/title_status.lua).
 --- @param status string "ready", "warming" or "unreachable".
 --- @return string|nil The glyph, or nil when the manifest declares none.
 function M.title_health_dot(status)
-	local ok_menu, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
-	if not ok_menu or type(ManifestMenu) ~= "table" or type(ManifestMenu.get_root) ~= "function" then
-		Logger.error(LOG, "Manifest renderer unavailable — the AI title has no health dot.")
-		return nil
-	end
-	local root = ManifestMenu.get_root()
-	local top = type(root) == "table" and root.top_level or nil
-	if type(top) ~= "table" then return nil end
-	for _, entry in ipairs(top) do
-		if type(entry) == "table" and entry.id == "llm" then
-			local dots = entry.health_dot
-			local glyph = type(dots) == "table" and dots[status] or nil
-			if type(glyph) == "string" and glyph ~= "" then return glyph end
-			return nil
-		end
-	end
-	return nil
+	return require("menu.ui.title_status").dot(status)
 end
 
 --- Resolves a menu row's `disabled` value from the shared policy, mirroring the
