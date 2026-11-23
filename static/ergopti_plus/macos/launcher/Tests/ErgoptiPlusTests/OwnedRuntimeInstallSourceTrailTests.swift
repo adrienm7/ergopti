@@ -50,7 +50,7 @@ final class OwnedRuntimeInstallSourceTrailTests: XCTestCase {
 			catch { thrown = error }
 		}
 		XCTAssertEqual(thrown as? OwnedRuntimeInstallFailure, .source, "the case callers compare stays .source")
-		XCTAssertTrue(trail.contains("OWNED_RUNTIME_INSTALL_TRAIL|refused-source-entry-kind-120000-links-1-link@OwnedRuntimeInstallWorker.swift:"), trail)
+		XCTAssertTrue(trail.contains("OWNED_RUNTIME_INSTALL_TRAIL|refused-source-entry-kind-120000-links-1-link:OwnedRuntimeInstallWorker.swift:"), trail)
 		XCTAssertEqual(trail.components(separatedBy: "OWNED_RUNTIME_INSTALL_TRAIL|").count - 1, 1, "one refusal, one trail line: " + trail)
 		#else
 		throw XCTSkip("The install worker fixtures exist only in debug test builds.")

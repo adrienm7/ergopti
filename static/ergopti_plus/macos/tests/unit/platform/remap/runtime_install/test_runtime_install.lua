@@ -104,8 +104,8 @@ helpers.describe("owned runtime first install", function()
 	-- Field report 2026-11-15: every attempt read « the helper left cleanup pending » while the launcher's own log
 	-- line named the helper trail's errno 24 (owned-install-trail-cause).
 	helpers.it("names the helper trail's cause of a cleanup left pending", function()
-		local trail = "fd-limit-256-to-10240,refused-source-root-dup-errno-24-fds-250-of-256@OwnedRuntimeInstallWorker.swift:239,"
-			.. "publish-failed-source,refused-cleanupPending@OwnedRuntimeInstallJournal.swift:388"
+		local trail = "fd-limit-256-to-10240,refused-source-root-dup-errno-24-fds-250-of-256:OwnedRuntimeInstallWorker.swift:239,"
+			.. "publish-failed-source,refused-cleanupPending:OwnedRuntimeInstallJournal.swift:388"
 		local installer, world = fake(function()
 			return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|" .. trail .. "\n"
 		end)
@@ -124,6 +124,26 @@ helpers.describe("owned runtime first install", function()
 		-- A line whose trail breaks the closed grammar is not read as a trail.
 		local odd = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|a b\n" end)))
 		helpers.assert_eq(odd.reason, "install_unanswered")
+	end)
+
+	-- Field report 2026-11-23: the redaction read `refused-destination@OwnedRuntimeFirstInstallOwner.swift:62` as an
+	-- e-mail address, so the log, the error dialog and the report all said `<email>:62` instead of the cause.
+	helpers.it("keeps the helper trail's refusal through the diagnostics redaction", function()
+		local trail = "refused-destination:OwnedRuntimeFirstInstallOwner.swift:62,publish-failed-destination"
+		local result = install((fake(function()
+			return 77, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|helper|" .. trail .. "\n"
+		end)))
+		helpers.assert_eq(result.reason, "install_refused")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause(trail), "destination")
+		-- The pinned 16.3.0-ergopti.6 helper still writes `@` before the file.
+		helpers.assert_eq(Install.trail_cause("refused-destination@OwnedRuntimeFirstInstallOwner.swift:62"), "destination")
+		local file = assert(io.open(helpers.shared("diagnostics/data/redaction.json"), "rb"))
+		local rules = require("core.text.engine.json").decode(file:read("*a"))
+		file:close()
+		local redacted = require("diagnostics.engine.reports.redact").apply(result.detail, rules, {})
+		helpers.assert_eq(redacted, result.detail)
+		helpers.assert_true(redacted:find("refused-destination:OwnedRuntimeFirstInstallOwner.swift:62", 1, true) ~= nil, redacted)
 	end)
 
 	helpers.it("refuses without a launcher and when the manager is absent or fails", function()

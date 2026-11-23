@@ -43,10 +43,12 @@ enum OwnedRuntimeInstallTrail {
 	#else
 	private static var writesRefusals: Bool { isInstallerHelper }
 	#endif
+	/// The refusal is `refused-<case>[-<check>]:<file>:<line>`. An `@` before the file read as an e-mail address
+	/// to the diagnostics redaction, which turned the cause into `<email>:62` (field report 2026-11-23).
 	static func refusal(_ failure: OwnedRuntimeInstallFailure, _ check: String?, file: StaticString, line: UInt) {
 		guard writesRefusals else { return }
 		let source = String(describing: file).split(separator: "/").last.map(String.init) ?? String(describing: file)
-		note("refused-" + String(describing: failure) + (check.map { "-" + $0 } ?? "") + "@" + source + ":" + String(line))
+		note("refused-" + String(describing: failure) + (check.map { "-" + $0 } ?? "") + ":" + source + ":" + String(line))
 	}
 }
 

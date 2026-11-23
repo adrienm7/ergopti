@@ -132,8 +132,11 @@ local KINDS = {
 M.CAUSE_MAX_LENGTH = require("diagnostics.engine.field_check.report").MAX_VALUE_LENGTH
 
 --- The helper trail's first refusal, or else its last note, as one closed
---- token: `refused-source-root-dup-errno-24@OwnedRuntimeInstallWorker.swift:239`
---- reads `source-root-dup-errno-24`. The full trail stays in the detail.
+--- token: `refused-source-root-dup-errno-24:OwnedRuntimeInstallWorker.swift:239`
+--- reads `source-root-dup-errno-24`. The full trail stays in the detail. The
+--- helper of the pinned 16.3.0-ergopti.6 artifact still puts an `@` before the
+--- file, which the diagnostics redaction reads as an e-mail address; later
+--- helpers write `:` (OwnedRuntimeInstallTrail.refusal).
 --- @param trail string|nil Comma-joined notes the launcher relayed.
 --- @return string|nil cause Letters, digits and `_.:+-` only, at most CAUSE_MAX_LENGTH long.
 function M.trail_cause(trail)
@@ -143,7 +146,7 @@ function M.trail_cause(trail)
 		if not first_refusal and note:sub(1, 8) == "refused-" then first_refusal = note:sub(9) end
 		last = note
 	end
-	local cause = ((first_refusal or last or ""):gsub("@.*$", ""):gsub("[^%w_%.:%+%-]", ""))
+	local cause = ((first_refusal or last or ""):gsub("[@:][^@:,]+:%d+$", ""):gsub("[^%w_%.:%+%-]", ""))
 	if cause == "" then return nil end
 	return cause:sub(1, M.CAUSE_MAX_LENGTH)
 end
