@@ -75,9 +75,9 @@ checkNegative(
 
 // --- Initialization Audit ---
 check(
-	'Init: locale trigger provider is wired',
+	'Init: locale display provider is wired',
 	'static/ergopti_plus/macos/init.lua',
-	/locale_mod\.set_trigger_provider/
+	/locale_mod\.set_display_provider/
 );
 
 check(
