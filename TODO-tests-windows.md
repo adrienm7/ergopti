@@ -11,15 +11,23 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 (`gh workflow run ci.yml --ref <branch> -f os_lanes=windows`). Rules and ported work:
 [PC handoff](docs/tooling/windows-pc-agent-handoff.md). Order:
 
-1. The full AHK suite passed 19,331 of 19,331 on 2026-11-17 (`npm run test:ahk-parallel -- --fresh`, after the fixes
-   of `fix/windows-pc-2026-11-17`); the owned daemon's proxy (743181a933) has still not run live.
-2. Field report: run with Windows PowerShell 5.1 on 2026-11-17 (field run network and composer pass, boot cost
-   3,814 ms over its 2,500 ms budget), after four collector fixes; the runtime layer of
-   `test-windows-field-report-contract.cjs` passes. Left: the `pwsh` run (PowerShell 7 is not installed on the PC),
-   and a boot cost measured on an idle PC before reading it as a regression.
+1. The full AHK suite on 2026-11-23 (`node tools/test/ahk-parallel.cjs --fresh`, four workers, 3.3 GB free):
+   19,549 of 19,561, 9 skipped; the 11 failures under load (full-snapshot-obsolete-parent, config-personal-file-
+   case-alias, clipboard-restore-debt-native-cas, selection-capture-native-control-focus) pass alone
+   (`--rerun-failures`), the twelfth, the OS-call purity ratchet, was fixed. The owned daemon's proxy (743181a933)
+   has still not run live.
+2. Field report: run with Windows PowerShell 5.1 on 2026-11-23 beside a developer driver
+   (`powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1 -NoPush`): network,
+   composer and `driver_reload` (3,890 ms) pass, no error; the idle CPU of 7.9 % was the developer source watcher
+   (fixed, 2.1 % after); the commit left a stale index (fixed). Left: the `pwsh` run (PowerShell 7 is not installed
+   on the PC), and the boot cost (3,010 ms at start, 3,895 ms after the reload, budget 2,500 ms) measured on an idle
+   PC before reading it as a regression: this one ran beside a terminal, an editor and 3.3 GB of free RAM.
 3. The Windows items of « Remaining code work » in TODO.md.
 4. The checks below and the [standing checks](docs/tooling/windows-maintainer-checks.md#standing-checks) 1 to 15
-   (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones).
+   (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones). On 2026-11-23 its 41 checks pass:
+   five had stale expectations (the « 🌐 Layouts and emulation » menu, the magic key that follows the OS layout
+   family, the terminator a Backspace gives back, a migration read before the boot's save) and were fixed;
+   `backspace-restore-rules` and TIM-01 in `reload-command` are new.
 
 ### Layouts and Ergopti Studio
 
@@ -104,20 +112,21 @@ Layouts` key. Re-saving the source under another `dll_name` with « Installer et
       caret moves after the expansion, never inside it.
 - [ ] Items 34, 37, 102 and 129: the Windows native cases of native delimiter transactions and packaging with both
       extension TOML files.
-- [ ] Immediate-Backspace restoration in Windows Terminal: `sru` + Space then Backspace types `sru` back through the
-      paced terminal capture, an OpenTUI prompt such as Claude Code included. The live check `backspace-undo-hosts`
-      passed on 2026-11-17 in an edit, Notepad and a conhost console; conhost names its client as the window's owner,
-      so the console took the atomic path, and the check does not drive the user's own Windows Terminal.
+- [ ] Immediate-Backspace restoration in Windows Terminal: `sru` + Space then Backspace types `sru ` back (the
+      trigger and its Space) through the paced terminal capture, an OpenTUI prompt such as Claude Code included. The
+      live check `backspace-undo-hosts` passed on 2026-11-23 in an edit, Notepad and a conhost console; conhost names
+      its client as the window's owner, so the console took the atomic path, and the check does not drive the user's
+      own Windows Terminal.
 - [ ] Immediate-Backspace restoration of an emoji per host (2026-11-17): an expansion ending in « 👍🏽 », then
       Backspace, gives the trigger back with nothing left of the expansion in a classic Edit (Win+R), the Store
       Notepad, WordPad and Edge or an Electron app, and so does one ending in « 🇫🇷 »; the DEBUG log names the
       host family (« Undo: N Backspace step(s) in a richedit host »); a letter typed before the trigger stays, in Word
       too.
-- [ ] Backspace restore (2026-11-19): in Notepad, Edge and Windows Terminal, a ★ trigger (`td★`) then Backspace
-      within half a second leaves `td`, never `td★`; `adn` then Space, a comma or Enter, then Backspace, leaves `adn`
-      and that terminator, never `ADN`; a Backspace a second after the expansion, or after Escape, deletes one
-      character; with Hotstrings > « Backspace undoes the last expansion » off, Backspace deletes one character, and
-      the window's choices and free entry (« Other value… », 50 to 10000 ms) take effect without a reload.
+- [ ] Backspace restore in Notepad, Edge and Windows Terminal (2026-11-19). The rules themselves pass with real keys
+      in an edit control on 2026-11-23 (`node tools/maintainer/windows-live-checks.cjs --only backspace-restore-rules`:
+      `c★` gives `c`, `adn` + Space, comma or Enter gives `adn` and that terminator, a Backspace 1.5 s later or after
+      Escape and the option off each delete one character). Left: the same in those three hosts, and the window's
+      choices and free entry (« Other value… », 50 to 10000 ms) taking effect without a reload.
 - [ ] One-shot modifiers (2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the one-shot
       Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level on the
       Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold AltGr
@@ -266,12 +275,10 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 
 ### Pause, startup, updates and network
 
-- [ ] TIM-01, a reload is measured: Reload from the tray, then from a saved setting; the log has « Reload
-      completed in N ms (reload request to boot complete). » once per reload, an « Over budget: reload » warning
-      only above 4000 ms, and a plain start of the driver writes neither. TIM-04: an AI prediction whose first
-      display takes over 2 s logs « Over budget: prediction.display » once. TIM-05: from a developer driver,
-      `tools/dev/collect-windows-field-report.ps1` reports `driver_reload` pass with the reload's duration, follows
-      the reloaded driver and finishes the run.
+- [ ] TIM-04: an AI prediction whose first display takes over 2 s logs « Over budget: prediction.display » once.
+      TIM-01 is automated (the live check `reload-command` counts one « Reload completed in N ms » per reload, none
+      for the plain start, and the over-budget warnings against `driver_reload_ms`); TIM-05 passed on 2026-11-23 (the
+      field report's `driver_reload` pass, 3,890 ms, followed by the rest of the run).
 - [ ] EDD-1, a pause stops typing, not configuration: paused, save once from each editor (prompt, paths, hotstrings
       window, layout manager install/select/remove, action picker, model page choice, download and removal, magic key
       capture), from the AI scope restore and the hotstring order rows, and from the AI menu's local server rows with
@@ -312,10 +319,6 @@ eader.sqlite` held open by another program, press Reset: the status line says th
       boots (summed `process_cpu`); the 2026-11-16 smoke boots gave `Boot complete` between 5.9 and 8.7 s.
 - [ ] Hot-path span lines: at DEBUG, switch the layout once; the field log then holds a `layout.switch` pair beside the
       `tray.fill` and `hotstring.expand` ones already seen.
-- [ ] One folder name: after the next boot, `%APPDATA%\Ergopti\` is gone and the log holds « Removed the emptied
-      legacy folder » (`legacy-folder-migration-bootstrap-log`); the rest of the handoff's Windows list
-      ([handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)) passed on
-      2026-11-16.
 - [ ] Requalify the key-combination and updater cohorts after the structure migration: the native key-combination run
       (`run-windows-key-combination-cohorts.cjs`) needs the CI lane's generated
       `windows-key-combination-cohort-inputs.json`; the updater cohort
