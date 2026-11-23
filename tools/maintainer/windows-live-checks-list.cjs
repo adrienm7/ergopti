@@ -2656,6 +2656,88 @@ const CHECKS = [
 			if (problems.length > 0) return fail(`${problems.join('; ')} (${seen.join(', ')})`);
 			return pass(seen.join(', '));
 		}
+	},
+	{
+		id: 'backspace-restore-rules',
+		title:
+			'Backspace restore with real keys and the default 500 ms window: the terminator and a ★ trigger come back, a late Backspace, one after Escape or with the option off deletes one character',
+		async run(context) {
+			const skip = context.otherDriverReason();
+			if (skip) return notExecuted(skip);
+			const adn = shippedRule('autocorrection.toml', 'adn');
+			const cest = shippedRule('french/magickey.toml', 'c★');
+			if (!adn || !/output = "ADN"/.test(adn.line) || !cest)
+				return notExecuted('the shipped data no longer holds adn -> ADN and c★ -> c’est');
+			const config = (enabled) =>
+				[
+					'[category_enabled]',
+					'hotstrings = true',
+					'autocorrection = true',
+					'french_magickey = true',
+					'[hotstrings]',
+					'trigger_char = "★"',
+					`backspace_restore_enabled = ${enabled}`,
+					`[hotstrings.autocorrection.${adn.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					`[hotstrings.french_magickey.${cest.section}]`,
+					'enabled = true',
+					'time_activation_seconds = 0',
+					''
+				].join('\n');
+			const space = ['key', '{SC039}'];
+			const backspace = ['key', '{SC00E}'];
+			// The typist waits 120 ms after each key: a Backspace right after the
+			// expansion lands well inside the 500 ms window.
+			const on = [
+				{ name: 'adn Space', steps: [['text', 'adn'], space, backspace], expected: 'adn ' },
+				{ name: 'adn comma', steps: [['text', 'adn,'], backspace], expected: 'adn,' },
+				{
+					name: 'adn Enter',
+					steps: [['text', 'adn'], ['key', '{SC01C}'], backspace],
+					expected: 'adn\\n'
+				},
+				{ name: 'c★', steps: [['text', 'c★'], backspace], expected: 'c' },
+				{
+					name: 'adn Space, a Backspace 1.5 s later',
+					steps: [['text', 'adn'], space, ['wait', '1500'], backspace],
+					expected: 'ADN'
+				},
+				{
+					name: 'adn Space, Escape, Backspace',
+					steps: [['text', 'adn'], space, ['key', '{SC001}'], backspace],
+					expected: 'ADN'
+				}
+			];
+			const off = [
+				{
+					name: 'option off, adn Space',
+					steps: [['text', 'adn'], space, backspace],
+					expected: 'ADN'
+				},
+				{ name: 'option off, c★', steps: [['text', 'c★'], backspace], expected: 'c’es' }
+			];
+			const problems = [];
+			const seen = [];
+			for (const [label, enabled, cases] of [
+				['on', true, on],
+				['off', false, off]
+			]) {
+				const { session } = await bootEnglish(context, `restore-${label}`, config(enabled));
+				await session.run('pump', ['3000']);
+				for (const item of cases) {
+					const typed = await typeInto(session, item.steps);
+					seen.push(`${item.name}="${typed}"`);
+					if (typed !== item.expected)
+						problems.push(`${item.name}: "${typed}", "${item.expected}" expected`);
+				}
+				const errors = session.loggedErrors();
+				if (errors.length > 0) problems.push(`the log holds an error: ${errors[0]}`);
+				await session.stop();
+			}
+			if (problems.length > 0) return fail(problems.join('; '));
+			return pass(seen.join(', '));
+		}
 	}
 ];
 
