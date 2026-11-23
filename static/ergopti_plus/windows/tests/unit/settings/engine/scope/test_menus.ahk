@@ -11,7 +11,13 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 
 _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
-	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nprivate_filter_enabled = false`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
+	; The layout probe stores a value that is neither its default nor its
+	; recommendation, so the clear removes it and the restore writes it: the
+	; layer switches recommend their default since 2026-11-23 and the restore
+	; leaves them out of the file.
+	Assert(!ManifestValuesEqual(ManifestRecommendedFor("layout.direct_access_digits"), ManifestDefaultFor("layout.direct_access_digits")),
+		"the layout probe must have a nonneutral recommendation")
+	Source := '[layout]`ndirect_access_digits = "symbols"`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nprivate_filter_enabled = false`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -62,9 +68,9 @@ _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"
 					AssertEqual(Parsed["llm"]["enabled"], true)
 					AssertEqual(Parsed["metrics"]["enabled"], true)
 					if Mode == "clear"
-						Assert(!Parsed["layout"].Has("ergopti_base"))
+						Assert(!Parsed["layout"].Has("direct_access_digits"))
 					else
-						AssertEqual(Parsed["layout"]["ergopti_base"], ManifestRecommendedFor("layout.ergopti_base"))
+						AssertEqual(Parsed["layout"]["direct_access_digits"], ManifestRecommendedFor("layout.direct_access_digits"))
 				} else {
 					AssertEqual(Parsed["layout"]["emulated_layout"], "ergol")
 					if Mode == "clear"

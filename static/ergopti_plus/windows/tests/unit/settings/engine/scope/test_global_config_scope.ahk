@@ -23,7 +23,12 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	; Real line feeds: escaped backticks once left both switches out of the file,
 	; so the clear's assertion on the Tap-Holds switch could not fail.
 	Assert(InStr(Fixture.source, "[category_enabled]`n"), "the fixture declares the category switches")
-	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nmeta_b = "open_url"`nmeta_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__meta_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
+	; The layout probe is neither its default nor its recommendation, so both the
+	; clear and the restore must rewrite it (the layer switches recommend their
+	; default since 2026-11-23, so they no longer can serve).
+	Assert(!ManifestValuesEqual(ManifestRecommendedFor("layout.direct_access_digits"), ManifestDefaultFor("layout.direct_access_digits")),
+		"the layout probe must have a nonneutral recommendation")
+	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`ndirect_access_digits = "symbols"`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nmeta_b = "open_url"`nmeta_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__meta_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
 	if Scenario == "absent"
 		ConfigSource := StrReplace(ConfigSource, '`nenabled = true`n', '`n')
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
@@ -144,9 +149,9 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 					AssertEqual(true, Parsed[Scope]["enabled"], "existing consent is preserved")
 			}
 			if Mode == "clear"
-				Assert(!Parsed["layout"].Has("ergopti_base"))
+				Assert(!Parsed["layout"].Has("direct_access_digits"))
 			else
-				AssertEqual(ManifestRecommendedFor("layout.ergopti_base"), Parsed["layout"]["ergopti_base"])
+				AssertEqual(ManifestRecommendedFor("layout.direct_access_digits"), Parsed["layout"]["direct_access_digits"])
 			Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay_offset"))
 			for PersonalPath in Fixture.personal {
 				if Mode == "clear"
