@@ -33,7 +33,6 @@
 
 'use strict';
 
-const { execFileSync } = require('node:child_process');
 const { escapeTableCell: cell } = require('../lib/text-escape.cjs');
 
 const REPOSITORY = 'adrienm7/ergopti';
@@ -207,13 +206,7 @@ function readJobs(runId, readApi, repository = REPOSITORY) {
  * @returns {object}
  */
 function readGitHubApi(endpoint) {
-	return JSON.parse(
-		execFileSync('gh', ['api', endpoint], {
-			encoding: 'utf8',
-			maxBuffer: 16 * 1024 * 1024,
-			stdio: ['ignore', 'pipe', 'pipe']
-		})
-	);
+	return require('./github-api-read.cjs').readGitHubApi(endpoint, 16 * 1024 * 1024);
 }
 
 /**

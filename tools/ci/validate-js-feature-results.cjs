@@ -233,19 +233,11 @@ async function main() {
 			'Usage: node tools/ci/validate-js-feature-results.cjs <downloaded-artifacts-directory>|--admit-jobs'
 		);
 	const { loadInventory } = require('../test/lib/js-feature-inventory.cjs');
-	const { execFileSync } = require('node:child_process');
 	const inventory = loadInventory(path.resolve(__dirname, '..', '..'));
 	const received = await receiveUnit(
 		inventory,
 		process.env,
-		(endpoint) =>
-			JSON.parse(
-				execFileSync('gh', ['api', endpoint], {
-					encoding: 'utf8',
-					maxBuffer: 4 * 1024 * 1024,
-					stdio: ['ignore', 'pipe', 'pipe']
-				})
-			),
+		(endpoint) => require('./github-api-read.cjs').readGitHubApi(endpoint),
 		process.argv[2] === '--admit-jobs' ? null : () => collectJournals(process.argv[2])
 	);
 	console.log(JSON.stringify(received, null, 2));

@@ -567,15 +567,7 @@ async function main(argv = process.argv.slice(2), env = process.env, ports = {})
 	);
 	const artifact = ports.artifact || require('./site-artifact.cjs');
 	const readApi =
-		ports.readApi ||
-		((endpoint) =>
-			JSON.parse(
-				execFileSync('gh', ['api', endpoint], {
-					encoding: 'utf8',
-					maxBuffer: 4 * 1024 * 1024,
-					stdio: ['ignore', 'pipe', 'pipe']
-				})
-			));
+		ports.readApi || ((endpoint) => require('./github-api-read.cjs').readGitHubApi(endpoint));
 	if (argv[0] === 'admit') {
 		const bytes = artifact.fileHash(argv[1], {
 			maximumBytes: 2 * 1024 * 1024,

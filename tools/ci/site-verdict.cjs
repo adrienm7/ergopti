@@ -64,31 +64,7 @@ function requireManifestMetadata(build, target, source, cname) {
 }
 
 /** Bind actual copied manifests and browser proofs to both latest successful writer jobs. */
-// A GitHub server error (HTTP 5xx) is transient: the 2026-11-23 dev run lost its
-// whole verdict to one 502 on a job listing page. Any other refusal is final.
-const SERVER_RETRY_DELAYS_MS = [5000, 15000, 30000];
-
-/**
- * Runs one GitHub read, repeating it only after a server error.
- * @param {() => string} read The read; it throws with gh's stderr on failure.
- * @param {number[]} delays Pauses before each repeat, in milliseconds.
- * @returns {string} The read's output.
- */
-function readWithServerRetry(read, delays = SERVER_RETRY_DELAYS_MS) {
-	for (let attempt = 0; ; attempt += 1) {
-		try {
-			return read();
-		} catch (error) {
-			const serverError = /HTTP 5\d\d/.test(String(error.stderr || error.message));
-			if (!serverError || attempt >= delays.length) throw error;
-			console.error(
-				`GitHub server error, read repeated in ${delays[attempt] / 1000} s: ` +
-					String(error.stderr || error.message).trim()
-			);
-			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delays[attempt]);
-		}
-	}
-}
+const { readWithServerRetry, readGitHubApi } = require('./github-api-read.cjs');
 
 async function verifyBundles(files, env, ports = {}) {
 	closed(files, ['bundleRoot', 'sourceRoot']);
@@ -107,18 +83,7 @@ async function verifyBundles(files, env, ports = {}) {
 				encoding: 'utf8',
 				stdio: ['ignore', 'pipe', 'pipe']
 			}));
-	const readApi =
-		ports.readApi ||
-		((endpoint) =>
-			JSON.parse(
-				readWithServerRetry(() =>
-					execFileSync('gh', ['api', endpoint], {
-						encoding: 'utf8',
-						maxBuffer: 4 * 1024 * 1024,
-						stdio: ['ignore', 'pipe', 'pipe']
-					})
-				)
-			));
+	const readApi = ports.readApi || ((endpoint) => readGitHubApi(endpoint));
 	const identity = await readCurrentRun(env, readApi);
 	const selected = await selectSiteJobs(
 		{ head_sha: identity.head_sha, run_id: identity.run_id, run_attempt: identity.run_attempt },
