@@ -58,23 +58,25 @@ function runPackaged(mutate) {
 
 const hotstrings = (packaged, name) => path.join(packaged, 'ergopti', 'hotstrings', name);
 
-check('the real registry passes and names the suffixes and magic-key replacement files', () => {
+check('the real registry passes and names the suffixes and repeat-correction files', () => {
 	const result = runPackaged(() => {});
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /ergopti\/hotstrings\/suffixes_a\.toml sha256=[0-9a-f]{64} /);
 	assert.match(
 		result.stdout,
-		/ergopti\/hotstrings\/magickeyreplace\.toml sha256=[0-9a-f]{64} sections=replace/
+		/ergopti\/hotstrings\/repeatcorrections\.toml sha256=[0-9a-f]{64} sections=repeat_corrections/
 	);
 	// The file the Linux required list never named is bound and therefore required.
 	assert.match(result.stdout, /ergopti\/hotstrings\/distancesreduction\.toml /);
 	assert.match(result.stdout, /PASS bound=\d+/);
 });
 
-check('a package without the magic-key replacement file is refused', () => {
-	const result = runPackaged((packaged) => fs.rmSync(hotstrings(packaged, 'magickeyreplace.toml')));
+check('a package without the repeat-correction file is refused', () => {
+	const result = runPackaged((packaged) =>
+		fs.rmSync(hotstrings(packaged, 'repeatcorrections.toml'))
+	);
 	assert.equal(result.status, 1);
-	assert.match(result.stderr, /lacks the bound file ergopti\/hotstrings\/magickeyreplace\.toml/);
+	assert.match(result.stderr, /lacks the bound file ergopti\/hotstrings\/repeatcorrections\.toml/);
 });
 
 check('a package whose suffix file differs from its source is refused', () => {
@@ -219,7 +221,7 @@ check('the Windows bundle archive passes with every bound file inside it', () =>
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(
 		result.stdout,
-		/ergopti\/hotstrings\/magickeyreplace\.toml sha256=[0-9a-f]{64} sections=replace/
+		/ergopti\/hotstrings\/repeatcorrections\.toml sha256=[0-9a-f]{64} sections=repeat_corrections/
 	);
 	assert.match(result.stdout, /PASS bound=\d+/);
 });

@@ -303,14 +303,13 @@ REQUIRED_FILES=(
 	"linux/xkb_installation/layout_package.py"
 	"linux/xkb_installation/desktop_activation.py"
 	"linux/static/layouts/registry/index.json"
-	# The shipped Ergopti extension supplies its reduction/roll packs and the
-	# exact MagicKey sections declared by its manifest.
+	# The shipped Ergopti extension supplies its reduction, roll, correction
+	# and suffix packs.
 	"linux/static/layouts/registry/ergopti/manifest.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/sfbsreduction.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/rolls.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
-	"linux/static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
 	"linux/install/layout_registry.sh"
 	"linux/install/native_source_build.sh"
 	# The .rpm wrapper and the standalone launcher admit native_modules/ here.

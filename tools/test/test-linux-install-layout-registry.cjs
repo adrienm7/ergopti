@@ -42,13 +42,7 @@ const DEFAULTS = path.join(SHARED, 'layouts', 'data', 'defaults.json');
 const DRIVER_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-driver.sh');
 
 // The files the Ergopti extension supplies in place of the shared folder.
-const MOVED = [
-	'sfbsreduction.toml',
-	'rolls.toml',
-	'repeatcorrections.toml',
-	'suffixes_a.toml',
-	'magickeyreplace.toml'
-];
+const MOVED = ['sfbsreduction.toml', 'rolls.toml', 'repeatcorrections.toml', 'suffixes_a.toml'];
 const EXTENSION_HOTSTRINGS = path.join(
 	ROOT,
 	'static',

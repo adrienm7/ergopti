@@ -957,11 +957,6 @@ if (selection && refs) {
 			'static/layouts/registry/ergopti/hotstrings/suffixes_a.toml',
 			'the shipped French suffix pack'
 		],
-		[
-			'drop',
-			'static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml',
-			'the shipped MagicKey replacement metadata'
-		],
 		['drop', `${SHARED_REL}/core/i18n/data/locales/fr.json`, 'a dynamic locale path'],
 		['drop', 'static/img/flags/de.png', 'a dynamic flag path'],
 		['drop', 'static/img/flags/de.bmp', 'a native language flag path'],

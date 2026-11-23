@@ -257,10 +257,6 @@
 			"dest": "static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
 		},
 		{
-			"source": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml",
-			"dest": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
-		},
-		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.ps1",
 			"dest": "vendor/ergopti_network_pac.ps1"
 		},
