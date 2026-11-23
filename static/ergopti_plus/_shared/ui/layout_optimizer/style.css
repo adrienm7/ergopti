@@ -192,11 +192,11 @@ body:has(> main.layout-optimizer) {
 		grid-row: 2;
 	}
 
+	/* In place, not sticky: a pinned run card floated over the result and
+	   its score chart below it once the page scrolled (maintainer, 2026-11-23). */
 	.lo-step-run {
 		grid-column: 2;
 		grid-row: 1 / span 2;
-		position: sticky;
-		top: var(--lo-space-4);
 	}
 
 	.lo-step-result {

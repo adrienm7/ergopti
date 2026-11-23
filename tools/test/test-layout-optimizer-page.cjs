@@ -754,6 +754,20 @@ check(
 	'the worker scores the library'
 );
 
+// (optimizer-run-card-in-place) The « Run the search » card stays in its
+// grid cell: pinned (position: sticky), it floated over the best layout found
+// and its score chart below it once the page scrolled (maintainer, 2026-11-23).
+{
+	const style = fs.readFileSync(path.join(PAGE_DIR, 'style.css'), 'utf8');
+	const runRules = [...style.matchAll(/([^{}]*\.lo-step-run[^{}]*)\{([^}]*)\}/g)];
+	check(runRules.length > 0, 'run card: style.css lost its .lo-step-run rule');
+	for (const [, selector, body] of runRules)
+		check(
+			!/position:\s*(sticky|fixed)/.test(body),
+			`run card: ${selector.trim()} pins the card over the results`
+		);
+}
+
 if (errors.length) {
 	console.error(`FAIL test-layout-optimizer-page: ${errors.length} problem(s)`);
 	for (const e of errors) console.error(`  - ${e}`);
