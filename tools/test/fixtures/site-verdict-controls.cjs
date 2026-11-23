@@ -505,7 +505,31 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		/source\/run/,
 		{ event: 'pull_request', source: 'c'.repeat(40) }
 	);
-	assert.equal(controls, 51, 'all two-target, attempt, source and PR identity controls execute');
+	// A GitHub 5xx is repeated (one 502 cost the dev verdict on 2026-11-23);
+	// any other refusal, and a server error that outlasts the delays, stay final.
+	const failing = (stderr, okAfter) => {
+		let calls = 0;
+		return {
+			read: () => {
+				calls += 1;
+				if (calls > okAfter) return 'ok';
+				throw Object.assign(new Error('gh failed'), { stderr });
+			},
+			calls: () => calls
+		};
+	};
+	const transient = failing('gh: Server Error (HTTP 502)', 2);
+	assert.equal(owner.readWithServerRetry(transient.read, [0, 0, 0]), 'ok');
+	assert.equal(transient.calls(), 3, 'two server errors are repeated, then the read succeeds');
+	controls++;
+	const refused = failing('gh: Not Found (HTTP 404)', 1);
+	assert.throws(() => owner.readWithServerRetry(refused.read, [0, 0, 0]), /gh failed/);
+	assert.equal(refused.calls(), 1, 'a client refusal is never repeated');
+	const lasting = failing('gh: Server Error (HTTP 503)', 9);
+	assert.throws(() => owner.readWithServerRetry(lasting.read, [0, 0]), /gh failed/);
+	assert.equal(lasting.calls(), 3, 'a server error that outlasts every delay fails');
+	controls++;
+	assert.equal(controls, 53, 'all two-target, attempt, source and PR identity controls execute');
 	return {
 		controls,
 		scope:
