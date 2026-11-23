@@ -482,7 +482,7 @@ end
 --- @return boolean ready True when the folder and the file exist.
 --- @return string|nil failure The step and cause of a refusal.
 local function ensure_log_file()
-	local folder = KC_LOG_PATH:match("^(.*)/[^/]+$")
+	local folder = require("core.fs.engine.native_path").dirname(KC_LOG_PATH)
 	local attrs = hs.fs.attributes(folder)
 	if attrs == nil then
 		local made, mkdir_err = hs.fs.mkdir(folder)
