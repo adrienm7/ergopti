@@ -42,32 +42,34 @@ enum OwnedRuntimeUninstall {
 		return exists(runtimeDirectory) || jobs.contains(where: { exists($0.plist) })
 	}
 
-	/// The one fixed shell command run with administrator rights. It names only the
-	/// constants above, holds no caller-supplied text, and fails at the first error:
-	/// a job that is not loaded is skipped by an explicit test, not by ignoring a
-	/// failed `bootout`.
-	static func script() -> String {
-		var steps = ["set -e"]
-		for job in jobs {
+	/// Stops each job by its label, removes its job file, then removes the Runtime folder. It names only the
+	/// constants above and holds no caller-supplied text; a job that is not loaded is skipped by an explicit test,
+	/// not by ignoring a failed `bootout`.
+	/// - Parameter retired: The jobs to retire.
+	/// - Returns: The steps, in order, each one shell command.
+	static func retirementSteps(_ retired: [(label: String, plist: String)]) -> [String] {
+		var steps: [String] = []
+		for job in retired {
 			steps.append("if /bin/launchctl print system/\(job.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(job.label); fi")
 			steps.append("/bin/rm -f \(job.plist)")
 		}
 		steps.append("/bin/rm -rf '\(runtimeDirectory)'")
-		return steps.joined(separator: "; ")
+		return steps
+	}
+
+	/// The one fixed shell command run with administrator rights, which fails at the first error.
+	static func script() -> String {
+		return (["set -e"] + retirementSteps(jobs)).joined(separator: "; ")
 	}
 
 	/// Retires what an earlier install left at the Runtime path before the first install runs: the helper refuses
 	/// an existing Runtime or Core job by design, and the driver offers the install only when an installed file is
 	/// missing or unreadable, so a half-published or older Runtime refused every retry at `refused-destination`
-	/// with no way out (field report 2026-11-23). It stops the Core job by its label, then removes its job file and
-	/// the Runtime folder, as `script()` does; the VirtualHIDDevice job is left to the install helper, which
-	/// bootstraps an exact plist already on disk. Each step ends with `; ` for the staged program that follows.
+	/// with no way out (field report 2026-11-23). It retires the Core job and the Runtime folder with the uninstall's
+	/// own steps; the VirtualHIDDevice job is left to the install helper, which bootstraps an exact plist already
+	/// on disk. Each step ends with `; ` for the staged program that follows.
 	static func staleRuntimeProgram() -> String {
-		let core = coreJob
-		return "task_step=stale_runtime; "
-			+ "if /bin/launchctl print system/\(core.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(core.label); fi; "
-			+ "/bin/rm -f '\(core.plist)'; "
-			+ "if [ -e '\(runtimeDirectory)' ] || [ -L '\(runtimeDirectory)' ]; then /bin/rm -rf '\(runtimeDirectory)'; fi; "
+		return "task_step=stale_runtime; " + retirementSteps([coreJob]).map { $0 + "; " }.joined()
 	}
 
 	/// The AppleScript that asks macOS for the administrator prompt.

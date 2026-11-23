@@ -46,7 +46,7 @@ final class OwnedRuntimeServiceRepairTests: XCTestCase {
 		let label = Identifiers.ServiceLabels.macosCore
 		XCTAssertTrue(program.hasPrefix("task_step=stale_runtime; "), program)
 		XCTAssertTrue(program.contains("/bin/launchctl bootout system/" + label + ";"), program)
-		XCTAssertTrue(program.contains("/bin/rm -f '/Library/LaunchDaemons/" + label + ".plist';"), program)
+		XCTAssertTrue(program.contains("/bin/rm -f /Library/LaunchDaemons/" + label + ".plist;"), program)
 		XCTAssertTrue(program.contains("/bin/rm -rf '" + OwnedRuntimeUninstall.runtimeDirectory + "';"), program)
 		XCTAssertFalse(program.contains(Identifiers.ServiceLabels.macosVirtualHid), program)
 		// The same text, pointed at a disposable folder and an unknown job, removes a half-published Runtime.
