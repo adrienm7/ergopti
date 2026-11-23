@@ -164,6 +164,18 @@ _NRP_UseLayout(Layout) {
 	MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
 }
 
+; The OS layout as a fresh installation leaves it: « None » selected and the
+; layer switches at their manifest default, on since the maintainer decision of
+; 2026-11-23, so the selection alone keeps the built-in emulation off and a
+; source that stores neither switch agrees with this intent.
+; @param {String} Digits The stored number-row ordering.
+; @returns {Map} A layout section for _NRP_UseLayout.
+_NRP_NoSelectionLayout(Digits) {
+	Defaults := ManifestBuildFeaturesMap()["layout"]
+	return Map("emulated_layout", "", "ergopti_base", Defaults["ergopti_base"],
+		"ergopti_alt_gr", Defaults["ergopti_alt_gr"], "ergopti_variant", "none", "direct_access_digits", Digits)
+}
+
 ; « Digits first » stored on AZERTY, then the built-in Ergopti and the Ergo-L
 ; emulation over it, then AZERTY again: the stored choice is never rewritten,
 ; it is inert where it cannot reorder the row and applies again on AZERTY with
@@ -278,8 +290,10 @@ _NRP_NativeSymbolsFirst() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile]
 	Dir := _KLT_TempDir()
 	try {
-		Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
-			"ergopti_variant", "none", "direct_access_digits", "symbols")
+		; The base switch is on and « None » selected: the selection gate alone
+		; leaves the row to the OS layout.
+		Native := _NRP_NoSelectionLayout("symbols")
+		AssertTrue(Native["ergopti_base"], "the fixture must leave the base switch on so the selection gate is exercised")
 		_NRP_UseLayout(Native)
 		KLE_Model := 0
 		KLE_Id := ""
@@ -497,8 +511,7 @@ _NRP_EdgeKeysFollowTheChoice() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile, _NumberRowEdgesLogged,
 		_NumberRowForegroundLayout, _DigitRowProfiles]
 	Dir := _KLT_TempDir()
-	Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
-		"ergopti_variant", "none", "direct_access_digits", "symbols")
+	Native := _NRP_NoSelectionLayout("symbols")
 	Azerty := 0x7E57040C, Qwerty := 0x7E570409
 	Symbols := ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"]
 	AzPlain := Map(), AzShift := Map(), UsPlain := Map(), UsShift := Map()
@@ -520,7 +533,11 @@ _NRP_EdgeKeysFollowTheChoice() {
 			; Off: the edge keys keep the layout's own levels on AZERTY, QWERTY and Ergopti.
 			for Vec in [[Azerty, "digits", false], [Qwerty, "symbols", false], [Qwerty, "symbols", true]] {
 				Layout["direct_access_digits"] := Vec[2]
-				Layout["ergopti_base"] := Vec[3]
+				; The selection turns the built-in Ergopti on; the base switch stays
+				; at its default, on, so « None » must keep the emulation off by
+				; itself. The gate turns the switch off in Layout, hence the reset.
+				Layout["ergopti_base"] := Native["ergopti_base"]
+				Layout["ergopti_variant"] := Vec[3] ? "ergopti" : "none"
 				_NRP_UseLayout(Layout)
 				KLE_Model := 0
 				KLE_Id := ""
