@@ -600,9 +600,10 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 				-- A plain RCtrl or LCtrl passes through as Ctrl; the one-shot holds Shift.
 				if key == "left_ctrl" or (key == "right_ctrl" and keys.right_ctrl == nil) then ctrl = true end
 			end
-			local deleted, previous = {}, nil
+			local deleted, previous, edges = {}, nil, 0
 			-- Each edge arrow is three UTF-8 bytes, which a Lua class cannot hold.
 			for code, edge in lalt_tap(keys, held):gmatch("(%d+)(\226\134[\145\147])") do
+				edges = edges + 1
 				code = tonumber(code)
 				if CTRL_CODES[code] then ctrl = edge == "↓"
 				elseif edge == "↓" and (code == 14 or code == 111) then
@@ -610,6 +611,7 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 				end
 				if edge == "↓" then previous = code end
 			end
+			helpers.assert_true(edges > 0, "the thumb tap emits key edges the pattern reads")
 			local got = deleted.key == nil and "char_back"
 				or ((deleted.ctrl and "word" or "char")
 					.. ((deleted.key == 111 or deleted.after_right) and "_forward" or "_back"))
