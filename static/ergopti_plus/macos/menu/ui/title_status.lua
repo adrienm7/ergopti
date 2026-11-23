@@ -60,10 +60,7 @@ end
 --- The statuses the manifest declares a dot for.
 --- @return table statuses Sorted status names; empty when none is declared.
 function M.statuses()
-	local out = {}
-	for status in pairs(declared_dots() or {}) do out[#out + 1] = status end
-	table.sort(out)
-	return out
+	return require("core.text.engine.table_util").sorted_keys(declared_dots() or {})
 end
 
 --- The dot a title carries for a status, read from the manifest.
