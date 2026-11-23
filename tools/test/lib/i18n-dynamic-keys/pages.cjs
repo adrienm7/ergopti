@@ -22,7 +22,6 @@ const SCHEMA = ROOT + '_shared/diagnostics/data/schema.json';
 const MODEL = ROOT + '_shared/ui/healthcheck/model.js';
 const CHECKS = ROOT + '_shared/ui/healthcheck/checks.js';
 const PAGE_SCRIPT = ROOT + '_shared/ui/healthcheck/script.js';
-const NATIVE = ROOT + 'windows/diagnostics/ui/healthcheck/core.ahk';
 const LAYOUT_MANAGER = ROOT + '_shared/ui/layout_manager/script.js';
 const APPS_HELPERS = ROOT + '_shared/ui/metrics_apps/helpers.js';
 const APPS_CHARTS = ROOT + '_shared/ui/metrics_apps/charts.js';
@@ -210,9 +209,8 @@ module.exports = [
 	},
 	{
 		prefix: 'healthcheck.field.',
-		files: [MODEL, NATIVE],
-		source:
-			'the field ids of every section of the diagnostics schema (the page and the native view)',
+		files: [MODEL],
+		source: 'the field ids of every section of the diagnostics schema (the page)',
 		keys: () =>
 			ctx.keysOf(
 				'healthcheck.field.',
@@ -244,8 +242,8 @@ module.exports = [
 	},
 	{
 		prefix: 'healthcheck.section.',
-		files: [MODEL, NATIVE],
-		source: 'the section ids of the diagnostics schema (the page and the native view)',
+		files: [MODEL],
+		source: 'the section ids of the diagnostics schema (the page)',
 		keys: () =>
 			ctx.keysOf(
 				'healthcheck.section.',
