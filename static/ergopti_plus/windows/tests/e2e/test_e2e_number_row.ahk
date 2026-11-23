@@ -57,6 +57,10 @@ _E2ENR_Layout(Klid) {
 _E2ENR_UseLayout(Layout) {
 	global Features, CategoryEnabled, LayerEnabled
 	Features["layout"] := Layout
+	; The loader's gates, as a real start applies them: « None » selected turns
+	; the on-by-default layer switches off (maintainer decision of 2026-11-23),
+	; so a fixture read raw would emulate the built-in Ergopti.
+	ApplyMasterGatesToFeatures(Features, Map(), (*) => true)
 	CategoryEnabled := Map("Layout", true)
 	LayerEnabled := false
 	; No master gate: its desired view is then the Features read here.
