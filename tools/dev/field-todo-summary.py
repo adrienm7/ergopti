@@ -432,9 +432,14 @@ def main(argv):
         args.installed,
     )
     markdown = render_markdown(records, args.installed, target["section"])
-    with open(os.path.join(args.report, "todo_summary.md"), "w", encoding="utf-8") as handle:
+    # LF on every OS: Windows text mode would write CRLF.
+    with open(
+        os.path.join(args.report, "todo_summary.md"), "w", encoding="utf-8", newline="\n"
+    ) as handle:
         handle.write(markdown)
-    with open(os.path.join(args.report, "todo_summary.json"), "w", encoding="utf-8") as handle:
+    with open(
+        os.path.join(args.report, "todo_summary.json"), "w", encoding="utf-8", newline="\n"
+    ) as handle:
         json.dump(
             {
                 "schema": 1,

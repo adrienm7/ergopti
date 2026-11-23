@@ -501,6 +501,15 @@ function fixture(name, start = 'dev') {
 	git(clone, 'init', '-q', '-b', 'dev');
 	git(clone, 'add', '-A');
 	git(clone, 'commit', '-q', '-m', 'fixture');
+	// The repository's pre-commit hook formats and re-stages the staged files:
+	// a commit naming its paths does that on a temporary index, and the real
+	// one kept the unformatted bytes (2026-11-23, the switch back to dev failed).
+	const hook = path.join(clone, '.git', 'hooks', 'pre-commit');
+	fs.writeFileSync(
+		hook,
+		'#!/bin/sh\nfor f in $(git diff --cached --name-only -- "*analysis.md"); do\n\tprintf "\\n" >> "$f"\n\tgit add -f -- "$f"\ndone\n'
+	);
+	fs.chmodSync(hook, 0o755);
 	git(base, 'init', '-q', '--bare', origin);
 	git(clone, 'remote', 'add', 'origin', fileUrl(origin));
 	git(clone, 'push', '-q', 'origin', 'dev');

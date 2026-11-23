@@ -882,6 +882,10 @@ function Complete-Report {
 	if ($LASTEXITCODE -ne 0) { Fail "$OutRelative still names this PC or its user; nothing was committed." }
 	if (-not (Invoke-Git add '-f' $OutRelative)) { Fail "git add of $OutRelative failed." }
 	if (-not (Invoke-Git commit '-q' '-m' $Subject $OutRelative)) { Fail 'git commit failed.' }
+	# A commit naming its paths runs the hooks on a temporary index: the
+	# formatter's rewrite reaches the commit and the files, not the real index,
+	# which kept the unformatted bytes and stopped the switch back to the base.
+	if (-not (Invoke-Git add '-f' $OutRelative)) { Fail "git add of $OutRelative after the commit failed." }
 	if ($NoPush) {
 		Log "Committed on $Branch without pushing."
 	} else {

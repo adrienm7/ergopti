@@ -87,7 +87,8 @@ def write_readme(folder):
         "- `../field_run/`: the app's own results per step (field_run_attempt_N: runs a reload cut short).",
         "",
     ]
-    (folder / MAIN / "README.md").write_text("\n".join(lines), encoding="utf-8")
+    # LF on every OS: Windows text mode would write CRLF.
+    (folder / MAIN / "README.md").write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def tidy(folder):

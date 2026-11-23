@@ -146,6 +146,10 @@ field_report_commit() {
 	ls -1 "${out}" | sed 's/^/  /'
 	git add -f -- "${out}" || fail "git add of ${out} failed."
 	git commit -q -m "${subject}" -- "${out}" || fail "git commit failed."
+	# A commit naming its paths runs the hooks on a temporary index: the
+	# formatter's rewrite reaches the commit and the files, not the real index,
+	# which kept the unformatted bytes and stopped the switch back to the base.
+	git add -f -- "${out}" || fail "git add of ${out} after the commit failed."
 	if [ "${push}" = true ]; then
 		git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
 		log "Pushed ${branch}. Tell the coordinator: report ${out}."
