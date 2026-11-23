@@ -351,6 +351,12 @@
 			"slot": "meta_space"
 		},
 		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "star",
+			"slot": "meta_star"
+		},
+		{
 			"driver": "macos",
 			"modifiers": ["ctrl"],
 			"key": "a",
@@ -466,15 +472,15 @@
 		},
 		{
 			"driver": "macos",
-			"modifiers": ["cmd"],
-			"key": "star",
-			"slot": "primary_star"
+			"modifiers": ["ctrl"],
+			"key": "space",
+			"slot": "secondary_space"
 		},
 		{
 			"driver": "macos",
 			"modifiers": ["ctrl"],
-			"key": "space",
-			"slot": "secondary_space"
+			"key": "star",
+			"slot": "secondary_star"
 		},
 		{
 			"driver": "linux",
@@ -487,6 +493,12 @@
 			"modifiers": ["super"],
 			"key": "space",
 			"slot": "meta_space"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["super"],
+			"key": "star",
+			"slot": "meta_star"
 		}
 	],
 	"pending_keys": ["star"],

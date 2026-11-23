@@ -137,8 +137,13 @@ _KSNR_ChordsHoldOnBothAltGrFamilies() {
 		Saved := _TestSetAltGrFamily(Family == "kana", Family == "standard")
 		try {
 			Seen := 0
+			Pending := Map()
+			for Key in _KSNR_Corpus()["pending_keys"]
+				Pending[Key] := true
 			for Row in _KSNR_Corpus()["crosswalk"] {
-				if Row["driver"] != "windows"
+				; A pending key (★) is no catalogue key: the ★ slot owner binds it on
+				; the scan code the layout types it with (infra/star_slot.ahk).
+				if Row["driver"] != "windows" || Pending.Has(Row["key"])
 					continue
 				Seen += 1
 				Context := Row["slot"] . " on the " . Family . " AltGr"
