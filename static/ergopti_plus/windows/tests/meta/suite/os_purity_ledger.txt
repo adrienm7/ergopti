@@ -34,7 +34,7 @@ calls:core core/text/engine/source_text_codec.ahk 2
 calls:core core/text/engine/toml/helpers.ahk 4
 calls:core core/text/engine/toml/loader.ahk 1
 calls:core core/ui/engine/native_dialogs.ahk 1
-calls:core core/ui/engine/webview/utils.ahk 2
+calls:core core/ui/engine/webview/utils.ahk 1
 calls:core infra/altgr_family.ahk 2
 calls:core infra/user_actions.ahk 2
 calls:core infra/wrap_symbols_config.ahk 2
@@ -89,7 +89,7 @@ calls:ui menu/ui/builder/rebuild.ahk 1
 calls:ui ui/changelog/init.ahk 3
 calls:ui ui/menu/menu_shortcuts.ahk 2
 calls:ui ui/onboarding/answers.ahk 1
-calls:ui ui/onboarding/webview.ahk 4
+calls:ui ui/onboarding/webview.ahk 3
 calls:ui ui/wpm/wpm_category_color.ahk 1
 calls:ui ui/wpm/wpm_gdiplus_ownership.ahk 32
 calls:ui ui/wpm/wpm_widget.ahk 1
@@ -141,9 +141,9 @@ families:core menu/engine/population.ahk 9
 families:core menu/engine/startup_commands.ahk 1
 families:core modules/keymap/keylayout/keylayout_emulation.ahk 1
 families:core modules/keymap/keylayout/layout_registry.ahk 1
-families:core modules/keymap/layout.ahk 27
+families:core modules/keymap/layout.ahk 25
 families:core modules/keymap/layout/layout_altgr.ahk 5
-families:core modules/keymap/layout/layout_shift_caps.ahk 19
+families:core modules/keymap/layout/layout_shift_caps.ahk 17
 families:core modules/keystats/keystats.ahk 3
 families:core modules/keystats/keystats_app_categories.ahk 2
 families:core modules/keystats/keystats_av_state.ahk 2
@@ -166,7 +166,6 @@ families:core modules/shortcuts/tap_keys.ahk 4
 families:core modules/shortcuts/utils.ahk 1
 families:core modules/shortcuts/win.ahk 18
 families:core modules/take_note.ahk 4
-families:core modules/updater/changelog.ahk 1
 families:core modules/updater/core.ahk 8
 families:core modules/updater/self_update.ahk 11
 families:core platform/remap/altgr.ahk 9
@@ -196,11 +195,10 @@ families:ui ai/ui/menu/init.ahk 4
 families:ui ai/ui/menu/menu_main.ahk 2
 families:ui ai/ui/menu/models/models.ahk 2
 families:ui ai/ui/menu/panels/local_server_panel.ahk 2
-families:ui ai/ui/menu/profiles.ahk 5
+families:ui ai/ui/menu/profiles.ahk 4
 families:ui ai/ui/menu/tab_accept.ahk 9
-families:ui ai/ui/model_browser/init.ahk 8
+families:ui ai/ui/model_browser/init.ahk 6
 families:ui ai/ui/prompt_editor/init.ahk 1
-families:ui core/ui/ui/editors.ahk 3
 families:ui core/ui/ui/spotlight/ownership.ahk 3
 families:ui core/ui/ui/tooltip/core.ahk 11
 families:ui core/ui/ui/tooltip/helpers.ahk 19
@@ -213,7 +211,6 @@ families:ui diagnostics/ui/healthcheck/helpers.ahk 1
 families:ui diagnostics/ui/healthcheck/probes.ahk 3
 families:ui diagnostics/ui/healthcheck/report.ahk 1
 families:ui gestures/ui/conflicts.ahk 2
-families:ui hotstrings/ui/hotstrings_config_window/hcw_mutations.ahk 4
 families:ui hotstrings/ui/hotstrings_config_window/webview.ahk 3
 families:ui hotstrings/ui/menu/hotstrings.ahk 1
 families:ui hotstrings/ui/personal_info_editor/init.ahk 4
@@ -231,7 +228,7 @@ families:ui ui/layout_manager/init.ahk 2
 families:ui ui/menu/menu_layout.ahk 1
 families:ui ui/onboarding/gesture_registration.ahk 4
 families:ui ui/onboarding/webview.ahk 9
-families:ui ui/update_check/init.ahk 2
+families:ui ui/update_check/init.ahk 1
 families:ui ui/wpm/wpm_display.ahk 6
 families:ui ui/wpm/wpm_widget.ahk 2
-families:entry ErgoptiPlus.ahk 10
+families:entry ErgoptiPlus.ahk 9

@@ -66,7 +66,6 @@ _PHNS_Classified() {
 		"_MI_StageSuspend", "checks the pause row itself",
 		; Fences against a pause transition.
 		"_LLM_Menu_BuildHeld", Fence, "MagicKeyEditor", Fence,
-		"MagicKeySourceCapture", Fence,
 		; Snapshot fields compared by intent owners.
 		"_LLM_Menu_EnableSnapshot", Snapshot, "_LLM_Menu_PrivacySnapshot", Snapshot,
 		"_LLM_Menu_InfoBarSnapshot", Snapshot, "_LLM_Menu_IndentSnapshot", Snapshot,
