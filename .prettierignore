@@ -41,6 +41,8 @@ static/ergopti_plus/docs/architecture.md
 docs/design/owned-runtimes.md
 # Owned by codegen-feature-requirements.cjs since it joined the generator registry.
 docs/design/feature-requirements.md
+# Owned by codegen-platform-parity.cjs.
+docs/platform-parity-table.md
 docs/feature-inventory.md
 src/routes/ergopti-plus/action-inventory.json
 src/routes/ergopti-plus/feature-inventory.json

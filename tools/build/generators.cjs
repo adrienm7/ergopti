@@ -536,13 +536,9 @@ const GENERATORS = [
 		]
 	},
 	{
-		// The three manifest projections below were run only by hand, so a
+		// The two manifest projections below were run only by hand, so a
 		// manifest change shipped them stale: the parity table broke the Linux
 		// parity check on dev (2026-11-23).
-		script: 'codegen/codegen-config-schema-metrics.cjs',
-		outputs: ['static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json']
-	},
-	{
 		script: 'codegen/codegen-feature-requirements.cjs',
 		outputs: ['docs/design/feature-requirements.md']
 	},
