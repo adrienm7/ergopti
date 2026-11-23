@@ -1,4 +1,4 @@
---- tests/meta/regressions/test_hammerspoon_icon_hidden.lua
+--- tests/meta/regressions/test_embedded_runtime_icon_hidden.lua
 
 --- ==============================================================================
 --- MODULE: Regression — the Hammerspoon hammer stays out of the menu bar
