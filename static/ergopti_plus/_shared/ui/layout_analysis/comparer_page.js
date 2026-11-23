@@ -137,6 +137,9 @@
 	// The class of a rank's cell: an ordinal, the one number a table writes
 	// without a unit (studio-numbers.cjs).
 	const RANK_CELL = 'la-rank';
+	// The class of a table's layout-name cells (the ranking's and every
+	// heat table's), the column that stays in view while it scrolls sideways.
+	const NAME_COLUMN = 'la-name-col';
 	// How many metrics a key's score tooltip names, worst first.
 	const HEAT_SCORE_PARTS = 3;
 	// A difference key is at most this mix of its colour, so its ink stays readable.
@@ -2233,6 +2236,8 @@
 			for (const column of columns) {
 				// A metric's header wraps on two lines at most (style.css la-th-metric).
 				const th = el('th', column.name ? 'la-sortable la-th-metric' : 'la-sortable');
+				// The layout's name stays in view while the metrics scroll by (style.css la-name-col).
+				if (column.key === 'name') th.classList.add(NAME_COLUMN);
 				th.scope = 'col';
 				// The sort is a button, so the keyboard reaches it.
 				const button = el('button', 'la-sort', column.label);
@@ -2309,7 +2314,10 @@
 								);
 					// The name opens the layout's details: a button for the keyboard, the
 					// row answers to the pointer too.
-					if (column.key === 'name') cell.replaceChildren(rowNameButton(String(value)));
+					if (column.key === 'name') {
+						cell.replaceChildren(rowNameButton(String(value)));
+						cell.classList.add(NAME_COLUMN);
+					}
 					if (column.key === 'name' && result.incomplete) cell.append(' ', incompleteFlag(result));
 					if (column.key === 'name' && view) cell.prepend(...view.controls(result));
 					// The relative view shows differences: a percentile is of a value.
@@ -2837,7 +2845,7 @@
 		function heatTableRow(result) {
 			const tr = el('tr');
 			if (state.details === result.layout.id) tr.className = 'la-selected';
-			const th = el('th');
+			const th = el('th', NAME_COLUMN);
 			th.append(rowNameButton(result.layout.name));
 			th.scope = 'row';
 			if (result.incomplete) th.append(' ', incompleteFlag(result));
@@ -3919,6 +3927,8 @@
 			for (const column of columns) {
 				const th = el('th', 'la-sortable');
 				th.scope = 'col';
+				// Over a layout's row header, which stays in view (heatTableRow).
+				if (column.key === 'name') th.classList.add(NAME_COLUMN);
 				const sort = el('button', 'la-sort', column.label);
 				sort.type = 'button';
 				sort.dataset.sortScope = scope;

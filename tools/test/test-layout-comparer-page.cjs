@@ -1260,6 +1260,8 @@ check(
 			.map(fnSource)
 			.join('\n') +
 			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';" +
+			// The page's own name column class, so the harness cannot drift from it.
+			`\n${(page.match(/const NAME_COLUMN = '[^']+';/) || ['const NAME_COLUMN = null;'])[0]}` +
 			// Two results are too few references for a percentile (E.percentiles).
 			'\nconst libraryPercentile = () => null;',
 		context
@@ -1350,6 +1352,63 @@ check(
 		check(
 			constant !== undefined && new RegExp(`event\\.data\\.type === ${constant}\\)`).test(shell),
 			`shell messages: the site's Studio shell does not route ${message}`
+		);
+	}
+}
+
+// (comparer-table-scroll) Every table scrolls inside its own box, never the
+// page: with hundreds of layouts each sub-tab's tables (« Fingers and hands »,
+// « Rows ») were tens of thousands of pixels long, only the overview's ranking
+// was bounded (maintainer, 2026-11-23). One shared rule bounds them all, the
+// header stays in view inside the box and the layout's name column stays in
+// view while a wide table scrolls sideways.
+{
+	const style = fs.readFileSync(path.join(PAGE_DIR, 'style.css'), 'utf8');
+	const rule = (selector) => {
+		const at = style.indexOf(`\n${selector} {\n`);
+		return at < 0 ? '' : style.slice(at, style.indexOf('\n}', at));
+	};
+	const wrap = rule('.la-table-wrap');
+	check(
+		/\n\tmax-height: [^;]*vh[^;]*;/.test(wrap) && /\n\toverflow: auto;/.test(wrap),
+		'table scroll: .la-table-wrap is not bounded to the viewport with its own scrollbars'
+	);
+	const narrower = [...style.matchAll(/\n([^\n{}]+\.la-table-wrap[^\n{}]*) \{([^}]*)\}/g)].filter(
+		(m) => m[1] !== '.la-table-wrap' && /\n\t(max-height|overflow[-a-z]*):/.test(m[2])
+	);
+	check(
+		narrower.length === 0,
+		`table scroll: a narrower rule sizes the table box (${narrower.map((m) => m[1]).join(', ')})`
+	);
+	const head = rule('.la-table thead th');
+	check(
+		/\n\tposition: sticky;/.test(head) &&
+			/\n\ttop: 0;/.test(head) &&
+			/\n\tz-index: \d+;/.test(head),
+		'table scroll: the header does not stay in view over the rows'
+	);
+	const name = rule('.la-table .la-name-col');
+	check(
+		/\n\tposition: sticky;/.test(name) &&
+			/\n\tleft: 0;/.test(name) &&
+			/\n\tbackground: /.test(name),
+		'table scroll: the layout name column does not stay in view'
+	);
+	check(
+		/const NAME_COLUMN = 'la-name-col';/.test(page) &&
+			/if \(column\.key === 'name'\) th\.classList\.add\(NAME_COLUMN\);/.test(
+				page.slice(page.indexOf('function rankingTable('))
+			) &&
+			/cell\.classList\.add\(NAME_COLUMN\);/.test(page) &&
+			/function heatTableRow\([^)]*\) \{[^}]*el\('th', NAME_COLUMN\)/.test(page),
+		'table scroll: the ranking and heat tables do not mark their layout name column'
+	);
+	// Each table's box is the shared class alone: an inline height would undo it.
+	for (const source of ['comparer_page.js', 'analyser_tab.js']) {
+		const text = fs.readFileSync(path.join(PAGE_DIR, source), 'utf8');
+		check(
+			!/la-table-wrap[^\n]*style|wrap\.style\.(max)?[hH]eight/.test(text),
+			`table scroll: ${source} sizes a table box inline`
 		);
 	}
 }

@@ -686,10 +686,15 @@ body:has(> main.layout-analysis) {
 	font-size: 0.9em;
 }
 
-/* Positioned, so screen-reader text in a cell stays inside the scrolling box. */
+/* Every table scrolls inside its own box, never the page: with hundreds of
+   layouts a sub-tab's tables were tens of thousands of pixels long and the
+   next figure was out of reach (maintainer, 2026-11-23). A short table keeps
+   its own height. Positioned, so screen-reader text in a cell stays inside
+   the scrolling box. */
 .la-table-wrap {
 	margin-top: 12px;
-	overflow-x: auto;
+	max-height: max(12rem, 70vh);
+	overflow: auto;
 	position: relative;
 }
 
@@ -711,11 +716,41 @@ body:has(> main.layout-analysis) {
 	text-align: left;
 }
 
+/* The header stays in view over the rows, and over a column that stays in
+   view (la-name-col, a heat table's row header) at their crossing. */
 .la-table thead th {
 	background: var(--la-surface);
 	position: sticky;
 	top: 0;
 	vertical-align: bottom;
+	z-index: 2;
+}
+
+/* A wide table's layout name stays in view while its metrics scroll by; its
+   own background hides them, and a hovered or selected row tints it too. It
+   wraps in a bounded column: a long name with its « incomplete » flag once
+   took 840 px on one line, most of the box once pinned. */
+.la-table .la-name-col {
+	background: var(--la-surface);
+	left: 0;
+	/* As wide as a usual name, never more: a table cell's width is a floor. */
+	min-width: min(16em, 40vw);
+	overflow-wrap: anywhere;
+	position: sticky;
+	white-space: normal;
+	width: min(16em, 40vw);
+	z-index: 1;
+}
+
+.la-table thead th.la-name-col,
+.la-heat-table thead th:first-child {
+	left: 0;
+	z-index: 3;
+}
+
+.la-table tbody tr:hover > .la-name-col,
+.la-table tr.la-selected > .la-name-col {
+	background: linear-gradient(var(--la-accent-soft), var(--la-accent-soft)), var(--la-surface);
 }
 
 .la-sortable {
@@ -1455,11 +1490,6 @@ body:has(> main.layout-analysis) {
 /* The tiles fill the column beside the score chart. */
 .layout-analysis .la-leaders-box h3 {
 	margin: 0 0 8px;
-}
-
-.la-overview .la-table-wrap {
-	max-height: 70vh;
-	overflow: auto;
 }
 
 /* The best layout by the score and a few metrics, one tile each. */
