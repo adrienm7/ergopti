@@ -27,9 +27,12 @@ enum UninstallFailure: Error {
 /// user's own approval in System Settings.
 enum OwnedRuntimeUninstall {
 	static let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime"
+	/// The Core job, which the first install refuses to find already on disk.
+	static let coreJob: (label: String, plist: String) =
+		(Identifiers.ServiceLabels.macosCore, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist")
 	/// Label and property list of each job the owned installer registers.
 	static let jobs: [(label: String, plist: String)] = [
-		(Identifiers.ServiceLabels.macosCore, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"),
+		coreJob,
 		(Identifiers.ServiceLabels.macosVirtualHid, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"),
 	]
 
@@ -51,6 +54,20 @@ enum OwnedRuntimeUninstall {
 		}
 		steps.append("/bin/rm -rf '\(runtimeDirectory)'")
 		return steps.joined(separator: "; ")
+	}
+
+	/// Retires what an earlier install left at the Runtime path before the first install runs: the helper refuses
+	/// an existing Runtime or Core job by design, and the driver offers the install only when an installed file is
+	/// missing or unreadable, so a half-published or older Runtime refused every retry at `refused-destination`
+	/// with no way out (field report 2026-11-23). It stops the Core job by its label, then removes its job file and
+	/// the Runtime folder, as `script()` does; the VirtualHIDDevice job is left to the install helper, which
+	/// bootstraps an exact plist already on disk. Each step ends with `; ` for the staged program that follows.
+	static func staleRuntimeProgram() -> String {
+		let core = coreJob
+		return "task_step=stale_runtime; "
+			+ "if /bin/launchctl print system/\(core.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(core.label); fi; "
+			+ "/bin/rm -f '\(core.plist)'; "
+			+ "if [ -e '\(runtimeDirectory)' ] || [ -L '\(runtimeDirectory)' ]; then /bin/rm -rf '\(runtimeDirectory)'; fi; "
 	}
 
 	/// The AppleScript that asks macOS for the administrator prompt.

@@ -42,7 +42,7 @@ final class OwnedRuntimeServiceRepairTests: XCTestCase {
 	/// install, and the helper refused every retry at `refused-destination`. The install's administrator shell now
 	/// retires it first; the repair keeps the published Runtime it repairs.
 	func testTheInstallRetiresAStaleRuntimeBeforeTheHelper() throws {
-		let program = OwnedRuntimeInstallMainOperation.staleRuntimeProgram()
+		let program = OwnedRuntimeUninstall.staleRuntimeProgram()
 		let label = Identifiers.ServiceLabels.macosCore
 		XCTAssertTrue(program.hasPrefix("task_step=stale_runtime; "), program)
 		XCTAssertTrue(program.contains("/bin/launchctl bootout system/" + label + ";"), program)
