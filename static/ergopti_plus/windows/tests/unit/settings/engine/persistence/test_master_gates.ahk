@@ -296,7 +296,13 @@ _A1_WithDesiredFixture(Body) {
 	DirCreate(Directory)
 	try {
 		Owner["initialized"] := false
-		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", false),
+		; Two layout switches that default off and that only the Layout master
+		; gates: the layer switches default on and the layout selection also
+		; gates them (maintainer decision of 2026-11-23), so they cannot tell a
+		; master gate from a selection gate nor make true a nonneutral intent.
+		for Leaf in ["number_row_reorder_edges", "pause_switch_enabled"]
+			AssertEqual(false, ManifestDefaultFor("layout." . Leaf), "the desired-intent fixture needs a layout switch that defaults off: " . Leaf)
+		Features := Map("layout", Map("number_row_reorder_edges", true, "pause_switch_enabled", false),
 			"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "chatgpt_url", "https://old.test"),
 			"hotstrings", Map("repeat_key_enabled", true, "trigger_char", "*",
 				"rolls", Map("hc", Map("enabled", true))))
@@ -325,8 +331,8 @@ _A1_WithDesiredFixture(Body) {
 
 _A1_DesiredMenu() {
 	global Features
-	AssertFalse(Features["layout"]["ergopti_base"], "the native layout remains inactive")
-	Row := MenuRowWithLabel("layout.ergopti_base", "Layout fixture", "Layout")
+	AssertFalse(Features["layout"]["number_row_reorder_edges"], "the native layout remains inactive")
+	Row := MenuRowWithLabel("layout.number_row_reorder_edges", "Layout fixture", "Layout")
 	AssertTrue(Row is Map, "the desired row is reachable")
 	AssertTrue(Row["checked"], "the desired child remains checked behind a disabled master")
 	AssertFalse(Row.Get("disabled", false), "a disabled master must not disable its child editor")
@@ -341,23 +347,23 @@ _A1_DesiredWrite() {
 		Observed.updates := Updates
 		return true
 	}
-	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_alt_gr", true, "", Writer, (*) => 0))
-	AssertFalse(Features["layout"]["ergopti_alt_gr"], "editing a child must not revive runtime under master OFF")
-	AssertTrue(ReadFeatureStateV2("layout.ergopti_alt_gr")["enabled"], "the committed desired choice is visible")
-	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "editing a sibling preserves prior intent")
+	AssertTrue(WriteFeatureV2(Features, "layout.pause_switch_enabled", true, "", Writer, (*) => 0))
+	AssertFalse(Features["layout"]["pause_switch_enabled"], "editing a child must not revive runtime under master OFF")
+	AssertTrue(ReadFeatureStateV2("layout.pause_switch_enabled")["enabled"], "the committed desired choice is visible")
+	AssertTrue(ReadFeatureStateV2("layout.number_row_reorder_edges")["enabled"], "editing a sibling preserves prior intent")
 	AssertEqual(1, Observed.updates.Length, "the write crosses the real transaction boundary")
 }
 Test("master intent: child edits preserve disabled runtime and sibling intent (a1-desired)",
 	_A1_WithDesiredFixture.Bind(_A1_DesiredWrite))
 
 _A1_GatesKeepParameters() {
-	Candidate := Map("layout", Map("ergopti_base", true, "parameter", "retained"),
+	Candidate := Map("layout", Map("number_row_reorder_edges", true, "parameter", "retained"),
 		"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "delay_ms", 42))
 	ApplyMasterGatesToFeatures(Candidate, Map(), (*) => false)
 	AssertEqual("retained", Candidate["layout"]["parameter"], "gates preserve string parameters")
 	AssertEqual(42, Candidate["shortcuts"]["delay_ms"], "gates preserve numeric parameters")
 	AssertEqual("q", Candidate["shortcuts"]["a_grave"]["letter"], "disabled alpha features retain their parameter")
-	AssertFalse(Candidate["layout"]["ergopti_base"])
+	AssertFalse(Candidate["layout"]["number_row_reorder_edges"])
 	AssertFalse(Candidate["shortcuts"]["a_grave"]["enabled"])
 }
 Test("master intent: runtime projection preserves pure parameters (a1-desired)", _A1_GatesKeepParameters)
@@ -367,7 +373,7 @@ _A1_FullSaveUsesDesired() {
 	Updates := _ConfigCollectFullSaveUpdates()
 	Found := false
 	for Update in Updates {
-		if Update.Section == "layout" && Update.Key == "ergopti_base" {
+		if Update.Section == "layout" && Update.Key == "number_row_reorder_edges" {
 			Found := true
 			AssertTrue(Update.HasOwnProp("Value") && Update.Value == true,
 				"the desired true override survives a full save behind master OFF")
@@ -386,12 +392,12 @@ _A1_ExplicitOffDeletesDesiredOverride() {
 		Observed.updates := Updates
 		return true
 	}
-	AssertFalse(Features["layout"]["ergopti_base"])
-	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_base", false, "", Writer, (*) => 0))
+	AssertFalse(Features["layout"]["number_row_reorder_edges"])
+	AssertTrue(WriteFeatureV2(Features, "layout.number_row_reorder_edges", false, "", Writer, (*) => 0))
 	AssertEqual(1, Observed.updates.Length, "runtime false must not bypass the desired OFF write")
 	AssertTrue(Observed.updates[1].HasOwnProp("Delete") && Observed.updates[1].Delete == 1,
 		"neutral OFF explicitly deletes the former true override")
-	AssertFalse(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
+	AssertFalse(ReadFeatureStateV2("layout.number_row_reorder_edges")["enabled"])
 }
 Test("master intent: explicit OFF deletes a demoted desired override (a1-sparse)",
 	_A1_WithDesiredFixture.Bind(_A1_ExplicitOffDeletesDesiredOverride))
@@ -400,11 +406,11 @@ _A1_RefusedWriteRetainsBothStates() {
 	global Features
 	Desired := MasterGateState()["features"]
 	Runtime := Features
-	AssertFalse(WriteFeatureV2(Features, "layout.ergopti_base", false, "", (*) => false, (*) => 0))
+	AssertFalse(WriteFeatureV2(Features, "layout.number_row_reorder_edges", false, "", (*) => false, (*) => 0))
 	AssertTrue(MasterGateState()["features"] == Desired, "refusal cannot publish desired candidates")
 	AssertTrue(Features == Runtime, "refusal cannot publish runtime candidates")
-	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
-	AssertFalse(Features["layout"]["ergopti_base"])
+	AssertTrue(ReadFeatureStateV2("layout.number_row_reorder_edges")["enabled"])
+	AssertFalse(Features["layout"]["number_row_reorder_edges"])
 }
 Test("master intent: refused persistence preserves desired and raw runtime (a1-desired)",
 	_A1_WithDesiredFixture.Bind(_A1_RefusedWriteRetainsBothStates))
@@ -412,8 +418,8 @@ Test("master intent: refused persistence preserves desired and raw runtime (a1-d
 _A1_ReenableDesiredOnly() {
 	global Features
 	AssertTrue(ToggleCategoryAllFeatures("Layout", true, (*) => true, (*) => 0, (*) => true))
-	AssertTrue(Features["layout"]["ergopti_base"], "reenabling restores the desired true child")
-	AssertFalse(Features["layout"]["ergopti_alt_gr"], "reenabling does not enable the undesired sibling")
+	AssertTrue(Features["layout"]["number_row_reorder_edges"], "reenabling restores the desired true child")
+	AssertFalse(Features["layout"]["pause_switch_enabled"], "reenabling does not enable the undesired sibling")
 	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, (*) => true, (*) => 0, (*) => true))
 	AssertTrue(Features["shortcuts"]["a_grave"]["enabled"])
 	AssertEqual("q", Features["shortcuts"]["a_grave"]["letter"], "parameters survive OFF and ON")
@@ -424,11 +430,11 @@ Test("master intent: reenable restores only desired children (a1-desired)",
 _A1_UnrelatedDemotionSurvivesEdit() {
 	global Features, CategoryEnabled
 	CategoryEnabled["Layout"] := true
-	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"])
-	AssertFalse(Features["layout"]["ergopti_base"])
-	AssertTrue(WriteFeatureV2(Features, "layout.ergopti_alt_gr", true, "", (*) => true, (*) => 0))
-	AssertFalse(Features["layout"]["ergopti_base"], "a sibling edit cannot reactivate a session-demoted feature")
-	AssertTrue(Features["layout"]["ergopti_alt_gr"])
+	AssertTrue(ReadFeatureStateV2("layout.number_row_reorder_edges")["enabled"])
+	AssertFalse(Features["layout"]["number_row_reorder_edges"])
+	AssertTrue(WriteFeatureV2(Features, "layout.pause_switch_enabled", true, "", (*) => true, (*) => 0))
+	AssertFalse(Features["layout"]["number_row_reorder_edges"], "a sibling edit cannot reactivate a session-demoted feature")
+	AssertTrue(Features["layout"]["pause_switch_enabled"])
 }
 Test("master intent: unrelated session demotion survives a child edit (a1-desired)",
 	_A1_WithDesiredFixture.Bind(_A1_UnrelatedDemotionSurvivesEdit))
@@ -484,16 +490,16 @@ Test("master intent: parameter editors and repeat toggle consume desired state (
 _A1_DemotionDuringMasterWrite() {
 	global Features, CategoryEnabled
 	CategoryEnabled["Layout"] := true
-	Features["layout"]["ergopti_base"] := true
+	Features["layout"]["number_row_reorder_edges"] := true
 	Writer(*) {
 		global Features
-		Features["layout"]["ergopti_base"] := false
+		Features["layout"]["number_row_reorder_edges"] := false
 		return true
 	}
 	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, Writer, (*) => 0, (*) => true))
-	AssertFalse(Features["layout"]["ergopti_base"],
+	AssertFalse(Features["layout"]["number_row_reorder_edges"],
 		"a runtime demotion during unrelated durable I/O must survive category publication")
-	AssertTrue(ReadFeatureStateV2("layout.ergopti_base")["enabled"], "session demotion must not erase desired intent")
+	AssertTrue(ReadFeatureStateV2("layout.number_row_reorder_edges")["enabled"], "session demotion must not erase desired intent")
 }
 Test("master intent: master publication preserves a concurrent runtime demotion (a1-admission)",
 	_A1_WithDesiredFixture.Bind(_A1_DemotionDuringMasterWrite))

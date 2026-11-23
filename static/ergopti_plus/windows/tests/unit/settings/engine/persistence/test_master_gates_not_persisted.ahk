@@ -23,7 +23,7 @@
 _MGP_DesiredBatchPreservesUnknown() {
 	global ConfigurationFile, Features
 	Original := "[unknown.nested]" . Chr(10) . 'token = "retain"' . Chr(10)
-	Original .= "[layout]" . Chr(10) . "ergopti_alt_gr = true" . Chr(10)
+	Original .= "[layout]" . Chr(10) . "pause_switch_enabled = true" . Chr(10)
 	SavedPath := ConfigurationFile
 	Fixture := _ScopeOwnerFixture(Original)
 	try {
@@ -33,13 +33,13 @@ _MGP_DesiredBatchPreservesUnknown() {
 			"the full-save batch must cross the durable transaction gateway")
 		AssertEqual("retain", TOML_Read(ConfigurationFile, "unknown.nested", "token", "missing"),
 			"unknown nested keys survive the mixed sparse batch")
-		AssertEqual(1, TOML_Read(ConfigurationFile, "layout", "ergopti_base", -1),
+		AssertEqual(1, TOML_Read(ConfigurationFile, "layout", "number_row_reorder_edges", -1),
 			"desired true survives while its runtime master is disabled")
-		AssertEqual(-1, TOML_Read(ConfigurationFile, "layout", "ergopti_alt_gr", -1),
+		AssertEqual(-1, TOML_Read(ConfigurationFile, "layout", "pause_switch_enabled", -1),
 			"a desired neutral leaf deletes its previous override rather than omitting it")
 		AssertEqual(1, TOML_Read(ConfigurationFile, "hotstrings.rolls.hc", "enabled", -1),
 			"disabled hotstring subcategories retain their desired section choices")
-		AssertFalse(Features["layout"]["ergopti_base"], "saving cannot activate runtime")
+		AssertFalse(Features["layout"]["number_row_reorder_edges"], "saving cannot activate runtime")
 	} finally {
 		ConfigurationFile := SavedPath
 		_ScopeOwnerCleanup(Fixture)
