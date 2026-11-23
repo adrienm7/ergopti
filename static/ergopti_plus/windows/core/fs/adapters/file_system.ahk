@@ -331,11 +331,13 @@ FSChangeNotificationOpen(Dir, Subtree, Filter) {
 ; @returns {Boolean}
 ; @throws {OSError} When the wait or the re-arm fails.
 FSChangeNotificationTaken(Handle) {
-	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
+	; This adapter is included alone by isolated helpers, without the process
+	; adapter's PLC_WAIT_* names: the two Win32 results are spelled here.
+	static WAIT_OBJECT_0 := 0x00000000, WAIT_TIMEOUT := 0x00000102
 	Result := DllCall("WaitForSingleObject", "Ptr", Handle, "UInt", 0, "UInt")
-	if (Result == PLC_WAIT_TIMEOUT)
+	if (Result == WAIT_TIMEOUT)
 		return false
-	if (Result != PLC_WAIT_OBJECT_0)
+	if (Result != WAIT_OBJECT_0)
 		throw OSError(A_LastError, -1, "WaitForSingleObject on a change notification")
 	if !DllCall("FindNextChangeNotification", "Ptr", Handle, "Int")
 		throw OSError(A_LastError, -1, "FindNextChangeNotification")
