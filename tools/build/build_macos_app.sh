@@ -629,6 +629,19 @@ build_icon() {
 		sips -z "$double" "$double" "$src" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 	done
 	iconutil -c icns "$iconset" -o "$APP_PATH/Contents/Resources/ErgoptiPlus.icns"
+
+	# The embedded engine shows its own icon in its dialogs, notifications and
+	# the privacy lists, and that was Hammerspoon's hammer (field report
+	# 2026-11-23). It now carries ErgoptiPlus' icon: CFBundleIconName would
+	# make macOS read Hammerspoon's asset catalogue first, so it goes.
+	local hs_app="$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	local hs_plist="$hs_app/Contents/Info.plist"
+	[ -f "$hs_plist" ] || fail "embedded Hammerspoon Info.plist missing."
+	cp "$APP_PATH/Contents/Resources/ErgoptiPlus.icns" "$hs_app/Contents/Resources/ErgoptiPlus.icns"
+	plutil -replace CFBundleIconFile -string "ErgoptiPlus" "$hs_plist"
+	if plutil -extract CFBundleIconName raw "$hs_plist" >/dev/null 2>&1; then
+		plutil -remove CFBundleIconName "$hs_plist"
+	fi
 }
 
 

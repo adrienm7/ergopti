@@ -574,7 +574,7 @@ func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
 	// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
 	// Ergopti provides its own menubar item via hs.menubar; the HS default
 	// icons are redundant and reveal the underlying dependency.
-	for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
+	for key in kHammerspoonHiddenIconKeys {
 		CFPreferencesSetValue(
 			key as CFString,
 			false as CFBoolean,
