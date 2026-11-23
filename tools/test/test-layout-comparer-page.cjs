@@ -1373,6 +1373,12 @@ check(
 		/\n\tmax-height: [^;]*vh[^;]*;/.test(wrap) && /\n\toverflow: auto;/.test(wrap),
 		'table scroll: .la-table-wrap is not bounded to the viewport with its own scrollbars'
 	);
+	// A frame that grows with its page (the site's benchmarks) makes a vh its own
+	// height: only a fixed ceiling keeps the tables from growing with it.
+	check(
+		/\n\tmax-height: clamp\([^,;]+, [^,;]*vh[^,;]*, [\d.]+rem\);/.test(wrap),
+		'table scroll: .la-table-wrap has no fixed ceiling for a frame that grows with its page'
+	);
 	const narrower = [...style.matchAll(/\n([^\n{}]+\.la-table-wrap[^\n{}]*) \{([^}]*)\}/g)].filter(
 		(m) => m[1] !== '.la-table-wrap' && /\n\t(max-height|overflow[-a-z]*):/.test(m[2])
 	);

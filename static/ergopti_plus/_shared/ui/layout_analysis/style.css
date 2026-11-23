@@ -689,11 +689,13 @@ body:has(> main.layout-analysis) {
 /* Every table scrolls inside its own box, never the page: with hundreds of
    layouts a sub-tab's tables were tens of thousands of pixels long and the
    next figure was out of reach (maintainer, 2026-11-23). A short table keeps
-   its own height. Positioned, so screen-reader text in a cell stays inside
-   the scrolling box. */
+   its own height. The rem ceiling holds where the frame grows with the page
+   (the site's benchmarks, reportHeight): there a vh is the frame's own
+   height, so 70vh alone would grow with the tables it bounds. Positioned, so
+   screen-reader text in a cell stays inside the scrolling box. */
 .la-table-wrap {
 	margin-top: 12px;
-	max-height: max(12rem, 70vh);
+	max-height: clamp(12rem, 70vh, 48rem);
 	overflow: auto;
 	position: relative;
 }
