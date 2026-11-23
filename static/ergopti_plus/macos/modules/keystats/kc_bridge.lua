@@ -30,7 +30,6 @@ local M = {}
 local hs      = hs
 local Logger  = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
-local FileSystem = require("core.fs.adapters.file_system")
 local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TextUtils = require("core.text.engine.utils_core")
@@ -483,7 +482,13 @@ end
 --- @return boolean ready True when the folder and the file exist.
 --- @return string|nil failure The step and cause of a refusal.
 local function ensure_log_file()
-	local folder_ready, folder_err = FileSystem.prepare_parent_for_create(KC_LOG_PATH)
+	-- The bridge arms from keystats module construction: a raising port must
+	-- become this refusal, named in the caller's warning, or the half-built
+	-- keystats module would refuse its own reload.
+	local called, folder_ready, folder_err = pcall(function()
+		return require("core.fs.adapters.file_system").prepare_parent_for_create(KC_LOG_PATH)
+	end)
+	if not called then folder_ready, folder_err = false, folder_ready end
 	if not folder_ready then
 		return false, string.format("cannot create the folder of '%s': %s", KC_LOG_PATH, tostring(folder_err))
 	end
