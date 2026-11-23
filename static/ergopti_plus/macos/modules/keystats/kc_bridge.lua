@@ -30,6 +30,7 @@ local M = {}
 local hs      = hs
 local Logger  = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
+local FileSystem = require("core.fs.adapters.file_system")
 local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TextUtils = require("core.text.engine.utils_core")
@@ -482,14 +483,9 @@ end
 --- @return boolean ready True when the folder and the file exist.
 --- @return string|nil failure The step and cause of a refusal.
 local function ensure_log_file()
-	local folder = require("core.fs.engine.native_path").dirname(KC_LOG_PATH)
-	local attrs = hs.fs.attributes(folder)
-	if attrs == nil then
-		local made, mkdir_err = hs.fs.mkdir(folder)
-		if not made then return false, string.format("cannot create '%s': %s", folder, tostring(mkdir_err)) end
-		Logger.info(LOG, "Created the Karabiner hand-off folder '%s'.", folder)
-	elseif attrs.mode ~= "directory" then
-		return false, string.format("'%s' is a %s, not a folder", folder, tostring(attrs.mode))
+	local folder_ready, folder_err = FileSystem.prepare_parent_for_create(KC_LOG_PATH)
+	if not folder_ready then
+		return false, string.format("cannot create the folder of '%s': %s", KC_LOG_PATH, tostring(folder_err))
 	end
 	local handle, open_err = io.open(KC_LOG_PATH, "a")
 	if not handle then return false, string.format("cannot create '%s': %s", KC_LOG_PATH, tostring(open_err)) end
