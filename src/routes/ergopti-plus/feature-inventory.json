@@ -2313,8 +2313,8 @@
 		"path": "shortcuts.star.letter",
 		"family": "setting",
 		"labels": {
-			"fr": "shortcuts.star.letter",
-			"en": "shortcuts.star.letter"
+			"fr": "Lettre que suivent les raccourcis sur la touche ★",
+			"en": "Letter the shortcuts on the ★ key follow"
 		},
 		"platforms": {
 			"windows": true,
