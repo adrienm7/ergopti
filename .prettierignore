@@ -39,6 +39,8 @@ static/ergopti_plus/_shared/ui/value_check.js
 static/ergopti_plus/macos/ai/engine/managed-python-downloads.json
 static/ergopti_plus/docs/architecture.md
 docs/design/owned-runtimes.md
+# Owned by codegen-feature-requirements.cjs since it joined the generator registry.
+docs/design/feature-requirements.md
 docs/feature-inventory.md
 src/routes/ergopti-plus/action-inventory.json
 src/routes/ergopti-plus/feature-inventory.json
