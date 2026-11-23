@@ -161,6 +161,24 @@ function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {
 	return errors;
 }
 
+/**
+ * Gives the private copy a Git index of its own files.
+ * @param {string} root Private tree to index.
+ */
+function indexPrivateTree(root) {
+	for (const args of [
+		['init', '--quiet'],
+		['add', '--all', '--force', '--', '.']
+	]) {
+		const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true });
+		if (result.error || result.signal || result.status !== 0)
+			throw new Error(
+				`Drift fixture index refused: git ${args[0]} (status=${result.status}): ` +
+					(result.error?.message || result.stderr || '').trim()
+			);
+	}
+}
+
 /** Copies current source bytes and confines every perturbation to that copy. */
 function runIsolatedCoverage({ files, probe = runCoverage } = {}) {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-drift-coverage-'));
@@ -194,6 +212,10 @@ function runIsolatedCoverage({ files, probe = runCoverage } = {}) {
 			fs.mkdirSync(path.dirname(destination), { recursive: true });
 			fs.copyFileSync(source, destination);
 		}
+		// Generators that inventory tracked sources (the platform parity table)
+		// read the Git index, so the private copy carries its own index of the
+		// same files; node_modules is linked afterwards and stays untracked.
+		indexPrivateTree(temporary);
 		fs.symlinkSync(
 			path.join(ROOT, 'node_modules'),
 			path.join(temporary, 'node_modules'),
