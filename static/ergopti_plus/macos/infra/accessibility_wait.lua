@@ -94,6 +94,11 @@ end
 --- @param opts table Wait options (install_identity, reset_memory).
 local function reset_then_prompt(permission, state, opts)
 	if opts.reset_memory.get() == opts.install_identity then
+		-- No tccutil runs, so nothing can revoke a grant: the poll may resume.
+		-- Left pending, every boot after an install's first (a reload, a
+		-- relaunch) ignored the grant until its deadline, so the user had to
+		-- reload once more (field report 2026-11-23).
+		state.reset_pending = false
 		Logger.info(LOG, "Accessibility entry already reset for install %s; keeping the user's entry.",
 			opts.install_identity)
 		prompt_user(permission)

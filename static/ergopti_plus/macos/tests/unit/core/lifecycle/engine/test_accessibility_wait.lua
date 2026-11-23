@@ -94,6 +94,21 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil, table.concat(h.events, ","))
 	end)
 
+	-- Every boot after an install's first left the reset pending forever, so the
+	-- grant was ignored until the deadline and the user had to reload again
+	-- (field report 2026-11-23, accessibility-wait-resumes-after-reload).
+	helpers.it("a reload of the same install resumes the boot as soon as trust arrives", function()
+		local h = harness()
+		h.remembered = "0.0.0-dev.162:16777230:4242"
+		helpers.assert_eq(h.wait.start(h.opts), true)
+		h.ticks()
+		helpers.assert_nil(h.index("trusted"), "no resume while untrusted")
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("trusted") ~= nil, "the grant must resume the boot without another reload")
+		helpers.assert_nil(h.index("timeout:3"), table.concat(h.events, ","))
+	end)
+
 	helpers.it("a new install resets once more", function()
 		local h = harness()
 		h.remembered = "0.0.0-dev.161:16777230:4100"
