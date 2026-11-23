@@ -5,6 +5,21 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## One layout mark from the theoretical worst; AAA everywhere (2026-11-23)
+
+The maintainer found the score's points opaque and asked for one mark per
+layout where 0 is the worst layout possible, higher is better with no ceiling,
+and gaps read in %; QWERTY, shared by every language, is the reference named
+beside it, not AZERTY. The Optimiser's « an existing layout would do the job »
+gap follows it in %. Implementation is the TODO's Ergopti Studio item.
+
+Accessibility targets WCAG 2.2 AAA (the latest WCAG) on the site, Ergopti+ and
+every app window, measured in CI by every tool that covers AAA criteria, red at
+the first finding (TODO « AAA measured in CI »). The QCM of 2026-11-23 also
+re-confirmed decisions already recorded here (change penalty free, Undo with no
+timer, `/ergopti-plus-old` retired, site texts in English, a switch for the
+screen-reader notices).
+
 ## Pending leaf rows are sealed; frame receipts keep every check (2026-11-22)
 
 The maintainer chose sealed rows (QCM 2026-11-22) over a faster frame that

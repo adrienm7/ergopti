@@ -143,8 +143,14 @@ every maintainer request here.
 
 The goal is a totally accessible project: the site (ergopti.fr), Ergopti Studio (editor, Comparer, Optimiser,
 benchmarks) on the site and inside the app, and Ergopti+ itself (menus, windows, dialogs, tooltips, onboarding) on
-Windows, macOS and Linux. Target WCAG 2.2 level AA everywhere, AAA where it costs little; every new page or window
-is held to it from now on.
+Windows, macOS and Linux. Target WCAG 2.2 level AAA everywhere (maintainer, 2026-11-23: the latest WCAG, AAA on the
+site, Ergopti+ and every app window); every new page or window is held to it from now on.
+
+- [ ] **[CODE] AAA measured in CI, red below perfect (maintainer, 2026-11-23).** Survey the tools that measure
+      accessibility (axe-core's `wcag2aaa`/`wcag22aaa` tags beside the AA ones, Pa11y with HTML_CodeSniffer's
+      WCAG2AAA standard, IBM Equal Access, Lighthouse) and wire the ones that cover the AAA criteria into the site,
+      Studio and app-window gates, with a zero baseline: any finding fails CI. List the AAA criteria no tool can
+      measure (e.g. sign language, extended audio description, reading level) with how each is checked instead.
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the
@@ -238,6 +244,13 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
+- [ ] **[CODE] One layout score with 0 as the theoretical worst (maintainer, 2026-11-23).** Points with no zero read
+      as nothing (« what is a point? »). Every layout gets a mark where 0 is the worst layout possible on the corpus
+      and the settings, and higher is better with no ceiling, so ratios read plainly (« 23 % more than QWERTY »).
+      QWERTY, common to every language, is the reference named beside the mark; AZERTY is French only. The worst
+      bound comes from the score's own costs (the Optimiser run to maximise them, or a proven upper bound), not a
+      library layout. The Comparer, the Optimiser (its « an existing layout would do the job » gap in %) and the
+      site follow it ([decision](docs/memory/maintainer-decisions.md)).
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
       model »): 73 of the 91 files left out for its keys came in, the library holds 783 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
