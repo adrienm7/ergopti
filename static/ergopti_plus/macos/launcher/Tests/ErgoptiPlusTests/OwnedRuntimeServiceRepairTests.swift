@@ -69,6 +69,16 @@ final class OwnedRuntimeServiceRepairTests: XCTestCase {
 		XCTAssertFalse(FileManager.default.fileExists(atPath: plist.path))
 	}
 
+	/// Field report 2026-11-23: a plain `refused-destination`, met before the journal wrote anything, came back as
+	/// « cleanup pending » because the rollback it never needed refused.
+	func testARefusalBeforeTheJournalIsARefusalNotCleanupPending() {
+		var rolledBack = 0
+		XCTAssertEqual(OwnedRuntimeIdleServiceEntry.unpublishedResult(.refused, rollback: { rolledBack += 1; return false }), .refused)
+		XCTAssertEqual(rolledBack, 0, "nothing was written, so nothing is rolled back")
+		XCTAssertEqual(OwnedRuntimeIdleServiceEntry.unpublishedResult(.cleanupPending, rollback: { true }), .refused)
+		XCTAssertEqual(OwnedRuntimeIdleServiceEntry.unpublishedResult(.cleanupPending, rollback: { false }), .cleanupPending)
+	}
+
 	func testHelperResultValuesMatchTheRepairEntry() {
 		XCTAssertEqual(OwnedRuntimeInstallMainOperation.Mode.repair.helperResults,
 			[OwnedRuntimeServiceRepairEntry.Result.servicesObserved.rawValue, OwnedRuntimeServiceRepairEntry.Result.servicePending.rawValue])
