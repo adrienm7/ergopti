@@ -408,7 +408,7 @@ Test("screen brightness: closed diagnostic refuses malformed private observation
 
 _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		ExpectedStage := "readback", ExpectedPolicyType := "object") {
-	global _DriverDir, _SharedDir, _VendorDir
+	global _DriverDir, _SharedDir, _VendorDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Observed := [], Control := Map(), Polls := 0
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
@@ -429,7 +429,7 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 	try {
 		AssertTrue(Handle.start(), "the native owned child must really start")
 		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired(Started, 5000) {
+		while Observed.Length == 0 && !TickExpired(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS) {
 			Polls++
 			_SR_TreePoll()
 			Sleep(10)

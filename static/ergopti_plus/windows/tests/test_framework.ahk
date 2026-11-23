@@ -59,6 +59,14 @@ global TEST_NOT_EXECUTED_COUNT := 0
 ; report.cjs parse the same spelling.
 global TEST_NOT_EXECUTED_MARKER := " # SKIP NOT EXECUTED: "
 
+; How long a test waits for a real child process or a local peer to settle by
+; itself. Each such wait polls its explicit condition, so a healthy run returns
+; as soon as the child does; this bound only decides when a stalled one fails.
+; A hosted Windows runner ran 10 to 50 times slower than usual for minutes
+; (CI run 45247903986): 330 ms PowerShell children took over 5 s and a 2.7 s
+; managed request over 30 s, so short per-test literals failed healthy code.
+global TEST_NATIVE_SETTLE_TIMEOUT_MS := 60000
+
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
