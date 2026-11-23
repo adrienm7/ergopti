@@ -1033,6 +1033,9 @@ async function main() {
 				'window.__workers = 0; const NativeWorker = window.Worker;' +
 				'window.Worker = function (...args) { window.__workers += 1; return new NativeWorker(...args); };</script>' +
 				[
+					// Every host of the page loads it (test-layout-optimizer-page pins
+					// both): a run that ends reads its reduced-motion choice.
+					'a11y_prefs.js',
 					'_generated/key_legend.js',
 					'layout_analysis/_generated/analysis_data.js',
 					'layout_analysis/analysis_engine.js',
@@ -1166,6 +1169,9 @@ async function main() {
 				`<style>${inline('theme.css')}${inline('layout_optimizer/style.css')}</style>` +
 				`<script>window._i18n_strings = ${JSON.stringify(strings).replace(/</g, '\\u003c')};</script>` +
 				[
+					// Every host of the page loads it (test-layout-optimizer-page pins
+					// both): a run that ends reads its reduced-motion choice.
+					'a11y_prefs.js',
 					'_generated/key_legend.js',
 					'layout_analysis/_generated/analysis_data.js',
 					'layout_analysis/analysis_engine.js',
