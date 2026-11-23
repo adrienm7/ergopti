@@ -473,6 +473,30 @@ local function resync_cursor_to_eof()
 	return true, eof_or_err
 end
 
+--- Creates the hand-off log and its folder before anything opens them.
+--- Karabiner appends through a plain `echo >>`, which creates the file but never
+--- its folder, and this bridge drains the log from module load whether Metrics
+--- is on or not, before LogManager creates <config_dir>/metrics/. The folder is
+--- therefore the bridge's to create: without it a fresh configuration loses every
+--- physical press and the cold-start EOF proof is refused.
+--- @return boolean ready True when the folder and the file exist.
+--- @return string|nil failure The step and cause of a refusal.
+local function ensure_log_file()
+	local folder = KC_LOG_PATH:match("^(.*)/[^/]+$")
+	local attrs = hs.fs.attributes(folder)
+	if attrs == nil then
+		local made, mkdir_err = hs.fs.mkdir(folder)
+		if not made then return false, string.format("cannot create '%s': %s", folder, tostring(mkdir_err)) end
+		Logger.info(LOG, "Created the Karabiner hand-off folder '%s'.", folder)
+	elseif attrs.mode ~= "directory" then
+		return false, string.format("'%s' is a %s, not a folder", folder, tostring(attrs.mode))
+	end
+	local handle, open_err = io.open(KC_LOG_PATH, "a")
+	if not handle then return false, string.format("cannot create '%s': %s", KC_LOG_PATH, tostring(open_err)) end
+	handle:close()
+	return true
+end
+
 local function _arm_watchers()
 	if not require_state("_arm_watchers") then return false end
 	if _watchers_active then return true end
@@ -485,9 +509,9 @@ local function _arm_watchers()
 
 	-- Touch: hs.pathwatcher binds to an inode; the file must exist before
 	-- watcher:start() or creation events may be missed on some macOS versions.
-	local fh_touch = io.open(KC_LOG_PATH, "a")
-	if fh_touch then fh_touch:close()
-	else Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
+	local log_ready, log_failure = ensure_log_file()
+	if not log_ready then
+		Logger.warn(LOG, "Karabiner hand-off log unavailable — bridge may not receive KE events: %s.", log_failure)
 	end
 
 	local watcher_ok, watcher_candidate = xpcall(function()
@@ -577,6 +601,13 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions, may
 		build_managed_output_set(tap_hold_config, available_actions)
 	else
 		Logger.debug(LOG, "Tap/hold configuration is deferred; suppression set starts empty.")
+	end
+
+	-- The EOF proof below opens the log for reading: create it first, or a fresh
+	-- configuration refuses the proof at every cold start.
+	local log_ready, log_failure = ensure_log_file()
+	if not log_ready then
+		Logger.warn(LOG, "Karabiner hand-off log unavailable at cold start: %s.", log_failure)
 	end
 
 	-- Set _file_offset to current end so we ignore stale lines from a prior session

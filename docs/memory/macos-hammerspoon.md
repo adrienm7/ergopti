@@ -1224,7 +1224,9 @@ because Hammerspoon's exit status 0 makes the launcher quit with a fatal exit.
 ### project-hs-kc-ledger-process-lifecycle
 
 The Karabiner physical-key ledger keeps draining when metrics are disabled.
-Only process shutdown tears it down.
+Only process shutdown tears it down. It starts at keystats load, before
+LogManager creates `<config_dir>/metrics/`, so the bridge creates that folder
+and the log before its EOF proof; Karabiner's `echo >>` cannot create a folder.
 
 ### project-macos-ax-reads-unanswered-and-self
 
