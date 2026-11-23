@@ -89,4 +89,20 @@ function M.decode(json_str)
 	return as_tree(result), nil
 end
 
+
+--- Reads and decodes one bundled JSON data file. The read is the adapter's own,
+--- so a shipped data file reads the same while a caller's configuration file
+--- port is replaced or refuses.
+--- @param path string Absolute path of the file.
+--- @return any|nil decoded Lua value, or nil on failure.
+--- @return string|nil err Error description on failure; nil means success.
+function M.decode_file(path)
+	if type(path) ~= "string" or path == "" then return nil, "path is required" end
+	local handle, open_err = io.open(path, "rb")
+	if not handle then return nil, tostring(open_err) end
+	local text = handle:read("*a")
+	handle:close()
+	return M.decode(text)
+end
+
 return M

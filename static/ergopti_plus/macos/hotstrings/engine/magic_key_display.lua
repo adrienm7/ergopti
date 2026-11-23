@@ -20,7 +20,6 @@ local M = {}
 
 local MagicKey   = require("hotstrings.engine.magic_key_rules")
 local JsonCodec  = require("core.fs.adapters.json_codec")
-local FileSystem = require("core.fs.adapters.file_system")
 local Keycodes   = require("platform.input.keycodes")
 local Paths      = require("core.fs.engine.paths")
 local Manifest   = require("menu.engine.manifest_reader")
@@ -44,9 +43,7 @@ local _registry = nil
 --- @param relative string Path under _shared/.
 --- @return table parsed
 local function read_json(relative)
-	local text, status, read_detail = FileSystem.read_with_status(Paths.shared(relative))
-	assert(status == "ok", "magic key rules: " .. relative .. " is " .. tostring(status) .. ": " .. tostring(read_detail))
-	local parsed, detail = JsonCodec.decode(text or "")
+	local parsed, detail = JsonCodec.decode_file(Paths.shared(relative))
 	assert(type(parsed) == "table", "magic key rules: " .. relative .. " is unreadable: " .. tostring(detail))
 	return parsed
 end
