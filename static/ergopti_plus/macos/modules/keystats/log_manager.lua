@@ -1872,9 +1872,15 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 	return true
 end
 
---- Rebuild each partition in a private SQLite snapshot, then atomically publish
---- only if the canonical handle and its complete change witness are unchanged.
---- No intermediate stage cursor is durable: an interrupted job starts again.
+--- Rebuild each partition in a private SQLite snapshot, then publish it day by
+--- day only while the canonical handle and its complete change witness are
+--- unchanged. No intermediate stage cursor is durable: an interrupted job starts
+--- again. Every refusal returns its exact step and cause: the log line is the
+--- only evidence a maintainer gets from a ledger that lives on the user's Mac.
+--- @param owner userdata The canonical writer handle.
+--- @param requested_device_ids string[]|nil Partitions to rebuild; nil rebuilds all.
+--- @return boolean published
+--- @return string|nil failure Step and cause of a refusal.
 local _aggregate_cache_revision
 local function _publish_rebuilt_partitions(owner, requested_device_ids)
 	local devices, seen = {}, {}
@@ -1883,18 +1889,19 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 			seen[id] = true; devices[#devices + 1] = id
 		end
 	end
+	if SqliteWriter.get_db() ~= owner then return false, "the canonical writer handle changed before the rebuild" end
 	local initial = RebuildSnapshot.witness(owner)
-	if not initial or SqliteWriter.get_db() ~= owner then return false end
+	if not initial then return false, "cannot observe the source revision" end
 	if type(requested_device_ids) == "table" then
 		for _, id in ipairs(requested_device_ids) do add(id) end
 	else
-		local enumerated = pcall(function()
+		local enumerated, enumerate_err = pcall(function()
 			for row in owner:nrows([[SELECT DISTINCT device_id FROM (
 				SELECT device_id FROM events_typing UNION SELECT device_id FROM events_app_switch
 				UNION SELECT device_id FROM events_window_switch UNION SELECT device_id FROM events_system
 			) ORDER BY device_id;]]) do add(row.device_id) end
 		end)
-		if not enumerated then return false end
+		if not enumerated then return false, "cannot enumerate raw devices: " .. tostring(enumerate_err) end
 		for i = #devices, 1, -1 do if devices[i] == _device_id then table.remove(devices, i) end end
 		seen[_device_id] = nil; add(_device_id)
 	end
@@ -1902,15 +1909,15 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 	-- Revoke the old global certificate before publishing any partition. The
 	-- same lock verifies that enumeration observed the captured source.
 	local previous_revision, begin_open = nil, false
-	local fenced = pcall(function()
-		assert(owner:exec("BEGIN IMMEDIATE;") == sqlite3.OK, "rebuild fence refused")
+	local fenced, fence_err = pcall(function()
+		assert(owner:exec("BEGIN IMMEDIATE;") == sqlite3.OK, "rebuild fence refused: " .. tostring(owner:errmsg()))
 		begin_open = true
 		assert(SqliteWriter.get_db() == owner and RebuildSnapshot.same(initial, RebuildSnapshot.witness(owner)), "source changed")
 		previous_revision = _aggregate_cache_revision(owner)
 		assert(owner:exec("INSERT OR REPLACE INTO meta(key,value) VALUES('aggregate_cache_revision','0');") == sqlite3.OK,
 			"cannot revoke old certificate")
 		initial = assert(RebuildSnapshot.witness(owner), "cannot observe fenced source")
-		assert(owner:exec("COMMIT;") == sqlite3.OK, "cannot commit rebuild fence")
+		assert(owner:exec("COMMIT;") == sqlite3.OK, "cannot commit rebuild fence: " .. tostring(owner:errmsg()))
 		begin_open = false
 	end)
 	if not fenced then
@@ -1918,7 +1925,7 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 			local rolled, rc = pcall(owner.exec, owner, "ROLLBACK;")
 			if not rolled or rc ~= sqlite3.OK then SqliteWriter.quarantine_db(owner) end
 		end
-		return false
+		return false, "rebuild fence: " .. tostring(fence_err)
 	end
 	local job = _recovery
 	local snapshot, failure, poisoned = RebuildSnapshot.open(owner, sqlite3, DERIVED_DEVICE_TABLES,
@@ -1929,20 +1936,32 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 		if poisoned then SqliteWriter.quarantine_db(owner) end
 		if job then job.stage_cleanup = nil end
 		Logger.error(LOG, "Cannot create aggregate reconstruction snapshot: %s.", tostring(failure))
-		return false
+		return false, "reconstruction snapshot: " .. tostring(failure)
 	end
-	local worked, accepted = pcall(function()
-		if not RebuildSnapshot.same(initial, snapshot.captured) then return false end
+	-- Device ids stay out of the log (keystats-device-log-privacy): a refusal
+	-- names its partition by position and whether it is this Mac's own.
+	local function partition(index)
+		return string.format("%s partition %d of %d", devices[index] == _device_id and "local" or "foreign",
+			index, #devices)
+	end
+	local worked, accepted, refusal = pcall(function()
+		if not RebuildSnapshot.same(initial, snapshot.captured) then
+			return false, "source changed between the fence and the snapshot"
+		end
 		-- Refuse any unproved ledger before publishing the first partition.
-		for _, device in ipairs(devices) do
-			local ok, cutoffs = pcall(_typing_replay_cutoffs, snapshot.db, device)
-			if not ok or not cutoffs then return false end
+		for index, device in ipairs(devices) do
+			local ok, cutoffs, detail = pcall(_typing_replay_cutoffs, snapshot.db, device)
+			if not ok or not cutoffs then
+				return false, string.format("typing rollover facts of the %s: %s",
+					partition(index), tostring(ok and detail or cutoffs))
+			end
 		end
 		for index, device in ipairs(devices) do
 			_staging_recovery = true
 			local walked, result = pcall(_rebuild_aggregates_from_raw, snapshot.db, { device })
 			_staging_recovery = false
-			if not walked or result ~= true then return false end
+			if not walked then return false, string.format("walk of the %s raised: %s", partition(index), tostring(result)) end
+			if result ~= true then return false, string.format("walk of the %s failed (see the error above)", partition(index)) end
 			-- Every published partition invalidates readers even if a later
 			-- partition fails; only the last can certify the whole rebuild.
 			local finish_sql = Queries.render("meta.rev_bump", "native")
@@ -1952,7 +1971,9 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 				local parts = {}
 				if compatible then
 					local encoded_ok, context = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
-					if not encoded_ok or type(context) ~= "string" then return false end
+					if not encoded_ok or type(context) ~= "string" then
+						return false, "cannot encode the rebuilt typing context: " .. tostring(context)
+					end
 					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(context) .. " WHERE key='ngram_ctx_json';"
 					parts[#parts + 1] = "UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION) .. " WHERE key='aggregate_cache_revision';"
 					parts[#parts + 1] = "DELETE FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY) .. ";"
@@ -1960,14 +1981,21 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 				parts[#parts + 1] = Queries.render("meta.rev_bump", "native")
 				finish_sql = table.concat(parts, "\n")
 			end
-			local published, next_witness, poisoned = RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)
-			if poisoned then SqliteWriter.quarantine_db(owner) end
-			if not published then return false end
+			local published_at = timer.absoluteTime()
+			local published, next_witness, publish_poisoned, detail = RebuildSnapshot.publish(snapshot, _sq(device), finish_sql)
+			if publish_poisoned then SqliteWriter.quarantine_db(owner) end
+			if not published then
+				return false, string.format("publication of the %s: %s", partition(index), tostring(detail))
+			end
 			snapshot.captured = next_witness
-			-- Do not recopy already published partitions into the next attachment.
+			if type(detail) == "table" then
+				Logger.info(LOG, "Published the rebuilt aggregates of the %s: %d day(s) over %.0f ms, longest transaction %.0f ms.",
+					partition(index), detail.days or 0, (timer.absoluteTime() - published_at) / 1e6, (detail.longest_ns or 0) / 1e6)
+			end
+			-- Do not republish already published partitions from the next device.
 			for _, name in ipairs(DERIVED_DEVICE_TABLES) do
 				if snapshot.db:exec("DELETE FROM temp." .. name .. " WHERE device_id=" .. _sq(device) .. ";") ~= sqlite3.OK then
-					return false
+					return false, string.format("cannot drop the published staging rows of the %s from %s", partition(index), name)
 				end
 			end
 		end
@@ -1976,7 +2004,10 @@ local function _publish_rebuilt_partitions(owner, requested_device_ids)
 	_staging_recovery = false
 	local closed = RebuildSnapshot.close(snapshot)
 	if job then job.stage_cleanup = nil end
-	return worked and accepted == true and closed
+	if not worked then return false, "reconstruction raised: " .. tostring(accepted) end
+	if accepted ~= true then return false, refusal or "reconstruction refused without a cause" end
+	if not closed then return false, "the reconstruction snapshot could not be closed" end
+	return true
 end
 
 --- Synchronise cache metadata after a successful fresh-cache recovery.
@@ -2270,8 +2301,9 @@ local function _recover_aggregate_cache(db, replay_state)
 	-- walk leaves them to ingest, whose partition rebuild counts what they add:
 	-- a row imported here could land before its resume point and never be walked.
 	if _running_recovery_progress() == nil then _sync_foreign_data_sql() end
-	if not _publish_rebuilt_partitions(db) then
-		Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
+	local published, failure = _publish_rebuilt_partitions(db)
+	if not published then
+		Logger.error(LOG, "Aggregate cache recovery failed at %s; raw events remain durable for retry.", tostring(failure))
 	else
 		Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
 	end
@@ -2527,7 +2559,11 @@ function M.ingest_once()
 	if not db then return end
 
 	local foreign_devices = _sync_foreign_data_sql(function(device_id)
-		return _publish_rebuilt_partitions(db, { device_id })
+		local published, failure = _publish_rebuilt_partitions(db, { device_id })
+		if not published then
+			Logger.warn(LOG, "Foreign partition rebuild failed at %s.", tostring(failure))
+		end
+		return published
 	end)
 	trace.mark("foreign")
 	-- Foreign reconstruction can quarantine and consume the exact writer. Never

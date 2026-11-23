@@ -1,6 +1,7 @@
 --- tests/unit/modules/keystats/storage/test_rebuild_day_settlement.lua
 
---- Verifies day-boundary settlement in a staged real SQLite rebuild.
+--- Verifies day-boundary settlement in a staged real SQLite rebuild, and that a
+--- refused recovery names its failing step.
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver, shared = root .. '/static/ergopti_plus/macos', root .. '/static/ergopti_plus/_shared'
@@ -17,12 +18,15 @@ local function child()
   local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
+ local errors = {}
+ logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
  package.loaded['core.logger.engine.logger'] = logger
  local case = assert(os.getenv('ERGOPTI_REBUILD_CASE'))
  local writer = { get_db = function() return db end, acquire_backup_source = function(owner) return owner == db end,
   release_backup_source = function() return true end, quarantine_db = function() return true end }
  package.loaded['modules.keystats.sqlite_writer'] = writer
- package.loaded['modules.keystats.export'] = { get_native_app_category = function() return nil end }
+ package.loaded['modules.keystats.export'] = { get_native_app_category = function() return nil end,
+  sync_foreign_data_sql = function() return {} end }
  package.loaded['modules.keystats.text_cipher'] = { decrypt = function(value) return value end }
  local aggregator = helpers.load_with_stubs('modules.keystats.aggregator', { sqlite3 = sqlite })
  aggregator.init({ device_id = 'device' })
@@ -72,6 +76,10 @@ local function child()
  local native_open, fail_commit = snapshot_port.open, case == 'retry'
  snapshot_port.open = function(...)
   local snapshot, detail, poisoned = native_open(...)
+  if snapshot and case == 'changed' then
+   -- Another writer commits on the canonical handle after the snapshot.
+   assert(db:exec("INSERT OR REPLACE INTO meta(key,value) VALUES('concurrent_writer','1');") == sqlite.OK)
+  end
   if snapshot then
    local native_exec = snapshot.db.exec
    snapshot.db.exec = function(self, sql)
@@ -81,7 +89,13 @@ local function child()
   end
   return snapshot, detail, poisoned
  end
- local first = publish(db, { 'device' })
+ local first, failure
+ if case == 'changed' then
+  local recover = upvalue(upvalue(manager.ingest_once, '_start_aggregate_recovery'), '_recover_aggregate_cache')
+  recover(db, nil)
+ else
+  first, failure = publish(db, { 'device' })
+ end
  local function rows()
   local result = {}
   for row in db:nrows("SELECT date,app,token,c FROM ngram_words WHERE device_id='device' ORDER BY date,app,token") do result[#result+1] = row end
@@ -93,7 +107,8 @@ local function child()
  local wifi = 0
  for row in db:nrows("SELECT wifi_changes FROM agg_system_day WHERE device_id='device'") do wifi = wifi + row.wifi_changes end
  assert(db:close() == sqlite.OK)
- print(json.encode({ kind = 'done', first = first, second = second, before = before, final = final, wifi = wifi }))
+ print(json.encode({ kind = 'done', first = first, failure = failure, second = second, before = before, final = final,
+  wifi = wifi, errors = errors }))
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_day_settlement%.lua$') then child(); return end
 local helpers = require('tests.helpers')
@@ -151,4 +166,30 @@ print('PASS: replay settled one prior-day word')
    helpers.assert_eq(ok, true, output); helpers.assert_eq(output, 'PASS: replay settled one prior-day word\n')
   end)
  end
+
+ -- The 2026-11-23 field log read « Aggregate cache recovery failed: raw events
+ -- remain durable for retry. » at every start, with nothing to say which of a
+ -- dozen silent refusals had thrown minutes of reconstruction away.
+ helpers.it('names the failing step when a recovery is refused (recovery-failure-names-cause)', function()
+  local script = [[
+import importlib.util,os,sys,tempfile
+from pathlib import Path
+root=Path(sys.argv[1]).resolve()
+path=root/'static/ergopti_plus/macos/tests/support/keystats/rebuild_sqlite_bridge.py'
+spec=importlib.util.spec_from_file_location('rebuild_bridge',path)
+bridge=importlib.util.module_from_spec(spec);spec.loader.exec_module(bridge)
+os.environ['ERGOPTI_REBUILD_CASE']='changed'
+with tempfile.TemporaryDirectory(prefix='ergopti-recovery-cause-') as tmp:
+ result=bridge.run_fixture(sys.argv[2],Path(sys.argv[3]).resolve(),root,tmp)
+ expected=('Aggregate cache recovery failed at publication of the local partition 1 of 1: source changed '
+  'after 0 published day(s) (publish day 2026-10-17); raw events remain durable for retry.')
+ assert expected in result['errors'],result
+ assert not result['final'],result
+print('PASS: recovery refusal names its step')
+]]
+  local lua = os.getenv('LUA') or arg[-1]
+  local command = 'python3 -c ' .. quote(script) .. ' ' .. quote(helpers.driver_root() .. '../../..') .. ' ' .. quote(lua) .. ' ' .. quote(source) .. ' 2>&1'
+  local pipe = assert(io.popen(command, 'r')); local output = pipe:read('*a'); local ok = pipe:close()
+  helpers.assert_eq(ok, true, output); helpers.assert_eq(output, 'PASS: recovery refusal names its step\n')
+ end)
 end)

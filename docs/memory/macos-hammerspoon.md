@@ -1503,18 +1503,23 @@ so once at INFO and completes the rotation on the first tick after the recovery;
 a real stall stays a WARNING. `_recovery_pause_sec` now scales the pause to
 0.5 % of a core on battery (`platform/system/power_source.lua`) and keeps full speed on
 the mains. Reconstruction now uses a backup of the exact admitted writer handle
-and builds derived tables privately. Only a complete partition replaces its old
-rows, in the same transaction as its publication metadata; the global cache
-certificate returns only with the final compatible partition. A reload starts
-the private reconstruction again: a durable cursor cannot acknowledge progress
-whose temporary tables disappeared. Keep old aggregates until publication and
-reject unreadable typing ciphertext instead of certifying an empty result.
-Never reopen a pathname to infer the source connection's identity. The native
-backup lease prevents close while backup steps yield; finish must consume that
-owner before any destination SQLite API runs. The final temporary-table transfer
-has a synchronous time budget and refuses publication when exceeded. A lock-free
-reader takes `hold_recovery`: commits raced both scans of `field_storage` into
-101 false issues on a sound cache.
+and builds derived tables privately. A rebuilt partition replaces its old rows
+one day per transaction (every derived table is keyed by `device_id, date`),
+pacing between days with no transaction open; its publication metadata commits
+after the last day, and the global cache certificate returns only with the
+final compatible partition. A reload starts the private reconstruction again: a
+durable cursor cannot acknowledge progress whose temporary tables disappeared.
+Keep a day's old aggregates until that day publishes and reject unreadable
+typing ciphertext instead of certifying an empty result. Never reopen a
+pathname to infer the source connection's identity. The native backup lease
+prevents close while snapshot backup steps yield. Never bound publication by a
+time budget that refuses after the work: the former 250 ms copy budget refused
+every partition of millions of n-gram rows (389 MB staged copied in 315 ms on a
+fast host), so the 2026-11-23 field cache rebuilt for minutes at every start
+and failed at its last step, forever. Every refusal of
+`_publish_rebuilt_partitions` returns its step and cause for the ERROR line. A
+lock-free reader takes `hold_recovery`: commits raced both scans of
+`field_storage` into 101 false issues on a sound cache.
 
 ### project-macos-absence-needs-lstat-proof
 
