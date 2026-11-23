@@ -2773,8 +2773,10 @@ local function main()
 	-- turns a keycode into the character the user typed, injection turns a
 	-- character into the keycode that produces it under THEIR layout. Without it
 	-- every accented replacement is typed as whatever the US layout would put on
-	-- that key, which is the defect ydotool has never been able to fix.
-	if not keyboard_layout.refresh(opts.keymap) then
+	-- that key, which is the defect ydotool has never been able to fix. The
+	-- magic key's default already read the keymap at boot: a layout still
+	-- current on the desktop source is not dumped a second time.
+	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 	if not privacy_owners.startup_checkpoint() then return end
