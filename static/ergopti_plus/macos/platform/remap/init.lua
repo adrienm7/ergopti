@@ -3668,6 +3668,18 @@ function M.guardian_state()
 	return GUARDIAN_STATE_UNKNOWN
 end
 
+--- The lease controller's public phase, for the Tap-Holds title dot, read
+--- from memory without any native observation or side effect.
+--- @return string phase `active` once the rules are in force, `failed`, a
+---   transitional phase, `uninitialized`, or `unknown` when unreadable.
+function M.lease_phase()
+	if not _state then return GUARDIAN_STATE_UNKNOWN end
+	-- A watch reads it every second: a lease not yet started answers quietly
+	local ok, phase = pcall(LeaseController.status, { before_init = "uninitialized" })
+	if not ok or type(phase) ~= "string" then return GUARDIAN_STATE_UNKNOWN end
+	return phase
+end
+
 --- Enables or disables the Karabiner integration and persists the choice.
 --- When enabling: deploys inert token-gated rules, then activates the exact lease.
 --- When disabling: revokes only that lease; stock Karabiner remains user-managed.

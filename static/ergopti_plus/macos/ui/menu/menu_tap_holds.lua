@@ -47,6 +47,13 @@ local WindowTitles = require("core.ui.engine.window_titles")
 local ConfigKeys = require("settings.engine.keys")
 
 local ValueCheck = require("settings.engine.value_check")
+local TitleStatus = require("menu.ui.title_status")
+local TapHoldsStatus = require("ui.menu.tap_holds_status")
+local Timings = require("core.timing.engine.timings")
+
+-- The title's status dot outlives the build that painted it: the runtime turns
+-- ready or fails later, so the shared watch repaints it (menu/ui/title_status.lua).
+local _status_watch = TitleStatus.new_watch("Tap-Holds", Timings.sec("tap_hold", "title_status_watch_ms"))
 
 -- The shared value schema declarations of the delays this menu asks for.
 local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
@@ -1387,7 +1394,21 @@ function M.build(ctx)
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
 	local children = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
-	return receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
+	local row = receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
+
+	-- The AI title's dot (maintainer, 2026-11-23), read again live by the watch:
+	-- a pause or the switch changing after this build repaints it too.
+	local function read_status()
+		local paused = ctx.paused == true
+		if type(ctx.is_paused) == "function" then paused = ctx.is_paused() == true end
+		local on = type(karabiner.get_tap_holds_enabled) == "function"
+			and karabiner.get_tap_holds_enabled() == true
+		return TapHoldsStatus.read(karabiner, on, paused)
+	end
+	local status = read_status()
+	if row then TitleStatus.decorate(row, status) end
+	if type(update_menu) == "function" then _status_watch.watch(status, read_status, update_menu) end
+	return row
 end
 
 --- Switches the Tap-Holds feature, persists it, then redeploys the rules.
@@ -1543,5 +1564,6 @@ end
 M._picker_fingerprint  = picker_fingerprint
 M._build_picker_trees  = build_picker_trees
 M._reset_picker_cache  = function() _picker_cache = nil end
+M._status_watch        = _status_watch
 
 return M

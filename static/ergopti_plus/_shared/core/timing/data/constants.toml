@@ -830,6 +830,12 @@ one_shot_shift_timeout_ms = 2000
 # build_tap_copy. LX: platform/remap/tap_hold_manager.lua.
 copy_verify_ms = 300
 
+# Period of the watch that repaints the Tap-Holds menu title's status dot when
+# the remap runtime turns ready, waits or fails after the menu was built. It
+# only reads in-memory state, like the AI title's watch (ai_health_watch_ms).
+# HS: ui/menu/menu_tap_holds.lua (menu/ui/title_status.lua).
+title_status_watch_ms = 1000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Hotstring expansion delay: complex keystrokes (PAR-7)

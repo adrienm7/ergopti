@@ -235,6 +235,10 @@ french_magickey = "FrenchMagicKey"
 # `greyed_when_paused` until 2026-11-15.
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
+# On macOS the title carries the llm entry's health_dot glyphs for the state of
+# the Karabiner runtime the tap-holds depend on (maintainer, 2026-11-23).
+# Windows and Linux draw none: their tap-holds run inside the driver's own
+# process, which has no separate runtime that can wait, fail or be missing.
 [[menu.top_level]]
 type = "group"
 id = "tap_holds"
@@ -308,6 +312,7 @@ boot_deferred = true
 # 2026-10-29): ready once the model answers, warming while the server answers
 # but the model loads, unreachable when the server is silent or the model was
 # given up on. No dot while the AI is off or paused, or before a first probe.
+# The macOS Tap-Holds title shows these same glyphs (menu/ui/title_status.lua).
 health_dot = { ready = "🟢", warming = "🟡", unreachable = "🔴" }
 
 [[menu.top_level]]
