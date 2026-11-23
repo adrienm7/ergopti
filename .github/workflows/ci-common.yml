@@ -428,7 +428,11 @@ jobs:
     # the host. Return to ubuntu-latest with the Playwright upgrade that supports
     # 26.04 (tools/test/test-ubuntu-ci-acquisition.cjs reads its host check).
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The browser tests take about 17 minutes. The browser install usually
+    # takes 3 but took 13 on a slow mirror (2026-11-23), which cancelled the
+    # stable lot on its last page under the former 30-minute budget; the
+    # install keeps its own bound below.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.common-build.outputs.site_matrix) }}
@@ -453,6 +457,7 @@ jobs:
         run: node tools/ci/site-matrix.cjs admit
 
       - name: Install production site browsers
+        timeout-minutes: 15
         run: node tools/ci/install-playwright.cjs chromium webkit
 
       - name: Receive exact production site
