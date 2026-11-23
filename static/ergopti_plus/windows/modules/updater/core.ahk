@@ -3948,7 +3948,7 @@ Updater_ParseTagName(Json) {
 
 ; Extracts the release object's own "body" (release notes markdown), decoded
 ; once by the shared parser. Returns "" when the field is absent, null, not a
-; string or empty — callers display t("updater.changelog_empty") in that case.
+; string or empty.
 ; Carriage returns are kept: the shared release-notes page normalizes line
 ; endings when rendering.
 Updater_ParseBody(Json) {
