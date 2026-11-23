@@ -800,6 +800,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       shared root by `build_stamp.txt` has been out for one full release cycle. The structure step that moves
       `linux/infra/version.lua` (also required by v1.0.9) must add that probe too.
 
+## Dev prerelease numbering (maintainer request, 2026-11-23)
+
+- [ ] **[CI] Restart the dev counter at each new core, once `v1.0.10` stable is published.** Today `N` in
+      `vX.Y.Z-dev.N` is one counter across the whole series (decision of 2026-11-08 in
+      [maintainer decisions](docs/memory/maintainer-decisions.md)), so the 1.0.10 prereleases read `dev.170`…`dev.177`
+      when the core already says which release they lead to. Wanted: `N` counts the prereleases of its own core,
+      `v1.0.11-dev.1`, `.2`… Not before that stable: semver orders `v1.0.10-dev.1` below the installed
+      `v1.0.10-dev.177`, so the updaters would never offer it; `1.0.10` keeps `dev.178` and up. Change in `ci.yml`: take
+      the highest `N` among tags of the computed core only (`next_n=1` when none), keep the request range from the
+      newest dev tag of the whole series and the `v0.0.0` bridge rule up to 169; pin both cases in
+      `tools/test/test-ci-release-reruns.cjs` and replace the 2026-11-08 decision text. Sparkle is unaffected: its
+      build number is the CI run number (`ci-macos.yml`, `ERGOPTI_BUILD`).
+
 ## Test quality gates (maintainer request, 2026-11-23)
 
 The suites have unit, integration and end-to-end tests, but nothing measures how much of the code they run or
