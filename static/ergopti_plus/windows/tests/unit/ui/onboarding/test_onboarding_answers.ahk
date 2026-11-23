@@ -742,7 +742,8 @@ _TOAN_PrebootChosenTargetUsesActualWizardWal(Current := false) {
 		AssertTrue(ConfigTransitionResultIs(Committed, "committed_new"), "the actual guarded native WAL publishes the wizard target and locator before later Boot")
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Chosen))
 		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
-		AssertEqual("ergopti_plus", Document["layout"]["ergopti_variant"].Value)
+		; The parsed document wraps only booleans (TOML_Bool); a string is native.
+		AssertEqual("ergopti_plus", Document["layout"]["ergopti_variant"])
 		if Current
 			AssertEqual("independent", Document["private"]["keep"])
 		AssertEqual(Locator, FSReadUtf8Exact(PathsFile), "the stable locator is the final actual native target")
