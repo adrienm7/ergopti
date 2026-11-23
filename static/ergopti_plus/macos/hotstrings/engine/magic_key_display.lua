@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The layout default probes the selected input source's base level on the
----    keys the shared data names (hs.keycodes.map). An emulated layout types
+---    keys the shared data names (platform.input.keycodes). An emulated layout types
 ---    over that source, so while one is active the manifest default applies.
 --- 2. The display is idempotent here: a text that already shows « ★ (ù) » is
 ---    folded back before the shared rule runs, so a label translated through
@@ -20,6 +20,8 @@ local M = {}
 
 local MagicKey   = require("hotstrings.engine.magic_key_rules")
 local JsonCodec  = require("core.fs.adapters.json_codec")
+local FileSystem = require("core.fs.adapters.file_system")
+local Keycodes   = require("platform.input.keycodes")
 local Paths      = require("core.fs.engine.paths")
 local Manifest   = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
@@ -42,9 +44,8 @@ local _registry = nil
 --- @param relative string Path under _shared/.
 --- @return table parsed
 local function read_json(relative)
-	local handle = assert(io.open(Paths.shared(relative), "rb"), "magic key rules: " .. relative .. " is missing")
-	local text = handle:read("*a")
-	handle:close()
+	local text, status, read_detail = FileSystem.read_with_status(Paths.shared(relative))
+	assert(status == "ok", "magic key rules: " .. relative .. " is " .. tostring(status) .. ": " .. tostring(read_detail))
 	local parsed, detail = JsonCodec.decode(text or "")
 	assert(type(parsed) == "table", "magic key rules: " .. relative .. " is unreadable: " .. tostring(detail))
 	return parsed
@@ -74,9 +75,7 @@ local function input_source_text(code)
 	if _registry == nil then _registry = read_json("layouts/data/keycodes/physical_keys.json").keys end
 	local entry = _registry[code]
 	if type(entry) ~= "table" or type(entry.hs) ~= "number" then return nil end
-	local map = hs.keycodes and hs.keycodes.map
-	local text = type(map) == "table" and map[entry.hs] or nil
-	return type(text) == "string" and text or nil
+	return Keycodes.character_for(entry.hs)
 end
 
 --- Whether an emulated layout types over the input source.
