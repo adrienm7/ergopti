@@ -555,6 +555,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],
 			"repro": "npm run test:bench-ahk-startup-paths"
+		},
+		{
+			"id": "generators-registered",
+			"ordinal": 726,
+			"name": "every file-writing codegen script is in the generator registry, and the pre-commit hook regenerates before formatting",
+			"cmd": "node",
+			"args": ["tools/test/test-generators-registered.cjs"],
+			"repro": "npm run test:generators-registered"
 		}
 	]
 }

@@ -53,6 +53,11 @@ IDENTITY_PYTHON=python3
 python3 -c '' 2>/dev/null || IDENTITY_PYTHON=python
 "$IDENTITY_PYTHON" tools/dev/field-report-redact.py --staged || exit 1
 
+# Generated projections follow their staged sources (tools/dev/regen-staged.cjs):
+# a manifest change once reached dev without its parity table. It runs before
+# the formatter so the regenerated files are formatted and checked like the rest.
+node tools/dev/regen-staged.cjs || exit 1
+
 # Formatting — Prettier and Ruff rewrite the staged files they own and
 # re-stage them, so every commit carries formatted bytes; CI's check then
 # never finds a diff. A staged file with unstaged changes is refused.

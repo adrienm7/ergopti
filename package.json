@@ -645,6 +645,7 @@
 		"test:prompt-editor-literal-token": "node ./tools/test/test-prompt-editor-literal-token.cjs",
 		"test:hotstring-editor-preference-update": "node ./tools/test/test-hotstring-editor-preference-update.cjs",
 		"test:hotstring-editor-collapsed-sections": "node ./tools/test/test-hotstring-editor-collapsed-sections.cjs",
+		"test:generators-registered": "node ./tools/test/test-generators-registered.cjs",
 		"test:personal-editor-initialization": "node ./tools/test/test-personal-editor-initialization.cjs",
 		"test:metrics-app-unicode-search": "node ./tools/test/test-metrics-app-unicode-search.cjs",
 		"test:token-prompt-focus": "node ./tools/test/test-token-prompt-focus.cjs",

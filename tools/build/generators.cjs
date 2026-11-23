@@ -260,6 +260,13 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-layout-analysis-data-js.cjs',
+		// 13 s of the 19 s the registry takes: the pre-commit regeneration runs it
+		// only when one of its sources is staged.
+		precommitInputs: [
+			'static/ergopti_plus/_shared/layouts/data/',
+			'static/corpus/',
+			'tools/codegen/codegen-layout-analysis-data-js.cjs'
+		],
 		outputs: [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_don_quichotte.js',
@@ -340,6 +347,7 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-kbd-setup-stub-js.cjs',
+		precommitSkip: 'needs makensis, which a development machine may lack; CI regenerates it',
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/kbd_setup_stub.js']
 	},
 	{
@@ -486,6 +494,7 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-keystats-roi-case.cjs',
+		precommitSkip: 'needs its qualified Node and Unicode versions; CI regenerates it',
 		outputs: [
 			'static/ergopti_plus/_shared/metrics/engine/privacy/roi_case.lua',
 			'static/ergopti_plus/_shared/tests/corpus/keystats/roi_lowercase_vectors.json'
@@ -525,6 +534,21 @@ const GENERATORS = [
 			'src/routes/ergopti-plus/behavior-inventory.json',
 			'docs/behavior-inventory.md'
 		]
+	},
+	{
+		// The three manifest projections below were run only by hand, so a
+		// manifest change shipped them stale: the parity table broke the Linux
+		// parity check on dev (2026-11-23).
+		script: 'codegen/codegen-config-schema-metrics.cjs',
+		outputs: ['static/ergopti_plus/_shared/settings/data/config_schema/config.schema.json']
+	},
+	{
+		script: 'codegen/codegen-feature-requirements.cjs',
+		outputs: ['docs/design/feature-requirements.md']
+	},
+	{
+		script: 'codegen/codegen-platform-parity.cjs',
+		outputs: ['docs/platform-parity-table.md']
 	},
 	{
 		script: 'codegen/gen-architecture-diagram.cjs',
