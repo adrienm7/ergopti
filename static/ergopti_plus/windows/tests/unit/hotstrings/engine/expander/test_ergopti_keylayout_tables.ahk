@@ -561,7 +561,7 @@ _EKT_PlusRollNativeCase() {
 			_EKT_PlusRollCompletion.Bind(State))
 		AssertTrue(Handle.start(), "the actual source-helper native child must start")
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+		while State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

@@ -692,7 +692,7 @@ _WHR_ActualWrappingHistory() {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], _WHR_Completed.Bind(State))
 		AssertTrue(Handle.start(), "the real wrapping definitions must start in their native fixture")
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+		while State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

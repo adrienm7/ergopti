@@ -162,7 +162,7 @@ _HCPB_Case(Mode) {
 		}
 		try {
 			Started := A_TickCount
-			while State.Completed == 0 && TickElapsed(Started) < 5000 {
+			while State.Completed == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 				_SR_TreePoll()
 				Sleep(10)
 			}

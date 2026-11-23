@@ -639,7 +639,7 @@ _PPH_ActualPlainPaste(Entry, Mode) {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], _PPH_Completed.Bind(State))
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+		while State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}
