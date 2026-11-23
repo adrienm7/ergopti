@@ -28,13 +28,6 @@ local Logger = require("core.logger.engine.logger")
 
 local LOG = "ui.menu.title_status"
 
---- The statuses a title dot shows, keys of the manifest's ``health_dot``.
-M.READY = "ready"
-M.WARMING = "warming"
-M.UNREACHABLE = "unreachable"
-
---- The manifest's top-level entry whose ``health_dot`` declares the glyphs.
-local GLYPH_OWNER = "llm"
 
 
 
@@ -45,11 +38,11 @@ local GLYPH_OWNER = "llm"
 -- ===============================
 -- ===============================
 
---- The dot a title carries for a status, read from the manifest.
---- @param status string|nil One of M.READY, M.WARMING, M.UNREACHABLE.
---- @return string|nil glyph Nil for a nil status or when the manifest declares none.
-function M.dot(status)
-	if status == nil then return nil end
+--- The ``health_dot`` table of the manifest's top level: its keys are the
+--- statuses a title shows ("ready", "warming", "unreachable"), its values the
+--- glyphs. The manifest is their one source, so no status is spelt here.
+--- @return table|nil dots Nil when the manifest is unavailable or declares none.
+local function declared_dots()
 	local ok_menu, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 	if not ok_menu or type(ManifestMenu) ~= "table" or type(ManifestMenu.get_root) ~= "function" then
 		Logger.error(LOG, "Manifest renderer unavailable — the menu titles have no status dot.")
@@ -59,13 +52,28 @@ function M.dot(status)
 	local top = type(root) == "table" and root.top_level or nil
 	if type(top) ~= "table" then return nil end
 	for _, entry in ipairs(top) do
-		if type(entry) == "table" and entry.id == GLYPH_OWNER then
-			local dots = entry.health_dot
-			local glyph = type(dots) == "table" and dots[status] or nil
-			if type(glyph) == "string" and glyph ~= "" then return glyph end
-			return nil
-		end
+		if type(entry) == "table" and type(entry.health_dot) == "table" then return entry.health_dot end
 	end
+	return nil
+end
+
+--- The statuses the manifest declares a dot for.
+--- @return table statuses Sorted status names; empty when none is declared.
+function M.statuses()
+	local out = {}
+	for status in pairs(declared_dots() or {}) do out[#out + 1] = status end
+	table.sort(out)
+	return out
+end
+
+--- The dot a title carries for a status, read from the manifest.
+--- @param status string|nil A status the manifest's ``health_dot`` declares.
+--- @return string|nil glyph Nil for a nil status or when the manifest declares none.
+function M.dot(status)
+	if status == nil then return nil end
+	local dots = declared_dots()
+	local glyph = type(dots) == "table" and dots[status] or nil
+	if type(glyph) == "string" and glyph ~= "" then return glyph end
 	return nil
 end
 

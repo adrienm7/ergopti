@@ -689,7 +689,7 @@ local function observe_actual_fixed_parent(id, module, context, manifest, transl
 		local label, dotted = translator.get(caption), {}
 		if id == "tap_holds" then
 			local TitleStatus = require("menu.ui.title_status")
-			for _, status in ipairs({ TitleStatus.READY, TitleStatus.WARMING, TitleStatus.UNREACHABLE }) do
+			for _, status in ipairs(TitleStatus.statuses()) do
 				local glyph = TitleStatus.dot(status)
 				if glyph then dotted[label .. " " .. glyph] = true end
 			end

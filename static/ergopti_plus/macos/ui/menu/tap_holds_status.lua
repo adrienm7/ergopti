@@ -24,23 +24,24 @@
 local M = {}
 
 local Logger = require("core.logger.engine.logger")
-local TitleStatus = require("menu.ui.title_status")
 
 local LOG = "ui.menu.tap_holds_status"
 
-local READY, WARMING, UNREACHABLE = TitleStatus.READY, TitleStatus.WARMING, TitleStatus.UNREACHABLE
+-- The statuses are the keys of the manifest's health_dot (menu.toml), as the
+-- AI title returns them; test_title_status checks each one has its glyph.
+local ready, warming, unreachable = "ready", "warming", "unreachable"
 
 --- Ergopti's own runtime, by owner state (runtime_owner.lua STATE). A blocked
 --- runtime (`unavailable`, `failed`) takes its colour from its reason.
 M.OWNED_STATES = {
-	ready = READY,
-	uninitialized = WARMING,
-	idle = WARMING,
-	starting = WARMING,
-	admitted = WARMING,
-	peers_starting = WARMING,
-	stopping = WARMING,
-	stopped = WARMING,
+	ready = ready,
+	uninitialized = warming,
+	idle = warming,
+	starting = warming,
+	admitted = warming,
+	peers_starting = warming,
+	stopping = warming,
+	stopped = warming,
 	unavailable = false,
 	failed = false,
 }
@@ -52,42 +53,42 @@ M.OWNED_STATES = {
 --- it is unticked. Red for every block that keeps the tap-holds off until
 --- something is installed, repaired, downloaded or fixed.
 M.OWNED_REASONS = {
-	other_karabiner_running = WARMING,
-	virtual_hid_not_active = WARMING,
-	artifact_unpinned = UNREACHABLE,
-	capture_unpinned = UNREACHABLE,
-	runtime_not_installed = UNREACHABLE,
-	runtime_job_not_loaded = UNREACHABLE,
-	launchd_unreadable = UNREACHABLE,
-	system_extension_listing_failed = UNREACHABLE,
-	close_other_unsupported = UNREACHABLE,
-	close_other_failed = UNREACHABLE,
-	other_karabiner_still_running = UNREACHABLE,
-	coexistence_probe_failed = UNREACHABLE,
-	owned_configuration_missing = UNREACHABLE,
-	artifact_fetch_failed = UNREACHABLE,
-	capture_start_refused = UNREACHABLE,
-	capture_lost = UNREACHABLE,
-	capture_start_timeout = UNREACHABLE,
-	readiness_timer_refused = UNREACHABLE,
-	virtual_hid_absent = UNREACHABLE,
-	virtual_hid_incompatible = UNREACHABLE,
-	virtual_hid_unreadable = UNREACHABLE,
+	other_karabiner_running = warming,
+	virtual_hid_not_active = warming,
+	artifact_unpinned = unreachable,
+	capture_unpinned = unreachable,
+	runtime_not_installed = unreachable,
+	runtime_job_not_loaded = unreachable,
+	launchd_unreadable = unreachable,
+	system_extension_listing_failed = unreachable,
+	close_other_unsupported = unreachable,
+	close_other_failed = unreachable,
+	other_karabiner_still_running = unreachable,
+	coexistence_probe_failed = unreachable,
+	owned_configuration_missing = unreachable,
+	artifact_fetch_failed = unreachable,
+	capture_start_refused = unreachable,
+	capture_lost = unreachable,
+	capture_start_timeout = unreachable,
+	readiness_timer_refused = unreachable,
+	virtual_hid_absent = unreachable,
+	virtual_hid_incompatible = unreachable,
+	virtual_hid_unreadable = unreachable,
 }
 
 --- The shared Karabiner-Elements guardian (remap guardian_state): it blocks
 --- every rule while macOS waits for its approval or cannot run it.
 M.GUARDIAN_STATES = {
-	requires_approval = WARMING,
-	unavailable = UNREACHABLE,
+	requires_approval = warming,
+	unavailable = unreachable,
 }
 
 --- The lease of the shared runtime (remap lease_phase): `active` once the
 --- rules are in force, `failed` when they could not be; every other phase is
 --- on its way.
 M.LEASE_PHASES = {
-	active = READY,
-	failed = UNREACHABLE,
+	active = ready,
+	failed = unreachable,
 }
 
 --- Calls one optional facade reader.
@@ -115,13 +116,13 @@ local function owned_status(status)
 	if by_state == nil then
 		Logger.error(LOG, "Unknown owned runtime state '%s': the Tap-Holds title shows it as failed.",
 			tostring(status.state))
-		return UNREACHABLE
+		return unreachable
 	end
 	local by_reason = M.OWNED_REASONS[status.reason]
 	if by_reason then return by_reason end
 	Logger.error(LOG, "Unknown owned runtime reason '%s': the Tap-Holds title shows it as failed.",
 		tostring(status.reason))
-	return UNREACHABLE
+	return unreachable
 end
 
 --- The status the Tap-Holds title shows.
@@ -133,16 +134,16 @@ function M.read(karabiner, tap_holds_on, paused)
 	if tap_holds_on ~= true or paused == true or type(karabiner) ~= "table" then return nil end
 	-- « Ergopti uses Karabiner » off: nothing can deploy the switched-on tap-holds
 	local _, integration_on = read(karabiner, "get_enabled")
-	if integration_on ~= true then return UNREACHABLE end
+	if integration_on ~= true then return unreachable end
 	local _, conflicts = read(karabiner, "legacy_rule_conflicts")
-	if type(conflicts) == "table" then return UNREACHABLE end
+	if type(conflicts) == "table" then return unreachable end
 	local owned_present, owned = read(karabiner, "owned_runtime_status")
 	if owned_present and type(owned) == "table" then return owned_status(owned) end
 	local _, guardian = read(karabiner, "guardian_state")
 	local by_guardian = M.GUARDIAN_STATES[guardian]
 	if by_guardian then return by_guardian end
 	local _, phase = read(karabiner, "lease_phase")
-	return M.LEASE_PHASES[phase] or WARMING
+	return M.LEASE_PHASES[phase] or warming
 end
 
 return M
