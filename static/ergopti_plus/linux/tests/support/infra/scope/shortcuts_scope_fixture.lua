@@ -71,6 +71,10 @@ local function with_scope(body, source, options)
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
 			}
+			-- The tap-hold owner starts the host's Wayland copy watcher (wl-paste)
+			-- in a Wayland session: the scope under test owns no host process.
+			package.loaded["clipboard.adapters.wayland_selection_counter"] = { start = function() return false end,
+				stop = function() end, read = function() return nil, "unsupported" end }
 			local gestures = require("gestures.engine.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
 			gestures.execute_action = function(action, binding)
