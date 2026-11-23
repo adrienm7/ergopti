@@ -47,19 +47,19 @@ local PICKER_ROUTE_CASES = {
 	},
 	{
 		setter = "set_combo_combo_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_chord",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_hold_tap",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_hold_hold",
 		expected_id = "shift_pair",
 	},

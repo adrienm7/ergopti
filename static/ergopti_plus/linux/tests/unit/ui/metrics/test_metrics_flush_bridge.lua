@@ -126,7 +126,8 @@ H.describe("metrics flush bridge", function()
 	end)
 	-- The shared value schema's declaration (value-validation): a refused typed
 	-- score is notified with the localized text naming the range, nothing is written.
-	for _, typed in ipairs({ "3", "2,5", "abc", "0x1", "", "-2.01" }) do
+	-- A blank answer is no refusal: it returns to the unedited score (PCK-13).
+	for _, typed in ipairs({ "3", "2,5", "abc", "0x1", "-2.01" }) do
 		H.it("category edit refuses the typed score " .. typed .. " with the value check's text (value-validation)", function()
 			local F = fixture("metrics_apps")
 			F.read_safe()

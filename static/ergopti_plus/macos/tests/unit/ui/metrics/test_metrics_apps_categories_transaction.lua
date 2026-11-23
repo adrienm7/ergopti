@@ -415,9 +415,9 @@ end)
 helpers.describe("metrics warning native signature", function()
 	helpers.it("presents an invalid score warning without saving the category", function()
 		-- The shared value check's refusal names the declared range (value-validation):
-		-- a word, past the maximum, a fraction past it written with a comma, a
-		-- hexadecimal string and an empty answer.
-		for _, input in ipairs({ "abc", "3", "2,5", "0x1", "" }) do
+		-- a word, past the maximum, a fraction past it written with a comma and a
+		-- hexadecimal string. A blank answer returns to the unedited score (PCK-13).
+		for _, input in ipairs({ "abc", "3", "2,5", "0x1" }) do
 			with_category_store({ score_input = input }, function(metrics, state, callbacks)
 				local before = state.target
 				attempt_edit(metrics, callbacks)
