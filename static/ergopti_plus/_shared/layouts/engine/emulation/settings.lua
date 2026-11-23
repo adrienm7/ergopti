@@ -17,8 +17,12 @@
 ---    reported through the caller's sink and read as its default.
 --- 3. The layout emulated is `emulated_layout` when set, else the registry copy
 ---    of the built-in Ergopti layout (LayoutManager_ActiveId): Ergopti+ for the
----    ergopti_plus variant, Ergopti for "ergopti" and "none" (no helper overlay).
----    The .keylayout is the one description every driver types.
+---    ergopti_plus variant, Ergopti for "ergopti". The variant "none" selects no
+---    layout. The .keylayout is the one description every driver types.
+--- 5. The selection is the only gate (maintainer decision of 2026-11-23): the
+---    layer switches (base and Shift, AltGr and Shift+AltGr) are on by default
+---    and only choose layers, so with « None » selected they do nothing and a
+---    new installation emulates nothing.
 --- 4. An enum leaf written in another case (`ergopti_variant = "Ergopti_Plus"`)
 ---    takes its manifest spelling, as Windows' loader admits it (CFX-001).
 --- ==============================================================================
@@ -32,8 +36,8 @@ local TableUtil = require("core.text.engine.table_util")
 
 local M = {}
 
---- The registry layout each built-in Ergopti variant types.
-M.VARIANT_LAYOUTS = { none = "ergopti", ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
+--- The registry layout each built-in Ergopti variant types; "none" types none.
+M.VARIANT_LAYOUTS = { none = false, ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
 
 local KEY = ConfigKeys.KEY
 
@@ -82,8 +86,8 @@ M.LEAVES = {
 --- @param config table Parsed config.toml.
 --- @param default_for function (path) -> the manifest default.
 --- @param report function|nil (segments, detail) Called for an outdated leaf.
---- @return table settings { id = registry id|nil, base, alt_gr, layout = { emulate_<row> },
----   number_row, edges }
+--- @return table settings { id = registry id, nil while « None » is selected, base, alt_gr,
+---   layout = { emulate_<row> }, number_row, edges }
 function M.resolve(config, default_for, report)
 	if type(config) ~= "table" then error("The emulation settings need a parsed configuration.") end
 	if type(default_for) ~= "function" then error("The emulation settings need the manifest defaults.") end
@@ -108,12 +112,15 @@ function M.resolve(config, default_for, report)
 	end
 	local layout = {}
 	for _, row in ipairs(RowsPolicy.IDS) do layout["emulate_" .. row] = values["emulate_" .. row] end
-	local id = values.emulated_layout ~= "" and values.emulated_layout or M.VARIANT_LAYOUTS[values.variant]
+	-- The selection alone decides whether a layout is emulated: the layer
+	-- switches never select one.
+	local id = values.emulated_layout ~= "" and values.emulated_layout or M.VARIANT_LAYOUTS[values.variant] or nil
 	return { id = id, base = values.base, alt_gr = values.alt_gr, layout = layout,
 		number_row = values.number_row, edges = values.edges }
 end
 
---- Whether the settings emulate anything: a layout and at least one of its layers.
+--- Whether the settings emulate anything: a selected layout and at least one
+--- of its layers.
 --- @param settings table M.resolve's result.
 --- @return boolean
 function M.active(settings)
@@ -139,20 +146,19 @@ function M.switch_value(settings, path)
 end
 
 --- The leaves a layout choice writes, as the onboarding choice and the Windows
---- layout manager (_LayMgrWeb_SelectionOperations) write them.
+--- layout manager (_LayMgrWeb_SelectionOperations) write them: the selection
+--- only, never a layer switch.
 --- @param choice string "none", "ergopti", "ergopti_plus" or a registry id.
 --- @return table|nil values path -> value; nil for an invalid choice.
 function M.choice_values(choice)
 	if choice == "none" then
-		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_BASE] = false,
-			[KEY.LAYOUT_ERGOPTI_VARIANT] = "none" }
+		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_VARIANT] = "none" }
 	end
 	if choice == "ergopti" or choice == "ergopti_plus" then
-		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_BASE] = true,
-			[KEY.LAYOUT_ERGOPTI_VARIANT] = choice }
+		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_VARIANT] = choice }
 	end
 	if type(choice) ~= "string" or not choice:match("^[a-z][a-z0-9_]*$") then return nil end
-	return { [KEY.LAYOUT_EMULATED_LAYOUT] = choice, [KEY.LAYOUT_ERGOPTI_BASE] = true }
+	return { [KEY.LAYOUT_EMULATED_LAYOUT] = choice }
 end
 
 --- Sparse write operations for path -> value, in a stable order.

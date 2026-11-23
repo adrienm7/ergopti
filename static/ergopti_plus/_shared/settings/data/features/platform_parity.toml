@@ -173,7 +173,7 @@ technical = "The Karabiner-Elements virtual HID keyboard type decides which keyc
 
 [reasons."platform_reason.layout_master_switch_is_windows"]
 kind = "driver_storage"
-technical = "Windows gates the whole layout section with its category switch (category_enabled.layout). macOS and Linux emulate layouts too (modules/keymap/layout_emulation.lua) but keep no category gate: emulated_layout none with ergopti_base and ergopti_alt_gr off leaves every key to the system layout."
+technical = "Windows gates the whole layout section with its category switch (category_enabled.layout). macOS and Linux emulate layouts too (modules/keymap/layout_emulation.lua) but keep no category gate: the layout selection gates the layer switches, so « None » (emulated_layout empty, ergopti_variant none) leaves every key to the system layout."
 
 [reasons."platform_reason.action_lookup_is_macos_dictionary"]
 kind = "os_api"

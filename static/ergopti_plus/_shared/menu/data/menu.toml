@@ -2311,9 +2311,9 @@ i18n = "menu.layout.header_tuning"
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
 # LAYERS it types, these two rows, and which keyboard ROWS, in the submenu
-# below. The AltGr layer alone types Ergopti's AltGr over the OS layout; with
-# the base layer it completes the emulated one. The three drivers emulate the
-# layout (maintainer, 2026-11-06).
+# below. Both rows are on by default and choose layers of the selected layout:
+# under « None » they do nothing (maintainer, 2026-11-23). The three drivers
+# emulate the layout (maintainer, 2026-11-06).
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.

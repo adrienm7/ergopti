@@ -198,7 +198,16 @@ Test("layout manager host: the active layout follows the emulation settings (lay
 	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
 		Map("emulated_layout", "", "ergopti_base", true, "ergopti_variant", "ergopti")))),
 	AssertEqual("", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "", "ergopti_base", false))),
-		"without the Ergopti emulation Windows types its own layout")
+		"without the Ergopti emulation Windows types its own layout"),
+	; The selection is the one gate (maintainer decision of 2026-11-23): a layer
+	; switch selects no layout, and unticking one keeps the layout selected
+	; (layout-selection-is-the-gate).
+	AssertEqual("", LayoutManager_ActiveId(Map("layout",
+		Map("emulated_layout", "", "ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "none"))),
+		"« None » selects nothing whatever the layer switches say"),
+	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
+		Map("emulated_layout", "", "ergopti_base", false, "ergopti_variant", "ergopti"))),
+		"a selected layout stays selected with its base layer unticked")
 ))
 
 ; Keep the emulated layout (decided on 2026-11-12, as macOS and Linux): the menu
@@ -325,7 +334,7 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		AssertEqual(Expected, Parsed["layout"].Get("emulated_layout", ""))
 		AssertEqual(Base, Parsed["layout"].Get("ergopti_base", false))
 		AssertEqual(Plus, (Parsed["layout"].Get("ergopti_variant", "ergopti") == "ergopti_plus"))
-		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"], "selection does not claim an independent AltGr layer")
+		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"], "a selection writes no layer switch")
 		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])
 		AssertEqual("retain", Parsed["layout"]["future_owner"])
 		AssertEqual(false, Parsed["category_enabled"]["layout"], "picker selection cannot grant a closed category")
@@ -357,10 +366,12 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
+; A selection writes no layer switch: the fixture's unticked base layer stays
+; as the user left it (layout-selection-is-the-gate).
 Test("layout selection: built-in Ergopti+ owns empty emulation until late refusal (todo96-picker-handoff)",
-	_LMH_SelectionPendingCase.Bind("ergopti_plus", "", true, true))
+	_LMH_SelectionPendingCase.Bind("ergopti_plus", "", false, true))
 Test("layout selection: built-in Ergopti restores its exact source on refusal (todo96-picker-handoff)",
-	_LMH_SelectionPendingCase.Bind("ergopti", "", true, false))
+	_LMH_SelectionPendingCase.Bind("ergopti", "", false, false))
 Test("layout selection: a registry source preserves built-in gates on refusal (todo96-picker-handoff)",
 	_LMH_SelectionPendingCase.Bind("ergol", "ergol", false, true))
 
@@ -509,7 +520,7 @@ _LMH_SelectionCommittedCase() {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		AssertFalse(Parsed["layout"].Has("emulated_layout"), "the neutral empty source is omitted by the real sparse writer")
 		AssertEqual("", Parsed["layout"].Get("emulated_layout", ""))
-		AssertEqual(true, Parsed["layout"]["ergopti_base"])
+		AssertEqual(false, Parsed["layout"]["ergopti_base"], "a selection writes no layer switch")
 		AssertEqual("ergopti_plus", Parsed["layout"]["ergopti_variant"])
 		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"])
 		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])

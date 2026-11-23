@@ -284,7 +284,7 @@ helpers.describe("layout emulation (Linux consumption)", function()
 	end)
 
 	helpers.it("keeps the AltGr layer alone when the base layer is off", function()
-		local M, record = fixture({ emulated_layout = "ergol", ergopti_alt_gr = true })
+		local M, record = fixture({ emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true })
 		M.reload()
 		helpers.assert_true(not press(M, KEY_Q), "the base level is the system layout's")
 		helpers.assert_true(press(M, KEY_Q, { altgr = true }), "AltGr is emulated")
@@ -298,7 +298,7 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		for _, case in ipairs({
 			{ { ergopti_base = true, ergopti_variant = "ergopti" }, true },
 			{ { ergopti_base = true, ergopti_variant = "ergopti", emulate_number_row = false }, false },
-			{ { emulated_layout = "ergol", ergopti_alt_gr = true }, false },
+			{ { emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true }, false },
 		}) do
 			local M = fixture(case[1])
 			helpers.assert_true(M.reload(), "the layout loads")

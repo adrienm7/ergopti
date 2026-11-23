@@ -716,10 +716,10 @@ swipe_5_horiz = 3.5
 
 
 [layout]
-ergopti_base = false
+ergopti_base = true
 direct_access_digits = "native"
 number_row_reorder_edges = false
-ergopti_alt_gr = false
+ergopti_alt_gr = true
 ergopti_variant = "none"
 emulate_number_row = true
 emulate_top_row = true

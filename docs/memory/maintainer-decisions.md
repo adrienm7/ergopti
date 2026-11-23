@@ -5,6 +5,25 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The layout selection gates four on-by-default layers (2026-11-23)
+
+The maintainer found the macOS emulation of Ergopti+ typing the system
+layout's Option characters: `layout.ergopti_alt_gr` defaulted off and a layout
+choice wrote only `ergopti_base`. Decision: the four layers (base and Shift,
+`ergopti_base`; AltGr and Shift+AltGr, `ergopti_alt_gr`) default on in the
+manifest, and the layout selection (`emulated_layout`, else `ergopti_variant`)
+is their one gate. With « None » selected (the default) the switches do
+nothing, so a new installation still emulates nothing; a selected layout
+emulates all four layers, and unticking a switch turns that layer alone off.
+A choice writes the selection only, never a layer switch, and the menu shows
+« None » from the selection alone. Owners: `_shared/layouts/engine/emulation/
+settings.lua` (macOS, Linux), `ErgoptiLayout_LayoutIsSelected` and
+`_MG_GateLayersOnSelection` (Windows); regressions
+`layout-selection-is-the-gate`. Values equal to the old default were never
+stored, so existing users get the new default; an explicit value is kept. The
+earlier « the AltGr layer alone types Ergopti's AltGr over the OS layout »
+under « None » is superseded: select Ergopti and untick the base layer for it.
+
 ## One layout mark from the theoretical worst; AAA everywhere (2026-11-23)
 
 The maintainer found the score's points opaque and asked for one mark per
@@ -927,8 +946,9 @@ it reads in this order on the three OS:
    layout is selected. The header says that it overrides that layout.
 3. « Réglages de la disposition, système ou émulée »
    (`menu.layout.header_tuning`, « Layout tuning, system or emulated »): the
-   base and AltGr layer rows (the AltGr layer alone types Ergopti's AltGr over
-   the OS layout; their labels say « of the selected layout »), « Rangées
+   base and AltGr layer rows (on by default, they choose the layers of the
+   selected layout and do nothing under « None », decision of 2026-11-23;
+   their labels say « of the selected layout »), « Rangées
    émulées » (the rows left to the OS layout while learning), the number row
    (`number_row_policy`, digits in direct access on the OS or emulated
    layout), the é è ê à shortcuts (Windows, Linux; they follow the key that

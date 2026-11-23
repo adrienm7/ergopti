@@ -1847,11 +1847,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -1868,11 +1863,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -1887,11 +1877,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -1914,7 +1899,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -1924,7 +1909,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}
@@ -3802,11 +3787,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -3823,11 +3803,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -3842,11 +3817,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -3869,7 +3839,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -3879,7 +3849,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}
@@ -5190,11 +5160,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -5211,11 +5176,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -5230,11 +5190,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -5257,7 +5212,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -5267,7 +5222,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}

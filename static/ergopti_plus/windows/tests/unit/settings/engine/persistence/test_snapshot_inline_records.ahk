@@ -288,17 +288,18 @@ _FMS_AbsentGenerationCannotConsumeExternalCreation(Path) {
 	Cache := ParseConfigTomlFile(Path)
 	AssertEqual(0, Cache.Count)
 	AssertFalse(ConfigTomlReadSnapshot(Path).Present)
-	FileAppend('[layout]`nergopti_base = true`n', Path, "UTF-8")
+	; The external file holds the opposite of the manifest default.
+	FileAppend('[layout]`nergopti_base = false`n', Path, "UTF-8")
 	Target := ManifestBuildFeaturesMap()
 	AssertEqual(0, ApplyConfigToml(Target, Path), "external creation cannot replace admitted absence between boot consumers")
-	AssertFalse(Target["layout"]["ergopti_base"])
+	AssertTrue(Target["layout"]["ergopti_base"], "the admitted absence keeps the manifest default")
 	Assert(ParseConfigTomlFile(Path) == Cache)
 	_ParseTomlCache.Delete(Path)
 	Fresh := ParseConfigTomlFile(Path)
-	AssertTrue(IniCacheGet(Fresh, "layout", "ergopti_base"))
+	AssertFalse(IniCacheGet(Fresh, "layout", "ergopti_base"))
 	AssertTrue(ConfigTomlReadSnapshot(Path).Present)
 	AssertEqual(1, ApplyConfigToml(Target, Path))
-	AssertTrue(Target["layout"]["ergopti_base"])
+	AssertFalse(Target["layout"]["ergopti_base"])
 }
 _FMS_ExternalCreationCannotSplitAbsentBoot() {
 	_FMS_WithSource("absent_created", "", _FMS_AbsentGenerationCannotConsumeExternalCreation)

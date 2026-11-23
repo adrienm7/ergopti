@@ -23,6 +23,10 @@
  *      values, so documentation cannot show an activated emulation.
  *   5. The row switches that narrow an emulation (emulate_*) stay parameters:
  *      on their own they alter no input, which is why they may default on.
+ *      The layer switches (ergopti_base: base and Shift, ergopti_alt_gr:
+ *      AltGr and Shift+AltGr) default on for the same reason: the layout
+ *      selection (ergopti_variant "none", emulated_layout "") is their one gate
+ *      (maintainer decision of 2026-11-23, layout-selection-is-the-gate).
  *   6. No shipped default, recommended value, first-run template or example
  *      names an absolute folder of one machine (a drive letter, /Users/ or
  *      /home/): the take-note folder shipped as D:\Bureau, which exists only
@@ -41,10 +45,10 @@ const NEUTRAL_LAYOUT = {
 	ahk: {
 		driver: 'windows',
 		values: {
-			ergopti_base: false,
+			ergopti_base: true,
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
-			ergopti_alt_gr: false,
+			ergopti_alt_gr: true,
 			ergopti_variant: 'none',
 			emulated_layout: '',
 			pause_switch_enabled: false,
@@ -55,10 +59,10 @@ const NEUTRAL_LAYOUT = {
 	hs: {
 		driver: 'macos',
 		values: {
-			ergopti_base: false,
+			ergopti_base: true,
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
-			ergopti_alt_gr: false,
+			ergopti_alt_gr: true,
 			ergopti_variant: 'none',
 			emulated_layout: '',
 			pause_switch_enabled: false,
@@ -70,10 +74,10 @@ const NEUTRAL_LAYOUT = {
 	linux: {
 		driver: 'linux',
 		values: {
-			ergopti_base: false,
+			ergopti_base: true,
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
-			ergopti_alt_gr: false,
+			ergopti_alt_gr: true,
 			ergopti_variant: 'none',
 			emulated_layout: '',
 			pause_switch_enabled: false,
@@ -85,6 +89,9 @@ const NEUTRAL_LAYOUT = {
 
 /** Values that leave the typed output to the operating system. */
 const NEUTRAL_VALUES = [false, 'none', '', 'native'];
+
+/** Layer switches that only choose layers of the selected layout: on by default. */
+const LAYER_SWITCHES = ['ergopti_base', 'ergopti_alt_gr'];
 
 /** Row switches that only narrow an emulation (see the manifest comment above them). */
 const EMULATION_ROW_PARAMETERS = [
@@ -172,6 +179,7 @@ async function checkPlatform(manifest, platform, spec) {
 				Object.hasOwn(values, entry.id),
 				`${driver}: ${name} alters input; list its neutral value in this test`
 			);
+			if (LAYER_SWITCHES.includes(entry.id)) continue;
 			assert(
 				NEUTRAL_VALUES.includes(defaultFor(entry, platform)),
 				`${driver}: ${name} alters input and must default to a neutral value`

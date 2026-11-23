@@ -4288,11 +4288,17 @@ family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities"
 
+# The two layer switches of the emulated layout (base and Shift; AltGr and
+# Shift+AltGr below) are on by default and only choose layers: the layout
+# selection (emulated_layout, else ergopti_variant) is the one gate, so with
+# « None » selected they do nothing and a new installation emulates nothing
+# (maintainer decision of 2026-11-23).
 [[features.layout]]
 id = "ergopti_base"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = false
+default = true
+rule_exception = "Maintainer decision of 2026-11-23: the layer switches only choose which layers of the selected layout are emulated; the layout selection, None by default, is their gate, so a fresh install emulates nothing."
 recommended = true
 family = "feature"
 type = "boolean"
@@ -4364,7 +4370,8 @@ description_key = "menu.layout.number_row_edges"
 id = "ergopti_alt_gr"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = false
+default = true
+rule_exception = "Maintainer decision of 2026-11-23: the layer switches only choose which layers of the selected layout are emulated; the layout selection, None by default, is their gate, so a fresh install emulates nothing."
 recommended = true
 family = "feature"
 type = "boolean"
@@ -4901,7 +4908,7 @@ note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboar
 id = "emulated_layout"
 label_key = "onboarding.layout.emulated_layout"
 platforms = ["ahk", "hs", "linux"]
-choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_base" = false, "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
+choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
 
 [[onboarding.pages.keyboard_layout.controls]]
 id = "alt_gr_emulation"

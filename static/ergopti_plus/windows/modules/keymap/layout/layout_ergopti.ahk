@@ -677,6 +677,28 @@ ErgoptiLayout_BuiltinVariant(FeaturesSource := unset) {
 }
 
 /**
+ * Whether a layout is selected for emulation: a registry layout, or the
+ * Ergopti or Ergopti➕ variant. « None » selects nothing, and the layer
+ * switches (base and Shift, AltGr and Shift+AltGr) then do nothing: the
+ * selection is the only gate (maintainer decision of 2026-11-23), as the
+ * shared layouts/engine/emulation/settings.lua reads it on macOS and Linux.
+ * @param {Map} FeaturesSource Features to read; the live map when omitted.
+ * @returns {Boolean}
+ */
+ErgoptiLayout_LayoutIsSelected(FeaturesSource := unset) {
+	global Features
+	if !IsSet(FeaturesSource) {
+		if !IsSet(Features)
+			return false
+		FeaturesSource := Features
+	}
+	if KeylayoutEmulation_SelectedId(FeaturesSource) != ""
+		return true
+	Variant := ErgoptiLayout_BuiltinVariant(FeaturesSource)
+	return Variant != "" && StrCompare(Variant, "none", true) != 0
+}
+
+/**
  * Keeps the helper overlay independent from base and general AltGr admission.
  * A selected registry source supersedes helpers even before its model is loaded.
  * @param {Map} FeaturesSource Effective feature source; the live source when omitted.

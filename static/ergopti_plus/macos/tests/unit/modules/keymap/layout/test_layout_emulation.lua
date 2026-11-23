@@ -100,7 +100,7 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		for _, case in ipairs({
 			{ { ergopti_base = true, ergopti_variant = "ergopti" }, true },
 			{ { ergopti_base = true, ergopti_variant = "ergopti", emulate_number_row = false }, false },
-			{ { emulated_layout = "ergol", ergopti_alt_gr = true }, false },
+			{ { emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true }, false },
 		}) do
 			local M = fixture(case[1])
 			helpers.assert_true(M.reload(), "the layout loads")
@@ -228,6 +228,32 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_true(not M.key_down(e, KC_Q), "kept")
 		helpers.assert_eq(e.unicode, "^", "Ergo-L's AltGr symbol")
 		helpers.assert_nil(e.flags.alt, "no application reads an Option chord")
+	end)
+
+	-- AltGr and Shift+AltGr were off by default, so choosing Ergopti+ typed the
+	-- system layout's Option characters (maintainer report of 2026-11-23). The
+	-- four layers are on by default and the selection is their one gate
+	-- (layout-selection-is-the-gate).
+	helpers.it("types the four layers of a selected layout by default (layout-selection-is-the-gate)", function()
+		local M = fixture({ ergopti_variant = "ergopti_plus" })
+		helpers.assert_true(M.reload(), "the selected layout loads")
+		local altgr = event({ alt = true }, "œ")
+		helpers.assert_true(not M.key_down(altgr, KC_Q), "kept")
+		helpers.assert_eq(altgr.unicode, "`", "Ergopti+'s AltGr level")
+		local shift_altgr = event({ alt = true, shift = true }, "Œ")
+		helpers.assert_true(not M.key_down(shift_altgr, KC_Q), "kept")
+		helpers.assert_eq(shift_altgr.unicode, "„", "Ergopti+'s Shift+AltGr level")
+		local unticked = fixture({ ergopti_variant = "ergopti_plus", ergopti_alt_gr = false })
+		unticked.reload()
+		local passed = event({ alt = true }, "œ")
+		helpers.assert_true(not unticked.key_down(passed, KC_Q), "kept")
+		helpers.assert_nil(passed.unicode, "an unticked AltGr layer is left to the system layout")
+		local base = event({}, "q")
+		unticked.key_down(base, KC_Q)
+		helpers.assert_eq(base.unicode, "è", "the base layer stays emulated")
+		local none = fixture({ ergopti_base = true, ergopti_alt_gr = true, ergopti_variant = "none" })
+		helpers.assert_true(none.reload(), "« None » reloads")
+		helpers.assert_true(not none.status().active, "« None » emulates nothing, whatever the layers")
 	end)
 
 	helpers.it("names the ISO key pair by the keyboard's geometry", function()

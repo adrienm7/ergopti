@@ -1050,7 +1050,7 @@ M.features = {
 		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
+		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = true, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", family = "feature", enum_values = { "native", "digits", "symbols" },
@@ -1062,7 +1062,7 @@ M.features = {
 		path = "layout.number_row_reorder_edges", id = "number_row_reorder_edges", section = "layout", default = false, type = "boolean", description_key = "menu.layout.number_row_edges", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "feature",
 	},
 	{
-		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
+		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = true, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.ergopti_variant", id = "ergopti_variant", section = "layout", default = "none", type = "enum", description_key = "menu.layout.ergopti_plus", platforms = { "ahk", "hs", "linux" }, recommended = "ergopti_plus", family = "feature", enum_values = { "none", "ergopti", "ergopti_plus" },

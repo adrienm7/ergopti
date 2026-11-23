@@ -2772,7 +2772,10 @@ function pick(page, id, value) {
 	const operations = finish(page).answers.operations;
 	const written = new Map(operations.map((operation) => [operation.path, operation.value]));
 	assert.equal(written.get('category_enabled.layout'), true);
-	assert.equal(written.get('layout.ergopti_base'), true);
+	// The selection is the one gate of the layer switches, which stay on by
+	// default: choosing a layout writes no layer switch (layout-selection-is-the-gate).
+	assert.equal(written.has('layout.ergopti_base'), false, 'the selection writes no layer switch');
+	assert.equal(written.has('layout.ergopti_alt_gr'), false, 'the AltGr layers stay at their default');
 	assert.equal(written.get('layout.ergopti_variant'), 'ergopti_plus');
 	assert.equal(written.get('layout.direct_access_digits'), 'digits');
 	assert.equal(written.get('layout.emulate_number_row'), false);
@@ -2787,6 +2790,11 @@ function pick(page, id, value) {
 	fresh.platform = 'windows';
 	goToPage(fresh, 'keyboard_layout');
 	answer(fresh, true);
+	assert.equal(
+		controlGroups(fresh).get('alt_gr_emulation').children[0].children[0].checked,
+		true,
+		'the AltGr and Shift+AltGr layers are on by default, inert under « None »'
+	);
 	const neutral = finish(fresh).answers.operations.filter((operation) =>
 		operation.path.startsWith('layout.')
 	);

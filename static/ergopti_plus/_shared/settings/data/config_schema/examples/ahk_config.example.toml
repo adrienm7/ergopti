@@ -536,9 +536,10 @@ letter = "z"
 # ======================
 
 [layout]
-ergopti_base = false
+# The layer switches are on; « none » selects no layout, so nothing is emulated.
+ergopti_base = true
 direct_access_digits = "native"
-ergopti_alt_gr = false
+ergopti_alt_gr = true
 ergopti_variant = "none"
 emulated_layout = ""
 # ==============================================

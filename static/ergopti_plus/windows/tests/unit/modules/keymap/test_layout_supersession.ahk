@@ -65,6 +65,36 @@ _LSD_GateCase() {
 	AssertTrue(Target["layout"]["emulate_bottom_row"])
 }
 
+; The four layers (base and Shift, AltGr and Shift+AltGr) are on by default and
+; the selection is their one gate (maintainer decision of 2026-11-23): with
+; « None » selected nothing is emulated, a selected layout emulates all four,
+; and unticking one switch turns off that layer alone (layout-selection-is-the-gate).
+Test("layout selection: the layer switches default on and the selection is their gate (layout-selection-is-the-gate)",
+	_LSD_SelectionGateCase)
+
+_LSD_SelectionGateCase() {
+	AssertTrue(ManifestDefaultFor("layout.ergopti_base"), "base and Shift are on by default")
+	AssertTrue(ManifestDefaultFor("layout.ergopti_alt_gr"), "AltGr and Shift+AltGr are on by default")
+	Fresh := ManifestBuildFeaturesMap()
+	ApplyMasterGatesToFeatures(Fresh, Map(), (*) => true)
+	AssertFalse(Fresh["layout"]["ergopti_base"], "« None », the default selection, emulates no base layer")
+	AssertFalse(Fresh["layout"]["ergopti_alt_gr"], "nor any AltGr layer")
+	Chosen := ManifestBuildFeaturesMap()
+	Chosen["layout"]["ergopti_variant"] := "ergopti_plus"
+	ApplyMasterGatesToFeatures(Chosen, Map(), (*) => true)
+	AssertTrue(Chosen["layout"]["ergopti_base"], "a selected layout emulates its base and Shift layers")
+	AssertTrue(Chosen["layout"]["ergopti_alt_gr"], "and its AltGr and Shift+AltGr layers")
+	Unticked := ManifestBuildFeaturesMap()
+	Unticked["layout"]["ergopti_variant"] := "ergopti"
+	Unticked["layout"]["ergopti_alt_gr"] := false
+	ApplyMasterGatesToFeatures(Unticked, Map(), (*) => true)
+	AssertTrue(Unticked["layout"]["ergopti_base"], "the other layer stays emulated")
+	AssertFalse(Unticked["layout"]["ergopti_alt_gr"], "an unticked layer alone is off")
+	Registry := Map("layout", Map("emulated_layout", "ergol", "ergopti_variant", "none",
+		"ergopti_base", true, "ergopti_alt_gr", true))
+	AssertEqual(0, _MG_GateLayersOnSelection(Registry), "a registry selection is a selection")
+}
+
 
 
 

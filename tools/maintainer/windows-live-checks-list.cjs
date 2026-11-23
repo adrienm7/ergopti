@@ -2228,8 +2228,11 @@ const CHECKS = [
 				return live.effectiveConfig(session);
 			};
 			let config = await choose(builtIn[1]);
+			// The selection is the one gate of the layer switches, on by default
+			// (maintainer decision of 2026-11-23): a choice writes no layer switch.
 			if (
 				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'true' ||
+				config[KEY.LAYOUT_ERGOPTI_ALT_GR] !== 'true' ||
 				config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"ergopti"'
 			)
 				problems.push(
@@ -2245,11 +2248,11 @@ const CHECKS = [
 				problems.push(`Ergopti➕ stored the variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}`);
 			config = await choose(none);
 			if (
-				config[KEY.LAYOUT_ERGOPTI_BASE] !== 'false' ||
+				config[KEY.LAYOUT_ERGOPTI_VARIANT] !== '"none"' ||
 				config[KEY.LAYOUT_EMULATED_LAYOUT] !== '""'
 			)
 				problems.push(
-					`None stored base ${config[KEY.LAYOUT_ERGOPTI_BASE]}, emulated ${config[KEY.LAYOUT_EMULATED_LAYOUT]}`
+					`None stored variant ${config[KEY.LAYOUT_ERGOPTI_VARIANT]}, emulated ${config[KEY.LAYOUT_EMULATED_LAYOUT]}`
 				);
 			const native = await typeRow(session);
 			if (native.system.includes('dead') || native.system.includes('none'))

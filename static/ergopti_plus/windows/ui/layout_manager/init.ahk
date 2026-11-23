@@ -131,8 +131,8 @@ LayoutManager_ActiveId(FeaturesSource := unset) {
 	Selected := KeylayoutEmulation_SelectedId(FeaturesSource)
 	if (Selected != "")
 		return Selected
-	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
-	if !(Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) = true)
+	; The selection alone: a layer switch selects no layout.
+	if !ErgoptiLayout_LayoutIsSelected(FeaturesSource)
 		return ""
 	return ErgoptiLayout_BuiltinVariant(FeaturesSource)
 }
@@ -708,18 +708,17 @@ LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
 }
 
 /**
- * Makes a stored layout the emulated one with its base layer on ([layout]
- * emulated_layout and ergopti_base), the « Emulate without installing » of the
- * layout editor, and reports its terminal outcome as LayoutManager_SelectSettled.
+ * Makes a stored layout the emulated one ([layout] emulated_layout), the
+ * « Emulate without installing » of the layout editor, and reports its terminal
+ * outcome as LayoutManager_SelectSettled. The selection is the one gate of the
+ * layer switches, which keep the user's choice.
  * @param {String} Id Registry layout identifier (the composer's).
  * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
  * @param {Map} Options Configuration lifecycle ports for owner tests.
  * @returns {Boolean} Whether the successor launch was accepted.
  */
 LayoutManager_EmulateSettled(Id, OnDone, Options := unset) {
-	Lifecycle := IsSet(Options) ? Options.Clone() : Map()
-	Lifecycle["emulate"] := true
-	return LayoutManager_SelectSettled(Id, OnDone, Lifecycle)
+	return LayoutManager_SelectSettled(Id, OnDone, IsSet(Options) ? Options : Map())
 }
 
 /**
@@ -745,13 +744,13 @@ LayoutManager_SelectTransition(Id, Options := unset) {
 	Expected := Options.Has("expected") ? Options["expected"] : SnapshotFn.Call(Path)
 	LoggerInfo("LayoutManager", "Selecting the '{1}' layout through the owned reload handoff.", Id)
 	return ConfigScopeCommitOperations("keyboard_layout", "select",
-		_LayMgrWeb_SelectionOperations.Bind(Id, Path, Expected, SnapshotFn, Options.Get("emulate", false)), Options)
+		_LayMgrWeb_SelectionOperations.Bind(Id, Path, Expected, SnapshotFn), Options)
 }
 
 ; Built-in selections keep the existing empty-emulation contract and overlays.
-; A registry selection changes only its source identifier; it owns no layer gate.
-; An emulated source also turns its base layer on, which « none » may have left off.
-_LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn, Emulate := false) {
+; A selection writes only its source: the selection is the one gate of the
+; layer switches, which it never writes (maintainer decision of 2026-11-23).
+_LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 	global ERGOPTI_PLUS_LAYOUT_ID
 	Current := SnapshotFn.Call(Path)
 	if !(Expected is Map) || !(Current is Map)
@@ -764,19 +763,12 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn, Emulate := false)
 	if Id == ""
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
-			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, false),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, "none"),
 		]
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
-			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
-		]
-	if Emulate
-		return [
-			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id),
-			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
 		]
 	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
 }

@@ -276,16 +276,18 @@ _LCS_EmulateCase() {
 	} finally DirDelete(Dir, true)
 }
 
-Test("layout editor host: the emulation turns the base layer on with the composed layout (layout-editor-windows)",
+; The selection is the one gate of the layer switches (maintainer decision of
+; 2026-11-23): emulating the composed layout writes its identifier and leaves
+; the base and AltGr switches to the user (layout-selection-is-the-gate).
+Test("layout editor host: emulating the composed layout writes only its identifier (layout-selection-is-the-gate)",
 	_LCS_EmulateOperationsCase)
 
 _LCS_EmulateOperationsCase() {
 	Snapshot := Map("valid", true, "path", "C:\c.toml", "presence", true, "content", "", "values", Map())
 	Snap := (*) => Snapshot
-	Operations := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap, true)
-	AssertEqual(2, Operations.Length)
-	Plain := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
-	AssertEqual(1, Plain.Length, "a registry selection still writes only its identifier")
+	Operations := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
+	AssertEqual(1, Operations.Length, "a registry selection writes only its identifier")
+	AssertEqual(ConfigLeaf.EMULATED_LAYOUT, Operations[1].Key, "the identifier is the selection")
 }
 
 Test("layout editor host: a source re-saved under another DLL name uninstalls the previous DLL first (kbd-dll-replaced)",

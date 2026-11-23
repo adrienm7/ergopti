@@ -26,7 +26,8 @@ M.BUILTIN = {
 --- @return string "none", "ergopti", "ergopti_plus" or a registry id.
 local function current_choice(settings, emulated_layout)
 	if type(emulated_layout) == "string" and emulated_layout ~= "" then return emulated_layout end
-	if settings.base ~= true and settings.alt_gr ~= true then return "none" end
+	-- The selection alone: the layer switches select no layout.
+	if settings.id == nil then return "none" end
 	return settings.id == "ergopti_plus" and "ergopti_plus" or "ergopti"
 end
 
