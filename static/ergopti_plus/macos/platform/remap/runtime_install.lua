@@ -27,6 +27,11 @@
 ---    first install refuses an existing runtime by design. It installs no
 ---    driver package and requests no activation: it restarts the services of
 ---    the installed copy, and the next owner names any approval still due.
+--- 8. A Stale Runtime Is Retired: the install is offered only when an
+---    installed file is missing or unreadable, so its administrator shell
+---    first stops the Core job and removes what an earlier install left at the
+---    Runtime path; otherwise the helper refused every retry
+---    (`refused-destination`, field report 2026-11-23).
 --- ==============================================================================
 
 local M = {}

@@ -154,6 +154,23 @@ enum OwnedRuntimeInstallMainOperation {
 			+ "/usr/sbin/installer -pkg \"$task_work/driver.pkg\" -target / >/dev/null; /bin/rm -rf \"$task_work\"; "
 	}
 
+	/// Retires what an earlier install left at the Runtime path before the first install runs: the helper refuses
+	/// an existing Runtime or Core job by design, and the driver offers this install only when an installed file
+	/// is missing or unreadable, so a half-published or older Runtime refused every retry at
+	/// `refused-destination` with no way out (field report 2026-11-23). It stops the Core job by its label, then
+	/// removes the job file and the Runtime folder, as the uninstall does; the VirtualHIDDevice job is left to
+	/// the helper, which bootstraps an exact plist already on disk.
+	static func staleRuntimeProgram() -> String {
+		let quote = OwnedVirtualHIDDaemonReportMainOperation.quote
+		let label = Identifiers.ServiceLabels.macosCore
+		let plist = quote("/Library/LaunchDaemons/" + label + ".plist")
+		let runtime = quote(OwnedRuntimeUninstall.runtimeDirectory)
+		return "task_step=stale_runtime; "
+			+ "if /bin/launchctl print system/" + label + " >/dev/null 2>&1; then /bin/launchctl bootout system/" + label + "; fi; "
+			+ "/bin/rm -f " + plist + "; "
+			+ "if [ -e " + runtime + " ] || [ -L " + runtime + " ]; then /bin/rm -rf " + runtime + "; fi; "
+	}
+
 	/// Deliberate signed Main CLI request, off the main thread (the AppleScript prompt runs here).
 	static func run(arguments: [String]) -> Int32 {
 		guard let mode = Self.mode(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
@@ -180,6 +197,7 @@ enum OwnedRuntimeInstallMainOperation {
 			}
 			driverStep = Self.driverProgram(package)
 		}
+		let staleStep = mode == .install ? Self.staleRuntimeProgram() : ""
 		let program: String
 		do {
 			let source = try OwnedRuntimeInstallTree(root: helper, protected: false)
@@ -212,7 +230,7 @@ enum OwnedRuntimeInstallMainOperation {
 			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
 				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
 				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
-				driverStep + "task_step=helper; task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
+				driverStep + staleStep + "task_step=helper; task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
 					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " " + mode.helperArgument + ") || task_status=$?; "
 					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
 					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""

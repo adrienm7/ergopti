@@ -38,6 +38,37 @@ final class OwnedRuntimeServiceRepairTests: XCTestCase {
 		}
 	}
 
+	/// Field report 2026-11-23: a Runtime folder an earlier install left (its CLI missing) made the driver offer the
+	/// install, and the helper refused every retry at `refused-destination`. The install's administrator shell now
+	/// retires it first; the repair keeps the published Runtime it repairs.
+	func testTheInstallRetiresAStaleRuntimeBeforeTheHelper() throws {
+		let program = OwnedRuntimeInstallMainOperation.staleRuntimeProgram()
+		let label = Identifiers.ServiceLabels.macosCore
+		XCTAssertTrue(program.hasPrefix("task_step=stale_runtime; "), program)
+		XCTAssertTrue(program.contains("/bin/launchctl bootout system/" + label + ";"), program)
+		XCTAssertTrue(program.contains("/bin/rm -f '/Library/LaunchDaemons/" + label + ".plist';"), program)
+		XCTAssertTrue(program.contains("/bin/rm -rf '" + OwnedRuntimeUninstall.runtimeDirectory + "';"), program)
+		XCTAssertFalse(program.contains(Identifiers.ServiceLabels.macosVirtualHid), program)
+		// The same text, pointed at a disposable folder and an unknown job, removes a half-published Runtime.
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent("stale-runtime-" + UUID().uuidString)
+		defer { try? FileManager.default.removeItem(at: root) }
+		try FileManager.default.createDirectory(at: root.appendingPathComponent("Runtime/bin", isDirectory: true),
+			withIntermediateDirectories: true)
+		let plist = root.appendingPathComponent("core.plist")
+		try Data("x".utf8).write(to: plist)
+		let sandboxed = program
+			.replacingOccurrences(of: OwnedRuntimeUninstall.runtimeDirectory, with: root.appendingPathComponent("Runtime").path)
+			.replacingOccurrences(of: "/Library/LaunchDaemons/" + label + ".plist", with: plist.path)
+			.replacingOccurrences(of: label, with: "com.ergoptiplus.tests.absent-" + UUID().uuidString)
+		let shell = Process()
+		shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+		shell.arguments = ["-c", "set -eu; " + sandboxed + "exit 0"]
+		try shell.run(); shell.waitUntilExit()
+		XCTAssertEqual(shell.terminationStatus, 0)
+		XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Runtime").path))
+		XCTAssertFalse(FileManager.default.fileExists(atPath: plist.path))
+	}
+
 	func testHelperResultValuesMatchTheRepairEntry() {
 		XCTAssertEqual(OwnedRuntimeInstallMainOperation.Mode.repair.helperResults,
 			[OwnedRuntimeServiceRepairEntry.Result.servicesObserved.rawValue, OwnedRuntimeServiceRepairEntry.Result.servicePending.rawValue])
