@@ -26,6 +26,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const PLATFORM_GATE = 'tools/test/test-convention-p-platform-only.cjs';
 const DRIVER_ROOTS_LIB = 'tools/lib/driver-roots.cjs';
+const KNOWN_DEBT_LIB = 'tools/test/lib/known-debt.cjs';
 const GATES = [
 	PLATFORM_GATE,
 	'tools/test/test-driver-tree-parity.cjs',
@@ -80,6 +81,9 @@ function verifyPlatformCandidate() {
 		// The gate reads the driver roots through the shared library.
 		fs.mkdirSync(path.join(fixture, 'tools', 'lib'), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, DRIVER_ROOTS_LIB), path.join(fixture, DRIVER_ROOTS_LIB));
+		// It names its admitted offenders through the known-debt reporter.
+		fs.mkdirSync(path.join(fixture, 'tools', 'test', 'lib'), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, KNOWN_DEBT_LIB), path.join(fixture, KNOWN_DEBT_LIB));
 		const seeds = [];
 		// A driver is a tree with a _generated folder (tools/lib/driver-roots.cjs).
 		for (const driver of ['windows', 'macos', 'linux']) {
