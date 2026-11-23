@@ -768,6 +768,68 @@ check(
 		);
 }
 
+// (optimizer-reveal-result) A run that ends on its own scrolls the page to the
+// best layout found, so the reader knows where to look (maintainer,
+// 2026-11-23): smoothly, at once under reduced motion; a stopped or failed run
+// leaves the scroll alone. The page's own finish() runs on stubs.
+{
+	const fnSource = (name) => {
+		const at = page.indexOf(`function ${name}(`);
+		check(at >= 0, `reveal: the page lost ${name}`);
+		return at >= 0 ? page.slice(at, page.indexOf('\n\t\t}\n', at) + 4) : '';
+	};
+	const finishWith = ({ stopped, error, reduced }) => {
+		const scrolls = [];
+		const elements = {};
+		const element = (id) =>
+			(elements[id] ||= {
+				id,
+				hidden: true,
+				scrollIntoView: (options) => scrolls.push({ id, ...options })
+			});
+		const context = {
+			$: element,
+			state: { running: {} },
+			number: String,
+			evaluations: () => 0,
+			setStatus() {},
+			t: (key) => key,
+			PREFIX: 'layout_optimizer.',
+			window: { ErgoptiA11yPrefs: { reducedMotion: () => reduced } }
+		};
+		vm.createContext(context);
+		vm.runInContext(`${fnSource('finish')}\n${fnSource('revealResult')}`, context);
+		context.finish({ runners: [], stopped }, Date.now(), error);
+		return scrolls;
+	};
+	const done = finishWith({ stopped: false, error: null, reduced: false });
+	check(
+		done.length === 1 &&
+			done[0].id === 'lo-result' &&
+			done[0].behavior === 'smooth' &&
+			done[0].block === 'start',
+		`reveal: a finished run does not scroll smoothly to the result (${JSON.stringify(done)})`
+	);
+	const still = finishWith({ stopped: false, error: null, reduced: true });
+	check(
+		still.length === 1 && still[0].behavior === 'auto',
+		`reveal: reduced motion still scrolls smoothly (${JSON.stringify(still)})`
+	);
+	check(
+		finishWith({ stopped: true, error: null, reduced: false }).length === 0,
+		'reveal: a stopped run takes the scroll'
+	);
+	check(
+		finishWith({ stopped: false, error: 'failed', reduced: false }).length === 0,
+		'reveal: a failed run takes the scroll'
+	);
+	check(
+		read(path.join(PAGE_DIR, 'index.html')).includes('<script src="../a11y_prefs.js"></script>') &&
+			read(shared('ui', 'layout_editor_window', 'index.html')).includes('a11y_prefs.js'),
+		'reveal: a page hosting the optimizer does not load a11y_prefs.js (reducedMotion)'
+	);
+}
+
 if (errors.length) {
 	console.error(`FAIL test-layout-optimizer-page: ${errors.length} problem(s)`);
 	for (const e of errors) console.error(`  - ${e}`);

@@ -66,6 +66,9 @@
  *    run's time above the start's score, with the evaluations per second, the
  *    same said in words and as a table (the drawing is hidden from assistive
  *    technology, its text is not).
+ * 18. The result in sight: a run that ends on its own scrolls the page to the
+ *    best layout found, smoothly unless motion is reduced; a stopped or
+ *    failed run leaves the scroll alone.
  * ==============================================================================
  */
 
@@ -1735,7 +1738,21 @@
 			if (error) {
 				setStatus(error, true);
 				$('lo-retry').hidden = false;
-			} else setStatus(t(`${PREFIX}status.${running.stopped ? 'stopped' : 'done'}`, values));
+			} else {
+				setStatus(t(`${PREFIX}status.${running.stopped ? 'stopped' : 'done'}`, values));
+				if (!running.stopped) revealResult();
+			}
+		}
+
+		/**
+		 * Brings the best layout found into view once a run the reader started
+		 * ends on its own, so they know where to look: smoothly, or at once under
+		 * reduced motion (a11y_prefs.js). A stopped or failed run leaves the
+		 * scroll where the reader put it.
+		 */
+		function revealResult() {
+			const instant = window.ErgoptiA11yPrefs.reducedMotion();
+			$('lo-result').scrollIntoView({ behavior: instant ? 'auto' : 'smooth', block: 'start' });
 		}
 
 		function stop() {
