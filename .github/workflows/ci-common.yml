@@ -308,7 +308,11 @@ jobs:
           mkdir "$cache/used"
           echo "restored archives: $(find "$cache/restored" -maxdepth 1 -name '*.deb' | wc -l)"
 
+      # Usually 3 minutes. The native download and the browser download each
+      # retry three times with a 10-minute deadline per attempt, resuming what
+      # the previous attempt fetched; this bound ends a run that never recovers.
       - name: Install shared UI browsers
+        timeout-minutes: 30
         run: node tools/ci/install-playwright.cjs chromium webkit
 
       # Saved even when the install failed, so the next run resumes the download
@@ -430,9 +434,12 @@ jobs:
     runs-on: ubuntu-24.04
     # The browser tests take about 17 minutes. The browser install usually
     # takes 3 but took 13 on a slow mirror (2026-11-23), which cancelled the
-    # stable lot on its last page under the former 30-minute budget; the
-    # install keeps its own bound below.
-    timeout-minutes: 45
+    # stable lot on its last page under the former 30-minute budget, then was
+    # still downloading when a 15-minute bound stopped it (run 45271461283).
+    # The install keeps its own 30-minute bound below, inside which its
+    # downloads retry and resume (tools/ci/ubuntu_apt.py,
+    # tools/ci/install-playwright.cjs).
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.common-build.outputs.site_matrix) }}
@@ -457,7 +464,7 @@ jobs:
         run: node tools/ci/site-matrix.cjs admit
 
       - name: Install production site browsers
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: node tools/ci/install-playwright.cjs chromium webkit
 
       - name: Receive exact production site

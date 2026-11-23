@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import unquote, urlsplit
 
 
@@ -325,6 +326,18 @@ def package_arguments(arguments):
 # stopped it, three times in a row. Twenty minutes still ends a hung call.
 APT_COMMAND_TIMEOUT_SECONDS = 1200
 
+# The network calls (index update and archive download) are retried in the same
+# private lists and cache directories, so a later attempt resumes the archives
+# and partial files an earlier one left. On 2026-11-23 the Install and launch
+# browser install (run 45271461283) was still downloading 126 MB at a few
+# dozen KB/s when its step stopped it: one stalled mirror connection then cost
+# the whole run. Each attempt has its own deadline, and the last failure is
+# raised unchanged; the offline dpkg install is never retried, since killing
+# it could leave dpkg interrupted.
+APT_DOWNLOAD_ATTEMPTS = 3
+APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS = 600
+APT_DOWNLOAD_BACKOFF_SECONDS = (15, 30)
+
 
 def command_prefix(directory):
     """Use the same isolated indexes and signature policy for both operations."""
@@ -486,6 +499,39 @@ def export_used_archives(plan, archives, used, *, downloaded_only=False):
             target.write_bytes(source.read_bytes())
 
 
+def run_network_call(execute, argv, label, sleep):
+    """Run one APT network call with bounded attempts; the last failure stands."""
+    for attempt in range(1, APT_DOWNLOAD_ATTEMPTS):
+        try:
+            return execute(argv, check=True, timeout=APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired as failure:
+            reason = "exceeded %d s" % APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS
+            stopped = failure
+        except subprocess.CalledProcessError as failure:
+            reason = "exited with status %d" % failure.returncode
+            stopped = failure
+        delay = APT_DOWNLOAD_BACKOFF_SECONDS[attempt - 1]
+        try:
+            print(
+                "APT %s attempt %d of %d %s; retrying in %d s"
+                % (label, attempt, APT_DOWNLOAD_ATTEMPTS, reason, delay),
+                file=sys.stderr,
+                flush=True,
+            )
+        except Exception:
+            # An unannounced retry would read as a hang: the APT status stands.
+            stopped.add_note("APT retry notice unavailable")
+            raise stopped from None
+        sleep(delay)
+    try:
+        return execute(argv, check=True, timeout=APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as failure:
+        failure.add_note(
+            "APT %s failed on each of its %d attempts" % (label, APT_DOWNLOAD_ATTEMPTS)
+        )
+        raise
+
+
 def deb_cache_directories(root):
     """The restored and used halves of a runner-owned cache; links are refused."""
     root = Path(root)
@@ -505,6 +551,7 @@ def acquire(
     mirrors=None,
     deb_cache=None,
     capture=subprocess.run,
+    sleep=time.sleep,
 ):
     """Wait for each actual APT operation before disposing its private authorities."""
     raw = admitted_source(raw, mirrors)
@@ -528,7 +575,7 @@ def acquire(
         directory.chmod(0o555)
         require_owned(directory.lstat(), "private-namespace", directory=True)
         prefix = command_prefix(directory)
-        execute(prefix + ["update"], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS)
+        run_network_call(execute, prefix + ["update"], "index update", sleep)
         plan = []
         if deb_cache is not None:
             restored, used = deb_cache_directories(deb_cache)
@@ -556,6 +603,9 @@ def acquire(
             (archives / "partial").mkdir(mode=0o755, parents=True)
             import_cached_archives(plan, digests, restored, archives)
         try:
+            run_network_call(
+                execute, prefix + ["install", "--download-only", *arguments], "download", sleep
+            )
             execute(
                 prefix + ["install", *arguments], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS
             )

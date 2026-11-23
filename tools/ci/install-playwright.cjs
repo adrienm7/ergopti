@@ -46,6 +46,45 @@ function status(result) {
 	return result.status;
 }
 
+// The browser download from Playwright's CDN gets bounded attempts of its own:
+// one stalled transfer must not hold the step until its timeout, and a rerun
+// skips the browsers an earlier attempt completed. The native packages before
+// it retry inside tools/ci/ubuntu_apt.py, which resumes their archives.
+const BROWSER_ATTEMPTS = 3;
+const BROWSER_ATTEMPT_TIMEOUT_MS = 10 * 60 * 1000;
+const BROWSER_BACKOFF_MS = [15 * 1000, 30 * 1000];
+
+/** True only when the child was stopped by its own attempt deadline. */
+function timedOut(result) {
+	return result.error !== undefined && result.error.code === 'ETIMEDOUT';
+}
+
+/** Downloads the browsers with bounded attempts; the last failure stands. */
+function downloadBrowsers(browsers, ports) {
+	for (let attempt = 1; ; attempt++) {
+		const result = ports.execute(process.execPath, [ports.cli, 'install', ...browsers], {
+			timeout: BROWSER_ATTEMPT_TIMEOUT_MS
+		});
+		let reason;
+		let code = 1;
+		if (timedOut(result)) reason = `exceeded ${BROWSER_ATTEMPT_TIMEOUT_MS / 1000} s`;
+		else {
+			code = status(result);
+			if (code === 0) return 0;
+			reason = `exited with status ${code}`;
+		}
+		if (attempt === BROWSER_ATTEMPTS) {
+			ports.log(`Playwright browser download failed on each of its ${BROWSER_ATTEMPTS} attempts`);
+			return code;
+		}
+		const delay = BROWSER_BACKOFF_MS[attempt - 1];
+		ports.log(
+			`Playwright browser download attempt ${attempt} of ${BROWSER_ATTEMPTS} ${reason}; retrying in ${delay / 1000} s`
+		);
+		ports.sleep(delay);
+	}
+}
+
 /** Waits for native dependencies before downloading browsers as the original user. */
 function prepare(browsers, ports) {
 	const packages = prerequisites(ports.platform, ports.official, ports.catalogue, browsers);
@@ -59,7 +98,7 @@ function prepare(browsers, ports) {
 		])
 	);
 	if (acquired !== 0) return acquired;
-	return status(ports.execute(process.execPath, [ports.cli, 'install', ...browsers]));
+	return downloadBrowsers(browsers, ports);
 }
 
 /** Binds only the installed version from npm ci to its own host and package owners. */
@@ -80,11 +119,23 @@ function main(browsers) {
 		official: host.isOfficiallySupportedPlatform,
 		catalogue,
 		cli: path.join(cliRoot, 'cli.js'),
-		execute: (executable, arguments_) => spawnSync(executable, arguments_, { stdio: 'inherit' })
+		execute: (executable, arguments_, options = {}) =>
+			spawnSync(executable, arguments_, { stdio: 'inherit', ...options }),
+		log: (message) => console.error(message),
+		sleep: (milliseconds) =>
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
 	});
 }
 
-module.exports = { pinnedVersion, prerequisites, prepare, main };
+module.exports = {
+	BROWSER_ATTEMPTS,
+	BROWSER_ATTEMPT_TIMEOUT_MS,
+	BROWSER_BACKOFF_MS,
+	pinnedVersion,
+	prerequisites,
+	prepare,
+	main
+};
 if (require.main === module) {
 	try {
 		process.exitCode = main(process.argv.slice(2));

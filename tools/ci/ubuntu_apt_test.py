@@ -4,6 +4,7 @@
 from pathlib import Path
 from contextlib import contextmanager
 import errno
+import io
 import tempfile
 import subprocess
 import stat
@@ -195,6 +196,8 @@ def private_owner_ports(uid=0):
 
 def acquire_as_root(*args, **kwargs):
     """Run the real acquisition body with an explicit private root-owner port."""
+    # A retried network call waits through this port, never on the wall clock.
+    kwargs.setdefault("sleep", lambda seconds: None)
     with private_owner_ports():
         return owner.acquire(*args, **kwargs)
 
@@ -245,11 +248,11 @@ class UbuntuArchiveControls(unittest.TestCase):
         self.assertEqual(model.fd_rows, {})
 
     def test_actual_source_bytes_and_package_selection_survive_both_scoped_operations(self):
-        calls, roots = [], []
+        calls, roots, timeouts = [], [], []
 
         def execute(argv, *, check, timeout):
             self.assertTrue(check)
-            self.assertEqual(timeout, owner.APT_COMMAND_TIMEOUT_SECONDS)
+            timeouts.append(timeout)
             source = next(
                 value.split("=", 1)[1]
                 for value in argv
@@ -276,11 +279,31 @@ class UbuntuArchiveControls(unittest.TestCase):
             execute,
             keyring=CANONICAL,
         )
-        self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0][:-1], calls[1][:-5])
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls[0][:-1], calls[1][:-6])
+        self.assertEqual(calls[0][:-1], calls[2][:-5])
         self.assertEqual(calls[0][-1], "update")
         self.assertEqual(
-            calls[1][-5:], ["install", "-y", "--no-install-recommends", "luajit", "./owned.deb"]
+            calls[1][-6:],
+            [
+                "install",
+                "--download-only",
+                "-y",
+                "--no-install-recommends",
+                "luajit",
+                "./owned.deb",
+            ],
+        )
+        self.assertEqual(
+            calls[2][-5:], ["install", "-y", "--no-install-recommends", "luajit", "./owned.deb"]
+        )
+        self.assertEqual(
+            timeouts,
+            [
+                owner.APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS,
+                owner.APT_DOWNLOAD_ATTEMPT_TIMEOUT_SECONDS,
+                owner.APT_COMMAND_TIMEOUT_SECONDS,
+            ],
         )
         self.assertIn("Dir::Etc::SourceParts=-", calls[0])
         self.assertIn("APT::Update::Error-Mode=any", calls[0])
@@ -290,6 +313,7 @@ class UbuntuArchiveControls(unittest.TestCase):
         self.assertIn("Acquire::http::Timeout=30", calls[0])
         self.assertIn("Acquire::Retries=5", calls[1])
         self.assertEqual(roots[0], roots[1])
+        self.assertEqual(roots[0], roots[2])
         self.assertFalse(roots[0].exists())
 
     def test_foreign_repository_and_weakened_signature_sources_refuse_before_execution(self):
@@ -336,10 +360,13 @@ class UbuntuArchiveControls(unittest.TestCase):
             roots.append(Path(source).parent)
             raise failure
 
+        waits = []
         with self.assertRaises(subprocess.CalledProcessError) as observed:
-            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
+            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL, sleep=waits.append)
         self.assertIs(observed.exception, failure)
-        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls), owner.APT_DOWNLOAD_ATTEMPTS)
+        self.assertTrue(all(argv[-1] == "update" for argv in calls))
+        self.assertEqual(waits, list(owner.APT_DOWNLOAD_BACKOFF_SECONDS))
         self.assertFalse(roots[0].exists())
 
     def test_install_failure_is_not_promoted_to_success(self):
@@ -348,13 +375,67 @@ class UbuntuArchiveControls(unittest.TestCase):
 
         def execute(argv, *, check, timeout):
             calls.append(argv)
-            if "install" in argv:
+            if "install" in argv and "--download-only" not in argv:
                 raise failure
 
         with self.assertRaises(subprocess.CalledProcessError) as observed:
             acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL)
         self.assertIs(observed.exception, failure)
-        self.assertEqual(len(calls), 2)
+        # The offline dpkg install is never retried: a killed one leaves dpkg interrupted.
+        self.assertEqual(len(calls), 3)
+
+    def test_a_stalled_download_resumes_in_the_same_private_cache_on_retry(self):
+        # apt-download-retry-2026-11-23: the Install and launch browser install
+        # (run 45271461283) was still downloading when its step stopped it.
+        calls, caches, waits, archives_seen = [], [], [], []
+
+        def execute(argv, *, check, timeout):
+            calls.append(argv)
+            if "--download-only" not in argv:
+                return
+            archives = (
+                Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
+                / "archives"
+            )
+            archives.mkdir(exist_ok=True)
+            caches.append(archives)
+            archives_seen.append(sorted(p.name for p in archives.glob("*.deb")))
+            if len(caches) == 1:
+                (archives / "first.deb").write_bytes(b"done")
+                raise subprocess.TimeoutExpired(argv, timeout)
+            (archives / "second.deb").write_bytes(b"done")
+
+        stderr = io.StringIO()
+        with patch.object(owner.sys, "stderr", stderr):
+            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL, sleep=waits.append)
+        self.assertEqual([argv[-2] for argv in calls[1:3]], ["--download-only"] * 2)
+        self.assertEqual(calls[3][-2:], ["install", "luajit"])
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(caches[0], caches[1])
+        self.assertEqual(archives_seen, [[], ["first.deb"]])
+        self.assertEqual(waits, [owner.APT_DOWNLOAD_BACKOFF_SECONDS[0]])
+        self.assertIn(
+            "APT download attempt 1 of 3 exceeded 600 s; retrying in 15 s", stderr.getvalue()
+        )
+
+    def test_a_download_failing_every_attempt_never_installs_and_keeps_its_status(self):
+        calls, waits = [], []
+        failures = []
+
+        def execute(argv, *, check, timeout):
+            calls.append(argv)
+            if "--download-only" in argv:
+                failures.append(subprocess.CalledProcessError(100, argv))
+                raise failures[-1]
+            self.assertEqual(argv[-1], "update", "the dpkg install must not run")
+
+        with self.assertRaises(subprocess.CalledProcessError) as observed:
+            acquire_as_root(VALID, ["luajit"], execute, keyring=CANONICAL, sleep=waits.append)
+        self.assertIs(observed.exception, failures[-1])
+        self.assertEqual(len(failures), owner.APT_DOWNLOAD_ATTEMPTS)
+        self.assertEqual(len(calls), 1 + owner.APT_DOWNLOAD_ATTEMPTS)
+        self.assertIn("APT download failed on each of its 3 attempts", observed.exception.__notes__)
+        self.assertEqual(waits, list(owner.APT_DOWNLOAD_BACKOFF_SECONDS))
 
 
 class PinnedUbuntuAuthorityControls(unittest.TestCase):
@@ -426,10 +507,10 @@ class PinnedUbuntuAuthorityControls(unittest.TestCase):
             calls.append(argv)
 
         acquire_as_root(raw, ["-y", "luajit"], execute, keyring=CANONICAL, mirrors=MIRRORS)
-        self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0][:-1], calls[1][:-3])
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls[0][:-1], calls[2][:-3])
         self.assertFalse(roots[0].exists())
-        self.assertFalse(roots[1].exists())
+        self.assertFalse(roots[2].exists())
 
     def test_unknown_mirrors_paths_or_options_refuse_before_namespace(self):
         raw = VALID.replace(
@@ -772,7 +853,7 @@ class ActiveOriginAndCleanupControls(unittest.TestCase):
             calls.append(argv)
 
         acquire_as_root(raw, ["luajit"], execute, keyring=CANONICAL)
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3)
         self.assertFalse(roots[0].exists())
 
     def test_mixed_stanzas_select_only_the_active_mirror_and_preserve_full_source(self):
@@ -1042,7 +1123,7 @@ class ArchiveCacheControls(unittest.TestCase):
             seen = {}
 
             def execute(argv, *, check, timeout):
-                if "install" in argv:
+                if "--download-only" in argv:
                     archives = (
                         Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
                         / "archives"
@@ -1089,7 +1170,7 @@ class ArchiveCacheControls(unittest.TestCase):
                 (cache / half).mkdir()
 
             def execute(argv, *, check, timeout):
-                if "install" in argv:
+                if "--download-only" in argv:
                     archives = (
                         Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
                         / "archives"

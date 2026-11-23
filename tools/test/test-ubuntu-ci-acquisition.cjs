@@ -130,6 +130,7 @@ for (const [acquisition, browserExit] of [
 	[0, 42]
 ]) {
 	const calls = [];
+	const waits = [];
 	const result = browsers.prepare(['chromium', 'webkit'], {
 		platform: 'ubuntu24.04-x64',
 		official: true,
@@ -138,10 +139,17 @@ for (const [acquisition, browserExit] of [
 		execute: (exe, args) => {
 			calls.push([exe, args]);
 			return { status: calls.length === 1 ? acquisition : browserExit, signal: null };
-		}
+		},
+		log: () => {},
+		sleep: (milliseconds) => waits.push(milliseconds)
 	});
 	assert.equal(result, acquisition || browserExit);
-	assert.equal(calls.length, acquisition === 0 ? 2 : 1);
+	// A failed browser download is retried to its bound and keeps its own status;
+	// a failed native acquisition already retried inside ubuntu_apt.py.
+	const expectedCalls =
+		acquisition !== 0 ? 1 : browserExit === 0 ? 2 : 1 + browsers.BROWSER_ATTEMPTS;
+	assert.equal(calls.length, expectedCalls);
+	assert.deepEqual(waits, browserExit !== 0 ? browsers.BROWSER_BACKOFF_MS : []);
 	assert.deepEqual(calls[0], [
 		'sudo',
 		[
@@ -157,6 +165,56 @@ for (const [acquisition, browserExit] of [
 			process.execPath,
 			['/owned/playwright/cli.js', 'install', 'chromium', 'webkit']
 		]);
+}
+// browser-download-retry-2026-11-23: one stalled CDN transfer stops only its
+// own attempt, and the rerun uses the same command with the same deadline.
+{
+	const calls = [];
+	const waits = [];
+	const logs = [];
+	const stalled = Object.assign(new Error('spawnSync node ETIMEDOUT'), { code: 'ETIMEDOUT' });
+	const result = browsers.prepare(['chromium', 'webkit'], {
+		platform: 'ubuntu24.04-x64',
+		official: true,
+		catalogue,
+		cli: '/owned/playwright/cli.js',
+		execute: (exe, args, options) => {
+			calls.push([exe, args, options]);
+			if (calls.length === 2) return { error: stalled, status: null, signal: 'SIGTERM' };
+			return { status: 0, signal: null };
+		},
+		log: (message) => logs.push(message),
+		sleep: (milliseconds) => waits.push(milliseconds)
+	});
+	assert.equal(result, 0);
+	assert.equal(calls.length, 3);
+	assert.equal(calls[0][2], undefined, 'the native acquisition keeps its own internal bounds');
+	assert.deepEqual(calls[1], calls[2], 'the retry repeats the same command and deadline');
+	assert.deepEqual(calls[1][2], { timeout: browsers.BROWSER_ATTEMPT_TIMEOUT_MS });
+	assert.deepEqual(waits, [browsers.BROWSER_BACKOFF_MS[0]]);
+	assert.deepEqual(logs, [
+		'Playwright browser download attempt 1 of 3 exceeded 600 s; retrying in 15 s'
+	]);
+}
+{
+	let calls = 0;
+	const logs = [];
+	const stalled = Object.assign(new Error('spawnSync node ETIMEDOUT'), { code: 'ETIMEDOUT' });
+	const result = browsers.prepare(['chromium'], {
+		platform: 'ubuntu24.04-x64',
+		official: true,
+		catalogue,
+		cli: '/owned/playwright/cli.js',
+		execute: () =>
+			++calls === 1
+				? { status: 0, signal: null }
+				: { error: stalled, status: null, signal: 'SIGTERM' },
+		log: (message) => logs.push(message),
+		sleep: () => {}
+	});
+	assert.equal(result, 1, 'a download that stalls on every attempt fails the step');
+	assert.equal(calls, 1 + browsers.BROWSER_ATTEMPTS);
+	assert.equal(logs.at(-1), 'Playwright browser download failed on each of its 3 attempts');
 }
 for (const terminal of [
 	{ status: null, signal: null },
@@ -353,5 +411,5 @@ const result = spawnSync(
 assert.ifError(result.error);
 assert.equal(result.signal, null);
 assert.equal(result.status, 0, result.stdout + result.stderr);
-assert.match(result.stderr, /Ran 37 tests in /);
+assert.match(result.stderr, /Ran 39 tests in /);
 console.log('PASS: signed Ubuntu host acquisition, failure controls and workflow mutations');

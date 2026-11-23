@@ -2457,7 +2457,7 @@ function commonSiteProblems(source) {
 			test = doc.jobs['common-testbuild'];
 		for (const [job, previous, name, timeout] of [
 			[build, 'common-e2e', 'Build', 60],
-			[test, 'common-build', 'Install and launch', 45]
+			[test, 'common-build', 'Install and launch', 55]
 		]) {
 			same(job.needs, [previous], 'adjacent production stage');
 			same(job.name, name, 'actual API stage name');
@@ -2551,7 +2551,7 @@ function commonSiteProblems(source) {
 			test.steps[4],
 			{
 				name: 'Install production site browsers',
-				'timeout-minutes': 15,
+				'timeout-minutes': 30,
 				run: 'node tools/ci/install-playwright.cjs chromium webkit'
 			},
 			'both production browser engines'
