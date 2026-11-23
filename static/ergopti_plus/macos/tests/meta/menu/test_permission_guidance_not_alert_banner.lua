@@ -52,21 +52,22 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_eq(#offenders, 0, "hs.alert banner outside the allowlist:\n" .. table.concat(offenders, "\n"))
 	end)
 
-	helpers.it("the boot's Accessibility wait leaves the guidance to macOS's own prompt", function()
-		-- A second dialog asking to find the app with Cmd+Shift+G and + competed
-		-- with the macOS prompt, whose button adds the right entry (field report 2026-11-05).
-		-- The one dialog left names the other copies that can hold the switch.
+	helpers.it("the boot's Accessibility wait shows the steps that name ErgoptiPlus.app", function()
+		-- The 2026-11-05 report retired these steps in favour of macOS's prompt
+		-- alone. That prompt adds a "Hammerspoon" entry; turning it on did not
+		-- start a first install, and nothing said to add ErgoptiPlus.app with +
+		-- or that no reload is needed (field report 2026-11-23). The steps are
+		-- back for every wait, and name the other copies when there are some.
 		local unit, err = helpers.read_driver_unit("AccessibilityWait.start({")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
-		helpers.assert_true(body:find("guide_accessibility", 1, true) == nil,
-			"the boot must not open Ergopti's own Accessibility steps")
-		helpers.assert_true(body:find("show_guidance", 1, true) == nil, "the wait takes no guidance dialog")
-		helpers.assert_true(body:find("name_other_copies(AccessibilityPermission, paths)", 1, true) ~= nil,
-			"the copies that can hold the switch are named")
+		helpers.assert_true(body:find("guide_accessibility(AccessibilityPermission, copies)", 1, true) ~= nil,
+			"the wait must be given the steps, copies included")
+		helpers.assert_true(body:find("name_other_copies", 1, true) == nil,
+			"a copies-only dialog left a lone copy without steps")
 		local dialog = helpers.read_module_source("ui.permission_dialog")
-		helpers.assert_true(dialog ~= nil and dialog:find("function M.guide_accessibility", 1, true) == nil,
-			"the retired Accessibility steps dialog must stay retired")
+		helpers.assert_true(dialog ~= nil and dialog:find("permission.grant_app_path()", 1, true) ~= nil,
+			"the steps quote the app the user installed, not the runtime nested in it")
 	end)
 
 	helpers.it("reopening ErgoptiPlus during the wait asks for the prompt again", function()

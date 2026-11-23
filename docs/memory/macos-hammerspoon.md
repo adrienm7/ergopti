@@ -858,6 +858,19 @@ certificate hash. Action: sign every object through `sign_code` in
 costs every user one re-grant), and read the requirement the release log
 prints before blaming the driver for a lost grant.
 
+### project-macos-accessibility-grant-names-the-app
+
+The launcher opens the embedded runtime (`Contents/Frameworks/Hammerspoon.app`)
+through Launch Services from inside its own bundle. On a first install
+(2026-11-23) macOS's prompt offered a "Hammerspoon" entry; turning it on did
+not trust the driver, which started only once `ErgoptiPlus.app` itself was
+added with + and turned on, with "Hammerspoon" left on too. Whether the
+runtime entry is also needed is unproven: read TCC's attribution on a Mac
+(`tools/diagnostics/hs274_accessibility_diagnostics.py`) before narrowing it.
+Action: the boot wait always shows `ui/permission_dialog` steps naming the
+launcher bundle (`accessibility_permission.grant_app_path`), never the nested
+runtime; the stale-entry reset still targets the runtime's identifier only.
+
 ### project-hs-input-source-single-owner
 
 `hs.keycodes.inputSourceChanged` is a setter, so one broker owns it and

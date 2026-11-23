@@ -57,16 +57,24 @@ M.SCRIPT = table.concat({
 	'exit 0',
 }, "\n")
 
+--- Returns the app the user sees for a runtime path: the launcher bundle that
+--- embeds the runtime, or the path itself for a runtime that is its own app.
+--- @param runtime_path string Path of a runtime bundle.
+--- @return string path
+function M.app_path(runtime_path)
+	if runtime_path:sub(-#EMBEDDED_SUFFIX) == EMBEDDED_SUFFIX then
+		return runtime_path:sub(1, #runtime_path - #EMBEDDED_SUFFIX)
+	end
+	return runtime_path
+end
+
 --- Turns the probe's lines into the apps to name, launcher paths first.
 --- @param stdout string Probe output, one runtime path per line.
 --- @return table paths Distinct app paths, sorted.
 function M.parse(stdout)
 	local seen, paths = {}, {}
 	for line in tostring(stdout or ""):gmatch("[^\n]+") do
-		local path = line
-		if path:sub(-#EMBEDDED_SUFFIX) == EMBEDDED_SUFFIX then
-			path = path:sub(1, #path - #EMBEDDED_SUFFIX)
-		end
+		local path = M.app_path(line)
 		if path ~= "" and not seen[path] then
 			seen[path] = true
 			paths[#paths + 1] = path

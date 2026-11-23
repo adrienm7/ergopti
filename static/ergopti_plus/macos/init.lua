@@ -1567,8 +1567,8 @@ Boot.stage_once("Accessibility permission")
 -- Settings still shows it checked, so exiting with instructions left users
 -- stuck. The wait clears that stale entry once per install, unless another copy
 -- signed differently can hold the switch (it then names that copy), shows
--- macOS's own prompt, opens the pane, and runs this boot again once macOS
--- trusts the process.
+-- macOS's own prompt, opens the pane, shows the steps that add and turn on
+-- ErgoptiPlus.app, and runs this boot again once macOS trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
 if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
@@ -1589,9 +1589,10 @@ if accessibility_trusted ~= true then
 		every = TimerScheduler.every,
 		cancel = TimerScheduler.cancel,
 		watch_reopen = watch_launcher_reopen,
-		-- Another copy signed differently can hold the one switch: its paths are named.
-		name_other_copies = function(paths)
-			return require("ui.permission_dialog").name_other_copies(AccessibilityPermission, paths)
+		-- The steps name the app to add with + at its install path; another copy
+		-- signed differently can hold the one switch, so its paths are named too.
+		show_guide = function(copies)
+			return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission, copies)
 		end,
 		install_identity = install_identity,
 		reset_memory = {

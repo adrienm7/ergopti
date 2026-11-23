@@ -191,8 +191,9 @@ function M.bundle_id()
 	return require("adapters.tcc_grant").bundle_id()
 end
 
---- Returns the path of the running app, the one the Accessibility list shows
---- (as "Hammerspoon") and the one to add with + when the entry is missing.
+--- Returns the path of the running runtime bundle. Packaged, it is the
+--- Hammerspoon.app nested in ErgoptiPlus.app, which macOS lists as
+--- "Hammerspoon".
 --- @return string|nil path Nil when the running process reports none.
 --- @return string|nil detail Exact reason when path is nil.
 function M.bundle_path()
@@ -202,6 +203,19 @@ function M.bundle_path()
 		return nil, "hs.processInfo.bundlePath is unavailable"
 	end
 	return path
+end
+
+--- Returns the app the user turns on in the Accessibility list, and adds with
+--- + when it is missing. Packaged, it is ErgoptiPlus.app, the launcher that
+--- starts the runtime from inside its own bundle: a first install's grant to
+--- the "Hammerspoon" entry alone left the driver untrusted, and it started
+--- once ErgoptiPlus.app was added and turned on (field report 2026-11-23).
+--- @return string|nil path Nil when the running process reports none.
+--- @return string|nil detail Exact reason when path is nil.
+function M.grant_app_path()
+	local path, err = M.bundle_path()
+	if path == nil then return nil, err end
+	return require("clipboard.adapters.accessibility_copies").app_path(path)
 end
 
 --- Finds the other registered copies of this app whose signature differs: the
