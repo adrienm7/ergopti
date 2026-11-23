@@ -218,7 +218,8 @@ _Redact_AcceptUrlCredential(Rules, Text, First, Last) {
 }
 
 ; Accepts an e-mail address: a local part, an @, and a dotted domain ending in
-; a top-level label of at least two letters.
+; a top-level label of at least two letters that is not a source file
+; extension (Rules["not_email_extensions"]).
 _Redact_AcceptEmail(Rules, Text, First, Last) {
 	Start := _Redact_RunStart(Text, First - 1, "email_local")
 	if (Start == First)
@@ -240,6 +241,11 @@ _Redact_AcceptEmail(Rules, Text, First, Last) {
 		return 0
 	Loop Parse Tld {
 		if !_Redact_CharIs(A_LoopField, 1, "letter")
+			return 0
+	}
+	; A source file such as File.swift:62 is not a domain
+	for Extension in Rules["not_email_extensions"] {
+		if (StrLower(Tld) == Extension)
 			return 0
 	}
 	return Map("text", Rules["email_placeholder"], "last", Stop, "first", Start)

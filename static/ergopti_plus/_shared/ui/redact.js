@@ -229,7 +229,8 @@
 
 	/**
 	 * Replaces e-mail addresses: a local part, an @, and a dotted domain ending
-	 * in a top-level label of at least two letters.
+	 * in a top-level label of at least two letters that is not a source file
+	 * extension (rules.not_email_extensions).
 	 * @param {string} text
 	 * @param {object} rules
 	 * @returns {string}
@@ -252,6 +253,8 @@
 				})
 			)
 				return null;
+			// A source file such as File.swift:62 is not a domain (rules.not_email_extensions)
+			if (rules.not_email_extensions.indexOf(tld.toLowerCase()) !== -1) return null;
 			return { text: rules.email_placeholder, last: stop, first: start };
 		});
 	}

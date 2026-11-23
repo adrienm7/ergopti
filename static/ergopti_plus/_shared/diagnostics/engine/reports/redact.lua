@@ -225,7 +225,8 @@ local function redact_url_credentials(text, rules)
 end
 
 --- Replaces e-mail addresses: a local part, an @, and a dotted domain ending in
---- a top-level label of at least two letters.
+--- a top-level label of at least two letters that is not a source file
+--- extension (rules.not_email_extensions).
 --- @param text string
 --- @param rules table
 --- @return string
@@ -239,7 +240,12 @@ local function redact_emails(text, rules)
 		local domain = source:sub(last + 1, stop)
 		local dot = domain:match("^.*()%.")
 		if not dot or dot < 2 then return nil end
-		if not domain:sub(dot + 1):match("^[A-Za-z][A-Za-z]+$") then return nil end
+		local tld = domain:sub(dot + 1)
+		if not tld:match("^[A-Za-z][A-Za-z]+$") then return nil end
+		tld = tld:lower()
+		for _, extension in ipairs(rules.not_email_extensions) do
+			if tld == extension then return nil end
+		end
 		return rules.email_placeholder, stop, start
 	end)
 end
