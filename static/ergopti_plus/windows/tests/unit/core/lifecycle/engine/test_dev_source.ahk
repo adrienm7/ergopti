@@ -169,6 +169,34 @@ _DST_SnapshotScope() {
 }
 Test("dev source: the snapshot skips tests and generated files (windows-dev-mode)", _DST_SnapshotScope)
 
+; Walking the driver tree costs about 35 ms, and the poll runs every second:
+; walking it on every tick cost the developer run 6 % of a CPU while idle (field
+; report 2026-11-23). An idle tick keeps the snapshot it has; a save is still seen.
+_DST_IdleTickDoesNotWalk() {
+	global _DevSourceWatcher, _DST_Reloads, _DST_Arms
+	_DST_Reloads := 0, _DST_Arms := []
+	Root := _DST_Tree()
+	try {
+		DevSourceWatcher_Start(Root, "", _DST_Reload, _DST_Arm, _DST_Now)
+		; The file system may still report the scratch files' own creation.
+		Sleep(300)
+		_DST_Poll()
+		Kept := _DevSourceWatcher["snapshot"]
+		_DST_Poll()
+		_DST_Poll()
+		AssertTrue(_DevSourceWatcher["snapshot"] == Kept, "an idle tick walked the tree")
+		_DST_Touch(Root . "\infra\a.ahk")
+		_DST_Poll()
+		AssertFalse(_DevSourceWatcher["snapshot"] == Kept, "the save was not walked")
+		_DST_Poll()
+		AssertEqual(1, _DST_Reloads, "the settled save reloads")
+	} finally {
+		DevSourceWatcher_Stop()
+		DirDelete(Root, true)
+	}
+}
+Test("dev source: an idle tick does not walk the tree (windows-dev-mode)", _DST_IdleTickDoesNotWalk)
+
 _DST_ReloadsOnce() {
 	global _DevSourceWatcher, _DST_Reloads, _DST_Arms
 	_DST_Reloads := 0

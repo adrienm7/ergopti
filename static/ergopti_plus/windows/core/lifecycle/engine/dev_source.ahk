@@ -23,7 +23,10 @@
 ; 4. Poll, not ReadDirectoryChangesW: a one-second timer compares the modified
 ;    time and size of every driver .ahk. It runs only in a developer run and
 ;    needs no overlapped I/O or callback thread; a change reloads only after one
-;    quiet tick, so an editor's multi-file save reloads once.
+;    quiet tick, so an editor's multi-file save reloads once. The tick first
+;    reads a change notification handle without waiting and walks the tree only
+;    once the tree changed or a burst is pending: the walk alone costs about
+;    35 ms, 3.5 % of a CPU every second while idle (field report 2026-11-23).
 ; 5. Whole-tree settle: a burst of more than dev_source_bulk_threshold distinct
 ;    files (a pull, a checkout, a sync) waits dev_source_bulk_settle_ms of quiet
 ;    across the whole tree, and no reload starts while Git rewrites the tree
@@ -44,6 +47,9 @@
 #Requires AutoHotkey v2.0
 
 global DEV_SOURCE_POLL_MS := 1000
+; FindFirstChangeNotificationW filter: a file or folder created, removed or
+; renamed (an editor's save by rename included), a size or a write time changed.
+global DEV_SOURCE_CHANGE_FILTER := 0x1 | 0x2 | 0x8 | 0x10
 ; Files of the gitdir whose presence means Git is rewriting the tree: the lock
 ; of every index and working-tree update, the multi-step merge markers, and the
 ; file every rebase backend keeps in its state folder.
@@ -211,11 +217,16 @@ DevSource_Snapshot(DriverDir) {
 	Snapshot := Map()
 	; A_LoopFilePath keeps DriverDir exactly as given; A_LoopFileFullPath expands
 	; an 8.3 short folder (a runner's RUNNER~1 temp), which broke the prefix cut.
-	Loop Files DriverDir . "\*.ahk", "FR" {
-		Relative := SubStr(A_LoopFilePath, StrLen(DriverDir) + 2)
-		if RegExMatch(Relative, "i)^(?:tests|_generated)\\")
-			continue
+	Loop Files DriverDir . "\*.ahk", "F"
 		Snapshot[A_LoopFilePath] := A_LoopFileTimeModified . "|" . A_LoopFileSize
+	; The skipped folders are never entered: walking tests\ (about 2,200 files)
+	; every second to drop them afterwards cost the developer run 6 % of a CPU
+	; while idle (field report 2026-11-23).
+	Loop Files DriverDir . "\*", "D" {
+		if (A_LoopFileName = "tests") || (A_LoopFileName = "_generated")
+			continue
+		Loop Files A_LoopFilePath . "\*.ahk", "FR"
+			Snapshot[A_LoopFilePath] := A_LoopFileTimeModified . "|" . A_LoopFileSize
 	}
 	return Snapshot
 }
@@ -249,7 +260,12 @@ DevSourceWatcher_Start(DriverDir, GitDir, ReloadFn, ArmFn := SetTimer, NowFn := 
 		throw Error("The developer source watcher is already running")
 	if (GitDir != "") && !InStr(FileExist(GitDir), "D")
 		throw Error("The developer source watcher needs the clone's gitdir: " . GitDir)
-	_DevSourceWatcher := Map("dir", DriverDir, "git_dir", GitDir,
+	; Armed before the first snapshot, so a save during it is still seen.
+	Notification := DllCall("FindFirstChangeNotificationW", "Str", DriverDir, "Int", true,
+		"UInt", DEV_SOURCE_CHANGE_FILTER, "Ptr")
+	if (Notification == -1)
+		throw OSError(A_LastError, -1, "FindFirstChangeNotificationW " . DriverDir)
+	_DevSourceWatcher := Map("dir", DriverDir, "git_dir", GitDir, "notification", Notification,
 		"snapshot", DevSource_Snapshot(DriverDir), "burst", Map(), "last_change", 0,
 		"git_hold", "", "git_hold_since", 0, "git_hold_reported", false,
 		"reload", ReloadFn, "arm", ArmFn, "now", NowFn)
@@ -268,6 +284,9 @@ DevSourceWatcher_Stop() {
 	if !(_DevSourceWatcher is Map)
 		return
 	_DevSourceWatcher["arm"](_DevSourceWatcherTick, 0)
+	if !DllCall("FindCloseChangeNotification", "Ptr", _DevSourceWatcher["notification"], "Int")
+		LoggerWarn("DevSource", "Developer source watcher could not close its change notification: Win32 {1}.",
+			A_LastError)
 	if (_DevSourceWatcher["git_hold"] != "")
 		LoggerWarn("DevSource", "Developer source watcher stopped while a Git operation ({1}) held its reload.",
 			_DevSourceWatcher["git_hold"])
@@ -283,6 +302,9 @@ _DevSourceWatcherTick() {
 		return
 	Watcher := _DevSourceWatcher
 	Now := Watcher["now"]()
+	; A pending burst walks on every tick: its quiet tick is what settles it.
+	if !_DevSourceTreeChanged(Watcher) && (Watcher["burst"].Count == 0)
+		return
 	Snapshot := DevSource_Snapshot(Watcher["dir"])
 	Changed := DevSource_SnapshotChanges(Watcher["snapshot"], Snapshot)
 	Watcher["snapshot"] := Snapshot
@@ -311,6 +333,23 @@ _DevSourceWatcherTick() {
 		LoggerInfo("DevSource", "{1} saved source files settled across the tree (first {2}); reloading the driver.",
 			Burst.Count, First)
 	Watcher["reload"]()
+}
+
+; Whether the tree changed since the last tick, re-arming the notification
+; before the walk that follows, so a change during that walk is not lost.
+; @param Watcher {Map} The running watcher.
+; @returns {Boolean}
+; @throws {OSError} When the wait or the re-arm fails.
+_DevSourceTreeChanged(Watcher) {
+	global PLC_WAIT_OBJECT_0, PLC_WAIT_TIMEOUT
+	Result := DllCall("WaitForSingleObject", "Ptr", Watcher["notification"], "UInt", 0, "UInt")
+	if (Result == PLC_WAIT_TIMEOUT)
+		return false
+	if (Result != PLC_WAIT_OBJECT_0)
+		throw OSError(A_LastError, -1, "WaitForSingleObject on the source change notification")
+	if !DllCall("FindNextChangeNotification", "Ptr", Watcher["notification"], "Int")
+		throw OSError(A_LastError, -1, "FindNextChangeNotification")
+	return true
 }
 
 ; Whether no Git operation holds the pending reload. The hold is paired: its
