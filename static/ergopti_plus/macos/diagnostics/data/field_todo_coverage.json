@@ -98,6 +98,12 @@
 			"not_testable": "The submenu is read in the open menu-bar menu, which no run captures: open Configuration; the order is unit-tested (test_menu, configuration_parent.json)."
 		},
 		{
+			"id": "debug_logs_rows",
+			"title": "D\u00e9bogage logs rows and the detailed log switch",
+			"checks": [],
+			"not_testable": "The rows are read and clicked in the open menu-bar menu, which no run captures: open D\u00e9bogage; the order, the switch and the report line are unit-tested (test_menu, report_vectors.json)."
+		},
+		{
 			"id": "tray_reading_font",
 			"title": "Tray menu drawn in the reading font",
 			"checks": [],

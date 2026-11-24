@@ -132,6 +132,18 @@
 			"not_testable": "The row is clicked in the desktop's tray menu, which no run drives: tick it, type a hotstring (nothing expands), untick it; the row and its pause toggle are unit-tested (test_suspend_row)."
 		},
 		{
+			"id": "configuration_titles",
+			"title": "Configuration titles",
+			"checks": [],
+			"not_testable": "The submenu is read in the desktop's tray menu, which no run drives: open Configuration; the order is unit-tested (the menu manifest parity gate)."
+		},
+		{
+			"id": "debug_logs_rows",
+			"title": "D\u00e9bogage logs rows and the detailed log switch",
+			"checks": [],
+			"not_testable": "The rows are read and clicked in the desktop's tray menu, which no run drives: open D\u00e9bogage; the order, the switch and the report line are unit-tested (the menu manifest parity gate, report_vectors.json)."
+		},
+		{
 			"id": "tray_shortcut_hint",
 			"title": "Tray shortcut hints beside Suspend, Reload and Quit",
 			"checks": [],
