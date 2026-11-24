@@ -1406,6 +1406,28 @@ M.pasteboard = {
 		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = nil
 	end,
+	-- libpasteboard.m writeItemForType: a trailing boolean is `add`; with it the
+	-- type joins the current item without clearContents, so the count holds.
+	writeDataForUTI = function(...)
+		local args = table.pack(...)
+		local add = false
+		if args.n >= 3 and type(args[args.n]) == "boolean" then
+			add = args[args.n]
+			args.n = args.n - 1
+		elseif args.n >= 3 and args[args.n] == nil then
+			args.n = args.n - 1
+		end
+		local name, uti, bytes
+		if args.n == 2 then uti, bytes = args[1], args[2] else name, uti, bytes = args[1], args[2], args[3] end
+		assert(type(uti) == "string" and type(bytes) == "string", "writeDataForUTI needs a UTI and its bytes")
+		local key = pasteboard_key(name)
+		if not add or PASTEBOARD_DATA[key] == nil then
+			PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
+			PASTEBOARD_DATA[key] = {}
+		end
+		PASTEBOARD_DATA[key][uti] = bytes
+		return true
+	end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
 M.spaces = {

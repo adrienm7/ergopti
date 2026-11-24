@@ -580,6 +580,9 @@ local function perform_paste(value, handoff)
 	_paste_recovery_only = true
 	if _paste_publication_lease then _paste_publication_lease.mutated = true end
 	local ok_write, write_result = pcall(hs.pasteboard.setContents, value)
+	-- Clipboard managers leave the expansion out of their history; the marker
+	-- keeps the change count the ownership checks below compare.
+	if ok_write and write_result == true then Clipboard.mark_transient() end
 	local lease = _paste_publication_lease
 	if lease then
 		local after = clipboard_change_count()

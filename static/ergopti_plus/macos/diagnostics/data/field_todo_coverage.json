@@ -80,6 +80,12 @@
 			"condition": "Two pairs sharing Tab as second key, CapsLock and Left Shift as first keys, on distinct tap actions."
 		},
 		{
+			"id": "clipboard_manager_hint",
+			"title": "Pasted text kept out of clipboard managers (nspasteboard.org markers)",
+			"checks": [],
+			"not_testable": "Needs a clipboard manager running on the Mac and a person reading its history after a paste: the field report reads no clipboard manager."
+		},
+		{
 			"id": "mrt004_service_repair",
 			"title": "MRT-004 « Réparer le service »",
 			"checks": [],
