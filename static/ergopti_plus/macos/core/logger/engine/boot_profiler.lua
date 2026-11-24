@@ -25,6 +25,11 @@
 ---    fallback boot log (and to launcher.log until the user log folder is
 ---    ready) through adapters/boot_journal, because Logger lines queued for
 ---    the native worker die with os.exit().
+--- 6. One boot summary: complete() names a stage still open, as the Windows and
+---    Linux profilers do, and writes one never-collapsed line with the total,
+---    its CPU, the heap and every closed stage, the Linux summary's shape. A
+---    stage left open used to end the boot without a word, and no single line
+---    compared one boot with another (boot profiler parity BPF-02, BPF-03).
 --- ==============================================================================
 
 local M = {}
@@ -241,6 +246,10 @@ function M.complete()
 	untrace_requires()
 	local total = _start_ns and (now_ns() - _start_ns) / NS_PER_MS or 0
 	_boot_cpu_ms = M.cpu_ms()
+	if _open_stage ~= nil then
+		pcall(Logger.warn, LOG, "Boot completed with unclosed stage(s): %s.", _open_stage)
+		pcall(BootJournal.append, "WARNING", "Boot completed with unclosed stage(s): " .. _open_stage .. ".")
+	end
 	pcall(Logger.success, LOG, "Boot complete in %.0f ms.", total)
 	pcall(BootJournal.append, "SUCCESS", string.format("Boot complete in %.0f ms.", total))
 	-- Never collapsed: the CPU total is the figure a slow-boot report compares
@@ -250,6 +259,13 @@ function M.complete()
 	-- Read here, not at load: the profiler starts before the timings registry.
 	PerfBudget.judge(Logger, LOG, "boot", total,
 		function() return require("core.timing.engine.timings").ms("budgets", "boot_total_ms") end)
+	-- Stage names are code literals, never content.
+	local parts = {}
+	for _, stage in ipairs(_stage_durations) do
+		parts[#parts + 1] = string.format("%s=%.0fms(cpu %.0fms)", stage.name, stage.ms, stage.cpu_ms)
+	end
+	pcall(Logger.evidence, LOG, "Boot summary: total=%.0fms (cpu %.0fms) heap=%dKB stages: %s.", total,
+		_boot_cpu_ms, math.floor(collectgarbage("count")), table.concat(parts, " "))
 end
 
 --- Logs the time since the previous mark and since M.begin().
@@ -280,7 +296,7 @@ function M.mark(phase_name)
 		or (cpu_now - _last_cpu_ms)
 	_last_cpu_ms = cpu_now
 	_open_stage, _stage_start_ns, _stage_cpu_ms, _last_completed = nil, nil, nil, name
-	_stage_durations[#_stage_durations + 1] = { name = name, ms = stage_ms }
+	_stage_durations[#_stage_durations + 1] = { name = name, ms = stage_ms, cpu_ms = stage_cpu_ms }
 	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms, cpu %.1f ms)."
 	pcall(Logger.success, LOG, format, name, stage_ms, delta, total, stage_cpu_ms)
 	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total, stage_cpu_ms))
