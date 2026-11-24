@@ -140,8 +140,10 @@ all of them. The leniencies that matter for Rule A:
 - `test-shared-lua-helpers-single-use` covers copy, trim, quote and
   percent-encode only; no gate compared Lua function bodies across the two Lua
   drivers.
-- `test-driver-tree-parity` measures directories down to depth 2 with a
-  floor and a union ceiling; it does not see folder sizes.
+- `test-driver-tree-parity` measures directories down to depth 2 against a
+  ledger of every path and the drivers that hold it
+  (`tools/test/driver-tree-parity-baseline.json`, a floor and a union ceiling
+  until 2026-11-24); it does not see folder sizes.
 
 The ratchet `tools/test/test-shared-literal-inventory.cjs` (`js-0508`) holds
 the hand-typed values per driver and kind and the macOS/Linux logic pairs

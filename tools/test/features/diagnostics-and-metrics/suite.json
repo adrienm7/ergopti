@@ -236,7 +236,7 @@
 		},
 		{
 			"id": "js-0252",
-			"ordinal": 266,
+			"ordinal": 267,
 			"name": "keystats walker constants single source (bucket edges and caps: shared helpers vs both walkers)",
 			"cmd": "node",
 			"args": ["tools/test/test-walker-constants-single-source.cjs"],
@@ -244,7 +244,7 @@
 		},
 		{
 			"id": "js-0254",
-			"ordinal": 268,
+			"ordinal": 269,
 			"name": "HotPath segment inventory (every measured hot path declared with what it covers)",
 			"cmd": "node",
 			"args": ["tools/test/test-hotpath-segments-declared.cjs"],
@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "js-0286",
-			"ordinal": 300,
+			"ordinal": 301,
 			"name": "metrics heatmap translation coverage",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-heatmap-translation.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "js-0287",
-			"ordinal": 301,
+			"ordinal": 302,
 			"name": "metrics rebuild banner (partial snapshots are labelled)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-rebuild-banner.cjs"],
@@ -268,7 +268,7 @@
 		},
 		{
 			"id": "js-0288",
-			"ordinal": 302,
+			"ordinal": 303,
 			"name": "metrics freshness banner (cached snapshots carry their date)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-freshness-banner.cjs"],
@@ -276,7 +276,7 @@
 		},
 		{
 			"id": "js-0330",
-			"ordinal": 346,
+			"ordinal": 347,
 			"name": "metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-open-rows-wording.cjs"],
@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "js-0331",
-			"ordinal": 347,
+			"ordinal": 348,
 			"name": "report button is white on blue with enough contrast in both appearances (diagnostics and error windows)",
 			"cmd": "node",
 			"args": ["tools/test/test-report-button-contrast.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "js-0382",
-			"ordinal": 391,
+			"ordinal": 392,
 			"name": "metrics manifest payload contract (reader vocabulary reaches real consumers)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-manifest-contract.cjs"],
@@ -300,7 +300,7 @@
 		},
 		{
 			"id": "js-0383",
-			"ordinal": 392,
+			"ordinal": 393,
 			"name": "typing-speed source toggles (net expansion gain and filter semantics)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-speed-source-filters.cjs"],
@@ -308,7 +308,7 @@
 		},
 		{
 			"id": "js-0384",
-			"ordinal": 393,
+			"ordinal": 394,
 			"name": "Linux metrics SQLite bridge (persistent manifest + selected-range refresh)",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-metrics-sqlite-bridge.cjs"],
@@ -316,7 +316,7 @@
 		},
 		{
 			"id": "js-0385",
-			"ordinal": 394,
+			"ordinal": 395,
 			"name": "Windows metrics range bridge (native selected date/app refresh)",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-metrics-range-bridge.cjs"],
@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0403",
-			"ordinal": 401,
+			"ordinal": 402,
 			"name": "pinned AHK timing copies match the shared timing registry",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-timings-single-source.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0404",
-			"ordinal": 402,
+			"ordinal": 403,
 			"name": "SQLite event cursor numeric policy single source",
 			"cmd": "node",
 			"args": ["tools/test/test-sqlite-event-id-single-source.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0406",
-			"ordinal": 404,
+			"ordinal": 405,
 			"name": "WPM readout constants single source (every canon key read by a driver, none restated)",
 			"cmd": "node",
 			"args": ["tools/test/test-wpm-constants-single-source.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0407",
-			"ordinal": 405,
+			"ordinal": 406,
 			"name": "WPM strip darkening cross-driver drift (Lua model and AHK round-half-up on the canon factor; golden vectors)",
 			"cmd": "node",
 			"args": ["tools/test/test-wpm-color-normalisation-single-source.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0413",
-			"ordinal": 410,
+			"ordinal": 411,
 			"name": "every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "compact-data-sql",
-			"ordinal": 425,
+			"ordinal": 426,
 			"name": "SQL compaction retains captured markers and refuses partial projections",
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "compact-data-sql-protocol",
-			"ordinal": 426,
+			"ordinal": 427,
 			"name": "SQL compaction wrapper receives native duration and exact failed-child diagnostics",
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql-protocol.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "metrics-collection-controls",
-			"ordinal": 441,
+			"ordinal": 442,
 			"name": "metrics pause and session reset: one declaration, one meaning and one set of sequences on all three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-collection-controls.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "keystats-sql-census",
-			"ordinal": 455,
+			"ordinal": 456,
 			"name": "keystats SQL census extractor counts concatenated statements once and groups CLI and in-process spellings by shape",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-census.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "keystats-query-catalogue",
-			"ordinal": 456,
+			"ordinal": 457,
 			"name": "keystats named-query catalogue returns the legacy rows on a realistic fixture in both dialects and its compiled outputs are current",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-query-catalogue.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "keystats-sql-shared-spelling",
-			"ordinal": 475,
+			"ordinal": 476,
 			"name": "no keystats statement is spelled by hand in both Lua drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-shared-spelling.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "keystats-write-catalogue",
-			"ordinal": 477,
+			"ordinal": 478,
 			"name": "keystats write statements of the catalogue leave the rows the legacy driver SQL left and render to the shared vectors",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "legacy-folder-names",
-			"ordinal": 574,
+			"ordinal": 575,
 			"name": "legacy folder names (only the one-time migration spells a data folder of the builds before the single folder name)",
 			"cmd": "node",
 			"args": ["tools/test/test-legacy-folder-names.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-metrics-app-unicode-search",
-			"ordinal": 577,
+			"ordinal": 578,
 			"name": "application filter matches canonically equivalent Unicode names",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-unicode-search.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-metrics-app-fallback-icon-unicode",
-			"ordinal": 584,
+			"ordinal": 585,
 			"name": "typing metrics fallback badges preserve Unicode initials",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-fallback-icon-unicode.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "typing-metrics-partial-live",
-			"ordinal": 589,
+			"ordinal": 590,
 			"name": "typing metrics partial live slots preserve calendar and selected-range ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-typing-metrics-partial-live.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-crash-worker-partial-write",
-			"ordinal": 592,
+			"ordinal": 593,
 			"name": "Windows crash workers publish only complete reports after a refused write",
 			"cmd": "node",
 			"args": ["tools/test/test-crash-worker-partial-write.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-metrics-key-names",
-			"ordinal": 594,
+			"ordinal": 595,
 			"name": "metrics heatmap names its special keys from the key name table in every locale",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-key-names.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "js-metrics-maintenance",
-			"ordinal": 601,
+			"ordinal": 602,
 			"name": "dashboard export and purge: a tombstone purges every device in any replay order and the page answers only its own request",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-maintenance.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "keystats-roi-case-profile",
-			"ordinal": 605,
+			"ordinal": 606,
 			"name": "trigger ROI lowercase projection replays its qualified native Windows profile and rejects changed receipts",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-roi-case.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "js-windows-diagnostic-progress-reader",
-			"ordinal": 624,
+			"ordinal": 625,
 			"name": "Windows diagnostic worker commits its archive while the host reads its progress",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],
@@ -493,7 +493,7 @@
 		},
 		{
 			"id": "js-0546",
-			"ordinal": 713,
+			"ordinal": 714,
 			"name": "typing dashboard cards each say what they count (help text, WCAG 3.3.5)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-cards-explained.cjs"],
@@ -501,7 +501,7 @@
 		},
 		{
 			"id": "metrics-number-locale",
-			"ordinal": 714,
+			"ordinal": 715,
 			"name": "metrics pages format every number in the interface language (MET-07)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-number-locale.cjs"],
@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "metrics-view-states",
-			"ordinal": 718,
+			"ordinal": 719,
 			"name": "metrics dashboards show their empty, error and value states (MET-13, MET-14, MET-16)",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-view-states.cjs"],

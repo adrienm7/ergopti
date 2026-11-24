@@ -112,12 +112,15 @@ for (const t of trees.values()) for (const p of t) union.add(p);
 const shared = [...union].filter((p) => DRIVERS.every((d) => trees.get(d).has(p))).sort();
 const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 
-// ── The ratchet ─────────────────────────────────────────────────────────────
+// ── History of the shared count ─────────────────────────────────────────────
 //
-// 2026-08-01: 23 of 49 distinct paths are present in all three drivers (46.9 %).
-// Raise BASELINE_SHARED as Lots 3–6 land; never lower it to make a change pass.
+// Until 2026-11-24 this gate compared five literal counts (shared 66, union 87,
+// tests 18/75, canonical 9). A count let a regression and an unrelated fix of
+// the same size cancel out unseen, and its failure named a total, not the path.
+// The ledger (driver-tree-parity-baseline.json) now names every path with the
+// drivers that hold it. The counts' history stays below for the reasons it
+// gives for each per-driver path.
 //
-// History, so the ratchet reads as a trajectory rather than a number:
 //   11/51 (21.6 %) — first measurement.
 //   12/51 (23.5 %) — crash_reporter promoted out of lib/ into modules/diagnostics
 //                    on macOS and Windows, where Linux already had it. The union
@@ -143,10 +146,6 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    _shared/ui/, the canonical set, rather than from what this
 //                    driver happened to call them.
 //
-// Written as a literal, not as `shared.length`. Deriving the baseline from the
-// value it is supposed to constrain makes the comparison `x <= x` — a check that
-// passes for every possible input, which is the precise definition of the false
-// green this repo already ratchets against elsewhere.
 //   25/47 (53.2 %) — measured 2026-08-04, and the ratchet had been carrying two
 //                    paths of slack since 2026-08-01. Slack in a ratchet is not
 //                    harmless: it is exactly enough room for a regression to
@@ -196,12 +195,12 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    the path leaves the shared set with no counterpart. The one
 //                    lowering this ratchet allows is a feature removed from every
 //                    driver (decided by the agent, to review by the maintainer).
-const BASELINE_SHARED = 66;
 
-// The union is ratcheted too, downward: a driver that grows a new unshared
-// directory dilutes the ratio even when nothing was removed. Bounding it stops
-// the programme drifting sideways — adding structure to one driver while the
-// shared count stands still.
+// ── History of the union count ──────────────────────────────────────────────
+//
+// The union was ratcheted too, downward: a driver that grows a new unshared
+// directory dilutes the ratio even when nothing was removed. The ledger keeps
+// that rule: a path on fewer than three drivers is new debt until recorded.
 //
 //   48 → 49 on 2026-08-06 — ui/numeric_prompt, Linux only, and this is the
 //   exemption the message above names rather than a concession. macOS asks for
@@ -224,21 +223,21 @@ const BASELINE_SHARED = 66;
 //   structure without a corresponding macOS/Linux runtime responsibility.
 //
 //   51 → 52 on 2026-09-24 — ui/error_dialog, shared by all three drivers (see
-//   BASELINE_SHARED above): no driver grew an unshared directory.
+//   the shared count above): no driver grew an unshared directory.
 //   52 → 54 — ui/layer_editor and ui/layout_manager add two shared paths after
 //   ui/error_dialog; no new asymmetric directory is introduced.
 //   54 → 55 — ui/config_cleanup adds one path on all three drivers. This is
 //   symmetric growth, paired with the shared-count increase above.
 //   55 → 56 — ui/update_check, the host of the shared update-check window,
 //   landed on macOS first; the Linux and Windows hosts made it a shared path
-//   (BASELINE_SHARED 34).
+//   (the shared count 34).
 //   56 → 57 on 2026-09-29 — ui/permission_dialog, macOS only. It walks the
 //   user through a macOS privacy grant (System Settings > Privacy & Security,
 //   the TCC entry of the embedded runtime), which neither Windows nor Linux
 //   has: a counterpart folder there would host nothing. The geometry gate
 //   records the same exemption for Windows.
 //   57 → 58 on 2026-10-05 — platform/network is added on all three drivers,
-//   paired with BASELINE_SHARED 35. Native GIO runtime/child probes need an
+//   paired with the shared count 35. Native GIO runtime/child probes need an
 //   explicit seam; the sibling README files identify their existing native
 //   HTTP/proxy owners without pretending to load GIO or adding wrapper code.
 //   57 → 58 on 2026-10-06 — ui/physical_shortcuts, one path on all three
@@ -255,7 +254,7 @@ const BASELINE_SHARED = 66;
 //   Shared-count36 and canonical-source17 remain unchanged. No generated bin,
 //   private fixture directory or implementation-independent feature is counted.
 //   60 -> 62 on 2026-10-24 - ui/field_check is one path on all three drivers,
-//   paired with BASELINE_SHARED 39 (symmetric growth). vendor/remap-runtime is
+//   paired with the shared count 39 (symmetric growth). vendor/remap-runtime is
 //   macOS only: it pins the owned Karabiner remap runtime and its VirtualHID
 //   driver package (ADR 011), which neither Windows nor Linux ships; a
 //   counterpart folder there would hold nothing.
@@ -278,13 +277,12 @@ const BASELINE_SHARED = 66;
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 87;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
 // The tests/ trees were excluded from the numbers above, so nothing noticed them
 // drifting (audit 2026-10-18, item 4 of its tidy-tree plan). They get their own
-// pair of literals rather than joining the architecture's ratio: a directory of
+// ledger section rather than joining the architecture's ratio: a directory of
 // fixtures is not structure a driver owes its siblings.
 /** Depth-≤2 directory paths of a driver's tests/ tree, POSIX-style. */
 function testsTreeOf(driver) {
@@ -309,25 +307,6 @@ for (const t of testsTrees.values()) for (const p of t) testsUnion.add(p);
 const testsShared = [...testsUnion]
 	.filter((p) => DRIVERS.every((d) => testsTrees.get(d).has(p)))
 	.sort();
-
-// Measured 2026-10-30. Raise the first and lower the second as the trees converge;
-// never the other way to make a change pass.
-const BASELINE_TESTS_SHARED = 18;
-// 62 -> 63 on 2026-11-11: the Linux container desktop proofs (tests/hardware/desktop).
-const BASELINE_TESTS_UNION = 75;
-
-if (testsShared.length < BASELINE_TESTS_SHARED) {
-	errors.push(
-		`only ${testsShared.length} test director(ies) are present in all three drivers, below the recorded ` +
-			`${BASELINE_TESTS_SHARED}. A suite moved without its counterparts.`
-	);
-}
-if (testsUnion.size > BASELINE_TESTS_UNION) {
-	errors.push(
-		`the union of driver test directories grew to ${testsUnion.size} (recorded ${BASELINE_TESTS_UNION}). ` +
-			'Mirror the new directory on its counterparts, or raise this deliberately with a note saying why.'
-	);
-}
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
@@ -380,8 +359,8 @@ const canonicalPartial = CANONICAL.filter(
 );
 const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature(d, f)));
 
-// Frozen 2026-08-03 at the first measurement. Raise as features are unified;
-// never lower it to make a change pass.
+// History of the count of canonical features on all three drivers, frozen
+// 2026-08-03 at the first measurement (the ledger now names each feature):
 //   14/25 on all three, 5 partial, 6 nowhere.
 // The six that are nowhere — apps, download, hotstrings_config, layout,
 // metrics, personal_info — are the ones Convention S cannot stub, because there is
@@ -402,66 +381,109 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // a missing module. Raised the same day it was measured: leaving it at 16 would
 // hand the ratchet exactly one feature of slack, which is the failure the note
 // above condemns and would silently undo the tightening it describes.
-const BASELINE_CANONICAL_ON_ALL = 9;
 
-if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
-	errors.push(
-		`only ${canonicalOnAll.length} of ${CANONICAL.length} canonical features are present on all ` +
-			`three drivers, below the recorded ${BASELINE_CANONICAL_ON_ALL}. A feature that lost its ` +
-			'canonical path on one driver is exactly what I1 forbids — move it back, or rename it ' +
-			'in _shared/core/features.json if the canonical name itself changed.'
-	);
+// ── The ledger ──────────────────────────────────────────────────────────────
+//
+// One entry per measured path or canonical feature, naming the drivers that
+// hold it: `tree:<path>` for the architecture, `tests:<path>` for the tests/
+// trees and `canonical:<tree>/<name>` for _shared/core/features.json (`none`
+// when no driver ships it). The measurement must equal the ledger, so a
+// regression and an unrelated fix can no longer cancel out, and a failure
+// names the path. The two directions of a difference differ in who records it:
+//   - convergence (a path gains a driver, a path not on all three disappears,
+//     a canonical feature reaches another driver, a new path on all three):
+//     any change records it with --record-convergence;
+//   - divergence (a path loses a driver, a new path not on all three, a path
+//     every driver held disappears): the structure phase 2 runner records it
+//     with --update-baseline --allow-rise, one `[RISE]` line each for the
+//     step's commit. Any other change edits the ledger by hand and says why
+//     the structure is genuinely per-driver in its commit.
+const LEDGER_PATH = path.join(__dirname, 'driver-tree-parity-baseline.json');
+const LEDGER_ABOUT =
+	'Ledger of tools/test/test-driver-tree-parity.cjs (invariant I1): every depth-2 directory of ' +
+	'the three drivers (tree:), of their tests/ trees (tests:) and every canonical feature ' +
+	'(canonical:), with the drivers that hold it. Record convergence with --record-convergence; ' +
+	'divergence is recorded by the structure phase 2 runner or by hand with its reason in the commit.';
+const ALL_THREE = DRIVERS.slice().sort().join('+');
+
+const holdersOf = (has) => DRIVERS.filter(has).sort().join('+') || 'none';
+const measured = {};
+for (const p of union) measured[`tree:${p}`] = holdersOf((d) => trees.get(d).has(p));
+for (const p of testsUnion) measured[`tests:${p}`] = holdersOf((d) => testsTrees.get(d).has(p));
+for (const f of CANONICAL)
+	measured[`canonical:${f.tree}/${f.name}`] = holdersOf((d) => hasFeature(d, f));
+
+/**
+ * Whether a recorded entry may move to a measured one without divergence.
+ * @param {string} key - The ledger key.
+ * @param {string|undefined} recorded - The holders the ledger names.
+ * @param {string|undefined} found - The holders measured now.
+ * @returns {boolean} True when the change only brings the drivers together.
+ */
+function converges(key, recorded, found) {
+	const canonical = key.startsWith('canonical:');
+	if (recorded === undefined) return canonical || found === ALL_THREE;
+	if (found === undefined) return recorded !== ALL_THREE;
+	const before = recorded === 'none' ? [] : recorded.split('+');
+	const after = new Set(found === 'none' ? [] : found.split('+'));
+	return before.every((d) => after.has(d));
 }
 
-if (shared.length < BASELINE_SHARED) {
-	errors.push(
-		`only ${shared.length} director(ies) are present in all three drivers, below the recorded ` +
-			`${BASELINE_SHARED}. Either the reorganisation regressed, or one driver moved a directory ` +
-			'without its counterparts. Run with --measure to see which.'
-	);
+let ledger;
+try {
+	ledger = JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8'));
+} catch (error) {
+	console.error(`[ERROR] ${path.relative(ROOT, LEDGER_PATH)} is unreadable: ${error.message}`);
+	process.exit(1);
 }
-if (union.size > BASELINE_UNION) {
-	errors.push(
-		`the union of driver directories grew to ${union.size} (recorded ${BASELINE_UNION}). A new ` +
-			'directory in one driver only dilutes I1 even when nothing was removed — add its ' +
-			'counterparts, or raise this deliberately with a note saying why the structure is ' +
-			'genuinely per-driver.'
-	);
-}
+const recordedEntries = Object.fromEntries(
+	Object.entries(ledger).filter(([key]) => !key.startsWith('_'))
+);
+const differences = [...new Set([...Object.keys(recordedEntries), ...Object.keys(measured)])]
+	.sort()
+	.filter((key) => recordedEntries[key] !== measured[key])
+	.map((key) => ({
+		key,
+		recorded: recordedEntries[key],
+		found: measured[key],
+		converges: converges(key, recordedEntries[key], measured[key])
+	}));
+const describe = ({ key, recorded, found }) =>
+	`${key}: recorded ${recorded ?? 'absent'}, measured ${found ?? 'absent'}`;
 
-// A structure step moves directories on the way to the target tree: the union
-// grows while old and new folders coexist, and the shared counts fall while a
-// feature has moved on one driver's tests only. Under the structure phase 2
-// runner only, --update-baseline --allow-rise moves each recorded value to
-// the measured one, one `[RISE]` line per change for the step's commit.
-if (process.argv.includes('--update-baseline')) {
-	if (!process.argv.includes('--allow-rise') || process.env.ERGOPTI_STRUCTURE_PHASE !== '2') {
-		console.error(
-			'[ERROR] --update-baseline --allow-rise is for the structure phase 2 runner only.'
-		);
-		process.exit(1);
-	}
-	const measured = {
-		BASELINE_UNION: union.size,
-		BASELINE_TESTS_UNION: testsUnion.size,
-		BASELINE_SHARED: shared.length,
-		BASELINE_TESTS_SHARED: testsShared.length,
-		BASELINE_CANONICAL_ON_ALL: canonicalOnAll.length
-	};
-	let source = fs.readFileSync(__filename, 'utf8');
-	for (const [name, value] of Object.entries(measured)) {
-		const literal = new RegExp(`^const ${name} = (\\d+);$`, 'm');
-		const recorded = source.match(literal);
-		if (!recorded) {
-			console.error(`[ERROR] ${name} is not a literal of this file.`);
+const recordConvergence = process.argv.includes('--record-convergence');
+const updateBaseline = process.argv.includes('--update-baseline');
+if (recordConvergence || updateBaseline) {
+	if (updateBaseline) {
+		if (!process.argv.includes('--allow-rise') || process.env.ERGOPTI_STRUCTURE_PHASE !== '2') {
+			console.error(
+				'[ERROR] --update-baseline --allow-rise is for the structure phase 2 runner only.'
+			);
 			process.exit(1);
 		}
-		if (Number(recorded[1]) === value) continue;
-		source = source.replace(literal, `const ${name} = ${value};`);
-		console.log(`[RISE] I1 ${name} moved to ${value} (recorded ${recorded[1]})`);
+	} else {
+		const diverging = differences.filter((d) => !d.converges);
+		if (diverging.length > 0) {
+			console.error('[ERROR] --record-convergence refuses a divergence:');
+			for (const d of diverging) console.error(`    - ${describe(d)}`);
+			process.exit(1);
+		}
 	}
-	fs.writeFileSync(__filename, source);
+	for (const d of differences)
+		console.log(`${d.converges ? '[RECORD]' : '[RISE]'} I1 ${describe(d)}`);
+	const written = { _about: LEDGER_ABOUT };
+	for (const key of Object.keys(measured).sort()) written[key] = measured[key];
+	fs.writeFileSync(LEDGER_PATH, JSON.stringify(written, null, '\t') + '\n');
 	process.exit(0);
+}
+
+for (const d of differences) {
+	errors.push(
+		d.converges
+			? `${describe(d)}: the drivers converged; record it with --record-convergence.`
+			: `${describe(d)}: a driver diverged. Add its counterparts, or record it in the ledger ` +
+					'with a commit that says why the structure is genuinely per-driver.'
+	);
 }
 
 if (process.argv.includes('--measure')) {
