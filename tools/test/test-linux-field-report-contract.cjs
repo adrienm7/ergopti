@@ -10,9 +10,10 @@
  * collector:
  * 1. the field report names come from the shared identifiers, and the logs
  *    folder from the driver's own resolver;
- * 2. from dev the report goes to field/linux-<today>-dev, the base is
- *    recorded in git config and in base.txt, only the report folder is
- *    committed (logs included with -f), and the branch is pushed;
+ * 2. with --push, from dev the report goes to field/linux-<today>-dev, the
+ *    base is recorded in git config and in base.txt, only the report folder
+ *    is committed (logs included with -f), and the branch is pushed; without
+ *    it (the default) the report is only saved and git is left alone;
  * 3. on that field branch a later run reads the recorded base, brings the
  *    base's new commit from origin and reuses the branch;
  * 4. a base that is not on origin is not updated and still reports;
@@ -241,14 +242,15 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 }
 
 /**
- * Runs the real collector inside a fixture.
+ * Runs the real collector inside a fixture, by default as the maintainer's
+ * --push run (to the fixture's file:// origin).
  * @param {object} paths Fixture paths.
- * @param {{push?: boolean, onStart?: (child: object) => void}} [options]
+ * @param {{push?: boolean, onStart?: (child: object) => void}} [options] push=false runs the local default.
  */
-function runCollector(paths, { push = false, onStart } = {}) {
+function runCollector(paths, { push = true, onStart } = {}) {
 	return new Promise((resolve) => {
 		const args = [path.join(paths.clone, SCRIPT)];
-		if (!push) args.push('--no-push');
+		if (push) args.push('--push');
 		const child = spawn(bashExecutable(), args, {
 			cwd: paths.clone,
 			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` },
@@ -373,7 +375,7 @@ function read(folder, name) {
 			async () => {
 				const paths = fixture('from-dev');
 				const devBefore = git(paths.clone, 'rev-parse', 'dev');
-				const result = await runCollector(paths, { push: true });
+				const result = await runCollector(paths);
 				assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 				const expected = `${names.branch_prefix}linux-${today()}-dev`;
 				assert.equal(git(paths.clone, 'branch', '--show-current'), expected);
@@ -652,6 +654,29 @@ function read(folder, name) {
 				fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'),
 				/# edit\n$/
 			);
+		});
+
+		await check('without --push the report is only saved and git is left alone', async () => {
+			const paths = fixture('local-default');
+			// A tracked edit stays: a local run never stashes or resets the clone.
+			fs.appendFileSync(path.join(paths.clone, '.gitignore'), '# edit\n');
+			const headBefore = git(paths.clone, 'rev-parse', 'HEAD');
+			const result = await runCollector(paths, { push: false });
+			assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+			assert.equal(git(paths.clone, 'branch', '--show-current'), 'dev', 'no field branch');
+			assert.equal(git(paths.clone, 'rev-parse', 'HEAD'), headBefore, 'nothing committed');
+			assert.equal(git(paths.clone, 'stash', 'list'), '', 'nothing stashed');
+			assert.match(fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'), /# edit\n$/);
+			assert.equal(
+				git(paths.clone, 'ls-remote', '--heads', 'origin', 'field/*'),
+				'',
+				'nothing pushed'
+			);
+			const folders = reportFolders(paths);
+			assert.equal(folders.length, 1);
+			assert.match(read(folders[0], 'base.txt'), /^field_branch: dev\nbase: dev\ncommit: \w+\n$/);
+			assert.match(result.stdout, /Saved locally in .*: nothing was committed or pushed\./);
+			assert.match(result.stdout, /Attach that folder .* to an issue/);
 		});
 	} finally {
 		fs.rmSync(scratch, { recursive: true, force: true });

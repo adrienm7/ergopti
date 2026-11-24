@@ -69,7 +69,7 @@ AutoHotkey does not run in the cloud containers, so the work above is covered
 only by static and JS tests. Once it lands on `dev`:
 
 1. Run the full AHK suite and fix what fails.
-2. Run `collect-windows-field-report.ps1` and the runtime layer of
+2. Run `collect-windows-field-report.ps1 -Push` and the runtime layer of
    `test-windows-field-report-contract.cjs` with `pwsh`.
 3. Push the field report so the coordinator can read it.
 

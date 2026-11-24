@@ -2771,3 +2771,14 @@ Geometric Shapes, General Punctuation).
   holding personal data. Taskmaster-1's written self-dialogs (CC BY 4.0,
   role-play by crowd workers, no worker ids) ship as an English count table;
   a French chat corpus is still open in TODO.md.
+
+## The field report saves locally; only --push publishes it (2026-11-24)
+
+The three collectors (`tools/dev/collect-macos-field-report.sh`,
+`collect-linux-field-report.sh`, `collect-windows-field-report.ps1`) save the
+redacted report folder and touch nothing in git by default: no stash, no field
+branch, no update from the base, no commit, no push. Only the maintainer can
+push, so only `--push` (`-Push` on Windows) runs the field-branch flow. Action:
+write `--push` in every command the maintainer is told to run; a person without
+push rights attaches the saved folder to an issue. Pinned by the three
+field-report contract tests.

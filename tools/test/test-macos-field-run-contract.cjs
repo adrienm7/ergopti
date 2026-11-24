@@ -356,13 +356,17 @@ async function waitFor(file, ms = 10000) {
 }
 
 /**
- * Runs the real collector, without pushing, inside a fixture.
+ * Runs the real collector inside a fixture, by default as the maintainer's
+ * --push run (to the fixture's file:// origin).
  * @param {object} paths Fixture paths.
  * @param {(child: object) => void} [onStart] Receives the child, in its own process group.
+ * @param {{push?: boolean}} [options] push=false runs the local default.
  */
-function runCollector(paths, onStart) {
+function runCollector(paths, onStart, { push = true } = {}) {
 	return new Promise((resolve) => {
-		const child = spawn(bashExecutable(), [path.join(paths.clone, SCRIPT), '--no-push'], {
+		const args = [path.join(paths.clone, SCRIPT)];
+		if (push) args.push('--push');
+		const child = spawn(bashExecutable(), args, {
 			cwd: paths.clone,
 			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` },
 			detached: Boolean(onStart)
@@ -1342,6 +1346,45 @@ function reportFolder(paths) {
 						fs.readFileSync(reportFile(folder, 'base.txt'), 'utf8'),
 						/^field_branch: field\/mac-.*-dev\nbase: dev\ncommit: \w+\n$/
 					);
+				} finally {
+					driver.child.kill();
+				}
+			}
+		);
+
+		await check(
+			'without --push the report is saved locally and git is left alone (no branch, commit or push)',
+			async () => {
+				const paths = fixture('local', { onDev: true });
+				const driver = startDriver(paths, 'done');
+				try {
+					await waitFor(driver.readyPath);
+					const headBefore = git(paths.clone, 'rev-parse', 'HEAD').trim();
+					const result = await runCollector(paths, undefined, { push: false });
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					assert.equal(
+						git(paths.clone, 'branch', '--show-current').trim(),
+						'dev',
+						'no field branch'
+					);
+					assert.equal(
+						git(paths.clone, 'rev-parse', 'HEAD').trim(),
+						headBefore,
+						'nothing committed'
+					);
+					assert.equal(git(paths.clone, 'stash', 'list').trim(), '', 'nothing stashed');
+					assert.equal(
+						git(paths.clone, 'ls-remote', '--heads', 'origin', 'field/*').trim(),
+						'',
+						'nothing pushed'
+					);
+					const folder = reportFolder(paths);
+					assert.match(
+						fs.readFileSync(reportFile(folder, 'base.txt'), 'utf8'),
+						/^field_branch: dev\nbase: dev\ncommit: \w+\n$/
+					);
+					assert.match(result.stdout, /Saved locally in .*: nothing was committed or pushed\./);
+					assert.match(result.stdout, /Attach that folder .* to an issue/);
 				} finally {
 					driver.child.kill();
 				}
