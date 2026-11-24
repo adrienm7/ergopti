@@ -160,8 +160,9 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       modes still fail that way now and then (sends=1, Edit empty), at the old head too. The TextSend payload
       (`CB_WriteTextWithReceipt`, LLM and diagnostics) carries the same exclusion formats since 2026-11-24
       (`_CB_WriteTransientText`, `test_clipboard_reader_wait.ahk`). macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
-      each reader separately), so the race does not exist there; their transient hints
-      (`org.nspasteboard.TransientType`, `x-kde-passwordManagerHint`) are not set yet.
+      each reader separately), so the race does not exist there. Linux offers its paste payloads with
+      `x-kde-passwordManagerHint` through the multi-format owner since 2026-11-24
+      (`test_clipboard_transient_hint.lua`); the macOS `org.nspasteboard.TransientType` is not set yet.
       Count ratchets now compare named ledgers (a new item and a fixed entry both fail: `tools/test/lib/known-debt.cjs`
       and the per-file OS-purity ledgers of both drivers) and the TOML cost tests compare two input sizes. What is
       left needs a measurement or a design first.
