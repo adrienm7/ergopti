@@ -5,6 +5,23 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Wikisource texts are checked by the importer (2026-11-24)
+
+Confirmed by the maintainer on 2026-11-24 (TODO « Wikisource texts as
+corpora », option 1), the rule of « Wikisource, Norvig, Tatoeba and chat
+corpora » (2026-11-21) is now enforced, not only written in register
+prose: `wikisourceRefusal` (`tools/build/import-corpus-texts.cjs`) refuses
+a `wikisource_texts` work unless its register entry is CC BY-SA 4.0,
+credits « Wikisource contributors » and names every page read as
+« <title> (revision <revid>) » in its note; its `gutenberg_absent` records
+when (`checked_on`) and how (`evidence`) Project Gutenberg was found to lack
+it; and its `public_domain` years were free in the year of that check
+(first published more than 95 years before, United States; author dead
+more than 70 years before, European Union). Judging the years at the check's
+year keeps a pass a pass as the cut-offs move forward. A new Wikisource work
+fills both records and cites each revision; do not reopen the licence.
+Tests: `tools/test/test-corpus-text-sources.cjs`.
+
 ## The layout selection gates four on-by-default layers (2026-11-23)
 
 The maintainer found the macOS emulation of Ergopti+ typing the system
@@ -2770,7 +2787,6 @@ Geometric Shapes, General Punctuation).
   before 1931) and the EU (author dead more than 70 years). They go through
   `tools/build/import-corpus-texts.cjs` (`wikisource_texts`), which pins the
   extracted text, not the parser's HTML (it carries render ids).
-  Confirmed again by the maintainer on 2026-11-24 (option 1); do not reopen.
 - **Norvig's counts and Tatoeba's full exports: both imported** as count
   tables through `tools/build/import-count-tables.cjs`. Norvig's
   `count_1w.txt` ships although norvig.com states no licence for its data
