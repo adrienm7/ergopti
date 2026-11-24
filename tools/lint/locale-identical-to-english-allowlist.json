@@ -1841,10 +1841,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
-		"menu.debug.console": {
-			"reason": "loanword-or-cognate",
-			"locales": ["fr", "it", "nl", "pt"]
-		},
 		"menu.debug.header_logs": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "fr", "nl", "pt"]

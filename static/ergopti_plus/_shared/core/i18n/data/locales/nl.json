@@ -1779,7 +1779,7 @@
 	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
-	"menu.debug.console": "Console",
+	"menu.debug.console": "Hammerspoon-console",
 	"menu.debug.healthcheck": "Systeemdiagnose",
 	"menu.debug.header_logs": "Logs",
 	"menu.debug.header_diagnostics": "Diagnose",

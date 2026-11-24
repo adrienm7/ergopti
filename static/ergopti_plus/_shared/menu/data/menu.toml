@@ -1083,14 +1083,6 @@ type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
-# Right under the diagnostics window (the maintainer's request of 2026-10-02):
-# it decides whether an error shows itself, which that window then explains.
-[[menu.debug_menu]]
-type = "check"
-id = "show_error_dialog"
-i18n = "menu.debug.show_error_dialog"
-checked_when = ["error_dialog_enabled"]
-
 [[menu.debug_menu]]
 type = "command"
 id = "report_bug"
@@ -1108,6 +1100,19 @@ id = "---"
 [[menu.debug_menu]]
 type = "section_header"
 i18n = "menu.debug.header_logs"
+
+# The Logs section opens with its switches, then a separator, then the rows
+# that open a log (maintainer, 2026-11-24): the diagnostics group holds only
+# rows that open a window or a page, so the error-window switch left it.
+[[menu.debug_menu]]
+type = "check"
+id = "show_error_dialog"
+i18n = "menu.debug.show_error_dialog"
+checked_when = ["error_dialog_enabled"]
+
+[[menu.debug_menu]]
+type = "---"
+id = "---"
 
 [[menu.debug_menu]]
 type = "choice"

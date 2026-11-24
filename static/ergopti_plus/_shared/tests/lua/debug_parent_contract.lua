@@ -69,20 +69,22 @@ function M.register(helpers, fixture, corpus, platform)
 					local labels = {}; for _, row in ipairs(parent.menu) do labels[#labels + 1] = row.title end
 					helpers.assert_eq(labels, expected[platform], "complete hand-authored native child image")
 					-- The developer rows (macOS's console and its separator) lead; the
-					-- « Diagnostics » and « Logs » headers open the two user groups.
+					-- « Diagnostics » and « Logs » headers open the two user groups, and
+					-- the Logs switches come first, then a separator (2026-11-24).
 					local base = platform == "hs" and 2 or 0
 					local checks = expected[platform .. "_tests"]
 					Layout.assert_layout(helpers, parent.menu, {
-						diagnostics = expected[platform][base + 2], report = expected[platform][base + 4],
-						suggest = expected[platform][base + 5], logs = expected[platform][base + 8],
+						diagnostics = expected[platform][base + 2], report = expected[platform][base + 3],
+						suggest = expected[platform][base + 4], logs = expected[platform][base + 9],
 						field_report = expected.field_report, tests = expected.tests, checks = checks,
 					}, platform .. " " .. language)
 					helpers.assert_eq(observed.effects, {}, "constructing Debug invokes no action")
-					for _, header in ipairs({ base + 1, base + 7 }) do
+					for _, header in ipairs({ base + 1, base + 6 }) do
 						helpers.assert_true(parent.menu[header].disabled == true, "the section header is inert: " .. header)
 						helpers.assert_nil(parent.menu[header].fn, "the section header has no action: " .. header)
 					end
-					local choice = parent.menu[base + 8]
+					helpers.assert_eq(parent.menu[base + 8].title, "-", "a separator closes the Logs switches")
+					local choice = parent.menu[base + 9]
 					helpers.assert_eq(#choice.menu, 4)
 					for index, value in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
 						helpers.assert_eq(choice.menu[index].checked == true, value == "INFO")

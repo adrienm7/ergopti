@@ -178,18 +178,20 @@ _MLG_CheckConfigurationCorpus(Code, Expected) {
 Test("menu layout: the Configuration parent and rows keep their corpus captions (configuration-parent)",
 	_MLG_ConfigurationCorpus)
 
-; Versions, Configuration, then Language at the top level, and « Afficher une
-; fenêtre à chaque erreur » right under « Diagnostic système » in Debug (the
-; maintainer's requests of 2026-10-02).
+; Versions, Configuration, then Language at the top level (the maintainer's
+; requests of 2026-10-02), and « Afficher une fenêtre à chaque erreur » opening
+; the Logs section of Debug, before a separator (maintainer, 2026-11-24).
 _MLG_RowsFollowTheRequestedOrder() {
 	TopLevel := ", " . _MLG_Order("top_level") . ", "
 	Assert(InStr(TopLevel, ", about, configuration, language, ") > 0,
 		"the top level must list Versions, Configuration, then Language: " . TopLevel)
 	Debug := ", " . _MLG_Order("debug_menu") . ", "
-	Assert(InStr(Debug, ", healthcheck, show_error_dialog, ") > 0,
-		"the error-window switch must follow the system diagnostics row: " . Debug)
+	Assert(InStr(Debug, ", header menu.debug.header_logs, show_error_dialog, ---, ") > 0,
+		"the error-window switch must open the Logs section, before a separator: " . Debug)
+	Assert(InStr(Debug, ", healthcheck, report_bug, ") > 0,
+		"the diagnostics group holds only rows that open a window: " . Debug)
 }
-Test("menu layout: Versions, Configuration, Language; the error window under the diagnostics (menu-order-2026-10-02)",
+Test("menu layout: Versions, Configuration, Language; the error window opens the Logs (menu-order-2026-11-24)",
 	_MLG_RowsFollowTheRequestedOrder)
 
 ; The zero-based position of the first native row whose text starts with a

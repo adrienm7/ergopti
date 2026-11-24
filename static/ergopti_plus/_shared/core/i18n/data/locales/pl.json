@@ -1779,7 +1779,7 @@
 	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
-	"menu.debug.console": "Konsola",
+	"menu.debug.console": "Konsola Hammerspoon",
 	"menu.debug.healthcheck": "Diagnostyka systemu",
 	"menu.debug.header_logs": "Logi",
 	"menu.debug.header_diagnostics": "Diagnostyka",

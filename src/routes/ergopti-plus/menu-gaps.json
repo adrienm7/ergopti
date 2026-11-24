@@ -195,7 +195,7 @@
 	{
 		"path": "debug_menu.console",
 		"visibility": "hide",
-		"labels": { "fr": "Console", "en": "Console" },
+		"labels": { "fr": "Console Hammerspoon", "en": "Hammerspoon console" },
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
