@@ -222,9 +222,8 @@ waits for the maintainer's review).
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
       model »): 73 of the 91 files left out for its keys came in, the library holds 783 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
-      board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (the ErgoDox's extra left thumb keys are idle since
-      2026-11-21) (`docs/design/layout-analysis.md`,
-      « ErgoDox keys »). Still in `not_imported`: KLA's four standard-board files need Tab, Caps Lock, Enter or a
+      board-only codes and the Shift keys read as QMK's mod-tap (`docs/design/layout-analysis.md`, « ErgoDox keys »;
+      the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Still in `not_imported`: KLA's four standard-board files need Tab, Caps Lock, Enter or a
       bottom modifier as character keys on ISO and ANSI (TypeMatrix's q and a, the ANSI BvoFRak's q, Arensito's à,
       AOEYK's \), which would also offer them to the optimizer; KLAnext's Einbinder Orthogonal, VCKB, VCKB2 and Yp Hina
       Fu put a letter on the ErgoDox's left 2-unit outer thumb key, where the board keeps Space (a code of its own
@@ -290,9 +289,8 @@ waits for the maintainer's review).
       Left, the native files: no `.keylayout` holds a custom modifier (macOS relies on the emulation); XKB holds
       Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB and KLC
       exports are refused for reasons older than the levels (`unbound_stateful_actions`, Caps Lock on the Roya or
-      AltGr columns), as is the DLL package (`kbd_unit_invalid` on a dead-key result). Not checked on real
-      hardware: a user tap-hold or remap on Caps Lock or AltGr may still take the key before the emulation (the
-      Linux tap-hold engine runs first, an AHK static label is created first).
+      AltGr columns), as is the DLL package (`kbd_unit_invalid` on a dead-key result). The real-machine check (a user
+      tap-hold or remap on Caps Lock or AltGr against the held levels) is in the three TODO-tests files.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
@@ -388,97 +386,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ## Carried over from the 1.0.9 requests
 
-- [ ] **Slowness, Windows boot.** Left, largest first, process CPU measured 17 November on the maintainer's
-      configuration (`tools/dev/bench-ahk-startup.cjs` smoke boots with one warm-up boot, loaded PC, median of 5
-      interleaved boots, summed CPU about 7.6 s): script parse before the first line, 2.0-2.2 s (`/validate` alone
-      takes as much; it follows code volume, full-line comments are only about 200 ms of it, so only a smaller
-      include graph or a worker helps); hotstring registration 1.2 s, needed at the first key (the registrars cost
-      about 0.5 ms per cached row with its case variants, the `generated_hotstrings.tsv` admission about 110 ms);
-      layout and remaps 1.0 s (a disk cache is rejected: native hotkey registration), of which the two Ergopti
-      `.keylayout` parses about 100-170 ms (both needed: Ergopti+ gives the AltGr keys), their spec 35-60 ms,
-      `platform/remap.ahk` 150 ms and the ★ key slot's cohort registration 45-60 ms; the configuration stage
-      500-700 ms; the shortcuts stage 170-330 ms; the AI catalogue 230 ms (deferring it means a lazy accessor for
-      its 184 readers). The tray menu is built before readiness by decision (« Windows boot: keyboard before tray »
-      in `docs/memory/maintainer-decisions.md`), so it cannot move after ready; what is left in it is the menu rows
-      themselves. Done 18 November (same bench, 3 interleaved rounds of 3 boots, PC under heavy use, so whole-boot
-      totals moved more with load than with the code): the shipped `index.json` is decoded once for both layouts
-      (one decode 14-26 ms; `ErgoptiLayout_Init` 375 to 266 ms), the ★ key slot's source probe reads the base
-      tables and the number-row mode once per probe instead of once per key (196 table builds to 2;
-      `StarSlotStart` 248 to 156 ms), and the tray's Hotstrings total counts bundled files from the admitted
-      hotstring cache rows instead of rescanning about 3,200 catalogue lines (172 to 31 ms; the tray stage 734 to
-      500 ms CPU). The i18n stage is 60-80 ms warm: its 700 ms and 480 ms of the hotstring stage in earlier
-      notes were cold caches of a fresh private code copy, which the benchmark now warms first. A smoke boot beside a
-      resident driver is suspended, so it does not measure the keyboard arbiter of the prefix-watcher stage. The PC
-      timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in the TODO-tests files.
-      Done 18 November, second pass (quiet PC beside the resident driver, 4 interleaved rounds of one warm-up and 3
-      boots per variant, medians of 12): the configuration stage was 250 ms CPU, and 160-190 ms of it was the typed
-      read of the 33 KB personal hotstrings file for its `_meta` tables. The TOML document reader now reads a one-line
-      assignment of simple tokens, splits a member list of bare keys and one-line scalars, decodes a one-line basic
-      string or a Boolean and takes a quoted key without escapes by native matches instead of its lexer, with the same
-      documents, records and spans on 518 TOML files (the shared tree and a real configuration): the personal file
-      parses in 33-45 ms instead of 94-115 ms and config.toml, read about five times per boot, in 10-12 ms instead of
-      16-20 ms (same process). The configuration stage went from 250 to 172 ms CPU with the member split alone, and
-      from 195 to 141 ms with every shortcut in a later, quieter series (wall 197 to 140 ms); the whole boot stayed
-      inside its noise (4.85 s elapsed both ways). Measured and left:
-      the hotstring stage has no single hotspot (« Trimming per-row work in the Windows hotstring registrars » in
-      `docs/memory/rejected_proposals.md`); the `.tsv` admission is 40-65 ms warm. Done 18 November, third pass:
-      the AI catalogue include decoded `api_providers.json` (21 ms), walked the whole text again for the providers'
-      spans (20 ms) and each provider's slice once more (24-32 ms), and each thinking_dialect was walked again on
-      top. One decode now also returns the providers' member span tree (`JsonParseWithMemberSpans`), so the text
-      is walked as one complete document per load instead of 170 times, with every refusal and its message kept
-      (`test_remote_catalog_refusals.ahk`). Same bench, 4 interleaved rounds of one warm-up and 3 boots per
-      variant, PC loaded by a WSL suite, medians of 12: the AI stage ('LLM defaults loaded') 255 to 170 ms wall
-      and 250 to 172 ms CPU, every new boot below every old one but one; a standalone QPC harness on the same
-      text, 119 to 61 ms. The whole boot stayed inside its noise (6.53 to 6.43 s). Linux decoded the same text
-      three times for two owners (the remote catalogue and both local-server catalogue loads); it now decodes
-      it once (`Json.decode_shared`), about 9 ms less (4.4 ms per LuaJIT decode under WSL). macOS decodes it once natively and once lossless, which the shape proof
-      needs, and walks no slice again. Done 19 November: the same include decoded `local_servers.json`
-      (16 KB), validated it whole twice more (request_fields, thinking_dialect), decoded each request field's
-      slice and walked the dialect's slice again, 5 passes; one `JsonParseWithMemberSpans` now serves them,
-      1 pass, every logged refusal kept (`test_remote_catalog_refusals.ahk`). Same bench, 4 interleaved
-      rounds, medians of 12: the AI stage 123 to 114 ms wall and 125 to 109 ms CPU, inside a noisy PC's
-      spread; the whole boot inside its noise (5.52 to 5.48 s). Linux decoded the file once per local
-      catalogue load, two at boot; `Json.decode_shared` now serves both (1.2 ms per LuaJIT decode under WSL).
-      macOS loads it once, natively and lossless for the shape proof, like `api_providers.json`.
-      Done 20 November (same bench, interleaved rounds of one warm-up and one boot per variant, PC loaded by other
-      agents, medians): the InputHook scalar end-key table (64,515 units, warmed in `core/lifecycle/engine/boot.ahk`)
-      was filled by one `NumPut` per unit; it is written four units per Int64 store now, the same units in the same
-      order (`test_siho_boot_window.ahk`): 'Paths and shared configuration loaded' 219 to 109 ms CPU over 5 rounds, a
-      QPC harness 145-380 to 21-28 ms. `JsonParse` reads a member whose key has no escape and whose value is a plain
-      scalar (a string without escapes, an integer of up to 18 digits, a literal) with its separator by one anchored
-      match, a key before a container value and a plain array element likewise; the rest and every refusal keep the
-      exact walk, with the same trees, counters and messages on the 728 JSON files of the tree
-      (`test_json_decode_fast_path.ahk`). Over 620 shipped files 21.9 to 10.7 s, the menu manifest 190 to 82 ms; at
-      boot over 15 rounds 'Config parsed (TOML + i18n)', where `HotstringsSeedLanguageCategoryGates` decodes the
-      manifest first, 172 to 78 ms CPU, the shortcuts stage 94 to 47 ms and 'LLM defaults loaded' 78 to 63 ms. The
-      whole boot stayed inside its noise. Measured and left: the script parse (1.1-2.6 s CPU here) follows code volume,
-      11.9 MB over 577 included files, of which the functions no production code names are about 46 KB, so dead code
-      is no lever, and `vendor/UIA.ahk` is about 70 ms; config.toml is decoded twice by design (the private shadow);
-      the menu manifest is needed whole before the tray.
-      Done 22 November (bench configuration with hotstrings and the AI on and three 37 KB personal files; PC heavily
-      loaded by other agents, so whole-boot wall times moved with load; main-thread cycles from QueryThreadCycleTime,
-      3 interleaved rounds of one warm-up and 3 boots per variant, medians of 9): the logger redacted each line with
-      `Redact_Apply`, which resolved the rules and the context again for every line (the 17 shipped names lower-cased
-      twice, each folder spelling, a bound callback per pass) and rebuilt the line once per pass: about 1.1 ms a
-      line, 315-350 ms for a boot's 280 lines in a QPC harness, felt as one 200-300 ms main-thread stall wherever the
-      first 500 ms flush timer fell (the Ergopti layout read, `platform/remap.ahk` or `MagicEditorStart` in turn:
-      'layout and remaps' read 485-590 ms instead of 220-270). A flush now prepares the passes once
-      (`Redact_Prepare`, `Redact_ApplyPrepared`) and skips a pass whose needle the text lacks with one native search:
-      the same 280 lines in 24-45 ms with byte-identical output; 'layout and remaps' 1871 to 1179 Mcycles, the tray
-      stage 968 to 687, the stages' sum 6423 to 5258 and a boot's logger flushes 3709 to 1967 Mcycles
-      (`test_native_write.ahk` counts one preparation per batch). Full startup smoke, 2 interleaved runs per variant:
-      green both ways, the first deferred menu build of a fixture boot at 11.5 s median before and 10.2 s after
-      (32 fixture boots each, same load). macOS and Linux redact each line through the shared Lua module, which
-      folded the line to lower case and rebuilt it once per pass and resolved the home-relative configuration folder
-      again per line: an unmatched line now costs one fold and no rebuild (`redact_work.lua`), the 280 lines in
-      47-59 ms instead of 104-219 ms under Lua 5.4, the 43 shared vectors unchanged. Measured and left: the script
-      parse is linear in code volume (synthetic 5, 10 and 20 MB scripts validate in 1.0, 1.8 and 3.8 s CPU, about
-      0.18 ms per KB; the entry's `/validate` 1.45-1.97 s); the two `.keylayout` parses take about 130 ms together in
-      a QPC harness, 5 ms of it the tag scan and the rest interpreter cost per tag and attribute (a split-based
-      attribute reader measured no gain); each additional personal hotstring file costs a full `TOML_ParseDocument`
-      at discovery (60-120 ms for 37 KB, kept for the menu's metadata questions) and 140 ms of registration in
-      `LoadExtTomlFile` (about 0.5 ms a row); the boot full save just after the ready line (`_SaveFullConfigDeferred`)
-      holds the main thread about 990 Mcycles, measured once.
+- [ ] **Slowness, Windows boot.** The passes of 17 to 22 November cut the configuration, AI catalogue, JSON,
+      InputHook table and logger redaction stages (`tools/dev/bench-ahk-startup.cjs`; each pass's figures are in
+      `git log -p -- TODO.md`). The tray menu is built before readiness by decision (« Windows boot: keyboard before
+      tray » in `docs/memory/maintainer-decisions.md`). Measured and left, largest first: the script parse, linear in
+      code volume (about 0.18 ms per KB, 11.9 MB over 577 files; dead code is about 46 KB, so only a smaller include
+      graph or a worker helps); hotstring registration, about 0.5 ms per cached row with its case variants and no
+      single hotspot (« Trimming per-row work in the Windows hotstring registrars » in
+      `docs/memory/rejected_proposals.md`); the two `.keylayout` parses, about 130 ms, interpreter cost per tag and
+      attribute; each additional personal hotstring file, a full `TOML_ParseDocument` at discovery (60-120 ms for
+      37 KB, kept for the menu's metadata questions) and about 140 ms of registration; the boot full save just after
+      the ready line (`_SaveFullConfigDeferred`, about 990 Mcycles, measured once); the AI catalogue (deferring it
+      means a lazy accessor for its 184 readers). The PC timings and the macOS field points `rerun_2026_11_02` and
+      `main_thread_holds` are in the TODO-tests files.
 - [ ] **[RELEASE] Before publishing.** On a quiet PC with no resident driver: the whole AHK suite,
       `npm run test:ahk-tray-rows-read-as-text`, every live check including `quit-over-a-log-flush`, the JS, macOS and
       Linux suites, and a Windows field report with a driver.
@@ -487,16 +407,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- **Parity literals.** PAR-58: `terminator_restoration`, `context_buffer`, `request_plan_*` and `row_options` are
-  replayed on all three drivers (row options on macOS and Linux through `test-keylayout-row-options` and
-  `test-xkb-row-options`). `session_events` and `metrics_maintenance` are replayed on all three drivers since
-  2026-11-18 (on macOS: three session fixes in `modules/keystats/session_machine.lua`, synthetic text no longer
-  opening a session, and a Purge found by its tombstone's UTC instant). `composite_key` is Windows-only by its own
-  scope. `menus/*`: macOS and Linux replay every corpus whose rows they draw (per-corpus table in
-  [the parity audit](docs/platform-parity-audit.md)). PAR-74: 2 literals left, in `_shared/settings/data/features/caps_word_auto_off_policy.ahk`, which
-  cannot include the generated constants. PAR-79: 4 Windows timer literals left (13 in
-  `timer-literal-baseline.json`, 9 of them in the archived `old/kalamine` scripts), and none can move: the 3 startup
-  smoke sleeps of `ErgoptiPlus.ahk` and the UIA worker's idle `Sleep(250)` run before or without the registry.
 - **Tests.** Source assertions left to convert to behaviour (3,799 `_Driver*` source reads in 991 files; 68 meta
   files still name `A_IsSuspended`, 57 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
@@ -545,9 +455,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 ### All drivers
 
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
-      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S26 (hotstrings) is
-      built on `fix/windows-pc-2026-11-17` and waits for its CI proof. Left: S27 (install) to S38, one step per commit
-      with `tools/audit/structure/run-phase2.cjs`, two or three per push after a CI proof.
+      [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S01 to S26 are on dev.
+      Left: S27 (install) to S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per
+      push after a CI proof.
       Paths that describe a published artifact (a prior release's payload, a historical pin) keep their old spelling.
 - **Provider flags inferred, not read.** Only provable with a live key: SambaNova's `enable_thinking: false` (off is
   its default, the docs show only `true`) and the Chutes Qwen `enable_thinking` field; a refusal is dropped and
@@ -558,17 +468,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Linux
 
-- [ ] **Archive downloads: time a first install on the PC.** The owned archive download waited out the idle wait
-      twice per 64 KiB chunk (the write's thread-pool acknowledgement, then the restarted pipe reader, which libuv
-      registers only on its next poll) and read `config.toml` 28 times per chunk. Fixed on 2026-11-20: the idle
-      wait polls libuv's backend descriptor, the curl reader's resume calls `event_loop.wake()`, and the AI
-      preference reader reads the bytes only when the file's lstat change token moves (trusted once the file has
-      been quiet 3 s). `tests/hardware/run_archive_download_throughput.lua`, 64 MiB from a loopback server on a
-      shared 8-core WSL: 3.1 MB/s before (2 idle-wait timeouts and 28 full config reads per chunk), 11.0 MB/s
-      with the wake alone, 17.7 to 21.1 MB/s with both (0 full reads per chunk), so about 70 s instead of 7.7 min
-      for the 1.4 GB archive. Its `revoke` mode rewrites the model in place with the same size mid-download, on a
-      trusted token: no byte lands after the edit. What remains per chunk is 14 `install_resolver` ancestor walks
-      (about 1.5 ms, one lstat per ancestor each). Time a first real install on the PC.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen

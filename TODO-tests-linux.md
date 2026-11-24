@@ -34,7 +34,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
 - [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of
       `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions, including mutter and KWin reloading a
       `~/.config/xkb` layout (107); KDE is not proved even in a container
-      ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)).
+      ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)). With Neo 2 emulated
+      (2026-11-20), Caps Lock holds Mod3 and AltGr Mod4, also with a user tap-hold or remap on either key: the
+      tap-hold engine runs before the hook's `onHeldModifierKey`.
 - [ ] <!-- field-point: owned_gtk_host --> Owned GTK host: tap delay row and every tray dialog (ca680655d7), group
       restore and clear, open target, Backspace word start.
 - [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): on a real keyboard under
@@ -55,7 +57,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       Ollama to its readiness (the AI menu turning ready; the log lines of the service start and of the version
       probe that answered), once with the runtime already installed and once right after its first install. Linux
       probes every 3 s up to what is left of the 30 min install budget, macOS waits at most 30 s: the two figures
-      decide one bound for the three.
+      decide one bound for the three. Time that first install's archive download too (fixed 2026-11-20: 17.7 to
+      21.1 MB/s from a loopback server, about 70 s for the 1.4 GB archive instead of 7.7 min;
+      `tests/hardware/run_archive_download_throughput.lua`).
 - [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, fixed 2026-11-21): on GNOME (Wayland, then X11)
       without the AppIndicator extension, start the daemon with `--tray`: about 15 s after « Tray icon created » a
       window « Ergopti+ has no tray icon on this desktop » and a notification say it in the configured language and

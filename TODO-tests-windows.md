@@ -54,6 +54,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
       « Désinstaller » asks first, « Non » changes nothing, « Oui » raises one UAC prompt and leaves no `Keyboard
 Layouts` key. Re-saving the source under another `dll_name` with « Installer et utiliser » removes the old DLL
       first (LCP-06). With `ergopti_ansi` emulated from the registry, Ctrl+è sends the chosen letter (LCP-07).
+- [ ] Neo-family held levels (2026-11-20): with Neo 2 emulated from Studio, Caps Lock holds Mod3 (it never toggles)
+      and AltGr holds Mod4, also once a user tap-hold or remap is bound to either key: an AHK static label is created
+      before the emulation's, so it may take the key first.
 - [ ] Layout editor host (2026-11-12): the real UAC install of a source's DLLs, typing, switching and the uninstall
       (Settings > Apps and « Remove »), in source and compiled mode.
 - [ ] Ergopti Studio opens maximized (2026-11-17), at 100 %, 150 % and 200 % display scale: the title bar and its
