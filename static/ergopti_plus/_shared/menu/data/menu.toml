@@ -372,6 +372,17 @@ id = "suspend"
 platforms = ["ahk"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
+# The macOS twin of the Windows « Suspendre » row, right before Reload
+# (maintainer, 2026-11-24): ticked while Ergopti is paused, a click pauses or
+# resumes it. The « Ergopti+ » title pill at the top keeps toggling too.
+[[menu.top_level]]
+type = "check"
+id = "suspend"
+i18n = "menu.global.suspend"
+platforms = ["hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+checked_when = ["script_paused"]
+
 [[menu.top_level]]
 type = "command"
 id = "reload"

@@ -72,9 +72,12 @@ for (const [parent, category] of Object.entries(CATEGORIES)) {
 	assert.ok(top, `${parent} is a top-level category`);
 	assert.equal(top.disabled_when, undefined, `${parent}: the main-menu row is never greyed`);
 }
-// A new top-level checkbox is a new category: it has to join the table.
+// A new top-level checkbox is a new category: it has to join the table. The
+// one lifecycle checkbox, macOS « Suspendre » (2026-11-24), pauses the whole
+// driver and owns no submenu, so it is no category.
+const LIFECYCLE_CHECKS = new Set(['suspend']);
 for (const row of manifest.top_level) {
-	if (row.checked_when !== undefined)
+	if (row.checked_when !== undefined && !(row.type === 'check' && LIFECYCLE_CHECKS.has(row.id)))
 		assert.ok(CATEGORIES[row.id], `top-level row ${row.id} is listed as a category`);
 }
 

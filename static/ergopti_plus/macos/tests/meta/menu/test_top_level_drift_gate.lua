@@ -46,6 +46,7 @@ local TITLE_KEYS = {
 	configuration   = "menu.configuration.title",
 	language        = "menu.global.language",
 	about           = "menu.about.title",
+	suspend         = "menu.global.suspend",
 	reload          = "menu.global.reload_macos",
 	quit            = "menu.global.quit_macos",
 	debug           = "menu.debug.title",

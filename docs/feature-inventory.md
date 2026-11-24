@@ -381,6 +381,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 ## windows — restricted menu entries
 
 - [ ] `programmable_hotstring_entry.programmable_hotstrings` (hide): Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.
+- [ ] `top_level.suspend` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.reload` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.quit` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `llm_menu.llm_generation` (hide): Linux only: this driver lists the models and the generation settings straight in the menu. macOS and Windows put the same choices behind a submenu row, which their own rows above declare.
@@ -615,6 +616,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 
 ## linux — restricted menu entries
 
+- [ ] `top_level.suspend` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.reload` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.quit` (hide): Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `llm_menu.llm_generation_settings` (hide): Not a submenu on Linux: the Linux driver lists the models and the generation settings (suggestion count, word limits, temperature, context) straight in this menu, through its own row below.

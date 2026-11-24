@@ -75,7 +75,10 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       erreur » opens the Logs section, before a separator, on the three OS. « Journal détaillé » replaced the
       log-level selector (unticked INFO, ticked DEBUG, same `script.log_level`; maintainer-decisions « Detailed
       log »). The bug report's warnings group ends with « Detailed log: off — turn on Debug › Detailed log and
-      reproduce for more detail » while the switch is off (report_vectors.json, three ports).
+      reproduce for more detail » while the switch is off (report_vectors.json, three ports). macOS gains the
+      Windows « Suspendre » row right before « Recharger », ticked while paused; the title pill still toggles
+      (field point `tray_suspend_row`). Linux keeps its paused header row, which resumes, and has no standalone
+      pause row: to decide whether it gets one.
 - [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
       that sets no icon and so shows the engine's application icon) still showed the hammer, although
       `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`

@@ -780,6 +780,23 @@ function M.generate(ctx, menu_mods, actions)
 			end
 			return about_item and { about_item } or {}
 		end,
+		-- « Suspendre », the Windows row, right before Reload (maintainer,
+		-- 2026-11-24): the title pill keeps toggling the same pause.
+		["suspend"]         = function()
+			local command = "suspend"
+			local row = ManifestMenu.check_row("top_level", command, {
+				[command] = function()
+					local control = ctx.script_control
+					-- The same transaction as the pause key and the title pill
+					if type(control) ~= "table" or type(control.toggle_script_control) ~= "function" then
+						Logger.error(LOG, "Pause row: the script control owner is absent — nothing paused.")
+						return false
+					end
+					return control.toggle_script_control()
+				end,
+			}, { script_paused = function() return ctx.paused == true end })
+			return row and { row } or {}
+		end,
 		["reload"]          = function()
 			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
 			if not row then return {} end

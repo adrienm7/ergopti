@@ -425,10 +425,12 @@ const APPROVED_TOP_LEVEL = [
 ];
 
 const declaredTopLevel = (topLevel || []).map((row) => row.id);
-// Only Reload/Quit have adjacent, disjoint native caption declarations.
-// Pin their physical multiplicity and the unchanged approved native order.
+// Suspend, Reload and Quit have adjacent, disjoint native declarations: the
+// Windows row and the macOS « Suspendre » row (maintainer, 2026-11-24), and one
+// caption per platform for Reload and Quit. Pin their physical multiplicity and
+// the unchanged approved native order.
 const approvedPhysicalOrder = APPROVED_TOP_LEVEL.flatMap((id) =>
-	id === 'reload' || id === 'quit' ? [id, id] : [id]
+	id === 'suspend' || id === 'reload' || id === 'quit' ? [id, id] : [id]
 );
 if (declaredTopLevel.join(',') !== approvedPhysicalOrder.join(',')) {
 	errors.push(
@@ -442,7 +444,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 		(id) =>
 			id !== SEPARATOR &&
 			(id !== 'apps' || APPS_DRIVERS.includes(driver)) &&
-			(id !== 'suspend' || driver === 'ahk')
+			(id !== 'suspend' || driver === 'ahk' || driver === 'hs')
 	);
 	if (ids.join(',') !== approved.join(',')) {
 		errors.push(

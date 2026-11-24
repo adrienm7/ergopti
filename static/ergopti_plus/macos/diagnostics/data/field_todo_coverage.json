@@ -86,6 +86,12 @@
 			"not_testable": "Needs the runtime rebuild that ships the repair role, then an administrator bootout of a system job: rebuild the owned runtime first; the Swift and Lua parsers are unit-tested (test_runtime_service_repair)."
 		},
 		{
+			"id": "tray_suspend_row",
+			"title": "Tray « Suspendre » row before Reload",
+			"checks": [],
+			"not_testable": "The row is clicked in the open menu-bar menu, which no run drives: tick it, type a hotstring (nothing expands), untick it; the row and its pause transaction are unit-tested (test_suspend_row)."
+		},
+		{
 			"id": "menu_header_pill_centred",
 			"title": "Menu header pill centred on the menu",
 			"checks": [],

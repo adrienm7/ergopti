@@ -12,6 +12,22 @@
 		}
 	},
 	{
+		"path": "top_level.suspend",
+		"visibility": "hide",
+		"labels": { "fr": "⏸︎ Suspendre", "en": "⏸︎ Suspend" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
+			},
+			"linux": {
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
+			}
+		}
+	},
+	{
 		"path": "top_level.reload",
 		"visibility": "hide",
 		"labels": { "fr": "🔄 Recharger", "en": "🔄 Reload" },
