@@ -145,6 +145,17 @@ function checkScanner() {
 	assert.equal(scanner.imageProblems('<svg aria-hidden="true">', 'html').length, 0);
 	assert.equal(scanner.imageProblems('<svg role="img" aria-label="Logo">', 'html').length, 0);
 	assert.equal(
+		scanner.imageProblems('<svg role="group" aria-label="Keys" onkeydown="move(event)">', 'html')
+			.length,
+		0,
+		'an interactive drawing'
+	);
+	assert.equal(
+		scanner.imageProblems('<svg role="group" aria-label="Keys">', 'html').length,
+		1,
+		'a named group that moves no focus'
+	);
+	assert.equal(
 		scanner.imageProblems("const icon = document.createElement('img');\nicon.src = x;", 'js')
 			.length,
 		1,

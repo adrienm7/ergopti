@@ -510,6 +510,7 @@ async function selfCheck(chromium) {
 		await page.setContent(`<main><h1>Check</h1>
 			<div id="mouse">Click me</div>
 			<span id="hover">Hover me</span>
+			<svg role="group" aria-label="Keys"><rect id="inline" width="1" height="1" onmouseenter="void 0"></rect><rect id="inline-focus" width="1" height="1" tabindex="0" aria-label="A" onmouseenter="void 0" onfocus="void 0"></rect><rect width="1" height="1" tabindex="-1" onfocus="void 0"></rect></svg>
 			<div id="fake" role="button">Fake</div>
 			<div role="tablist" id="tabs"><button role="tab" id="t1">One</button><button role="tab" id="t2" tabindex="-1">Two</button></div>
 			<ul><li><button id="delegated">Inside</button></li></ul>
@@ -535,6 +536,16 @@ async function selfCheck(chromium) {
 			'A clickable div the keyboard cannot reach'
 		);
 		assert.match(problems, /mouse only \(hover\): span#hover/, 'Content shown on hover only');
+		assert.match(
+			problems,
+			/mouse only \(hover\): rect#inline /,
+			'A hover handler written in the markup, on an SVG shape'
+		);
+		assert.doesNotMatch(
+			problems,
+			/rect#inline-focus/,
+			'A focusable shape with a focus handler passes'
+		);
 		assert.match(problems, /role button without focus: div#fake/, 'A control role without focus');
 		assert.doesNotMatch(
 			problems,
@@ -557,12 +568,13 @@ async function selfCheck(chromium) {
 		assert.deepEqual(
 			images,
 			[
+				'svg has a focusable mark without a name',
 				'img#noalt has no alt',
 				'svg#bare is neither aria-hidden nor a named image',
 				'svg#hovered has values in hover titles only',
 				'canvas#chart is neither aria-hidden nor a named image'
 			],
-			'Images without a text alternative or with values on hover only, a hidden svg and a listed drawing passing'
+			'Images without a text alternative or with values on hover only, an unnamed mark of a drawing, a hidden svg and a listed drawing passing'
 		);
 		await page.evaluate(() => {
 			const dialog = document.getElementById('sticky');

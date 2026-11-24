@@ -1097,6 +1097,8 @@ function render_kc_heatmap(kc_data_arr) {
 
 	let rects = '';
 	let labels = '';
+	// The keys take the focus in turn (hm_key_navigation): only the first one is a Tab stop.
+	let key_index = 0;
 	let tooltips = ''; // foreignObject-based tooltip divs (CSS-positioned via JS)
 
 	// Generate a unique id prefix for tooltip elements
@@ -1297,8 +1299,7 @@ function render_kc_heatmap(kc_data_arr) {
 				'Z'
 			].join(' ');
 			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 			// Label centred in the wing portion (wider area, more legible than the narrow stem)
 			const ret_font = 15;
 			const ret_cx = (wing_lx + rx_ret) / 2;
@@ -1311,8 +1312,7 @@ function render_kc_heatmap(kc_data_arr) {
 			// Standard or half-height rounded rect
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
 				fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 		}
 
 		// ISO Return renders its own label (centred in the wing); skip the generic one
@@ -1325,7 +1325,7 @@ function render_kc_heatmap(kc_data_arr) {
 
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" role="tooltip" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:start;">` +
 			tip_html +
@@ -1334,9 +1334,9 @@ function render_kc_heatmap(kc_data_arr) {
 
 	container.innerHTML =
 		`<figure style="display:inline-block;position:relative;margin:0;">` +
-		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:start;">` +
+		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:var(--heatmap-keys-caption);margin-bottom:6px;text-align:start;">` +
 		`${_t('ui_typing.heatmap_keys_title')}</figcaption>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="kc_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="group" aria-labelledby="kc_heatmap_caption" xmlns="http://www.w3.org/2000/svg" onkeydown="hm_key_navigation(event)" ` +
 		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
@@ -1362,6 +1362,74 @@ function hm_show_tip(tip_id) {
 function hm_hide_tip(tip_id) {
 	const el = document.getElementById(tip_id);
 	if (el) el.style.display = 'none';
+}
+
+/**
+ * The attributes of one heatmap key: its popup opens on hover and on keyboard
+ * focus (WCAG 2.1.1, 1.4.13), the key is named for a screen reader and
+ * described by its popup, and only the first key of a drawing is a Tab stop:
+ * the arrow keys move between the others (hm_key_navigation).
+ * @param {string} tip_id - The DOM id of the key's tooltip element.
+ * @param {string} name - What the key types, read as its name.
+ * @param {boolean} first - Whether the key is the drawing's Tab stop.
+ * @returns {string} The attributes, ready for the key's SVG markup.
+ */
+function hm_key_attributes(tip_id, name, first) {
+	return (
+		`data-tip="${tip_id}" class="hm-key" role="img" aria-label="${escape_html(name)}" ` +
+		`aria-describedby="${tip_id}" tabindex="${first ? 0 : -1}" ` +
+		`onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')" ` +
+		`onfocus="hm_focus_tip(this, '${tip_id}')" onblur="hm_hide_tip('${tip_id}')"`
+	);
+}
+
+/**
+ * Shows a key's tooltip beside the focused key, as the pointer shows it
+ * beside the cursor.
+ * @param {Element} key - The focused key shape.
+ * @param {string} tip_id - The DOM id of its tooltip element.
+ */
+function hm_focus_tip(key, tip_id) {
+	const el = document.getElementById(tip_id);
+	if (!el) return;
+	el.style.display = 'block';
+	const box = key.getBoundingClientRect();
+	const tw = el.offsetWidth;
+	const th = el.offsetHeight;
+	let lft = box.right + 8;
+	let top = box.bottom + 8;
+	if (lft + tw > window.innerWidth - 8) lft = Math.max(8, box.left - tw - 8);
+	if (top + th > window.innerHeight - 8) top = Math.max(8, box.top - th - 8);
+	el.style.left = lft + 'px';
+	el.style.top = top + 'px';
+}
+
+/**
+ * Moves the focus between the keys of a heatmap with the arrow keys, Home and
+ * End (one Tab stop per drawing, the roving key keeps it), and closes the
+ * open popup with Escape without moving the focus (WCAG 1.4.13).
+ * @param {KeyboardEvent} evt - The keydown event on the drawing.
+ */
+function hm_key_navigation(evt) {
+	const keys = [...evt.currentTarget.querySelectorAll('.hm-key')];
+	const at = keys.indexOf(document.activeElement);
+	if (at < 0) return;
+	if (evt.key === 'Escape') {
+		hm_hide_tip(keys[at].getAttribute('data-tip'));
+		evt.preventDefault();
+		return;
+	}
+	const STEPS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+	let next;
+	if (evt.key === 'Home') next = 0;
+	else if (evt.key === 'End') next = keys.length - 1;
+	else if (STEPS[evt.key] !== undefined)
+		next = Math.min(keys.length - 1, Math.max(0, at + STEPS[evt.key]));
+	else return;
+	evt.preventDefault();
+	keys[at].setAttribute('tabindex', '-1');
+	keys[next].setAttribute('tabindex', '0');
+	keys[next].focus();
 }
 
 /** Tracks mouse position and repositions any visible heatmap tooltip near the cursor. */
@@ -1580,6 +1648,8 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	let rects = '';
 	let labels = '';
+	// The keys take the focus in turn (hm_key_navigation): only the first one is a Tab stop.
+	let key_index = 0;
 	let tooltips = '';
 
 	key_entries.forEach(([kc_str, pos]) => {
@@ -1742,8 +1812,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				'Z'
 			].join(' ');
 			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 			const ret_font = 15;
 			const ret_cx = (wing_lx + rx_ret) / 2;
 			const ret_cy = sy_qwerty + KH / 2;
@@ -1754,8 +1823,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		} else {
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
 				fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 		}
 
 		if (kc_str !== '36') {
@@ -1766,7 +1834,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		}
 
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" aria-hidden="true" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" role="tooltip" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
 			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:start;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
@@ -1776,9 +1844,9 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	container.innerHTML =
 		`<figure style="display:inline-block;position:relative;margin:0;">` +
-		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:start;">` +
+		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:var(--heatmap-sfb-caption);margin-bottom:6px;text-align:start;">` +
 		`${_t('ui_typing.heatmap_sfb_title')}</figcaption>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="sfb_heatmap_caption" xmlns="http://www.w3.org/2000/svg" ` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="group" aria-labelledby="sfb_heatmap_caption" xmlns="http://www.w3.org/2000/svg" onkeydown="hm_key_navigation(event)" ` +
 		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
