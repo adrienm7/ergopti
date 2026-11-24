@@ -13,7 +13,13 @@
 ; 3. a cancelled run is closed as interrupted and its observer told once;
 ; 4. the report names the counts, each verdict, the steps not run with their
 ;    reason, the rows to run separately and the folder; its evidence line
-;    follows the macOS and Linux grammar.
+;    follows the macOS and Linux grammar;
+; 5. the progress window: a page that loads late gets the step states so far,
+;    each change and the end reach the page, closing it during the run cancels
+;    the run, and its buttons open the run's folder, copy its report and file
+;    its issue with the evidence line; the command opens it, a second click
+;    brings it back, and without a window the run goes on and its report opens
+;    in the one-click dialog.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -214,27 +220,224 @@ _TFR_Text() {
 }
 Test("field report: the report names each verdict, the steps not run and the folder (field-report-in-app)", _TFR_Text)
 
+; A progress over recording effects, bound to a recording window.
+_TFR_Progress(Box, CopyOk := true, IssueOk := true) {
+	Effects := Map(
+		"open_folder", (Dir) => (Box.Opened.Push(Dir), true),
+		"copy", (Text) => (Box.Copies.Push(Text), CopyOk),
+		"issue", (Line, Text) => (Box.Issues.Push(Line . "|" . Text), IssueOk))
+	Progress := FieldReportProgress(Effects, (Step) => (Step["check"] == "network" ? "Network" : ""),
+		() => (Box.Cancelled += 1, true))
+	Window := {Pushed: Box.Pushed}
+	Window.Push := (Self, Json) => (Self.Pushed.Push(Json), true)
+	Window.Close := (Self) => (Box.Closed += 1)
+	Progress.Bind(Window)
+	return Progress
+}
+
+_TFR_Box() {
+	return {Pushed: [], Opened: [], Copies: [], Issues: [], Cancelled: 0, Closed: 0}
+}
+
+_TFR_ProgressRun() {
+	return Map("request_id", "app-1", "dir", "C:\fr\results\app-1",
+		"steps", [Map("id", "field_network", "check", "network"), Map("id", "field_composer", "check", "composer")],
+		"not_run", [Map("step", "driver_reload", "reason", "needs_collector")])
+}
+
+_TFR_ProgressSummary() {
+	return FieldReport_Summary([Map("step", "field_network", "verdict", "pass", "codes", [], "report", 0),
+		Map("step", "field_composer", "verdict", "fail", "codes", ["probe_fail"], "report", 0)],
+		[Map("step", "driver_reload", "reason", "needs_collector")], _TFR_ProgressRun()["steps"],
+		Map("request_id", "app-1", "interrupted", false), "C:\fr\results\app-1")
+}
+
+_TFR_ProgressReplaysAndPushes() {
+	Box := _TFR_Box()
+	Progress := _TFR_Progress(Box)
+	Run := _TFR_ProgressRun()
+	Progress.Started(Run["steps"][1])
+	Progress.Attach(Run)
+	AssertEqual(0, Box.Pushed.Length, "nothing reaches a page that has not loaded")
+	Progress.OnReady()
+	AssertEqual(1, Box.Pushed.Length, "one init message")
+	Init := JsonParse(Box.Pushed[1])
+	AssertEqual("init", Init["type"])
+	AssertEqual("field_report.open_explorer", Init["open_key"])
+	AssertEqual("Network", Init["steps"][1]["title"])
+	AssertEqual("running", Init["steps"][1]["state"], "the step started before the page loaded")
+	AssertEqual("field_composer", Init["steps"][2]["title"], "a step without a Tests row reads as its id")
+	AssertEqual("pending", Init["steps"][2]["state"])
+	AssertEqual("driver_reload", Init["not_run"][1]["id"])
+	AssertEqual("needs_collector", Init["not_run"][1]["reason"])
+	Progress.Recorded("field_network", "pass")
+	Step := JsonParse(Box.Pushed[2])
+	AssertEqual("step", Step["type"])
+	AssertEqual("field_network", Step["id"])
+	AssertEqual("pass", Step["state"])
+	Progress.Finished(_TFR_ProgressSummary(), "the report")
+	Done := JsonParse(Box.Pushed[3])
+	AssertEqual("done", Done["type"])
+	AssertFalse(Done["passed"])
+	AssertFalse(Done["interrupted"])
+	AssertEqual(1, Done["counts"]["fail"])
+	AssertEqual("C:\fr\results\app-1", Done["folder"])
+	Late := _TFR_Box()
+	LateProgress := _TFR_Progress(Late)
+	LateProgress.Attach(Run)
+	LateProgress.Recorded("field_network", "pass")
+	LateProgress.Finished(_TFR_ProgressSummary(), "the report")
+	LateProgress.OnReady()
+	AssertEqual(2, Late.Pushed.Length, "a page that loads after the end gets the init and the end")
+	AssertEqual("pass", JsonParse(Late.Pushed[1])["steps"][1]["state"])
+	AssertEqual("done", JsonParse(Late.Pushed[2])["type"])
+}
+Test("field report: the progress window gives a late page the states so far (field-report-window)",
+	_TFR_ProgressReplaysAndPushes)
+
+_TFR_ProgressCancels() {
+	Box := _TFR_Box()
+	Progress := _TFR_Progress(Box)
+	Progress.Attach(_TFR_ProgressRun())
+	Progress.OnAction("cancel")
+	AssertEqual(1, Box.Cancelled, "Stop cancels the run")
+	Progress.OnAction("close")
+	AssertEqual(2, Box.Cancelled, "closing the window during the run cancels it")
+	AssertEqual(1, Box.Closed)
+	Boxed := _TFR_Box()
+	BoxedProgress := _TFR_Progress(Boxed)
+	BoxedProgress.Attach(_TFR_ProgressRun())
+	BoxedProgress.OnClosed()
+	BoxedProgress.OnClosed()
+	AssertEqual(1, Boxed.Cancelled, "the close box cancels the run once")
+	Ended := _TFR_Box()
+	EndedProgress := _TFR_Progress(Ended)
+	EndedProgress.Attach(_TFR_ProgressRun())
+	EndedProgress.Finished(_TFR_ProgressSummary(), "the report")
+	EndedProgress.OnAction("close")
+	AssertEqual(0, Ended.Cancelled, "a finished run is not cancelled")
+	AssertEqual(1, Ended.Closed)
+}
+Test("field report: closing the progress window during the run cancels it (field-report-window)",
+	_TFR_ProgressCancels)
+
+_TFR_ProgressActions() {
+	Box := _TFR_Box()
+	Progress := _TFR_Progress(Box)
+	Progress.Attach(_TFR_ProgressRun())
+	Progress.OnReady()
+	Progress.Finished(_TFR_ProgressSummary(), "the report")
+	Progress.OnAction("open_folder")
+	AssertEqual("C:\fr\results\app-1", Box.Opened[1], "the run's own folder")
+	Answer := JsonParse(Box.Pushed[Box.Pushed.Length])
+	AssertEqual("open_folder", Answer["action"])
+	AssertTrue(Answer["ok"])
+	Progress.OnAction("copy")
+	AssertEqual("the report", Box.Copies[1])
+	AssertTrue(JsonParse(Box.Pushed[Box.Pushed.Length])["ok"])
+	Progress.OnAction("issue")
+	AssertEqual("check=field_report verdict=fail request=app-1 pass=1 fail=1 not_run=1"
+		. " field_network=pass field_composer=fail|the report", Box.Issues[1],
+		"the issue carries the run's evidence line and its report")
+	AssertEqual("issue", JsonParse(Box.Pushed[Box.Pushed.Length])["action"])
+	AssertTrue(JsonParse(Box.Pushed[Box.Pushed.Length])["ok"])
+	Before := Box.Pushed.Length
+	Progress.OnAction("delete_everything")
+	AssertEqual(Before, Box.Pushed.Length, "an unknown action gets no answer")
+	Refused := _TFR_Box()
+	RefusedProgress := _TFR_Progress(Refused, false, false)
+	RefusedProgress.Attach(_TFR_ProgressRun())
+	RefusedProgress.OnReady()
+	RefusedProgress.OnAction("issue")
+	AssertFalse(JsonParse(Refused.Pushed[Refused.Pushed.Length])["ok"], "an issue before the end fails")
+	AssertEqual(0, Refused.Issues.Length, "no form before the end")
+	RefusedProgress.Finished(_TFR_ProgressSummary(), "the report")
+	RefusedProgress.OnAction("copy")
+	AssertFalse(JsonParse(Refused.Pushed[Refused.Pushed.Length])["ok"], "a refused clipboard is said")
+	RefusedProgress.OnAction("issue")
+	AssertFalse(JsonParse(Refused.Pushed[Refused.Pushed.Length])["ok"], "a form that did not open is said")
+}
+Test("field report: the progress window's buttons act on the run's own folder and report (field-report-window)",
+	_TFR_ProgressActions)
+
+_TFR_WindowHost() {
+	Body := _DriverFuncBody("_FieldReport_DefaultDeps")
+	Assert(Body != "", "the field report's collaborators must exist before checking them")
+	AssertTrue(InStr(Body, '"window", (Owner) => FieldReportWindow.Open(Owner)') > 0,
+		"the row opens the shared progress window")
+	Finish := _DriverFuncBody("_FieldReport_Finish")
+	Assert(Finish != "", "the end of the run must exist before checking where its report goes")
+	AssertTrue(InStr(Finish, "Progress.Finished(Summary, Text)") > 0, "the report goes to the progress window")
+	AssertTrue(InStr(Finish, "if !State.Windowed {") > 0, "the one-click dialog shows it only without a window")
+	Deps := _DriverFuncBody("_FieldReport_DefaultDeps")
+	AssertTrue(InStr(Deps, '"issue", (Line, Text) => HealthCheck_ReportFieldRun(Line, Text)') > 0,
+		"the issue goes through the bug-report link owner")
+	Window := FieldReportWindow()
+	AssertTrue(Window is WebViewHost, "the window is a WebViewHost: manifest geometry, locale and reading choices")
+	Told := {Count: 0}
+	Owner := {}
+	Owner.OnClosed := (Self) => (Told.Count += 1)
+	Window.Owner := Owner
+	Window.ResetDone := true
+	Window.Opened := true
+	Window.Close()
+	Window.Close()
+	AssertEqual(1, Told.Count, "closing the window tells its owner once")
+	Unopened := FieldReportWindow()
+	Unopened.Owner := Owner
+	Unopened.ResetDone := true
+	Unopened.Close()
+	AssertEqual(1, Told.Count, "a window that never opened tells nobody: the run goes on")
+	Box := _TFR_Box()
+	Progress := _TFR_Progress(Box)
+	Progress.Attach(_TFR_ProgressRun())
+	Progress.Detach(Progress.Window)
+	Progress.OnClosed()
+	AssertEqual(0, Box.Cancelled, "a detached window cancels nothing")
+	Progress.OnReady()
+	AssertEqual(0, Box.Pushed.Length, "a detached window takes no push")
+}
+Test("field report: the progress window is a WebViewHost that tells its owner once (field-report-window)",
+	_TFR_WindowHost)
+
 _TFR_Command() {
-	Box := {Shown: [], Notes: [], Refusals: []}
+	Box := {Refusals: [], Notes: [], Shown: [], Windows: 0, Fronts: 0, Owner: 0, RefuseWindow: false, Cancelled: 0}
 	Run := Map("request_id", "app-1", "dir", "C:\fr\results\app-1",
 		"steps", [Map("id", "field_network", "check", "network")], "not_run", [])
 	Fake := {Observer: 0}
 	Fake.SubmitInApp := (Self, Observer, &Reason) => (Self.Observer := Observer, Reason := "", Run)
+	Fake.CancelInApp := (Self) => (Box.Cancelled += 1, true)
 	Deps := Map("session", () => Fake,
 		"notify", (Text) => Box.Notes.Push(Text),
 		"busy", (Text) => Box.Refusals.Push(Text),
-		"show", (Title, Text) => Box.Shown.Push(Title . "|" . Text))
+		"window", (Owner) => (Box.Windows += 1, Box.Owner := Owner, !Box.RefuseWindow),
+		"front", () => (Box.Fronts += 1, !Box.RefuseWindow),
+		"show", (Title, Text) => Box.Shown.Push(Title . "|" . Text),
+		"effects", Map("open_folder", (Dir) => true, "copy", (Text) => true, "issue", (Line, Text) => true))
 	try {
 		AssertTrue(FieldReport_Command(Deps), "the run starts")
-		AssertEqual(1, Box.Notes.Length, "the start is announced")
+		AssertEqual(1, Box.Windows, "the progress window opens")
+		AssertTrue(Box.Owner is FieldReportProgress, "the window follows the run's progress")
+		AssertEqual(0, Box.Notes.Length, "the window replaces the start notice")
 		AssertFalse(FieldReport_Command(Deps), "a second click starts nothing")
-		AssertEqual(1, Box.Refusals.Length, "the second click is refused")
+		AssertEqual(1, Box.Fronts, "a second click brings the window back")
+		AssertEqual(0, Box.Refusals.Length)
 		Fake.Observer["step_recorded"].Call(1, Run["steps"][1], Map("step", "field_network", "verdict", "pass",
 			"codes", [], "report", _TFR_Report()))
 		Fake.Observer["finished"].Call(Map("request_id", "app-1", "interrupted", false), Run["dir"])
-		AssertEqual(1, Box.Shown.Length, "one report")
+		AssertTrue(InStr(Box.Owner.Text, "C:\fr\results\app-1") > 0, "the report names its folder")
+		AssertEqual("C:\fr\results\app-1", Box.Owner.Summary["dir"])
+		AssertEqual(0, Box.Shown.Length, "the report stays in its window")
+		Box.RefuseWindow := true
+		AssertTrue(FieldReport_Command(Deps), "without a window the run still starts")
+		AssertEqual(1, Box.Notes.Length, "the start is announced")
+		AssertFalse(FieldReport_Command(Deps), "a second click starts nothing")
+		AssertEqual(1, Box.Refusals.Length, "with no window to bring back, it is refused")
+		Fake.Observer["finished"].Call(Map("request_id", "app-1", "interrupted", false), Run["dir"])
+		AssertEqual(1, Box.Shown.Length, "the report opens in the one-click dialog")
 		AssertTrue(InStr(Box.Shown[1], t("menu.debug.field_report") . "|") == 1, Box.Shown[1])
-		AssertTrue(FieldReport_Command(Deps), "a finished run can start again")
+		AssertEqual(0, Box.Cancelled, "no run was cancelled")
 	} finally _FieldReport_SetBusy(false)
 }
-Test("field report: the command refuses a second click and shows one report (field-report-in-app)", _TFR_Command)
+Test("field report: the command opens the progress window, or the dialog without one (field-report-window)",
+	_TFR_Command)

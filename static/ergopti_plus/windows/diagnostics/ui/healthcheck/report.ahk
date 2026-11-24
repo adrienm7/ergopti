@@ -812,6 +812,50 @@ HealthCheck_ReportBug(Overrides := 0) {
 	return true
 }
 
+; The field report's evidence line, the only text of it a bug form carries:
+; keys, step ids, verdict enums and counts, never a path or a sentence. The
+; grammar of the shared Lua runner's EVIDENCE_LINE
+; (_shared/diagnostics/engine/healthcheck/report.lua), which macOS and Linux check.
+global HC_FIELD_REPORT_LINE := "^check=field_report verdict=\w+ request=[\w.:-]+[\w=\s-]*$"
+
+; Opens the bug form for a finished field report
+; (diagnostics/ui/field_check/field_report.ahk), as macOS and Linux do through
+; report_field_run: this PC's version, OS and driver from a fresh snapshot and
+; the run's evidence line in the report field, the redacted complete report on
+; the clipboard first for the Full report field.
+; @param Line {String} The run's evidence line (FieldReport_LogLine).
+; @param Text {String} The complete report.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Boolean} Whether the bug form was opened.
+; @throws {ValueError} When the line is outside the evidence grammar.
+HealthCheck_ReportFieldRun(Line, Text, Overrides := 0) {
+	global HC_FIELD_REPORT_LINE
+	if !(Line is String) || !RegExMatch(Line, HC_FIELD_REPORT_LINE)
+		throw ValueError("A field report issue needs its evidence line.")
+	LoggerStart("HealthCheckReport", "Opening the bug form for the field report…")
+	Effects := _HCReport_Effects(Overrides)
+	try {
+		Config := HealthCheck_Config()
+		Document := HealthCheck_ShareDocument(HealthCheck_Run(), Config["schema"])
+		ReportField := Config["templates"]["templates"]["bug"]["report_field"]
+		if !(ReportField is String) || ReportField == ""
+			throw Error("The bug template names no report field.")
+		Fields := Map("version", Document["fields"]["version"], "os", Document["fields"]["os"],
+			"driver", Document["fields"]["driver"], ReportField, Line)
+		Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
+		; The clipboard first: the form the browser opens asks for it
+		if !Effects["copy"].Call(Redact_Apply(Text, Config["redaction"], HealthCheck_RedactionContext(Overrides)))
+			throw Error("The clipboard refused the field report.")
+		if !Effects["open_url"].Call(Url)
+			throw Error("The browser could not be opened.")
+	} catch as Err {
+		LoggerError("HealthCheckReport", "Field report issue failed: {1}", Err.Message)
+		return false
+	}
+	LoggerSuccess("HealthCheckReport", "Field report issue form opened.")
+	return true
+}
+
 ; Opens the GitHub feature form with the version and the system prefilled.
 ; @param Overrides {Map|Integer} Replacement side effects (tests only).
 ; @returns {Boolean}
