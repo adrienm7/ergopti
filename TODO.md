@@ -362,7 +362,12 @@ waits for the maintainer's review).
       with the conveniences; (3) magic and repeat keys: write a design first (`layout-source-format.md`, engine
       ways of typing as a context-dependent output, and the three drivers' emulation, `cross-driver-parity`);
       (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How do I compare,
-      rank, read a Pareto »), routed through `i18n`.
+      rank, read a Pareto »), routed through `i18n`; (6) more shown-only metrics of the playground's views, as
+      extra rows of the movement table: row changes split concordant and discordant (the longer finger reaching
+      up or not), alternation whose ends are an SFS, weak redirects (no index), each with and without thumbs, and
+      each cell's percentile against the library (`E.percentiles`); (7) a Principal and Comparison frame at the top
+      of the Comparer that every tab follows (today « One layout » and the trace each choose theirs); (8) Kawalyzer's
+      « Clever Keys » (context outputs) with item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

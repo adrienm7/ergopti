@@ -119,13 +119,26 @@ Legend: ● full, ◐ partial, ○ absent.
 4. **Share link carries the tab and its settings** (done, 2026-11-25): the tab
    shown (`tab`), the Pareto values (`px`, `py`), the trace text (`text`) and
    its two layouts (`details`, `versus`).
-5. **N-gram to words drill-down**: from a worst pair, the words of the corpus's
-   word table that contain it. Left in TODO.md.
-6. **Corpus blends**: a weighted mix of built-in corpora. Left in TODO.md.
-7. **Magic and repeat keys**: an engine model, a source format and the drivers'
+5. **N-gram to words drill-down** (done in the trace, 2026-11-25): each
+   penalised pair or triple opens the corpus words that type its keys in a
+   row (`wordsWithKeys()`). Left: the same on the worst n-gram rows.
+6. **Movement table** (done, 2026-11-25): each pair class over adjacent pairs
+   and over skipgrams, with the compared layout and the difference
+   (`movementTable()`, « One layout »), shown and never scored.
+7. **Corpus blends**: a weighted mix of built-in corpora. Left in TODO.md.
+8. **Magic and repeat keys**: an engine model, a source format and the drivers'
    emulation. Left in TODO.md (a design first: Ergopti's own drivers would
    need to emulate them, `cross-driver-parity`).
-8. **Saved layout versions** and **in-app task help**: left in TODO.md.
+9. **Saved layout versions** and **in-app task help**: left in TODO.md.
+
+## Kawalyzer, from its description
+
+Kawalyzer (named in the maintainer's Discord excerpt, not opened in this
+session) advertises full support of one dead key (1DK), magic and repeat
+keys, « Clever Keys » and drag and drop. Ergopti already models 1DK (Ergo-L's
+dead key twice, `dead:<state>`) and drag-and-drop swaps; magic, repeat and
+Clever Keys (context-dependent outputs) are the same gap as item 8, left in
+TODO.md with a design first.
 
 The scoring is untouched: the views read the engine's metrics and the score
 settings as they are (QWERTY index 100, the decided weights and thresholds).
