@@ -339,9 +339,12 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
   chain is the whole gap left (finger speed per finger within 0.1 on average,
   1.6 at most, the pinkies, whose low speed magnifies it). Since 2026-11-24
   a text corpus carries genkey's own skipgrams, so that gap is gone on the
-  text corpora by construction; the run against genkey itself
-  (`verify-analyser-scores.cjs --genkey`) is still to redo before the
-  fidelity on a text can read `exact`. Before
+  text corpora: rerun against genkey itself on 2026-11-24 (same build,
+  layouts and texts, 140 points), the Score is within 0.005 % on average,
+  0.017 % at most, and every statistic within genkey's printed rounding
+  (score and finger speeds within 0.005, index use within 0.05, SFB within
+  0.0005, LSB within 0.005). The fidelity stays `close`: it is one value per
+  analyser, and the word lists and count tables keep the chain. Before
   2026-11-19, a key whose character genkey's corpus filter substitutes (the
   `"` of Engram, read as `'`) took the place of the key the corpus reaches,
   though genkey's layout reader only lower-cases: 1.4 % on average, 9.9 % at
@@ -406,7 +409,12 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   0.08 (0.30). Before that, the Shift token after a dropped character (a
   capital starting a word) was missing from the totals and the skipgrams
   through Shift were missing: 0.0057 on average (0.028 at most, Canary).
-  The run against the REPL is still to redo with these counts. Gate (every
+  Rerun against the REPL on 2026-11-24 with these counts (same build, data
+  files and config, 72 points): Score within 0.0003 on average, 0.0007 at
+  most; SFB 0.0005 (0.003 at most), finger speed 0.0008 (0.004), stretches
+  0.001 (0.012), rolls 0.005 (0.012), alternates 0.007 (0.018), redirects
+  0.001 (0.004), bad redirects 0.0004 (0.002). The trigrams' chain is the gap
+  left, so the fidelity stays `close`. Gate (every
   vector read with its text's counts, as a text corpus ships them, and
   `textTables` hand-counted on two short texts): hand-computed from the
   source (`the` 0.1333, `decided` −6.3314 on
@@ -552,7 +560,9 @@ and layout, the gap to KLAnext's numbers recorded in
 `tools/dev/analyser-reference/klanext.json`, with our library's layouts and
 with KLAnext's own layout definitions. With `--oxeylyzer=<exe>
 --oxeylyzer-data=<its data folder>` it also runs a local Oxeylyzer build on our
-corpus texts; with `--genkey=<exe> --genkey-data=<its source folder>` and
+corpus texts (without the network, a checkout of its `data-files` branch with a
+`.data-version` file is the data folder, and the config its first run writes
+there, `OXEYLYZER_DATA_DIR` set to a copy, goes in `../config/config.toml`); with `--genkey=<exe> --genkey-data=<its source folder>` and
 `--keygen=<exe> --keygen-data=<its source folder>`, local builds of genkey and
 keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
 `--carpalx-perl5lib` for the Perl modules it needs), carpalx itself; with
@@ -560,14 +570,14 @@ keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
 Optimizer (KLO in the table); with `--cyanophage=<folder with its optimiser.js,
 worker.js and words-english.json>`, the Cyanophage optimiser's own code. Each
 tool that prints sub-scores is also compared metric by metric (the figures
-quoted in each section above). Measured on 2026-11-18, and on 2026-11-19 for
-Oxeylyzer, genkey and Cyanophage:
+quoted in each section above). Measured on 2026-11-18, on 2026-11-19 for
+Cyanophage and on 2026-11-24 for Oxeylyzer and genkey:
 
 | Analyser   | Points | Mean gap                                | Largest      |
 | ---------- | ------ | --------------------------------------- | ------------ |
 | KLAnext    | 126    | 0.0024 (its definitions), 0.18 % (ours) | 0.005, 2.5 % |
-| Oxeylyzer  | 72     | 0.0032 (0.0044 before)                  | 0.012        |
-| genkey     | 140    | 1.3 % (1.4 % and 5.5 % before)          | 8.3 %        |
+| Oxeylyzer  | 72     | 0.0003 (0.0032 and 0.0044 before)       | 0.0007       |
+| genkey     | 140    | 0.005 % (1.3 %, 1.4 %, 5.5 % before)    | 0.017 %      |
 | keygen     | 85     | 0.11 % (its), 0.09 % (ours)             | 0.34 %       |
 | carpalx    | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
 | KLO        | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
