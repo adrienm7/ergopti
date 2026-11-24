@@ -5,7 +5,7 @@
 ; The real command runner and full lifecycle are included; only unrelated
 ; teardown and output ports are passive in the private child.
 _UCLC_Source() {
-	global _DriverDir
+	global _DriverDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Source := _TNLC_Source()
 	Footer := "#Include " . _DriverDir . "\tests\fixtures\takenote_pause_lifecycle_owner_body.ahk`n"
 	AssertEqual(Footer, SubStr(Source, -StrLen(Footer)))
@@ -25,11 +25,13 @@ _UCLC_Source() {
 		AssertTrue(Body != "", "The actual command graph needs its genuine function: " . Symbol)
 		Source .= Body . "`n"
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\user_command_lifecycle_owner_body.ahk`n"
+	; The child does not load the test framework: it reads the same settle bound.
+	return Source . "global TEST_NATIVE_SETTLE_TIMEOUT_MS := " . TEST_NATIVE_SETTLE_TIMEOUT_MS . "`n"
+		. "#Include " . _DriverDir . "\tests\fixtures\user_command_lifecycle_owner_body.ahk`n"
 }
 
 _UCLC_Case(Mode) {
- global _DriverDir
+ global _DriverDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
  static RetirementDebt := 0
  AssertFalse(IsObject(RetirementDebt), "A prior unretired child blocks its successor")
  Directory := A_Temp . "\ergopti_usercommand_lifecycle_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -45,8 +47,10 @@ _UCLC_Case(Mode) {
   Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
    ["/ErrorStdOut=UTF-8", Script, Mode, Directory, _DriverDir . "\..\_shared"], _LCPC_Done.Bind(State))
   AssertTrue(Handle.start())
+  ; The child's own waits use the same bound inside this one, which leaves them
+  ; room to report their own failure first.
   Start := A_TickCount
-  while !State.Calls && TickElapsed64(Start) < 15000 {
+  while !State.Calls && TickElapsed64(Start) < 2 * TEST_NATIVE_SETTLE_TIMEOUT_MS {
    _SR_TreePoll()
    Sleep(10)
   }

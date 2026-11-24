@@ -49,15 +49,11 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       red, the Windows updater source seal, resealed by `470a83a50b`; run 45292696642 (`282f8c1192`) stopped at the
       formatting of this file. Never verified on a runner yet: the Swift lease fix (XCTest
       `testParentEOFKeepsFencedQueuedBehindHangupAfterStaleReadyRead`, no Swift toolchain in the cloud container), the
-      Windows `TEST_NATIVE_SETTLE_TIMEOUT_MS` waits (15 AHK tests), the Ubuntu APT and Playwright download retries,
+      Windows `TEST_NATIVE_SETTLE_TIMEOUT_MS` waits (15 AHK tests, then on 2026-11-24 the per-file limits and four
+      child fixtures guarded by `tools/test/test-ahk-native-settle-bound.cjs`; production
+      `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` stays 500 ms unless a forced-termination test flakes alone), the Ubuntu APT and Playwright download retries,
       and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by Runner » is GitHub capacity:
       rerun the failed jobs, do not move it to Intel.
-- [ ] **[Windows] Short waits left after the flaky-test pass:** child fixtures that cannot read the test constant
-      (`tests/fixtures/user_command_lifecycle_owner_body.ahk:137`, `worker_live_foreground_body.ahk:71`) and the named
-      per-file limits (`SRTOW_*`, `_UER_NATIVE_WAIT_MS`, `_TDCR_NATIVE_WAIT_MS`, `CALO_READER_WAIT_MS`,
-      `CRH_OPEN_WAIT_MS`, `PWRS_CAPTURE_TIMEOUT_MS`). Production `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` (500 ms) is
-      kept on purpose; revisit only if a forced-termination test flakes alone. Linux hardware lane
-      `tests/hardware/http_empty_headers.lua` keeps 3 s per request and 20 s in its Python harness.
 - [ ] **[macOS] Owned runtime artifact.** The admin-shell helper changes of 2026-11-23 (stale runtime retirement
       before install, refusal note `refused-<case>:<file>:<line>`) only reach users once the maintainer rebuilds
       and republishes the runtime (`16.3.0-ergopti.7`); `vendor/remap-runtime/manifest.json` is theirs to move.

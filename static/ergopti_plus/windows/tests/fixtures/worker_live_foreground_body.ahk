@@ -62,13 +62,16 @@ _KLWF_StartCompanion() {
 		"The actual distinct image must own the exact gated native receiver.")
 	return State
 }
+; The parent writes its TEST_NATIVE_SETTLE_TIMEOUT_MS into the generated
+; source, since this child does not load the test framework.
 _KLWF_RetireCompanion(State) {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	if !IsObject(State) || !IsObject(State.Handle)
 		return true
 	if !FileExist(State.Gate)
 		_KLWF_Require(FSWriteCreateDurable(State.Gate, "release"), "Only the privately owned companion gate is opened.")
 	Started := A_TickCount
-	while !State.Calls && TickElapsed64(Started) < 3000 {
+	while !State.Calls && TickElapsed64(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		_SR_TreePoll()
 		Sleep(10)
 	}
@@ -125,7 +128,7 @@ _KLWF_RaceSpawn(Executable, Arguments, Done) {
 }
 
 _KLWF_Main() {
-	global _MAD_Root, _KLWF, _KLWF_Receiver
+	global _MAD_Root, _KLWF, _KLWF_Receiver, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	_KLWF_Require(A_Args.Length == 2 && _MAD_Root == _MAD_ExpectedRoot && (A_Args[2] == "parent-control" || A_Args[2] == "worker"
 		|| A_Args[2] == "worker-switch-ingest" || A_Args[2] == "worker-typing-ingest"),
 		"The owned child requires its exact private root and known mode.")
@@ -207,7 +210,7 @@ _KLWF_Main() {
 			_KLWF_Require(KLPF_RequestBuild("apps", _MAD_Root, "full", 61, _KLWF_Completed),
 				"The actual public worker scheduler must admit the independent process.")
 			Started := A_TickCount
-			while _KLWF.Calls == 0 && TickElapsed64(Started) < 15000 {
+			while _KLWF.Calls == 0 && TickElapsed64(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 				_SR_TreePoll()
 				Sleep(10)
 			}

@@ -83,6 +83,11 @@ _UCLC_EnvironmentReturn(Self, Added) {
 
 _UCLC_Main() {
 	global _LCPC_World, _ConfigDir, _SharedDir, _UserActionPorts, GestureActionParameters, _UserCommandEntries
+	; The parent writes its TEST_NATIVE_SETTLE_TIMEOUT_MS into the generated
+	; source, since this child does not load the test framework.
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
+	_LCPC_Require(IsSet(TEST_NATIVE_SETTLE_TIMEOUT_MS) && TEST_NATIVE_SETTLE_TIMEOUT_MS > 0,
+		"The parent must publish its positive native settle bound.")
 	_LCPC_Require(A_Args.Length == 3, "An owned mode, directory and shared source are required.")
 	Mode := A_Args[1], Directory := A_Args[2]
 	_LCPC_Require(Mode == "current-type" || Mode == "retired-type" || Mode == "retired-copy" || Mode == "acquire-resume", "Unknown private command mode.")
@@ -134,7 +139,7 @@ _UCLC_Main() {
 			RealTerminate := Handle.terminate
 			_UCLC_State.Pid := Handle.processId()
 			Begin := A_TickCount
-			while !FileExist(Ready) && TickElapsed64(Begin) < 5000 {
+			while !FileExist(Ready) && TickElapsed64(Begin) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 				_SR_TreePoll()
 				Sleep(10)
 			}
@@ -149,7 +154,7 @@ _UCLC_Main() {
 			}
 			_LCPC_Require(FSWriteCreateDurable(Gate, "release") == 1, "Only the fixture may release its waiting batch.")
 			Begin := A_TickCount
-			while _UserCommandEntries.Has("gesture__tap_3") && TickElapsed64(Begin) < 7000 {
+			while _UserCommandEntries.Has("gesture__tap_3") && TickElapsed64(Begin) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 				_SR_TreePoll()
 				Sleep(10)
 			}

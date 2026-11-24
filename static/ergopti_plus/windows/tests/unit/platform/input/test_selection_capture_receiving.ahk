@@ -20,8 +20,6 @@
 
 ; How long a window may take to become the foreground one, in seconds.
 global PWRS_ACTIVATE_TIMEOUT_S := 3
-; How long the control's capture may take to deliver and restore, in ms.
-global PWRS_CAPTURE_TIMEOUT_MS := 5000
 
 ; Two real top-level windows of this process, the first one with its text
 ; field focused; restores the user's clipboard and foreground afterwards.
@@ -88,7 +86,7 @@ Test("selection capture receiving: a real foreground change during the snapshot 
 _PWRS_UnchangedForegroundDelivers() {
 	_PWRS_WithWindows(Body)
 	Body(Source, Other) {
-		global PWRS_CAPTURE_TIMEOUT_MS
+		global TEST_NATIVE_SETTLE_TIMEOUT_MS
 		Sentinel := "receiving-user-copy-" . A_TickCount
 		A_Clipboard := Sentinel
 		Sends := []
@@ -103,7 +101,7 @@ _PWRS_UnchangedForegroundDelivers() {
 		AssertEqual(1, Sends.Length, "one copy chord")
 		AssertEqual(Source.Hwnd, Sends[1], "aimed at the source window")
 		Begin := A_TickCount
-		while ((Delivered.Length == 0 || A_Clipboard !== Sentinel) && A_TickCount - Begin < PWRS_CAPTURE_TIMEOUT_MS)
+		while ((Delivered.Length == 0 || A_Clipboard !== Sentinel) && A_TickCount - Begin < TEST_NATIVE_SETTLE_TIMEOUT_MS)
 			Sleep(20)
 		AssertEqual(1, Delivered.Length, "the selection is delivered once")
 		AssertEqual("receiving selected text", Delivered[1], "with the copied text")
