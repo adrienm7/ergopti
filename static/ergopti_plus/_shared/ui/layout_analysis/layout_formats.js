@@ -450,21 +450,34 @@ var LAYOUT_FORMATS = (function () {
 			'Slash'
 		];
 		const at = (start, codes, map) => codes.forEach((code, i) => (map[start + i] = code));
+		// Tab, Caps Lock, Enter and the right Control are character keys for a
+		// file that types on them (KLA's TypeMatrix and BvoFRak put q on Tab,
+		// TypeMatrix a on Caps Lock, Arensito à on Enter, AOEYK \ on the right
+		// Control): the engine's optional keys and Caps Lock, a held key a
+		// layout holding no level there types on.
 		const standard = {};
 		at(0, top, standard);
+		standard[14] = 'Tab';
 		at(15, tab, standard);
 		standard[27] = 'Backslash';
+		standard[28] = 'CapsLock';
 		at(29, home, standard);
+		standard[40] = 'Enter';
 		at(42, bottom, standard);
 		standard[56] = 'Space';
+		standard[60] = 'ControlRight';
 		const european = {};
 		at(0, top, european);
+		european[14] = 'Tab';
 		at(15, tab, european);
+		european[27] = 'Enter';
+		european[28] = 'CapsLock';
 		at(29, home, european);
 		european[40] = 'Backslash';
 		european[42] = 'IntlBackslash';
 		at(43, bottom, european);
 		european[57] = 'Space';
+		european[61] = 'ControlRight';
 		// The ErgoDox: every finger key. Those KLA's QWERTY gives a character
 		// take that character's key; the others, which have no KeyboardEvent
 		// code, the model's board-only codes (analysis_model.json

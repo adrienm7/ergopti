@@ -518,6 +518,58 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 			`KLA ErgoDox export: key ${index} (${code}) has finger ${written.keys[index].finger}, the board ${DATA.boards.ergodox.fingers[code]}`
 		);
 }
+// (standard-board-character-keys-2026-11-24) KLA's standard and european
+// boards type on Tab (14), Caps Lock (28), Enter (40 on standard, 27 on
+// european) and the right Control (60, 61), which were read as no key: KLA's
+// TypeMatrix « q » on 14 and « a » on 28, Arensito « à À | » on 40, AOEYK
+// « \ | » on 60. The control characters KLA draws there type nothing.
+{
+	const key = (id, cells) => {
+		const [primary, shift, altGr] = Array.from(cells).map((c) => c.codePointAt(0));
+		return { id, primary, shift: shift ?? -1, altGr: altGr ?? -1, shiftAltGr: -1, finger: 1 };
+	};
+	const standard = F.fromKla({
+		label: 'standard keys',
+		keyboardType: 'standard',
+		keys: [
+			key(14, 'qQ'),
+			key(28, 'aA'),
+			key(40, 'àÀ|'),
+			key(60, '\\|'),
+			{ id: 13, primary: 9, finger: 10 },
+			key(56, ' ')
+		]
+	});
+	const rows = standard.layout.rows;
+	check(
+		(rows.Tab || []).slice(0, 2).join() === 'q,Q' &&
+			(rows.CapsLock || []).slice(0, 2).join() === 'a,A' &&
+			(rows.Enter || []).slice(0, 3).join() === 'à,À,|' &&
+			(rows.ControlRight || []).slice(0, 2).join() === '\\,|' &&
+			standard.unmapped.length === 0,
+		`KLA standard keys: ${JSON.stringify(rows)} ${JSON.stringify(standard.unmapped)}`
+	);
+	const european = F.fromKla({
+		label: 'european keys',
+		keyboardType: 'european',
+		keys: [key(14, 'qQ'), key(27, 'éÉ'), key(28, 'aA'), key(61, '<>'), key(57, ' ')]
+	});
+	const eu = european.layout.rows;
+	const written = F.toKla(european.layout, DATA.model.fingerings.standard);
+	check(
+		(eu.Tab || [])[0] === 'q' &&
+			(eu.Enter || [])[0] === 'é' &&
+			(eu.CapsLock || [])[0] === 'a' &&
+			(eu.ControlRight || [])[0] === '<' &&
+			european.unmapped.length === 0 &&
+			written.keyboardType === 'european' &&
+			written.keys[14].primary === 'q'.codePointAt(0) &&
+			written.keys[27].primary === 'é'.codePointAt(0) &&
+			canonical(F.fromKla(JSON.parse(JSON.stringify(written))).layout) ===
+				canonical(european.layout),
+		`KLA european keys: ${JSON.stringify(eu)} ${JSON.stringify(european.unmapped)}`
+	);
+}
 // The library's KLA layouts are the reader's reading of KLA's published files
 // (tools/build/import-kla-layouts.cjs): the codegen keeps every key and level
 // and completes nothing; a file left out names its reason, a duplicate the

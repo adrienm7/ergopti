@@ -2349,7 +2349,7 @@
 			}
 			const layout = layoutOf(result.layout.id);
 			// Every key uncoloured: the board only shows where the n-gram's keys are.
-			const board = E.keyboard(result.keyboard, result.profile || undefined);
+			const board = E.layoutKeyboard(layout, result.keyboard, result.profile || undefined);
 			const flat = Object.fromEntries(board.codes.map((code) => [code, 0]));
 			drawBoard($('la-ngrams-board'), result, layout, flat, {
 				other: false,
@@ -3223,17 +3223,22 @@
 				levelChoices(boards.map((b) => layoutOf(b.result.layout.id))),
 				state.heats.level
 			);
-			const modifiers = new Set(E.heldCodes());
 			// The space bar takes a share of the presses no other key comes near: the
 			// scale is the other keys', and the space bar is drawn at its darkest.
-			const extentOf = (values) =>
-				Math.max(
+			// A held key the layout types on (Caps Lock) is one of its keys.
+			const extentOf = (values, layout) => {
+				const modifiers = new Set(E.heldCodesOf(layout));
+				return Math.max(
 					...Object.entries(values)
 						.filter(([code]) => !modifiers.has(code) && code !== SPACE_CODE)
 						.map(([, v]) => Math.abs(v)),
 					0
 				);
-			const common = Math.max(...boards.map((b) => extentOf(b.values)), 0);
+			};
+			const common = Math.max(
+				...boards.map((b) => extentOf(b.values, layoutOf(b.result.layout.id))),
+				0
+			);
 			const ramp = (extent) => [
 				measure(0, HEAT_DIGITS, unit),
 				heatRamp(),
@@ -3264,7 +3269,7 @@
 				if (result.incomplete) title.append(' ', incompleteFlag(result));
 				card.setAttribute('aria-labelledby', titleId);
 				const box = el('div', 'la-heatmap la-heatmap-small');
-				const extent = shared ? common : extentOf(values);
+				const extent = shared ? common : extentOf(values, layout);
 				const tableRows = drawBoard(box, result, layout, values, {
 					extent,
 					other: false,
@@ -3676,8 +3681,9 @@
 		 */
 		function drawBoard(box, result, layout, byCode, options) {
 			box.replaceChildren();
-			const board = E.keyboard(result.keyboard, result.profile || undefined);
-			const modifiers = new Set(E.heldCodes());
+			// The layout's own board: its Tab or Enter key when it types there.
+			const board = E.layoutKeyboard(layout, result.keyboard, result.profile || undefined);
+			const modifiers = new Set(E.heldCodesOf(layout));
 			const shown = board.codes.filter((code) => !modifiers.has(code));
 			const extent =
 				options.extent !== undefined

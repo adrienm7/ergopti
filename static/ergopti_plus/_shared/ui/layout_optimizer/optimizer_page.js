@@ -1200,8 +1200,9 @@
 				: null;
 			box.replaceChildren();
 			const drawn = [];
-			const board = E.keyboard($('lo-keyboard').value);
-			const modifiers = new Set(E.heldCodes());
+			// The layout's own board: its Tab or Enter key, Caps Lock when it types there.
+			const board = E.layoutKeyboard(layout, $('lo-keyboard').value);
+			const modifiers = new Set(E.heldCodesOf(layout));
 			const minX = Math.min(...board.x) - 0.5;
 			const maxX = Math.max(...board.x) + 0.5;
 			const maxY = Math.max(...board.y);
@@ -1983,8 +1984,9 @@
 		 * the best layout, and whether it changed, in words and with a mark.
 		 */
 		function drawBoardTable(start, best, changed) {
-			const board = E.keyboard($('lo-keyboard').value);
-			const modifiers = new Set(E.heldCodes());
+			// The start's board, which the run keeps (scoreSession).
+			const board = E.layoutKeyboard(start, $('lo-keyboard').value);
+			const modifiers = new Set(E.heldCodesOf(start));
 			const where = keyPlaces(board, modifiers);
 			const keys = board.codes
 				.map((code, k) => ({ code, x: board.x[k], y: board.y[k] }))

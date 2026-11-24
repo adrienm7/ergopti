@@ -170,16 +170,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 
 	/**
 	 * The finger of each key on our fingering of a keyboard (the layout's
-	 * standard or angle fingering), for the analysers that read the fingering
+	 * standard or angle fingering, with the optional keys it types on), for the analysers that read the fingering
 	 * from the layout file.
 	 * @returns {{board: object, finger: Map<string, number>}} Board and code → finger.
 	 */
 	function ourFingers(layout, keyboardId, profile) {
-		const E = engine();
-		const board =
-			keyboardId === 'iso' && layout.fingering === 'angle'
-				? E.keyboard('iso_angle', profile)
-				: E.keyboard(keyboardId, profile);
+		// The layout's own board: the angle fingering, its Tab or Enter key.
+		const board = engine().layoutKeyboard(layout, keyboardId, profile);
 		const finger = new Map();
 		board.codes.forEach((code, k) => finger.set(code, board.finger[k]));
 		return { board, finger };

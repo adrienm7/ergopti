@@ -281,15 +281,18 @@ waits for the maintainer's review).
       library layout. The Comparer, the Optimiser (its « an existing layout would do the job » gap in %) and the
       site follow it ([decision](docs/memory/maintainer-decisions.md)).
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 73 of the 91 files left out for its keys came in, the library holds 787 layouts
+      model »): 73 of the 91 files left out for its keys came in, the library holds 791 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
       board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (the ErgoDox's extra left thumb keys are idle since
       2026-11-21) (`docs/design/layout-analysis.md`,
-      « ErgoDox keys »). Still in `not_imported`: KLA's four standard-board files need Tab, Caps Lock, Enter or a
-      bottom modifier as character keys on ISO and ANSI (TypeMatrix's q and a, the ANSI BvoFRak's q, Arensito's à,
-      AOEYK's \), which would also offer them to the optimizer; KLAnext's VCKB and VCKB2 type a letter (d, l) on the
-      ErgoDox's right 2-unit outer thumb key, the board's AltGr (a mod-tap code there, as the Shift keys' tapped
-      characters have, would read it; each would still lack its « u », on the left thumb's second key).
+      « ErgoDox keys »). Still in `not_imported`: KLAnext's VCKB and VCKB2 type a letter (d, l) on the ErgoDox's
+      right 2-unit outer thumb key, the board's AltGr (a mod-tap code there, as the Shift keys' tapped characters
+      have, would read it; each would still lack its « u », on the left thumb's second key). The KLA importer
+      (`tools/build/import-kla-layouts.cjs`) no longer reproduces the library: run whole on 2026-11-24 it dropped
+      BvoFRak's stated dead keys, brought back KLA's Spanish Dvorak and the reasons of the entries replaced by
+      their XKB files (Neo 2, Spanish QWERTY) and moved AdNW's duplicate; teach it those hand-made entries
+      (`LEFT_OUT`, kept fields) before its next run, as the four standard-board files were added by its rules
+      alone.
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
@@ -912,6 +915,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
 - [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending
       integration.
+- [ ] **Tab, Caps Lock, Enter and the right Control as character keys (decided by the agent on 2026-11-24, to review
+      by the maintainer).** KLA's TypeMatrix, BvoFRak (ANSI), Arensito and AOEYK type there. Kept meanwhile: Tab,
+      Enter and the right Control are optional keys, on the board of a layout typing on one only (left pinky, right
+      pinky, right pinky; ISO Enter by its lower part), and Caps Lock is typed on by a layout holding no level
+      there, at its right end and never lateral; the optimizer offers them only when its start layout types there
+      (`docs/design/layout-analysis.md`, « Optional keys »). Choose whether the optimizer should offer them to any
+      start layout, and the right Control's finger (KLA gives AOEYK's the right thumb).
 - [ ] **A letter on the ErgoDox's left 2-unit outer thumb key (decided by the agent on 2026-11-24, to review by the
       maintainer).** KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e ») put a letter on key 66, where the
       board keeps Space, beside their space or « o » on the inner key. Kept meanwhile: the letter is read on Space,
