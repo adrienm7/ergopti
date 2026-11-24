@@ -43,6 +43,17 @@ function M.menu_columns() return MENU_COLUMNS end
 --- @return table font { name, size }
 function M.menu_font() return { name = MENU_FONT_NAME, size = MENU_COLUMNS.font } end
 
+-- The font the root rows are drawn in, nil for the system font: the rows take
+-- the reading font after the root compositions (menu/ui/builder/reading_font.lua),
+-- so the pill measures them in it. Set by the builder before each badge.
+local row_font = nil
+
+--- Names the font the next badge measures the root rows in.
+--- @param font table|nil { name, size } (hs.styledtext), nil for the system font.
+function M.measure_rows_in(font)
+	row_font = font
+end
+
 -- The pill's padding around its text and the text size, in points.
 local PILL_PAD_X, PILL_PAD_Y, PILL_TEXT_SIZE = 8, 10, 14
 local pending_canvas = nil
@@ -81,7 +92,8 @@ end
 --- @return number|nil width
 local function title_width(title)
 	if not ((type(title) == "string" and title ~= "-" and title ~= "") or type(title) == "userdata") then return nil end
-	local ok, size = pcall(hs.drawing.getTextDrawingSize, title, { font = MENU_FONT_NAME, size = MENU_COLUMNS.font })
+	local font = row_font or M.menu_font()
+	local ok, size = pcall(hs.drawing.getTextDrawingSize, title, { font = font.name, size = font.size })
 	return ok and type(size) == "table" and type(size.w) == "number" and size.w or nil
 end
 
