@@ -48,7 +48,12 @@
 	--chart-wpm-rgb: 204, 163, 0;
 	--kpi-precision-color: var(--theme-hue-008000);
 	--kpi-delegation-color: rgb(0, 86, 179);
-	--kpi-sfb-color: rgb(0, 155, 150); /* Teal — same-finger bigram indicator (was rep color) */
+	/* Teal — same-finger bigram indicator (was rep color); 7:1 on its tinted
+	   button, where rgb(0, 155, 150) was 3.3:1 on white (WCAG 1.4.6). */
+	--kpi-sfb-color: rgb(0, 92, 88);
+	/* The two heatmaps' captions, 7:1 on the page (their fixed hues were 3:1). */
+	--heatmap-keys-caption: rgb(11, 79, 156);
+	--heatmap-sfb-caption: rgb(20, 83, 45);
 	--kpi-dist-color: rgb(0, 113, 197);
 	--kpi-rep-color: rgb(0, 134, 174); /* Mid-blue-cyan — between dist blue and sfb teal */
 
@@ -102,6 +107,8 @@
 /* Variables mode SOMBRE */
 @media (prefers-color-scheme: dark) {
 	:root {
+		--heatmap-keys-caption: var(--theme-hue-1e96ff);
+		--heatmap-sfb-caption: var(--theme-hue-22c55e);
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
 		--mono-bg: var(--theme-grey-111);
 		--mono-color: var(--theme-hue-9cdcfe);
@@ -1684,4 +1691,11 @@ th .tooltip .tooltiptext {
 	border-radius: 2px;
 	outline: 2px solid var(--theme-orange-dark);
 	outline-offset: 1px;
+}
+
+/* The focused key of a heatmap: its border in the accent colour, wider, on
+   top of the page's focus ring, which an SVG shape draws thinly. */
+.hm-key:focus-visible {
+	stroke: var(--theme-accent);
+	stroke-width: 3;
 }

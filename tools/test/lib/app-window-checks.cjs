@@ -133,11 +133,15 @@ function operabilityProblems() {
 			(node.getAttribute('aria-label') || '').trim() ||
 				(node.getAttribute('aria-labelledby') || '').trim()
 		);
+	// A handler written as an attribute in markup (`onmouseenter="…"`, an SVG
+	// drawing built as a string) never goes through the setter recordListeners
+	// watches, nor through addEventListener: it is read from the attribute.
+	const handles = (node, type) =>
+		(listeners.get(node) || new Set()).has(type) || node.hasAttribute('on' + type);
 	for (const node of scope.querySelectorAll('*')) {
 		if (!exposed(node)) continue;
-		const types = listeners.get(node) || new Set();
-		const pointer = POINTER.some((type) => types.has(type)) || node.hasAttribute('onclick');
-		const hover = HOVER.some((type) => types.has(type));
+		const pointer = POINTER.some((type) => handles(node, type));
+		const hover = HOVER.some((type) => handles(node, type));
 		// A chart canvas reads its pointer itself: its text alternative is what
 		// the keyboard and a reader get (the data shown beside it or its name).
 		const chart = node.tagName === 'CANVAS' && node.getAttribute('role') === 'img' && named(node);
@@ -145,10 +149,8 @@ function operabilityProblems() {
 			problems.push('mouse only (click): ' + describe(node));
 		if (hover && !chart && !focusable(node) && !holdsFocusable(node)) {
 			const followsFocus = (() => {
-				for (let at = node; at && at !== document.body; at = at.parentElement) {
-					const own = listeners.get(at);
-					if (own && FOCUS.some((type) => own.has(type))) return true;
-				}
+				for (let at = node; at && at !== document.body; at = at.parentElement)
+					if (FOCUS.some((type) => handles(at, type))) return true;
 				return false;
 			})();
 			if (!followsFocus) problems.push('mouse only (hover): ' + describe(node));
@@ -374,8 +376,17 @@ function imageProblems() {
 			);
 			continue;
 		}
+		// An interactive drawing (the typing heatmaps' keys) is a named group of
+		// marks that each take the focus in turn and carry their own name.
+		const marks = role === 'group' && tag === 'svg' ? [...node.querySelectorAll('[tabindex]')] : [];
 		if (!named(node)) problems.push(`${describe(node)} is neither aria-hidden nor a named image`);
-		else if (tag !== 'canvas' && role !== 'img' && tag === 'svg')
+		else if (marks.length > 0) {
+			if (!marks.some((mark) => mark.tabIndex >= 0))
+				problems.push(`${describe(node)} is a group of marks none of which takes the focus`);
+			for (const mark of marks)
+				if (!(mark.getAttribute('aria-label') || '').trim())
+					problems.push(`${describe(node)} has a focusable mark without a name`);
+		} else if (tag !== 'canvas' && role !== 'img' && tag === 'svg')
 			problems.push(`${describe(node)} is named but not role="img"`);
 		// Marks with their own hover titles hold values a pointer alone reads:
 		// inside role="img" a screen reader hears only the image's name. The
