@@ -3603,6 +3603,7 @@
 	"ui_apps.col_top_dests": "Top destinations",
 	"ui_apps.col_typing_pct": "Typing %",
 	"ui_apps.col_window": "Window",
+	"ui_apps.columns_help_title": "What the columns mean",
 	"ui_apps.compare_title": "Comparison vs previous period",
 	"ui_apps.detail_global_activity": "Total recorded activity",
 	"ui_apps.detail_productivity_score": "Score calculated from your categories",

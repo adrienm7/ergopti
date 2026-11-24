@@ -3603,6 +3603,7 @@
 	"ui_apps.col_top_dests": "Destinos principales",
 	"ui_apps.col_typing_pct": "Escritura %",
 	"ui_apps.col_window": "Ventana",
+	"ui_apps.columns_help_title": "Qué significan las columnas",
 	"ui_apps.compare_title": "Comparación con período anterior",
 	"ui_apps.detail_global_activity": "Actividad global registrada",
 	"ui_apps.detail_productivity_score": "Puntuación calculada según sus categorías",
