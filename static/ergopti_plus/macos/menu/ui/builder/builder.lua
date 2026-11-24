@@ -813,7 +813,7 @@ function M.generate(ctx, menu_mods, actions)
 				[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
 				[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
-				[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_all() end,
+				[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_field_report() end,
 				[COMMAND.FIELD_CHECK_LEASE] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
 				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
 				[COMMAND.FIELD_CHECK_NETWORK] = function() require("diagnostics.ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,

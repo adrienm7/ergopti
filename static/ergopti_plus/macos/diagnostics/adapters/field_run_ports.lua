@@ -471,12 +471,10 @@ end
 -- ==========================
 -- ==========================
 
---- Builds the ports of a developer runtime.
---- @param root string Clone root (core/lifecycle/engine/dev_source.lua).
+--- The ports over one field run declaration file.
+--- @param declaration string Absolute path of diagnostics/data/field_run.json.
 --- @return table ports
-function M.new(root)
-	assert(type(root) == "string" and root:sub(1, 1) == "/", "field run ports need the clone root")
-	local declaration = root .. require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH .. "/diagnostics/data/field_run.json"
+local function build(declaration)
 	return {
 		read_declaration = function() return FileSystem.read(declaration) end,
 		read = function(path) return FileSystem.read_with_status(path) end,
@@ -497,6 +495,40 @@ function M.new(root)
 		reload_driver = function(reason) return require("core.lifecycle.engine.shutdown.termination_coordinator").request_reload(reason) end,
 		run_step = run_step,
 	}
+end
+
+--- Builds the ports of a developer runtime.
+--- @param root string Clone root (core/lifecycle/engine/dev_source.lua).
+--- @return table ports
+function M.new(root)
+	assert(type(root) == "string" and root:sub(1, 1) == "/", "field run ports need the clone root")
+	return build(root .. require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH .. "/diagnostics/data/field_run.json")
+end
+
+--- Builds the ports of an installed app's in-app run (no clone): the shipped
+--- declaration of this driver and the installed folder of the shared protocol.
+--- @return table ports
+function M.new_installed()
+	local source = debug.getinfo(1, "S").source or ""
+	local root = assert((source:sub(1, 1) == "@" and source:sub(2) or source):match("^(.*)/diagnostics/adapters/field_run_ports%.lua$"),
+		"field run ports: the driver root is unresolved")
+	local ports = build(root .. "/diagnostics/data/field_run.json")
+	--- This app's process id, which the session's documents carry.
+	function ports.pid()
+		return assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable")
+	end
+	--- The installed folder: folder.macos of _shared/diagnostics/data/field_run_protocol.json.
+	--- @return string|nil folder nil when HOME is unset.
+	function ports.installed_folder()
+		local protocol = assert(require("core.fs.adapters.json_codec").decode_file(
+			require("core.fs.engine.paths").shared("diagnostics/data/field_run_protocol.json")),
+			"field run ports: the shared protocol is unreadable")
+		local folder = assert(protocol.folder and protocol.folder.macos, "field run ports: the protocol has no folder.macos")
+		local base = os.getenv(folder.base)
+		if type(base) ~= "string" or base:sub(1, 1) ~= "/" then return nil end
+		return base .. "/" .. table.concat(folder.segments, "/")
+	end
+	return ports
 end
 
 return M

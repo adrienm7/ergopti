@@ -1,60 +1,32 @@
 {
 	"_comment": [
-		"The Debug menu's « Test everything » (debug_tests_menu.field_check_all): on each driver, the checks it runs one after the other and the Tests rows it leaves to a person. Read by _shared/diagnostics/engine/field_check/run_all.lua (macOS, Linux) and windows/diagnostics/ui/field_check/run_all.ahk.",
-		"run: each entry names a step of the driver's developer field run declaration (macOS diagnostics/data/field_run.json, Linux and Windows diagnostics/data/field_run_steps.json), whose check and deadline_seconds the run uses, so a check has one bound whichever run starts it; row is the Tests row that starts the same check alone, when there is one. A check is listed only when it needs no person (no typing, no dialog to answer, no administrator prompt) and changes nothing it does not put back.",
-		"separate: the Tests rows a person must run, each listed in the report as « run separately »; step names the field run step that covers the same point, when there is one. tools/test/test-field-check-all-plan.cjs fails when a Tests row of a platform is in neither list, when a step is not declared for that platform or is not a field_check step, or when a row is not offered on that platform.",
-		"The field point ids of the report come from the driver's field_todo_coverage.json (macOS, Linux): every TODO-tests point one of whose checks names the step. Windows has no coverage file; its report names the step only."
+		"The interim plan of Débogage's « Lancer le field report (tous les tests) » on Windows only: the checks windows/diagnostics/ui/field_check/run_all.ahk runs one after the other until the Windows driver hands its own field run session the steps in-app, as macOS and Linux already do (their diagnostics/engine/field_run/field_run.lua Session:submit_in_app; TODO.md « Lancer le field report », Windows). Delete this file with that change.",
+		"run: each entry names a step of windows/diagnostics/data/field_run_steps.json, whose check and deadline_seconds the run uses; row is the Tests row that starts the same check alone, when there is one. separate: the Tests rows a person must run, listed in the report as « run separately ». tools/test/test-field-check-all-plan.cjs fails when a Windows Tests row is in neither list or a step is not a field check of that file."
 	],
 	"schema": 1,
 	"platforms": {
 		"ahk": {
 			"run": [
-				{ "step": "field_boot_cost" },
-				{ "step": "field_network", "row": "field_check_network" },
-				{ "step": "field_composer", "row": "composer_check" }
+				{
+					"step": "field_boot_cost"
+				},
+				{
+					"step": "field_network",
+					"row": "field_check_network"
+				},
+				{
+					"step": "field_composer",
+					"row": "composer_check"
+				}
 			],
-			"separate": [{ "row": "send_probe" }, { "row": "hook_probe" }]
-		},
-		"hs": {
-			"run": [
-				{ "step": "field_boot_cost" },
-				{ "step": "field_lease", "row": "field_check_lease" },
-				{ "step": "field_owned_runtime", "row": "field_check_owned_runtime" },
-				{ "step": "field_network", "row": "field_check_network" },
-				{ "step": "field_toolchain", "row": "field_check_toolchain" },
-				{ "step": "field_login_items", "row": "field_check_login_items" },
-				{ "step": "field_composer", "row": "composer_check" },
-				{ "step": "field_permissions" },
-				{ "step": "field_event_taps" },
-				{ "step": "field_input_sources" },
-				{ "step": "field_storage" },
-				{ "step": "field_launcher_roles" },
-				{ "step": "field_network_hosts" },
-				{ "step": "field_ollama_blob_host" },
-				{ "step": "field_pac_fallback" },
-				{ "step": "field_ai_local" },
-				{ "step": "field_local_servers" },
-				{ "step": "field_capslock_chord" },
-				{ "step": "field_gesture_frames" },
-				{ "step": "field_physical_shortcuts" },
-				{ "step": "field_tap_hold_thresholds" },
-				{ "step": "field_tap_copy" },
-				{ "step": "field_raw_telemetry" },
-				{ "step": "field_menu_build" },
-				{ "step": "field_slow_lines" },
-				{ "step": "field_log_signals" },
-				{ "step": "field_fifo_safety" },
-				{ "step": "field_app_health" },
-				{ "step": "field_idle_cost" }
-			],
-			"separate": [{ "row": "field_check_key_accounting", "step": "key_accounting" }]
-		},
-		"linux": {
-			"run": [
-				{ "step": "field_composer", "row": "composer_check" },
-				{ "step": "field_network", "row": "field_check_network" }
-			],
-			"separate": []
+			"separate": [
+				{
+					"row": "send_probe"
+				},
+				{
+					"row": "hook_probe"
+				}
+			]
 		}
 	}
 }

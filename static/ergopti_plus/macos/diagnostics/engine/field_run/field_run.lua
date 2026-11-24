@@ -43,6 +43,16 @@
 ---    at teardown with its kind and reason; a run cut short without teardown is
 ---    closed at the next start. Either way the done file says interrupted, so
 ---    the collector never waits for a run that is gone.
+--- 7. In-app run (maintainer decision, 2026-11-24): Débogage's « Lancer le
+---    field report » hands the session its field check steps in-process
+---    (Session:submit_in_app, _shared/diagnostics/engine/field_run/in_app.lua) and
+---    watches it through an observer: each step's start and result, then the
+---    end of the run. The results land in the same files as a collector's run.
+---    Without a clone (an installed app) the session is started on demand on
+---    the installed folder the shared protocol declares (folder.macos,
+---    M.start_in_app). A step that needs a person, the collector or the signed
+---    install is listed back as not run with its reason; the person can cancel
+---    the run, which closes it as interrupted.
 --- ==============================================================================
 
 local M = {}
@@ -53,6 +63,7 @@ local Report = require("diagnostics.engine.field_check.report")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local Guided = require("diagnostics.engine.field_run.guided")
+local InApp = require("diagnostics.engine.field_run.in_app")
 
 local LOG = "field_run"
 
@@ -491,7 +502,17 @@ function Session:close_running(cause)
 	Logger.warn(LOG, "Field run %s cut short by a %s (%s) during step '%s'; closed as interrupted.",
 		run.request.request_id, kind or "teardown", reason or "no reason", step)
 	self.run = nil
+	self:notify(run, "finished", { request_id = run.request.request_id, interrupted = true }, run.dir)
 end
+
+-- Session:submit_in_app, cancel_in_app and notify, shared with the other Lua driver
+InApp.install(Session, {
+	busy = function() return TerminationCoordinator.terminal_in_progress() end,
+	valid_id = function(session, id) return is_request_id(session.spec, id) end,
+	cancel = function(session) session:close_running({ kind = "cancelled", reason = "person" }) end,
+	logger = Logger,
+	log = LOG,
+})
 
 --- Stops watching and withdraws the readiness file; a running run is closed
 --- as interrupted, with the cause when the caller knows it.
@@ -560,9 +581,11 @@ end
 --- @param request table From M.parse_request().
 --- @param dir string Results folder of this request.
 --- @return boolean started
-function Session:begin(request, dir)
+--- @param observer table|nil The in-app run's observer (Session:submit_in_app).
+function Session:begin(request, dir, observer)
 	local spec, ports = self.spec, self.ports
 	local run = self:new_run(request, dir, ports.now_ms(), ports.iso_now())
+	run.observer = observer
 	self.run = run
 	local ids = {}
 	for _, step in ipairs(request.steps) do ids[#ids + 1] = step.id end
@@ -672,6 +695,7 @@ function Session:run_step(index, step, continue)
 	local last_mark = progress_aware and ports.progress_mark() or nil
 	run.current_step = step.id
 	Logger.info(LOG, "Field run step %d/%d '%s' started.", index, #run.request.steps, step.id)
+	self:notify(run, "step_started", index, step)
 	local function settle(verdict, codes, report)
 		if settled then
 			local late_codes = {}
@@ -906,6 +930,7 @@ function Session:record(index, step, fields)
 		log_window = fields.log_window or { lines = Json.array({}), truncated = false },
 	}
 	self:publish(string.format("%s/%02d_%s.json", run.dir, index, step.id), document)
+	self:notify(run, "step_recorded", index, step, document)
 	Logger.evidence(LOG, "Field run step result: step=%s verdict=%s codes=%s", step.id, fields.verdict,
 		#codes > 0 and table.concat(codes, ",") or "none")
 end
@@ -971,6 +996,7 @@ function Session:finish()
 	})
 	self.ports.remove(self:path("running"))
 	self.run = nil
+	self:notify(run, "finished", { request_id = run.request.request_id, interrupted = false }, run.dir)
 	if written then
 		Logger.success(LOG, "Field run %s finished.", run.request.request_id)
 	else
@@ -1038,6 +1064,40 @@ function M.start(opts)
 	end
 	Logger.success(LOG, "Developer field run watcher ready.")
 	return true
+end
+
+--- The started session, for the menu's in-app run.
+--- @return table|nil session nil when none started, or it stopped.
+function M.current()
+	if _session ~= nil and not _session.active then return nil end
+	return _session
+end
+
+--- Starts the session of an installed app on demand, for the menu's in-app
+--- run: the shipped declaration and the installed folder the shared protocol
+--- declares (folder.macos). A running session (a developer runtime, or one
+--- the collector opened) is returned as is.
+--- @param opts table { pid?, ports?, folder? }; the pid and the folder come from the ports by default.
+--- @return table|nil session, string|nil error
+function M.start_in_app(opts)
+	if M.current() ~= nil then return _session end
+	if _session ~= nil then return nil, "the stopped field run session still has an owner" end
+	Logger.start(LOG, "Starting the in-app field run session…")
+	local ok, err = pcall(function()
+		local ports = opts.ports or require("diagnostics.adapters.field_run_ports").new_installed()
+		local spec = M.validate(Json.decode(assert(ports.read_declaration(), "the declaration could not be read")))
+		local folder = opts.folder or assert(ports.installed_folder(), "the installed field run folder is unresolved")
+		local session = M.new({ spec = spec, folder = folder, pid = opts.pid or ports.pid(), ports = ports })
+		_session = session
+		session:start()
+	end)
+	if not ok then
+		if _session then pcall(_session.stop, _session); _session = nil end
+		Logger.error(LOG, "The in-app field run session could not start: %s.", tostring(err))
+		return nil, tostring(err)
+	end
+	Logger.success(LOG, "In-app field run session ready.")
+	return _session
 end
 
 --- Reports whether a field run is running: the auto-reload watchers hold a

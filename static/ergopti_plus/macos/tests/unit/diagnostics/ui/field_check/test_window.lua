@@ -99,9 +99,7 @@ helpers.describe("field check menu rows", function()
 				end
 			end
 			for id in pairs(rows) do
-				-- « Test everything » runs a plan of checks (test_run_all.lua), not one check
-				helpers.assert_true(Window.ROWS[id] ~= nil or Window.SHARED_ROWS[id] ~= nil or id == Window.ALL_ROW,
-					"row without a check: " .. id)
+				helpers.assert_true(Window.ROWS[id] ~= nil or Window.SHARED_ROWS[id] ~= nil, "row without a check: " .. id)
 			end
 		end)
 	end)

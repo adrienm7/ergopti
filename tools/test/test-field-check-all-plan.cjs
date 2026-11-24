@@ -5,8 +5,10 @@
  * MODULE: « Test Everything » Plan Tests
  * DESCRIPTION:
  * Pins static/ergopti_plus/_shared/diagnostics/data/field_check_all.json, the
- * plan of the Debug menu's « Test everything » on each driver:
- * 1. the declaration names the three drivers and nothing else;
+ * interim plan of Débogage's « Lancer le field report » on Windows, and the
+ * row on every driver:
+ * 1. the declaration names Windows only (macOS and Linux hand their own field
+ *    run session the steps in-app);
  * 2. every step it runs is a field_check step of that driver's developer field
  *    run declaration, listed once, and every row it names is a Tests row that
  *    driver offers;
@@ -31,9 +33,7 @@ const MANIFEST = '_shared/menu/data/menu_manifest.json';
 const ALL_ROW = 'field_report';
 // Each driver's developer field run declaration, which owns its steps' checks and deadlines
 const STEPS_FILES = {
-	ahk: 'windows/diagnostics/data/field_run_steps.json',
-	hs: 'macos/diagnostics/data/field_run.json',
-	linux: 'linux/diagnostics/data/field_run_steps.json'
+	ahk: 'windows/diagnostics/data/field_run_steps.json'
 };
 // The source line that routes the row on each driver
 const ROUTES = {
@@ -43,11 +43,11 @@ const ROUTES = {
 	],
 	hs: [
 		'macos/menu/ui/builder/builder.lua',
-		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_all() end,'
+		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_field_report() end,'
 	],
 	linux: [
 		'linux/diagnostics/ui/menu_debug.lua',
-		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.run_all").run() end,'
+		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.field_report").run() end,'
 	]
 };
 
@@ -73,14 +73,17 @@ function offeredRows(platform) {
 	return rows;
 }
 
-check('the plan names the three drivers and nothing else', () => {
-	assert.equal(plan.schema, 1);
-	assert.deepEqual(Object.keys(plan.platforms).sort(), Object.keys(STEPS_FILES).sort());
-	for (const [platform, own] of Object.entries(plan.platforms)) {
-		assert.deepEqual(Object.keys(own).sort(), ['run', 'separate'], `${platform} plan keys`);
-		assert(own.run.length > 0, `${platform} runs at least one check`);
+check(
+	'the interim plan is the Windows one only: macOS and Linux run their field run in-app',
+	() => {
+		assert.equal(plan.schema, 1);
+		assert.deepEqual(Object.keys(plan.platforms).sort(), Object.keys(STEPS_FILES).sort());
+		for (const [platform, own] of Object.entries(plan.platforms)) {
+			assert.deepEqual(Object.keys(own).sort(), ['run', 'separate'], `${platform} plan keys`);
+			assert(own.run.length > 0, `${platform} runs at least one check`);
+		}
 	}
-});
+);
 
 check(
 	'every run step is a field check of the driver field run, once, and every row is offered',

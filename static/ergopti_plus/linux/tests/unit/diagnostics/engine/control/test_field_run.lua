@@ -451,3 +451,69 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		helpers.assert_true(why:find("XDG_RUNTIME_DIR", 1, true) ~= nil)
 	end)
 end)
+
+helpers.describe("Linux field run in-app (field-report-in-app)", function()
+	helpers.it("runs the field check steps in-process, writes the same results and tells its observer", function()
+		local session, w = started()
+		local events = {}
+		local run = session:submit_in_app({
+			step_started = function(index, step) events[#events + 1] = "start:" .. index .. ":" .. step.id end,
+			step_recorded = function(_, step, result) events[#events + 1] = "record:" .. step.id .. ":" .. result.verdict end,
+			finished = function(done, dir) events[#events + 1] = "done:" .. tostring(done.interrupted) .. ":" .. dir end,
+		})
+		helpers.assert_not_nil(run, "the in-app run starts")
+		helpers.assert_true(run.request_id:find("^" .. require("diagnostics.engine.field_run.in_app").PREFIX) ~= nil, "an in-app request id")
+		helpers.assert_eq(run.not_run, { { step = "driver_reload", reason = "needs_collector" } },
+			"the timed reload is left out by name")
+		helpers.assert_eq(w.files[FOLDER .. "/request.json"], nil, "no request file is written")
+		w.flush()
+		local dir = "results/" .. run.request_id .. "/"
+		helpers.assert_eq(w.json(dir .. "accepted.json").steps, { "field_composer", "field_network" })
+		helpers.assert_eq(w.json(dir .. "01_field_composer.json").verdict, "pass")
+		helpers.assert_eq(w.json(dir .. "02_field_network.json").verdict, "pass")
+		helpers.assert_eq(w.json(dir .. "done.json").interrupted, false)
+		helpers.assert_eq(events, { "start:1:field_composer", "record:field_composer:pass", "start:2:field_network",
+			"record:field_network:pass", "record:config_guard:pass", "done:false:" .. FOLDER .. "/" .. dir:sub(1, -2) })
+	end)
+
+	helpers.it("refuses a second in-app run, and one while a collector's run goes on", function()
+		local session, w = started({ checks = { composer = "silent" } })
+		helpers.assert_not_nil(session:submit_in_app({}))
+		local again, why = session:submit_in_app({})
+		helpers.assert_nil(again)
+		helpers.assert_eq(why, "busy")
+		session:cancel_in_app()
+		w.request('{"schema":1,"request_id":"r1","steps":["field_composer"]}')
+		local during, reason = session:submit_in_app({})
+		helpers.assert_nil(during)
+		helpers.assert_eq(reason, "busy", "a collector's run keeps the session")
+	end)
+
+	helpers.it("a cancelled in-app run is closed as interrupted and its observer told once", function()
+		local session, w = started({ checks = { composer = "silent" } })
+		local finished = {}
+		local run = session:submit_in_app({ finished = function(done) finished[#finished + 1] = done end })
+		helpers.assert_true(session:cancel_in_app())
+		helpers.assert_true(not session:cancel_in_app(), "nothing left to cancel")
+		local done = w.json("results/" .. run.request_id .. "/done.json")
+		helpers.assert_eq({ done.interrupted, done.cause.kind, done.cause.step }, { true, "cancelled", "field_composer" })
+		helpers.assert_eq(#finished, 1)
+		helpers.assert_eq(w.files[FOLDER .. "/running.json"], nil)
+		w.flush(10 ^ 7)
+		helpers.assert_eq(#finished, 1, "a late timer changes nothing")
+	end)
+
+	helpers.it("an observer that raises never stops the run", function()
+		local session, w = started()
+		local run = session:submit_in_app({ step_started = function() error("boom") end })
+		w.flush()
+		helpers.assert_eq(w.json("results/" .. run.request_id .. "/done.json").interrupted, false)
+	end)
+
+	helpers.it("names the started session for the menu, and none once it stopped", function()
+		local session = FieldRun.start({ pid = 4242, spec = shipped(), folder = FOLDER, ports = world().ports })
+		helpers.assert_true(rawequal(FieldRun.current(), session))
+		session:stop()
+		helpers.assert_nil(FieldRun.current())
+	end)
+end)

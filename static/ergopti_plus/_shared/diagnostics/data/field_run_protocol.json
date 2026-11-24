@@ -30,6 +30,10 @@
 	"step_kinds": ["field_check", "diagnostics", "ai", "reload", "guided", "guard"],
 	"folder": {
 		"clone": "build/field-run",
+		"macos": {
+			"base": "HOME",
+			"segments": ["Library", "Application Support", "Ergopti", "field-run"]
+		},
 		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["ergopti", "field-run"] },
 		"windows": { "base": "LOCALAPPDATA", "segments": ["Ergopti", "field-run"] }
 	},

@@ -34,7 +34,7 @@ end
 
 --- Native services, replaceable by tests.
 --- @param spec table|nil The check's spec (supplies the environment), or nil for
----   a caller that runs no environment of its own (« Test everything »).
+---   a caller that runs no environment of its own (the in-app field report).
 --- @return table
 local function native(spec)
 	local I18n = require("core.i18n.engine.i18n")
@@ -88,7 +88,8 @@ end
 ---   unusable_step = string  step recorded when the environment is unusable }
 --- @return table runner { run, is_running, _reset }
 function M.new(spec)
-	local runner = {}
+	-- The locale key of the check's title, which an in-app field report reads too.
+	local runner = { title_key = spec.title_key }
 	local running = false
 
 	--- Reports whether a check is pending.
