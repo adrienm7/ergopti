@@ -66,10 +66,17 @@ try {
 	assert.equal(luajit.sources[0].commit, pinned.commit);
 	assert.equal(luajit.sources[0].branch, undefined, 'a branch would move under the pin');
 	const metainfo = fs.readFileSync(path.join(payload, `share/metainfo/${id}.metainfo.xml`), 'utf8');
+	// The website is the homepage (tools/lib/app-metadata.cjs, from CNAME); the
+	// repository the runtime updater follows is the source browser.
 	assert.equal(
 		metainfo.match(/<url type="homepage">([^<]+)<\/url>/)?.[1],
+		`https://${fs.readFileSync(path.join(ROOT, 'CNAME'), 'utf8').trim()}`
+	);
+	assert.equal(
+		metainfo.match(/<url type="vcs-browser">([^<]+)<\/url>/)?.[1],
 		`https://${github}/${updater.owner}/${updater.repo}`
 	);
+	assert.match(metainfo, /<project_license>MIT<\/project_license>/);
 	const desktop = fs.readFileSync(path.join(payload, `share/applications/${id}.desktop`), 'utf8');
 	assert.equal(desktop.match(/^Icon=(.+)$/m)?.[1], id);
 	const canonical = fs.readFileSync(path.join(BUILD, '_shared/tray/data/ergopti_tray.png'));

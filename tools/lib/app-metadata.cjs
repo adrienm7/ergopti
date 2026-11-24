@@ -43,7 +43,13 @@ const SOURCE = shared('core', 'text', 'data', 'app_metadata.json');
 const DEFAULTS = shared('updater', 'data', 'defaults.json');
 const IDENTIFIERS = shared('core', 'text', 'data', 'identifiers.json');
 const TIME_ZONE = 'Europe/Paris';
-const STRING_FIELDS = ['publisher', 'summary', 'macos_category', 'metadata_license'];
+const STRING_FIELDS = [
+	'publisher',
+	'maintainer_email',
+	'summary',
+	'macos_category',
+	'metadata_license'
+];
 
 // ===================================
 // ===================================
@@ -101,6 +107,7 @@ function readMetadata(root = ROOT) {
 		...readLicense(root),
 		productName: identifiers.app.display_name,
 		publisher: data.publisher,
+		maintainer: `${readLicense(root).holder} <${data.maintainer_email}>`,
 		summary: data.summary,
 		description: Object.freeze([...data.description]),
 		macosCategory: data.macos_category,
@@ -279,6 +286,8 @@ function debianCopyright(endYear, meta = readMetadata()) {
 function field(name, endYear, meta = readMetadata()) {
 	if (name === 'copyright') return copyrightNotice(endYear, meta);
 	if (name === 'copyright-years') return copyrightYears(endYear, meta);
+	// Debian's extended description: one space before each line, " ." between paragraphs.
+	if (name === 'debian-description') return meta.description.map((p) => ` ${p}`).join('\n .\n');
 	const key = name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 	const value = meta[key];
 	if (typeof value !== 'string' && typeof value !== 'number') fail(`unknown field "${name}".`);
@@ -322,10 +331,13 @@ if (require.main === module) {
 		const [command, ...rest] = process.argv.slice(2);
 		const positional = command === 'field' ? rest.shift() : undefined;
 		const options = parseOptions(rest);
+		// Only the copyright needs the build year: a package without a Git
+		// checkout (the AppImage container) still writes its other fields.
 		const year = () => (options.year ? Number(options.year) : buildYear());
+		const needsYear = ['copyright', 'copyright-years'].includes(positional);
 		let output;
 		if (command === 'build-year') output = `${buildYear()}\n`;
-		else if (command === 'field') output = `${field(positional, year())}\n`;
+		else if (command === 'field') output = `${field(positional, needsYear ? year() : undefined)}\n`;
 		else if (command === 'desktop-entry') output = desktopEntry(options);
 		else if (command === 'metainfo')
 			output = appstreamMetainfo({

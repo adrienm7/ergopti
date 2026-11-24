@@ -93,16 +93,6 @@ IFS= read -r -d '' PROJECT_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && p
 # The external hosts are declared once in _shared/core/text/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/core/text/data/identifiers.sh
 . "$PROJECT_ROOT/static/ergopti_plus/_shared/core/text/data/identifiers.sh"
-# The homepage is the repository the runtime updater follows.
-ERGOPTI_REPOSITORY="$(node - "$PROJECT_ROOT/static/ergopti_plus/_shared/updater/data/defaults.json" <<'NODE'
-const { github } = require(process.argv[2]);
-if (!github || ![github.owner, github.repo].every((value) =>
-	typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value))) {
-	throw new Error('The canonical update repository is invalid.');
-}
-process.stdout.write(`${github.owner}/${github.repo}`);
-NODE
-)"
 # A caller that runs several builds at once gives each its own output directory.
 BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
 case "$BUILD_DIR" in
@@ -342,16 +332,11 @@ DESKTOP_FILE="$PAYLOAD_DIR/share/applications/${APP_ID}.desktop"
 # --tray for the same reason the packaged systemd units carry it: opts.tray
 # defaults to false and the whole menu block is gated on it, so a launcher
 # without it yields a daemon with no icon and no menu.
-cat > "$DESKTOP_FILE" << 'DESKTOP_EOF'
-[Desktop Entry]
-Type=Application
-Name=Ergopti
-Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti --tray
-Icon=org.ergopti.Ergopti
-Terminal=false
-Categories=Utility;
-DESKTOP_EOF
+# The entry and the metainfo below come from tools/lib/app-metadata.cjs, shared
+# with the other packages and the macOS and Windows builds.
+APP_METADATA="$PROJECT_ROOT/tools/lib/app-metadata.cjs"
+node "$APP_METADATA" desktop-entry --exec "ergopti --tray" --icon org.ergopti.Ergopti \
+  > "$DESKTOP_FILE"
 echo "  Desktop entry: $(basename "$DESKTOP_FILE")"
 
 # ----------------------------------------------------------------------
@@ -370,33 +355,10 @@ echo "  Application icon: $(basename "$ICON_FILE")"
 # a function of WHEN the packager ran rather than of what it read.
 METAINFO_FILE="$PAYLOAD_DIR/share/metainfo/${APP_ID}.metainfo.xml"
 
-cat > "$METAINFO_FILE" << METAINFO_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<component type="desktop-application">
-  <id>org.ergopti.Ergopti</id>
-  <name>Ergopti</name>
-  <summary>Ergonomic keyboard optimizer with AI-powered hotstrings</summary>
-  <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
-  <developer_name>Ergopti Contributors</developer_name>
-  <url type="homepage">https://${ERGOPTI_HOST_GITHUB}/${ERGOPTI_REPOSITORY}</url>
-  <launchable type="desktop-id">org.ergopti.Ergopti.desktop</launchable>
-  <description>
-    <p>
-      Ergopti is a cross-platform keyboard optimizer: an intelligent hotstring
-      engine, keystroke metrics, and AI-assisted text expansion. On Linux it
-      runs as a user daemon that reads evdev and injects through uinput.
-    </p>
-    <p>
-      This package requires full device access to work, because it reads
-      /dev/input and writes /dev/uinput. It also needs the host udev rule and
-      the input and uinput group membership that the project installer sets up
-      with "install.sh --setup-perms" — without them the daemon starts but
-      captures nothing.
-    </p>
-  </description>
-</component>
-METAINFO_EOF
+# The Flatpak's own condition is stated beside the shared description.
+node "$APP_METADATA" metainfo --id "$APP_ID" --desktop-id "${APP_ID}.desktop" \
+  --note "This package requires full device access to work, because it reads /dev/input and writes /dev/uinput. It also needs the host udev rule and the input and uinput group membership that the project installer sets up with \"install.sh --setup-perms\": without them the daemon starts but captures nothing." \
+  > "$METAINFO_FILE"
 echo "  AppStream: $(basename "$METAINFO_FILE")"
 
 # ----------------------------------------------------------------------

@@ -249,17 +249,10 @@ echo "  Launcher: usr/bin/ergopti"
 # ----------------------------------------------------------------------
 # appimagetool refuses an AppDir without a top-level .desktop file, and matches
 # its Icon key against the icon file sitting beside it.
-cat > "$APPDIR/ergopti.desktop" << 'DESKTOP_EOF'
-[Desktop Entry]
-Type=Application
-Name=Ergopti
-Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti
-Icon=ergopti
-Terminal=false
-Categories=Utility;
-X-GNOME-Autostart-enabled=true
-DESKTOP_EOF
+# The entry comes from tools/lib/app-metadata.cjs, shared with the other
+# packages and the macOS and Windows builds.
+node "$PROJECT_ROOT/tools/lib/app-metadata.cjs" desktop-entry --exec ergopti --icon ergopti --autostart \
+  > "$APPDIR/ergopti.desktop"
 echo "  Desktop entry: ergopti.desktop"
 
 # ----------------------------------------------------------------------

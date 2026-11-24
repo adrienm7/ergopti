@@ -7,7 +7,9 @@
  * package's own version on a non-release validation run, as
  * linux-package-version.cjs does) and that version's release tag. Writes the
  * rendered PKGBUILD and its pacman hook ergopti.install into one directory,
- * which is what the release attaches and what `makepkg -si` reads.
+ * which is what the release attaches and what `makepkg -si` reads. The
+ * maintainer, description, website and desktop entry are filled first, from
+ * tools/lib/app-metadata.cjs, as every other package writes them.
  *
  * Usage: node tools/build/render-arch-pkgbuild.cjs <release tarball> <output directory>
  */
@@ -18,6 +20,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { loadChannels } = require('./release-channel.cjs');
+const metadata = require('../lib/app-metadata.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const TEMPLATE = path.join(__dirname, 'PKGBUILD');
@@ -27,6 +30,42 @@ const SOURCE_PACKAGE = path.join(ROOT, 'package.json');
 const STAMP_MEMBER = '_shared/build_stamp.txt';
 const VERSION_KEY = 'version';
 const PLACEHOLDERS = ['__PKGVER__', '__TAG__', '__SHA256__'];
+const METADATA_PLACEHOLDERS = ['__MAINTAINER__', '__PKGDESC__', '__URL__', '__DESKTOP_ENTRY__'];
+
+/** Replaces each placeholder, which the template must hold exactly once. */
+function fill(template, values) {
+	let text = template;
+	for (const [placeholder, value] of Object.entries(values)) {
+		if (text.split(placeholder).length !== 2)
+			throw new Error(`the template must hold ${placeholder} exactly once`);
+		text = text.replace(placeholder, () => value);
+	}
+	return text;
+}
+
+/**
+ * Fills the application metadata, leaving the release placeholders.
+ * @param {string} template The PKGBUILD template text.
+ * @returns {string}
+ */
+function renderMetadata(template) {
+	const meta = metadata.readMetadata();
+	// The recipe double-quotes pkgdesc and url: neither may close the quote.
+	for (const value of [meta.summary, meta.homepage])
+		if (/["$`\\]/.test(value)) throw new Error(`not a double-quotable value: ${value}`);
+	const entry = metadata
+		.desktopEntry({ exec: 'ergopti --tray', icon: 'ergopti', autostart: true }, meta)
+		.trimEnd();
+	return fill(
+		template,
+		Object.fromEntries(
+			METADATA_PLACEHOLDERS.map((placeholder, index) => [
+				placeholder,
+				[meta.maintainer, meta.summary, meta.homepage, entry][index]
+			])
+		)
+	);
+}
 
 /**
  * Projects a release version onto pacman's grammar: no hyphen is allowed, and
@@ -54,12 +93,7 @@ function render(template, release) {
 		__TAG__: 'v' + release.version,
 		__SHA256__: release.sha256
 	};
-	let text = template;
-	for (const placeholder of PLACEHOLDERS) {
-		if (text.split(placeholder).length !== 2)
-			throw new Error(`the template must hold ${placeholder} exactly once`);
-		text = text.replace(placeholder, () => values[placeholder]);
-	}
+	const text = fill(renderMetadata(template), values);
 	if (/__[A-Z0-9]+__/.test(text)) throw new Error('the rendered recipe kept a placeholder');
 	return text;
 }
@@ -103,4 +137,4 @@ if (require.main === module) {
 	}
 }
 
-module.exports = { render, pacmanVersion, PLACEHOLDERS };
+module.exports = { render, renderMetadata, pacmanVersion, PLACEHOLDERS, METADATA_PLACEHOLDERS };

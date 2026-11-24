@@ -118,22 +118,24 @@ echo "  Wrapper: /usr/bin/ergopti"
 # ----------------------------------------------------------------------
 # 5. Desktop entry (autostart)
 # ----------------------------------------------------------------------
-cat > "$DEB_ROOT/usr/share/applications/ergopti.desktop" << 'DESKTOP_EOF'
-[Desktop Entry]
-Type=Application
-Name=Ergopti
-Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti --tray
-Icon=ergopti
-Terminal=false
-Categories=Utility;
-X-GNOME-Autostart-enabled=true
-DESKTOP_EOF
+# The entry, the AppStream metainfo and the copyright file come from
+# tools/lib/app-metadata.cjs, shared with the other packages and the macOS and
+# Windows builds.
+APP_METADATA="$PROJECT_ROOT/tools/lib/app-metadata.cjs"
+node "$APP_METADATA" desktop-entry --exec "ergopti --tray" --icon ergopti --autostart \
+  > "$DEB_ROOT/usr/share/applications/ergopti.desktop"
 mkdir -p "$DEB_ROOT/etc/xdg/autostart"
 sed 's|^Exec=.*|Exec=ergopti --session-start --tray|' \
   "$DEB_ROOT/usr/share/applications/ergopti.desktop" \
   > "$DEB_ROOT/etc/xdg/autostart/ergopti.desktop"
 echo "  Desktop entry: ergopti.desktop"
+# Software centres match the metainfo to the entry above by its desktop id.
+mkdir -p "$DEB_ROOT/usr/share/metainfo"
+node "$APP_METADATA" metainfo --id org.ergopti.Ergopti --desktop-id ergopti.desktop \
+  > "$DEB_ROOT/usr/share/metainfo/org.ergopti.Ergopti.metainfo.xml"
+mkdir -p "$DEB_ROOT/usr/share/doc/$PACKAGE_NAME"
+node "$APP_METADATA" debian-copyright > "$DEB_ROOT/usr/share/doc/$PACKAGE_NAME/copyright"
+echo "  AppStream metainfo and copyright file"
 
 # ----------------------------------------------------------------------
 # 6. Application icon
@@ -185,16 +187,16 @@ cat > "$DEB_ROOT/DEBIAN/control" << CONTROL_EOF
 Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
-Maintainer: Ergopti Contributors <ergopti@example.com>
+Maintainer: $(node "$APP_METADATA" field maintainer)
 Depends: xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
 Recommends: xdotool, wmctrl, wl-clipboard
 Section: utils
 Priority: optional
-Homepage: https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti
-Description: Ergonomic keyboard optimizer with AI-powered hotstrings
- Ergopti is a cross-platform keyboard optimizer that provides an
- intelligent hotstring engine, keystroke metrics, and AI-assisted
- text expansion. It runs as a user daemon on Linux via systemd.
+Homepage: $(node "$APP_METADATA" field homepage)
+Vcs-Browser: $(node "$APP_METADATA" field repository)
+Bugs: $(node "$APP_METADATA" field issues)
+Description: $(node "$APP_METADATA" field summary)
+$(node "$APP_METADATA" field debian-description)
 CONTROL_EOF
 echo "  DEBIAN/control"
 printf '%s\n' /etc/udev/rules.d/99-ergopti-uinput.rules /etc/modules-load.d/ergopti-uinput.conf > "$DEB_ROOT/DEBIAN/conffiles"

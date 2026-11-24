@@ -138,17 +138,11 @@ chmod 755 "$INSTALL_ROOT/usr/bin/ergopti"
 # ----------------------------------------------------------------------
 # 5. Desktop entry
 # ----------------------------------------------------------------------
-cat > "$INSTALL_ROOT/usr/share/applications/ergopti.desktop" << 'DESKTOP_EOF'
-[Desktop Entry]
-Type=Application
-Name=Ergopti
-Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti --tray
-Icon=ergopti
-Terminal=false
-Categories=Utility;
-X-GNOME-Autostart-enabled=true
-DESKTOP_EOF
+# The entry and the spec's metadata come from tools/lib/app-metadata.cjs,
+# shared with the other packages and the macOS and Windows builds.
+APP_METADATA="$PROJECT_ROOT/tools/lib/app-metadata.cjs"
+node "$APP_METADATA" desktop-entry --exec "ergopti --tray" --icon ergopti --autostart \
+  > "$INSTALL_ROOT/usr/share/applications/ergopti.desktop"
 mkdir -p "$INSTALL_ROOT/etc/xdg/autostart"
 sed 's|^Exec=.*|Exec=ergopti --session-start --tray|' \
   "$INSTALL_ROOT/usr/share/applications/ergopti.desktop" \
@@ -200,9 +194,11 @@ cat > "$RPM_ROOT/SPECS/ergopti.spec" << SPEC_EOF
 Name:           $PACKAGE_NAME
 Version:        $VERSION
 Release:        $RELEASE%{?dist}
-Summary:        Ergonomic keyboard optimizer with AI-powered hotstrings
-License:        MIT
-URL:            https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti
+Summary:        $(node "$APP_METADATA" field summary)
+License:        $(node "$APP_METADATA" field license)
+URL:            $(node "$APP_METADATA" field homepage)
+Vendor:         $(node "$APP_METADATA" field publisher)
+Packager:       $(node "$APP_METADATA" field maintainer)
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      $ARCH
@@ -270,7 +266,7 @@ if [ "\$1" -eq 0 ]; then
 fi
 
 %changelog
-* $(date +"%a %b %d %Y") Ergopti Contributors <ergopti@example.com> - $VERSION-$RELEASE
+* $(date +"%a %b %d %Y") $(node "$APP_METADATA" field maintainer) - $VERSION-$RELEASE
 - Initial RPM packaging for Fedora/RHEL.
 SPEC_EOF
 

@@ -141,4 +141,82 @@ check(() => {
 	assert.ok(!/Copyright ©|Copyright \(c\)/.test(script), 'the build must not type a notice');
 });
 
+// 6. Linux: the menus and software centres read the entry and the metainfo
+check(() => {
+	const entry = metadata.desktopEntry({ exec: 'ergopti --tray', icon: 'ergopti' }, meta);
+	assert.match(entry, /^\[Desktop Entry\]\n/);
+	assert.match(entry, new RegExp(`^Comment=${meta.summary}$`, 'm'));
+	assert.match(entry, /^Categories=Utility;$/m);
+	assert.match(entry, /^Keywords=(?:[a-z]+;)+$/m);
+	assert.doesNotMatch(entry, /X-GNOME-Autostart/, 'only an autostart entry says so');
+	const xml = metadata.appstreamMetainfo(
+		{ id: 'org.ergopti.Ergopti', desktopId: 'x.desktop' },
+		meta
+	);
+	for (const element of [
+		'<project_license>MIT</project_license>',
+		`<metadata_license>${meta.metadataLicense}</metadata_license>`,
+		`<url type="homepage">${meta.homepage}</url>`,
+		`<url type="bugtracker">${meta.issues}</url>`,
+		`<url type="vcs-browser">${meta.repository}</url>`,
+		`<url type="contact">${meta.issues}</url>`,
+		`<developer_name>${meta.holder}</developer_name>`,
+		'<content_rating type="oars-1.1"/>',
+		'<category>Utility</category>',
+		'<launchable type="desktop-id">x.desktop</launchable>'
+	])
+		assert.ok(xml.includes(element), `the metainfo must carry ${element}`);
+	const lint = spawnSync('xmllint', ['--noout', '-'], { input: xml, encoding: 'utf8' });
+	if (!lint.error) assert.equal(lint.status, 0, lint.stderr);
+	const copyright = metadata.debianCopyright(2026, meta);
+	assert.match(
+		copyright,
+		/^Format: https:\/\/www\.debian\.org\/doc\/packaging-manuals\/copyright-format\/1\.0\/$/m
+	);
+	assert.match(copyright, new RegExp(`^Copyright: ${meta.firstYear}–2026 ${meta.holder}$`, 'm'));
+	assert.match(copyright, /^License: MIT\n Copyright \(c\)/m);
+	// Each packager writes the shared values and types none of them.
+	for (const rel of [
+		'tools/build/build-linux-deb.sh',
+		'tools/build/build-linux-rpm.sh',
+		'tools/build/build-linux-appimage.sh',
+		'tools/build/build-linux-flatpak.sh',
+		'tools/build/PKGBUILD'
+	]) {
+		const source = read(rel);
+		assert.doesNotMatch(source, /example\.com|Ergopti Contributors/, `${rel} invents a maintainer`);
+		assert.doesNotMatch(
+			source,
+			/^Comment=|^Summary: +[A-Z]|<project_license>/m,
+			`${rel} types a field`
+		);
+	}
+	const deb = read('tools/build/build-linux-deb.sh');
+	for (const line of [
+		'Maintainer: $(node "$APP_METADATA" field maintainer)',
+		'Homepage: $(node "$APP_METADATA" field homepage)',
+		'Bugs: $(node "$APP_METADATA" field issues)',
+		'Description: $(node "$APP_METADATA" field summary)'
+	])
+		assert.ok(deb.includes(line), `the Debian control must write ${line}`);
+	assert.ok(deb.includes('debian-copyright > "$DEB_ROOT/usr/share/doc/$PACKAGE_NAME/copyright"'));
+	assert.ok(deb.includes('metainfo --id org.ergopti.Ergopti --desktop-id ergopti.desktop'));
+	const rpm = read('tools/build/build-linux-rpm.sh');
+	for (const tag of ['Summary', 'License', 'URL', 'Vendor', 'Packager'])
+		assert.match(rpm, new RegExp(`^${tag}: +\\$\\(node "\\$APP_METADATA" field [a-z]+\\)$`, 'm'));
+	assert.ok(read('tools/build/build-linux-flatpak.sh').includes('metainfo --id "$APP_ID"'));
+	const { render } = require('../build/render-arch-pkgbuild.cjs');
+	const pkgbuild = render(read('tools/build/PKGBUILD'), {
+		version: '1.2.3',
+		sha256: 'a'.repeat(64)
+	});
+	assert.match(
+		pkgbuild,
+		new RegExp(`^# Maintainer: ${meta.maintainer.replace(/[+.]/g, '\\$&')}$`, 'm')
+	);
+	assert.match(pkgbuild, new RegExp(`^pkgdesc="${meta.summary}"$`, 'm'));
+	assert.match(pkgbuild, new RegExp(`^url="${meta.homepage}"$`, 'm'));
+	assert.match(pkgbuild, new RegExp(`^Comment=${meta.summary}$`, 'm'));
+});
+
 console.log(`[OK] application metadata: ${checks} check(s).`);

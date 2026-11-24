@@ -227,3 +227,10 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       on, Hotstrings > Preview bubbles > « Read previews to the screen reader » ticked by default: a preview and a
       finished AI prediction are said; untick it: both still draw and nothing is said; tick it again: said again,
       without a restart.
+- [ ] <!-- field-point: app_metadata --> Package metadata (2026-11-24): install the release `.deb`, then open it
+      in GNOME Software or KDE Discover: the page shows the summary « Hotstrings and shortcuts to type faster and
+      more ergonomically », the MIT licence, Adrien MOYAUX as developer and the website and issue-tracker links;
+      `apt show ergopti` names the maintainer, `Homepage: https://ergopti.fr` and `Bugs:`; `/usr/share/doc/ergopti/copyright`
+      reads « Copyright: 2024–<year of the build> Adrien MOYAUX »; the Flatpak's `flatpak info --show-metadata` and
+      `appstreamcli validate /app/share/metainfo/org.ergopti.Ergopti.metainfo.xml` (inside it) pass without error,
+      and the menus list « Ergopti » under Utilities with the same comment in every package.

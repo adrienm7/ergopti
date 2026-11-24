@@ -908,6 +908,13 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Package contact and category (2026-11-24):** decided by the agent on 2026-11-24, to review by the
+      maintainer. The repository publishes no contact address, so the Debian, RPM and Arch Maintainer fields name
+      the maintainer's GitHub commit address (`maintainer_email` in `_shared/core/text/data/app_metadata.json`) and
+      the AppStream `contact` URL, the Debian `Upstream-Contact` and the exe's comments send users to the issue
+      tracker; give a monitored address to replace it. The macOS category is `public.app-category.utilities` (the
+      Linux entries' `Utility`) rather than productivity. The AppImage ships no AppStream file yet: appimagetool
+      validates one when present and no `appstreamcli` ran here, so it is left for a run that can validate it.
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
 - [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending

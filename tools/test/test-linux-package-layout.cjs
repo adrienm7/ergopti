@@ -352,18 +352,22 @@ if (daemonExecStartsFound === 0) {
 // Desktop launchers are a second user-facing entrypoint. Unlike the AppImage,
 // whose AppRun injects --tray for an argument-free launch, these wrappers pass
 // their arguments through verbatim and therefore need the flag in the entry.
+// Every package writes its entry through tools/lib/app-metadata.cjs: the shell
+// packagers pass the command as --exec, the Arch renderer as exec.
 const EXPLICIT_TRAY_DESKTOP_SOURCES = [
 	// The standalone installer emits through desktop_entry.sh; its real output
 	// is asserted by test-linux-install-sandbox.cjs, including quoted prefixes.
 	'tools/build/build-linux-deb.sh',
 	'tools/build/build-linux-rpm.sh',
 	'tools/build/build-linux-flatpak.sh',
-	'tools/build/PKGBUILD'
+	'tools/build/render-arch-pkgbuild.cjs'
 ];
 let desktopEntriesFound = 0;
 for (const rel of EXPLICIT_TRAY_DESKTOP_SOURCES) {
 	const src = read(rel);
-	for (const match of src.matchAll(/^Exec=(?<command>[^\n]*ergopti[^\n]*)$/gm)) {
+	for (const match of src.matchAll(
+		/(?:^Exec=|desktop-entry --exec |exec: ')(?<command>"?ergopti[^"'\n]*)/gm
+	)) {
 		desktopEntriesFound++;
 		if (!/\s--tray(?:\s|$)/.test(match.groups.command)) {
 			errors.push(

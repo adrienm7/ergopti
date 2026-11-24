@@ -274,6 +274,12 @@
 			"title": "Daily note refusals logged and the Windows-only note settings’ reason (SNU-08, SNU-09)",
 			"checks": [],
 			"not_testable": "Needs a notes folder made read-only and a broken text/plain handler on the person’s desktop: the field report changes neither the data folder nor the desktop associations."
+		},
+		{
+			"id": "app_metadata",
+			"title": "Software centres and menus show the package metadata",
+			"checks": [],
+			"not_testable": "Needs a person to install the release packages and read the software centre's page: the field report runs from a checkout and installs no package; tools/test/test-app-metadata.cjs pins the fields every packager writes."
 		}
 	]
 }

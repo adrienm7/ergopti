@@ -1,4 +1,4 @@
-# Maintainer: Ergopti Contributors <ergopti@example.com>
+# Maintainer: __MAINTAINER__
 #
 # The release's own Arch recipe: a repack of the release tarball, which carries
 # the driver and the private runtime the AppImage stages on the oldest
@@ -7,16 +7,18 @@
 # runtimes, PIN). This file is a template: tools/build/render-arch-pkgbuild.cjs
 # fills its version, tag and checksum placeholders from the tarball a release
 # ships, and the release attaches the rendered PKGBUILD with ergopti.install.
+# Its maintainer, description, website and desktop entry come from
+# tools/lib/app-metadata.cjs, shared with every other package.
 #
 # Build with:  makepkg -si   (in a folder holding PKGBUILD and ergopti.install)
 
 pkgname=ergopti
 pkgver=__PKGVER__
 pkgrel=1
-pkgdesc="Ergonomic keyboard optimizer with AI-powered hotstrings"
+pkgdesc="__PKGDESC__"
 # The private runtime is x86_64 ELF, staged in the oldest-LTS build container.
 arch=('x86_64')
-url="https://github.com/adrienm7/ergopti"
+url="__URL__"
 license=('MIT')
 install=ergopti.install
 # The tarball's private runtime was staged and admitted as it is: keep its
@@ -75,15 +77,7 @@ WRAPPER
 
   # Desktop entry
   install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/ergopti.desktop" << 'DESKTOP'
-[Desktop Entry]
-Type=Application
-Name=Ergopti
-Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti --tray
-Icon=ergopti
-Terminal=false
-Categories=Utility;
-X-GNOME-Autostart-enabled=true
+__DESKTOP_ENTRY__
 DESKTOP
 
   # Permission files belong to the package manager; lifecycle hooks apply them

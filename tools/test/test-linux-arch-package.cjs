@@ -111,17 +111,28 @@ try {
 		path.join(ROOT, 'tools/build/templates/linux-portable-runtime-env.sh'),
 		path.join(build, 'linux/network-runtime-env.sh')
 	);
-	const staged = spawnSync(bashExecutable(), ['-s', '--', recipe, srcdir, pkgdir, scratch], {
-		env: { ...process.env, ERGOPTI_ARCH_BUNDLE_DIR: build },
-		input:
-			'set -euo pipefail\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
-			'printf "%s\\0" "${depends[@]}" > "$4/dependencies"\n' +
-			'printf "%s" "${install:-}" > "$4/hook-name"\n' +
-			'printf "%s\\0" "${arch[@]}" > "$4/architectures"\n' +
-			'printf "%s\\0" "${source[@]}" > "$4/sources"\npackage\n',
-		encoding: 'utf8',
-		timeout: 120000
-	});
+	// The recipe with its application metadata filled, as the release renders
+	// it; the release placeholders stay, as the source checks below read them.
+	const metadataRecipe = path.join(scratch, 'PKGBUILD');
+	fs.writeFileSync(
+		metadataRecipe,
+		require('../build/render-arch-pkgbuild.cjs').renderMetadata(fs.readFileSync(recipe, 'utf8'))
+	);
+	const staged = spawnSync(
+		bashExecutable(),
+		['-s', '--', metadataRecipe, srcdir, pkgdir, scratch],
+		{
+			env: { ...process.env, ERGOPTI_ARCH_BUNDLE_DIR: build },
+			input:
+				'set -euo pipefail\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
+				'printf "%s\\0" "${depends[@]}" > "$4/dependencies"\n' +
+				'printf "%s" "${install:-}" > "$4/hook-name"\n' +
+				'printf "%s\\0" "${arch[@]}" > "$4/architectures"\n' +
+				'printf "%s\\0" "${source[@]}" > "$4/sources"\npackage\n',
+			encoding: 'utf8',
+			timeout: 120000
+		}
+	);
 	assert.equal(staged.status, 0, staged.stderr || staged.stdout || staged.error?.message);
 	const library = path.join(pkgdir, 'usr/lib/ergopti');
 	const native = fs.readFileSync(path.join(library, 'bin/libergopti_archive_publication.so'));
