@@ -97,6 +97,7 @@ local HotCounter  = require("hotstrings.ui.menu.counter")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
 local ShortcutHint = require("menu.ui.builder.shortcut_hint")
+local MenuReadingFont = require("menu.ui.builder.reading_font")
 local Labels      = require("menu.engine.labels")
 
 
@@ -942,6 +943,18 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.error(LOG, "Declared download root composition refused.")
 	end
 
+	-- The reading font draws the titles too (maintainer decision 2026-11-24):
+	-- the pill measures the root rows in it, and they take it last, below.
+	local ok_face, reading_font = pcall(MenuReadingFont.font)
+	if not ok_face then
+		Logger.error(LOG, string.format("Error naming the menu's reading font: %s.", tostring(reading_font)))
+		reading_font = nil
+	end
+	local ok_measure, measure_err = pcall(CanvasBadge.measure_rows_in, reading_font)
+	if not ok_measure then
+		Logger.error(LOG, string.format("Error handing the reading font to the canvas badge: %s.", tostring(measure_err)))
+	end
+
 	-- This is the single highest-blast-radius call in the whole build pipeline:
 	-- it is the LAST step and mutates the menu in place, so an unguarded exception
 	-- here would unwind past every component built above and turn one broken
@@ -961,6 +974,14 @@ function M.generate(ctx, menu_mods, actions)
 
 	-- After the root compositions above, which admit string titles only.
 	ShortcutHint.decorate(rendered, ctx.script_control)
+
+	-- Last: every title, a hint row's styled one included, takes the face.
+	if reading_font ~= nil then
+		local ok_font, font_err = pcall(MenuReadingFont.apply, rendered, { font_attributes = reading_font })
+		if not ok_font then
+			Logger.error(LOG, string.format("Error drawing the menu in the reading font: %s.", tostring(font_err)))
+		end
+	end
 
 	if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 	return rendered
