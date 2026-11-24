@@ -756,7 +756,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   so a behaviour test of their own guard could not fail: the ROI half-life tick, the click handlers, the updater
   background tick, the ShellRunner pollers, the ingest tick and the click-hold key watcher (its paused branch does
   what the running one does). Owners outside the headless runner (`Ergopti_OnSuspendEnter`/`Resume`, the layout
-  poll, the model browser bridge) stay source reads until they get a harness.
+  poll, the model browser bridge, the WPM display module that only a `WPMWidget` double stands for) stay source reads
+  until they get a harness.
 - **Signing follow-ups (maintainer).** The workflows and scripts are ready; only these steps are left. SignPath:
   after acceptance, set the secrets `SIGNPATH_API_TOKEN` and `WINDOWS_SIGNER_SUBJECT` and the variables
   `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG` and `SIGNPATH_SIGNING_POLICY_SLUG`, approve the first stable
