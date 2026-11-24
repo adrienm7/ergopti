@@ -15,8 +15,11 @@
 ---    privacy-safe result as the log line.
 --- 3. Localized: every sentence comes from the locales; step values are raw
 ---    tokens (counts, states, versions).
---- 4. « Lancer le field report » runs this app's own field run in-app and shows
----    one report of its results (M.run_field_report).
+--- 4. « Lancer le field report » runs this app's own field run in-app in the
+---    shared progress window (diagnostics/ui/field_check/field_report_window.lua,
+---    M.run_field_report): each step as it goes, then the report, its folder in
+---    Finder, the report on the clipboard and the GitHub issue form. Without a
+---    window the finished report opens in the dialog above, as on Linux.
 --- ==============================================================================
 
 local M = {}
@@ -25,6 +28,7 @@ local Logger = require("core.logger.engine.logger")
 local I18n = require("core.i18n.engine.i18n")
 local Engine = require("diagnostics.engine.field_check.field_check")
 local FieldReport = require("diagnostics.engine.field_check.field_report")
+local FieldReportProgress = require("diagnostics.ui.field_check.field_report_progress")
 
 local LOG = "diagnostics.ui.field_check"
 
@@ -86,6 +90,17 @@ local function native()
 		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
 		session = in_app_session,
 		coverage = coverage,
+		window = function(owner) return require("diagnostics.ui.field_check.field_report_window").open(owner) end,
+		bring_to_front = function() return require("diagnostics.ui.field_check.field_report_window").bring_to_front() end,
+		effects = {
+			open_folder = function(dir, done)
+				require("core.process.adapters.shell_runner").open(dir, done)
+			end,
+			copy = function(text) return require("clipboard.adapters.clipboard").write(text) == true end,
+			issue = function(line, text, done)
+				return require("diagnostics.ui.healthcheck.report").report_field_run(line, text, nil, done)
+			end,
+		},
 	}
 end
 
@@ -126,8 +141,9 @@ function M.run(row_id, services)
 	end)
 end
 
--- True while the in-app field report runs.
+-- True while the in-app field report runs, and whether its window opened.
 local _report_running = false
+local _report_windowed = false
 
 --- The Tests rows a person runs alone: a row whose check no step of the run takes.
 --- @param steps table The steps the in-app run takes.
@@ -158,15 +174,19 @@ end
 --- Débogage's « Lancer le field report (tous les tests) »: hands this app's
 --- field run session (diagnostics/engine/field_run/field_run.lua; started on
 --- demand on the installed folder when no clone opened one) its steps
---- in-process, then shows one report (_shared/diagnostics/engine/field_check/field_report.lua)
---- and writes its evidence line. Nothing is committed or pushed: the report
---- names the folder of the result files.
+--- in-process and shows them in the progress window as they go; when the run
+--- ends, the window shows the report (_shared/diagnostics/engine/field_check/field_report.lua)
+--- and its evidence line is written. Nothing is committed or pushed: the
+--- window names the folder of the result files.
 --- @param services table|nil Test doubles for native services.
 --- @return boolean started
 function M.run_field_report(services)
 	local env = services or native()
 	if _report_running then
-		env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.get("field_check.busy"), "warn")
+		Logger.warn(LOG, "The field report refused: it is still running.")
+		if not (_report_windowed and env.bring_to_front()) then
+			env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.get("field_check.busy"), "warn")
+		end
 		return false
 	end
 	local session, why = env.session()
@@ -177,13 +197,34 @@ function M.run_field_report(services)
 	end
 	local coverage = env.coverage()
 	local results, checks = {}, {}
+	-- A step reads as the Tests row that also runs its check alone, else its id
+	local function title_of(check)
+		local key = title_key_of(check)
+		return key and I18n.get(key) or nil
+	end
+	local window = FieldReportProgress.new({
+		open_key = "field_report.open_finder",
+		title_of = function(step) return title_of(step.check) end,
+		cancel = function() return session:cancel_in_app() end,
+		effects = env.effects,
+		logger = Logger,
+		log = LOG,
+	})
+	-- Whether the window opened: without it the end shows the report in a dialog
+	local windowed = false
 	_report_running = true
 	Logger.start(LOG, "In-app field report started…")
 	-- Declared first: the observer reads the run the session hands back
 	local run
 	run, why = session:submit_in_app({
-		step_started = function(_, step) checks[step.id] = step.check end,
-		step_recorded = function(_, _, result) results[#results + 1] = result end,
+		step_started = function(_, step)
+			checks[step.id] = step.check
+			window.started(step)
+		end,
+		step_recorded = function(_, step, result)
+			results[#results + 1] = result
+			window.recorded(result.step or step.id, result.verdict)
+		end,
 		finished = function(done, dir)
 			_report_running = false
 			local summary = FieldReport.summary({ results = results, not_run = run.not_run,
@@ -191,10 +232,12 @@ function M.run_field_report(services)
 			Logger.evidence(LOG, "Field report result: %s", FieldReport.format_log_line(summary))
 			Logger.success(LOG, "In-app field report finished: %s.",
 				summary.interrupted and "interrupted" or summary.passed and "pass" or "fail")
-			show_report(env, M.FIELD_REPORT_TITLE, FieldReport.format_text(summary, I18n.get, function(step)
-				local key = title_key_of(checks[step])
-				return key and I18n.get(key) or nil
-			end))
+			local text = FieldReport.format_text(summary, I18n.get, function(step) return title_of(checks[step]) end)
+			window.finished(summary, text)
+			if not windowed then
+				Logger.warn(LOG, "The field report window is not open; the report opens in a dialog.")
+				show_report(env, M.FIELD_REPORT_TITLE, text)
+			end
 		end,
 	})
 	if run == nil then
@@ -204,13 +247,19 @@ function M.run_field_report(services)
 			I18n.get(why == "busy" and "field_check.busy" or "field_check.all.unavailable"), "warn")
 		return false
 	end
-	env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.format("field_check.all.started", #run.steps), "info")
+	window.attach(run)
+	windowed = env.window(window) == true
+	_report_windowed = windowed
+	if not windowed then
+		Logger.warn(LOG, "The field report window could not open; the run goes on without it.")
+		env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.format("field_check.all.started", #run.steps), "info")
+	end
 	return true
 end
 
 --- Forgets a pending field report; tests only.
 function M._reset()
-	_report_running = false
+	_report_running, _report_windowed = false, false
 end
 
 return M

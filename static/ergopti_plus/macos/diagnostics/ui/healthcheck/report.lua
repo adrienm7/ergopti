@@ -8,7 +8,8 @@
 --- file under the logs folder and reveal it, report it on GitHub (copy it,
 --- then save an approved local attachment and open the short bug form), open a folder or a
 --- settings page. Also the Debug menu's "Report a bug", which runs that same
---- report action on a fresh snapshot without the window, and "Suggest a feature".
+--- report action on a fresh snapshot without the window, "Suggest a feature",
+--- and the field report window's « Create a GitHub issue » (report_field_run).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared output is rebuilt from the host snapshot through a closed typed
@@ -309,6 +310,23 @@ function M.report_bug(opts, overrides, complete)
 		return M.perform({ action = "report", text = document.text, fields = document.fields },
 			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
 	end)
+end
+
+--- Opens the bug form for a finished field report
+--- (diagnostics/ui/field_check/field_report_window.lua): this Mac's version,
+--- OS and driver and the run's evidence line, the redacted report on the
+--- clipboard, through the shared runner as on Linux.
+--- @param line string The run's evidence line.
+--- @param text string The complete report.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request
+function M.report_field_run(line, text, overrides, complete)
+	return Runner.report_field_run(line, text, function()
+		local bridge = require("diagnostics.ui.healthcheck.core")
+		-- The versions are the local_state probe's, as for « Suggest a feature »
+		return bridge.run({ local_state = true }), bridge.config(), M.redaction_context(overrides)
+	end, overrides, complete)
 end
 
 --- Opens the GitHub feature form with the version and the system prefilled.

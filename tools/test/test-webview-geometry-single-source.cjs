@@ -253,6 +253,7 @@ const MACOS_MODULES = {
 	layout_editor_window: 'ui/layout_manager/init.lua',
 	healthcheck: 'diagnostics/ui/healthcheck/core.lua',
 	error_dialog: 'diagnostics/ui/error_dialog.lua',
+	field_report: 'diagnostics/ui/field_check/field_report_window.lua',
 	permission_dialog: 'ui/permission_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua',
 	update_check: 'ui/update_check/init.lua'
@@ -261,9 +262,6 @@ const MACOS_MODULES = {
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
 // entry (app gone from the manifest) fails, so this cannot quietly rot.
 const MACOS_EXCLUSIONS = {
-	field_report:
-		"no macOS host yet: the in-app field report shows its report in the one-click checks' " +
-		'dialog until the host of this window lands (TODO.md, « Lancer le field report », progress window)',
 	token_prompt:
 		'no macOS reader since the custom-model dialog left with the model selector page ' +
 		'(2026-10-27); the Hugging Face login that shares its title sizes its own frame',
