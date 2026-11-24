@@ -214,7 +214,8 @@ _MSC_SharedLifecycleRows(Owner, State) {
 			_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
 				(CommandId) => State.Calls.Push(CommandId), (Fn, Delay) => State.Timers.Push(Fn))
 			Row := _TrayMenuStage[Index]
-			AssertEqual(t("menu.global." . Id), Row["label"])
+			; The caption reads the declaration; the chord after its tab is the tray hint's.
+			AssertEqual(ScriptShortcutTrayLabel(t("menu.global." . Id), "script_" . Id), Row["label"])
 			AssertEqual("action", Row["kind"])
 			AssertTrue(Row["target"] is MenuStartupSafeCommand,
 				"the shared provider wrapper cannot conceal lifecycle admission")
@@ -260,8 +261,10 @@ _MSC_DeclaredLifecyclePresentation() {
 		_MI_StageReload()
 		_MI_StageQuit()
 		AssertEqual(2, _TrayMenuStage.Length)
-		AssertEqual(t("button.cancel"), _TrayMenuStage[1]["label"], "the actual reload stage reads its declaration")
-		AssertEqual(t("button.ok"), _TrayMenuStage[2]["label"], "the actual quit stage reads its declaration")
+		AssertEqual(ScriptShortcutTrayLabel(t("button.cancel"), "script_reload"), _TrayMenuStage[1]["label"],
+			"the actual reload stage reads its declaration")
+		AssertEqual(ScriptShortcutTrayLabel(t("button.ok"), "script_quit"), _TrayMenuStage[2]["label"],
+			"the actual quit stage reads its declaration")
 		Reload["type"] := "---"
 		Quit["type"] := "---"
 		_TrayMenuStage := false
@@ -379,8 +382,8 @@ _MSC_DisjointLifecycleSource(Mode) {
 		_MI_StageReload()
 		_MI_StageQuit()
 		AssertEqual(2, _TrayMenuStage.Length, "both actual native lifecycle builders stage their visible source owners")
-		AssertEqual(t("menu.global.reload"), _TrayMenuStage[1]["label"])
-		AssertEqual(t("menu.global.quit"), _TrayMenuStage[2]["label"])
+		AssertEqual(ScriptShortcutTrayLabel(t("menu.global.reload"), "script_reload"), _TrayMenuStage[1]["label"])
+		AssertEqual(ScriptShortcutTrayLabel(t("menu.global.quit"), "script_quit"), _TrayMenuStage[2]["label"])
 		Assert(HasMethod(_TrayMenuStage[1]["target"], "Call") && HasMethod(_TrayMenuStage[2]["target"], "Call"),
 			"the actual native startup command wrappers are retained")
 	} finally {

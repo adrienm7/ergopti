@@ -1701,6 +1701,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include ../menu/engine/manifest_menu.ahk
 #Include unit/menu/test_population.ahk
 #Include unit/menu/test_startup_commands.ahk
+#Include unit/menu/builder/test_tray_shortcut_hint.ahk
 #Include unit/settings/engine/persistence/test_registry_cache.ahk
 #Include unit/ai/api/test_runtime_activation.ahk
 ; The tray root builder: its top-level dispatcher and the id → builder table.

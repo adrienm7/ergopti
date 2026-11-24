@@ -15,6 +15,7 @@
 ; already loaded.
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\reading_preferences.ahk
+#Include %A_LineFile%\..\tray_shortcut_hint.ahk
 
 
 
@@ -526,7 +527,8 @@ _MI_StageAbout() {
 
 _MI_StageSuspend() {
 	global MenuSuspend
-	MenuSuspend := t("menu.global.suspend")
+	; The caption, then the chord that pauses after a tab (ScriptShortcutTrayLabel).
+	MenuSuspend := ScriptShortcutTrayLabel(t("menu.global.suspend"), "script_pause_toggle")
 	TrayMenuStage_AddAction(MenuSuspend, MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("suspend", ToggleSuspend)))
 	; The row carries its own checked state at its single construction
 	; point, so no rebuild caller can forget it. UpdateTrayIcon owns the
@@ -545,6 +547,8 @@ _MI_StageReload() {
 	Row := MenuRenderer_CommandRow("top_level", "reload",
 		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
 	if Row is Map && Row.Has("action") {
+		; The caption, then the chord that reloads after a tab (ScriptShortcutTrayLabel).
+		Row["label"] := ScriptShortcutTrayLabel(Row["label"], "script_reload")
 		; Keep lifecycle admission explicit after the shared provider wraps its callback.
 		TrayMenuStage_AddAction(Row["label"], MenuStartupReloadCommand(Row["action"]))
 		if Row.Get("disabled", false)
@@ -557,6 +561,8 @@ _MI_StageQuit() {
 	Row := MenuRenderer_CommandRow("top_level", "quit",
 		Map("quit", MenuStartupLifecycleDispatch.Bind("quit", ActivateExitApp)))
 	if Row is Map && Row.Has("action") {
+		; The caption, then the chord that quits after a tab (ScriptShortcutTrayLabel).
+		Row["label"] := ScriptShortcutTrayLabel(Row["label"], "script_quit")
 		; Keep lifecycle admission explicit after the shared provider wraps its callback.
 		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
 		if Row.Get("disabled", false)
