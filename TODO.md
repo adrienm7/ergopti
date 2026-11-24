@@ -575,11 +575,6 @@ Each closes on a named green hosted or native run, recorded here.
 The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/maintainer-decisions.md),
 « Agent decisions reviewed on 2026-11-24 »).
 
-- [ ] **[CODE] The ErgoDox's left 2-unit outer thumb key types a letter (maintainer, 2026-11-24).** For
-      KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e »), the outer key (key 66) becomes the left thumb's
-      typing key instead of reading the letter on Space. The maintainer's reading: these layouts put the letter on the
-      key that is Alt on Windows and the left Command on macOS, so it should work there; check that mapping and make
-      both layouts complete on the ErgoDox (`docs/design/layout-analysis.md`, « ErgoDox keys »).
 - [ ] **[CODE] A layout select beside the version select (maintainer, 2026-11-24).** The Disposition Ergopti pages
       get a layout select beside the version select, Ergopti first, drawing `static/layouts/visualisation/bepo.json`
       through `tools/codegen/codegen-site-keyboard.cjs` (dead keys from `dead_levels`); `bepo_1_1rc2.toml` stays undrawn

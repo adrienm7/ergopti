@@ -3573,9 +3573,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 			);
 	// KLAnext's Einbinder Orthogonal: « u » on the left big outer key (66), its
 	// space on the inner one (67); Yp Hina Fu: « e » on 66, « o » on 67, the
-	// space on the right big outer key (75). The left thumb types on one key
-	// (maintainer, 2026-11-21): Einbinder's space key, Yp Hina Fu's rest key, so
-	// each lacks the letter of 66 on the ErgoDox.
+	// space on the right big outer key (75). The ErgoDox's left thumb types on
+	// both 2-unit keys together (maintainer, 2026-11-24: 66 is where Alt, or Cmd
+	// on macOS, sits), so both are complete there: they lacked the letter of 66
+	// while the left thumb typed on one key.
 	for (const [id, code, level, expected] of [
 		['einbinder_orthogonal', 'Space', 0, 'u'],
 		['einbinder_orthogonal', 'NonConvert', 0, ' '],
@@ -3588,14 +3589,19 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 			cell(id, code, level) === expected,
 			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its KLAnext file has ${expected}`
 		);
-	for (const [id, lost] of [
-		['einbinder_orthogonal', 'uU'],
-		['yp_hina_fu', 'eE']
-	]) {
+	for (const id of ['einbinder_orthogonal', 'yp_hina_fu']) {
 		const result = E.analyse(byId.get(id), prepared, { keyboard: 'ergodox' });
 		check(
-			result.incomplete && result.coverage.missingRequired.join('') === lost,
-			`collections: ${id} on the ErgoDox lacks ${result.coverage.missingRequired.join('')}, not ${lost}`
+			!result.incomplete && result.coverage.missingRequired.length === 0,
+			`collections: ${id} on the ErgoDox lacks ${result.coverage.missingRequired.join('')}`
+		);
+		// The letter of 66 is typed by the left thumb and counted in its pairs.
+		const letter = cell(id, 'Space', 0);
+		check(
+			result.keys.Space &&
+				result.keys.Space.presses > 0 &&
+				E.spareThumbKeys(byId.get(id), 'ergodox').length === 0,
+			`collections: ${id} does not type « ${letter} » on the ErgoDox's outer 2-unit key`
 		);
 	}
 	check(

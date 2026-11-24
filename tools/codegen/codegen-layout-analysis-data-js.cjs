@@ -1154,6 +1154,10 @@ function buildBoards(model) {
 		// A board's own outer columns replace the model's outer_keys on it.
 		for (const code of board.outer_keys || [])
 			if (!board.keys[code]) throw new Error(`board ${id}: outer key ${code} is not on it`);
+		// The left thumb keys a layout types on together are left thumb keys of it.
+		for (const code of board.left_thumb_typing_keys || [])
+			if (board.fingers[code] !== 'lt')
+				throw new Error(`board ${id}: left thumb typing key ${code} is not the left thumb's`);
 	}
 	return boards;
 }
