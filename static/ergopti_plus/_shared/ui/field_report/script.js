@@ -12,8 +12,8 @@
  *
  * FEATURES & RATIONALE:
  * 1. One entry point for the host, window.receiveFieldReport(message), with a
- *    typed message: init (the steps, the steps not run, the label of the
- *    open-folder button), step (one step's new state), done (the counts and
+ *    typed message: init (the steps with their state so far, the steps not
+ *    run, the label of the open-folder button), step (one step's new state), done (the counts and
  *    the folder) and action (the result of a request). Linux answers the
  *    bridge's requests through window.__hostBridgeResponse, routed here too.
  * 2. Every change of a step is announced in the polite live region, so a
@@ -270,7 +270,9 @@
 			case 'init':
 				run = {
 					steps: (message.steps || []).map(function (step) {
-						return { id: step.id, title: step.title, state: 'pending' };
+						// A window opened during the run starts from the states so far
+						var state = STATES.indexOf(step.state) >= 0 ? step.state : 'pending';
+						return { id: step.id, title: step.title, state: state };
 					}),
 					not_run: message.not_run || [],
 					open_key: message.open_key,

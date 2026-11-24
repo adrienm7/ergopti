@@ -7,7 +7,8 @@
  * Drives the shared field report window (_shared/ui/field_report/) in Chromium
  * as the three hosts do:
  * 1. the page asks for its run with "ready" and offers nothing to act on but
- *    Close and Stop before the run ends;
+ *    Close and Stop before the run ends; a window opened during the run
+ *    starts from the states its init names;
  * 2. each step's state reaches its line and the live region, said again in
  *    the user's language when the strings land after the step;
  * 3. at the end the counts, the verdict and the folder are shown, Stop is
@@ -173,15 +174,23 @@ async function main() {
 		});
 		assert.equal(await page.locator('#status').innerText(), en['field_report.action_failed']);
 
-		// An interrupted run says so; Stop asks the host to stop it
+		// A window opened during the run starts from the states so far; an
+		// interrupted run says so; Stop asks the host to stop it
 		await page.evaluate(() => {
 			window.receiveFieldReport({
 				type: 'init',
-				steps: [{ id: 'a', title: 'A' }],
+				steps: [
+					{ id: 'a', title: 'A', state: 'pass' },
+					{ id: 'b', title: 'B', state: 'bogus' }
+				],
 				not_run: [],
 				open_key: 'field_report.open_files'
 			});
 		});
+		assert.deepEqual(await page.locator('#steps li').allInnerTexts(), [
+			'A — ' + en['field_report.state.pass'],
+			'B — ' + en['field_report.state.pending']
+		]);
 		await page.locator('#btn-cancel').click();
 		assert.deepEqual(await page.evaluate(() => window.messages[window.messages.length - 1]), {
 			action: 'cancel'

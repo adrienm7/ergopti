@@ -18,9 +18,13 @@
 ---    how a failed reveal is judged, and whether the action is bound to the
 ---    loaded driver module.
 --- 3. A Debug menu row holds one request: a second click supersedes the first.
+--- 4. The field report window's « Create a GitHub issue » opens the bug form
+---    with this machine's version, OS and driver and the run's evidence line,
+---    a closed vocabulary; its complete report goes redacted to the clipboard.
 --- ==============================================================================
 
 local IssueLink = require("diagnostics.engine.reports.issue_link")
+local Redact = require("diagnostics.engine.reports.redact")
 local Share = require("diagnostics.engine.healthcheck.share")
 
 local M = {}
@@ -29,7 +33,11 @@ local M = {}
 M.FOLDER_IDS = { config_dir = true, logs_dir = true, crash_dir = true, diagnostics_dir = true, app_dir = true }
 
 -- The actions that open a URL the caller built, by effect kind.
-local URL_EFFECTS = { suggest_feature = "open_url" }
+local URL_EFFECTS = { suggest_feature = "open_url", field_report = "open_url" }
+
+-- The field report's evidence line, the only text of it a bug form carries:
+-- keys, step ids, verdict enums and counts, never a path or a sentence.
+local EVIDENCE_LINE = "^check=field_report verdict=[%w_]+ request=[%w_.:-]+[%w_=%s-]*$"
 
 
 
@@ -49,7 +57,7 @@ local URL_EFFECTS = { suggest_feature = "open_url" }
 ---     reveal and returns true when it already finished the action,
 ---   module_current = function() -> boolean: the driver module is still the loaded one,
 ---   perform_requires_loaded_owner = boolean: whether perform() also checks it }
---- @return table runner { perform, menu_request }
+--- @return table runner { perform, menu_request, report_field_run }
 function M.new(ports)
 	assert(type(ports) == "table" and type(ports.logger) == "table" and type(ports.log) == "string",
 		"a diagnostics runner needs a logger and a log namespace")
@@ -195,7 +203,7 @@ function M.new(ports)
 	runner.perform = perform
 
 	-- One request per Debug menu row: a second click supersedes the first
-	local menu_slots = { report_bug = {}, suggest_feature = {} }
+	local menu_slots = { report_bug = {}, suggest_feature = {}, field_report = {} }
 
 	--- Runs one Debug menu GitHub request under an exact owner: a failure is
 	--- logged and notified, and the completion receives the child outcome.
@@ -232,6 +240,34 @@ function M.new(ports)
 	end
 
 	runner.menu_request = menu_request
+
+	--- Opens the bug form for a finished field report: version, OS and driver
+	--- from a fresh snapshot, the run's evidence line in the report field, and
+	--- the complete report redacted on the clipboard for the Full report field.
+	--- @param line string The run's evidence line (field_report.format_log_line).
+	--- @param text string The complete report.
+	--- @param collect function() -> snapshot, documents, redaction context.
+	--- @param overrides table|nil Replacement side effects (tests only).
+	--- @param complete function|nil Receives true once the form opened.
+	--- @return table|nil cancellable request
+	function runner.report_field_run(line, text, collect, overrides, complete)
+		assert(type(line) == "string" and line:match(EVIDENCE_LINE), "a field report issue needs its evidence line")
+		assert(type(text) == "string" and type(collect) == "function", "a field report issue needs its report and snapshot")
+		return menu_request("field_report", overrides, complete, function(owner)
+			local snapshot, documents, context = collect()
+			local document = Share.document(snapshot, documents.schema, nil)
+			local report_field = documents.templates.templates.bug.report_field
+			assert(type(report_field) == "string", "the bug template names no report field")
+			local fields = { version = document.fields.version, os = document.fields.os, driver = document.fields.driver,
+				[report_field] = line }
+			local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
+			-- The clipboard first: the form the browser opens asks for it
+			if ports.effects_with(overrides).copy(Redact.apply(text, documents.redaction, context)) ~= true then
+				error("the clipboard refused the field report")
+			end
+			return perform({ action = "field_report", url = url }, {}, documents, {}, overrides, nil, owner)
+		end)
+	end
 
 	return runner
 end
