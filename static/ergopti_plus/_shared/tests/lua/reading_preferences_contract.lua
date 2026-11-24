@@ -7,7 +7,8 @@
 --- its names, values and font folders are a11y_prefs.js's and the features
 --- manifest's, the seed carries only the non-default choices and cannot end
 --- its <script>, the chosen font's faces are inlined from the shipped files,
---- a missing font file is an error, and each choice's owner reads the
+--- a missing font file is an error, the tray menus' sfnt face is named
+--- from menu_faces.json, and each choice's owner reads the
 --- driver's store and refuses an unknown value. register_host() builds a real
 --- page through the driver's own builder and requires the seed and the font
 --- before a11y_prefs.js runs.
@@ -121,6 +122,25 @@ function M.register(helpers, shared_root)
 			local unknown, why = Reading.font_style({ font = "comic" }, fonts_dir, read_bytes)
 			helpers.assert_nil(unknown)
 			helpers.assert_true(tostring(why):find("unknown reading font", 1, true) ~= nil, tostring(why))
+		end)
+
+		helpers.it("names the sfnt face the tray menus draw each reading font with (reading-font-menus)", function()
+			local none, none_err = Reading.menu_face("default", fonts_dir, read_bytes)
+			helpers.assert_nil(none)
+			helpers.assert_nil(none_err)
+			for font, folder in pairs(Reading.FONT_FOLDERS) do
+				local face, err = Reading.menu_face(font, fonts_dir, read_bytes)
+				helpers.assert_true(face ~= nil, tostring(err))
+				helpers.assert_true(face.path:find(fonts_dir .. "/" .. folder .. "/", 1, true) == 1, face.path)
+				helpers.assert_true(face.path:find("%.[ot]tf$") ~= nil, font .. ": an sfnt file, never the WOFF2")
+				helpers.assert_true(face.family ~= "" and face.postscript ~= "", font)
+			end
+			local missing, why = Reading.menu_face("dyslexic", shared_root .. "/ui/missing_fonts", read_bytes)
+			helpers.assert_nil(missing)
+			helpers.assert_true(tostring(why):find("cannot read", 1, true) ~= nil, tostring(why))
+			local unknown, reason = Reading.menu_face("comic", fonts_dir, read_bytes)
+			helpers.assert_nil(unknown)
+			helpers.assert_true(tostring(reason):find("unknown reading font", 1, true) ~= nil, tostring(reason))
 		end)
 
 		helpers.it("pushes a choice into an open window, its font inlined (reading-preferences-live)", function()

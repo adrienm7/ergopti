@@ -31,6 +31,11 @@
 --- 5. Open windows follow: push_script() is what a host runs in each window
 ---    still open once a choice is saved (the Configuration menu, the setup
 ---    wizard), the font inlined as in the page's own head.
+--- 6. Tray menus follow on macOS: menu_face() names the sfnt face of the
+---    chosen font (_shared/ui/fonts/menu_faces.json), which the launcher
+---    registers for the login session and the menu builder draws its titles
+---    in. Linux cannot: its tray crosses the session bus as dbusmenu, whose
+---    items carry no font (the Configuration row says so).
 --- ==============================================================================
 
 local M = {}
@@ -79,6 +84,9 @@ M.FONT_FOLDERS = { hyperlegible = "atkinson-hyperlegible", dyslexic = "opendysle
 
 -- Built styles, by font folder path: a page build must not re-encode the faces.
 local _styles = {}
+
+-- Decoded menu_faces.json, by fonts folder path: a menu build must not reparse it.
+local _menu_faces = {}
 
 
 
@@ -258,6 +266,38 @@ function M.push_script(preferences, fonts_dir, read_file)
 	local css = style:gsub("^<style>", ""):gsub("</style>$", "")
 	local seed = M.statement(preferences):match("^window%.__ergopti_reading=(.*);$")
 	return "window.ErgoptiA11yPrefs&&window.ErgoptiA11yPrefs.receiveHost(" .. seed .. "," .. Json.encode(css) .. ");", nil
+end
+
+--- The sfnt face the tray menus draw the chosen reading font with, nil for
+--- the default font (the system's own menu font).
+--- @param font string The `font` choice (current().font).
+--- @param fonts_dir string Path of _shared/ui/fonts, without a trailing slash.
+--- @param read_file function Returns a file's bytes, or nil when unreadable.
+--- @return table|nil face { family, postscript, path }, nil for the default.
+--- @return string|nil error Exact reason when the face cannot be named.
+function M.menu_face(font, fonts_dir, read_file)
+	if font == nil or font == "default" then return nil, nil end
+	if M.FONT_FOLDERS[font] == nil then return nil, "unknown reading font " .. tostring(font) end
+	local faces = _menu_faces[fonts_dir]
+	if faces == nil then
+		local raw = read_file(fonts_dir .. "/menu_faces.json")
+		if type(raw) ~= "string" or raw == "" then return nil, "cannot read " .. fonts_dir .. "/menu_faces.json" end
+		local ok, decoded = pcall(Json.decode, raw)
+		if not ok or type(decoded) ~= "table" or type(decoded.faces) ~= "table" then
+			return nil, fonts_dir .. "/menu_faces.json is not a face manifest"
+		end
+		faces = decoded.faces
+		_menu_faces[fonts_dir] = faces
+	end
+	local face = faces[font]
+	if type(face) ~= "table" or type(face.file) ~= "string" or type(face.family) ~= "string"
+		or type(face.postscript) ~= "string" then
+		return nil, fonts_dir .. "/menu_faces.json declares no face for " .. font
+	end
+	local path = fonts_dir .. "/" .. face.file
+	local bytes = read_file(path)
+	if type(bytes) ~= "string" or bytes == "" then return nil, "cannot read " .. path end
+	return { family = face.family, postscript = face.postscript, path = path }, nil
 end
 
 --- Everything a host inserts right after <head>: the seed, then the font.
