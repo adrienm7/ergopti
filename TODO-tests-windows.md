@@ -31,6 +31,14 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 
 ### Layouts and Ergopti Studio
 
+- [ ] **Tray menu in the reading font (maintainer, 2026-11-24):** in Configuration › Accessibilité pick
+      « OpenDyslexic »: at the next opening the whole tray menu, submenus included, is drawn in OpenDyslexic at the
+      system menu size, the row reads « Police des fenêtres et menus : OpenDyslexic (dyslexie) »; the hovered row is
+      highlighted as usual, disabled rows and section titles are grey, check marks, submenu arrows, the row icons
+      and the right-hand shortcut column are in place, Alt-free mnemonics still run their row (press the underlined
+      letter with the menu open), and Narrator reads each row. With high contrast on, the rows use its colours. Pick
+      « Atkinson Hyperlegible », then « Par défaut »: the menu follows, and « Par défaut » looks exactly as before
+      (no owner-drawn row; `TrayMenuFont` logs only its ready line).
 - [ ] Layout tool pages (LTP-01 to LTP-07, 2026-11-21), Narrator on, interface in English and the Configuration
       menu's reading font set to Atkinson Hyperlegible: « Install or remove layouts… » shows that font and Narrator
       reads it in English (LTP-01, LTP-02), as Ergopti Studio. Tab to « Use » or « Update » on an installed layout

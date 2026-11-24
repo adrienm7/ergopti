@@ -98,6 +98,12 @@
 			"not_testable": "The submenu is read in the open menu-bar menu, which no run captures: open Configuration; the order is unit-tested (test_menu, configuration_parent.json)."
 		},
 		{
+			"id": "tray_reading_font",
+			"title": "Tray menu drawn in the reading font",
+			"checks": [],
+			"not_testable": "The menu is drawn by AppKit in the open menu-bar menu, which no run captures: pick each reading font and look at the rows in light and dark mode; the restyling, the face lookup and the session registration are unit-tested (test_reading_font_titles, MenuFontRegistrationTests)."
+		},
+		{
 			"id": "tray_suspend_row",
 			"title": "Tray « Suspendre » row before Reload",
 			"checks": [],
