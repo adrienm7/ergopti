@@ -601,10 +601,22 @@ var LAYOUT_ANALYSIS = (function () {
 	function checkLevels(layout) {
 		const { levels, modifiers } = layout;
 		if (levels === undefined && modifiers === undefined) return null;
-		if (checkedLevels.has(levels) && checkedLevels.get(levels) === modifiers) return levels;
 		const fail = (what) => {
 			throw new Error(`layout_analysis: ${layout.id} ${what}`);
 		};
+		// The rows change with every copy that shares its levels (the
+		// optimizer's trials): they are checked each time.
+		const typesOnModifier = () => {
+			for (const [name, modifier] of Object.entries(modifiers))
+				for (const side of ['for_left_hand', 'for_right_hand'])
+					for (const code of modifier[side])
+						if ((layout.rows[code] || []).some((cell) => cell !== null))
+							fail(`types on ${code}, which holds its modifier ${name}`);
+		};
+		if (checkedLevels.has(levels) && checkedLevels.get(levels) === modifiers) {
+			typesOnModifier();
+			return levels;
+		}
 		if (!Array.isArray(levels) || levels.length <= LAYER_IDS.length)
 			fail(`levels must list more than ${LAYER_IDS.length} levels`);
 		if (!modifiers || typeof modifiers !== 'object') fail('levels need their modifiers');
@@ -619,11 +631,9 @@ var LAYOUT_ANALYSIS = (function () {
 				const codes = modifier[side];
 				if (!Array.isArray(codes) || codes.length === 0 || codes.some((c) => typeof c !== 'string'))
 					fail(`modifier ${name} needs its ${side} keys`);
-				for (const code of codes)
-					if ((layout.rows[code] || []).some((cell) => cell !== null))
-						fail(`types on ${code}, which holds its modifier ${name}`);
 			}
 		}
+		typesOnModifier();
 		const ids = new Set();
 		const used = new Set();
 		levels.forEach((level, i) => {
