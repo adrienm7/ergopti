@@ -150,6 +150,12 @@
 			"not_testable": "Needs a first install of the 1.4 GB managed Ollama runtime over the real network, timed by a person: the field report does not install the runtime."
 		},
 		{
+			"id": "clipboard_manager_hint",
+			"title": "Pasted text kept out of clipboard managers (x-kde-passwordManagerHint)",
+			"checks": [],
+			"not_testable": "Needs Klipper, GPaste or CopyQ running on the desktop and a person reading its history after a paste: the field report reads no clipboard manager."
+		},
+		{
 			"id": "tray_host_missing",
 			"title": "Tray without a tray host: the window and notification that say so, then its click and its accessible name (TRAY-03)",
 			"checks": [],

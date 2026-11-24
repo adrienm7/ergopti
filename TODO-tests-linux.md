@@ -71,6 +71,11 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       MB/s on the shared WSL before the ancestry reuse and 82 MB/s after it in the cloud container, with 0.7 install
       ancestor walks per chunk instead of 14.2; a download far below the line rate points at the per-chunk fences
       again.
+- [ ] <!-- field-point: clipboard_manager_hint --> Pasted text kept out of clipboard managers (2026-11-24): on KDE
+      Plasma with Klipper (X11, then Wayland) and on GNOME X11 with GPaste or CopyQ, expand a hotstring that pastes
+      (a long one or one with emoji) and run an LLM paste: the manager's history does not list the payload, while a
+      Ctrl+C the user makes afterwards still shows. On GNOME Wayland the log says once « No multi-format clipboard
+      owner on this session ».
 - [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, fixed 2026-11-21): on GNOME (Wayland, then X11)
       without the AppIndicator extension, start the daemon with `--tray`: about 15 s after « Tray icon created » a
       window « Ergopti+ has no tray icon on this desktop » and a notification say it in the configured language and
