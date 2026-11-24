@@ -293,8 +293,11 @@ waits for the maintainer's review).
       writes Mod3 and leaves Mod4 out since 2026-11-24 (Neo's dead key held only on Mod3+Mod4, `dead_belowdot`,
       refused it as `unbound_stateful_actions`: it is now listed in `unreachable_actions`); the Neo KLC export is
       still refused, « Caps Lock changes the roya column » (`buildModel` of
-      `tools/codegen/lib/windows-keyboard-layout.cjs`): Mod3 takes the Roya bit on Caps Lock's scan code, and the
-      canonical's Roya key map with Caps Lock is not the one without it (not investigated further). The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
+      `tools/codegen/lib/windows-keyboard-layout.cjs`): Mod3 takes the Roya bit on Caps Lock's scan code, but its layers
+      list no `caps_lock` as optional, so Caps Lock with Mod3 falls back to the base key map, which a KLC column
+      cannot hold. Listing `caps_lock` optional on the five level layers (as Neo behaves) passes that check and
+      stops at the next one: « Backquote: Caps Lock types neither the base nor the Shift characters (SGCAP is not
+      generated) ». The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
       `undefined`), without Mod3 and Mod4 (`no_windows_column`): `tools/lib/kbd-dll/source.cjs` gives a custom
       modifier no Roya, Loya or Kana bit as the KLC export does, and Mod4's AltGr, an E0 key, could not hold one. The real-machine check (a user
       tap-hold or remap on Caps Lock or AltGr against the held levels) is in the three TODO-tests files.
