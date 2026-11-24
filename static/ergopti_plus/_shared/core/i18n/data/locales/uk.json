@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Усі автоматичні перевірки пройдено.",
 	"field_check.all.verdict_fail": "Принаймні одну автоматичну перевірку не пройдено.",
 	"field_check.all.separate_header": "Запустіть окремо (потрібна ваша участь):",
+	"field_check.all.input_probe_notice": "За кілька секунд почнеться перевірка введення, яка друкує у власному маленькому вікні: не друкуйте й не клацайте до її завершення.",
 	"field_report.title": "Польовий звіт",
 	"field_report.heading": "Польовий звіт виконується",
 	"field_report.heading_done": "Польовий звіт завершено",

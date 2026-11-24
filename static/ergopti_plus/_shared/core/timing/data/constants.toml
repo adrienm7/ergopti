@@ -1105,6 +1105,11 @@ wpm_menubar_update_ms = 500
 # AHK: diagnostics/engine/field_run/field_run.ahk.
 field_run_poll_ms = 1000
 
+# Windows: how long an input probe step of the field run waits after its notice
+# asking the person not to type, so the notice can be read before keys are sent.
+# AHK: diagnostics/engine/field_run/field_run.ahk.
+field_run_input_notice_ms = 4000
+
 # Hammerspoon reload debounce after a config file change, and the settle poll
 # while Git holds the tree.
 # HS: menu/ui/builder/watchers.lua DEBOUNCE_SEC.

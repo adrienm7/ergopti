@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Všechny automatické kontroly prošly.",
 	"field_check.all.verdict_fail": "Alespoň jedna automatická kontrola selhala.",
 	"field_check.all.separate_header": "Spusťte samostatně (potřebují vás):",
+	"field_check.all.input_probe_notice": "Za několik sekund začne kontrola vstupu, která píše do vlastního malého okna: do jejího konce nepište ani neklikejte.",
 	"field_report.title": "Terénní zpráva",
 	"field_report.heading": "Terénní zpráva probíhá",
 	"field_report.heading_done": "Terénní zpráva dokončena",

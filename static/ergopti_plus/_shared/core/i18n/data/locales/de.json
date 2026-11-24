@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Alle automatischen Prüfungen waren erfolgreich.",
 	"field_check.all.verdict_fail": "Mindestens eine automatische Prüfung ist fehlgeschlagen.",
 	"field_check.all.separate_header": "Separat ausführen (sie brauchen Sie):",
+	"field_check.all.input_probe_notice": "In wenigen Sekunden startet eine Eingabeprüfung, die in ein eigenes kleines Fenster tippt: Bis zum Ende nicht tippen oder klicken.",
 	"field_report.title": "Feldbericht",
 	"field_report.heading": "Feldbericht läuft",
 	"field_report.heading_done": "Feldbericht beendet",

@@ -56,9 +56,11 @@ global FIELD_REPORT_VERDICTS := ["pass", "fail", "timeout", "skip", "needs_perso
 ; The Windows Tests rows and the field run check each runs alone, as the Debug
 ; menu wires them (_MI_BuildDebuggingMenu); a probe the field run has no step
 ; for maps to "". A row whose check no step of the run takes is run separately.
+; The two input probes are steps since 2026-11-24 (maintainer), after a notice
+; asking not to type.
 FieldReport_RowChecks() {
 	return Map(MenuCommand.FIELD_CHECK_NETWORK, "network", MenuCommand.COMPOSER_CHECK, "composer",
-		MenuCommand.SEND_PROBE, "", MenuCommand.HOOK_PROBE, "")
+		MenuCommand.SEND_PROBE, "send_probe", MenuCommand.HOOK_PROBE, "hook_probe")
 }
 
 

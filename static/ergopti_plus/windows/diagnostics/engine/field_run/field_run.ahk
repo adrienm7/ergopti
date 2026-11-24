@@ -231,7 +231,52 @@ FieldRun_Runners() {
 		"network", (Spec, Done) => NetworkCheck_Run(_FieldRun_ReportOutcome.Bind(Spec, , Done))
 			|| Done.Call("fail", ["busy"]),
 		"composer", (Spec, Done) => ComposerCheck_Run(_FieldRun_ReportOutcome.Bind(Spec, , Done))
-			|| Done.Call("fail", ["busy"]))
+			|| Done.Call("fail", ["busy"]),
+		"send_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunSendComparison, _FieldRun_SendProbeCodes),
+		"hook_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunHookOrder, _FieldRun_HookProbeCodes))
+}
+
+/**
+ * Runs one input probe of the Tests menu as a step: a notice first asks the
+ * person not to type, since the probe types into a window of its own and any
+ * key pressed meanwhile spoils it (maintainer, 2026-11-24), then the probe
+ * runs once that notice had time to be read.
+ * @param {Func} Probe - InputProbe_RunSendComparison or InputProbe_RunHookOrder.
+ * @param {Func} CodesFn - Result -> Array of closed codes.
+ * @param {Map} Spec - The shared protocol.
+ * @param {Func} Done - Settles the step: verdict, codes.
+ */
+_FieldRun_RunInputProbe(Probe, CodesFn, Spec, Done) {
+	NotifierSend(t("field_check.all.input_probe_notice"), Map("title", t("input_probe.title"), "level", "warning"))
+	SetTimer(_FieldRun_InputProbeAfterNotice.Bind(Probe, CodesFn, Done), -TimingsGet("ui", "field_run_input_notice_ms"))
+}
+
+; The probe itself, once the notice was shown. A probe that could not start
+; (busy, paused, keys held, no focus) is a skip with its reason.
+_FieldRun_InputProbeAfterNotice(Probe, CodesFn, Done) {
+	try Result := Probe.Call()
+	catch as Err {
+		LoggerError(FIELD_RUN_TAG, "Field run input probe raised: {1}", Err.Message)
+		return Done.Call("fail", ["raised"])
+	}
+	if Result["state"] != "done"
+		return Done.Call("skip", ["not_started_" . Result["reason"]])
+	Done.Call(Result["pass"] ? "pass" : "fail", CodesFn.Call(Result))
+}
+
+; The send comparison's codes: how many scenario rows ran and how many were exact.
+_FieldRun_SendProbeCodes(Result) {
+	Exact := 0
+	for Row in Result["rows"]
+		if InputProbe_RowPasses(Row)
+			Exact += 1
+	return ["rows_" . Result["rows"].Length, "exact_rows_" . Exact]
+}
+
+; The hook check's codes: which hook ran first before and after the SendInput.
+_FieldRun_HookProbeCodes(Result) {
+	Verdict := Result["verdict"]
+	return ["before_" . Verdict["before"], "after_" . Verdict["after"], "rehook_" . Verdict["rehook"]]
 }
 
 ; The boot that started this driver, against [budgets] boot_total_ms.
