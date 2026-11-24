@@ -13,6 +13,8 @@
 
 #Include ../../../infra/phase_stats.ahk
 #Include ../../../core/logger/engine/perf_budget.ahk
+; TrayMenuFont_Install re-orders the popup handlers after a rebuild.
+#Include ../../../tray/adapters/menu_font.ahk
 
 
 
@@ -775,8 +777,12 @@ RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
 	Published := false
 	try Published := _TrayRootDrain()
 	finally ElapsedMs := PhaseStats_Stop("menu.rebuild", Started)
-	if ((Published is Integer) && Published == 1)
+	if ((Published is Integer) && Published == 1) {
+		; The new root may have registered the population's popup handler: the
+		; reading-font handler goes back after it (tray/adapters/menu_font.ahk).
+		TrayMenuFont_Install()
 		_TrayRootReportRebuild(ElapsedMs, TrayMenuItemCount(A_TrayMenu))
+	}
 	return Published
 }
 
