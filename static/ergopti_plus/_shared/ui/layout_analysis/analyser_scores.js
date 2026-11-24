@@ -1254,7 +1254,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * 1/2^(g−1). The tables hold the gap of 1 (the trigrams); the longer gaps
 	 * are carried forward by the trigrams' second-order chain, P(c | a b) =
 	 * trigram(abc) / bigram(ab), whose bigram also counts the runs that end
-	 * after b, so a run's end stops the chain as genkey's reset does.
+	 * after b, so a run's end stops the chain as genkey's reset does. A table
+	 * counted from a text (textTables) brings genkey's exact skipgrams instead.
 	 * @param {object} table - prepareNgrams() output.
 	 * @returns {{uni: Map, bi: Map, skip: Map}} Letter → n, pair → n, pair → weight.
 	 */
@@ -1280,6 +1281,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			const z = norm(b);
 			if (x && y && z) add(tri, x + y + z, n);
 		}
+		// A table counted from a text brings genkey's own skipgrams (textTables).
+		const own = table.analysers && table.analysers.genkey;
+		if (own) return { uni, bi, skip: new Map(Object.entries(own.skipgrams)) };
 		const skip = new Map();
 		const next = new Map();
 		for (const [abc, n] of tri) {
@@ -1312,6 +1316,41 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			const sub = model.substitutions[lower] || lower;
 			return valid.has(sub) ? sub : null;
 		};
+	}
+
+	/**
+	 * genkey's skipgrams of a text, as its corpus reader counts them: a pair of
+	 * characters g apart (g from 1 to its largest gap) with the weight
+	 * decay^(g−1), every character between them kept by its filter. A character
+	 * the filter drops, a line break among them, starts a new run.
+	 * @param {string} text - The corpus text.
+	 * @returns {object} pair → weight.
+	 */
+	function genkeyTextSkipgrams(text) {
+		const model = entry('genkey').model;
+		const norm = genkeyNorm(model);
+		const weights = [];
+		for (let gap = 1; gap <= model.skipgram_max_gap; gap++)
+			weights.push(model.skipgram_decay ** (gap - 1));
+		const skip = {};
+		let run = [];
+		for (const char of text) {
+			const x = norm(char);
+			if (x === null) {
+				run = [];
+				continue;
+			}
+			// run[run.length - 1] is the previous character: gap 0, a bigram.
+			for (let gap = 1; gap <= weights.length; gap++) {
+				const i = run.length - 1 - gap;
+				if (i < 0) break;
+				const key = run[i] + x;
+				skip[key] = (skip[key] || 0) + weights[gap - 1];
+			}
+			run.push(x);
+			if (run.length > weights.length + 1) run.shift();
+		}
+		return skip;
 	}
 
 	/**
@@ -1483,9 +1522,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * whole, line breaks included (they are dropped characters, and Shift is
 	 * held across them). Whether Shift is held across a run of dropped
 	 * characters is exact across one, and carried by the trigrams'
-	 * second-order chain across longer runs (a blank line, an indentation);
-	 * skip-2 and skip-3 grams are not in the tables and are taken equal to
-	 * skip-1.
+	 * second-order chain across longer runs (a blank line, an indentation).
+	 * A table counted from a text (textTables) brings its exact bigrams,
+	 * skipgrams of gaps 1 to 3 and totals; without it, skip-2 and skip-3 grams
+	 * are taken equal to skip-1.
 	 */
 	function oxeyTables(table) {
 		const model = entry('oxeylyzer').model;
@@ -1575,17 +1615,109 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				map.set(key, n - loss.get(n));
 			}
 		};
+		// A table counted from a text brings Oxeylyzer's own token pairs and
+		// totals (textTables): its skipgrams of every gap, each count read back
+		// from its saved share exactly. Its trigrams still come from the chain,
+		// stored on their exact total.
+		const own = table.analysers && table.analysers.oxeylyzer;
+		if (own) {
+			const exact = (counts, total) => {
+				const map = new Map(Object.entries(counts));
+				stored(map, total);
+				return map;
+			};
+			stored(trigrams, own.totals.trigrams);
+			return {
+				bigrams: exact(own.bigrams, own.totals.bigrams),
+				skips: own.skipgrams.map((counts, g) => exact(counts, own.totals.skipgrams[g])),
+				trigrams,
+				chars: own.chars,
+				bigramTotal: own.totals.bigrams,
+				trigramTotal: own.totals.trigrams
+			};
+		}
 		stored(bigrams, bigramTotal + shiftTokens);
 		stored(trigrams, trigramTotal);
 		return {
 			bigrams,
-			skip,
+			// Without a text, skip-1 stands for skip-2 and skip-3.
+			skips: Array.from({ length: OXEY_SKIP_GAPS }, () => skip),
 			trigrams,
 			chars: chars + shiftTokens,
 			// Every Shift token starts a bigram with its capital.
 			bigramTotal: bigramTotal + shiftTokens,
 			trigramTotal
 		};
+	}
+
+	// Oxeylyzer's skipgram gaps (skipgrams, skipgrams2, skipgrams3).
+	const OXEY_SKIP_GAPS = 3;
+	// The Shift token of Oxeylyzer's cleaner, in textTables' token stream; no
+	// layout types it, so the pairs holding it count in the totals only.
+	const OXEY_SHIFT = '\u21d1';
+
+	/**
+	 * Oxeylyzer's token counts of a text, as its cleaner and counter read it
+	 * whole: each character becomes its token, a capital or a Shift form
+	 * writes the Shift token first unless Shift is still held (only a kept
+	 * unshifted character releases it), and a dropped character is a gap no
+	 * n-gram ends on, though a skipgram spans it. Line breaks are read as one
+	 * line feed, as the n-gram tables read them.
+	 * @param {string} text - The corpus text.
+	 * @returns {{chars: number, bigrams: object, skipgrams: object[], totals:
+	 *   {bigrams: number, skipgrams: number[], trigrams: number}}} The token
+	 *   pairs without the Shift token, and every total.
+	 */
+	function oxeyTextTables(text) {
+		const model = entry('oxeylyzer').model;
+		const tokens = [];
+		let held = false;
+		for (const char of text.replace(/\r\n?/g, '\n')) {
+			const t = oxeyToken(model, char);
+			if (!t) tokens.push(null);
+			else if (!t.shift) {
+				held = false;
+				tokens.push(t.token);
+			} else {
+				if (!held) tokens.push(OXEY_SHIFT);
+				held = true;
+				tokens.push(t.token);
+			}
+		}
+		const bigrams = {};
+		const skipgrams = [];
+		const totals = { bigrams: 0, skipgrams: [], trigrams: 0 };
+		for (let g = 0; g < OXEY_SKIP_GAPS; g++) {
+			skipgrams.push({});
+			totals.skipgrams.push(0);
+		}
+		const add = (map, a, b) => {
+			if (a === OXEY_SHIFT || b === OXEY_SHIFT) return;
+			map[a + b] = (map[a + b] || 0) + 1;
+		};
+		let chars = 0;
+		for (let i = 0; i < tokens.length; i++) {
+			const x = tokens[i];
+			if (x === null) continue;
+			chars++;
+			const y = tokens[i + 1];
+			if (y === undefined || y === null) continue;
+			totals.bigrams++;
+			add(bigrams, x, y);
+			if (tokens[i + 2] !== undefined && tokens[i + 2] !== null) totals.trigrams++;
+		}
+		for (let i = 0; i < tokens.length; i++) {
+			const x = tokens[i];
+			if (x === null) continue;
+			for (let g = 1; g <= OXEY_SKIP_GAPS; g++) {
+				const y = tokens[i + g + 1];
+				if (y === undefined) break;
+				if (y === null) continue;
+				totals.skipgrams[g - 1]++;
+				add(skipgrams[g - 1], x, y);
+			}
+		}
+		return { chars, bigrams, skipgrams, totals };
 	}
 
 	/** Oxeylyzer's trigram class of three finger numbers (LP 0 … RP 9). */
@@ -1642,8 +1774,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const w = model.weights;
 		const r = w.sfs / w.sfbs;
 		const mix = (a, b, weight) => {
-			const s = t.skip.get(a + b) || 0;
-			return Math.trunc(((t.bigrams.get(a + b) || 0) + (r + r * r + r * r * r) * s) * weight);
+			let n = t.bigrams.get(a + b) || 0;
+			for (let g = 0; g < t.skips.length; g++) n += r ** (g + 1) * (t.skips[g].get(a + b) || 0);
+			return Math.trunc(n * weight);
 		};
 		const both = (a, b, weight) => mix(a, b, weight) + mix(b, a, weight);
 		const flen = (f) => model.f_len[['p', 'r', 'm', 'i', 't'][orderOf(f)]];
@@ -2597,7 +2730,24 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return out;
 	}
 
-	return { ORDER, analysers, score, scoreAll };
+	/**
+	 * The counts of a text that only the text itself gives some analysers,
+	 * beside its n-gram tables: genkey's skipgrams of gaps 1 to 9 and
+	 * Oxeylyzer's token pairs of gaps 1 to 3 with its exact totals. Set as
+	 * `analysers` on the tables of that text (ngramsFromText), the scorers read
+	 * them instead of carrying the trigrams' chain forward.
+	 * @param {string} text - The corpus text.
+	 * @returns {{genkey: {skipgrams: object}, oxeylyzer: object}} The counts.
+	 */
+	function textTables(text) {
+		if (typeof text !== 'string') throw new Error('analyser_scores: textTables needs a text');
+		return {
+			genkey: { skipgrams: genkeyTextSkipgrams(text) },
+			oxeylyzer: oxeyTextTables(text)
+		};
+	}
+
+	return { ORDER, analysers, score, scoreAll, textTables };
 })();
 
 // Node (tests) reads the module through a vm context or require().

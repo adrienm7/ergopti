@@ -115,6 +115,7 @@ const PURITY_TEST_PATH = path.join(
 const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const FORMATS_PATH = shared('ui', 'layout_analysis', 'layout_formats.js');
+const ANALYSER_SCORES_PATH = shared('ui', 'layout_analysis', 'analyser_scores.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const SOURCES = [
 	'layouts/data/analysis/analysis_model.json',
@@ -126,6 +127,7 @@ const SOURCES = [
 	'layouts/data/analysis/board_geometries.json',
 	'static/corpus/register.json',
 	'layouts/data/analysis/analyser_models.json',
+	'ui/layout_analysis/analyser_scores.js (textTables)',
 	'layouts/data/keycodes/physical_keys.json',
 	'layouts/data/keycodes/keyboard_forms.json',
 	'../../layouts/registry (through layout_composer)'
@@ -250,6 +252,22 @@ function loadEngine() {
 	vm.createContext(sandbox);
 	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), sandbox, { filename: ENGINE_PATH });
 	return vm.runInContext('LAYOUT_ANALYSIS', sandbox);
+}
+
+/**
+ * The analyser scorers (analyser_scores.js), loaded as the classic script a
+ * page loads with only their constants defined: textTables() reads nothing
+ * else.
+ * @param {object} analysers - buildAnalysers() output.
+ * @returns {object} LAYOUT_ANALYSER_SCORES.
+ */
+function loadAnalyserScores(analysers) {
+	const sandbox = { LAYOUT_ANALYSIS_DATA: { analysers } };
+	vm.createContext(sandbox);
+	vm.runInContext(fs.readFileSync(ANALYSER_SCORES_PATH, 'utf8'), sandbox, {
+		filename: ANALYSER_SCORES_PATH
+	});
+	return vm.runInContext('LAYOUT_ANALYSER_SCORES', sandbox);
 }
 
 /**
@@ -778,7 +796,7 @@ function countTableCounts(text, id) {
  * @returns {{catalogue: object[], tables: object}} The list the page shows and
  *   the tables by corpus id.
  */
-function buildCorpora(engine) {
+function buildCorpora(engine, scores) {
 	const manifest = JSON.parse(fs.readFileSync(CORPORA_PATH, 'utf8'));
 	const register = corpusRegister();
 	const catalogue = [];
@@ -823,6 +841,10 @@ function buildCorpora(engine) {
 				: format === 'count_table'
 					? countTableCounts(text, corpus.id)
 					: engine.ngramsFromText(text);
+		// A text gives the analysers that read it whole their own counts
+		// (genkey's and Oxeylyzer's skipgrams of every gap); a word list or a
+		// count table has no text to count them from.
+		const ownCounts = counts.breaks ? scores.textTables(text) : null;
 		// Its most frequent words, counted from the same text by the engine's rule;
 		// a count table brings its own, counted by the importer from its source.
 		const words =
@@ -848,6 +870,18 @@ function buildCorpora(engine) {
 				chars: sorted(b.chars),
 				bigrams: sorted(b.bigrams),
 				trigrams: sorted(b.trigrams)
+			};
+		}
+		if (ownCounts) {
+			const o = ownCounts.oxeylyzer;
+			tables[corpus.id].analysers = {
+				genkey: { skipgrams: sorted(ownCounts.genkey.skipgrams) },
+				oxeylyzer: {
+					chars: o.chars,
+					totals: o.totals,
+					bigrams: sorted(o.bigrams),
+					skipgrams: o.skipgrams.map(sorted)
+				}
 			};
 		}
 		if (words) tables[corpus.id].words = words;
@@ -962,6 +996,23 @@ function tableText(table, patterns) {
 }
 
 /**
+ * The counts only a text gives some analysers as JSON text, each table's
+ * keys written by keyText().
+ * @param {{genkey: object, oxeylyzer: object}} counts - From textTables().
+ * @param {RegExp[]} patterns - From scannerPatterns().
+ * @returns {string} The JSON object text.
+ */
+function analyserText(counts, patterns) {
+	const o = counts.oxeylyzer;
+	return (
+		`{"genkey":{"skipgrams":${tableText(counts.genkey.skipgrams, patterns)}},` +
+		`"oxeylyzer":{"chars":${o.chars},"totals":${JSON.stringify(o.totals)},` +
+		`"bigrams":${tableText(o.bigrams, patterns)},` +
+		`"skipgrams":[${o.skipgrams.map((table) => tableText(table, patterns)).join(',')}]}}`
+	);
+}
+
+/**
  * The generated file of one corpus's tables.
  * @param {string} id - The corpus id.
  * @param {object} table - Its tables.
@@ -990,6 +1041,7 @@ function corpusSource(id, table, licence) {
 					`"bigrams":${tableText(table.breaks.bigrams, patterns)},` +
 					`"trigrams":${tableText(table.breaks.trigrams, patterns)}}`
 				: '') +
+			(table.analysers ? `,"analysers":${analyserText(table.analysers, patterns)}` : '') +
 			(table.words ? `,"words":${tableText(table.words, patterns)}` : '') +
 			'};',
 		''
@@ -1337,7 +1389,7 @@ function buildData() {
 	const weights = JSON.parse(fs.readFileSync(WEIGHTS_PATH, 'utf8'));
 	const library = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf8'));
 	const engine = loadEngine();
-	const corpora = buildCorpora(engine);
+	const corpora = buildCorpora(engine, loadAnalyserScores(buildAnalysers()));
 	checkIdealLoad(model.ideal_finger_load);
 	// The engine keeps an edited load in the same order (analysis_engine.js idealLoad).
 	model.ideal_finger_load_hands = HAND_FINGERS;

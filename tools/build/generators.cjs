@@ -265,6 +265,8 @@ const GENERATORS = [
 		precommitInputs: [
 			'static/ergopti_plus/_shared/layouts/data/',
 			'static/corpus/',
+			// textTables() counts the analysers' own skipgrams of each text corpus.
+			'static/ergopti_plus/_shared/ui/layout_analysis/analyser_scores.js',
 			'tools/codegen/codegen-layout-analysis-data-js.cjs'
 		],
 		outputs: [

@@ -78,7 +78,9 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   it. Main tables and `breaks` together count every n-gram of the text.
 - `prepareNgrams(ngrams)` → the tables as arrays, cached per object. Call it
   once per corpus and pass the result to every analysis: this is what makes a
-  comparison instant.
+  comparison instant. A table's `analysers` (the counts only a text gives some
+  analysers, `LAYOUT_ANALYSER_SCORES.textTables`,
+  [analyser-scores.md](analyser-scores.md#api)) is kept as is.
 - `hashText(text)` → FNV-1a 32-bit hex, the cache key of a corpus's tables.
 - `libraryLayouts()` → the library (registry, reference and imported layouts).
 - `layoutFromRows({id, name, rows, dead?, command?, fingering?})` → a checked
@@ -1020,8 +1022,9 @@ register is the one source for them. The codegen enforces three rules:
 - it refuses a built-in corpus whose status is not `ship`.
 
 The codegen counts the n-grams of each built-in corpus with the engine's own
-`ngramsFromText` and writes only the tables (with their `breaks` for a text;
-a word list or a count table has none). Each corpus gets its own file,
+`ngramsFromText` and writes only the tables (with their `breaks` and the
+analysers' own counts, `analysers`, for a text; a word list or a count table
+has none). Each corpus gets its own file,
 `_generated/corpus_<id>.js`, loaded when the corpus is chosen, with the
 licence and attribution in its header. `LAYOUT_ANALYSIS_DATA.corpora` lists
 the corpora with their licence, attribution, source and size, and the page
