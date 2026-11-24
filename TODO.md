@@ -147,7 +147,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
     (29, one per write-entry admission, `_ConfigSchemaEntryAdmitted` and `ConfigFullStateCanPersist`) and about 19
     other compares; read them from the `# api-save registry compares` lines of a Windows run, give each a unit
     counted apart from the reads, then drop the ceiling.
-  - `test-port-vector-traceability.cjs` (73) is a floor; name the traced vectors instead.
   - The two Studio speed bounds (120 and 5000 table walks) rest on ratios measured with every core busy; read the
     ratio each test prints on a quiet PC and on CI, and set each bound to twice the highest.
   - Kept on purpose: order-of-magnitude bounds that state their reason (the Linux e2e 3000 tray rows against the

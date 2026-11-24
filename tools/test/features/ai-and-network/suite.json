@@ -156,7 +156,7 @@
 		},
 		{
 			"id": "js-0306",
-			"ordinal": 321,
+			"ordinal": 322,
 			"name": "MLX dependency bootstrap fingerprints both dependency manifests",
 			"cmd": "node",
 			"args": ["tools/test/test-mlx-deps-lock-fingerprint.cjs"],
@@ -164,7 +164,7 @@
 		},
 		{
 			"id": "js-0312",
-			"ordinal": 327,
+			"ordinal": 328,
 			"name": "The stock Ollama installer is retired; only Ergopti's runtime is verified",
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-stock-installer-retired.cjs"],
@@ -172,7 +172,7 @@
 		},
 		{
 			"id": "js-0313",
-			"ordinal": 328,
+			"ordinal": 329,
 			"name": "MLX emitted downloader refuses failed system trust activation",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-mlx-download-trust-activation.cjs"],
@@ -180,7 +180,7 @@
 		},
 		{
 			"id": "js-0314",
-			"ordinal": 329,
+			"ordinal": 330,
 			"name": "managed native HTTP receives actual pipe closure and shared routing",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-native-http-receiving.cjs"],
@@ -188,7 +188,7 @@
 		},
 		{
 			"id": "js-0315",
-			"ordinal": 330,
+			"ordinal": 331,
 			"name": "managed bootstrap admits pinned bytes before offline installation",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-managed-bootstrap-http.cjs"],
@@ -196,7 +196,7 @@
 		},
 		{
 			"id": "js-0316",
-			"ordinal": 331,
+			"ordinal": 332,
 			"name": "managed Python release projections retain the independent official pin",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-python-release.cjs"],
@@ -204,7 +204,7 @@
 		},
 		{
 			"id": "js-0317",
-			"ordinal": 332,
+			"ordinal": 333,
 			"name": "managed bootstrap shared policy and generated Swift remain source-qualified",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-bootstrap-policy.cjs"],
@@ -212,7 +212,7 @@
 		},
 		{
 			"id": "js-0319",
-			"ordinal": 334,
+			"ordinal": 335,
 			"name": "bootstrap retry canonical data preserves original shell and generated Lua",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bootstrap-retry-projection.cjs"],
@@ -220,7 +220,7 @@
 		},
 		{
 			"id": "js-0320",
-			"ordinal": 335,
+			"ordinal": 336,
 			"name": "managed Ollama portable admission and operation retirement",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-ollama-protocol.cjs"],
@@ -228,7 +228,7 @@
 		},
 		{
 			"id": "js-0321",
-			"ordinal": 338,
+			"ordinal": 339,
 			"name": "managed Ollama catalogue preserves native source and publication admission",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-managed-ollama-catalogue.cjs"],
@@ -236,7 +236,7 @@
 		},
 		{
 			"id": "js-0322",
-			"ordinal": 339,
+			"ordinal": 340,
 			"name": "native PAC source contract preserves ownership and exact full-URL binding",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-native-pac-source-contract.cjs"],
@@ -244,7 +244,7 @@
 		},
 		{
 			"id": "js-0323",
-			"ordinal": 340,
+			"ordinal": 341,
 			"name": "native PAC helpers preserve independent standard function vectors",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-network-pac-helpers.cjs"],
@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "js-0324",
-			"ordinal": 341,
+			"ordinal": 342,
 			"name": "macOS opaque clients refuse unsupported automatic proxy routing",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-opaque-network-admission.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "js-0327",
-			"ordinal": 344,
+			"ordinal": 345,
 			"name": "Ollama server command preserves exact process ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-server-command.cjs"],
@@ -268,7 +268,7 @@
 		},
 		{
 			"id": "js-macos-python-system-compat",
-			"ordinal": 350,
+			"ordinal": 351,
 			"name": "macOS and shared Python helpers run on Apple's system Python 3.9",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-python-system-compat.cjs"],
@@ -276,7 +276,7 @@
 		},
 		{
 			"id": "js-0334",
-			"ordinal": 351,
+			"ordinal": 352,
 			"name": "prompt editor bridge (shared frontend ↔ Windows host)",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-bridge.cjs"],
@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "js-0339",
-			"ordinal": 356,
+			"ordinal": 357,
 			"name": "one ready-made prompt action per built-in prompt profile",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-actions-single-source.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "js-0340",
-			"ordinal": 357,
+			"ordinal": 358,
 			"name": "Windows rewrite prompt and prompt action ports are included, ordered and wired",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-rewrite-prompt-wiring.cjs"],
@@ -300,7 +300,7 @@
 		},
 		{
 			"id": "js-0341",
-			"ordinal": 358,
+			"ordinal": 359,
 			"name": "Windows types an accepted prediction as one exact Text-mode batch at TextSender SendLevel",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-llm-accept-injection.cjs"],
@@ -308,7 +308,7 @@
 		},
 		{
 			"id": "js-0343",
-			"ordinal": 360,
+			"ordinal": 361,
 			"name": "Windows cycles a visible prediction once per navigation chord in either keyboard-hook order",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-llm-nav-cycle.cjs"],
@@ -316,7 +316,7 @@
 		},
 		{
 			"id": "js-0344",
-			"ordinal": 361,
+			"ordinal": 362,
 			"name": "every driver cycles a visible prediction on each chord its tooltip advertises: the arrows and either Shift+Tab",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-nav-chord-contract.cjs"],
@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0350",
-			"ordinal": 366,
+			"ordinal": 367,
 			"name": "a manual prediction is refused for the same four reasons, with the same notices, on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-manual-prediction-refusals-single-source.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0366",
-			"ordinal": 377,
+			"ordinal": 378,
 			"name": "changelog loads are bounded and fall back to the releases Atom feed",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-network-resilience.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0372",
-			"ordinal": 382,
+			"ordinal": 383,
 			"name": "Versions managed failures retain safe report and exact action ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-changelog-managed-failure.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0378",
-			"ordinal": 388,
+			"ordinal": 389,
 			"name": "managed download failures render safe translated actions with captured owners",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-network-failure-ui.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0379",
-			"ordinal": 389,
+			"ordinal": 390,
 			"name": "managed fixture late accepted clients retain exact retirement ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-remote-retirement.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "js-0380",
-			"ordinal": 390,
+			"ordinal": 391,
 			"name": "model browser actions retain their operation session across native reuse",
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-session.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "js-0448",
-			"ordinal": 429,
+			"ordinal": 430,
 			"name": "Ollama release pin parity (one 0.40.6 pin, no retired 0.24.0 or 0.40.4 pin or upstream seam)",
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-release-pin-parity.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "js-0449",
-			"ordinal": 430,
+			"ordinal": 431,
 			"name": "managed Ollama no-cloud parity (every owned server gets the shared OLLAMA_NO_CLOUD)",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-no-cloud.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0456",
-			"ordinal": 436,
+			"ordinal": 437,
 			"name": "managed Ollama PAC route (launcher role, shell admission and daemon environment)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-proxy-route-contract.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0467",
-			"ordinal": 444,
+			"ordinal": 445,
 			"name": "Go route plan gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-route-plan-gate.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0468",
-			"ordinal": 445,
+			"ordinal": 446,
 			"name": "proxy policy single source (every hand-typed precedence pinned to proxy_policy.json, no new copy)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0476",
-			"ordinal": 461,
+			"ordinal": 462,
 			"name": "network field check parity (one step list, every label localised, no URL in the evidence)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-network-field-check-parity.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0493",
-			"ordinal": 471,
+			"ordinal": 472,
 			"name": "proxy precedence shell projection (the shell expansions are generated from proxy_policy.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-ollama-termination-owned",
-			"ordinal": 494,
+			"ordinal": 495,
 			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ollama-termination-owned.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-model-selector-page",
-			"ordinal": 497,
+			"ordinal": 498,
 			"name": "model selector page greys unavailable backends, downloads missing models and keeps keyboard access",
 			"cmd": "node",
 			"args": ["tools/test/test-model-selector-page.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-llm-backend-brands-single-source",
-			"ordinal": 498,
+			"ordinal": 499,
 			"name": "AI backend brand and emoji single source (backends.json, emoji-first model button)",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-backend-brands-single-source.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-test-prediction-single-source",
-			"ordinal": 507,
+			"ordinal": 508,
 			"name": "the AI menu's test prediction: one excerpt length and blank-answer reason, on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-test-prediction-single-source.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-windows-route-plan",
-			"ordinal": 542,
+			"ordinal": 543,
 			"name": "Windows route plan replays the shared route-plan vectors in PowerShell",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-route-plan.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "go-proxy-relay-gate",
-			"ordinal": 549,
+			"ordinal": 550,
 			"name": "Go proxy sign-in relay gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-proxy-relay-gate.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "macos-proxy-relay-shell",
-			"ordinal": 553,
+			"ordinal": 554,
 			"name": "macOS Ollama daemon starts under the proxy sign-in relay when the proxy demands NTLM or Negotiate",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-proxy-relay-shell.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "fake-network-controls",
-			"ordinal": 554,
+			"ordinal": 555,
 			"name": "The fake corporate network refuses a wrong NTLM password and ends each proxy mode as it claims",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-fake-network.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "windows-proxy-relay-bundle",
-			"ordinal": 555,
+			"ordinal": 556,
 			"name": "The bundled Windows proxy relay is the one its sources and manifest name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-relay-bundle.cjs"],
@@ -500,7 +500,7 @@
 		},
 		{
 			"id": "windows-proxy-relay-e2e",
-			"ordinal": 556,
+			"ordinal": 557,
 			"name": "Windows proxy relay end to end: real relay, launcher and SSPI through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-relay-e2e.cjs"],
@@ -509,7 +509,7 @@
 		},
 		{
 			"id": "windows-proxy-override-e2e",
-			"ordinal": 561,
+			"ordinal": 562,
 			"name": "Windows proxy override end to end: the real adapter and workers through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-proxy-override-e2e.cjs"],
@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "perplexity-agent-e2e",
-			"ordinal": 563,
+			"ordinal": 564,
 			"name": "Perplexity Agent API end to end: the real transport and the shared Lua through the fake network",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-perplexity-agent-e2e.cjs"],
@@ -527,7 +527,7 @@
 		},
 		{
 			"id": "js-model-browser-host-actions",
-			"ordinal": 567,
+			"ordinal": 568,
 			"name": "every model selector page action has a handler on macOS, Linux and Windows",
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-host-actions.cjs"],
@@ -535,7 +535,7 @@
 		},
 		{
 			"id": "js-prompt-editor-literal-token",
-			"ordinal": 591,
+			"ordinal": 592,
 			"name": "prompt editor preserves literal brace text through its save bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-literal-token.cjs"],
@@ -543,7 +543,7 @@
 		},
 		{
 			"id": "js-llm-provider-retirements",
-			"ordinal": 608,
+			"ordinal": 609,
 			"name": "remote providers keep no retired endpoint or model as a default",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-provider-retirements.cjs"],
