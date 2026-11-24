@@ -13,8 +13,8 @@
  * 3. every Tests command row a driver offers is « Test everything » itself, a
  *    row whose check the plan runs, or a row it lists as « run separately »,
  *    so a new Tests row cannot be forgotten by the combined report;
- * 4. « Test everything » heads the Tests rows on every driver, and each driver
- *    routes it (AutoHotkey cannot run here, so its wiring is read from source).
+ * 4. the field report row stands just before Tests on every driver, and
+ *    each driver routes it (AutoHotkey cannot run here, so its wiring is read from source).
  * ==============================================================================
  */
 
@@ -28,7 +28,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const BASE = path.join(ROOT, 'static/ergopti_plus');
 const PLAN = '_shared/diagnostics/data/field_check_all.json';
 const MANIFEST = '_shared/menu/data/menu_manifest.json';
-const ALL_ROW = 'field_check_all';
+const ALL_ROW = 'field_report';
 // Each driver's developer field run declaration, which owns its steps' checks and deadlines
 const STEPS_FILES = {
 	ahk: 'windows/diagnostics/data/field_run_steps.json',
@@ -39,15 +39,15 @@ const STEPS_FILES = {
 const ROUTES = {
 	ahk: [
 		'windows/menu/ui/builder/menu_init.ahk',
-		'MenuCommand.FIELD_CHECK_ALL, (*) => FieldCheckAll_Command(),'
+		'MenuCommand.FIELD_REPORT, (*) => FieldCheckAll_Command(),'
 	],
 	hs: [
 		'macos/menu/ui/builder/builder.lua',
-		'[COMMAND.FIELD_CHECK_ALL] = function() require("diagnostics.ui.field_check").run_all() end,'
+		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_all() end,'
 	],
 	linux: [
 		'linux/diagnostics/ui/menu_debug.lua',
-		'[COMMAND.FIELD_CHECK_ALL] = function() require("diagnostics.ui.field_check.run_all").run() end,'
+		'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.run_all").run() end,'
 	]
 };
 
@@ -116,26 +116,33 @@ check('every Tests row a driver offers is run, listed as separate, or « Test ev
 	}
 });
 
-check('« Test everything » heads the Tests rows on every driver and each driver routes it', () => {
-	assert.equal(tests[0].id, ALL_ROW);
-	assert.equal(tests[0].platforms, undefined, 'every driver offers it');
-	for (const [platform, [file, line]] of Object.entries(ROUTES))
-		assert(readText(file).includes(line), `${platform}: ${file} does not route ${ALL_ROW}`);
-	assert(
-		/^#Include diagnostics\/ui\/field_check\/run_all\.ahk$/m.test(
-			readText('windows/ErgoptiPlus.ahk')
-		),
-		'the Windows driver includes its run'
-	);
-	const runner = readText('windows/tests/run_all.ahk');
-	assert(
-		/^#Include \.\.\/diagnostics\/ui\/field_check\/run_all\.ahk$/m.test(runner),
-		'the AHK suite loads it'
-	);
-	assert(
-		/^#Include unit\/diagnostics\/ui\/test_field_check_all\.ahk$/m.test(runner),
-		'the AHK suite runs its tests'
-	);
-});
+check(
+	'the field report row stands just before Tests on every driver and each driver routes it',
+	() => {
+		const debug = read(MANIFEST).debug_menu;
+		const at = debug.findIndex((row) => row.id === ALL_ROW);
+		assert(at >= 0, 'the Debug menu declares the field report row');
+		assert.equal(debug[at + 1].id, 'debug_tests', 'it stands just before Tests');
+		assert.equal(debug[at].platforms, undefined, 'every driver offers it');
+		assert(!tests.some((row) => row.id === ALL_ROW), 'it is not inside Tests');
+		for (const [platform, [file, line]] of Object.entries(ROUTES))
+			assert(readText(file).includes(line), `${platform}: ${file} does not route ${ALL_ROW}`);
+		assert(
+			/^#Include diagnostics\/ui\/field_check\/run_all\.ahk$/m.test(
+				readText('windows/ErgoptiPlus.ahk')
+			),
+			'the Windows driver includes its run'
+		);
+		const runner = readText('windows/tests/run_all.ahk');
+		assert(
+			/^#Include \.\.\/diagnostics\/ui\/field_check\/run_all\.ahk$/m.test(runner),
+			'the AHK suite loads it'
+		);
+		assert(
+			/^#Include unit\/diagnostics\/ui\/test_field_check_all\.ahk$/m.test(runner),
+			'the AHK suite runs its tests'
+		);
+	}
+);
 
 console.log(`[OK] « Test everything » plan (${checks} checks).`);

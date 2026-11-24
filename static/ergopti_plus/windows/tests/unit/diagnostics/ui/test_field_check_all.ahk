@@ -93,7 +93,7 @@ _TFCA_Translate(Key) {
 _TFCA_ShippedPlan() {
 	Plan := _FieldCheckAll_LoadPlan()
 	AssertTrue(Plan["run"].Length > 0, "the Windows plan runs checks")
-	Classified := Map("field_check_all", true)
+	Classified := Map("field_report", true)
 	for Entry in Plan["run"] {
 		AssertTrue(FieldRun_Runners().Has(Entry["check"]), "a field run runner exists for " . Entry["check"])
 		if Entry["row"] != ""
@@ -101,8 +101,14 @@ _TFCA_ShippedPlan() {
 	}
 	for Entry in Plan["separate"]
 		Classified[Entry["row"]] := true
+	Debug := _MM_GetManifestRoot()["debug_menu"]
+	At := 0
+	for Index, Row in Debug
+		if Row.Get("id", "") == "field_report"
+			At := Index
+	AssertTrue(At > 0, "the Debug menu declares the field report row")
+	AssertEqual("debug_tests", Debug[At + 1].Get("id", ""), "the field report row stands just before Tests")
 	Rows := _MM_GetManifestRoot()["debug_tests_menu"]
-	AssertEqual("field_check_all", Rows[1]["id"], "« Test everything » heads the Tests rows")
 	for Row in Rows {
 		ForWindows := !Row.Has("platforms")
 		if Row.Has("platforms")
@@ -113,7 +119,7 @@ _TFCA_ShippedPlan() {
 			AssertTrue(Classified.Has(Row["id"]), "Tests row neither run nor listed: " . Row["id"])
 	}
 	Body := _DriverFuncBody("_MI_BuildDebuggingMenu")
-	AssertTrue(InStr(Body, "MenuCommand.FIELD_CHECK_ALL, (*) => FieldCheckAll_Command(),") > 0,
+	AssertTrue(InStr(Body, "MenuCommand.FIELD_REPORT, (*) => FieldCheckAll_Command(),") > 0,
 		"the Debug menu routes « Test everything »")
 }
 Test("test everything: the shipped plan classifies every Windows Tests row (field-check-all)", _TFCA_ShippedPlan)
@@ -257,7 +263,7 @@ _TFCA_Command() {
 		AssertEqual(1, Box.Refusals.Length, "the second click is refused")
 		_TFCA_Drain(Clock, 999999)
 		AssertEqual(1, Box.Shown.Length, "one combined report")
-		AssertTrue(InStr(Box.Shown[1], t("menu.debug.field_check_all") . "|") == 1, Box.Shown[1])
+		AssertTrue(InStr(Box.Shown[1], t("menu.debug.field_report") . "|") == 1, Box.Shown[1])
 		AssertTrue(FieldCheckAll_Command(Deps), "a finished run can start again")
 		_TFCA_Drain(Clock, 999999)
 	} finally _FieldCheckAll_Busy(false)

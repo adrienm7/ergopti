@@ -38,7 +38,7 @@
 global FIELD_CHECK_ALL_TAG := "FieldCheckAll"
 
 ; Locale key of the row and of the combined report's title (the row's own label).
-global FIELD_CHECK_ALL_TITLE := "menu.debug." . MenuCommand.FIELD_CHECK_ALL
+global FIELD_CHECK_ALL_TITLE := "menu.debug." . MenuCommand.FIELD_REPORT
 
 ; True while the sequence runs.
 global _FieldCheckAllBusy := false
