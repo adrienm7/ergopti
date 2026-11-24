@@ -1,6 +1,7 @@
 {
 	"programmable_hotstring_entry": "platform_reason.menu_container_rows_are_built_per_driver",
 	"top_level": "platform_reason.tray_top_level_rows_are_each_drivers",
+	"configuration_menu.reading_font": "platform_reason.reading_font_menus_need_native_drawing",
 	"llm_trigger_menu": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"agent_menu": "platform_reason.menu_container_rows_are_built_per_driver",
 	"selection_caps_word_control": "platform_reason.selection_operations_are_a_block_on_linux",

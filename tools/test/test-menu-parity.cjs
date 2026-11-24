@@ -6787,6 +6787,16 @@ function languageParentSource(source, driver) {
 				.replace('{1}', locale['menu.configuration.reading_spacing'])
 				.replace('{2}', locale['menu.configuration.reading_spacing.default'])
 		]);
+		// Linux draws its tray in the desktop theme's font: its row names the windows alone.
+		const readingFont = (key) =>
+			locale['common.label_value']
+				.replace('{1}', locale[key])
+				.replace('{2}', locale['menu.configuration.reading_font.default']);
+		assert.deepEqual(hand[code].linux_children, {
+			[readingFont('menu.configuration.reading_font')]: readingFont(
+				'menu.configuration.reading_font_windows_only'
+			)
+		});
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,

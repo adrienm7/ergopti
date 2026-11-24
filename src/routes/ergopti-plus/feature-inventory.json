@@ -48,8 +48,8 @@
 		"path": "script.reading_font",
 		"family": "setting",
 		"labels": {
-			"fr": "Police des fenêtres",
-			"en": "Font of the windows"
+			"fr": "Police des fenêtres et menus",
+			"en": "Font of the windows and menus"
 		},
 		"platforms": {
 			"windows": true,

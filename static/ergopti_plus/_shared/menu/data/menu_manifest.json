@@ -1219,6 +1219,37 @@
 			"id": "reading_font",
 			"i18n": "menu.configuration.reading_font",
 			"path": "script.reading_font",
+			"platforms": [
+				"ahk",
+				"hs"
+			],
+			"unavailable": "hide",
+			"show_current_choice": true,
+			"current_choice_label_value": true,
+			"choices": [
+				{
+					"value": "default",
+					"i18n": "menu.configuration.reading_font.default"
+				},
+				{
+					"value": "hyperlegible",
+					"i18n": "menu.configuration.reading_font.hyperlegible"
+				},
+				{
+					"value": "dyslexic",
+					"i18n": "menu.configuration.reading_font.dyslexic"
+				}
+			]
+		},
+		{
+			"type": "choice",
+			"id": "reading_font",
+			"i18n": "menu.configuration.reading_font_windows_only",
+			"path": "script.reading_font",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide",
 			"show_current_choice": true,
 			"current_choice_label_value": true,
 			"choices": [
