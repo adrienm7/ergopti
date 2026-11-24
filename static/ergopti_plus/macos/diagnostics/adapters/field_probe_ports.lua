@@ -1010,6 +1010,20 @@ function M.new()
 				deliveries = counts.deliveries,
 			}
 		end,
+		-- The icon the running engine's bundle declares (engine dialogs show it)
+		engine_icon_facts = function()
+			local bundle = tostring(hs.processInfo.bundlePath or "")
+			if not bundle:match("/ErgoptiPlus%.app/Contents/Frameworks/Hammerspoon%.app$") then
+				return { embedded = false }
+			end
+			local ok, info = pcall(hs.plist.read, bundle .. "/Contents/Info.plist")
+			if not ok or type(info) ~= "table" then return { embedded = true, readable = false } end
+			local icon_file = info.CFBundleIconFile
+			local icns = type(icon_file) == "string" and icon_file ~= ""
+				and hs.fs.attributes(bundle .. "/Contents/Resources/" .. icon_file:gsub("%.icns$", "") .. ".icns", "mode")
+			return { embedded = true, readable = true, icon_file = icon_file, icon_name = info.CFBundleIconName,
+				icns_present = icns == "file" }
+		end,
 		physical_shortcut_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 			local bound = 0

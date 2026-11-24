@@ -195,6 +195,17 @@
 			"not_testable": "Needs the journal of an interrupted install, which an --installed run removes before it installs: install from the Tap-Holds menu on the Mac that kept one; the shell text is unit-tested (OwnedRuntimeServiceRepairTests, test_runtime_install)."
 		},
 		{
+			"id": "engine_dialog_icon",
+			"title": "Engine dialog icon",
+			"checks": [
+				{
+					"step": "field_engine_icon",
+					"report": ["engine_icon_file", "engine_icon_name", "engine_icns"]
+				}
+			],
+			"not_testable": "The icon drawn in an engine dialog needs eyes: with the three plist steps passing, a hammer there is a stale Launch Services entry."
+		},
+		{
 			"id": "managed_ollama_0406",
 			"title": "Managed Ollama 0.40.6",
 			"checks": [

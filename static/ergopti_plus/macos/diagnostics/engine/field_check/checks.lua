@@ -956,6 +956,7 @@ M.checks = {
 	tap_copy = require("diagnostics.engine.field_check.tap_copy").tap_copy,
 	raw_telemetry = require("diagnostics.engine.field_check.raw_telemetry").raw_telemetry,
 	physical_shortcuts = require("diagnostics.engine.field_check.physical_shortcuts").physical_shortcuts,
+	engine_icon = require("diagnostics.engine.field_check.engine_icon").engine_icon,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the
