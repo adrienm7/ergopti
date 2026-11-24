@@ -43,7 +43,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
 - [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of
       `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions, including mutter and KWin reloading a
       `~/.config/xkb` layout (107); KDE is not proved even in a container
-      ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)).
+      ([receipts](docs/audits/linux-container-proofs/2026-11-10-layouts/README.md)). With Neo 2 emulated
+      (2026-11-20), Caps Lock holds Mod3 and AltGr Mod4, also with a user tap-hold or remap on either key: the
+      tap-hold engine runs before the hook's `onHeldModifierKey`.
 - [ ] <!-- field-point: owned_gtk_host --> Owned GTK host: tap delay row and every tray dialog (ca680655d7), group
       restore and clear, open target, Backspace word start.
 - [ ] <!-- field-point: physical_shortcut_delivery --> Physical shortcut delivery (LIN-004): on a real keyboard under

@@ -138,6 +138,8 @@ Hands needed:
       note the password-field limit (Secure Event Input: the system layout types). Then bind a Shortcuts-menu slot
       to Ctrl+Z: under the emulation it runs from the key that types « z » in Ergopti➕, not from the French Z key
       (the Carbon `hs.hotkey` slot sees the rewritten key code; Linux ILX-001, input/layout follow-up report).
+      With Neo 2 emulated (2026-11-20), right Option holds Mod4, also with a user tap-hold or remap on right Option
+      (Caps Lock cannot hold Mod3 on macOS: `platform_reason.caps_lock_level_not_held_on_macos`).
 - [ ] <!-- field-point: hotstrings_asa --> Hotstrings (asa): the carrier types the whole `ASA` while the trigger's `a` is held (`test_text_carrier_avoids_held_key`); on the Mac: field report: `field_log_signals` `log_held_key_moves` after a person types `asa` + Space fast twenty times, also holding `a`, and `hotstring_roundtrip`; ordinary hotstrings in Edge, VS Code and a terminal stay hands.
 - [ ] <!-- field-point: omlx_8181 --> oMLX on port 8181: field report: `field_local_servers` names it in API mode (`server_<id>` `up:...`), with no `ps` deadlock.
 - [ ] <!-- field-point: l46_gestures --> L46 with no explicit `[gestures.sensitivities]` swipe_3 value (6d3aa65273): field report: `field_gesture_frames`, and `field_log_signals` `log_capture_stamp_errors` (no `has no capture timestamp` ERROR after a reload) and `log_three_finger_rejections` (`<n>:<gate>`). The swipes themselves (minutes of two-finger scrolls switch no tab; deliberate vertical three-finger swipes — slow, flick, staggered, after a scroll, finger resting, ten half a second apart — each switch exactly one tab, past 29 units two) stay hands.
