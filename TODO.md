@@ -346,14 +346,11 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
-- [ ] **Other analysers, what is left (2026-11-24).** Every text corpus now carries genkey's skipgrams of gaps 1 to
-      9 and Oxeylyzer's token pairs of gaps 1 to 3 with its exact totals, counted from its text
-      (`LAYOUT_ANALYSER_SCORES.textTables`, `analysers` of each `_generated/corpus_<id>.js`, 1.43 MB for the 31 text
-      corpora; docs/design/analyser-scores.md, « API »). Left: rerun `verify-analyser-scores.cjs` with `--genkey`
-      and `--oxeylyzer` on a machine that may run the two tools (this cloud session could build genkey but not run
-      it) and set their fidelity to `exact` on texts if the gaps are gone; the word lists and the 12 count-table
-      corpora keep the trigrams' chain (no text to count from). keycraft (BSD-3, Go, its score scaled on its own
-      layout set) needs its own run to be checked; shirolyzer's score is undocumented.
+- [ ] **Other analysers, what is left (2026-11-24).** genkey and Oxeylyzer were rerun on their text corpora on
+      2026-11-24 (`verify-analyser-scores.cjs --genkey`, `--oxeylyzer`: Score within 0.005 % and 0.0003 on average,
+      docs/design/analyser-scores.md); both stay `close` for the word lists and the 12 count-table corpora (the
+      trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
+      own run to be checked; shirolyzer's score is undocumented.
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -637,7 +634,11 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-None open.
+- [ ] **Analyser fidelity per corpus kind (decided by the agent on 2026-11-24, to review by the maintainer).**
+      Rerun on 2026-11-24, genkey matches itself on the text corpora within its printed rounding and Oxeylyzer within
+      0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
+      both stay `close` (the word lists and count tables keep the trigrams' chain), the text-corpus result stated in
+      docs/design/analyser-scores.md. The other choice is a `fidelity` per corpus kind, with genkey `exact` on texts.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 
