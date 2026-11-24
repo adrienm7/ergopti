@@ -616,13 +616,15 @@ until then, so every layout's ErgoDox values changed with this convention.
   thumb code (67 NonConvert, 74 Convert, 73 KanaMode) or a board-only thumb
   key; the other typed keys of that thumb take its thumb codes left free,
   big keys first, as before. The left 2-unit outer key (66) holds the
-  board's Space: a letter there, beside a space on the inner key, is typed
-  on Space (decided by the agent on 2026-11-24, to review by the
-  maintainer), one key at its place on every drawing. Since the left thumb
-  types on one key, the space's (or the rest key's), that letter is a key
-  the board lacks for the layout: KLAnext's Einbinder Orthogonal lacks its
-  « u » and Yp Hina Fu its « e » on the ErgoDox, both incomplete there as on
-  the boards without thumb keys. The right 2-unit outer key (75) holds
+  board's Space, and the left thumb types on both 2-unit keys together
+  (`left_thumb_typing_keys` of the ErgoDox in `board_geometries.json`;
+  maintainer, 2026-11-24), where every other board keeps one: with a
+  layout's space or rest key on the inner key (67), the outer one sits where
+  the left thumb's second key, Alt (Cmd on macOS), is. A letter there is
+  typed by the left thumb and counts in its pairs like a thumb key's
+  (`leftThumbKeys`, `layoutBoard`), so KLAnext's Einbinder Orthogonal
+  (« u ») and Yp Hina Fu (« e ») are complete on the ErgoDox; they are the
+  only library layouts that type on both, and no other value moved. The right 2-unit outer key (75) holds
   AltGr, a modifier: a letter there has no code and is named unread
   (KLAnext's VCKB and VCKB2 stay out for it).
 - The board names its own outer columns (`outer_keys` in

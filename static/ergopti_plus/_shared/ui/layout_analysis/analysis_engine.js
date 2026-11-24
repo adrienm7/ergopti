@@ -577,6 +577,9 @@ var LAYOUT_ANALYSIS = (function () {
 		board.leftThumbRest =
 			model.thumb_rest_keys.find((code) => board.leftThumbCodes.includes(code)) ||
 			board.codes[board.homeOf[LEFT_THUMB]];
+		// The left thumb keys a layout types on together (the ErgoDox's two
+		// 2-unit keys: left_thumb_typing_keys), where other boards keep one.
+		board.leftThumbTogether = (board3d && board3d.left_thumb_typing_keys) || [];
 		board.modifiers = {
 			shiftForLeft: board.index.get(model.modifier_keys.shift_for_left_hand),
 			shiftForRight: board.index.get(model.modifier_keys.shift_for_right_hand),
@@ -2209,8 +2212,28 @@ var LAYOUT_ANALYSIS = (function () {
 	function spareThumbKeys(layoutInput, keyboardId, profile) {
 		const layout = layoutFromRows(layoutInput);
 		const board = keyboard(keyboardId, profile);
-		const kept = leftThumbKey(board, layout);
-		return board.leftThumbCodes.filter((code) => code !== kept);
+		const kept = leftThumbKeys(board, layout);
+		return board.leftThumbCodes.filter((code) => !kept.includes(code));
+	}
+
+	/**
+	 * The left thumb keys a layout types on: its leftThumbKey, and on a board
+	 * whose left thumb types on several keys together (the ErgoDox's 2-unit
+	 * keys, left_thumb_typing_keys; maintainer, 2026-11-24) every other one of
+	 * those it puts a character on.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {string[]} Codes of board.leftThumbCodes, the leftThumbKey first.
+	 */
+	function leftThumbKeys(board, layout) {
+		const first = leftThumbKey(board, layout);
+		if (!board.leftThumbTogether.includes(first)) return [first];
+		const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
+		return [first].concat(
+			board.leftThumbTogether.filter(
+				(code) => code !== first && board.leftThumbCodes.includes(code) && typed(code)
+			)
+		);
 	}
 
 	/**
@@ -2226,8 +2249,16 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function layoutBoard(board, layout) {
 		const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
-		const kept = leftThumbKey(board, layout);
-		const dropped = board.leftThumbCodes.filter((code) => code !== kept && typed(code));
+		const kept = leftThumbKeys(board, layout);
+		const dropped = board.leftThumbCodes.filter((code) => !kept.includes(code) && typed(code));
+		// A left thumb key typed together with the first (the ErgoDox's outer
+		// 2-unit key, board code Space) takes part in the pairs like a thumb key
+		// when it types no space.
+		const letterKeys = kept
+			.slice(1)
+			.filter((code) => !(layout.rows[code] || []).some((cell) => cell === ' '))
+			.map((code) => board.index.get(code))
+			.filter((k) => board.outOfPairs[k] === 1);
 		const spaceKeys = data()
 			.model.thumb_keys.filter(
 				(code) =>
@@ -2236,13 +2267,14 @@ var LAYOUT_ANALYSIS = (function () {
 					(layout.rows[code] || []).some((cell) => cell === ' ')
 			)
 			.map((code) => board.index.get(code));
-		if (spaceKeys.length === 0 && dropped.length === 0) return board;
+		if (spaceKeys.length === 0 && dropped.length === 0 && letterKeys.length === 0) return board;
 		let copies = layoutBoardCache.get(board);
 		if (!copies) layoutBoardCache.set(board, (copies = new Map()));
-		const key = `${spaceKeys.join(',')}|${dropped.join(',')}`;
+		const key = `${spaceKeys.join(',')}|${dropped.join(',')}|${letterKeys.join(',')}`;
 		if (!copies.has(key)) {
 			const outOfPairs = Uint8Array.from(board.outOfPairs);
 			for (const k of spaceKeys) outOfPairs[k] = 1;
+			for (const k of letterKeys) outOfPairs[k] = 0;
 			const index = new Map(board.index);
 			for (const code of dropped) index.delete(code);
 			copies.set(key, Object.assign({}, board, { outOfPairs, index }));
