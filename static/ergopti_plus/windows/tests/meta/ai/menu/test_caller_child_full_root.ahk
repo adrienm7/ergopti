@@ -265,6 +265,7 @@ RunTests()
 }
 
 _LMCC_FullRootReusesTheCallerChild() {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	static Retained := []
 	Directory := A_Temp "\ergopti-llm-caller-child-" A_ScriptHwnd "-" A_TickCount "-" Random(100000, 999999)
 	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"))
@@ -281,7 +282,7 @@ _LMCC_FullRootReusesTheCallerChild() {
 		Quiesced := false
 		AssertTrue(Task.start())
 		Started := A_TickCount
-		while !State["done"] && ((A_TickCount - Started) & 0xFFFFFFFF) < 5000
+		while !State["done"] && ((A_TickCount - Started) & 0xFFFFFFFF) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 			Sleep(10)
 		AssertTrue(State["done"], "the isolated root queue child must exit naturally")
 		AssertEqual(0, State["exit"], State["output"])

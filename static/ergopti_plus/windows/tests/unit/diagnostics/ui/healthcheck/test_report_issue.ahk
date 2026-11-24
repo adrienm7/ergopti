@@ -338,7 +338,7 @@ _THPA_FieldReportIssue() {
 	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
 		. "/issues/new?template=bug_report.yml&"
 	AssertEqual(Prefix, SubStr(Calls[2], 1, StrLen(Prefix)))
-	AssertEqual(Line, _THPA_QueryValue(Calls[2], "diagnostics"), "the form carries the evidence line")
+	AssertEqual(Line, UriDecode(_THPA_QueryValue(Calls[2], "diagnostics")), "the form carries the evidence line")
 	AssertEqual("Windows", _THPA_QueryValue(Calls[2], "driver"))
 	AssertFalse(InStr(Calls[2], "JDoe"), "the URL carries no account name")
 	Refused := false
