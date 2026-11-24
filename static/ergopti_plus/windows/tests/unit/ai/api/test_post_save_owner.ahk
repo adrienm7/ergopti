@@ -14,6 +14,46 @@
 ; until reading its journal back stopped comparing (llm-api-save-registry-compares).
 global _WAPO_MAX_REGISTRY_COMPARES_PER_SAVE := 400
 
+; The owners of those comparisons that repeat per a traced unit, by the name
+; ConfigMigrateDeepCompareOwnersTake gives them ("request:caller<parent"; a
+; closure has an empty name), and the ConfigTransitionGuardCompareBudget request
+; that counts their unit. They are the anonymous guards of the guarded native
+; transition ports, the owners of that former journal re-read: each compares at
+; its admission, at its first unproven check and at the two checks of every
+; durable effect, never at a read (_ConfigTransitionGuardedProductionPort).
+global _WAPO_GUARD_COMPARE_OWNERS := Map(
+	"capture_transition:<Func.Prototype.Call", "capture_transition",
+	"capture_recovery:<Func.Prototype.Call", "capture_recovery")
+
+; Takes the comparison owners and guard budgets spent since the last call.
+_WAPO_TakeGuardCompares(Budgets) {
+	global ConfigTransitionGuardCompareBudget
+	Owners := ConfigMigrateDeepCompareOwnersTake()
+	Spent := Map()
+	for Request, Total in ConfigTransitionGuardCompareBudget {
+		Spent[Request] := Total - Budgets.Get(Request, 0)
+		Budgets[Request] := Total
+	}
+	return { owners: Owners, spent: Spent }
+}
+
+; Every anonymous guard comparison of the save stays within the unit its owner
+; repeats per, and the transaction guards really compared.
+_WAPO_AssertGuardCompares(Taken) {
+	; Every owner is printed, so a run measures those the table does not name yet.
+	for Owner, Compares in Taken.owners
+		_TestPrint("# api-save registry compares " . Owner . "=" . Compares)
+	for Owner, Request in _WAPO_GUARD_COMPARE_OWNERS {
+		Compares := Taken.owners.Get(Owner, 0)
+		Budget := Taken.spent[Request]
+		_TestPrint("# api-save guard compares " . Owner . "=" . Compares . " budget=" . Budget)
+		AssertTrue(Compares <= Budget, "The " . Request . " guards may compare only at their admission and their "
+			. "durable effects, never at a journal read: " . Compares . " compares for a budget of " . Budget)
+	}
+	AssertTrue(Taken.owners.Get("capture_transition:<Func.Prototype.Call", 0) > 0,
+		"Positive control: the save's transaction guards must compare the live registry")
+}
+
 _WAPO_Mutate(State, Candidate) {
 	if State.Mode == "delete"
 		return _LLM_Menu_RemoveApiEntryCandidate(Candidate, State.SavedEntry["Id"])
@@ -139,7 +179,10 @@ _WAPO_ActualSaveOfferBody(Mode) {
 		Form.Port["test_entry"] := _WAPO_Test.Bind(State)
 		Form.Port["ready"] := _WAPO_Ready.Bind(State)
 		ComparesBefore := ConfigMigrateRegistryDeepCompares
+		GuardBudgets := Map()
+		_WAPO_TakeGuardCompares(GuardBudgets)
 		AssertTrue(Form.Run(), "Optional stale post-save work cannot undo an acknowledged native save.")
+		_WAPO_AssertGuardCompares(_WAPO_TakeGuardCompares(GuardBudgets))
 		if !(Mode == "replace" || Mode == "delete" || Mode == "after-test-replace" || Mode == "late-transport") {
 			Compares := ConfigMigrateRegistryDeepCompares - ComparesBefore
 			AssertTrue(Compares > 0 && Compares <= _WAPO_MAX_REGISTRY_COMPARES_PER_SAVE,

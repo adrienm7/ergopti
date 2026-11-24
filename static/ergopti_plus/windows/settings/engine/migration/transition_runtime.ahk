@@ -19,6 +19,15 @@
 
 global _ConfigTransitionRetainedBarrier := false
 
+; Registry comparisons the guards of the guarded native ports may spend, by the
+; request of their guards (diagnostics only). A guard compares at most once when
+; it is admitted, once for the first check before any standing proof, and once
+; for each of the two checks of a durable effect (its pre-check and its native
+; admission): reading back the journal spends none. The API save test bounds the
+; guards' actual comparisons by this, not by a count, so a read that compares
+; again exceeds it however few effects a save has.
+global ConfigTransitionGuardCompareBudget := Map("capture_transition", 0, "capture_recovery", 0)
+
 
 
 
@@ -816,6 +825,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 	static PortOwner := ConfigTransitionProductionPort
 	static ReplaceOwner := FSConfigAtomicMoveReplace, CreateOwner := FSConfigAtomicMoveCreate
 	static DeleteOwner := FSConfigDeleteStrict, NoopOwner := FSNativeAcknowledge
+	global ConfigTransitionGuardCompareBudget
 	for Owner in [PortOwner, ReplaceOwner, CreateOwner, DeleteOwner, NoopOwner]
 		if Object.Prototype.HasOwnProp.Call(Owner, "Call")
 			throw Error("The original configuration native producer was modified")
@@ -826,6 +836,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 	Native := PortOwner.Call()
 	Guards := Map()
 	Guards.CaseSense := "On"
+	GuardRequest := Recovery ? "capture_recovery" : "capture_transition"
 	; Keep canonical Native as authority. This private callback adapter forwards
 	; the captured real native class without registering itself as a native port.
 	Callbacks := Map()
@@ -867,6 +878,14 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			throw Error("The complete configuration transition candidate was refused")
 		Guards[_ConfigWriteLeaseKey(Path)] := { check: Guard, old_present: Present, old_content: Content,
 			new_present: Candidate["present"], new_content: Candidate["content"] }
+		; Its admission above and its first check before any standing proof.
+		ConfigTransitionGuardCompareBudget[GuardRequest] += 2
+	}
+	; Each durable effect checks every guard twice, emptying the standing proof
+	; each time (AllLive); only these may compare again.
+	SpendEffect() {
+		global ConfigTransitionGuardCompareBudget
+		ConfigTransitionGuardCompareBudget[GuardRequest] += 2 * Guards.Count
 	}
 	NativeLive() {
 		for Owner in [PortOwner, ReplaceOwner, CreateOwner, DeleteOwner, NoopOwner]
@@ -905,6 +924,8 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		return ConfigMigrateWithRegistryProof(() => Check.Call(Args*), Standing)
 	}
 	Dispatch(ReadOnly, Callback, Args*) {
+		if !ReadOnly
+			SpendEffect()
 		if !AllLive(!ReadOnly)
 			throw Error("The actual guarded native callback owner was withdrawn before dispatch")
 		Result := Callback.Call(Args*)
@@ -924,6 +945,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		return Content
 	}
 	MoveReplace(Source, Destination) {
+		SpendEffect()
 		if !AllLive()
 			return 0
 		Key := _ConfigWriteLeaseKey(Destination)
@@ -938,11 +960,13 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		return ReplaceOwner.Call(Source, Destination, &MoveError, Admission)
 	}
 	MoveCreate(Source, Destination) {
+		SpendEffect()
 		if !AllLive()
 			return 0
 		return CreateOwner.Call(Source, Destination, AllLive)
 	}
 	Delete(Path) {
+		SpendEffect()
 		if !AllLive()
 			return 0
 		Key := _ConfigWriteLeaseKey(Path)
@@ -956,6 +980,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 		return DeleteOwner.Call(Path, Admission)
 	}
 	Noop(Path, Content, Present) {
+		SpendEffect()
 		if !AllLive()
 			return 0
 		ActualPresent := Callbacks["exists"].Call(Path)

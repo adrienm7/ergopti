@@ -147,13 +147,14 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       Count ratchets now compare named ledgers (a new item and a fixed entry both fail: `tools/test/lib/known-debt.cjs`
       and the per-file OS-purity ledgers of both drivers) and the TOML cost tests compare two input sizes. What is
       left needs a measurement or a design first.
-  - `unit/ai/api/test_post_save_owner.ahk` still caps one API save at 400 registry deep compares. Measured
-    2026-11-22 by owner (`ConfigMigrateDeepCompareOwnersTake`): 152 per save, of which the anonymous transition
-    guards `capture_recovery:<Func.Prototype.Call` 56 and `capture_transition:<Func.Prototype.Call` 48, and
-    `check_write:ConfigMigrateBoot<ConfigSchemaCanPrepareWrite` 29. An owner table like the startup smoke's
-    `BOOT_WORK_OWNERS` needs the unit those guards repeat per (native observations of one transaction?) traced in
-    `settings/engine/migration/migrate.ahk` first; naming them « each » without it would let the former
-    1 665-compare journal re-read back in.
+  - `unit/ai/api/test_post_save_owner.ahk` still caps one API save at 400 registry deep compares for the owners
+    its `_WAPO_GUARD_COMPARE_OWNERS` table does not name yet. Since 2026-11-24 the two anonymous transition guards
+    (104 of the 152 compares measured 2026-11-22) are bounded by their traced unit instead,
+    `ConfigTransitionGuardCompareBudget`: two per guard at its admission and first unproven check, two per guard
+    and durable effect, none per journal read. Left: `check_write:ConfigMigrateBoot<ConfigSchemaCanPrepareWrite`
+    (29, one per write-entry admission, `_ConfigSchemaEntryAdmitted` and `ConfigFullStateCanPersist`) and about 19
+    other compares; read them from the `# api-save registry compares` lines of a Windows run, give each a unit
+    counted apart from the reads, then drop the ceiling.
   - `test-driver-tree-parity.cjs` (shared 66, union 87, tests 18/75, canonical 9) and
     `test-port-vector-traceability.cjs` (73) are floors and ceilings that the structure phase 2 runner rewrites with
     `--update-baseline --allow-rise`; listing the directories instead means changing that runner with them.
