@@ -1140,7 +1140,11 @@ when they carry a character. `janiso` is no JIS board despite its name
 keys); it is read the same way from KLAnext's QWERTY on it
 (`layouts/qwerty.za.janiso.json`), which puts `[` `\` `` ` `` left of the
 letter rows and `]` `-` `'` right of them, so a character there takes the key
-its QWERTY character has on ANSI. KLAnext's layout list (`db.js`) holds no
+its QWERTY character has on ANSI. The left outer column's number-row key
+(index 1), which that QWERTY leaves empty and Hands Down Neu's janiso files
+give `` ` `` `~`, takes the ErgoDox's key at the same place,
+`LeftOuterNumber` (every ANSI code is another index's): measured on the
+ErgoDox, a key the other keyboards lack. KLAnext's layout list (`db.js`) holds no
 `ergolinear` layout (`KB.keyMap.ergolinear`: three split rows of 12 keys, no
 number row), so its keys are placed by position, as on the Corne: the ten
 middle keys of each letter row, Quote right of the home row, the right
