@@ -158,8 +158,8 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       formats nor a delayed-rendering receipt can prove the paste (a single open 0-140 ms after a write failed
       about 1 time in 60-120). The `gesture-transform-native-render-focus` and `wrap-native-render-focus` current
       modes still fail that way now and then (sends=1, Edit empty), at the old head too. The TextSend payload
-      (`CB_WriteTextWithReceipt`, LLM and diagnostics) is still published through `A_Clipboard`, without the
-      exclusion formats. macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
+      (`CB_WriteTextWithReceipt`, LLM and diagnostics) carries the same exclusion formats since 2026-11-24
+      (`_CB_WriteTransientText`, `test_clipboard_reader_wait.ahk`). macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
       each reader separately), so the race does not exist there; their transient hints
       (`org.nspasteboard.TransientType`, `x-kde-passwordManagerHint`) are not set yet.
       Count ratchets now compare named ledgers (a new item and a fixed entry both fail: `tools/test/lib/known-debt.cjs`

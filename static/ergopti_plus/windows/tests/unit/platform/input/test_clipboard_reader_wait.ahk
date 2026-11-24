@@ -6,7 +6,8 @@
 ; Windows wakes clipboard readers (explorer.exe, clipboard history) after every
 ; change. A second owned process holds the real lock the same way, so the
 ; SendInstant publication and its contention probe meet a reader on demand
-; instead of depending on the desktop's. No sequence or holder is forged.
+; instead of depending on the desktop's. No sequence or holder is forged. The
+; TextSend payload is checked for the same transient formats.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -128,6 +129,27 @@ _CRWT_PublicationOutwaitsReader() {
 }
 Test("Clipboard reader wait: the paste publication outwaits a passing reader (clipboard-reader-wait)",
 	_CRWT_PublicationOutwaitsReader)
+
+/** The TextSend payload (LLM, diagnostics) carries the same transient formats as the paste transport. */
+_CRWT_TextReceiptMarksTransient() {
+	global CB_TRANSIENT_FORMAT_NAMES
+	_CRWT_RequireIdleOwner()
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String, "the test must snapshot the user's clipboard first")
+	try {
+		Payload := "ergopti text receipt " . A_TickCount
+		Sequence := 0
+		AssertTrue(CB_WriteTextWithReceipt(Payload, &Sequence), "the TextSend publication must succeed")
+		AssertTrue(Sequence > 0, "the TextSend publication must authenticate its own sequence")
+		Publication := _CRWT_ReadPublication()
+		AssertEqual(Payload, Publication.Text)
+		for Name in CB_TRANSIENT_FORMAT_NAMES
+			AssertEqual(0, Publication.Markers[Name], "the TextSend payload must carry " . Name . " = 0")
+		AssertEqual(Sequence, CB_GetSequenceNumber(), "reading the markers must not change the receipt")
+	} finally AssertTrue(CB_RestoreAll(Saved), "the user's clipboard must be restored")
+}
+Test("Clipboard reader wait: the TextSend payload is marked transient (clipboard-reader-wait)",
+	_CRWT_TextReceiptMarksTransient)
 
 /** A reader holding past the bound still refuses the publication, within the bound. */
 _CRWT_PublicationRefusesLongReader() {
