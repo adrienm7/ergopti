@@ -104,6 +104,21 @@ check('the shared declaration is well formed', () => {
 	assert.equal(protocol.folder.linux.segments[0], AppDirs.folderName('linux'));
 	assert(!path.isAbsolute(protocol.folder.clone), 'the clone folder is relative to the clone root');
 	assert.match('mac-2026-10-30_191337', new RegExp(protocol.request_id_pattern));
+	// The in-app run's prefix (Débogage « Lancer le field report »): AutoHotkey
+	// reads it here; the shared Lua module holds the same value.
+	assert.match(
+		`${protocol.in_app_prefix}20261124T120000Z`,
+		new RegExp(protocol.request_id_pattern)
+	);
+	const inApp = fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/diagnostics/engine/field_run/in_app.lua'),
+		'utf8'
+	);
+	assert.equal(
+		inApp.match(/^M\.PREFIX = "([^"]*)"$/m)?.[1],
+		protocol.in_app_prefix,
+		'in_app.lua M.PREFIX'
+	);
 	assert.match('03_field_network.json', new RegExp(protocol.result_file_pattern));
 	assert.doesNotMatch('../x.json', new RegExp(protocol.result_file_pattern));
 });

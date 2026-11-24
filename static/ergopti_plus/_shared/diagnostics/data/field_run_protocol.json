@@ -5,6 +5,7 @@
 		"The folder: a developer run from a clone uses folder.clone (relative to the clone root); an installed driver uses folder.<os>, the base an environment variable and the segments joined to it. A collector looks in the developer folder first, then the installed one.",
 		"Documents lists the keys each file carries; a driver may add keys, never drop one. A refusal carries request_id only when the request had a valid one (optional_keys). The guard kind is the configuration guard a driver runs after the last step (macOS and Linux config_guard); it is never a declared step. Every value a driver writes is a closed code, a count, a duration or a time: no typed text, path, URL or user name.",
 		"A guided step (macOS only, diagnostics/engine/field_run/guided.lua) is the one exception to running with no person: it publishes one gesture in its driver's prompt file, the collector prints it and may write the person's answer, and the step records what it observed or was answered; no gesture within its bound is needs_person.",
+		"An in-app run (Débogage « Lancer le field report », no collector) takes a request id starting with in_app_prefix; _shared/diagnostics/engine/field_run/in_app.lua M.PREFIX (macOS, Linux) is pinned equal to it by tools/test/test-field-run-protocol.cjs and field_run.ahk reads it.",
 		"A reload step (macOS, Linux and Windows driver_reload) writes the resume document before it asks for the reload; the reloaded driver (on Linux the successor daemon) reads it once, records the reload step and runs the next one (on Windows the successor instance, after its boot completes). A run whose reload leaves no usable resume document is closed with an interrupted done marker."
 	],
 	"schema": 1,
@@ -25,6 +26,7 @@
 	"code_pattern": "^[A-Za-z0-9_.:+-]{1,64}$",
 	"log_window_max_lines": 200,
 	"all_steps": "all",
+	"in_app_prefix": "app-",
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
 	"step_kinds": ["field_check", "diagnostics", "ai", "reload", "guided", "guard"],

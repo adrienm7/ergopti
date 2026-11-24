@@ -427,7 +427,7 @@ ComposerCheck_ShowReport(Report, ShowFn := 0, TitleKey := "menu.debug.composer_c
 
 /**
  * Shows a finished report's text in the one-click checks' window, with a
- * « Copy report » button; « Test everything » shows its combined report here.
+ * « Copy report » button; the in-app field report shows its report here.
  * @param {string} Text - The report text.
  * @param {Func} ShowFn - Opens the window; tests replace it.
  * @param {string} TitleKey - Locale key of the window title.

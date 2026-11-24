@@ -822,18 +822,14 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   `mods`.
 
 - [ ] **« Lancer le field report (tous les tests) » (maintainer requests, 2026-11-24).** Débogage's row just before «
-      Tests » runs the driver's own field run in-app: on macOS and Linux the menu hands the field run session its field
-      check steps in-process (`Session:submit_in_app`, `_shared/diagnostics/engine/field_run/in_app.lua`), with no clone
-      and no collector, and shows one report (`_shared/diagnostics/engine/field_check/field_report.lua`): verdict
-      counts, each step with its TODO-tests field points, the steps not run here with their reason (guided: a person;
-      reload, AI downloads, diagnostics, signed install: the collector), the Tests rows run separately and the folder of
-      the result files to attach to an issue. An installed Mac app starts its session on demand on `folder.macos` of the
-      shared protocol. Left:
-  - **Windows in-app run.** `field_run.ahk` starts its session in developer source mode only; start it on demand on
-    `folder.windows` (`LOCALAPPDATA\Ergopti\field-run`) and add the same in-process submit, observer and cancel, then
-    delete `windows/diagnostics/ui/field_check/run_all.ahk`, its test and
-    `_shared/diagnostics/data/field_check_all.json`, the interim sequencer the Windows row still runs (AutoHotkey
-    cannot run in the cloud containers: a Windows PC session).
+      Tests » runs the driver's own field run in-app: on the three drivers the menu hands the field run session its
+      field check steps in-process (`Session:submit_in_app`, shared by macOS and Linux in
+      `_shared/diagnostics/engine/field_run/in_app.lua`; `SubmitInApp` in `field_run.ahk`), with no clone and no
+      collector, and shows one report (`_shared/diagnostics/engine/field_check/field_report.lua`): verdict counts, each
+      step with its TODO-tests field points, the steps not run here with their reason (guided: a person; reload, AI
+      downloads, diagnostics, signed install: the collector), the Tests rows run separately and the folder of the result
+      files to attach to an issue. An installed Mac app or Windows driver starts its session on demand on `folder.macos`
+      or `folder.windows` of the shared protocol. Left:
   - **Progress window (maintainer request, 2026-11-24).** A shared WebView app window (`_shared/ui`, each driver's
     host, like the diagnostics and update windows; AAA tokens of `theme.css`, keyboard walk, live-region
     announcements) showing each step's state (pending, running, pass, fail, skipped, needs you) from the observer,

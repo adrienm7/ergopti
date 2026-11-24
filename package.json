@@ -243,7 +243,7 @@
 		"test:field-todo-summary": "node ./tools/test/test-field-todo-summary.cjs",
 		"test:field-guided": "node ./tools/test/test-field-guided.cjs",
 		"test:field-run-protocol": "node ./tools/test/test-field-run-protocol.cjs",
-		"test:field-check-all-plan": "node ./tools/test/test-field-check-all-plan.cjs",
+		"test:field-report-row": "node ./tools/test/test-field-report-row.cjs",
 		"test:feature-requirements": "node ./tools/test/test-feature-requirements.cjs",
 		"test:windows-field-report-contract": "node ./tools/test/test-windows-field-report-contract.cjs",
 		"test:windows-route-plan": "node ./tools/test/test-windows-route-plan.cjs",
