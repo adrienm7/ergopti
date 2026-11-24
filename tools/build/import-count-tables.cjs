@@ -649,8 +649,8 @@ function pruneDeviation(engine, counts, tables) {
 	for (const id of PRUNE_CHECK_LAYOUTS) {
 		const layout = library.get(id);
 		if (!layout) throw new Error(`the layout library has no ${id}`);
-		const before = engine.analyse(layout, full, {}).metrics;
-		const after = engine.analyse(layout, kept, {}).metrics;
+		const before = engine.measure(layout, full, {}).metrics;
+		const after = engine.measure(layout, kept, {}).metrics;
 		for (const metric of Object.keys(before)) {
 			const change = pruneChange(engine, metric, before, after);
 			if (!Number.isFinite(change)) throw new Error(`${id} ${metric} is not finite`);

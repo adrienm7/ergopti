@@ -479,8 +479,10 @@ async function exercisePresets(browser, origin) {
 	assert.deepEqual(await pressed(), ['balanced'], 'Undo brings the previous settings back');
 	assert.equal(await page.inputValue('#la-weight-roll_in'), '1');
 	// A floor under every row's SFB share: only the part above it costs points
-	// (score_weights.json « floors », the engine's aboveFloor), so each row
-	// gains exactly the SFB weight times the floor, shown to one decimal.
+	// (score_weights.json « floors », the engine's aboveFloor), so each total,
+	// QWERTY's too, gains c = the SFB weight times the floor. A mark is an
+	// index on QWERTY's total r, so each gap to 100 scales by one factor:
+	// (m' − 100) / (m − 100) = r / (r + c), the same for every row (r < 0).
 	const byName = () =>
 		page.$$eval('#la-table tbody tr', (rows) =>
 			Object.fromEntries(
@@ -504,10 +506,27 @@ async function exercisePresets(browser, origin) {
 	}, ergoptiBefore);
 	const floored = await byName();
 	assert.deepEqual(Object.keys(floored).sort(), Object.keys(unfloored).sort());
-	for (const [name, score] of Object.entries(floored))
+	// Rows away from QWERTY's 100; each mark is shown to one decimal, so a
+	// factor read from a gap g is off by at most about 0.11 / |g|. QWERTY costs
+	// between 150 and 250 points on the shown corpus, so r / (r + c), c = 1.5,
+	// lies between 1.006 and 1.011; QWERTY itself stays 100.
+	const factors = Object.entries(floored)
+		.filter(([name]) => Math.abs(unfloored[name] - 100) >= 5)
+		.map(([name, score]) => {
+			const gap = unfloored[name] - 100;
+			return { name, factor: (score - 100) / gap, slack: 0.11 / Math.abs(gap) };
+		});
+	assert.ok(factors.length >= 1, `rows away from QWERTY: ${factors.length}`);
+	const c = sfbWeight * 0.3;
+	for (const { name, factor, slack } of factors)
 		assert.ok(
-			Math.abs(score - unfloored[name] - sfbWeight * 0.3) <= 0.11,
-			`${name}: ${unfloored[name]} with no floor, ${score} with an SFB floor of 0.3 %`
+			factor >= 250 / (250 - c) - slack && factor <= 150 / (150 - c) + slack,
+			`${name}: ${unfloored[name]} with no floor, ${floored[name]} with an SFB floor of 0.3 % (factor ${factor})`
+		);
+	if ('QWERTY' in floored)
+		assert.ok(
+			floored.QWERTY === 100 && unfloored.QWERTY === 100,
+			'QWERTY reads 100 with and without the floor'
 		);
 	// A large SFB floor makes SFB cost nothing, so the score moves again.
 	const plain = await topScore(page);

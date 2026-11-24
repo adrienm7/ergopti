@@ -558,27 +558,34 @@ distinct corpus character once) and the share on the same finger and row
 {smallGap, closest})` lists the five most alike layouts (`LIBRARY_CLOSEST`)
 and the best-scoring existing layout (every complete layout before an
 incomplete one, as the Comparer ranks), each with its gap: the optimized
-layout's score minus its own, in the score's points, and `percent`, how
-much higher the higher of the two marks is (`LAYOUT_ANALYSIS.markGap`: the
-mark has a zero, the worst layout possible, so its gaps read as ratios;
-[layout-analysis.md](layout-analysis.md#mark)). Every entry carries its
-`mark` and `zero`; entries on two zeros are refused, and the optimized
-layout's mark is its total less that zero. The card writes the gap in %
-with the points beside it. The verdict reads the best existing layout's
-gap in points, against the small gap the maintainer confirmed in points:
+layout's mark minus its own, and `percent`, that gap in % of the best
+existing layout's mark (`LAYOUT_ANALYSIS.markPercent`; the mark is an index
+on QWERTY, [layout-analysis.md](layout-analysis.md#mark)). One base for
+every gap keeps their signs and order; QWERTY is in the library and
+complete, so the best existing mark is at least 100. Every entry carries its
+`mark` and `reference` (QWERTY's total); entries on two QWERTY totals are
+refused, and the optimized layout's mark is `LAYOUT_ANALYSIS.markIndex` of
+its total on that reference. The card writes each gap in %. The verdict
+reads the best existing layout's `percent` against the small gap
+(maintainer, 2026-11-24: in % of the mark, no longer in points):
 
-| Verdict           | When                          | Says                                                                    |
-| ----------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `small_gap`       | 0 ≤ gap ≤ `similar_score_gap` | That layout would do the job; the optimized one is only so much better. |
-| `optimized_ahead` | gap > `similar_score_gap`     | The optimized layout leads the best existing one by that much.          |
-| `existing_better` | gap < 0                       | An existing layout scores more; a longer run may close the gap.         |
+| Verdict           | When                             | Says                                                                    |
+| ----------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `small_gap`       | 0 ≤ percent ≤ `similar_mark_gap` | That layout would do the job; the optimized one is only so much better. |
+| `optimized_ahead` | percent > `similar_mark_gap`     | The optimized layout leads the best existing one by that much.          |
+| `existing_better` | percent < 0                      | An existing layout marks more; a longer run may close the gap.          |
 
-`similar_score_gap` (`analysis_model.json`, read by
-`LAYOUT_ANALYSIS.similarScoreGap()`, checked by the codegen) is 2 points
-(confirmed by the maintainer on 2026-11-19): about one 1 u SFB in 500
-bigrams (0.2 % at 5 flat and 0.26 per millimetre of its travel), and about
-the gap between Ergopti+ and Ergopti on the Nemolivier anthology (1.7
-points).
+`similar_mark_gap` (`analysis_model.json`, read by
+`LAYOUT_ANALYSIS.similarMarkGap()`, checked by the codegen) is 0.56 %: the
+2 points the maintainer confirmed on 2026-11-19 (about one 1 u SFB in 500
+bigrams, and about the gap between Ergopti+ and Ergopti on the Nemolivier
+anthology, 1.7 points) read as a % of the best existing mark on Don
+Quichotte with the default settings. There QWERTY costs 181.16 points, so 2
+points are 100 × 2 / 181.16 = 1.104 marks, and the best existing layout,
+Ergopti+, marks 195.93: 1.104 / 195.93 = 0.56 %. The same 2 points give
+0.57 % on Swann (QWERTY 178.57 points, Erglace JF 197.41) and 0.55 % on
+Nemolivier (QWERTY 188.04, BEO 192.58), so the threshold holds across the
+French built-in corpora.
 
 **Card.** A card under the result: the verdict with a mark (≈, ▲, ★) and a
 coloured edge; the best existing layout with a ring gauge of its
@@ -602,7 +609,8 @@ only), keyboard ISO, format TKL, default weights, 1 annealing restart of 3 000 s
 99 % of the n-grams: 14 s in Node, score −87.9 → +14.0 (Ergo-L 11.8, Ergopti
 24.6 on the same corpus and options, with their own punctuation and digits).
 These are totals, measured before the mark; the page's tiles, chart and shelf
-now show marks (total − the run's zero, its start's), the gains staying in
+show marks (`LAYOUT_ANALYSIS.markIndex` of each total on the start's QWERTY
+total, one corpus and settings whatever the layout), the gains staying in
 points.
 
 ## Follow-ups

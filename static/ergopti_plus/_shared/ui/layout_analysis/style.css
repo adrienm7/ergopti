@@ -680,12 +680,6 @@ body:has(> main.layout-analysis) {
 	white-space: nowrap;
 }
 
-/* The gap to the first layout, after the score. */
-.la-chart-gap {
-	color: var(--la-sub);
-	font-size: 0.9em;
-}
-
 /* Every table scrolls inside its own box, never the page: with hundreds of
    layouts a sub-tab's tables were tens of thousands of pixels long and the
    next figure was out of reach (maintainer, 2026-11-23). A short table keeps

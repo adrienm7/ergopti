@@ -139,8 +139,8 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
     incomplete: false,               // a required character missing (below)
     typing: {mode, cost, alternatives, changed, paths, chords},  // Ways of typing
     simplicity: {accents, pairs, digits},  // each {value, measured} or null
-    score: {total, zero, mark, contributions: {metric: points}, weights},
-    zeroBasis: {sfbMm, kinds, sameFingerMm, reach, idealMin, runLinks}  // Mark
+    score: {total, reference, mark, contributions: {metric: points}, weights},
+    referenceBasis: {id, metrics, parts}  // QWERTY's measures: Mark
   }
   ```
 
@@ -213,17 +213,23 @@ count}`), `chords` the multi-character outputs used with their counts.
   graded metric by the key's part of each grade (its travel by its finger's
   grade); the keys' points add up to those metrics' part of the score.
 
-- `score(result, weights?, floors?, grades?)` → `{total, zero, mark,
+- `score(result, weights?, floors?, grades?)` → `{total, reference, mark,
 contributions, weights, floors, grades}`; the given weights, floors and grades override the
   defaults metric by metric (see [Global score](#global-score)). A graded
   metric needs `result.parts` (`analyse()` and `scoreSession()` give them),
-  the mark `result.zeroBasis` (`analyse()` gives it; a result without it is
-  refused): `zero` is the theoretical worst, `mark` = `total` − `zero`
-  ([Mark](#mark)).
-- `markGap(mark, reference)` → 100 × (`mark` / `reference` − 1), in %: « 23 %
-  more than QWERTY »; a reference at or below 0, or a mark that is not
-  finite, is refused. `diff(a, b).score` compares the marks, with `gap` =
-  `markGap(a, b)`.
+  the mark `result.referenceBasis` (`analyse()` gives it; a result without
+  it is refused): `reference` is QWERTY's total on the same corpus, board
+  and settings, `mark` the total's index on it (`markIndex`, [Mark](#mark)).
+- `markIndex(total, reference)` → 100 × (2 − `total` / `reference`): the
+  mark of a total beside QWERTY's (`reference` < 0); a QWERTY total at or
+  above 0 is refused as `mark_reference_cost` ({cost}), a total that is not
+  finite too. `diff(a, b).score` compares the marks by their difference.
+- `markPercent(gap, base)` → 100 × `gap` / `base`: a difference of marks in
+  % of a base mark above 0 (the optimizer's « an existing layout would do
+  the job »).
+- `measure(layout, ngrams, options)` → `analyse()`'s result without
+  `referenceBasis` and `score`: the measures alone, for a caller that reads
+  no score on a text where QWERTY may cost nothing (a toy text).
 - `defaultWeights()` → a copy of `score_weights.json` (the « restore defaults »
   action); `defaultFloors()` → a copy of its `floors`; `scoreFloors(floors?)`
   → the floors with the given ones, refusing a floor on a metric that has no
@@ -238,7 +244,7 @@ contributions, weights, floors, grades}`; the given weights, floors and grades o
   boolean and a run multiplier below 1;
   `flatGrades()` → the grades that weigh each graded metric by its plain
   value ([Graded costs](#graded-costs)).
-- `referenceLayout()` → the library id every mark is named beside and the
+- `referenceLayout()` → the library id every mark is an index on and the
   ranking's relative view measures against: `reference_layout` of
   `analysis_model.json`, `qwerty` on every corpus (maintainer, 2026-11-23:
   QWERTY is shared by every language, AZERTY is French only).
@@ -317,9 +323,10 @@ occurrences}`: how alike two layouts type a corpus, in %. Each corpus
   points per % of the corpus's characters moved.
 - `same_finger_factor` of `analysis_model.json` weighs each finger's
   same-finger move in `sfb_distance` (Cyanophage's factors).
-- `similarScoreGap()` → `similar_score_gap` of `analysis_model.json` (default
-  2 points): the score gap under which the optimizer says an existing layout
-  does the job of the one it found.
+- `similarMarkGap()` → `similar_mark_gap` of `analysis_model.json` (default
+  0.56 %): the mark gap, in % of the best existing layout's mark, under
+  which the optimizer says an existing layout does the job of the one it
+  found ([layout-optimizer.md](layout-optimizer.md#existing-layouts)).
 - `scoreSession(layout, ngrams, options)` → `{total, trial(layout) → {total,
 changed, walk, compile, compiled, commit()}}`: the global score of layouts
   that change a little at a time (the layout optimizer), equal to
@@ -667,7 +674,7 @@ metric a share of the typed characters.
 | `lsb`              | %     | lower  | Lateral stretch bigram: one hand, adjacent fingers, one key lateral (index inner column Digit5/T/G/B, Digit6/Y/H/N; pinky outer keys Backquote, IntlBackslash, Minus, Equal, brackets, Quote, Backslash).                                                                                                                                                                                                                                                                                                 |
 | `scissors`         | %     | lower  | Full scissor: one hand, adjacent fingers, the longer finger two or more rows below the shorter one (lengths: middle > ring > index > pinky).                                                                                                                                                                                                                                                                                                                                                              |
 | `half_scissors`    | %     | lower  | Half scissor: the same, one row apart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `pinky_ring`       | %     | lower  | Pinky–ring pair: one hand, the pinky and the ring finger, any rows (the same row included; Oxeylyzer's `pinky_ring_bigrams`; Cyanophage's pinky–ring scissor is its part on different rows). A half scissor between them is counted in both. Weight 0 by default.                                                                                                                                                                                                                                         |
+| `pinky_ring`       | %     | lower  | Pinky–ring pair: one hand, the pinky and the ring finger, any rows (the same row included; Oxeylyzer's `pinky_ring_bigrams`; Cyanophage's pinky–ring scissor is its part on different rows). A half scissor between them is counted in both. Weight 0.14 beside `sfb` 5 (maintainer, 2026-11-24).                                                                                                                                                                                                         |
 | `row_jump`         | %     | lower  | Row jump, the maintainer's « skipgram »: two consecutive keys typed by two different fingers of one hand on different logical rows; one finger's move is an SFB, counted there (maintainer, 2026-11-21). A scissor is one too. Graded by its fingers times its rows ([Graded costs](#graded-costs)).                                                                                                                                                                                                      |
 | `hand_run`         | %     | lower  | Same-hand runs: 100 × (the mean, over the keystrokes, of the multiplier of the same-hand run each is in − 1), by the run scale of `grades.hand_run`; the space and the thumbs end a run, read from the key bigrams and trigrams as a chain ([Graded costs](#graded-costs)).                                                                                                                                                                                                                               |
 | `roll_in`          | %     | higher | Two-key inward roll: one hand, different fingers, toward the index.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -786,60 +793,44 @@ analysers and its ranking impact on the library are in
 
 ### Mark
 
-The maintainer's decision of 2026-11-23 (docs/memory/maintainer-decisions.md):
-the score's points read as nothing, so every layout gets a **mark**, `mark =
-total − zero`, where `zero` is the global score of the worst layout possible
-on the corpus, the keyboard and the score settings. 0 is that worst, higher
-is better with no ceiling, and two marks compare as a ratio
-(`markGap`: « 23 % more than QWERTY »). QWERTY, shared by every language, is
-the reference named beside the mark (`referenceLayout()`). The ranking does
-not change: the zero is the same for every layout on one corpus and
-settings, so the mark is the total shifted by one number.
+The maintainer's decision of 2026-11-24 (docs/memory/maintainer-decisions.md),
+after Alt Alpha Ranker: the score's points read as nothing, so every layout
+gets a **mark**, an index on QWERTY on the same corpus, board and settings.
+A layout's cost is minus its total (its penalties less its rewards, in
+points), and
 
-The zero is a bound derived from the score's own costs, never a library
-layout (`scoreZero`, from `result.zeroBasis`). The rewards are ≥ 0, so the
-worst total is at least minus the most every penalty can cost together:
+    mark = 100 × (2 − cost / cost(QWERTY))   (markIndex)
 
-- **Key pairs.** A key bigram is one event: its metrics add up (an SFB, or a
-  row jump with a scissor, a pinky–ring pair and a lateral stretch), so the
-  most expensive pair the board allows bounds them all: 100 × the most
-  points one pair takes per % (SFB by its grade plus its `sfb_distance`
-  travel, the longest move of that grade; the other kinds by their weights
-  and row-jump cell). Every key but the held Shift and AltGr is a key a
-  layout may type on; the space's and the thumbs' keys count in every pair.
-- **Key triples.** 100 × (`sfs` + half the `sfb_distance` weight × the
-  longest same-finger move + `redirect` + `redirect_bad`).
-- **Floors.** When floors make it lower, the pairs and triples are bounded
-  by each metric's own bound above its floor instead (`sfb` 100 % × its
-  largest grade, `sfb_distance` 150 × the longest move, the other shares
-  100 %).
-- **Every other penalty** by its own bound above its floor: 100 % for a
-  share (`pinky_load`, `outer_column`, `hand_imbalance`, `modifier_usage`,
-  `altgr_usage`, `dead_key_usage`, `unsupported`), 100 − the smallest ideal
-  load for `finger_imbalance`, and for `distance` 4 presses
-  (`ZERO_PRESSES`: a key with Shift and two held modifiers, the most a
-  library level holds, or a dead key and a key each with Shift) of the
-  longest graded reach.
-- **hand_run** at its value on the worst stream the corpus allows: every
-  character but the space typed by one key of one hand, so a run ends at
-  the space only.
+QWERTY reads 100 on every corpus, a layout costing 23 % less than QWERTY
+reads 123, one costing nothing 200, a net reward above 200, with no ceiling;
+one costing twice QWERTY's cost reads 0, and a worse one below 0. QWERTY
+never changes, so a mark is reproducible and independent of the library.
+`score()` reads QWERTY's total from `result.referenceBasis`, its measures on
+the same table and options (`analyse()` measures QWERTY once per table and
+options, cached), so `rescore()` follows new weights, floors and grades.
 
-Two parts are bounds of a model, not of every input, and are recorded as a
-decision to review: `distance` assumes at most 4 presses per character (a
-character typed through a chain of dead keys presses more), and `hand_run`'s
-chain (handRunLinks) has no finite bound at all (a carry that tends to 1
-makes the run as long as the stream), so its part is the one-hand stream's.
-A layout past those models can fall below 0; the page shows its mark as it
-is. Every library layout on both golden corpora, on the default keyboard and
-on the ErgoDox for the thumb layouts, stays above 0
-(`test-layout-analysis-engine.cjs`, sections 3 and 9).
+**Why linear, not the ratio cost(QWERTY) / cost(layout).** The rewards
+nearly offset the penalties of a good layout: on Don Quichotte with the
+default settings QWERTY costs 181.16 points and Ergopti+ 7.37, Erglace 4.62
+on Swann, and no library layout reaches a cost of 0 on Nemolivier, Swann,
+the English Wikipedia articles or Pride and Prejudice. The ratio would read
+Ergopti+ about 2,460 and an optimized layout near a cost of 0 tens of
+thousands, and it has no value at a cost of 0, which the optimizer can pass.
+The index above keeps QWERTY at 100 and « 23 % better » at 123 while staying
+linear in the total: it ranks the layouts exactly as their totals do (pinned
+on both golden corpora, `test-layout-analysis-engine.cjs`, section 9), its
+differences are points scaled by one number (one mark is 1 % of QWERTY's
+cost), and every layout has one. On Don Quichotte Ergopti+ marks 195.93.
 
-The bound is loose by nature: no layout makes every key pair the most
-expensive one. On Don Quichotte with the default settings the zero is
-−8,416, QWERTY's mark 8,235 and Ergopti+'s 8,409 (+2.1 % on QWERTY); the
-library's lowest mark is 7,227. A tighter zero needs either a proof over
-the corpus's own n-grams or the optimizer run to maximise the cost (a found
-worst, which a layout may pass); both are left to the maintainer.
+**QWERTY's cost at or below 0.** The index needs QWERTY to cost points: on a
+toy text (« asdf » on the home row) or with settings that reward more than
+they penalise (every weight at 0, rewards alone), QWERTY's total is at or
+above 0 and `markIndex` refuses it as `mark_reference_cost` with the cost;
+`analyse()` refuses the analysis, and the Comparer and the Optimiser say so
+in words (`layout_analysis.error.mark_reference_cost`), the results left as
+they were. QWERTY costs points on every built-in corpus with the default
+settings (pinned on each, section 9). `measure()` gives the measures alone
+on any text.
 
 ## Ways of typing
 
@@ -1393,23 +1384,25 @@ high contrast); the chosen tab stands on the surface with a bar in its mark
 and heavier text, so colour is never its only cue. The overview is drawn after every
 analysis, another tab when it is shown.
 
-- **Overview**: the mark chart (bars from 0, the worst layout possible,
-  so their lengths compare as ratios; each value names its gap to QWERTY in
-  % in brackets, `markGap`; each bar opens the details with a click or
+- **Overview**: the mark chart (QWERTY reads 100, so each value says its
+  gap to QWERTY by itself; bars from 0, a layout costing twice QWERTY's,
+  a mark at or below 0 drawing none; each bar opens the details with a click or
   Enter), the best complete layout shown by its mark and by nine metrics as
   tiles, and the sortable ranking (header buttons, units in the headers, its
   columns the viewer's: `#la-table-options`; the score column and its
   filters read the mark). « Difference to … »
   (`#la-table-relative`, saved as `table.relative`) writes every metric
   column as its difference to the reference layout, in the metric's unit,
-  and the mark as its gap to the reference's in %, with ▲ or ▼ and the
+  and the mark as its difference to the reference's (one mark is 1 % of
+  QWERTY's cost), with ▲ or ▼ and the
   verdict in words (`E.diff`); the sort stays on the values. The reference
   is `reference_layout` of the model (`E.referenceLayout`): QWERTY on every
   corpus (maintainer, 2026-11-23); it is analysed on the same text when it
   is not compared. A metric reads as a difference, not a ratio (Alt Alpha
   Ranker divides by QWERTY's value): it stays defined where the reference's
   value is 0 (QWERTY's unsupported share on English, its direct digits). The
-  mark has a zero, so it alone reads as a ratio ([Mark](#mark)).
+  mark is already an index on QWERTY ([Mark](#mark)), so its difference is
+  in % of QWERTY's cost.
 - **Fingers and hands**: the finger load against the ideal as a heat table
   (each finger's share, its signed gap to the ideal under it, the cell orange
   above and blue below the ideal, into the neutral surface; the ideal load is
@@ -1743,7 +1736,7 @@ does not load the panel's scripts gets no panel.
 - Each edit is analysed 150 ms after the last change. In Chromium the
   conversion takes about 0.3 ms and the analysis about 5 ms.
 - The headline and the editor's chip show the layout's mark ([Mark](#mark)),
-  and its change since the last edit in the same points.
+  and its change since the last edit in marks (each 1 % of QWERTY's cost).
 - The library is ranked once per corpus, keyboard, weights and ideal finger
   load. The rank is « N of library + 1 », counted by the engine's
   `rankOrder`: an incomplete edited layout ranks after every complete one,
@@ -1905,21 +1898,18 @@ form with the score's own weights, typed alone (no space around it); a word
 table keeps 1,000 words.
 
 Decided by the agent on 2026-11-19, to review by the maintainer, for the
-analyser study's ideas (report section 10): `pinky_ring` weighs 0 and every
-floor is 0 (the maintainer weighed `sfb_distance` 0.26 and lowered `sfb` to 5
-the same day, [Global score](#global-score)); the skipgram half of `sfb_distance` is 0.5
-(genkey's and Oxeylyzer's discount of gap 1 under an SFB); `pinky_ring`
-counts the same row too (Oxeylyzer); the relative view is a difference to
-AZERTY on French and QWERTY otherwise. Floors are read from
-`score_weights.json`, and the Comparer's score settings and their file
-(`ergopti-score-settings`, version 3) edit each one. Measured on 2026-11-24
-over the 783 library layouts (ISO board): `pinky_ring` ranks them unlike
-`half_scissors` (Spearman 0.03 on Swann, 0.07 on the English Wikipedia
-articles; 0.05 and 0.09 against both scissors kinds), from 0.02 % to 11.6 % of
-the bigrams (mean 3.2 %) on Swann. Kept meanwhile at weight 0 (decided by the
-agent on 2026-11-24, to review by the maintainer): a weight moves every score
-while the score's normalisation is being changed; Oxeylyzer's own ratio to
-its SFB weight (0.2 to 7) would give about 0.14 beside `sfb` 5.
+analyser study's ideas (report section 10): the skipgram half of
+`sfb_distance` is 0.5 (genkey's and Oxeylyzer's discount of gap 1 under an
+SFB); `pinky_ring` counts the same row too (Oxeylyzer); the relative view
+was a difference to AZERTY on French and QWERTY otherwise (QWERTY on every
+corpus since 2026-11-23). Floors are read from `score_weights.json`, and the
+Comparer's score settings and their file (`ergopti-score-settings`, version 3) edit each one. Measured on 2026-11-24 over the 783 library layouts (ISO
+board): `pinky_ring` ranks them unlike `half_scissors` (Spearman 0.03 on
+Swann, 0.07 on the English Wikipedia articles; 0.05 and 0.09 against both
+scissors kinds), from 0.02 % to 11.6 % of the bigrams (mean 3.2 %) on Swann.
+The maintainer weighed `pinky_ring` 0.14 on 2026-11-24, Oxeylyzer's ratio
+of its pinky–ring weight to its SFB weight (0.2 to 7) beside `sfb` 5, and
+kept every floor at 0 ([Global score](#global-score)).
 
 Decided by the agent on 2026-11-18, to review by the maintainer, for the
 Comparer's sub-tabs: the tab order and names; the overview's nine leader

@@ -155,8 +155,8 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 	 *   options: keyboard, format, weights, profile…)}.
 	 * @param {function(object): void} post - Receives {type:
 	 *   'library_progress', done, total}, then {type: 'library_done',
-	 *   entries: [{id, name, score, mark, zero, incomplete, similarity: {weighted,
-	 *   unweighted}}]} in the library's order, or {type: 'error', code,
+	 *   entries: [{id, name, score, mark, reference, incomplete, similarity:
+	 *   {weighted, unweighted}}]} in the library's order, or {type: 'error', code,
 	 *   values, message}.
 	 * @returns {{stop: function(): void}} Ends the scan at the next slice, with
 	 *   no further message.
@@ -198,7 +198,7 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 						name: layout.name,
 						score: result.score.total,
 						mark: result.score.mark,
-						zero: result.score.zero,
+						reference: result.score.reference,
 						incomplete: result.incomplete,
 						similarity: { weighted: similarity.weighted, unweighted: similarity.unweighted }
 					});
@@ -222,46 +222,52 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 	 * What the library comparison says of an optimized layout: the library
 	 * layouts most alike to it, and the best-scoring one (every complete
 	 * layout before an incomplete one, as the Comparer ranks), each with its
-	 * gap; the verdict reads the best one's gap against the small gap.
-	 * @param {object[]} entries - scoreLibrary()'s entries, all on one zero
-	 *   (one corpus and settings).
+	 * gap; the verdict reads the best one's gap, in % of its mark, against
+	 * the small gap.
+	 * @param {object[]} entries - scoreLibrary()'s entries, all on one
+	 *   QWERTY total (one corpus and settings).
 	 * @param {number} optimized - The optimized layout's score (its total).
-	 * @param {{smallGap: number, closest: number}} settings - The score gap
-	 *   under which an existing layout does the job
-	 *   (LAYOUT_ANALYSIS.similarScoreGap), and how many alike layouts to list.
+	 * @param {{smallGap: number, closest: number}} settings - The mark gap,
+	 *   in % of the best existing layout's mark, under which an existing
+	 *   layout does the job (LAYOUT_ANALYSIS.similarMarkGap), and how many
+	 *   alike layouts to list.
 	 * @returns {{closest: object[], best: object, verdict: string, smallGap:
-	 *   number, mark: number}} Each layout {id, name, score, mark, zero,
-	 *   incomplete, similarity, gap, percent}, gap = optimized − its score in
-	 *   points (positive: the optimized layout scores more), percent = how
-	 *   much higher the higher of the two marks is, in % (LAYOUT_ANALYSIS
-	 *   .markGap); mark: the optimized layout's; verdict `existing_better`
-	 *   (gap < 0), `small_gap` (gap ≤ smallGap) or `optimized_ahead`.
+	 *   number, mark: number}} Each layout {id, name, score, mark, reference,
+	 *   incomplete, similarity, gap, percent}, gap = the optimized layout's
+	 *   mark − its mark (positive: the optimized layout marks more), percent =
+	 *   that gap in % of the best existing layout's mark (LAYOUT_ANALYSIS
+	 *   .markPercent); mark: the optimized layout's (LAYOUT_ANALYSIS
+	 *   .markIndex); verdict `existing_better` (percent < 0), `small_gap`
+	 *   (percent ≤ smallGap) or `optimized_ahead`.
 	 * @throws {Error} On no entry, a non-finite score or mark, entries on two
-	 *   zeros, or invalid settings.
+	 *   QWERTY totals, a best mark not above 0, or invalid settings.
 	 */
 	function librarySummary(entries, optimized, settings) {
 		if (!Array.isArray(entries) || entries.length === 0)
 			throw new Error('layout_optimizer: no library layout to compare with');
 		if (!Number.isFinite(optimized))
 			throw new Error(`layout_optimizer: the optimized score ${optimized} is not a number`);
-		const zero = entries[0].zero;
-		if (!Number.isFinite(zero) || entries.some((entry) => entry.zero !== zero))
-			throw new Error('layout_optimizer: the library layouts are not on one zero');
-		// The zero is the same for every layout on one corpus and settings.
-		const mark = optimized - zero;
+		const reference = entries[0].reference;
+		if (!Number.isFinite(reference) || entries.some((entry) => entry.reference !== reference))
+			throw new Error('layout_optimizer: the library layouts are not on one QWERTY total');
+		// QWERTY's total is the same for every layout on one corpus and settings.
+		const mark = LAYOUT_ANALYSIS.markIndex(optimized, reference);
 		const { smallGap, closest } = settings;
 		if (!Number.isFinite(smallGap) || smallGap < 0)
 			throw new Error(`layout_optimizer: small gap ${smallGap} is not a number ≥ 0`);
 		if (!Number.isInteger(closest) || closest < 1)
 			throw new Error(`layout_optimizer: ${closest} alike layouts to list`);
-		const rows = entries.map((entry) => {
+		for (const entry of entries)
 			if (!Number.isFinite(entry.score) || !Number.isFinite(entry.mark))
 				throw new Error(`layout_optimizer: ${entry.id} has no score`);
-			const gap = optimized - entry.score;
-			const percent =
-				gap >= 0
-					? LAYOUT_ANALYSIS.markGap(mark, entry.mark)
-					: LAYOUT_ANALYSIS.markGap(entry.mark, mark);
+		const top = entries
+			.slice()
+			.sort((a, b) => Number(a.incomplete) - Number(b.incomplete) || b.score - a.score)[0];
+		// Every gap is a share of the best existing layout's mark: QWERTY is in
+		// the library and complete, so that mark is at least 100.
+		const rows = entries.map((entry) => {
+			const gap = mark - entry.mark;
+			const percent = LAYOUT_ANALYSIS.markPercent(gap, top.mark);
 			return Object.assign({}, entry, { gap, percent });
 		});
 		const alike = rows
@@ -273,11 +279,13 @@ var LAYOUT_OPTIMIZER_RUNNER = (function () {
 					b.score - a.score
 			)
 			.slice(0, closest);
-		const best = rows
-			.slice()
-			.sort((a, b) => Number(a.incomplete) - Number(b.incomplete) || b.score - a.score)[0];
+		const best = rows.find((row) => row.id === top.id);
 		const verdict =
-			best.gap < 0 ? 'existing_better' : best.gap <= smallGap ? 'small_gap' : 'optimized_ahead';
+			best.percent < 0
+				? 'existing_better'
+				: best.percent <= smallGap
+					? 'small_gap'
+					: 'optimized_ahead';
 		return { closest: alike, best, verdict, smallGap, mark };
 	}
 

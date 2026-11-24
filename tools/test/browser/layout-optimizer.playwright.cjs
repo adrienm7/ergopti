@@ -256,19 +256,20 @@ async function exerciseProgressChart(browser, origin) {
 	);
 	assert.match(
 		chart.summary,
-		/^Best score -?\d[\d,]*\.\d\d\u00a0points, [+-]?\d[\d,]*\.\d\d\u00a0points over the start; last gain at \d+\.\d\u00a0s\. \d[\d,]*\u00a0layouts scored per second\.$/,
+		/^Best score -?\d[\d,]*\.\d\d, [+-]?\d[\d,]*\.\d\d\u00a0points over the start; last gain at \d+\.\d\u00a0s\. \d[\d,]*\u00a0layouts scored per second\.$/,
 		`the chart in words: ${JSON.stringify(chart.summary)}`
 	);
 	assert.ok(chart.rows.length >= 2, `the table lists the points: ${chart.rows.length}`);
 	for (const [time, best, gain] of chart.rows) {
 		assert.match(time, /^\d+\.\d\u00a0s$/, time);
-		assert.match(best, /\u00a0points$/, best);
+		// The best is a mark (an index on QWERTY, no unit), its gain in points.
+		assert.match(best, /^-?\d[\d,]*\.\d\d$/, best);
 		assert.match(gain, /^[+-]?\d[\d,]*\.\d\d\u00a0points$/, gain);
 	}
 	// The pointer over the drawing shows the point under it.
 	const box = await page.locator('#lo-chart-svg').boundingBox();
 	await page.hover('#lo-chart-svg', { position: { x: box.width * 0.9, y: box.height / 2 } });
-	assert.match(await page.textContent('#lo-chart-tip'), /\u00a0s · .*\u00a0points$/);
+	assert.match(await page.textContent('#lo-chart-tip'), /\u00a0s · -?\d[\d,]*\.\d\d$/);
 	await page.mouse.move(0, 0);
 	assert.equal(await page.isHidden('#lo-chart-tip'), true, 'leaving the drawing hides it');
 	assert.deepEqual(errors, []);
@@ -534,7 +535,7 @@ async function exerciseResultsShelf(browser, origin) {
 	assert.equal(new Set(items.map((item) => item.name)).size, items.length, 'one name each');
 	const scores = items.map((item) => {
 		const match =
-			/^Score (-?[\d,]+\.\d\d)\u00a0points \([+-]?[\d,]+\.\d\d\u00a0points over the start\) · \d+\u00a0keys moved$/.exec(
+			/^Score (-?[\d,]+\.\d\d) \([+-]?[\d,]+\.\d\d\u00a0points over the start\) · \d+\u00a0keys moved$/.exec(
 				item.facts
 			);
 		assert.ok(match, `the facts in words: ${JSON.stringify(item.facts)}`);
