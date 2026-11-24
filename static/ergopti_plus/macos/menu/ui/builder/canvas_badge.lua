@@ -30,9 +30,18 @@ local LOG    = "canvas_badge"
 --- its image stood about 31 points left of the menu's middle.
 local MENU_COLUMNS = { left = 22, trailing = 22, submenu_arrow = 62, font = 14 }
 
+-- The system font NSMenu draws its rows in.
+local MENU_FONT_NAME = ".AppleSystemUIFont"
+
 --- The menu's native metrics the badge geometry assumes, for the tests.
 --- @return table columns { left, trailing, submenu_arrow, font }
 function M.menu_columns() return MENU_COLUMNS end
+
+--- The font of a root row's title, as hs.styledtext names a font: a styled
+--- title (the tray's shortcut hints) must name it, or AppKit draws it in
+--- Helvetica 12.
+--- @return table font { name, size }
+function M.menu_font() return { name = MENU_FONT_NAME, size = MENU_COLUMNS.font } end
 
 -- The pill's padding around its text and the text size, in points.
 local PILL_PAD_X, PILL_PAD_Y, PILL_TEXT_SIZE = 8, 10, 14
@@ -72,7 +81,7 @@ end
 --- @return number|nil width
 local function title_width(title)
 	if not ((type(title) == "string" and title ~= "-" and title ~= "") or type(title) == "userdata") then return nil end
-	local ok, size = pcall(hs.drawing.getTextDrawingSize, title, { font = ".AppleSystemUIFont", size = MENU_COLUMNS.font })
+	local ok, size = pcall(hs.drawing.getTextDrawingSize, title, { font = MENU_FONT_NAME, size = MENU_COLUMNS.font })
 	return ok and type(size) == "table" and type(size.w) == "number" and size.w or nil
 end
 

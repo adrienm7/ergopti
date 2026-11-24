@@ -96,6 +96,7 @@ end
 local HotCounter  = require("hotstrings.ui.menu.counter")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
+local ShortcutHint = require("menu.ui.builder.shortcut_hint")
 local Labels      = require("menu.engine.labels")
 
 
@@ -957,6 +958,9 @@ function M.generate(ctx, menu_mods, actions)
 	if not ok_badge then
 		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
 	end
+
+	-- After the root compositions above, which admit string titles only.
+	ShortcutHint.decorate(rendered, ctx.script_control)
 
 	if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 	return rendered

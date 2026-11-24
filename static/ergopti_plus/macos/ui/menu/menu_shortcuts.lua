@@ -35,14 +35,9 @@ local TextUtils = require("core.text.engine.utils_core")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("core.lifecycle.engine.compat.utf8")
 local LOG           = "menu_shortcuts"
--- The label of each script chord slot: this driver's AltGr is the right
--- Option key.
-local SCRIPT_CHORD_LABELS = {
-	script_altgr_enter     = "sg_labels.script_ropt_return",
-	script_altgr_backspace = "sg_labels.script_ropt_backspace",
-	script_altgr_delete    = "sg_labels.script_ropt_delete",
-	script_altgr_escape    = "sg_labels.script_ropt_escape",
-}
+-- The label of each script chord slot (this driver's AltGr is the right
+-- Option key), the same one the tray shows beside Suspend, Reload and Quit.
+local ScriptChordLabels = require("ui.menu.script_chord_labels")
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}
@@ -734,7 +729,7 @@ function M.build(ctx)
 				local rows = {}
 				for _, slot in ipairs(script_control.script_chord_slots()) do
 					local current = state.script_control_shortcuts[slot.id] or "none"
-					local slot_label = i18n.get(SCRIPT_CHORD_LABELS[slot.id])
+					local slot_label = ScriptChordLabels.label(slot.id)
 					-- A setting: it runs while paused and takes effect on resume, so the
 					-- chord that resumes stays the one active at pause time (EDD-1, the
 					-- maintainer's decision of 2026-11-14; script_control defers it).

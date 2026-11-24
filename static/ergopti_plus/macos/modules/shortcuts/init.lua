@@ -162,6 +162,7 @@ M.set_script_chords_enabled = ScriptControl.set_chords_enabled
 M.script_chords_enabled = ScriptControl.chords_enabled
 M.script_chord_slots    = ScriptControl.slots
 M.script_chord_runs     = ScriptControl.slot_runs
+M.script_chord_hint_slot = ScriptControl.hint_slot
 M.karabiner_script_chords = ScriptControl.karabiner_chords
 M.SCRIPT_BINDING_PREFIX = ScriptControl.BINDING_PREFIX
 M.set_on_pause_change   = ScriptControl.set_on_pause_change
