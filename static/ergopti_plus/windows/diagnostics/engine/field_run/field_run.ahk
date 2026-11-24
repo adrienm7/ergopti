@@ -437,10 +437,12 @@ class FieldRunSession {
 		Codes := []
 		for Code in Resume["codes"]
 			Codes.Push(Code)
+		; Only a collector's request reloads (an in-app run lists the reload as not run), so a
+		; resumed run has no observer; Notify still reads the field.
 		return {Request: Request, Dir: this.Path("results") . "\" . Request["request_id"], Index: Resume["index"],
 			Verdicts: Verdicts, Order: Order, StartedAt: Resume["started_at"], StartTick: StartTick,
 			DeadlineTick: StartTick + Request["deadline_seconds"] * 1000, ActiveStep: 0, Reloading: false,
-			ResumeCodes: Codes, ResumeSince: A_TickCount}
+			ResumeCodes: Codes, ResumeSince: A_TickCount, Observer: 0}
 	}
 
 	/**
