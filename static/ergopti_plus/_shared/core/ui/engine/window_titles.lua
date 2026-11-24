@@ -13,6 +13,7 @@ local TITLE_KEYS = {
 	["config_cleanup"] = "dialog.unused_keys.title",
 	["download_window"] = "download_window.window_title",
 	["error_dialog"] = "common.error_title",
+	["field_report"] = "field_report.title",
 	["healthcheck"] = "menu.debug.healthcheck",
 	["hotstring_editor"] = "editor.hotstrings.window_title",
 	["hotstrings_config_window"] = "hs_config.window_title",

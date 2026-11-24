@@ -1,0 +1,157 @@
+/* _shared/ui/field_report/style.css */
+
+/* ===========================================================================
+ * MODULE: Field Report Window Styles
+ * DESCRIPTION:
+ * Single-source styles for the field report window, consumed by all three
+ * hosts (Windows WebView2, macOS WKWebView, Linux WebKit2GTK): the steps as
+ * they run, the summary and a fixed row of buttons. Colours are the dialog
+ * tokens of theme.css, so the page follows the light or dark appearance with
+ * their contrast.
+ * =========================================================================== */
+
+:root {
+	--text: var(--theme-dialog-text);
+	--muted: var(--theme-dialog-muted);
+	--background: var(--theme-dialog-background);
+	--panel: var(--theme-dialog-panel);
+	--border: var(--theme-dialog-border);
+	--accent: var(--theme-dialog-accent);
+	--accent-text: var(--theme-dialog-accent-text);
+	--ok: var(--theme-dialog-ok);
+	--fail: var(--theme-dialog-fail);
+}
+
+html,
+body {
+	background: var(--background);
+	color: var(--text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+	font-size: 13px;
+	margin: 0;
+	padding: 0;
+}
+
+/* The document itself scrolls, so the step list needs no focusable scroll box
+   of its own; the buttons stay at the bottom of the window. */
+body {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+main {
+	flex: 1;
+	padding: 14px 18px 6px;
+}
+
+h1 {
+	font-size: 17px;
+	margin: 0 0 6px;
+}
+
+h2 {
+	font-size: 14px;
+	margin: 12px 0 6px;
+}
+
+.intro {
+	color: var(--muted);
+	margin: 0 0 6px;
+}
+
+.steps,
+.counts {
+	margin: 0;
+	padding-inline-start: 22px;
+}
+
+.step {
+	padding: 2px 0;
+}
+
+.step.pending,
+.step.skip,
+.step.not_run {
+	color: var(--muted);
+}
+
+.step.pass {
+	color: var(--ok);
+}
+
+.step.fail,
+.step.timeout {
+	color: var(--fail);
+	font-weight: 600;
+}
+
+.step.running {
+	font-weight: 600;
+}
+
+.verdict {
+	font-weight: 600;
+	margin: 0 0 4px;
+}
+
+.folder {
+	margin: 8px 0 0;
+	word-break: break-all;
+}
+
+.status {
+	margin: 10px 0 0;
+	min-height: 1.2em;
+}
+
+.status.ok {
+	color: var(--ok);
+}
+
+.status.fail {
+	color: var(--fail);
+}
+
+.status.info {
+	color: var(--muted);
+}
+
+.buttons {
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+	bottom: 0;
+	display: flex;
+	flex: none;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 10px 18px;
+	position: sticky;
+}
+
+button {
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	cursor: pointer;
+	font: inherit;
+	padding: 4px 12px;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-text);
+}
+
+/* Close stands alone on the left; creating the issue, the action the page
+   ends on, is the last button on the right. */
+#btn-close {
+	margin-inline-end: auto;
+}

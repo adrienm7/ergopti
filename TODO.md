@@ -830,14 +830,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       downloads, diagnostics, signed install: the collector), the Tests rows run separately and the folder of the result
       files to attach to an issue. An installed Mac app or Windows driver starts its session on demand on `folder.macos`
       or `folder.windows` of the shared protocol. Left:
-  - **Progress window (maintainer request, 2026-11-24).** A shared WebView app window (`_shared/ui`, each driver's
-    host, like the diagnostics and update windows; AAA tokens of `theme.css`, keyboard walk, live-region
-    announcements) showing each step's state (pending, running, pass, fail, skipped, needs you) from the observer,
-    then the counts and three buttons: open the results folder (Finder, Explorer, file manager), « Copier le rapport
-    », « Créer une issue GitHub » through the bug-report link builder's public function with the summary in the URL
-    and the report on the clipboard. Closing it during the run calls `Session:cancel_in_app` (logged pair). Add it to
-    the app-window accessibility scan with fake hosts. The macOS and Linux observers are in place; today the report
-    opens in the one-click checks' dialog.
+  - **Progress window (maintainer request, 2026-11-24).** The shared page is in place: `_shared/ui/field_report/`
+    (apps.manifest.json `field_report`, bridge `field_report`, `window.receiveFieldReport` with init, step, done and
+    action messages; each step's state in its line and the polite live region; the counts, the verdict and the
+    folder at the end; Stop, Close and the three end buttons sending `cancel`, `close`, `open_folder`, `copy` and
+    `issue`), scanned by the app windows accessibility audit and driven by
+    `tools/test/browser/field-report-window.playwright.cjs`. Left: the three hosts, which open it from the row, push
+    the observer's events to it and serve its actions (`Session:cancel_in_app` / `CancelInApp`, the results folder
+    in Finder, Explorer or the file manager, the full report to the clipboard, the issue form through the bug-report
+    link builder's public function with the summary in the URL), then drop the `field_report` exclusions of
+    `test-webview-geometry-single-source.cjs`. Until then the report opens in the one-click checks' dialog.
   - **Field points still without an automatic driver step.** Linux: the collector's probe steps `linux_input_access`,
     `linux_autostart`, `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`)
     run only from `collect-linux-field-report.sh`; a Linux field check step reading the same probes from
