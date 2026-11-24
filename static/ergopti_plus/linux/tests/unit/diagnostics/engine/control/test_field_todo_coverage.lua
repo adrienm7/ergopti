@@ -29,8 +29,12 @@ local COVERAGE = Json.decode(read(DRIVER .. "/diagnostics/data/field_todo_covera
 local RUN = Json.decode(read(DRIVER .. "/diagnostics/data/field_run_steps.json"))
 local GUIDED = Json.decode(read(DRIVER .. "/diagnostics/data/field_guided_steps.json"))
 
+-- The report step labels: every step a daemon check writes is shown under one
+-- (_shared/diagnostics/engine/field_check/report.lua format_text)
+local EN = Json.decode(read(DRIVER .. "/../_shared/core/i18n/data/locales/en.json"))
+
 -- Every declared step, with the report steps it can write: a collector step
--- writes one report step per probe, a daemon check its own (not read here).
+-- writes one report step per probe, a daemon check the steps its report labels.
 local STEPS = {}
 for _, step in ipairs(RUN.steps) do STEPS[step.id] = { kind = step.kind } end
 for _, step in ipairs(GUIDED.steps) do
@@ -92,8 +96,9 @@ helpers.describe("Linux field report TODO coverage: TODO-tests-linux.md « To co
 				local step = STEPS[check.step]
 				helpers.assert_not_nil(step, point.id .. " names the undeclared step " .. tostring(check.step))
 				for _, id in ipairs(check.report or {}) do
-					helpers.assert_true(step.kind == "collector" and step.writes[id] == true,
-						point.id .. ": " .. check.step .. " writes no report step " .. id)
+					local writes = step.kind == "collector" and step.writes[id] == true
+						or step.kind == "field_check" and type(EN["field_check.step." .. id]) == "string"
+					helpers.assert_true(writes, point.id .. ": " .. check.step .. " writes no report step " .. id)
 				end
 			end
 			if #point.checks == 0 then

@@ -741,6 +741,7 @@ return {
 	"tests.unit.modules.shortcuts.text_actions.test_wrap_symbol_settings",
 	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.diagnostics.ui.field_check.test_field_report",
+	"tests.unit.diagnostics.engine.field_check.test_setup_check",
 	"tests.unit.core.network.adapters.test_check",
 	"tests.unit.core.network.adapters.test_policy_read_admission",
 	"tests.unit.infra.updater.test_asset_signature",

@@ -4,63 +4,6 @@
 	"poll_seconds": 3,
 	"steps": [
 		{
-			"id": "linux_input_access",
-			"mode": "probe",
-			"probes": [
-				{
-					"id": "uinput_writable",
-					"kind": "path_access",
-					"glob": "/dev/uinput",
-					"access": "write"
-				},
-				{
-					"id": "evdev_readable",
-					"kind": "path_access",
-					"glob": "/dev/input/event*",
-					"access": "read"
-				}
-			],
-			"proves": "The daemon's input path is open to this user: /dev/uinput is writable and at least one evdev node is readable."
-		},
-		{
-			"id": "linux_autostart",
-			"mode": "probe",
-			"probes": [
-				{
-					"id": "unit_enabled",
-					"kind": "command_exit",
-					"argv": ["systemctl", "--user", "is-enabled", "--quiet", "ergopti-hotstrings.service"],
-					"expect": "zero"
-				}
-			],
-			"proves": "The user manager starts Ergopti at login: its systemd user unit is enabled."
-		},
-		{
-			"id": "linux_polkit_agent",
-			"mode": "probe",
-			"probes": [
-				{
-					"id": "polkit_agent",
-					"kind": "command_exit",
-					"argv": ["pgrep", "-f", "polkit.*agent|polkit-gnome|polkit-kde|lxpolkit|mate-polkit"],
-					"expect": "zero"
-				}
-			],
-			"proves": "A polkit authentication agent runs in this session, so an administrator prompt can appear."
-		},
-		{
-			"id": "linux_focus_listener",
-			"mode": "probe",
-			"probes": [
-				{
-					"id": "focus_listening",
-					"kind": "log_count",
-					"pattern": "\\[INFO\\] \\[[^]]*\\] Listening for (GNOME Shell|KWin|cosmic-comp) focus reports"
-				}
-			],
-			"proves": "On GNOME or KDE Wayland the compositor focus reporter answered: the day log says Listening for GNOME Shell or KWin focus reports."
-		},
-		{
 			"id": "linux_window_topology",
 			"mode": "observe",
 			"probes": [

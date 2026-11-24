@@ -507,6 +507,13 @@ function M.start_compositor_focus(options)
 	return _compositor_focus.start()
 end
 
+--- The state of the focus source start_compositor_focus() started, for the
+--- field run's setup check.
+--- @return string|nil nil when this session has none (X11, another desktop).
+function M.compositor_focus_status()
+	return _compositor_focus and _compositor_focus.status() or nil
+end
+
 --- Stops the focus source started by start_compositor_focus().
 --- @return boolean settled
 function M.stop_compositor_focus()

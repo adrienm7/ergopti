@@ -82,6 +82,7 @@ M.PROTOCOL_PATH = "diagnostics/data/field_run_protocol.json"
 M.CHECK_RUNNERS = {
 	composer = "diagnostics.ui.field_check.composer_check",
 	network = "diagnostics.ui.field_check.network_check",
+	setup = "diagnostics.ui.field_check.setup_check",
 }
 
 

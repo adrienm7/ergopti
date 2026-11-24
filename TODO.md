@@ -860,10 +860,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     line built by `issue_link.build_url`, the redacted report on the clipboard); without a window the report opens
     in the one-click dialog. Left: the macOS and Windows hosts, then drop the `field_report` exclusions of
     `test-webview-geometry-single-source.cjs`; until then those two open the report in the one-click dialog.
-  - **Field points still without an automatic driver step.** Linux: the collector's probe steps `linux_input_access`,
-    `linux_autostart`, `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`)
-    run only from `collect-linux-field-report.sh`; a Linux field check step reading the same probes from
-    `diagnostics/data/field_guided_steps.json` would put them in the in-app run. Windows: `TODO-tests-windows.md`
+  - **Field points still without an automatic driver step.** Linux: done. The collector's four probe steps are now
+    the daemon's field run step `field_setup` (check `setup`, `linux/diagnostics/engine/field_check/setup_check.lua`:
+    `/dev/uinput` writable, an evdev node readable, the systemd user unit enabled, a polkit agent running, the
+    compositor focus source ready), so the in-app run and the collector both decide `physical_acceptance` and
+    `wayland_focus` by it. Windows: `TODO-tests-windows.md`
     carries no `field-point` ids and no `field_todo_coverage.json`, so its report would name steps only. macOS: 196
     step ids of the field run checks have no `field_check.step.*` label, so the report shows their steps as closed
     codes.
