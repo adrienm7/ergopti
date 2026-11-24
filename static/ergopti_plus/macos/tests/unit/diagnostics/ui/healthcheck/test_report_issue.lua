@@ -670,8 +670,11 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 		package.loaded["diagnostics.ui.healthcheck.core"] = {
 			DRIVER = "macos",
 			config = documents,
-			run = function()
-				return { driver = "macos", sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" } } }
+			-- As the real collector does, the versions are the local_state
+			-- probe's: a phase A snapshot alone has none (feature-version-unknown)
+			run = function(opts)
+				local versions = type(opts) == "table" and opts.local_state == true and { ergopti_version = "2.4.0" } or {}
+				return { driver = "macos", sections = { versions = versions, system = { os = "macOS 15.1" } } }
 			end,
 		}
 		local completed

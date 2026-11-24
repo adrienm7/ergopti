@@ -924,7 +924,10 @@ end
 
 --- Collects the synchronous (phase A) snapshot: memory, Hammerspoon queries
 --- and small files only; the probes fill the rest.
---- @param opts table|nil { detailed = boolean, extensive = boolean, state = menu state|nil }
+--- @param opts table|nil { detailed = boolean, extensive = boolean, state = menu state|nil,
+---   complete_local = boolean (also the configuration and the local state now),
+---   local_state = boolean (only the local state now: the versions, which
+---   Suggest a feature prefills) }
 --- @return table The version 2 snapshot.
 function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
@@ -1008,6 +1011,8 @@ function M.run(opts)
 		local err = require("diagnostics.engine.healthcheck.configuration").complete(snapshot,
 			H.configuration_context(schema, opts.configuration))
 		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
+		complete_local_state(snapshot)
+	elseif opts.local_state == true then
 		complete_local_state(snapshot)
 	end
 	return snapshot

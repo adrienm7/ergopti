@@ -319,7 +319,9 @@ function M.suggest_feature(overrides, complete)
 	return menu_request(ConfigKeys.COMMAND.SUGGEST_FEATURE, overrides, complete, function(owner)
 		local bridge = require("diagnostics.ui.healthcheck.core")
 		local documents = bridge.config()
-		local document = Share.document(bridge.run(), documents.schema,
+		-- The versions are the local_state probe's: without it the form said
+		-- "unknown" for the version the bug form shows
+		local document = Share.document(bridge.run({ local_state = true }), documents.schema,
 			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
