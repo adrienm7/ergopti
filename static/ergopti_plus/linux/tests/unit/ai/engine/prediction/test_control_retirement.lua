@@ -708,7 +708,9 @@ do
 			put("hotstrings.engine.repeat_key", { is_enabled = no })
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("clipboard.adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
-			put("clipboard.adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
+			-- The boot arms the payload hint once (arm_transient_hint); no selection read is permitted.
+			put("clipboard.adapters.clipboard", { arm_transient_hint = noop,
+				read_primary = function() error("no selection read is permitted") end })
 			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
 			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
