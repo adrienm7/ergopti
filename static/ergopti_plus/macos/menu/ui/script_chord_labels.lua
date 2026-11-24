@@ -1,4 +1,4 @@
---- ui/menu/script_chord_labels.lua
+--- menu/ui/script_chord_labels.lua
 
 --- ==============================================================================
 --- MODULE: Script Chord Labels

@@ -1,4 +1,4 @@
---- menu/adapters/styled_title.lua
+--- core/ui/adapters/styled_title.lua
 
 --- ==============================================================================
 --- MODULE: Styled Menu Title (Hammerspoon)

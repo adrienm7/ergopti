@@ -1,4 +1,4 @@
---- tests/unit/menu/ui/tray/test_tray_shortcut_hint.lua
+--- tests/unit/menu/ui/tray/test_shortcut_hint.lua
 
 --- ==============================================================================
 --- MODULE: Tray Shortcut Hints
@@ -37,7 +37,7 @@ end
 --- @return table rows
 local function root(control, paused)
 	-- The hint and its adapter read the hs stub of this load, not an earlier one.
-	package.loaded["menu.adapters.styled_title"] = nil
+	package.loaded["core.ui.adapters.styled_title"] = nil
 	package.loaded["menu.ui.builder.shortcut_hint"] = nil
 	local builder = helpers.load_with_stubs("menu.ui.builder.builder")
 	local i18n = require("core.i18n.engine.i18n")
@@ -132,7 +132,7 @@ helpers.describe("macOS tray shortcut hints (script-chord-tray-hint)", function(
 	end)
 
 	helpers.it("greys the whole styled title of a disabled row", function()
-		package.loaded["menu.adapters.styled_title"] = nil
+		package.loaded["core.ui.adapters.styled_title"] = nil
 		local Hint = helpers.load_with_stubs("menu.ui.builder.shortcut_hint")
 		local saved = hs.styledtext.new
 		hs.styledtext.new = function(text, attributes)

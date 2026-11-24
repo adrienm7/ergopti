@@ -37,7 +37,7 @@ local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 local LOG           = "menu_shortcuts"
 -- The label of each script chord slot (this driver's AltGr is the right
 -- Option key), the same one the tray shows beside Suspend, Reload and Quit.
-local ScriptChordLabels = require("ui.menu.script_chord_labels")
+local ScriptChordLabels = require("menu.ui.script_chord_labels")
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}

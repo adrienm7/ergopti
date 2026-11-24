@@ -146,7 +146,6 @@
 	"tree:launcher/Sources": "macos",
 	"tree:launcher/Tests": "macos",
 	"tree:menu": "linux+macos+windows",
-	"tree:menu/adapters": "macos",
 	"tree:menu/engine": "linux+macos+windows",
 	"tree:menu/ui": "linux+macos+windows",
 	"tree:modules": "linux+macos+windows",

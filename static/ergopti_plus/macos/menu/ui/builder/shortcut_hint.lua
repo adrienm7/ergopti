@@ -8,7 +8,7 @@
 --- label, as Windows shows it after a tab and Linux in the label text.
 ---
 --- FEATURES & RATIONALE:
---- 1. The chord is the one the Shortcuts submenu names (ui.menu.script_chord_labels)
+--- 1. The chord is the one the Shortcuts submenu names (menu.ui.script_chord_labels)
 ---    for the slot the shared rule picks (keyboard.engine.layers.script_chords,
 ---    hint_slot): the first slot whose live chord runs the action.
 --- 2. A styled title, not a native key equivalent: an NSMenu key equivalent
@@ -25,8 +25,8 @@
 local M = {}
 local Logger = require("core.logger.engine.logger")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
-local ChordLabels = require("ui.menu.script_chord_labels")
-local StyledTitle = require("menu.adapters.styled_title")
+local ChordLabels = require("menu.ui.script_chord_labels")
+local StyledTitle = require("core.ui.adapters.styled_title")
 local TrayHints = require("menu.engine.tray_shortcut_hints")
 local i18n = require("core.i18n.engine.i18n")
 
@@ -57,7 +57,7 @@ end
 --- @param label string The row's title.
 --- @param hint string The chord's name.
 --- @param disabled boolean Whether the row is greyed.
---- @return any title An hs.styledtext (menu.adapters.styled_title).
+--- @return any title An hs.styledtext (core.ui.adapters.styled_title).
 function M.title(label, hint, disabled)
 	local font = CanvasBadge.menu_font()
 	local body = { font = font }

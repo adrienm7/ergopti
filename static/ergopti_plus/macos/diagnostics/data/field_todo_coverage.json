@@ -113,7 +113,7 @@
 			"id": "tray_shortcut_hint",
 			"title": "Tray shortcut hints beside Suspend, Reload and Quit",
 			"checks": [],
-			"not_testable": "The hints are drawn in the open menu-bar menu, which no run captures: read the three rows with the preset chords, then after moving and clearing one chord and switching the chords off; the styled titles and the shared rule are unit-tested (test_tray_shortcut_hint)."
+			"not_testable": "The hints are drawn in the open menu-bar menu, which no run captures: read the three rows with the preset chords, then after moving and clearing one chord and switching the chords off; the styled titles and the shared rule are unit-tested (test_shortcut_hint)."
 		},
 		{
 			"id": "menu_header_pill_centred",
