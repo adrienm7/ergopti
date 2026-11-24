@@ -52,9 +52,10 @@ _TSCO_RequestCopy(Phase) {
 	_TSCO.WriterSequence := Identity.Sequence
 }
 
-; Decorate only the complete genuine publisher. The native bool and every
-; value remain unchanged; this exposes its unlocked return to the real copier.
-CB_Write(Text) {
+; Decorate only the complete genuine publisher of a nonempty TextSend payload.
+; The native bool and every value remain unchanged; this exposes its unlocked
+; return to the real copier.
+_CB_WriteTransientText(Text) {
 	global _TSCO, _TEXT_CLIPBOARD_OWNER_TOKEN
 	try {
 		Published := _TSCO_ActualWrite(Text)

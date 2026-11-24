@@ -12,13 +12,15 @@
 
 _TSCOT_ChildSource() {
 	global _DriverDir
-	ClipboardOwner := _DriverProductionFileForSymbol("CB_Write", _DriverDir)
+	; A nonempty TextSend payload is published by _CB_WriteTransientText, the
+	; native writer that adds the clipboard-history exclusion formats.
+	ClipboardOwner := _DriverProductionFileForSymbol("_CB_WriteTransientText", _DriverDir)
 	SenderOwner := _DriverProductionFileForSymbol("TextSend", _DriverDir)
 	EditorOwner := _DriverProductionFileForSymbol("_TextSenderQueueNative", _DriverDir)
 	AssertTrue(ClipboardOwner != "" && SenderOwner != "" && EditorOwner != "",
 		"All three complete genuine adapter owners must resolve")
 	ClipboardSource := FileRead(ClipboardOwner, "UTF-8")
-	ClipboardSource := StrReplace(ClipboardSource, "CB_Write(Text) {", "_TSCO_ActualWrite(Text) {", true, &Writes)
+	ClipboardSource := StrReplace(ClipboardSource, "_CB_WriteTransientText(Text) {", "_TSCO_ActualWrite(Text) {", true, &Writes)
 	AssertEqual(1, Writes, "Only the genuine text publisher declaration may be decorated")
 	SenderSource := FileRead(SenderOwner, "UTF-8")
 	Masked := _DriverMaskNonCode(&SenderSource)
