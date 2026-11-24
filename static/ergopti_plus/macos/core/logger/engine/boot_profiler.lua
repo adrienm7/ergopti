@@ -30,6 +30,10 @@
 ---    its CPU, the heap and every closed stage, the Linux summary's shape. A
 ---    stage left open used to end the boot without a word, and no single line
 ---    compared one boot with another (boot profiler parity BPF-02, BPF-03).
+--- 7. Explicit ownership: begin() and complete() run once per Lua VM, as on
+---    Linux; a second call is a programming error and raises. begin() used to
+---    restart the clock and drop every closed stage, and a second complete()
+---    judged and logged the boot again (BPF-04).
 --- ==============================================================================
 
 local M = {}
@@ -69,6 +73,8 @@ local _open_stage     = nil
 local _stage_start_ns = nil
 local _last_completed = nil
 local _complete       = false
+-- True once begin() ran: the single boot owner (see M._reset_for_test()).
+local _begun          = false
 
 -- Monotonic nanoseconds → milliseconds. The AHK driver works directly in ticks
 -- (A_TickCount is already ms); Hammerspoon's clock is in nanoseconds, so every
@@ -182,9 +188,11 @@ function M.sub(label)
 	return elapsed_ms
 end
 
---- Starts (or restarts) the boot timer. Call once, as early as the logger is
---- ready, so subsequent marks measure deltas from a known origin.
+--- Starts the boot timer. Call once, as early as the logger is ready, so
+--- subsequent marks measure deltas from a known origin.
 function M.begin()
+	if _begun then error("boot_profiler.begin() called twice — boot has a single owner.", 2) end
+	_begun = true
 	_start_ns = now_ns()
 	_last_ns  = _start_ns
 	_start_cpu_ms = _cpu_ms()
@@ -242,6 +250,7 @@ end
 
 --- Records the whole boot duration once every stage has completed.
 function M.complete()
+	if _complete then error("boot_profiler.complete() called twice — boot completes once.", 2) end
 	_complete = true
 	untrace_requires()
 	local total = _start_ns and (now_ns() - _start_ns) / NS_PER_MS or 0
@@ -347,6 +356,15 @@ end
 --- @param fn function|nil Zero-argument function returning CPU milliseconds.
 function M.use_cpu_clock(fn)
 	_cpu_ms = fn or process_cpu_ms
+end
+
+--- Forgets the boot so a test can begin another one (tests only).
+function M._reset_for_test()
+	untrace_requires()
+	_begun, _complete, _start_ns, _last_ns = false, false, nil, nil
+	_start_cpu_ms, _last_cpu_ms, _stage_cpu_ms = nil, nil, nil
+	_open_stage, _stage_start_ns, _last_completed, _sub_last_ns = nil, nil, nil, nil
+	_boot_complete_ms, _boot_cpu_ms, _stage_durations, _loaded_modules = nil, nil, {}, {}
 end
 
 --- Returns the milliseconds elapsed since M.begin() without emitting a log.
