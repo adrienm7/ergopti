@@ -146,3 +146,8 @@ section keyboard-controls button:hover {
 	background-color: rgb(0, 0, 0);
 	color: rgba(255, 255, 255, 0.8);
 } */
+
+/* The controls drawn right under their keyboard keep it at a distance. */
+keyboard + keyboard-controls {
+	margin-top: 5vh;
+}

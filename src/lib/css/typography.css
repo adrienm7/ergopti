@@ -18,7 +18,7 @@ li {
    under the centred titles and keyboards. A block that holds a keyboard
    drawing keeps the full width: the drawing is sized on the window, so in a
    narrower list it passed the column's edge and lost its last keys. */
-bloc-main main :is(p, ul, ol, dl, blockquote):not(:has(keyboard)) {
+.bloc-main main :is(p, ul, ol, dl, blockquote):not(:has(keyboard)) {
 	margin-inline: auto;
 	max-width: 58ch;
 }

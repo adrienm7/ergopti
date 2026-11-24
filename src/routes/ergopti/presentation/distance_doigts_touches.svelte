@@ -138,26 +138,22 @@
 			[METTRE ICI UN CLAVIER VIDE MONTRANT LES MEILLEURS EMPLACEMENTS EN COULEUR]
 		</p> -->
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		La rangée des chiffres est donc encore moins accessible, car il faut traverser deux rangées
 		depuis la rangée de repos pour l’atteindre. Laisser le <kbd>É</kbd> sur cette ligne comme en
 		AZERTY est donc une très mauvaise idée, car cette lettre est beaucoup utilisée en français. Il y
 		est environ 2 fois plus fréquent que le <kbd>J</kbd>. Pourtant, en AZERTY, c’est le <kbd>J</kbd>
 		qui occupe l’un des meilleurs emplacements du clavier : la touche de repos de l’index.
 	</p>
-	<p>
+	<p class="space-after-tiny">
 		Enfin, contrairement à BÉPO ou Optimot, <Ergopti /> ne place pas de symboles de programmation ou
 		de ponctuation sur la rangée des chiffres. Ces symboles sont ramenés au plus près des doigts grâce
 		à l’utilisation de la couche <kbd>AltGr</kbd>.
 	</p>
 
-	<tiny-space></tiny-space>
 	<KeyboardBasis id="frequences" />
-	<tiny-space></tiny-space>
 
-	<p>
+	<p class="space-before-tiny">
 		Comme le montre le clavier ci-dessus, les lettres les plus fréquentes sont bien sur la rangée du
 		milieu en <Ergopti />. Effectivement, la lettre la plus fréquente, le <kbd>E</kbd>, est en
 		rouge. Viennent ensuite en orange les voyelles et consonnes les plus fréquentes. Enfin, les

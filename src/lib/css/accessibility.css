@@ -206,7 +206,7 @@
 :root[data-a11y-contrast='high'],
 :root[data-a11y-contrast='high'] body,
 :root[data-a11y-contrast='high'] .bg-blue,
-:root[data-a11y-contrast='high'] bloc-main,
+:root[data-a11y-contrast='high'] .bloc-main,
 :root[data-a11y-contrast='high'] header,
 :root[data-a11y-contrast='high'] footer {
 	background: #000 !important;

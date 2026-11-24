@@ -12,8 +12,7 @@
 		>. Ceci est très important, car si vous ne le faites pas, alors vos résultats n’auront aucune
 		valeur.
 	</p>
-	<tiny-space></tiny-space>
-	<h3>Comparer le même type de clavier</h3>
+	<h3 class="space-before-tiny">Comparer le même type de clavier</h3>
 	<p>
 		Ne comparez pas une disposition ISO avec une disposition Ergodox. Sinon, logiquement la
 		disposition Ergodox sera mieux notée. Elle aura en effet une distance aux touches moindre, car
@@ -22,8 +21,9 @@
 		pouces.
 	</p>
 
-	<tiny-space></tiny-space>
-	<h3>Comparer des claviers possédant une touche pour tous les caractères du corpus</h3>
+	<h3 class="space-before-tiny">
+		Comparer des claviers possédant une touche pour tous les caractères du corpus
+	</h3>
 	<p>
 		Un autre point à bien faire attention est de <strong
 			>s’assurer que toutes les lettres soient bien dans les dispositions à comparer</strong
@@ -32,8 +32,7 @@
 		pas dans la disposition anglophone.
 	</p>
 
-	<tiny-space></tiny-space>
-	<h3>Conclusion sur la comparaison de dispositions</h3>
+	<h3 class="space-before-tiny">Conclusion sur la comparaison de dispositions</h3>
 	<p>
 		Comparer des dispositions n’est pas aussi simple qu’on pourrait de prime abord le penser. Il ne
 		suffit pas de balancer son texte et sa disposition dans un comparateur et de le faire tourner.

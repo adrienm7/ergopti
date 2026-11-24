@@ -30,8 +30,7 @@
 		touches atteintes. Le pire est quand ces <SFB />s constituent la majorité de nos frappes, ce qui
 		se produit si l’on utilise une disposition non optimisée comme AZERTY.
 	</p>
-	<tiny-space></tiny-space>
-	<p>
+	<p class="space-before-tiny">
 		Une combinaison de deux touches, c’est-à-dire deux caractères qui se suivent, est appelée <em
 			>bigramme</em
 		>

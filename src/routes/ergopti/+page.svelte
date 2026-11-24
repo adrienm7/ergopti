@@ -36,7 +36,6 @@ sub-pages that hold the details (siteNavigation.js lists them).
 	<KeyboardBasis id="presentation" />
 	<!-- A click on a key switches the drawn layer; the layer select of the
 	     controls does it from the keyboard (WCAG 2.1.1). -->
-	<tiny-space></tiny-space>
 	<KeyboardControls id="presentation" />
 	<ul class="overview-pages">
 		{#each LAYOUT_PAGES.slice(1) as entry (entry.route)}

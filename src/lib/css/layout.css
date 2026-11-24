@@ -30,7 +30,7 @@ html {
 	width: var(--largeur-main);
 }
 
-bloc-main {
+.bloc-main {
 	background: #00000090;
 	display: flex;
 	flex-direction: row;

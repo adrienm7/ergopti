@@ -30,7 +30,7 @@
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
-		<bloc-introduction>
+		<section class="bloc-introduction">
 			<h1 data-aos="zoom-in">Installer la Disposition <Ergopti></Ergopti></h1>
 			<p class="encart-introduction">
 				Téléchargez la Disposition <Ergopti></Ergopti> pour Windows, macOS ou Linux. Pour la tester sans
@@ -38,7 +38,7 @@
 				<a href={resolve('/studio/essayer') + '?layout=ergopti'} class="link">essayez-la en ligne</a
 				>.
 			</p>
-		</bloc-introduction>
+		</section>
 	</svelte:fragment>
 
 	<p>
@@ -54,8 +54,8 @@
 			><strong>Serveur Discord</strong> <i class="icon-discord" aria-hidden="true"></i></a
 		>.
 	</p>
-	<tiny-space></tiny-space>
 	<nav
+		class="space-before-tiny"
 		style="display: flex; gap: 1rem; justify-content:center; font-size:1.5rem"
 		aria-label="Installation par système"
 	>

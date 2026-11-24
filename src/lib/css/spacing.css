@@ -29,24 +29,23 @@ main ul li,
 	margin-bottom: 10vh;
 }
 
-tiny-space {
-	display: block;
-	height: 5vh;
+/* Vertical room around a block, as a margin of the block itself: the empty
+   spacer elements these replace were made-up elements, generic boxes that
+   meant nothing (tools/test/test-site-semantic-html.cjs). */
+.space-before-tiny {
+	margin-top: 5vh;
 }
 
-small-space {
-	display: block;
-	height: 10vh;
+.space-before-small {
+	margin-top: 10vh;
 }
 
-medium-space {
-	display: block;
-	height: 20vh;
+.space-after-tiny {
+	margin-bottom: 5vh;
 }
 
-big-space {
-	display: block;
-	height: 30vh;
+.space-after-big {
+	margin-bottom: 30vh;
 }
 
 hr {

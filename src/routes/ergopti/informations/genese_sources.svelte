@@ -28,9 +28,7 @@
 		à chaque fois que l’on essaie une nouvelle disposition.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		Les premières versions de ce projet, baptisées <strong
 			><a href="https://bepo.fr/wiki/Utilisateur:Adrien_Moyaux" target="_blank" class="link"
 				>Optim7</a
@@ -64,9 +62,7 @@
 		roulements largement plus fréquents pour les lettres ne bénéficiant pas de cette alternance.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		La disposition a beaucoup évoluée au fil du temps. En particulier, la touche sur l’index gauche
 		a plusieurs fois changé :
 		<kbd>Q</kbd>, puis <kbd>P</kbd>, puis <kbd>W</kbd>. Enfin, une touche spéciale
@@ -82,9 +78,7 @@
 		></Ergopti>.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		À un certain stade de développement, il devint évident que la disposition
 		<strong>Optim7</strong> n'était plus une simple variante d’Optimot. Le besoin de renommer ce
 		projet s’est alors imposé. Un utilisateur nommé
@@ -136,9 +130,7 @@
 		ce ne soit pas un problème en dupliquant ces raccourcis sur les voyelles accentuées.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		<i class="icon-circle-2" aria-hidden="true"
 			><span class="path1"></span><span class="path2"></span></i
 		>
@@ -157,9 +149,7 @@
 		fonction de leur accessibilité.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		<i class="icon-circle-3" aria-hidden="true"
 			><span class="path1"></span><span class="path2"></span></i
 		>

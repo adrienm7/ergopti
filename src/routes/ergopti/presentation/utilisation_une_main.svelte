@@ -29,8 +29,7 @@
 	</h3>
 
 	<KeyboardBasis id="controle" />
-	<tiny-space></tiny-space>
-	<p>
+	<p class="space-before-tiny">
 		Les raccourcis <samp class="kbd-output">Ctrl</samp> + <samp class="kbd-output">X</samp>,
 		<samp class="kbd-output">Ctrl</samp>
 		+ <samp class="kbd-output">C</samp>,
@@ -48,8 +47,7 @@
 
 	<h3>Touches de raccourci sur la version Ergodox</h3>
 	<KeyboardBasis id="raccourcis_ergodox" />
-	<tiny-space></tiny-space>
-	<p>
+	<p class="space-before-tiny">
 		La version d’<Ergopti /> adaptée aux claviers de type Ergodox est complètement optimisée pour l’utilisation
 		à une main. En effet, des touches <kbd>Copier</kbd>, <kbd>Coller</kbd>, <kbd>Couper</kbd> et
 		<kbd>Alt+Tab</kbd> ont été directement incluses à gauche du clavier. À noter que ces touches ne sont
