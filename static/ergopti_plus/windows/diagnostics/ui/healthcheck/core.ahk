@@ -410,8 +410,10 @@ _HealthCheck_Developer() {
 		"modules_failed",   Check["failed"],
 		"modules_disabled", [],
 		"ring_lines",       LoggerRingBufferSnapshot().Length)
-	if IsSet(LOGGER_MIN_LEVEL)
+	if IsSet(LOGGER_MIN_LEVEL) {
 		Developer[ConfigLeaf.LOG_LEVEL] := String(LOGGER_MIN_LEVEL)
+		Developer["detailed_log"] := LoggerIsDetailed(LOGGER_MIN_LEVEL) ? 1 : 0
+	}
 	return Developer
 }
 

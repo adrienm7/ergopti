@@ -1,5 +1,5 @@
 {
-	"_comment": "Golden vectors of the readable English diagnostics report: `diagnostics` is the exact text the bug form is prefilled with (fields.diagnostics of the share document, the complete report's start before its JSON block). Replayed byte for byte by share.lua (macOS and Linux suites), model.js (tools/test/fixtures/healthcheck-sharing-controls.cjs) and report.ahk (AHK suite), because the host refuses a page preview that differs from its own text. The groups follow share_policy.report_order: errors first, the unbounded changed settings last. `large` builds a configuration of `large.rows` changed settings on top of the first vector's snapshot: its errors, checks and permissions must still reach the bug link whole, ahead of the cut.",
+	"_comment": "Golden vectors of the readable English diagnostics report: `diagnostics` is the exact text the bug form is prefilled with (fields.diagnostics of the share document, the complete report's start before its JSON block). Replayed byte for byte by share.lua (macOS and Linux suites), model.js (tools/test/fixtures/healthcheck-sharing-controls.cjs) and report.ahk (AHK suite), because the host refuses a page preview that differs from its own text. The groups follow share_policy.report_order: errors first, the unbounded changed settings last. `large` builds a configuration of `large.rows` changed settings on top of the first vector's snapshot: its errors, checks and permissions must still reach the bug link whole, ahead of the cut. The issues group closes with the « Detailed log: off » hint while developer.detailed_log is false, and the Windows writer reports the switch as 1 (maintainer, 2026-11-24).",
 	"vectors": [
 		{
 			"id": "macos-every-group",
@@ -58,7 +58,7 @@
 							"2026-11-24 12:17:30:000 [ERROR] other | A line the facts do not recognise"
 						]
 					},
-					"developer": { "ring_lines": 400, "phase_a_ms": 8.25 },
+					"developer": { "detailed_log": false, "ring_lines": 400, "phase_a_ms": 8.25 },
 					"paths": { "config_dir": "/Users/PRIVATE_USER_ZEBRA/config" }
 				},
 				"probes": {
@@ -79,7 +79,7 @@
 					{ "probes": { "github_api": { "state": "timeout", "cleanup": "unknown", "ms": 3 } } }
 				]
 			},
-			"diagnostics": "# ErgoptiPlus diagnostics\n\nTechnical facts only: no logs, typed text, paths or names.\n\n## Warnings and errors\nWarnings this session: 3\nErrors this session: 2\nRecent error lines read: 2 (today’s errors file)\nRecognised error: lease_watchdog_exit (exit_code=73)\n\n## Checks (probe ids)\n```\nappleevent_transport: timeout (cleanup=pending, native_status=-1744)\nconfiguration: ok (ms=4)\ngithub_api: error (detail=native_refused, ms=120)\nretired_runs: 1\n```\n\n## Permissions\nAccessibility: granted\nInput Monitoring: denied\n\n## Configuration files\nBuilt-in defaults: Read\nconfig.toml: Read\nlayers.toml: Missing\n\n## Input state\nPaused: no\nRemapping engine: active\nKey presses seen by the taps: 120\nKeys stuck down: 0\n\n## Versions\nErgoptiPlus version: 1.0.10-dev.178\nCommit: abc1234def\nUpdate channel: dev\nRuntime: 1.1.1\n\n## System and load\nOperating system: macOS 15.1\nAvailable memory: 4096 MB\nProcessor load: 12.35 %\nProcessor used by ErgoptiPlus: 1.5 %\nErgoptiPlus running for: 3600 s\nRuns as administrator: no\n\n## Hardware\nLogical cores: 10\nArchitecture: arm64\nMemory: 16384 MB\n\n## Artificial intelligence\nEnabled: yes\nBackend: mlx\n\n## Developer details\nLines in the in-memory log: 400\nCollection time: 8.25 ms\n\n## Report\nDriver: macOS\nCollected (UTC): 2026-11-24T11:18:00Z\nFormat: 2\nDetails included: no\nExtensive checks: no\n\n## Settings that differ from the defaults (config.toml keys)\n```\ngestures.enabled = false\ngestures.modes.swipe_3_down = incremental\ngestures.swipe_3_down = 9 characters\nllm.models.user_models = 2 items\nmetrics.keep_days = 45\n```\n"
+			"diagnostics": "# ErgoptiPlus diagnostics\n\nTechnical facts only: no logs, typed text, paths or names.\n\n## Warnings and errors\nWarnings this session: 3\nErrors this session: 2\nRecent error lines read: 2 (today’s errors file)\nRecognised error: lease_watchdog_exit (exit_code=73)\nDetailed log: off — turn on Debug › Detailed log and reproduce for more detail\n\n## Checks (probe ids)\n```\nappleevent_transport: timeout (cleanup=pending, native_status=-1744)\nconfiguration: ok (ms=4)\ngithub_api: error (detail=native_refused, ms=120)\nretired_runs: 1\n```\n\n## Permissions\nAccessibility: granted\nInput Monitoring: denied\n\n## Configuration files\nBuilt-in defaults: Read\nconfig.toml: Read\nlayers.toml: Missing\n\n## Input state\nPaused: no\nRemapping engine: active\nKey presses seen by the taps: 120\nKeys stuck down: 0\n\n## Versions\nErgoptiPlus version: 1.0.10-dev.178\nCommit: abc1234def\nUpdate channel: dev\nRuntime: 1.1.1\n\n## System and load\nOperating system: macOS 15.1\nAvailable memory: 4096 MB\nProcessor load: 12.35 %\nProcessor used by ErgoptiPlus: 1.5 %\nErgoptiPlus running for: 3600 s\nRuns as administrator: no\n\n## Hardware\nLogical cores: 10\nArchitecture: arm64\nMemory: 16384 MB\n\n## Artificial intelligence\nEnabled: yes\nBackend: mlx\n\n## Developer details\nDetailed log: no\nLines in the in-memory log: 400\nCollection time: 8.25 ms\n\n## Report\nDriver: macOS\nCollected (UTC): 2026-11-24T11:18:00Z\nFormat: 2\nDetails included: no\nExtensive checks: no\n\n## Settings that differ from the defaults (config.toml keys)\n```\ngestures.enabled = false\ngestures.modes.swipe_3_down = incremental\ngestures.swipe_3_down = 9 characters\nllm.models.user_models = 2 items\nmetrics.keep_days = 45\n```\n"
 		},
 		{
 			"id": "windows-configuration-not-collected",
@@ -91,11 +91,12 @@
 				"extensive": false,
 				"sections": {
 					"versions": { "ergopti_version": "1.0.10-dev.178", "commit": "abc1234def (git)" },
-					"issues": { "warn_count": 0, "err_count": 0 }
+					"issues": { "warn_count": 0, "err_count": 0 },
+					"developer": { "detailed_log": 1 }
 				},
 				"probes": { "configuration": { "state": "pending", "cleanup": "settled" } }
 			},
-			"diagnostics": "# ErgoptiPlus diagnostics\n\nTechnical facts only: no logs, typed text, paths or names.\n\n## Warnings and errors\nWarnings this session: 0\nErrors this session: 0\nRecent error lines read: unknown\n\n## Checks (probe ids)\n```\nconfiguration: pending\n```\n\n## Versions\nErgoptiPlus version: 1.0.10-dev.178\nCommit: abc1234def\n\n## Report\nDriver: Windows\nCollected (UTC): 2026-11-24T11:18:00Z\nFormat: 2\nDetails included: yes\nExtensive checks: no\n\n## Settings that differ from the defaults (config.toml keys)\nunknown\n"
+			"diagnostics": "# ErgoptiPlus diagnostics\n\nTechnical facts only: no logs, typed text, paths or names.\n\n## Warnings and errors\nWarnings this session: 0\nErrors this session: 0\nRecent error lines read: unknown\n\n## Checks (probe ids)\n```\nconfiguration: pending\n```\n\n## Versions\nErgoptiPlus version: 1.0.10-dev.178\nCommit: abc1234def\n\n## Developer details\nDetailed log: yes\n\n## Report\nDriver: Windows\nCollected (UTC): 2026-11-24T11:18:00Z\nFormat: 2\nDetails included: yes\nExtensive checks: no\n\n## Settings that differ from the defaults (config.toml keys)\nunknown\n"
 		},
 		{
 			"id": "linux-nothing-changed",

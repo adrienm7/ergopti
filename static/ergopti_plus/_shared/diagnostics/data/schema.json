@@ -599,6 +599,10 @@
 					"type": "text"
 				},
 				{
+					"id": "detailed_log",
+					"type": "bool"
+				},
+				{
 					"id": "ring_lines",
 					"type": "count"
 				},
@@ -933,6 +937,9 @@
 							"fields": {
 								"ring_lines": {
 									"kind": "number"
+								},
+								"detailed_log": {
+									"kind": "boolean"
 								},
 								"phase_a_ms": {
 									"kind": "number"

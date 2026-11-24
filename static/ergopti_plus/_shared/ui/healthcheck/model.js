@@ -1366,6 +1366,9 @@
 						);
 					});
 				}
+				// The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
+				if (sections.developer && sections.developer.detailed_log === false)
+					lines.push(label('healthcheck.export.detailed_log_off'));
 				group(label('healthcheck.section.issues'), lines);
 			},
 			checks: function () {

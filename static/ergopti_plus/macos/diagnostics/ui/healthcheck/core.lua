@@ -905,6 +905,9 @@ local function collect_developer()
 	return {
 		modules_disabled    = {},
 		log_level           = level_name(),
+		detailed_log        = require("core.logger.engine.level_setting").is_detailed(level_name(),
+			require("menu.engine.manifest_reader").find_entry_by_path(
+				require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL), require("core.logger.engine")),
 		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
 		event_tap_telemetry = M.event_tap_telemetry(require("platform.system.info").runtime_version()).summary,
 	}

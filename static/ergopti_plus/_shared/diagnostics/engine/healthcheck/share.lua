@@ -344,6 +344,10 @@ local function readable(safe, schema)
 				lines[#lines + 1] = label("healthcheck.export.recognised_error") .. ": " .. event.code .. facts(event, keys)
 			end
 		end
+		-- The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
+		if sections.developer and sections.developer.detailed_log == false then
+			lines[#lines + 1] = label("healthcheck.export.detailed_log_off")
+		end
 		group(label("healthcheck.section.issues"), lines)
 	end
 	render.checks = function()

@@ -540,6 +540,9 @@ local function collect_developer(state)
 		modules_failed   = failed,
 		modules_disabled = disabled,
 		log_level        = level,
+		detailed_log     = require("core.logger.engine.level_setting").is_detailed(level,
+			require("menu.engine.manifest_reader").find_entry_by_path(
+				require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL), logger),
 		ring_lines       = #(logger.ring_buffer_snapshot() or {}),
 	}
 end

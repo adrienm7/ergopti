@@ -2795,5 +2795,7 @@ then writes DEBUG or INFO. The rule lives in
 `_shared/core/logger/engine/level_setting.lua` and the Windows logger, held
 by the `detailed_log` logger parity vectors. Do not bring back a level picker
 in the menu; `config.toml` remains the place for any other level. Asked the
-same day: the bug report says when the detailed log is off (open in TODO.md
-while the report builder is being changed).
+same day: the readable bug report closes its warnings group with « Detailed
+log: off — turn on Debug › Detailed log and reproduce for more detail » while
+the switch is off, from the snapshot's `developer.detailed_log` that each
+driver fills from the same rule.
