@@ -628,15 +628,6 @@ try {
 			/action_without_neutral_transition/
 		],
 		[
-			'unbound stateful action',
-			(xml) =>
-				xml.replace(
-					'</keyboard>',
-					'<actions><action id="not_a_keysym"><when state="none" output="ffi"/><when state="acute" output="z"/></action></actions></keyboard>'
-				),
-			/unbound_stateful_actions/
-		],
-		[
 			'control',
 			(xml) => xml.replace('output="a"', 'output="&#x0009;"'),
 			/control_output_on_character_key/
@@ -675,6 +666,34 @@ try {
 			reason,
 			label
 		);
+	// An action no projected key types and no keysym names (Neo 2's dead key
+	// held only on Mod3+Mod4) is left out and listed: it was refused
+	// (unbound_stateful_actions), which kept Neo 2 from XKB.
+	{
+		const unreachable = exportXkb(
+			Source.importKeylayout(
+				simpleXml.replace(
+					'</keyboard>',
+					'<actions><action id="not_a_keysym"><when state="none" output="ffi"/><when state="acute" output="z"/></action></actions></keyboard>'
+				),
+				'unreachable',
+				'iso'
+			)
+		);
+		assert.deepEqual(unreachable.report.unreachable_actions, ['not_a_keysym']);
+		assert(
+			[...unreachable.files].every(
+				([file, text]) => file === 'export.json' || !text.includes('not_a_keysym')
+			),
+			'no XKB file names the unreachable action'
+		);
+	}
+	const neo2 = exportXkb(
+		Source.read(
+			fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'neo2_source.toml'), 'utf8')
+		)
+	);
+	assert.deepEqual(neo2.report.unreachable_actions, ['dead_belowdot'], 'Neo 2 exports to XKB');
 	const edited = clone(simple);
 	edited.remap = { KeyA: 'KeyB' };
 	assert.throws(() => exportXkb(edited), /remap/);

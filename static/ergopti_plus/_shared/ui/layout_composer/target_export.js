@@ -131,6 +131,7 @@ var LayoutTargetExport = (function () {
 						: []),
 					'Listed empty cells emit NoSymbol and may inherit XKB symbols; source key disabling is not compiled.',
 					'Listed unbound character actions use the converter Unicode keysym fallback, without a physical source action binding.',
+					'Listed unreachable actions (typed by no projected key, named by no keysym) are left out with their dead-key transitions.',
 					'XCompose requires client support and the exported Compose file; native macOS dead-key fallback and cancellation are not certified.',
 					'Registry-specific keysym hints, driver features and installation are outside this source export.'
 				]

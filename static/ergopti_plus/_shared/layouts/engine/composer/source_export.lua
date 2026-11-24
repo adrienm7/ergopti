@@ -85,10 +85,24 @@ function M.xkb(input)
 		if control(terminator.output) then return { ok = false, reason = "control_terminator", state = terminator.state } end
 	end
 	local projection = Converter.projection_report(canonical, codes, types, level5)
+	-- A one-scalar action ID has a defined Unicode keysym fallback. An arbitrary
+	-- identifier would be emitted as a raw, possibly nonexistent keysym; since no
+	-- projected key types it and no keysym names it, nothing can enter its
+	-- transitions on XKB (Neo's dead key held only on Mod3+Mod4), so it is left
+	-- out and listed instead.
+	local unreachable = {}
 	for _, action in ipairs(projection.unbound_actions) do
-		-- A one-scalar action ID has a defined Unicode keysym fallback. Arbitrary
-		-- identifiers would be emitted as raw, possibly nonexistent keysyms.
-		if Utf8.len(action) ~= 1 then return { ok = false, reason = "unbound_stateful_actions", actions = Json.array(projection.unbound_actions) } end
+		if Utf8.len(action) ~= 1 then unreachable[action] = true end
+	end
+	projection.unreachable_actions = TableUtil.sorted_keys(unreachable)
+	if #projection.unreachable_actions > 0 then
+		local kept = {}
+		for key, value in pairs(canonical) do kept[key] = value end
+		kept.actions = {}
+		for _, action in ipairs(canonical.actions) do
+			if not unreachable[action.id] then kept.actions[#kept.actions + 1] = action end
+		end
+		canonical = kept
 	end
 	local result, conversion_error = Converter.convert(canonical, {
 		keycodes = codes, keysyms = input.keysyms, locale_extended_prefixes = input.locale_extended_prefixes,
@@ -109,6 +123,7 @@ function M.xkb(input)
 	projection.modifier_differences = Json.array(projection.modifier_differences)
 	projection.empty_cells = Json.array(projection.empty_cells)
 	projection.unbound_actions = Json.array(projection.unbound_actions)
+	projection.unreachable_actions = Json.array(projection.unreachable_actions)
 	return { ok = true, symbols = result.symbols_text, compose = result.compose_text, types = types,
 		projection = projection, system_key_codes = Json.array(passthrough) }
 end

@@ -289,9 +289,12 @@ waits for the maintainer's review).
       Lua and AutoHotkey engines). macOS cannot hold Mod3 on Caps Lock, which an event tap never sees held
       (`platform_reason.caps_lock_level_not_held_on_macos`): only a generated Karabiner rule could, still to do.
       Left, the native files: no `.keylayout` holds a custom modifier (macOS relies on the emulation); XKB holds
-      Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB and KLC
-      exports are refused for reasons older than the levels (`unbound_stateful_actions`, Caps Lock on the Roya or
-      AltGr columns). The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
+      Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB export
+      writes Mod3 and leaves Mod4 out since 2026-11-24 (Neo's dead key held only on Mod3+Mod4, `dead_belowdot`,
+      refused it as `unbound_stateful_actions`: it is now listed in `unreachable_actions`); the Neo KLC export is
+      still refused, « Caps Lock changes the roya column » (`buildModel` of
+      `tools/codegen/lib/windows-keyboard-layout.cjs`): Mod3 takes the Roya bit on Caps Lock's scan code, and the
+      canonical's Roya key map with Caps Lock is not the one without it (not investigated further). The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
       `undefined`), without Mod3 and Mod4 (`no_windows_column`): `tools/lib/kbd-dll/source.cjs` gives a custom
       modifier no Roya, Loya or Kana bit as the KLC export does, and Mod4's AltGr, an E0 key, could not hold one. The real-machine check (a user
       tap-hold or remap on Caps Lock or AltGr against the held levels) is in the three TODO-tests files.
