@@ -336,7 +336,7 @@ async function exerciseSections(page, origin, basePath) {
  */
 async function expectStudioWorkspace(page, origin, basePath, route) {
 	await visit(page, origin, basePath, route);
-	assert.equal(await page.locator('#sidebar, bloc-introduction').count(), 0, 'Bare workspace');
+	assert.equal(await page.locator('#sidebar, .bloc-introduction').count(), 0, 'Bare workspace');
 	const frame = page.locator('main iframe.studio-frame');
 	await frame.waitFor({ state: 'visible' });
 	const box = await frame.boundingBox();

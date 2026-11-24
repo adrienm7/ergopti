@@ -62,11 +62,11 @@ query added after it.
 	<meta http-equiv="refresh" content={'0;url=' + resolveWithQuery(legacy.target, resolve)} />
 </svelte:head>
 
-<bloc-introduction>
+<section class="bloc-introduction">
 	<p class="legacy-redirect">
 		Cette page a déménagé : <a href={resolveWithQuery(legacy.target, resolve)}>suivre le lien</a>.
 	</p>
-</bloc-introduction>
+</section>
 
 <style>
 	.legacy-redirect {

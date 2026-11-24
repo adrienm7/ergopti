@@ -152,7 +152,7 @@
 
 <a class="skip-link" href="#contenu" lang="fr">Aller au contenu</a>
 
-<bloc-page id="page" class="bg-blue">
+<div id="page" class="bg-blue">
 	<!-- A direct child of the page, so its sticky position holds down to the footer. -->
 	<Header />
 	<div style="flex-grow:1">
@@ -162,10 +162,10 @@
 	{#if !isStudioPage(page.url.pathname)}
 		<Footer />
 	{/if}
-</bloc-page>
+</div>
 
 {#if isLayoutPage(page.url.pathname)}
-	<keyboard-reference>
+	<aside class="keyboard-reference" aria-label="Clavier de référence">
 		<button
 			id="afficher-clavier-reference"
 			onclick={toggleZIndex}
@@ -183,18 +183,17 @@
 			>
 		</button>
 
-		<clavier-reference
+		<div
 			id="clavier-ref"
-			class="bg-blue"
+			class="clavier-reference bg-blue"
 			style="z-index: {zIndex}; display:{affiche}"
 		>
 			<div class="conteneur">
 				<KeyboardBasis id="reference" />
-				<tiny-space></tiny-space>
 				<KeyboardControls id="reference" />
 			</div>
-		</clavier-reference>
-	</keyboard-reference>
+		</div>
+	</aside>
 {/if}
 
 <aside class="banner" lang="fr" aria-label="Annonce">
@@ -259,7 +258,7 @@
 		color: transparent;
 	}
 
-	clavier-reference {
+	.clavier-reference {
 		--couleur: 60;
 		bottom: 0;
 		height: 100vh;
@@ -272,7 +271,7 @@
 		width: 100vw;
 	}
 
-	clavier-reference .conteneur {
+	.clavier-reference .conteneur {
 		/* Permet d’avoir une div qui ne scrolle pas ce qui est dessous */
 		--marge: 10vh;
 		align-items: center;

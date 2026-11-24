@@ -85,9 +85,7 @@
 		</li>
 	</ul>
 
-	<tiny-space></tiny-space>
-
-	<p>D’autres sont placées par paires l’une à côté de l’autre :</p>
+	<p class="space-before-tiny">D’autres sont placées par paires l’une à côté de l’autre :</p>
 	<ul>
 		<li>
 			<kbd>AltGr</kbd> + <kbd>A</kbd> ➜ <samp class="kbd-output">{'<'}</samp> et <kbd>AltGr</kbd> +
@@ -129,8 +127,7 @@
 			➜ <samp class="kbd-output">”</samp>.
 		</li>
 	</ul>
-	<tiny-space></tiny-space>
-	<p class="encadre">
+	<p class="encadre space-before-tiny">
 		À noter que les touches sont aussi placées le plus possible par distance selon leur fréquence
 		d’utilisation. Ainsi, les paires de touches très utilisées <kbd>()</kbd>,
 		<kbd>{'{}'}</kbd>, <kbd>{'<>'}</kbd> et <kbd>[]</kbd> sont toutes sur la rangée du milieu.

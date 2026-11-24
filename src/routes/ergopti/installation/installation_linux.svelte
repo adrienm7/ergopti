@@ -60,11 +60,9 @@
 	ce qui rend cette étape de sélection de la disposition après redémarrage parfois inutile.
 </p>
 
-<tiny-space></tiny-space>
-<hr />
-<tiny-space></tiny-space>
+<hr class="space-before-tiny" />
 
-<p>
+<p class="space-before-tiny">
 	Le processus d'installation utilise un script bash unique qui gère la sélection interactive
 	(version, variante) puis lance automatiquement l'installateur approprié. Deux méthodes
 	d'installation sont disponibles :

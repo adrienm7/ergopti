@@ -42,9 +42,7 @@
 	</a>
 </div>
 
-<small-space></small-space>
-
-<p>
+<p class="space-before-small">
 	Il suffit d'exécuter le fichier <code>Ergopti_windows.exe</code> et de cliquer sur le bouton d'installation
 	pour installer le pilote sur Windows. Ensuite, il est conseillé de redémarrer l'ordinateur pour être
 	sûr que le pilote soit bien pris en compte.

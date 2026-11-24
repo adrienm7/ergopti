@@ -29,9 +29,9 @@
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
-		<bloc-introduction>
+		<section class="bloc-introduction">
 			<IntroductionDisposition />
-		</bloc-introduction>
+		</section>
 	</svelte:fragment>
 
 	<DistanceDoigtsTouches />
@@ -44,8 +44,8 @@
 	<UtilisationUneMain />
 
 	<svelte:fragment slot="bloc-fin">
-		<bloc-fin>
+		<section class="bloc-fin">
 			<DispositionPlus />
-		</bloc-fin>
+		</section>
 	</svelte:fragment>
 </PageWrapper>

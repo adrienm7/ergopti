@@ -48,13 +48,13 @@ FEATURES & RATIONALE:
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
-		<bloc-introduction>
+		<section class="bloc-introduction">
 			<section class="main" lang={i18n.lang}>
 				<h1>{t('Déclaration d’accessibilité')}</h1>
 				<hr class="margin-h1" />
 				<LangToggle />
 			</section>
-		</bloc-introduction>
+		</section>
 	</svelte:fragment>
 
 	<section lang={i18n.lang}>

@@ -22,8 +22,7 @@
 		aria-hidden="true"
 	></i>Installation macOS
 </h2>
-<tiny-space></tiny-space>
-<div class="download-buttons">
+<div class="download-buttons space-before-tiny">
 	<a
 		class="button-link"
 		href={release ? urlMacosBundle : undefined}
@@ -35,9 +34,7 @@
 	</a>
 </div>
 
-<tiny-space></tiny-space>
-
-<p>
+<p class="space-before-tiny">
 	Le driver <a href={resolve('/ergopti-plus')} class="link"><ErgoptiPlus /></a> s'installe aussi
 	avec
 	<a href="https://brew.sh" class="link" target="_blank" rel="noopener">Homebrew</a>, en choisissant
@@ -55,9 +52,9 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 	l'autre : les réglages sont conservés.
 </p>
 
-<tiny-space></tiny-space>
-
-<p>Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :</p>
+<p class="space-before-tiny">
+	Ce bundle doit être dézippé puis placé dans le dossier des extensions de clavier de macOS :
+</p>
 <code>/Library/Keyboard Layouts/</code>
 
 <p>
@@ -71,9 +68,7 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 	+ <kbd>G</kbd> dans le Finder. Cela ouvre directement l'emplacement spécifié.
 </p>
 
-<tiny-space></tiny-space>
-
-<p>
+<p class="space-before-tiny">
 	Après avoir placé le bundle dans le bon dossier, redémarrer la session (ou l'ordinateur) pour que
 	macOS prenne en compte la nouvelle disposition. Ensuite, aller dans <code
 		>Préférences Système</code
@@ -110,9 +105,7 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 />
 <div style="margin-top:15px"></div>
 
-<tiny-space></tiny-space>
-
-<p>Le bundle contient plusieurs variantes de la disposition :</p>
+<p class="space-before-tiny">Le bundle contient plusieurs variantes de la disposition :</p>
 <ul>
 	<li><strong>Ergopti</strong> : version standard, la même que le KbdEdit sur Windows ;</li>
 	<li>

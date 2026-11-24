@@ -79,9 +79,9 @@
 		sur deux doigts consécutifs, dans un mouvement horizontal.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>Les roulements d’<Ergopti></Ergopti> sont visibles sur le clavier ci-dessous :</p>
+	<p class="space-before-tiny">
+		Les roulements d’<Ergopti></Ergopti> sont visibles sur le clavier ci-dessous :
+	</p>
 	<KeyboardBasis id="roulements" />
 	<div style="height: 20px" />
 	<keyboard-control-rolls

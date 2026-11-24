@@ -19,9 +19,7 @@
 		crédibles. Toutefois, cela augmentera d’autant les temps de calcul.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<p>
+	<p class="space-before-tiny">
 		En conclusion, <strong
 			>ne prenez les résultats des benchmarks que comme des tendances générales</strong
 		>. Une disposition meilleure de 2,48% sur un certain corpus n’implique pas que la disposition

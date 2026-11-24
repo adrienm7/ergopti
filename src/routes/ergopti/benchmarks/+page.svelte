@@ -61,9 +61,9 @@
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
-		<bloc-introduction>
+		<section class="bloc-introduction">
 			<IntroductionBenchmarks />
-		</bloc-introduction>
+		</section>
 	</svelte:fragment>
 
 	<CommentComparer></CommentComparer>

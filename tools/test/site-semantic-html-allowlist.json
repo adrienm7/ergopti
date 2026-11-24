@@ -169,13 +169,6 @@
 			"reason": "Empty spacer that keeps the room of the fixed banner under the header on narrow screens."
 		},
 		{
-			"file": "src/lib/components/LegacyRedirect.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
-		},
-		{
 			"file": "src/lib/components/PageWrapper.svelte",
 			"element": "div (none)",
 			"count": 1,
@@ -205,10 +198,10 @@
 		},
 		{
 			"file": "src/lib/components/PageWrapper.svelte",
-			"element": "bloc-main (none)",
+			"element": "div.bloc-main",
 			"count": 1,
 			"kind": "layout",
-			"reason": "The flex row of the table of contents and the article column (layout.css); the nav and the main inside carry the meaning."
+			"reason": "The flex row of the page’s side navigation and its main content; nav and main are its two children, the row itself has no meaning."
 		},
 		{
 			"file": "src/lib/components/SFB.svelte",
@@ -373,31 +366,17 @@
 		},
 		{
 			"file": "src/routes/+layout.svelte",
-			"element": "bloc-page.bg-blue",
+			"element": "div.bg-blue",
 			"count": 1,
 			"kind": "layout",
-			"reason": "The flex column of the whole page that keeps the header sticky and the footer at the bottom; the header, main and footer inside carry the meaning."
+			"reason": "The page box (#page): the flex column of the site header, the content and the footer, so the sticky header holds down to the footer; body itself is SvelteKit’s."
 		},
 		{
 			"file": "src/routes/+layout.svelte",
-			"element": "keyboard-reference (none)",
+			"element": "div.clavier-reference",
 			"count": 1,
 			"kind": "layout",
-			"reason": "Pins the keyboard reference button and its panel to the window corner; the button inside is the control."
-		},
-		{
-			"file": "src/routes/+layout.svelte",
-			"element": "clavier-reference.bg-blue",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The panel the keyboard reference button shows and hides (aria-controls); the drawing inside is a named table."
-		},
-		{
-			"file": "src/routes/+layout.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
+			"reason": "The full-window panel of the reference keyboard that its toggle button shows and hides (aria-controls); the aside around them names it."
 		},
 		{
 			"file": "src/routes/+page.svelte",
@@ -412,13 +391,6 @@
 			"count": 3,
 			"kind": "language",
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
-		},
-		{
-			"file": "src/routes/accessibilite/+page.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
 		},
 		{
 			"file": "src/routes/ergopti-plus/+layout.svelte",
@@ -1800,27 +1772,6 @@
 			"reason": "An aria-hidden fake window control of a drawn title bar."
 		},
 		{
-			"file": "src/routes/ergopti/+page.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/benchmarks/+page.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
-		},
-		{
-			"file": "src/routes/ergopti/benchmarks/comment_comparer.svelte",
-			"element": "tiny-space (none)",
-			"count": 3,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
 			"file": "src/routes/ergopti/benchmarks/comparateurs_dispositions.svelte",
 			"element": "div (none)",
 			"count": 1,
@@ -1828,27 +1779,6 @@
 			"reason": "Puts the layout select on its own line above the comparison."
 		},
 		{
-			"file": "src/routes/ergopti/benchmarks/comparateurs_dispositions.svelte",
-			"element": "tiny-space (none)",
-			"count": 4,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/benchmarks/corpus.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/informations/+page.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
-		},
-		{
 			"file": "src/routes/ergopti/informations/autocritiques.svelte",
 			"element": "span (none)",
 			"count": 2,
@@ -1877,13 +1807,6 @@
 			"reason": "English words inside French text, marked lang=\"en\" (WCAG 3.1.2); an i element would take the site-wide gradient text style."
 		},
 		{
-			"file": "src/routes/ergopti/informations/changelog.svelte",
-			"element": "tiny-space (none)",
-			"count": 2,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
 			"file": "src/routes/ergopti/informations/genese_sources.svelte",
 			"element": "span.path1",
 			"count": 3,
@@ -1896,13 +1819,6 @@
 			"count": 3,
 			"kind": "icon-layer",
 			"reason": "One layer of a two-colour icomoon glyph inside its aria-hidden i; the icon font paints each layer on its own element."
-		},
-		{
-			"file": "src/routes/ergopti/informations/genese_sources.svelte",
-			"element": "tiny-space (none)",
-			"count": 5,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/installation/+page.svelte",
@@ -1910,27 +1826,6 @@
 			"count": 2,
 			"kind": "layout",
 			"reason": "A 1rem spacer and the flex row of the two PDF links."
-		},
-		{
-			"file": "src/routes/ergopti/installation/+page.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
-		},
-		{
-			"file": "src/routes/ergopti/installation/+page.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/installation/installation_linux.svelte",
-			"element": "tiny-space (none)",
-			"count": 2,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/installation/installation_macos.svelte",
@@ -1945,13 +1840,6 @@
 			"count": 5,
 			"kind": "layout",
 			"reason": "Margin spacers between the download blocks of the installation steps."
-		},
-		{
-			"file": "src/routes/ergopti/installation/installation_macos.svelte",
-			"element": "tiny-space (none)",
-			"count": 5,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/installation/installation_macos.svelte",
@@ -1973,34 +1861,6 @@
 			"count": 3,
 			"kind": "layout",
 			"reason": "Margin spacers between the download blocks of the installation steps."
-		},
-		{
-			"file": "src/routes/ergopti/installation/installation_windows.svelte",
-			"element": "small-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/+page.svelte",
-			"element": "bloc-introduction (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The title band above the article column, outside main: a header here would be a second banner landmark, and the section inside holds the h1."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/+page.svelte",
-			"element": "bloc-fin (none)",
-			"count": 1,
-			"kind": "layout",
-			"reason": "The full-width band under the article column for the closing Ergopti+ presentation; its section carries the meaning."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/chiffres_acces_direct.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
@@ -2036,13 +1896,6 @@
 			"count": 2,
 			"kind": "layout",
 			"reason": "The caption line under the home-row drawing in the drawing style of Keyboard.css; a figcaption would need the drawing to be a figure that Keyboard.css does not style."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
-			"element": "tiny-space (none)",
-			"count": 3,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
@@ -2087,13 +1940,6 @@
 			"reason": "The framed box of a summary in the main flow; it is part of the text, not tangential to it, so not an aside."
 		},
 		{
-			"file": "src/routes/ergopti/presentation/espace_insecable_automatique.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
 			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
 			"element": "span (none)",
 			"count": 3,
@@ -2103,9 +1949,9 @@
 		{
 			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
 			"element": "div (none)",
-			"count": 2,
+			"count": 1,
 			"kind": "layout",
-			"reason": "Centres the scroll-down link and the call-to-action link."
+			"reason": "Centres the scroll-down link."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
@@ -2136,34 +1982,6 @@
 			"reason": "Keeps a word and the punctuation after it on one line (white-space: nowrap)."
 		},
 		{
-			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
-			"element": "tiny-space (none)",
-			"count": 3,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
-			"element": "small-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/introduction_ergopti.svelte",
-			"element": "big-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/minimisation_sfbs.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
 			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
 			"element": "div (none)",
 			"count": 1,
@@ -2179,31 +1997,10 @@
 		},
 		{
 			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
-			"element": "tiny-space (none)",
-			"count": 1,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
 			"element": "keyboard-control-rolls (none)",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Centres the roll picker under the keyboard drawing; the select inside is the named control."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/placement_logique_touches.svelte",
-			"element": "tiny-space (none)",
-			"count": 2,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/utilisation_une_main.svelte",
-			"element": "tiny-space (none)",
-			"count": 2,
-			"kind": "decorative",
-			"reason": "An empty vertical spacer of the page rhythm (spacing.css): no content, nothing for assistive technology to read."
 		},
 		{
 			"file": "src/routes/studio/+layout.svelte",
