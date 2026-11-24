@@ -46,7 +46,7 @@ M.SHARED_ROWS = {
 }
 
 --- The « Test everything » row and the title of its combined report (the row's own label).
-M.ALL_ROW = require("settings.engine.keys").COMMAND.FIELD_CHECK_ALL
+M.ALL_ROW = require("settings.engine.keys").COMMAND.FIELD_REPORT
 M.ALL_TITLE = "menu.debug." .. M.ALL_ROW
 
 --- Reads and decodes one bundled JSON declaration; a missing or broken file raises.

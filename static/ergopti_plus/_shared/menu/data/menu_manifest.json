@@ -1351,6 +1351,11 @@
 			"id": "---"
 		},
 		{
+			"type": "command",
+			"id": "field_report",
+			"i18n": "menu.debug.field_report"
+		},
+		{
 			"type": "group",
 			"id": "debug_tests",
 			"i18n": "menu.debug.tests"
@@ -1358,14 +1363,20 @@
 	],
 	"debug_tests_menu": [
 		{
-			"type": "command",
-			"id": "field_check_all",
-			"i18n": "menu.debug.field_check_all"
+			"type": "section_header",
+			"i18n": "menu.debug.header_tests_network"
 		},
 		{
 			"type": "command",
 			"id": "field_check_network",
 			"i18n": "menu.debug.field_check_network"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_tests_remapping"
 		},
 		{
 			"type": "command",
@@ -1400,6 +1411,21 @@
 			"reason_key": "platform_reason.input_probe_is_autohotkey_specific"
 		},
 		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_tests_remap_runtime",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "command",
 			"id": "field_check_lease",
 			"i18n": "menu.debug.field_check_lease",
@@ -1416,6 +1442,21 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.debug.header_tests_system",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "command",

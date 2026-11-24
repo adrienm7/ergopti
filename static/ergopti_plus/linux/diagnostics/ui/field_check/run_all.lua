@@ -26,7 +26,7 @@ local RunAll = require("diagnostics.engine.field_check.run_all")
 local LOG = "diagnostics.ui.field_check.run_all"
 
 --- The row and the title of its combined report (the row's own label).
-M.ROW = require("settings.engine.keys").COMMAND.FIELD_CHECK_ALL
+M.ROW = require("settings.engine.keys").COMMAND.FIELD_REPORT
 M.TITLE_KEY = "menu.debug." .. M.ROW
 
 -- True while the sequence runs

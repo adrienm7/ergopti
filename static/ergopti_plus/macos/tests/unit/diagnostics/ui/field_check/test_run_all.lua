@@ -65,9 +65,12 @@ helpers.describe("test everything: the macOS plan", function()
 				helpers.assert_true(classified[row.id] == true, "Tests row neither run nor listed: " .. row.id)
 			end
 		end
-		helpers.assert_eq(manifest.debug_tests_menu[1].id, Window.ALL_ROW, "« Test everything » heads the Tests rows")
+		local at
+		for index, row in ipairs(manifest.debug_menu) do if row.id == Window.ALL_ROW then at = index end end
+		helpers.assert_not_nil(at, "the Debug menu declares the field report row")
+		helpers.assert_eq(manifest.debug_menu[at + 1].id, "debug_tests", "the field report row stands just before Tests")
 		local builder = assert(helpers.read_driver_unit('require("diagnostics.ui.field_check").run('))
-		helpers.assert_contains(builder, '[COMMAND.FIELD_CHECK_ALL] = function() require("diagnostics.ui.field_check").run_all() end')
+		helpers.assert_contains(builder, '[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check").run_all() end')
 	end)
 
 	helpers.it("runs no check that needs a person or changes the Karabiner runtime", function()
@@ -161,7 +164,7 @@ helpers.describe("test everything: the macOS run", function()
 			helpers.assert_true(not Engine.is_running(), "the stuck check was abandoned")
 			helpers.assert_eq(#world.alerts, 1)
 			local alert = world.alerts[1]
-			helpers.assert_eq(alert.title, "[menu.debug.field_check_all]")
+			helpers.assert_eq(alert.title, "[menu.debug.field_report]")
 			helpers.assert_contains(alert.text, "[field_check.all.verdict_fail]")
 			helpers.assert_contains(alert.text, "✅ a — point_a")
 			helpers.assert_contains(alert.text, "❌ b\n    [field_check.all.timeout]")

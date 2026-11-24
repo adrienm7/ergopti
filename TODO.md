@@ -807,24 +807,24 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods`.
 
-- [ ] **« Tout tester »: the field points no driver check covers yet (maintainer request, 2026-11-24).** The Debug
-      menu's « Tests » opens with « Tout tester » on the three drivers: it runs, one after the other, every check of
-      `_shared/diagnostics/data/field_check_all.json` and shows one report with each check's verdict, its field run step
-      and the TODO-tests field points that step decides, then the rows to run separately. On macOS it also runs the 22
-      read-only field run checks that had no menu row (boot and idle cost, permissions, event taps, input sources,
-      storage, launcher roles, network hosts, Ollama blob host, PAC fallback, local AI, local servers, Ctrl+Caps Lock,
-      gesture frames, physical shortcuts, tap-hold thresholds, tap copy, raw telemetry, menu build, slow lines, log
-      signals, FIFO safety, app health); on Windows the boot cost. Left, automatic but not yet a driver check. Linux:
-      the collector's probe steps `linux_input_access`, `linux_autostart`, `linux_polkit_agent` and
-      `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`) run only from
+- [ ] **« Lancer le field report »: the field points no driver check covers yet (maintainer request, 2026-11-24).**
+      Débogage's « Lancer le field report (tous les tests) », just before « Tests », on the three drivers, runs, one
+      after the other, every check of `_shared/diagnostics/data/field_check_all.json` and shows one report with each
+      check's verdict, its field run step and the TODO-tests field points that step decides, then the rows to run
+      separately. On macOS it also runs the 22 read-only field run checks that had no menu row (boot and idle cost,
+      permissions, event taps, input sources, storage, launcher roles, network hosts, Ollama blob host, PAC fallback,
+      local AI, local servers, Ctrl+Caps Lock, gesture frames, physical shortcuts, tap-hold thresholds, tap copy, raw
+      telemetry, menu build, slow lines, log signals, FIFO safety, app health); on Windows the boot cost. Left,
+      automatic but not yet a driver check. Linux: the collector's probe steps `linux_input_access`, `linux_autostart`,
+      `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`) run only from
       `collect-linux-field-report.sh`; a Linux field check reading the same probes from
-      `diagnostics/data/field_guided_steps.json` would put them in « Tout tester ». Windows: `TODO-tests-windows.md`
-      carries no `field-point` ids and the driver no `field_todo_coverage.json`, so its report names the field run step
-      only; the automatable standing checks of `tools/maintainer/windows-live-checks.cjs` run outside the driver. macOS:
-      the checks that type into their own scratch field (`typing_selftest`, `hotstring_roundtrip`, `prediction_tooltip`)
-      or change state (`layout_rows`, `apple_shortcuts`, the owned runtime's install, start and pause) stay field run
-      only; the 196 step ids of the field run checks have no `field_check.step.*` label, so the report shows their steps
-      as closed codes.
+      `diagnostics/data/field_guided_steps.json` would put them in the field report row. Windows:
+      `TODO-tests-windows.md` carries no `field-point` ids and the driver no `field_todo_coverage.json`, so its report
+      names the field run step only; the automatable standing checks of `tools/maintainer/windows-live-checks.cjs` run
+      outside the driver. macOS: the checks that type into their own scratch field (`typing_selftest`,
+      `hotstring_roundtrip`, `prediction_tooltip`) or change state (`layout_rows`, `apple_shortcuts`, the owned
+      runtime's install, start and pause) stay field run only; the 196 step ids of the field run checks have no
+      `field_check.step.*` label, so the report shows their steps as closed codes.
 
 ### Linux
 
@@ -964,12 +964,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
       form keeps ErgoptiPlus version, Driver and Operating system, prefilled and optional, so an idea sent from an
       old version whose feature already exists can be answered at once. Kept meanwhile: kept. The other choice is
       to drop the three fields and keep only the title and the proposal.
-- [ ] **The input probes in « Tout tester » (decided by the agent on 2026-11-24, to review by the maintainer).**
+- [ ] **The input probes in « Lancer le field report » (decided by the agent on 2026-11-24, to review by the maintainer).**
       « Mesurer SendEvent et SendInput » asks nothing, but it types into its own window for several seconds and any
       key the person presses spoils it, like « Enregistrer l'ordre des hooks clavier »; both are listed in the
       report as « run separately ». Kept meanwhile: separate. Choose:
   1. **(recommended) Keep both separate.**
-  2. Run the SendInput comparison in « Tout tester », after a notice asking not to type.
+  2. Run the SendInput comparison in the field report row, after a notice asking not to type.
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
 - [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending

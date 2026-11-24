@@ -75,7 +75,7 @@ function M.register(helpers, fixture, corpus, platform)
 					Layout.assert_layout(helpers, parent.menu, {
 						diagnostics = expected[platform][base + 2], report = expected[platform][base + 4],
 						suggest = expected[platform][base + 5], logs = expected[platform][base + 8],
-						tests = expected.tests, checks = checks,
+						field_report = expected.field_report, tests = expected.tests, checks = checks,
 					}, platform .. " " .. language)
 					helpers.assert_eq(observed.effects, {}, "constructing Debug invokes no action")
 					for _, header in ipairs({ base + 1, base + 7 }) do

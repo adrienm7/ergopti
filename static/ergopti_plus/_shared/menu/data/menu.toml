@@ -1141,6 +1141,15 @@ i18n = "menu.debug.open_error_log"
 type = "---"
 id = "---"
 
+# « Run the field report (every test) », just before « Tests » (maintainer
+# decision, 2026-11-24): one click runs every test of the Tests submenu, one
+# after the other, and opens one combined report. The plan of each driver is
+# _shared/diagnostics/data/field_check_all.json.
+[[menu.debug_menu]]
+type = "command"
+id = "field_report"
+i18n = "menu.debug.field_report"
+
 # « Tests »: every one-click check and probe, in one submenu on every driver.
 # Each driver builds its rows from debug_tests_menu with the same command owners
 # and draws no Tests row when none of them is for its platform.
@@ -1149,21 +1158,15 @@ type = "group"
 id = "debug_tests"
 i18n = "menu.debug.tests"
 
-# The rows of « Tests », grouped by topic: « Test everything » first, then the
-# network, the typing chain (the composed layout, the key accounting, the two
-# Windows input probes), then the macOS Karabiner runtime and the system around
-# it. At most eight rows reach one driver (macOS), so the topics need no
-# separator between them.
-#
-# « Test everything » runs, one after the other, every check of this driver
-# that needs no person and opens one combined report: each check's verdict, its
-# field run step and the TODO-tests field points it decides, then the Tests rows
-# to run separately. The plan of each driver is
-# _shared/diagnostics/data/field_check_all.json.
+# The rows of « Tests », in topic groups each headed by its title and set apart
+# by a separator, in the same order on every driver (maintainer request,
+# 2026-11-24): the network, the key remapping (the composed layout, the key
+# accounting, the two Windows input probes), then on macOS the Karabiner
+# runtime and the system and third-party tools around it. A group no row of a
+# driver fills draws neither its title nor its separator.
 [[menu.debug_tests_menu]]
-type = "command"
-id = "field_check_all"
-i18n = "menu.debug.field_check_all"
+type = "section_header"
+i18n = "menu.debug.header_tests_network"
 
 # One-click field checks of the macOS input and network chain (issue #101, item
 # 31). The network check runs on all three drivers (macOS and Linux share its
@@ -1174,6 +1177,13 @@ i18n = "menu.debug.field_check_all"
 type = "command"
 id = "field_check_network"
 i18n = "menu.debug.field_check_network"
+
+[[menu.debug_tests_menu]]
+type = "---"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_remapping"
 
 # The composed-layout check installs the shipped check composition through the
 # composer's save path, verifies it and removes it again; every driver routes it.
@@ -1208,6 +1218,17 @@ platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
 [[menu.debug_tests_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_remap_runtime"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
 type = "command"
 id = "field_check_lease"
 i18n = "menu.debug.field_check_lease"
@@ -1220,6 +1241,17 @@ id = "field_check_owned_runtime"
 i18n = "menu.debug.field_check_owned_runtime"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_system"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.debug_tests_menu]]
 type = "command"
