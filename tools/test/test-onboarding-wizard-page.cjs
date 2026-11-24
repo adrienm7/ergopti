@@ -281,9 +281,13 @@ function loadPage() {
 		getElementById: (id) => elements.get(id) || null,
 		createElement: (tag) => makeElement(tag, ''),
 		addEventListener() {},
-		documentElement: { lang: 'en', dir: '' }
+		documentElement: makeElement('html', '')
 	};
+	document.documentElement.lang = 'en';
+	document.documentElement.dir = '';
+	document.documentElement.ownerDocument = document;
 	const window = {
+		addEventListener() {},
 		webkit: {
 			messageHandlers: {
 				hsOnboarding: { postMessage: (m) => messages.push(JSON.parse(JSON.stringify(m))) }
@@ -292,6 +296,9 @@ function loadPage() {
 	};
 	const context = vm.createContext({ console, window, document, JSON });
 	vm.runInContext(hostBridge, context);
+	// The page loads a11y_prefs.js first in its head: the reading lists above
+	// the languages read and apply its choices.
+	vm.runInContext(fs.readFileSync(path.join(SHARED, 'ui/a11y_prefs.js'), 'utf8'), context);
 	// The page loads page_locale.js in its head; the wizard sets its locale through it.
 	vm.runInContext(fs.readFileSync(path.join(SHARED, 'ui/page_locale.js'), 'utf8'), context);
 	vm.runInContext(catalogueScript, context);

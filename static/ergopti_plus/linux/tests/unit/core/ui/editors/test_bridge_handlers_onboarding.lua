@@ -346,6 +346,49 @@ helpers.describe("ui.bridge_handlers", function()
 				"a fresh page starts in the running language")
 		end)
 
+		helpers.it("(reading-preferences-wizard) saves a reading choice as the menu does", function()
+			local state = onboarding_state()
+			local saved, pushes, rebuilds = {}, 0, 0
+			state.webview_manager.push_reading_preferences = function() pushes = pushes + 1 end
+			state.on_config_changed = function() rebuilds = rebuilds + 1 end
+			local owners = {
+				["core.ui.engine.webview.reading_font"] = true,
+				["core.ui.engine.webview.reading_spacing"] = true,
+			}
+			local previous = {}
+			for name in pairs(owners) do
+				previous[name] = package.loaded[name]
+				package.loaded[name] = {
+					set = function(value)
+						saved[#saved + 1] = { owner = name, value = value }
+						return value ~= "comic"
+					end,
+				}
+			end
+			local ok, err = pcall(function()
+				helpers.assert_true(handler.on_message({
+					action = "setReadingPreference", name = "font", value = "dyslexic",
+				}, state).accepted)
+				helpers.assert_true(handler.on_message({
+					action = "setReadingPreference", name = "spacing", value = "wide",
+				}, state).accepted)
+				helpers.assert_eq(handler.on_message({
+					action = "setReadingPreference", name = "font", value = "comic",
+				}, state).accepted, false, "a refused value is reported")
+				helpers.assert_eq(handler.on_message({
+					action = "setReadingPreference", name = "colors", value = "cvd",
+				}, state).accepted, false, "an unknown choice is refused")
+			end)
+			for name in pairs(owners) do package.loaded[name] = previous[name] end
+			assert(ok, err)
+			helpers.assert_eq(#saved, 3, "an unknown choice reaches no writer")
+			helpers.assert_eq(saved[1].owner, "core.ui.engine.webview.reading_font")
+			helpers.assert_eq(saved[1].value, "dyslexic")
+			helpers.assert_eq(saved[2].owner, "core.ui.engine.webview.reading_spacing")
+			helpers.assert_eq(pushes, 2, "each saved choice reaches the open windows, a refused one none")
+			helpers.assert_eq(rebuilds, 2, "the menu is rebuilt after each saved choice")
+		end)
+
 		helpers.it("(onboarding-window-title) retitles the window in the previewed locale", function()
 			local state, _, captured = onboarding_state()
 			local result = handler.on_message({ action = "previewLocale", locale = "fr" }, state)

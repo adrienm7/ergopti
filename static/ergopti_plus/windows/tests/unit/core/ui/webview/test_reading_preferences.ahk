@@ -186,3 +186,20 @@ _TRP_OpenWindowsFollowTheChoice() {
 }
 Test("reading preferences: the open windows take a saved choice at once (reading-preferences-live)",
 	_TRP_OpenWindowsFollowTheChoice)
+
+; The setup wizard offers the font and the spacing beside the languages and
+; saves them through the Configuration menu's writer; an unknown name is refused.
+_TRP_WizardSavesAsTheMenu() {
+	Calls := []
+	SetFn := (Key, Value) => (Calls.Push([Key, Value]), true)
+	AssertTrue(_OnbWeb_SetReadingPreference("font", "dyslexic", SetFn), "the wizard saves the font")
+	AssertTrue(_OnbWeb_SetReadingPreference("spacing", "wide", SetFn), "the wizard saves the spacing")
+	AssertFalse(_OnbWeb_SetReadingPreference("colors", "cvd", SetFn), "an unknown choice is refused")
+	AssertEqual(2, Calls.Length, "an unknown choice reaches no writer")
+	AssertEqual(ConfigLeaf.READING_FONT, Calls[1][1])
+	AssertEqual("dyslexic", Calls[1][2])
+	AssertEqual(ConfigLeaf.READING_SPACING, Calls[2][1])
+	AssertEqual("wide", Calls[2][2])
+}
+Test("reading preferences: the setup wizard saves a choice as the menu does (reading-preferences-wizard)",
+	_TRP_WizardSavesAsTheMenu)

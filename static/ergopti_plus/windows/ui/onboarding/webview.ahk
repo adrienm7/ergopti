@@ -259,9 +259,9 @@ _Onboarding_TryWeb() {
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
-; "action" field. Handled actions: ready, previewLocale, localeSelected,
-; pickConfigDir, resolveMetricsPath, loadExistingConfig, registerGesturesAuto,
-; registerGesturesManual, finish.
+; "action" field. Handled actions: ready, previewLocale, setReadingPreference,
+; localeSelected, pickConfigDir, resolveMetricsPath, loadExistingConfig,
+; registerGesturesAuto, registerGesturesManual, finish.
 _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if !_OnbWeb_SessionCurrent(SessionEpoch)
 		return
@@ -289,6 +289,8 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_InjectInitData, SessionEpoch), -1)
 	} else if (Action == "previewLocale") {
 		_OnbWeb_PreviewLocale(Payload.Has("locale") ? Payload["locale"] : "", SessionEpoch)
+	} else if (Action == "setReadingPreference") {
+		_OnbWeb_SetReadingPreference(Payload.Get("name", ""), Payload.Get("value", ""))
 	} else if (Action == "localeSelected") {
 		global _ob_locale
 		Locale := Payload.Get("locale", "")
@@ -477,6 +479,20 @@ _OnbWeb_OpenFailed(Detail, SessionEpoch, ShowErrorFn := _Onboarding_ShowError) {
 		return false
 	_OnbWeb_OnClose()
 	return true
+}
+
+; The reader's font or spacing, picked beside the languages: saved as the
+; Configuration menu saves it, which pushes it to every open window, this one
+; included (ReadingPrefs_Set).
+; @param Name {Any} The page's name of the choice (`font`, `spacing`).
+; @param Value {Any} The chosen value.
+; @returns {Boolean} Whether the choice was saved.
+_OnbWeb_SetReadingPreference(Name, Value, SetFn := ReadingPrefs_Set) {
+	for Key, PageName in ReadingPrefs_Names()
+		if (PageName == Name)
+			return SetFn.Call(Key, Value)
+	LoggerWarn("Onboarding", "setReadingPreference refused: '{1}' is not a reading choice.", Name)
+	return false
 }
 
 ; Loads the strings for a previewed locale and pushes them as an envelope so

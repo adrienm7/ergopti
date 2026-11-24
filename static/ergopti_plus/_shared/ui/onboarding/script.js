@@ -616,6 +616,49 @@ function _renderLanguage() {
 	// The step's name is its heading, as on every later step: the window title
 	// already names the product and the wizard.
 	document.getElementById('language-title').textContent = _t('onboarding.welcome.heading');
+	_renderReading();
+}
+
+// The reading choices offered above the languages, by a11y_prefs.js name;
+// each list is #reading-<name>, labelled by #reading-<name>-label.
+var READING_CHOICES = ['font', 'spacing'];
+
+/**
+ * Fills the reading choices above the languages: each list offers the values
+ * of a11y_prefs.js and shows the window's current one (its host's seed).
+ */
+function _renderReading() {
+	var prefs = window.ErgoptiA11yPrefs;
+	var current = prefs.read();
+	READING_CHOICES.forEach(function (name) {
+		var key = 'menu.configuration.reading_' + name;
+		var select = document.getElementById('reading-' + name);
+		document.getElementById('reading-' + name + '-label').textContent = _t(key);
+		select.innerHTML = '';
+		prefs.PREFERENCES[name].values.forEach(function (value) {
+			var option = document.createElement('option');
+			option.value = value;
+			option.textContent = _t(key + '.' + value);
+			select.appendChild(option);
+		});
+		select.value = current[name] || prefs.PREFERENCES[name].values[0];
+	});
+}
+
+/**
+ * Applies a reading choice to this window at once and asks the host to save
+ * it as the Configuration menu does; the host then pushes it to every open
+ * window, this one included (with the font inlined where the page has no
+ * address to link it from).
+ * @param {string} name The a11y_prefs.js name of the choice.
+ * @param {string} value The chosen value.
+ */
+function _chooseReading(name, value) {
+	var prefs = window.ErgoptiA11yPrefs;
+	var choices = prefs.read();
+	choices[name] = value;
+	prefs.receiveHost(choices);
+	_post({ action: 'setReadingPreference', name: name, value: value });
 }
 
 /** Refreshes the configuration-folder step from the answers. */
@@ -1241,6 +1284,13 @@ document.getElementById('config-browse').addEventListener('click', function () {
 		if (!page) return;
 		_setAnswer(page, document.getElementById('page-yes').checked);
 		_renderPage(page);
+	});
+});
+
+READING_CHOICES.forEach(function (name) {
+	var select = document.getElementById('reading-' + name);
+	select.addEventListener('change', function () {
+		_chooseReading(name, select.value);
 	});
 });
 

@@ -24,7 +24,9 @@
  *    word spacing 0.16 em more than « Par défaut », line height 1.5 and
  *    paragraph spacing 2 em;
  * 4. follow a choice pushed into the open window (receiveHost), the way the
- *    hosts apply a menu change at once, the inline font included.
+ *    hosts apply a menu change at once, the inline font included;
+ * 5. in the setup wizard, restyle the page as soon as the reader picks a font
+ *    or a spacing beside the languages, and ask the host to save it.
  * ==============================================================================
  */
 
@@ -314,6 +316,86 @@ async function checkLivePush(browser, origin, target, selector) {
 	}
 }
 
+/**
+ * The setup wizard offers the font and the spacing beside the languages: a
+ * choice restyles the page at once and is posted to the host to be saved.
+ */
+async function checkWizard(browser, origin) {
+	const wizard = WINDOWS.find((target) => target.id === 'onboarding');
+	for (const delivery of DELIVERIES) {
+		const { context, page, errors } = await openWindow(
+			browser,
+			origin,
+			wizard,
+			{ font: 'default', spacing: 'default' },
+			delivery
+		);
+		try {
+			const where = `onboarding (${delivery})`;
+			const font = page.locator('#reading-font');
+			check(
+				(await page.locator('#reading-font option').count()) === 3,
+				`${where}: the three fonts are offered`
+			);
+			check((await font.inputValue()) === 'default', `${where}: the current font is selected`);
+			check(
+				(await page.locator('#reading-font-label').textContent()) === 'Police des fenêtres',
+				`${where}: the font list is named in the wizard's language`
+			);
+			// Chosen with the keyboard, as a reader who cannot use a pointer does.
+			await font.focus();
+			await page.keyboard.press('End');
+			await page.evaluate(settle);
+			check(
+				(await page.evaluate(() => document.documentElement.getAttribute('data-a11y-font'))) ===
+					'dyslexic',
+				`${where}: the page takes the dyslexia font at once`
+			);
+			const posted = await page.evaluate(() =>
+				window.__hostMessages.filter((message) => message.action === 'setReadingPreference')
+			);
+			check(
+				posted.length === 1 && posted[0].name === 'font' && posted[0].value === 'dyslexic',
+				`${where}: the host is asked to save the font (${JSON.stringify(posted)})`
+			);
+			// The host's answer: the macOS and Linux hosts push the faces inline.
+			if (delivery === 'inline')
+				await page.evaluate(
+					([seed, css]) => window.ErgoptiA11yPrefs.receiveHost(seed, css),
+					[{ font: 'dyslexic' }, inlineFontCss('dyslexic')]
+				);
+			await page.waitForFunction(() =>
+				[...document.fonts].some(
+					(face) => face.family.replace(/['"]/g, '') === 'OpenDyslexic' && face.status === 'loaded'
+				)
+			);
+			let look = await page.evaluate(readLook, { selector: 'h1', probeText: PROBE_TEXT });
+			check(
+				look.family === 'OpenDyslexic' && look.loaded,
+				`${where}: the heading is drawn in OpenDyslexic`
+			);
+			await page.selectOption('#reading-spacing', 'wide');
+			await page.evaluate(settle);
+			look = await page.evaluate(readLook, { selector: 'h1', probeText: PROBE_TEXT });
+			check(
+				look.family === 'OpenDyslexic' && look.letterSpacing > 0,
+				`${where}: the wide spacing adds to the chosen font`
+			);
+			check(
+				(await page.evaluate(
+					() =>
+						window.__hostMessages.filter((message) => message.action === 'setReadingPreference')
+							.length
+				)) === 2,
+				`${where}: the host is asked to save the spacing`
+			);
+			check(errors.length === 0, `${where}: no page error (${errors.join('; ')})`);
+		} finally {
+			await context.close();
+		}
+	}
+}
+
 (async () => {
 	const server = await serveStatic(STATIC_ROOT, 0);
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -324,6 +406,7 @@ async function checkLivePush(browser, origin, target, selector) {
 		const metrics = WINDOWS.find((target) => target.id === 'metrics_typing');
 		await checkWindow(browser, origin, metrics, 'h1');
 		await checkLivePush(browser, origin, metrics, 'h1');
+		await checkWizard(browser, origin);
 	} finally {
 		await browser.close();
 		server.close();

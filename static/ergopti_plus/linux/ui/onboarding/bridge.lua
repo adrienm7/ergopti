@@ -19,6 +19,7 @@ M.bridge_name = "hsOnboarding"
 M.ACTIONS = {
 	ready = true,
 	previewLocale = true,
+	setReadingPreference = true,
 	localeSelected = true,
 	pickConfigDir = true,
 	resolveMetricsPath = true,
@@ -636,6 +637,24 @@ function M.on_message(payload, state, context)
 		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
 		}, page_current), titled = retitle(state, strings, page_current) }
+	elseif action == "setReadingPreference" then
+		-- The reader's font or spacing, picked beside the languages: saved by
+		-- the choice's owner, as the Configuration menu saves it, then pushed
+		-- to every open window, this one included, with the font inlined; the
+		-- menu is rebuilt so its tick follows.
+		local preference = require("core.ui.engine.webview.reading_preferences").for_name(payload.name)
+		if preference == nil then
+			Logger.error(LOG, "setReadingPreference refused — '%s' is not a reading choice.", tostring(payload.name))
+			return { accepted = false }
+		end
+		if not require(preference.module).set(payload.value) then
+			Logger.error(LOG, "Reading choice %s could not be saved; it is unchanged.", tostring(payload.value))
+			return { accepted = false }
+		end
+		local manager = webview(state)
+		if manager and type(manager.push_reading_preferences) == "function" then manager.push_reading_preferences() end
+		if type(state.on_config_changed) == "function" then state.on_config_changed() end
+		return { accepted = true }
 	elseif action == "localeSelected" then
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if not locale_available(i18n, payload.locale) then return { accepted = false } end

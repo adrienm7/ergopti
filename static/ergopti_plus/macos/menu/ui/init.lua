@@ -147,6 +147,22 @@ M._active_tasks = {}
 --- @return table|nil configWatcher The file watcher object.
 -- The running menu's timed rebuild, published once the menu exists (M.start).
 local _timed_rebuild = nil
+-- The Configuration menu's reading-choice writer, published by M.start so the
+-- setup wizard saves a choice exactly as the menu does (and reticks it).
+local _set_reading_preference = nil
+
+--- Saves a reading choice of the windows as the Configuration menu does:
+--- stored, pushed to the open windows, the menu ticked again.
+--- @param owner string The choice's owner module (reading_preferences.lua).
+--- @param value string The chosen value.
+--- @return boolean saved False when refused, or before the menu exists.
+function M.set_reading_preference(owner, value)
+	if type(_set_reading_preference) ~= "function" then
+		Logger.error(LOG, "A reading choice came before the menu bar exists; it is not saved.")
+		return false
+	end
+	return _set_reading_preference(owner, value) == true
+end
 
 --- Rebuilds the menu tree now, as a state change does, and times it: the
 --- developer field run's menu step (diagnostics/engine/field_check/probes.lua).
@@ -1239,7 +1255,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 			return true
 		end,
-		-- The windows opened from now on read the choice (ui/ui/builder.lua).
+		-- The windows opened from now on read the choice (ui/ui/builder.lua);
+		-- the setup wizard saves through it too (M.set_reading_preference).
 		set_reading_preference    = function(owner, value)
 			if not require(owner).set(value) then
 				require("core.logger.engine.logger").error("menu", "Reading choice %s could not be saved; it is unchanged.", tostring(value))
@@ -1833,6 +1850,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
+	_set_reading_preference = actions.set_reading_preference
 	_timed_rebuild = function()
 		local started = hs.timer.secondsSinceEpoch()
 		local ok = rebuild_menu_cache() == true

@@ -63,6 +63,16 @@ function M.for_command(command)
 	error("no reading preference owns the menu command " .. tostring(command), 2)
 end
 
+--- The preference a page names (a11y_prefs.js), as the setup wizard posts it.
+--- @param name any The page's name (`font`, `spacing`).
+--- @return table|nil The PREFERENCES entry, nil for an unknown name.
+function M.for_name(name)
+	for _, preference in ipairs(M.PREFERENCES) do
+		if preference.name == name then return preference end
+	end
+	return nil
+end
+
 -- The folder of each reading font under _shared/ui/fonts/, as a11y_prefs.js
 -- names it (FONT_FOLDERS there).
 M.FONT_FOLDERS = { hyperlegible = "atkinson-hyperlegible", dyslexic = "opendyslexic" }

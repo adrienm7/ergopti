@@ -236,6 +236,36 @@ h1 {
 	width: 24px;
 }
 
+/* The reading choices above the languages: each label beside its list, both
+   pairs on one row, wrapped when the window is narrow. */
+.reading-prefs {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 12px;
+}
+
+.reading-choice {
+	color: var(--theme-label);
+	font-size: 13px;
+}
+
+.reading-prefs select {
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-d0d0d0);
+	border-radius: 7px;
+	color: var(--theme-label);
+	font: inherit;
+	padding: 5px 8px;
+}
+
+.reading-prefs select:focus-visible {
+	border-color: var(--theme-blue);
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	outline: 2px solid var(--theme-blue);
+}
+
 /* PNG flag (Windows path) sized to sit on the emoji baseline. */
 .lang-flag-img {
 	display: block;

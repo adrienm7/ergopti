@@ -10,7 +10,7 @@
 		<script src="../a11y_prefs.js"></script>
 		<script src="../page_locale.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
-		<link rel="stylesheet" href="style.css?v=7" />
+		<link rel="stylesheet" href="style.css?v=8" />
 		<script src="../host_bridge.js"></script>
 		<!-- The pages, their questions and checklists, generated from the
 		     manifest's [onboarding] declaration. -->
@@ -26,6 +26,14 @@
 			<!-- Language -->
 			<section class="step" id="step-language">
 				<h1 id="language-title"></h1>
+				<!-- The reader's font and spacing, applied to this window as soon as
+				     chosen: a dyslexic reader gets them from the first screen. -->
+				<p class="reading-prefs">
+					<label class="reading-choice" for="reading-font" id="reading-font-label"></label>
+					<select id="reading-font"></select>
+					<label class="reading-choice" for="reading-spacing" id="reading-spacing-label"></label>
+					<select id="reading-spacing"></select>
+				</p>
 				<fieldset class="lang-list" id="lang-list" aria-labelledby="language-title"></fieldset>
 			</section>
 
@@ -102,6 +110,6 @@
 			<button type="button" class="primary" id="btn-next"></button>
 		</footer>
 
-		<script src="script.js?v=13"></script>
+		<script src="script.js?v=14"></script>
 	</body>
 </html>

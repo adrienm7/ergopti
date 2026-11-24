@@ -1040,6 +1040,17 @@ local function handle_message(body)
 		end
 		inject_strings(body.locale, owner, view)
 
+	elseif action == "setReadingPreference" then
+		-- The reader's font or spacing, picked beside the languages: saved as
+		-- the Configuration menu saves it, then pushed to every open window,
+		-- this one included, with the font inlined.
+		local preference = require("core.ui.engine.webview.reading_preferences").for_name(body.name)
+		if preference == nil then
+			Logger.warn(LOG, "setReadingPreference refused — '%s' is not a reading choice.", tostring(body.name))
+			return
+		end
+		require("menu.ui").set_reading_preference(preference.module, body.value)
+
 	elseif action == "localeSelected" then
 		-- User confirmed language and moved to step 2 — switch locale in memory
 		-- Recorded only: Finish switches and persists it (onboarding report OBM-001).
