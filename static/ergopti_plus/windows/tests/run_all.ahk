@@ -127,6 +127,7 @@ _TestResultsBeginRun()
 #Include support/native_cli_diagnostics.ahk
 #Include support/receiving_profile.ahk
 #Include support/native_keyboard_walk.ahk
+#Include support/child_receipt.ahk
 
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
@@ -730,6 +731,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_keepawake_restored_on_resume.ahk
 #Include unit/modules/shortcuts/test_keepawake_session_parity.ahk
 #Include unit/suite/test_runner_shard.ahk
+#Include unit/suite/test_child_receipt_read.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
 ; chord syntax tests use the shared parser and registrar without binding hotkeys.

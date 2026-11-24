@@ -157,4 +157,30 @@ for (const { parent, child, waits } of GENERATED_CHILDREN) {
 	);
 }
 
+// Receipts a child renames into place: readiness is a successful strict read,
+// since a holder of the new name makes that read return false for a moment
+// (CI run 45363812480), and the wait is bounded by the shared bound.
+const receiptHelper = read('support/child_receipt.ahk');
+assert.ok(
+	new RegExp(`TickElapsed\\(Started\\) >= ${BOUND}\\b`).test(receiptHelper),
+	'the child receipt wait is bounded by the shared settle bound'
+);
+for (const file of [
+	'unit/diagnostics/ui/healthcheck/test_pac_response.ahk',
+	'unit/diagnostics/ui/healthcheck/test_pac_encoding.ahk',
+	'unit/diagnostics/ui/healthcheck/test_pac_boundaries.ahk'
+]) {
+	const source = read(file);
+	assert.equal(
+		count(source, 'JsonParse(FSReadUtf8Exact(Directory . "\\ready.json"))'),
+		0,
+		`${file} parses its ready receipt only once it has read as text`
+	);
+	assert.equal(
+		count(source, 'TestAwaitChildReceiptUtf8(Directory . "\\ready.json"'),
+		1,
+		`${file} awaits its ready receipt through TestAwaitChildReceiptUtf8`
+	);
+}
+
 console.log('ok - Windows native waits read the shared TEST_NATIVE_SETTLE_TIMEOUT_MS');
