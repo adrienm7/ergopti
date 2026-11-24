@@ -447,6 +447,23 @@ bundled with Ergopti, pausing pauses Karabiner and the chord key moves to the
 physical Alt (Option) position. Action: a new chord or chord path checks the
 key pressed just before, and `test-script-chords-three-os.cjs` pins all three.
 
+### project-tray-shortcut-hints-name-the-script-chord-slot
+
+Maintainer request (2026-11-24): « Suspendre », « Recharger » and « Quitter »
+name the chord bound to `script_pause_toggle`, `script_reload` and
+`script_quit`: the first script-chord slot, in `script_chords.json` order,
+whose live chord runs it, named as « Raccourcis de gestion du script » names
+the slot; none while the chords' switch is off. One rule decides it,
+`hint_slot` in `_shared/keyboard/engine/layers/script_chords.lua`, mirrored by
+`script_chord_hint.ahk`; both replay `script_chord_hint_vectors.json`. Windows
+writes it after a tab (the accelerator column), macOS in a styled title
+(`secondaryLabelColor`: no NSMenu key equivalent names the right Option key
+or a sequence), Linux in the label through `menu.global.shortcut_hint` (the
+appindicator tray exports no dbusmenu `shortcut`). The keyboard-slot, tap-key
+and gesture bindings of the same actions are out of scope. Action: a new
+binding kind shown there goes through `hint_slot` and its vectors, never a
+per-driver rule.
+
 ### project-restore-and-clear-read-two-shared-keys
 
 Every row that puts a section back to Ergopti's preset reads
