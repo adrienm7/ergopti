@@ -790,8 +790,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 - [ ] **Field report follow-ups (2026-11-03).** Decide from the next report which half of the 230 ms cold
       `karabiner.layout_actions` phase to reduce (`karabiner_layout_actions` in TODO-tests-macos.md; the
-      regeneration itself stays synchronous, see the rejected proposals). A Metrics toggle still reads the hardware
-      UUID synchronously when no start-delay prefetch ran (`modules/keystats/host_signature.lua`).
+      regeneration itself stays synchronous, see the rejected proposals).
 - [ ] **One folder name for Ergopti on the three OS.** Remove the boot migration only once the maintainer's
       machines pass the checks of the TODO-tests files
       ([handoff](docs/tooling/one-folder-name-handoff.md)).

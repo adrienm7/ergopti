@@ -268,8 +268,9 @@ end
 
 --- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1). The deferred boot
 --- start prefetches it off the main thread (modules/keystats/host_signature.lua):
---- this synchronous pipeline held the run loop 151 ms at boot+1 s. It still
---- runs when nothing prefetched the value, e.g. a later Metrics toggle.
+--- this synchronous pipeline held the run loop 151 ms at boot+1 s. The
+--- Metrics toggle waits for the same prefetch (ui/menu/menu_metrics.lua), so it
+--- runs only when the prefetch failed or could not start.
 local function _host_signature()
 	local prefetched = HostSignature.value()
 	if prefetched then return prefetched end

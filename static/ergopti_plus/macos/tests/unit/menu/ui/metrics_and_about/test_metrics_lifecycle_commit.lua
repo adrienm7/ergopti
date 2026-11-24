@@ -5,13 +5,15 @@
 --- DESCRIPTION:
 --- Drives the real top-level Metrics action with a keystats whose strict start
 --- returns false. The click must compensate the already-persisted ON preference,
---- keep WPM producers stopped, and repaint an unchecked menu.
+--- keep WPM producers stopped, and repaint an unchecked menu. A toggle whose
+--- hardware UUID read is still pending starts the engine only once it settles.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local function load_menu(start_result)
-	local ctx = { saves = 0, updates = 0, menubar_starts = 0, widget_starts = 0, alerts = {}, revocations = 0 }
+local function load_menu(start_result, prepare_start)
+	local ctx = { saves = 0, updates = 0, menubar_starts = 0, widget_starts = 0, alerts = {}, revocations = 0,
+		starts = 0 }
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	_G.hs = hs_stub
@@ -27,7 +29,8 @@ local function load_menu(start_result)
 	}
 	package.loaded["modules.keystats"] = setmetatable({
 		DEFAULT_STATE = defaults,
-		start = function() return start_result end,
+		start = function() ctx.starts = ctx.starts + 1; return start_result end,
+		prepare_start = prepare_start,
 		set_options = function() return true end,
 		revoke_roi_text = function() ctx.revocations = ctx.revocations + 1 end,
 		set_disabled_apps = function() end,
@@ -59,11 +62,11 @@ local function load_menu(start_result)
 	package.loaded["menu.engine.manifest_menu"] = renderer
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.wpm.wpm_menubar"] = {
-		start = function() ctx.menubar_starts = ctx.menubar_starts + 1 end,
+		start = function() ctx.menubar_starts = ctx.menubar_starts + 1; return true end,
 		stop = function() end, set_use_source_colors = function() end,
 	}
 	package.loaded["ui.wpm.wpm_widget"] = {
-		start = function() ctx.widget_starts = ctx.widget_starts + 1 end,
+		start = function() ctx.widget_starts = ctx.widget_starts + 1; return true end,
 		stop = function() end, set_use_source_colors = function() end,
 	}
 	package.loaded["ui.menu.menu_metrics"] = nil
@@ -100,6 +103,61 @@ helpers.describe("menu_metrics: strict keystats lifecycle reaches the checkmark"
 			"WPM menubar cannot start when the keystats security watcher failed")
 		helpers.assert_eq(0, ctx.widget_starts,
 			"WPM widget cannot start when the keystats security watcher failed")
+	end)
+end)
+
+helpers.describe("menu_metrics: the toggle reads the hardware UUID off the main thread", function()
+	local function pending_prepare()
+		local probe = { calls = 0 }
+		probe.prepare = function(on_ready)
+			probe.calls = probe.calls + 1
+			probe.resume = on_ready
+			return false
+		end
+		return probe
+	end
+
+	helpers.it("starts the engine only once the pending read settles", function()
+		local probe = pending_prepare()
+		local ctx = load_menu(true, probe.prepare)
+		helpers.assert_true(ctx.toggle(), "the ON preference is committed while the read runs")
+		helpers.assert_eq(probe.calls, 1)
+		helpers.assert_eq(ctx.starts, 0, "a start now would read the UUID synchronously on the run loop")
+		helpers.assert_true(ctx.state.keystats_enabled)
+		helpers.assert_eq(ctx.menubar_starts, 0)
+		probe.resume()
+		helpers.assert_eq(ctx.starts, 1)
+		helpers.assert_eq(ctx.menubar_starts, 1)
+		helpers.assert_eq(ctx.widget_starts, 1)
+		probe.resume()
+		helpers.assert_eq(ctx.starts, 1, "a repeated settle cannot start the engine twice")
+	end)
+
+	helpers.it("compensates a deferred refusal like a synchronous one", function()
+		local probe = pending_prepare()
+		local ctx = load_menu(false, probe.prepare)
+		helpers.assert_true(ctx.toggle())
+		probe.resume()
+		helpers.assert_eq(ctx.starts, 1)
+		helpers.assert_eq(ctx.state.keystats_enabled, false)
+		helpers.assert_eq(ctx.saves, 2)
+		helpers.assert_eq(ctx.menubar_starts, 0)
+	end)
+
+	helpers.it("never starts when Metrics was switched off before the read settled", function()
+		local probe = pending_prepare()
+		local ctx = load_menu(true, probe.prepare)
+		helpers.assert_true(ctx.toggle())
+		ctx.toggle()
+		helpers.assert_eq(ctx.state.keystats_enabled, false)
+		probe.resume()
+		helpers.assert_eq(ctx.starts, 0)
+	end)
+
+	helpers.it("starts at once when the value is already known", function()
+		local ctx = load_menu(true, function() return true end)
+		helpers.assert_true(ctx.toggle())
+		helpers.assert_eq(ctx.starts, 1)
 	end)
 end)
 
