@@ -1802,8 +1802,15 @@ the same day, [Global score](#global-score)); the skipgram half of `sfb_distance
 (genkey's and Oxeylyzer's discount of gap 1 under an SFB); `pinky_ring`
 counts the same row too (Oxeylyzer); the relative view is a difference to
 AZERTY on French and QWERTY otherwise. Floors are read from
-`score_weights.json` only: the Comparer's score settings and their file do
-not edit them yet (TODO).
+`score_weights.json`, and the Comparer's score settings and their file
+(`ergopti-score-settings`, version 3) edit each one. Measured on 2026-11-24
+over the 783 library layouts (ISO board): `pinky_ring` ranks them unlike
+`half_scissors` (Spearman 0.03 on Swann, 0.07 on the English Wikipedia
+articles; 0.05 and 0.09 against both scissors kinds), from 0.02 % to 11.6 % of
+the bigrams (mean 3.2 %) on Swann. Kept meanwhile at weight 0 (decided by the
+agent on 2026-11-24, to review by the maintainer): a weight moves every score
+while the score's normalisation is being changed; Oxeylyzer's own ratio to
+its SFB weight (0.2 to 7) would give about 0.14 beside `sfb` 5.
 
 Decided by the agent on 2026-11-18, to review by the maintainer, for the
 Comparer's sub-tabs: the tab order and names; the overview's nine leader

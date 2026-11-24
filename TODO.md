@@ -360,17 +360,6 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
-- [ ] **Ideas from the other analysers, weights to decide (2026-11-19).** `pinky_ring` (pinky–ring pairs on any
-      row), the penalty floors (`floors` of `score_weights.json`) and the ranking's « Difference to QWERTY / AZERTY »
-      view are in the engine and the Comparer, at weight or floor 0 (docs/design/layout-analysis.md, « Metrics » and
-      « Global score »); `sfb_distance` was weighed by the maintainer on 2026-11-19, and the graded costs (SFB by
-      rows, `row_jump` as the same-hand skipgram by fingers and rows, travel by finger, the alternation switch and
-      the same-hand run scale `hand_run`) were decided on 2026-11-21 and ship with the agent's scale
-      (docs/audits/layout-analysers/graded-costs-ranking.md: one-row jumps make `row_jump` the largest new term,
-      about 16 points per layout). Pending decisions: whether `pinky_ring` gets a weight once it is seen to rank
-      layouts differently from `half_scissors`; any non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point).
-      The Comparer's score settings edit each floor and grade with its help, and its export file
-      (`ergopti-score-settings`, version 3) requires them.
 - [ ] **Other analysers, what is left (2026-11-24).** Every text corpus now carries genkey's skipgrams of gaps 1 to
       9 and Oxeylyzer's token pairs of gaps 1 to 3 with its exact totals, counted from its text
       (`LAYOUT_ANALYSER_SCORES.textTables`, `analysers` of each `_generated/corpus_<id>.js`, 1.43 MB for the 31 text
@@ -927,6 +916,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
      presented, read from the same catalogues.
   2. Type the ★ replacements in the Studio's « Essayer » tab when Ergopti+ is chosen.
   3. Leave them out: the app shows its own hotstrings.
+- [ ] **`pinky_ring` weight and the penalty floors (decided by the agent on 2026-11-24, to review by the
+      maintainer).** The metrics, the floors (`floors` of `score_weights.json`), their editing in the Comparer's
+      score settings (file version 3) and the « Difference to QWERTY / AZERTY » view are all shipped. Measured on
+      2026-11-24 over the 783 library layouts: `pinky_ring` ranks them unlike `half_scissors` (Spearman 0.03 on
+      Swann, 0.07 on English Wikipedia), so it is no duplicate. Kept meanwhile: `pinky_ring` at weight 0 and every
+      floor at 0, so no score moves while the score's normalisation changes (docs/design/layout-analysis.md, the
+      agent's decisions of 2026-11-19). Choose a `pinky_ring` weight (Oxeylyzer's ratio to its SFB weight would give
+      about 0.14 beside `sfb` 5) and any non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point).
 - [ ] **Row jumps in the global score (review note).** Decided 2026-11-21: `row_jump` counts same-hand bigrams on
       different fingers only (one finger's move stays an SFB) and weighs half the SFB weight (`sfb` 5, `row_jump`
       2.5), on dev since 732f924251 ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »).
