@@ -3152,6 +3152,15 @@
 			"authors": ["Alan Reiser"],
 			"url": "https://alanreiser.com/",
 			"basis": "collection"
+		},
+		"einbinder_orthogonal": {
+			"authors": ["Harvey Einbinder, modded to ErgoDox by Ian Douglas"],
+			"url": "http://www.google.la/patents/US3945482",
+			"basis": "collection"
+		},
+		"yp_hina_fu": {
+			"authors": ["Snarfangel"],
+			"basis": "collection"
 		}
 	}
 }

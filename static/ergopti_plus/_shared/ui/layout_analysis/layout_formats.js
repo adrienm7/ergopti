@@ -1249,8 +1249,10 @@ var LAYOUT_FORMATS = (function () {
 	 * order, none beyond them. On the ErgoDox (spec.keys) a key keeps the key's
 	 * own code when it is one of the thumb's codes or a board-only thumb key
 	 * (its upper pair and small column), the others take the thumb's codes
-	 * left free, in order; a space beyond them on the left big outer key is
-	 * typed on Space, the key the board puts there.
+	 * left free, in order; a key beyond them on the left big outer key is
+	 * typed on Space, the key the board puts there, whatever it types
+	 * (KLAnext's Einbinder Orthogonal: « u » there, its space on the inner
+	 * key; the engine's left thumb then types on the space's key alone).
 	 * @param {object} spec - KLA_THUMB_BOARDS entry.
 	 * @param {string} hand - 'left' or 'right'.
 	 * @param {Array<{index: number, cells: Array}>} kept - The thumb's typed keys.
@@ -1268,9 +1270,7 @@ var LAYOUT_FORMATS = (function () {
 			const code = physical(thumb);
 			if (own.includes(code) || boardOnly(code)) return code;
 			if (free.length > 0) return free.shift();
-			if (code === 'Space' && thumb.cells.every((cell) => cell === NONE || cell === ' '))
-				return 'Space';
-			return null;
+			return code === 'Space' ? 'Space' : null;
 		});
 	}
 

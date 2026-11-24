@@ -142,7 +142,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 785;
+const LIBRARY_COUNT = 787;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -3436,13 +3436,14 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			cell('hands_down_promethium', 'RightOuterBottom', 0) === 'q',
 		'collections: Hands Down Promethium does not type z and q on its ErgoDox keys'
 	);
-	// An ErgoDox file is left out only for a letter on the left big outer thumb
-	// key, which the model keeps as the space bar, as a duplicate, or when
-	// KLAnext does not serve it.
+	// An ErgoDox file is left out only for a letter on the right big outer
+	// thumb key, which holds the board's AltGr, as a duplicate, or when
+	// KLAnext does not serve it; a letter on the left one is typed on Space
+	// (ergodox-left-outer-thumb-letter-2026-11-24).
 	for (const entry of libraryFile.not_imported) {
 		if (!/ergodox|_ergo/.test(entry.source_path) || entry.same_as) continue;
 		check(
-			/left 2-unit outer thumb key|answers 404/.test(entry.reason) ||
+			/right 2-unit outer thumb key|answers 404/.test(entry.reason) ||
 				/^layouts\/ergodox\./.test(entry.source_path),
 			`collections: ${entry.source_path} is still left out: ${entry.reason}`
 		);
@@ -3514,10 +3515,41 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			cell(id, code, level) === expected,
 			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its official file has ${expected}`
 		);
-	// A thumb-letter layout types its space on its own thumb, never the shared bar.
+	// A thumb-letter layout types its space on its own thumb, never the shared
+	// bar; the ErgoDox's left big outer key, Space, may hold a letter.
 	for (const layout of library)
 		if (E.thumbKeys().some((code) => layout.rows[code]))
-			check(!layout.rows.Space, `collections: ${layout.id} has thumb keys and the space bar`);
+			check(
+				!(layout.rows.Space || []).includes(' '),
+				`collections: ${layout.id} has thumb keys and types its space on the space bar`
+			);
+	// KLAnext's Einbinder Orthogonal: « u » on the left big outer key (66), its
+	// space on the inner one (67); Yp Hina Fu: « e » on 66, « o » on 67, the
+	// space on the right big outer key (75). The left thumb types on one key
+	// (maintainer, 2026-11-21): Einbinder's space key, Yp Hina Fu's rest key, so
+	// each lacks the letter of 66 on the ErgoDox.
+	for (const [id, code, level, expected] of [
+		['einbinder_orthogonal', 'Space', 0, 'u'],
+		['einbinder_orthogonal', 'NonConvert', 0, ' '],
+		['einbinder_orthogonal', 'Convert', 0, 'n'],
+		['yp_hina_fu', 'Space', 0, 'e'],
+		['yp_hina_fu', 'NonConvert', 0, 'o'],
+		['yp_hina_fu', 'Convert', 0, ' ']
+	])
+		check(
+			cell(id, code, level) === expected,
+			`collections: ${id} ${code} level ${level} is ${cell(id, code, level)}, its KLAnext file has ${expected}`
+		);
+	for (const [id, lost] of [
+		['einbinder_orthogonal', 'uU'],
+		['yp_hina_fu', 'eE']
+	]) {
+		const result = E.analyse(byId.get(id), prepared, { keyboard: 'ergodox' });
+		check(
+			result.incomplete && result.coverage.missingRequired.join('') === lost,
+			`collections: ${id} on the ErgoDox lacks ${result.coverage.missingRequired.join('')}, not ${lost}`
+		);
+	}
 	check(
 		(left.get('JSON/HandsDownArchive/Hands_Down_ref_ansi.json') || {}).same_as === 'hands_down',
 		'collections: Hands Down Reference is not the library’s hands_down'
