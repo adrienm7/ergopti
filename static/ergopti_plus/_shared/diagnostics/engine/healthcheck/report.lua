@@ -253,6 +253,7 @@ function M.new(ports)
 	function runner.report_field_run(line, text, collect, overrides, complete)
 		assert(type(line) == "string" and line:match(EVIDENCE_LINE), "a field report issue needs its evidence line")
 		assert(type(text) == "string" and type(collect) == "function", "a field report issue needs its report and snapshot")
+		-- config-key-literal-ok: the help action id, named like the menu row
 		return menu_request("field_report", overrides, complete, function(owner)
 			local snapshot, documents, context = collect()
 			local document = Share.document(snapshot, documents.schema, nil)
@@ -265,6 +266,7 @@ function M.new(ports)
 			if ports.effects_with(overrides).copy(Redact.apply(text, documents.redaction, context)) ~= true then
 				error("the clipboard refused the field report")
 			end
+			-- config-key-literal-ok: the help action id, named like the menu row
 			return perform({ action = "field_report", url = url }, {}, documents, {}, overrides, nil, owner)
 		end)
 	end

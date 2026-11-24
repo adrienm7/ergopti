@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local M = {}
-M.bridge_name = "field_report"
+M.bridge_name = "field_report" -- config-key-literal-ok: the bridge name, named like the menu row
 
 local FieldReport = require("diagnostics.engine.field_check.field_report")
 

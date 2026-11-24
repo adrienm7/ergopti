@@ -383,6 +383,7 @@ _HCShare_Readable(Safe, Schema) {
 				}
 				; The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
 				Developer := Sections.Get("developer", 0)
+				; config-key-literal-ok: the report field, named like the menu row
 				if (Developer is Map) && Developer.Has("detailed_log") && !Developer["detailed_log"]
 					Lines.Push(L("healthcheck.export.detailed_log_off"))
 				_HCShare_Group(Out, L("healthcheck.section.issues"), Lines)

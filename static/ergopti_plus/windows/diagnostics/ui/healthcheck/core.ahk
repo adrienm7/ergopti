@@ -413,6 +413,7 @@ _HealthCheck_Developer() {
 		"ring_lines",       LoggerRingBufferSnapshot().Length)
 	if IsSet(LOGGER_MIN_LEVEL) {
 		Developer[ConfigLeaf.LOG_LEVEL] := String(LOGGER_MIN_LEVEL)
+		; config-key-literal-ok: the report field, named like the menu row
 		Developer["detailed_log"] := LoggerIsDetailed(LOGGER_MIN_LEVEL) ? 1 : 0
 	}
 	return Developer

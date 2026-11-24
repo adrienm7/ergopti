@@ -28,6 +28,7 @@
 (function () {
 	'use strict';
 
+	// config-key-literal-ok: the host bridge name, named like the menu row
 	var post = makeHostBridge('field_report');
 
 	// The verdicts of the shared protocol and the two states before them
@@ -306,6 +307,7 @@
 
 	// Linux answers each request through the bridge response hook
 	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
+		// config-key-literal-ok: the host bridge name, named like the menu row
 		if (bridge !== 'field_report') return;
 		var message = decodeHostBridgeResponse(isBase64, payload);
 		if (message !== null) window.receiveFieldReport(message);

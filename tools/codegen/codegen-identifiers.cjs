@@ -46,6 +46,7 @@ const GROUPS = [
 	'service_labels',
 	'hosts',
 	'dev_source',
+	// config-key-literal-ok: an identifier group, named like the menu row
 	'field_report',
 	'bytecode_package',
 	'macos_notifications',

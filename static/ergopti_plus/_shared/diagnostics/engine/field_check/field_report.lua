@@ -28,7 +28,7 @@ local LabelValue = require("core.i18n.engine.label_value")
 local M = {}
 
 --- Identity of the evidence line.
-M.CHECK_ID = "field_report"
+M.CHECK_ID = "field_report" -- config-key-literal-ok: the evidence line id, named like the menu row
 
 --- The verdicts of the shared protocol, in the order the counts read.
 M.VERDICT_ORDER = { "pass", "fail", "timeout", "skip", "needs_person", "needs_typing" }
