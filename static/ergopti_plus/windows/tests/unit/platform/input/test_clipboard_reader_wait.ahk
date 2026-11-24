@@ -17,16 +17,19 @@ _CRWT_Done(State, Code, Output, ErrorText) {
 
 ; Starts the known reader and returns once it holds the lock for HoldMs.
 _CRWT_StartReader(HoldMs) {
-	global _DriverDir
+	global _DriverDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	static Serial := 0
 	Root := A_Temp . "\ergopti_clipboard_reader_" . A_ScriptHwnd . "_" . ++Serial . "_" . A_TickCount
 	FSCreateDirectoryExclusiveStrict(Root)
 	Reader := {Root: Root, Calls: 0, Code: -1, Output: "", ErrorText: "", Handle: 0, Hwnd: 0}
 	Reader.Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8",
-		_DriverDir . "\tests\fixtures\clipboard_reader_hold.ahk", Root, String(HoldMs)], _CRWT_Done.Bind(Reader))
+		_DriverDir . "\tests\fixtures\clipboard_reader_hold.ahk", Root, String(HoldMs),
+		String(TEST_NATIVE_SETTLE_TIMEOUT_MS)], _CRWT_Done.Bind(Reader))
 	AssertTrue(Reader.Handle.start(), "the known reader process must start")
+	; The reader's own open wait runs inside this one under the same bound, so
+	; this one leaves it room to report its own failure first.
 	Started := A_TickCount
-	while !FileExist(Root . "\held") && Reader.Calls == 0 && TickElapsed(Started) < 10000 {
+	while !FileExist(Root . "\held") && Reader.Calls == 0 && TickElapsed(Started) < 2 * TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		_SR_TreePoll()
 		Sleep(1)
 	}
@@ -36,10 +39,11 @@ _CRWT_StartReader(HoldMs) {
 }
 
 _CRWT_FinishReader(Reader) {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	if !IsObject(Reader)
 		return
 	Started := A_TickCount
-	while Reader.Calls == 0 && TickElapsed(Started) < 10000 {
+	while Reader.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		_SR_TreePoll()
 		Sleep(10)
 	}

@@ -212,7 +212,7 @@ Test("Metrics Apps native DOM: pick and edit round-trip through real dialogs, st
 
 
 _KLWF_Source(Root) {
-	global _DriverDir
+	global _DriverDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Code := _MAD_Source(Root, [])
 	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\webview_metrics_apps_dom_body.ahk")
 	AssertEqual(Fixture, SubStr(Code, StrLen(Code) - StrLen(Fixture) + 1),
@@ -228,6 +228,8 @@ _KLWF_Source(Root) {
 		AssertTrue(Owner != "" && _DriverIsProductionSource(Owner), "The actual foreground producer graph must exist: " . Name)
 		Code .= "#Include " . Owner . "`n"
 	}
+	; The child does not load the test framework: it reads the same settle bound.
+	Code .= "global TEST_NATIVE_SETTLE_TIMEOUT_MS := " . TEST_NATIVE_SETTLE_TIMEOUT_MS . "`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\worker_live_foreground_body.ahk")
 }
 
@@ -239,6 +241,7 @@ _KLWF_Completed(State, Code, Output, ErrorText, *) {
 }
 
 _KLWF_Case(Mode) {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "A retained actual worker tree prevents another fixture")
 	Root := A_Temp . "\ergopti_live_worker_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -254,8 +257,10 @@ _KLWF_Case(Mode) {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Root . "\store", Mode], _KLWF_Completed.Bind(State))
 		AssertTrue(Handle.start(), "The actual owned focus producer must start")
+		; The child's own worker and companion waits use the same bound inside
+		; this one, which leaves them room to report their own failure first.
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed64(Started) < 25000 {
+		while State.Calls == 0 && TickElapsed64(Started) < 2 * TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

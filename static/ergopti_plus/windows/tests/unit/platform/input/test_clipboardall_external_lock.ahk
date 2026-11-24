@@ -16,9 +16,12 @@ _CALC_Completed(State, Code, Output, ErrorText) {
 	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
 }
 
+; The observer bounds its own reader waits by the same shared bound, which runs
+; inside each of these waits, so they leave it room to report its failure first.
 _CALC_WaitFile(Path, State) {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Started := A_TickCount
-	while !FileExist(Path) && State.Calls == 0 && TickElapsed(Started) < 10000 {
+	while !FileExist(Path) && State.Calls == 0 && TickElapsed(Started) < 2 * TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		_SR_TreePoll()
 		Sleep(10)
 	}
@@ -63,7 +66,7 @@ _CALC_StartForeignReader(Root) {
 }
 
 _CALC_Run(Held, ForeignReader := false) {
-	global DriverPid, _DriverDir
+	global DriverPid, _DriverDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	PreviousCritical := Critical("On"), WasSuspended := A_IsSuspended
 	Original := 0, SnapshotTaken := false, Saved := 0, Token := 0, Primary := 0, ReaderPid := 0
 	Task := 0, Retired := true, RootCreated := false, RawOpened := false
@@ -96,7 +99,7 @@ _CALC_Run(Held, ForeignReader := false) {
 		AssertTrue(CB_Write("temporary clipboard lock payload"))
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\clipboardall_lock_observer.ahk", Root, String(FormatId),
-				String(ProcessExist())],
+				String(ProcessExist()), String(TEST_NATIVE_SETTLE_TIMEOUT_MS)],
 			_CALC_Completed.Bind(State))
 		Retired := false
 		AssertTrue(Task.start(), "the actual separate clipboard observer must start")
@@ -127,7 +130,7 @@ _CALC_Run(Held, ForeignReader := false) {
 			ReaderPid := _CALC_StartForeignReader(Root)
 		AssertTrue(FSWriteCreateDurable(Root . "\after.request", "probe"))
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 10000 {
+		while State.Calls == 0 && TickElapsed(Started) < 2 * TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

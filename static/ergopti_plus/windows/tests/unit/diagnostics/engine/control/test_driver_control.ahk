@@ -359,9 +359,6 @@ for _TDCR_Phase in ["token", "factory", "start"]
 		_TDCR_RetireDuringStart.Bind(_TDCR_Phase))
 
 
-; Bound only this fixture's native deferred-delivery observation.
-global _TDCR_NATIVE_WAIT_MS := 2000
-
 _TDCR_ReadinessListen(State, Message, Callback, Threads) {
 	if Threads == 1 {
 		State["session_visible_at_registration"] := FileExist(State["world"].Session.Path("session")) != ""
@@ -387,7 +384,7 @@ _TDCR_ReadinessAfterNativeActivation() {
 }
 
 _TDCR_ReadinessAfterNativeActivationBody(World) {
-	global _TDCR_NATIVE_WAIT_MS
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	AssertFalse(A_IsCritical, "native control delivery needs an interruptible fixture")
 	World.Session.Pid := ProcessExist()
 	Creation := HealthCheck_ControlCreationTime()
@@ -410,7 +407,7 @@ _TDCR_ReadinessAfterNativeActivationBody(World) {
 		"UPtr", World.Session.Pid, "Ptr", Creation, "Ptr")
 	AssertEqual(1, Ack, "the actual private native message is admitted after token publication")
 	Started := A_TickCount
-	while World.Calls.Length == 0 && !TickExpired64(Started, _TDCR_NATIVE_WAIT_MS)
+	while World.Calls.Length == 0 && !TickExpired64(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS)
 		Sleep(1)
 	AssertEqual(1, World.Calls.Length, "the actual native one-shot must dispatch the authenticated request")
 	World.Session.Stop()

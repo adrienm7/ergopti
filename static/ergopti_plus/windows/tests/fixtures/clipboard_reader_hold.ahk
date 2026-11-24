@@ -13,14 +13,19 @@
 #NoTrayIcon
 #Warn All, StdOut
 
-; The desktop's own readers may hold the lock when this one starts.
-global CRH_OPEN_WAIT_MS := 5000
-
 _CRH_Main() {
+	if A_Args.Length != 3
+		throw Error("a root, a hold time and the settle bound are required")
 	Root := A_Args[1], HoldMs := Integer(A_Args[2])
+	; The desktop's own readers may hold the lock when this one starts. This
+	; process does not load the test framework, so the parent passes its
+	; TEST_NATIVE_SETTLE_TIMEOUT_MS to bound that wait.
+	SettleMs := Integer(A_Args[3])
+	if SettleMs <= 0
+		throw Error("the parent must pass its positive settle bound")
 	Started := A_TickCount
 	while !DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") {
-		if A_TickCount - Started >= CRH_OPEN_WAIT_MS
+		if A_TickCount - Started >= SettleMs
 			throw Error("the known reader could not open the clipboard")
 		Sleep(5)
 	}
