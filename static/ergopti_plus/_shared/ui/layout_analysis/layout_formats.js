@@ -533,8 +533,13 @@ var LAYOUT_FORMATS = (function () {
 		// (layouts/qwerty.za.janiso.json): its two outer columns hold the
 		// punctuation the standard board has right of P, L and the slash, and
 		// each index takes the key its QWERTY character has on an ANSI board.
-		// The outermost columns and the other bottom keys have no character key.
+		// The left outer column's number-row key (1), which that QWERTY leaves
+		// empty and Hands Down Neu's janiso files give « ` ~ », takes the
+		// ErgoDox's key at the same place (LeftOuterNumber, a board-only code):
+		// every ANSI code is another index's. The outermost columns and the
+		// other bottom keys have no character key.
 		const janiso = {};
+		janiso[1] = 'LeftOuterNumber';
 		at(2, top.slice(1, 11), janiso);
 		janiso[12] = 'Equal';
 		janiso[15] = 'BracketLeft';
