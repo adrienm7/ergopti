@@ -27,6 +27,8 @@ const { chromium } = require('playwright');
 const { shared } = require('../../lib/paths.cjs');
 // The UX study's cases (docs/audits/layout-analysers/ux-study.md).
 const studioUx = require('./layout-editor-studio-ux.cjs');
+// The Comparer's Pareto and Trace tabs and their links.
+const studioViews = require('./studio-views.cjs');
 // Every number the Studio shows, through its one formatter (studio-numbers).
 const studioNumbers = require('./studio-numbers.cjs');
 // The ranking's compact headers and their popovers (studio-header-popovers).
@@ -4438,6 +4440,9 @@ async function exerciseComparerLink(browser, origin) {
 		await studioUx.exerciseScoreChip(browser, origin);
 		await studioUx.exerciseScoreChipNames(browser, origin);
 		await studioUx.exerciseShareLinkLayouts(browser, origin);
+		await studioViews.exercisePareto(browser, origin);
+		await studioViews.exerciseTrace(browser, origin);
+		await studioViews.exerciseViewLinks(browser, origin);
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
 		await studioUx.exerciseBestCycles(browser, origin);

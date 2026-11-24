@@ -1367,6 +1367,9 @@ difference, then for each layout a strip of characters over their keys (each
 key in its finger's hue with its finger printed under it, a key of a
 penalised pair or triple outlined; aria-hidden), the same keystroke by
 keystroke as a table, and the penalised pairs and triples in words.
+« Copy the link » on either tab carries it (`tab`), the Pareto values
+(`px`, `py`) or the trace's text and its two layouts (as `details` and
+`versus`), so a shared view opens as it was.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
@@ -1560,7 +1563,8 @@ source with the popover) describe it. The grids fall to one column under
 240 px, so the panel reflows at 320 px. The site embeds it like the editor
 (`?lang=<code>`); the app's Studio window loads the same page. A link may add
 `corpus=<built-in id>`, `keyboard=<id>`, `format=<id>`, `layouts=<id,id>`,
-`details=<id>` and `versus=<id>`: the page opens on them over the
+`details=<id>`, `versus=<id>`, `tab=<tab id>`, `px=<value>` and `py=<value>`
+(the Pareto tab's two values) and `text=<trace text>`: the page opens on them over the
 visitor's saved choice without saving them, and names an unknown value in the
 console, keeping the saved choice. The site's benchmark page
 (`/ergopti/benchmarks`) frames it this way (`fr_nemolivier`, `iso`), so its
