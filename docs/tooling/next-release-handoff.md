@@ -135,7 +135,7 @@ developer app and leaves out the steps `field_run.json` marks `signed_app` (the 
 is the complete run:
 
 ```sh
-git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed
+git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed --push
 ```
 
 A push to dev no longer publishes a prerelease by itself: when the fix to check is newer than the newest dev

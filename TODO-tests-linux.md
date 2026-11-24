@@ -6,7 +6,7 @@ The Linux checks only a real desktop can answer; code work stays in [TODO.md](TO
 
 ## To confirm on Linux
 
-Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh` run answers each
+Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh --push` run answers each
 of them in `docs/field-reports/linux-<stamp>/todo_summary.md` (probe steps read the session, guided steps prompt the
 gestures in the terminal): coverage table, verdicts and what no run can test in
 [docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md). No machine is available
