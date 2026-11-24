@@ -31,13 +31,14 @@ final class MenuFontRegistrationTests: XCTestCase {
 		return url.path
 	}
 
+	/// The bundle name plays no part: only the path below Resources matters.
 	func testFontsDirectorySitsBesideTheDriverTree() {
 		let directory = MenuFontRegistration.fontsDirectory(
-			configDir: "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos"
+			configDir: "/Applications/Any.app/Contents/Resources/static/ergopti_plus/macos"
 		)
 		XCTAssertEqual(
 			directory.path,
-			"/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/ui/fonts"
+			"/Applications/Any.app/Contents/Resources/static/ergopti_plus/_shared/ui/fonts"
 		)
 	}
 
