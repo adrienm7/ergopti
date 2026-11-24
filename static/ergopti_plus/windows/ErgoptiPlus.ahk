@@ -1589,6 +1589,13 @@ _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+; The process CPU beside the wall total, the line macOS writes, so the field log
+; analyser reads boot.cpu on every driver (boot profiler parity BPF-05).
+_BootCpuMs := BootClockCpuMs()
+if (_BootCpuMs >= 0)
+	LoggerEvidence("BootProfile", "Boot CPU: {1} ms of process CPU over {2} ms of boot.", Round(_BootCpuMs), _BootTotalMs)
+else
+	LoggerWarn("BootProfile", "Boot CPU unreadable: GetProcessTimes refused, so the boot's process CPU is not measured.")
 try PerfBudget_Report("BootProfile", "boot", _BootTotalMs, TimingsGet("budgets", "boot_total_ms"))
 catch as _BootBudgetErr
 	LoggerError("BootProfile", "The boot could not be judged against its budget: {1}.", _BootBudgetErr.Message)

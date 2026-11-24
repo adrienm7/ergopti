@@ -724,6 +724,22 @@
 		},
 		{
 			"driver": "windows",
+			"source": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"template": "Boot CPU: {1} ms of process CPU over {2} ms of boot.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot CPU: 1450 ms of process CPU over 2410 ms of boot.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.cpu",
+						"value": 1450.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "windows",
 			"source": "static/ergopti_plus/windows/core/lifecycle/engine/lifecycle.ahk",
 			"template": "Complete configured menu usable at {1} ms since process start; input initialization pending={2}.",
 			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Complete configured menu usable at 1980 ms since process start; input initialization pending=0.",
