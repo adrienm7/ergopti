@@ -86,6 +86,12 @@
 			"not_testable": "Needs the runtime rebuild that ships the repair role, then an administrator bootout of a system job: rebuild the owned runtime first; the Swift and Lua parsers are unit-tested (test_runtime_service_repair)."
 		},
 		{
+			"id": "menu_header_pill_centred",
+			"title": "Menu header pill centred on the menu",
+			"checks": [],
+			"not_testable": "The pill is drawn in the open menu-bar menu, which no run captures: open the menu in light and dark mode, paused and not; the geometry is unit-tested (test_canvas_badge_no_leak)."
+		},
+		{
 			"id": "tap_holds_title_red_dot",
 			"title": "Tap-Holds title red dot while the owned runtime is KO",
 			"checks": [],

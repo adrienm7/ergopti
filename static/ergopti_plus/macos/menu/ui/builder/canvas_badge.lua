@@ -9,6 +9,11 @@
 --- 1. Extracted from builder.lua so badge rendering is isolated from structural
 ---    menu assembly logic.
 --- 2. Adapts pill appearance for light/dark mode and paused state.
+--- 3. Centred On The Menu: NSMenu draws a row's image after the state column on
+---    its left and keeps the submenu-arrow column on its right, so a pill
+---    centred in its own image sat left of the menu's middle (field photo of
+---    dev.178, 2026-11-24: about 30 % to 52 % of the menu's width). The pill is
+---    centred on the whole menu width those columns frame (M.layout).
 --- ==============================================================================
 
 local M = {}
@@ -16,6 +21,21 @@ local hs     = hs
 local Logger = require("core.logger.engine.logger")
 local ManifestMenu = require("menu.engine.manifest_menu")
 local LOG    = "canvas_badge"
+
+--- The menu's native metrics, in points. `left` is the state (check mark)
+--- column every row keeps before its title or image; `trailing` the inset
+--- after the title column, widened by `submenu_arrow` once any root row opens
+--- a submenu; `font` the row font size the root titles are measured in.
+--- Calibrated on the dev.178 photo of 2026-11-24, where the pill centred in
+--- its image stood about 31 points left of the menu's middle.
+local MENU_COLUMNS = { left = 22, trailing = 22, submenu_arrow = 62, font = 14 }
+
+--- The menu's native metrics the badge geometry assumes, for the tests.
+--- @return table columns { left, trailing, submenu_arrow, font }
+function M.menu_columns() return MENU_COLUMNS end
+
+-- The pill's padding around its text and the text size, in points.
+local PILL_PAD_X, PILL_PAD_Y, PILL_TEXT_SIZE = 8, 10, 14
 local pending_canvas = nil
 local canvas_busy = false
 
@@ -46,6 +66,37 @@ end
 -- ==================================
 -- ==================================
 
+--- Width of one root row's title in the menu font, nil for a separator, an
+--- empty title (an image row) or a title that cannot be measured.
+--- @param title any A string or an hs.styledtext.
+--- @return number|nil width
+local function title_width(title)
+	if not ((type(title) == "string" and title ~= "-" and title ~= "") or type(title) == "userdata") then return nil end
+	local ok, size = pcall(hs.drawing.getTextDrawingSize, title, { font = ".AppleSystemUIFont", size = MENU_COLUMNS.font })
+	return ok and type(size) == "table" and type(size.w) == "number" and size.w or nil
+end
+
+--- Computes the badge image and the pill inside it so the pill sits in the
+--- middle of the whole menu. The image starts after the left column and the
+--- menu ends the trailing columns after the widest title or image, so the
+--- pill's centre in the image is half of (image + trailing - left).
+--- @param widest number Widest root title, in points.
+--- @param has_submenu boolean Whether a root row opens a submenu.
+--- @param text_w number Width of the pill's text.
+--- @return table geometry { canvas_w, pill_w, pill_h, pill_x }
+function M.layout(widest, has_submenu, text_w)
+	local columns = MENU_COLUMNS
+	local trailing = columns.trailing + (has_submenu and columns.submenu_arrow or 0)
+	local shift = trailing - columns.left
+	local pill_w = math.ceil(text_w + (PILL_PAD_X * 2))
+	local pill_h = PILL_TEXT_SIZE + (PILL_PAD_Y * 2)
+	-- The image never narrows the title column the other rows need, and is wide
+	-- enough to hold the pill at its shifted place when it is the widest row.
+	local canvas_w = math.max(math.ceil(widest), pill_w + math.abs(shift))
+	local pill_x = (canvas_w + shift - pill_w) / 2
+	return { canvas_w = canvas_w, pill_w = pill_w, pill_h = pill_h, pill_x = pill_x }
+end
+
 --- Builds the pill badge menu item for the macOS menu bar title.
 --- @param items table The items list to prepend the badge into (modified in place).
 --- @param ctx table Menu context, used for ctx.paused and ctx.script_control.
@@ -68,33 +119,18 @@ function M.prepend_to(items, ctx, on_click)
 		return false
 	end
 	local display_text = frame[1].label
-	-- Calculate the required canvas width based on the longest root menu item
-	local max_text_width = 0
-	for _, item in ipairs(items) do
-		if type(item.title) == "string" and item.title ~= "-" then
-			local ok_s, size_s = pcall(hs.drawing.getTextDrawingSize, item.title, { font = ".AppleSystemUIFont", size = 14 })
-			if ok_s and type(size_s) == "table" and size_s.w then
-				local extra_width = (item.menu ~= nil) and 15 or 0
-				if (size_s.w + extra_width) > max_text_width then
-					max_text_width = size_s.w + extra_width
-				end
-			end
-		end
-	end
-
-	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
+	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = PILL_TEXT_SIZE })
 	local text_w = ok and size and size.w or 80
-
-	-- Configure perfectly balanced padding for the pill
-	local pad_x = 8
-	local pad_y = 10
-	local pill_w = math.ceil(text_w + (pad_x * 2))
-	local pill_h = 14 + (pad_y * 2)
-	-- Keep the entire badge visible even if the menu has only short rows.
-	local canvas_w = math.max(math.ceil(max_text_width), pill_w)
-
-	-- Mathematically center the pill horizontally inside the transparent canvas
-	local pill_x = (canvas_w - pill_w) / 2
+	-- The widest root row, and whether the menu keeps its submenu-arrow column
+	local widest, has_submenu = 0, false
+	for _, item in ipairs(items) do
+		if item.menu ~= nil then has_submenu = true end
+		local width = title_width(item.title)
+		if width and width > widest then widest = width end
+	end
+	local geometry = M.layout(widest, has_submenu, text_w)
+	local canvas_w, pill_w, pill_h, pill_x = geometry.canvas_w, geometry.pill_w, geometry.pill_h, geometry.pill_x
+	local pad_y = PILL_PAD_Y
 
 	local is_dark = hs.host.interfaceStyle() == "Dark"
 	local bg_color   = is_dark and { white = 1 } or { white = 0.15 }
@@ -140,7 +176,7 @@ function M.prepend_to(items, ctx, on_click)
 				text          = display_text,
 				textColor     = text_color,
 				textAlignment = "center",
-				textSize      = 14,
+				textSize      = PILL_TEXT_SIZE,
 				textFont      = "Helvetica-Bold",
 				-- Adjust Y slightly (pad_y - 2) to account for font baseline rendering
 				frame         = { x = pill_x, y = pad_y - 2, w = pill_w, h = pill_h }

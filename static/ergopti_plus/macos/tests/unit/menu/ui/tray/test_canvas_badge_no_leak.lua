@@ -134,20 +134,35 @@ helpers.describe("canvas_badge: prepend_to deletes every canvas it creates", fun
 		helpers.assert_eq(counters.create_count, 2)
 		helpers.assert_eq(counters.delete_count, 2)
 	end)
-	helpers.it("centers the whole badge for both short and long menu rows", function()
-		for _, row_width in ipairs({ 20, 200 }) do
+	helpers.it("centres the pill on the whole menu width, not on its own image (2026-11-24)", function()
+		-- Field photo of dev.178: the pill spanned about 30 % to 52 % of the menu,
+		-- centred in its image while NSMenu draws that image after the state
+		-- column and keeps the submenu-arrow column on the right.
+		for _, case in ipairs({
+			{ width = 20, submenu = false }, { width = 200, submenu = false },
+			{ width = 20, submenu = true }, { width = 200, submenu = true },
+		}) do
 			local canvas, counters = make_canvas_stub()
 			local M = helpers.load_with_stubs("menu.ui.builder.canvas_badge", {
 				canvas = canvas,
 				drawing = { getTextDrawingSize = function(_, attrs)
-					return { w = attrs.font == "Helvetica-Bold" and 60 or row_width }
+					return { w = attrs.font == "Helvetica-Bold" and 60 or case.width }
 				end },
 			})
-			M.prepend_to({ { title = "Row" } }, {}, function() end)
+			local row = { title = "Row", menu = case.submenu and {} or nil }
+			M.prepend_to({ row, { title = "Other" } }, {}, function() end)
 			local rect = counters.elements[1].frame
-			helpers.assert_true(rect.x >= 0, "badge must not start outside its canvas")
-			helpers.assert_true(rect.x + rect.w <= counters.frame.w, "badge must fit inside its canvas")
-			helpers.assert_eq(rect.x, (counters.frame.w - rect.w) / 2, "badge is centered")
+			local name = string.format("rows of %d points%s", case.width, case.submenu and " with a submenu" or "")
+			helpers.assert_true(rect.x >= 0, name .. ": the pill must not start outside its image")
+			helpers.assert_true(rect.x + rect.w <= counters.frame.w, name .. ": the pill must fit inside its image")
+			local columns = M.menu_columns()
+			helpers.assert_true(type(columns) == "table", name .. ": the menu columns are declared")
+			local trailing = columns.trailing + (case.submenu and columns.submenu_arrow or 0)
+			local title_column = math.max(case.width, counters.frame.w)
+			local menu_w = columns.left + title_column + trailing
+			helpers.assert_eq(columns.left + rect.x + rect.w / 2, menu_w / 2, name .. ": the pill is centred on the menu")
+			helpers.assert_true(counters.frame.w <= math.max(case.width, rect.w + math.abs(trailing - columns.left)),
+				name .. ": the image never widens the menu beyond what the pill needs")
 		end
 	end)
 

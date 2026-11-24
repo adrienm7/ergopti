@@ -67,7 +67,9 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
 - [ ] **[macOS] Menu requests of 2026-11-24 (maintainer, photo of the dev.178 menu).** Tap-Holds title without a
       dot while the owned runtime was not installed and its install refused: fixed, red 🔴 even with the switch off
       and repainted when the runtime fails after a build (field point `tap_holds_title_red_dot`). Windows and Linux
-      draw no Tap-Holds dot: their tap-holds have no separate runtime.
+      draw no Tap-Holds dot: their tap-holds have no separate runtime. The « Ergopti+ » header pill sat left of the
+      menu's middle (about 30 % to 52 % of its width): now centred on the whole menu width, its column metrics
+      calibrated on the photo (field point `menu_header_pill_centred`); Windows and Linux draw no header pill.
 - [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
       that sets no icon and so shows the engine's application icon) still showed the hammer, although
       `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`
