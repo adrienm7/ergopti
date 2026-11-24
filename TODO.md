@@ -54,23 +54,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` stays 500 ms unless a forced-termination test flakes alone), the Ubuntu APT and Playwright download retries,
       and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by Runner » is GitHub capacity:
       rerun the failed jobs, do not move it to Intel.
-- [ ] **[macOS] Menu requests of 2026-11-24 (maintainer, photo of the dev.178 menu).** Tap-Holds title without a
-      dot while the owned runtime was not installed and its install refused: fixed, red 🔴 even with the switch off
-      and repainted when the runtime fails after a build (field point `tap_holds_title_red_dot`). Windows and Linux
-      draw no Tap-Holds dot: their tap-holds have no separate runtime. The « Ergopti+ » header pill sat left of the
-      menu's middle (about 30 % to 52 % of its width): now centred on the whole menu width, its column metrics
-      calibrated on the photo (field point `menu_header_pill_centred`); Windows and Linux draw no header pill.
-      Debug: « Console » reads « Console Hammerspoon » (macOS only: Windows offers Window Spy, the variable list
-      and the key history under their own names, Linux has no console row), and « Afficher une fenêtre à chaque
-      erreur » opens the Logs section, before a separator, on the three OS. « Journal détaillé » replaced the
-      log-level selector (unticked INFO, ticked DEBUG, same `script.log_level`; maintainer-decisions « Detailed
-      log »). The bug report's warnings group ends with « Detailed log: off — turn on Debug › Detailed log and
-      reproduce for more detail » while the switch is off (report_vectors.json, three ports). macOS gains the
-      Windows « Suspendre » row right before « Recharger », ticked while paused; the title pill still toggles
-      (field point `tray_suspend_row`). Linux draws the same row before « Recharger » (maintainer, 2026-11-24), and its paused header row still resumes. Configuration groups its rows under « — Réinitialisation — »,
-      « — Fichiers et assistant — » (cleanup, paths, wizard: no more one-row group), « — Réseau — » (proxy) and
-      « — Accessibilité — » (window font and spacing), the same on the three OS (field point
-      `configuration_titles`).
 - [ ] **[All] Tray shortcut hints (maintainer, 2026-11-24).** « Suspendre », « Recharger » and « Quitter » show
       the chord bound to their action (`script_pause_toggle`, `script_reload`, `script_quit`): the first of the
       four script-chord slots, in `script_chords.json` order, whose live chord runs it, named as « Raccourcis de
