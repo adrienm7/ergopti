@@ -144,6 +144,12 @@
 			"not_testable": "Needs a quiet desktop timed twice, after a new login and right after the runtime's first install: the field report runs inside a busy session and does not install the runtime."
 		},
 		{
+			"id": "ollama_archive_first_install",
+			"title": "Owned Ollama archive download timed on a first real install",
+			"checks": [],
+			"not_testable": "Needs a first install of the 1.4 GB managed Ollama runtime over the real network, timed by a person: the field report does not install the runtime."
+		},
+		{
 			"id": "tray_host_missing",
 			"title": "Tray without a tray host: the window and notification that say so, then its click and its accessible name (TRAY-03)",
 			"checks": [],

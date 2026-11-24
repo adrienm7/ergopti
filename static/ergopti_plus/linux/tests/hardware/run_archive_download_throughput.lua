@@ -132,8 +132,11 @@ resolver.current = function(...)
 end
 -- runtime_repair.current: its entry and budget are RAM; the source is not.
 local function repair_current() return source.current(snapshot) == true end
+-- The production reuse window of runtime_composition.lua.
 local files = assert(require("ai.engine.ollama.install_admission").new(resolver,
-	require("ai.engine.ollama.install_files"), repair_current, true))
+	require("ai.engine.ollama.install_files"), repair_current, true, {
+		window_ms = require("core.timing.engine.timings").ms("llm", "install_ancestry_reuse_ms"),
+		now_ms = Clock.now_ms }))
 -- install_phase.current, then archive_installer.current around it.
 local function phase_current() return repair_current() and files.current() == true end
 local function installer_current()

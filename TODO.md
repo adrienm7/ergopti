@@ -690,17 +690,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Linux
 
-- [ ] **Archive downloads: time a first install on the PC.** The owned archive download waited out the idle wait
-      twice per 64 KiB chunk (the write's thread-pool acknowledgement, then the restarted pipe reader, which libuv
-      registers only on its next poll) and read `config.toml` 28 times per chunk. Fixed on 2026-11-20: the idle
-      wait polls libuv's backend descriptor, the curl reader's resume calls `event_loop.wake()`, and the AI
-      preference reader reads the bytes only when the file's lstat change token moves (trusted once the file has
-      been quiet 3 s). `tests/hardware/run_archive_download_throughput.lua`, 64 MiB from a loopback server on a
-      shared 8-core WSL: 3.1 MB/s before (2 idle-wait timeouts and 28 full config reads per chunk), 11.0 MB/s
-      with the wake alone, 17.7 to 21.1 MB/s with both (0 full reads per chunk), so about 70 s instead of 7.7 min
-      for the 1.4 GB archive. Its `revoke` mode rewrites the model in place with the same size mid-download, on a
-      trusted token: no byte lands after the edit. What remains per chunk is 14 `install_resolver` ancestor walks
-      (about 1.5 ms, one lstat per ancestor each). Time a first real install on the PC.
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen
@@ -850,6 +839,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
   2. A tighter bound over the corpus's own n-grams (to study: what share of the key bigrams one pair can hold).
   3. The optimizer run to maximise the cost on each corpus and settings: realistic ratios, but a found worst that
      a layout may pass (a negative mark), and seconds of search per change of settings.
+- [ ] **Linux install ancestry reuse window (decided by the agent on 2026-11-24, to review by the maintainer).** The
+      managed Ollama download re-admitted its install folder's ancestors about 14 times per 64 KiB chunk, from separate
+      callbacks, so no single turn could carry one walk. An admitted walk now answers the per-download owner's
+      `current()` for `[llm] install_ancestry_reuse_ms` = 1 ms; a refusal is never kept and each file mutation walks
+      before and after it. The walk was already a path-receipt fence, not proof against a same-user race, so 1 ms
+      widens no boundary it held. Choose another window, or 0 to walk every time.
 - [ ] **Text replacements of the former « Essayer » page (decided by the agent on 2026-11-21, to review by the
       maintainer).** `/ergopti/utilisation` also typed Ergopti+'s ★ text replacements and listed them by category;
       the Studio's « Essayer » tab types the layout only (its dead keys and levels, any library layout), so the

@@ -76,6 +76,7 @@ function M.new(deps)
 		retiring=retention.remove(paths,d.process,bootstrap,label)
 	end
 	local admission_new=d.admission.new
+	local ancestry_reuse=d.timings.ms('llm','install_ancestry_reuse_ms')
 	local environment=d.environment
 	assert(type(environment)=='function', 'captured native environment port unavailable')
 	-- The shared serve environment keeps the owned daemon on local models only.
@@ -174,7 +175,8 @@ function M.new(deps)
 				plan.asset.bytes+plan.asset.unpacked_bytes+margin),done)
 		end
 		if not current(authorized) then return empty('runtime_source_changed',done) end
-		local files,reason=admission_new(d.resolver,d.file_factory,authorized,true)
+		local files,reason=admission_new(d.resolver,d.file_factory,authorized,true,
+			{window_ms=ancestry_reuse,now_ms=d.owned_timer.now_ms})
 		if not files then return empty(reason or 'runtime_file_admission_unavailable',done) end
 		-- The phase owns reservation, budget subscription and every native stage.
 		return phase_start({files=files,process=d.process,http=d.http,archive_factory=d.archive_factory}, {

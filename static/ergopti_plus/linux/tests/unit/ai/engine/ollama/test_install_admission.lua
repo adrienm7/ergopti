@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 local function expect(value, message) assert(value, message) end
 local function test(name, body) helpers.it(name .. " (ollama-install)", body) end
 local Admission = helpers.load_module("ai.engine.ollama.install_admission")
-local function fixture(consent)
-	local f = { source = true, ancestry = true, calls = {}, parent_prepared = false }
+local function fixture(consent, reuse)
+	local f = { source = true, ancestry = true, calls = {}, parent_prepared = false, walks = 0 }
 	local resolver = {
 		plan = function() return { directory = "/private/release/ollama" } end,
-		current = function() return f.ancestry, "install_ancestor_substituted" end,
+		current = function() f.walks = f.walks + 1; return f.ancestry, "install_ancestor_substituted" end,
 		prepare = function(admission)
 			f.calls[#f.calls + 1] = "parent"
 			assert(admission.explicit_consent == true and admission.authorized() == true)
@@ -38,7 +38,7 @@ local function fixture(consent)
 		end
 	end
 	f.files, f.resolver = files, resolver
-	f.owner = assert(Admission.new(resolver, { new = function(directory) assert(directory == "/private/release/ollama"); return files end }, function() return f.source end, consent ~= false))
+	f.owner = assert(Admission.new(resolver, { new = function(directory) assert(directory == "/private/release/ollama"); return files end }, function() return f.source end, consent ~= false, reuse))
 	return f
 end
 test("construction is read-only and cannot invent download consent", function()
@@ -85,4 +85,56 @@ test("later public function replacement cannot redirect captured native owner", 
 	f.files.cleanup = function() error("replacement cannot acquire cleanup") end
 	f.resolver.current = function() error("replacement cannot alter path proof") end
 	assert(f.owner.cleanup() == true and f.calls[1] == "cleanup")
+end)
+-- A 64 KiB archive chunk re-admitted the owner 14 times, each an ancestor walk.
+local function reusing()
+	local clock = { now = 100 }
+	local f = fixture(true, { window_ms = 1, now_ms = function() return clock.now end })
+	return f, clock
+end
+test("one admitted ancestor walk answers current() within the reuse window only", function()
+	local f, clock = reusing()
+	for _ = 1, 14 do assert(f.owner.current() == true) end
+	assert(f.walks == 1, "14 re-admissions inside the window walk once, walked " .. f.walks)
+	clock.now = 101
+	assert(f.owner.current() == true and f.walks == 1, "the window bound itself is still inside")
+	clock.now = 102
+	assert(f.owner.current() == true and f.walks == 2, "past the window the ancestors are walked again")
+end)
+test("a substituted ancestor is seen as soon as the window ends and a refusal is never kept", function()
+	local f, clock = reusing()
+	assert(f.owner.current() == true); f.ancestry = false
+	clock.now = 102
+	local admitted, reason = f.owner.current()
+	assert(admitted == false and reason == "install_ancestor_substituted")
+	f.ancestry = true
+	assert(f.owner.current() == true and f.walks == 3, "a refusal is walked again, never served from memory")
+end)
+test("a source revocation is never served from the reused walk", function()
+	local f = reusing()
+	assert(f.owner.current() == true); f.source = false
+	local admitted, reason = f.owner.current()
+	assert(admitted == false and reason == "install_source_stale")
+end)
+test("every file mutation walks the ancestors before and after it", function()
+	local f = reusing()
+	assert(f.owner.current() == true and f.walks == 1)
+	assert(f.owner.admit_size() == true)
+	assert(f.walks == 3, "admit_size walks before and after its mutation, walked " .. f.walks)
+end)
+test("a clock that goes backwards or fails walks again or refuses", function()
+	local f, clock = reusing()
+	assert(f.owner.current() == true); clock.now = 50
+	assert(f.owner.current() == true and f.walks == 2)
+	clock.now = "broken"
+	local admitted, reason = f.owner.current()
+	assert(admitted == false and reason == "install_ancestry_clock_unavailable")
+end)
+test("an invalid reuse contract is refused at construction", function()
+	for _, reuse in ipairs({ 1, {}, { window_ms = -1, now_ms = function() return 0 end }, { window_ms = 0 / 0, now_ms = function() return 0 end }, { window_ms = 1 } }) do
+		local owner, reason = Admission.new({ plan = function() return { directory = "/d" } end, current = function() return true end,
+			prepare = function() return true end }, { new = function() return { directory = "/d", cleanup = function() return true end } end },
+			function() return true end, true, reuse)
+		assert(owner == nil and reason == "install_ancestry_reuse_invalid")
+	end
 end)
