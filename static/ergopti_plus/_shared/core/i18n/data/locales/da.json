@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "utilgængelig: Windows' berøringsfladeindstillinger kunne ikke læses; åbn denne menu igen for at læse dem igen",
 	"menu.global.reload_macos": "↺ Genindlæs",
 	"menu.global.quit_macos": "✕ Afslut",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Layout når scriptet er sat på pause : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Layout når scriptet er aktivt : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

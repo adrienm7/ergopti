@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "недоступно: не вдалося прочитати налаштування сенсорної панелі Windows; знову відкрийте це меню, щоб прочитати їх ще раз",
 	"menu.global.reload_macos": "↺ Перезавантажити",
 	"menu.global.quit_macos": "✕ Вийти",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Розкладка коли скрипт на паузі : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Розкладка коли скрипт активний : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

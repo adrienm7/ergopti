@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "לא זמין: לא ניתן היה לקרוא את הגדרות משטח המגע של Windows; פתחו שוב תפריט זה כדי לקרוא אותן מחדש",
 	"menu.global.reload_macos": "↺ טען מחדש",
 	"menu.global.quit_macos": "✕ צא",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ פריסה כשהסקריפט מושהה : %s",
 	"menu.layout.resume_picker_caption": "  ↳ פריסה כשהסקריפט פעיל : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "अनुपलब्ध: Windows टचपैड सेटिंग्स पढ़ी नहीं जा सकीं; उन्हें फिर से पढ़ने के लिए यह मेनू दोबारा खोलें",
 	"menu.global.reload_macos": "↺ पुनः लोड करें",
 	"menu.global.quit_macos": "✕ बंद करें",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ स्क्रिप्ट रुकने पर लेआउट : %s",
 	"menu.layout.resume_picker_caption": "  ↳ स्क्रिप्ट सक्रिय होने पर लेआउट : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

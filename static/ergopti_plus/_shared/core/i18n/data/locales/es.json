@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "no disponible: no se pudieron leer los ajustes del panel táctil de Windows; vuelve a abrir este menú para leerlos de nuevo",
 	"menu.global.reload_macos": "↺ Recargar",
 	"menu.global.quit_macos": "✕ Salir",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Disposición cuando script pausado : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Disposición cuando script activo : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "niet beschikbaar: de Windows-touchpadinstellingen konden niet worden gelezen; open dit menu opnieuw om ze opnieuw te lezen",
 	"menu.global.reload_macos": "↺ Herladen",
 	"menu.global.quit_macos": "✕ Afsluiten",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Indeling wanneer script gepauzeerd : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Indeling wanneer script actief : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

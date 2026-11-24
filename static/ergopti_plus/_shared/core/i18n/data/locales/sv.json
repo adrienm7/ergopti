@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "otillgängligt: Windows pekplatteinställningar kunde inte läsas; öppna den här menyn igen för att läsa dem på nytt",
 	"menu.global.reload_macos": "↺ Läs in på nytt",
 	"menu.global.quit_macos": "✕ Avsluta",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Layout när skriptet är pausat : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Layout när skriptet är aktivt : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "kullanılamıyor: Windows dokunmatik yüzey ayarları okunamadı; ayarları yeniden okumak için bu menüyü tekrar açın",
 	"menu.global.reload_macos": "↺ Yeniden yükle",
 	"menu.global.quit_macos": "✕ Çıkış",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Betik duraklatıldığında düzen : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Betik etkinken düzen : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

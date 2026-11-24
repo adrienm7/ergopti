@@ -44,6 +44,7 @@ const LINUX_ACCENTED = ROOT + 'linux/modules/shortcuts/accented_shortcuts.lua';
 const LINUX_PREDICTION = ROOT + 'linux/ai/engine/prediction/engine.lua';
 const LINUX_TAP_HOLDS_MENU = ROOT + 'linux/ui/menu/menu_tap_holds.lua';
 const LINUX_SHORTCUTS_MENU = ROOT + 'linux/ui/menu/menu_shortcuts.lua';
+const LINUX_TRAY_SHORTCUT_HINT = ROOT + 'linux/menu/ui/builder/shortcut_hint.lua';
 const LINUX_LAYOUTS_MENU = ROOT + 'linux/ui/menu/menu_layouts.lua';
 
 const MACOS_GESTURE_ACTIONS = ROOT + 'macos/gestures/engine/actions.lua';
@@ -485,7 +486,7 @@ module.exports = [
 	},
 	{
 		prefix: 'sg_labels.',
-		files: [LINUX_SHORTCUTS_MENU],
+		files: [LINUX_SHORTCUTS_MENU, LINUX_TRAY_SHORTCUT_HINT],
 		source: 'the slot ids of _shared/shortcuts/data/actions/script_chords.json',
 		keys: () =>
 			ctx.keysOf(

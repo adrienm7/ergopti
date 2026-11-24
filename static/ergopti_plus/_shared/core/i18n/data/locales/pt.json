@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "indisponível: não foi possível ler as definições do touchpad do Windows; reabra este menu para voltar a lê-las",
 	"menu.global.reload_macos": "↺ Recarregar",
 	"menu.global.quit_macos": "✕ Sair",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Layout quando script pausado : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Layout quando script ativo : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

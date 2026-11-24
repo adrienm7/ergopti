@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "利用不可: Windows のタッチパッド設定を読み取れませんでした; このメニューを開き直して、もう一度読み取ってください",
 	"menu.global.reload_macos": "↺ リロード",
 	"menu.global.quit_macos": "✕ 終了",
+	"menu.global.shortcut_hint": "{1}（{2}）",
 	"menu.layout.pause_picker_caption": "  ↳ スクリプト停止中のレイアウト : %s",
 	"menu.layout.resume_picker_caption": "  ↳ スクリプト有効時のレイアウト : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "nedostupné: nastavení touchpadu Windows se nepodařilo přečíst; otevřete tuto nabídku znovu a nastavení se přečte znovu",
 	"menu.global.reload_macos": "↺ Znovu načíst",
 	"menu.global.quit_macos": "✕ Ukončit",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Rozložení když skript pozastaven : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Rozložení když skript aktivní : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

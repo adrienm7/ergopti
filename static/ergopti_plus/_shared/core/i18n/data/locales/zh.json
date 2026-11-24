@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "不可用：无法读取 Windows 触控板设置；请重新打开此菜单以再次读取",
 	"menu.global.reload_macos": "↺ 重新加载",
 	"menu.global.quit_macos": "✕ 退出",
+	"menu.global.shortcut_hint": "{1}（{2}）",
 	"menu.layout.pause_picker_caption": "  ↳ 脚本暂停时的布局 : %s",
 	"menu.layout.resume_picker_caption": "  ↳ 脚本活跃时的布局 : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

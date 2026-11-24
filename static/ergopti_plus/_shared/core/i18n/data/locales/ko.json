@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "사용 불가: Windows 터치패드 설정을 읽을 수 없음; 이 메뉴를 다시 열어 설정을 다시 읽으세요",
 	"menu.global.reload_macos": "↺ 다시 로드",
 	"menu.global.quit_macos": "✕ 종료",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ 스크립트 일시정지 시 레이아웃 : %s",
 	"menu.layout.resume_picker_caption": "  ↳ 스크립트 활성 시 레이아웃 : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

@@ -398,6 +398,16 @@ function M.slot_runs(slot_id, paused)
 	return ScriptChords.runs(M.catalogue(), assignments[slot_id], chords_on, paused)
 end
 
+--- The slot whose chord the tray shows beside an action's row: the first slot
+--- whose live chord runs it (the shared rule, ScriptChords.hint_slot).
+--- @param action string The tray row's action id.
+--- @return string|nil slot_id Nil when no chord runs it.
+function M.hint_slot(action)
+	load_assignments()
+	local assignments, chords_on = live_chords()
+	return ScriptChords.hint_slot(M.catalogue(), assignments, chords_on, action)
+end
+
 
 
 

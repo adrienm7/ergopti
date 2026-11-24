@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "غير متاح: تعذّرت قراءة إعدادات لوحة اللمس في Windows؛ أعد فتح هذه القائمة لقراءتها من جديد",
 	"menu.global.reload_macos": "↺ إعادة تحميل",
 	"menu.global.quit_macos": "✕ إنهاء",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ التخطيط عند إيقاف البرنامج : %s",
 	"menu.layout.resume_picker_caption": "  ↳ التخطيط عند تشغيل البرنامج : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

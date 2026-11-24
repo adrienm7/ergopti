@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "unavailable: the Windows touchpad settings could not be read; open this menu again to read them again",
 	"menu.global.reload_macos": "↺ Reload",
 	"menu.global.quit_macos": "✕ Quit",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Layout when script is paused : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Layout when script is active : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

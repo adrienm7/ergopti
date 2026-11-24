@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "niedostępny: nie udało się odczytać ustawień touchpada systemu Windows; otwórz ponownie to menu, aby odczytać je jeszcze raz",
 	"menu.global.reload_macos": "↺ Przeładuj",
 	"menu.global.quit_macos": "✕ Zakończ",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Układ gdy skrypt wstrzymany : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Układ gdy skrypt aktywny : %s",
 	"menu.layout.native_variant_caption": "%s v%s",

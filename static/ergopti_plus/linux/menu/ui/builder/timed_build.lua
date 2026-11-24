@@ -10,6 +10,8 @@
 --- [budgets] menu_rebuild_ms (_shared/core/logger/engine/perf_budget.lua), so
 --- tools/dev/field-log-analyse.py judges both drivers with one pattern. The
 --- builder itself stays untouched: its tests read it as the real tray builder.
+--- The finished root then gets the shortcut hints of Suspend, Reload and Quit
+--- (shortcut_hint.lua), timed with the build.
 --- ==============================================================================
 
 local Logger     = require("core.logger.engine.shim")
@@ -19,14 +21,15 @@ local LOG = "menu.ui.builder.timed_build"
 
 local M = {}
 
---- Builds the menu tree and records its duration. A raised error propagates
---- unchanged and records nothing.
+--- Builds the menu tree, adds its shortcut hints and records the duration. A
+--- raised error propagates unchanged and records nothing.
 --- @param build function The menu builder (ui.menu.builder.build).
 --- @param ctx table Menu context.
 --- @return table items The tree the builder returned.
 function M.run(build, ctx)
 	local started = PhaseStats.now()
-	local items = build(ctx)
+	local items = require("menu.ui.builder.shortcut_hint").decorate(build(ctx),
+		require("core.i18n.engine.i18n").get)
 	local elapsed_ms = PhaseStats.stop("menu.rebuild", started)
 	Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms,
 		type(items) == "table" and #items or 0)

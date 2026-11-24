@@ -4580,6 +4580,7 @@
 	"gestures.system.slot_unverified": "indisponible : réglages du pavé tactile Windows illisibles ; rouvrez ce menu pour les relire",
 	"menu.global.reload_macos": "↺ Recharger",
 	"menu.global.quit_macos": "✕ Quitter",
+	"menu.global.shortcut_hint": "{1} ({2})",
 	"menu.layout.pause_picker_caption": "  ↳ Disposition quand script en pause : %s",
 	"menu.layout.resume_picker_caption": "  ↳ Disposition quand script actif : %s",
 	"menu.layout.native_variant_caption": "%s v%s",
