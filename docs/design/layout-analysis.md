@@ -234,6 +234,12 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   of each class; the skipgram column is shown only (our `sfs` keeps its own
   definition). « One layout » shows it folded, with the compared layout and
   the difference.
+- `wordsWithKeys(layout, words, codes, {keyboard?, profile?, limit?})` →
+  `{words, occurrences}`: the words of a word table whose key stream (each
+  character its cheapest way, the ways compiled once) holds the given two or
+  three codes in a row, the most frequent first. The trace's « Corpus words »
+  button opens them under each penalised pair or triple (the drill-down of the
+  Layouts Wiki playground's Keystrokes and Words views).
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the

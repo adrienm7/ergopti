@@ -245,6 +245,33 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	);
 }
 
+// =====================================
+// ======= 4/ Words with keys ==========
+// =====================================
+
+{
+	const qwerty = byId.get('qwerty');
+	const words = { the: 5, ded: 2, cede: 3, dog: 1, édé: 9 };
+	const found = E.wordsWithKeys(qwerty, words, ['KeyD', 'KeyE'], { keyboard: 'iso' });
+	check(
+		JSON.stringify(found.words.map((w) => w.word)) === JSON.stringify(['cede', 'ded']) &&
+			found.occurrences === 5,
+		`words: « de » in a row, the most frequent first, untyped words left out (${JSON.stringify(found)})`
+	);
+	const triple = E.wordsWithKeys(qwerty, words, ['KeyE', 'KeyD', 'KeyE'], { keyboard: 'iso' });
+	check(
+		JSON.stringify(triple.words.map((w) => w.word)) === JSON.stringify(['cede']),
+		'words: three keys in a row'
+	);
+	check(
+		E.wordsWithKeys(qwerty, words, ['KeyD', 'KeyE'], { keyboard: 'iso', limit: 1 }).words.length ===
+			1,
+		'words: the limit'
+	);
+	throws(() => E.wordsWithKeys(qwerty, words, ['KeyD']), 'words: one code throws');
+	throws(() => E.wordsWithKeys(qwerty, words, ['KeyD', 'Nope']), 'words: an unknown code throws');
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-views: ${errors.length} problem(s)`);

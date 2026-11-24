@@ -16,7 +16,8 @@
  * 2. Trace: the events table counts the text typed for the chosen layout, a
  *    second layout adds its column and the difference, the strip is hidden
  *    from assistive technology and its table names each character, and a
- *    character the layout cannot type is said in words.
+ *    character the layout cannot type is said in words; a penalised group
+ *    opens the corpus words that type its keys in a row.
  * 3. Links: « Copy the link » on a tab carries the tab, the Pareto values or
  *    the trace's text and layouts, and the link opens on them.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
@@ -142,6 +143,15 @@ async function exerciseTrace(browser, origin) {
 		ths.map((th) => th.textContent)
 	);
 	assert.deepEqual(chars, ['Ç', 'a', '␣', 'v', 'a', '␣', '?'], 'trace: one row per character');
+	// The drill-down from a penalised group to the corpus's words.
+	await page.fill('#la-trace-text', 'le cœur des sœurs');
+	const button = page.locator('.la-trace-words-button').first();
+	await button.waitFor();
+	await button.click();
+	assert.equal(await button.getAttribute('aria-expanded'), 'true', 'trace: the words open');
+	const words = page.locator(`#${await button.getAttribute('aria-controls')}`);
+	assert.ok(await words.isVisible(), 'trace: the words are shown');
+	assert.notEqual((await words.textContent()).trim(), '', 'trace: the words are listed');
 	assert.deepEqual(errors, []);
 	await context.close();
 }
