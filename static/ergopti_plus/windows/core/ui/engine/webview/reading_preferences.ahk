@@ -247,18 +247,18 @@ ReadingPrefs_PushToOpen() {
 _ReadingPrefs_DropClosed() {
 	global _ReadingPrefsViews
 	for Ptr, View in _ReadingPrefsViews.Clone()
-		if !_ReadingPrefs_ViewOpen(View)
+		if _ReadingPrefs_ViewClosed(View)
 			_ReadingPrefsViews.Delete(Ptr)
 }
 
-; Whether a tracked WebView still answers: reading its address throws once
-; its window has closed.
+; Whether a tracked WebView's window has closed: reading its address throws
+; once it has.
 ; @param View {Object}
 ; @returns {Boolean}
-_ReadingPrefs_ViewOpen(View) {
+_ReadingPrefs_ViewClosed(View) {
 	try {
 		Address := View.Source
-		return Address is String
+		return !(Address is String)
 	}
-	return false
+	return true
 }
