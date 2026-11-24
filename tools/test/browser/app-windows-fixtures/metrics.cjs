@@ -255,6 +255,32 @@ module.exports = [
 				enter: (page) => showsSelected(page, '.tabs .tab-btn', '[data-tab="' + tab + '"]')
 			})),
 			{
+				// A heatmap key's popup opens on keyboard focus too: the drawing is
+				// one Tab stop, the arrow keys move between its keys and Escape
+				// hides the open popup (WCAG 2.1.1, 1.4.13).
+				name: 'heatmap-key',
+				enter: async (page) => {
+					await showsSelected(page, '.tabs .tab-btn', '[data-tab="kc"]');
+					const keys = page.locator('#kc_heatmap_container .hm-key');
+					assert.ok((await keys.count()) > 40, 'the key heatmap is drawn');
+					const shown = () =>
+						page.evaluate(() => {
+							const key = document.activeElement;
+							const tip = key && document.getElementById(key.getAttribute('data-tip'));
+							return Boolean(tip && tip.checkVisibility());
+						});
+					await page.focus('#kc_heatmap_container .hm-key[tabindex="0"]');
+					assert.ok(await shown(), 'the focused key shows its popup');
+					const first = await page.evaluate(() => document.activeElement.getAttribute('data-tip'));
+					await page.keyboard.press('ArrowRight');
+					const second = await page.evaluate(() => document.activeElement.getAttribute('data-tip'));
+					assert.notEqual(second, first, 'ArrowRight moves to the next key');
+					assert.ok(await shown(), 'the next key shows its own popup');
+					await page.keyboard.press('Escape');
+					assert.ok(!(await shown()), 'Escape hides the popup');
+				}
+			},
+			{
 				// A rebuild in progress and a failed refresh, both banners shown.
 				name: 'banners',
 				enter: (page) =>

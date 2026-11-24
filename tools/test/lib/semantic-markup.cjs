@@ -495,7 +495,12 @@ function imageProblems(source, kind) {
 /** Whether an svg opening tag hides itself or names itself as an image. */
 function svgAlternative(context) {
 	if (/\baria-hidden\s*=\s*\\?["'`]?true/.test(context)) return true;
-	return /\brole\s*=\s*\\?["'`]?img/.test(context) && /\baria-(label|labelledby)\s*=/.test(context);
+	const named = /\baria-(label|labelledby)\s*=/.test(context);
+	if (/\brole\s*=\s*\\?["'`]?img/.test(context)) return named;
+	// An interactive drawing (the typing heatmaps): a named group whose own
+	// keydown handler moves the focus between its marks, each named in turn
+	// (the app windows scan checks the marks in the page).
+	return /\brole\s*=\s*\\?["'`]?group/.test(context) && named && /\bonkeydown\s*=/.test(context);
 }
 
 /**
