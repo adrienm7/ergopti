@@ -978,32 +978,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
 more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
       stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
       first, not in board order. Approve or change.
-- [ ] **The locale's neutral value.** The manifest declares `script.locale` default `fr`, but every driver reads an
-      absent locale row as the system language, and the sparse writer deletes a chosen `fr` as neutral. On Windows,
-      whose full save writes the locale through `_ConfigSparseUpdates` (`settings/engine/io.ahk`), a French choice
-      on another system language therefore reads as that language after the next reload (read in source, not
-      replayed). The Lua drivers keep the native locale when the row is absent until this is settled: (a) no
-      neutral value for the locale (always written, never deleted), then an absent row clears the native value as
-      the other `[script]` rows do; (b) absence means `fr` on every OS (no system-language detection).
-- [ ] **macOS `migrations.toml` boot parse (about 30 ms of Lua 5.4): cache it?** Windows skips the parse with a typed
-      cache keyed by the registry's SHA-256 and the parser files' identity
-      (`settings/engine/publication/registry_cache.ahk`, validation still runs on a hit); config migration is where a
-      wrong cache would rewrite a user's settings. The Mac measurement is `migrations_registry_parse` in
-      TODO-tests-macos.md. Kept meanwhile: no cache.
-  1. **(recommended) Wait for the Mac measurement,** then port the Windows cache to Lua only if the parse costs over
-     20 ms (native `hs.hash.SHA256` of the source and parser files, a typed codec that evaluates no cached code,
-     validation kept on a hit).
-  2. Port the Windows typed cache now, before the measurement.
-  3. Never cache: 30 ms at boot is accepted.
-- [ ] **Wikisource texts as corpora: under which licence?** The built-in books come from Project Gutenberg
-      (`static/corpus/text_sources.json`). Wikisource publishes its pages under CC BY-SA 4.0, while the works it
-      transcribes are in the public domain and a faithful transcription arguably adds no new right. Kept meanwhile:
-      no Wikisource text.
-  1. **(recommended) Ship Wikisource texts as CC BY-SA 4.0,** the stricter reading, as the Wikipedia articles already
-     are: only for a public-domain work Project Gutenberg lacks (author dead over 70 years, published before the US
-     cut-off), each register entry naming the pages and revisions read and « Wikisource contributors » ([CODE]).
-  2. Ship them as public domain, crediting Wikisource as the source only.
-  3. No Wikisource: Project Gutenberg only.
 - [ ] **An e-mail or chat corpus?** No candidate is cleared: the Enron mails hold personal data, the Ubuntu IRC logs'
       licence is unchecked, Wikipedia talk pages (CC BY-SA) sign each message with a user name. Tatoeba's short
       sentences are the conversational register meanwhile.

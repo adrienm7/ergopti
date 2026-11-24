@@ -255,6 +255,13 @@ WSL, 3 × 21 interleaved rounds: the registry is 10.9 KB since its squash (the
 SHA-256 of the 365 KB identity is not in the hit figure; the Mac boot
 measurement stays the field point `migrations_registry_parse`.
 
+Confirmed again by the maintainer on 2026-11-24 (port the Windows cache now,
+which this entry already is): a stale cache is an INFO miss and a corrupt one
+a WARNING rebuild, as on Windows, never a boot failure; the tests are
+`macos/tests/unit/settings/migration/test_registry_cache.lua` (hit, registry
+change, parser change, corrupt file, rejected model). Linux still parses, by
+the earlier choice of no cache for the Linux parse.
+
 ## Linux runs the synchronous metrics writer on one sqlite3 child (2026-11-21)
 
 The maintainer chose the persistent child of
@@ -332,6 +339,10 @@ absent row; any shipped code differs from it, so it is written. Consequences:
 Tests: `test_neutral_value.ahk` and the `locale-neutral-2026-11-21`
 cases of `_shared/tests/lua/settings/script_config_authority_contract.lua`
 (macOS and Linux).
+
+Confirmed again by the maintainer on 2026-11-24 (option a of the TODO
+entry, which had outlived this implementation): no other neutral value, a
+chosen language always written. Do not reopen it.
 
 ## The live speed counts the produced text (2026-11-21)
 
@@ -2759,6 +2770,7 @@ Geometric Shapes, General Punctuation).
   before 1931) and the EU (author dead more than 70 years). They go through
   `tools/build/import-corpus-texts.cjs` (`wikisource_texts`), which pins the
   extracted text, not the parser's HTML (it carries render ids).
+  Confirmed again by the maintainer on 2026-11-24 (option 1); do not reopen.
 - **Norvig's counts and Tatoeba's full exports: both imported** as count
   tables through `tools/build/import-count-tables.cjs`. Norvig's
   `count_1w.txt` ships although norvig.com states no licence for its data
