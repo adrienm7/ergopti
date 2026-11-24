@@ -21,9 +21,7 @@ require("tests.lua.diagnostics.field_report_contract")(helpers)
 
 helpers.describe("field report: the Linux row", function()
 	helpers.it("is routed by the Debug menu, and each field run check names its Tests row title", function()
-		local handle = assert(io.open(helpers.driver_root() .. "/diagnostics/ui/menu_debug.lua", "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = assert(helpers.read_module_source("diagnostics.ui.menu_debug"))
 		helpers.assert_contains(source,
 			'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.field_report").run() end,')
 		helpers.assert_eq(require("core.ui.ui.webkit_host").bridge_for_app("field_report"), "field_report",
