@@ -53,6 +53,7 @@ return {
 	"tests.unit.ai.engine.features.test_selected_main_cache",
 	"tests.unit.platform.input.synthetic_input.test_clipboard_prepared_stage",
 	"tests.unit.platform.input.synthetic_input.test_clipboard_snapshot_restorability",
+	"tests.unit.platform.input.synthetic_input.test_clipboard_transient_hint",
 	"tests.unit.hotstrings.engine.injector.test_ordinary_clipboard_preparation",
 	"tests.unit.platform.input.synthetic_input.test_clipboard_write_deadline",
 	"tests.unit.hotstrings.engine.injector.test_selected_output_custody",

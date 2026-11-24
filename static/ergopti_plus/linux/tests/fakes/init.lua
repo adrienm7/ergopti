@@ -559,6 +559,14 @@ function M.clipboard(opts)
 	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
 	fake.counter = 0
 	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	-- The transient hint: armed once, as the daemon's boot does.
+	function fake.arm_transient_hint()
+		if fake.transient_armed then error("the transient clipboard hint is already armed", 2) end
+		fake.transient_armed = true
+	end
+	function fake.transient_targets(text)
+		return { { name = "text/plain;charset=utf-8", data = text }, { name = "x-kde-passwordManagerHint", data = "secret" } }
+	end
 	function fake.change_counter()
 		if opts.available == false then return nil, "unsupported" end
 		return fake.counter

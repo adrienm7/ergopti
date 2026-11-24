@@ -212,6 +212,63 @@ local function write_backend_checked(selected_backend, text)
 	return ran and result == true
 end
 
+-- The text targets a transient payload is offered under, as wl-copy and xclip
+-- offer plain text, then the hint Klipper, CopyQ and GPaste read to leave an
+-- item out of their history.
+local TRANSIENT_TEXT_TARGETS = { "text/plain;charset=utf-8", "UTF8_STRING", "text/plain", "STRING", "TEXT" }
+local TRANSIENT_HINT = { name = "x-kde-passwordManagerHint", data = "secret" }
+
+-- The daemon arms the hint once at boot (arm_transient_hint). Unarmed, a
+-- transient write is the session writer's, as for any other process that
+-- loads this adapter (field run, hardware harnesses, unit fakes).
+local _transient_armed = false
+-- Whether the multi-format owner runs on this session: nil until the first
+-- armed write probes it. The display server and the daemon's interpreter do
+-- not change while the process runs.
+local _transient_owner = nil
+
+--- The targets of one transient payload.
+--- @param text string Payload.
+--- @return table targets Ordered { { name, data } }.
+function M.transient_targets(text)
+	local targets = {}
+	for _, name in ipairs(TRANSIENT_TEXT_TARGETS) do targets[#targets + 1] = { name = name, data = text } end
+	targets[#targets + 1] = { name = TRANSIENT_HINT.name, data = TRANSIENT_HINT.data }
+	return targets
+end
+
+--- Lets the payloads the driver pastes and then restores carry the hint.
+--- The owner is probed at the first such write, not here, so boot spawns
+--- nothing. Raises when armed twice: one boot owns it.
+function M.arm_transient_hint()
+	if _transient_armed then error("the transient clipboard hint is already armed", 2) end
+	_transient_armed = true
+end
+
+--- Writes a payload the caller pastes and then restores. wl-copy, xclip and
+--- xsel offer one type per write, so the hint needs the multi-format owner;
+--- where it cannot run, the payload goes through the session's writer and
+--- reaches clipboard managers, which is said once.
+--- @param selected_backend table
+--- @param text string
+--- @return boolean
+local function write_transient_checked(selected_backend, text)
+	if not _transient_armed then return write_backend_checked(selected_backend, text) end
+	if _transient_owner == nil then
+		_transient_owner = require("clipboard.adapters.owner").available() == true
+		if not _transient_owner then
+			Logger.info(LOG, "No multi-format clipboard owner on this session: pasted text is not hidden from clipboard managers.")
+		end
+	end
+	if not _transient_owner then return write_backend_checked(selected_backend, text) end
+	return require("clipboard.adapters.owner").write(M.transient_targets(text)) == true
+end
+
+--- Restores the unarmed state (test seam).
+function M._reset_transient_hint_for_tests()
+	_transient_armed, _transient_owner = false, nil
+end
+
 -- Targets that carry the text the writer restores, or ICCCM bookkeeping
 -- with no payload of its own. Anything else (text/html, image/png, a file
 -- manager's copied files...) is a format the single-type writers cannot
@@ -597,7 +654,7 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			if not current() then return false end
 			-- A failed/throwing setter may already have changed the clipboard.
 			restore_required = true
-			if not write_backend_checked(b, text) then return false end
+			if not write_transient_checked(b, text) then return false end
 			written = true
 			if not current() then return false end
 			if not wait_checked(sleep_ms, SETTLE_MS) then return false end
@@ -666,7 +723,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	end
 
 	if not admitted(admission) then return false end
-	if not write_backend_checked(b, text) then
+	if not write_transient_checked(b, text) then
 		-- A failed launcher may already have transferred ownership, or another
 		-- application may have copied. Restore only identifiable contents.
 		local read_ok, current = read_backend_checked(b)
@@ -720,7 +777,7 @@ local function copy_selection(b, emit_combo, sleep_ms, publication)
 	local function current() return publication == nil or admitted(publication.current) end
 	if not current() then return false, "destination_changed" end
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
-	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed", sentinel end
+	if not write_transient_checked(b, sentinel) then return false, "clipboard_probe_write_failed", sentinel end
 	if not current() then return false, "destination_changed", sentinel end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c", publication)
 	if not copy_ok or copied ~= true then return false, "copy_chord_failed", sentinel end
@@ -809,7 +866,7 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
-	if not write_backend_checked(b, sentinel) then
+	if not write_transient_checked(b, sentinel) then
 		local ok, current = read_backend_checked(b)
 		if not ok then return false, "", "clipboard_ownership_unknown" end
 		if current ~= sentinel and current ~= saved.text then return false, "", "clipboard_probe_write_failed" end
@@ -896,7 +953,7 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	local still_owned, contents = read_backend_checked(b)
 	if not still_owned or contents ~= owned then return fail("clipboard_changed") end
 	previous_owned, owned = owned, replacement
-	if not write_backend_checked(b, replacement) then
+	if not write_transient_checked(b, replacement) then
 		return fail("replacement_write_failed")
 	end
 	if not current() then return fail("destination_changed") end

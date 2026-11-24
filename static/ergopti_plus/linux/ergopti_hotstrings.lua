@@ -1107,6 +1107,10 @@ local function main()
 	-- process name (ADD-3): converted once, before any list owner reads them.
 	require("core.lifecycle.engine.app_identity_migration").run()
 
+	-- Pasted payloads carry x-kde-passwordManagerHint, so clipboard managers
+	-- leave them out of their history (clipboard/adapters/clipboard.lua).
+	require("clipboard.adapters.clipboard").arm_transient_hint()
+
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
 	-- The AI's own typing context, fed by this engine's edits and read by the
