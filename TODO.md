@@ -562,9 +562,6 @@ share.lua, model.js and report.ahk, `configuration_vectors.json`, `test-issue-te
 - [ ] **[CI] Run the AHK suite on the change.** `report.ahk`'s readable report port, the default filter of
       `configuration.ahk` and their tests (`report-readable`, `report-budget`) were only parse-gated here: no
       AutoHotkey ran.
-- [ ] **No raw log line can be shared.** The closed sharing policy carries recognised error codes and counts, not
-      the recent log lines (`project-shared-export-schema-is-closed`): the « recent log lines » of the request
-      need a privacy decision before any schema change. Meanwhile the opt-in redacted day log stays the way.
 
 ## CI acceptance
 
@@ -631,6 +628,16 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Recent log lines in the bug report (decided by the agent on 2026-11-24, to review by the maintainer).** The
+      request of 2026-11-24 asked for the « recent log lines »; the closed sharing policy carries only recognised
+      error codes and counts (`project-shared-export-schema-is-closed`), because a raw line can hold typed text, a
+      path or a name no redaction rule knows, and the field report never pushes to GitHub by default. Kept
+      meanwhile: no raw log line in the report, the clipboard or the link; the opt-in redacted day log stays the way
+      to share lines. Choose:
+  1. **(recommended) Keep the closed policy** and give each new failure shape a recognised code
+     (`recent_error_facts.rules` of `_shared/diagnostics/data/schema.json`).
+  2. Add the last ERROR lines, redacted, to the saved file only (never the link or the clipboard), behind the
+     same opt-in as the day log.
 - [ ] **Bug link login-redirect budget (decided by the agent on 2026-11-24, to review by the maintainer).** Measured
       anonymously on github.com (`tools/dev/measure-issue-url-limits.cjs`): `/issues/new` answers 500 from about
       6,460 bytes and `/login` from about 6,500, so a 4,000-byte link dense in `%XX` failed after the signed-out
