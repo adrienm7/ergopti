@@ -1,4 +1,4 @@
---- tests/unit/clipboard/test_transient_markers.lua
+--- tests/unit/platform/input/synthetic_input/test_transient_markers.lua
 
 --- ==============================================================================
 --- MODULE: Transient Pasteboard Markers
