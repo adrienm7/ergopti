@@ -94,7 +94,7 @@ _SRTNR_RefusedRequest(Mode := "deliver") {
 		AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Scope.Observer, "Int"))
 		Scope.Observer := 0
 		Started := A_TickCount
-		while !Scope.State["TreeQuiesced"] && TickElapsed(Started) < SRTOW_EXIT_SIGNAL_SETTLE_MS {
+		while !Scope.State["TreeQuiesced"] && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(SRTOW_PID_POLL_MS)
 		}
