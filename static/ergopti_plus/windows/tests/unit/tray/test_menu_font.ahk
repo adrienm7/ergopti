@@ -181,7 +181,9 @@ _TMF_HandlerOrder() {
 	Assert(Rebuild != "", "RebuildTrayMenu is found")
 	AssertTrue(InStr(Rebuild, "TrayMenuFont_Install()") > InStr(Rebuild, "_TrayRootDrain()"),
 		"every published rebuild re-appends the handler after the population's")
-	Boot := FileRead(A_LineFile . "\..\..\..\..\ErgoptiPlus.ahk", "UTF-8")
+	; The entry point by name, wherever it lives: the census helper throws on a
+	; rename, where a pinned path would read the wrong file or none.
+	Boot := _DriverFileSource("ErgoptiPlus.ahk")
 	AssertTrue(InStr(Boot, "`nTrayMenuFont_Init()") > InStr(Boot, "`nReadingPrefs_Init(_IniCache)"),
 		"the boot prepares the tray font once the reading choices are read")
 }
