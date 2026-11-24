@@ -266,6 +266,12 @@ module.exports = [
 			)
 	},
 	{
+		prefix: 'layout_analysis.finger_short.',
+		files: [COMPARER],
+		source: 'LAYOUT_ANALYSIS_DATA.model.fingers (the trace tab prints each key finger short)',
+		keys: () => ctx.keysOf('layout_analysis.finger_short.', data().model.fingers)
+	},
+	{
 		prefix: 'layout_analysis.fingering.base_',
 		files: [FINGERING],
 		source: 'fingering_editor.js BASES',

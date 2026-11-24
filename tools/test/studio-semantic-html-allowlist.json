@@ -192,7 +192,7 @@
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
 			"element": "span.la-swatch",
-			"count": 5,
+			"count": 8,
 			"kind": "decorative",
 			"reason": "A legend's colour sample, aria-hidden: a drawn box beside the entry's words, which say what it stands for."
 		},
@@ -240,10 +240,45 @@
 		},
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
-			"element": "span (none)",
-			"count": 3,
+			"element": "div.la-pareto-chart",
+			"count": 2,
+			"kind": "mount",
+			"reason": "The box the Pareto tab redraws its scatter plot or its spread into (a named svg image), keeping it at a readable width; the table under them says every point in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "div#la-trace-out",
+			"count": 1,
+			"kind": "mount",
+			"reason": "The mount point the trace tab refills with its events table and one titled section per traced layout; it adds no meaning of its own."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-trace-char",
+			"count": 1,
 			"kind": "decorative",
-			"reason": "A drawn bar, absolutely positioned in its aria-hidden track cell; the row's cells say its value."
+			"reason": "A character of the trace strip above its keys, inside the aria-hidden strip that the keystroke table repeats in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-trace-key-text",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The legend of a key cap of the trace strip, inside the aria-hidden strip that the keystroke table repeats in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span.la-trace-finger",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The finger printed under a key cap of the trace strip (so its colour is never the only cue), inside the aria-hidden strip that the keystroke table repeats in words."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
+			"element": "span (none)",
+			"count": 4,
+			"kind": "decorative",
+			"reason": "A drawn bar, absolutely positioned in its aria-hidden track cell; the row's cells say its value. A key of the trace strip (its finger-coloured cap holding the key's legend and its finger), inside the aria-hidden strip that the keystroke table repeats in words."
 		},
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
