@@ -30,7 +30,7 @@ local TrayHints = require("menu.engine.tray_shortcut_hints")
 local LOG = "menu.ui.builder.shortcut_hint"
 
 -- The locale template joining a row's label ({1}) to its chord ({2}).
-M.KEY = "menu.global.shortcut_hint"
+M.template_key = "menu.global.shortcut_hint"
 
 -- A lookup that answers with the key itself has no catalogue behind it (the
 -- lookup already reported the raw key): the row keeps its hint, as
@@ -43,10 +43,10 @@ local NO_CATALOGUE_TEMPLATE = "{1} ({2})"
 --- @param hint string The chord's name.
 --- @return string
 function M.compose(t, label, hint)
-	local template = t(M.KEY)
-	if template == M.KEY then template = NO_CATALOGUE_TEMPLATE end
+	local template = t(M.template_key)
+	if template == M.template_key then template = NO_CATALOGUE_TEMPLATE end
 	if type(template) ~= "string" or not template:find("{1}", 1, true) or not template:find("{2}", 1, true) then
-		error("locale key " .. M.KEY .. " does not hold {1} and {2}: " .. tostring(template), 2)
+		error("locale key " .. M.template_key .. " does not hold {1} and {2}: " .. tostring(template), 2)
 	end
 	return (template:gsub("{([12])}", function(slot)
 		return slot == "1" and label or hint
