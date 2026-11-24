@@ -283,13 +283,6 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **[CODE] One layout score with 0 as the theoretical worst (maintainer, 2026-11-23).** Points with no zero read
-      as nothing (« what is a point? »). Every layout gets a mark where 0 is the worst layout possible on the corpus
-      and the settings, and higher is better with no ceiling, so ratios read plainly (« 23 % more than QWERTY »).
-      QWERTY, common to every language, is the reference named beside the mark; AZERTY is French only. The worst
-      bound comes from the score's own costs (the Optimiser run to maximise them, or a proven upper bound), not a
-      library layout. The Comparer, the Optimiser (its « an existing layout would do the job » gap in %) and the
-      site follow it ([decision](docs/memory/maintainer-decisions.md)).
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
       model »): 73 of the 91 files left out for its keys came in, the library holds 783 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
@@ -927,11 +920,23 @@ Each question names the default kept meanwhile; an answer moves into the item or
 - [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
       maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
       most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
-      the maintainer on 2026-11-19. Kept meanwhile: the gap is said in points, not in %, since the score has no
-      zero; the similarity shown first is the weighted share of the characters on the same key and level, spaces
-      aside, with the same finger and row and the unweighted share beside it; five alike layouts are listed.
-      Choose whether a gap in % of the run's gain over its start would read better, and the measure shown first
-      (docs/design/layout-optimizer.md, « Existing layouts »).
+      the maintainer on 2026-11-19. Since the mark (2026-11-24) the card says the gap in % of the marks with the
+      points beside it, and the verdict still reads the gap in points against those 2 points; the similarity shown
+      first is the weighted share of the characters on the same key and level, spaces aside, with the same finger
+      and row and the unweighted share beside it; five alike layouts are listed. Choose whether the small gap
+      becomes a %, and the measure shown first (docs/design/layout-optimizer.md, « Existing layouts »).
+- [ ] **The mark's zero (decided by the agent on 2026-11-24, to review by the maintainer).** Every layout's mark is
+      its total less the zero, a bound from the score's own costs on the board, corpus and settings
+      (docs/design/layout-analysis.md, « Mark »): the most expensive key pair and triple, every other penalty at
+      100 % (`distance` at 4 presses of the longest reach), `hand_run` at the corpus typed by one hand. Loose by
+      nature: on Don Quichotte the zero is −8,416 and Ergopti+ reads +2.1 % on QWERTY, not tens of %. Two parts are
+      a model's bound, not a proof (`distance` past 4 presses per character, `hand_run`'s chain, which has no finite
+      bound). QWERTY is now the reference on every corpus, the Comparer's relative view included (AZERTY was the
+      French one). Kept meanwhile: this bound. Choose:
+  1. **(recommended) Keep this bound** and accept small ratios: no library layout reaches 0.
+  2. A tighter bound over the corpus's own n-grams (to study: what share of the key bigrams one pair can hold).
+  3. The optimizer run to maximise the cost on each corpus and settings: realistic ratios, but a found worst that
+     a layout may pass (a negative mark), and seconds of search per change of settings.
 - [ ] **Text replacements of the former « Essayer » page (decided by the agent on 2026-11-21, to review by the
       maintainer).** `/ergopti/utilisation` also typed Ergopti+'s ★ text replacements and listed them by category;
       the Studio's « Essayer » tab types the layout only (its dead keys and levels, any library layout), so the

@@ -558,9 +558,14 @@ distinct corpus character once) and the share on the same finger and row
 {smallGap, closest})` lists the five most alike layouts (`LIBRARY_CLOSEST`)
 and the best-scoring existing layout (every complete layout before an
 incomplete one, as the Comparer ranks), each with its gap: the optimized
-layout's score minus its own, in the score's points. A ratio of scores
-would mean nothing, since the score has no zero (AZERTY is about −88). The
-verdict reads the best existing layout's gap:
+layout's score minus its own, in the score's points, and `percent`, how
+much higher the higher of the two marks is (`LAYOUT_ANALYSIS.markGap`: the
+mark has a zero, the worst layout possible, so its gaps read as ratios;
+[layout-analysis.md](layout-analysis.md#mark)). Every entry carries its
+`mark` and `zero`; entries on two zeros are refused, and the optimized
+layout's mark is its total less that zero. The card writes the gap in %
+with the points beside it. The verdict reads the best existing layout's
+gap in points, against the small gap the maintainer confirmed in points:
 
 | Verdict           | When                          | Says                                                                    |
 | ----------------- | ----------------------------- | ----------------------------------------------------------------------- |
@@ -596,6 +601,9 @@ Start AZERTY, corpus « Du côté de chez Swann », default switches (letters
 only), keyboard ISO, format TKL, default weights, 1 annealing restart of 3 000 swaps on
 99 % of the n-grams: 14 s in Node, score −87.9 → +14.0 (Ergo-L 11.8, Ergopti
 24.6 on the same corpus and options, with their own punctuation and digits).
+These are totals, measured before the mark; the page's tiles, chart and shelf
+now show marks (total − the run's zero, its start's), the gains staying in
+points.
 
 ## Follow-ups
 

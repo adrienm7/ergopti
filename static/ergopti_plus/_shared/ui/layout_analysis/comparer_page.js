@@ -1974,10 +1974,10 @@
 		}
 
 		/**
-		 * Horizontal bars of the global score, best first. The score has no
-		 * natural zero (each metric adds or removes its weighted value), so the
-		 * bars run from the weakest layout shown to the best one: the longest is
-		 * the best, and each value names its gap to the first. The user's own
+		 * Horizontal bars of the mark, best first. The mark's 0 is the worst
+		 * layout possible on this text and these settings (E.score), so each bar
+		 * runs from 0 and their lengths compare as ratios; each value names its
+		 * gap to the reference (QWERTY, E.referenceLayout) in %. The user's own
 		 * layouts take the accent colour. The filters choose the layouts drawn.
 		 */
 		function renderChart() {
@@ -1987,21 +1987,16 @@
 			const shown = rows.slice(0, CHART_MAX_BARS);
 			moreNoteAfter(box, shown.length, rows.length);
 			if (shown.length === 0) return;
-			const totals = shown.map((r) => r.score.total);
-			const best = Math.max(...totals);
-			const worst = Math.min(...totals);
-			const span = best - worst;
+			const best = Math.max(...shown.map((r) => r.score.mark));
+			const reference = referenceResult();
 			for (const result of shown) {
-				const value = format(result.score.total, 1);
-				const gap = result.score.total - best;
+				const value = format(result.score.mark, 1);
 				// An incomplete layout ranks after the complete ones and says what it lacks.
 				const flag = result.incomplete ? incompleteFlag(result) : null;
 				const track = el('td', 'la-chart-track');
 				const bar = el('span', isPersonal(result) ? 'la-bar la-bar-mine' : 'la-bar la-bar-score');
-				// The weakest keeps a sliver, so every row shows a bar; one layout alone is full.
-				const share = span > 0 ? (result.score.total - worst) / span : 1;
 				bar.style.left = '0%';
-				bar.style.width = `${3 + share * 97}%`;
+				bar.style.width = `${best > 0 ? Math.max(0, (100 * result.score.mark) / best) : 0}%`;
 				track.append(bar);
 				// The cell says its unit to a screen reader; the chart's title says it on screen.
 				const row = barRow(
@@ -2028,7 +2023,11 @@
 				row.title = `${result.layout.name}: ${withUnit(value, t('layout_analysis.unit.points'))}${
 					flag ? ` (${flag.textContent})` : ''
 				}`;
-				if (gap < 0) row.lastChild.append(' ', el('small', 'la-chart-gap', `(${format(gap, 1)})`));
+				if (reference && reference.layout.id !== result.layout.id)
+					row.lastChild.append(
+						' ',
+						el('small', 'la-chart-gap', `(${markGapText(result, reference)})`)
+					);
 				box.append(row);
 			}
 		}
@@ -2079,7 +2078,7 @@
 			tile(
 				t('layout_analysis.chart.title'),
 				complete[0],
-				measure(complete[0].score.total, 1, t('layout_analysis.unit.points'))
+				measure(complete[0].score.mark, 1, t('layout_analysis.unit.points'))
 			);
 			for (const id of LEADER_METRICS) {
 				const higher = E.METRICS[id].better === 'higher';
@@ -2112,8 +2111,8 @@
 					(!origin || originOf(layout) === origin) &&
 					(!language || layout.language === language) &&
 					(complete === 'all' || (complete === 'yes') === !r.incomplete) &&
-					(min === null || r.score.total >= min) &&
-					(max === null || r.score.total <= max)
+					(min === null || r.score.mark >= min) &&
+					(max === null || r.score.mark <= max)
 				);
 			});
 		}
@@ -2208,7 +2207,7 @@
 					label: t('layout_analysis.table.score'),
 					// Its popover: the weights' explanation and the score's formula.
 					info: 'weights',
-					value: (r) => r.score.total,
+					value: (r) => r.score.mark,
 					digits: 1,
 					unit: t('layout_analysis.unit.points')
 				}
@@ -2298,11 +2297,10 @@
 					const cell =
 						// The rank is an ordinal: it reads as is in the relative view too.
 						versus && column.digits !== undefined && column.key !== 'rank'
-							? relativeCell(
-									column.key === 'score' ? versus.score : versus.metrics[column.key],
-									column.digits,
-									column.unit
-								)
+							? column.key === 'score'
+								? // The mark as its gap to the reference's, in % (a ratio: it has a zero).
+									relativeCell({ delta: versus.score.gap, verdict: versus.score.verdict }, 1, '%')
+								: relativeCell(versus.metrics[column.key], column.digits, column.unit)
 							: el(
 									'td',
 									column.key === 'rank' ? RANK_CELL : '',
@@ -2397,35 +2395,33 @@
 		}
 
 		/**
-		 * The language the relative view picks its reference by: a corpus's own
-		 * (a built-in text, the app's), else the page's (the user's own text).
-		 * @param {{builtin?: object, host?: object}} [corpus] - An entry of corpora.
-		 * @param {string} pageLocale - The page's language code.
-		 * @returns {string} A language code.
+		 * A mark's gap to the reference's, signed, in % and naming it
+		 * (« +2.1 % vs QWERTY »): E.markGap, the one ratio of two marks.
+		 * @param {object} result - An analyse() result.
+		 * @param {object} reference - The reference's (referenceResult).
+		 * @returns {string}
 		 */
-		function referenceLanguage(corpus, pageLocale) {
-			const own = corpus && (corpus.builtin || corpus.host);
-			return own && typeof own.language === 'string' ? own.language : pageLocale;
+		function markGapText(result, reference) {
+			const gap = E.markGap(result.score.mark, reference.score.mark);
+			return t('layout_analysis.mark.versus', {
+				gap: `${gap > 0 ? '+' : ''}${measure(gap, 1, '%')}`,
+				layout: reference.layout.name
+			});
 		}
 
-		// The reference analysed for the relative view when it is not compared,
-		// per analysis (generation) and layout id.
+		// The reference analysed for the relative view and the marks when it is
+		// not compared, per analysis (generation) and layout id.
 		let referenceAnalysis = null;
 
 		/**
-		 * The result the relative view measures against on this corpus
-		 * (E.referenceLayout: AZERTY on a French text, QWERTY otherwise): the
-		 * compared one, else that layout analysed once on the same text with
-		 * the same options and scored with the current weights.
+		 * The result every mark is named beside and the relative view measures
+		 * against (E.referenceLayout: QWERTY on every corpus): the compared one,
+		 * else that layout analysed once on the same text with the same options
+		 * and scored with the current weights.
 		 * @returns {object|null} An analyse() result; null without a text.
 		 */
 		function referenceResult() {
-			const id = E.referenceLayout(
-				referenceLanguage(
-					corpora.find((c) => c.id === state.corpus),
-					INFO.locale()
-				)
-			);
+			const id = E.referenceLayout();
 			const compared = state.results.find((r) => r.layout.id === id);
 			if (compared) return compared;
 			if (!state.tables || !byId.has(id)) return null;

@@ -302,10 +302,11 @@ async function exerciseScoreChip(browser, origin) {
 			live: document.getElementById('le-score-live').textContent
 		}));
 	const first = await chip();
-	// The graded costs can take a score below zero: the chip keeps its sign.
+	// The chip shows the mark (0 is the worst layout possible), grouped by
+	// thousands; a layout past the zero's model keeps its sign.
 	assert.match(
 		first.score,
-		/^[-−]?\d+([.,]\d)?$/,
+		/^[-−]?\d{1,3}([,   ]\d{3})*([.,]\d)?$/,
 		`the chip shows the score: ${JSON.stringify(first)}`
 	);
 	assert.equal(first.change, '', 'no change on the first analysis');

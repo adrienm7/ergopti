@@ -1256,9 +1256,7 @@ check(
 	};
 	vm.createContext(context);
 	vm.runInContext(
-		['relativeCell', 'referenceLanguage', 'rankingTable', 'rowNameButton', 'validTable']
-			.map(fnSource)
-			.join('\n') +
+		['relativeCell', 'rankingTable', 'rowNameButton', 'validTable'].map(fnSource).join('\n') +
 			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';" +
 			// The page's own name column class, so the harness cannot drift from it.
 			`\n${(page.match(/const NAME_COLUMN = '[^']+';/) || ['const NAME_COLUMN = null;'])[0]}` +
@@ -1266,14 +1264,10 @@ check(
 			'\nconst libraryPercentile = () => null;',
 		context
 	);
-	const language = (corpus, locale) =>
-		vm.runInContext('referenceLanguage', context)(corpus, locale);
+	// One reference on every corpus, French included (maintainer, 2026-11-23).
 	check(
-		E.referenceLayout(language({ builtin: { language: 'fr' } }, 'en')) === 'azerty' &&
-			E.referenceLayout(language({ builtin: { language: 'en' } }, 'fr')) === 'qwerty' &&
-			E.referenceLayout(language({ id: 'custom' }, 'fr')) === 'azerty' &&
-			E.referenceLayout(language({ host: { language: 'en' } }, 'fr')) === 'qwerty',
-		'relative: the reference follows the corpus, else the page’s language'
+		E.referenceLayout() === 'qwerty' && !/referenceLanguage/.test(page),
+		'relative: QWERTY is the reference on every corpus'
 	);
 	const validTable = vm.runInContext('validTable', context);
 	check(
@@ -1313,9 +1307,17 @@ check(
 		rowOf(plain, dvorak.layout.name)[3] === pct('0.00'),
 		`relative: the plain table shows Dvorak's SFB as ${rowOf(plain, dvorak.layout.name)[3]}`
 	);
-	const delta = (dvorak.score.total - qwerty.score.total).toFixed(1);
+	// The score column shows the mark, which has a zero (not the old points).
 	check(
-		rowOf(relative, dvorak.layout.name)[2] === `${pts(`+${delta}`)} ▲ better` &&
+		rowOf(plain, dvorak.layout.name)[2] === pts(dvorak.score.mark.toFixed(1)) &&
+			dvorak.score.mark > 0 &&
+			dvorak.score.total < dvorak.score.mark,
+		`relative: the plain table shows Dvorak's mark as ${rowOf(plain, dvorak.layout.name)[2]}`
+	);
+	// The relative view writes the mark as its gap to QWERTY's in %, a ratio.
+	const gap = (100 * (dvorak.score.mark / qwerty.score.mark - 1)).toFixed(1);
+	check(
+		rowOf(relative, dvorak.layout.name)[2] === `${pct(`+${gap}`)} ▲ better` &&
 			rowOf(relative, dvorak.layout.name)[3] === `${pct('-100.00')} ▲ better`,
 		`relative: Dvorak against QWERTY reads ${JSON.stringify(rowOf(relative, dvorak.layout.name))}`
 	);

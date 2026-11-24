@@ -30,7 +30,7 @@ The maintainer found the score's points opaque and asked for one mark per
 layout where 0 is the worst layout possible, higher is better with no ceiling,
 and gaps read in %; QWERTY, shared by every language, is the reference named
 beside it, not AZERTY. The Optimiser's « an existing layout would do the job »
-gap follows it in %. Implementation is the TODO's Ergopti Studio item.
+gap follows it in %. Implemented on 2026-11-24: `score().mark` and `markGap` (docs/design/layout-analysis.md, « Mark »); how the zero is bounded waits under the TODO's « Maintainer decisions pending ».
 
 Accessibility targets WCAG 2.2 AAA (the latest WCAG) on the site, Ergopti+ and
 every app window, measured in CI by every tool that covers AAA criteria, red at

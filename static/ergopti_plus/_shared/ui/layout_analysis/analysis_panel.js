@@ -613,7 +613,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			const rank = 1 + scores.filter((other) => E.rankOrder(other, result) < 0).length;
 			headline.className = 'la-panel-score';
 			headline.textContent = t('layout_analysis.panel.score', {
-				score: format(result.score.total, SCORE_DIGITS),
+				score: format(result.score.mark, SCORE_DIGITS),
 				rank,
 				count: scores.length + 1
 			});
@@ -657,11 +657,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				}
 			};
 			tellResult({
-				score: result.score.total,
+				score: result.score.mark,
 				rank,
 				count: scores.length + 1,
 				incomplete: result.incomplete,
-				change: before ? result.score.total - before.score : null
+				change: before ? result.score.mark - before.score : null
 			});
 			drawTyping(result, layout);
 			tellHighlight(null);
@@ -683,7 +683,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				lineage,
 				context,
 				keys,
-				now: { metrics: result.metrics, score: result.score.total },
+				now: { metrics: result.metrics, score: result.score.mark },
 				before
 			};
 			state.drawn = signature;

@@ -1308,9 +1308,14 @@ async function main() {
 					keyboard: 'iso',
 					weights,
 					format: E.defaultKeyboardFormat()
-				}).score.total;
+				}).score.mark;
 			});
-			assert.equal(after, expected.toFixed(2), 'the start score is the Comparer score');
+			// The tile shows the mark (total − zero), grouped by thousands as the page writes numbers.
+			assert.equal(
+				after.replace(/,/g, ''),
+				expected.toFixed(2),
+				'the start mark is the Comparer mark'
+			);
 			assert.deepEqual(errors, []);
 			await context.close();
 		}

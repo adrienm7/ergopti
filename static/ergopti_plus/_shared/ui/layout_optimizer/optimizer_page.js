@@ -476,7 +476,9 @@
 			mark,
 			t(`layout_optimizer.library.verdict.${summary.verdict}`, {
 				name: best.name,
-				gap: points(best.gap),
+				// The marks' gap as a ratio (they have a zero), the points beside it.
+				gap: percent(best.percent),
+				points: points(best.gap),
 				threshold: number(summary.smallGap, 2)
 			})
 		);
@@ -487,7 +489,10 @@
 			const chip = el('p', `lo-gap lo-gap-${side}`);
 			const glyph = el('span', 'lo-gap-mark', GAP_MARKS[side]);
 			glyph.setAttribute('aria-hidden', 'true');
-			chip.append(glyph, t(`layout_optimizer.library.gap_${side}`, { gap: points(entry.gap) }));
+			chip.append(
+				glyph,
+				t(`layout_optimizer.library.gap_${side}`, { gap: percent(entry.percent) })
+			);
 			return chip;
 		};
 		const buttons = (entry) => {
@@ -510,7 +515,7 @@
 		const facts = (entry) => {
 			const list = el('ul', 'lo-library-facts');
 			list.append(
-				el('li', '', t('layout_optimizer.library.score', { score: number(entry.score, 2) })),
+				el('li', '', t('layout_optimizer.library.score', { score: number(entry.mark, 2) })),
 				el(
 					'li',
 					'',
@@ -1867,10 +1872,13 @@
 			drawTradeoff(score, moved);
 			const startScore = state.startResult.score.total;
 			const change = score - startScore;
+			// The tiles show marks: the run's zero is the start's (one corpus and
+			// settings, whatever the layout), so the best mark is its total less it.
+			const zero = state.startResult.score.zero;
 			// The tiles' outputs stay in place and only their text changes, so a
 			// screen reader says each new best score (an <output> is a live status).
-			$('lo-score-start').value = number(startScore, 2);
-			$('lo-score-best').value = number(score, 2);
+			$('lo-score-start').value = number(state.startResult.score.mark, 2);
+			$('lo-score-best').value = number(score - zero, 2);
 			$('lo-score-gain').value = signed(change, 2);
 			$('lo-score-change').classList.toggle('lo-tile-good', change > 0);
 			$('lo-score-change').classList.toggle('lo-tile-bad', change < 0);
@@ -2072,8 +2080,11 @@
 			if (!chart) return;
 			const reported = running.shares.filter((part) => part.progress);
 			if (reported.length === 0) return;
-			if (chart.start === null) chart.start = reported[0].progress.startScore;
-			const best = Math.max(...reported.map((part) => part.progress.best));
+			// The chart draws marks (E.score: total − zero): the run's zero is its
+			// start's, one corpus and settings whatever the layout.
+			const zero = state.startResult.score.zero;
+			if (chart.start === null) chart.start = reported[0].progress.startScore - zero;
+			const best = Math.max(...reported.map((part) => part.progress.best)) - zero;
 			const point = {
 				seconds: (Date.now() - began) / 1000,
 				best,
@@ -2096,6 +2107,11 @@
 			withUnit(number(value, digits), t(`${PREFIX}unit.seconds`));
 		/** A score and its unit. */
 		const pointsText = (value) => withUnit(number(value, 2), t('layout_analysis.unit.points'));
+		/**
+		 * A layout's total shown as its mark (E.score: total − zero), the run's
+		 * zero being its start's: one corpus and settings, whatever the layout.
+		 */
+		const markText = (total) => pointsText(total - state.startResult.score.zero);
 
 		/** The round steps (1, 2 or 5 times a power of ten) that cover [low, high] in about three. */
 		function ticks(low, high) {
@@ -2292,7 +2308,8 @@
 				return;
 			}
 			const start = state.startInUse;
-			const from = state.chart.start;
+			// The shelf keeps totals, the chart marks: the start's total is its mark plus the zero.
+			const from = state.chart.start + state.startResult.score.zero;
 			const top = Math.max(...state.shelf.map((entry) => entry.score - from), 0);
 			list.replaceChildren(
 				...state.shelf.map((entry, i) => {
@@ -2318,7 +2335,7 @@
 						'p',
 						'lo-shelf-facts',
 						t(`${PREFIX}shelf.facts`, {
-							score: pointsText(entry.score),
+							score: markText(entry.score),
 							gain: withUnit(signed(gain, 2), t('layout_analysis.unit.points')),
 							count: moved
 						})

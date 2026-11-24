@@ -531,11 +531,16 @@ if (done && typeof RUNNER.scoreLibrary === 'function') {
 		for (const id of ['azerty', 'ergol', 'bepo']) {
 			const entry = libraryDone.entries.find((item) => item.id === id);
 			const layout = libraryLayouts.find((item) => item.id === id);
-			const score = E.analyse(layout, tables, request.analysis).score.total;
+			const analysed = E.analyse(layout, tables, request.analysis).score;
+			const score = analysed.total;
 			const alike = E.layoutSimilarity(done.result.layout, layout, tables, {});
 			check(
 				entry && entry.score === score,
 				`library scan: ${id} scores ${entry && entry.score}, the engine ${score}`
+			);
+			check(
+				entry && entry.mark === analysed.mark && entry.zero === analysed.zero,
+				`library scan: ${id} has the mark ${entry && entry.mark}, the engine ${analysed.mark}`
 			);
 			check(
 				entry && JSON.stringify(entry.similarity.weighted) === JSON.stringify(alike.weighted),
@@ -552,10 +557,13 @@ if (done && typeof RUNNER.scoreLibrary === 'function') {
 
 // The summary's verdict, the best existing layout against the small gap.
 if (typeof RUNNER.librarySummary === 'function') {
+	// Every entry on one zero, −100: a mark is its score plus 100.
 	const entry = (id, score, sameKey, incomplete) => ({
 		id,
 		name: id,
 		score,
+		mark: score + 100,
+		zero: -100,
 		incomplete: Boolean(incomplete),
 		similarity: {
 			weighted: { sameKey, sameFingerRow: sameKey },
@@ -576,6 +584,29 @@ if (typeof RUNNER.librarySummary === 'function') {
 	check(summary(15).verdict === 'optimized_ahead', 'a gap of 6 points is not small');
 	check(summary(8).verdict === 'existing_better', 'an existing layout that scores more says so');
 	check(summary(11).verdict === 'small_gap', 'a gap equal to the threshold is small');
+	// The gap also reads as a ratio of marks (maintainer, 2026-11-23): the
+	// optimized mark 110.5 is 1.38 % above near's 109; near at 109 is 1.87 %
+	// above an optimized 107 (summary(7): an existing layout scores more).
+	check(
+		small.mark === 110.5 && Math.abs(small.best.percent - 100 * (110.5 / 109 - 1)) < 1e-9,
+		`the small gap is ${small.best.percent} % of the marks`
+	);
+	const behind = summary(7);
+	check(
+		behind.verdict === 'existing_better' &&
+			Math.abs(behind.best.percent - 100 * (109 / 107 - 1)) < 1e-9,
+		`an existing layout ahead reads its own lead: ${behind.best.percent} %`
+	);
+	let twoZeros = false;
+	try {
+		RUNNER.librarySummary([entries[0], Object.assign({}, entries[1], { zero: -50 })], 10, {
+			smallGap: 2,
+			closest: 2
+		});
+	} catch {
+		twoZeros = true;
+	}
+	check(twoZeros, 'a summary of layouts on two zeros is refused');
 }
 
 // =============================
@@ -703,8 +734,8 @@ if (typeof RUNNER.librarySummary === 'function') {
 			check(textOf(item).includes(entry.name), `library card: ${entry.id} is not named`);
 			const gap = descendants(item).find((node) => hasClass(node, 'lo-gap'));
 			check(
-				Boolean(gap) && textOf(gap).includes(Math.abs(entry.gap).toFixed(2)),
-				`library card: ${entry.id} has no score gap in words`
+				Boolean(gap) && textOf(gap).includes(`${entry.percent.toFixed(1)}%`),
+				`library card: ${entry.id} has no mark gap in % in words`
 			);
 		});
 		const buttons = all.filter((node) => node.tagName === 'BUTTON');

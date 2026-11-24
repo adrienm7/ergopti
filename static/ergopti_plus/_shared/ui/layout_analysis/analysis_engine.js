@@ -2358,6 +2358,13 @@ var LAYOUT_ANALYSIS = (function () {
 		// One layout analysed in detail: each event's heaviest groups over the board.
 		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
 		result.incomplete = result.coverage.missingRequired.length > 0;
+		// The zero's basis: the keyboard as no layout changes it (boardFor only
+		// drops keys and pairs), the corpus and the ideal load.
+		result.zeroBasis = zeroBasis(
+			keyboard(opts.keyboard || DEFAULT_KEYBOARD, opts.profile),
+			table,
+			m.ideal
+		);
 		result.score = score(result, opts.weights, opts.floors, opts.grades);
 		return result;
 	}
@@ -3574,7 +3581,7 @@ var LAYOUT_ANALYSIS = (function () {
 		const totalOf = (layout, compiled, c, counts, keyCount, formValues) => {
 			const all = streamCounts();
 			for (let j = 0; j < names.length; j++) all[names[j]] = c[names[j]] + counts[j];
-			return score(
+			return scoreTotals(
 				streamMetrics(layout, board, compiled, all, keyCount, opts, weightedFit(forms, formValues)),
 				opts.weights,
 				opts.floors,
@@ -6843,6 +6850,273 @@ var LAYOUT_ANALYSIS = (function () {
 		return floor > 0 ? Math.max(0, value - floor) : value;
 	}
 
+	// ===============================
+	// ======= 8b/ Mark and zero =====
+	// ===============================
+
+	// The presses one typed character costs the travel bound at most: a key
+	// with Shift and two held modifiers (the most a library level holds), or a
+	// dead key and a key each with Shift. docs/design/layout-analysis.md, « Mark ».
+	const ZERO_PRESSES = 4;
+	// The penalty metrics the zero bounds, by the class of events they count:
+	// the key pairs, the key triples (sfb_distance counts in both) and the rest.
+	const ZERO_PAIR_METRICS = Object.freeze([
+		'sfb',
+		'sfb_distance',
+		'lsb',
+		'scissors',
+		'half_scissors',
+		'pinky_ring',
+		'row_jump'
+	]);
+	const ZERO_TRIPLE_METRICS = Object.freeze(['sfs', 'sfb_distance', 'redirect', 'redirect_bad']);
+	// A pair kind's fields (zeroBasis().kinds): its row jump cell (-1: none),
+	// whether it is a pinky–ring pair, its scissor (0 none, 1 half, 2 full) and
+	// whether it is a lateral stretch.
+	const ZERO_KIND_CELL = 0;
+	const ZERO_KIND_PINKY_RING = 1;
+	const ZERO_KIND_SCISSOR = 2;
+	const ZERO_KIND_LSB = 3;
+	const zeroBoardCache = new WeakMap();
+	const zeroRunCache = new WeakMap();
+
+	/**
+	 * What a board lets a key pair or a press cost, whatever the layout: the
+	 * longest same-finger move of each SFB grade, every kind of pair two
+	 * fingers of one hand make, the longest same-finger move and each finger
+	 * type's longest reach. Every key but the held modifiers (Shift, AltGr:
+	 * never in the stream) is a key a layout may type on; the space's and the
+	 * thumbs' keys count in every pair, a superset of what analyse() counts.
+	 * @param {object} board - From keyboard() (the layout's own board only
+	 *   drops keys or leaves pairs out, so its events are a subset).
+	 * @returns {{sfbMm: Array<number|null>, kinds: number[][], sameFingerMm:
+	 *   number, reach: object}} sfbMm per GRADE_CELLS.sfb cell (null: no pair
+	 *   of that grade); reach: finger type → mm.
+	 */
+	function zeroBoard(board) {
+		const cached = zeroBoardCache.get(board);
+		if (cached) return cached;
+		const K = board.codes.length;
+		const held = new Set(Object.values(board.modifiers));
+		const sameFinger = sameFingerCosts(board);
+		const sfbMm = GRADE_CELLS.sfb.map(() => null);
+		const kinds = new Map();
+		let sameFingerMm = 0;
+		for (let k1 = 0; k1 < K; k1++) {
+			if (held.has(k1)) continue;
+			for (let k2 = 0; k2 < K; k2++) {
+				if (k1 === k2 || held.has(k2)) continue;
+				if (board.finger[k1] === board.finger[k2]) {
+					const grade = sfbRowGrade(board, k1, k2);
+					const mm = sameFinger[k1 * K + k2];
+					if (sfbMm[grade] === null || mm > sfbMm[grade]) sfbMm[grade] = mm;
+					if (mm > sameFingerMm) sameFingerMm = mm;
+					continue;
+				}
+				if (board.hand[k1] !== board.hand[k2]) continue;
+				const o1 = board.order[k1];
+				const o2 = board.order[k2];
+				const rows = fingerRows(board, k1, k2);
+				const kind = [-1, 0, 0, 0];
+				if (rows && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS)
+					kind[ZERO_KIND_CELL] = rowJumpCell(board, k1, k2);
+				if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER)
+					kind[ZERO_KIND_PINKY_RING] = 1;
+				if (rows && Math.abs(o1 - o2) === 1) {
+					const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
+					const shorter = longer === k1 ? k2 : k1;
+					const down = board.row[longer] - board.row[shorter];
+					kind[ZERO_KIND_SCISSOR] = down >= 2 ? 2 : down === 1 ? 1 : 0;
+					if (board.lateral[k1] || board.lateral[k2]) kind[ZERO_KIND_LSB] = 1;
+				}
+				kinds.set(kind.join(','), kind);
+			}
+		}
+		const reach = Object.fromEntries(GRADES.distance.map((type) => [type, 0]));
+		for (let k = 0; k < K; k++) {
+			const type = fingerType(board.finger[k]);
+			if (board.reach[k] > reach[type]) reach[type] = board.reach[k];
+		}
+		const out = { sfbMm, kinds: Array.from(kinds.values()), sameFingerMm, reach };
+		zeroBoardCache.set(board, out);
+		return out;
+	}
+
+	/**
+	 * The same-hand run links of the worst stream a corpus allows: every
+	 * character but the space typed by one key of one hand, so a run ends at
+	 * the space only (handRunLinks of that stream).
+	 * @param {object} table - From prepareNgrams().
+	 * @returns {{start: number, carry: number, keystrokes: number}}
+	 */
+	function zeroRunLinks(table) {
+		const cached = zeroRunCache.get(table);
+		if (cached) return cached;
+		const c = streamBaseCounts();
+		const runs = (char) => char !== ' ';
+		for (const [a, b, n] of table.bi) {
+			c.run_pairs += n;
+			if (runs(a) && runs(b)) c.run_same += n;
+		}
+		for (const [a, b, d, n] of table.tri) {
+			const lead = runs(a) && runs(b);
+			const tail = runs(b) && runs(d);
+			c.run3 += n;
+			if (lead) c.run3_lead += n;
+			if (tail) c.run3_tail += n;
+			if (lead && tail) c.run3_all += n;
+		}
+		const links = handRunLinks(c);
+		zeroRunCache.set(table, links);
+		return links;
+	}
+
+	/**
+	 * What the zero of the mark is computed from, weights aside: the board's
+	 * pairs and reach (zeroBoard), the corpus's worst run links (zeroRunLinks)
+	 * and the smallest ideal finger load. A plain object: a result carries it
+	 * (result.zeroBasis) so score() and rescore() follow new weights.
+	 * @param {object} board - From keyboard(), the layout-independent board.
+	 * @param {object} table - From prepareNgrams().
+	 * @param {object} ideal - From idealLoad().
+	 * @returns {object}
+	 */
+	function zeroBasis(board, table, ideal) {
+		const b = zeroBoard(board);
+		return {
+			sfbMm: b.sfbMm.slice(),
+			kinds: b.kinds.map((kind) => kind.slice()),
+			sameFingerMm: b.sameFingerMm,
+			reach: Object.assign({}, b.reach),
+			idealMin: Math.min(...Object.values(ideal)),
+			runLinks: Object.assign({}, zeroRunLinks(table))
+		};
+	}
+
+	/**
+	 * The upper bound of each penalty metric's weighed value (its graded
+	 * value) on the basis: what the metric can cost, alone, at most.
+	 * @param {object} basis - From zeroBasis().
+	 * @param {object} gradeOf - From scoreGrades().
+	 * @returns {object} Penalty metric → bound, in its unit.
+	 */
+	function zeroBounds(basis, gradeOf) {
+		const present = (index) => basis.kinds.some((kind) => kind[index] > 0);
+		const sfbFactors = GRADE_CELLS.sfb
+			.map((_, i) => (basis.sfbMm[i] === null ? 0 : cellFactor('sfb', i, gradeOf.sfb)))
+			.concat([0]);
+		const cellFactors = basis.kinds
+			.filter((kind) => kind[ZERO_KIND_CELL] >= 0)
+			.map((kind) => cellFactor('row_jump', kind[ZERO_KIND_CELL], gradeOf.row_jump))
+			.concat([0]);
+		const scissors = (size) => basis.kinds.some((kind) => kind[ZERO_KIND_SCISSOR] === size);
+		const travel = Math.max(
+			...GRADES.distance.map((type) => gradeOf.distance[type] * basis.reach[type])
+		);
+		return {
+			sfb: 100 * Math.max(...sfbFactors),
+			sfs: 100,
+			sfb_distance: (100 + 100 * SFS_DISTANCE_SHARE) * basis.sameFingerMm,
+			lsb: present(ZERO_KIND_LSB) ? 100 : 0,
+			scissors: scissors(2) ? 100 : 0,
+			half_scissors: scissors(1) ? 100 : 0,
+			pinky_ring: present(ZERO_KIND_PINKY_RING) ? 100 : 0,
+			row_jump: 100 * Math.max(...cellFactors),
+			hand_run: handRunValue(basis.runLinks, gradeOf.hand_run),
+			redirect: 100,
+			redirect_bad: 100,
+			distance: ZERO_PRESSES * travel,
+			finger_imbalance: 100 - basis.idealMin,
+			hand_imbalance: 100,
+			pinky_load: 100,
+			modifier_usage: 100,
+			altgr_usage: 100,
+			dead_key_usage: 100,
+			outer_column: 100,
+			unsupported: 100
+		};
+	}
+
+	/**
+	 * The most a key pair costs, in points per percentage point of the key
+	 * bigrams, by the weights and grades (no floor): one pair is one kind of
+	 * event, so its metrics add up and the most expensive pair bounds them all.
+	 */
+	function zeroPairPoints(basis, w, gradeOf) {
+		let most = 0;
+		GRADE_CELLS.sfb.forEach((_, i) => {
+			if (basis.sfbMm[i] === null) return;
+			most = Math.max(
+				most,
+				w.sfb * cellFactor('sfb', i, gradeOf.sfb) + w.sfb_distance * basis.sfbMm[i]
+			);
+		});
+		for (const kind of basis.kinds) {
+			let points = 0;
+			if (kind[ZERO_KIND_CELL] >= 0)
+				points += w.row_jump * cellFactor('row_jump', kind[ZERO_KIND_CELL], gradeOf.row_jump);
+			if (kind[ZERO_KIND_PINKY_RING]) points += w.pinky_ring;
+			if (kind[ZERO_KIND_SCISSOR] === 2) points += w.scissors;
+			if (kind[ZERO_KIND_SCISSOR] === 1) points += w.half_scissors;
+			if (kind[ZERO_KIND_LSB]) points += w.lsb;
+			most = Math.max(most, points);
+		}
+		return most;
+	}
+
+	/**
+	 * The zero of the mark: a lower bound of the global score of every layout
+	 * on this board, corpus and settings, minus every penalty at its bound
+	 * (the rewards are ≥ 0, so they are left at 0). The key pairs and triples
+	 * are each bounded by their most expensive kind (their metrics add up per
+	 * n-gram) or, when floors make it lower, by each metric's own bound above
+	 * its floor; every other penalty by its own bound above its floor.
+	 * @param {object} basis - From zeroBasis() (result.zeroBasis).
+	 * @param {object} used - The weights in use (every metric's).
+	 * @param {object} floorOf - From scoreFloors().
+	 * @param {object} gradeOf - From scoreGrades().
+	 * @returns {number} A finite number ≤ 0, in score points.
+	 * @throws {Error} When a weighted penalty metric has no bound.
+	 */
+	function scoreZero(basis, used, floorOf, gradeOf) {
+		if (!basis || !basis.reach || !basis.runLinks)
+			throw new Error("layout_analysis: the mark needs analyse()'s zeroBasis");
+		const bounds = zeroBounds(basis, gradeOf);
+		const floored = (id) => (used[id] || 0) * Math.max(0, bounds[id] - (floorOf[id] || 0));
+		for (const [id, metric] of Object.entries(METRICS))
+			if (metric.better === 'lower' && id in used && !(id in bounds))
+				throw new Error(`layout_analysis: ${id} has no bound for the mark's zero`);
+		const streamed = new Set(ZERO_PAIR_METRICS.concat(ZERO_TRIPLE_METRICS));
+		const joint =
+			100 * zeroPairPoints(basis, used, gradeOf) +
+			100 *
+				(used.sfs +
+					SFS_DISTANCE_SHARE * used.sfb_distance * basis.sameFingerMm +
+					used.redirect +
+					used.redirect_bad);
+		let cost = Math.min(
+			joint,
+			Array.from(streamed).reduce((sum, id) => sum + floored(id), 0)
+		);
+		for (const id of Object.keys(bounds)) if (!streamed.has(id)) cost += floored(id);
+		if (!Number.isFinite(cost)) throw new Error("layout_analysis: the mark's zero is not finite");
+		return -cost;
+	}
+
+	/**
+	 * A mark's gap to a reference mark, in %: how much more (or less) the
+	 * first is than the second, « 23 % more than QWERTY ».
+	 * @param {number} mark - A score.mark.
+	 * @param {number} reference - The reference's score.mark, > 0.
+	 * @returns {number} 100 × (mark / reference − 1).
+	 * @throws {Error} When the reference is not a mark above 0.
+	 */
+	function markGap(mark, reference) {
+		if (!Number.isFinite(mark) || !(reference > 0) || !Number.isFinite(reference))
+			throw new Error('layout_analysis: a mark gap needs a finite mark and a reference above 0');
+		return 100 * (mark / reference - 1);
+	}
+
 	/**
 	 * The value of a scored metric the score weighs: the metric itself, or
 	 * for a graded one (GRADES) its graded value.
@@ -6876,7 +7150,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   negative or non-finite weight; on a floor scoreFloors() refuses or
 	 *   grades scoreGrades() refuses.
 	 */
-	function score(result, weights, floors, grades) {
+	function scoreTotals(result, weights, floors, grades) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
 		const floorOf = scoreFloors(floors);
 		const gradeOf = scoreGrades(grades);
@@ -6895,6 +7169,27 @@ var LAYOUT_ANALYSIS = (function () {
 			total += contributions[id];
 		}
 		return { total, contributions, weights: used, floors: floorOf, grades: gradeOf };
+	}
+
+	/**
+	 * The global score of an analysis and its mark: scoreTotals(), then the
+	 * zero (scoreZero: the theoretical worst on the result's board, corpus and
+	 * settings) and the mark, total − zero: 0 for the worst layout possible,
+	 * higher is better with no ceiling, so two marks compare as a ratio
+	 * (markGap).
+	 * @param {object} result - analyse() output (metrics, parts, zeroBasis).
+	 * @param {object} [weights] - As scoreTotals().
+	 * @param {object} [floors] - As scoreTotals().
+	 * @param {object} [grades] - As scoreTotals().
+	 * @returns {{total: number, zero: number, mark: number, contributions:
+	 *   object, weights: object, floors: object, grades: object}} Score.
+	 * @throws {Error} As scoreTotals(), or when the result has no zeroBasis.
+	 */
+	function score(result, weights, floors, grades) {
+		const out = scoreTotals(result, weights, floors, grades);
+		out.zero = scoreZero(result.zeroBasis, out.weights, out.floors, out.grades);
+		out.mark = out.total - out.zero;
+		return out;
 	}
 
 	/**
@@ -6943,12 +7238,14 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * Compares two analyses metric by metric: each value, the difference and
-	 * which one the metric prefers, then the global score the same way.
+	 * which one the metric prefers, then the mark the same way and as a
+	 * ratio (markGap).
 	 * @param {object} a - analyse() output, the layout read.
 	 * @param {object} b - analyse() output, the layout it is compared with.
 	 * @returns {{metrics: object, score: object}} metric → {a, b, delta, verdict},
 	 *   delta = a − b; verdict is `better` or `worse` for a, `same` when equal,
-	 *   `none` for a metric shown but not scored; score → {a, b, delta, verdict}.
+	 *   `none` for a metric shown but not scored; score → {a, b, delta, gap,
+	 *   verdict} of the marks, gap = markGap(a, b) in %.
 	 * @throws {Error} When either result lacks a metric of METRICS or its score.
 	 */
 	function diff(a, b) {
@@ -6965,10 +7262,16 @@ var LAYOUT_ANALYSIS = (function () {
 			metrics[id] = { a: x, b: y, delta: x - y, verdict: verdict(metric.better, x - y) };
 		}
 		if (!a.score || !b.score) throw new Error('layout_analysis: diff needs both scores');
-		const delta = a.score.total - b.score.total;
+		const delta = a.score.mark - b.score.mark;
 		return {
 			metrics,
-			score: { a: a.score.total, b: b.score.total, delta, verdict: verdict('higher', delta) }
+			score: {
+				a: a.score.mark,
+				b: b.score.mark,
+				delta,
+				gap: markGap(a.score.mark, b.score.mark),
+				verdict: verdict('higher', delta)
+			}
 		};
 	}
 
@@ -7153,18 +7456,15 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * The layout the ranking's « relative » view measures the others against
-	 * on a corpus of a language (model reference_layouts: AZERTY for French,
-	 * QWERTY otherwise, Alt Alpha Ranker's QWERTY baseline).
-	 * @param {string} [language] - The corpus's language code; unknown: the default.
+	 * The layout every mark is named beside and the ranking's « relative »
+	 * view measures the others against, on every corpus (model
+	 * reference_layout: QWERTY, shared by every language, Alt Alpha Ranker's
+	 * baseline; maintainer, 2026-11-23).
 	 * @returns {string} A library layout id.
 	 * @throws {Error} When the model's reference is not a library layout.
 	 */
-	function referenceLayout(language) {
-		const refs = data().model.reference_layouts;
-		const id = Object.prototype.hasOwnProperty.call(refs.by_language, language)
-			? refs.by_language[language]
-			: refs.default;
+	function referenceLayout() {
+		const id = data().model.reference_layout;
 		if (!data().layouts.some((layout) => layout.id === id))
 			throw new Error(`layout_analysis: reference layout ${id} is not in the library`);
 		return id;
@@ -7486,6 +7786,7 @@ var LAYOUT_ANALYSIS = (function () {
 		analyse,
 		scoreSession,
 		score,
+		markGap,
 		keyScoreCost,
 		keyValues,
 		keyDiff,
