@@ -5067,6 +5067,7 @@ var LayoutEditorPage = (function () {
 			// A section a state hides is null: it must not reach the page as text.
 			root.replaceChildren(...parts.filter(Boolean));
 			fitLegends();
+			observeKeyNames();
 			applyHeat();
 			placeScoreChip();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
@@ -5187,9 +5188,40 @@ var LayoutEditorPage = (function () {
 		 * Fits every key label inside its key: the font shrinks in proportion to the
 		 * overflow, in width and in height, down to LEGEND_MIN_PX, then a label
 		 * still too long is cut with an ellipsis (the key's title holds it whole).
-		 * A board not laid out yet (a hidden frame) is measured at the next resize.
+		 * A board not laid out yet (a hidden frame) is measured at the next resize,
+		 * and keeps the sizes it was last fitted to: resetting them there left the
+		 * legends unfitted once the frame showed again, a key name below its legend
+		 * then crossing the key's bottom edge. One frame later, a key name that
+		 * still crosses its key's edge refits the board once: under the site's
+		 * 200 % text (a zoomed body) Chromium measured the size a legend had before
+		 * its reset on every other fit, so that fit shrank nothing.
 		 */
 		function fitLegends() {
+			if (!fitLegendsOnce()) return;
+			requestAnimationFrame(() => {
+				if (keyNameCrosses()) fitLegendsOnce();
+			});
+		}
+
+		/**
+		 * Whether a key name of the drawn board ends below its key's content box.
+		 * @returns {boolean}
+		 */
+		function keyNameCrosses() {
+			return [...root.querySelectorAll('#le-board .le-key > .le-code')].some((code) => {
+				const key = code.parentElement;
+				const bottom = key.clientHeight - parseFloat(getComputedStyle(key).paddingBottom);
+				return code.offsetTop + code.offsetHeight > bottom + 1;
+			});
+		}
+
+		/**
+		 * One fit of every legend (fitLegends).
+		 * @returns {boolean} False when the board is not laid out, so nothing was fitted.
+		 */
+		function fitLegendsOnce() {
+			const drawn = root.querySelector('#le-board');
+			if (!drawn || drawn.clientWidth === 0) return false;
 			const legends = [...root.querySelectorAll('#le-board .le-legend')];
 			legends.forEach((node) => {
 				node.style.fontSize = '';
@@ -5216,6 +5248,7 @@ var LayoutEditorPage = (function () {
 			legends.forEach((node) => {
 				if (node.scrollWidth > node.clientWidth) node.classList.add('cut');
 			});
+			return true;
 		}
 
 		/**
@@ -5259,6 +5292,37 @@ var LayoutEditorPage = (function () {
 					placeScoreChip();
 				});
 			}).observe(root);
+		}
+
+		// A reader's text spacing (WCAG 1.4.12: a user style sheet, or the site's
+		// « wide » spacing chosen while the editor is open), a reading choice
+		// written on the root element and a web font that finishes loading all
+		// resize the legends and key names without changing the editor's width,
+		// so the observer above never fires and a legend fitted to the old layout
+		// pushed the key name below it past the key's bottom edge. Each of them
+		// refits on the next frame; the key names are watched by size, which
+		// fitLegends never writes, so the refit cannot loop.
+		let refitFrame = 0;
+		const refitSoon = () => {
+			cancelAnimationFrame(refitFrame);
+			refitFrame = requestAnimationFrame(fitLegends);
+		};
+		const keyNameObserver =
+			typeof ResizeObserver === 'function' ? new ResizeObserver(refitSoon) : null;
+		if (typeof MutationObserver === 'function')
+			new MutationObserver(refitSoon).observe(document.documentElement, {
+				attributes: true,
+				attributeFilter: ['data-a11y-font', 'data-a11y-text', 'data-a11y-spacing']
+			});
+		if (document.fonts && typeof document.fonts.addEventListener === 'function')
+			document.fonts.addEventListener('loadingdone', refitSoon);
+
+		/** Watch the key names of the board just drawn (keyNameObserver). */
+		function observeKeyNames() {
+			if (!keyNameObserver) return;
+			keyNameObserver.disconnect();
+			for (const code of root.querySelectorAll('#le-board .le-key > .le-code'))
+				keyNameObserver.observe(code);
 		}
 
 		// One persistent element for a host's side panel (the analysis of the Studio):

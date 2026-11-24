@@ -480,19 +480,7 @@ const FRAME_SKIPPED_CHECKS = Object.freeze(['header-cover', 'long-sentence']);
  * Elements of a Studio frame a check leaves out, each with its reason; the
  * ratchet test checks the names. Remove a row once its reason is fixed.
  */
-const PENDING_FRAME_ELEMENTS = Object.freeze([
-	Object.freeze({
-		frame: 'ergopti_plus/_shared/ui/layout_editor/index.html',
-		check: 'text-clipped',
-		selector: '#le-board .le-key > .le-code',
-		reason:
-			'The drawn keys of the editor keep the size of the keyboard. Under the ' +
-			'WCAG 1.4.12 spacing, the names of five one-unit keys of the navigation ' +
-			'block (« Échap », « Suppr », « Début », « Pg préc », « Pg suiv ») wrap ' +
-			'and still pass the key edge by a pixel or two; the whole name stays in ' +
-			'the key’s accessible name and title. The legends fit (fitLegends).'
-	})
-]);
+const PENDING_FRAME_ELEMENTS = Object.freeze([]);
 
 /**
  * The selectors a frame leaves out of a check (PENDING_FRAME_ELEMENTS).

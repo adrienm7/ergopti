@@ -207,10 +207,9 @@ baseline as violations go.
       (`script.reading_font`, `script.reading_spacing`): Windows seeds them beside each locale seed and loads the
       font from `_shared/ui/fonts/`, macOS and Linux inline it (`_shared/core/ui/engine/webview/reading_preferences.lua`);
       proof `test-reading-preferences-seed.cjs`, `reading_preferences_contract.lua` on both Lua runners and
-      `test_reading_preferences.ahk`. Left: the names of five one-unit keys of the editor's navigation block, still
-      cut by a pixel or two under the 1.4.12 spacing (`PENDING_FRAME_ELEMENTS` in `site-reading.cjs`); a font
-      change reaches only the windows opened after it; a look at the dyslexia font in a real window on each OS; the
-      plain-language review of the Studio's own strings (the 21 locales' catalogue, not measured).
+      `test_reading_preferences.ahk`. Left: a font change reaches only the windows opened after it; a look at the
+      dyslexia font in a real window on each OS; the plain-language review of the Studio's own strings (the 21
+      locales' catalogue, not measured).
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
       (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
