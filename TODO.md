@@ -810,8 +810,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
       report as « run separately ». Kept meanwhile: separate. Choose:
   1. **(recommended) Keep both separate.**
   2. Run the SendInput comparison in the field report row, after a notice asking not to type.
-- [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
-      left thumb key types on any board, the ErgoDox included; implementation pending integration.
+- [ ] **Row jumps' shipped scale (review note).** Decided 2026-11-21 and on dev since 732f924251: `row_jump` counts
+      same-hand bigrams on different fingers only and weighs half the SFB weight (`sfb` 5, `row_jump` 2.5)
+      ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »). Kept meanwhile: the agent's
+      starting scale. Review it against `docs/audits/layout-analysers/graded-costs-ranking.md`.
+- [ ] **Identity gate false positive (open question of the 2026-11-15 hand-off).** The identity gate flags every
+      PDF's root trailer key in containers whose home is the root account's. Kept meanwhile: unchanged.
 - [ ] **Tab, Caps Lock, Enter and the right Control as character keys (decided by the agent on 2026-11-24, to review
       by the maintainer).** KLA's TypeMatrix, BvoFRak (ANSI), Arensito and AOEYK type there. Kept meanwhile: Tab,
       Enter and the right Control are optional keys, on the board of a layout typing on one only (left pinky, right
@@ -851,14 +855,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       `current()` for `[llm] install_ancestry_reuse_ms` = 1 ms; a refusal is never kept and each file mutation walks
       before and after it. The walk was already a path-receipt fence, not proof against a same-user race, so 1 ms
       widens no boundary it held. Choose another window, or 0 to walk every time.
-- [ ] **Text replacements of the former « Essayer » page (decided by the agent on 2026-11-21, to review by the
-      maintainer).** `/ergopti/utilisation` also typed Ergopti+'s ★ text replacements and listed them by category;
-      the Studio's « Essayer » tab types the layout only (its dead keys and levels, any library layout), so the
-      list and the ★ replacements went with the page. Kept meanwhile: removed.
-  1. **(recommended) List the replacements on `/ergopti-plus/hotstrings`**, where Ergopti+'s hotstrings are
-     presented, read from the same catalogues.
-  2. Type the ★ replacements in the Studio's « Essayer » tab when Ergopti+ is chosen.
-  3. Leave them out: the app shows its own hotstrings.
 - [ ] **Where the site shows another layout's keyboard (decided by the agent on 2026-11-24, to review by the
       maintainer).** `tools/codegen/codegen-site-keyboard.cjs` now draws any layout source of its `LAYOUTS` with the
       default patch (Ergopti's drawings and modifiers, the source's characters and a level per dead key, no Ergopti+
@@ -876,40 +872,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       floor at 0, so no score moves while the score's normalisation changes (docs/design/layout-analysis.md, the
       agent's decisions of 2026-11-19). Choose a `pinky_ring` weight (Oxeylyzer's ratio to its SFB weight would give
       about 0.14 beside `sfb` 5) and any non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point).
-- [ ] **Row jumps in the global score (review note).** Decided 2026-11-21: `row_jump` counts same-hand bigrams on
-      different fingers only (one finger's move stays an SFB) and weighs half the SFB weight (`sfb` 5, `row_jump`
-      2.5), on dev since 732f924251 ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »).
-      Review the shipped scale against `docs/audits/layout-analysers/graded-costs-ranking.md`.
-      the maintainer on 2026-11-19, and the similarity shown first, the weighted share of the characters on the
-      same key and level, spaces aside, with the same finger and row, the unweighted share beside it, on
-      2026-11-22 (`docs/memory/maintainer-decisions.md`). Kept meanwhile: the gap is said in points, not in %,
-      since the score has no zero; five alike layouts are listed. Choose whether a gap in % of the run's gain
-      over its start would read better (docs/design/layout-optimizer.md, « Existing layouts »).
-- [ ] **Optimizer change penalty (decided by the agent on 2026-11-19, to review by the maintainer).** The
-      Optimiser can take off its objective the cost of leaving the start layout: a weight in score points per % of
-      the corpus's characters moved, each weighted by its occurrences as `layoutSimilarity` weighs them (100 − its
-      weighted same-key share), and a hard « at most N changed characters » (a letter and its capital count once).
-      Kept meanwhile (`score_weights.json` `change_penalty`): presets « few changes » 3, « balanced » 1, « free » 0,
-      the slider up to 5, « at most 6 changed characters » when the limit is switched on, and « free » chosen
-      first, so a run moves what pays as before until the reader asks otherwise. Measured on AZERTY, the first 60 000 characters of Nemolivier, 3 000 swaps: weight 0 moves 92 % of
-      the typed characters for +102 points, 1 moves 71 % for +95, 3 moves 8 % for +36. Choose the presets, whether
-      « balanced » should be the first one, and whether the hard limit should count a letter and its capital as two
-      (docs/design/layout-optimizer.md, « Change penalty »).
-- [ ] **The left thumb's second key (decided by the agent on 2026-11-19, to review by the maintainer).** The
-      thumbs' own keys are NonConvert (left thumb), Convert and KanaMode (right), as on JIS; their effort and pairs
-      were settled on 2026-11-19 (docs/memory/maintainer-decisions.md). Kept meanwhile: one key for the left thumb,
-      so the layouts that need two there (Cahi, Chia, SNTH) stay out of the library. Choose whether the left thumb
-      gets a second key.
-
-- [ ] **Accessibility texts stay French (decided by the agent on 2026-11-19, to review by the maintainer).** The
-      site's accessibility statement (`/accessibilite`) and its settings dialog (`A11ySettings.svelte`) do not get
-      the 21 locales: the site has no locale system (only the Ergopti+ pages read in English, through `t()`), and
-      what Ergopti+ and Ergopti Studio show in the app already goes through the 21 locales. Under the English
-      Ergopti+ page they say `lang="fr"` with the rest of the site's header, footer and banner, so a screen reader
-      reads them as French (`tools/test/test-site-languages.cjs`). Kept meanwhile: French only.
-  1. **(recommended) Keep them French** until the site itself offers a language choice, then route them through it.
-  2. Translate the dialog and the statement into English now, with the Ergopti+ `t()` dictionary.
-  3. Give them the 21 locales, which first needs a locale system for the whole site.
 - [ ] **AAA tools: axe-core only (decided by the agent on 2026-11-24, to review by the maintainer).** Of the tools
       surveyed ([aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md)), only axe-core measures AAA rules
       without a new dependency or a network fetch; IBM Equal Access and Lighthouse have no AAA rule. Kept meanwhile:
@@ -917,51 +879,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Keep axe-core alone** and write the repository's own checks for what it misses (2.5.5).
   2. Add HTML_CodeSniffer (pinned npm package), injected into the same Playwright pages, for its `WCAG2AAA`
      errors; its notices need a person anyway.
-- [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
-      finished AI predictions are announced only while the system says a screen reader runs (Windows
-      `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.
-- [ ] **Ergopti+ sections in French under the English page (decided by the agent on 2026-11-17, to review by the
-      maintainer).** Ten sections of the Ergopti+ pages have no English text; they now say `lang="fr"`, so a screen
-      reader reads them as French (`tools/test/test-ergopti-plus-languages.cjs`). Kept meanwhile: marked, not
-      translated.
-  1. **(recommended) Translate them** through `t()` and `locales/en.js`, dropping each `lang="fr"` as it goes.
-  2. Keep them French on the English page.
-- [ ] **Undo with no timer (decided by the agent on 2026-11-17, to review by the maintainer).** The Studio's restores
-      offer « Undo » until the section is edited again or another restore replaces it, not for a few seconds (WCAG
-      2.2.1, no time limits). Kept meanwhile: no timer.
-  1. **(recommended) Keep it without a timer.**
-  2. Hide the offer after a delay, paused while it has the focus or the pointer.
-- [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
-      Utilisation page is split into « Essayer » and `/ergopti/installation` (downloads, OS guides, printable
-      layouts); `/utilisation` without an anchor lands on installation. « Essayer » is now Ergopti Studio's tab
-      (`/studio/essayer`, maintainer 2026-11-21, `docs/memory/maintainer-decisions.md`): `/ergopti/utilisation`
-      redirects to it with `layout=ergopti`, anchors kept. No `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations).
-      Ergopti+ sub-pages: présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités
-      (tap-holds, raccourcis, trackpad, métriques), configuration (réglages, vie privée), installation (démarrer,
-      télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
-      shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
-      disc of the logos) is new. Approve or change.
-- [ ] **List the text replacements of the former « Essayer » page on `/ergopti-plus/hotstrings` (maintainer
-      2026-11-22, `docs/memory/maintainer-decisions.md`).** `/ergopti/utilisation` also typed Ergopti+'s ★ text
-      replacements and listed them by category; the Studio's « Essayer » tab types the layout only, so the list
-      went with the page. List them by category on `/ergopti-plus/hotstrings`, read from the same catalogues
-      (being implemented by another change).
-- [ ] **« Essayer » becomes a Studio tab (maintainer, 2026-11-21).** The site placements decided by the agent on
-      2026-11-14 (fb510e1113, f555c231e5) are approved ([decision](docs/memory/maintainer-decisions.md)), except the
-      « Essayer » page (`/ergopti/utilisation`: online typing and text replacements), which moves into a tab of
-      Ergopti Studio. Another agent is implementing it; close this item when that move lands.
-- [ ] **Row jumps in the global score? (decided by the agent on 2026-11-17, to review by the maintainer)** The new
-      `row_jump` metric (two keys of one hand two rows or more apart, any fingers) is shown in the Comparer, the
-      heatmap and the worst pairs, but has no weight: the study gives it none, and it overlaps SFBs and scissors.
-      The effort per word uses the score's weights on the word typed alone, folded to lower case. Kept meanwhile:
-      informative only.
-  1. **(recommended) Keep it informative** until the study weighs it.
-  2. Give it a small default weight (e.g. 0.5 point per %) in `score_weights.json` and the study.
-  3. Count only jumps on different fingers, so it no longer overlaps the SFBs.
-- [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
-      key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
-      MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
-      and corner mark); ISO ticks for split and ortholinear boards.
 - [ ] **A French chat corpus?** The chat corpus shipped on 2026-11-21 is English only (Taskmaster-1's written
       dialogs, CC BY 4.0); Tatoeba's sentences stay the French conversational register. Candidates, none cleared,
       none downloaded: CoMeRe (Ortolang, chats and forums; licence per sub-corpus, unchecked; pseudonymised user
@@ -971,71 +888,3 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Check CoMeRe's per-corpus licences** and import, as a count table, a sub-corpus under a free
      licence whose user names are already pseudonymised ([CODE]).
   2. Keep Tatoeba as the French conversational register.
-- [ ] **Key-combination parity KCD-1 to KCD-8:** decided 2026-11-21: the recommended option for each, except KCD-7
-      where Linux admits a pair or chord across two keyboards; implementation pending integration.
-- [ ] **Tap-hold and hotstring cascade parity THD-1 to THD-4, HCD-1, HCD-2, HCD-4, HCD-5:** decided 2026-11-21: a
-      pair's tap lifts the layer then restores it, a pair's tap takes the strict threshold, a layer key cancels a
-      layer-hold pair's tap, the macOS thumb Backspace follows BackSpaceLogic, an expired winner fires nothing, a bare
-      `:` or `;` ends a trigger everywhere, `@` tags wait the dynamic delay, and a tag follows the typed case per
-      letter; implementation pending integration.
-- [ ] **Identity gate false positive (open question of the 2026-11-15 hand-off).** The identity gate's false
-      positive on every PDF's root trailer key in containers whose home is the root account's (left unchanged). The
-      hand-off's other questions (layout name casing, dead-key marker style, ISO ticks on split and ortholinear
-      boards) were validated as built by the maintainer on 2026-11-21.
-- [ ] **Accessibility choices of the second pass (decided by the agent on 2026-11-17, to review by the
-      maintainer).** The legacy `/ergopti-plus-old` page is kept and fixed, not retired, since the new Ergopti+ page
-      links to it (« Ancienne version de cette page »); the system's « increase contrast » (`prefers-contrast:
-more`, macOS and WebKit) does not switch the Studio frames to the black-and-yellow high-contrast theme, which
-      stays the site setting's (the site itself has no such rule); the heatmap table lists keys by value, largest
-      first, not in board order. Approve or change.
-- [ ] **An e-mail or chat corpus?** No candidate is cleared: the Enron mails hold personal data, the Ubuntu IRC logs'
-      licence is unchecked, Wikipedia talk pages (CC BY-SA) sign each message with a user name. Tatoeba's short
-      sentences are the conversational register meanwhile.
-  1. **(recommended) None for now:** Tatoeba stays the conversational register until a source with a clear licence
-     and no personal data is found.
-  2. Check the Ubuntu IRC logs' licence and, if it allows shipping, import a bounded sample with nicknames replaced
-     ([CODE]).
-  3. Wikipedia talk pages under CC BY-SA 4.0 with the signatures stripped ([CODE]).
-- [ ] **Norvig's n-gram counts? (decided by the agent on 2026-11-17, to review by the maintainer)** norvig.com/ngrams
-      gives its code under MIT but no licence for its data files, which it says are « derived from the Google Web
-      Trillion Word Corpus », distributed by the Linguistic Data Consortium under its own licence. Kept meanwhile:
-      not imported; the Leipzig and Google Books tables cover the same need.
-  1. **(recommended) Leave them out:** nothing read allows shipping counts derived from an LDC corpus.
-  2. Ask Peter Norvig under which licence the counts may ship, then import them ([CODE]).
-- [ ] **Tatoeba's full exports as count tables? (decided by the agent on 2026-11-17, to review by the maintainer)**
-      Tatoeba's sentences are CC BY 2.0 FR, whose one condition is to credit each sentence's author; a count table
-      holds no sentence, so its authors could only be credited together. Kept meanwhile: the 30,000-sentence
-      samples, which name each author on its line.
-  1. **(recommended) Import counts of every French and English sentence,** crediting « Tatoeba contributors » with
-     a link to the export that names each author ([CODE]).
-  2. The same, with the export's author list shipped beside each table ([CODE]).
-  3. Keep the samples only.
-- [ ] **Key-combination parity decisions KCD-1 to KCD-8 (2026-11-17 pass).** Kept meanwhile: each OS as it is.
-  - KCD-1, « Copy tap → combo » under symmetry: Windows writes only the earlier order's chord
-    (`KeyCombinationChordCopyRows`), macOS and Linux (shared `plan_chord_copy`) every order's own chord, which
-    shows once symmetry is turned off. 1. **(recommended)** Windows follows the shared planner. 2. The shared
-    planner writes only the owner order under symmetry.
-  - KCD-2, a program launch or the monitor Alt-Tab in a chord: refused on Windows and Linux, admitted on macOS
-    (Karabiner runs them). 1. **(recommended)** Keep macOS admitting them, with a platform reason on the chord
-    picker of Windows and Linux. 2. Refuse them on macOS too.
-  - KCD-3, a refused `[mod_combos]` delay or a non-boolean `enabled`: Linux turns every chord off, Windows and
-    macOS warn and use the declared value. 1. **(recommended)** Linux warns and uses the declared value. 2. Keep Linux failing closed.
-  - KCD-4, the one-shot Shift as a pair's tap: the Linux menu refuses it, its read admits it, Windows and macOS run
-    it. 1. **(recommended)** Linux offers it. 2. Refuse it as a pair tap everywhere.
-  - KCD-5, under symmetry the macOS menu hides the reverse-order pairs, tap and hold included, though the
-    generator still applies them. 1. **(recommended)** List every pair, as Windows and Linux; only the chord row is
-    shared. 2. Keep them hidden and stop applying their tap and hold.
-  - KCD-6, `[mod_combos] enabled` switches every key combination on macOS, only the chords on Windows and Linux.
-    1. **(recommended)** macOS reads `category_enabled.key_combinations` as its master and `[mod_combos] enabled`
-       as the chords only, with a migration. 2. Windows and Linux read `[mod_combos] enabled` as the master.
-  - KCD-7, a pair or chord across two keyboards: Linux refuses it, Windows and macOS admit it.
-    1. **(recommended)** Keep it, with a platform reason. 2. Linux admits it.
-  - KCD-8, the pair rows: summary, empty word, slot order and grouping differ on each OS.
-    1. **(recommended)** All follow Windows (tap, hold, chord; a submenu per first key; the chord in the summary).
-    2. Leave each OS's menu as it is.
-- [ ] **Parity decisions THD-1 to THD-4 and HCD-1, HCD-2, HCD-4, HCD-5.** Tap-holds
-      ([report](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): THD-1 the pair tap and the layer, THD-2
-      the lone window, THD-3 layer-hold pair activity, THD-4 the macOS thumb Backspace under modifiers. Hotstring
-      cascade ([report](docs/audits/platform-parity/2026-11-11-hotstring-cascade/report.md)): HCD-1 an expired best
-      candidate (macOS falls to a lower rule), HCD-2 a bare `:` or `;` ends a trigger on macOS only, HCD-4 the delay
-      on `@` tags, HCD-5 an uppercase one-letter tag (privacy). Each report names the default kept meanwhile.
