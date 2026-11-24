@@ -4533,6 +4533,27 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		}
 		check(refused, `levels: ${what} was not refused`);
 	}
+	// (levels-cache-rows-2026-11-24) A copy sharing a checked layout's levels
+	// (the optimizer's trials, Object.assign) that types on a key holding its
+	// modifier was taken: the levels' cache skipped the rows. Neo 2 with x on
+	// Caps Lock, its Mod3, is refused.
+	const neoCopy = byId.get('neo2_new');
+	let typedOnMod3 = false;
+	try {
+		E.analyse(
+			Object.assign({}, neoCopy, {
+				id: 'neo_caps',
+				rows: Object.assign({}, neoCopy.rows, {
+					CapsLock: ['x'].concat(neoCopy.rows.KeyA.slice(1).map(() => null))
+				})
+			}),
+			text,
+			{}
+		);
+	} catch (error) {
+		typedOnMod3 = /types on CapsLock, which holds its modifier mod3/.test(error.message);
+	}
+	check(typedOnMod3, 'levels: a copy of Neo 2 types on Caps Lock, which holds its Mod3');
 }
 
 if (errors.length > 0) {
