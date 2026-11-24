@@ -45,15 +45,13 @@ every maintainer request here.
 Everything is on `dev` (tip `78fa30d1fa`); `v1.0.10-dev.178` is published. Stable `v1.0.10` waits for the
 maintainer, who will try `dev.178` on the Mac first: never push `main` without their explicit go.
 
-- [ ] **[CI] Read the two runs queued on `dev`** (`88310973bc`, then `78fa30d1fa`) and turn any red green. Never
-      verified on a runner yet: the Swift lease fix (`fix(macos): keep the inner's FENCED queued behind a socket
-    hang-up`, new XCTest `testParentEOFKeepsFencedQueuedBehindHangupAfterStaleReadyRead`, no Swift toolchain in the
-      cloud container), the Windows `TEST_NATIVE_SETTLE_TIMEOUT_MS` waits (15 AHK tests), the Ubuntu APT and
-      Playwright download retries, and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by
-      Runner » is GitHub capacity: rerun the failed jobs, do not move it to Intel.
-- [ ] **[CI] Same 5xx retry for the other CI scripts that read the GitHub API** (`tools/ci/run-timing.cjs`,
-      `site-deploy-admission.cjs`, `validate-js-feature-results.cjs`), as `readWithServerRetry` in
-      `tools/ci/site-verdict.cjs` now does; one 502 cost a whole verdict on 2026-11-23.
+- [ ] **[CI] Read the next complete `dev` run** and turn any red green. Run 45289220983 (`88310973bc`) had one
+      red, the Windows updater source seal, resealed by `470a83a50b`; run 45292696642 (`282f8c1192`) stopped at the
+      formatting of this file. Never verified on a runner yet: the Swift lease fix (XCTest
+      `testParentEOFKeepsFencedQueuedBehindHangupAfterStaleReadyRead`, no Swift toolchain in the cloud container), the
+      Windows `TEST_NATIVE_SETTLE_TIMEOUT_MS` waits (15 AHK tests), the Ubuntu APT and Playwright download retries,
+      and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by Runner » is GitHub capacity:
+      rerun the failed jobs, do not move it to Intel.
 - [ ] **[Windows] Short waits left after the flaky-test pass:** child fixtures that cannot read the test constant
       (`tests/fixtures/user_command_lifecycle_owner_body.ahk:137`, `worker_live_foreground_body.ahk:71`) and the named
       per-file limits (`SRTOW_*`, `_UER_NATIVE_WAIT_MS`, `_TDCR_NATIVE_WAIT_MS`, `CALO_READER_WAIT_MS`,
