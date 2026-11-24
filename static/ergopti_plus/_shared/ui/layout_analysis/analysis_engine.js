@@ -407,6 +407,9 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} [profile] - A fingering profile (fingeringProfile): its
 	 *   base fingering, finger of each key and home key of each finger replace
 	 *   the keyboard's own; absent, the model's defaults.
+	 * @param {boolean} [withOptional] - Whether the board keeps the model's
+	 *   optional_keys (Tab, Enter, the right Control), which only a layout that
+	 *   types on one of them is measured with (boardFor); absent, without them.
 	 * @returns {object} {id, codes, index: Map code → i, finger, order, hand,
 	 *   row, relRow (row relative to the finger's home key), x, y, width (in key units), home,
 	 *   lateral, outer, homeOf: finger → key index}.
@@ -414,9 +417,11 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   that is not on the board or not pressed by its own finger (a shared
 	 *   home key, the space bar, rests both thumbs).
 	 */
-	function keyboard(keyboardId, profile) {
+	function keyboard(keyboardId, profile, withOptional) {
 		const checked = profile === undefined ? null : fingeringProfile(profile);
-		const cacheKey = checked ? `${keyboardId}|${JSON.stringify(checked)}` : keyboardId;
+		const cacheKey =
+			(checked ? `${keyboardId}|${JSON.stringify(checked)}` : keyboardId) +
+			(withOptional ? '|optional' : '');
 		if (keyboardCache.has(cacheKey)) return keyboardCache.get(cacheKey);
 		const { model, geometry } = data();
 		const spec = model.keyboards[keyboardId];
@@ -448,6 +453,9 @@ var LAYOUT_ANALYSIS = (function () {
 		// macOS, and keys further away: idle_thumb_keys) are no typing keys: a
 		// layout's characters there are on a key the board lacks.
 		const idle = new Set(model.idle_thumb_keys);
+		// Tab, Enter and the right Control are keys only for the layouts that
+		// type on them: the others keep the board they always had.
+		const optional = new Set(withOptional ? [] : model.optional_keys);
 		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
 			id: keyboardId,
@@ -469,7 +477,7 @@ var LAYOUT_ANALYSIS = (function () {
 			outer: []
 		};
 		for (const [code, fingerId] of Object.entries(fingering)) {
-			if (idle.has(code)) continue;
+			if (idle.has(code) || optional.has(code)) continue;
 			// A board key: its centre already, no row stagger to remove.
 			const g = board3d
 				? board3d.keys[code] && {
@@ -793,17 +801,29 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The keys a layout only holds: heldCodes but a held key it types on
+	 * (TypeMatrix's a on Caps Lock), which a drawing shows as a character key.
+	 * @param {object} layout - Library shape.
+	 * @returns {string[]} KeyboardEvent codes.
+	 */
+	function heldCodesOf(layout) {
+		return heldCodes().filter((code) => !(layout.rows[code] || []).some((cell) => cell !== null));
+	}
+
+	/**
 	 * The keys a layout types characters on: every finger-assigned key but the
-	 * held modifiers, the thumb keys, then the board-only keys (board_only_keys:
-	 * the ErgoDox's keys without a KeyboardEvent code, measured on that board
-	 * only). The codes layoutFromComposerSource keeps.
+	 * modifiers every board has (Shift, AltGr; Caps Lock, a held key, is typed
+	 * on by a layout that holds no level there), the optional keys among them
+	 * (Tab, Enter, the right Control), the thumb keys, then the board-only keys
+	 * (board_only_keys: the ErgoDox's keys without a KeyboardEvent code,
+	 * measured on that board only). The codes layoutFromComposerSource keeps.
 	 * @param {object} [model] - analysis_model.json; the loaded data's when absent
 	 *   (the codegen passes it before the data exists).
 	 * @returns {string[]} KeyboardEvent codes, then the board-only codes.
 	 */
 	function typingCodes(model) {
 		const m = model || data().model;
-		const modifiers = new Set(heldCodes(m));
+		const modifiers = new Set(Object.values(m.modifier_keys));
 		const thumbs = new Set(m.thumb_keys);
 		return Object.keys(m.fingerings.standard)
 			.filter((code) => !modifiers.has(code))
@@ -2109,17 +2129,52 @@ var LAYOUT_ANALYSIS = (function () {
 	// ==========================
 
 	/**
-	 * The keyboard a layout is measured on: an angle-mod layout uses the angle
-	 * fingering of an ISO board.
+	 * The keyboard a layout is measured on (layoutKeyboard: an angle-mod
+	 * layout uses the angle fingering of an ISO board, the optional keys only
+	 * for a layout typing on one, unless withOptional says), less its left
+	 * thumb's spare keys (layoutBoard).
 	 */
-	function boardFor(layout, keyboardId, profile) {
-		// A profile with its own base fingering decides; otherwise an angle-mod
-		// layout on an ISO board takes the angle fingering.
-		const board =
-			keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base)
-				? keyboard('iso_angle', profile)
-				: keyboard(keyboardId, profile);
-		return layoutBoard(board, layout);
+	function boardFor(layout, keyboardId, profile, withOptional) {
+		return layoutBoard(checkedLayoutKeyboard(layout, keyboardId, profile, withOptional), layout);
+	}
+
+	/**
+	 * Whether a layout types on one of the model's optional keys (Tab, Enter,
+	 * the right Control), which only its board then has.
+	 * @param {object} layout - Library shape.
+	 * @returns {boolean}
+	 */
+	function typesOnOptionalKeys(layout) {
+		return data().model.optional_keys.some((code) =>
+			(layout.rows[code] || []).some((cell) => cell !== null)
+		);
+	}
+
+	/**
+	 * The keyboard a layout is measured and drawn on, before its left thumb's
+	 * spare keys are taken off (layoutBoard): a profile with its own base
+	 * fingering decides, else an angle-mod layout on an ISO board takes the
+	 * angle fingering; the board has the optional keys (Tab, Enter, the right
+	 * Control) only when the layout types on one of them.
+	 * @param {object} layoutInput - Library shape.
+	 * @param {string} keyboardId - A key of model.keyboards.
+	 * @param {object} [profile] - A fingering profile.
+	 * @returns {object} From keyboard().
+	 */
+	function layoutKeyboard(layoutInput, keyboardId, profile) {
+		return checkedLayoutKeyboard(layoutFromRows(layoutInput), keyboardId, profile);
+	}
+
+	/**
+	 * layoutKeyboard for a layout layoutFromRows already checked (boardFor's);
+	 * withOptional, when given, decides instead of the layout whether the board
+	 * keeps the optional keys (a score session keeps its first layout's).
+	 */
+	function checkedLayoutKeyboard(layout, keyboardId, profile, withOptional) {
+		const optional = withOptional === undefined ? typesOnOptionalKeys(layout) : withOptional;
+		return keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base)
+			? keyboard('iso_angle', profile, optional)
+			: keyboard(keyboardId, profile, optional);
 	}
 
 	const layoutBoardCache = new WeakMap();
@@ -3492,7 +3547,10 @@ var LAYOUT_ANALYSIS = (function () {
 		const table = prepareNgrams(ngrams);
 		const keyboardId = opts.keyboard || DEFAULT_KEYBOARD;
 		const firstLayout = layoutFromRows(layoutInput);
-		const board = boardFor(firstLayout, keyboardId, opts.profile);
+		// A trial that empties the first layout's Tab or Enter keeps its board:
+		// an unpressed key changes no metric.
+		const optional = typesOnOptionalKeys(firstLayout);
+		const board = boardFor(firstLayout, keyboardId, opts.profile, optional);
 		const forms = compactForms(opts.format, opts.formWeights);
 		const formMissing = forms.map((form) => new Set(form.missing));
 		// The corpus's characters as ids, and its n-grams as id lists: an array
@@ -3705,7 +3763,7 @@ var LAYOUT_ANALYSIS = (function () {
 
 		function trial(layoutInput) {
 			const layout = layoutFromRows(layoutInput);
-			if (boardFor(layout, keyboardId, opts.profile) !== board)
+			if (boardFor(layout, keyboardId, opts.profile, optional) !== board)
 				throw new Error('layout_analysis: a score session keeps the board it started on');
 			// The compiled ways hold each level's modifier keys (levelTable).
 			if (layout.levels !== firstLayout.levels || layout.modifiers !== firstLayout.modifiers)
@@ -7770,6 +7828,7 @@ var LAYOUT_ANALYSIS = (function () {
 		ACCESS_WEIGHTS,
 		LAYER_IDS,
 		heldCodes,
+		heldCodesOf,
 		AnalysisError,
 		KEY_EVENTS,
 		KEY_COST_METRICS,
@@ -7781,6 +7840,7 @@ var LAYOUT_ANALYSIS = (function () {
 		SFS_DISTANCE_SHARE,
 		hashText,
 		keyboard,
+		layoutKeyboard,
 		fingeringProfile,
 		layoutFromRows,
 		levelsOf,

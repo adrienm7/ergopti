@@ -103,6 +103,10 @@
  *    AltGr where ANSI has no key right of left Shift), a level whose key the
  *    board lacks types nothing, the pages write « Mod4+ », a score session
  *    keeps its levels, and malformed levels are refused.
+ * 19. Optional keys: Tab, Enter and the right Control are on a layout's
+ *    board only when it types on one (ISO Enter on its lower part), Caps Lock
+ *    is typed on by a layout holding no level there; KLA's TypeMatrix,
+ *    BvoFRak (ANSI), Arensito and AOEYK type their characters there.
  * ==============================================================================
  */
 
@@ -1746,7 +1750,11 @@ for (const layout of library) {
 		{
 			layout: 'qwerty',
 			options: { weights: { sfb_distance: 0.4, pinky_ring: 3 }, floors: { sfs: 1 } }
-		}
+		},
+		// q on Tab and a on Caps Lock (standard-board-character-keys-2026-11-24):
+		// a swap that empties Tab keeps the session's board, and an unpressed
+		// key changes no metric of the full analysis on its board without Tab.
+		{ layout: 'typematrix', options: {} }
 	];
 	let trials = 0;
 	let planned = 0;
@@ -1781,11 +1789,8 @@ for (const layout of library) {
 			walks[`${id}:${trial.walk}`] = (walks[`${id}:${trial.walk}`] || 0) + 1;
 			compiles[`${id}:${trial.compile}`] = (compiles[`${id}:${trial.compile}`] || 0) + 1;
 			const parsed = E.layoutFromRows(candidate);
-			const board = E.keyboard(
-				(options.keyboard || 'iso') === 'iso' && parsed.fingering === 'angle'
-					? 'iso_angle'
-					: options.keyboard || 'iso'
-			);
+			// The session's board: the start layout's (its fingering, its Tab key).
+			const board = E.layoutKeyboard(byId.get(id), options.keyboard || 'iso');
 			const whole = waysText(E.compileWays(parsed, board, null));
 			if (waysText(trial.compiled) !== whole) {
 				check(false, `incremental: ${id} swap ${s} compiles other ways than a whole compile`);
@@ -4595,6 +4600,83 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		typedOnMod3 = /types on CapsLock, which holds its modifier mod3/.test(error.message);
 	}
 	check(typedOnMod3, 'levels: a copy of Neo 2 types on Caps Lock, which holds its Mod3');
+}
+
+// ===================================
+// ======= 19/ Optional keys =========
+// ===================================
+
+{
+	// (standard-board-character-keys-2026-11-24) KLA's TypeMatrix, BvoFRak
+	// (ANSI), Arensito and AOEYK type on Tab, Caps Lock, Enter and the right
+	// Control, which had no code of a typing key: their files stayed out.
+	// Tab, Enter and the right Control are optional keys (on a layout's board
+	// only when it types on one), Caps Lock a held key a layout typing on it
+	// keeps as a character key.
+	const optional = ['Tab', 'Enter', 'ControlRight'];
+	for (const id of ['iso', 'ansi', 'ortho', 'iso_angle', 'jis', 'abnt'])
+		check(
+			optional.every((code) => !E.keyboard(id).index.has(code)) &&
+				optional.every((code) => E.layoutKeyboard(byId.get('arensito_kla'), id).index.has(code)),
+			`optional keys: ${id} has them for every layout, or not for one typing on Enter`
+		);
+	check(
+		E.layoutKeyboard(byId.get('qwerty'), 'iso') === E.keyboard('iso'),
+		'optional keys: a layout typing on none of them is not measured on the ISO board'
+	);
+	for (const code of ['Tab', 'CapsLock', 'Enter', 'ControlRight'])
+		check(E.typingCodes().includes(code), `optional keys: ${code} is no typing code`);
+	// ISO Enter is pressed on its lower part, level with the home row; ANSI's
+	// is a home-row key; Tab is the left pinky's, Enter and the right Control
+	// the right pinky's.
+	for (const id of ['iso', 'ansi']) {
+		const board = E.layoutKeyboard(byId.get('arensito_kla'), id);
+		const at = (code) => board.index.get(code);
+		check(
+			board.row[at('Enter')] === board.row[at('KeyA')] &&
+				board.finger[at('Enter')] === board.finger[at('Semicolon')] &&
+				board.finger[at('Tab')] === board.finger[at('KeyA')] &&
+				board.finger[at('ControlRight')] === board.finger[at('Semicolon')],
+			`optional keys: ${id} Enter row ${board.row[at('Enter')]}, fingers ` +
+				`${board.finger[at('Tab')]} ${board.finger[at('Enter')]} ${board.finger[at('ControlRight')]}`
+		);
+	}
+	// Each file's characters there, typed and complete on ISO and ANSI; on a
+	// board without the key (the Corne), a letter there makes the layout
+	// incomplete.
+	for (const [id, code, cells] of [
+		['typematrix', 'Tab', 'qQ'],
+		['typematrix', 'CapsLock', 'aA'],
+		['bvofrak1_kla', 'Tab', 'qQ'],
+		['arensito_kla', 'Enter', 'àÀ|'],
+		['aoeyk', 'ControlRight', '\\|']
+	]) {
+		const row = byId.get(id).rows[code] || [];
+		check(
+			row.filter((cell) => cell !== null).join('') === cells,
+			`optional keys: ${id} ${code} holds ${JSON.stringify(row)}, its KLA file ${cells}`
+		);
+		for (const keyboard of ['iso', 'ansi']) {
+			const result = E.analyse(byId.get(id), prepared, { keyboard });
+			check(
+				!result.incomplete &&
+					!result.coverage.missingKeys.includes(code) &&
+					(code === 'ControlRight' || result.keys[code].presses > 0),
+				`optional keys: ${id} on ${keyboard} does not type on ${code}`
+			);
+		}
+	}
+	const corne = E.analyse(byId.get('typematrix'), prepared, { keyboard: 'corne' });
+	check(
+		corne.incomplete && corne.coverage.missingRequired.join('') === 'aqAQ',
+		`optional keys: TypeMatrix on the Corne lacks ${corne.coverage.missingRequired.join('')}`
+	);
+	// A drawing shows Caps Lock as a key of the layouts typing on it only.
+	check(
+		!E.heldCodesOf(byId.get('typematrix')).includes('CapsLock') &&
+			E.heldCodesOf(byId.get('qwerty')).includes('CapsLock'),
+		'optional keys: heldCodesOf keeps Caps Lock for TypeMatrix, or drops it for QWERTY'
+	);
 }
 
 if (errors.length > 0) {

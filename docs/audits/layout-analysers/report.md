@@ -882,6 +882,18 @@ incomplete there, as on the boards without thumb keys. VCKB and VCKB2 stay
 out: they also type d (and l) on the right 2-unit outer key, the board's
 AltGr, a modifier with no code for a character.
 
+The same day KLA's four standard-board files came in (791 layouts, decided by
+the agent, to review by the maintainer): Tab, Enter and the right Control are
+optional keys of the row-staggered boards, on the board of a layout typing on
+one of them only, and Caps Lock a typing key for a layout holding no level
+there (docs/design/layout-analysis.md, « Optional keys »). TypeMatrix (q on
+Tab, a on Caps Lock: QWERTY drawn for the TypeMatrix's middle column, −171.9
+on Don Quichotte), BvoFRak 1.0 FR (ANSI) (its ISO copy's q on Tab instead of
+the key left of Z), the full Arensito (à on Enter) and AOEYK (\ on the right
+Control) are complete on ISO and ANSI; the 787 layouts held before keep every
+value on the eleven keyboards, bit for bit. The optimizer offers those keys
+only when its start layout types there.
+
 Values, proved by dumping every metric, score and cost of every layout on
 the eleven keyboards and two corpora (French Nemolivier, the first 300 000
 characters, and English Alice) before and after:
@@ -917,7 +929,7 @@ characters, and English Alice) before and after:
   the thumb-letter layouts, 41 of those 50 moved, Blickensderfer 5 left them
   and 26 new ones joined.
 
-The library holds 787 layouts.
+The library holds 791 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

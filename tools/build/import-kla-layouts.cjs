@@ -24,9 +24,10 @@
  * 2. Whole layouts: a KLA file states every key and level, so its entry keeps
  *    them (`rows`) instead of an alphabetic block the codegen completes.
  * 3. No silent loss: a file with characters on keys the library's keyboard
- *    model has no code for (TypeMatrix's middle column, a modifier key of the
- *    standard board; every ErgoDox key has one, its board-only keys
- *    included), or that places a letter twice, is not imported; a thumb key
+ *    model has no code for (a modifier key of the standard board but Tab,
+ *    Caps Lock, Enter and the right Control; every ErgoDox key has one, its
+ *    board-only keys included), or that places a letter twice, is not
+ *    imported; a thumb key
  *    drawing only KLA's action signs (⌦ ⇞) types nothing and loses nothing.
  *    Every file left out is listed in `not_imported` with its reason.
  * 4. One entry per arrangement: a file with the same letters on the same keys
@@ -298,9 +299,8 @@ function classify(klaDir) {
 				credits[sameAs] = { authors: [author.trim()], url: linkOf(json) };
 			continue;
 		}
-		// What the board has no code for: TypeMatrix's middle column, a
-		// character on a modifier key; an ErgoDox thumb key's action signs type
-		// nothing.
+		// What the board has no code for: a character on a modifier key; an
+		// ErgoDox thumb key's action signs type nothing.
 		const lost = unmapped
 			.filter((entry) => entry.what === 'key')
 			.flatMap((entry) => entry.detail.replace(/^\d+ \(|\)$/g, '').split(' '))
