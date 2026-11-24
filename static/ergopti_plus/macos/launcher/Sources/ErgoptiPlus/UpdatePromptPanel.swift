@@ -28,6 +28,8 @@ private final class UpdatePromptAction: NSObject {
 @MainActor
 final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegate {
 	private static let contentWidth: CGFloat = 400
+	/// Space between the window's edges and its content, on every side.
+	static let contentMargin: CGFloat = 20
 
 	private var panel: NSPanel?
 	private var actions: [UpdatePromptAction] = []
@@ -168,10 +170,28 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		stack.orientation = .vertical
 		stack.alignment = .leading
 		stack.spacing = 12
-		stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+		stack.translatesAutoresizingMaskIntoConstraints = false
 
+		// The stack is pinned inside a plain content view on all four sides.
+		// As the window's own content view it took the window's autoresizing
+		// frame, so a row wider than the frame computed before layout (the
+		// progress bar, a long localized button row) ran into the right edge
+		// with no margin.
+		let content = NSView()
+		content.addSubview(stack)
+		NSLayoutConstraint.activate([
+			stack.topAnchor.constraint(equalTo: content.topAnchor, constant: Self.contentMargin),
+			stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: Self.contentMargin),
+			content.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: Self.contentMargin),
+			content.bottomAnchor.constraint(equalTo: stack.bottomAnchor, constant: Self.contentMargin),
+		])
+
+		// Measured before the view enters the window: a content view takes
+		// fixed autoresizing constraints from the window's frame, which would
+		// win over the rows' own widths.
+		let size = content.fittingSize
 		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth + 40, height: 120),
+			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.titled, .closable],
 			backing: .buffered,
 			defer: false)
@@ -180,8 +200,7 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		panel.hidesOnDeactivate = false
 		// Normal level: the prompt is ordered front (and focused when the user
 		// asked for it), never kept above the windows the user opens next.
-		panel.contentView = stack
-		panel.setContentSize(stack.fittingSize)
+		panel.contentView = content
 		panel.delegate = self
 		panel.center()
 		self.panel = panel

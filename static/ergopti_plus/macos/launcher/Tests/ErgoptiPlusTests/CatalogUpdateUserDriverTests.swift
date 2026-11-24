@@ -305,6 +305,27 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		} as? NSPanel, "the updater must create a real native panel")
 	}
 
+	/// The stack of rows the panel's content view holds.
+	private func contentStack(of panel: NSPanel) throws -> NSStackView {
+		return try XCTUnwrap(panel.contentView?.subviews.compactMap { $0 as? NSStackView }.first,
+			"the panel's content view holds its stack of rows")
+	}
+
+	/// Every row ends at least the panel margin before the window's right
+	/// edge: the field report of 2026-11-24 showed the progress bar and the
+	/// French button row touching it.
+	private func assertMargins(of panel: NSPanel, _ label: String) throws {
+		let content = try XCTUnwrap(panel.contentView)
+		content.layoutSubtreeIfNeeded()
+		let margin = UpdatePromptPanel.contentMargin
+		for row in try contentStack(of: panel).arrangedSubviews {
+			let frame = row.convert(row.bounds, to: content)
+			XCTAssertGreaterThanOrEqual(frame.minX, margin - 0.5, "\(label): a row starts inside the left margin")
+			XCTAssertLessThanOrEqual(frame.maxX, content.bounds.width - margin + 0.5,
+				"\(label): a row ends inside the right margin")
+		}
+	}
+
 	func testEveryLocaleUsesBareUpdaterHeadingsAndSharedNativePanelCaptions() throws {
 		_ = NSApplication.shared
 		let presenter = UpdatePromptPanel()
@@ -320,7 +341,8 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			presenter.present(offer.prompt, activate: false) { answers.append($0) }
 			let offerPanel = try newNativePanel(since: previous)
 			XCTAssertEqual(offerPanel.title, try Self.nativeCaption(bareOffer), "\(code) native offer caption")
-			let stack = try XCTUnwrap(offerPanel.contentView as? NSStackView)
+			let stack = try contentStack(of: offerPanel)
+			try assertMargins(of: offerPanel, "\(code) offer")
 			let heading = try XCTUnwrap(stack.arrangedSubviews.first as? NSTextField)
 			XCTAssertEqual(heading.stringValue, bareOffer, "native chrome branding does not alter the heading")
 			XCTAssertEqual(offerPanel.level, .normal, "an updater window must not be topmost")
@@ -332,6 +354,7 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			presenter.showProgress(progress, fraction: nil, onCancel: {}, onClose: nil)
 			let progressPanel = try newNativePanel(since: previous)
 			XCTAssertEqual(progressPanel.title, try Self.nativeCaption(bareProgress), "\(code) native progress caption")
+			try assertMargins(of: progressPanel, "\(code) progress")
 			presenter.closeAll()
 		}
 		XCTAssertTrue(answers.isEmpty, "caption updates and programmatic closes never consent to a download")
@@ -347,7 +370,7 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			fraction: nil, onCancel: { cancellations += 1 }, onClose: nil)
 		let panel = try newNativePanel(since: previous)
 		XCTAssertEqual(panel.title, try Self.nativeCaption("Update"))
-		let stack = try XCTUnwrap(panel.contentView as? NSStackView)
+		let stack = try contentStack(of: panel)
 		let bar = try XCTUnwrap(stack.arrangedSubviews.compactMap { $0 as? NSProgressIndicator }.first)
 		XCTAssertEqual(bar.accessibilityLabel(), "Checking", "the bar is named by its step (a11y-update-progress-label)")
 		presenter.showProgress(UpdateProgressText(title: "Mise à jour", message: "Downloading", cancelTitle: "Cancel"),

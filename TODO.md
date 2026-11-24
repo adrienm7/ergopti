@@ -64,7 +64,7 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
 - [ ] **[macOS] Check `dev.178` on the Mac** (then move what stays open to TODO-tests-macos.md with its field
       point): no hammer icon in the menu bar, rounded icon in Quick Look, Accessibility guidance names
       ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not
-      installed, AltGr and Shift+AltGr are emulated once a layout is chosen, no « Aggregate cache recovery failed »
+      installed, AltGr and Shift+AltGr are emulated once a layout is chosen, the update window keeps a right margin beside its progress bar and its button row (fixed 2026-11-24), no « Aggregate cache recovery failed »
       or `%s` in the log.
 - [ ] **[Maintainer] Questions left open:** the Tap-Holds warning dot stays the shared yellow 🟡 (orange asked
       once, not confirmed); keystats day-by-day aggregate publication shipped, review welcome.
