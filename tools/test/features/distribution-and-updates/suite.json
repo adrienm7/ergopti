@@ -706,6 +706,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-app-icon-shape.cjs"],
 			"repro": "npm run test:macos-app-icon-shape"
+		},
+		{
+			"id": "app-metadata",
+			"ordinal": 729,
+			"name": "every package shows the LICENSE copyright, the website and the description from one metadata source",
+			"cmd": "node",
+			"args": ["tools/test/test-app-metadata.cjs"],
+			"repro": "npm run test:app-metadata"
 		}
 	]
 }
