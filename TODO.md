@@ -445,21 +445,6 @@ The [coverage and remaining-work register](docs/platform-parity-audit.md#review-
 and the campaign reports under [docs/audits/platform-parity/](docs/audits/platform-parity/) record what is done.
 Native receiving stays unqualified everywhere; the real-machine scenarios are in the TODO-tests files.
 
-- [ ] **[CODE] Layout capabilities left open (maintainer request 2026-11-19, « installer, retirer, émuler, petits
-      changements sur les 3 OS »).** The audit and its matrix are in
-      [platform-parity-audit.md](docs/platform-parity-audit.md#layout-capabilities--november-19-2026); every gap it
-      listed is fixed (LCP-05 to LCP-08) and `test-layout-capability-contract.cjs` pins each path. LCP-09 (2026-11-22):
-      Hyprland now installs, switches and takes the number-row options live through `hyprctl keyword` with a read-back,
-      selected again at the next session; Sway, niri and river are refused with a named reason
-      (`layout_manager.failure_session_unsupported`; Sway reports no layout ids, so a refused layout could not be put
-      back); a Hyprland configuration reload selects the recorded layout again (`configreloaded` on the event
-      socket, `hyprland_reload_watch.lua`). Left, real machine
-      only: the steps of TODO-tests-windows.md (remove a Studio DLL from the layout manager, re-save a source under
-      another `dll_name`) and TODO-tests-linux.md (an X11 layout loaded again after a new session, the Hyprland
-      selection). Decided with the
-      recommended option: under an emulated layout of another family, the accented keys keep that layout's Command
-      level on Windows and Linux; macOS draws no letter picker and says so in its reason.
-
 - [ ] **[CODE] Parity audit continuation.** Take one bounded module at a time across Windows, macOS, Linux and shared;
       do not restart a finished campaign without source drift or a new hypothesis. The
       [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`: 190 areas, 108
@@ -470,6 +455,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       prompts, metrics views, small native units, layout tool pages (the census report's ninth section) and timing
       engines. Every finding they opened is fixed or decided (`docs/memory/maintainer-decisions.md`). Left:
   - SFC-06 (Credential Manager inside `explorer.exe`): field path only, no fix possible by process name;
+  - the Linux note's folder and dated choice (`platform_reason.take_note_settings_are_windows`, `not_yet`);
   - OLL-06, one Ollama readiness bound once the cold start is measured on a quiet PC (field checks); the unpacked
     sizes of `ollama_release.json` are provisional (three times the archive): run
     `node tools/build/pin-ollama-release.cjs --archives <folder> --write` in CI on the five pinned archives and
