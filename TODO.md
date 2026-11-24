@@ -85,14 +85,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
   groups, WSL Lua suites, interactive desktop checks); prefer CI on temporary `ci/verify-<sha>` branches (deleted
   after reading). After each agent: remove its worktree and scratch files; purge stale scratch dirs, WSL `/root`
   copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
-- [ ] **CI reds left after verify run 44072500520** (decisions taken 2026-11-17):
-  - macOS Intel « managed Ollama build handoff never arrived »: maintainer decision: make the consuming cell
-    `needs` the Intel build job and update `macos-stage-contract.json` with its review. Done locally on
-    2026-11-18: both managed Ollama builds run in their own job `e2e-ollama-build`, which `e2e-hs` and Build
-    need (stage roles, admission, contract and tests updated); confirm on the next run that « macOS / E2E tests
-    (Managed Ollama build (macOS 15, Intel)) » ends before « macOS / E2E tests (Managed Ollama (macOS 15,
-    Intel)) » starts and that the receiver admits the handoff on its first poll.
-  - Re-read the first complete run after these; keylayout owner pin and Menus « cold command section » to confirm.
 - [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
       `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
       similar magic thresholds (boot operation ceilings, literal ratchets where they only count) with budgets that
@@ -619,35 +611,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       time once `public_key_spki_base64` is provisioned: the step-4 check of
       [update-signing](docs/tooling/update-signing.md) (a real feed-only install on Windows and Linux, the log saying
       the signature verified, an older row refused), then enforcement `required`.
-- [ ] **[CI] Number-row cohort still selects in the XCTest process (macOS).** The refused restores were not a stale
-      test-process cache: the TIS probe (`probe-macos-tis-cache.yml`) left HIToolbox's own current layout
-      (`AppleCurrentKeyboardLayoutInputSourceID`, read by every process, the launcher included) on the old source while
-      the selected list moved, 3 times in about 5,900 steps of a process that is an application and selects, under a
-      storm of selection notifications, and never when a plain child selected (runs 44025301586, 44029045918);
-      re-selecting the already-selected source does not repair it. The shared `KeyboardSourceSelectionFixture` now
-      selects through the launcher's headless role, and refusals name `system_current_layout_stale` or
-      `process_current_source_stale` from the recorded system layout. Left: `NumberRowSourceProbeTests.swift` keeps
-      its own in-process selection because its bytes are the reviewed image `number_row_current_test_causal.py` pins
-      (`CURRENT_TEST_SHA`); moving it to the shared fixture needs that review renewed. No retry is added. Renewal
-      accepted by the maintainer on 2026-11-21, pending integration: 685cec9b89 (branch
-      `agent/macos-number-row-xctest-review-candidate`, review notes in its message) drops the suite's private copy of the fixture (lines 19-72: the 5 s bound, the observed-selection
-      loop, `selectAndObserve`'s in-process `TISSelectInputSource`, the restoration-observed guard) for
-      `KeyboardSourceSelectionFixture.withSelectedSource`, which runs the same phases (`original.capture`, `select`,
-      `restore.inner`, `restore.outer`) and refusal messages; the twelve methods and every assertion stay, the causal
-      `XCTAssertThrowsError` moves from line 435 to 339, and the fixture's source scan now covers this file. The
-      counterfactual is still the sole `NEEDLE` omission of `NumberRowSourceProbe.swift`, so the expected red stays
-      one « did not throw error » in `testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject`. Left:
-      the reviewer renews the image (« Maintainer decisions pending »), then CI proves it in ci-macos.yml's
-      `e2e-hs` (« E2E tests ») lots of role managed-ollama-native, step « Qualify actual selected number-row Carbon
-      XCTest controls » (twelve cases, seven TIS closures restored).
-- [ ] **[CI] Prove the number-row cohort's shared-fixture selection on macOS.** The XCTest process left HIToolbox's
-      current layout (`AppleCurrentKeyboardLayoutInputSourceID`) on the old source 3 times in about 5,900 steps when
-      it selected itself (runs 44025301586, 44029045918). Since 22e1017c6a (image accepted by the maintainer on
-      2026-11-21, [decision](docs/memory/maintainer-decisions.md)) `NumberRowSourceProbeTests.swift` selects through
-      `KeyboardSourceSelectionFixture` and the launcher's headless role, as `KeyboardSourceProbeTests`; no retry is
-      added. Left: the first macOS CI run after the push proves it in ci-macos.yml's `e2e-hs` (« E2E tests ») lots of
-      role managed-ollama-native, step « Qualify actual selected number-row Carbon XCTest controls » (twelve cases,
-      seven TIS closures restored); close this item on that green run.
 
 ## Carried over from the 1.0.9 requests
 
@@ -903,17 +866,10 @@ Each closes on a named green hosted or native run, recorded here.
       `golang.org/x/sys/unix` on Linux and macOS); pin x/sys v0.37.0 there only if it does not (no `require` is added
       meanwhile, since CI runs with `GOPROXY=off`).
 - [ ] **[CI] Intermittent fixtures.** Close each once it stays green over further runs; no known code is left:
-  - Linux: the window switch, the cffi-lua clone, desktop-webview AI focus, and desktop-webview « The privacy owner
-    follows real GTK fields on the accessibility bus » (failed once in 43611736406; its fixture may need the ready-file
-    wait the secure-field probe got);
   - Windows: the `config` group, including the config-transition timer custody (bound 2048,
     `test-windows-config-timer-custody-bound.cjs`) and one `run_llm_model_browser` watchdog on
     `model-browser-native-json` (43347126427, not reproduced; all four `config-*` groups, the bound check and
-    `run_llm_model_browser.ahk` passed three times in a row locally on 2026-11-18, so only hosted runs are left);
-  - macOS: Go `TestIdleDeadlinePhysicallyRetiresPeer` and `TestCancellationAndConcurrentClosePhysicallyRetirePeer`
-    (Intel Managed Ollama, fixed with its `slow-start` case), Swift
-    `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`, and the Install-and-launch
-    `symlink_logs_dir` Quit timeout (once in 42929436137, unexplained).
+    `run_llm_model_browser.ahk` passed three times in a row locally on 2026-11-18, so only hosted runs are left).
 
 ## Maintainer decisions pending
 
@@ -922,8 +878,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
 
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
-- [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending
-      integration.
 - [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
       maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
       most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
