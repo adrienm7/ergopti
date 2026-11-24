@@ -221,6 +221,17 @@ for (const file of SCRIPTS)
 const E = vm.runInContext('LAYOUT_ANALYSIS', sandbox);
 const S = vm.runInContext('LAYOUT_ANALYSER_SCORES', sandbox);
 const MODELS = vm.runInContext('LAYOUT_ANALYSIS_DATA', sandbox).analysers;
+
+/**
+ * A text's tables as a shipped text corpus carries them: its n-grams and the
+ * counts only the text gives some analysers (genkey's and Oxeylyzer's
+ * skipgrams of every gap).
+ * @param {string} text - The corpus text.
+ * @returns {object} ngramsFromText() output with its `analysers` counts.
+ */
+function textNgrams(text) {
+	return Object.assign(E.ngramsFromText(text), { analysers: S.textTables(text) });
+}
 const library = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 
 /** One library layout, or an error naming it. */
@@ -396,7 +407,7 @@ ${out.slice(-600)}`
 			// Each layout's block of statistics ends with its Score line.
 			const blocks = out.split(/^Score: .*$/m).slice(0, OXEYLYZER_LAYOUTS.length);
 			const tables = E.prepareNgrams(
-				E.ngramsFromText(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
+				textNgrams(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
 			);
 			const line = OXEYLYZER_LAYOUTS.map((layout, k) => {
 				const ours = S.score('oxeylyzer', libraryLayout(layout), tables, { keyboard: 'ortho' });
@@ -524,7 +535,7 @@ function verifyGenkey(exe, data) {
 			for (const m of run(['rank']).matchAll(/^(.*?)\s+(-?[0-9.]+)\s*$/gm))
 				theirs.set(m[1].trim(), Number(m[2]));
 			const tables = E.prepareNgrams(
-				E.ngramsFromText(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
+				textNgrams(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'))
 			);
 			const line = [];
 			for (const { layout } of files) {

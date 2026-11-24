@@ -58,6 +58,15 @@ unit, parts}`; `value` is `null` for an analyser without a score.
   default) or `custom` (see « Two fingerings »).
 - `scoreAll(layout, ngrams, {keyboard, profile})` → `{id: {official, custom}}`,
   sharing the per-layout work between scorers.
+- `textTables(text)` → `{genkey: {skipgrams}, oxeylyzer: {chars, totals,
+bigrams, skipgrams}}`: the counts only a text gives, genkey's skipgrams of
+  gaps 1 to 9 and Oxeylyzer's token pairs of gaps 1 to 3 with its exact
+  totals (pairs holding its Shift token counted in the totals only). Set as
+  `analysers` on that text's tables, the two scorers read them instead of the
+  trigrams' chain. The codegen ships them in every text corpus (about 46 KB
+  per corpus, 1.43 MB in all, against 5.93 MB for character pairs of gaps 2
+  to 9), and the Comparer counts them from the user's own text; word lists and
+  count tables have no text to count them from and keep the chain.
 
 `layout` is the engine's library shape; `keyboard` is the engine's (`iso`,
 `iso_angle`, `ansi`, `ortho`), mapped to each analyser's own boards below. In
@@ -312,8 +321,10 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
   base layer only.
 - **Skipgrams.** genkey counts a pair of characters g apart (g = 1 to 9,
   every character between them kept, the count reset at a line end) with the
-  weight 1/2^(g−1). The tables hold the gap of 1 (the trigrams); the longer
-  gaps are carried forward by the trigrams' second-order chain, P(c | ab) =
+  weight 1/2^(g−1). A text corpus carries them, counted from its text as
+  genkey's reader does (`textTables`, since 2026-11-24). A word list or a count
+  table holds the gap of 1 only (the trigrams): there the longer gaps are
+  carried forward by the trigrams' second-order chain, P(c | ab) =
   trigram(abc) / bigram(ab), computed once per corpus. The bigram also counts
   the runs that end after b, so a run's end stops the chain as genkey's reset
   does; the chain is exact when each pair of characters has one continuation.
@@ -326,7 +337,11 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
   0.0005, LSB within 0.005. An own transcription of the formula fed with
   genkey's exact skipgrams gives its output to 9 decimals, so the skipgram
   chain is the whole gap left (finger speed per finger within 0.1 on average,
-  1.6 at most, the pinkies, whose low speed magnifies it). Before
+  1.6 at most, the pinkies, whose low speed magnifies it). Since 2026-11-24
+  a text corpus carries genkey's own skipgrams, so that gap is gone on the
+  text corpora by construction; the run against genkey itself
+  (`verify-analyser-scores.cjs --genkey`) is still to redo before the
+  fidelity on a text can read `exact`. Before
   2026-11-19, a key whose character genkey's corpus filter substitutes (the
   `"` of Engram, read as `'`) took the place of the key the corpus reaches,
   though genkey's layout reader only lower-cases: 1.4 % on average, 9.9 % at
@@ -373,8 +388,12 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   by the trigrams' second-order chain across longer runs: blank lines,
   indentation), so its token totals come within a few counts of its own
   (_Alice_: 121 146.4 characters for its 121 144, 68 326.5 trigrams for its
-  68 337). Two approximations remain. The tables hold no skip-2 or skip-3
-  grams, so skip-1 stands for them (about 0.002 on the score). Oxeylyzer saves
+  68 337). Two approximations remained, both gone on a text corpus since
+  2026-11-24: it carries Oxeylyzer's own bigrams, skipgrams of gaps 1 to 3
+  and totals, counted from its text (`textTables`); its trigrams still come
+  from the chain, stored on the exact total. On a word list or a count table,
+  skip-1 stands for skip-2 and skip-3 (about 0.002 on the score), and the
+  truncation below is averaged. Oxeylyzer saves
   each count as a share of its table and reads it back truncated: whether a
   count loses one depends on the bits of the table's exact total, from 7 % of
   the n-grams to 73 % (its trigrams of the Python text), so a total the chain
@@ -387,7 +406,10 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   0.08 (0.30). Before that, the Shift token after a dropped character (a
   capital starting a word) was missing from the totals and the skipgrams
   through Shift were missing: 0.0057 on average (0.028 at most, Canary).
-  Gate: hand-computed from the source (`the` 0.1333, `decided` −6.3314 on
+  The run against the REPL is still to redo with these counts. Gate (every
+  vector read with its text's counts, as a text corpus ships them, and
+  `textTables` hand-counted on two short texts): hand-computed from the
+  source (`the` 0.1333, `decided` −6.3314 on
   the staggered board, −6.0214 on ortho) and the REPL's own output on short
   texts with capitals (`dEd` −2.28, `A Dog ran` 0.174, `sat. A Dog` −0.2) and
   with Shift held across line breaks (QWERTY 0.264, Colemak 0.206; 0.251 and
@@ -581,7 +603,10 @@ the Keyboard Layout Optimizer's `finger_repeats` (SFB with distance) and
   a French corpus and QWERTY otherwise.
 
 Longer skipgrams (genkey's gaps 1 to 9 weighted 1/2^(g−1), Oxeylyzer's 1 to 3
-weighted (1/7)^g) stay out: the corpus format has uni-, bi- and trigrams only.
+weighted (1/7)^g) stay out of the Ergopti score; the two scorers of this page
+read them from each text corpus's `analysers` counts (see « API »), counted in
+the analyser's own token stream, where one character is one key. For our own
+metrics, the corpus format keeps uni-, bi- and trigrams only.
 Measured on 2026-11-19, character pairs at gaps 2 and 3 would add 1.26 MB to
 the 9.2 MB of corpus files (about 40 % of each of the 25 text corpora: 57 KB
 on Don Quichotte's 148 KB) and gaps 2 to 9 5.93 MB (about 185 %), while the 12

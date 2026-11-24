@@ -1922,9 +1922,17 @@ var LAYOUT_ANALYSIS = (function () {
 			uni: split(ngrams.chars, 1),
 			bi: split(ngrams.bigrams, 2),
 			tri: split(ngrams.trigrams, 3),
-			breaks: null
+			breaks: null,
+			analysers: null
 		};
 		prepared.totalChars = prepared.uni.reduce((sum, entry) => sum + entry[1], 0);
+		// The counts some analysers read from the text itself
+		// (LAYOUT_ANALYSER_SCORES.textTables), when the table has them.
+		if (ngrams.analysers !== undefined) {
+			if (!ngrams.analysers || typeof ngrams.analysers !== 'object')
+				throw new Error('layout_analysis: analysers must be an object');
+			prepared.analysers = ngrams.analysers;
+		}
 		// The n-grams with a line break or a tab (ngramsFromText), when the
 		// table has them; only the analysers that type Enter and Tab read them.
 		if (ngrams.breaks !== undefined) {

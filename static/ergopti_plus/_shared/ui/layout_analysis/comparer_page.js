@@ -1488,10 +1488,19 @@
 				state.custom = null;
 			} else {
 				const hash = E.hashText(trimmed);
-				if (!state.custom || state.custom.hash !== hash || !state.custom.words)
+				// A text saved before its analysers' own counts (genkey's and
+				// Oxeylyzer's skipgrams of every gap) is counted again.
+				if (
+					!state.custom ||
+					state.custom.hash !== hash ||
+					!state.custom.words ||
+					!state.custom.tables.analysers
+				)
 					state.custom = {
 						hash,
-						tables: E.ngramsFromText(trimmed),
+						tables: Object.assign(E.ngramsFromText(trimmed), {
+							analysers: window.LAYOUT_ANALYSER_SCORES.textTables(trimmed)
+						}),
 						words: E.wordsFromText(trimmed)
 					};
 			}
