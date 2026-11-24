@@ -96,6 +96,7 @@ end
 local HotCounter  = require("hotstrings.ui.menu.counter")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
+local MenuReadingFont = require("menu.ui.builder.reading_font")
 local Labels      = require("menu.engine.labels")
 
 
@@ -939,6 +940,13 @@ function M.generate(ctx, menu_mods, actions)
 	if type(compose_download) ~= "function"
 		or compose_download({ download = _dl_item and { _dl_item } or {}, body = rendered }) ~= true then
 		Logger.error(LOG, "Declared download root composition refused.")
+	end
+
+	-- The reading font draws the titles too (maintainer decision 2026-11-24),
+	-- before the pill measures the widest one. A failure keeps the system font.
+	local ok_font, font_err = pcall(MenuReadingFont.apply, rendered)
+	if not ok_font then
+		Logger.error(LOG, string.format("Error drawing the menu in the reading font: %s.", tostring(font_err)))
 	end
 
 	-- This is the single highest-blast-radius call in the whole build pipeline:

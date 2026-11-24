@@ -29,12 +29,18 @@ local M = {}
 -- =================================
 -- =================================
 
---- The comparable text of a row title.
+--- The comparable text of a row title. A styled title (the macOS menu drawn
+--- in a reading font, hs.styledtext) compares by its characters, so a click
+--- path names the same row whatever font the menu was drawn in.
 --- @param title any Row title.
 --- @return string
 function M.title_text(title)
 	if type(title) == "string" then return title end
 	if title == nil then return "" end
+	if type(title) == "userdata" or type(title) == "table" then
+		local ok, text = pcall(function() return title:getString() end)
+		if ok and type(text) == "string" then return text end
+	end
 	return tostring(title)
 end
 
