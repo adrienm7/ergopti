@@ -43,7 +43,6 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const http = require('node:http');
 const path = require('node:path');
 const { collectOutline, outlineProblems } = require('../lib/heading-landmarks.cjs');
 const { walkProblems } = require('../lib/keyboard-walk.cjs');
@@ -53,6 +52,8 @@ const operability = require('../lib/keyboard-operability.cjs');
 const appChecks = require('../lib/app-window-checks.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
+// The loopback server and the fake native host every app window test shares.
+const { serveStatic, installFakeHost } = require('../lib/app-window-host.cjs');
 // WCAG 2.2 level AAA is the target: the tags axe runs (A, AA and AAA).
 const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
 
@@ -81,82 +82,6 @@ const OPERABILITY_RULE = 'keyboard-operability';
 // The rule names of the keyboard operability and text alternative checks.
 const OPERABLE_RULE = 'keyboard-operable';
 const IMAGES_RULE = 'text-alternatives';
-const TYPES = {
-	'.html': 'text/html',
-	'.js': 'text/javascript',
-	'.mjs': 'text/javascript',
-	'.css': 'text/css',
-	'.json': 'application/json',
-	'.svg': 'image/svg+xml',
-	'.png': 'image/png',
-	'.woff2': 'font/woff2',
-	'.toml': 'text/plain'
-};
-
-/**
- * Serves static/ read-only on loopback, as the hosts' virtual hosts serve a window.
- * @param {number} port - 0 for any free port.
- */
-function serve(port) {
-	const server = http.createServer((request, response) => {
-		const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-		const file = path.resolve(STATIC_ROOT, pathname.slice(1));
-		if (
-			!file.startsWith(STATIC_ROOT + path.sep) ||
-			!fs.existsSync(file) ||
-			!fs.statSync(file).isFile()
-		) {
-			response.writeHead(404);
-			response.end();
-			return;
-		}
-		response.setHeader('Content-Type', TYPES[path.extname(file)] || 'application/octet-stream');
-		fs.createReadStream(file).pipe(response);
-	});
-	return new Promise((resolve, reject) => {
-		server.once('error', reject);
-		server.listen(port, '127.0.0.1', () => resolve(server));
-	});
-}
-
-/**
- * The fake host, run in the page before its own scripts: the seed the real
- * hosts prepend (locale), the bridge of one driver family, and a message log.
- * A fixture's host function, when it has one, answers each message the page
- * posts, as the native host does with ExecuteScript / evaluateJavaScript.
- * @param {{bridge: string, family: string, locale: string, host: string|null}} seed
- */
-function installFakeHost(seed) {
-	window._i18n_locale = seed.locale;
-	window.__hostMessages = [];
-	// The fixture's answer, compiled from its source in the page's own realm.
-	const answer = seed.host ? (0, eval)('(' + seed.host + ')') : null;
-	const receive = (raw) => {
-		let message = raw;
-		if (typeof raw === 'string')
-			try {
-				message = JSON.parse(raw);
-			} catch (_) {
-				message = raw;
-			}
-		window.__hostMessages.push(message);
-		if (answer) setTimeout(() => answer(message), 0);
-	};
-	if (seed.family === 'windows')
-		window.chrome = {
-			webview: {
-				postMessage: receive,
-				addEventListener() {},
-				removeEventListener() {}
-			}
-		};
-	else
-		window.webkit = {
-			messageHandlers: {
-				[seed.bridge]: { postMessage: (payload) => receive(JSON.parse(JSON.stringify(payload))) }
-			}
-		};
-}
 
 /**
  * Describes the focused element, or null when the focus is outside the
@@ -382,7 +307,7 @@ function statesOf(target) {
  */
 async function auditWindows(chromium, windows, family, port) {
 	const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-	const server = await serve(port);
+	const server = await serveStatic(STATIC_ROOT, port);
 	const origin = `http://127.0.0.1:${server.address().port}`;
 	const browser = await chromium.launch();
 	const findings = [];
