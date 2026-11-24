@@ -538,6 +538,9 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include ui/update_check/init.ahk
 #Include diagnostics/engine/reports/crash_reporter.ahk
 #Include core/text/engine/json.ahk
+; After the reading preferences (ui/changelog/init.ahk) and the JSON reader,
+; before the boot calls TrayMenuFont_Init.
+#Include tray/adapters/menu_font.ahk
 #Include settings/engine/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk
@@ -857,6 +860,8 @@ LoggerInit()
 ErrorDialog_Init(_IniCache)
 ; The windows' font and spacing, read before any window can open
 ReadingPrefs_Init(_IniCache)
+; The tray menu draws in that font too, before the tray is first shown
+TrayMenuFont_Init()
 ManagedNetworkFailureWindows_Init()
 ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),

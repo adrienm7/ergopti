@@ -403,6 +403,7 @@ InstallHotstringHooks()
 #Include ../adapters/mouse_control.ahk
 #Include ../core/ui/adapters/graphics_renderer.ahk
 #Include ../tray/adapters/notify_icon.ahk
+#Include ../tray/adapters/menu_font.ahk
 #Include ../core/ui/ui/spotlight/ownership.ahk
 #Include ../core/process/adapters/shell_runner.ahk
 #Include ../../_shared/shortcuts/data/actions/brightness.ahk
@@ -1435,6 +1436,7 @@ global _AhkSubDir := ""
 #Include unit/platform/system/test_accessibility.ahk
 #Include unit/platform/system/test_native_keyboard_walk.ahk
 #Include unit/tray/test_notify_icon.ahk
+#Include unit/tray/test_menu_font.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../menu/engine/command_origin.ahk
 #Include unit/menu/test_command_origin.ahk
