@@ -905,7 +905,7 @@ _LLM_Deps_State := "ready"
 #Include ../ui/layout_manager/source_store.ahk
 #Include ../ui/layout_manager/kbd_register_core.ahk
 #Include ../diagnostics/ui/field_check/network_check.ahk
-#Include ../diagnostics/ui/field_check/run_all.ahk
+#Include ../diagnostics/ui/field_check/field_report.ahk
 #Include ../core/network/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
@@ -917,7 +917,7 @@ _LLM_Deps_State := "ready"
 #Include unit/hotstrings/engine/expander/test_kbd_register.ahk
 #Include unit/modules/keymap/test_layout_source_emulation.ahk
 #Include unit/diagnostics/ui/test_network_check.ahk
-#Include unit/diagnostics/ui/test_field_check_all.ahk
+#Include unit/diagnostics/ui/test_field_report.ahk
 #Include unit/hotstrings/engine/expander/test_ergopti_keylayout_tables.ahk
 #Include unit/modules/keymap/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,

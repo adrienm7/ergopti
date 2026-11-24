@@ -33,6 +33,17 @@
 ;    (core/timing/engine/reload_timing.ahk, launch to boot complete) and runs
 ;    the next step. A reload refused, or accepted and never started, fails by
 ;    name; a run with no usable resume file is closed as interrupted.
+; 7. In-app run (maintainer decision, 2026-11-24): Débogage's « Lancer le
+;    field report » hands the session its field check steps in-process
+;    (SubmitInApp), with no request file, and watches it through an observer:
+;    each step's start and result, then the end of the run. The results land in
+;    the same files as a collector's run. Without a clone (an installed
+;    driver) the session is started on demand on the installed folder the
+;    shared protocol declares (folder.windows, FieldRun_StartInApp). The timed
+;    reload is left out (it ends the driver that shows the run) and listed back
+;    as not run; the person can cancel the run, which closes it as interrupted.
+;    The macOS and Linux sessions share the same rules
+;    (_shared/diagnostics/engine/field_run/in_app.lua).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -73,7 +84,7 @@ FieldRun_LoadProtocol(Path) {
 	if !(Spec is Map) || Spec.Get("schema", 0) != 1
 		throw Error("The field run protocol has an unsupported shape.")
 	for Key in ["files", "max_request_bytes", "request_id_pattern", "step_id_pattern", "code_pattern",
-			"verdicts", "reasons", "step_kinds", "folder", "steps_file", "all_steps"]
+			"verdicts", "reasons", "step_kinds", "folder", "steps_file", "all_steps", "in_app_prefix"]
 		if !Spec.Has(Key)
 			throw Error("The field run protocol lacks " . Key . ".")
 	for Kind in ["ready", "request", "refused", "running", "results", "accepted", "done", "resume"]
@@ -200,12 +211,13 @@ FieldRun_Code(Spec, Text) {
 	return ((Text is String) && RegExMatch(Text, Spec["code_pattern"])) ? Text : "redacted"
 }
 
-; The verdict and codes of a finished tray check report (ComposerCheck_NewReport).
+; The verdict and codes of a finished tray check report (ComposerCheck_NewReport);
+; the report itself goes on to the in-app run's observer.
 _FieldRun_ReportOutcome(Spec, Report, Done) {
 	Codes := []
 	for Step in Report["steps"]
 		Codes.Push(FieldRun_Code(Spec, Step["id"] . "_" . Step["state"] . (Step["value"] != "" ? ":" . Step["value"] : "")))
-	Done.Call(ComposerCheck_Passed(Report) ? "pass" : "fail", Codes)
+	Done.Call(ComposerCheck_Passed(Report) ? "pass" : "fail", Codes, Report)
 }
 
 /**
@@ -572,13 +584,15 @@ class FieldRunSession {
 		this.Publish(this.Path("refused"), Refusal)
 	}
 
-	Begin(Request, Dir) {
+	; Observer: the in-app run's (SubmitInApp), 0 for a collector's request.
+	Begin(Request, Dir, Observer := 0) {
 		Ids := []
 		for Step in Request["steps"]
 			Ids.Push(Step["id"])
 		this.Run := {Request: Request, Dir: Dir, Index: 0, Verdicts: Map(), Order: [],
 			StartedAt: _FieldRun_IsoNow(), StartTick: A_TickCount,
-			DeadlineTick: A_TickCount + Request["deadline_seconds"] * 1000, ActiveStep: 0, Reloading: false}
+			DeadlineTick: A_TickCount + Request["deadline_seconds"] * 1000, ActiveStep: 0, Reloading: false,
+			Observer: Observer}
 		this.Publish(this.Path("running"), Map("schema", this.Spec["schema"], "request_id", Request["request_id"]))
 		this.Publish(Dir . "\" . this.Spec["files"]["accepted"], Map("schema", this.Spec["schema"],
 			"request_id", Request["request_id"], "pid", this.Pid, "steps", Ids,
@@ -603,6 +617,7 @@ class FieldRunSession {
 			DeadlineMs: DeadlineMs, Timer: 0}
 		Active.ActiveStep := Token
 		LoggerInfo(FIELD_RUN_TAG, "Field run step {1}/{2} '{3}' started.", Active.Index, Active.Request["steps"].Length, Step["id"])
+		this.Notify(Active, "step_started", Active.Index, Step)
 		if LeftMs <= 0
 			return this.Settle(Token, "timeout", ["request_deadline"])
 		if (Step["kind"] == "reload")
@@ -617,8 +632,11 @@ class FieldRunSession {
 		}
 	}
 
-	/** Records a step's verdict once, then starts the next step on a fresh thread. */
-	Settle(Token, Verdict, Codes) {
+	/**
+	 * Records a step's verdict once, then starts the next step on a fresh thread.
+	 * @param {Map} Report - The tray check's own report, for the in-app observer; 0 when none.
+	 */
+	Settle(Token, Verdict, Codes, Report := 0) {
 		if Token.Settled {
 			LoggerInfo(FIELD_RUN_TAG, "Field run step '{1}' answered {2} after it was settled; dropped.",
 				Token.Step["id"], Verdict)
@@ -650,6 +668,8 @@ class FieldRunSession {
 			Joined .= (Joined == "" ? "" : ",") . Code
 		LoggerEvidence(FIELD_RUN_TAG, "Field run step result: step={1} verdict={2} codes={3}", Step["id"], Verdict,
 			Joined == "" ? "none" : Joined)
+		this.Notify(Active, "step_recorded", Active.Index, Step,
+			Map("step", Step["id"], "verdict", Verdict, "codes", Clean, "report", Report))
 		SetTimer(ObjBindMethod(this, "Next"), -1)
 	}
 
@@ -674,6 +694,66 @@ class FieldRunSession {
 			LoggerWarn(FIELD_RUN_TAG, "Field run {1} cut short by a {2}; closed as interrupted.", Active.Request["request_id"], Cause)
 		else
 			LoggerSuccess(FIELD_RUN_TAG, "Field run {1} finished.", Active.Request["request_id"])
+		this.Notify(Active, "finished", Map("request_id", Active.Request["request_id"], "interrupted", Interrupted),
+			Active.Dir)
+	}
+
+	/** Tells the in-app run's observer about one event; an observer that raises never stops the run. */
+	Notify(Active, Event, Args*) {
+		Observer := Active.Observer
+		if !(Observer is Map) || !Observer.Has(Event)
+			return
+		try Observer[Event].Call(Args*)
+		catch as Err
+			LoggerError(FIELD_RUN_TAG, "The field run observer raised on {1}: {2}", Event, Err.Message)
+	}
+
+	/**
+	 * Runs the session's field check steps in-process for Débogage's « Lancer le
+	 * field report »: no request file, the same results. The other steps are
+	 * listed back as not run (the timed reload ends the driver that shows it).
+	 * @param {Map} Observer - "step_started" (Index, Step), "step_recorded" (Index,
+	 *   Step, Result), "finished" (Done, Dir); each optional.
+	 * @param {VarRef} Reason - Receives why nothing started: "busy" or "duplicate_request".
+	 * @returns {Map|Integer} "request_id", "dir", "steps", "not_run" (Array of Map step,
+	 *   reason); 0 when nothing started.
+	 */
+	SubmitInApp(Observer, &Reason) {
+		Reason := ""
+		if IsObject(this.Run) || FileExist(this.Path("request")) {
+			Reason := "busy"
+			return 0
+		}
+		Steps := [], NotRun := []
+		for Step in this.Steps["steps"] {
+			if Step["kind"] == "field_check"
+				Steps.Push(Step)
+			else
+				NotRun.Push(Map("step", Step["id"], "reason", "needs_collector"))
+		}
+		Id := this.Spec["in_app_prefix"] . FormatTime(A_NowUTC, "yyyyMMdd") . "T" . FormatTime(A_NowUTC, "HHmmss") . "Z"
+		if !RegExMatch(Id, this.Spec["request_id_pattern"])
+			throw Error("The in-app field run id breaks the shared rule: " . Id)
+		Dir := this.Path("results") . "\" . Id
+		if DirExist(Dir) {
+			Reason := "duplicate_request"
+			return 0
+		}
+		DirCreate(Dir)
+		LoggerInfo(FIELD_RUN_TAG, "In-app field run {1} requested from the menu.", Id)
+		this.Begin(Map("request_id", Id, "steps", Steps, "deadline_seconds", this.Steps["deadline"]["default"]),
+			Dir, Observer)
+		return Map("request_id", Id, "dir", Dir, "steps", Steps, "not_run", NotRun)
+	}
+
+	/** Cancels the in-app run the person stopped: it is closed as interrupted. */
+	CancelInApp() {
+		if !IsObject(this.Run) || !(this.Run.Observer is Map)
+			return false
+		Id := this.Run.Request["request_id"]
+		this.Finish(true, "cancelled")
+		LoggerInfo(FIELD_RUN_TAG, "In-app field run {1} cancelled by the person.", Id)
+		return true
 	}
 
 	; Each file is replaced whole, so the collector never reads half a document.
@@ -720,6 +800,37 @@ FieldRun_Start(CloneRoot, ReloadFn) {
 	_FieldRun := Session
 	Session.Start()
 	LoggerSuccess(FIELD_RUN_TAG, "Developer field run ready ({1} step(s)).", Steps["steps"].Length)
+}
+
+/**
+ * The field run session for Débogage's « Lancer le field report »: the running
+ * one (a developer driver), or one started on demand on the installed folder
+ * the shared protocol declares (folder.windows) with the shipped steps.
+ * @returns {FieldRunSession}
+ * @throws {Error} When the installed folder cannot be resolved or the session cannot start.
+ */
+FieldRun_StartInApp() {
+	global _FieldRun, _SharedDir, _DriverDir
+	if IsObject(_FieldRun)
+		return _FieldRun
+	LoggerStart(FIELD_RUN_TAG, "Starting the in-app field run session…")
+	Spec := FieldRun_LoadProtocol(_SharedDir . "\diagnostics\data\field_run_protocol.json")
+	Runners := FieldRun_Runners()
+	Steps := FieldRun_LoadSteps(_DriverDir . "\diagnostics\data\field_run_steps.json", Spec, Runners)
+	Installed := Spec["folder"]["windows"]
+	Base := EnvGet(Installed["base"])
+	if Base == ""
+		throw Error("The in-app field run folder is unresolved: %" . Installed["base"] . "% is empty.")
+	Folder := Base
+	for Segment in Installed["segments"]
+		Folder .= "\" . Segment
+	Session := FieldRunSession(Spec, Steps, Folder, ProcessExist(),
+		Map("poll_ms", TimingsGet("ui", "field_run_poll_ms"), "runners", Runners,
+			"reload", () => ReloadPreservingSuspend(), "reload_ms", ReloadTimingResult))
+	Session.Start()
+	_FieldRun := Session
+	LoggerSuccess(FIELD_RUN_TAG, "In-app field run session ready ({1} step(s)).", Steps["steps"].Length)
+	return Session
 }
 
 /** Retires the developer field run. */

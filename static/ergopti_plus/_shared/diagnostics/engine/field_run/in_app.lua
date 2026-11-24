@@ -20,7 +20,8 @@
 
 local M = {}
 
---- The request id prefix of an in-app run, set apart from a collector's.
+--- The request id prefix of an in-app run, set apart from a collector's: the
+--- shared protocol's in_app_prefix, which tools/test/test-field-run-protocol.cjs pins it to.
 M.PREFIX = "app-"
 
 --- Why a step of each kind is left out of an in-app run.

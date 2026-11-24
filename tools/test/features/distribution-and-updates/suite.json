@@ -613,10 +613,10 @@
 		{
 			"id": "js-0549",
 			"ordinal": 545,
-			"name": "« Test everything » runs only field checks of each driver's field run and classifies every Tests row",
+			"name": "the field report row stands before Tests and runs each driver's own field run in-app",
 			"cmd": "$NODE_EXECUTABLE",
-			"args": ["tools/test/test-field-check-all-plan.cjs"],
-			"repro": "npm run test:field-check-all-plan"
+			"args": ["tools/test/test-field-report-row.cjs"],
+			"repro": "npm run test:field-report-row"
 		},
 		{
 			"id": "js-managed-pyobjc",

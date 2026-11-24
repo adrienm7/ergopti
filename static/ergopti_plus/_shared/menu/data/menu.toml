@@ -1142,9 +1142,9 @@ type = "---"
 id = "---"
 
 # « Run the field report (every test) », just before « Tests » (maintainer
-# decision, 2026-11-24): one click runs every test of the Tests submenu, one
-# after the other, and opens one combined report. The plan of each driver is
-# _shared/diagnostics/data/field_check_all.json.
+# decision, 2026-11-24): one click hands the driver's own field run session its
+# field check steps in-app (diagnostics/engine/field_run/field_run.*), the
+# tests of the Tests submenu among them, and opens one report of its results.
 [[menu.debug_menu]]
 type = "command"
 id = "field_report"
