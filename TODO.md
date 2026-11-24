@@ -119,9 +119,14 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
     (104 of the 152 compares measured 2026-11-22) are bounded by their traced unit instead,
     `ConfigTransitionGuardCompareBudget`: two per guard at its admission and first unproven check, two per guard
     and durable effect, none per journal read. Left: `check_write:ConfigMigrateBoot<ConfigSchemaCanPrepareWrite`
-    (29, one per write-entry admission, `_ConfigSchemaEntryAdmitted` and `ConfigFullStateCanPersist`) and about 19
-    other compares; read them from the `# api-save registry compares` lines of a Windows run, give each a unit
-    counted apart from the reads, then drop the ceiling.
+    (29, one per write-entry admission, `_ConfigSchemaEntryAdmitted` and `ConfigFullStateCanPersist`) and 19
+    other compares, read from the `# api-save registry compares` lines of CI run 45495877427 (identical over its
+    four single-save modes, doubled by the two-save ones): `check_write:ConfigMigrateBoot<Func.Prototype.Call` 1,
+    `ClassifyImage<ConfigMigrateBoot` 2 per capture request and 1 per `prepare_owned` and `settle_owned`,
+    `capture_*:ConfigMigrateBoot<_ConfigTransitionGuardedProductionPort` 1 (recovery) and 2 (transition),
+    `prepare_owned:…<ConfigSchemaPrepareOwnedSource` 2, `settle_owned:…<ConfigSchemaSettleOwnedSource` 5 and
+    `settle_owned:FinalAdmission<Func.Prototype.Call` 2. Left: count the `ConfigMigrateBoot` calls of each request
+    apart from the reads, prove each owner's compares per call on a Windows run, then drop the ceiling.
   - The two Studio speed bounds (120 and 5000 table walks) rest on ratios measured with every core busy; read the
     ratio each test prints on a quiet PC and on CI, and set each bound to twice the highest.
   - Kept on purpose: order-of-magnitude bounds that state their reason (the Linux e2e 3000 tray rows against the
