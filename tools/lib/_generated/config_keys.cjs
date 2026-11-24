@@ -400,6 +400,7 @@ module.exports = Object.freeze({
 		EXTENSION_ALL_SECTIONS: "extension_all_sections",
 		EXTENSION_DISABLE_ALL: "extension_disable_all",
 		EXTENSION_ENABLE_ALL: "extension_enable_all",
+		FIELD_CHECK_ALL: "field_check_all",
 		FIELD_CHECK_KEY_ACCOUNTING: "field_check_key_accounting",
 		FIELD_CHECK_LEASE: "field_check_lease",
 		FIELD_CHECK_LOGIN_ITEMS: "field_check_login_items",

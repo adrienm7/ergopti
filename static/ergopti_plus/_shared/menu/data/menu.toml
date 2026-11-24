@@ -1149,11 +1149,22 @@ type = "group"
 id = "debug_tests"
 i18n = "menu.debug.tests"
 
-# The rows of « Tests », grouped by topic: the network, then the typing chain
-# (the composed layout, the key accounting, the two Windows input probes), then
-# the macOS Karabiner runtime and the system around it. At most seven rows reach
-# one driver (macOS), so the topics need no separator between them.
+# The rows of « Tests », grouped by topic: « Test everything » first, then the
+# network, the typing chain (the composed layout, the key accounting, the two
+# Windows input probes), then the macOS Karabiner runtime and the system around
+# it. At most eight rows reach one driver (macOS), so the topics need no
+# separator between them.
 #
+# « Test everything » runs, one after the other, every check of this driver
+# that needs no person and opens one combined report: each check's verdict, its
+# field run step and the TODO-tests field points it decides, then the Tests rows
+# to run separately. The plan of each driver is
+# _shared/diagnostics/data/field_check_all.json.
+[[menu.debug_tests_menu]]
+type = "command"
+id = "field_check_all"
+i18n = "menu.debug.field_check_all"
+
 # One-click field checks of the macOS input and network chain (issue #101, item
 # 31). The network check runs on all three drivers (macOS and Linux share its
 # steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS

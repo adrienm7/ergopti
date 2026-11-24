@@ -234,23 +234,30 @@ function M.steps_relative(steps_file)
 	return steps_file:sub(#prefix + 1)
 end
 
+--- Reads and decodes one JSON declaration; an unreadable or broken file raises.
+--- « Test everything » (diagnostics/ui/field_check/run_all.lua) reads its plan
+--- and the coverage file through it too.
+--- @param path string Absolute path.
+--- @return table
+function M.read_declaration(path)
+	local handle = require("core.fs.engine.regular_file_reader").open_source(path)
+	if not handle then error("field run: the declaration is unreadable: " .. path, 0) end
+	local read, text = pcall(handle.read, handle, "*a")
+	local closed, acknowledged = pcall(handle.close, handle)
+	if not read or type(text) ~= "string" or not closed or not acknowledged then
+		error("field run: the declaration could not be read and closed: " .. path, 0)
+	end
+	local ok, value = pcall(Json.decode, text)
+	if not ok then error("field run: the declaration is not JSON: " .. path, 0) end
+	return value
+end
+
 --- Reads and builds the declaration from the shared tree and the driver tree.
 --- @param shared_root string Absolute _shared folder.
 --- @param driver_root string Absolute Linux driver folder.
 --- @return table spec
 function M.load(shared_root, driver_root)
-	local function decode(path)
-		local handle = require("core.fs.engine.regular_file_reader").open_source(path)
-		if not handle then error("field run: the declaration is unreadable: " .. path, 0) end
-		local read, text = pcall(handle.read, handle, "*a")
-		local closed, acknowledged = pcall(handle.close, handle)
-		if not read or type(text) ~= "string" or not closed or not acknowledged then
-			error("field run: the declaration could not be read and closed: " .. path, 0)
-		end
-		local ok, value = pcall(Json.decode, text)
-		if not ok then error("field run: the declaration is not JSON: " .. path, 0) end
-		return value
-	end
+	local decode = M.read_declaration
 	local protocol = decode(shared_root .. "/" .. M.PROTOCOL_PATH)
 	local steps_file = type(protocol) == "table" and type(protocol.steps_file) == "table" and protocol.steps_file.linux
 	return M.declaration(protocol, decode(driver_root .. "/" .. M.steps_relative(steps_file)))

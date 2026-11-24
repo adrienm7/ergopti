@@ -391,6 +391,7 @@ class MenuCommand {
 	static EXTENSION_ALL_SECTIONS := "extension_all_sections"
 	static EXTENSION_DISABLE_ALL := "extension_disable_all"
 	static EXTENSION_ENABLE_ALL := "extension_enable_all"
+	static FIELD_CHECK_ALL := "field_check_all"
 	static FIELD_CHECK_KEY_ACCOUNTING := "field_check_key_accounting"
 	static FIELD_CHECK_LEASE := "field_check_lease"
 	static FIELD_CHECK_LOGIN_ITEMS := "field_check_login_items"
