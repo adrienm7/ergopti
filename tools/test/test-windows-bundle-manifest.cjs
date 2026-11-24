@@ -383,8 +383,9 @@ for (const [label, pattern] of [
 
 // Every tree a runtime root global reaches: _SharedDir, _ExtensionsDir, the
 // registry folder, _StaticDir's img/ (tray icons, flags, the onboarding assets
-// host) and favicon.ico, _VendorDir, and _DriverDir's generated files. Chains
-// that reach anywhere else are reported below instead of passing silently.
+// host) and favicon.ico, _VendorDir, and _DriverDir's PowerShell workers, field
+// run steps and generated files. Chains that reach anywhere else are reported
+// below instead of passing silently.
 const registryFolder = JSON.parse(read(LAYOUT_DEFAULTS_REL)).registry.folder;
 const UNIVERSE_PREFIXES = [
 	SHARED_REL,
@@ -398,6 +399,7 @@ const UNIVERSE_PREFIXES = [
 	`${DRIVER_REL}/ai/engine/ollama/ollama_download_archive.ps1`,
 	`${DRIVER_REL}/ai/engine/ollama/ollama-runtime-launch.ps1`,
 	`${DRIVER_REL}/ai/engine/ollama/ollama-model-pull.ps1`,
+	`${DRIVER_REL}/diagnostics/data/field_run_steps.json`,
 	`${DRIVER_REL}/_generated`
 ];
 // A generated .ahk is an #Include Ahk2Exe compiles in, like every other driver

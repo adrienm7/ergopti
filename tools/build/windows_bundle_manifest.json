@@ -56,6 +56,11 @@
 			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
 			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
 			"why": "Managed Ollama uses this stock PowerShell runtime worker from the extracted static tree."
+		},
+		{
+			"source": "static/ergopti_plus/windows/diagnostics/data/field_run_steps.json",
+			"dest": "static/ergopti_plus/windows/diagnostics/data/field_run_steps.json",
+			"why": "The Debug menu's in-app field report (FieldRun_StartInApp) reads the Windows field check steps from _DriverDir."
 		}
 	],
 	"exclude": [
@@ -315,6 +320,10 @@
 		{
 			"source": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1",
 			"dest": "static/ergopti_plus/windows/ai/engine/ollama/ollama-model-pull.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/diagnostics/data/field_run_steps.json",
+			"dest": "static/ergopti_plus/windows/diagnostics/data/field_run_steps.json"
 		}
 	]
 }
