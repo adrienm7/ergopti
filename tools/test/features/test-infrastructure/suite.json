@@ -566,7 +566,7 @@
 		},
 		{
 			"id": "js-0548",
-			"ordinal": 732,
+			"ordinal": 733,
 			"name": "Windows native test waits read the shared settle bound, children included",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-native-settle-bound.cjs"],
