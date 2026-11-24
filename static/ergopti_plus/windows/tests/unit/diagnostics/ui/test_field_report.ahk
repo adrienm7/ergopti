@@ -88,7 +88,8 @@ _TFR_Translate(Key) {
 _TFR_RowIsRouted() {
 	Body := _DriverFuncBody("_MI_BuildDebuggingMenu")
 	Assert(Body != "", "the Debug builder must exist before checking its commands")
-	AssertTrue(InStr(Body, "MenuCommand.FIELD_REPORT, (*) => FieldReport_Command(),") > 0,
+	; The driver source reads each generated constant as the string it stands for.
+	AssertTrue(InStr(Body, _DriverResolveConstants("MenuCommand.FIELD_REPORT") . ", (*) => FieldReport_Command(),") > 0,
 		"the Debug menu routes the field report row")
 	Debug := _MM_GetManifestRoot()["debug_menu"]
 	At := 0
