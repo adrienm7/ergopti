@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Instalar",
 	"karabiner.owned_install.done": "O motor de remapeamento está instalado. Se o macOS pedir, permita o driver em Definições do Sistema > Geral > Elementos de início de sessão e extensões. O Ergopti reinicia agora.",
 	"karabiner.owned_install.failed": "Não foi possível instalar o motor de remapeamento ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Não foi possível instalar completamente o motor de remapeamento ({1}). Tente novamente a partir do menu Tap-Holds: a próxima tentativa retoma o que esta deixou.",
+	"karabiner.owned_install.failed_busy": "Outra instalação do motor de remapeamento ainda está em curso neste Mac, por isso nada foi alterado ({1}). Aguarde até que termine ou reinicie o Mac e tente novamente a partir do menu Tap-Holds.",
 	"karabiner.owned_repair.title": "Reparar o motor de remapeamento do Ergopti",
 	"karabiner.owned_repair.body": "O motor de remapeamento do Ergopti está instalado, mas o seu serviço em segundo plano não está em execução. O Ergopti volta a iniciá-lo a partir da cópia instalada e pede a sua palavra-passe de administrador. Nada mais é alterado neste Mac.",
 	"karabiner.owned_repair.confirm": "Reparar",

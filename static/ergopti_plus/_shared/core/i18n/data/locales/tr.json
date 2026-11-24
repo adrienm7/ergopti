@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Yükle",
 	"karabiner.owned_install.done": "Yeniden eşleme motoru yüklendi. macOS sorarsa, Sistem Ayarları > Genel > Giriş Öğeleri ve Uzantılar’da sürücüye izin verin. Ergopti şimdi yeniden başlıyor.",
 	"karabiner.owned_install.failed": "Yeniden eşleme motoru yüklenemedi ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Yeniden eşleme motoru tamamen yüklenemedi ({1}). Tap-Holds menüsünden yeniden deneyin: sonraki deneme bunun bıraktığı yerden devam eder.",
+	"karabiner.owned_install.failed_busy": "Bu Mac’te yeniden eşleme motorunun başka bir yüklemesi hâlâ sürüyor, bu nedenle hiçbir şey değiştirilmedi ({1}). Bitmesini bekleyin veya Mac’i yeniden başlatın, ardından Tap-Holds menüsünden yeniden deneyin.",
 	"karabiner.owned_repair.title": "Ergopti’nin yeniden eşleme motorunu onar",
 	"karabiner.owned_repair.body": "Ergopti’nin yeniden eşleme motoru kurulu, ancak arka plan hizmeti çalışmıyor. Ergopti onu kurulu kopyadan yeniden başlatır ve yönetici parolanızı ister. Bu Mac’te başka hiçbir şey değiştirilmez.",
 	"karabiner.owned_repair.confirm": "Onar",

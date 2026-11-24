@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "تثبيت",
 	"karabiner.owned_install.done": "تم تثبيت محرك إعادة التعيين. إذا طلب macOS ذلك، اسمح لبرنامج التشغيل في إعدادات النظام > عام > عناصر تسجيل الدخول والامتدادات. يُعاد تشغيل Ergopti الآن.",
 	"karabiner.owned_install.failed": "تعذّر تثبيت محرك إعادة التعيين ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "تعذّر إكمال تثبيت محرك إعادة التعيين ({1}). أعد المحاولة من قائمة Tap-Holds: ستستأنف المحاولة التالية ما تركته هذه المحاولة.",
+	"karabiner.owned_install.failed_busy": "لا يزال تثبيت آخر لمحرك إعادة التعيين قيد التشغيل على هذا الـ Mac، لذا لم يُغيَّر أي شيء ({1}). انتظر حتى ينتهي أو أعد تشغيل الـ Mac، ثم أعد المحاولة من قائمة Tap-Holds.",
 	"karabiner.owned_repair.title": "إصلاح محرك إعادة التعيين الخاص بـ Ergopti",
 	"karabiner.owned_repair.body": "محرك إعادة التعيين الخاص بـ Ergopti مثبّت، لكن خدمته في الخلفية لا تعمل. يعيد Ergopti تشغيلها من النسخة المثبّتة ويطلب كلمة مرور المسؤول. لا يتغيّر أي شيء آخر على هذا الـ Mac.",
 	"karabiner.owned_repair.confirm": "إصلاح",

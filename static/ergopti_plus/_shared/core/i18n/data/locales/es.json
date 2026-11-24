@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Instalar",
 	"karabiner.owned_install.done": "El motor de reasignación está instalado. Si macOS lo pide, permite el controlador en Ajustes del Sistema > General > Ítems de inicio y extensiones. Ergopti se reinicia ahora.",
 	"karabiner.owned_install.failed": "No se pudo instalar el motor de reasignación ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "No se pudo instalar por completo el motor de reasignación ({1}). Vuelva a intentarlo desde el menú Tap-Holds: el siguiente intento retoma lo que este dejó.",
+	"karabiner.owned_install.failed_busy": "Otra instalación del motor de reasignación sigue en curso en este Mac, así que no se ha cambiado nada ({1}). Espere a que termine o reinicie el Mac y vuelva a intentarlo desde el menú Tap-Holds.",
 	"karabiner.owned_repair.title": "Reparar el motor de reasignación de Ergopti",
 	"karabiner.owned_repair.body": "El motor de reasignación de Ergopti está instalado, pero su servicio en segundo plano no está en marcha. Ergopti lo vuelve a iniciar desde la copia instalada y pide su contraseña de administrador. No se cambia nada más en este Mac.",
 	"karabiner.owned_repair.confirm": "Reparar",

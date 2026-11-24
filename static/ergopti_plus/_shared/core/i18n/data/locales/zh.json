@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "安装",
 	"karabiner.owned_install.done": "重映射引擎已安装。如果 macOS 提示，请在 系统设置 > 通用 > 登录项与扩展 中允许该驱动。Ergopti 现在重新启动。",
 	"karabiner.owned_install.failed": "无法安装重映射引擎（{1}）。",
+	"karabiner.owned_install.failed_cleanup_pending": "无法完整安装重映射引擎（{1}）。请从 Tap-Holds 菜单重试：下一次尝试会接着处理这次留下的内容。",
+	"karabiner.owned_install.failed_busy": "这台 Mac 上仍有另一个重映射引擎安装正在进行，因此未做任何更改（{1}）。请等待其完成或重启 Mac，然后从 Tap-Holds 菜单重试。",
 	"karabiner.owned_repair.title": "修复 Ergopti 的重映射引擎",
 	"karabiner.owned_repair.body": "Ergopti 的重映射引擎已安装，但其后台服务未在运行。Ergopti 会从已安装的副本重新启动它，并请求您的管理员密码。此 Mac 上的其他内容不会被更改。",
 	"karabiner.owned_repair.confirm": "修复",

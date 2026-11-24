@@ -21,6 +21,9 @@
 --- 5. Service Repair: « Réparer le service » (MRT-004) asks and reports the
 ---    same way for an installed runtime whose service is not loaded, with its
 ---    own texts and the facade's repair_owned_runtime.
+--- 6. Actionable Failures: an install left half-way, or stopped because
+---    another one is running, says what to do next; the detail stays in
+---    parentheses for the diagnostics (field report 2026-11-24).
 --- ==============================================================================
 
 local M = {}
@@ -40,6 +43,13 @@ local REASON = require("platform.remap.runtime_install").REASON
 -- ======= 1/ Internal helpers =========
 -- =====================================
 
+-- The failure text a reason has instead of the plain one, when its offer
+-- defines it: what to do after an install left half-way or met another one.
+local FAILED_TEXT_BY_REASON = {
+	[REASON.CLEANUP_PENDING] = "failed_cleanup_pending",
+	[REASON.BUSY] = "failed_busy",
+}
+
 -- The two offers: their facade operation, their texts and their log wording.
 -- Each key is spelt whole, so the translation audit sees every one in use.
 local OFFERS = {
@@ -47,6 +57,8 @@ local OFFERS = {
 		title = "karabiner.owned_install.title", body = "karabiner.owned_install.body",
 		confirm = "karabiner.owned_install.confirm", done = "karabiner.owned_install.done",
 		failed = "karabiner.owned_install.failed",
+		failed_cleanup_pending = "karabiner.owned_install.failed_cleanup_pending",
+		failed_busy = "karabiner.owned_install.failed_busy",
 	} },
 	repair = { operation = "repair_owned_runtime", name = "service repair", texts = {
 		title = "karabiner.owned_repair.title", body = "karabiner.owned_repair.body",
@@ -73,8 +85,8 @@ end
 --- @return boolean scheduled
 local function report(offer, ok, reason, detail, reload)
 	if not ok and reason == REASON.CANCELLED then return false end
-	local message = ok and i18n.get(offer.texts.done)
-		or i18n.format(offer.texts.failed, tostring(detail or reason))
+	local failed = offer.texts[FAILED_TEXT_BY_REASON[reason]] or offer.texts.failed
+	local message = ok and i18n.get(offer.texts.done) or i18n.format(failed, tostring(detail or reason))
 	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		require("core.ui.engine.dialog_util").block_alert(i18n.get(offer.texts.title), message,
 			i18n.get("common.ok"))

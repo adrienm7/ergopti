@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "התקנה",
 	"karabiner.owned_install.done": "מנוע המיפוי הותקן. אם macOS מבקש, אשר את מנהל ההתקן בהגדרות המערכת > כללי > פריטי התחברות והרחבות. Ergopti מופעל מחדש כעת.",
 	"karabiner.owned_install.failed": "לא ניתן היה להתקין את מנוע המיפוי ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "לא ניתן היה להשלים את התקנת מנוע המיפוי ({1}). נסו שוב מתפריט Tap-Holds: הניסיון הבא ימשיך מהמקום שבו ניסיון זה נעצר.",
+	"karabiner.owned_install.failed_busy": "התקנה אחרת של מנוע המיפוי עדיין פועלת ב-Mac הזה, ולכן דבר לא שונה ({1}). המתינו לסיומה או הפעילו מחדש את ה-Mac, ואז נסו שוב מתפריט Tap-Holds.",
 	"karabiner.owned_repair.title": "תיקון מנוע המיפוי של Ergopti",
 	"karabiner.owned_repair.body": "מנוע המיפוי של Ergopti מותקן, אך שירות הרקע שלו אינו פועל. Ergopti מפעיל אותו מחדש מהעותק המותקן ומבקש את סיסמת המנהל שלך. שום דבר אחר ב-Mac הזה אינו משתנה.",
 	"karabiner.owned_repair.confirm": "תיקון",

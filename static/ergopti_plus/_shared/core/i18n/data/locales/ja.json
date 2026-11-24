@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "インストール",
 	"karabiner.owned_install.done": "リマップエンジンをインストールしました。macOS に求められたら、システム設定 > 一般 > ログイン項目と機能拡張 でドライバを許可してください。Ergopti を再起動します。",
 	"karabiner.owned_install.failed": "リマップエンジンをインストールできませんでした（{1}）。",
+	"karabiner.owned_install.failed_cleanup_pending": "リマップエンジンのインストールを最後まで完了できませんでした（{1}）。Tap-Holds メニューからもう一度お試しください。次の試行で今回残された処理を引き継ぎます。",
+	"karabiner.owned_install.failed_busy": "この Mac ではリマップエンジンの別のインストールがまだ実行中のため、何も変更されていません（{1}）。完了を待つか Mac を再起動してから、Tap-Holds メニューからもう一度お試しください。",
 	"karabiner.owned_repair.title": "Ergopti のリマップエンジンを修復",
 	"karabiner.owned_repair.body": "Ergopti のリマップエンジンはインストールされていますが、バックグラウンドのサービスが動作していません。Ergopti はインストール済みのコピーからサービスを再び起動し、管理者パスワードを求めます。この Mac のほかの部分は変更されません。",
 	"karabiner.owned_repair.confirm": "修復",

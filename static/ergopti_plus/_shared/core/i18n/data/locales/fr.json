@@ -1436,6 +1436,8 @@
 	"karabiner.owned_install.confirm": "Installer",
 	"karabiner.owned_install.done": "Le moteur de remappage est installé. Si macOS le demande, autorisez le pilote dans Réglages Système > Général > Ouverture et extensions. Ergopti redémarre maintenant.",
 	"karabiner.owned_install.failed": "Le moteur de remappage n’a pas pu être installé ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Le moteur de remappage n’a pas pu être installé jusqu’au bout ({1}). Réessayez depuis le menu Tap-Holds : la tentative suivante reprend ce que celle-ci a laissé.",
+	"karabiner.owned_install.failed_busy": "Une autre installation du moteur de remappage est encore en cours sur ce Mac, donc rien n’a été modifié ({1}). Attendez qu’elle se termine ou redémarrez le Mac, puis réessayez depuis le menu Tap-Holds.",
 	"karabiner.owned_repair.title": "Réparer le moteur de remappage d’Ergopti",
 	"karabiner.owned_repair.body": "Le moteur de remappage d’Ergopti est installé, mais son service en arrière-plan ne tourne pas. Ergopti le relance à partir de la copie installée et demande votre mot de passe administrateur. Rien d’autre n’est modifié sur ce Mac.",
 	"karabiner.owned_repair.confirm": "Réparer",

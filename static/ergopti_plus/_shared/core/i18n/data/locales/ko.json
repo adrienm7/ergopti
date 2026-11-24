@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "설치",
 	"karabiner.owned_install.done": "리매핑 엔진이 설치되었습니다. macOS가 요청하면 시스템 설정 > 일반 > 로그인 항목 및 확장 프로그램에서 드라이버를 허용하세요. Ergopti가 지금 다시 시작됩니다.",
 	"karabiner.owned_install.failed": "리매핑 엔진을 설치할 수 없습니다({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "리매핑 엔진을 끝까지 설치할 수 없습니다({1}). Tap-Holds 메뉴에서 다시 시도하세요. 다음 시도에서 이번에 남은 작업을 이어서 처리합니다.",
+	"karabiner.owned_install.failed_busy": "이 Mac에서 리매핑 엔진의 다른 설치가 아직 실행 중이므로 아무것도 변경되지 않았습니다({1}). 설치가 끝날 때까지 기다리거나 Mac을 재시동한 다음 Tap-Holds 메뉴에서 다시 시도하세요.",
 	"karabiner.owned_repair.title": "Ergopti 리매핑 엔진 복구",
 	"karabiner.owned_repair.body": "Ergopti 리매핑 엔진은 설치되어 있지만 백그라운드 서비스가 실행되고 있지 않습니다. Ergopti가 설치된 사본에서 서비스를 다시 시작하고 관리자 암호를 요청합니다. 이 Mac의 다른 항목은 변경되지 않습니다.",
 	"karabiner.owned_repair.confirm": "복구",

@@ -1072,6 +1072,16 @@ SHA-256, then a closed member list, receipt last); the privileged installer
 still reads only the payload sealed in its own signed bundle, so a downloaded
 `Runtime/` tree cannot be installed without changing the artifact to the
 signed installer helper.
+No helper recovers a ledger it leaves in that folder: the install journal is
+opened with `O_CREAT | O_EXCL` and its rollback refuses a transaction past its
+publication intent, so one interrupted install made every later helper refuse
+at `OwnedRuntimeInstallJournal.swift:94` (field report 2026-11-24). The
+install's administrator shell (`OwnedRuntimeUninstall.staleRuntimeProgram`)
+retires the ledgers in `staleLedgers` and the `.runtime-install-<UUID>` stages
+after `lsof` proves no live helper holds them, and stops at `install_busy`
+otherwise. Action: a new durable ledger the first install writes goes into
+`staleLedgers` or gets its own recovery owner, in the launcher, which ships
+without a runtime rebuild.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 

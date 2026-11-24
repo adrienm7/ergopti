@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Nainstalovat",
 	"karabiner.owned_install.done": "Přemapovací jádro je nainstalováno. Pokud se macOS zeptá, povolte ovladač v Nastavení systému > Obecné > Položky a rozšíření při přihlášení. Ergopti se nyní restartuje.",
 	"karabiner.owned_install.failed": "Přemapovací jádro se nepodařilo nainstalovat ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Přemapovací jádro se nepodařilo nainstalovat celé ({1}). Zkuste to znovu z nabídky Tap-Holds: další pokus naváže na to, co tento zanechal.",
+	"karabiner.owned_install.failed_busy": "Na tomto Macu stále běží jiná instalace přemapovacího jádra, proto se nic nezměnilo ({1}). Počkejte, až skončí, nebo Mac restartujte a pak to zkuste znovu z nabídky Tap-Holds.",
 	"karabiner.owned_repair.title": "Opravit přemapovací jádro Ergopti",
 	"karabiner.owned_repair.body": "Přemapovací jádro Ergopti je nainstalováno, ale jeho služba na pozadí neběží. Ergopti ji znovu spustí z nainstalované kopie a požádá o heslo správce. Nic jiného se na tomto Macu nezmění.",
 	"karabiner.owned_repair.confirm": "Opravit",

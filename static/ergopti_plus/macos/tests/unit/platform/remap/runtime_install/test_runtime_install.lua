@@ -194,4 +194,57 @@ helpers.describe("owned runtime first install", function()
 		helpers.assert_eq(results[1], true)
 		helpers.assert_eq(results[2], true)
 	end)
+
+	-- Field report 2026-11-24: an earlier install's journal made every helper refuse at its exclusive create, and the
+	-- dialog showed only the helper's trail. The administrator shell now retires that journal, and stops before
+	-- touching anything when a live helper still holds it (stale-install-journal).
+	helpers.it("names another install still running apart from a cleanup left pending (stale-install-journal)", function()
+		local busy = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|install_busy\n" end)))
+		helpers.assert_eq(busy.reason, "install_busy")
+		helpers.assert_true(busy.detail:find("nothing was stopped or removed", 1, true) ~= nil, busy.detail)
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.REASON.BUSY, "install_busy")
+		-- The same step under another status is not the busy refusal.
+		local other = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1|install_busy\n" end)))
+		helpers.assert_eq(other.reason, "install_failed")
+		-- The step the shell names is the launcher's own constant.
+		local source = assert(require("tests.support.source_file").read(helpers.driver_root()
+			.. "/launcher/Sources/ErgoptiPlus/UninstallWorker.swift"))
+		helpers.assert_true(source:find('static let busyStep = "' .. Install.BUSY_STEP .. '"', 1, true) ~= nil,
+			"BUSY_STEP must match OwnedRuntimeUninstall.busyStep")
+	end)
+
+	helpers.it("tells the user what to do after a cleanup left pending or another install (stale-install-journal)", function()
+		local Install = require("platform.remap.runtime_install")
+		local cases = {
+			{ Install.REASON.CLEANUP_PENDING, "karabiner.owned_install.failed_cleanup_pending" },
+			{ Install.REASON.BUSY, "karabiner.owned_install.failed_busy" },
+			{ Install.REASON.FAILED, "karabiner.owned_install.failed" },
+		}
+		for _, case in ipairs(cases) do
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+			local alerts, scheduled = {}, {}
+			local dialog_util = { block_alert = function(title, body, first)
+				alerts[#alerts + 1] = { title = title, body = body }
+				return first
+			end }
+			local deferred = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end }
+			local Dialog = helpers.load_with_stubs("ai.ui.owned_runtime_install", {
+				["core.ui.engine.dialog_util"] = dialog_util,
+				["core.timing.engine.deferred_work"] = deferred,
+			})
+			package.loaded["core.ui.engine.dialog_util"] = dialog_util
+			package.loaded["core.timing.engine.deferred_work"] = deferred
+			local started = Dialog.open({
+				install_owned_runtime = function(on_done) on_done(false, case[1], "detail"); return true end,
+			}, function() error("a failed install never reloads") end)
+			helpers.assert_eq(started, true)
+			helpers.assert_eq(#scheduled, 1, case[1])
+			scheduled[1]()
+			helpers.assert_eq(alerts[2].body, case[2], case[1])
+			package.loaded["core.ui.engine.dialog_util"] = nil
+			package.loaded["core.timing.engine.deferred_work"] = nil
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+		end
+	end)
 end)

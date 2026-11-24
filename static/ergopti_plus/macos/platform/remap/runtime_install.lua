@@ -32,6 +32,12 @@
 ---    first stops the Core job and removes what an earlier install left at the
 ---    Runtime path; otherwise the helper refused every retry
 ---    (`refused-destination`, field report 2026-11-23).
+--- 9. Interrupted Installs Are Retired Too: that shell also removes the
+---    install journal and copy stages an earlier helper left, which the next
+---    helper otherwise refused forever (`refused-cleanupPending`, field report
+---    2026-11-24). A journal a live helper still holds stops it at the
+---    `install_busy` step, reported under the reason of the same name, so the
+---    user is told another install is running.
 --- ==============================================================================
 
 local M = {}
@@ -87,8 +93,14 @@ M.REASON = {
 	NOT_OFFERED = "install_not_offered",
 	-- The repair restarted part of the services and left the rest for a retry.
 	REPAIR_PENDING = "repair_pending",
+	-- A live helper still holds the journal of another install, so nothing was stopped or removed.
+	BUSY = "install_busy",
 }
 local REASON = M.REASON
+
+--- The administrator shell's step that finds another install's journal still
+--- held (OwnedRuntimeUninstall.busyStep, UninstallWorker.swift).
+M.BUSY_STEP = "install_busy"
 
 -- The administrator shell's exit statuses the helper uses (InstallerMain.swift).
 local HELPER_REFUSED = 77
@@ -179,6 +191,9 @@ local function parse_role(role, code, stdout)
 		-- Field report 2026-11-15: the driver log and the field check said only « cleanup pending »; the helper's
 		-- trail named the descriptor exhaustion that left it.
 		local traced = trail and (", trail " .. trail) or ""
+		if number == HELPER_REFUSED and step == M.BUSY_STEP then
+			return false, REASON.BUSY, "another install's helper still holds its journal, so nothing was stopped or removed"
+		end
 		if number == HELPER_REFUSED then
 			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "") .. traced, cause
 		end

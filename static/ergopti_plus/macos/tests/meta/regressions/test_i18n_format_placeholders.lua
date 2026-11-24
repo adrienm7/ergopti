@@ -62,6 +62,7 @@ helpers.describe("i18n.format texts carry no printf placeholder (i18n-format-pla
 			end
 		end
 		for _, key in ipairs({ "karabiner.owned_install.failed", "karabiner.owned_repair.failed",
+			"karabiner.owned_install.failed_cleanup_pending", "karabiner.owned_install.failed_busy",
 			"apps.cloner.python_offer.failed" }) do
 			helpers.assert_true(seen[key] == true, key .. " must be found as an i18n.format text")
 		end

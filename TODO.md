@@ -61,6 +61,19 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
 - [ ] **[macOS] Owned runtime artifact.** The admin-shell helper changes of 2026-11-23 (stale runtime retirement
       before install, refusal note `refused-<case>:<file>:<line>`) only reach users once the maintainer rebuilds
       and republishes the runtime (`16.3.0-ergopti.7`); `vendor/remap-runtime/manifest.json` is theirs to move.
+- [ ] **[macOS] Install journal left by an interrupted install** (field report 2026-11-24, dev.178,
+      `refused-cleanupPending` at `OwnedRuntimeInstallJournal.swift:94`). Fixed in the launcher: the install's
+      administrator shell retires `.runtime-install-journal`, `.runtime-service-journal` and the
+      `.runtime-install-<UUID>` stages once `lsof` shows no helper holds them (field point
+      `owned_install_stale_journal`). Left for the `.7` helper: `OwnedRuntimeInstallJournal.retireUnpublished` still
+      refuses a journal with only its header (a failure between `create()` and the stage's first record), so that
+      helper leaves cleanup pending until the next install's shell retires it.
+- [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
+      that sets no icon and so shows the engine's application icon) still showed the hammer, although
+      `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`
+      (b3c3708a80). On the Mac: `plutil -p /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist | grep -i icon`
+      and `ls …/Hammerspoon.app/Contents/Resources/*.icns`; if both are right, the icon is a stale Launch Services
+      entry of the updated bundle (`lsregister -f` on it, then restart Ergopti); otherwise fix the build step.
 - [ ] **[macOS] Check `dev.178` on the Mac** (then move what stays open to TODO-tests-macos.md with its field
       point): no hammer icon in the menu bar, rounded icon in Quick Look, Accessibility guidance names
       ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not

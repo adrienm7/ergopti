@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Installera",
 	"karabiner.owned_install.done": "Ommappningsmotorn är installerad. Om macOS frågar, tillåt drivrutinen i Systeminställningar > Allmänt > Inloggningsobjekt och tillägg. Ergopti startar om nu.",
 	"karabiner.owned_install.failed": "Ommappningsmotorn kunde inte installeras ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Ommappningsmotorn kunde inte installeras helt ({1}). Försök igen från menyn Tap-Holds: nästa försök fortsätter där det här slutade.",
+	"karabiner.owned_install.failed_busy": "En annan installation av ommappningsmotorn pågår fortfarande på den här Macen, så inget har ändrats ({1}). Vänta tills den är klar eller starta om Macen och försök sedan igen från menyn Tap-Holds.",
 	"karabiner.owned_repair.title": "Reparera Ergoptis ommappningsmotor",
 	"karabiner.owned_repair.body": "Ergoptis ommappningsmotor är installerad, men dess bakgrundstjänst körs inte. Ergopti startar den igen från den installerade kopian och ber om ditt administratörslösenord. Inget annat på den här Macen ändras.",
 	"karabiner.owned_repair.confirm": "Reparera",

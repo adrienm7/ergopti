@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Zainstaluj",
 	"karabiner.owned_install.done": "Silnik przemapowania jest zainstalowany. Jeśli macOS poprosi, zezwól na sterownik w Ustawieniach systemowych > Ogólne > Rzeczy otwierane po zalogowaniu i rozszerzenia. Ergopti uruchamia się ponownie.",
 	"karabiner.owned_install.failed": "Nie udało się zainstalować silnika przemapowania ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "Nie udało się w pełni zainstalować silnika przemapowania ({1}). Spróbuj ponownie z menu Tap-Holds: następna próba podejmie to, co pozostawiła ta.",
+	"karabiner.owned_install.failed_busy": "Na tym Macu nadal trwa inna instalacja silnika przemapowania, więc niczego nie zmieniono ({1}). Poczekaj, aż się zakończy, lub uruchom ponownie Maca, a następnie spróbuj ponownie z menu Tap-Holds.",
 	"karabiner.owned_repair.title": "Napraw silnik przemapowania Ergopti",
 	"karabiner.owned_repair.body": "Silnik przemapowania Ergopti jest zainstalowany, ale jego usługa w tle nie działa. Ergopti uruchamia ją ponownie z zainstalowanej kopii i prosi o hasło administratora. Nic innego na tym Macu nie zostaje zmienione.",
 	"karabiner.owned_repair.confirm": "Napraw",

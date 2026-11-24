@@ -1436,6 +1436,8 @@
 	"karabiner.owned_install.confirm": "Install",
 	"karabiner.owned_install.done": "The remapping engine is installed. If macOS asks, allow the driver in System Settings > General > Login Items & Extensions. Ergopti restarts now.",
 	"karabiner.owned_install.failed": "The remapping engine could not be installed ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "The remapping engine could not be fully installed ({1}). Try again from the Tap-Holds menu: the next attempt picks up what this one left behind.",
+	"karabiner.owned_install.failed_busy": "Another installation of the remapping engine is still running on this Mac, so nothing was changed ({1}). Wait for it to finish or restart the Mac, then try again from the Tap-Holds menu.",
 	"karabiner.owned_repair.title": "Repair Ergopti’s remapping engine",
 	"karabiner.owned_repair.body": "Ergopti’s remapping engine is installed, but its background service is not running. Ergopti starts it again from the installed copy and asks for your administrator password. Nothing else on this Mac is changed.",
 	"karabiner.owned_repair.confirm": "Repair",

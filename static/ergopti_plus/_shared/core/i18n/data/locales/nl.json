@@ -1441,6 +1441,8 @@
 	"karabiner.owned_install.confirm": "Installeren",
 	"karabiner.owned_install.done": "De remapping-engine is geïnstalleerd. Als macOS erom vraagt, sta het stuurprogramma toe in Systeeminstellingen > Algemeen > Inlogonderdelen en extensies. Ergopti start nu opnieuw.",
 	"karabiner.owned_install.failed": "De remapping-engine kon niet worden geïnstalleerd ({1}).",
+	"karabiner.owned_install.failed_cleanup_pending": "De remapping-engine kon niet volledig worden geïnstalleerd ({1}). Probeer het opnieuw via het menu Tap-Holds: de volgende poging gaat verder waar deze is gebleven.",
+	"karabiner.owned_install.failed_busy": "Er loopt nog een andere installatie van de remapping-engine op deze Mac, dus er is niets gewijzigd ({1}). Wacht tot die klaar is of herstart de Mac, en probeer het daarna opnieuw via het menu Tap-Holds.",
 	"karabiner.owned_repair.title": "Ergopti’s remapping-engine herstellen",
 	"karabiner.owned_repair.body": "Ergopti’s remapping-engine is geïnstalleerd, maar de achtergronddienst draait niet. Ergopti start die opnieuw vanuit de geïnstalleerde kopie en vraagt om je beheerderswachtwoord. Verder verandert er niets op deze Mac.",
 	"karabiner.owned_repair.confirm": "Herstellen",
