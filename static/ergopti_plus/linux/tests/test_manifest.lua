@@ -942,6 +942,7 @@ return {
 	"tests.unit.menu.about.test_log_openers",
 	"tests.unit.menu.hotstrings.test_extension_hotstrings",
 	"tests.unit.menu.structure.test_languages_and_global_separator",
+	"tests.unit.menu.structure.test_suspend_row",
 	"tests.unit.menu.structure.test_pause_greys_features",
 	"tests.unit.menu.structure.test_metrics_widget_menu_parity",
 	"tests.unit.menu.structure.test_metrics_availability_rows",

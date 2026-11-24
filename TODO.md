@@ -77,8 +77,7 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       log »). The bug report's warnings group ends with « Detailed log: off — turn on Debug › Detailed log and
       reproduce for more detail » while the switch is off (report_vectors.json, three ports). macOS gains the
       Windows « Suspendre » row right before « Recharger », ticked while paused; the title pill still toggles
-      (field point `tray_suspend_row`). Linux keeps its paused header row, which resumes, and has no standalone
-      pause row: to decide whether it gets one. Configuration groups its rows under « — Réinitialisation — »,
+      (field point `tray_suspend_row`). Linux draws the same row before « Recharger » (maintainer, 2026-11-24), and its paused header row still resumes. Configuration groups its rows under « — Réinitialisation — »,
       « — Fichiers et assistant — » (cleanup, paths, wizard: no more one-row group), « — Réseau — » (proxy) and
       « — Accessibilité — » (window font and spacing), the same on the three OS (field point
       `configuration_titles`).

@@ -400,7 +400,8 @@
 			"id": "suspend",
 			"i18n": "menu.global.suspend",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers",
 			"checked_when": [

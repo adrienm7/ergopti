@@ -1979,6 +1979,7 @@ function declaredLinuxNativeTray(unit, builder) {
 		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
 		["about"]           = _build_about,
+		["suspend"]         = _build_suspend,
 		["reload"]          = _build_reload,
 		["quit"]            = _build_quit,
 		["debug"]           = _build_debug,

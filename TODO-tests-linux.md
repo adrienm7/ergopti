@@ -13,6 +13,7 @@ gestures in the terminal): coverage table, verdicts and what no run can test in
 yet; the first run also proves the field run without a click (53c1766514), the report marks, and `driver_reload`
 (one daemon restart under a real user manager). Container and CI proofs are not physical evidence.
 
+- [ ] <!-- field-point: tray_suspend_row --> **« Suspendre » row (maintainer, 2026-11-24):** the tray menu shows « ⏸︎ Suspendre » right above « Recharger »; click it: the row is ticked, the header reads paused and a hotstring no longer expands; click it again, or the paused header row: the daemon resumes and the row is unticked.
 - [ ] <!-- field-point: raw_telemetry --> Raw telemetry: under X11, move, resize and maximise a window and change
       monitor: `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a
       WireGuard tunnel up then down: `events_network` holds the four Internet and VPN kinds.

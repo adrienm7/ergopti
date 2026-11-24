@@ -52,6 +52,7 @@ const PART_MODULES = new Set([
 	'menu.ui.builder.quit',
 	'menu.ui.builder.reload',
 	'ui.menu.menu_shortcuts',
+	'menu.ui.builder.suspend',
 	'ui.menu.menu_tap_holds'
 ]);
 // The root's own module name, which it spells only in its LOG source.

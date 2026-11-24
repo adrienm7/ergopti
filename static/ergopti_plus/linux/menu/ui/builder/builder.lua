@@ -232,6 +232,8 @@ local _build_about = require("ui.menu.menu_about").build
 -- Read by the tests of the About update rows.
 M._about_update_rows = _about_update_rows
 
+local _build_suspend = require("menu.ui.builder.suspend").build
+
 local _build_reload = require("menu.ui.builder.reload").build
 
 local _build_quit = require("menu.ui.builder.quit").build
@@ -338,6 +340,7 @@ function M.build(ctx)
 		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
 		["about"]           = _build_about,
+		["suspend"]         = _build_suspend,
 		["reload"]          = _build_reload,
 		["quit"]            = _build_quit,
 		["debug"]           = _build_debug,

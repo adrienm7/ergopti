@@ -128,6 +128,12 @@
 			"condition": "A slow local model; a mouse, a wheel and a touchpad."
 		},
 		{
+			"id": "tray_suspend_row",
+			"title": "Tray « Suspendre » row before Reload",
+			"checks": [],
+			"not_testable": "The row is clicked in the desktop's tray menu, which no run drives: tick it, type a hotstring (nothing expands), untick it; the row and its pause toggle are unit-tested (test_suspend_row)."
+		},
+		{
 			"id": "local_server_rows_paused",
 			"title": "The AI menu's local server rows commit while paused; only the rescan waits",
 			"checks": [],

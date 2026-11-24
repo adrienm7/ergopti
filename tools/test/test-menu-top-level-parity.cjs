@@ -130,7 +130,13 @@ const projections = {
 	ahk: projectionFor('ahk'),
 	linux: projectionFor('linux')
 };
-const shapes = new Set(Object.values(projections).map((p) => p.join(',')));
+// Compared by declaration, not id alone: since every driver draws Suspend,
+// Reload and Quit (2026-11-24), only their per-platform declarations differ.
+const declarationsFor = (driver) =>
+	(topLevel || [])
+		.filter((row) => row.id !== SEPARATOR && (!row.platforms || row.platforms.includes(driver)))
+		.map((row) => row.id + '|' + (row.i18n || '') + '|' + (row.type || ''));
+const shapes = new Set(['hs', 'ahk', 'linux'].map((driver) => declarationsFor(driver).join(',')));
 if (shapes.size === 1) {
 	errors.push(
 		'the manifest projects the same top-level menu for all three drivers. Either every platform ' +
@@ -426,7 +432,7 @@ const APPROVED_TOP_LEVEL = [
 
 const declaredTopLevel = (topLevel || []).map((row) => row.id);
 // Suspend, Reload and Quit have adjacent, disjoint native declarations: the
-// Windows row and the macOS « Suspendre » row (maintainer, 2026-11-24), and one
+// Windows row and the macOS and Linux « Suspendre » row (maintainer, 2026-11-24), and one
 // caption per platform for Reload and Quit. Pin their physical multiplicity and
 // the unchanged approved native order.
 const approvedPhysicalOrder = APPROVED_TOP_LEVEL.flatMap((id) =>
@@ -444,7 +450,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 		(id) =>
 			id !== SEPARATOR &&
 			(id !== 'apps' || APPS_DRIVERS.includes(driver)) &&
-			(id !== 'suspend' || driver === 'ahk' || driver === 'hs')
+			(id !== 'suspend' || ['ahk', 'hs', 'linux'].includes(driver))
 	);
 	if (ids.join(',') !== approved.join(',')) {
 		errors.push(
