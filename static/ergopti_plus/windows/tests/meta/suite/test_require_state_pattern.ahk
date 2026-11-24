@@ -89,11 +89,6 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; is written with the published value; a reader before boot sees "automatic", the
 	; declared empty value, by design. There is no injected state for a guard to wait on.
 	"core/network/adapters/proxy_override.ahk", true,
-	; _FieldReportBusy — a re-entrancy flag, not injected state, the twin of
-	; _ComposerCheckBusy. It starts false at its declaration, FieldReport_Command
-	; sets it for the one in-app run and that run's end clears it; a second click
-	; meanwhile only says the report is still running.
-	"diagnostics/ui/field_check/field_report.ahk", true,
 	; _LayEdWin_StudioCache — a lazy cache of the last Ergopti Studio keystats
 	; projection, keyed by the keystats folder stamp. It starts empty at its
 	; declaration and the editor window fills it after a complete worker read;

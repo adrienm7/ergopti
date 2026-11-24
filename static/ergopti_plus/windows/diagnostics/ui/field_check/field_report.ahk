@@ -50,9 +50,6 @@ global FIELD_REPORT_TAG := "FieldReport"
 ; Locale key of the row and of the report's title (the row's own label).
 global FIELD_REPORT_TITLE := "menu.debug." . MenuCommand.FIELD_REPORT
 
-; True while the in-app run goes on.
-global _FieldReportBusy := false
-
 ; The verdicts of the shared protocol, in the order the counts read.
 global FIELD_REPORT_VERDICTS := ["pass", "fail", "timeout", "skip", "needs_person", "needs_typing"]
 
@@ -568,12 +565,12 @@ _FieldReport_StepTitle(Step) {
  * @returns {Boolean} False when nothing started.
  */
 FieldReport_Command(Deps := 0, *) {
-	global _FieldReportBusy, FIELD_REPORT_TAG
+	global FIELD_REPORT_TAG
 	Real := _FieldReport_DefaultDeps()
 	if (Deps is Map)
 		for Key, Value in Deps
 			Real[Key] := Value
-	if _FieldReportBusy {
+	if _FieldReport_Busy() {
 		LoggerWarn(FIELD_REPORT_TAG, "The field report refused: it is still running.")
 		if !Real["front"].Call()
 			Real["busy"].Call(t("field_check.busy"))
@@ -627,8 +624,21 @@ _FieldReport_Finish(Deps, Progress, State, Done, Dir) {
 	}
 }
 
+/**
+ * The busy flag of the one in-app run: true while it goes on. A re-entrancy
+ * flag that starts false, held in this function rather than a module global,
+ * so there is no initialization for a state guard to wait on.
+ * @param {Boolean} Value - The new state; omitted, the flag is only read.
+ * @returns {Boolean} The flag after the call.
+ */
+_FieldReport_Busy(Value := unset) {
+	static Busy := false
+	if IsSet(Value)
+		Busy := Value
+	return Busy
+}
+
 ; Sets the busy flag of the one run.
 _FieldReport_SetBusy(Value) {
-	global _FieldReportBusy
-	_FieldReportBusy := Value
+	_FieldReport_Busy(Value)
 }
