@@ -18,6 +18,13 @@
 			"proves": "The managed download chain works: proxy settings, PAC download and verdict, route lookup, TLS trust and one transfer, with the route of each Ollama origin."
 		},
 		{
+			"id": "field_setup",
+			"kind": "field_check",
+			"check": "setup",
+			"deadline_seconds": 30,
+			"proves": "The session gives the daemon what install.sh set up: /dev/uinput writable and one evdev node readable, the systemd user unit enabled, a polkit authentication agent running, and on GNOME, KDE or COSMIC Wayland the compositor focus reporter listening."
+		},
+		{
 			"id": "driver_reload",
 			"kind": "reload",
 			"deadline_seconds": 60,

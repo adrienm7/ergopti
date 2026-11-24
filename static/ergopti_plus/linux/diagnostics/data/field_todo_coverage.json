@@ -28,7 +28,7 @@
 			"title": "Wayland focus on GNOME and KDE",
 			"checks": [
 				{
-					"step": "linux_focus_listener",
+					"step": "field_setup",
 					"report": ["focus_listening"]
 				},
 				{
@@ -43,16 +43,8 @@
 			"title": "Physical acceptance (grabs, polkit, autostart, wizard, magic key, hotplug)",
 			"checks": [
 				{
-					"step": "linux_input_access",
-					"report": ["uinput_writable", "evdev_readable"]
-				},
-				{
-					"step": "linux_autostart",
-					"report": ["unit_enabled"]
-				},
-				{
-					"step": "linux_polkit_agent",
-					"report": ["polkit_agent"]
+					"step": "field_setup",
+					"report": ["uinput_writable", "evdev_readable", "unit_enabled", "polkit_agent"]
 				},
 				{
 					"step": "linux_physical_hands"

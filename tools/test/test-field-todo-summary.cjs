@@ -170,37 +170,30 @@ check('a point no run can test says why, in the summary and the terminal', () =>
 });
 
 check('a Linux report reads the field run and the collector steps of its own coverage', () => {
-	const folder = report([]);
+	// The daemon's setup check decides the input path, autostart and polkit
+	const folder = report([
+		{
+			step: 'field_setup',
+			verdict: 'fail',
+			codes: ['fail_polkit_agent'],
+			report: {
+				check: 'setup',
+				steps: [
+					{ id: 'uinput_writable', state: 'pass' },
+					{ id: 'evdev_readable', state: 'pass' },
+					{ id: 'focus_listening', state: 'skip', value: 'no_compositor_source' },
+					{ id: 'unit_enabled', state: 'pass' },
+					{ id: 'polkit_agent', state: 'fail', value: 'not_running' }
+				]
+			}
+		}
+	]);
 	fs.mkdirSync(path.join(folder, 'field_guided'));
 	const guided = (index, step, verdict, codes, steps = []) =>
 		fs.writeFileSync(
 			path.join(folder, 'field_guided', `${String(index).padStart(2, '0')}_${step}.json`),
 			JSON.stringify({ schema: 1, step, verdict, codes, report: { check: step, steps } })
 		);
-	guided(
-		1,
-		'linux_input_access',
-		'pass',
-		['probes_met'],
-		[
-			{ id: 'uinput_writable', state: 'pass', value: '1' },
-			{ id: 'evdev_readable', state: 'pass', value: '9' }
-		]
-	);
-	guided(
-		2,
-		'linux_autostart',
-		'pass',
-		['probes_met'],
-		[{ id: 'unit_enabled', state: 'pass', value: '0' }]
-	);
-	guided(
-		3,
-		'linux_polkit_agent',
-		'fail',
-		['polkit_agent_1'],
-		[{ id: 'polkit_agent', state: 'fail', value: '1' }]
-	);
 	guided(11, 'linux_physical_hands', 'pass', ['attested_pass']);
 	guided(13, 'linux_layout_emulation_kde', 'needs_person', ['no_answer_420s']);
 	const result = run('--os', 'linux', '--report', folder);
@@ -218,7 +211,7 @@ check('a Linux report reads the field run and the collector steps of its own cov
 		linux.points.map((point) => point.id)
 	);
 	assert.equal(byId.physical_acceptance.verdict, 'fail', 'no polkit agent fails the point by name');
-	assert.match(byId.physical_acceptance.evidence.join(' '), /polkit_agent=fail:1/);
+	assert.match(byId.physical_acceptance.evidence.join(' '), /polkit_agent=fail:not_running/);
 	assert.equal(byId.layout_emulation_w1_w4.verdict, 'needs_person');
 	assert.equal(byId.owned_gtk_host.verdict, 'not_run');
 	// Testable since the maintainer turned delivery on: absent from this run, never a pass

@@ -410,18 +410,25 @@ function read(folder, name) {
 				// The guided and probe steps, then one verdict per TODO point
 				assert.match(steps, /^field_guided\s+exit=0$/m);
 				assert.match(steps, /^todo_summary\s+exit=0$/m);
-				const autostart = JSON.parse(read(folder, 'field_guided/02_linux_autostart.json'));
-				assert.equal(autostart.verdict, 'pass', 'the systemctl stand-in answers 0');
-				const topology = JSON.parse(read(folder, 'field_guided/05_linux_window_topology.json'));
+				// The session probes are the daemon's field run step now (field_setup)
+				assert(
+					!fs
+						.readdirSync(path.join(folder, 'field_guided'))
+						.some((name) =>
+							/_linux_(input_access|autostart|polkit_agent|focus_listener)\.json$/.test(name)
+						),
+					'the collector no longer probes what the daemon checks'
+				);
+				const topology = JSON.parse(read(folder, 'field_guided/01_linux_window_topology.json'));
 				assert.equal(topology.verdict, 'fail', 'no Metrics database is named, never a pass');
 				assert.match(topology.codes.join(','), /topo_window_move_no_metrics_database/);
 				// The day log exists but holds no withdrawal: no gesture, never a pass
 				const window = JSON.parse(
-					read(folder, 'field_guided/09_linux_prediction_window_switch.json')
+					read(folder, 'field_guided/05_linux_prediction_window_switch.json')
 				);
 				assert.equal(window.verdict, 'needs_person');
 				assert.deepEqual(window.codes, ['gesture_not_observed_1s']);
-				const hands = JSON.parse(read(folder, 'field_guided/10_linux_prediction_keep.json'));
+				const hands = JSON.parse(read(folder, 'field_guided/06_linux_prediction_keep.json'));
 				assert.equal(hands.verdict, 'needs_person');
 				assert.deepEqual(hands.codes, ['no_answer_1s']);
 				assert.match(

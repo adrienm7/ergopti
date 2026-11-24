@@ -215,6 +215,10 @@ function M.new(options)
 		return status == "starting" or status == "ready" or status == "failed"
 	end
 
+	--- The source's state, for the field run's setup check.
+	--- @return string "idle", "starting", "ready", "failed" or "stopped"
+	function source.status() return status end
+
 	--- The desktop family this source serves.
 	--- @return string
 	function source.family() return family end
