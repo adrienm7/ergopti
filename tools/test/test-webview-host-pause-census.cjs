@@ -41,6 +41,9 @@ const PAUSE_POLICY = Object.freeze({
 	'windows/ui/physical_shortcuts/host.ahk': { configuration: true },
 	// Removes the unused keys of config.toml (LTP-10).
 	'windows/settings/ui/cleanup.ahk': { configuration: true },
+	// The field report progress window: it only shows a run, and the run and
+	// its Stop answer under a pause as on macOS and Linux.
+	'windows/diagnostics/ui/field_check/field_report.ahk': { configuration: true },
 	'windows/ui/download_window/init.ahk': {
 		configuration: false,
 		reason:
