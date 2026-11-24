@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "أخبار بالإنجليزية — مليون جملة (إحصاءات)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — كلمات إنجليزية من الويب (إحصاءات)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — حوارات مكتوبة بالإنجليزية (إحصاءات)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — رسائل نصية بالفرنسية (إحصاءات)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — كل الجمل بالإنجليزية (إحصاءات)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "ويكيبيديا الإنجليزية — مليون جملة (إحصاءات)",
 	"layout_analysis.corpus.name.es_news_1m": "أخبار بالإسبانية — مليون جملة (إحصاءات)",

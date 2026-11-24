@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "英語ニュース — 100万文（集計）",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — ウェブの英単語（集計）",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — 英語の書き言葉の対話（集計）",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — フランス語のショートメッセージ（集計）",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — 英語の全文（集計）",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "英語版ウィキペディア — 100万文（集計）",
 	"layout_analysis.corpus.name.es_news_1m": "スペイン語ニュース — 100万文（集計）",

@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Wiadomości w języku angielskim — 1 milion zdań (zliczenia)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — wyrazy angielskie z sieci (zliczenia)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — pisane dialogi w języku angielskim (zliczenia)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — SMS-y w języku francuskim (zliczenia)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — wszystkie zdania w języku angielskim (zliczenia)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipedia w języku angielskim — 1 milion zdań (zliczenia)",
 	"layout_analysis.corpus.name.es_news_1m": "Wiadomości w języku hiszpańskim — 1 milion zdań (zliczenia)",

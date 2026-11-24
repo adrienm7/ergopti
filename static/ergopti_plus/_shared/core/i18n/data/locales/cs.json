@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Zprávy v angličtině — 1 milion vět (četnosti)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — anglická slova z webu (četnosti)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — psané dialogy v angličtině (četnosti)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — textové zprávy ve francouzštině (četnosti)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — všechny věty v angličtině (četnosti)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipedie v angličtině — 1 milion vět (četnosti)",
 	"layout_analysis.corpus.name.es_news_1m": "Zprávy ve španělštině — 1 milion vět (četnosti)",

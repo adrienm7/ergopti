@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "English news — 1 million sentences (counts)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — English words from the Web (counts)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — written English dialogs (counts)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — French text messages (counts)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — all English sentences (counts)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "English Wikipedia — 1 million sentences (counts)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanish news — 1 million sentences (counts)",

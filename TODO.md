@@ -582,9 +582,6 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 - [ ] **[CODE] Add HTML_CodeSniffer to the AAA audit (maintainer, 2026-11-24).** Pinned npm package injected into the
       same Playwright pages as axe-core, gating on its `WCAG2AAA` errors (its notices need a person and stay a list),
       beside the repository's own checks for what both miss (2.5.5).
-- [ ] **[CODE] Check CoMeRe's per-corpus licences (maintainer, 2026-11-24).** Read the licence of each CoMeRe
-      sub-corpus (Ortolang) and import, as a count table, one under a free licence whose user names are already
-      pseudonymised; never a corpus holding personal data. Until then Tatoeba stays the French conversational register.
 
 ## Maintainer decisions pending
 

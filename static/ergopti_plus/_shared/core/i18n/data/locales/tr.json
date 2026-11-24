@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "İngilizce haberler — 1 milyon cümle (sayımlar)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — web kaynaklı İngilizce sözcükler (sayımlar)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — yazılı İngilizce diyaloglar (sayımlar)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — Fransızca kısa mesajlar (sayımlar)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — tüm İngilizce cümleler (sayımlar)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "İngilizce Vikipedi — 1 milyon cümle (sayımlar)",
 	"layout_analysis.corpus.name.es_news_1m": "İspanyolca haberler — 1 milyon cümle (sayımlar)",

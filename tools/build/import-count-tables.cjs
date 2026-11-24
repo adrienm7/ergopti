@@ -40,7 +40,8 @@
  * 8. Other sources, each read whole: a Tatoeba per-language export
  *    (« id<TAB>lang<TAB>sentence », bzip2, unpacked by the bzip2 program
  *    that Git for Windows, macOS and Linux ship) and a Taskmaster dialog file
- *    (JSON, each utterance one line) count as text; a plain « word<TAB>count »
+ *    (JSON, each utterance one line) and a CoMeRe TEI file (each <post> one
+ *    line, its anonymisation placeholders left out) count as text; a plain « word<TAB>count »
  *    list (Norvig's) counts by the word-list rule, as Lexique does.
  * ==============================================================================
  */
@@ -68,11 +69,17 @@ const KINDS = [
 	'google_books_1grams',
 	'tatoeba_sentences',
 	'taskmaster_dialogs',
+	'comere_tei_posts',
 	'word_counts'
 ];
 // The kinds whose sentences count as text (bigrams and trigrams cross words);
 // the others are word lists.
-const TEXT_KINDS = ['leipzig_sentences', 'tatoeba_sentences', 'taskmaster_dialogs'];
+const TEXT_KINDS = [
+	'leipzig_sentences',
+	'tatoeba_sentences',
+	'taskmaster_dialogs',
+	'comere_tei_posts'
+];
 // The largest unpacked bzip2 export read whole (English Tatoeba: about 120 MB).
 const MAX_UNPACKED_BYTES = 1 << 30;
 // A Google Books token kept as a word: letters and combining marks, with
@@ -376,6 +383,45 @@ function taskmasterCounts(text, engine) {
 		}
 	}
 	return sentenceCounts(utterances, engine);
+}
+
+// The XML entities a CoMeRe TEI text uses, and the numeric ones.
+const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+
+/**
+ * The counts of a CoMeRe TEI file (Ortolang, cmr-*-tei-v1.xml): the text of
+ * each <post> one line, counted as text. What the corpus anonymised is an
+ * <fs type="anonymisation"> placeholder (« [_forename_] »), alone or in a
+ * <name>: it is left out whole, so no placeholder is counted. Other markup
+ * (an emoticon's <distinct>) keeps its typed text.
+ * @param {string} text - The TEI XML.
+ * @param {object} engine - LAYOUT_ANALYSIS.
+ * @returns {object} The counts, with words.
+ * @throws {Error} When the file holds no post, or a placeholder is left in a post's text.
+ */
+function comereCounts(text, engine) {
+	const posts = [];
+	for (const match of text.matchAll(/<post\b[^>]*>([\s\S]*?)<\/post>/g)) {
+		const body = match[1].replace(/<fs\s+type="anonymisation"\s*>[\s\S]*?<\/fs>/g, '');
+		const line = body
+			.replace(/<[^>]*>/g, '')
+			.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (entity, name) => {
+				if (name[0] !== '#') {
+					if (!Object.hasOwn(XML_ENTITIES, name)) throw new Error(`unknown XML entity ${entity}`);
+					return XML_ENTITIES[name];
+				}
+				return String.fromCodePoint(
+					name[1] === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10)
+				);
+			})
+			.replace(/\s+/g, ' ')
+			.trim();
+		if (/\[_\w+_?\]/.test(line))
+			throw new Error(`a CoMeRe anonymisation placeholder is left: ${JSON.stringify(line)}`);
+		if (line !== '') posts.push(line);
+	}
+	if (posts.length === 0) throw new Error('a CoMeRe TEI file without posts');
+	return sentenceCounts(posts, engine);
 }
 
 /**
@@ -719,6 +765,7 @@ function archiveCounts(source, archivePath, engine) {
 	if (source.kind === 'leipzig_sentences') return leipzigCounts(text, engine);
 	if (source.kind === 'tatoeba_sentences') return tatoebaCounts(text, engine);
 	if (source.kind === 'taskmaster_dialogs') return taskmasterCounts(text, engine);
+	if (source.kind === 'comere_tei_posts') return comereCounts(text, engine);
 	if (source.kind === 'word_counts') return wordCountCounts(text, source, engine);
 	return lexiqueCounts(text, source, engine);
 }
@@ -800,6 +847,7 @@ module.exports = {
 	sentenceCounts,
 	tatoebaCounts,
 	taskmasterCounts,
+	comereCounts,
 	wordCountCounts,
 	KINDS,
 	TEXT_KINDS,

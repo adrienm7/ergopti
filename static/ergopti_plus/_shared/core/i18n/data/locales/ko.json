@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "영어 뉴스 — 100만 문장 (집계)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — 웹의 영어 단어 (집계)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — 영어 문자 대화 (집계)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — 프랑스어 문자 메시지 (집계)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — 모든 영어 문장 (집계)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "영어 위키백과 — 100만 문장 (집계)",
 	"layout_analysis.corpus.name.es_news_1m": "스페인어 뉴스 — 100만 문장 (집계)",

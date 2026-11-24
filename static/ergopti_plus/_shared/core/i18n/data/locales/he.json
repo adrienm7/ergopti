@@ -5224,6 +5224,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "חדשות באנגלית — מיליון משפטים (ספירות)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — מילים באנגלית מהרשת (ספירות)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — דיאלוגים כתובים באנגלית (ספירות)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — הודעות טקסט בצרפתית (ספירות)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — כל המשפטים באנגלית (ספירות)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "ויקיפדיה באנגלית — מיליון משפטים (ספירות)",
 	"layout_analysis.corpus.name.es_news_1m": "חדשות בספרדית — מיליון משפטים (ספירות)",
