@@ -56,6 +56,12 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       probe that answered), once with the runtime already installed and once right after its first install. Linux
       probes every 3 s up to what is left of the 30 min install budget, macOS waits at most 30 s: the two figures
       decide one bound for the three.
+- [ ] <!-- field-point: ollama_archive_first_install --> Owned Ollama archive download on the PC (2026-11-24): time a
+      first real install of the managed Ollama runtime (about 1.4 GB) from the AI menu, from the download's start to its
+      install. The loopback bench (`tests/hardware/run_archive_download_throughput.lua`, 64 MiB) ran at 17.7 to 21.1
+      MB/s on the shared WSL before the ancestry reuse and 82 MB/s after it in the cloud container, with 0.7 install
+      ancestor walks per chunk instead of 14.2; a download far below the line rate points at the per-chunk fences
+      again.
 - [ ] <!-- field-point: tray_host_missing --> No tray host (TRAY-03, fixed 2026-11-21): on GNOME (Wayland, then X11)
       without the AppIndicator extension, start the daemon with `--tray`: about 15 s after « Tray icon created » a
       window « Ergopti+ has no tray icon on this desktop » and a notification say it in the configured language and

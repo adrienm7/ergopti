@@ -96,6 +96,14 @@ ai_health_watch_ms = 1000
 # enable_admission.lua. AHK: ollama_http.ahk LLM_OllamaIsRunning_Async.
 local_server_probe_timeout_ms = 1500
 
+# Linux: how long one admitted ancestor walk of the managed Ollama install
+# answers the per-download file owner's current(). A 64 KiB archive chunk
+# re-admits it about 14 times from separate callbacks, each walk one lstat per
+# ancestor; a refusal is never kept and every file mutation walks afresh.
+# LX: ai/engine/local_servers/runtime_composition.lua (ai/engine/ollama/install_admission.lua).
+# Linux only: no other driver walks the install ancestors per download chunk.
+install_ancestry_reuse_ms = 1
+
 # Deadline of each listening-socket or per-pid command of a local server sweep
 # (lsof, ss, ps -p; on Windows the one shell query of the processes and
 # sockets, whose cold start takes about two seconds): the sweep then goes on

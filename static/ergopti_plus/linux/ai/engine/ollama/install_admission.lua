@@ -10,13 +10,24 @@ local M = {}
 --- @param factory table Exact native file owner factory exposing new(directory).
 --- @param authorized function Captured originating source admission.
 --- @param explicit_consent boolean Literal chosen runtime-download consent.
+--- @param reuse table|nil { window_ms, now_ms }: how long one admitted ancestor
+---   walk answers current() ([llm] install_ancestry_reuse_ms) and the monotonic
+---   clock that dates it. Absent, every current() walks the ancestors.
 --- @return table|nil owner
 --- @return string|nil reason
-function M.new(resolver, factory, authorized, explicit_consent)
+function M.new(resolver, factory, authorized, explicit_consent, reuse)
 	if type(resolver) ~= "table" or type(resolver.plan) ~= "function"
 		or type(resolver.current) ~= "function" or type(resolver.prepare) ~= "function"
 		or type(factory) ~= "table" or type(factory.new) ~= "function" or type(authorized) ~= "function" then
 		return nil, "install_ancestry_port_unavailable"
+	end
+	local window_ms, now_ms = nil, nil
+	if reuse ~= nil then
+		if type(reuse) ~= "table" or type(reuse.window_ms) ~= "number" or reuse.window_ms < 0
+			or reuse.window_ms ~= reuse.window_ms or type(reuse.now_ms) ~= "function" then
+			return nil, "install_ancestry_reuse_invalid"
+		end
+		window_ms, now_ms = reuse.window_ms, reuse.now_ms
 	end
 	local get_plan, check_path, prepare_parent = resolver.plan, resolver.current, resolver.prepare
 	local planned, plan = pcall(get_plan)
@@ -32,10 +43,30 @@ function M.new(resolver, factory, authorized, explicit_consent)
 		local called, allowed, failure = pcall(check_path)
 		return called and allowed == true, failure or "install_ancestor_substituted"
 	end
+	-- A download chunk re-admits this owner about 14 times from separate
+	-- callbacks (write acknowledgement, output lease, curl reader), each walk one
+	-- lstat per ancestor (about 1.5 ms per chunk on the maintainer's PC). An
+	-- admitted walk answers current() for window_ms only; a refusal is never
+	-- kept, and every mutation below walks again before and after it.
+	local admitted_at = nil
+	local function forget() admitted_at = nil end
+	local function reused_ancestry()
+		if not window_ms then return ancestry() end
+		local read, now = pcall(now_ms)
+		if not read or type(now) ~= "number" then forget(); return false, "install_ancestry_clock_unavailable" end
+		if admitted_at and now >= admitted_at and now - admitted_at <= window_ms then return true end
+		local allowed, failure = ancestry()
+		admitted_at = allowed and now or nil
+		return allowed, failure
+	end
 	local function current()
 		local called, allowed = pcall(authorized)
 		if not called or allowed ~= true then return false, "install_source_stale" end
-		return ancestry()
+		return reused_ancestry()
+	end
+	local function fresh()
+		forget()
+		return current()
 	end
 	owner.current = current
 	local methods = { "prepare", "admit_size", "hash_command", "admit_checksum", "extract_command",
@@ -49,18 +80,18 @@ function M.new(resolver, factory, authorized, explicit_consent)
 		local method_name, invoke = name, files[name]
 		if type(invoke) ~= "function" then return nil, "install_file_port_unavailable" end
 		owner[name] = function(...)
-			local admitted, failure = current()
+			local admitted, failure = fresh()
 			if not admitted then return nil, failure end
 			if method_name == "prepare" or method_name == "prepare_retained" then
 				if explicit_consent ~= true then return nil, "install_consent_unavailable" end
-				local called, ready, parent_reason = pcall(prepare_parent, { explicit_consent = true, authorized = current })
+				local called, ready, parent_reason = pcall(prepare_parent, { explicit_consent = true, authorized = fresh })
 				if not called or ready ~= true then return nil, parent_reason or "install_parent_admission_refused" end
-				admitted, failure = current()
+				admitted, failure = fresh()
 				if not admitted then return nil, failure end
 			end
 			local value, detail = invoke(...)
 			owner.published = files.published == true
-			admitted, failure = current()
+			admitted, failure = fresh()
 			if not admitted then return nil, failure end
 			return value, detail
 		end
@@ -74,6 +105,7 @@ function M.new(resolver, factory, authorized, explicit_consent)
 		local admitted, failure = ancestry()
 		if not admitted then return false, failure end
 		local cleaned = cleanup()
+		forget()
 		owner.published = files.published == true
 		if cleaned == true then return true end
 		return false, "install_file_cleanup_refused"

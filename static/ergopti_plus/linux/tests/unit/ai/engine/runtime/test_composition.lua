@@ -43,10 +43,11 @@ local function fixture(extra)
 	local phase={start=function(ports,opts,done)w.phase_ports,w.phase_options=ports,opts;return w.op end}
 	local process={start=function(program,args,options,done)w.finite[#w.finite+1]={program=program,args=args,opts=options,done=done};return w.op end,start_service=function(binary,args,options,done)w.service={binary=binary,args=args,opts=options};return w.op end}
 	local http={get_owned=function(url,headers,options,done)w.http={url=url,headers=headers,opts=options,done=done};return w.op end}
-	local admission={new=function(r,f,authorized,consent)w.admission={r=r,f=f,authorized=authorized,consent=consent};return w.file_owner end}
+	local admission={new=function(r,f,authorized,consent,reuse)w.admission={r=r,f=f,authorized=authorized,consent=consent,reuse=reuse};return w.file_owner end}
 	local timer={after=function()end,now_ms=function()return 0 end}
+	w.timer=timer
 	local timings={ms=function(section,key)
-		return assert(({['llm:dependency_bootstrap_timeout_ms']=100,['llm:local_server_probe_timeout_ms']=25,['ui:ollama_deps_poll_ms']=10})[section..':'..key])
+		return assert(({['llm:dependency_bootstrap_timeout_ms']=100,['llm:local_server_probe_timeout_ms']=25,['llm:install_ancestry_reuse_ms']=7,['ui:ollama_deps_poll_ms']=10})[section..':'..key])
 	end,count=function(section,key)
 		assert(section=='limits' and key=='ollama_install_free_space_margin_bytes','the margin comes from the registry')
 		return w.margin
@@ -69,6 +70,8 @@ test('binary installation consumes exact phase/file owners and budget',function(
 	eq(w.phase_options.asset,w.asset);eq(w.phase_options.explicit_consent,true);eq(w.phase_options.budget,w.budget)
 	eq(w.phase_ports.files,w.file_owner);eq(w.phase_options.timeout_ms,100);eq(w.phase_options.helper_timeout_ms,100)
 	eq(w.admission.consent,true);eq(w.admission.f,w.factory)
+	-- The per-download ancestry reuse comes from the registry, dated by the owned clock.
+	eq(w.admission.reuse.window_ms,7);eq(w.admission.reuse.now_ms,w.timer.now_ms)
 end)
 test('stale installation admission dispatches no phase',function()local w=fixture();w.authorized=false;local o=w.controller.ports.install({},w.budget,w.authorizer,function()end);eq(o:is_settled(),true);eq(w.phase_options,nil)end)
 -- OLL-04, OLL-14: the pinned archive, its unpacked runtime and the registry
