@@ -289,6 +289,15 @@ eader.sqlite` held open by another program, press Reset: the status line says th
       complete report. Debug > Suggest a feature: the form reads the running version, not `unknown`, and Driver «
       Windows »; only the title and « Your proposal » are required. Whether GitHub selects a dropdown option from the
       link was not checked live: if Driver stays empty, report it.
+- [ ] **Field report progress window (2026-11-24):** Debug > « Lancer le
+      field report (tous les tests) » opens the « Field report » window at once: each step reads waiting, then
+      running, then its verdict (Narrator says each change without moving the focus), the steps not run here read
+      « not run here » with their reason. At the end: the verdict, the counts and « Saved in: » the results folder;
+      « Show in File Explorer » opens that folder, « Copy report » puts the complete report on the clipboard, « Create a
+      GitHub issue » opens the bug form with the version, Driver « Windows » and the `check=field_report` line, and
+      Ctrl+V into Full report pastes the complete report. Run it again and click « Stop the run », and once more and
+      close the window with its close box during the run: the log says « cancelled by the person » and the report
+      is interrupted. The window follows the Configuration menu's reading font and light or dark appearance.
 - [ ] TIM-04: an AI prediction whose first display takes over 2 s logs « Over budget: prediction.display » once.
       TIM-01 is automated (the live check `reload-command` counts one « Reload completed in N ms » per reload, none
       for the plain start, and the over-budget warnings against `driver_reload_ms`); TIM-05 passed on 2026-11-23 (the

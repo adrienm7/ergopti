@@ -654,23 +654,19 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       Tests » runs the driver's own field run in-app: on the three drivers the menu hands the field run session its
       field check steps in-process (`Session:submit_in_app`, shared by macOS and Linux in
       `_shared/diagnostics/engine/field_run/in_app.lua`; `SubmitInApp` in `field_run.ahk`), with no clone and no
-      collector, and shows one report (`_shared/diagnostics/engine/field_check/field_report.lua`): verdict counts, each
-      step with its TODO-tests field points, the steps not run here with their reason (guided: a person; reload, AI
-      downloads, diagnostics, signed install: the collector), the Tests rows run separately and the folder of the result
-      files to attach to an issue. An installed Mac app or Windows driver starts its session on demand on `folder.macos`
+      collector, and follows it in the shared progress window (`_shared/ui/field_report/`; hosts
+      `macos/diagnostics/ui/field_check/field_report_window.lua` over `field_report_progress.lua`,
+      `linux/diagnostics/ui/field_check/field_report.lua`, `FieldReportWindow` in `field_report.ahk`): each step as it
+      goes, Stop and the close box cancelling the run, then one report
+      (`_shared/diagnostics/engine/field_check/field_report.lua`), its folder in Finder, Explorer or the file manager,
+      the report on the clipboard and « Create a GitHub issue » (the shared runner's `report_field_run` on macOS and
+      Linux, `HealthCheck_ReportFieldRun` on Windows: the bug form with the version, OS, driver and the run's evidence
+      line, the redacted report on the clipboard); without a window the report opens in the one-click dialog. The
+      real windows are the « Field report progress window » lines of the three TODO-tests files. The report holds the
+      verdict counts, each step with its TODO-tests field points, the steps not run here with their reason (guided: a
+      person; reload, AI downloads, diagnostics, signed install: the collector), the Tests rows run separately and the
+      folder of the result files to attach to an issue. An installed Mac app or Windows driver starts its session on demand on `folder.macos`
       or `folder.windows` of the shared protocol. Left:
-  - **Progress window (maintainer request, 2026-11-24).** The shared page is in place: `_shared/ui/field_report/`
-    (apps.manifest.json `field_report`, bridge `field_report`, `window.receiveFieldReport` with init, step, done and
-    action messages; each step's state in its line and the polite live region; the counts, the verdict and the
-    folder at the end; Stop, Close and the three end buttons sending `cancel`, `close`, `open_folder`, `copy` and
-    `issue`), scanned by the app windows accessibility audit and driven by
-    `tools/test/browser/field-report-window.playwright.cjs`. The Linux host is done
-    (`linux/diagnostics/ui/field_check/field_report.lua`): the row opens the window, which receives each step and
-    the summary; Stop, Close and the close box cancel the run; Copy, the file manager and « Create a GitHub issue »
-    (shared diagnostics runner `report_field_run`: the bug form with the version, OS, driver and the run's evidence
-    line built by `issue_link.build_url`, the redacted report on the clipboard); without a window the report opens
-    in the one-click dialog. Left: the macOS and Windows hosts, then drop the `field_report` exclusions of
-    `test-webview-geometry-single-source.cjs`; until then those two open the report in the one-click dialog.
   - **Field points still without an automatic driver step.** Linux: done. The collector's four probe steps are now
     the daemon's field run step `field_setup` (check `setup`, `linux/diagnostics/engine/field_check/setup_check.lua`:
     `/dev/uinput` writable, an evdev node readable, the systemd user unit enabled, a polkit agent running, the

@@ -322,6 +322,39 @@ _THPA_MenuReportBugFailureNotifies() {
 Test("Report a bug (menu): a refused clipboard notifies instead of opening the form (menu-report-bug)",
 	_THPA_MenuReportBugFailureNotifies)
 
+; The field report window's « Create a GitHub issue » (field-report-window).
+_THPA_FieldReportIssue() {
+	global _SharedDir
+	Calls := []
+	Line := "check=field_report verdict=fail request=app-20261124T120000Z pass=1 fail=1 not_run=1"
+		. " field_network=pass field_composer=fail"
+	AssertTrue(HealthCheck_ReportFieldRun(Line, "Field report`nSaved in: C:\Users\JDoe\AppData\Local\Ergopti",
+		_THPA_Effects(Calls)))
+	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
+	AssertEqual(1, InStr(Calls[1], "copy:"), "the report is on the clipboard before the form opens")
+	AssertFalse(InStr(Calls[1], "JDoe"), "the clipboard holds the redacted report: " . Calls[1])
+	AssertTrue(InStr(Calls[1], "Saved in: ") > 0, Calls[1])
+	GitHub := JsonParse(FileRead(_SharedDir . "\updater\data\defaults.json", "UTF-8"))["github"]
+	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
+		. "/issues/new?template=bug_report.yml&"
+	AssertEqual(Prefix, SubStr(Calls[2], 1, StrLen(Prefix)))
+	AssertEqual(Line, _THPA_QueryValue(Calls[2], "diagnostics"), "the form carries the evidence line")
+	AssertEqual("Windows", _THPA_QueryValue(Calls[2], "driver"))
+	AssertFalse(InStr(Calls[2], "JDoe"), "the URL carries no account name")
+	Refused := false
+	try HealthCheck_ReportFieldRun("Saved in C:\Users\JDoe", "x", _THPA_Effects(Calls))
+	catch ValueError
+		Refused := true
+	AssertTrue(Refused, "a line outside the evidence grammar never reaches a form")
+	AssertEqual(2, Calls.Length, "nothing more left the machine")
+	Blocked := []
+	AssertFalse(HealthCheck_ReportFieldRun(Line, "x", _THPA_Effects(Blocked, Map("clipboard", false))))
+	for Call in Blocked
+		AssertTrue(InStr(Call, "open_url:") = 0, "the browser must not open without the report: " . _THPA_Join(Blocked))
+}
+Test("Field report issue: the evidence line in the form, the redacted report on the clipboard (field-report-window)",
+	_THPA_FieldReportIssue)
+
 
 /** Replays the same synthetic sharing corpus as the JavaScript and Lua ports. */
 _THPA_SharingVectors() {

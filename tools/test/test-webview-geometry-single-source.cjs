@@ -312,6 +312,16 @@ const WINDOWS_APPS = {
 			];
 		}
 	},
+	field_report: {
+		file: 'diagnostics/ui/field_check/field_report.ahk',
+		// The WebViewHost base sizes the window from the manifest entry, as for
+		// config_cleanup below.
+		checks: () => [
+			/class FieldReportWindow extends WebViewHost/,
+			/Host\.AppId\s*:=\s*"field_report"/,
+			/^(?![\s\S]*_Geometry\(\)\s*\{)/
+		]
+	},
 	config_cleanup: {
 		file: 'settings/ui/cleanup.ahk',
 		checks: () => [
@@ -414,9 +424,6 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
-	field_report:
-		"no Windows host yet: the in-app field report shows its report in the one-click checks' " +
-		'window until the host of this window lands (TODO.md, « Lancer le field report », progress window)',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',
