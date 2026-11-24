@@ -232,6 +232,33 @@ for (const entry of levelLosses.concat(dof.unmapped))
 		F.lossMessage(entry).key.startsWith('layout_analysis.formats.loss.'),
 		'each loss is worded'
 	);
+// The Windows package (2026-11-24): Neo's chained dead keys have an empty
+// terminator and only results of several characters, which a DEADKEY entry
+// cannot hold, so Space alone stays; it typed `undefined` (kbd_unit_invalid)
+// and refused the package. It now types the dead key's private character.
+{
+	const windowsDoc = plain(reloaded.doc);
+	windowsDoc.exports = Object.assign({}, windowsDoc.exports, {
+		windows: { locale: 'de-DE', layout_id: '00000407', dll_name: 'neo2' }
+	});
+	const built = IO.windowsDlls(windowsDoc);
+	const graveTilde = windowsDoc.dead_keys.findIndex((dead) => dead.id === 'grave_tilde');
+	assert.equal(windowsDoc.dead_keys[graveTilde].terminator, '', 'grave_tilde ends on nothing');
+	const tables = built.model.dead_keys[graveTilde];
+	assert.deepEqual(
+		plain(tables.rules),
+		[{ base: 0x20, result: tables.dead }],
+		"Space after grave_tilde types the dead key's own character"
+	);
+	const said = new Set(built.omitted.map((entry) => `${entry.path}:${entry.reason}`));
+	for (const reason of [
+		'dead_keys.grave_tilde.terminator:dead_key_private_character',
+		'dead_keys.grave_tilde.rules[a]:dead_result_not_one_unit',
+		'dead_keys.grave_tilde:dead_key_without_windows_rule'
+	])
+		assert(said.has(reason), `the Windows package says ${reason}`);
+	assert(IO.windowsPackage(windowsDoc).bytes.length > 0, 'Neo 2 builds a Windows package');
+}
 
 (async () => {
 	const part = await F.toLink([read]);

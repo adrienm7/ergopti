@@ -333,7 +333,9 @@ waits for the maintainer's review).
       Left, the native files: no `.keylayout` holds a custom modifier (macOS relies on the emulation); XKB holds
       Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB and KLC
       exports are refused for reasons older than the levels (`unbound_stateful_actions`, Caps Lock on the Roya or
-      AltGr columns), as is the DLL package (`kbd_unit_invalid` on a dead-key result). The real-machine check (a user
+      AltGr columns). The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
+      `undefined`), without Mod3 and Mod4 (`no_windows_column`): `tools/lib/kbd-dll/source.cjs` gives a custom
+      modifier no Roya, Loya or Kana bit as the KLC export does, and Mod4's AltGr, an E0 key, could not hold one. The real-machine check (a user
       tap-hold or remap on Caps Lock or AltGr against the held levels) is in the three TODO-tests files.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a

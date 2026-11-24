@@ -1745,9 +1745,12 @@ function fromSource(source, options = {}) {
 			seen.set(key, entry);
 			rules.push(entry);
 		}
-		// Windows needs one entry: Space then types the terminator's first character.
+		// Windows needs one entry: Space then types the terminator's first
+		// character, or the dead key's own private character when the terminator
+		// is empty (Neo's chained dead keys), which `omitted` already says.
 		if (!rules.length) {
-			rules.push({ base: 0x20, result: unitsOf(dead.terminator)[0] });
+			const terminator = unitsOf(dead.terminator);
+			rules.push({ base: 0x20, result: terminator.length ? terminator[0] : deadUnit.get(dead.id) });
 			omitted.push({ path: `dead_keys.${dead.id}`, reason: 'dead_key_without_windows_rule' });
 		}
 		return Object.assign(
