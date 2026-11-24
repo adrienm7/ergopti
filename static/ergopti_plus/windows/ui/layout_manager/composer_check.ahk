@@ -422,7 +422,17 @@ ComposerCheck_Command(*) {
  *   default (the network check shows its report through the same window).
  */
 ComposerCheck_ShowReport(Report, ShowFn := 0, TitleKey := "menu.debug.composer_check") {
-	Text := ComposerCheck_Text(Report, t)
+	ComposerCheck_ShowText(ComposerCheck_Text(Report, t), ShowFn, TitleKey)
+}
+
+/**
+ * Shows a finished report's text in the one-click checks' window, with a
+ * « Copy report » button; « Test everything » shows its combined report here.
+ * @param {string} Text - The report text.
+ * @param {Func} ShowFn - Opens the window; tests replace it.
+ * @param {string} TitleKey - Locale key of the window title.
+ */
+ComposerCheck_ShowText(Text, ShowFn := 0, TitleKey := "menu.debug.composer_check") {
 	if !HasMethod(ShowFn, "Call")
 		ShowFn := (Title, Body) => _ComposerCheck_ShowWindow(Title, Body, TitleKey)
 	ShowFn.Call(t(TitleKey), Text)
