@@ -113,4 +113,43 @@ function M.resolve(stored, entry, core)
 	return { level = name, threshold = M.threshold(name, core), refused = refused }
 end
 
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 3/ Detailed Log Switch =======
+-- ======================================
+-- ======================================
+
+--- The level the « Detailed log » switch of the Debug menu stores when it is
+--- ticked (maintainer, 2026-11-24); unticked stores the declared default.
+M.DETAILED_LEVEL = "DEBUG"
+
+--- Whether a stored value reads as « Detailed log » ticked: its threshold
+--- lets through more than the default's, so TRACE and DONE tick it too, and
+--- WARNING, ERROR or a refused value do not.
+--- @param stored any The stored value; nil when none is stored.
+--- @param entry table The `script.log_level` declaration.
+--- @param core table The shared logger core.
+--- @return boolean detailed
+function M.is_detailed(stored, entry, core)
+	local default = M.resolve(nil, entry, core)
+	return M.resolve(stored, entry, core).threshold < default.threshold
+end
+
+--- The level a click on « Detailed log » stores: the default when it reads
+--- ticked, else the detailed level.
+--- @param stored any The stored value; nil when none is stored.
+--- @param entry table The `script.log_level` declaration.
+--- @param core table The shared logger core.
+--- @return string level Upper-case declared name.
+function M.detailed_toggle_target(stored, entry, core)
+	if M.is_detailed(stored, entry, core) then return M.resolve(nil, entry, core).level end
+	local detailed = M.canonical(M.DETAILED_LEVEL, entry)
+	if detailed == nil then error("level_setting: the detailed level is not one of the declared values", 2) end
+	return detailed
+end
+
 return M

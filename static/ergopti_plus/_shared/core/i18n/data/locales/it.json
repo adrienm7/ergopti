@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Mostra cosa avvia Ergopti all'accesso",
 	"menu.debug.key_history": "Cronologia tasti",
 	"menu.debug.list_vars": "Stato variabili",
+	"menu.debug.detailed_log": "Registro dettagliato",
 	"menu.debug.log_level": "Livello di log",
 	"menu.debug.open_error_log": "Apri il file degli errori di oggi",
 	"menu.debug.no_errors_today": "Nessun avviso né errore oggi",

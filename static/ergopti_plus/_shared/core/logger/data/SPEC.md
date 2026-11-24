@@ -195,6 +195,15 @@ Windows resolves it in `LoggerResolveLevel`, macOS and Linux in
 `_shared/core/logger/engine/level_setting.lua`; the `level_setting` cases of
 `_shared/tests/corpus/logger/parity_vectors.json` hold the three to it.
 
+The menus set the level through one switch, Debug > « Detailed log »
+(maintainer, 2026-11-24), over the same `script.log_level` value: it reads
+ticked when the stored level's threshold lets through more than the default's
+(DEBUG, TRACE, DONE), and a click stores the default when ticked, else DEBUG.
+Any other declared value stays valid in `config.toml` and reads unticked.
+Windows owns it in `LoggerIsDetailed` and `LoggerDetailedToggleTarget`, macOS
+and Linux in `level_setting.lua` (`is_detailed`, `detailed_toggle_target`);
+the `detailed_log` cases of `parity_vectors.json` hold the three to it.
+
 A line that passes the filter can still be withheld by one of the two
 suppression layers below. Both are implemented once in the shared Lua core
 (macOS and Linux) and mirrored in `windows/core/logger/engine/logger.ahk`, and both are

@@ -804,11 +804,18 @@ function M.generate(ctx, menu_mods, actions)
 				if Logger.current_level == severity then active_level_name = level; break end
 			end
 			local healthcheck = require("diagnostics.ui.healthcheck")
+			local LevelSetting = require("core.logger.engine.level_setting")
+			local LoggerCore = require("core.logger.engine")
+			local log_entry = require("menu.engine.manifest_reader").find_entry_by_path(
+				require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL)
 			local dbg_ctx = {}
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
-				[require("settings.engine.keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
+				-- « Detailed log » (maintainer, 2026-11-24): DEBUG when ticked, the default otherwise
+				[COMMAND.DETAILED_LOG] = function()
+					return actions.set_log_level(LevelSetting.detailed_toggle_target(active_level_name, log_entry, LoggerCore))
+				end,
 				[require("settings.engine.keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
 				[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
 				[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
@@ -827,7 +834,9 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
-			dbg_ctx.state_getters[require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
+			dbg_ctx.state_getters["detailed_log_enabled"] = function()
+				return LevelSetting.is_detailed(active_level_name, log_entry, LoggerCore)
+			end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("diagnostics.ui.error_dialog").is_enabled()
 			end

@@ -69,6 +69,11 @@ global LOGGER_DEFAULT_LEVEL := "INFO"
 ; Resolved at boot from the ini (Script.LogLevel) or LOGGER_DEFAULT_LEVEL.
 global LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 
+; The level the Debug menu's « Detailed log » switch stores when ticked
+; (maintainer, 2026-11-24); unticked stores LOGGER_DEFAULT_LEVEL. The macOS and
+; Linux twin is DETAILED_LEVEL of _shared/core/logger/engine/level_setting.lua.
+global LOGGER_DETAILED_LEVEL := "DEBUG"
+
 ; Cached severity threshold (integer) and per-level fast-path flags, refreshed
 ; by LoggerInit whenever LOGGER_MIN_LEVEL changes. Hot-path callers (notably
 ; LoggerDebug / LoggerTrace / LoggerDone invoked from per-keystroke dispatch)
@@ -544,6 +549,21 @@ LoggerResolveLevel(Value) {
 				}
 		}
 		return Map("level", LOGGER_DEFAULT_LEVEL, "refused", true)
+}
+
+; Whether a stored level reads as « Detailed log » ticked: its threshold lets
+; through more than the default's, so TRACE and DONE tick it too, and WARNING,
+; ERROR or a refused value do not (the detailed_log parity vectors).
+LoggerIsDetailed(Value) {
+		global LOGGER_SEVERITY, LOGGER_DEFAULT_LEVEL
+		return LOGGER_SEVERITY[LoggerResolveLevel(Value)["level"]] < LOGGER_SEVERITY[LOGGER_DEFAULT_LEVEL]
+}
+
+; The level a click on « Detailed log » stores: the default when it reads
+; ticked, else the detailed level.
+LoggerDetailedToggleTarget(Value) {
+		global LOGGER_DEFAULT_LEVEL, LOGGER_DETAILED_LEVEL
+		return LoggerIsDetailed(Value) ? LOGGER_DEFAULT_LEVEL : LOGGER_DETAILED_LEVEL
 }
 
 ; Initialise the logger. Reads the minimum level from the ini and resolves the

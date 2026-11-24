@@ -179,15 +179,16 @@ Test("menu layout: the Configuration parent and rows keep their corpus captions 
 	_MLG_ConfigurationCorpus)
 
 ; Versions, Configuration, then Language at the top level (the maintainer's
-; requests of 2026-10-02), and « Afficher une fenêtre à chaque erreur » opening
-; the Logs section of Debug, before a separator (maintainer, 2026-11-24).
+; requests of 2026-10-02), and « Journal détaillé » then « Afficher une fenêtre
+; à chaque erreur » opening the Logs section of Debug, before a separator
+; (maintainer, 2026-11-24).
 _MLG_RowsFollowTheRequestedOrder() {
 	TopLevel := ", " . _MLG_Order("top_level") . ", "
 	Assert(InStr(TopLevel, ", about, configuration, language, ") > 0,
 		"the top level must list Versions, Configuration, then Language: " . TopLevel)
 	Debug := ", " . _MLG_Order("debug_menu") . ", "
-	Assert(InStr(Debug, ", header menu.debug.header_logs, show_error_dialog, ---, ") > 0,
-		"the error-window switch must open the Logs section, before a separator: " . Debug)
+	Assert(InStr(Debug, ", header menu.debug.header_logs, detailed_log, show_error_dialog, ---, ") > 0,
+		"the two Logs switches must open the Logs section, before a separator: " . Debug)
 	Assert(InStr(Debug, ", healthcheck, report_bug, ") > 0,
 		"the diagnostics group holds only rows that open a window: " . Debug)
 }
@@ -236,7 +237,7 @@ _MLG_DebugTestsCloseTheMenu() {
 		Diagnostics := _MLG_RowStarting(Built, "menu.debug.healthcheck")
 		Report := _MLG_RowStarting(Built, "menu.debug.report_bug")
 		Suggest := _MLG_RowStarting(Built, "menu.debug.suggest_feature")
-		Logs := _MLG_RowStarting(Built, "menu.debug.log_level")
+		Logs := _MLG_RowStarting(Built, "menu.debug.detailed_log")
 		AssertTrue(Diagnostics >= 0 && Diagnostics < Report && Report < Suggest && Suggest < Logs,
 			"diagnostics, report and suggest come first, then the logs: " . Diagnostics . " " . Report
 			. " " . Suggest . " " . Logs)

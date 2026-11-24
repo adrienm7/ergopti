@@ -272,7 +272,7 @@ _MM_DebugFallback() {
 		Map("id", MenuCommand.LIST_VARS),
 		Map("id", MenuCommand.KEY_HISTORY),
 		Map("id", "---"),
-		Map("id", ConfigLeaf.LOG_LEVEL),
+		Map("id", MenuCommand.DETAILED_LOG),
 		Map("id", MenuCommand.OPEN_LOGS),
 		Map("id", MenuCommand.OPEN_TODAY_LOG),
 		Map("id", MenuCommand.OPEN_ERROR_LOG),

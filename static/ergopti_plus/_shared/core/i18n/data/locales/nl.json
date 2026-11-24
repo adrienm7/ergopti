@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Toon wat Ergopti bij het inloggen start",
 	"menu.debug.key_history": "Toetsgeschiedenis",
 	"menu.debug.list_vars": "Variabelestatus",
+	"menu.debug.detailed_log": "Uitgebreid logboek",
 	"menu.debug.log_level": "Logniveau",
 	"menu.debug.open_error_log": "Foutenbestand van vandaag openen",
 	"menu.debug.no_errors_today": "Vandaag geen waarschuwingen of fouten",

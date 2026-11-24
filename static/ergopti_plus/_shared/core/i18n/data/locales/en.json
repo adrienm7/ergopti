@@ -1794,6 +1794,7 @@
 	"menu.debug.field_check_login_items": "Show what starts Ergopti at login",
 	"menu.debug.key_history": "Key history",
 	"menu.debug.list_vars": "Variable state",
+	"menu.debug.detailed_log": "Detailed log",
 	"menu.debug.log_level": "Log level",
 	"menu.debug.open_error_log": "Open today's errors file",
 	"menu.debug.no_errors_today": "No warnings or errors today",

@@ -72,7 +72,13 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       calibrated on the photo (field point `menu_header_pill_centred`); Windows and Linux draw no header pill.
       Debug: « Console » reads « Console Hammerspoon » (macOS only: Windows offers Window Spy, the variable list
       and the key history under their own names, Linux has no console row), and « Afficher une fenêtre à chaque
-      erreur » opens the Logs section, before a separator, on the three OS.
+      erreur » opens the Logs section, before a separator, on the three OS. « Journal détaillé » replaced the
+      log-level selector (unticked INFO, ticked DEBUG, same `script.log_level`; maintainer-decisions « Detailed
+      log »).
+- [ ] **[Coordinator] Bug report: say when the detailed log is off** (maintainer, 2026-11-24). Add one short
+      line to the bug report on the three OS when `script.log_level` reads unticked (`level_setting.is_detailed`,
+      Windows `LoggerIsDetailed`): « Detailed log: off — turn on Debug > Detailed log and reproduce for more
+      detail », through i18n in the 21 locales. Left to the agent editing the report builder at the time.
 - [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
       that sets no icon and so shows the engine's application icon) still showed the hammer, although
       `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`

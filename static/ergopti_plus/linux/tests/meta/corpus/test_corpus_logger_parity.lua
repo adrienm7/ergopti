@@ -62,6 +62,11 @@ dofile(shared_root .. "/tests/corpus/logger/parity_replay.lua")({
 		local resolved = LevelSetting.resolve(not absent and stored or nil, entry, Core)
 		return resolved.level, resolved.threshold, resolved.refused
 	end,
+	detailed_log = function(stored, absent)
+		local LevelSetting = require("core.logger.engine.level_setting")
+		local value = not absent and stored or nil
+		return LevelSetting.is_detailed(value, entry, Core), LevelSetting.detailed_toggle_target(value, entry, Core)
+	end,
 	emit_body = emit_body,
 	dated_expired = Sink.dated_log_expired,
 	topical_stale = Sink.topical_log_stale,

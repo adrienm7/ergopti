@@ -183,9 +183,6 @@ function main() {
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	const featurePaths = loadResolvablePaths();
 	const localeKeys = loadLocaleKeys();
-	const logTokens = JSON.parse(
-		readSourceFile(resolve(SHARED, 'tests/corpus/menus/log_level_rows.json'))
-	).levels;
 	const violations = [];
 
 	const i18nFields = ['i18n', 'i18n_dynamic'];
@@ -263,16 +260,9 @@ function main() {
 				} else {
 					for (const choice of item.choices) {
 						if (choice.label !== undefined) {
-							// Literal labels are admitted only for the existing logger's
-							// technical enum tokens, checked independently below.
-							if (
-								item.path !== 'script.log_level' ||
-								choice.i18n !== undefined ||
-								!logTokens.some(
-									(entry) => entry.value === choice.value && entry.label === choice.label
-								)
-							)
-								violations.push(`${where}: literal choice labels are reserved for log tokens`);
+							// The logger's technical tokens were the one literal label; they
+							// left with the log-level selector (2026-11-24).
+							violations.push(`${where}: a choice label is translated, never literal`);
 							continue;
 						}
 						for (const loc of Object.keys(localeKeys)) {
@@ -902,77 +892,47 @@ function checkChoiceProjection() {
 			menu.agent_menu[0].choices.map((choice) => choice.value),
 			['auto', 'off', 'action']
 		);
-		const logCorpus = JSON.parse(
-			readSourceFile(path.join(SHARED, 'tests/corpus/menus/log_level_rows.json'))
-		);
+		// « Detailed log » replaced the log-level selector (maintainer, 2026-11-24):
+		// one check over script.log_level, and the retired token metadata refuses.
 		result = execute(original);
 		assert.equal(result.status, 0, result.stderr);
 		menu = JSON.parse(readSourceFile(output));
-		const logRow = menu.debug_menu.find((row) => row.id === 'log_level');
-		assert.equal(logRow.type, 'choice');
-		assert.equal(logRow.path, 'script.log_level');
-		assert.deepEqual(logRow.choices, logCorpus.levels);
-		assert.equal(logRow.current_choice_label_value, true);
-		for (const key of ['choice_values', 'choice_label_kind', 'choice_icons'])
-			assert.equal(Object.hasOwn(logRow, key), false, 'source metadata is consumed');
-		const logOrder = original.replace(
-			'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
-			'choice_values = ["ERROR", "DEBUG", "WARNING", "INFO"]'
-		);
-		assert.notEqual(logOrder, original);
-		result = execute(logOrder);
-		assert.equal(result.status, 0, result.stderr);
-		assert.deepEqual(
-			JSON.parse(readSourceFile(output))
-				.debug_menu.find((row) => row.id === 'log_level')
-				.choices.map((choice) => choice.value),
-			logCorpus.reordered_values
+		const detailed = menu.debug_menu.find((row) => row.id === 'detailed_log');
+		assert.equal(detailed.type, 'check');
+		assert.deepEqual(detailed.checked_when, ['detailed_log_enabled']);
+		assert.equal(
+			menu.debug_menu.some((row) => row.id === 'log_level' || row.path === 'script.log_level'),
+			false,
+			'no log-level selector remains'
 		);
 		const acknowledged = fs.readFileSync(output);
-		for (const [oldValue, invalidValue, reason] of [
-			[
-				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
-				'choice_values = ["DEBUG", "DEBUG"]',
-				'choice_values'
-			],
-			[
-				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
-				'choice_values = ["DEBUG", "UNKNOWN"]',
-				'choice_values'
-			],
-			[
-				'choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]',
-				'choice_values = []',
-				'choice_values'
-			],
-			[
-				'choice_label_kind = "log_level_token"',
-				'choice_label_kind = "literal"',
-				'choice_label_kind'
-			],
-			[
-				'path = "script.log_level"\nchoice_values',
-				'path = "llm.agent_mode"\nchoice_values',
-				'choice_values'
-			],
-			['ERROR = "❌"', 'ERROR = "untranslated caption"', 'choice_icons'],
-			[
-				'current_choice_label_value = true',
-				'current_choice_label_value = false',
-				'current_choice_label_value'
-			],
-			['ERROR = "❌"', 'OTHER = "❌"', 'choice_icons'],
-			[
-				'current_choice_label_value = true',
-				'current_choice_label_value = "{1}"',
-				'current_choice_label_value'
-			]
+		for (const retired of [
+			'choice_label_kind = "log_level_token"',
+			'choice_icons = { off = "❌" }'
 		]) {
-			const invalid = original.replace(oldValue, invalidValue);
+			const invalid = original.replace(
+				'choice_label_prefix = "menu.agent.mode_"',
+				'choice_label_prefix = "menu.agent.mode_"\n' + retired
+			);
 			assert.notEqual(invalid, original);
 			result = execute(invalid);
-			assert.notEqual(result.status, 0, 'invalid log choice projection must refuse publication');
-			assert.match(result.stderr, new RegExp(reason));
+			assert.notEqual(result.status, 0, 'retired log-token metadata must refuse publication');
+			assert.match(result.stderr, new RegExp(retired.split(' ')[0]));
+			assert.deepEqual(
+				fs.readFileSync(output),
+				acknowledged,
+				'refusal preserves acknowledged bytes'
+			);
+		}
+		for (const invalidValue of [
+			'current_choice_label_value = false',
+			'current_choice_label_value = "{1}"'
+		]) {
+			const invalid = original.replace('current_choice_label_value = true', invalidValue);
+			assert.notEqual(invalid, original);
+			result = execute(invalid);
+			assert.notEqual(result.status, 0, 'invalid current choice label must refuse publication');
+			assert.match(result.stderr, /current_choice_label_value/);
 			assert.deepEqual(
 				fs.readFileSync(output),
 				acknowledged,
@@ -8437,15 +8397,10 @@ console.log(
 			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		// The row joins its label to its value through the locale's common.label_value.
-		assert.equal(
-			hand[code].linux[8],
-			locale['common.label_value']
-				.replace('{1}', locale['menu.debug.log_level'])
-				.replace('{2}', 'ℹ️ INFO')
-		);
+		// « Detailed log » opens the Logs section, right under its header.
+		assert.equal(hand[code].linux[6], locale['menu.debug.detailed_log']);
 		assert.equal(hand[code].tests, locale['menu.debug.tests']);
-		assert.equal(hand[code].hs[10], hand[code].linux[8]);
+		assert.equal(hand[code].hs[8], hand[code].linux[6]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,

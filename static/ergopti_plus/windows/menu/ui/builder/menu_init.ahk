@@ -711,8 +711,10 @@ _MI_ChannelPickerRow(SetChannelFn, IsLocal := Updater_IsLocalSource()) {
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
-; Shared commands and one enum choice: native code supplies only the actual
-; setter and current runtime value, while the manifest owns the row policy. The
+; Shared commands and two switches: native code supplies only the actual
+; setters and current runtime values, while the manifest owns the row policy.
+; « Detailed log » stores DEBUG when ticked and the default otherwise
+; (maintainer, 2026-11-24) through the same log-level setter. The
 ; checks and probes hang in its « Tests » group, built from debug_tests_menu
 ; with the same command owners; no Tests row is drawn when none is for Windows.
 _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
@@ -735,10 +737,10 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
 		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
 		ConfigLeaf.SHOW_ERROR_DIALOG, (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
-		ConfigLeaf.LOG_LEVEL, LogLevelCommand
+		MenuCommand.DETAILED_LOG, (*) => LogLevelCommand.Call(LoggerDetailedToggleTarget(LOGGER_MIN_LEVEL))
 	)
 	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled,
-		ConfigKey.SCRIPT_LOG_LEVEL, (*) => LOGGER_MIN_LEVEL)
+		"detailed_log_enabled", (*) => LoggerIsDetailed(LOGGER_MIN_LEVEL))
 	GroupBuilders := Map("debug_tests", () => _MI_BuildDebugTestsMenu(Commands, StateGetters))
 	return MenuRenderer_Build("debug_menu", "Debug", "", GroupBuilders, Map(), Commands, StateGetters)
 }

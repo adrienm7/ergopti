@@ -89,7 +89,7 @@ _LogParity_RunAll() {
 	Data := JsonParse(FileRead(CorpusPath, "UTF-8"))
 
 	_LogParity_Sections() {
-		for Name in ["level_setting", "format_failure", "dated_retention", "topical_retention"] {
+		for Name in ["level_setting", "detailed_log", "format_failure", "dated_retention", "topical_retention"] {
 			AssertTrue(Data.Has(Name) && Data[Name]["cases"].Length > 0, "the " . Name . " section is empty")
 			Named := false
 			for Driver in Data[Name]["drivers"]
@@ -120,6 +120,21 @@ _LogParity_RunAll() {
 	}
 	for _, Vector in Data["level_setting"]["cases"]
 		Test("logger parity level_setting: " . Vector["id"], _LogParity_MakeLevelCase(Vector))
+
+	_LogParity_MakeDetailedCase(Vector) {
+		_Run() {
+			global LOGGER_DEFAULT_LEVEL
+			; An absent key reaches the resolver as the IniCacheGet default.
+			Stored := Vector.Has("stored_absent") ? LOGGER_DEFAULT_LEVEL : Vector["stored"]
+			AssertEqual(Vector["ticked"] ? true : false, LoggerIsDetailed(Stored) ? true : false,
+				Vector["id"] . ": ticked")
+			AssertEqual(Vector["click_stores"], LoggerDetailedToggleTarget(Stored),
+				Vector["id"] . ": the level a click stores")
+		}
+		return _Run
+	}
+	for _, Vector in Data["detailed_log"]["cases"]
+		Test("logger parity detailed_log: " . Vector["id"], _LogParity_MakeDetailedCase(Vector))
 
 	_LogParity_MakeFormatCase(Vector) {
 		_Run() {

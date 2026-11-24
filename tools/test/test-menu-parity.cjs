@@ -6505,16 +6505,10 @@ function languageParentSource(source, driver) {
 			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.debug.title']);
-		// The row joins its label to its value through the locale's common.label_value; it
-		// follows the Diagnostic block and the Logs header.
-		assert.equal(
-			hand[code].linux[8],
-			locale['common.label_value']
-				.replace('{1}', locale['menu.debug.log_level'])
-				.replace('{2}', 'ℹ️ INFO')
-		);
+		// « Detailed log » follows the Diagnostic block and opens the Logs section.
+		assert.equal(hand[code].linux[6], locale['menu.debug.detailed_log']);
 		assert.equal(hand[code].tests, locale['menu.debug.tests']);
-		assert.equal(hand[code].hs[10], hand[code].linux[8]);
+		assert.equal(hand[code].hs[8], hand[code].linux[6]);
 	}
 	function tokenDepths(tokens) {
 		let depth = 0,

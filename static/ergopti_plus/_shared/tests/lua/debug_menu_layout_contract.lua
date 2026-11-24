@@ -65,7 +65,7 @@ function M.assert_layout(helpers, rows, captions, state)
 	for _, row in ipairs(rows) do
 		if type(row.menu) == "table" and row.title ~= captions.tests then groups = groups + 1 end
 	end
-	helpers.assert_eq(groups, 1, state .. ": only the log level opens a submenu besides Tests")
+	helpers.assert_eq(groups, 0, state .. ": only Tests opens a submenu (the log level is one switch)")
 end
 
 return M

@@ -353,8 +353,9 @@ const CHOICE_REGISTRIES = {
  * so a declared ordered subset must be validated against that enum. Each
  * translated leaf becomes `{ value, i18n }`, labelled
  * by the key `<row i18n>.<value>`, or by an explicit `choice_label_prefix` for
- * established label keys. The logger alone may expose its existing technical
- * tokens with source-owned emoji; these are not untranslated natural language.
+ * established label keys. Every leaf is translated: the logger's technical
+ * tokens left the menu with the log-level selector (2026-11-24), so a literal
+ * label is refused.
  * `show_current_choice` lets the shared renderer fill
  * a declared placeholder (default {1}) from the selected label;
  * `current_choice_label_value` instead joins the row's label to it through the
@@ -444,27 +445,9 @@ function projectChoices(menu, raw) {
 				throw new Error(
 					`${where}: choice_values must be a unique enum subset with at least two values`
 				);
-			const technical = row.choice_label_kind === 'log_level_token';
-			if (row.choice_label_kind !== undefined && (!technical || row.path !== KEY.SCRIPT_LOG_LEVEL))
-				throw new Error(`${where}: choice_label_kind is reserved for the logger's enum tokens`);
-			const icons = row.choice_icons;
-			if (technical) {
-				if (
-					prefix !== undefined ||
-					!icons ||
-					typeof icons !== 'object' ||
-					Array.isArray(icons) ||
-					Object.keys(icons).length !== values.length ||
-					values.some(
-						(value) =>
-							!Object.hasOwn(icons, value) ||
-							typeof icons[value] !== 'string' ||
-							!/^\p{Extended_Pictographic}\uFE0F?$/u.test(icons[value])
-					)
-				)
-					throw new Error(`${where}: choice_icons must name every selected log token exactly once`);
-			} else if (icons !== undefined) {
-				throw new Error(`${where}: choice_icons belongs to log_level_token only`);
+			for (const retired of ['choice_label_kind', 'choice_icons']) {
+				if (row[retired] !== undefined)
+					throw new Error(`${where}: ${retired} was retired with the log-level selector`);
 			}
 			// A free-entry row closes the submenu: the driver's command prompts for a
 			// value outside the presets. Both fields or neither, and only beside a
@@ -495,15 +478,12 @@ function projectChoices(menu, raw) {
 				throw new Error(`${where}: custom_unit_i18n names the free entry's unit key`);
 			row.choices =
 				projectedRegistry ||
-				values.map((value) =>
-					technical
-						? { value, label: `${icons[value]} ${value}` }
-						: { value, i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}` }
-				);
+				values.map((value) => ({
+					value,
+					i18n: prefix === undefined ? `${row.i18n}.${value}` : `${prefix}${value}`
+				}));
 			delete row.choice_registry;
 			delete row.choice_values;
-			delete row.choice_label_kind;
-			delete row.choice_icons;
 			// The compiler consumes this source metadata; native readers use only
 			// the projected labels and must not carry a competing prefix policy.
 			delete row.choice_label_prefix;

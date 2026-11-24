@@ -22,6 +22,7 @@ end
 --- Runs every case of the sections that name `ctx.driver`.
 --- @param ctx table { helpers, corpus, driver, core_path,
 ---   resolve_level = fn(stored, absent) -> level, threshold, refused,
+---   detailed_log = fn(stored, absent) -> ticked, level a click stores,
 ---   default_level = string, emit_body = fn(template, argument) -> body,
 ---   dated_expired = fn(date, now, days) -> boolean,
 ---   topical_stale = fn(modified, now) -> boolean }
@@ -51,6 +52,17 @@ return function(ctx)
 				assert_eq(level, case.level, case.id .. ": level")
 				assert_eq(threshold, case.threshold, case.id .. ": threshold")
 				assert_eq(refused, case.refused, case.id .. ": refused")
+			end)
+		end
+	end)
+
+	describe("logger parity detailed_log (" .. ctx.driver .. ")", function()
+		local section = replayed("detailed_log")
+		for _, case in ipairs(section.cases) do
+			it("logger parity detailed_log: " .. case.id, function()
+				local ticked, target = ctx.detailed_log(case.stored, case.stored_absent == true)
+				assert_eq(ticked, case.ticked, case.id .. ": ticked")
+				assert_eq(target, case.click_stores, case.id .. ": the level a click stores")
 			end)
 		end
 	end)

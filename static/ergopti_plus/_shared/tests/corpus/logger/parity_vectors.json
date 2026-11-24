@@ -101,6 +101,67 @@
 			}
 		]
 	},
+	"detailed_log": {
+		"_comment": "The Debug menu's « Detailed log » switch (maintainer, 2026-11-24) replaces the log-level selector over the same script.log_level value: it reads ticked when the stored value's threshold lets through more than the default's, and a click stores the default when ticked, else DEBUG. Replayed through LoggerIsDetailed / LoggerDetailedToggleTarget (Windows) and _shared/core/logger/engine/level_setting.lua is_detailed / detailed_toggle_target (macOS, Linux).",
+		"drivers": ["windows", "macos", "linux"],
+		"declaration": "script.log_level",
+		"cases": [
+			{
+				"id": "absent_value_reads_unticked",
+				"stored_absent": true,
+				"ticked": false,
+				"click_stores": "DEBUG"
+			},
+			{
+				"id": "debug_reads_ticked",
+				"stored": "DEBUG",
+				"ticked": true,
+				"click_stores": "INFO"
+			},
+			{
+				"id": "trace_reads_ticked",
+				"stored": "TRACE",
+				"ticked": true,
+				"click_stores": "INFO"
+			},
+			{
+				"id": "done_reads_ticked_in_any_case",
+				"stored": "done",
+				"ticked": true,
+				"click_stores": "INFO"
+			},
+			{
+				"id": "info_reads_unticked",
+				"stored": "INFO",
+				"ticked": false,
+				"click_stores": "DEBUG"
+			},
+			{
+				"id": "success_reads_unticked",
+				"stored": "SUCCESS",
+				"ticked": false,
+				"click_stores": "DEBUG"
+			},
+			{
+				"id": "warning_reads_unticked",
+				"stored": "WARNING",
+				"ticked": false,
+				"click_stores": "DEBUG"
+			},
+			{
+				"id": "error_reads_unticked",
+				"stored": "ERROR",
+				"ticked": false,
+				"click_stores": "DEBUG"
+			},
+			{
+				"id": "a_refused_value_reads_unticked",
+				"stored": "VERBOSE",
+				"ticked": false,
+				"click_stores": "DEBUG"
+			}
+		]
+	},
 	"format_failure": {
 		"_comment": "LOG-02. A format error keeps the line and records the failure on it: the template, then the marker, the error text, and how many arguments were lost. The shared Lua core (macOS, Linux) used to write the bare template, indistinguishable from a normal line. Each language has its own template syntax; the object argument is what makes both formatters raise (an AHK Map, a Lua table under %d).",
 		"drivers": ["windows", "macos", "linux"],
@@ -230,14 +291,31 @@
 				"refuse_first": 1,
 				"error": "disk is full",
 				"emit": ["first", "second"],
-				"expect": [{ "body": "second" }, { "report_count": 1 }]
+				"expect": [
+					{
+						"body": "second"
+					},
+					{
+						"report_count": 1
+					}
+				]
 			},
 			{
 				"id": "two_lost_lines_are_reported_once",
 				"refuse_first": 2,
 				"error": "disk is full",
 				"emit": ["first", "second", "third", "fourth"],
-				"expect": [{ "body": "third" }, { "report_count": 2 }, { "body": "fourth" }]
+				"expect": [
+					{
+						"body": "third"
+					},
+					{
+						"report_count": 2
+					},
+					{
+						"body": "fourth"
+					}
+				]
 			}
 		]
 	}

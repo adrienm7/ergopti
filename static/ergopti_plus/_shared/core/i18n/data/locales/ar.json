@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "عرض ما يشغّل Ergopti عند تسجيل الدخول",
 	"menu.debug.key_history": "سجل المفاتيح",
 	"menu.debug.list_vars": "حالة المتغيرات",
+	"menu.debug.detailed_log": "سجل مفصل",
 	"menu.debug.log_level": "مستوى السجل",
 	"menu.debug.open_error_log": "فتح ملف أخطاء اليوم",
 	"menu.debug.no_errors_today": "لا توجد تحذيرات أو أخطاء اليوم",

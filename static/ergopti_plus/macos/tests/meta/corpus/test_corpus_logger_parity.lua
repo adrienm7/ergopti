@@ -74,6 +74,11 @@ dofile(shared_root .. "/tests/corpus/logger/parity_replay.lua")({
 		helpers.assert_eq(warned, resolved.refused, "a refused level must be logged, and only then")
 		return resolved.level, applied, resolved.refused
 	end,
+	detailed_log = function(stored, absent)
+		local LevelSetting = require("core.logger.engine.level_setting")
+		local value = not absent and stored or nil
+		return LevelSetting.is_detailed(value, entry, Core), LevelSetting.detailed_toggle_target(value, entry, Core)
+	end,
 	emit_body = function(template, argument)
 		local lines = captured(function() Logger.info("LogParity", template, argument) end)
 		assert(#lines == 1, "exactly one line must reach the sink, got " .. #lines)

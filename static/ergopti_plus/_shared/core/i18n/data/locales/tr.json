@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Ergopti'yi oturum açılırken neyin başlattığını göster",
 	"menu.debug.key_history": "Tuş geçmişi",
 	"menu.debug.list_vars": "Değişken durumu",
+	"menu.debug.detailed_log": "Ayrıntılı günlük",
 	"menu.debug.log_level": "Günlük seviyesi",
 	"menu.debug.open_error_log": "Bugünün hata dosyasını aç",
 	"menu.debug.no_errors_today": "Bugün uyarı veya hata yok",

@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Показати, що запускає Ergopti під час входу",
 	"menu.debug.key_history": "Історія клавіш",
 	"menu.debug.list_vars": "Стан змінних",
+	"menu.debug.detailed_log": "Докладний журнал",
 	"menu.debug.log_level": "Рівень логування",
 	"menu.debug.open_error_log": "Відкрити файл помилок за сьогодні",
 	"menu.debug.no_errors_today": "Сьогодні немає попереджень і помилок",

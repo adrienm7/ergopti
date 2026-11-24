@@ -1,26 +1,27 @@
 --- tests/unit/menu/about/test_log_level_choices.lua
 
 --- ==============================================================================
---- MODULE: Shared Debug Log Choices (Linux)
+--- MODULE: Debug « Detailed log » Switch (Linux)
 --- DESCRIPTION:
---- Replays an independently captured four-state presentation through the real
---- tray builder. Moving the shared choices must move the native leaves and their
---- callbacks without bypassing the existing acknowledged persistence owner.
+--- « Detailed log » replaced the log-level selector (maintainer, 2026-11-24).
+--- The real tray builder ticks it from the shared detailed_log cases, and a
+--- click asks the existing acknowledged persistence owner for DEBUG or the
+--- default, returning that owner's refusal.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
---- Reads expectations that are independent of the generated menu manifest.
---- @return table corpus
-local function corpus()
-	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/log_level_rows.json"), "rb"))
+--- The « Detailed log » cases the three drivers replay.
+--- @return table cases
+local function cases()
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/logger/parity_vectors.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(Json.decode(raw))
+	return assert(Json.decode(raw)).detailed_log.cases
 end
 
---- Finds the real native log-level parent without assuming its position.
+--- Finds the real native « Detailed log » row without assuming its position.
 --- @param selected string Current durable severity.
 --- @param setter function Existing native assignment owner.
 --- @return table row
@@ -37,13 +38,13 @@ local function build(selected, setter)
 		config = config, log_level = selected, on_set_log_level = setter,
 		on_toggle_pause = function() end, on_quit = function() end,
 	})
-	local label = require("core.i18n.engine.i18n").get("menu.debug.log_level")
+	local label = require("core.i18n.engine.i18n").get("menu.debug.detailed_log")
 	for _, top in ipairs(rows) do
 		for _, row in ipairs(top.menu or {}) do
-			if row.title and row.title:find(label, 1, true) == 1 then return row end
+			if row.title == label then return row end
 		end
 	end
-	error("the declared Debug log-level parent is missing")
+	error("the declared Debug « Detailed log » row is missing")
 end
 
 --- Compiles the actual daemon callback and binds the real script-settings owner.
@@ -108,63 +109,34 @@ local function native_owner(receipt)
 	end, observed
 end
 
-helpers.describe("Linux shared Debug log choices", function()
-	for _, state in ipairs(corpus().states) do
-		helpers.it("replays the independent four-state matrix for " .. state.selected, function()
-			local observed = {}
-			local row = build(state.selected, function(value) observed[#observed + 1] = value; return true end)
-			local expected = corpus().levels
-			helpers.assert_eq(#row.menu, 4)
-			for index, level in ipairs(expected) do
-				helpers.assert_eq(row.menu[index].title, level.label)
-				helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
-				if level.value == state.selected then
-					helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get("menu.debug.log_level"), level.label))
-				end
-				helpers.assert_eq(row.menu[index].fn(), true)
-			end
-			helpers.assert_eq(observed, { "DEBUG", "INFO", "WARNING", "ERROR" })
-		end)
+helpers.describe("Linux Debug « Detailed log » switch", function()
+	local LevelSetting = require("core.logger.engine.level_setting")
+	local entry = require("menu.engine.manifest_reader").find_entry_by_path("script.log_level")
+	for _, case in ipairs(cases()) do
+		-- The live level is always a declared name: replay the cases that name one.
+		local selected = type(case.stored) == "string" and LevelSetting.canonical(case.stored, entry) or nil
+		if selected then
+			helpers.it("ticks and asks for the shared level: " .. case.id, function()
+				local observed = {}
+				local row = build(selected, function(value) observed[#observed + 1] = value; return true end)
+				helpers.assert_nil(row.menu, "the detailed log is one switch, not a submenu")
+				helpers.assert_eq(row.checked == true, case.ticked)
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(observed, { case.click_stores })
+			end)
+		end
 	end
 
-	helpers.it("follows shared ordering and returns the actual durable owner's refusal", function()
-		local renderer = require("menu.engine.manifest_menu")
-		local declaration
-		for _, row in ipairs(renderer.get_root().debug_menu) do if row.id == "log_level" then declaration = row end end
-		local previous = declaration.choices
-		local expected, labels = corpus(), {}
-		for _, level in ipairs(expected.levels) do labels[level.value] = level.label end
-		declaration.choices = {}
-		for _, value in ipairs(expected.reordered_values) do
-			declaration.choices[#declaration.choices + 1] = { value = value, label = labels[value] }
-		end
-		local setter, observations = native_owner("false")
-		local ok, detail = pcall(function()
-			local row = build(observations.selected, setter)
-			for index, value in ipairs(expected.reordered_values) do
-				helpers.assert_eq(row.menu[index].title, labels[value])
-				helpers.assert_eq(row.menu[index].checked == true, value == "INFO")
-			end
-			helpers.assert_eq(row.menu[1].fn(), false)
-			helpers.assert_eq(observations.requested, "ERROR")
-			helpers.assert_eq(observations.selected, "INFO")
-			helpers.assert_eq(observations.durable, { ["script.log_level"] = "INFO", future = 42 })
-			helpers.assert_eq(observations.threshold, 20)
-			helpers.assert_eq(observations.detached, 20)
-			helpers.assert_eq(observations.rebuilds, 0)
-		end)
-		declaration.choices = previous
-		if not ok then error(detail, 0) end
-	end)
 	for _, receipt in ipairs({ "false", "nil", "true" }) do
 		helpers.it("returns the actual daemon owner receipt for storage " .. receipt, function()
 			local setter, observed = native_owner(receipt)
-			local row = build("INFO", setter)
-			helpers.assert_eq(row.menu[4].fn(), receipt == "true")
-			helpers.assert_eq(observed.requested, "ERROR")
+			local row = build(observed.selected, setter)
+			helpers.assert_eq(row.checked == true, false, "INFO reads as an unticked detailed log")
+			helpers.assert_eq(row.fn(), receipt == "true")
+			helpers.assert_eq(observed.requested, "DEBUG")
 			helpers.assert_eq(observed.detached, 20)
-			helpers.assert_eq(observed.selected, receipt == "true" and "ERROR" or "INFO")
-			helpers.assert_eq(observed.threshold, receipt == "true" and 40 or 20)
+			helpers.assert_eq(observed.selected, receipt == "true" and "DEBUG" or "INFO")
+			helpers.assert_eq(observed.threshold, receipt == "true" and 10 or 20)
 			helpers.assert_eq(observed.durable["script.log_level"], observed.selected)
 			helpers.assert_eq(observed.durable.future, 42)
 			helpers.assert_eq(observed.rebuilds, receipt == "true" and 1 or 0)

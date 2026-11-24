@@ -2782,3 +2782,18 @@ push, so only `--push` (`-Push` on Windows) runs the field-branch flow. Action:
 write `--push` in every command the maintainer is told to run; a person without
 push rights attaches the saved folder to an issue. Pinned by the three
 field-report contract tests.
+
+## « Detailed log » replaces the log-level selector (2026-11-24)
+
+The Debug menu of the three OS shows one switch, « Journal détaillé »
+(`menu.debug.detailed_log`), at the top of the Logs section beside « Afficher
+une fenêtre à chaque erreur », then a separator and the rows that open a log.
+Unticked is INFO (the default), ticked is DEBUG. The stored key stays
+`script.log_level` with its eight declared values and no migration: a
+hand-edited TRACE or DONE reads ticked, WARNING or ERROR unticked, and a click
+then writes DEBUG or INFO. The rule lives in
+`_shared/core/logger/engine/level_setting.lua` and the Windows logger, held
+by the `detailed_log` logger parity vectors. Do not bring back a level picker
+in the menu; `config.toml` remains the place for any other level. Asked the
+same day: the bug report says when the detailed log is off (open in TODO.md
+while the report builder is being changed).

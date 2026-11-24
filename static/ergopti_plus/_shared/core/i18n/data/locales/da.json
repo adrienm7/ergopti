@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Vis hvad der starter Ergopti ved login",
 	"menu.debug.key_history": "Tasthhistorik",
 	"menu.debug.list_vars": "Variabeltilstand",
+	"menu.debug.detailed_log": "Detaljeret log",
 	"menu.debug.log_level": "Logniveau",
 	"menu.debug.open_error_log": "Åbn dagens fejlfil",
 	"menu.debug.no_errors_today": "Ingen advarsler eller fejl i dag",

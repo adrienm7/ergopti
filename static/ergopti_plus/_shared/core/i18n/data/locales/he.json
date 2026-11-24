@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "הצגת מה מפעיל את Ergopti בכניסה",
 	"menu.debug.key_history": "היסטוריית מקשים",
 	"menu.debug.list_vars": "מצב משתנים",
+	"menu.debug.detailed_log": "יומן מפורט",
 	"menu.debug.log_level": "רמת יומן",
 	"menu.debug.open_error_log": "פתח את קובץ השגיאות של היום",
 	"menu.debug.no_errors_today": "אין אזהרות או שגיאות היום",

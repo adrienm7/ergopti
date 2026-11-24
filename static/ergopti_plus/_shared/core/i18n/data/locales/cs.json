@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Zobrazit, co spouští Ergopti při přihlášení",
 	"menu.debug.key_history": "Historie kláves",
 	"menu.debug.list_vars": "Stav proměnných",
+	"menu.debug.detailed_log": "Podrobný protokol",
 	"menu.debug.log_level": "Úroveň logu",
 	"menu.debug.open_error_log": "Otevřít dnešní soubor chyb",
 	"menu.debug.no_errors_today": "Dnes žádná varování ani chyby",

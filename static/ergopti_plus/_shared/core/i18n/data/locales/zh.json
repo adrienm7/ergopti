@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "显示登录时启动 Ergopti 的项目",
 	"menu.debug.key_history": "按键历史",
 	"menu.debug.list_vars": "变量状态",
+	"menu.debug.detailed_log": "详细日志",
 	"menu.debug.log_level": "日志级别",
 	"menu.debug.open_error_log": "打开今日错误文件",
 	"menu.debug.no_errors_today": "今天没有警告或错误",

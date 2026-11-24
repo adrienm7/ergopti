@@ -1799,6 +1799,7 @@
 	"menu.debug.field_check_login_items": "Mostrar qué inicia Ergopti al iniciar sesión",
 	"menu.debug.key_history": "Historial de teclas",
 	"menu.debug.list_vars": "Estado de variables",
+	"menu.debug.detailed_log": "Registro detallado",
 	"menu.debug.log_level": "Nivel de log",
 	"menu.debug.open_error_log": "Abrir el archivo de errores de hoy",
 	"menu.debug.no_errors_today": "Ninguna advertencia ni error hoy",
