@@ -21,18 +21,22 @@
 local helpers = require("tests.helpers")
 
 -- The rows in the order the menu must draw them, by the key of their label.
+-- Each group under its « — Title — » header (maintainer, 2026-11-24).
 local EXPECTED = {
+	"— menu.configuration.header_reset —",
 	"common.restore_recommended",
 	"common.clear_to_system",
 	"-",
+	"— menu.configuration.header_files —",
 	"menu.global.clean_unused_keys",
-	"-",
 	"menu.global.config_folder",
 	"menu.global.setup_wizard",
 	"-",
+	"— menu.configuration.header_network —",
 	"menu.debug.proxy_override",
 	-- The windows' reading choices, captioned with their current value.
 	"-",
+	"— menu.configuration.header_accessibility —",
 	"menu.configuration.reading_font: menu.configuration.reading_font.default",
 	"menu.configuration.reading_spacing: menu.configuration.reading_spacing.default",
 }
@@ -202,20 +206,7 @@ helpers.describe("configuration submenu (macOS): no row acts on the user's Karab
 			local rows = rows_with_karabiner(enabled, calls)
 			local drawn = {}
 			for index, row in ipairs(rows) do drawn[index] = row.title end
-			helpers.assert_eq(table.concat(drawn, ", "), table.concat({
-				"common.restore_recommended",
-				"common.clear_to_system",
-				"-",
-				"menu.global.clean_unused_keys",
-				"-",
-				"menu.global.config_folder",
-				"menu.global.setup_wizard",
-				"-",
-				"menu.debug.proxy_override",
-				"-",
-				"menu.configuration.reading_font: menu.configuration.reading_font.default",
-				"menu.configuration.reading_spacing: menu.configuration.reading_spacing.default",
-			}, ", "))
+			helpers.assert_eq(table.concat(drawn, ", "), table.concat(EXPECTED, ", "))
 			helpers.assert_nil(row_titled(rows, "menu.global.karabiner_integration"))
 			helpers.assert_nil(row_titled(rows, "menu.global.remove_from_karabiner"))
 			helpers.assert_eq(#calls, 0, "building the menu asks nothing of the remap owner")

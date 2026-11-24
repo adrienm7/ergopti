@@ -3,16 +3,19 @@
 		"parent": "Configuration",
 		"quit": "⏹ Quit",
 		"children": [
+			"— Reset —",
 			"↺ Restore recommended values",
 			"✕ Clear all (system behaviour)",
 			"-",
+			"— Files and wizard —",
 			"Clean config.toml",
-			"-",
 			"Paths (configuration & logs)…",
 			"Setup wizard…",
 			"-",
+			"— Network —",
 			"Proxy for downloads…",
 			"-",
+			"— Accessibility —",
 			"Font of the windows: Default",
 			"Text spacing of the windows: Default"
 		]
@@ -21,16 +24,19 @@
 		"parent": "Configuration",
 		"quit": "⏹ Quitter",
 		"children": [
+			"— Réinitialisation —",
 			"↺ Restaurer les valeurs conseillées",
 			"✕ Tout effacer (comportement du système)",
 			"-",
+			"— Fichiers et assistant —",
 			"Nettoyer config.toml",
-			"-",
 			"Chemins (configuration & logs)…",
 			"Assistant de configuration…",
 			"-",
+			"— Réseau —",
 			"Proxy des téléchargements…",
 			"-",
+			"— Accessibilité —",
 			"Police des fenêtres : Par défaut",
 			"Espacement du texte des fenêtres : Par défaut"
 		]

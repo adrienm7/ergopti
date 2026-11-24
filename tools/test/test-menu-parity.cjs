@@ -6764,17 +6764,22 @@ function languageParentSource(source, driver) {
 			readSourceFile(path.join(base, '_shared/core/i18n/data/locales', code + '.json'))
 		);
 		assert.equal(hand[code].parent, locale['menu.configuration.title']);
+		// « — Title — » headers over every group (maintainer, 2026-11-24)
+		const title = (key) => '— ' + locale['menu.configuration.' + key] + ' —';
 		assert.deepEqual(hand[code].children, [
+			title('header_reset'),
 			locale['common.restore_recommended'],
 			locale['common.clear_to_system'],
 			'-',
+			title('header_files'),
 			locale['menu.global.clean_unused_keys'],
-			'-',
 			locale['menu.global.config_folder'],
 			locale['menu.global.setup_wizard'],
 			'-',
+			title('header_network'),
 			locale['menu.debug.proxy_override'],
 			'-',
+			title('header_accessibility'),
 			locale['common.label_value']
 				.replace('{1}', locale['menu.configuration.reading_font'])
 				.replace('{2}', locale['menu.configuration.reading_font.default']),

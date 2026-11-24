@@ -86,6 +86,12 @@
 			"not_testable": "Needs the runtime rebuild that ships the repair role, then an administrator bootout of a system job: rebuild the owned runtime first; the Swift and Lua parsers are unit-tested (test_runtime_service_repair)."
 		},
 		{
+			"id": "configuration_titles",
+			"title": "Configuration submenu grouped under titles",
+			"checks": [],
+			"not_testable": "The submenu is read in the open menu-bar menu, which no run captures: open Configuration; the order is unit-tested (test_menu, configuration_parent.json)."
+		},
+		{
 			"id": "tray_suspend_row",
 			"title": "Tray « Suspendre » row before Reload",
 			"checks": [],

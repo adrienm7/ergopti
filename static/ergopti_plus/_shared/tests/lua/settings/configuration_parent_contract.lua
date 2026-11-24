@@ -62,8 +62,13 @@ function M.register(helpers, fixture, corpus, platform)
 					helpers.assert_eq(observed.effects, {}, "constructing Configuration invokes no action")
 					local expected_result
 					if platform == "hs" then expected_result = false end
-					helpers.assert_eq(parent.menu[6].fn(), expected_result)
+					-- Each group sits under its « — Title — » header (2026-11-24)
+					for _, header in ipairs({ 1, 5, 10, 13 }) do
+						helpers.assert_true(parent.menu[header].disabled == true, "the section header is inert: " .. header)
+						helpers.assert_nil(parent.menu[header].fn, "the section header has no action: " .. header)
+					end
 					helpers.assert_eq(parent.menu[7].fn(), expected_result)
+					helpers.assert_eq(parent.menu[8].fn(), expected_result)
 					helpers.assert_eq(observed.effects, { "paths_editor", "setup_wizard" })
 					for index = #observed.effects, 1, -1 do observed.effects[index] = nil end
 					local paused = find(build(true), expected.parent)
@@ -73,11 +78,11 @@ function M.register(helpers, fixture, corpus, platform)
 					-- restore, the clear and the macOS unused-key clean stay live while
 					-- paused; the composition is pinned by each global scope's
 					-- edd1-paused-writes regression.
-					for _, index in ipairs(platform == "hs" and { 1, 2, 4 } or { 1, 2 }) do
+					for _, index in ipairs(platform == "hs" and { 2, 3, 6 } or { 2, 3 }) do
 						helpers.assert_true(paused.menu[index].disabled ~= true)
 						helpers.assert_eq(type(paused.menu[index].fn), "function")
 					end
-					for _, index in ipairs({ 6, 7 }) do
+					for _, index in ipairs({ 7, 8 }) do
 						helpers.assert_true(paused.menu[index].disabled ~= true)
 						helpers.assert_eq(type(paused.menu[index].fn), "function")
 					end

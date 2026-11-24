@@ -222,6 +222,8 @@ function checkMenu(menu, rows, errors) {
 		checked += 1;
 		const where = `${menu} (${platform})`;
 		let at = shown[0] && shown[0].type === 'toggle' ? 1 : 0;
+		// A titled first group (Configuration, 2026-11-24) opens with its header
+		if (shown[at] && shown[at].type === 'section_header') at += 1;
 		const expected = [];
 		if (at === 1) expected.push(shown[0].id);
 		if (scopeKind(shown[at]) !== 'restore') {

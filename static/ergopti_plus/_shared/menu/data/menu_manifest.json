@@ -1159,6 +1159,10 @@
 	],
 	"configuration_menu": [
 		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_reset"
+		},
+		{
 			"type": "command",
 			"id": "scope_restore",
 			"i18n": "common.restore_recommended"
@@ -1172,12 +1176,13 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_files"
+		},
+		{
 			"type": "command",
 			"id": "clean_unused_keys",
 			"i18n": "menu.global.clean_unused_keys"
-		},
-		{
-			"type": "---"
 		},
 		{
 			"type": "command",
@@ -1193,12 +1198,20 @@
 			"type": "---"
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_network"
+		},
+		{
 			"type": "command",
 			"id": "proxy_override",
 			"i18n": "menu.debug.proxy_override"
 		},
 		{
 			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_accessibility"
 		},
 		{
 			"type": "choice",

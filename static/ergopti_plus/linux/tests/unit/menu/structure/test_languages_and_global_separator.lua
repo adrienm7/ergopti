@@ -76,7 +76,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		helpers.assert_true(is_separator(rows[at - 2]), "and a separator must precede that header")
 	end)
 
-	helpers.it("configuration: restore and clear, the cleanup, the two windows, then the proxy", function()
+	helpers.it("configuration: each group under its title, restore and clear, the files, the proxy, accessibility", function()
 		local mb = helpers.load_module("menu.ui.builder.builder")
 		local i18n = require("core.i18n.engine.i18n")
 		local shown = {}
@@ -92,24 +92,29 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
 		local drawn = {}
 		for index, row in ipairs(rows) do drawn[index] = is_separator(row) and "-" or row.title end
+		-- « — Title — » headers over every group (maintainer, 2026-11-24)
+		local function title(key) return i18n.decorate_section(i18n.get(key)) end
 		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
+			title("menu.configuration.header_reset"),
 			i18n.get("common.restore_recommended"),
 			i18n.get("common.clear_to_system"),
 			"-",
+			title("menu.configuration.header_files"),
 			i18n.get("menu.global.clean_unused_keys"),
-			"-",
 			i18n.get("menu.global.config_folder"),
 			i18n.get("menu.global.setup_wizard"),
 			"-",
+			title("menu.configuration.header_network"),
 			i18n.get("menu.debug.proxy_override"),
 			"-",
+			title("menu.configuration.header_accessibility"),
 			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_font"))
 				:gsub("{2}", i18n.get("menu.configuration.reading_font.default"))),
 			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_spacing"))
 				:gsub("{2}", i18n.get("menu.configuration.reading_spacing.default"))),
 		}, " | "), "Uninstall moved to the Version / Updates submenu; the download proxy moved here from Debug")
 		-- The folders editor, as on the other two drivers, not the file manager.
-		local folder = rows[6]
+		local folder = rows[7]
 		local fn = folder.fn or folder.action
 		helpers.assert_eq(type(fn), "function", "the folders row must act")
 		fn()

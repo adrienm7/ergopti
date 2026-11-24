@@ -100,8 +100,11 @@ _MLG_Order(MenuName) {
 ; Gestures clear (2026-11-03). The macOS-only Karabiner rows left with the owned
 ; runtime default (ADR 011).
 _MLG_ConfigurationRowsInOrder() {
-	AssertEqual("scope_restore, scope_clear, ---, clean_unused_keys, ---, config_folder, "
-		. "setup_wizard, ---, proxy_override, ---, reading_font, reading_spacing",
+	; Each group under its « — Title — » header (maintainer, 2026-11-24)
+	AssertEqual("header menu.configuration.header_reset, scope_restore, scope_clear, ---, "
+		. "header menu.configuration.header_files, clean_unused_keys, config_folder, setup_wizard, ---, "
+		. "header menu.configuration.header_network, proxy_override, ---, "
+		. "header menu.configuration.header_accessibility, reading_font, reading_spacing",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
 	AssertFalse(InStr(_MLG_Order("debug_menu"), "proxy_override"), "Debug no longer declares the proxy row")

@@ -970,6 +970,13 @@ id = "locales"
 # owner writes its backup first, so neither row asks: the backup is the undo
 # (the maintainer retired the clear's question on 2026-09-30). AI and metrics
 # consent are never granted by the restore.
+#
+# Every group opens with a « — Title — » header like the Debug menu's
+# (maintainer, 2026-11-24): Reset, Files and wizard, Network, Accessibility.
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_reset"
+
 [[menu.configuration_menu]]
 type = "command"
 id = "scope_restore"
@@ -983,6 +990,10 @@ i18n = "common.clear_to_system"
 [[menu.configuration_menu]]
 type = "---"
 
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_files"
+
 # Lists the config.toml keys the driver does not use and offers to remove them
 # after a backup. Each driver applies its own reader's rule: Windows the boot
 # loader's unknown-key check against the manifest, macOS and Linux the keys
@@ -991,11 +1002,6 @@ type = "---"
 type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
-
-# Set apart by a separator: the rows above rewrite the configuration, the rows
-# below open a window onto it.
-[[menu.configuration_menu]]
-type = "---"
 
 # The folders editor: where the configuration and the logs live.
 [[menu.configuration_menu]]
@@ -1018,6 +1024,10 @@ i18n = "menu.global.setup_wizard"
 type = "---"
 
 [[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_network"
+
+[[menu.configuration_menu]]
 type = "command"
 id = "proxy_override"
 i18n = "menu.debug.proxy_override"
@@ -1027,6 +1037,10 @@ i18n = "menu.debug.proxy_override"
 # opens from then on.
 [[menu.configuration_menu]]
 type = "---"
+
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_accessibility"
 
 [[menu.configuration_menu]]
 type = "choice"
