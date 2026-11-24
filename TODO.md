@@ -324,16 +324,15 @@ analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-an
 waits for the maintainer's review).
 
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 73 of the 91 files left out for its keys came in, the library holds 785 layouts
+      model »): 73 of the 91 files left out for its keys came in, the library holds 787 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
       board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (the ErgoDox's extra left thumb keys are idle since
       2026-11-21) (`docs/design/layout-analysis.md`,
       « ErgoDox keys »). Still in `not_imported`: KLA's four standard-board files need Tab, Caps Lock, Enter or a
       bottom modifier as character keys on ISO and ANSI (TypeMatrix's q and a, the ANSI BvoFRak's q, Arensito's à,
-      AOEYK's \), which would also offer them to the optimizer; KLAnext's Einbinder Orthogonal, VCKB, VCKB2 and Yp Hina
-      Fu put a letter on the ErgoDox's left 2-unit outer thumb key, where the board keeps Space (a code of its own
-      there would draw two keys at one place: the Comparer's and the Optimiser's boards draw every non-modifier
-      code).
+      AOEYK's \), which would also offer them to the optimizer; KLAnext's VCKB and VCKB2 type a letter (d, l) on the
+      ErgoDox's right 2-unit outer thumb key, the board's AltGr (a mod-tap code there, as the Shift keys' tapped
+      characters have, would read it; each would still lack its « u », on the left thumb's second key).
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
@@ -816,6 +815,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
   2. Run the SendInput comparison in the field report row, after a notice asking not to type.
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
+- [ ] **A letter on the ErgoDox's left 2-unit outer thumb key (decided by the agent on 2026-11-24, to review by the
+      maintainer).** KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e ») put a letter on key 66, where the
+      board keeps Space, beside their space or « o » on the inner key. Kept meanwhile: the letter is read on Space,
+      the board's own key there (one key at its place on every drawing), and both layouts are in the library,
+      incomplete on the ErgoDox since the left thumb types on one key (`docs/design/layout-analysis.md`, « ErgoDox
+      keys »). Choose whether such a letter should instead make the outer key the left thumb's typing key.
 - [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
       maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
       most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
