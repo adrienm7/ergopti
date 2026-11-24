@@ -228,7 +228,7 @@
 		},
 		{
 			"id": "js-0275",
-			"ordinal": 289,
+			"ordinal": 290,
 			"name": "dynamic hotstrings menu labels (resolver bridge + locale keys)",
 			"cmd": "node",
 			"args": ["tools/test/test-dynamic-hotstrings-menu-labels.cjs"],
@@ -236,7 +236,7 @@
 		},
 		{
 			"id": "js-0276",
-			"ordinal": 290,
+			"ordinal": 291,
 			"name": "manifest menu labels resolve (whole class, not a sample)",
 			"cmd": "node",
 			"args": ["tools/test/test-manifest-menu-labels-resolve.cjs"],
@@ -244,7 +244,7 @@
 		},
 		{
 			"id": "js-0278",
-			"ordinal": 292,
+			"ordinal": 293,
 			"name": "manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-labels-resolve.cjs"],
@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "platform-reason-wording",
-			"ordinal": 442,
+			"ordinal": 443,
 			"name": "platform reasons describe the platform and never schedule work",
 			"cmd": "node",
 			"args": ["tools/test/test-platform-reason-wording.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "llm-prompt-keys-single-source",
-			"ordinal": 457,
+			"ordinal": 458,
 			"name": "AI numeric prompts and local-server port dialogs use one key set on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
@@ -268,7 +268,7 @@
 		},
 		{
 			"id": "linux-menu-parts",
-			"ordinal": 540,
+			"ordinal": 541,
 			"name": "the Linux tray root is read with its split section modules, and every other wiring is refused",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-menu-parts.cjs"],
@@ -276,7 +276,7 @@
 		},
 		{
 			"id": "menu-shown-rows-have-own-label",
-			"ordinal": 569,
+			"ordinal": 570,
 			"name": "every manifest row a driver shows has its own key in all 21 locales, and every key the menus name exists",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-shown-rows-have-own-label.cjs"],
@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "french-punctuation",
-			"ordinal": 570,
+			"ordinal": 571,
 			"name": "no French string glues high punctuation to a word, and every label joins its value through common.label_value",
 			"cmd": "node",
 			"args": ["tools/test/test-french-punctuation.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "menu-category-off-rule",
-			"ordinal": 571,
+			"ordinal": 572,
 			"name": "a category off greys its submenu but the enable row and the rows declared readable_when_off",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-category-off-rule.cjs"],
@@ -300,7 +300,7 @@
 		},
 		{
 			"id": "menu-no-duplicate-actions",
-			"ordinal": 706,
+			"ordinal": 707,
 			"name": "every tray action has one place, and Ergopti Studio precedes the layout menu (menu-no-duplicate-actions)",
 			"cmd": "node",
 			"args": ["tools/test/test-menu-no-duplicate-actions.cjs"],

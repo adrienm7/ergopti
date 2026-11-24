@@ -276,7 +276,7 @@
 		},
 		{
 			"id": "js-0242",
-			"ordinal": 256,
+			"ordinal": 257,
 			"name": "stubs intercept something (no package.loaded key naming a missing module)",
 			"cmd": "node",
 			"args": ["tools/test/test-stubs-intercept-something.cjs"],
@@ -284,7 +284,7 @@
 		},
 		{
 			"id": "js-0251",
-			"ordinal": 265,
+			"ordinal": 266,
 			"name": "npm alias ⇄ suite parity (no alias names a gate the suite does not run; the aliasless count only falls)",
 			"cmd": "node",
 			"args": ["tools/test/test-npm-aliases-match-the-suite.cjs"],
@@ -292,7 +292,7 @@
 		},
 		{
 			"id": "js-0280",
-			"ordinal": 294,
+			"ordinal": 295,
 			"name": "source-tree scan coverage (no scanner list forgets platform/)",
 			"cmd": "node",
 			"args": ["tools/test/test-source-trees-are-scanned.cjs"],
@@ -300,7 +300,7 @@
 		},
 		{
 			"id": "js-0281",
-			"ordinal": 295,
+			"ordinal": 296,
 			"name": "untracked driver artifacts cannot contaminate commit-candidate gates",
 			"cmd": "node",
 			"args": ["tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs"],
@@ -308,7 +308,7 @@
 		},
 		{
 			"id": "js-0289",
-			"ordinal": 303,
+			"ordinal": 304,
 			"name": "AHK source encoding (UTF-8 BOM + LF)",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-encoding.cjs"],
@@ -316,7 +316,7 @@
 		},
 		{
 			"id": "js-0290",
-			"ordinal": 304,
+			"ordinal": 305,
 			"name": "mutation-test harness passes un-mutated (Stryker precondition)",
 			"cmd": "node",
 			"args": ["tools/test/test-mutation-targets.cjs"],
@@ -324,7 +324,7 @@
 		},
 		{
 			"id": "js-0296",
-			"ordinal": 310,
+			"ordinal": 311,
 			"name": "formatting gate (hook formats staged files, CI checks the tree with the pinned Ruff, generated files ignored)",
 			"cmd": "node",
 			"args": ["tools/test/test-format-gate.cjs"],
@@ -332,7 +332,7 @@
 		},
 		{
 			"id": "js-0325",
-			"ordinal": 341,
+			"ordinal": 342,
 			"name": "CPython resolution refuses configured interpreter substitution",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-python-resolution.cjs"],
@@ -340,7 +340,7 @@
 		},
 		{
 			"id": "js-0328",
-			"ordinal": 344,
+			"ordinal": 345,
 			"name": "every gate script is actually wired into a runner",
 			"cmd": "node",
 			"args": ["tools/test/test-gate-scripts-are-wired.cjs"],
@@ -348,7 +348,7 @@
 		},
 		{
 			"id": "js-0357",
-			"ordinal": 368,
+			"ordinal": 369,
 			"name": "file-path headers (convention 3, every source file names itself)",
 			"cmd": "node",
 			"args": ["tools/lint/audit-file-headers.cjs"],
@@ -356,7 +356,7 @@
 		},
 		{
 			"id": "js-0362",
-			"ordinal": 373,
+			"ordinal": 374,
 			"name": "git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)",
 			"cmd": "node",
 			"args": ["tools/test/test-git-mv-resilience.cjs"],
@@ -364,7 +364,7 @@
 		},
 		{
 			"id": "js-0408",
-			"ordinal": 406,
+			"ordinal": 407,
 			"name": "expected pcall rejection stays distinct from weak success assertions",
 			"cmd": "node",
 			"args": ["tools/test/test-false-green-pcall-rejection.cjs"],
@@ -372,7 +372,7 @@
 		},
 		{
 			"id": "js-0412",
-			"ordinal": 409,
+			"ordinal": 410,
 			"name": "every Windows meta test census the Linux lane can recompute matches the driver source (hardening-f)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-f-ahk-meta-counts.cjs"],
@@ -380,7 +380,7 @@
 		},
 		{
 			"id": "js-0414",
-			"ordinal": 411,
+			"ordinal": 412,
 			"name": "tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)",
 			"cmd": "node",
 			"args": ["tools/test/find-false-greens.cjs"],
@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0415",
-			"ordinal": 412,
+			"ordinal": 413,
 			"name": "literal JS feature inventory preserves ordered default projections and refuses invalid plans",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-js-feature-inventory.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0416",
-			"ordinal": 413,
+			"ordinal": 414,
 			"name": "JS feature journals require a complete source-bound successful exact union",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-js-feature-results.cjs"],
@@ -404,7 +404,7 @@
 		},
 		{
 			"id": "js-0433",
-			"ordinal": 414,
+			"ordinal": 415,
 			"name": "Retained publication plans require every selected lane and exact source/run identity",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-publication-plan.cjs"],
@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0434",
-			"ordinal": 415,
+			"ordinal": 416,
 			"name": "Adjacent OS scheduler custody preserves strict original verdicts",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ci-stage-status.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-0435",
-			"ordinal": 416,
+			"ordinal": 417,
 			"name": "Mac matrix stage roles preserve complete native qualification custody",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-stage-roles.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-0436",
-			"ordinal": 417,
+			"ordinal": 418,
 			"name": "Current Carbon fixture causal controls preserve historical source and exact native refusal",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-number-row-current-test-causal.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "js-0439",
-			"ordinal": 420,
+			"ordinal": 421,
 			"name": "the Windows AHK compiler-warning gate fails on real /ErrorStdOut warnings and load errors",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-warning-gate.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-0441",
-			"ordinal": 422,
+			"ordinal": 423,
 			"name": "the Windows unit matrix runs exactly the AHK module groups, once each",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-module-matrix.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-0442",
-			"ordinal": 423,
+			"ordinal": 424,
 			"name": "the cached script tokenizer returns fresh, mode-specific scans after eviction",
 			"cmd": "node",
 			"args": ["tools/test/test-script-source.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-0450",
-			"ordinal": 430,
+			"ordinal": 431,
 			"name": "AHK cases the host cannot run are reported as not executed, never passed",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-not-executed.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "js-0460",
-			"ordinal": 436,
+			"ordinal": 437,
 			"name": "Windows native owner hook stays first after the AutoHotkey SendInput rehook",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-native-hook-front.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-0461",
-			"ordinal": 437,
+			"ordinal": 438,
 			"name": "Windows replayed edge: what AutoHotkey consumers make of it",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-replay-consumers.cjs"],
@@ -484,7 +484,7 @@
 		},
 		{
 			"id": "js-0477",
-			"ordinal": 461,
+			"ordinal": 462,
 			"name": "local runners refuse a host whose toolchain differs from CI (pinned Node, Lua 5.4, non-root, pwsh)",
 			"cmd": "node",
 			"args": ["tools/test/test-host-toolchain.cjs"],
@@ -492,7 +492,7 @@
 		},
 		{
 			"id": "js-0499",
-			"ordinal": 482,
+			"ordinal": 483,
 			"name": "Wine runner preserves process exclusion without forking per unrelated PID",
 			"cmd": "node",
 			"args": ["tools/test/test-wine-runner-process-guard.cjs"],
@@ -501,7 +501,7 @@
 		},
 		{
 			"id": "js-linux-private-runner-output",
-			"ordinal": 504,
+			"ordinal": 505,
 			"name": "Linux private helper failures stay private while canonical failures remain reportable",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-runner-private-output.cjs"],
@@ -510,7 +510,7 @@
 		},
 		{
 			"id": "js-windows-sendinput-consumers",
-			"ordinal": 507,
+			"ordinal": 508,
 			"name": "Windows SendInput: every direct call is decided in the input hooks design note",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-sendinput-consumers.cjs"],
@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "js-no-pinned-source-reads-linux",
-			"ordinal": 546,
+			"ordinal": 547,
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
@@ -526,7 +526,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 558,
+			"ordinal": 559,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
@@ -534,7 +534,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 592,
+			"ordinal": 593,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],
@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 672,
+			"ordinal": 673,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
@@ -550,7 +550,7 @@
 		},
 		{
 			"id": "js-0543",
-			"ordinal": 685,
+			"ordinal": 686,
 			"name": "startup benchmark fixture paths follow app_dirs.toml",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],
@@ -558,7 +558,7 @@
 		},
 		{
 			"id": "generators-registered",
-			"ordinal": 727,
+			"ordinal": 728,
 			"name": "every file-writing codegen script is in the generator registry, and the pre-commit hook regenerates before formatting",
 			"cmd": "node",
 			"args": ["tools/test/test-generators-registered.cjs"],
@@ -566,7 +566,7 @@
 		},
 		{
 			"id": "js-0548",
-			"ordinal": 730,
+			"ordinal": 731,
 			"name": "Windows native test waits read the shared settle bound, children included",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-native-settle-bound.cjs"],
