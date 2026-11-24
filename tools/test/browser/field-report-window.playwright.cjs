@@ -139,7 +139,7 @@ async function main() {
 				passed: false,
 				interrupted: false,
 				counts: { pass: 1, fail: 1 },
-				folder: '/Users/me/Library/Application Support/Ergopti/field-run/results/app-1'
+				folder: '~/Library/Application Support/Ergopti/field-run/results/app-1'
 			})
 		);
 		assert.equal(await page.locator('#summary').isHidden(), false);
