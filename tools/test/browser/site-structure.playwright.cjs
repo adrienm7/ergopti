@@ -280,7 +280,11 @@ async function exerciseSections(page, origin, basePath) {
 	}
 	for (const route of VERSION_SELECTOR.absent) {
 		await visit(page, origin, basePath, route);
-		assert.equal(await page.locator('#version-selection').count(), 0, 'No selector on ' + route);
+		assert.equal(
+			await page.locator('#version-selection, #layout-selection').count(),
+			0,
+			'No selector on ' + route
+		);
 	}
 	await visit(page, origin, basePath, '/ergopti/benchmarks');
 	const current = page.locator('nav.subnav a[aria-current="page"]');
@@ -641,20 +645,30 @@ async function exerciseGeneratedKeyboard(page, origin, basePath) {
 
 /**
  * (other-layout-keyboard) The same drawing and emulation show another layout
- * generated from its own source by the default patch: bépo's data served in
- * place of Ergopti's shows bépo's characters, lists its dead levels in the
- * level select, and its circumflex dead key opens the level its source gives.
+ * generated from its own source by the default patch: « Bépo » in the layout
+ * select beside the version select (maintainer, 2026-11-24; Ergopti first)
+ * shows bépo's characters, disables the Ergopti version select, lists bépo's
+ * dead levels in the level select, and its circumflex dead key opens the
+ * level its source gives; « Ergopti » brings Ergopti back.
  */
 async function exerciseOtherLayoutKeyboard(page, origin, basePath) {
 	const file = path.join(__dirname, '../../../static/layouts/visualisation/bepo.json');
 	const data = JSON.parse(fs.readFileSync(file, 'utf8'));
 	const cell = (key) => data.keys.find((candidate) => candidate.key === key);
-	const served = '**/layouts/visualisation/ergopti_v2.2.json';
-	await page.route(served, (route) =>
-		route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) })
-	);
-	try {
+	{
 		await visit(page, origin, basePath, '/ergopti');
+		const select = page.locator('#layout-selection');
+		assert.deepEqual(
+			await select.locator('option').evaluateAll((nodes) => nodes.map((node) => node.value)),
+			['ergopti', 'bepo'],
+			'The layout select offers Ergopti first, then bépo'
+		);
+		assert.equal(await select.inputValue(), 'ergopti', 'Ergopti is drawn by default');
+		await select.selectOption('bepo');
+		assert.ok(
+			await page.locator('#version-selection').isDisabled(),
+			'The Ergopti version select is off while bépo is drawn'
+		);
 		const board = page.locator('#keyboard_presentation');
 		const key = (name) => board.locator(`keyboard-key[data-key='${name}']`);
 		const text = async (name) =>
@@ -692,8 +706,17 @@ async function exerciseOtherLayoutKeyboard(page, origin, basePath) {
 			cell('a').dead_005eShift,
 			'Shift on the dead level gives its capital'
 		);
-	} finally {
-		await page.unroute(served);
+		await select.selectOption('ergopti');
+		assert.ok(
+			!(await page.locator('#version-selection').isDisabled()),
+			'The version select is back with Ergopti'
+		);
+		await page.waitForFunction(
+			(bepo) =>
+				document.querySelector("#keyboard_presentation keyboard-key[data-key='i'] div")
+					?.textContent !== bepo,
+			cell('i').Primary
+		);
 	}
 }
 

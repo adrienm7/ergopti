@@ -616,10 +616,6 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 - [ ] **[CODE] Identity gate false positive on PDF trailers (maintainer, 2026-11-24).** Fix it: the identity gate
       flags every PDF's root trailer key in containers whose home is the root account's; ignore PDF internal structure
       there, with a regression test.
-- [ ] **[CODE] A layout select beside the version select (maintainer, 2026-11-24).** The Disposition Ergopti pages
-      get a layout select beside the version select, Ergopti first, drawing `static/layouts/visualisation/bepo.json`
-      through `tools/codegen/codegen-site-keyboard.cjs` (dead keys from `dead_levels`); `bepo_1_1rc2.toml` stays undrawn
-      while two dead keys share « ˰ ».
 - [ ] **[CODE] Add HTML_CodeSniffer to the AAA audit (maintainer, 2026-11-24).** Pinned npm package injected into the
       same Playwright pages as axe-core, gating on its `WCAG2AAA` errors (its notices need a person and stay a list),
       beside the repository's own checks for what both miss (2.5.5).
