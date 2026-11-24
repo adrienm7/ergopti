@@ -80,11 +80,15 @@ _MLG_LanguageRowCarriesItsFlag() {
 Test("menu layout: each hotstring language row carries its locale's flag (menu-languages-flag)",
 	_MLG_LanguageRowCarriesItsFlag)
 
-; The rows of one manifest menu, ids, separators and section headers (which
-; carry no id), joined in order.
+; The rows one manifest menu draws on Windows, ids, separators and section
+; headers (which carry no id), joined in order. A row split per driver (the
+; reading font names the menus on Windows and macOS only) declares one entry
+; per platform list, so the entries for other drivers are skipped.
 _MLG_Order(MenuName) {
 	Order := ""
 	for _, Entry in _MM_GetManifestRoot()[MenuName] {
+		if !_MR_IsForPlatform(Entry, "ahk")
+			continue
 		Kind := Entry.Get("type", "")
 		Order .= (Order == "" ? "" : ", ") . (Kind == "---" ? "---"
 			: Kind == "section_header" && !Entry.Has("id") ? "header " . Entry["i18n"] : Entry["id"])
