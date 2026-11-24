@@ -197,7 +197,19 @@
 	// (the app's Studio window): the site's Comparer.
 	const SITE_COMPARER_URL = 'https://ergopti.fr/studio/comparer';
 	// The link parameters this page reads; the others of the address are dropped.
-	const LINK_PARAMS = ['corpus', 'keyboard', 'format', 'layouts', 'details', 'versus'];
+	// tab: the tab shown; px, py: the Pareto tab's two values; text: the trace's text.
+	const LINK_PARAMS = [
+		'corpus',
+		'keyboard',
+		'format',
+		'layouts',
+		'details',
+		'versus',
+		'tab',
+		'px',
+		'py',
+		'text'
+	];
 	// The layout origins a link can name: the user's own layouts stay on their device.
 	const SHAREABLE_ORIGINS = ['registry', 'reference', 'library'];
 	// The message the framing page listens for to size its frame.
@@ -1258,25 +1270,42 @@
 			versus: linked.versus || null,
 			// The sub-tab shown: a link's layout in detail opens « One layout »,
 			// else the visitor's last choice (tabSaved, kept only when they click).
-			tab: linked.details
-				? DETAILS_TAB
-				: linked.corpus || linked.layouts
-					? DEFAULT_TAB
-					: TABS.includes(saved.tab)
-						? saved.tab
-						: HOME_TAB,
+			tab: linked.tab
+				? linked.tab
+				: linked.details
+					? DETAILS_TAB
+					: linked.corpus || linked.layouts
+						? DEFAULT_TAB
+						: TABS.includes(saved.tab)
+							? saved.tab
+							: HOME_TAB,
 			tabSaved: TABS.includes(saved.tab) ? saved.tab : HOME_TAB,
 			// Each themed table's sort, by table name.
 			tabSorts: {},
 			heats: validHeats(saved.heats),
 			pick: validFilters(saved.pick, ['origin', 'language']),
 			// The Pareto tab's two values and whether it shows the frontier only.
-			pareto: validPareto(saved.pareto),
+			pareto: validPareto(
+				linked.px || linked.py
+					? Object.assign(
+							{},
+							saved.pareto,
+							linked.px ? { x: linked.px } : {},
+							linked.py ? { y: linked.py } : {}
+						)
+					: saved.pareto
+			),
 			// The trace tab's text (null: the sample) and its two layouts.
+			// A link's trace opens on its detailed layout and the one it is compared with.
 			trace: {
-				text: typeof saved.traceText === 'string' ? saved.traceText : null,
+				text:
+					linked.text !== undefined
+						? linked.text
+						: typeof saved.traceText === 'string'
+							? saved.traceText
+							: null,
 				layout: null,
-				versus: null
+				versus: linked.versus || null
 			}
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
@@ -1435,6 +1464,23 @@
 				if (id === null) continue;
 				if (byId.has(id)) out[name] = id;
 				else console.warn(`layout comparer: the link names no layout ${id} (${name})`);
+			}
+			// The tab shown, the Pareto tab's two values and the trace's text.
+			const tab = query.get('tab');
+			if (tab !== null) {
+				if (TABS.includes(tab)) out.tab = tab;
+				else console.warn(`layout comparer: the link names no tab ${tab}`);
+			}
+			for (const name of ['px', 'py']) {
+				const id = query.get(name);
+				if (id === null) continue;
+				if (paretoChoices().includes(id)) out[name] = id;
+				else console.warn(`layout comparer: the link names no Pareto value ${id} (${name})`);
+			}
+			const text = query.get('text');
+			if (text !== null) {
+				if (Array.from(text).length <= E.TRACE_MAX_CHARS) out.text = text;
+				else console.warn('layout comparer: the link’s trace text is too long');
 			}
 			return out;
 		}
@@ -2434,9 +2480,13 @@
 			const textBox = $('la-trace-text');
 			if (document.activeElement !== textBox) textBox.value = traceInput();
 			const ids = state.results.map((r) => r.layout.id);
-			if (!ids.includes(state.trace.layout))
+			// Before the first results (a link's layouts wait for them) nothing is replaced.
+			if (ids.length > 0 && !ids.includes(state.trace.layout))
 				state.trace.layout = ids.includes(state.details) ? state.details : ids[0] || null;
-			if (!ids.includes(state.trace.versus) || state.trace.versus === state.trace.layout)
+			if (
+				ids.length > 0 &&
+				(!ids.includes(state.trace.versus) || state.trace.versus === state.trace.layout)
+			)
 				state.trace.versus = null;
 			const entries = state.results.map((r) => [r.layout.id, r.layout.name]);
 			fillSelect(
@@ -5249,8 +5299,20 @@
 			query.set('format', state.format);
 			query.set('layouts', shareable.map((l) => l.id).join(','));
 			const canShare = (id) => shareable.some((l) => l.id === id);
-			if (state.details && canShare(state.details)) query.set('details', state.details);
-			if (state.versus && canShare(state.versus)) query.set('versus', state.versus);
+			// A trace link names the traced layouts as the detailed one and its versus.
+			const [details, versus] =
+				state.tab === 'trace'
+					? [state.trace.layout, state.trace.versus]
+					: [state.details, state.versus];
+			if (details && canShare(details)) query.set('details', details);
+			if (versus && canShare(versus)) query.set('versus', versus);
+			// The tab shown, with the Pareto tab's values or the trace's own text.
+			if (state.tab !== HOME_TAB) query.set('tab', state.tab);
+			if (state.tab === 'pareto') {
+				query.set('px', state.pareto.x);
+				query.set('py', state.pareto.y);
+			}
+			if (state.tab === 'trace' && state.trace.text !== null) query.set('text', state.trace.text);
 			if (lang) query.set('lang', lang);
 			return {
 				url: `${base}?${query.toString().replace(/%2C/g, ',')}`,

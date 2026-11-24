@@ -19,7 +19,11 @@ export const COMPARER_LINK_PARAMS = Object.freeze([
 	'format',
 	'layouts',
 	'details',
-	'versus'
+	'versus',
+	'tab',
+	'px',
+	'py',
+	'text'
 ]);
 
 /**
