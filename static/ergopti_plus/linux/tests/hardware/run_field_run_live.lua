@@ -121,17 +121,27 @@ local output = handle:read("*a")
 handle:close()
 io.write(output)
 
-for index, step in ipairs({ "field_composer", "field_network", "driver_reload", "config_guard" }) do
+-- The run's steps are the Linux steps file's, then its configuration guard; the
+-- collector numbers each result file by its position in that run.
+local spec = require("core.text.engine.json").decode(
+	assert(read(ROOT .. "/static/ergopti_plus/linux/diagnostics/data/field_run_steps.json")))
+local steps = {}
+for _, step in ipairs(spec.steps) do steps[#steps + 1] = step.id end
+steps[#steps + 1] = spec.guard_step
+local reload_file
+for index, step in ipairs(steps) do
+	local file = string.format("%s/report/field_run/%02d_%s.json", scratch, index, step)
+	if step == "driver_reload" then reload_file = file end
 	check(output:match("field run " .. step .. ": (%a[%w_]*)") ~= nil, "the collector prints a verdict for " .. step)
-	check(read(string.format("%s/report/field_run/%02d_%s.json", scratch, index, step)) ~= nil,
-		"and copies its result file")
+	check(read(file) ~= nil, "and copies its result file")
 end
+check(reload_file ~= nil, "the Linux steps include the timed reload")
 check(output:match("running this collector is the consent") ~= nil, "the collector states its consent before the download")
 check(output:match("field_python=installed") ~= nil, "the collector installs Ergopti's Python")
 check(output:match("field run field_composer: pass") ~= nil, "the composer check passes headless")
 check(output:match("field run driver_reload: pass %(reloaded%)") ~= nil,
 	"the host restarts and the successor resumes the run")
-local reload_result = read(scratch .. "/report/field_run/03_driver_reload.json") or ""
+local reload_result = reload_file and read(reload_file) or ""
 -- A pass without reload_unmeasured: the successor read the predecessor's stamp.
 check(reload_result:match('"reload_ms":%d+') ~= nil, "the reload step names the reload's duration")
 local successor_pid = tonumber((read(ready) or ""):match('"pid":(%d+)'))
