@@ -4228,6 +4228,10 @@
 				"uk",
 				"zh"
 			]
+		},
+		"field_report.title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
 		}
 	}
 }

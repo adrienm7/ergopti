@@ -131,6 +131,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium checks multiline values in the personal information editor;
 	// the shared UI browser lane of Core / js runs it as its own step.
 	'tools/test/browser/personal-info-editor.playwright.cjs',
+	// Real Chromium drives the field report window's progress, end of run and
+	// actions; the shared UI browser lane of Core / js runs it as its own step.
+	'tools/test/browser/field-report-window.playwright.cjs',
 	// A manual launcher that serves the fake corporate network until stdin
 	// closes; test-fake-network.cjs runs the library it starts inside the suite.
 	'tools/test/fake-network.cjs'
