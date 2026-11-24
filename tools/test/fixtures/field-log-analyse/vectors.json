@@ -476,8 +476,30 @@
 		{
 			"driver": "linux",
 			"source": "static/ergopti_plus/linux/core/logger/engine/boot_profiler.lua",
-			"template": "Boot complete in %.0f ms (cpu %.0f ms).",
-			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).",
+			"template": "Boot complete in %.0f ms (cpu %.0f ms) since the process started.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms) since the process started.",
+			"expect": {
+				"measures": [
+					{
+						"metric": "boot.total",
+						"value": 812.0,
+						"declared": 2500.0,
+						"budget": null
+					},
+					{
+						"metric": "boot.cpu",
+						"value": 300.0,
+						"declared": null,
+						"budget": null
+					}
+				]
+			}
+		},
+		{
+			"driver": "linux",
+			"source": "static/ergopti_plus/linux/core/logger/engine/boot_profiler.lua",
+			"template": "Boot complete in %.0f ms (cpu %.0f ms) since boot timing; the load phase is not measured.",
+			"line": "2026-10-30 10:00:00:123 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms) since boot timing; the load phase is not measured.",
 			"expect": {
 				"measures": [
 					{

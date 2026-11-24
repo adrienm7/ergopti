@@ -180,7 +180,7 @@ function fixture(name, { start = 'dev', localOnly = false, hang = false } = {}) 
 	const day = today();
 	fs.writeFileSync(
 		path.join(logs, `${LOG_FILES.main}${day}${LOG_FILES.extension}`),
-		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms).\n' +
+		'2026-10-28 10:00:00 [INFO] [BootProfile] Boot complete in 812 ms (cpu 300 ms) since the process started.\n' +
 			'2026-10-28 10:01:00 [INFO] [network_check] check=network verdict=pass steps=1 pac=pass\n' +
 			'2026-10-28 10:01:10 [INFO] [composer_check] check=composer verdict=fail steps=2 build=fail\n' +
 			'2026-10-28 10:01:20 [INFO] [field_check] check=layout_probe verdict=skip steps=0\n' +

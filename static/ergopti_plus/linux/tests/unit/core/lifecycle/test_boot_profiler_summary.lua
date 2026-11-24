@@ -20,6 +20,8 @@ local function fixture()
 	logger.set_level(20)
 	local profiler = helpers.load_module("core.logger.engine.boot_profiler")
 	profiler._reset_for_test()
+	-- The test runner's own age is no boot: each case states the load it means.
+	profiler._use_process_age(function() return nil end)
 	return profiler, lines
 end
 
@@ -76,7 +78,7 @@ helpers.describe("boot profiler: CPU time beside wall time", function()
 		helpers.assert_contains(joined, "(cpu 30 ms)")
 		helpers.assert_contains(joined, "(cpu 12 ms)")
 		helpers.assert_contains(joined, "Boot complete in ")
-		helpers.assert_contains(joined, "(cpu 42 ms).")
+		helpers.assert_contains(joined, "(cpu 42 ms) since boot timing")
 		helpers.assert_contains(joined, "(cpu 42ms) heap=")
 		helpers.assert_contains(joined, "config=")
 		helpers.assert_contains(joined, "(cpu 30ms)")
@@ -89,5 +91,37 @@ helpers.describe("boot profiler: CPU time beside wall time", function()
 		for index = 1, 2000000 do sink = sink + index % 7 end
 		helpers.assert_true(sink > 0)
 		helpers.assert_true(profiler.cpu_ms() > 0, "a busy loop must consume CPU time")
+	end)
+end)
+
+helpers.describe("boot profiler: the total is spawn to ready (bpf-01)", function()
+	-- Over the shared 2500 ms boot budget only once the load phase is counted.
+	local SLOW_LOAD_MS = 3000
+
+	helpers.it("judges, logs and returns the load phase plus the stages", function()
+		local profiler, lines = fixture()
+		profiler._use_process_age(function() return SLOW_LOAD_MS end)
+		local cpu = 150
+		profiler._use_cpu_clock(function() return cpu end)
+		profiler.begin()
+		profiler.stage("config"); cpu = cpu + 20; profiler.stage_done("config")
+		local total = profiler.complete()
+		helpers.assert_true(total >= SLOW_LOAD_MS, "the load phase belongs to the boot, got " .. tostring(total))
+		helpers.assert_eq(profiler.boot_ms(), total, "the snapshot reads the same total")
+		local joined = table.concat(lines, "\n")
+		helpers.assert_contains(joined, "Over budget: boot took 30",
+			"the budget judges spawn to ready, as Windows does from the process creation")
+		helpers.assert_contains(joined, "(cpu 170 ms) since the process started.")
+		helpers.assert_contains(joined, "load=3000ms")
+	end)
+
+	helpers.it("says the load phase is missing when /proc did not tell it", function()
+		local profiler, lines = fixture()
+		profiler.begin()
+		local total = profiler.complete()
+		helpers.assert_true(total < SLOW_LOAD_MS, "nothing is added to an unmeasured load")
+		local joined = table.concat(lines, "\n")
+		helpers.assert_true(not joined:find("Over budget", 1, true), joined)
+		helpers.assert_contains(joined, "since boot timing; the load phase is not measured.")
 	end)
 end)

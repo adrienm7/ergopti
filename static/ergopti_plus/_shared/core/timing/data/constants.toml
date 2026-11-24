@@ -1370,7 +1370,9 @@ hotpath_statistics_interval_ms = 60000
 
 # Boot, process or VM start to "Boot complete". Measured p50 1667 ms, the
 # slowest healthy boot 2834 ms; the two 25 s and 32 s boots waited for the
-# Accessibility grant. 2500 ms is 1.5 times the median.
+# Accessibility grant. 2500 ms is 1.5 times the median. Windows and Linux count
+# from the process creation (Linux adds the load phase /proc gives to its
+# stages); macOS from its Lua VM's first lines, since Hammerspoon outlives a reload.
 # HS: core/logger/engine/boot_profiler.lua. LX: core/logger/engine/boot_profiler.lua. AHK: ErgoptiPlus.ahk.
 boot_total_ms = 2500
 
