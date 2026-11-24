@@ -115,6 +115,10 @@ t(Key, Args*) => Key
 PhaseStats_Now(Args*) => 0
 PhaseStats_Stop(Args*) => 0
 PerfBudget_Report(Args*) => 0
+; RebuildTrayMenu re-orders the reading-font popup handler after a publish;
+; the child draws no menu, and an unstubbed call would stop it on a modal
+; unset-variable warning.
+TrayMenuFont_Install(Args*) => 0
 TimingsGet(Args*) => 0
 BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
