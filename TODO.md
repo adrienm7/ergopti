@@ -560,8 +560,10 @@ feature now collects the local state, which holds the versions. Proofs: `report_
 share.lua, model.js and report.ahk, `configuration_vectors.json`, `test-issue-templates.cjs`.
 
 - [ ] **[CI] Run the AHK suite on the change.** `report.ahk`'s readable report port, the default filter of
-      `configuration.ahk` and their tests (`report-readable`, `report-budget`) were only parse-gated here: no
-      AutoHotkey ran.
+      `configuration.ahk`, the pasted-report bound and the login-redirect budget of `issue_link.ahk`, and their
+      tests (`report-readable`, `report-budget`, `report-body-budget`, `issue-link-corpus`, `test_configuration`)
+      were reviewed from source against the Lua originals on 2026-11-24 (one divergence fixed: an exponent lost its
+      second digit, `exponent-keeps-two-digits`), but no AutoHotkey ran: close on a green Windows run of them.
 
 ## CI acceptance
 
