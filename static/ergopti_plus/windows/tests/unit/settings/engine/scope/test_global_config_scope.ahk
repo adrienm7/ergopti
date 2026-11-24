@@ -72,9 +72,9 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		KeyboardShortcutAssignments := Map("meta_b", "open_url")
 		GestureActionParameters := TOML_ParseFreshFile(Fixture.path)["action_parameters"].Clone()
 		; Both rows of the Configuration menu's first group dispatch to the
-		; global owner: « Restaurer » first, « Tout effacer » second, then a
-		; separator (menu-first-group). An inert cleanup row follows it, so the
-		; renderer draws the separator.
+		; global owner: under the « — Réinitialisation — » title, « Restaurer »
+		; first, « Tout effacer » second, then a separator (menu-first-group). An
+		; inert cleanup row follows it, so the renderer draws the separator.
 		Factory := "_MI_GlobalScopeCommands"
 		Commands := %Factory%(Fixture.options)
 		Commands["clean_unused_keys"] := (*) => ""
@@ -89,8 +89,8 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 				ItemId := Candidate, Position := A_Index - 1
 		}
 		Assert(ItemId != 0, "the Configuration " . Id . " row must dispatch to the global owner")
-		AssertEqual(Mode == "clear" ? 1 : 0, Position, "the global scope rows open the Configuration menu")
-		Assert(TrayMenuIsSeparatorAt(Rendered, 2), "a separator closes the Configuration first group")
+		AssertEqual(Mode == "clear" ? 2 : 1, Position, "the global scope rows open the Configuration menu")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 3), "a separator closes the Configuration first group")
 		Receipt := (_MenuDispatchCallbacks[ItemId])()
 		; A restore leaves the personal hotstring files as they are (#96), so
 		; only config.toml, the overrides and the tap-hold file are backed up.
