@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "I risultati riguardano solo i controlli registrati. Le suite isolate non sono state eseguite.",
 	"healthcheck.problem.diagnostic_check": "Controllo diagnostico non riuscito: %s.",
 	"healthcheck.export.privacy_notice": "Solo dati tecnici: niente log, testo digitato, percorsi o nomi.",
+	"healthcheck.export.full_report_cut_note": "Tagliato per rispettare il limite di GitHub sulla lunghezza di una segnalazione. Il rapporto completo è nel file salvato con esso: allega quel file a questa segnalazione.",
 	"healthcheck.export.url_truncated_note": "Tagliato per stare nel link. Il rapporto completo è negli appunti: incollalo nel campo Full report qui sotto.",
 	"healthcheck.export.items": "elementi",
 	"healthcheck.export.characters": "caratteri",

@@ -19,7 +19,11 @@
 --- 4. A cut field can carry a note (one line saying where the complete text is),
 ---    appended after the truncation marker and counted in the budget: the caller
 ---    passes it only for the field that holds the complete report.
---- 5. The JS original and the AHK port (windows/diagnostics/engine/reports/issue_link.ahk) replay the
+--- 5. The complete report the user pastes into the form is bounded too:
+---    fit_lines keeps whole lines under GitHub's issue body limit, closes a
+---    code block it cut open, and ends with the truncation marker and a note
+---    saying where the rest is.
+--- 6. The JS original and the AHK port (windows/diagnostics/engine/reports/issue_link.ahk) replay the
 ---    same vectors: _shared/tests/corpus/diagnostics/issue_link_vectors.json.
 --- ==============================================================================
 
@@ -180,6 +184,63 @@ function M.build_url(templates, repository, template_id, values, notes)
 		error(string.format("issue_link: %d bytes left after every cut, budget %d", #url, max), 2)
 	end
 	return url
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 3/ The Pasted Report =======
+-- ====================================
+-- ====================================
+
+-- A line opening or closing a Markdown code block
+local FENCE = "```"
+
+--- Bounds a text to a UTF-8 byte budget at whole lines. A text that fits is
+--- returned unchanged; otherwise the longest prefix of whole lines that fits
+--- with its ending is kept, a code block it leaves open is closed (a kept
+--- prefix ending on the opening line drops that line instead), and the
+--- truncation marker, a blank line and the note follow.
+--- @param text string
+--- @param max_bytes number
+--- @param marker string
+--- @param note string
+--- @return string
+function M.fit_lines(text, max_bytes, marker, note)
+	text = tostring(text)
+	if #text <= max_bytes then return text end
+	local ending = marker .. "\n\n" .. note
+	local lines = {}
+	local start = 1
+	while true do
+		local stop = text:find("\n", start, true)
+		if not stop then lines[#lines + 1] = text:sub(start) break end
+		lines[#lines + 1] = text:sub(start, stop - 1)
+		start = stop + 1
+	end
+	local prefix_bytes = { [0] = 0 }
+	local open, best, best_open = false, 0, false
+	-- Strictly fewer lines than the text: a cut that keeps everything is no cut
+	for k = 1, #lines - 1 do
+		local line = lines[k]
+		prefix_bytes[k] = (k == 1 and 0 or prefix_bytes[k - 1] + 1) + #line
+		local fence = line:sub(1, #FENCE) == FENCE
+		if fence then open = not open end
+		-- A block cut right after its opening line keeps nothing of it
+		local count, count_open = k, open
+		if fence and open then count, count_open = k - 1, false end
+		if count >= 1 then
+			local cost = prefix_bytes[count] + 1 + (count_open and #FENCE + 1 or 0) + #ending
+			if cost <= max_bytes then best, best_open = count, count_open end
+		end
+	end
+	if best < 1 then
+		error(string.format("issue_link: not one line fits %d bytes with its ending", max_bytes), 2)
+	end
+	return table.concat(lines, "\n", 1, best) .. "\n" .. (best_open and FENCE .. "\n" or "") .. ending
 end
 
 return M

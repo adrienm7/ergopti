@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "परिणाम केवल दर्ज की गई जाँचों के हैं। अलग वातावरण वाले परीक्षण समूह नहीं चलाए गए।",
 	"healthcheck.problem.diagnostic_check": "निदान जाँच विफल हुई: %s।",
 	"healthcheck.export.privacy_notice": "केवल तकनीकी तथ्य: कोई लॉग, टाइप किया गया पाठ, पथ या नाम नहीं।",
+	"healthcheck.export.full_report_cut_note": "GitHub की इश्यू लंबाई सीमा में रखने के लिए छोटा किया गया। पूरी रिपोर्ट उसके साथ सहेजी गई फ़ाइल में है: उस फ़ाइल को इस इश्यू में संलग्न करें।",
 	"healthcheck.export.url_truncated_note": "लिंक में समाने के लिए छोटा किया गया। पूरी रिपोर्ट आपके क्लिपबोर्ड पर है: इसे नीचे Full report फ़ील्ड में चिपकाएँ।",
 	"healthcheck.export.items": "आइटम",
 	"healthcheck.export.characters": "अक्षर",

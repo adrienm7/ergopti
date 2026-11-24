@@ -23,7 +23,11 @@
  * 4. A cut field can carry a note (one line saying where the complete text is),
  *    appended after the truncation marker and counted in the budget: the
  *    caller passes it only for the field that holds the complete report.
- * 5. One algorithm, three languages: the Lua port
+ * 5. The complete report the user pastes into the form is bounded too:
+ *    fitLines keeps whole lines under GitHub's issue body limit, closes a
+ *    code block it cut open, and ends with the truncation marker and a note
+ *    saying where the rest is.
+ * 6. One algorithm, three languages: the Lua port
  *    (_shared/diagnostics/engine/reports/issue_link.lua) and the AHK port
  *    (windows/diagnostics/engine/reports/issue_link.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/issue_link_vectors.json).
@@ -186,6 +190,69 @@
 		return url;
 	}
 
-	var api = { percentEncode: percentEncode, buildIssueUrl: buildIssueUrl };
+	// A line opening or closing a Markdown code block
+	var FENCE = '```';
+
+	/**
+	 * UTF-8 length of a string; a lone surrogate counts as U+FFFD.
+	 * @param {string} text
+	 * @returns {number}
+	 */
+	function utf8Bytes(text) {
+		var parts = codePoints(text);
+		var total = 0;
+		for (var i = 0; i < parts.length; i++) {
+			var cp = parts[i].codePointAt(0);
+			total += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+		}
+		return total;
+	}
+
+	/**
+	 * Bounds a text to a UTF-8 byte budget at whole lines. A text that fits is
+	 * returned unchanged; otherwise the longest prefix of whole lines that fits
+	 * with its ending is kept, a code block it leaves open is closed (a kept
+	 * prefix ending on the opening line drops that line instead), and the
+	 * truncation marker, a blank line and the note follow.
+	 * @param {string} text
+	 * @param {number} maxBytes
+	 * @param {string} marker
+	 * @param {string} note
+	 * @returns {string}
+	 * @throws {Error} When not one line fits with the ending.
+	 */
+	function fitLines(text, maxBytes, marker, note) {
+		text = String(text);
+		if (utf8Bytes(text) <= maxBytes) return text;
+		var ending = marker + '\n\n' + note;
+		var endingBytes = utf8Bytes(ending);
+		var lines = text.split('\n');
+		var prefixBytes = [0];
+		var open = false;
+		var best = -1;
+		var bestOpen = false;
+		// Strictly fewer lines than the text: a cut that keeps everything is no cut
+		for (var k = 1; k < lines.length; k++) {
+			var line = lines[k - 1];
+			prefixBytes[k] = (k === 1 ? 0 : prefixBytes[k - 1] + 1) + utf8Bytes(line);
+			var fence = line.slice(0, FENCE.length) === FENCE;
+			if (fence) open = !open;
+			// A block cut right after its opening line keeps nothing of it
+			var count = fence && open ? k - 1 : k;
+			var countOpen = fence && open ? false : open;
+			if (count < 1) continue;
+			var cost = prefixBytes[count] + 1 + (countOpen ? FENCE.length + 1 : 0) + endingBytes;
+			if (cost <= maxBytes) {
+				best = count;
+				bestOpen = countOpen;
+			}
+		}
+		if (best < 1) {
+			throw new Error('issue_link: not one line fits ' + maxBytes + ' bytes with its ending');
+		}
+		return lines.slice(0, best).join('\n') + '\n' + (bestOpen ? FENCE + '\n' : '') + ending;
+	}
+
+	var api = { percentEncode: percentEncode, buildIssueUrl: buildIssueUrl, fitLines: fitLines };
 	global.ErgoptiIssueLink = api;
 })(window);

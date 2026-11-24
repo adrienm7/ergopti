@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the GitHub issue-link builder: RFC 3986 percent-encoding of UTF-8 (only A-Z a-z 0-9 - . _ ~ stay literal, space is %20) and the byte-bounded prefilled URL. Parameters follow the template, then the title (with its prefix), then the declared fields in order; empty values are omitted. When the URL is longer than max_url_bytes, the last parameter is cut first, at a whole code point, and ends with the truncation marker; a parameter that cannot keep one code point plus the marker is dropped; the title is cut only after every field; the template is never cut, and a URL that still does not fit is an error. A vector may carry notes (field id to one line): when that field is cut, a blank line and the note follow the truncation marker, inside the budget. Fixture templates and repository, independent of the real ones. Replayed by tools/test/test-issue-link-vectors.cjs, the macOS and Linux Lua suites and the AHK suite.",
+	"description": "Golden vectors for the GitHub issue-link builder: RFC 3986 percent-encoding of UTF-8 (only A-Z a-z 0-9 - . _ ~ stay literal, space is %20) and the byte-bounded prefilled URL. Parameters follow the template, then the title (with its prefix), then the declared fields in order; empty values are omitted. When the URL is longer than max_url_bytes, the last parameter is cut first, at a whole code point, and ends with the truncation marker; a parameter that cannot keep one code point plus the marker is dropped; the title is cut only after every field; the template is never cut, and a URL that still does not fit is an error. A vector may carry notes (field id to one line): when that field is cut, a blank line and the note follow the truncation marker, inside the budget. fit_vectors bound the complete report pasted into the form (GitHub refuses an issue body over 65,536 characters): a text within max_bytes UTF-8 bytes is unchanged; otherwise the longest prefix of whole lines that fits with its ending is kept, a code block it leaves open is closed by a fence line (a prefix ending on a block's opening line drops that line instead), then the marker, a blank line and the note; when not one line fits it is an error. Fixture templates and repository, independent of the real ones. Replayed by tools/test/test-issue-link-vectors.cjs, the macOS and Linux Lua suites and the AHK suite.",
 	"templates": {
 		"issue_new_url": "https://github.com/{owner}/{repo}/issues/new",
 		"truncation_marker": " […]",
@@ -241,6 +241,56 @@
 			"values": {
 				"version": "2.1.0"
 			},
+			"expect_error": true
+		}
+	],
+	"fit_vectors": [
+		{
+			"id": "fits_unchanged",
+			"text": "## Errors\nnone\n",
+			"max_bytes": 15,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
+			"expected": "## Errors\nnone\n"
+		},
+		{
+			"id": "cut_at_whole_lines",
+			"text": "line one\nline two\nline three\nline four\nline five\nline six\n",
+			"max_bytes": 50,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
+			"expected": "line one\n […]\n\nThe rest is in the saved file."
+		},
+		{
+			"id": "closes_a_block_it_cut_open",
+			"text": "## Changed settings\n```\na = 1\nb = 2\nc = 3\nd = 4\ne = 5\nf = 6\ng = 7\nh = 8\ni = 9\nj = 10\nk = 11\nl = 12\n```\n",
+			"max_bytes": 80,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
+			"expected": "## Changed settings\n```\na = 1\nb = 2\n```\n […]\n\nThe rest is in the saved file."
+		},
+		{
+			"id": "drops_a_bare_opening_line",
+			"text": "## Report\nDriver: Linux\n\n```json\n{\"driver\":\"linux\",\"sections\":{\"configuration\":{\"items\":[]}}}\n```\n",
+			"max_bytes": 75,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
+			"expected": "## Report\nDriver: Linux\n\n […]\n\nThe rest is in the saved file."
+		},
+		{
+			"id": "counts_utf8_bytes",
+			"text": "é é é é\nà à à à\nü ü ü ü\nö ö ö ö\nê ê ê ê\nï ï ï ï\n",
+			"max_bytes": 62,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
+			"expected": "é é é é\nà à à à\n […]\n\nThe rest is in the saved file."
+		},
+		{
+			"id": "not_one_line_fits",
+			"text": "a long first line that cannot fit\nsecond\n",
+			"max_bytes": 20,
+			"marker": " […]",
+			"note": "The rest is in the saved file.",
 			"expect_error": true
 		}
 	]

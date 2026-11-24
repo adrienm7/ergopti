@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Результати стосуються лише зареєстрованих перевірок. Ізольовані набори тестів не запускалися.",
 	"healthcheck.problem.diagnostic_check": "Діагностична перевірка завершилася помилкою: %s.",
 	"healthcheck.export.privacy_notice": "Лише технічні відомості: без журналів, введеного тексту, шляхів та імен.",
+	"healthcheck.export.full_report_cut_note": "Скорочено, щоб вкластися в обмеження GitHub на довжину звернення. Повний звіт у файлі, збереженому разом із ним: додайте цей файл до звернення.",
 	"healthcheck.export.url_truncated_note": "Скорочено, щоб уміститися в посилання. Повний звіт у буфері обміну: вставте його нижче в поле Full report.",
 	"healthcheck.export.items": "елементів",
 	"healthcheck.export.characters": "символів",

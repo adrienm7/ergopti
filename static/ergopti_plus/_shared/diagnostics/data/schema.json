@@ -622,6 +622,7 @@
 		"version": 1,
 		"notice_key": "healthcheck.export.privacy_notice",
 		"truncated_note_key": "healthcheck.export.url_truncated_note",
+		"full_report_cut_note_key": "healthcheck.export.full_report_cut_note",
 		"report_order": [
 			"issues",
 			"checks",

@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Los resultados solo abarcan las comprobaciones registradas. No se ejecutaron las pruebas aisladas.",
 	"healthcheck.problem.diagnostic_check": "Falló la comprobación de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Solo datos técnicos: sin registros, texto escrito, rutas ni nombres.",
+	"healthcheck.export.full_report_cut_note": "Recortado para respetar el límite de GitHub en la longitud de una incidencia. El informe completo está en el archivo guardado con él: adjunte ese archivo a esta incidencia.",
 	"healthcheck.export.url_truncated_note": "Recortado para caber en el enlace. El informe completo está en su portapapeles: péguelo en el campo Full report de abajo.",
 	"healthcheck.export.items": "elementos",
 	"healthcheck.export.characters": "caracteres",

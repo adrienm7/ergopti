@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Výsledky se týkají pouze zaznamenaných kontrol. Izolované testovací sady nebyly spuštěny.",
 	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s.",
 	"healthcheck.export.privacy_notice": "Pouze technické údaje: žádné protokoly, psaný text, cesty ani jména.",
+	"healthcheck.export.full_report_cut_note": "Zkráceno kvůli limitu GitHubu na délku hlášení. Úplná zpráva je v souboru uloženém spolu s ní: připojte tento soubor k hlášení.",
 	"healthcheck.export.url_truncated_note": "Zkráceno, aby se vešlo do odkazu. Úplná zpráva je ve schránce: vložte ji níže do pole Full report.",
 	"healthcheck.export.items": "položek",
 	"healthcheck.export.characters": "znaků",

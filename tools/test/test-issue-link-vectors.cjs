@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * Replays _shared/tests/corpus/diagnostics/issue_link_vectors.json through the
  * shared page builder _shared/ui/issue_link.js: RFC 3986 percent-encoding of
- * UTF-8 and the byte-bounded prefilled GitHub issue URL. The Lua and AHK ports
+ * UTF-8, the byte-bounded prefilled GitHub issue URL and the line-bounded
+ * pasted report. The Lua and AHK ports
  * replay the same file in their suites, so the three agree byte for byte.
  * ==============================================================================
  */
@@ -77,6 +78,33 @@ for (const vector of corpus.url_vectors || []) {
 	else if (got.length > vector.max_url_bytes) failures.push(`url ${vector.id}: over its budget`);
 }
 
+if (!Array.isArray(corpus.fit_vectors) || corpus.fit_vectors.length < 5) {
+	failures.push('the corpus holds fewer than 5 fit vectors');
+}
+for (const vector of corpus.fit_vectors || []) {
+	let got;
+	let error = null;
+	try {
+		got = IssueLink.fitLines(vector.text, vector.max_bytes, vector.marker, vector.note);
+	} catch (caught) {
+		error = caught;
+	}
+	if (vector.expect_error) {
+		if (!error)
+			failures.push(
+				`fit ${vector.id}: returned ${JSON.stringify(got)} where an error was expected`
+			);
+		continue;
+	}
+	if (error) failures.push(`fit ${vector.id}: threw ${error.message}`);
+	else if (got !== vector.expected)
+		failures.push(
+			`fit ${vector.id}: got ${JSON.stringify(got)}, expected ${JSON.stringify(vector.expected)}`
+		);
+	else if (Buffer.byteLength(got, 'utf8') > vector.max_bytes)
+		failures.push(`fit ${vector.id}: over its budget`);
+}
+
 // A lone surrogate has no UTF-8 form: it is encoded as U+FFFD, as the AHK port
 // does. JSON cannot carry one to the Lua port, so it is pinned here only.
 const lone = IssueLink.percentEncode('a\ud800b');
@@ -89,5 +117,5 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log(
-	`[OK] issue link vectors: ${corpus.encode_vectors.length} encoding and ${corpus.url_vectors.length} URL vector(s) match.`
+	`[OK] issue link vectors: ${corpus.encode_vectors.length} encoding, ${corpus.url_vectors.length} URL and ${corpus.fit_vectors.length} fit vector(s) match.`
 );

@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Wyniki dotyczą tylko zarejestrowanych kontroli. Izolowane zestawy testów nie zostały uruchomione.",
 	"healthcheck.problem.diagnostic_check": "Kontrola diagnostyczna nie powiodła się: %s.",
 	"healthcheck.export.privacy_notice": "Tylko dane techniczne: bez logów, wpisanego tekstu, ścieżek i nazw.",
+	"healthcheck.export.full_report_cut_note": "Przycięto, aby zmieścić się w limicie długości zgłoszenia na GitHubie. Pełny raport jest w zapisanym z nim pliku: dołącz ten plik do zgłoszenia.",
 	"healthcheck.export.url_truncated_note": "Skrócono, aby zmieścić w linku. Pełny raport jest w schowku: wklej go poniżej w pole Full report.",
 	"healthcheck.export.items": "elementów",
 	"healthcheck.export.characters": "znaków",
