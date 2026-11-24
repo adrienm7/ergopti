@@ -323,9 +323,16 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 					if item.title == i18n.get("menu.configuration.title") then rows = item.menu end
 				end
 				helpers.assert_true(type(rows) == "table", "the Configuration submenu")
-				helpers.assert_eq(rows[1].title, i18n.get("common.restore_recommended"))
-				helpers.assert_eq(rows[2].title, i18n.get("common.clear_to_system"))
-				helpers.assert_eq(rows[2].fn(), true, "the real global clear must acknowledge every composed owner")
+				-- The « — Réinitialisation — » title heads the group, so the
+				-- pair is found by its captions rather than by its position.
+				local restore, clear
+				for index, row in ipairs(rows) do
+					if row.title == i18n.get("common.restore_recommended") then restore = index end
+					if row.title == i18n.get("common.clear_to_system") then clear = index end
+				end
+				helpers.assert_true(restore ~= nil, "the Configuration menu offers the restore row")
+				helpers.assert_eq(clear, restore + 1, "the clear row follows the restore row")
+				helpers.assert_eq(rows[clear].fn(), true, "the real global clear must acknowledge every composed owner")
 			end)
 			os.execute = execute
 			if not ran then error(raised, 0) end
