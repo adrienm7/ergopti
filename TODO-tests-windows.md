@@ -310,6 +310,12 @@ eader.sqlite` held open by another program, press Reset: the status line says th
       typing (hotstrings, remaps, tap-holds, predictions) runs until the resume, after which each change applies and
       the local servers are searched again. A click that still waits (API entry test, test prediction, local server
       rescan, touchpad auto-configure, programmable hotstrings) shows the paused notice once.
+- [ ] Tray shortcut hints (maintainer, 2026-11-24): with the preset chords, right-click the icon: « Suspendre »,
+      « Recharger » and « Quitter » show « AltGr + Entrée », « AltGr + ⌫ » and « AltGr + Échap »
+      right-aligned in the accelerator column, and paused « Suspendre » keeps its tick. Set « AltGr + ⌫ » to
+      « Aucun » in Shortcuts > « Raccourcis de gestion du script »: after the reload « Recharger » has no
+      hint; set « AltGr + Entrée » to Recharger: « Recharger » shows « AltGr + Entrée »; turn the chords' switch off:
+      no row shows a hint. The hints have no keyboard role: pressing Enter in the open menu still runs the row.
 - [ ] Cold tray in the configured language (TRAY-01, 2026-11-20): with Ergopti set to English and Narrator on, start
       the driver and right-click the icon as soon as it appears: Suspend, Reload and Quit read in English, never «
       Suspendre », « Recharger », « Quitter », and Narrator names the icon « Ergopti+ », never `ErgoptiPlus.exe`. On a

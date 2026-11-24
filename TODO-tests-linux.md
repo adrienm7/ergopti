@@ -14,6 +14,7 @@ yet; the first run also proves the field run without a click (53c1766514), the r
 (one daemon restart under a real user manager). Container and CI proofs are not physical evidence.
 
 - [ ] <!-- field-point: tray_suspend_row --> **« Suspendre » row (maintainer, 2026-11-24):** the tray menu shows « ⏸︎ Suspendre » right above « Recharger »; click it: the row is ticked, the header reads paused and a hotstring no longer expands; click it again, or the paused header row: the daemon resumes and the row is unticked.
+- [ ] <!-- field-point: tray_shortcut_hint --> **Tray shortcut hints (maintainer, 2026-11-24):** with the preset chords, the tray menu reads « ⏸︎ Suspendre (AltGr + Entrée) », « 🔄 Recharger (AltGr + ⌫) » and « ⏹ Quitter (AltGr + Échap) » (the label text: the tray exports no dbusmenu shortcut); paused, « Suspendre » keeps its tick. Set « AltGr + ⌫ » to « Aucun » in Shortcuts > « Raccourcis de gestion du script »: « Recharger » loses its hint; set « AltGr + Entrée » to Recharger: « Recharger » reads « AltGr + Entrée »; untick the chords' switch: no row shows a hint. Note how GNOME, KDE and COSMIC draw the longer rows.
 - [ ] <!-- field-point: raw_telemetry --> Raw telemetry: under X11, move, resize and maximise a window and change
       monitor: `events_window_topo` holds the rows from the libxcb and RandR reads; unplug the network and bring a
       WireGuard tunnel up then down: `events_network` holds the four Internet and VPN kinds.

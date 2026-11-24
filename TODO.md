@@ -78,6 +78,18 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       « — Fichiers et assistant — » (cleanup, paths, wizard: no more one-row group), « — Réseau — » (proxy) and
       « — Accessibilité — » (window font and spacing), the same on the three OS (field point
       `configuration_titles`).
+- [ ] **[All] Tray shortcut hints (maintainer, 2026-11-24).** « Suspendre », « Recharger » and « Quitter » show
+      the chord bound to their action (`script_pause_toggle`, `script_reload`, `script_quit`): the first of the
+      four script-chord slots, in `script_chords.json` order, whose live chord runs it, named as « Raccourcis de
+      gestion du script » names the slot; none while the chords' switch is off or no slot holds the action. One
+      rule, `hint_slot` in `_shared/keyboard/engine/layers/script_chords.lua`, mirrored by
+      `_shared/keyboard/engine/layers/script_chord_hint.ahk`, both replaying `script_chord_hint_vectors.json`;
+      macOS and Linux find the three rows of their finished root by caption (`menu/engine/tray_shortcut_hints.lua`).
+      Windows puts it after a tab (the right-aligned accelerator column), macOS in a styled title in
+      `secondaryLabelColor` (no NSMenu key equivalent names the right Option key or a chord typed as a sequence),
+      Linux in the label through `menu.global.shortcut_hint` (the appindicator tray exports no dbusmenu
+      `shortcut`, which has no AltGr). Not covered: the keyboard-slot, tap-key and gesture bindings of the same
+      actions. Field checks on the three OS (field point `tray_shortcut_hint`).
 - [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
       that sets no icon and so shows the engine's application icon) still showed the hammer, although
       `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`
