@@ -32,9 +32,8 @@ local function ports(world)
 			return false, answer
 		end,
 		list_dir = function() return world.nodes or { "by-id", "event0", "event3" } end,
-		run = function(argv, timeout_ms, done)
+		run = function(argv, done)
 			table.insert(calls, table.concat(argv, " "))
-			helpers.assert_eq(timeout_ms, Check.COMMAND_TIMEOUT_MS)
 			local answer = (world.exits or {})[argv[1]]
 			if answer == "not_found" then return nil, "not_found" end
 			if answer == "timeout" then done(nil, "timeout") else done(answer or 0) end
@@ -46,7 +45,7 @@ end
 
 --- Runs the check and returns its steps by id and the port calls.
 local function run(world)
-	local report = Report.new_report(Check.CHECK_ID)
+	local report = Report.new_report("setup")
 	local finished = 0
 	local scripted, calls = ports(world)
 	Check.run(scripted, report, function() finished = finished + 1 end)
@@ -107,6 +106,11 @@ helpers.describe("field run setup check (linux)", function()
 		helpers.assert_eq(FieldRun.CHECK_RUNNERS.setup, "diagnostics.ui.field_check.setup_check")
 		local runner = require(FieldRun.CHECK_RUNNERS.setup)
 		helpers.assert_eq(runner.title_key, "field_check.setup.title")
+		-- The adapter bounds each command by half the step's deadline, read from the declaration
+		local ports = require("diagnostics.adapters.setup_check_ports").new("setup")
+		helpers.assert_type(ports.run, "function")
+		helpers.assert_true(not pcall(require("diagnostics.adapters.setup_check_ports").new, "absent"),
+			"a check no step runs has no bound")
 		local declared = false
 		for _, step in ipairs(read("field_run_steps.json").steps) do
 			if step.id == "field_setup" then declared = step.kind == "field_check" and step.check == "setup" end

@@ -7,16 +7,33 @@
 --- (diagnostics/engine/field_check/setup_check.lua): access checks through
 --- libuv, the /dev/input listing, the two commands through the daemon's own
 --- asynchronous runner (never a blocking shell on the keyboard loop) and the
---- compositor focus source's state.
+--- compositor focus source's state. Each command is bound to half its field
+--- run step's deadline (diagnostics/data/field_run_steps.json), so the two
+--- together never outlast the step.
 --- ==============================================================================
 
 local M = {}
 
+--- The bound of one command: half the deadline of the step running the check.
+--- @param check string The check's id in the field run declaration.
+--- @return number milliseconds
+local function command_timeout_ms(check)
+	local FieldRun = require("diagnostics.engine.field_run.field_run")
+	local Paths = require("core.fs.engine.paths")
+	local declaration = FieldRun.read_declaration(Paths.driver_root() .. "/diagnostics/data/field_run_steps.json")
+	for _, step in ipairs(declaration.steps) do
+		if step.check == check then return step.deadline_seconds * 1000 / 2 end
+	end
+	error("no field run step runs the " .. check .. " check")
+end
+
 --- Builds the ports.
+--- @param check string The check's id in the field run declaration.
 --- @return table ports
-function M.new()
+function M.new(check)
 	local uv = require("luv")
 	local Shell = require("core.process.adapters.shell_runner")
+	local timeout_ms = command_timeout_ms(check)
 	return {
 		access = function(path, mode)
 			local ok, _, code = uv.fs_access(path, mode)
@@ -33,7 +50,7 @@ function M.new()
 			end
 			return names
 		end,
-		run = function(argv, timeout_ms, done)
+		run = function(argv, done)
 			if not Shell.has_command(argv[1], true) then return nil, "not_found" end
 			local args = {}
 			for index = 2, #argv do args[#args + 1] = argv[index] end

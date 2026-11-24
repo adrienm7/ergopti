@@ -26,8 +26,6 @@ local Report = require("diagnostics.engine.field_check.report")
 
 local M = {}
 
-M.CHECK_ID = "setup"
-
 -- The paths install.sh opens to the user's groups
 M.UINPUT_PATH = "/dev/uinput"
 M.INPUT_DIR = "/dev/input"
@@ -37,9 +35,6 @@ M.UNIT = require("modules.updater.restarter").UNIT
 
 -- The polkit agents of the common desktops, as pgrep -f reads them
 M.POLKIT_PATTERN = "polkit.*agent|polkit-gnome|polkit-kde|lxpolkit|mate-polkit"
-
--- Each command's bound: both answer at once on a working session
-M.COMMAND_TIMEOUT_MS = 5000
 
 --- The closed code of a refused access.
 --- @param code string|nil Native error name (EACCES, ENOENT, ...).
@@ -89,8 +84,8 @@ end
 --- @param ports table {
 ---   access = function(path, mode "R"|"W") -> boolean, error name|nil,
 ---   list_dir = function(dir) -> names|nil,
----   run = function(argv, timeout_ms, done(exit code|nil, why|nil)) -> handle|nil, why: done is
----     called once with the exit code, or nil and "not_found", "timeout" or "error",
+---   run = function(argv, done(exit code|nil, why|nil)) -> handle|nil, why: done is called
+---     once with the exit code, or nil and "not_found", "timeout" or "error",
 ---   focus_status = function() -> nil (no compositor focus source) or its status }
 --- @param report table field check report.
 --- @param finish function
@@ -114,7 +109,7 @@ function M.run(ports, report, finish)
 			end
 			next_step()
 		end
-		local handle, refusal = ports.run(argv, M.COMMAND_TIMEOUT_MS, done)
+		local handle, refusal = ports.run(argv, done)
 		if handle == nil then done(nil, refusal == "not_found" and "not_found" or "error") end
 	end
 	command("unit_enabled", { "systemctl", "--user", "is-enabled", "--quiet", M.UNIT },
