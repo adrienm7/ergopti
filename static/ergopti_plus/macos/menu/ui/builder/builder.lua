@@ -783,9 +783,11 @@ function M.generate(ctx, menu_mods, actions)
 		-- « Suspendre », the Windows row, right before Reload (maintainer,
 		-- 2026-11-24): the title pill keeps toggling the same pause.
 		["suspend"]         = function()
-			local command = "suspend"
-			local row = ManifestMenu.check_row("top_level", command, {
-				[command] = function()
+			-- A menu command id, not a shell command: the owned-runtimes scan reads
+			-- a `command = "x"` assignment as a program it starts.
+			local command_id = "suspend"
+			local row = ManifestMenu.check_row("top_level", command_id, {
+				[command_id] = function()
 					local control = ctx.script_control
 					-- The same transaction as the pause key and the title pill
 					if type(control) ~= "table" or type(control.toggle_script_control) ~= "function" then
