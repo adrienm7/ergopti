@@ -62584,6 +62584,64 @@
 			}
 		},
 		{
+			"id": "hands_down_neu_janiso",
+			"name": "Hands Down Neu (janiso)",
+			"language": "en",
+			"source": "handsdown",
+			"source_path": "JSON/HandsDownNeu/Hands_Down_neu.en.janiso.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["q", "Q", null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "¬", null, null],
+				"Digit7": ["7", "^", null, null],
+				"Digit8": ["8", "&", null, null],
+				"Digit9": ["9", "|", null, null],
+				"Digit0": ["0", "?", null, null],
+				"Minus": ["j", "J", null, null],
+				"KeyQ": ["w", "W", null, null],
+				"KeyW": ["f", "F", null, null],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", null, null],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": ["-", "+", null, null],
+				"KeyU": [".", ":", null, null],
+				"KeyI": ["/", "*", null, null],
+				"KeyO": ["\"", "[", null, null],
+				"KeyP": ["'", "]", null, null],
+				"BracketLeft": ["(", "{", null, null],
+				"BracketRight": [")", "}", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["n", "N", null, null],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["b", "B", null, null],
+				"KeyH": [",", ";", null, null],
+				"KeyJ": ["a", "A", null, null],
+				"KeyK": ["e", "E", null, null],
+				"KeyL": ["i", "I", null, null],
+				"Semicolon": ["h", "H", null, null],
+				"Quote": ["\\", ">", null, null],
+				"Backslash": ["z", "Z", null, null],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["c", "C", null, null],
+				"KeyC": ["l", "L", null, null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["g", "G", null, null],
+				"KeyN": ["=", "<", null, null],
+				"KeyM": ["u", "U", null, null],
+				"Comma": ["o", "O", null, null],
+				"Period": ["y", "Y", null, null],
+				"Slash": ["k", "K", null, null],
+				"Space": [" ", null, "_", null],
+				"LeftOuterNumber": ["`", "~", null, null]
+			}
+		},
+		{
 			"id": "adextre_fr",
 			"name": "Adextre",
 			"language": "fr",
@@ -65389,6 +65447,64 @@
 				"RightInnerBottom": ["?", "|", null, null],
 				"RightLowerIndex": ["←", null, null, null]
 			}
+		},
+		{
+			"id": "hands_down_neu_janiso_klanext",
+			"name": "Hands Down Neu (KLAnext janiso)",
+			"language": "en",
+			"source": "klanext",
+			"source_path": "layouts/hands-down-neu.en.janiso.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["\\", ">", null, null],
+				"Digit1": ["1", "!", null, null],
+				"Digit2": ["2", "@", null, null],
+				"Digit3": ["3", "#", null, null],
+				"Digit4": ["4", "$", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "¬", null, null],
+				"Digit7": ["7", "^", null, null],
+				"Digit8": ["8", "&", null, null],
+				"Digit9": ["9", "|", null, null],
+				"Digit0": ["0", "?", null, null],
+				"Minus": ["j", "J", null, null],
+				"KeyQ": ["w", "W", null, null],
+				"KeyW": ["f", "F", null, null],
+				"KeyE": ["m", "M", null, null],
+				"KeyR": ["p", "P", null, null],
+				"KeyT": ["v", "V", null, null],
+				"KeyY": ["-", "+", null, null],
+				"KeyU": [".", ":", null, null],
+				"KeyI": ["q", "Q", null, null],
+				"KeyO": ["\"", "[", null, null],
+				"KeyP": ["'", "]", null, null],
+				"BracketLeft": ["(", "{", null, null],
+				"BracketRight": [")", "}", null, null],
+				"KeyA": ["r", "R", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["n", "N", null, null],
+				"KeyF": ["t", "T", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": [",", ";", null, null],
+				"KeyJ": ["a", "A", null, null],
+				"KeyK": ["e", "E", null, null],
+				"KeyL": ["i", "I", null, null],
+				"Semicolon": ["h", "H", null, null],
+				"Quote": ["=", "<", null, null],
+				"Backslash": ["z", "Z", null, null],
+				"KeyZ": ["x", "X", null, null],
+				"KeyX": ["c", "C", null, null],
+				"KeyC": ["l", "L", null, null],
+				"KeyV": ["d", "D", null, null],
+				"KeyB": ["b", "B", null, null],
+				"KeyN": ["/", "*", null, null],
+				"KeyM": ["u", "U", null, null],
+				"Comma": ["o", "O", null, null],
+				"Period": ["y", "Y", null, null],
+				"Slash": ["k", "K", null, null],
+				"Space": [" ", null, "_", null],
+				"LeftOuterNumber": ["`", "~", null, null]
+			}
 		}
 	],
 	"not_imported": [
@@ -65925,13 +66041,9 @@
 		},
 		{
 			"source": "handsdown",
-			"source_path": "JSON/HandsDownNeu/Hands_Down_neu.en.janiso.json",
-			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
-		},
-		{
-			"source": "handsdown",
 			"source_path": "JSON/HandsDownNeu/Hands_Down_neu.za.janiso.json",
-			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "hands_down_neu_janiso"
 		},
 		{
 			"source": "handsdown",
@@ -66996,11 +67108,6 @@
 		},
 		{
 			"source": "klanext",
-			"source_path": "layouts/hands-down-neu.en.janiso.json",
-			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
-		},
-		{
-			"source": "klanext",
 			"source_path": "layouts/hands-down-neu.ts.eu.ergodox.json",
 			"reason": "the same letters and digits as a library layout",
 			"same_as": "hands_down_neu_ergodox"
@@ -67008,7 +67115,8 @@
 		{
 			"source": "klanext",
 			"source_path": "layouts/hands-down-neu.za.janiso.json",
-			"reason": "characters on keys the library's keyboards have no code for (thumb keys included): ` ~"
+			"reason": "the same letters and digits as a library layout",
+			"same_as": "hands_down_neu_janiso_klanext"
 		},
 		{
 			"source": "klanext",

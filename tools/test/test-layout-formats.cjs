@@ -1711,6 +1711,24 @@ async function checkLinks() {
 			janiso.unmapped.length === 0,
 		`janiso: ${JSON.stringify(rows)} ${JSON.stringify(janiso.unmapped)}`
 	);
+	// (janiso-left-outer-number-2026-11-24) The left outer column's number-row
+	// key (1), which KLAnext's QWERTY leaves empty, was named unread: moutis/
+	// HandsDown Hands_Down_neu.en.janiso.json keeps « ` ~ » there (finger 1)
+	// and q on 43. It takes the ErgoDox's key at that place, every ANSI code
+	// being another index's; the key 0 beside it keeps no code.
+	const neu = F.fromKla({
+		label: 'hands-down-neu.en.janiso',
+		keyboardType: 'janiso',
+		keys: [key(1, '`~', 1), key(2, '1!', 1), key(43, 'qQ', 1), key(0, '¤', 1)]
+	});
+	check(
+		(neu.layout.rows.LeftOuterNumber || []).slice(0, 2).join() === '`,~' &&
+			neu.layout.rows.Digit1[0] === '1' &&
+			neu.layout.rows.Backquote[0] === 'q' &&
+			neu.unmapped.length === 1 &&
+			/^0 \(¤\)$/.test(neu.unmapped[0].detail),
+		`janiso: ${JSON.stringify(neu.layout.rows)} ${JSON.stringify(neu.unmapped)}`
+	);
 	const ergolinear = F.fromKla({
 		label: 'Hands Down Alt-ex ortho ts',
 		keyboardType: 'ergolinear',

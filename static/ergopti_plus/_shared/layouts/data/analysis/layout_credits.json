@@ -3140,6 +3140,18 @@
 		"x6_mod_sc0ty_nongr": {
 			"authors": ["Sc0tTy"],
 			"basis": "collection"
+		},
+		"hands_down_neu_janiso": {
+			"authors": ["R. Alan Reiser"],
+			"url": "https://sites.google.com/alanreiser.com/handsdown",
+			"basis": "source",
+			"checked": "2026-11-24",
+			"evidence": "moutis/HandsDown e8f532f62c, JSON/HandsDownNeu/Hands_Down_neu.en.janiso.json: « author »: « Alan Reiser », label « hands-down-neu.en.janiso », « moreInfoUrl » the Hands Down site; the Hands Down site: « … are trademarks of R. Alan Reiser »."
+		},
+		"hands_down_neu_janiso_klanext": {
+			"authors": ["Alan Reiser"],
+			"url": "https://alanreiser.com/",
+			"basis": "collection"
 		}
 	}
 }

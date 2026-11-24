@@ -318,7 +318,7 @@ analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-an
 waits for the maintainer's review).
 
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 73 of the 91 files left out for its keys came in, the library holds 783 layouts
+      model »): 73 of the 91 files left out for its keys came in, the library holds 785 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
       board-only codes, the Shift keys read as QMK's mod-tap and the thumb rule (the ErgoDox's extra left thumb keys are idle since
       2026-11-21) (`docs/design/layout-analysis.md`,
@@ -327,8 +327,7 @@ waits for the maintainer's review).
       AOEYK's \), which would also offer them to the optimizer; KLAnext's Einbinder Orthogonal, VCKB, VCKB2 and Yp Hina
       Fu put a letter on the ErgoDox's left 2-unit outer thumb key, where the board keeps Space (a code of its own
       there would draw two keys at one place: the Comparer's and the Optimiser's boards draw every non-modifier
-      code); Hands Down Neu's four janiso files keep the backquote and « ~ » on a key KLAnext's QWERTY leaves without
-      a character.
+      code).
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names

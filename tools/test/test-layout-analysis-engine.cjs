@@ -142,7 +142,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 783;
+const LIBRARY_COUNT = 785;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
@@ -3183,6 +3183,16 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		['poqdea_es', 'Semicolon', 0, 'i'],
 		['poqdea_es', 'Minus', 2, '´'],
 		['poqdea_es', 'Quote', 2, '¿'],
+		// moutis/HandsDown Hands_Down_neu.en.janiso.json: « ` ~ » on the left
+		// outer column's number-row key (1), q on 43, z on 29, j on 40;
+		// KLAnext's hands-down-neu.en.janiso.json, an earlier Neu, q on 23.
+		['hands_down_neu_janiso', 'LeftOuterNumber', 0, '`'],
+		['hands_down_neu_janiso', 'LeftOuterNumber', 1, '~'],
+		['hands_down_neu_janiso', 'Backquote', 0, 'q'],
+		['hands_down_neu_janiso', 'Backslash', 0, 'z'],
+		['hands_down_neu_janiso', 'Minus', 0, 'j'],
+		['hands_down_neu_janiso_klanext', 'LeftOuterNumber', 0, '`'],
+		['hands_down_neu_janiso_klanext', 'KeyI', 0, 'q'],
 		// moutis/HandsDown's ortho files on KLAnext's ergolinear board, by
 		// position: Alt « wchmv"kujq rsntgyieoa xbldfzp,./ », Alt-x « m v »
 		// on the top row's 4th and 5th keys, Polyglot « k j » ending it, Ref
@@ -3455,6 +3465,13 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		libraryFile.not_imported.every((entry) => !/janiso|ergolinear/.test(entry.reason)),
 		'collections: a file is still left out for its janiso or ergolinear board'
 	);
+	// Nor for a janiso key its QWERTY leaves empty (janiso-left-outer-number-2026-11-24):
+	// a janiso file is left out only as a duplicate.
+	for (const entry of libraryFile.not_imported)
+		check(
+			!/janiso/.test(entry.source_path) || entry.same_as,
+			`collections: ${entry.source_path} is still left out: ${entry.reason}`
+		);
 	// Thumb keys as the official files state them. moutis/HandsDown: Gold's
 	// key 67 « t » (finger 5) and 69 « T », 74 « ␣ _ » (finger 6); Silver's
 	// 67 « n ñ » and 69 « N Ñ »; Alt-ex (matrix) 56 « ␣ » and 59 « e » with

@@ -807,10 +807,15 @@ Alt, Alt-ex, Alt-nx, Alt-tx, Alt-x, Polyglot and Ref ortho files and Hands On
 ortho (moutis/HandsDown e8f532f62c), KLAnext's Poqdea (Spanish) and Uciea
 Vanilla. Of KLAnext's other janiso files, seven repeat a library layout
 (Colemak, Dvorak, QWERTY, Poqtea twice, Poutea, ZXCV Fingers), and the four
-Hands Down Neu files (two in each collection) keep « ` ~ » on the key left of
-1, which KLAnext's QWERTY leaves without a character. Every value of the 700
+Hands Down Neu files (two in each collection) kept « `` ` `` ~ » on the key
+left of 1, which KLAnext's QWERTY leaves without a character. Every value of the 700
 layouts held before is bit-identical on the eleven keyboards (15 400
 layout × corpus × keyboard rows), and their golden values are unchanged.
+Since 2026-11-24 that key reads as the ErgoDox's `LeftOuterNumber`, the key at
+the same place: Hands Down Neu (janiso) from moutis/HandsDown and KLAnext's
+earlier Neu (q right of i, g and b in QWERTY's order) came in, their « za »
+copies (the same letters, with AltGr accents) as duplicates, and the golden
+values of the 783 layouts held before are unchanged.
 
 **Every ErgoDox key** (2026-11-19, the maintainer's « Complete the model »;
 the codes, the Shift keys and the thumb rule decided by the agent, to review
@@ -903,7 +908,7 @@ characters, and English Alice) before and after:
   the thumb-letter layouts, 41 of those 50 moved, Blickensderfer 5 left them
   and 26 new ones joined.
 
-The library holds 783 layouts.
+The library holds 785 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
