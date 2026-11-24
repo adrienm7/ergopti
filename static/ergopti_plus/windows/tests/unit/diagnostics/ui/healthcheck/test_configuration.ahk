@@ -232,7 +232,8 @@ Test("diagnostics configuration: only the local probe is pending without the opt
 _HCCfgT_ProbeDeadline() {
 	Schema := HealthCheck_Config()["schema"]
 	Deadline := Schema["probes"]["configuration"]["timeout_ms"]
-	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	; DEBUG, not the default INFO: a setting at its default is no row
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "DEBUG"`n')
 	try {
 		PathOf := (Id) => Root . "\" . Id . ".toml"
 		Fast := 0
@@ -263,7 +264,8 @@ _HCCfgT_BrokenReader(Id) {
 
 _HCCfgT_CompleteStates() {
 	Schema := HealthCheck_Config()["schema"]
-	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	; DEBUG, not the default INFO: a setting at its default is no row
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "DEBUG"`n')
 	try {
 		Snapshot := Map("probes", Map("configuration", Map("state", "pending")),
 			"sections", Map("configuration_files", Map("items", []), "configuration", Map("items", [])))
@@ -285,7 +287,8 @@ Test("diagnostics configuration: a completed report names ok and error explicitl
 ; The probe runs on a timer after the caller returned, alone when local-only.
 _HCCfgT_LocalProbeRun() {
 	Schema := HealthCheck_Config()["schema"]
-	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	; DEBUG, not the default INFO: a setting at its default is no row
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "DEBUG"`n')
 	Published := []
 	Publish := (Epoch, Id, Result, Sections) => Published.Push(Map("id", Id, "result", Result, "sections", Sections))
 	try {
