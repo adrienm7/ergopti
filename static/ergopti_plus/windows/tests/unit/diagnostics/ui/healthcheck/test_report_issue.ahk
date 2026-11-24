@@ -89,6 +89,12 @@ _THPA_Snapshot(Long := false) {
 		Loop 300
 			Cohorts.Push(Map("probes", Map("github_api", Map("state", "timeout", "cleanup", "unknown", "ms", A_Index))))
 		Snapshot["retired_probes"] := Cohorts
+		; The readable report counts the retired runs in one line: many changed
+		; settings are what makes it longer than the link
+		Rows := []
+		Loop 300
+			Rows.Push(Map("setting", "gestures.swipe_" . A_Index, "type", "text", "value", "9"))
+		Snapshot["sections"]["configuration"] := Map("items", Rows)
 	}
 	return Snapshot
 }
@@ -272,7 +278,9 @@ _THPA_SuggestFeature() {
 	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
 		. "/issues/new?template=feature_request.yml&"
 	AssertEqual(Prefix, SubStr(Calls[1], 1, StrLen(Prefix)))
-	AssertContains(Calls[1], "driver=windows")
+	; The same identity as the bug form, the driver (a dropdown option) before the system
+	AssertContains(Calls[1], "&driver=Windows&os=Windows")
+	AssertTrue(_THPA_QueryValue(Calls[1], "version") != "", "The version is prefilled: " . Calls[1])
 	Assert(!InStr(Calls[1], "JDoe"), "the URL carries no account name")
 }
 Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)",
@@ -295,7 +303,7 @@ _THPA_MenuReportBug() {
 	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
 		. "/issues/new?template=bug_report.yml&"
 	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")
-	AssertEqual("windows", _THPA_QueryValue(Calls[4], "driver"))
+	AssertEqual("Windows", _THPA_QueryValue(Calls[4], "driver"), "The Driver dropdown option")
 	AssertTrue(InStr(_THPA_QueryValue(Calls[4], "os"), "Windows") = 1, "The system is named, not the driver: " . Calls[4])
 	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "", "The version is prefilled: " . Calls[4])
 	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "unknown", "A source run names its commit: " . Calls[4])
@@ -328,9 +336,11 @@ _THPA_SharingVectors() {
 		Readable := StrSplit(Document["text"], Chr(96) . Chr(96) . Chr(96) . "json")[1]
 		for Id in ["versions", "hardware", "system", "input", "ai", "permissions", "issues"]
 			AssertContains(Readable, "## " . Config["schema"]["export_strings"]["healthcheck.section." . Id])
-		AssertContains(Readable, "| probes.appleevent_transport.native_status | -1744 |")
-		AssertContains(Readable, "| probes.appleevent_transport.cleanup | pending |")
-		AssertContains(Readable, "| retired_probes.1.probes.appleevent_transport.cleanup | unknown |")
+		; One readable line per probe; the earlier runs are counted, their facts
+		; stay in the JSON block
+		AssertContains(Readable, "`nappleevent_transport: timeout (cleanup=pending, native_status=-1744, ms=99)`n")
+		AssertContains(Readable, "`nretired_runs: " . Document["snapshot"]["retired_probes"].Length . "`n")
+		AssertFalse(InStr(Readable, "| --- |"), "the readable report has no Markdown table")
 		AssertEqual("timeout", Document["snapshot"]["probes"]["appleevent_transport"]["state"])
 		AssertEqual("pending", Document["snapshot"]["probes"]["appleevent_transport"]["cleanup"])
 		AssertEqual(-1744, Document["snapshot"]["probes"]["appleevent_transport"]["native_status"])
@@ -352,6 +362,52 @@ _THPA_SharingVectors() {
 	}
 }
 Test("Diagnostics sharing: synthetic three-driver corpus excludes private fields", _THPA_SharingVectors)
+
+; The readable report, byte for byte as share.lua and model.js write it: the
+; host refuses a page preview that differs from its own text (report-readable).
+_THPA_ReportVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\healthcheck\report_vectors.json", "UTF-8"))
+	Schema := HealthCheck_Config()["schema"]
+	for Vector in Corpus["vectors"] {
+		Document := HealthCheck_ShareDocument(Vector["snapshot"], Schema)
+		AssertEqual(Vector["diagnostics"], Document["fields"]["diagnostics"], "report vector " . Vector["id"])
+		AssertEqual(1, InStr(Document["text"], Vector["diagnostics"] . "`n" . Chr(96) . Chr(96) . Chr(96) . "json`n"),
+			"the complete report starts with the same text, then its JSON block: " . Vector["id"])
+		AssertFalse(InStr(Document["text"], "PRIVATE_USER_ZEBRA"), Vector["id"] . " leaked a path")
+	}
+}
+Test("Diagnostics sharing: the readable report matches the shared vectors (report-readable)", _THPA_ReportVectors)
+
+; A config.toml with many changed settings: the bug link is cut in the
+; settings, the last group, after every error, check and permission. The
+; settings used to come first and cut the errors off the link (report-budget).
+_THPA_ReportBudget() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\healthcheck\report_vectors.json", "UTF-8"))
+	Config := HealthCheck_Config(), Schema := Config["schema"], Templates := Config["templates"]
+	Large := Corpus["large"], Base := 0
+	for Vector in Corpus["vectors"]
+		if Vector["id"] == Large["vector"]
+			Base := Vector
+	Snapshot := JsonParse(_HC_ValueToJson(Base["snapshot"]))
+	Items := Snapshot["sections"]["configuration"]["items"]
+	Loop Large["rows"]
+		Items.Push(Map("setting", Large["setting_prefix"] . A_Index, "type", "text", "value", "9"))
+	Document := HealthCheck_ShareDocument(Snapshot, Schema)
+	Url := IssueLink_BuildUrl(Templates, Config["repository"], "bug", Document["fields"], Document["notes"])
+	AssertTrue(StrLen(Url) <= Templates["max_url_bytes"], "the bug link fits its budget")
+	AssertTrue(StrLen(Url) > Templates["max_url_bytes"] - 64, "the bug link fills its budget")
+	AssertEqual("macOS", _THPA_QueryValue(Url, "driver"), "the Driver dropdown option")
+	Prefilled := _THPA_QueryValue(Url, "diagnostics")
+	Title := "## " . Schema["export_strings"]["healthcheck.export.changed_settings"]
+	Before := IssueLink_PercentEncode(SubStr(Base["diagnostics"], 1, InStr(Base["diagnostics"], Title, true) + StrLen(Title) - 1))
+	AssertEqual(Before, SubStr(Prefilled, 1, StrLen(Before)), "every group before the changed settings is whole")
+	AssertTrue(InStr(Prefilled, IssueLink_PercentEncode("`ngestures.enabled = false`n")) > 0, "the first changed settings fit")
+	Ending := IssueLink_PercentEncode(Templates["truncation_marker"] . "`n`n" . Schema["export_strings"][Schema["share_policy"]["truncated_note_key"]])
+	AssertEqual(Ending, SubStr(Prefilled, -StrLen(Ending)), "the note sends the user to the Full report field")
+}
+Test("Diagnostics sharing: a large configuration is cut in its changed settings only (report-budget)", _THPA_ReportBudget)
 
 _THPA_EnglishExport() {
 	Config := HealthCheck_Config()
@@ -385,7 +441,7 @@ _THPA_TemplateOnlyReport() {
 		_THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertEqual(true, Outcome["ok"])
 	Repo := Config["repository"]
-	Prefix := "open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=Windows%2011%20Pro%2026100.9457%20%28x64%29&driver=windows&diagnostics="
+	Prefix := "open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&driver=Windows&os=Windows%2011%20Pro%2026100.9457%20%28x64%29&diagnostics="
 	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "The page cannot change the identity")
 	AssertTrue(_THPA_QueryValue(Calls[4], "diagnostics") != IssueLink_PercentEncode("private query text"), "The host report replaces the page's text")
 	AssertTrue(InStr(Calls[4], "PRIVATE") = 0, "No page-derived text reaches the URL")
@@ -411,8 +467,8 @@ _THPA_PageObservations() {
 	Action["snapshot_revision"] := 1
 	AssertTrue(HealthCheck_CapturePageChecks(Snapshot, Action))
 	Doc := HealthCheck_ShareDocument(Snapshot, Config["schema"])
-	AssertContains(Doc["text"], "installed_page_reported (unqualified)")
-	AssertContains(Doc["text"], "page_check_observations.results.redaction.ms")
+	AssertContains(Doc["text"], Chr(34) . "installed_page_reported" . Chr(34))
+	AssertContains(Doc["text"], "`npage.redaction: ")
 	AssertEqual("not_run", Doc["snapshot"]["page_check_observations"]["results"]["driver_suites"]["state"])
 	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
 	SavedEpoch := _HC_WindowEpoch, HadView := IsSet(_HC_WebView), SavedView := HadView ? _HC_WebView : 0
@@ -505,7 +561,7 @@ _THPA_DayLog() {
 	AssertEqual(StrPut(Redacted, "UTF-8") - 1, Reply["bytes"])
 	AssertFalse(InStr(_HC_ValueToJson(Snapshot), "abcdefghijkl"), "the snapshot never holds the log")
 	With := HealthCheck_ShareDocument(Snapshot, Config["schema"], true)
-	AssertContains(With["text"], "day_log_attachment.included | true")
+	AssertContains(With["text"], "`n" . Config["schema"]["export_strings"]["healthcheck.export.day_log"] . ": yes (bytes=")
 	AssertFalse(InStr(HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"], "day_log_attachment"),
 		"a report that does not save the log does not record it")
 

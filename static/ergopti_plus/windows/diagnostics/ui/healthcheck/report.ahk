@@ -257,79 +257,201 @@ HealthCheck_CapturePageChecks(Snapshot, Action) {
 }
 
 
-/** Renders only the detached projection; no local message or path reaches a row. */
-_HCShare_Rows(Value, Rule, Prefix, Rows) {
-	if Rule["kind"] == "object" {
-		Keys := ""
-		for Key in Value
-			Keys .= Key . "`n"
-		for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n") {
-			if Key != ""
-				_HCShare_Rows(Value[Key], Rule["fields"][Key], Prefix == "" ? Key : Prefix . "." . Key, Rows)
-		}
-	} else if Rule["kind"] == "array" {
-		for Index, Item in Value
-			_HCShare_Rows(Item, Rule["item"], Prefix . "." . Index, Rows)
-	} else if Rule["kind"] == "setting_row" {
-		Rows.Push("| " . _HCShare_Cell(Value["setting"]) . " | " . _HCShare_Cell(Value["type"] . ": " . Value["value"]) . " |")
-	} else {
-		Text := Rule["kind"] == "boolean" ? (Value ? "true" : "false") : Value
-		Rows.Push("| " . _HCShare_Cell(Prefix) . " | " . _HCShare_Cell(Text) . " |")
-	}
+/**
+ * The operating-system name a driver is shown as: the issue form's Driver
+ * dropdown option and the report's Driver line; an unknown driver stays as is.
+ */
+_HCShare_OsName(Driver) {
+	static OS_NAMES := Map("macos", "macOS", "windows", "Windows", "linux", "Linux")
+	return OS_NAMES.Get(Driver, Driver)
 }
 
-_HCShare_Cell(Value) {
-	return StrReplace(RegExReplace(Value . "", "[\r\n]+", " "), "|", "\|")
-}
-
-_HCShare_Table(Rows, Title := "") {
-	if !Rows.Length
-		return ""
-	Text := (Title == "" ? "" : "## " . Title . "`n`n") . "| | |`n| --- | --- |`n"
-	for Row in Rows
-		Text .= Row . "`n"
-	return Text
-}
-
-/** Canonical section labels describe only values admitted by the sharing policy. */
-_HCShare_Readable(Safe, Schema) {
-	Policy := Schema["share_policy"]["projection"]["fields"]
-	Rows := [], Keys := ""
-	for Key in Safe
-		if Key != "sections" && Key != "probes" && Key != "retired_probes"
-			Keys .= Key . "`n"
+/** The keys of a Map, sorted case-sensitively as the Lua and JS ports sort them. */
+_HCShare_SortedKeys(Value) {
+	Keys := ""
+	for Key in Value
+		Keys .= Key . "`n"
+	Sorted := []
 	for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n")
 		if Key != ""
-			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
-	Text := _HCShare_Table(Rows)
-	for Section in Schema["sections"] {
-		Id := Section["id"]
-		if !Safe.Get("sections", Map()).Has(Id)
-			continue
-		Data := Safe["sections"][Id], Rows := [], Keys := ""
-		for Key in Data
-			Keys .= Key . "`n"
-		for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n") {
-			if Key == ""
-				continue
-			Label := Key
-			for Field in Section.Get("fields", [])
-				if Field["id"] == Key {
-					Label := _HCShare_English(Schema, "healthcheck.field." . Key)
-					break
-				}
-			_HCShare_Rows(Data[Key], Policy["sections"]["fields"][Id]["fields"][Key], Label, Rows)
-		}
-		TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.section." . Id))
-		if TableText != ""
-			Text .= "`n" . TableText
+			Sorted.Push(Key)
+	return Sorted
+}
+
+/** A number as the three ports print it: an integer bare, else at most two decimals. */
+_HCShare_Number(Value) {
+	if Value is Integer
+		return String(Value)
+	if Value == Floor(Value)
+		return String(Integer(Value))
+	return RegExReplace(RegExReplace(Format("{:.2f}", Value), "0+$"), "\.$")
+}
+
+/** A section field's scalar by its schema type: units for sizes and durations, yes or no for a boolean. */
+_HCShare_FieldText(Schema, Value, Kind) {
+	if Kind == "bool"
+		return _HCShare_English(Schema, Value ? "healthcheck.value.yes" : "healthcheck.value.no")
+	if !(Value is Number)
+		return String(Value)
+	switch Kind {
+		case "bytes": return Format("{:d} MB", Floor(Value / 1048576 + 0.5))
+		case "percent": return _HCShare_Number(Value) . " %"
+		case "seconds": return _HCShare_Number(Value) . " s"
+		case "ms": return _HCShare_Number(Value) . " ms"
 	}
-	Rows := []
-	for Key in ["probes", "retired_probes"]
-		if Safe.Has(Key)
-			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
-	TableText := _HCShare_Table(Rows, _HCShare_English(Schema, "healthcheck.deep_tests.probe_inventory"))
-	return Text . (TableText == "" ? "" : "`n" . TableText)
+	return _HCShare_Number(Value)
+}
+
+/** The `key=value` facts of a record in the given key order: "" or " (k=v, k=v)". */
+_HCShare_Facts(Record, Keys) {
+	Parts := ""
+	for Key in Keys {
+		if !Record.Has(Key)
+			continue
+		Value := Record[Key]
+		Parts .= (Parts == "" ? "" : ", ") . Key . "=" . (Value is Number ? _HCShare_Number(Value) : String(Value))
+	}
+	return Parts == "" ? "" : " (" . Parts . ")"
+}
+
+/** Appends one group: its heading, its lines (fenced for identifiers), a blank line. */
+_HCShare_Group(Out, Title, Lines, Fenced := false) {
+	static Fence := Chr(96) . Chr(96) . Chr(96)
+	if !Lines.Length
+		return
+	Out.Push("## " . Title)
+	if Fenced
+		Out.Push(Fence)
+	for Line in Lines
+		Out.Push(Line)
+	if Fenced
+		Out.Push(Fence)
+	Out.Push("")
+}
+
+/** The labelled scalar fields of one section, in the schema's field order. */
+_HCShare_FieldLines(Schema, Spec, Data) {
+	Lines := []
+	if !(Data is Map)
+		return Lines
+	for Field in Spec.Get("fields", []) {
+		Id := Field["id"]
+		if !Data.Has(Id) || Data[Id] is Map || Data[Id] is Array
+			continue
+		Lines.Push(_HCShare_English(Schema, "healthcheck.field." . Id) . ": "
+			. _HCShare_FieldText(Schema, Data[Id], Field.Get("type", "")))
+	}
+	return Lines
+}
+
+/**
+ * Formats only detached approved leaves as readable English lines, grouped in
+ * the order of share_policy.report_order, most useful first: when the issue
+ * link cuts the report, the least useful part goes. Port of share.lua's
+ * readable(); both replay report_vectors.json byte for byte.
+ */
+_HCShare_Readable(Safe, Schema) {
+	; The probe facts shown after the state; the hashes and deep-test
+	; provenance stay in the JSON block of the complete report
+	static PROBE_FACTS := ["detail", "cleanup", "native_status", "ms"]
+	static PAGE_CHECK_FACTS := ["reason", "ms"]
+	Sections := Safe.Get("sections", Map())
+	Specs := Map()
+	for Section in Schema["sections"]
+		Specs[Section["id"]] := Section
+	L := (Key) => _HCShare_English(Schema, Key)
+	YesNo := (Value) => L(Value ? "healthcheck.value.yes" : "healthcheck.value.no")
+	Out := []
+	for Id in Schema["share_policy"]["report_order"] {
+		Lines := []
+		switch Id {
+			case "issues":
+				Lines := _HCShare_FieldLines(Schema, Specs["issues"], Sections.Get("issues", 0))
+				Recent := Sections.Get("issues", Map()).Get("recent_error_facts", 0)
+				if (Recent is Map) && Recent.Has("examined_entries") {
+					; An unread source is no count: "0" would say the log held no error
+					Lines.Push(L("healthcheck.export.recent_errors_read") . ": " . (Recent.Get("observed", false)
+						? _HCShare_Number(Recent["examined_entries"]) . " (" . L("healthcheck.recent_source." . Recent["source"]) . ")"
+						: L("healthcheck.value.unknown")))
+					for Event in Recent.Get("events", []) {
+						Keys := []
+						for Key in _HCShare_SortedKeys(Event)
+							if Key != "code" && Key != "entry_index"
+								Keys.Push(Key)
+						Lines.Push(L("healthcheck.export.recognised_error") . ": " . Event["code"] . _HCShare_Facts(Event, Keys))
+					}
+				}
+				_HCShare_Group(Out, L("healthcheck.section.issues"), Lines)
+			case "checks":
+				Probes := Safe.Get("probes", Map())
+				for ProbeId in _HCShare_SortedKeys(Probes) {
+					Probe := Probes[ProbeId]
+					Shown := []
+					for Key in PROBE_FACTS
+						if !(Key == "cleanup" && Probe.Get("cleanup", "") == "settled")
+							Shown.Push(Key)
+					Lines.Push(ProbeId . ": " . Probe.Get("state", "") . _HCShare_Facts(Probe, Shown))
+				}
+				Pages := Safe.Get("page_check_observations", Map()).Get("results", Map())
+				for PageId in _HCShare_SortedKeys(Pages)
+					Lines.Push("page." . PageId . ": " . Pages[PageId].Get("state", "") . _HCShare_Facts(Pages[PageId], PAGE_CHECK_FACTS))
+				Retired := Safe.Get("retired_probes", [])
+				if (Retired is Array) && Retired.Length
+					Lines.Push("retired_runs: " . Retired.Length)
+				_HCShare_Group(Out, L("healthcheck.export.checks"), Lines, true)
+			case "permissions":
+				for Item in Sections.Get("permissions", Map()).Get("items", [])
+					Lines.Push(L("healthcheck.permission." . Item["id"]) . ": " . Item["state"])
+				_HCShare_Group(Out, L("healthcheck.section.permissions"), Lines)
+			case "configuration_files":
+				for Item in Sections.Get("configuration_files", Map()).Get("items", [])
+					Lines.Push(L("healthcheck.config_file." . Item["id"]) . ": " . L("healthcheck.config_state." . Item["state"]))
+				_HCShare_Group(Out, L("healthcheck.section.configuration_files"), Lines)
+			case "report":
+				Lines.Push(L("healthcheck.export.driver") . ": " . _HCShare_OsName(Safe["driver"]))
+				if Safe.Has("generated_at")
+					Lines.Push(L("healthcheck.export.generated") . ": " . Safe["generated_at"])
+				if Safe.Has("schema_version")
+					Lines.Push(L("healthcheck.export.schema") . ": " . _HCShare_Number(Safe["schema_version"]))
+				if Safe.Has("detailed")
+					Lines.Push(L("healthcheck.export.details") . ": " . YesNo(Safe["detailed"]))
+				if Safe.Has("extensive")
+					Lines.Push(L("healthcheck.export.extensive") . ": " . YesNo(Safe["extensive"]))
+				DayLog := Safe.Get("day_log_attachment", 0)
+				if (DayLog is Map) && DayLog.Has("included")
+					Lines.Push(L("healthcheck.export.day_log") . ": " . YesNo(DayLog["included"]) . _HCShare_Facts(DayLog, ["bytes", "lines"]))
+				_HCShare_Group(Out, L("healthcheck.export.report"), Lines)
+			case "configuration":
+				; Until the configuration probe answers, an empty list would claim
+				; no setting was changed
+				Probe := Safe.Get("probes", Map()).Get("configuration", 0)
+				if (Probe is Map) && Probe.Get("state", "") != "ok" {
+					_HCShare_Group(Out, L("healthcheck.export.changed_settings"), [L("healthcheck.value.unknown")])
+					continue
+				}
+				for Item in Sections.Get("configuration", Map()).Get("items", []) {
+					Value := Item["value"]
+					if Item["type"] == "text"
+						Value .= " " . L("healthcheck.export.characters")
+					else if Item["type"] == "list"
+						Value .= " " . L("healthcheck.export.items")
+					Lines.Push(Item["setting"] . " = " . Value)
+				}
+				if !Lines.Length {
+					_HCShare_Group(Out, L("healthcheck.export.changed_settings"), [L("healthcheck.value.none")])
+					continue
+				}
+				_HCShare_Group(Out, L("healthcheck.export.changed_settings"), Lines, true)
+			default:
+				if !Specs.Has(Id)
+					throw Error("report_order names an unknown section: " . Id)
+				_HCShare_Group(Out, L("healthcheck.section." . Id), _HCShare_FieldLines(Schema, Specs[Id], Sections.Get(Id, 0)))
+		}
+	}
+	Text := ""
+	for Index, Line in Out
+		Text .= (Index == 1 ? "" : "`n") . Line
+	return Text
 }
 
 /** Resolves an export label without changing or falling back to UI locale. */
@@ -363,7 +485,6 @@ _HCShare_FormVersion(Safe, Snapshot) {
  */
 _HCShare_FormOs(Safe) {
 	static SESSION_NAMES := Map("wayland", "Wayland", "x11", "X11")
-	static OS_NAMES := Map("macos", "macOS", "windows", "Windows", "linux", "Linux")
 	Sections := Safe.Get("sections", Map())
 	System := Sections.Get("system", Map())
 	Details := []
@@ -374,7 +495,7 @@ _HCShare_FormOs(Safe) {
 	Arch := Sections.Get("hardware", Map()).Get("arch", "unknown")
 	if Arch != "unknown"
 		Details.Push(Arch)
-	Name := System.Has("os") ? System["os"] : OS_NAMES.Get(Safe["driver"], Safe["driver"]) . " (version unknown)"
+	Name := System.Has("os") ? System["os"] : _HCShare_OsName(Safe["driver"]) . " (version unknown)"
 	Joined := ""
 	for Detail in Details
 		Joined .= (Joined == "" ? "" : ", ") . Detail
@@ -387,7 +508,7 @@ HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
 	Head := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
-		. "`n`ndriver-suites: not_run`npage-model-checks: " . (Safe.Has("page_check_observations") ? "installed_page_reported (unqualified)" : "not_collected") . "`n`n" . _HCShare_Readable(Safe, Schema)
+		. "`n`n" . _HCShare_Readable(Safe, Schema)
 	Text := Head . "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
@@ -395,7 +516,7 @@ HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
 		. "Driver: " . Safe["driver"] . "`nVersion: " . Versions.Get("ergopti_version", "unknown")
 		. "`nCommit: " . Versions.Get("commit", "unknown") . "`nDriver suites: NOT_RUN"
 	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
-		"fields", Map("driver", Safe["driver"], "version", _HCShare_FormVersion(Safe, Snapshot),
+		"fields", Map("driver", _HCShare_OsName(Safe["driver"]), "version", _HCShare_FormVersion(Safe, Snapshot),
 			"os", _HCShare_FormOs(Safe), "diagnostics", Head),
 		"notes", Map("diagnostics", _HCShare_English(Schema, Schema["share_policy"]["truncated_note_key"])))
 }

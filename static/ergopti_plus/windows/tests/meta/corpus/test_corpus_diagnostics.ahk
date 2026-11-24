@@ -226,6 +226,7 @@ _TCD_FormIdentity() {
 		Document := HealthCheck_ShareDocument(Snapshot, Schema)
 		AssertEqual(Vector["version"], Document["fields"]["version"], Vector["id"] . ": version")
 		AssertEqual(Vector["os"], Document["fields"]["os"], Vector["id"] . ": os")
+		AssertEqual(Data["driver_options"][Vector["snapshot"]["driver"]], Document["fields"]["driver"], Vector["id"] . ": driver option")
 		AssertTrue(InStr(Document["fields"]["diagnostics"], Chr(96) . Chr(96) . Chr(96) . "json") = 0,
 			Vector["id"] . ": the form report has no JSON block")
 	}

@@ -444,7 +444,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 			"the report field is the compact report built from the same snapshot")
 		helpers.assert_true(report.fields.diagnostics:find("Flush failed: disk full", 1, true) == nil, "the compact report excludes free error text")
 		helpers.assert_true(report.fields.diagnostics:find("```json", 1, true) == nil, "the compact report has no JSON block")
-		helpers.assert_eq(report.fields.driver, "macos")
+		helpers.assert_eq(report.fields.driver, "macOS", "the Driver dropdown option")
 		helpers.assert_eq(context.focused, focused_at_open, "reporting never brings the error window back to the front")
 		helpers.assert_eq(open.action, "open_path")
 		helpers.assert_eq(open.id, "errors_today", "open_log opens today's errors file, by id")

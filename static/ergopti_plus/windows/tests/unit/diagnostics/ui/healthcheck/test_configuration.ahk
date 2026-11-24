@@ -77,8 +77,13 @@ _HCCfgT_SharingControls() {
 					AssertEqual(Controls["expected_files"][Index][Key], Row[Key], Label . ": file " . Key)
 			for Canary in Controls["canaries"]
 				AssertFalse(InStr(Document["text"], Canary), Label . " leaked " . Canary)
-			for Row in Vector["expected"]
-				AssertContains(Document["text"], "| " . Row["setting"] . " | " . Row["type"] . ": " . Row["value"] . " |")
+			; One fenced "key = value" line per changed setting; a text or a list
+			; says it is only a length or a count
+			for Row in Vector["expected"] {
+				Unit := Row["type"] == "text" ? " " . Schema["export_strings"]["healthcheck.export.characters"]
+					: Row["type"] == "list" ? " " . Schema["export_strings"]["healthcheck.export.items"] : ""
+				AssertContains(Document["text"], "`n" . Row["setting"] . " = " . Row["value"] . Unit . "`n")
+			}
 		}
 	}
 }

@@ -454,8 +454,9 @@ _TestHC_ShareDocumentText() {
 		Config := HealthCheck_Config()
 		AssertContains(Text, Config["schema"]["export_strings"][Config["schema"]["share_policy"]["notice_key"]],
 			"The quick export uses canonical English without consulting the UI notice override.")
-		AssertContains(Text, "driver-suites: not_run")
-		AssertContains(Text, "page-model-checks: not_collected")
+		; The readable report names the driver; no page check before the page sent one
+		AssertContains(Text, "`nDriver: Windows`n")
+		AssertFalse(InStr(Text, "`npage."), "no page check is reported before the page sent one")
 		AssertContains(Text, '"driver":"windows"')
 		AssertContains(Text, '"generated_at":"2026-10-09T09:10:36Z"')
 		AssertEqual(0, InStr(Text, "%s"), "the quick export must interpolate the locale placeholder")

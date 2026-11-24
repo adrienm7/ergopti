@@ -3,6 +3,10 @@
 # The form ErgoptiPlus opens from Debug > Report a bug. The app prefills the
 # fields listed in static/ergopti_plus/_shared/diagnostics/data/issue_templates.json
 # by their `id`; tools/test/test-issue-templates.cjs keeps both in step.
+# The link carries a compact report cut to fit its budget, so the complete
+# report the app copied goes in the required full_report field, pasted by hand.
+# The driver dropdown's options are the names the app sends (share.lua,
+# model.js and report.ahk), pinned by the same test.
 # Labels live here because the URL's `labels=` parameter only applies to users
 # with triage permission. GitHub drops a label the repository does not have, so
 # each one must exist there (tools/test/test-issue-templates.cjs).
@@ -15,12 +19,16 @@ body:
   - type: markdown
     attributes:
       value: |
-        Describe the problem in your own words. Debug > Report a bug fills in the version, the system, the driver and a compact diagnostic report (technical facts only); the app copies the complete report to the clipboard and saves it as a file too. The diagnostics window can also save a redacted copy of today's complete log beside it, only if you tick that box. The app never uploads either file: once you paste or attach one here it is on GitHub, and the app cannot remove it.
+        Describe the problem in your own words.
+
+        **Debug > Report a bug** fills in the facts below and copies the full report to your clipboard: paste it into **Full report**.
+
+        Nothing is uploaded: only what you paste or attach here is shared.
   - type: textarea
     id: what_happened
     attributes:
       label: What happened?
-      description: What you did, what you expected, and what happened instead.
+      description: What you did, what you expected, what happened instead.
     validations:
       required: true
   - type: textarea
@@ -41,6 +49,16 @@ body:
       description: Shown in the About submenu.
     validations:
       required: true
+  - type: dropdown
+    id: driver
+    attributes:
+      label: Driver
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
   - type: input
     id: os
     attributes:
@@ -48,24 +66,24 @@ body:
       placeholder: macOS 15.1, Windows 11 24H2, Fedora Linux 41 (GNOME, Wayland)
     validations:
       required: true
-  - type: input
-    id: driver
-    attributes:
-      label: Driver
-      description: macos, windows or linux.
-    validations:
-      required: false
   - type: textarea
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Filled in by the app with technical facts only. When it is cut, a last line says the complete report is on your clipboard and in the saved file. Add relevant observations.
+      description: Filled in by the app, technical facts only. The complete report is on your clipboard for the field below.
     validations:
       required: false
+  - type: textarea
+    id: full_report
+    attributes:
+      label: Full report
+      description: Paste it here (Cmd+V or Ctrl+V). Debug > Report a bug put it on your clipboard.
+    validations:
+      required: true
   - type: textarea
     id: day_log
     attributes:
       label: Day log (optional)
-      description: Today's complete log file, optional. In the diagnostics window, tick the day log box before Report a bug and the app saves a redacted copy beside the report. Drop that file here, or paste its content. Leave this empty if you prefer not to share it.
+      description: Tick the day log box in the diagnostics window, then drop the saved file here.
     validations:
       required: false

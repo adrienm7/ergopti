@@ -39,6 +39,7 @@ return {
 	"tests.unit.menu.llm.test_profile_editor_configuration_owner",
 	"tests.unit.diagnostics.engine.reports.test_crash_privacy",
 	"tests.unit.diagnostics.engine.reports.test_crash_report_contract",
+	"tests.unit.diagnostics.engine.reports.test_readable_report_contract",
 	"tests.unit.diagnostics.engine.reports.test_redact_work",
 	"tests.unit.core.process.test_owned_process_deadline",
 	"tests.unit.core.ui.editors.prompt_editor.test_profile_roundtrip",

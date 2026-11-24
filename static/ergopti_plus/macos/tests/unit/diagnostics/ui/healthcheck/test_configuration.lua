@@ -94,7 +94,11 @@ helpers.describe("diagnostics configuration sharing", function()
 					helpers.assert_true(not document.text:find(canary, 1, true), vector.id .. " leaked " .. canary)
 				end
 				for _, row in ipairs(vector.expected) do
-					helpers.assert_contains(document.text, "| " .. row.setting .. " | " .. row.type .. ": " .. row.value .. " |")
+					-- One fenced "key = value" line per changed setting; a text or a
+					-- list says it is only a length or a count
+					local unit = row.type == "text" and " " .. schema.export_strings["healthcheck.export.characters"]
+						or row.type == "list" and " " .. schema.export_strings["healthcheck.export.items"] or ""
+					helpers.assert_contains(document.text, "\n" .. row.setting .. " = " .. row.value .. unit .. "\n")
 				end
 			end)
 		end

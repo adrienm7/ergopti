@@ -235,72 +235,198 @@ function M.capture_page_checks(snapshot, action)
 	return true
 end
 
-local function cell(value)
-	return (tostring(value):gsub("[\r\n]+", " "):gsub("|", "\\|"))
+-- The operating-system name each driver is shown as: the issue form's Driver
+-- dropdown options and the report's Driver line
+local OS_NAMES = { macos = "macOS", windows = "Windows", linux = "Linux" }
+
+-- Three backticks: a block of identifiers (probe ids, config.toml keys) that
+-- GitHub shows verbatim, so an underscore never turns into emphasis
+local FENCE = "```"
+
+-- The probe facts the compact report shows after the state; the hashes and
+-- deep-test provenance stay in the JSON block of the complete report
+local PROBE_FACTS = { "detail", "cleanup", "native_status", "ms" }
+local PAGE_CHECK_FACTS = { "reason", "ms" }
+
+--- Renders a number the same way in the three ports: an integer without a
+--- fraction, anything else with at most two decimals.
+--- @param value number
+--- @return string
+local function number_text(value)
+	if value == math.floor(value) then return string.format("%d", value) end
+	local text = string.format("%.2f", value):gsub("0+$", ""):gsub("%.$", "")
+	return text
 end
 
-local function rows_for(value, rule, prefix, rows)
-	if rule.kind == "object" then
-		for _, key in ipairs(TableUtil.sorted_keys(value)) do
-			rows_for(value[key], rule.fields[key], prefix == "" and key or prefix .. "." .. key, rows)
+--- Renders a scalar of a section field by the field's schema type: units for
+--- sizes and durations, yes or no for a boolean.
+--- @param value any A projected scalar.
+--- @param kind string|nil The schema field type.
+--- @param label function English label lookup.
+--- @return string
+local function field_text(value, kind, label)
+	if type(value) == "boolean" then return label(value and "healthcheck.value.yes" or "healthcheck.value.no") end
+	if type(value) ~= "number" then return tostring(value) end
+	if kind == "bool" then return label(value ~= 0 and "healthcheck.value.yes" or "healthcheck.value.no") end
+	if kind == "bytes" then return string.format("%d MB", math.floor(value / 1048576 + 0.5)) end
+	if kind == "percent" then return number_text(value) .. " %" end
+	if kind == "seconds" then return number_text(value) .. " s" end
+	if kind == "ms" then return number_text(value) .. " ms" end
+	return number_text(value)
+end
+
+--- Joins the `key=value` facts of a record in the given key order, skipping
+--- the absent ones.
+--- @param record table
+--- @param keys table
+--- @return string "" when none is present, else " (k=v, k=v)".
+local function facts(record, keys)
+	local parts = {}
+	for _, key in ipairs(keys) do
+		local value = record[key]
+		if value ~= nil then
+			parts[#parts + 1] = key .. "=" .. (type(value) == "number" and number_text(value) or tostring(value))
 		end
-	elseif rule.kind == "array" then
-		for index, item in ipairs(value) do rows_for(item, rule.item, prefix .. "." .. index, rows) end
-	elseif rule.kind == "setting_row" then
-		rows[#rows + 1] = "| " .. cell(value.setting) .. " | " .. cell(value.type .. ": " .. value.value) .. " |"
-	else
-		local text = rule.kind == "boolean" and (value and "true" or "false")
-			or type(value) == "number" and Json.encode(value) or value
-		rows[#rows + 1] = "| " .. cell(prefix) .. " | " .. cell(text) .. " |"
 	end
+	return #parts > 0 and " (" .. table.concat(parts, ", ") .. ")" or ""
 end
 
---- Formats only detached approved leaves, using the driver's existing catalogue.
+--- Formats only detached approved leaves as readable English lines, grouped in
+--- the order of share_policy.report_order, most useful first: when the issue
+--- link cuts the report, the least useful part goes. The model.js and
+--- report.ahk ports replay report_vectors.json byte for byte.
+--- @param safe table The projected snapshot.
+--- @param schema table The diagnostics schema with its English export strings.
+--- @return string
 local function readable(safe, schema)
-	local function translate(key)
+	local function label(key)
 		local value = schema.export_strings and schema.export_strings[key]
 		assert(type(value) == "string" and value ~= "", "English export label unavailable: " .. key)
 		return value
 	end
-	local policy, lines, rows = schema.share_policy.projection.fields, {}, {}
-	local keys = {}
-	for key in pairs(safe) do
-		if key ~= "sections" and key ~= "probes" and key ~= "retired_probes" then keys[#keys + 1] = key end
+	local sections = safe.sections or {}
+	local specs = {}
+	for _, section in ipairs(schema.sections) do specs[section.id] = section end
+	local out = {}
+	local function group(title, lines, fenced)
+		if #lines == 0 then return end
+		out[#out + 1] = "## " .. title
+		if fenced then out[#out + 1] = FENCE end
+		for _, line in ipairs(lines) do out[#out + 1] = line end
+		if fenced then out[#out + 1] = FENCE end
+		out[#out + 1] = ""
 	end
-	table.sort(keys)
-	for _, key in ipairs(keys) do rows_for(safe[key], policy[key], key, rows) end
-	local function append(title)
-		if #rows == 0 then return end
-		if title then lines[#lines + 1] = "## " .. translate(title); lines[#lines + 1] = "" end
-		lines[#lines + 1] = "| | |"; lines[#lines + 1] = "| --- | --- |"
-		for _, row in ipairs(rows) do lines[#lines + 1] = row end
-		lines[#lines + 1] = ""
-	end
-	append()
-	for _, section in ipairs(schema.sections) do
-		local data = safe.sections and safe.sections[section.id]
-		if data then
-			rows, keys = {}, TableUtil.sorted_keys(data)
-			for _, key in ipairs(keys) do
-				local label = key
-				for _, field in ipairs(section.fields or {}) do
-					if field.id == key then label = translate("healthcheck.field." .. key); break end
-				end
-				rows_for(data[key], policy.sections.fields[section.id].fields[key], label, rows)
+	local function field_lines(id)
+		local lines, data = {}, sections[id]
+		if type(data) ~= "table" then return lines end
+		for _, field in ipairs(specs[id].fields or {}) do
+			local value = data[field.id]
+			if value ~= nil and type(value) ~= "table" then
+				lines[#lines + 1] = label("healthcheck.field." .. field.id) .. ": " .. field_text(value, field.type, label)
 			end
-			append("healthcheck.section." .. section.id)
+		end
+		return lines
+	end
+	local render = {}
+	render.issues = function()
+		local lines = field_lines("issues")
+		local recent = sections.issues and sections.issues.recent_error_facts
+		if type(recent) == "table" and recent.examined_entries ~= nil then
+			-- An unread source is no count: "0" would say the log held no error
+			lines[#lines + 1] = label("healthcheck.export.recent_errors_read") .. ": " .. (recent.observed
+				and number_text(recent.examined_entries) .. " (" .. label("healthcheck.recent_source." .. recent.source) .. ")"
+				or label("healthcheck.value.unknown"))
+			for _, event in ipairs(recent.events or {}) do
+				local keys = {}
+				for _, key in ipairs(TableUtil.sorted_keys(event)) do
+					if key ~= "code" and key ~= "entry_index" then keys[#keys + 1] = key end
+				end
+				lines[#lines + 1] = label("healthcheck.export.recognised_error") .. ": " .. event.code .. facts(event, keys)
+			end
+		end
+		group(label("healthcheck.section.issues"), lines)
+	end
+	render.checks = function()
+		local lines = {}
+		for _, id in ipairs(TableUtil.sorted_keys(safe.probes or {})) do
+			local probe = safe.probes[id]
+			local shown = {}
+			for _, key in ipairs(PROBE_FACTS) do
+				if not (key == "cleanup" and probe.cleanup == "settled") then shown[#shown + 1] = key end
+			end
+			lines[#lines + 1] = id .. ": " .. tostring(probe.state) .. facts(probe, shown)
+		end
+		local pages = safe.page_check_observations and safe.page_check_observations.results or {}
+		for _, id in ipairs(TableUtil.sorted_keys(pages)) do
+			lines[#lines + 1] = "page." .. id .. ": " .. tostring(pages[id].state) .. facts(pages[id], PAGE_CHECK_FACTS)
+		end
+		local retired = type(safe.retired_probes) == "table" and #safe.retired_probes or 0
+		if retired > 0 then lines[#lines + 1] = "retired_runs: " .. number_text(retired) end
+		group(label("healthcheck.export.checks"), lines, true)
+	end
+	render.permissions = function()
+		local lines = {}
+		for _, item in ipairs(sections.permissions and sections.permissions.items or {}) do
+			lines[#lines + 1] = label("healthcheck.permission." .. item.id) .. ": " .. tostring(item.state)
+		end
+		group(label("healthcheck.section.permissions"), lines)
+	end
+	render.configuration_files = function()
+		local lines = {}
+		for _, item in ipairs(sections.configuration_files and sections.configuration_files.items or {}) do
+			lines[#lines + 1] = label("healthcheck.config_file." .. item.id) .. ": "
+				.. label("healthcheck.config_state." .. item.state)
+		end
+		group(label("healthcheck.section.configuration_files"), lines)
+	end
+	render.report = function()
+		local lines = { label("healthcheck.export.driver") .. ": " .. (OS_NAMES[safe.driver] or tostring(safe.driver)) }
+		if safe.generated_at ~= nil then lines[#lines + 1] = label("healthcheck.export.generated") .. ": " .. safe.generated_at end
+		if safe.schema_version ~= nil then
+			lines[#lines + 1] = label("healthcheck.export.schema") .. ": " .. number_text(safe.schema_version)
+		end
+		if safe.detailed ~= nil then lines[#lines + 1] = label("healthcheck.export.details") .. ": " .. field_text(safe.detailed, nil, label) end
+		if safe.extensive ~= nil then
+			lines[#lines + 1] = label("healthcheck.export.extensive") .. ": " .. field_text(safe.extensive, nil, label)
+		end
+		local log = safe.day_log_attachment
+		if type(log) == "table" and log.included ~= nil then
+			lines[#lines + 1] = label("healthcheck.export.day_log") .. ": " .. field_text(log.included, nil, label)
+				.. facts(log, { "bytes", "lines" })
+		end
+		group(label("healthcheck.export.report"), lines)
+	end
+	render.configuration = function()
+		-- Until the configuration probe answers, an empty list would claim no
+		-- setting was changed
+		local probe = safe.probes and safe.probes.configuration
+		if probe and probe.state ~= "ok" then
+			group(label("healthcheck.export.changed_settings"), { label("healthcheck.value.unknown") })
+			return
+		end
+		local lines = {}
+		for _, item in ipairs(sections.configuration and sections.configuration.items or {}) do
+			local value = item.value
+			if item.type == "text" then value = value .. " " .. label("healthcheck.export.characters")
+			elseif item.type == "list" then value = value .. " " .. label("healthcheck.export.items") end
+			lines[#lines + 1] = item.setting .. " = " .. value
+		end
+		if #lines == 0 then
+			group(label("healthcheck.export.changed_settings"), { label("healthcheck.value.none") })
+			return
+		end
+		group(label("healthcheck.export.changed_settings"), lines, true)
+	end
+	for _, id in ipairs(schema.share_policy.report_order) do
+		if render[id] then render[id]()
+		else
+			assert(specs[id], "report_order names an unknown section: " .. tostring(id))
+			group(label("healthcheck.section." .. id), field_lines(id))
 		end
 	end
-	rows = {}
-	for _, key in ipairs({ "probes", "retired_probes" }) do
-		if safe[key] then rows_for(safe[key], policy[key], key, rows) end
-	end
-	append("healthcheck.deep_tests.probe_inventory")
-	return table.concat(lines, "\n")
+	return table.concat(out, "\n")
 end
 
--- The operating-system name each driver is shown as when its version is unknown
-local OS_NAMES = { macos = "macOS", windows = "Windows", linux = "Linux" }
 -- The session name shown for a display server
 local SESSION_NAMES = { wayland = "Wayland", x11 = "X11" }
 
@@ -346,7 +472,8 @@ end
 --- @param notice string Localized privacy notice from the driver's catalogue.
 --- @param with_day_log boolean|nil See M.snapshot.
 --- @return table { text, fields, notes, name, snapshot }; fields.diagnostics is the
----   compact report (tables, no JSON block) the issue form is prefilled with
+---   compact report (readable lines, no JSON block) the issue form is prefilled
+---   with, and fields.driver the form's Driver dropdown option
 function M.document(snapshot, schema, notice, with_day_log)
 	local safe = M.snapshot(snapshot, schema, with_day_log)
 	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
@@ -355,15 +482,14 @@ function M.document(snapshot, schema, notice, with_day_log)
 	assert(type(truncated) == "string" and truncated ~= "", "English export truncation note unavailable")
 	local versions = safe.sections and safe.sections.versions or {}
 	local stamp = safe.generated_at or "unknown"
-	local head = "# ErgoptiPlus diagnostics\n\n" .. notice
-		.. "\n\ndriver-suites: not_run\npage-model-checks: " .. (safe.page_check_observations and "installed_page_reported (unqualified)" or "not_collected") .. "\n\n" .. readable(safe, schema)
+	local head = "# ErgoptiPlus diagnostics\n\n" .. notice .. "\n\n" .. readable(safe, schema)
 	return {
 		snapshot = safe,
 		summary = "A diagnostic attachment was saved locally. Attach that file here after reviewing it; no attachment is uploaded automatically.\n"
 			.. "Driver: " .. safe.driver .. "\nVersion: " .. (versions.ergopti_version or "unknown")
 			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
 		text = head .. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
-		fields = { driver = safe.driver, version = form_version(safe, snapshot), os = form_os(safe), diagnostics = head },
+		fields = { driver = OS_NAMES[safe.driver], version = form_version(safe, snapshot), os = form_os(safe), diagnostics = head },
 		notes = { diagnostics = truncated },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,
 	}

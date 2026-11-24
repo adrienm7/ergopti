@@ -203,6 +203,7 @@ helpers.describe("diagnostics corpus (linux): issue form identity (form-identity
 			local document = Share.document(snapshot, config.schema, "")
 			helpers.assert_eq(document.fields.version, vector.version, vector.id .. ": version")
 			helpers.assert_eq(document.fields.os, vector.os, vector.id .. ": os")
+			helpers.assert_eq(document.fields.driver, corpus.driver_options[vector.snapshot.driver], vector.id .. ": driver option")
 			helpers.assert_true(not document.fields.diagnostics:find("```json", 1, true),
 				vector.id .. ": the form report has no JSON block")
 		end)

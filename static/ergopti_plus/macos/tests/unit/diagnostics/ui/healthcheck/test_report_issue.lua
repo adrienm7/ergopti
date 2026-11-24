@@ -393,6 +393,12 @@ local function host_snapshot(long)
 		for index = 1, 300 do
 			snapshot.retired_probes[index] = { probes = { github_api = { state = "timeout", cleanup = "unknown", ms = index } } }
 		end
+		-- The readable report counts the retired runs in one line: many changed
+		-- settings are what makes it longer than the link
+		snapshot.sections.configuration = { items = {} }
+		for index = 1, 300 do
+			snapshot.sections.configuration.items[index] = { setting = "gestures.swipe_" .. index, type = "text", value = "9" }
+		end
 	end
 	return snapshot
 end
@@ -433,14 +439,14 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		local url = calls.open_url[1]
 		helpers.assert_eq(query_value(url, "os"), "macOS 15.1 (arm64)", "the real system name, version and architecture")
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&driver=macOS&os=macOS%2015.1%20%28arm64%29&diagnostics="
 		helpers.assert_eq(url:sub(1, #prefix), prefix, "the canonical bug URL: identity, then the compact report")
 		local prefilled = query_value(url, "diagnostics")
 		helpers.assert_eq(prefilled, Share.document(host_snapshot(false), documents().schema, "").fields.diagnostics,
 			"the form receives the compact report, which fits the budget")
 		helpers.assert_true(prefilled:find("# ErgoptiPlus diagnostics", 1, true) == 1, "it is the report")
 		helpers.assert_true(not prefilled:find("```json", 1, true), "the JSON block stays out of the URL")
-		helpers.assert_eq(query_value(url, "driver"), "macos")
+		helpers.assert_eq(query_value(url, "driver"), "macOS", "the Driver dropdown option")
 		helpers.assert_true(not url:find("jdoe", 1, true), "the URL carries no account name: " .. url)
 		helpers.assert_true(not url:find("%2FUsers%2F", 1, true), "the URL carries no home folder: " .. url)
 	end)
@@ -649,7 +655,7 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "not a bare URL: the bug template is selected")
 		helpers.assert_eq(query_value(calls.open_url[1], "version"), "2.4.0")
 		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macOS 15.1 (arm64)")
-		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "macos")
+		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "macOS", "the Driver dropdown option")
 		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= nil, "the compact report prefills the form")
 		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
 	end)
@@ -687,7 +693,7 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
 		helpers.assert_contains(calls.open_url[1], "version=2.4.0")
 		helpers.assert_contains(calls.open_url[1], "os=macOS%2015.1")
-		helpers.assert_contains(calls.open_url[1], "driver=macos")
+		helpers.assert_contains(calls.open_url[1], "version=2.4.0&driver=macOS&os=")
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
 	end)
 end)
@@ -707,9 +713,11 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
 				assert(readable:find("## " .. config.schema.export_strings["healthcheck.section." .. id], 1, true), "readable section omitted")
 			end
-			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
-			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
-			assert(readable:find("| retired_probes.1.probes.appleevent_transport.cleanup | unknown |", 1, true))
+			-- One readable line per probe; the earlier runs are counted, their facts
+			-- stay in the JSON block
+			assert(readable:find("\nappleevent_transport: timeout (cleanup=pending, native_status=-1744, ms=99)\n", 1, true))
+			assert(readable:find("\nretired_runs: " .. #document.snapshot.retired_probes .. "\n", 1, true))
+			assert(not readable:find("| --- |", 1, true), "the readable report has no Markdown table")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
@@ -778,7 +786,7 @@ helpers.describe("stable-metadata report URL", function()
 			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
 		helpers.assert_eq(result.ok, true)
 		local repo = documents().repository
-		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics="
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&driver=macOS&os=macOS%2015.1%20%28arm64%29&diagnostics="
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "the page cannot change the identity")
 		helpers.assert_true(query_value(calls.open_url[1], "diagnostics") ~= "private query text", "the host report replaces the page's text")
 		helpers.assert_true(not calls.open_url[1]:find("PRIVATE", 1, true), "no page-derived text reaches the URL")
@@ -806,8 +814,8 @@ helpers.describe("retained installed-page observations", function()
 		action.snapshot_revision = 1
 		helpers.assert_eq(Share.capture_page_checks(snapshot, action), true)
 		local doc = Share.document(snapshot, config.schema, "PRIVATE_LOCALE")
-		helpers.assert_contains(doc.text, "installed_page_reported (unqualified)")
-		helpers.assert_contains(doc.text, "page_check_observations.results.redaction.ms")
+		helpers.assert_contains(doc.text, "\"installed_page_reported\"")
+		helpers.assert_contains(doc.text, "\npage.redaction: ")
 		helpers.assert_eq(doc.snapshot.page_check_observations.results.driver_suites.state, "not_run")
 		rows.redaction.text = "PRIVATE_TEXT"
 		helpers.assert_eq(Share.page_checks(rows, config.schema), nil)
@@ -917,7 +925,8 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local f = fixture()
 		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
 		local text = f.text(true)
-		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
+		helpers.assert_true(text:find("\n" .. f.config.schema.export_strings["healthcheck.export.day_log"] .. ": yes (bytes=", 1, true) ~= nil,
+			"the report records the attachment")
 		local document = Share.document(f.snapshot, f.config.schema,
 			require("core.i18n.engine.i18n").get(f.config.schema.share_policy.notice_key), true)
 		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })

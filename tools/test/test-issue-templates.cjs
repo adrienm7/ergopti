@@ -17,8 +17,12 @@
  * 3. the repository comes from the updater defaults, and a worst-case prefill
  *    (long accented text and emoji in every field) stays within max_url_bytes,
  *    the report field is cut with the marker and the truncation note;
- * 4. the bug form has the optional day log textarea (never prefilled) and no
- *    consent checkbox.
+ * 4. the bug form has the optional day log textarea (never prefilled), the
+ *    required full report textarea the user pastes the clipboard into (never
+ *    prefilled) and no consent checkbox;
+ * 5. the driver field of both forms is a dropdown whose options are exactly
+ *    the names the app sends, and the feature form requires only its title and
+ *    the proposal.
  * ==============================================================================
  */
 
@@ -65,6 +69,19 @@ const REPOSITORY_LABELS = new Set([
 	'question',
 	'wontfix'
 ]);
+
+// The driver dropdown's options: the names share.lua, model.js and report.ahk
+// put in fields.driver, which the three suites replay from form_identity_vectors.json
+const DRIVER_OPTIONS = Object.values(
+	JSON.parse(
+		fs.readFileSync(
+			path.join(SHARED, 'tests', 'corpus', 'healthcheck', 'form_identity_vectors.json'),
+			'utf8'
+		)
+	).driver_options
+);
+if (DRIVER_OPTIONS.join() !== 'macOS,Windows,Linux')
+	throw new Error('form_identity_vectors.json must name macOS, Windows and Linux in that order');
 
 const failures = [];
 let fieldsChecked = 0;
@@ -157,6 +174,14 @@ for (const id of templateIds) {
 			failures.push(
 				`template "${id}" prefills "${fieldId}", which ${template.file} does not declare`
 			);
+		} else if (field.type === 'dropdown') {
+			// A dropdown is prefilled by the exact text of one option: the driver
+			// names the app sends (share.lua, model.js, report.ahk), nothing else
+			const options = (field.attributes && field.attributes.options) || [];
+			if (fieldId !== 'driver' || JSON.stringify(options) !== JSON.stringify(DRIVER_OPTIONS))
+				failures.push(
+					`${template.file}: dropdown "${fieldId}" must be the driver with the options ${DRIVER_OPTIONS.join(', ')}`
+				);
 		} else if (field.type !== 'input' && field.type !== 'textarea') {
 			failures.push(
 				`${template.file}: "${fieldId}" is a ${field.type}, which a URL cannot prefill`
@@ -204,9 +229,47 @@ if (!registry.templates.bug || registry.templates.bug.report_field === undefined
 		if ((bug.fields || []).includes(bug.day_log_field))
 			failures.push('the day log field must never be prefilled: it is not in fields');
 	}
+	// The full report field: a required textarea the user pastes the clipboard
+	// into, so a report cut to fit the link never loses the rest
+	const fullReport = body.find((item) => item && item.id === bug.full_report_field);
+	if (typeof bug.full_report_field !== 'string' || !fullReport) {
+		failures.push('the bug template names no full_report_field that its form declares');
+	} else {
+		if (fullReport.type !== 'textarea')
+			failures.push(`${bug.file}: the full report field must be a textarea`);
+		if (!fullReport.validations || fullReport.validations.required !== true)
+			failures.push(`${bug.file}: the full report field must be required`);
+		if (!/clipboard/.test((fullReport.attributes || {}).description || ''))
+			failures.push(`${bug.file}: the full report field must say the report is on the clipboard`);
+		if ((bug.fields || []).includes(bug.full_report_field))
+			failures.push('the full report field must never be prefilled: it is not in fields');
+		const ids = body.filter((item) => item && item.id).map((item) => item.id);
+		if (ids.indexOf(bug.full_report_field) !== ids.indexOf(bug.report_field) + 1)
+			failures.push(`${bug.file}: the full report field must follow the report field`);
+	}
 	// The consent box is gone: no checkboxes, nothing required beyond the facts
 	if (body.some((item) => item && item.type === 'checkboxes'))
 		failures.push(`${bug.file}: the consent checkbox must stay removed`);
+}
+// The feature form: the proposal is the only required field besides the title,
+// and the driver comes before the system in both forms
+{
+	const feature = registry.templates.feature || {};
+	const form = parseIssueFormYaml(
+		fs.readFileSync(path.join(FORMS_DIR, feature.file || ''), 'utf8')
+	);
+	const required = (Array.isArray(form.body) ? form.body : [])
+		.filter((item) => item && item.validations && item.validations.required === true)
+		.map((item) => item.id);
+	if (JSON.stringify(required) !== JSON.stringify(['proposal']))
+		failures.push(
+			`${feature.file}: only the proposal may be required, found ${required.join(', ')}`
+		);
+	for (const id of templateIds) {
+		const fields = registry.templates[id].fields || [];
+		if (fields.indexOf('driver') < 0 || fields.indexOf('driver') > fields.indexOf('os'))
+			failures.push(`template "${id}": the driver must come before the operating system`);
+	}
 }
 if (fieldsChecked < 4) failures.push(`only ${fieldsChecked} prefilled field(s) checked`);
 if (labelsChecked < templateIds.length)
@@ -248,7 +311,7 @@ if (!repository || !repository.owner || !repository.repo) {
 		title: 'Échec à l’ouverture 😀',
 		version: '2.1.0-dev.130',
 		os: 'Windows 11 Famille 26100.9457 — édition française',
-		driver: 'windows',
+		driver: 'Windows',
 		diagnostics: long
 	};
 	const note = 'The full report is on the clipboard and in the saved file.';

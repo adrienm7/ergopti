@@ -465,10 +465,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["nl"]
 		},
-		"healthcheck.section.configuration": {
-			"reason": "loanword-or-cognate",
-			"locales": ["fr"]
-		},
 		"healthcheck.section.hardware": {
 			"reason": "loanword-or-cognate",
 			"locales": ["cs", "da", "de", "es", "it", "nl", "pt"]

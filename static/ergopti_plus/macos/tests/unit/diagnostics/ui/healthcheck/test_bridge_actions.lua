@@ -313,7 +313,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
 			local repo = core.config().repository
-			local identity = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=unknown&os=macOS%20%28version%20unknown%29&driver=macos&diagnostics="
+			local identity = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=unknown&driver=macOS&os=macOS%20%28version%20unknown%29&diagnostics="
 			helpers.assert_eq(context.opened_urls[1]:sub(1, #identity), identity, "the identity, then the compact report")
 			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
 			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)

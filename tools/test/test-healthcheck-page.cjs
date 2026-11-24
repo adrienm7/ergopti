@@ -579,7 +579,10 @@ function init(page, detailed) {
 	if (page.posted.at(-1).action !== 'cancel' || page.scheduled.size !== 0)
 		fail('Cancel did not stop the model queue and request actual host cancellation');
 	const text = page.elements['preview-text'].textContent;
-	if (!text.includes('cancelled') || !text.includes('installed_page_reported (unqualified)'))
+	if (
+		!text.includes('cancelled') ||
+		!text.includes('"source":"installed_page_reported","qualification":"unqualified"')
+	)
 		fail('cancelled partial exports lose their precise outcomes');
 }
 
@@ -780,8 +783,8 @@ function init(page, detailed) {
 	if (
 		page.posted.at(-1).action !== 'copy' ||
 		page.posted.at(-1).text !== document ||
-		!document.includes('installed_page_reported (unqualified)') ||
-		!document.includes('page_check_observations.results.redaction.ms')
+		!document.includes('"source":"installed_page_reported","qualification":"unqualified"') ||
+		!/\npage\.redaction: \w+ \(ms=\d+\)\n/.test(document)
 	)
 		fail('The exact retained page observations did not reach English copy');
 }

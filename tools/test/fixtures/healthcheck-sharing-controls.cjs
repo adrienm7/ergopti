@@ -47,11 +47,15 @@ exports.run = function run(root) {
 				readable.includes('## ' + schema.export_strings['healthcheck.section.' + id]),
 				'readable section omitted: ' + id
 			);
-		assert.ok(readable.includes('| probes.appleevent_transport.native_status | -1744 |'));
-		assert.ok(readable.includes('| probes.appleevent_transport.cleanup | pending |'));
+		// One readable line per probe; the earlier runs are counted, and their
+		// facts stay in the JSON block
 		assert.ok(
-			readable.includes('| retired_probes.1.probes.appleevent_transport.cleanup | unknown |')
+			readable.includes(
+				'\nappleevent_transport: timeout (cleanup=pending, native_status=-1744, ms=99)\n'
+			)
 		);
+		assert.ok(readable.includes('\nretired_runs: ' + safe.retired_probes.length + '\n'));
+		assert.ok(!/\| --- \|/.test(readable), 'the readable report has no Markdown table');
 		assert.deepEqual(
 			JSON.parse(text.split('```json\n')[1].split('\n```')[0]),
 			JSON.parse(JSON.stringify(safe))
@@ -65,7 +69,7 @@ exports.run = function run(root) {
 		assert.equal(safe.probes.appleevent_transport.native_status, -1744);
 		assert.equal(safe.retired_probes[0].probes.appleevent_transport.cleanup, 'unknown');
 		assert.ok(!Object.hasOwn(safe, 'diagnostic_checks'));
-		assert.ok(text.includes('page-model-checks: not_collected'));
+		assert.ok(!text.includes('page.'), 'no page check is reported before the page sent one');
 		assert.ok(!Object.hasOwn(safe.sections, 'paths'));
 		assert.ok(!Object.hasOwn(safe.sections.issues, 'last_error'));
 		if (vector.name.endsWith('collector-labels')) {
@@ -169,11 +173,17 @@ exports.run = function run(root) {
 			const document = model.formatShareable(snapshot, schema, (key) => key);
 			for (const canary of configuration.canaries)
 				assert.ok(!document.includes(canary), label + ' leaked ' + canary);
-			for (const row of vector.expected)
-				assert.ok(
-					document.includes('| ' + row.setting + ' | ' + row.type + ': ' + row.value + ' |'),
-					label
-				);
+			// One fenced "key = value" line per changed setting; a text or a list
+			// says it is only a length or a count
+			for (const row of vector.expected) {
+				const unit =
+					row.type === 'text'
+						? ' ' + schema.export_strings['healthcheck.export.characters']
+						: row.type === 'list'
+							? ' ' + schema.export_strings['healthcheck.export.items']
+							: '';
+				assert.ok(document.includes('\n' + row.setting + ' = ' + row.value + unit + '\n'), label);
+			}
 		}
 	// The configuration comes from a probe: until it answers, and whenever it
 	// does not, the report says so explicitly instead of showing empty sections.
@@ -207,7 +217,19 @@ exports.run = function run(root) {
 			const safe = model.shareSnapshot(snapshot, schema);
 			assert.equal(safe.probes.configuration.state, state, label);
 			const text = model.formatShareable(snapshot, schema, (key) => key);
-			assert.ok(text.includes('| probes.configuration.state | ' + state + ' |'), label);
+			assert.ok(text.includes('\nconfiguration: ' + state), label);
+			// A configuration that was not read claims no setting either way
+			const changed = text.split(
+				schema.export_strings['healthcheck.export.changed_settings'] + '\n'
+			)[1];
+			assert.ok(
+				changed.startsWith(
+					schema.export_strings[
+						state === 'ok' ? 'healthcheck.value.none' : 'healthcheck.value.unknown'
+					] + '\n'
+				),
+				label + ' changed settings'
+			);
 			assert.ok(!text.includes('PRIVATE_USER_ZEBRA'), label + ' leaked a path');
 			const page = model.formatMarkdown(snapshot, schema, (key) => key);
 			assert.ok(page.includes(note), label + ' shows ' + note);
@@ -237,6 +259,54 @@ exports.run = function run(root) {
 	);
 	assert.throws(() => model.shareSnapshot({ driver: 'foreign' }, schema));
 	assert.throws(() => model.shareSnapshot(corpus.vectors[0].snapshot, {}));
+
+	// The readable report, byte for byte as share.lua and report.ahk write it:
+	// the host refuses a page preview that differs from its own text
+	const reports = JSON.parse(
+		fs.readFileSync(path.join(shared, 'tests/corpus/healthcheck/report_vectors.json'), 'utf8')
+	);
+	for (const vector of reports.vectors) {
+		const text = model.formatShareable(vector.snapshot, schema, (key) => key);
+		assert.equal(text.split('\n```json\n')[0], vector.diagnostics, 'report vector ' + vector.id);
+		assert.ok(!text.includes('PRIVATE_USER_ZEBRA'), vector.id + ' leaked a path');
+	}
+	// A config.toml with many changed settings: the bug link is cut in the
+	// settings, the last group, and keeps every error, check and permission
+	// whole (the settings used to come first and cut the errors off the link)
+	vm.runInContext(fs.readFileSync(path.join(shared, 'ui/issue_link.js'), 'utf8'), sandbox);
+	const templates = JSON.parse(
+		fs.readFileSync(path.join(shared, 'diagnostics/data/issue_templates.json'), 'utf8')
+	);
+	const repository = JSON.parse(
+		fs.readFileSync(path.join(shared, 'updater/data/defaults.json'), 'utf8')
+	).github;
+	const base = reports.vectors.find((vector) => vector.id === reports.large.vector);
+	const large = JSON.parse(JSON.stringify(base.snapshot));
+	for (let index = 0; index < reports.large.rows; index++)
+		large.sections.configuration.items.push({
+			setting: reports.large.setting_prefix + index,
+			type: 'text',
+			value: '9'
+		});
+	const head = model.formatShareable(large, schema, (key) => key).split('\n```json\n')[0];
+	const note = schema.export_strings[schema.share_policy.truncated_note_key];
+	const url = sandbox.ErgoptiIssueLink.buildIssueUrl(
+		templates,
+		repository,
+		'bug',
+		{ version: '1.0.10-dev.178', driver: 'macOS', os: 'macOS 15.1', diagnostics: head },
+		{ diagnostics: note }
+	);
+	assert.ok(url.length <= templates.max_url_bytes, 'the bug link fits its budget');
+	assert.ok(url.length > templates.max_url_bytes - 64, 'the bug link fills its budget');
+	const prefilled = decodeURIComponent(/[?&]diagnostics=([^&]*)/.exec(url)[1]);
+	const settingsTitle = '## ' + schema.export_strings['healthcheck.export.changed_settings'];
+	assert.ok(
+		prefilled.startsWith(base.diagnostics.split(settingsTitle)[0] + settingsTitle),
+		'every group before the changed settings reaches the link whole'
+	);
+	assert.ok(prefilled.includes('\ngestures.enabled = false\n'), 'the first changed settings fit');
+	assert.ok(prefilled.endsWith(templates.truncation_marker + '\n\n' + note));
 	console.log(
 		'[OK] diagnostic sharing: ' +
 			corpus.vectors.length +
