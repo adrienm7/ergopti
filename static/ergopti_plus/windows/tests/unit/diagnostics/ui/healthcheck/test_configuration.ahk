@@ -42,7 +42,7 @@ Test("diagnostics configuration: the shared vectors reduce identically (healthch
 
 _HCCfgT_Limit() {
 	Corpus := _HCCfgT_Corpus()
-	Document := TOML_ParseDocument('[script]`nlog_level = "INFO"`nshow_error_dialog = true`n`n[metrics]`nkeep_days = 3`n')
+	Document := TOML_ParseDocument('[script]`nlog_level = "DEBUG"`nshow_error_dialog = false`n`n[metrics]`nkeep_days = 3`n')
 	AssertEqual(2, HealthCheck_ConfigurationRows(Corpus["features"], Document, "windows", 2).Length)
 }
 Test("diagnostics configuration: the row count is bounded (healthcheck-configuration-limit)", _HCCfgT_Limit)

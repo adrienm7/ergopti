@@ -42,7 +42,7 @@ helpers.describe("diagnostics configuration reducer", function()
 
 	helpers.it("bounds the number of rows", function()
 		local rows = Configuration.rows(CORPUS.features,
-			Toml.decode("[script]\nlog_level = \"INFO\"\nshow_error_dialog = true\n\n[metrics]\nkeep_days = 3\n"),
+			Toml.decode("[script]\nlog_level = \"DEBUG\"\nshow_error_dialog = false\n\n[metrics]\nkeep_days = 3\n"),
 			"windows", 2)
 		helpers.assert_eq(#rows, 2)
 	end)

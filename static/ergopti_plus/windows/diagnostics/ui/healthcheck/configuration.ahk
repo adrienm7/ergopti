@@ -14,13 +14,16 @@
 ; 2. Every other string is reduced to its length in characters, and every array
 ;    to its item count: a path or a sentence typed into a text setting cannot
 ;    leave the machine through this section.
-; 3. Both ports replay
+; 3. A setting whose value equals its manifest default is no row: a config.toml
+;    that spells out every default would otherwise bury the few changed
+;    settings a bug report needs, and cut them off the issue link.
+; 4. Both ports replay
 ;    _shared/tests/corpus/healthcheck/configuration_vectors.json.
-; 4. HealthCheck_ConfigurationFiles and HealthCheck_CollectConfiguration report
+; 5. HealthCheck_ConfigurationFiles and HealthCheck_CollectConfiguration report
 ;    the state of each configuration file in the order they apply: ok, missing,
 ;    unreadable or invalid. A file that cannot be read is named, never skipped,
 ;    and nothing is cached or written.
-; 5. HealthCheck_ConfigurationProbe runs that collection as the local
+; 6. HealthCheck_ConfigurationProbe runs that collection as the local
 ;    `configuration` probe of the schema, against its deadline: phase A only
 ;    publishes empty sections and a pending probe. Flows without a page (the
 ;    Debug menu's report, the native fallback window) call
@@ -80,6 +83,27 @@ _HCConfig_Lookup(Document, Path) {
 	return Map("found", true, "value", Node)
 }
 
+; True when a typed value equals the manifest default: the same scalar, or a
+; list of the same scalars in the same order. The manifest holds a boolean as 1
+; or 0, so a TOML boolean is compared with those; strings compare case-sensitively.
+; @param Value {Any} A typed config.toml value.
+; @param Default {Any} The manifest default.
+; @returns {Boolean}
+_HCConfig_IsDefault(Value, Default) {
+	if Value is TOML_Bool
+		return (Default is Integer) && (Default == 0 || Default == 1) && (Value.Value ? 1 : 0) == Default
+	if Value is Integer || Value is Float
+		return (Default is Integer || Default is Float) && Value == Default
+	if Value is String
+		return (Default is String) && StrCompare(Value, Default, true) == 0
+	if !(Value is Array) || !(Default is Array) || Value.Length != Default.Length
+		return false
+	for Index, Item in Value
+		if (Item is Array) || (Item is Map) || !_HCConfig_IsDefault(Item, Default[Index])
+			return false
+	return true
+}
+
 ; Reduces one decoded value to a row, or 0 when it is not a reportable leaf.
 ; @param Path {String}
 ; @param Value {Any}
@@ -118,7 +142,8 @@ _HCConfig_Reduce(Path, Value, EnumValues) {
 ; ===============================
 ; ===============================
 
-; The reportable rows of a configuration document.
+; The reportable rows of a configuration document: the declared settings whose
+; value differs from the manifest default.
 ; @param Features {Array} Manifest entries: path, default, platforms, enum_values.
 ; @param Document {Map} Typed config.toml document.
 ; @param Driver {String} windows, macos or linux.
@@ -130,7 +155,9 @@ HealthCheck_ConfigurationRows(Features, Document, Driver, Limit) {
 		throw ValueError("Unknown diagnostics driver: " . Driver)
 	Token := Platforms[Driver]
 	Rows := Map()
-	Add(Path, Value, EnumValues) {
+	Add(Path, Value, EnumValues, Default) {
+		if _HCConfig_IsDefault(Value, Default)
+			return
 		Row := _HCConfig_Reduce(Path, Value, EnumValues)
 		if Row is Map
 			Rows[Path] := Row
@@ -147,12 +174,12 @@ HealthCheck_ConfigurationRows(Features, Document, Driver, Limit) {
 				Path := Feature["path"] . "." . Key
 				Found := _HCConfig_Lookup(Document, Path)
 				if Found["found"]
-					Add(Path, Found["value"], 0)
+					Add(Path, Found["value"], 0, Feature["default"][Key])
 			}
 		} else {
 			Found := _HCConfig_Lookup(Document, Feature["path"])
 			if Found["found"]
-				Add(Feature["path"], Found["value"], Feature.Get("enum_values", 0))
+				Add(Feature["path"], Found["value"], Feature.Get("enum_values", 0), Feature["default"])
 		}
 	}
 	Keys := ""

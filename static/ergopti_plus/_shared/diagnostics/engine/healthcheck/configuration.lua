@@ -13,12 +13,15 @@
 --- 2. Every other string is reduced to its length in characters, and every
 ---    array to its item count: a path or a sentence typed into a text setting
 ---    cannot leave the machine through this section.
---- 3. The AHK port (windows/diagnostics/ui/healthcheck/configuration.ahk) replays the same
+--- 3. A setting whose value equals its manifest default is no row: a
+---    config.toml that spells out every default would otherwise bury the few
+---    changed settings a bug report needs, and cut them off the issue link.
+--- 4. The AHK port (windows/diagnostics/ui/healthcheck/configuration.ahk) replays the same
 ---    vectors (_shared/tests/corpus/healthcheck/configuration_vectors.json).
---- 4. read_files and collect report the state of each configuration file in
+--- 5. read_files and collect report the state of each configuration file in
 ---    the order they apply: ok, missing, unreadable or invalid. A file that
 ---    cannot be read is named, never skipped, and nothing is cached or written.
---- 5. probe and complete run that collection as the local `configuration`
+--- 6. probe and complete run that collection as the local `configuration`
 ---    probe of the schema, against its deadline: phase A only publishes empty
 ---    sections and a pending probe, so reading and decoding the files never
 ---    counts against its budget. Menu reports, which have no page to keep
@@ -74,6 +77,21 @@ local function lookup(document, path)
 	return node
 end
 
+--- True when a decoded value equals the manifest default: the same scalar, or
+--- a list of the same scalars in the same order.
+--- @param value any
+--- @param default any
+--- @return boolean
+local function is_default(value, default)
+	if type(value) ~= type(default) then return false end
+	if type(value) ~= "table" then return value == default end
+	if not is_list(value) or not is_list(default) or #value ~= #default then return false end
+	for index = 1, #value do
+		if type(value[index]) == "table" or value[index] ~= default[index] then return false end
+	end
+	return true
+end
+
 --- Reduces one decoded value to a row, or nil when it is not a reportable leaf.
 --- @param path string
 --- @param value any
@@ -99,7 +117,8 @@ local function reduce(path, value, enum_values)
 	return nil
 end
 
---- The reportable rows of a configuration document.
+--- The reportable rows of a configuration document: the declared settings
+--- whose value differs from the manifest default.
 --- @param features table Manifest entries: path, default, platforms, enum_values.
 --- @param document table Decoded config.toml.
 --- @param driver string windows, macos or linux.
@@ -108,7 +127,8 @@ end
 function M.rows(features, document, driver, limit)
 	local platform = assert(PLATFORM_OF_DRIVER[driver], "unknown diagnostics driver")
 	local rows = {}
-	local function add(path, value, enum_values)
+	local function add(path, value, enum_values, default)
+		if is_default(value, default) then return end
 		local row = reduce(path, value, enum_values)
 		if row then rows[#rows + 1] = row end
 	end
@@ -121,10 +141,10 @@ function M.rows(features, document, driver, limit)
 			if type(feature.default) == "table" and not is_list(feature.default) then
 				for key in pairs(feature.default) do
 					local path = feature.path .. "." .. key
-					add(path, lookup(document, path), nil)
+					add(path, lookup(document, path), nil, feature.default[key])
 				end
 			else
-				add(feature.path, lookup(document, feature.path), feature.enum_values)
+				add(feature.path, lookup(document, feature.path), feature.enum_values, feature.default)
 			end
 		end
 	end
