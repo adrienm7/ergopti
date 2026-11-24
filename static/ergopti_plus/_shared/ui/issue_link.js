@@ -16,6 +16,10 @@
  *    applies to users with triage permission.
  * 2. The budget is measured on the percent-encoded string: an accented letter
  *    costs 6 bytes and an emoji 12, and GitHub answers 414 a little above 8 KB.
+ *    A signed-out click goes through /login?return_to=<the URL encoded again>,
+ *    where each %XX becomes %25XX: when the templates set max_redirect_bytes,
+ *    that redirect is bounded too, so a dense prefill is cut where a
+ *    letter-dense one is not.
  * 3. A prefill is a convenience, so an oversized one is cut rather than
  *    refused: the last parameter first, at a whole code point, ending with the
  *    truncation marker; a parameter that cannot keep one code point is dropped;
@@ -109,23 +113,46 @@
 	}
 
 	/**
-	 * Cuts one value so its encoded form fits `budget` bytes with the marker.
+	 * Bytes a URL grows by when GitHub's login redirect encodes it again: every
+	 * character outside the unreserved set (a %XX triplet's "%", a delimiter)
+	 * becomes three.
+	 * @param {string} encoded An already percent-encoded string.
+	 * @returns {number}
+	 */
+	function reencodedGrowth(encoded) {
+		var growth = 0;
+		for (var i = 0; i < encoded.length; i++) {
+			if (!UNRESERVED.test(encoded[i])) growth += 2;
+		}
+		return growth;
+	}
+
+	/**
+	 * Cuts one value so it fits both budgets with the marker: its encoded form
+	 * within `urlRoom` bytes and that form encoded again within `redirectRoom`.
 	 * @param {string} value
-	 * @param {number} budget Encoded bytes the value may take, marker included.
+	 * @param {number} urlRoom Encoded bytes the value may take, marker included.
+	 * @param {number} redirectRoom Re-encoded bytes it may take, marker included.
 	 * @param {string} marker
 	 * @returns {string|null} The cut value, or null when not one code point fits.
 	 */
-	function cutValue(value, budget, marker) {
-		var room = budget - percentEncode(marker).length;
+	function cutValue(value, urlRoom, redirectRoom, marker) {
+		var encodedMarker = percentEncode(marker);
+		var room = urlRoom - encodedMarker.length;
+		var redirect = redirectRoom - encodedMarker.length - reencodedGrowth(encodedMarker);
 		var parts = codePoints(value);
 		var kept = '';
 		var used = 0;
+		var usedRedirect = 0;
 		// Strictly shorter than the value: a cut that keeps everything is no cut
 		for (var i = 0; i < parts.length - 1; i++) {
-			var cost = encodeCodePoint(parts[i]).length;
-			if (used + cost > room) break;
+			var encoded = encodeCodePoint(parts[i]);
+			var cost = encoded.length;
+			var redirectCost = cost + reencodedGrowth(encoded);
+			if (used + cost > room || usedRedirect + redirectCost > redirect) break;
 			kept += parts[i];
 			used += cost;
+			usedRedirect += redirectCost;
 		}
 		return kept === '' ? null : kept + marker;
 	}
@@ -149,6 +176,15 @@
 		}
 		var max = templates.max_url_bytes;
 		var marker = templates.truncation_marker;
+		// The login redirect of a signed-out click carries the URL encoded again
+		var redirectMax = templates.max_redirect_bytes;
+		var redirectPrefix = templates.login_redirect_prefix;
+		if (redirectMax !== undefined && typeof redirectPrefix !== 'string') {
+			throw new Error('issue_link: max_redirect_bytes needs login_redirect_prefix');
+		}
+		var redirectLength = function (url) {
+			return redirectPrefix.length + url.length + reencodedGrowth(url);
+		};
 		var pattern = String(templates.issue_new_url);
 		if (pattern.indexOf('{owner}') < 0 || pattern.indexOf('{repo}') < 0) {
 			throw new Error('issue_link: issue_new_url must contain {owner} and {repo}');
@@ -172,10 +208,18 @@
 		}
 
 		for (var i = params.length - 1; i >= 1; i--) {
-			var over = joinUrl(base, params).length - max;
-			if (over <= 0) break;
+			var joined = joinUrl(base, params);
+			var over = joined.length - max;
+			var redirectOver = redirectMax === undefined ? 0 : redirectLength(joined) - redirectMax;
+			if (over <= 0 && redirectOver <= 0) break;
 			var ending = notes[params[i][0]] ? marker + '\n\n' + notes[params[i][0]] : marker;
-			var cut = cutValue(params[i][1], percentEncode(params[i][1]).length - over, ending);
+			var encodedValue = percentEncode(params[i][1]);
+			var cut = cutValue(
+				params[i][1],
+				encodedValue.length - Math.max(over, 0),
+				encodedValue.length + reencodedGrowth(encodedValue) - Math.max(redirectOver, 0),
+				ending
+			);
 			if (cut === null) params.splice(i, 1);
 			else {
 				params[i] = [params[i][0], cut];
@@ -186,6 +230,14 @@
 		var url = joinUrl(base, params);
 		if (url.length > max) {
 			throw new Error('issue_link: ' + url.length + ' bytes left after every cut, budget ' + max);
+		}
+		if (redirectMax !== undefined && redirectLength(url) > redirectMax) {
+			throw new Error(
+				'issue_link: a ' +
+					redirectLength(url) +
+					'-byte login redirect left after every cut, budget ' +
+					redirectMax
+			);
 		}
 		return url;
 	}

@@ -11,7 +11,9 @@
 --- 1. Pure: the caller passes the templates document and the repository read
 ---    from _shared/updater/data/defaults.json, so neither is typed here.
 --- 2. The budget is measured on the percent-encoded string, where an accented
----    letter costs 6 bytes and an emoji 12.
+---    letter costs 6 bytes and an emoji 12. A signed-out click goes through
+---    /login?return_to=<the URL encoded again>, where each %XX becomes %25XX:
+---    when the templates set max_redirect_bytes, that redirect is bounded too.
 --- 3. An oversized prefill is cut, never refused: the last parameter first, at
 ---    a whole code point, ending with the truncation marker; a parameter that
 ---    cannot keep one code point is dropped; the title goes last and the
@@ -104,21 +106,38 @@ local function join_url(base, params)
 	return base .. "?" .. table.concat(query, "&")
 end
 
---- Cuts one value so its encoded form fits `budget` bytes with the marker.
+--- Bytes a URL grows by when GitHub's login redirect encodes it again: every
+--- character outside the unreserved set (a %XX triplet's "%", a delimiter)
+--- becomes three.
+--- @param encoded string An already percent-encoded string.
+--- @return number
+local function reencoded_growth(encoded)
+	local _, count = encoded:gsub("[^%w%-%._~]", "")
+	return 2 * count
+end
+
+--- Cuts one value so it fits both budgets with the marker: its encoded form
+--- within `url_room` bytes and that form encoded again within `redirect_room`.
 --- @param value string
---- @param budget number Encoded bytes the value may take, marker included.
+--- @param url_room number Encoded bytes the value may take, marker included.
+--- @param redirect_room number Re-encoded bytes it may take, marker included.
 --- @param marker string
 --- @return string|nil The cut value, or nil when not one code point fits.
-local function cut_value(value, budget, marker)
-	local room = budget - #M.percent_encode(marker)
+local function cut_value(value, url_room, redirect_room, marker)
+	local encoded_marker = M.percent_encode(marker)
+	local room = url_room - #encoded_marker
+	local redirect = redirect_room - #encoded_marker - reencoded_growth(encoded_marker)
 	local parts = code_points(value)
-	local kept, used = {}, 0
+	local kept, used, used_redirect = {}, 0, 0
 	-- Strictly shorter than the value: a cut that keeps everything is no cut
 	for i = 1, #parts - 1 do
-		local cost = #TextUtils.percent_encode(parts[i])
-		if used + cost > room then break end
+		local encoded = TextUtils.percent_encode(parts[i])
+		local cost = #encoded
+		local redirect_cost = cost + reencoded_growth(encoded)
+		if used + cost > room or used_redirect + redirect_cost > redirect then break end
 		kept[#kept + 1] = parts[i]
 		used = used + cost
+		used_redirect = used_redirect + redirect_cost
 	end
 	if #kept == 0 then return nil end
 	return table.concat(kept) .. marker
@@ -144,6 +163,13 @@ function M.build_url(templates, repository, template_id, values, notes)
 	end
 	local max = templates.max_url_bytes
 	local marker = templates.truncation_marker
+	-- The login redirect of a signed-out click carries the URL encoded again
+	local redirect_max = templates.max_redirect_bytes
+	local redirect_prefix = templates.login_redirect_prefix
+	if redirect_max ~= nil and type(redirect_prefix) ~= "string" then
+		error("issue_link: max_redirect_bytes needs login_redirect_prefix", 2)
+	end
+	local function redirect_length(url) return #redirect_prefix + #url + reencoded_growth(url) end
 	-- Plain replacements: an owner is data, never a gsub pattern or replacement
 	local base = tostring(templates.issue_new_url)
 	local owner_at = base:find("{owner}", 1, true)
@@ -166,11 +192,15 @@ function M.build_url(templates, repository, template_id, values, notes)
 	end
 
 	for i = #params, 2, -1 do
-		local over = #join_url(base, params) - max
-		if over <= 0 then break end
+		local joined = join_url(base, params)
+		local over = #joined - max
+		local redirect_over = redirect_max == nil and 0 or redirect_length(joined) - redirect_max
+		if over <= 0 and redirect_over <= 0 then break end
 		local note = notes[params[i][1]]
 		local ending = (type(note) == "string" and note ~= "") and (marker .. "\n\n" .. note) or marker
-		local cut = cut_value(params[i][2], #M.percent_encode(params[i][2]) - over, ending)
+		local encoded_value = M.percent_encode(params[i][2])
+		local cut = cut_value(params[i][2], #encoded_value - math.max(over, 0),
+			#encoded_value + reencoded_growth(encoded_value) - math.max(redirect_over, 0), ending)
 		if cut == nil then
 			table.remove(params, i)
 		else
@@ -182,6 +212,10 @@ function M.build_url(templates, repository, template_id, values, notes)
 	local url = join_url(base, params)
 	if #url > max then
 		error(string.format("issue_link: %d bytes left after every cut, budget %d", #url, max), 2)
+	end
+	if redirect_max ~= nil and redirect_length(url) > redirect_max then
+		error(string.format("issue_link: a %d-byte login redirect left after every cut, budget %d",
+			redirect_length(url), redirect_max), 2)
 	end
 	return url
 end

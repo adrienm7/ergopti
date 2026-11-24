@@ -11,7 +11,9 @@
 ; 1. Pure: the caller passes the templates document and the repository read
 ;    from _shared/updater/data/defaults.json, so neither is typed here.
 ; 2. The budget is measured on the percent-encoded string, where an accented
-;    letter costs 6 bytes and an emoji 12.
+;    letter costs 6 bytes and an emoji 12. A signed-out click goes through
+;    /login?return_to=<the URL encoded again>, where each %XX becomes %25XX:
+;    when the templates set max_redirect_bytes, that redirect is bounded too.
 ; 3. An oversized prefill is cut, never refused: the last parameter first, at
 ;    a whole code point, ending with the truncation marker; a parameter that
 ;    cannot keep one code point is dropped; the title goes last and the
@@ -122,25 +124,51 @@ _IssueLink_JoinUrl(Base, Params) {
 	return Base . "?" . Query
 }
 
-; Cuts one value so its encoded form fits Budget bytes with the marker.
+; Bytes a URL grows by when GitHub's login redirect encodes it again: every
+; character outside the unreserved set (a %XX triplet's "%", a delimiter)
+; becomes three.
+; @param Encoded {String} An already percent-encoded string.
+; @returns {Integer}
+_IssueLink_ReencodedGrowth(Encoded) {
+	RegExReplace(Encoded, "[^A-Za-z0-9\-._~]", "", &Count)
+	return 2 * Count
+}
+
+; Cuts one value so it fits both budgets with the marker: its encoded form
+; within UrlRoom bytes and that form encoded again within RedirectRoom.
 ; @param Value {String}
-; @param Budget {Integer} Encoded bytes the value may take, marker included.
+; @param UrlRoom {Integer} Encoded bytes the value may take, marker included.
+; @param RedirectRoom {Integer} Re-encoded bytes it may take, marker included.
 ; @param Marker {String}
 ; @returns {String} The cut value, or "" when not one code point fits.
-_IssueLink_CutValue(Value, Budget, Marker) {
-	Room := Budget - StrLen(IssueLink_PercentEncode(Marker))
+_IssueLink_CutValue(Value, UrlRoom, RedirectRoom, Marker) {
+	EncodedMarker := IssueLink_PercentEncode(Marker)
+	Room := UrlRoom - StrLen(EncodedMarker)
+	Redirect := RedirectRoom - StrLen(EncodedMarker) - _IssueLink_ReencodedGrowth(EncodedMarker)
 	Points := _IssueLink_CodePoints(Value)
 	Kept := ""
 	Used := 0
+	UsedRedirect := 0
 	; Strictly shorter than the value: a cut that keeps everything is no cut
 	Loop Points.Length - 1 {
-		Cost := StrLen(_IssueLink_EncodeCodePoint(Points[A_Index]["code"]))
-		if (Used + Cost > Room)
+		Encoded := _IssueLink_EncodeCodePoint(Points[A_Index]["code"])
+		Cost := StrLen(Encoded)
+		RedirectCost := Cost + _IssueLink_ReencodedGrowth(Encoded)
+		if (Used + Cost > Room || UsedRedirect + RedirectCost > Redirect)
 			break
 		Kept .= Points[A_Index]["char"]
 		Used += Cost
+		UsedRedirect += RedirectCost
 	}
 	return (Kept == "") ? "" : Kept . Marker
+}
+
+; The length of the login redirect that carries Url encoded again.
+; @param Prefix {String} The login URL up to its return_to value.
+; @param Url {String}
+; @returns {Integer}
+_IssueLink_RedirectLength(Prefix, Url) {
+	return StrLen(Prefix) + StrLen(Url) + _IssueLink_ReencodedGrowth(Url)
 }
 
 ; Builds the prefilled issue URL.
@@ -161,6 +189,12 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	Template := Templates["templates"][TemplateId]
 	MaxUrlBytes := Templates["max_url_bytes"]
 	Marker := Templates["truncation_marker"]
+	; The login redirect of a signed-out click carries the URL encoded again
+	HasRedirect := Templates.Has("max_redirect_bytes")
+	RedirectMax := HasRedirect ? Templates["max_redirect_bytes"] : 0
+	RedirectPrefix := Templates.Get("login_redirect_prefix", "")
+	if HasRedirect && (!(RedirectPrefix is String) || RedirectPrefix == "")
+		throw ValueError("issue_link: max_redirect_bytes needs login_redirect_prefix.")
 	Base := Templates["issue_new_url"]
 	if !InStr(Base, "{owner}", true) || !InStr(Base, "{repo}", true)
 		throw ValueError("issue_link: issue_new_url must contain {owner} and {repo}.")
@@ -179,13 +213,16 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 
 	Index := Params.Length
 	while (Index >= 2) {
-		Over := StrLen(_IssueLink_JoinUrl(Base, Params)) - MaxUrlBytes
-		if (Over <= 0)
+		Joined := _IssueLink_JoinUrl(Base, Params)
+		Over := StrLen(Joined) - MaxUrlBytes
+		RedirectOver := HasRedirect ? _IssueLink_RedirectLength(RedirectPrefix, Joined) - RedirectMax : 0
+		if (Over <= 0 && RedirectOver <= 0)
 			break
 		Note := (Notes is Map) ? Notes.Get(Params[Index][1], "") : ""
 		Ending := (Note != "") ? Marker . "`n`n" . Note : Marker
-		Cut := _IssueLink_CutValue(Params[Index][2],
-			StrLen(IssueLink_PercentEncode(Params[Index][2])) - Over, Ending)
+		EncodedValue := IssueLink_PercentEncode(Params[Index][2])
+		Cut := _IssueLink_CutValue(Params[Index][2], StrLen(EncodedValue) - Max(Over, 0),
+			StrLen(EncodedValue) + _IssueLink_ReencodedGrowth(EncodedValue) - Max(RedirectOver, 0), Ending)
 		if (Cut == "") {
 			Params.RemoveAt(Index)
 		} else {
@@ -198,6 +235,9 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	Url := _IssueLink_JoinUrl(Base, Params)
 	if (StrLen(Url) > MaxUrlBytes)
 		throw Error("issue_link: " . StrLen(Url) . " bytes left after every cut, budget " . MaxUrlBytes . ".")
+	if HasRedirect && _IssueLink_RedirectLength(RedirectPrefix, Url) > RedirectMax
+		throw Error("issue_link: a " . _IssueLink_RedirectLength(RedirectPrefix, Url)
+			. "-byte login redirect left after every cut, budget " . RedirectMax . ".")
 	return Url
 }
 
