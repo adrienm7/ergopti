@@ -56,7 +56,8 @@ _HCConfig_CharacterCount(Text) {
 }
 
 ; Renders a number like the Lua port: an integer without a fraction, anything
-; else with 14 significant digits.
+; else with 14 significant digits and, as C's %g writes it there, an exponent
+; of at least two digits (1e-05): a runtime writing three keeps the last two.
 ; @param Value {Integer|Float}
 ; @returns {String} Empty for NaN and infinities.
 _HCConfig_NumberText(Value) {
@@ -66,7 +67,7 @@ _HCConfig_NumberText(Value) {
 		return ""
 	if Value == Floor(Value) && Abs(Value) < 1e15
 		return String(Integer(Value))
-	return RegExReplace(Format("{:.14g}", Value), "e([+-])0*(\d)", "e$1$2")
+	return RegExReplace(Format("{:.14g}", Value), "e([+-])0*(\d{2,})$", "e$1$2")
 }
 
 ; Walks a dotted path through nested semantic tables.

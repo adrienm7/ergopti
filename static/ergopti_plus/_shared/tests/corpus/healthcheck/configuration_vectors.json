@@ -1,5 +1,5 @@
 {
-	"_comment": "Replayed by the three drivers' configuration reducers (_shared/diagnostics/engine/healthcheck/configuration.lua on macOS and Linux, windows/diagnostics/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. A setting whose value equals its manifest default is no row (a config.toml that spells out every default would bury the changed settings a bug report needs). Every canary is a private value that must reach neither a row nor a shared document. An enum row is only a declared string member, compared exactly: a manifest enum may also declare booleans (script.alt_gr_is_kana_remap), which the AHK JSON reader holds as 1 and 0, so a typed \"1\" or \"0\" stays text.",
+	"_comment": "Replayed by the three drivers' configuration reducers (_shared/diagnostics/engine/healthcheck/configuration.lua on macOS and Linux, windows/diagnostics/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. A setting whose value equals its manifest default is no row (a config.toml that spells out every default would bury the changed settings a bug report needs). Every canary is a private value that must reach neither a row nor a shared document. An enum row is only a declared string member, compared exactly: a manifest enum may also declare booleans (script.alt_gr_is_kana_remap), which the AHK JSON reader holds as 1 and 0, so a typed \"1\" or \"0\" stays text. A number that is not a whole value under 1e15 is written with 14 significant digits and an exponent of at least two digits, as C's %g writes it (1e-05).",
 	"features": [
 		{
 			"path": "script.log_level",
@@ -166,6 +166,12 @@
 			"driver": "macos",
 			"toml": "[layout]\nmac_only = true\n",
 			"expected": [{ "setting": "layout.mac_only", "type": "boolean", "value": "true" }]
+		},
+		{
+			"id": "exponent-keeps-two-digits",
+			"driver": "windows",
+			"toml": "[llm.display]\nopacity = 0.00001\n",
+			"expected": [{ "setting": "llm.display.opacity", "type": "number", "value": "1e-05" }]
 		},
 		{
 			"id": "empty-document",
