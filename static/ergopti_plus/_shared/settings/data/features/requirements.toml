@@ -210,6 +210,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '
 "platform/input/" = "the evdev and uinput adapters the owners call"
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "diagnostics/ui/healthcheck/" = "the health check probes the device access"
+"diagnostics/engine/field_check/setup_check.lua" = "the field run's setup check probes the device access"
 
 [detection.linux.xdotool]
 content = ['["\x27]xdotool[ "\x27]']
