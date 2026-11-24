@@ -71,6 +71,15 @@
 			]
 		},
 		{
+			"id": "reading_windows",
+			"title": "Reading font and spacing reach the open windows at once, and the setup wizard offers them",
+			"checks": [
+				{
+					"step": "linux_reading_windows"
+				}
+			]
+		},
+		{
 			"id": "layout_emulation_w1_w4",
 			"title": "Layout emulation W1 to W4 on KDE",
 			"checks": [

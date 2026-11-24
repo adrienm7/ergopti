@@ -31,6 +31,13 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       still commits), plug it back (« A touchpad is back » once) and a bound swipe fires.
 - [ ] <!-- field-point: item50_cascade --> Item 50 cascade on a physical keyboard (`fb` + Space, Enter and ★ at 1, 2
       and 3 arrows, consumed and not, as `cascade_vectors.json` `fb_*`), and the composed layout typed on it.
+- [ ] <!-- field-point: reading_windows --> Reading font and spacing (field report of 2026-11-24): leave the typing
+      dashboard open and choose Configuration > « Police des fenêtres » OpenDyslexic: the open dashboard turns to
+      it at once, its title reads as a word (no « M é t r i q u e s ») and its toolbar keeps its rows;
+      « Espacement du texte des fenêtres » « Aéré » spreads lines, letters and words at once; « Par défaut » for
+      both gives the dashboard back. Configuration > setup wizard: its first screen offers both lists above the
+      languages, a choice there restyles the wizard at once and ticks the same menu row. The menu itself keeps the
+      system font (native menus cannot take a bundled font).
 - [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of
       `docs/design/layout-option-emulation.md` on real GNOME and KDE sessions, including mutter and KWin reloading a
       `~/.config/xkb` layout (107); KDE is not proved even in a container

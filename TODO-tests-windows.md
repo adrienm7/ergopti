@@ -247,6 +247,13 @@ physical size`); X and Y match the pad's width and height (logical span over mil
       buttons read « Restore default: Delay (ms) » and so on, the colour swatch is not read as a progress bar. 8. Fields named by their label: the Win + G link editor (« Link: »), the Releases window's channel picker
       (« Update channel ») and notes (« Changelog »), the input check's field.
 
+- [ ] Reading font and spacing (field report of 2026-11-24): leave the typing
+      dashboard open and choose Configuration > « Police des fenêtres » OpenDyslexic: the open dashboard turns to
+      it at once, its title reads as a word (no « M é t r i q u e s ») and its toolbar keeps its rows;
+      « Espacement du texte des fenêtres » « Aéré » spreads lines, letters and words at once; « Par défaut » for
+      both gives the dashboard back. Configuration > setup wizard: its first screen offers both lists above the
+      languages, a choice there restyles the wizard at once and ticks the same menu row. The menu itself keeps the
+      system font (a tray menu would need owner-drawn rows).
 - [ ] Metrics views and WPM readouts (MET-01 to MET-03, MET-06 to MET-08, MET-13 to MET-19, 2026-11-21): 1. With the tray
       readout on, type a burst then stop: the readout falls to nothing about 5 s after the last key, not 15 s
       (MET-01). 2. Accept an AI suggestion in an app listed in the metrics exclusions and in a private browser

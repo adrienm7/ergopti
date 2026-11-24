@@ -796,6 +796,15 @@
 			]
 		},
 		{
+			"id": "reading_windows",
+			"title": "Reading font and spacing reach the open windows at once, and the setup wizard offers them",
+			"checks": [
+				{
+					"step": "guided_reading_windows"
+				}
+			]
+		},
+		{
 			"id": "pause_ends_capsword",
 			"title": "A pause ends a running CapsWord and switches its CapsLock off",
 			"checks": [

@@ -252,6 +252,13 @@
 			"gesture": "Run npm run layout-source -- export-xkb static/ergopti_plus/_shared/tests/corpus/layouts/source/direct_levels.toml /tmp/sided-xkb, install it with python3 static/ergopti/linux/xkb_installation/user_layout_installer.py install --layout-id sided --display-name Sided --source-dir /tmp/sided-xkb, select it, then in a text editor type A, Right Ctrl+A, Right Alt+A and Right Ctrl+B. Did you get a, α, æ and β?",
 			"gesture_seconds": 420,
 			"proves": "A layout source compiled straight to XKB keeps a layer held by a sided modifier on XKB's fifth level on a real desktop."
+		},
+		{
+			"id": "linux_reading_windows",
+			"mode": "attest",
+			"gesture": "Open the typing metrics dashboard and leave it open. In Configuration, choose « Police des fenêtres » OpenDyslexic: the open dashboard turns to OpenDyslexic at once, its title reads as a word (no « M é t r i q u e s ») and its toolbar keeps its rows; choose « Espacement du texte des fenêtres » « Aéré »: lines, letters and words spread at once; back to « Par défaut » for both: the dashboard is as before. Then Configuration > setup wizard: its first screen offers both lists above the languages, and choosing OpenDyslexic there restyles the wizard at once and ticks the same row in the Configuration menu. Pass if all of it holds.",
+			"gesture_seconds": 300,
+			"proves": "A saved reading choice reaches the windows already open (push into each webview, font inlined), OpenDyslexic keeps the page's spacing with « Par défaut », and the wizard saves through the menu's writer."
 		}
 	]
 }

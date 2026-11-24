@@ -683,6 +683,15 @@
 			"proves": "One-shot Shift and CapsWord payloads behave natively under the person's keyboard."
 		},
 		{
+			"id": "guided_reading_windows",
+			"kind": "guided",
+			"mode": "attest",
+			"gesture_seconds": 180,
+			"deadline_seconds": 240,
+			"gesture": "Open the typing metrics dashboard and leave it open. In Configuration, choose « Police des fenêtres » OpenDyslexic: the open dashboard turns to OpenDyslexic at once, its title reads as a word (no « M é t r i q u e s ») and its toolbar keeps its rows; choose « Espacement du texte des fenêtres » « Aéré »: lines, letters and words spread at once; back to « Par défaut » for both: the dashboard is as before. Then Configuration > setup wizard: its first screen offers both lists above the languages, and choosing OpenDyslexic there restyles the wizard at once and ticks the same row in the Configuration menu. Pass if all of it holds.",
+			"proves": "A saved reading choice reaches the windows already open (push into each webview, font inlined), OpenDyslexic keeps the page's spacing with « Par défaut », and the wizard saves through the menu's writer."
+		},
+		{
 			"id": "guided_two_copies_accessibility",
 			"signed_app": true,
 			"kind": "guided",

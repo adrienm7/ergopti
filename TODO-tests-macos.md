@@ -181,6 +181,13 @@ Hands needed:
       (log lines name the cleanup).
 - [ ] <!-- field-point: input_policies --> Input policies: native one-shot Shift (modifier-map, dead-key and IME
       handling of the captured key) and CapsWord key/control payload receiving.
+- [ ] <!-- field-point: reading_windows --> Reading font and spacing (field report of 2026-11-24): leave the typing
+      dashboard open and choose Configuration > « Police des fenêtres » OpenDyslexic: the open dashboard turns to
+      it at once, its title reads as a word (no « M é t r i q u e s ») and its toolbar keeps its rows;
+      « Espacement du texte des fenêtres » « Aéré » spreads lines, letters and words at once; « Par défaut » for
+      both gives the dashboard back. Configuration > setup wizard: its first screen offers both lists above the
+      languages, a choice there restyles the wizard at once and ticks the same menu row. The menu itself keeps the
+      system font (native menus cannot take a bundled font).
 - [ ] <!-- field-point: pause_ends_capsword --> A pause ends CapsWord (worker P, 2026-11-14): switch CapsWord on, then pause Ergopti: CapsLock goes off at once and stays off through the pause (`watchers.end_capsword_for_pause`, `test_pause_ends_capsword`); a CapsLock set by hand before the pause stays on.
 - [ ] <!-- field-point: local_server_rows_paused --> Local server rows while paused (EDD-1, `edd1-local-server-rows`):
       with LM Studio or oMLX running and listed in the model selector page, pause Ergopti+: the server's models stay

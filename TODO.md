@@ -222,9 +222,23 @@ baseline as violations go.
       (`script.reading_font`, `script.reading_spacing`): Windows seeds them beside each locale seed and loads the
       font from `_shared/ui/fonts/`, macOS and Linux inline it (`_shared/core/ui/engine/webview/reading_preferences.lua`);
       proof `test-reading-preferences-seed.cjs`, `reading_preferences_contract.lua` on both Lua runners and
-      `test_reading_preferences.ahk`. Left: a font change reaches only the windows opened after it; a look at the
-      dyslexia font in a real window on each OS; the plain-language review of the Studio's own strings (the 21
-      locales' catalogue, not measured).
+      `test_reading_preferences.ahk`. Field report of 2026-11-24 (macOS, dev.178): with OpenDyslexic every window
+      read « M é t r i q u e s » and the metrics toolbar wrapped, and a change reached only the windows opened after
+      it. The OpenDyslexic faces carry side bearings and a space far wider than the system font's: theme.css and the
+      site's accessibility.css now give back the page's spacing with « Par défaut » and add the WCAG 1.4.12
+      increments on top of it with « Aéré » (now labelled « Aéré (lignes, lettres et mots plus espacés) » in the 21
+      locales, paragraph spacing 2 em included); a saved choice is pushed into every open window on the three OS
+      (`a11y_prefs.js` `receiveHost`: macOS `builder.push_reading_preferences`, Linux
+      `webview_manager.push_reading_preferences`, Windows `ReadingPrefs_Track` and `ReadingPrefs_PushToOpen`); the
+      setup wizard offers both lists above the languages from its first screen and saves through the menu's writer.
+      Proof `tools/test/browser/app-windows-reading.playwright.cjs` (computed font, spacing, toolbar rows, live push
+      and the wizard, as the Windows and the inline hosts deliver them). The native menus keep the system font on
+      the three OS, which the menu label « Police des fenêtres » states: Windows tray menus would need owner-drawn
+      rows (AutoHotkey's Menu draws them itself), the Linux tray is drawn by the desktop shell from dbusmenu, which
+      carries no font, and macOS `hs.menubar` takes styled titles only in a font the process can resolve, which
+      Hammerspoon cannot register from a bundled file, and a styled title loses the disabled grey. Left: a look at
+      the dyslexia font in a real window on each OS (TODO-tests); the plain-language review of the Studio's own
+      strings (the 21 locales' catalogue, not measured).
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
       (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
