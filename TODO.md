@@ -1181,16 +1181,6 @@ more`, macOS and WebKit) does not switch the Studio frames to the black-and-yell
      validation kept on a hit).
   2. Port the Windows typed cache now, before the measurement.
   3. Never cache: 30 ms at boot is accepted.
-- [ ] **Linux keystats boot: a persistent sqlite3 child?** Registration, the two migration checks and the open walk
-      cost one sqlite3 process each (about 4 ms); the remaining cut is a persistent child for the synchronous writer
-      ([design](docs/design/linux-sqlite-persistent-child.md)): about 29.5 ms of store boot would become 5 to 7 ms,
-      and each later synchronous read (dashboard `query_rows`, `get_meta`) would save its 4 ms. Kept meanwhile: one
-      process per query.
-  1. **(recommended) Build the persistent child** as the design writes it (one `sqlite3` spawned through LuaJIT FFI,
-     each success acknowledged by a per-call random token, a refused statement ending the child and the next call
-     starting a new one, a read deadline added), then implement ([CODE]).
-  2. Keep one process per query: 30 ms at boot is accepted.
-  3. Link `libsqlite3` through FFI, the largest saving, which breaks the driver's rule of never linking SQLite.
 - [ ] **Wikisource texts as corpora: under which licence?** The built-in books come from Project Gutenberg
       (`static/corpus/text_sources.json`). Wikisource publishes its pages under CC BY-SA 4.0, while the works it
       transcribes are in the public domain and a faithful transcription arguably adds no new right. Kept meanwhile:
