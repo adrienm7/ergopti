@@ -259,6 +259,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			Seed := _PromptEdWeb_I18nSeed()
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
+			ReadingPrefs_Track(View)
 			try View.AddScriptToExecuteOnDocumentCreated(Seed)
 			PreviousCritical := Critical("On")
 			try {

@@ -527,6 +527,7 @@ _UpdateCheck_Open() {
 		if !_UpdateCheck_StartupCurrent(Host)
 			return false
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		ReadingPrefs_Track(Host.view)
 		try Host.view.AddScriptToExecuteOnDocumentCreated(
 			"window.__i18n_base='https://" . UC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
 			. ReadingPrefs_SeedScript())

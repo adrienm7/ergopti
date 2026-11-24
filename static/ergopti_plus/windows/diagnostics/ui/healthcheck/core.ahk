@@ -822,6 +822,7 @@ HealthCheck_ShowWindow() {
 
 		; The locale base and code before the page scripts run: i18n.js fetches
 		; the strings through the virtual host
+		ReadingPrefs_Track(_HC_WebView)
 		if !Reuse
 			try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
 				"window.__i18n_base='https://" . HC_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"

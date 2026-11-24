@@ -317,6 +317,24 @@ function M.build_injected_html(assets_dir, html_name)
 	return html
 end
 
+--- Pushes the current reading choices into every window still open
+--- (core/ui/ui/reading_views.lua), so a change made in the Configuration menu
+--- or the setup wizard shows at once, the font inlined
+--- (core/ui/engine/webview/reading_preferences.lua).
+--- @return number|nil reached Windows the script was handed to, nil on error.
+--- @return string|nil error Why the chosen font cannot be inlined.
+function M.push_reading_preferences()
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local script, err = Reading.push_script(Reading.current(), Paths.shared("ui/fonts"), read_binary)
+	if script == nil then
+		Logger.error(LOG, "The open windows keep their font: %s.", tostring(err))
+		return nil, err
+	end
+	local reached = require("core.ui.ui.reading_views").push(script)
+	Logger.info(LOG, "The reading choices reached %d open window(s).", reached)
+	return reached, nil
+end
+
 --- Drops every memoised HTML so the next open re-reads sources from disk.
 --- Call this from a /reload-style command if you edit assets and want the
 --- change to take effect without a full Hammerspoon reload.
@@ -1173,6 +1191,7 @@ function M.show_webview(opts)
 	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
 	if not webview_current() then return abandon_required_mutation() end
 	if _factory_build_owner == wv then _factory_build_owner = nil end
+	require("core.ui.ui.reading_views").track(wv)
 	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", view_label,
 		now_ms() - opened_ms)
 	return wv

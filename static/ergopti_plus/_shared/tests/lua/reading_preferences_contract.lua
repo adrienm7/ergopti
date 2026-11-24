@@ -123,6 +123,21 @@ function M.register(helpers, shared_root)
 			helpers.assert_true(tostring(why):find("unknown reading font", 1, true) ~= nil, tostring(why))
 		end)
 
+		helpers.it("pushes a choice into an open window, its font inlined (reading-preferences-live)", function()
+			local script = assert(Reading.push_script({ font = "dyslexic", spacing = "wide" }, fonts_dir, read_bytes))
+			helpers.assert_true(script:find("^window%.ErgoptiA11yPrefs&&window%.ErgoptiA11yPrefs%.receiveHost%(") ~= nil, script:sub(1, 80))
+			helpers.assert_true(script:find('"font":"dyslexic"', 1, true) ~= nil, "the push names the font")
+			helpers.assert_true(script:find('"spacing":"wide"', 1, true) ~= nil, "the push names the spacing")
+			helpers.assert_true(script:find("data:font/woff2;base64,", 1, true) ~= nil, "the push carries the font inline")
+			helpers.assert_true(script:find("<", 1, true) == nil, "the push carries no markup")
+			helpers.assert_eq(Reading.push_script({ font = "default", spacing = "default" }, fonts_dir, read_bytes),
+				'window.ErgoptiA11yPrefs&&window.ErgoptiA11yPrefs.receiveHost({},"");',
+				"the default look drops the previous font")
+			local missing, err = Reading.push_script({ font = "dyslexic" }, shared_root .. "/ui/missing_fonts", read_bytes)
+			helpers.assert_nil(missing)
+			helpers.assert_true(tostring(err):find("cannot read", 1, true) ~= nil, tostring(err))
+		end)
+
 		helpers.it("reads each choice from the store, an unknown value as the default", function()
 			with_store({ ["script.reading_font"] = "dyslexic", ["script.reading_spacing"] = "comic" }, function()
 				local current = Reading.current()

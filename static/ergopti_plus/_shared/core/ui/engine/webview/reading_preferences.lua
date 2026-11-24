@@ -28,6 +28,9 @@
 ---    default (first) value is left out of the seed, as the script ignores it.
 --- 4. Script-safe: the seed lands in an inline <script>, so every "<" is
 ---    written as the JSON escape, as in i18n_seed.lua.
+--- 5. Open windows follow: push_script() is what a host runs in each window
+---    still open once a choice is saved (the Configuration menu, the setup
+---    wizard), the font inlined as in the page's own head.
 --- ==============================================================================
 
 local M = {}
@@ -228,6 +231,23 @@ function M.font_style(preferences, fonts_dir, read_file)
 	if not inlined:find("data:font/woff2", 1, true) then return nil, base .. "font.css names no font file" end
 	_styles[base] = "<style>" .. inlined .. "</style>"
 	return _styles[base], nil
+end
+
+--- The script a host runs in each window still open after a choice is saved,
+--- so the change shows at once (a11y_prefs.js receiveHost): the new seed and,
+--- the page having no address to link a font from, the chosen font's faces
+--- inlined ("" for the default font, which drops the previous one's).
+--- @param preferences table From current().
+--- @param fonts_dir string Path of _shared/ui/fonts.
+--- @param read_file function Returns a file's bytes, or nil.
+--- @return string|nil script The statement.
+--- @return string|nil error Why the chosen font cannot be inlined.
+function M.push_script(preferences, fonts_dir, read_file)
+	local style, err = M.font_style(preferences, fonts_dir, read_file)
+	if style == nil then return nil, err end
+	local css = style:gsub("^<style>", ""):gsub("</style>$", "")
+	local seed = M.statement(preferences):match("^window%.__ergopti_reading=(.*);$")
+	return "window.ErgoptiA11yPrefs&&window.ErgoptiA11yPrefs.receiveHost(" .. seed .. "," .. Json.encode(css) .. ");", nil
 end
 
 --- Everything a host inserts right after <head>: the seed, then the font.

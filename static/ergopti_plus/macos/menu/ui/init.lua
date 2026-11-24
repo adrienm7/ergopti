@@ -1246,6 +1246,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return false
 			end
 			require("core.logger.engine.logger").info("menu", "Reading choice set to %s.", tostring(value))
+			-- The open windows take it at once; the next ones are built with it.
+			require("core.ui.ui.builder").push_reading_preferences()
 			_menu_dirty = true
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 			return true

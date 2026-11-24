@@ -189,6 +189,7 @@ _HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 			Seed := _HsEdWeb_I18nSeed()
 			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
+			ReadingPrefs_Track(View)
 			try View.AddScriptToExecuteOnDocumentCreated(Seed)
 
 			; Globals retain subscription references before the aliases leave this

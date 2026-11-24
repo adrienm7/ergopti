@@ -957,6 +957,7 @@ LayoutManager_Open(*) {
 	View.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false
+	ReadingPrefs_Track(View)
 	View.AddScriptToExecuteOnDocumentCreated(_LayMgrWeb_SeedScript())
 	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
 		return false

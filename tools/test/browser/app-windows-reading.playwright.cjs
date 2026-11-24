@@ -22,7 +22,9 @@
  *    default font's width and the toolbar on one row at the window's size;
  * 3. add the WCAG 1.4.12 spacing with « Aéré »: letter spacing 0.12 em and
  *    word spacing 0.16 em more than « Par défaut », line height 1.5 and
- *    paragraph spacing 2 em.
+ *    paragraph spacing 2 em;
+ * 4. follow a choice pushed into the open window (receiveHost), the way the
+ *    hosts apply a menu change at once, the inline font included.
  * ==============================================================================
  */
 
@@ -259,6 +261,59 @@ async function checkWindow(browser, origin, target, selector) {
 	}
 }
 
+/** Resolves after two frames, once the transitions a change starts have ended. */
+function settle() {
+	return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+/** A choice pushed into an open window applies at once, the inline font included. */
+async function checkLivePush(browser, origin, target, selector) {
+	for (const delivery of DELIVERIES) {
+		const { context, page, errors } = await openWindow(
+			browser,
+			origin,
+			target,
+			{ font: 'default', spacing: 'default' },
+			delivery
+		);
+		try {
+			const where = `${target.id} (${delivery}, pushed)`;
+			await page.evaluate(
+				([seed, css]) => window.ErgoptiA11yPrefs.receiveHost(seed, css),
+				[
+					{ font: 'dyslexic', spacing: 'wide' },
+					delivery === 'inline' ? inlineFontCss('dyslexic') : null
+				]
+			);
+			await page.evaluate(() => document.fonts.ready);
+			await page.evaluate(settle);
+			await page.waitForFunction(() =>
+				[...document.fonts].some(
+					(face) => face.family.replace(/['"]/g, '') === 'OpenDyslexic' && face.status === 'loaded'
+				)
+			);
+			let look = await page.evaluate(readLook, { selector, probeText: PROBE_TEXT });
+			check(
+				look.family === 'OpenDyslexic' && look.loaded,
+				`${where}: the open window takes OpenDyslexic`
+			);
+			check(look.letterSpacing > 0, `${where}: the open window takes the wide spacing`);
+			await page.evaluate(() => window.ErgoptiA11yPrefs.receiveHost({}, ''));
+			// theme.css still runs each transition for 0.01 ms under reduced
+			// motion: a read in the same frame sees the start value.
+			await page.evaluate(settle);
+			look = await page.evaluate(readLook, { selector, probeText: PROBE_TEXT });
+			check(
+				look.family !== 'OpenDyslexic' && look.letterSpacing === 0,
+				`${where}: back to the default look (${JSON.stringify(look)})`
+			);
+			check(errors.length === 0, `${where}: no page error (${errors.join('; ')})`);
+		} finally {
+			await context.close();
+		}
+	}
+}
+
 (async () => {
 	const server = await serveStatic(STATIC_ROOT, 0);
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -268,6 +323,7 @@ async function checkWindow(browser, origin, target, selector) {
 	try {
 		const metrics = WINDOWS.find((target) => target.id === 'metrics_typing');
 		await checkWindow(browser, origin, metrics, 'h1');
+		await checkLivePush(browser, origin, metrics, 'h1');
 	} finally {
 		await browser.close();
 		server.close();

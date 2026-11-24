@@ -28,6 +28,10 @@
  *    next to window._i18n_locale). The seed wins over storage: a native
  *    window has no storage shared with the others, so the host's setting is
  *    the one source there. It is sanitized like a stored map.
+ * 6. A host pushes a later choice into its open windows (receiveHost), so a
+ *    change made in the Configuration menu or the setup wizard shows at once.
+ *    An inline page has no address to link a font from: its host passes the
+ *    chosen font's stylesheet, faces inlined, which replaces the one before.
  * ==============================================================================
  */
 
@@ -44,6 +48,8 @@
 	var SCRIPT_SRC = document.currentScript ? document.currentScript.src : '';
 	var FONT_FOLDERS = { hyperlegible: 'atkinson-hyperlegible', dyslexic: 'opendyslexic' };
 	var FONT_LINK_ID = 'ergopti-a11y-font-';
+	// The stylesheet a native host pushes into an inline page (receiveHost).
+	var HOST_FONT_ID = 'ergopti-a11y-host-font';
 	// Each preference: its root attribute and its allowed values, the first
 	// being the default (no attribute written).
 	var PREFERENCES = {
@@ -123,6 +129,26 @@
 		}
 	}
 
+	/**
+	 * A native host's new choices for this open window: they replace its seed
+	 * and apply at once. fontCss, from a host whose page is inline (macOS,
+	 * Linux), is the chosen font's stylesheet with its faces inlined; an empty
+	 * one (the default font) removes the previous font's.
+	 */
+	function receiveHost(preferences, fontCss) {
+		window.__ergopti_reading = sanitize(preferences);
+		if (typeof fontCss === 'string') {
+			var style = document.getElementById(HOST_FONT_ID);
+			if (!style) {
+				style = document.createElement('style');
+				style.id = HOST_FONT_ID;
+				document.head.appendChild(style);
+			}
+			style.textContent = fontCss;
+		}
+		return apply(read());
+	}
+
 	/** Whether animations and smooth scrolling must be skipped now. */
 	function reducedMotion() {
 		if (document.documentElement.getAttribute(PREFERENCES.motion.attribute) === 'reduce')
@@ -138,6 +164,7 @@
 		read: read,
 		apply: apply,
 		save: save,
+		receiveHost: receiveHost,
 		reducedMotion: reducedMotion
 	};
 

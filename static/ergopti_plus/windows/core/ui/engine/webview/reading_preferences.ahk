@@ -18,15 +18,21 @@
 ;    default is left out of the seed, which the script ignores anyway.
 ; 2. config.toml first, then the live value, then the menu, as the other
 ;    script settings (ErrorDialog_SetEnabled).
-; 3. A window opened after a change reads it; an open window keeps the look
-;    it was built with until it is opened again. A retained (hidden) host
-;    carries the seed in its reuse key, so a change retires it (MET-03).
+; 3. A window opened after a change reads it, and every open window takes it
+;    at once: each host hands its WebView to ReadingPrefs_Track beside its
+;    seed, and a saved choice is pushed into each one still open
+;    (ReadingPrefs_PushToOpen, a11y_prefs.js receiveHost). A retained
+;    (hidden) host carries the seed in its reuse key, so a change retires it
+;    (MET-03).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 ; The current values by config.toml key ([script]); 0 until ReadingPrefs_Init.
 global _ReadingPrefsValues := 0
+; The WebViews of the windows the hosts opened, by ObjPtr; a closed one is
+; dropped at the next track or push.
+global _ReadingPrefsViews := Map()
 
 
 
@@ -149,6 +155,7 @@ ReadingPrefs_Set(Key, Value, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 		return false
 	}
 	LoggerInfo("ReadingPrefs", "script.{1} set to {2}.", Key, Value)
+	ReadingPrefs_PushToOpen()
 	if HasMethod(RebuildFn, "Call")
 		RebuildFn.Call()
 	else
@@ -174,20 +181,82 @@ _ReadingPrefs_Publish(Key, Value) {
 ; =============================
 
 ; The boot-script statement every window's host adds beside _i18n_locale.
-; The values are the manifest's closed lists (plain words), so no escaping.
 ; @returns {String} `window.__ergopti_reading={...};`
 ReadingPrefs_SeedScript() {
+	return "window.__ergopti_reading=" . ReadingPrefs_SeedObject() . ";"
+}
+
+; The non-default choices as a JSON object, `{}` before the boot read them (a
+; test host, a fatal startup report): a11y_prefs.js then keeps its defaults.
+; The values are the manifest's closed lists (plain words), so no escaping.
+; @returns {String} `{"font":"dyslexic"}`
+ReadingPrefs_SeedObject() {
 	global _ReadingPrefsValues
-	Parts := ""
-	; A window shown before the boot read the choices (a test host, a fatal
-	; startup report) seeds none: a11y_prefs.js then keeps its defaults.
 	if !(_ReadingPrefsValues is Map)
-		return "window.__ergopti_reading={};"
+		return "{}"
+	Parts := ""
 	for Key, Name in ReadingPrefs_Names() {
 		Value := ReadingPrefs_Get(Key)
 		if (Value == ReadingPrefs_Default(Key))
 			continue
 		Parts .= (Parts = "" ? "" : ",") . '"' . Name . '":"' . Value . '"'
 	}
-	return "window.__ergopti_reading={" . Parts . "};"
+	return "{" . Parts . "}"
+}
+
+
+
+
+
+; ================================
+; ================================
+; ======= 4/ Open Windows ========
+; ================================
+; ================================
+
+; Keeps a window's WebView, so a later choice reaches it while it is open.
+; Every host calls it beside the seed it adds. Never throws: a host's open
+; must not fail on it.
+; @param View {Object} The window's CoreWebView2.
+ReadingPrefs_Track(View) {
+	global _ReadingPrefsViews
+	if !IsObject(View)
+		return
+	_ReadingPrefs_DropClosed()
+	_ReadingPrefsViews[ObjPtr(View)] := View
+}
+
+; Pushes the current choices into every open window, so a change shows at
+; once; a11y_prefs.js links the font beside the page.
+; @returns {Integer} The number of windows the script was handed to.
+ReadingPrefs_PushToOpen() {
+	global _ReadingPrefsViews
+	_ReadingPrefs_DropClosed()
+	Script := "window.ErgoptiA11yPrefs&&window.ErgoptiA11yPrefs.receiveHost(" . ReadingPrefs_SeedObject() . ");"
+	Reached := 0
+	for _, View in _ReadingPrefsViews
+		if WebView_RunScriptAsync(View, Script, "ReadingPrefs push")
+			Reached += 1
+	LoggerInfo("ReadingPrefs", "The reading choices reached {1} open window(s).", Reached)
+	return Reached
+}
+
+; Drops the views whose window has closed: a closed WebView refuses every call.
+_ReadingPrefs_DropClosed() {
+	global _ReadingPrefsViews
+	for Ptr, View in _ReadingPrefsViews.Clone()
+		if !_ReadingPrefs_ViewOpen(View)
+			_ReadingPrefsViews.Delete(Ptr)
+}
+
+; Whether a tracked WebView still answers: reading its address throws once
+; its window has closed.
+; @param View {Object}
+; @returns {Boolean}
+_ReadingPrefs_ViewOpen(View) {
+	try {
+		Address := View.Source
+		return Address is String
+	}
+	return false
 }

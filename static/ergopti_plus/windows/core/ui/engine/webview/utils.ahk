@@ -580,6 +580,7 @@ class WebViewHost {
 						Seed := "window.__i18n_base='https://" . Vhost . "/core/i18n/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
 								. ReadingPrefs_SeedScript()
+						ReadingPrefs_Track(this.WebView)
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
 						if this.CloseRequested
 								return false

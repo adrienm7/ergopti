@@ -180,6 +180,7 @@ _PathsEdWeb_TryOpen() {
 
 		; Navigation can synchronously deliver callbacks. Only this frame's
 		; captured view and controller may be used after that boundary.
+		ReadingPrefs_Track(View)
 		View.AddScriptToExecuteOnDocumentCreated(_PathsEdWeb_SeedScript())
 		if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true

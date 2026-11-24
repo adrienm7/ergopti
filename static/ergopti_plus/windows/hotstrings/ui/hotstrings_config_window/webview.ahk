@@ -201,6 +201,7 @@ _HCWWeb_TryOpen() {
 			Seed := _HCWWeb_I18nSeed()
 			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
 				return true
+			ReadingPrefs_Track(View)
 			try View.AddScriptToExecuteOnDocumentCreated(Seed)
 
 			; Globals retain subscription references before the aliases leave this

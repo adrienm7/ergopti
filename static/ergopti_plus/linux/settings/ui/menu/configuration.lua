@@ -140,7 +140,13 @@ local function _build_configuration(ctx)
 				Logger.error(LOG, "Configuration: ctx.on_set_reading_preference is absent — the row does nothing.")
 				return false
 			end
-			return ctx.on_set_reading_preference(preference.module, value)
+			if ctx.on_set_reading_preference(preference.module, value) ~= true then return false end
+			-- The open windows take the saved choice at once; the next ones are
+			-- built with it (webkit_host.lua).
+			if type(ctx.webview) == "table" and type(ctx.webview.push_reading_preferences) == "function" then
+				ctx.webview.push_reading_preferences()
+			end
+			return true
 		end
 		render_ctx.state_getters[preference.path] = function() return require(preference.module).get() end
 	end

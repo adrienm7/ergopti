@@ -360,6 +360,7 @@ KLWV_Open(which, metrics_dir) {
 			; Inject i18n base URL and locale code before page scripts run so
 			; i18n.js can resolve locale files without relying on currentScript
 			; path heuristics (which are unreliable across WebView2 versions).
+			ReadingPrefs_Track(webview)
 			locales_url := KLWV_LocalesUrl()
 			locale_code := I18nGetLocale()
 			seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"

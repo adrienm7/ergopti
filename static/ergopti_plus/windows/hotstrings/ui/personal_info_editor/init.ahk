@@ -157,6 +157,7 @@ _PiEdWeb_TryOpen(&FailureReason := "") {
 		try View.SetVirtualHostNameToFolderMapping(PIED_VHOST, _SharedDir, PIED_HOST_ACCESS_ALLOW)
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
+		ReadingPrefs_Track(View)
 		View.AddScriptToExecuteOnDocumentCreated(_PiEdWeb_SeedScript())
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true

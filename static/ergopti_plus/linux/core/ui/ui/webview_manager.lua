@@ -807,6 +807,41 @@ function M.eval_js(app_name, js_code)
 	return true
 end
 
+--- The apps that have a window, sorted.
+--- @return string[]
+function M.open_app_names()
+	local seen, names = {}, {}
+	for _, owners in ipairs({ _windows, _document_windows }) do
+		for app_name in pairs(owners) do
+			if not seen[app_name] then seen[app_name] = true; names[#names + 1] = app_name end
+		end
+	end
+	table.sort(names)
+	return names
+end
+
+--- Pushes the current reading choices into every open window, so a change
+--- made in the Configuration menu or the setup wizard shows at once, the font
+--- inlined as in the page's own head (core/ui/engine/webview/reading_preferences.lua).
+--- @return number|nil reached Windows the script was handed to, nil on error.
+--- @return string|nil error Why the chosen font cannot be inlined.
+function M.push_reading_preferences()
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local fonts_dir = webkit_host.resolve_ui_root(_driver_root()) .. "/fonts"
+	local function read_bytes(path) return require("core.fs.engine.regular_file_reader").read_source(path) end
+	local script, err = Reading.push_script(Reading.current(), fonts_dir, read_bytes)
+	if script == nil then
+		Logger.error(LOG, "The open windows keep their font: %s.", tostring(err))
+		return nil, err
+	end
+	local reached = 0
+	for _, app_name in ipairs(M.open_app_names()) do
+		if M.eval_js(app_name, script) then reached = reached + 1 end
+	end
+	Logger.info(LOG, "The reading choices reached %d open window(s).", reached)
+	return reached, nil
+end
+
 --- The live WebKit view for an app, or nil when it has no window.
 ---
 --- Published for the hardware harness, which has to read a value BACK out of the

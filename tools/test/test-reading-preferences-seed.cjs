@@ -19,7 +19,11 @@
  *    for the shrinking UNSEEDED_WINDOWS list (LTP-01);
  * 3. the macOS and Linux page builders, the only places those drivers seed
  *    a page, add the shared reading fragment, and both script scopes bind
- *    the two choices to their shared owners.
+ *    the two choices to their shared owners;
+ * 4. a saved choice reaches the windows already open: every Windows host that
+ *    adds a boot script hands its WebView to ReadingPrefs_Track, and the
+ *    macOS and Linux menus push the choice once saved (field report,
+ *    2026-11-24: a change reached only the windows opened after it).
  * Each check runs again on a mutated source and must then fail.
  * The behaviour itself is pinned by the drivers' unit tests
  * (test_reading_preferences.ahk, reading_preferences_contract.lua).
@@ -97,6 +101,34 @@ function windowsProblems(files) {
 			);
 	}
 	return problems;
+}
+
+/** Problems of the Windows hosts: each one that adds a boot script tracks its view. */
+function trackProblems(files) {
+	const problems = [];
+	for (const [file, source] of files) {
+		const added = (source.match(/\.AddScriptToExecuteOnDocumentCreated\(/g) || []).length;
+		const tracked = (source.match(/ReadingPrefs_Track\(/g) || []).length;
+		if (added > tracked)
+			problems.push(
+				`${file}: ${added - tracked} WebView(s) seeded but not tracked for a live choice`
+			);
+	}
+	return problems;
+}
+
+// The menu handlers that save a reading choice, and must push it to the open
+// windows of their driver.
+const LUA_PUSHES = Object.freeze({
+	'macos/menu/ui/init.lua': 'require("core.ui.ui.builder").push_reading_preferences()',
+	'linux/settings/ui/menu/configuration.lua': 'ctx.webview.push_reading_preferences()'
+});
+
+/** Problems of the macOS and Linux menus: a saved choice is pushed. */
+function pushProblems(sources) {
+	return Object.entries(LUA_PUSHES)
+		.filter(([file, call]) => !sources[file].includes(call))
+		.map(([file]) => `${file} saves a reading choice without pushing it to the open windows`);
 }
 
 // The Windows windows that navigate a page of their own with no locale seed.
@@ -182,6 +214,9 @@ assert.deepEqual(declarationProblems(featureList, menu, values), []);
 assert.deepEqual(windowsProblems(windows), []);
 assert.deepEqual(unseededProblems(windows), []);
 assert.deepEqual(luaProblems(builders, scopes), []);
+assert.deepEqual(trackProblems(windows), []);
+const pushSources = Object.fromEntries(Object.keys(LUA_PUSHES).map((file) => [file, read(file)]));
+assert.deepEqual(pushProblems(pushSources), []);
 
 // Each check fails on the shape it forbids.
 const withoutRow = {
@@ -248,6 +283,22 @@ assert.equal(
 	1,
 	'a scope that does not bind a choice is found'
 );
+
+const host = windows.find(([file]) => file === 'windows/ui/onboarding/webview.ahk');
+assert.deepEqual(
+	trackProblems([[host[0], host[1].replaceAll('ReadingPrefs_Track(', 'Other(')]]),
+	[`${host[0]}: 1 WebView(s) seeded but not tracked for a live choice`],
+	'a Windows host that stops tracking its view is found'
+);
+for (const file of Object.keys(LUA_PUSHES))
+	assert.equal(
+		pushProblems({
+			...pushSources,
+			[file]: pushSources[file].replaceAll('push_reading_preferences', 'other')
+		}).length,
+		1,
+		`${file} without its push is found`
+	);
 
 console.log(
 	`PASS test-reading-preferences-seed (${windows.filter(([, s]) => s.includes('_i18n_locale=')).length} Windows seeds, 2 Lua builders)`

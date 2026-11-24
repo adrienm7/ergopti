@@ -305,6 +305,7 @@ _CLW_BuildWindow(Channel, Request) {
 		. "window.__channel_switch_restarts=true;"
 		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 		. _CLW_InstallSeed()
+	ReadingPrefs_Track(_CLW_WebView)
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.

@@ -365,6 +365,7 @@ _Updater_NavigateReleaseNotes(WVC, Release) {
 	try {
 		WebView := WVC.CoreWebView2
 		WebView.SetVirtualHostNameToFolderMapping(RELEASE_NOTES_VHOST, _SharedDir, CHANGELOG_HOST_ACCESS_ALLOW)
+		ReadingPrefs_Track(WebView)
 		WebView.AddScriptToExecuteOnDocumentCreated(_Updater_ReleaseNotesSeed(Body, Session))
 		Subscription := WebView.WebMessageReceived(_Updater_OnReleaseNotesMessage.Bind(Url, Session))
 		WebView.Navigate(Url)

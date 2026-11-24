@@ -217,6 +217,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 		try View.SetVirtualHostNameToFolderMapping(ACTPICK_VHOST, _SharedDir, ACTPICK_HOST_ACCESS_ALLOW)
 		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
 			return true
+		ReadingPrefs_Track(View)
 		try View.AddScriptToExecuteOnDocumentCreated(_ActPickWeb_I18nSeed())
 
 		; Publish only RAM references. Local subscription aliases are withdrawn in

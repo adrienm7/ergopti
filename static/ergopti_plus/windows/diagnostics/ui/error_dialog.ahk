@@ -449,6 +449,7 @@ _ErrorDialog_Open(Record) {
 		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
 			return false
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		ReadingPrefs_Track(WV)
 		try WV.AddScriptToExecuteOnDocumentCreated(
 			"window.__i18n_base='https://" . ED_VHOST . "/core/i18n/data/locales/';window._i18n_locale='" . Locale . "';"
 			. ReadingPrefs_SeedScript())

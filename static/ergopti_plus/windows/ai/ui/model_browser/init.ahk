@@ -245,6 +245,7 @@ _LLM_ModelBrowser_ShowWeb(&RefusalEpoch := unset) {
 			seed := "window.__i18n_base='" . _LLM_MBW_LocalesUrl() . "';"
 				. "window._i18n_locale='" . _I18nLocale . "';"
 				. ReadingPrefs_SeedScript()
+			ReadingPrefs_Track(View)
 			try View.AddScriptToExecuteOnDocumentCreated(seed)
 			PreviousCritical := Critical("On")
 			try {

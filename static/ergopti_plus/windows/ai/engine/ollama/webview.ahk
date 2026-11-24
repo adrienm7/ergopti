@@ -351,6 +351,7 @@ OllamaWV_Create(kind, subtitle) {
 	locales_url := OllamaWV_LocalesUrl()
 	locale_code := _I18nLocale
 	seed_script := "window.__i18n_base='" locales_url "';window._i18n_locale='" locale_code "';" ReadingPrefs_SeedScript()
+	ReadingPrefs_Track(_OllamaWV_WebView)
 	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(seed_script)
 	LoggerInfo("LLM", "i18n seed injected: base=" locales_url " locale=" locale_code ".")
 

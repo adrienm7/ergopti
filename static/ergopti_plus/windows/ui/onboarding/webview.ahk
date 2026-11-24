@@ -232,6 +232,7 @@ _Onboarding_TryWeb() {
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui", WEBVIEW_HOST_ACCESS_ALLOW)
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST_ASSETS, _StaticDir, WEBVIEW_HOST_ACCESS_ALLOW)
 
+	ReadingPrefs_Track(_OnbWeb_WebView)
 	_OnbWeb_WebView.AddScriptToExecuteOnDocumentCreated(_OnbWeb_SeedScript(_ob_locale))
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
 	try _OnbWeb_Controller.Fill()

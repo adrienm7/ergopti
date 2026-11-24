@@ -1367,6 +1367,8 @@ function M.show_window(opts)
 	if ok_h ~= true or h_result == nil or h_result == false then
 		return abandon_open_window("wv:html() failed", h_result)
 	end
+	-- A reading choice saved while the window is open reaches it.
+	require("core.ui.ui.reading_views").track(wv)
 
 	-- Before this boundary no native show can have created a fade owner.
 	-- Mark first: show itself may mutate and then raise.

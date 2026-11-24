@@ -470,6 +470,8 @@ local function open_window(record)
 		close(session)
 		return false
 	end
+	-- A reading choice saved while the window is open reaches it.
+	require("core.ui.ui.reading_views").track(webview)
 	session.presentation_attempted = true
 	local ok_show, show_err = xpcall(function() return webview:show() end, debug.traceback)
 	if not ok_show or show_err == nil or show_err == false then

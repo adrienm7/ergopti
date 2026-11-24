@@ -138,3 +138,51 @@ _TRP_OwnWindowsSeedTheirPage() {
 	}
 }
 Test("reading preferences: the editors and the wizard seed their own page (ltp-09)", _TRP_OwnWindowsSeedTheirPage)
+
+; A WebView double: an open one answers its address and records each script;
+; a closed one throws on every call, as a WebView2 whose window has closed.
+class _TRP_FakeView {
+	__New(Open) {
+		this.Open := Open
+		this.Scripts := []
+	}
+
+	Source {
+		get {
+			if !this.Open
+				throw OSError("the window has closed")
+			return "https://ergopti.test/index.html"
+		}
+	}
+
+	ExecuteScriptAsync(Script) {
+		if !this.Open
+			throw OSError("the window has closed")
+		this.Scripts.Push(Script)
+		return { onSettled: (*) => 0 }
+	}
+}
+
+; A choice saved while windows were open reached none of them: they kept the
+; look they were built with until reopened (field report, 2026-11-24).
+_TRP_OpenWindowsFollowTheChoice() {
+	global _ReadingPrefsViews
+	Saved := _ReadingPrefsViews
+	_ReadingPrefsViews := Map()
+	Open := _TRP_FakeView(true), Closed := _TRP_FakeView(false)
+	try {
+		ReadingPrefs_Track(Open)
+		ReadingPrefs_Track(Open)
+		ReadingPrefs_Track(Closed)
+		_TRP_With(Map(ConfigLeaf.READING_FONT, "dyslexic", ConfigLeaf.READING_SPACING, "wide"), () => (
+			AssertEqual(1, ReadingPrefs_PushToOpen(), "only the open window is reached, once"),
+			AssertEqual(1, Open.Scripts.Length, "a window tracked twice is pushed once"),
+			AssertEqual('window.ErgoptiA11yPrefs&&window.ErgoptiA11yPrefs.receiveHost({"font":"dyslexic","spacing":"wide"});',
+				Open.Scripts[1], "the page applies the saved choices at once")))
+		AssertEqual(1, _ReadingPrefsViews.Count, "the closed window is dropped")
+	} finally {
+		_ReadingPrefsViews := Saved
+	}
+}
+Test("reading preferences: the open windows take a saved choice at once (reading-preferences-live)",
+	_TRP_OpenWindowsFollowTheChoice)
