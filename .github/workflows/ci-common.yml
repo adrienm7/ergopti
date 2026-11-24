@@ -376,6 +376,9 @@ jobs:
       - name: Test the field report window
         run: npm run test:browser:field-report-window
 
+      - name: Test the typing metrics card colours
+        run: npm run test:browser:metrics-card-colours
+
       - name: Plan both production site targets
         id: site-plan
         run: node tools/ci/site-matrix.cjs plan
