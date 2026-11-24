@@ -680,11 +680,13 @@
 		 * QWERTY costs nothing), else the failure with its message.
 		 */
 		function errorText(code, message, values) {
-			const key = `${PREFIX}error.${code}`;
-			const engineKey = `layout_analysis.error.${code}`;
 			const strings = window._i18n_strings || {};
-			if (typeof strings[key] === 'string') return t(key, values);
-			if (typeof strings[engineKey] === 'string') return t(engineKey, values);
+			// Each key is spelled inside its t() call, where the referenced-keys
+			// gate reads the family it builds.
+			if (typeof strings[`${PREFIX}error.${code}`] === 'string')
+				return t(`${PREFIX}error.${code}`, values);
+			if (typeof strings[`layout_analysis.error.${code}`] === 'string')
+				return t(`layout_analysis.error.${code}`, values);
 			return t(`${PREFIX}error.failed`, { message });
 		}
 

@@ -246,8 +246,9 @@ module.exports = [
 	},
 	{
 		prefix: 'layout_analysis.error.',
-		files: [POPOVER],
-		source: 'every literal new AnalysisError code of analysis_engine.js',
+		files: [POPOVER, OPTIMIZER],
+		source:
+			'every literal new AnalysisError code of analysis_engine.js (the Optimiser words the engine refusals it meets)',
 		keys: () =>
 			ctx.keysOf(
 				'layout_analysis.error.',
