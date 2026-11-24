@@ -12,7 +12,11 @@
 ; does on macOS and Linux, then stages the real rows.
 ;
 ; ROOT CAUSE ENCODED: the three rows showed their caption only, so the chord
-; that pauses, reloads or quits was written nowhere in the tray.
+; that pauses, reloads or quits was written nowhere in the tray. Then the hint
+; read the chord globals wherever a tray was staged, so a menu built before
+; ReadScriptShortcutsConfig (and this harness, which never runs
+; feature_state.ahk) threw an unset-global error instead of drawing its rows.
+; Each case here stages the chord state a boot builds, and restores it after.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,17 +39,47 @@ _TSH_Presets() {
 		"script_altgr_delete", "open_personal_shortcuts", "script_altgr_escape", "script_quit")
 }
 
-; Runs Body with the live chords replaced, restoring them after.
+; The driver's declared slot list, read from feature_state.ahk: the harness does
+; not run that file's declarations, and the boot runs exactly this block.
+_TSH_DeclaredSlots() {
+	Source := _StripFullLineComments(_DriverFileSource("feature_state.ahk"))
+	Start := InStr(Source, "global SCRIPT_SHORTCUT_SLOTS := [")
+	AssertTrue(Start > 0, "feature_state.ahk declares SCRIPT_SHORTCUT_SLOTS")
+	Block := SubStr(Source, Start, InStr(Source, "]", , Start) - Start)
+	Slots := []
+	Pos := 1
+	while (Pos := RegExMatch(Block, '"([a-z_]+)"', &Found, Pos)) {
+		Slots.Push(Found[1])
+		Pos += Found.Len
+	}
+	return Slots
+}
+
+; Runs Body with the chord state a boot builds (the declared slots and their
+; labels, the read chords at Assignments and the switch at ChordsOn), then
+; restores what the harness had, unset included.
 _TSH_WithChords(Assignments, ChordsOn, Body) {
-	global ScriptShortcutAssignments, ScriptShortcutChordsOn
-	Saved := ScriptShortcutAssignments
-	SavedOn := ScriptShortcutChordsOn
+	global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, ScriptShortcutChordsOn
+	global ScriptShortcutChordsRead
+	SavedSlots := IsSet(SCRIPT_SHORTCUT_SLOTS) ? SCRIPT_SHORTCUT_SLOTS : unset
+	SavedLabels := IsSet(SCRIPT_SHORTCUT_LABELS) ? SCRIPT_SHORTCUT_LABELS : unset
+	Saved := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
+	SavedOn := IsSet(ScriptShortcutChordsOn) ? ScriptShortcutChordsOn : unset
+	SavedRead := IsSet(ScriptShortcutChordsRead) ? ScriptShortcutChordsRead : unset
+	SCRIPT_SHORTCUT_SLOTS := _TSH_DeclaredSlots()
+	SCRIPT_SHORTCUT_LABELS := Map()
+	for Slot in SCRIPT_SHORTCUT_SLOTS
+		SCRIPT_SHORTCUT_LABELS[Slot] := "sg_labels." . Slot
 	ScriptShortcutAssignments := Assignments
 	ScriptShortcutChordsOn := ChordsOn
+	ScriptShortcutChordsRead := true
 	try Body.Call()
 	finally {
-		ScriptShortcutAssignments := Saved
-		ScriptShortcutChordsOn := SavedOn
+		SCRIPT_SHORTCUT_SLOTS := IsSet(SavedSlots) ? SavedSlots : unset
+		SCRIPT_SHORTCUT_LABELS := IsSet(SavedLabels) ? SavedLabels : unset
+		ScriptShortcutAssignments := IsSet(Saved) ? Saved : unset
+		ScriptShortcutChordsOn := IsSet(SavedOn) ? SavedOn : unset
+		ScriptShortcutChordsRead := IsSet(SavedRead) ? SavedRead : unset
 	}
 }
 
@@ -66,11 +100,11 @@ _TSH_Vectors() {
 Test("tray shortcut hint: the shared vectors (script-chord-tray-hint)", _TSH_Vectors)
 
 _TSH_CatalogueOrderIsTheDriverOrder() {
-	global SCRIPT_SHORTCUT_SLOTS
 	Slots := _TSH_Slots()
-	AssertEqual(Slots.Length, SCRIPT_SHORTCUT_SLOTS.Length, "the same slots")
+	Declared := _TSH_DeclaredSlots()
+	AssertEqual(Slots.Length, Declared.Length, "the same slots")
 	for Index, Slot in Slots
-		AssertEqual(Slot, SCRIPT_SHORTCUT_SLOTS[Index], "the hint reads the catalogue's order at " . Index)
+		AssertEqual(Slot, Declared[Index], "the hint reads the catalogue's order at " . Index)
 }
 Test("tray shortcut hint: the driver's slots are the catalogue's, in its order (script-chord-tray-hint)",
 	_TSH_CatalogueOrderIsTheDriverOrder)
@@ -111,3 +145,44 @@ _TSH_SwitchOff() {
 }
 Test("tray shortcut hint: none while the chords' switch is off (script-chord-tray-hint)",
 	(*) => _TSH_WithChords(_TSH_Presets(), false, _TSH_SwitchOff))
+
+; A tray staged before the boot read the chords draws its captions alone, and
+; never touches the chord globals: here they are all unset, as in early boot's
+; harness view, so reading one would throw.
+_TSH_BeforeTheChordsAreRead() {
+	global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, ScriptShortcutChordsOn
+	global ScriptShortcutChordsRead, _TrayMenuStage
+	SavedSlots := IsSet(SCRIPT_SHORTCUT_SLOTS) ? SCRIPT_SHORTCUT_SLOTS : unset
+	SavedLabels := IsSet(SCRIPT_SHORTCUT_LABELS) ? SCRIPT_SHORTCUT_LABELS : unset
+	Saved := IsSet(ScriptShortcutAssignments) ? ScriptShortcutAssignments : unset
+	SavedOn := IsSet(ScriptShortcutChordsOn) ? ScriptShortcutChordsOn : unset
+	SavedRead := IsSet(ScriptShortcutChordsRead) ? ScriptShortcutChordsRead : unset
+	SavedStage := _TrayMenuStage
+	try {
+		SCRIPT_SHORTCUT_SLOTS := unset
+		SCRIPT_SHORTCUT_LABELS := unset
+		ScriptShortcutAssignments := unset
+		ScriptShortcutChordsOn := unset
+		ScriptShortcutChordsRead := unset
+		AssertFalse(ScriptShortcutChordsAreRead(), "no chord is read before the boot reads them")
+		AssertEqual(t("menu.global.reload"), ScriptShortcutTrayLabel(t("menu.global.reload"), "script_reload"),
+			"the caption alone")
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageSuspend()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(3, _TrayMenuStage.Length, "the three rows are staged without the chords")
+		AssertEqual(t("menu.global.suspend"), _TrayMenuStage[1]["label"])
+		AssertEqual(t("menu.global.quit"), _TrayMenuStage[3]["label"])
+	} finally {
+		_TrayMenuStage := SavedStage
+		SCRIPT_SHORTCUT_SLOTS := IsSet(SavedSlots) ? SavedSlots : unset
+		SCRIPT_SHORTCUT_LABELS := IsSet(SavedLabels) ? SavedLabels : unset
+		ScriptShortcutAssignments := IsSet(Saved) ? Saved : unset
+		ScriptShortcutChordsOn := IsSet(SavedOn) ? SavedOn : unset
+		ScriptShortcutChordsRead := IsSet(SavedRead) ? SavedRead : unset
+	}
+}
+Test("tray shortcut hint: a tray staged before the chords are read shows its captions (script-chord-tray-hint)",
+	_TSH_BeforeTheChordsAreRead)

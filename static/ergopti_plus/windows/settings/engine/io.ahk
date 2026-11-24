@@ -2250,7 +2250,7 @@ _ConfigResetRollbackRefusedReload(OwnerBundle) {
 
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
-		global ScriptShortcutChordsOn
+		global ScriptShortcutChordsOn, ScriptShortcutChordsRead
 		; Authored preferences retain the canonical manifest/source-kind decision;
 		; detached runtime candidates keep their strict Boolean contract.
 		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
@@ -2269,6 +2269,20 @@ ReadScriptShortcutsConfig() {
 						try LoggerWarn("Shortcuts", "Script slot '{1}' has unknown action '{2}' — falling back to '{3}'.", Slot, Value,
 								ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "(none)")
 		}
+		ScriptShortcutChordsRead := true
+}
+
+; Declared bare, never initialised, so no include position can reset it: only
+; ReadScriptShortcutsConfig sets it, once the configured chords are published.
+global ScriptShortcutChordsRead
+
+; Whether the configured script chords are known. A reader that only shows them
+; (the tray hint) asks first: a menu staged before the boot read them, or in a
+; harness that never reads them, has no chord to name.
+; @return {Boolean}
+ScriptShortcutChordsAreRead() {
+		global ScriptShortcutChordsRead
+		return IsSet(ScriptShortcutChordsRead) && ScriptShortcutChordsRead == true
 }
 
 ; How often the chord cleanup looks again for the release of an AltGr the user
