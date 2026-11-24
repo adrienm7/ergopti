@@ -2284,7 +2284,13 @@ try {
 			'static/ergopti_plus/_shared/core/text/data/identifiers.sh',
 			'static/ergopti_plus/macos/ai/engine/network-retry.sh',
 			'static/ergopti_plus/_shared/core/network/data/route_origins.json',
-			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json'
+			'static/ergopti_plus/_shared/core/i18n/data/locale_order.json',
+			'LICENSE',
+			'CNAME',
+			'tools/lib/app-metadata.cjs',
+			'tools/lib/paths.cjs',
+			'static/ergopti_plus/_shared/core/text/data/app_metadata.json',
+			'static/ergopti_plus/_shared/core/text/data/identifiers.json'
 		]) {
 			const destination = path.join(repository, relative);
 			fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -2322,7 +2328,8 @@ try {
 		for (const [name, github, overrides, expected] of scenarios) {
 			fs.writeFileSync(defaultsPath, JSON.stringify({ github }));
 			const output = path.join(temporary, name);
-			const env = { ...process.env, ERGOPTI_CHANNEL: 'main' };
+			// The copy is no Git checkout: the build year comes from the epoch.
+			const env = { ...process.env, ERGOPTI_CHANNEL: 'main', SOURCE_DATE_EPOCH: '1767225600' };
 			delete env.GH_OWNER;
 			delete env.GH_REPO;
 			Object.assign(env, overrides);

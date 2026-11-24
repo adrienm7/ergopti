@@ -116,7 +116,8 @@ function readMetadata(root = ROOT) {
 
 /**
  * The year, in Paris time, of the commit being built: ERGOPTI_BUILD_COMMIT
- * when set (CI passes github.sha, as for the build stamp), else HEAD.
+ * when set (CI passes github.sha, as for the build stamp), else HEAD. The
+ * reproducible-builds SOURCE_DATE_EPOCH, when set, is that date already.
  * @param {string} [root] The repository root.
  * @param {NodeJS.ProcessEnv} [env] The environment.
  * @returns {number}
@@ -124,12 +125,15 @@ function readMetadata(root = ROOT) {
 function buildYear(root = ROOT, env = process.env) {
 	const commit = env.ERGOPTI_BUILD_COMMIT || 'HEAD';
 	const seconds = Number(
-		execFileSync('git', ['-C', root, 'show', '-s', '--format=%ct', commit], {
-			encoding: 'utf8',
-			stdio: ['ignore', 'pipe', 'pipe']
-		}).trim()
+		env.SOURCE_DATE_EPOCH !== undefined
+			? env.SOURCE_DATE_EPOCH
+			: execFileSync('git', ['-C', root, 'show', '-s', '--format=%ct', commit], {
+					encoding: 'utf8',
+					stdio: ['ignore', 'pipe', 'pipe']
+				}).trim()
 	);
-	if (!Number.isInteger(seconds) || seconds <= 0) fail(`commit ${commit} has no commit date.`);
+	if (!Number.isInteger(seconds) || seconds <= 0)
+		fail(`the build date of ${commit} is not a positive epoch: "${seconds}".`);
 	return Number(
 		new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: TIME_ZONE }).format(seconds * 1000)
 	);

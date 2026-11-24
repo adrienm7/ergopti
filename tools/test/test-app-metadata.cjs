@@ -67,6 +67,9 @@ check(() => {
 		)
 	);
 	assert.equal(metadata.buildYear(ROOT, {}), expected);
+	// 2025-12-31T23:00Z is already 2026 in Paris.
+	assert.equal(metadata.buildYear(ROOT, { SOURCE_DATE_EPOCH: '1767222000' }), 2026);
+	assert.throws(() => metadata.buildYear(ROOT, { SOURCE_DATE_EPOCH: '' }), /positive epoch/);
 	assert.throws(() => metadata.buildYear(ROOT, { ERGOPTI_BUILD_COMMIT: '0'.repeat(40) }));
 });
 
@@ -92,6 +95,50 @@ check(() => {
 		encoding: 'utf8'
 	});
 	assert.notEqual(bad.status, 0, 'an unknown field must fail, not print an empty value');
+});
+
+// 5. macOS: Finder and Quick Look read the launcher's copyright and category
+check(() => {
+	const script = read('tools/build/build_macos_app.sh');
+	const start = script.indexOf('generate_info_plist() {');
+	const generator = script.slice(start, script.indexOf('\n}\n', start));
+	assert.ok(start > 0, 'build_macos_app.sh has no generate_info_plist');
+	assert.match(
+		generator,
+		/plutil -replace NSHumanReadableCopyright -string "\$APP_COPYRIGHT" "\$plist"/,
+		'the launcher Info.plist must carry the copyright Finder shows'
+	);
+	assert.match(
+		generator,
+		/plutil -replace LSApplicationCategoryType -string "\$APP_CATEGORY" "\$plist"/
+	);
+	assert.ok(
+		generator.indexOf('NSHumanReadableCopyright') < generator.indexOf('plutil -lint'),
+		'the keys are written before the plist is linted, and so before codesign seals it'
+	);
+	assert.match(meta.macosCategory, /^public\.app-category\.[a-z-]+$/);
+	// The assignments the build runs yield the library's values.
+	const assignments = script.split('\n').filter((line) => /^APP_(COPYRIGHT|CATEGORY)=/.test(line));
+	assert.equal(assignments.length, 2, 'the build resolves the copyright and the category once');
+	const shell = `set -eu; REPO_ROOT="$1"; ${assignments.join('; ')}; printf '%s|%s' "$APP_COPYRIGHT" "$APP_CATEGORY"`;
+	const run = spawnSync('bash', ['-c', shell, '_', ROOT], { encoding: 'utf8' });
+	assert.equal(run.status, 0, run.stderr);
+	assert.equal(
+		run.stdout,
+		`${metadata.copyrightNotice(metadata.buildYear(), meta)}|${meta.macosCategory}`
+	);
+	assert.ok(
+		script.indexOf('APP_COPYRIGHT=') < start,
+		'the copyright is resolved before the plist is generated'
+	);
+	// The embedded engine shows under the application's name: it carries the
+	// application's copyright and keeps Hammerspoon's own.
+	const assemble = script.slice(script.indexOf('assemble_app() {'));
+	assert.match(
+		assemble,
+		/plutil -replace NSHumanReadableCopyright -string "\$APP_COPYRIGHT Includes Hammerspoon: \$hs_copyright" "\$hs_plist"/
+	);
+	assert.ok(!/Copyright ©|Copyright \(c\)/.test(script), 'the build must not type a notice');
 });
 
 console.log(`[OK] application metadata: ${checks} check(s).`);

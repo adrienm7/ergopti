@@ -299,3 +299,9 @@ Hands needed:
       VoiceOver on, Hotstrings > Preview bubbles > « Read previews to the screen reader » ticked by default: a
       preview and a finished AI prediction are said; untick it: both still draw and nothing is said; tick it again:
       said again, without a restart.
+- [ ] <!-- field-point: app_metadata --> Finder metadata (2026-11-24): select a release ErgoptiPlus.app in Finder
+      and press Space, then Get Info (Cmd+I): both show « Copyright © 2024–<year of the build> Adrien MOYAUX. MIT
+      License. » under the version; in /Applications, View > Use Groups > Application Category files it under
+      Utilities. `plutil -p
+      ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist | grep Copyright` names the same
+      notice followed by Hammerspoon's own. `codesign --verify --deep --strict ErgoptiPlus.app` still passes.

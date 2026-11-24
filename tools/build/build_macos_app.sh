@@ -117,6 +117,13 @@ NODE
 GH_OWNER="${GH_OWNER:-${UPDATER_REPOSITORY%/*}}"
 GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 
+# What Finder's Get Info and Quick Look show beside the version: the LICENSE
+# copyright ending at the year of the commit built, and the App Store category.
+# tools/lib/app-metadata.cjs is their one owner, shared with the Windows and
+# Linux packages.
+APP_COPYRIGHT="$(node "$REPO_ROOT/tools/lib/app-metadata.cjs" field copyright)"
+APP_CATEGORY="$(node "$REPO_ROOT/tools/lib/app-metadata.cjs" field macos-category)"
+
 # The outer app prohibits duplicate instances. Give the embedded GUI runtime a
 # dedicated Ergopti-owned identity while keeping it isolated from stock HS.
 # The names, bundle ids and hosts are declared once in _shared/core/text/data/identifiers.json.
@@ -555,6 +562,12 @@ assemble_app() {
 	# the user authorizes one app, never a « Hammerspoon » they did not install.
 	plutil -replace CFBundleName -string "$ERGOPTI_APP_NAME" "$hs_plist"
 	plutil -replace CFBundleDisplayName -string "$ERGOPTI_APP_NAME" "$hs_plist"
+	# It also shows under that name in Get Info: it states the application's
+	# copyright and keeps Hammerspoon's own, which its MIT licence requires.
+	local hs_copyright
+	hs_copyright="$(plutil -extract NSHumanReadableCopyright raw "$hs_plist")" \
+		|| fail "embedded Hammerspoon Info.plist has no NSHumanReadableCopyright."
+	plutil -replace NSHumanReadableCopyright -string "$APP_COPYRIGHT Includes Hammerspoon: $hs_copyright" "$hs_plist"
 
 	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
 	# update itself behind our back. Updates are owned exclusively by the
@@ -715,6 +728,9 @@ generate_info_plist() {
 		</dict>
 		</plist>
 	PLIST
+	# Set through plutil, which escapes them, rather than spliced into the XML.
+	plutil -replace NSHumanReadableCopyright -string "$APP_COPYRIGHT" "$plist"
+	plutil -replace LSApplicationCategoryType -string "$APP_CATEGORY" "$plist"
 	plutil -lint "$plist" >/dev/null || fail "Generated Info.plist failed plutil -lint."
 }
 

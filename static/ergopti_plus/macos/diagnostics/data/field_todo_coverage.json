@@ -971,6 +971,12 @@
 			"title": "Keep-awake credited across a pause and the Karabiner dialogs’ failure texts (SNU-04 to SNU-06)",
 			"checks": [],
 			"not_testable": "Needs a person to pause the driver during keep-awake and to accept the Karabiner driver update with the network down: the field report neither toggles keep-awake nor installs drivers."
+		},
+		{
+			"id": "app_metadata",
+			"title": "Finder and Quick Look show the copyright and category",
+			"checks": [],
+			"not_testable": "Needs a person to read Finder's Quick Look and Get Info panes: the field report reads no Finder window; tools/test/test-app-metadata.cjs pins the Info.plist keys the build writes."
 		}
 	]
 }
