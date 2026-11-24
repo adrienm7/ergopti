@@ -853,11 +853,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     action messages; each step's state in its line and the polite live region; the counts, the verdict and the
     folder at the end; Stop, Close and the three end buttons sending `cancel`, `close`, `open_folder`, `copy` and
     `issue`), scanned by the app windows accessibility audit and driven by
-    `tools/test/browser/field-report-window.playwright.cjs`. Left: the three hosts, which open it from the row, push
-    the observer's events to it and serve its actions (`Session:cancel_in_app` / `CancelInApp`, the results folder
-    in Finder, Explorer or the file manager, the full report to the clipboard, the issue form through the bug-report
-    link builder's public function with the summary in the URL), then drop the `field_report` exclusions of
-    `test-webview-geometry-single-source.cjs`. Until then the report opens in the one-click checks' dialog.
+    `tools/test/browser/field-report-window.playwright.cjs`. The Linux host is done
+    (`linux/diagnostics/ui/field_check/field_report.lua`): the row opens the window, which receives each step and
+    the summary; Stop, Close and the close box cancel the run; Copy, the file manager and « Create a GitHub issue »
+    (shared diagnostics runner `report_field_run`: the bug form with the version, OS, driver and the run's evidence
+    line built by `issue_link.build_url`, the redacted report on the clipboard); without a window the report opens
+    in the one-click dialog. Left: the macOS and Windows hosts, then drop the `field_report` exclusions of
+    `test-webview-geometry-single-source.cjs`; until then those two open the report in the one-click dialog.
   - **Field points still without an automatic driver step.** Linux: the collector's probe steps `linux_input_access`,
     `linux_autostart`, `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`)
     run only from `collect-linux-field-report.sh`; a Linux field check step reading the same probes from

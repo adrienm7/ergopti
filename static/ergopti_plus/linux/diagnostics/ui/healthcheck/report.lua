@@ -199,6 +199,21 @@ function M.report_bug(overrides, complete)
 	end)
 end
 
+--- Opens the bug form for a finished field report
+--- (diagnostics/ui/field_check/field_report.lua): this machine's version, OS
+--- and driver and the run's evidence line, the redacted report on the clipboard.
+--- @param line string The run's evidence line.
+--- @param text string The complete report.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request
+function M.report_field_run(line, text, overrides, complete)
+	return Runner.report_field_run(line, text, function()
+		local snapshot, documents = menu_snapshot()
+		return snapshot, documents, M.redaction_context(overrides)
+	end, overrides, complete)
+end
+
 --- Opens the GitHub feature form with the version and the system prefilled.
 --- @param overrides table|nil Replacement side effects (tests only).
 --- @param complete function|nil Receives true once the form opened.

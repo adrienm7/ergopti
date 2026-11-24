@@ -47,6 +47,7 @@ M.APP_BRIDGES = {
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",
 	error_dialog             = "error_dialog",
+	field_report             = "field_report",
 	healthcheck              = "healthcheck",
 	hotstring_editor         = "hsEditor",
 	hotstrings_config_window = "hotstrings_config_bridge",

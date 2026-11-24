@@ -323,6 +323,44 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		helpers.assert_eq(calls.notify, { "error" })
 	end)
 
+	-- The field report window's « Create a GitHub issue » must carry no path or
+	-- sentence in the URL, and the complete report redacted on the clipboard
+	-- (field-report-window).
+	helpers.it("a field report issue prefills the evidence line and copies the redacted report (field-report-window)", function()
+		local Report = helpers.load_module("diagnostics.ui.healthcheck.report")
+		local calls = {}
+		local overrides = recording(calls)
+		ordered(calls, overrides)
+		local previous_bridge = package.loaded["diagnostics.ui.healthcheck.bridge"]
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
+		package.loaded["diagnostics.ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
+			build_snapshot = function() return host_snapshot(false) end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		local line = "check=field_report verdict=fail request=app-20261124T120000Z pass=1 fail=1 not_run=1"
+			.. " field_network=pass field_composer=fail"
+		local ok, result = pcall(function()
+			local outcome
+			Report.report_field_run(line, "Field report\nSaved in: " .. HOME .. "/.cache/ergopti/field-run", overrides,
+				function(value) outcome = value end)
+			local refused = pcall(Report.report_field_run, "Saved in " .. HOME, "x", overrides, function() end)
+			return { outcome = outcome, refused = not refused }
+		end)
+		package.loaded["diagnostics.ui.healthcheck.bridge"] = previous_bridge
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result.outcome, true)
+		helpers.assert_true(result.refused, "a line outside the evidence grammar never reaches a form")
+		helpers.assert_eq(calls.order, { "copy", "open_url" })
+		helpers.assert_true(not calls.copy[1]:find("jdoe", 1, true), "the clipboard holds the redacted report")
+		helpers.assert_contains(calls.copy[1], "Saved in: ")
+		local repo = documents().repository
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
+		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), line, "the form carries the evidence line")
+		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "Linux")
+		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
+	end)
+
 	helpers.it("Suggest a feature opens the feature form with the version and the system", function()
 		local Report = helpers.load_module("diagnostics.ui.healthcheck.report")
 		local calls = {}

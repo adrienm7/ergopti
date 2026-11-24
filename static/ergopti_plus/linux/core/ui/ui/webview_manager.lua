@@ -346,6 +346,7 @@ local BRIDGE_MODULES = {
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
 	error_dialog          = "diagnostics.ui.error_dialog",
+	field_report          = "diagnostics.ui.field_check.field_report",
 	healthcheck           = "diagnostics.ui.healthcheck.bridge",
 	hotstring_editor      = "hotstrings.ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
