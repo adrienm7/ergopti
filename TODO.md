@@ -54,9 +54,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` stays 500 ms unless a forced-termination test flakes alone), the Ubuntu APT and Playwright download retries,
       and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by Runner » is GitHub capacity:
       rerun the failed jobs, do not move it to Intel.
-- [ ] **[macOS] Owned runtime artifact.** The admin-shell helper changes of 2026-11-23 (stale runtime retirement
-      before install, refusal note `refused-<case>:<file>:<line>`) only reach users once the maintainer rebuilds
-      and republishes the runtime (`16.3.0-ergopti.7`); `vendor/remap-runtime/manifest.json` is theirs to move.
 - [ ] **[macOS] Install journal left by an interrupted install** (field report 2026-11-24, dev.178,
       `refused-cleanupPending` at `OwnedRuntimeInstallJournal.swift:94`). Fixed in the launcher: the install's
       administrator shell retires `.runtime-install-journal`, `.runtime-service-journal` and the
@@ -634,11 +631,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **One folder name for Ergopti on the three OS.** Remove the boot migration only once the maintainer's
       machines pass the checks of the TODO-tests files
       ([handoff](docs/tooling/one-folder-name-handoff.md)).
-- [ ] **[RELEASE] Owned runtime rebuild.** The pinned runtime (16.3.0-ergopti.6) predates MRT-004: the next build
-      ships the « Réparer le service » helper role, the helper's one-hash report rule
-      (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`) and the raised descriptor limit, renames the owned runtime
-      folder `ErgoptiPlus`, and updates the manifest pin (the maintainer's step: agents do not touch the pinned
-      runtime).
 - [ ] **Item 31, owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
       [handoff](docs/tooling/next-release-handoff.md)). After the maintainer's WP9 pass (`owned_runtime_wp9` in
       TODO-tests-macos.md), delete the shared mode and set the three macOS `follow_up` rows of
