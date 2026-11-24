@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic（阅读障碍）",
 	"menu.configuration.reading_spacing": "窗口文字间距",
 	"menu.configuration.reading_spacing.default": "默认",
-	"menu.configuration.reading_spacing.wide": "宽松",
+	"menu.configuration.reading_spacing.wide": "宽松（加大行距、字距和词距）",
 	"menu.hotstrings.add_custom": "+ 添加自定义扩展…",
 	"menu.hotstrings.add_delimiter": "+ 添加自定义分隔符…",
 	"menu.hotstrings.category_enable": "启用类别",

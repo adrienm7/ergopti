@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (dyslexie)",
 	"menu.configuration.reading_spacing": "Rozestupy textu v oknech",
 	"menu.configuration.reading_spacing.default": "Výchozí",
-	"menu.configuration.reading_spacing.wide": "Široké",
+	"menu.configuration.reading_spacing.wide": "Vzdušné (větší rozestupy řádků, písmen a slov)",
 	"menu.hotstrings.add_custom": "+ Přidat vlastní expandér…",
 	"menu.hotstrings.add_delimiter": "+ Přidat vlastní oddělovač…",
 	"menu.hotstrings.category_enable": "Povolit kategorii",

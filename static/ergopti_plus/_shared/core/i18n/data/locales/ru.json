@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (дислексия)",
 	"menu.configuration.reading_spacing": "Интервалы текста в окнах",
 	"menu.configuration.reading_spacing.default": "По умолчанию",
-	"menu.configuration.reading_spacing.wide": "Широкие",
+	"menu.configuration.reading_spacing.wide": "Свободно (больше интервал между строками, буквами и словами)",
 	"menu.hotstrings.add_custom": "+ Добавить пользовательский расширитель…",
 	"menu.hotstrings.add_delimiter": "+ Добавить пользовательский разделитель…",
 	"menu.hotstrings.category_enable": "Включить категорию",

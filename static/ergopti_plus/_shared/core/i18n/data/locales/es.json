@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (dislexia)",
 	"menu.configuration.reading_spacing": "Espaciado del texto de las ventanas",
 	"menu.configuration.reading_spacing.default": "Predeterminado",
-	"menu.configuration.reading_spacing.wide": "Amplio",
+	"menu.configuration.reading_spacing.wide": "Aireado (más espacio entre líneas, letras y palabras)",
 	"menu.hotstrings.add_custom": "+ Añadir un expansor personalizado…",
 	"menu.hotstrings.add_delimiter": "+ Añadir delimitador personalizado…",
 	"menu.hotstrings.category_enable": "Activar la categoría",

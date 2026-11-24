@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (дислексія)",
 	"menu.configuration.reading_spacing": "Інтервали тексту у вікнах",
 	"menu.configuration.reading_spacing.default": "Типові",
-	"menu.configuration.reading_spacing.wide": "Широкі",
+	"menu.configuration.reading_spacing.wide": "Просторо (більші інтервали між рядками, літерами й словами)",
 	"menu.hotstrings.add_custom": "+ Додати власний розширювач…",
 	"menu.hotstrings.add_delimiter": "+ Додати власний роздільник…",
 	"menu.hotstrings.category_enable": "Увімкнути категорію",

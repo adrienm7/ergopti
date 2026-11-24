@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic（ディスレクシア）",
 	"menu.configuration.reading_spacing": "ウィンドウの文字間隔",
 	"menu.configuration.reading_spacing.default": "既定",
-	"menu.configuration.reading_spacing.wide": "広め",
+	"menu.configuration.reading_spacing.wide": "ゆったり（行・文字・単語の間隔を広く）",
 	"menu.hotstrings.add_custom": "+ カスタムエクスパンダーを追加…",
 	"menu.hotstrings.add_delimiter": "+ カスタム区切り文字を追加…",
 	"menu.hotstrings.category_enable": "カテゴリを有効にする",

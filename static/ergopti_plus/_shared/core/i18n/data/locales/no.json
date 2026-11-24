@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (dysleksi)",
 	"menu.configuration.reading_spacing": "Tekstavstand i vinduene",
 	"menu.configuration.reading_spacing.default": "Standard",
-	"menu.configuration.reading_spacing.wide": "Bred",
+	"menu.configuration.reading_spacing.wide": "Luftig (mer luft mellom linjer, bokstaver og ord)",
 	"menu.hotstrings.add_custom": "+ Legg til en egendefinert stutsing…",
 	"menu.hotstrings.add_delimiter": "+ Legg til egendefinert skilletegn…",
 	"menu.hotstrings.category_enable": "Aktiver kategorien",

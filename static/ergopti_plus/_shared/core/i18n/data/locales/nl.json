@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (dyslexie)",
 	"menu.configuration.reading_spacing": "Tekstafstand van de vensters",
 	"menu.configuration.reading_spacing.default": "Standaard",
-	"menu.configuration.reading_spacing.wide": "Ruim",
+	"menu.configuration.reading_spacing.wide": "Ruim (meer ruimte tussen regels, letters en woorden)",
 	"menu.hotstrings.add_custom": "+ Een aangepaste uitbreider toevoegen…",
 	"menu.hotstrings.add_delimiter": "+ Aangepast scheidingsteken toevoegen…",
 	"menu.hotstrings.category_enable": "Categorie inschakelen",

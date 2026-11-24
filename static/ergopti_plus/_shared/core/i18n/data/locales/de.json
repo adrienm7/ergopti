@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (Legasthenie)",
 	"menu.configuration.reading_spacing": "Textabstand der Fenster",
 	"menu.configuration.reading_spacing.default": "Standard",
-	"menu.configuration.reading_spacing.wide": "Weit",
+	"menu.configuration.reading_spacing.wide": "Luftig (mehr Abstand zwischen Zeilen, Buchstaben und Wörtern)",
 	"menu.hotstrings.add_custom": "+ Benutzerdefinierten Expander hinzufügen…",
 	"menu.hotstrings.add_delimiter": "+ Eigenes Trennzeichen hinzufügen…",
 	"menu.hotstrings.category_enable": "Kategorie aktivieren",

@@ -1954,7 +1954,7 @@
 	"menu.configuration.reading_font.dyslexic": "OpenDyslexic (डिस्लेक्सिया)",
 	"menu.configuration.reading_spacing": "विंडो में टेक्स्ट की दूरी",
 	"menu.configuration.reading_spacing.default": "डिफ़ॉल्ट",
-	"menu.configuration.reading_spacing.wide": "चौड़ी",
+	"menu.configuration.reading_spacing.wide": "खुला (पंक्तियों, अक्षरों और शब्दों के बीच अधिक दूरी)",
 	"menu.hotstrings.add_custom": "+ एक कस्टम विस्तारक जोड़ें…",
 	"menu.hotstrings.add_delimiter": "+ कस्टम विभाजक जोड़ें…",
 	"menu.hotstrings.category_enable": "श्रेणी सक्षम करें",
