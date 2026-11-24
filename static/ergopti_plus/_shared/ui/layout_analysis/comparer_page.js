@@ -137,6 +137,9 @@
 	// The class of a rank's cell: an ordinal, the one number a table writes
 	// without a unit (studio-numbers.cjs).
 	const RANK_CELL = 'la-rank';
+	// The class of a mark's cell: an index on QWERTY (QWERTY reads 100), a
+	// number with no unit, written alone like a rank (studio-numbers.cjs).
+	const MARK_CELL = 'la-cell-mark';
 	// The class of a table's layout-name cells (the ranking's and every
 	// heat table's), the column that stays in view while it scrolls sideways.
 	const NAME_COLUMN = 'la-name-col';
@@ -1645,8 +1648,17 @@
 			let drawn = start;
 			let drawEvery = PARTIAL_RENDER_MS;
 			for (let at = 0; at < pending.length; at += ANALYSE_SLICE) {
-				for (const [layout, table] of pending.slice(at, at + ANALYSE_SLICE))
-					scored.push(E.analyse(layout, table, options));
+				try {
+					for (const [layout, table] of pending.slice(at, at + ANALYSE_SLICE))
+						scored.push(E.analyse(layout, table, options));
+				} catch (error) {
+					if (!markRefused(error)) throw error;
+					setBusy(false);
+					state.results = [];
+					showStatus(INFO.refusal(error));
+					render();
+					return;
+				}
 				if (scored.length === pending.length) break;
 				showStatus(
 					t('layout_analysis.status.scoring', { done: scored.length, count: pending.length })
@@ -1684,9 +1696,25 @@
 			render();
 		}
 
+		/**
+		 * Whether an error is the mark's refusal of settings where QWERTY costs
+		 * nothing (E.markIndex): said in words, the results left as they were.
+		 */
+		function markRefused(error) {
+			return (
+				Boolean(error) && error.name === 'AnalysisError' && error.code === 'mark_reference_cost'
+			);
+		}
+
 		/** Re-scores after a weight change, without re-analysis. */
 		function rescore() {
-			state.results = E.rescore(state.results, state.weights, state.floors, state.grades);
+			try {
+				state.results = E.rescore(state.results, state.weights, state.floors, state.grades);
+			} catch (error) {
+				if (!markRefused(error)) throw error;
+				showStatus(INFO.refusal(error));
+				return;
+			}
 			save();
 			render();
 		}
@@ -1983,11 +2011,12 @@
 		}
 
 		/**
-		 * Horizontal bars of the mark, best first. The mark's 0 is the worst
-		 * layout possible on this text and these settings (E.score), so each bar
-		 * runs from 0 and their lengths compare as ratios; each value names its
-		 * gap to the reference (QWERTY, E.referenceLayout) in %. The user's own
-		 * layouts take the accent colour. The filters choose the layouts drawn.
+		 * Horizontal bars of the mark, best first. The mark is an index on
+		 * QWERTY on this text and these settings (E.markIndex): QWERTY reads
+		 * 100, so a value says its gap to QWERTY by itself. Each bar runs from
+		 * 0 (a layout costing twice QWERTY's), and a mark at or below 0 draws
+		 * none. The user's own layouts take the accent colour. The filters
+		 * choose the layouts drawn.
 		 */
 		function renderChart() {
 			const box = $('la-chart');
@@ -1997,7 +2026,6 @@
 			moreNoteAfter(box, shown.length, rows.length);
 			if (shown.length === 0) return;
 			const best = Math.max(...shown.map((r) => r.score.mark));
-			const reference = referenceResult();
 			for (const result of shown) {
 				const value = format(result.score.mark, 1);
 				// An incomplete layout ranks after the complete ones and says what it lacks.
@@ -2007,14 +2035,8 @@
 				bar.style.left = '0%';
 				bar.style.width = `${best > 0 ? Math.max(0, (100 * result.score.mark) / best) : 0}%`;
 				track.append(bar);
-				// The cell says its unit to a screen reader; the chart's title says it on screen.
-				const row = barRow(
-					result.layout.name,
-					track,
-					value,
-					` ${t('layout_analysis.unit.points')}`,
-					result.layout.id
-				);
+				const row = barRow(result.layout.name, track, value, '', result.layout.id);
+				row.querySelector('.la-chart-value').classList.add(MARK_CELL);
 				// The button's name starts with its visible text, the layout (WCAG 2.5.3).
 				rowName(row).setAttribute(
 					'aria-label',
@@ -2029,14 +2051,7 @@
 					row.classList.add('la-incomplete');
 					rowName(row).append(' ', flag);
 				}
-				row.title = `${result.layout.name}: ${withUnit(value, t('layout_analysis.unit.points'))}${
-					flag ? ` (${flag.textContent})` : ''
-				}`;
-				if (reference && reference.layout.id !== result.layout.id)
-					row.lastChild.append(
-						' ',
-						el('small', 'la-chart-gap', `(${markGapText(result, reference)})`)
-					);
+				row.title = `${result.layout.name}: ${value}${flag ? ` (${flag.textContent})` : ''}`;
 				box.append(row);
 			}
 		}
@@ -2084,11 +2099,7 @@
 				item.append(el('dt', '', label), value, who);
 				box.append(item);
 			};
-			tile(
-				t('layout_analysis.chart.title'),
-				complete[0],
-				measure(complete[0].score.mark, 1, t('layout_analysis.unit.points'))
-			);
+			tile(t('layout_analysis.chart.title'), complete[0], format(complete[0].score.mark, 1));
 			for (const id of LEADER_METRICS) {
 				const higher = E.METRICS[id].better === 'higher';
 				const best = complete.reduce((a, b) =>
@@ -2217,8 +2228,7 @@
 					// Its popover: the weights' explanation and the score's formula.
 					info: 'weights',
 					value: (r) => r.score.mark,
-					digits: 1,
-					unit: t('layout_analysis.unit.points')
+					digits: 1
 				}
 			].concat(
 				metricIds.map((id) => ({
@@ -2306,10 +2316,11 @@
 					const cell =
 						// The rank is an ordinal: it reads as is in the relative view too.
 						versus && column.digits !== undefined && column.key !== 'rank'
-							? column.key === 'score'
-								? // The mark as its gap to the reference's, in % (a ratio: it has a zero).
-									relativeCell({ delta: versus.score.gap, verdict: versus.score.verdict }, 1, '%')
-								: relativeCell(versus.metrics[column.key], column.digits, column.unit)
+							? relativeCell(
+									column.key === 'score' ? versus.score : versus.metrics[column.key],
+									column.digits,
+									column.unit
+								)
 							: el(
 									'td',
 									column.key === 'rank' ? RANK_CELL : '',
@@ -2319,6 +2330,7 @@
 											? format(value, column.digits)
 											: measure(value, column.digits, column.unit)
 								);
+					if (column.key === 'score') cell.classList.add(MARK_CELL);
 					// The name opens the layout's details: a button for the keyboard, the
 					// row answers to the pointer too.
 					if (column.key === 'name') {
@@ -2403,28 +2415,13 @@
 			return cell;
 		}
 
-		/**
-		 * A mark's gap to the reference's, signed, in % and naming it
-		 * (« +2.1 % vs QWERTY »): E.markGap, the one ratio of two marks.
-		 * @param {object} result - An analyse() result.
-		 * @param {object} reference - The reference's (referenceResult).
-		 * @returns {string}
-		 */
-		function markGapText(result, reference) {
-			const gap = E.markGap(result.score.mark, reference.score.mark);
-			return t('layout_analysis.mark.versus', {
-				gap: `${gap > 0 ? '+' : ''}${measure(gap, 1, '%')}`,
-				layout: reference.layout.name
-			});
-		}
-
-		// The reference analysed for the relative view and the marks when it is
-		// not compared, per analysis (generation) and layout id.
+		// The reference analysed for the relative view when it is not compared,
+		// per analysis (generation) and layout id.
 		let referenceAnalysis = null;
 
 		/**
-		 * The result every mark is named beside and the relative view measures
-		 * against (E.referenceLayout: QWERTY on every corpus): the compared one,
+		 * The result the relative view measures against (E.referenceLayout:
+		 * QWERTY on every corpus, the layout every mark is an index on): the compared one,
 		 * else that layout analysed once on the same text with the same options
 		 * and scored with the current weights.
 		 * @returns {object|null} An analyse() result; null without a text.

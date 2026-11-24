@@ -68,13 +68,30 @@ stored, so existing users get the new default; an explicit value is kept. The
 earlier « the AltGr layer alone types Ergopti's AltGr over the OS layout »
 under « None » is superseded: select Ergopti and untick the base layer for it.
 
-## One layout mark from the theoretical worst; AAA everywhere (2026-11-23)
+## The layout mark is an index on QWERTY; pinky_ring 0.14 (2026-11-24)
 
-The maintainer found the score's points opaque and asked for one mark per
-layout where 0 is the worst layout possible, higher is better with no ceiling,
-and gaps read in %; QWERTY, shared by every language, is the reference named
-beside it, not AZERTY. The Optimiser's « an existing layout would do the job »
-gap follows it in %. Implemented on 2026-11-24: `score().mark` and `markGap` (docs/design/layout-analysis.md, « Mark »); how the zero is bounded waits under the TODO's « Maintainer decisions pending ».
+The maintainer found the score's points opaque and asked (2026-11-23) for one
+mark per layout, higher is better with no ceiling, gaps read in %, QWERTY,
+shared by every language, as the reference rather than AZERTY. On 2026-11-24
+the maintainer replaced the zero at « the theoretical worst layout » (a bound
+so loose that Ergopti+ read only 2 % above QWERTY) with an index on QWERTY,
+like Alt Alpha Ranker: on the same corpus, board and settings QWERTY reads
+100 and a layout 23 % better reads 123, reproducible because QWERTY never
+changes and independent of the library. The cost is minus the total, and the
+mark is linear in it, 100 × (2 − cost / QWERTY's cost) (`markIndex`): the
+rewards nearly offset the penalties of good layouts (Ergopti+ costs 7.37
+points on Don Quichotte, QWERTY 181.16), so the ratio cost(QWERTY) / cost
+would read thousands and has no value at a cost of 0, which the optimizer
+can pass. A QWERTY cost at or below 0 (a toy text, rewards alone) is refused
+as `mark_reference_cost`, never read with a stand-in
+(docs/design/layout-analysis.md, « Mark »). Do not bring back a theoretical
+zero or a library-relative mark.
+
+The same day: `pinky_ring` weighs 0.14 (Oxeylyzer's ratio of its pinky–ring
+weight to its SFB weight, beside `sfb` 5) and every penalty floor stays 0
+(`score_weights.json`).
+
+## AAA everywhere (2026-11-23)
 
 Accessibility targets WCAG 2.2 AAA (the latest WCAG) on the site, Ergopti+ and
 every app window, measured in CI by every tool that covers AAA criteria, red at
@@ -1111,13 +1128,17 @@ ErgoDox codes back to QMK's places or name these keys after F13–F24, Tab or
 CapsLock; a new board's extra keys take board-only codes too
 (`docs/design/layout-analysis.md`, « ErgoDox keys »).
 
-## The Optimiser's small gap stays 2 points (2026-11-19)
+## The Optimiser's small gap is 0.56 % of the mark (2026-11-24)
 
-Decided by the maintainer on 2026-11-19: `similar_score_gap` stays 2 points
-(`analysis_model.json`), under which the Optimiser says an existing layout
-does the job of the one it found. Why: a fixed number of score points reads
-the same on every corpus and needs no zero of the score. The unit stays points
-and the similarity display stays as built (maintainer, 2026-11-21).
+Decided by the maintainer on 2026-11-24, with the QWERTY index: the Optimiser
+says an existing layout does the job of the one it found when the optimized
+mark leads the best existing one by at most `similar_mark_gap` (0.56 %,
+`analysis_model.json`) of that mark, no longer by 2 score points. 0.56 % is
+the former 2 points (confirmed on 2026-11-19) on Don Quichotte with the
+default settings: 2 points are 1.104 marks there, 0.56 % of Ergopti+'s
+195.93 (0.57 % on Swann, 0.55 % on Nemolivier;
+docs/design/layout-optimizer.md, « Existing layouts »). The similarity display
+stays as built (maintainer, 2026-11-21).
 
 ## Thumb keys: rest, travel, letter pairs and thumb SFBs (2026-11-19)
 

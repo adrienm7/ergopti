@@ -220,7 +220,7 @@ for (const vector of vectors) {
 	const layout = byId.get(vector.layout);
 	check(layout, `${vector.name}: no layout ${vector.layout}`);
 	if (!layout) continue;
-	const result = E.analyse(layout, E.ngramsFromText(vector.text), { keyboard: vector.keyboard });
+	const result = E.measure(layout, E.ngramsFromText(vector.text), { keyboard: vector.keyboard });
 	for (const [metric, expected] of Object.entries(vector.expect)) {
 		check(metric in E.METRICS, `${vector.name}: unknown metric ${metric}`);
 		const got = result.metrics[metric];
@@ -241,7 +241,7 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 // per hand), the gaps are 18.5 + 13.5 + 9.5 + 8.5 on the left and 50 on the
 // right: finger_imbalance is half of 100, 50 %.
 {
-	const result = E.analyse(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
+	const result = E.measure(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
 	const expected = { lp: 25, lr: 25, lm: 25, li: 25, ri: 0, rm: 0, rr: 0, rp: 0 };
 	check(
 		JSON.stringify(Object.keys(result.fingerShares).sort()) ===
@@ -281,7 +281,8 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 		`diff: hand_change ${JSON.stringify(d.metrics.hand_change)}`
 	);
 	check(
-		near(d.score.delta, qwerty.score.total - dvorak.score.total) &&
+		near(d.score.delta, qwerty.score.mark - dvorak.score.mark) &&
+			d.score.a === 100 &&
 			d.score.verdict === (d.score.delta > 0 ? 'better' : 'worse'),
 		`diff: score ${JSON.stringify(d.score)}`
 	);
@@ -311,7 +312,7 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 // « fjf » is one trigram alternating hands: F takes part twice, J once, so
 // F holds two thirds of alternation's 100 % and J one third.
 {
-	const rolls = E.analyse(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
+	const rolls = E.measure(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
 	check(near(rolls.metrics.roll_in, 100), `gain: roll_in = ${rolls.metrics.roll_in}`);
 	const expected = { KeyA: 100 / 6, KeyS: 100 / 3, KeyD: 100 / 3, KeyF: 100 / 6, KeyJ: 0 };
 	for (const [code, part] of Object.entries(expected))
@@ -326,7 +327,7 @@ check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry n
 	const values = E.keyValues(rolls, 'roll_in');
 	check(near(values.KeyS, 100 / 3) && near(values.KeyA, 100 / 6), 'keyValues: reads a gain');
 	check(near(E.keyValues(rolls, 'presses').KeyA, 25), 'keyValues: reads the presses');
-	const alternate = E.analyse(byId.get('qwerty'), E.ngramsFromText('fjf'), { keyboard: 'iso' });
+	const alternate = E.measure(byId.get('qwerty'), E.ngramsFromText('fjf'), { keyboard: 'iso' });
 	check(
 		near(alternate.metrics.alternation, 100),
 		`gain: alternation = ${alternate.metrics.alternation}`
@@ -692,93 +693,84 @@ for (const bad of [{ nonsense: 1 }, { repeat: 1 }, { sfb: -1 }, { sfb: Infinity 
 	check(threw, `score: ${JSON.stringify(bad)} must throw`);
 }
 
-// The mark (maintainer, 2026-11-23): total − zero, where the zero is the
-// theoretical worst on the corpus and settings, the same for every layout.
-// The old score had no zero: its points never read as a ratio.
-const throws = (run) => {
+// The mark (maintainer, 2026-11-24): an index on QWERTY, like Alt Alpha
+// Ranker's, 100 × (2 − cost / QWERTY's cost) with cost = −total on the same
+// corpus, board and settings. It replaced a total less a theoretical worst
+// (2026-11-23), whose loose bound read Ergopti+ only 2 % above QWERTY.
+const throws = (run, pattern) => {
 	try {
 		run();
-	} catch {
-		return true;
+	} catch (error) {
+		return pattern === undefined || pattern.test(String(error.message));
 	}
 	return false;
 };
 const qwertyHere = E.analyse(byId.get('qwerty'), ngrams, {});
+// Hand-computed: QWERTY costs 200 points (total −200).
 check(
-	result.score.zero < 0 &&
-		near(result.score.mark, result.score.total - result.score.zero) &&
-		result.score.mark > 0 &&
-		qwertyHere.score.total < 0 &&
-		qwertyHere.score.mark > 0,
-	`mark: total − zero, above 0 where the total is below (QWERTY ${qwertyHere.score.total} → ${qwertyHere.score.mark})`
+	near(E.markIndex(-200, -200), 100) &&
+		near(E.markIndex(-154, -200), 123) &&
+		near(E.markIndex(-50, -200), 175) &&
+		near(E.markIndex(0, -200), 200) &&
+		near(E.markIndex(10, -200), 205) &&
+		near(E.markIndex(-400, -200), 0) &&
+		near(E.markIndex(-500, -200), -50),
+	'mark: 100 × (2 − cost / QWERTY cost): QWERTY 100, 23 % less cost 123, no cost 200, no ceiling'
 );
 check(
-	qwertyHere.score.zero === result.score.zero,
-	'mark: the zero is the same for every layout on one corpus and settings'
+	throws(() => E.markIndex(-10, 0), /QWERTY costs 0 points/) &&
+		throws(() => E.markIndex(-10, 5), /QWERTY costs -5 points/) &&
+		throws(() => E.markIndex(Number.NaN, -200)) &&
+		throws(() => E.markIndex(-10, Number.NEGATIVE_INFINITY)),
+	'mark: a QWERTY cost at or below 0, or a total that is not finite, is refused'
 );
 check(
-	near(E.markGap(123, 100), 23) &&
-		near(E.markGap(qwertyHere.score.mark, qwertyHere.score.mark), 0) &&
-		throws(() => E.markGap(1, 0)) &&
-		throws(() => E.markGap(1, -5)) &&
-		throws(() => E.markGap(Number.NaN, 1)),
-	'mark: markGap reads « 23 % more » and refuses a reference at or below 0'
+	qwertyHere.score.mark === 100 &&
+		qwertyHere.score.reference === qwertyHere.score.total &&
+		result.score.reference === qwertyHere.score.total &&
+		near(result.score.mark, 100 * (2 - result.score.total / qwertyHere.score.total)),
+	`mark: the index on QWERTY's total on the same corpus (QWERTY ${qwertyHere.score.total} → 100, ${result.layout.id} ${result.score.total} → ${result.score.mark})`
+);
+check(
+	result.score.total > qwertyHere.score.total === result.score.mark > 100,
+	'mark: a layout scoring more than QWERTY marks above 100'
 );
 const versus = E.diff(result, qwertyHere);
 check(
-	near(versus.score.gap, E.markGap(result.score.mark, qwertyHere.score.mark)) &&
-		near(versus.score.delta, result.score.mark - qwertyHere.score.mark),
-	'mark: diff compares the marks, as a gap in % too'
+	near(versus.score.delta, result.score.mark - 100) && !('gap' in versus.score),
+	'mark: diff compares the marks by their difference, in % of QWERTY’s cost'
 );
 check(E.referenceLayout() === 'qwerty', 'mark: QWERTY is the reference on every corpus');
-// Hand-computed zeros: one weight alone, every other at 0.
+check(
+	near(E.markPercent(1, 200), 0.5) &&
+		near(E.markPercent(-3, 150), -2) &&
+		throws(() => E.markPercent(1, 0)) &&
+		throws(() => E.markPercent(1, -100)) &&
+		throws(() => E.markPercent(Number.NaN, 100)),
+	'mark: markPercent is a gap in % of a base mark above 0'
+);
 const only = (id, value) =>
 	Object.fromEntries(Object.keys(defaults).map((m) => [m, m === id ? value : 0]));
-const zeroOf = (weights, floors, grades) => E.score(result, weights, floors, grades).zero;
-const iso = E.keyboard('iso');
-const typeOf = (f) => {
-	const id = sandbox.LAYOUT_ANALYSIS_DATA.model.fingers[f];
-	return { p: 'pinky', r: 'ring', m: 'middle', i: 'index', t: 'thumb' }[id[1]];
-};
-const reachBound = Math.max(
-	...iso.codes.map((code, k) => E.defaultGrades().distance[typeOf(iso.finger[k])] * iso.reach[k])
-);
-check(near(zeroOf(only('unsupported', 1)), -100), 'mark: unsupported alone has its zero at −100');
+// A reward alone makes QWERTY's cost negative: no index reads against it.
 check(
-	near(zeroOf(only('sfb', 1)), -100 * E.defaultGrades().sfb.two_rows),
-	'mark: sfb alone has its zero at 100 % of its most expensive grade'
-);
-check(
-	near(zeroOf(only('sfb', 1), { sfb: 150 }), -(200 - 150)),
-	'mark: a floor lowers the zero to the bound above it'
-);
-check(
-	near(zeroOf(only('distance', 1)), -4 * reachBound),
-	`mark: distance alone has its zero at 4 presses of the longest graded reach (${reachBound} mm)`
-);
-check(
-	near(
-		zeroOf(only('finger_imbalance', 1)),
-		-(100 - Math.min(...Object.values(E.defaultIdealLoad())))
-	),
-	'mark: finger_imbalance alone is bounded by the smallest ideal load'
-);
-check(zeroOf(only('alternation', 1)) === 0, 'mark: a reward alone leaves the zero at 0');
-const flatPair = only('sfb', 2);
-flatPair.lsb = 2;
-check(
-	near(zeroOf(flatPair), -100 * Math.max(2 * 2, 2)),
-	'mark: a pair is one event: an SFB and a lateral stretch do not add up'
+	throws(() => E.score(result, only('alternation', 1)), /QWERTY costs -[0-9.]+ points/),
+	'mark: settings where QWERTY costs nothing are refused with its cost named'
 );
 const rescored = E.rescore([E.analyse(byId.get('qwerty'), ngrams, {})], { sfb: 0 })[0];
 check(
-	rescored.score.zero > qwertyHere.score.zero &&
-		near(rescored.score.mark, rescored.score.total - rescored.score.zero),
-	'mark: a rescore moves the zero with the weights'
+	rescored.score.mark === 100 &&
+		rescored.score.reference === rescored.score.total &&
+		rescored.score.reference > qwertyHere.score.reference,
+	'mark: a rescore moves QWERTY’s total with the weights, QWERTY staying 100'
+);
+const rescoredResult = E.rescore([E.analyse(byId.get('ergopti'), ngrams, {})], { sfb: 0 })[0];
+check(
+	near(rescoredResult.score.mark, 100 * (2 - rescoredResult.score.total / rescored.score.total)),
+	'mark: a rescored layout reads its index on QWERTY rescored the same way'
 );
 check(
-	throws(() => E.score(Object.assign({}, result, { zeroBasis: undefined }))),
-	'mark: a result without its zero basis is refused'
+	throws(() => E.score(Object.assign({}, result, { referenceBasis: undefined })), /referenceBasis/),
+	'mark: a result without its reference basis is refused'
 );
 // The ideal finger load: the maintainer's order (index ≥ middle ≥ ring ≥
 // pinky, pinkies under 8 %), editable per analysis, checked when edited.
@@ -794,7 +786,7 @@ for (const hand of ['l', 'r']) {
 }
 const allIndex = Object.fromEntries(Object.keys(ideal).map((f) => [f, 0]));
 allIndex.li = 100;
-const onF = E.analyse(byId.get('qwerty'), E.ngramsFromText('f'), { idealLoad: allIndex });
+const onF = E.measure(byId.get('qwerty'), E.ngramsFromText('f'), { idealLoad: allIndex });
 check(onF.metrics.finger_imbalance === 0, 'ideal load: an edited target is the one measured');
 check(E.defaultIdealLoad().li === ideal.li, 'ideal load: an edited target leaves the default');
 for (const bad of [
@@ -869,7 +861,7 @@ for (const id of ['iso', 'ansi', 'ortho', 'iso_angle']) {
 // An index resting one column in: its home key costs nothing, F costs a reach,
 // G stops being lateral, and the home row still counts both.
 const shifted = { home: { li: 'KeyG' }, fingers: { KeyG: 'li' } };
-const onGShifted = E.analyse(byId.get('qwerty'), E.ngramsFromText('g'), { profile: shifted });
+const onGShifted = E.measure(byId.get('qwerty'), E.ngramsFromText('g'), { profile: shifted });
 const onFShifted = E.analyse(byId.get('qwerty'), E.ngramsFromText('f'), { profile: shifted });
 check(
 	onGShifted.metrics.distance === 0 && onFShifted.metrics.distance > 0,
@@ -898,7 +890,7 @@ const topHome = {
 		rp: 'KeyP'
 	}
 };
-const onR = E.analyse(byId.get('qwerty'), E.ngramsFromText('r'), { profile: topHome });
+const onR = E.measure(byId.get('qwerty'), E.ngramsFromText('r'), { profile: topHome });
 check(onR.metrics.home_row === 100 && onR.metrics.distance === 0, 'profile: a home row one row up');
 const onV = E.analyse(byId.get('qwerty'), E.ngramsFromText('v'), { profile: topHome });
 check(
@@ -1015,7 +1007,7 @@ for (const id of ['corne', 'planck', 'ergodox', 'moonlander', 'kinesis_advantage
 		board.homeOf.every((k) => k !== undefined),
 		`board ${id}: a finger has no home key`
 	);
-	const onBoard = E.analyse(byId.get('qwerty'), E.ngramsFromText('fj'), { keyboard: id });
+	const onBoard = E.measure(byId.get('qwerty'), E.ngramsFromText('fj'), { keyboard: id });
 	check(onBoard.metrics.distance === 0, `board ${id}: f and j are home keys`);
 }
 const corne = E.analyse(byId.get('qwerty'), E.ngramsFromText('a1'), { keyboard: 'corne' });
@@ -1315,11 +1307,17 @@ for (const id of E.ACCESS_WEIGHTS) {
 	check(exportRefused, 'score config: an export of settings the import would refuse is refused');
 }
 const zeroAll = Object.fromEntries(Object.keys(defaults).map((m) => [m, 0]));
+// All-zero weights make every total 0, QWERTY's too: no mark reads against a
+// QWERTY that costs nothing, so the analysis is refused with its own code.
+let zeroAllCode = null;
+try {
+	E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, { weights: zeroAll });
+} catch (error) {
+	zeroAllCode = error.code;
+}
 check(
-	E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, { weights: zeroAll }).every(
-		(r) => r.score.total === 0
-	),
-	'analyse: all-zero weights give every layout zero'
+	zeroAllCode === 'mark_reference_cost',
+	`analyse: all-zero weights are refused by the mark (${zeroAllCode})`
 );
 
 // ==========================
@@ -2159,7 +2157,7 @@ const onlyKind = (result, char) =>
 {
 	const chord = [null, null, 'ab', null];
 	const sfbLayout = toy('toy_chord', { KeyQ: 'a', KeyA: 'b', KeyR: chord });
-	const viaChord = E.analyse(sfbLayout, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	const viaChord = E.measure(sfbLayout, E.ngramsFromText('ab'), { keyboard: 'iso' });
 	check(viaChord.typing.chords.ab === 1, 'chords: « ab » is typed with its chord');
 	check(
 		viaChord.metrics.sfb === 0 && viaChord.coverage.typed === 2,
@@ -2167,7 +2165,7 @@ const onlyKind = (result, char) =>
 	);
 	check(near(viaChord.metrics.modifier_usage, 100), 'chords: both characters typed with AltGr');
 	const apart = toy('toy_chord_apart', { KeyF: 'a', KeyJ: 'b', KeyR: chord });
-	const viaTaps = E.analyse(apart, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	const viaTaps = E.measure(apart, E.ngramsFromText('ab'), { keyboard: 'iso' });
 	check(Object.keys(viaTaps.typing.chords).length === 0, 'chords: two cheap taps beat the chord');
 	check(
 		viaTaps.coverage.typed === 2 && viaTaps.metrics.modifier_usage === 0,
@@ -2400,11 +2398,20 @@ check(
 vm.runInContext(fs.readFileSync(DON_QUICHOTTE_PATH, 'utf8'), sandbox, {
 	filename: DON_QUICHOTTE_PATH
 });
-// The mark's zero is the worst layout possible: no library layout falls below it.
-function markAboveZero(analysed, where) {
+// The mark is an index on QWERTY's total: QWERTY reads 100 and the marks rank
+// the layouts exactly as their totals do (the ranking before the mark).
+function marksRankAsTotals(analysed, where) {
+	const qwerty = analysed.find((r) => r.layout.id === 'qwerty');
+	check(qwerty && qwerty.score.mark === 100, `mark: QWERTY on ${where} reads 100`);
+	const byTotal = analysed.slice().sort((a, b) => b.score.total - a.score.total);
 	check(
-		analysed.score.mark > 0,
-		`mark: ${analysed.layout.id} on ${where} has the mark ${analysed.score.mark}, not above its zero`
+		byTotal.every(
+			(r, i) =>
+				i === 0 ||
+				Math.sign(byTotal[i - 1].score.mark - r.score.mark) ===
+					Math.sign(byTotal[i - 1].score.total - r.score.total)
+		),
+		`mark: the marks on ${where} rank the layouts as their totals do`
 	);
 }
 const goldenCorpora = {
@@ -2417,10 +2424,36 @@ const metricIds = Object.keys(E.METRICS);
 const measured = {};
 for (const [corpus, table] of Object.entries(goldenCorpora)) {
 	measured[corpus] = {};
+	const analysedHere = [];
 	for (const layout of library) {
 		const analysed = E.analyse(layout, table, {});
 		measured[corpus][layout.id] = metricIds.map((id) => analysed.metrics[id]);
-		markAboveZero(analysed, corpus);
+		analysedHere.push(analysed);
+	}
+	marksRankAsTotals(analysedHere, corpus);
+}
+// QWERTY reads 100 on every built-in corpus, each one costing QWERTY points:
+// the mark is readable on all of them with the default settings.
+{
+	const generated = path.dirname(DON_QUICHOTTE_PATH);
+	const corpora = {};
+	vm.createContext(corpora);
+	const files = fs.readdirSync(generated).filter((name) => /^corpus_.+\.js$/.test(name));
+	for (const name of files)
+		vm.runInContext(fs.readFileSync(path.join(generated, name), 'utf8'), corpora, {
+			filename: name
+		});
+	const tables = corpora.LAYOUT_ANALYSIS_CORPORA;
+	check(
+		files.length >= 50 && Object.keys(tables).length === files.length,
+		`mark: ${files.length} corpus files hold ${Object.keys(tables).length} corpora`
+	);
+	for (const [id, table] of Object.entries(tables)) {
+		const qwerty = E.analyse(byId.get('qwerty'), table, {});
+		check(
+			qwerty.score.mark === 100 && qwerty.score.reference < 0,
+			`mark: QWERTY on ${id} reads ${qwerty.score.mark} (it costs ${-qwerty.score.reference} points)`
+		);
 	}
 }
 // The layouts with a thumb letter on the boards whose thumb keys they use:
@@ -2435,7 +2468,10 @@ for (const [corpus, table] of Object.entries(goldenCorpora)) {
 	for (const layout of thumbLayouts) {
 		const analysed = E.analyse(layout, table, { keyboard: THUMB_GOLDEN_BOARD });
 		measuredThumbs[corpus][layout.id] = metricIds.map((id) => analysed.metrics[id]);
-		markAboveZero(analysed, `${corpus} on ${THUMB_GOLDEN_BOARD}`);
+		check(
+			near(analysed.score.mark, 100 * (2 - analysed.score.total / analysed.score.reference)),
+			`mark: ${layout.id} on ${corpus} on ${THUMB_GOLDEN_BOARD} reads its index on QWERTY there`
+		);
 	}
 }
 let goldenValues = 0;
@@ -2874,8 +2910,8 @@ if (UPDATE_GOLDEN) {
 // How alike two layouts type a corpus (layoutSimilarity): the optimizer's
 // « an existing layout would do the job ».
 check(typeof E.layoutSimilarity === 'function', 'similarity: the engine has no layoutSimilarity');
-check(typeof E.similarScoreGap === 'function', 'similarity: the engine has no similarScoreGap');
-if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'function') {
+check(typeof E.similarMarkGap === 'function', 'similarity: the engine has no similarMarkGap');
+if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'function') {
 	const azerty = byId.get('azerty');
 	const counts = E.ngramsFromText(
 		'Tarte et ratatouille, le rat trotte sur la terre. Elle a vu un kiwi, Waouh, et un xylophone ! '.repeat(
@@ -2986,12 +3022,10 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		empty = error.code;
 	}
 	check(empty === 'similarity_empty', `similarity: a corpus of spaces gives ${empty}`);
-	const gap = E.similarScoreGap();
+	const gap = E.similarMarkGap();
 	check(
-		Number.isFinite(gap) &&
-			gap >= 0 &&
-			gap === sandbox.LAYOUT_ANALYSIS_DATA.model.similar_score_gap,
-		`similarity: the small score gap is ${gap}`
+		Number.isFinite(gap) && gap >= 0 && gap === sandbox.LAYOUT_ANALYSIS_DATA.model.similar_mark_gap,
+		`similarity: the small mark gap is ${gap} %`
 	);
 
 	// The weighting the optimizer's change penalty shares: each character's
@@ -3671,12 +3705,12 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	const qwerty = byId.get('qwerty');
 	const ed = E.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
 	const edMm = 100 * Math.hypot(0.25, 1) * 19.05;
-	// The maintainer weighed sfb_distance 0.26 beside sfb 5 (2026-11-19);
-	// pinky_ring weighs 0: shown, out of the score until weighed.
+	// The maintainer weighed sfb_distance 0.26 beside sfb 5 (2026-11-19) and
+	// pinky_ring 0.14 (2026-11-24: Oxeylyzer's ratio to its SFB weight).
 	for (const [id, weight] of [
 		['sfb', 5],
 		['sfb_distance', 0.26],
-		['pinky_ring', 0]
+		['pinky_ring', 0.14]
 	])
 		check(
 			E.defaultWeights()[id] === weight,
@@ -3801,22 +3835,23 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), weighted, { filename: ENGINE_PATH });
 	const W = vm.runInContext('LAYOUT_ANALYSIS', weighted);
 	const choice = toy('toy_pinky_ring', { KeyA: 'a', KeyS: 'b', KeyU: 'b' });
-	const before = E.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
-	const after = W.analyse(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	const before = E.measure(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
+	const after = W.measure(choice, E.ngramsFromText('ab'), { keyboard: 'iso' });
 	check(
 		firstStep(before, 'b') === 'KeyS' && firstStep(after, 'b') === 'KeyU',
 		`ideas: « ab » types b on ${firstStep(before, 'b')}, then ${firstStep(after, 'b')} with pinky_ring 5`
 	);
 	// typing.cost: the travel of « ed » (1963.63 mm per 100 bigrams, over 2
-	// characters per bigram) and the pinky–ring pair of « aw » (5 × 100).
-	const edW = W.analyse(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
+	// characters per bigram) and the pinky–ring pair of « aw » ((5 − the
+	// default weight) × 100).
+	const edW = W.measure(qwerty, E.ngramsFromText('ed'), { keyboard: 'iso' });
 	check(
 		near(edW.typing.cost - ed.typing.cost, edMm),
 		`ideas: sfb_distance adds ${edW.typing.cost - ed.typing.cost} to « ed »'s typing cost`
 	);
-	const awW = W.analyse(qwerty, E.ngramsFromText('aw'), { keyboard: 'iso' });
+	const awW = W.measure(qwerty, E.ngramsFromText('aw'), { keyboard: 'iso' });
 	check(
-		near(awW.typing.cost - aw.typing.cost, 500),
+		near(awW.typing.cost - aw.typing.cost, (5 - E.defaultWeights().pinky_ring) * 100),
 		`ideas: pinky_ring adds ${awW.typing.cost - aw.typing.cost} to « aw »'s typing cost`
 	);
 }
@@ -3832,8 +3867,19 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 	const qwerty = byId.get('qwerty');
 	const w = E.defaultWeights();
 	const flat = E.flatGrades();
-	const graded = (text, grades, weights) =>
-		E.analyse(qwerty, E.ngramsFromText(text), { keyboard: 'iso', grades, weights });
+	// A toy text where QWERTY may cost nothing has no mark: its contributions
+	// are scored beside the reference basis of the stream text, which they do
+	// not depend on.
+	const graded = (text, grades, weights) => {
+		const measured = E.measure(qwerty, E.ngramsFromText(text), {
+			keyboard: 'iso',
+			grades,
+			weights
+		});
+		measured.referenceBasis = result.referenceBasis;
+		measured.score = E.score(measured, weights, undefined, grades);
+		return measured;
+	};
 	const withGrades = (metric, values) =>
 		Object.assign({}, flat, { [metric]: Object.assign({}, flat[metric], values) });
 	// SFB by rows: F→G one finger on one row (index), E→D one row, E→C two rows (middle).
@@ -3982,7 +4028,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		{
 			metrics: Object.assign({}, vacances.metrics),
 			parts: Object.assign({}, vacances.parts, { hand_run: links }),
-			zeroBasis: vacances.zeroBasis
+			referenceBasis: vacances.referenceBasis
 		},
 		{ hand_run: 1 },
 		undefined,
@@ -4000,7 +4046,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			parts: Object.assign({}, vacances.parts, {
 				hand_run: { start: 1, carry: 1, keystrokes: 10 }
 			}),
-			zeroBasis: vacances.zeroBasis
+			referenceBasis: vacances.referenceBasis
 		},
 		{ hand_run: 1 }
 	);
@@ -4023,7 +4069,7 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 		{
 			metrics: vacances.metrics,
 			parts: Object.assign({}, vacances.parts, { hand_run: series }),
-			zeroBasis: vacances.zeroBasis
+			referenceBasis: vacances.referenceBasis
 		},
 		{ hand_run: 1 }
 	);

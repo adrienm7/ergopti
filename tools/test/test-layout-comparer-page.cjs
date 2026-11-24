@@ -1257,7 +1257,7 @@ check(
 	vm.createContext(context);
 	vm.runInContext(
 		['relativeCell', 'rankingTable', 'rowNameButton', 'validTable'].map(fnSource).join('\n') +
-			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank';" +
+			"\nconst TABLE_METRICS = ['sfb']; const ALL = ''; const COMPLETE_CHOICES = ['all']; const RANK_CELL = 'la-rank'; const MARK_CELL = 'la-cell-mark';" +
 			// The page's own name column class, so the harness cannot drift from it.
 			`\n${(page.match(/const NAME_COLUMN = '[^']+';/) || ['const NAME_COLUMN = null;'])[0]}` +
 			// Two results are too few references for a percentile (E.percentiles).
@@ -1299,25 +1299,44 @@ check(
 	};
 	const plain = draw(null);
 	const relative = draw(qwerty);
+	// The mark's cells are a number with no unit, written alone like a rank
+	// (la-cell-mark, studio-numbers.cjs), in both views.
+	for (const reference of [null, qwerty]) {
+		const table = new Node('table');
+		vm.runInContext('rankingTable', context)(
+			table,
+			results,
+			['sfb'],
+			{ key: 'rank', descending: false },
+			() => {},
+			reference
+		);
+		const rows = table.find((n) => n.tag === 'tr').slice(1);
+		check(
+			rows.length > 0 && rows.every((tr) => / la-cell-mark$/.test(tr.children[2].className || '')),
+			`relative: the mark cells carry la-cell-mark (${reference ? 'relative' : 'plain'})`
+		);
+	}
 	const rowOf = (rows, name) => rows.find((cells) => cells[1] === name);
 	// Every cell carries its unit after a no-break space (the stub measure()).
 	const pct = (text) => `${text} %`;
-	const pts = (text) => `${text} layout_analysis.unit.points`;
 	check(
 		rowOf(plain, dvorak.layout.name)[3] === pct('0.00'),
 		`relative: the plain table shows Dvorak's SFB as ${rowOf(plain, dvorak.layout.name)[3]}`
 	);
-	// The score column shows the mark, which has a zero (not the old points).
+	// The score column shows the mark, an index on QWERTY with no unit (not
+	// the score's points): QWERTY reads 100.
 	check(
-		rowOf(plain, dvorak.layout.name)[2] === pts(dvorak.score.mark.toFixed(1)) &&
-			dvorak.score.mark > 0 &&
-			dvorak.score.total < dvorak.score.mark,
+		rowOf(plain, dvorak.layout.name)[2] === dvorak.score.mark.toFixed(1) &&
+			rowOf(plain, qwerty.layout.name)[2] === '100.0' &&
+			dvorak.score.mark === 100 * (2 - dvorak.score.total / qwerty.score.total),
 		`relative: the plain table shows Dvorak's mark as ${rowOf(plain, dvorak.layout.name)[2]}`
 	);
-	// The relative view writes the mark as its gap to QWERTY's in %, a ratio.
-	const gap = (100 * (dvorak.score.mark / qwerty.score.mark - 1)).toFixed(1);
+	// The relative view writes the mark as its difference to QWERTY's, in
+	// marks (each 1 % of QWERTY's cost).
+	const gap = (dvorak.score.mark - qwerty.score.mark).toFixed(1);
 	check(
-		rowOf(relative, dvorak.layout.name)[2] === `${pct(`+${gap}`)} ▲ better` &&
+		rowOf(relative, dvorak.layout.name)[2] === `+${gap} ▲ better` &&
 			rowOf(relative, dvorak.layout.name)[3] === `${pct('-100.00')} ▲ better`,
 		`relative: Dvorak against QWERTY reads ${JSON.stringify(rowOf(relative, dvorak.layout.name))}`
 	);

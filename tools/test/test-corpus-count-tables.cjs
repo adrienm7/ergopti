@@ -389,7 +389,7 @@ let checks = 0;
 	const library = new Map(engine.libraryLayouts().map((layout) => [layout.id, layout]));
 	const bepo = library.get('bepo');
 	const alone = (bigram) =>
-		engine.analyse(bepo, { chars: {}, bigrams: { [bigram]: 1 }, trigrams: {} }, {}).metrics;
+		engine.measure(bepo, { chars: {}, bigrams: { [bigram]: 1 }, trigrams: {} }, {}).metrics;
 	const sfbIndex = light.bigrams.findIndex(([bigram]) => alone(bigram).sfb_distance > 0);
 	assert(sfbIndex >= 0, 'the light tables keep a BÉPO same-finger bigram');
 	const short = { ...light, bigrams: light.bigrams.filter((_, i) => i !== sfbIndex) };

@@ -672,26 +672,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       the board's own key there (one key at its place on every drawing), and both layouts are in the library,
       incomplete on the ErgoDox since the left thumb types on one key (`docs/design/layout-analysis.md`, « ErgoDox
       keys »). Choose whether such a letter should instead make the outer key the left thumb's typing key.
-- [ ] **Optimizer « an existing layout would do the job » (decided by the agent on 2026-11-19, to review by the
-      maintainer).** After a run the Optimiser scores the library on the same corpus and settings and shows the
-      most alike layouts and the best-scoring one; its small gap, `similar_score_gap` = 2 points, was confirmed by
-      the maintainer on 2026-11-19. Since the mark (2026-11-24) the card says the gap in % of the marks with the
-      points beside it, and the verdict still reads the gap in points against those 2 points; the similarity shown
-      first is the weighted share of the characters on the same key and level, spaces aside, with the same finger
-      and row and the unweighted share beside it; five alike layouts are listed. Choose whether the small gap
-      becomes a %, and the measure shown first (docs/design/layout-optimizer.md, « Existing layouts »).
-- [ ] **The mark's zero (decided by the agent on 2026-11-24, to review by the maintainer).** Every layout's mark is
-      its total less the zero, a bound from the score's own costs on the board, corpus and settings
-      (docs/design/layout-analysis.md, « Mark »): the most expensive key pair and triple, every other penalty at
-      100 % (`distance` at 4 presses of the longest reach), `hand_run` at the corpus typed by one hand. Loose by
-      nature: on Don Quichotte the zero is −8,416 and Ergopti+ reads +2.1 % on QWERTY, not tens of %. Two parts are
-      a model's bound, not a proof (`distance` past 4 presses per character, `hand_run`'s chain, which has no finite
-      bound). QWERTY is now the reference on every corpus, the Comparer's relative view included (AZERTY was the
-      French one). Kept meanwhile: this bound. Choose:
-  1. **(recommended) Keep this bound** and accept small ratios: no library layout reaches 0.
-  2. A tighter bound over the corpus's own n-grams (to study: what share of the key bigrams one pair can hold).
-  3. The optimizer run to maximise the cost on each corpus and settings: realistic ratios, but a found worst that
-     a layout may pass (a negative mark), and seconds of search per change of settings.
 - [ ] **Linux install ancestry reuse window (decided by the agent on 2026-11-24, to review by the maintainer).** The
       managed Ollama download re-admitted its install folder's ancestors about 14 times per 64 KiB chunk, from separate
       callbacks, so no single turn could carry one walk. An admitted walk now answers the per-download owner's
@@ -707,14 +687,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) A layout select beside the version select** of the Disposition Ergopti pages, Ergopti first.
   2. A bépo drawing on the « Genèse et sources » page only.
   3. Keep it in the Studio (the Comparer's boards) and off the site pages.
-- [ ] **`pinky_ring` weight and the penalty floors (decided by the agent on 2026-11-24, to review by the
-      maintainer).** The metrics, the floors (`floors` of `score_weights.json`), their editing in the Comparer's
-      score settings (file version 3) and the « Difference to QWERTY / AZERTY » view are all shipped. Measured on
-      2026-11-24 over the 783 library layouts: `pinky_ring` ranks them unlike `half_scissors` (Spearman 0.03 on
-      Swann, 0.07 on English Wikipedia), so it is no duplicate. Kept meanwhile: `pinky_ring` at weight 0 and every
-      floor at 0, so no score moves while the score's normalisation changes (docs/design/layout-analysis.md, the
-      agent's decisions of 2026-11-19). Choose a `pinky_ring` weight (Oxeylyzer's ratio to its SFB weight would give
-      about 0.14 beside `sfb` 5) and any non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point).
 - [ ] **AAA tools: axe-core only (decided by the agent on 2026-11-24, to review by the maintainer).** Of the tools
       surveyed ([aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md)), only axe-core measures AAA rules
       without a new dependency or a network fetch; IBM Equal Access and Lighthouse have no AAA rule. Kept meanwhile:

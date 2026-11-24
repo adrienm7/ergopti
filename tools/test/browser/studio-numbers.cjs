@@ -29,7 +29,8 @@
  * 2. Every table cell (a td, or a figure's role="cell") that shows a number
  *    shows its unit too (« 12,3 % », « 45 ms », « 1 234 fois »), so a
  *    screen reader reads each cell with it; a rank (la-rank, la-cell-rank),
- *    an ordinal, is the one number written alone.
+ *    an ordinal, and a mark (la-cell-mark), an index on QWERTY with no unit
+ *    (QWERTY reads 100), are the numbers written alone.
  * ==============================================================================
  */
 
@@ -59,7 +60,7 @@ const LANGS = ['fr', 'en'];
 const KEY_CONTEXT = '.la-key, .la-keys, .la-ngram, .la-cell-count, .la-fingering-key';
 // The cells read whole, and the ranks among them, written without a unit.
 const CELLS = 'td, [role="cell"]';
-const RANKS = '.la-rank, .la-cell-rank';
+const RANKS = '.la-rank, .la-cell-rank, .la-cell-mark';
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',

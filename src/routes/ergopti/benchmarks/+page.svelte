@@ -110,6 +110,11 @@
 		est expliquée par son bouton « i », et les colonnes des autres analyseurs (KLAnext, Ergo‑L,
 		Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
 	</p>
+	<p>
+		La note de chaque disposition est un indice sur QWERTY, sur le même corpus et avec les mêmes
+		réglages : QWERTY vaut toujours 100, une disposition qui coûte 23 % de moins que QWERTY vaut
+		123, et plus haut est mieux, sans plafond.
+	</p>
 	<SiteFrame
 		class="benchmark-frame"
 		title="Benchmarks — comparaison des dispositions"

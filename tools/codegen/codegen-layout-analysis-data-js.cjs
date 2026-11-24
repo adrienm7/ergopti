@@ -1210,16 +1210,17 @@ function checkRequiredCharacters(model) {
 }
 
 /**
- * Rejects a similar score gap the optimizer could not compare with: the
- * score points under which an existing layout does the job of the optimized
- * one (docs/design/layout-optimizer.md, « Existing layouts »).
+ * Rejects a similar mark gap the optimizer could not compare with: the %
+ * of the best existing layout's mark under which an existing layout does
+ * the job of the optimized one (docs/design/layout-optimizer.md, « Existing
+ * layouts »).
  * @param {object} model - analysis_model.json.
  * @throws {Error} On a gap that is not a finite number ≥ 0.
  */
-function checkSimilarScoreGap(model) {
-	const gap = model.similar_score_gap;
+function checkSimilarMarkGap(model) {
+	const gap = model.similar_mark_gap;
 	if (typeof gap !== 'number' || !Number.isFinite(gap) || gap < 0)
-		throw new Error(`similar_score_gap: ${JSON.stringify(gap)} is not a number ≥ 0`);
+		throw new Error(`similar_mark_gap: ${JSON.stringify(gap)} is not a number ≥ 0`);
 }
 
 /**
@@ -1401,7 +1402,7 @@ function buildData() {
 	model.ideal_finger_load_hands = HAND_FINGERS;
 	checkKeyboardFormats(model);
 	checkRequiredCharacters(model);
-	checkSimilarScoreGap(model);
+	checkSimilarMarkGap(model);
 	checkThumbKeys(model);
 	checkChangePenalty(weights.change_penalty);
 	checkBoardOnlyKeys(model);

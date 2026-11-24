@@ -464,7 +464,9 @@
 			return node;
 		};
 		const percent = (value) => t('layout_optimizer.library.percent', { value: number(value, 1) });
-		const points = (value) => number(Math.abs(value), 2);
+		// The verdict's gap and threshold are fractions of a %: two digits.
+		const finePercent = (value) =>
+			t('layout_optimizer.library.percent', { value: number(Math.abs(value), 2) });
 		const best = summary.best;
 		const box = [];
 
@@ -476,10 +478,9 @@
 			mark,
 			t(`layout_optimizer.library.verdict.${summary.verdict}`, {
 				name: best.name,
-				// The marks' gap as a ratio (they have a zero), the points beside it.
-				gap: percent(best.percent),
-				points: points(best.gap),
-				threshold: number(summary.smallGap, 2)
+				// The marks' gap in % of the best existing layout's mark.
+				gap: finePercent(best.percent),
+				threshold: finePercent(summary.smallGap)
 			})
 		);
 		box.push(banner);
@@ -491,7 +492,7 @@
 			glyph.setAttribute('aria-hidden', 'true');
 			chip.append(
 				glyph,
-				t(`layout_optimizer.library.gap_${side}`, { gap: percent(entry.percent) })
+				t(`layout_optimizer.library.gap_${side}`, { gap: percent(Math.abs(entry.percent)) })
 			);
 			return chip;
 		};
@@ -673,13 +674,18 @@
 					option.textContent = t(`${select.dataset.i18nOptionPrefix}.${option.value}`);
 		}
 
-		/** The message of a refusal in the reader's language. */
+		/**
+		 * The message of a refusal in the reader's language: the Optimiser's
+		 * own, else the analysis engine's (the mark's refusal of settings where
+		 * QWERTY costs nothing), else the failure with its message.
+		 */
 		function errorText(code, message, values) {
 			const key = `${PREFIX}error.${code}`;
+			const engineKey = `layout_analysis.error.${code}`;
 			const strings = window._i18n_strings || {};
-			return typeof strings[key] === 'string'
-				? t(key, values)
-				: t(`${PREFIX}error.failed`, { message });
+			if (typeof strings[key] === 'string') return t(key, values);
+			if (typeof strings[engineKey] === 'string') return t(engineKey, values);
+			return t(`${PREFIX}error.failed`, { message });
 		}
 
 		// ============================
@@ -1638,11 +1644,17 @@
 			$('lo-stop').disabled = true;
 			const message = error && error.message ? error.message : String(error);
 			const strings = window._i18n_strings || {};
-			const own =
-				error && error.code && typeof strings[`${PREFIX}error.${error.code}`] === 'string';
+			// A refusal the Optimiser or the engine words (the mark's, on settings
+			// where QWERTY costs nothing) is said as is; any other names its stage.
+			const worded =
+				error &&
+				error.code &&
+				[`${PREFIX}error.${error.code}`, `layout_analysis.error.${error.code}`].some(
+					(key) => typeof strings[key] === 'string'
+				);
 			setStatus(
-				own
-					? t(`${PREFIX}error.${error.code}`, error.values)
+				worded
+					? errorText(error.code, message, error.values)
 					: t(`${PREFIX}error.stage.${stage}`, { message }),
 				true
 			);
@@ -1843,7 +1855,7 @@
 			state.library = null;
 			scan.runner.end();
 			const summary = window.LAYOUT_OPTIMIZER_RUNNER.librarySummary(message.entries, score, {
-				smallGap: E.similarScoreGap(),
+				smallGap: E.similarMarkGap(),
 				closest: LIBRARY_CLOSEST
 			});
 			$('lo-library-progress').hidden = true;
@@ -1873,13 +1885,11 @@
 			drawTradeoff(score, moved);
 			const startScore = state.startResult.score.total;
 			const change = score - startScore;
-			// The tiles show marks: the run's zero is the start's (one corpus and
-			// settings, whatever the layout), so the best mark is its total less it.
-			const zero = state.startResult.score.zero;
-			// The tiles' outputs stay in place and only their text changes, so a
-			// screen reader says each new best score (an <output> is a live status).
+			// The tiles show marks, the gain stays in points. The tiles' outputs
+			// stay in place and only their text changes, so a screen reader says
+			// each new best score (an <output> is a live status).
 			$('lo-score-start').value = number(state.startResult.score.mark, 2);
-			$('lo-score-best').value = number(score - zero, 2);
+			$('lo-score-best').value = number(markOf(score), 2);
 			$('lo-score-gain').value = signed(change, 2);
 			$('lo-score-change').classList.toggle('lo-tile-good', change > 0);
 			$('lo-score-change').classList.toggle('lo-tile-bad', change < 0);
@@ -2068,7 +2078,7 @@
 
 		/** The run's chart, emptied: it draws from the first progress. */
 		function resetChart() {
-			state.chart = { start: null, points: [], geometry: null };
+			state.chart = { start: null, startTotal: null, points: [], geometry: null };
 			$('lo-chart').hidden = false;
 			drawChart();
 		}
@@ -2082,18 +2092,25 @@
 			if (!chart) return;
 			const reported = running.shares.filter((part) => part.progress);
 			if (reported.length === 0) return;
-			// The chart draws marks (E.score: total − zero): the run's zero is its
-			// start's, one corpus and settings whatever the layout.
-			const zero = state.startResult.score.zero;
-			if (chart.start === null) chart.start = reported[0].progress.startScore - zero;
-			const best = Math.max(...reported.map((part) => part.progress.best)) - zero;
+			// The chart draws marks and keeps the totals its gains are said in.
+			if (chart.start === null) {
+				chart.startTotal = reported[0].progress.startScore;
+				chart.start = markOf(chart.startTotal);
+			}
+			const total = Math.max(...reported.map((part) => part.progress.best));
 			const point = {
 				seconds: (Date.now() - began) / 1000,
-				best,
+				best: markOf(total),
+				total,
 				evaluations: evaluations(running)
 			};
 			const last = chart.points[chart.points.length - 1];
-			if (last && !final && best <= last.best && point.seconds - last.seconds < CHART_POINT_SECONDS)
+			if (
+				last &&
+				!final &&
+				point.best <= last.best &&
+				point.seconds - last.seconds < CHART_POINT_SECONDS
+			)
 				return;
 			chart.points.push(point);
 			// A long run keeps its first and last points and thins the others.
@@ -2107,13 +2124,15 @@
 		/** A number of seconds and its unit, tied by a no-break space. */
 		const secondsText = (value, digits) =>
 			withUnit(number(value, digits), t(`${PREFIX}unit.seconds`));
-		/** A score and its unit. */
-		const pointsText = (value) => withUnit(number(value, 2), t('layout_analysis.unit.points'));
+		/** A gain in score points and its unit, signed. */
+		const gainText = (value) => withUnit(signed(value, 2), t('layout_analysis.unit.points'));
 		/**
-		 * A layout's total shown as its mark (E.score: total − zero), the run's
-		 * zero being its start's: one corpus and settings, whatever the layout.
+		 * A layout's total as its mark (E.markIndex), on the start's QWERTY
+		 * total: one corpus and settings, whatever the layout.
 		 */
-		const markText = (total) => pointsText(total - state.startResult.score.zero);
+		const markOf = (total) => E.markIndex(total, state.startResult.score.reference);
+		/** A layout's total shown as its mark. */
+		const markText = (total) => number(markOf(total), 2);
 
 		/** The round steps (1, 2 or 5 times a power of ten) that cover [low, high] in about three. */
 		function ticks(low, high) {
@@ -2224,9 +2243,9 @@
 			const gains = points.filter((point, i) => i === 0 || point.best > points[i - 1].best);
 			const lastGain = gains[gains.length - 1];
 			$('lo-chart-summary').textContent = t(`${PREFIX}chart.summary`, {
-				best: pointsText(last.best),
+				best: number(last.best, 2),
 				at: secondsText(lastGain.seconds, 1),
-				gain: withUnit(signed(last.best - chart.start, 2), t('layout_analysis.unit.points')),
+				gain: gainText(last.total - chart.startTotal),
 				rate: number(last.seconds > 0 ? last.evaluations / last.seconds : 0, 0)
 			});
 			const every = Math.max(1, Math.ceil(points.length / CHART_TABLE_ROWS));
@@ -2236,12 +2255,9 @@
 					const tr = el('tr');
 					tr.append(
 						el('td', 'lo-num', secondsText(point.seconds, 1)),
-						el('td', 'lo-num', pointsText(point.best)),
-						el(
-							'td',
-							'lo-num',
-							withUnit(signed(point.best - chart.start, 2), t('layout_analysis.unit.points'))
-						)
+						// A mark, an index on QWERTY: no unit (studio-numbers.cjs).
+						el('td', 'lo-num la-cell-mark', number(point.best, 2)),
+						el('td', 'lo-num', gainText(point.total - chart.startTotal))
 					);
 					return tr;
 				})
@@ -2269,7 +2285,7 @@
 			guide.setAttribute('y1', CHART_MARGIN.top);
 			guide.setAttribute('y2', CHART_HEIGHT - CHART_MARGIN.bottom);
 			const tip = $('lo-chart-tip');
-			tip.textContent = `${secondsText(point.seconds, 1)} · ${pointsText(point.best)}`;
+			tip.textContent = `${secondsText(point.seconds, 1)} · ${number(point.best, 2)}`;
 			tip.style.left = `${(x(point.seconds) / width) * 100}%`;
 			tip.style.top = `${(y(point.best) / CHART_HEIGHT) * 100}%`;
 			tip.hidden = false;
@@ -2310,8 +2326,8 @@
 				return;
 			}
 			const start = state.startInUse;
-			// The shelf keeps totals, the chart marks: the start's total is its mark plus the zero.
-			const from = state.chart.start + state.startResult.score.zero;
+			// The shelf keeps totals, the chart marks and the start's total.
+			const from = state.chart.startTotal;
 			const top = Math.max(...state.shelf.map((entry) => entry.score - from), 0);
 			list.replaceChildren(
 				...state.shelf.map((entry, i) => {
@@ -2338,7 +2354,7 @@
 						'lo-shelf-facts',
 						t(`${PREFIX}shelf.facts`, {
 							score: markText(entry.score),
-							gain: withUnit(signed(gain, 2), t('layout_analysis.unit.points')),
+							gain: gainText(gain),
 							count: moved
 						})
 					);
