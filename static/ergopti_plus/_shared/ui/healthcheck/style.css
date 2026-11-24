@@ -166,6 +166,15 @@ button.primary {
 	margin: 8px 0 0;
 }
 
+/* The day log's checkbox, alone on its line: the browser's 13 px box is
+   below the 24 px target WCAG 2.5.8 asks for. */
+#chk-day-log {
+	block-size: 24px;
+	inline-size: 24px;
+	margin: 0 6px 0 0;
+	vertical-align: middle;
+}
+
 .status {
 	margin: 6px 0 0;
 	min-height: 1.2em;
