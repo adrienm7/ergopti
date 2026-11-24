@@ -58,9 +58,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `CRH_OPEN_WAIT_MS`, `PWRS_CAPTURE_TIMEOUT_MS`). Production `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` (500 ms) is
       kept on purpose; revisit only if a forced-termination test flakes alone. Linux hardware lane
       `tests/hardware/http_empty_headers.lua` keeps 3 s per request and 20 s in its Python harness.
-- [ ] **[macOS] Owned runtime artifact.** The admin-shell helper changes of 2026-11-23 (stale runtime retirement
-      before install, refusal note `refused-<case>:<file>:<line>`) only reach users once the maintainer rebuilds
-      and republishes the runtime (`16.3.0-ergopti.7`); `vendor/remap-runtime/manifest.json` is theirs to move.
 - [ ] **[macOS] Check `dev.178` on the Mac** (then move what stays open to TODO-tests-macos.md with its field
       point): no hammer icon in the menu bar, rounded icon in Quick Look, Accessibility guidance names
       ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not
@@ -442,11 +439,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **One folder name for Ergopti on the three OS.** Remove the boot migration only once the maintainer's
       machines pass the checks of the TODO-tests files
       ([handoff](docs/tooling/one-folder-name-handoff.md)).
-- [ ] **[RELEASE] Owned runtime rebuild.** The pinned runtime (16.3.0-ergopti.6) predates MRT-004: the next build
-      ships the « Réparer le service » helper role, the helper's one-hash report rule
-      (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`) and the raised descriptor limit, renames the owned runtime
-      folder `ErgoptiPlus`, and updates the manifest pin (the maintainer's step: agents do not touch the pinned
-      runtime).
+- [ ] **[RELEASE] Owned runtime rebuild.** The pinned runtime (16.3.0-ergopti.6) predates MRT-004: the next build,
+      declared as 16.3.0-ergopti.7 (282f8c1192), ships the « Réparer le service » helper role, the helper's one-hash
+      report rule (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`), the raised descriptor limit, the admin-shell
+      helper changes of 2026-11-23 (stale runtime retirement before install, refusal note
+      `refused-<case>:<file>:<line>`), renames the owned runtime folder `ErgoptiPlus`, and updates the manifest pin
+      once that exact artifact is released (the maintainer's step: agents do not touch the pinned runtime or
+      `vendor/remap-runtime/manifest.json`).
 - [ ] **Item 31, owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
       [handoff](docs/tooling/next-release-handoff.md)). After the maintainer's WP9 pass (`owned_runtime_wp9` in
       TODO-tests-macos.md), delete the shared mode and set the three macOS `follow_up` rows of
