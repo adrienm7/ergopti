@@ -4,13 +4,14 @@
  * ==============================================================================
  * MODULE: Site Keyboard Data Codegen
  * DESCRIPTION:
- * Writes static/layouts/visualisation/ergopti_v2.2.json, the data the site's
- * keyboard drawings (src/lib/keyboard/Keyboard.js) and its emulation read,
- * from the Ergopti layout source (static/layouts/sources/ergopti.toml, read
- * by the Studio's own model) and a display patch
- * (src/lib/keyboard/data/ergopti_display_patch.json). The site therefore
- * always shows the layout's current levels and dead keys; nobody edits the
- * generated file.
+ * Writes the data the site's keyboard drawings (src/lib/keyboard/Keyboard.js)
+ * and its emulation read, one file of static/layouts/visualisation per entry
+ * of LAYOUTS, from a layout source of static/layouts/sources (read by the
+ * Studio's own model) and a display patch: Ergopti's own
+ * (src/lib/keyboard/data/ergopti_display_patch.json), or for a layout without
+ * Ergopti+ levels the default patch made from Ergopti's drawings. The site
+ * therefore always shows each layout's current levels and dead keys; nobody
+ * edits a generated file.
  *
  * FEATURES & RATIONALE:
  * 1. From the source: the four text levels (patch `levels` names the source
@@ -32,6 +33,13 @@
  *    does not name (or the reverse) and an unknown source key all stop the
  *    generation, so the patch can never drift from the layout silently.
  * 4. Deterministic: no timestamp; `--check` compares instead of writing.
+ * 5. Any layout: the default patch keeps Ergopti's ISO and ErgoDox drawings
+ *    and its modifier and editing keys, reads every character key from the
+ *    source, gives each source dead key a level named after its id, and
+ *    leaves out the Ergopti+ levels and Ergopti's own extra keys. Each file
+ *    names its dead levels (`dead_levels`, level to the glyph its dead key
+ *    shows) and its selectable levels (`level_labels`), so the emulation
+ *    opens any layout's dead keys without knowing the layout.
  * ==============================================================================
  */
 
@@ -42,9 +50,44 @@ const path = require('node:path');
 const { loadLayoutSource } = require('../lib/layout-source.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const SOURCE_PATH = path.join(ROOT, 'static', 'layouts', 'sources', 'ergopti.toml');
+const SOURCES_DIR = path.join(ROOT, 'static', 'layouts', 'sources');
+const OUT_DIR = path.join(ROOT, 'static', 'layouts', 'visualisation');
+const SOURCE_PATH = path.join(SOURCES_DIR, 'ergopti.toml');
 const PATCH_PATH = path.join(ROOT, 'src', 'lib', 'keyboard', 'data', 'ergopti_display_patch.json');
-const OUT_PATH = path.join(ROOT, 'static', 'layouts', 'visualisation', 'ergopti_v2.2.json');
+const OUT_PATH = path.join(OUT_DIR, 'ergopti_v2.2.json');
+// Every drawn layout: its source, its output and either its own display
+// patch or, for the default patch, the source layer of each text level.
+// bepo_1_1rc2.toml is not drawn: two of its dead keys share the terminator
+// « ˰ », which the drawing could not tell apart.
+const LAYOUTS = Object.freeze([
+	Object.freeze({ source: SOURCE_PATH, output: OUT_PATH, patch: PATCH_PATH }),
+	Object.freeze({
+		source: path.join(SOURCES_DIR, 'bepo.toml'),
+		output: path.join(OUT_DIR, 'bepo.json'),
+		levels: Object.freeze({
+			Primary: 'base',
+			Shift: 'shift',
+			AltGr: 'altgr',
+			ShiftAltGr: 'shift_altgr'
+		})
+	})
+]);
+// The selectable text levels of every layout, in the drawing's level select.
+const TEXT_LEVEL_LABELS = Object.freeze([
+	['➀ Primaire', 'Primary'],
+	['➁ Shift', 'Shift'],
+	['➂ AltGr', 'AltGr'],
+	['➃ Shift + AltGr', 'ShiftAltGr'],
+	['Ctrl', 'Ctrl']
+]);
+// The key types the default patch keeps from Ergopti's keys the source does
+// not own: modifiers, editing keys and blanks. Ergopti's own extra
+// characters (★, its ErgoDox ç) are blank on another layout.
+const DEFAULT_KEPT_TYPES = new Set(['special', 'enter', 'vide', 'none']);
+const DIGIT = /^\p{Nd}$/u;
+const ASCII_LETTER = /^[A-Za-z]$/;
+const LETTER = /^\p{L}$/u;
+const PUNCTUATION = /^[.,;:!?'’"«»\-]$/u;
 
 // A no-break space renders as the site's visible marker element (Keyboard.css).
 const NO_BREAK = /[  ]/g;
@@ -67,6 +110,7 @@ const COMBINING = Object.freeze({
 	'˛': '̨'
 });
 const CTRL_FROM_BASE = /^[a-z0-9]$/;
+const COMBINING_MARK = /^\p{M}$/u;
 
 /** The text a cell shows for a typed string. */
 function cellText(text) {
@@ -75,7 +119,9 @@ function cellText(text) {
 
 /** The legend of a dead key, from its terminator. */
 function deadGlyph(terminator) {
-	return COMBINING[terminator] ? '◌' + COMBINING[terminator] : terminator;
+	if (COMBINING[terminator]) return '◌' + COMBINING[terminator];
+	// A bare combining terminator (bépo's dot below) needs its circle too.
+	return COMBINING_MARK.test(terminator) ? '◌' + terminator : terminator;
 }
 
 /**
@@ -193,7 +239,7 @@ function buildKey(index, patch, key, allCodes) {
  * @param {object} patch the display patch.
  * @returns {object} the site's layout data.
  */
-function build(sourceText, patch) {
+function build(sourceText, patch, sourcePath = SOURCE_PATH, patchName = relative(PATCH_PATH)) {
 	const source = loadLayoutSource();
 	const document = source.read(sourceText);
 	const index = indexSource(document, patch);
@@ -205,32 +251,154 @@ function build(sourceText, patch) {
 				throw new Error(
 					`Key ${key.key}: the ISO drawing places ${geometryCodes.get(key.key)}, the patch reads ${key.source}`
 				);
+	const deadLevels = {};
+	const glyphs = new Set();
+	for (const [level, terminator] of Object.entries(patch.dead_levels)) {
+		const glyph = deadGlyph(terminator);
+		if (glyphs.has(glyph))
+			throw new Error(`Dead level ${level}: another dead key shows « ${glyph} »`);
+		glyphs.add(glyph);
+		deadLevels[level] = glyph;
+	}
+	const levelLabels = TEXT_LEVEL_LABELS.map(([label, level]) => ({ label, level }));
+	for (const level of Object.keys(patch.dead_levels)) {
+		const label = patch.level_labels?.[level] ?? deadLevels[level];
+		levelLabels.push({ label, level }, { label: label + ' ⇧', level: level + 'Shift' });
+	}
 	return {
-		_generated: `By tools/codegen/codegen-site-keyboard.cjs from ${path.relative(ROOT, SOURCE_PATH).replaceAll('\\', '/')} and ${path.relative(ROOT, PATCH_PATH).replaceAll('\\', '/')}: never edit by hand.`,
+		_generated: `By tools/codegen/codegen-site-keyboard.cjs from ${relative(sourcePath)} and ${patchName}: never edit by hand.`,
 		name: patch.name,
 		site: patch.site,
+		dead_levels: deadLevels,
+		level_labels: levelLabels,
 		iso: patch.iso,
 		ergodox: patch.ergodox,
 		keys: patch.keys.map((key) => buildKey(index, patch, key, allCodes))
 	};
 }
 
-/** The committed text of the generated file. */
-function render() {
-	const patch = JSON.parse(fs.readFileSync(PATCH_PATH, 'utf8'));
-	const data = build(fs.readFileSync(SOURCE_PATH, 'utf8'), patch);
-	return `${JSON.stringify(data, null, '\t')}\n`;
+/** A repository path with forward slashes. */
+function relative(file) {
+	return path.relative(ROOT, file).replaceAll('\\', '/');
+}
+
+/** The drawing type of a source key, from its base character. */
+function keyType(entry) {
+	if (!entry) return 'vide';
+	if (entry.dead_key !== undefined) return 'dead';
+	if (entry.text === ' ') return 'space';
+	if (DIGIT.test(entry.text)) return 'chiffre';
+	if (ASCII_LETTER.test(entry.text)) return 'letter';
+	if (LETTER.test(entry.text)) return 'french';
+	if (PUNCTUATION.test(entry.text)) return 'ponctuation';
+	return 'symbole';
+}
+
+/**
+ * The display patch of a layout without one: Ergopti's drawings and
+ * modifiers, every character key read from the source, a level per dead key.
+ * @param {object} document the read layout source.
+ * @param {object} ergopti Ergopti's display patch.
+ * @param {Object<string,string>} levels the source layer of each text level.
+ * @returns {object} the patch.
+ * @throws {Error} When a level names no layer of the source.
+ */
+function defaultPatch(document, ergopti, levels) {
+	const layers = new Map(document.layers.map((layer) => [layer.id, layer.keys]));
+	for (const [level, id] of Object.entries(levels))
+		if (!layers.has(id)) throw new Error(`Level ${level}: the source has no layer ${id}`);
+	const deadLevels = Object.fromEntries(
+		document.dead_keys.map((dead) => [dead.id, dead.terminator])
+	);
+	const levelOrder = [
+		'Primary',
+		'Shift',
+		'Ctrl',
+		'AltGr',
+		'ShiftAltGr',
+		...Object.keys(deadLevels).flatMap((level) => [level, level + 'Shift'])
+	];
+	const kept = new Set(levelOrder);
+	const base = layers.get(levels.Primary);
+	const keys = ergopti.keys.map((key) => {
+		if (key.source !== undefined) {
+			const out = { key: key.key, type: keyType(base[key.source]), source: key.source };
+			if (key.key === 'Space') out.display = { Primary: '␣' };
+			return out;
+		}
+		if (!DEFAULT_KEPT_TYPES.has(key.type)) return { key: key.key, type: 'vide', all: '' };
+		const out = { key: key.key, type: key.type, all: key.all };
+		const extra = Object.fromEntries(
+			Object.entries(key.extra ?? {}).filter(([field]) => kept.has(field))
+		);
+		if (Object.keys(extra).length) out.extra = extra;
+		return out;
+	});
+	return {
+		name: document.layout.name,
+		site: ergopti.site,
+		levels,
+		dead_levels: deadLevels,
+		level_order: levelOrder,
+		iso: ergopti.iso,
+		ergodox: ergopti.ergodox,
+		keys
+	};
+}
+
+/**
+ * The generated data of a layout of LAYOUTS (or one shaped like it).
+ * @param {{source: string, patch?: string, levels?: Object<string,string>}} layout
+ * @returns {object} the site's layout data.
+ */
+function buildLayout(layout) {
+	const sourceText = fs.readFileSync(layout.source, 'utf8');
+	const ergopti = JSON.parse(fs.readFileSync(PATCH_PATH, 'utf8'));
+	if (layout.patch !== undefined)
+		return build(
+			sourceText,
+			JSON.parse(fs.readFileSync(layout.patch, 'utf8')),
+			layout.source,
+			relative(layout.patch)
+		);
+	const document = loadLayoutSource().read(sourceText);
+	const patch = defaultPatch(document, ergopti, layout.levels);
+	return build(
+		sourceText,
+		patch,
+		layout.source,
+		`the default display patch (${relative(PATCH_PATH)})`
+	);
+}
+
+/** The committed text of a generated file (Ergopti's by default). */
+function render(layout = LAYOUTS[0]) {
+	return `${JSON.stringify(buildLayout(layout), null, '\t')}\n`;
 }
 
 if (require.main === module) {
-	const text = render();
-	if (process.argv.includes('--check')) {
-		if (fs.readFileSync(OUT_PATH, 'utf8') !== text)
-			throw new Error(
-				`${path.relative(ROOT, OUT_PATH)} is stale: run node tools/codegen/codegen-site-keyboard.cjs.`
-			);
-	} else fs.writeFileSync(OUT_PATH, text);
-	console.log('[OK] Site keyboard data matches the Ergopti layout source.');
+	for (const layout of LAYOUTS) {
+		const text = render(layout);
+		if (process.argv.includes('--check')) {
+			if (fs.readFileSync(layout.output, 'utf8') !== text)
+				throw new Error(
+					`${relative(layout.output)} is stale: run node tools/codegen/codegen-site-keyboard.cjs.`
+				);
+		} else fs.writeFileSync(layout.output, text);
+	}
+	console.log('[OK] Site keyboard data matches the layout sources.');
 }
 
-module.exports = { build, render, deadGlyph, cellText, SOURCE_PATH, PATCH_PATH, OUT_PATH };
+module.exports = {
+	build,
+	buildLayout,
+	defaultPatch,
+	keyType,
+	render,
+	deadGlyph,
+	cellText,
+	LAYOUTS,
+	SOURCE_PATH,
+	PATCH_PATH,
+	OUT_PATH
+};

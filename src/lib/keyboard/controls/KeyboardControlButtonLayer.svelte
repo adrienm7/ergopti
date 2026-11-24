@@ -1,30 +1,8 @@
 <script>
 	import * as stores_infos from '#lib/stores_infos.js';
+	import { onDestroy } from 'svelte';
 
 	export let id;
-
-	const baseLayers = [
-		['Visuel', 'Visuel'],
-		['➀ Primaire', 'Primary'],
-		['➁ Shift', 'Shift'],
-		['➂ AltGr', 'AltGr'],
-		['➃ Shift + AltGr', 'ShiftAltGr'],
-		['Ctrl', 'Ctrl'],
-		['Circonflexe', 'Circonflexe'],
-		['Circonflexe ⇧', 'CirconflexeShift'],
-		['Tréma', 'Trema'],
-		['Tréma ⇧', 'TremaShift'],
-		['Exposant', 'Exposant'],
-		['Exposant ⇧', 'ExposantShift'],
-		['Indice', 'Indice'],
-		['Indice ⇧', 'IndiceShift'],
-		['Grec', 'Greek'],
-		['Grec ⇧', 'GreekShift'],
-		['ℝ', 'R'],
-		['ℝ ⇧', 'RShift'],
-		['Monnaie', 'Currency'],
-		['Monnaie ⇧', 'CurrencyShift']
-	];
 
 	const extraLayers = [
 		['★ Navigation', 'Layer'],
@@ -33,12 +11,30 @@
 	];
 
 	let layerValue;
-	let availableLayers;
+	let availableLayers = [];
+	let config;
+	// The levels of the shown layout come with its data (level_labels).
+	let levelLabels = [];
 
-	stores_infos[id].subscribe((config) => {
+	function refresh() {
+		if (!config) return;
+		const baseLayers = [['Visuel', 'Visuel'], ...levelLabels];
 		layerValue = config.layer;
 		availableLayers = config.plus === 'yes' ? baseLayers.concat(extraLayers) : baseLayers;
+	}
+
+	stores_infos[id].subscribe((current) => {
+		config = current;
+		refresh();
 	});
+	const stopLayout = stores_infos.layoutData.subscribe((data) => {
+		if (!data) return;
+		if (!Array.isArray(data.level_labels))
+			throw new Error(`The layout data of ${data.name} names no level_labels`);
+		levelLabels = data.level_labels.map(({ label, level }) => [label, level]);
+		refresh();
+	});
+	onDestroy(stopLayout);
 
 	function changeLayer(newLayer) {
 		stores_infos[id].update((current) => ({

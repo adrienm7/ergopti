@@ -4,6 +4,7 @@
 		"(static/layouts/sources/ergopti.toml) cannot say. tools/codegen/codegen-site-keyboard.cjs",
 		"applies it to the source and writes static/layouts/visualisation/ergopti_v2.2.json.",
 		"levels: the source layer of each text level. dead_levels: each dead key by its terminator.",
+		"level_labels: the name of each dead level in the drawing's level select (the default patch names it by its glyph).",
 		"level_order: the levels of every key. iso, ergodox: the drawings (row, column, size, hand, finger).",
 		"keys: one entry per drawn key. A key with « source » takes its text levels and dead-key levels",
 		"from that source key; « display » replaces a source cell by a stand-in; « extra » holds the",
@@ -29,6 +30,15 @@
 		"Greek": "µ",
 		"R": "ℝ",
 		"Currency": "¤"
+	},
+	"level_labels": {
+		"Circonflexe": "Circonflexe",
+		"Trema": "Tréma",
+		"Exposant": "Exposant",
+		"Indice": "Indice",
+		"Greek": "Grec",
+		"R": "ℝ",
+		"Currency": "Monnaie"
 	},
 	"level_order": [
 		"Primary",
