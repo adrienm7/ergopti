@@ -45,7 +45,7 @@ h1 {
 /* Muted lines take the system's secondary label grey: 4.7:1 on the page and
    5.1:1 on a card, where #888 and #777 held 3.5:1 and 4.5:1 at best. */
 .subtitle {
-	color: var(--theme-secondary-label);
+	color: var(--theme-hue-48484c);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 10px;
@@ -66,7 +66,7 @@ h1 {
 }
 
 .catalogue-status {
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	flex-grow: 1;
 	font-size: 11px;
 	margin: 0;
@@ -143,7 +143,7 @@ h1 {
 .badge {
 	background: var(--theme-hue-ececf0);
 	border-radius: 10px;
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	font-size: 10px;
 	padding: 2px 8px;
 }
@@ -166,7 +166,7 @@ h1 {
 }
 
 .layout-meta {
-	color: var(--theme-secondary-label);
+	color: var(--theme-hue-48484c);
 	display: flex;
 	flex-wrap: wrap;
 	font-size: 11px;
@@ -241,7 +241,7 @@ button.link {
 /* The light accent, 5.9:1 on a card; the system blue held 4.0:1. */
 button.link {
 	background: transparent;
-	color: var(--theme-hue-0062cc);
+	color: var(--theme-hue-004a99);
 	padding: 5px 6px;
 }
 

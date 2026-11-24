@@ -38,7 +38,6 @@
 
 	/* Apple system greys and label colours. */
 	--theme-label: #1d1d1f;
-	--theme-secondary-label: #6e6e73;
 	--theme-gray4: #d1d1d6;
 	--theme-gray5: #e5e5ea;
 	--theme-gray6: #f2f2f7;
@@ -112,9 +111,10 @@
 	--theme-grey-f5f5f5: #f5f5f5;
 	--theme-grey-f9f9f9: #f9f9f9;
 	--theme-hue-005cc5: #005cc5;
-	/* The accessible accent: 5.8:1 under white text, 5.1:1 as text on the light
-	   grey background, where the Apple blue gives 4.0:1 and 3.6:1 (WCAG 1.4.3). */
-	--theme-hue-0062cc: #0062cc;
+	/* The accessible accent: 8.6:1 under white text, 7.7:1 as text on the light
+	   grey background, where the Apple blue gives 4.0:1 and 3.6:1 (WCAG 1.4.6
+	   enhanced contrast, AAA). */
+	--theme-hue-004a99: #004a99;
 	--theme-hue-008000: #008000;
 	--theme-hue-06243f: #06243f;
 	--theme-hue-094771: #094771;
@@ -155,9 +155,11 @@
 	--theme-hue-3fb950: #3fb950;
 	--theme-hue-46464a: #46464a;
 	--theme-hue-48484a: #48484a;
+	/* The muted text of every look in light: 7.1:1 or more on the white, grey and
+	   tinted surfaces it is read on (WCAG 1.4.6, AAA). */
+	--theme-hue-48484c: #48484c;
 	--theme-hue-4a1c1a: #4a1c1a;
 	--theme-hue-4a3a2d: #4a3a2d;
-	--theme-hue-4a9eff: #4a9eff;
 	--theme-hue-4cd964: #4cd964;
 	--theme-hue-4da6ff: #4da6ff;
 	--theme-hue-4db6ff: #4db6ff;
@@ -167,7 +169,6 @@
 	--theme-hue-5a8dee: #5a8dee;
 	--theme-hue-5e5f60: #5e5f60;
 	--theme-hue-5eb1ff: #5eb1ff;
-	--theme-hue-636366: #636366;
 	--theme-hue-64b5f6: #64b5f6;
 	--theme-hue-73d98c: #73d98c;
 	--theme-hue-77dd77: #77dd77;
@@ -176,14 +177,15 @@
 	--theme-hue-93b8f8: #93b8f8;
 	--theme-hue-9973f2: #9973f2;
 	--theme-hue-9a6700: #9a6700;
+	--theme-hue-9ccaff: #9ccaff;
 	--theme-hue-9cdcfe: #9cdcfe;
-	--theme-hue-a0a0a6: #a0a0a6;
 	--theme-hue-a0bfff: #a0bfff;
 	--theme-hue-a8d8ff: #a8d8ff;
 	--theme-hue-aec6cf: #aec6cf;
 	--theme-hue-af52de: #af52de;
 	--theme-hue-b3261e: #b3261e;
 	--theme-hue-bf7af0: #bf7af0;
+	--theme-hue-c4c4ca: #c4c4ca;
 	--theme-hue-c6d8f5: #c6d8f5;
 	--theme-hue-c8c8cc: #c8c8cc;
 	--theme-hue-cb99c9: #cb99c9;
@@ -238,12 +240,12 @@
 	--theme-surface-2: #f6f6f9;
 	--theme-separator: var(--theme-gray4);
 	--theme-text: var(--theme-label);
-	--theme-sub: var(--theme-secondary-label);
-	--theme-accent: var(--theme-hue-0062cc);
+	--theme-sub: var(--theme-hue-48484c);
+	--theme-accent: var(--theme-hue-004a99);
 	--theme-accent-soft: rgba(0, 122, 255, 0.12);
 	/* Behind white text (filled buttons, chips): no appearance's accent holds
 	   4.5:1 there, the dark one being made to be read on dark surfaces. */
-	--theme-accent-fill: var(--theme-hue-0062cc);
+	--theme-accent-fill: var(--theme-hue-004a99);
 	--theme-danger: var(--theme-red);
 }
 
@@ -254,10 +256,10 @@
 		--theme-surface-2: #242426;
 		--theme-separator: var(--theme-gray4-dark);
 		--theme-text: #fff;
-		--theme-sub: rgba(235, 235, 245, 0.6);
-		/* Read as text on the dark surfaces: 5.1:1 on the surface and 5.6:1 on
-		   the second one, where the Apple blue gives 3.8:1 and 4.3:1 (WCAG 1.4.3). */
-		--theme-accent: var(--theme-hue-4a9eff);
+		--theme-sub: rgba(235, 235, 245, 0.8);
+		/* Read as text on the dark surfaces: 8.2:1 on the surface and 9.1:1 on
+		   the second one, where the Apple blue gives 3.8:1 and 4.3:1 (WCAG 1.4.6). */
+		--theme-accent: var(--theme-hue-9ccaff);
 		--theme-accent-soft: rgba(10, 132, 255, 0.22);
 		--theme-danger: var(--theme-red-dark);
 	}
@@ -269,9 +271,9 @@
 	--theme-surface-2: #242426;
 	--theme-separator: var(--theme-gray4-dark);
 	--theme-text: #fff;
-	--theme-sub: rgba(235, 235, 245, 0.6);
+	--theme-sub: rgba(235, 235, 245, 0.8);
 	/* The dark accent of the system appearance above, chosen in the settings. */
-	--theme-accent: var(--theme-hue-4a9eff);
+	--theme-accent: var(--theme-hue-9ccaff);
 	--theme-accent-soft: rgba(10, 132, 255, 0.22);
 	--theme-danger: var(--theme-red-dark);
 }
@@ -284,40 +286,40 @@
 
 :root {
 	--theme-dialog-text: #1a1a1a;
-	--theme-dialog-muted: #666;
+	--theme-dialog-muted: var(--theme-hue-48484c);
 	--theme-dialog-background: #fff;
 	--theme-dialog-panel: #f6f6f6;
 	--theme-dialog-border: #e0e0e0;
 	--theme-dialog-code-background: #1e1e1e;
 	--theme-dialog-code-text: #d4d4d4;
-	--theme-dialog-accent: #0a66c2;
+	--theme-dialog-accent: var(--theme-hue-004a99);
 	--theme-dialog-accent-text: #fff;
-	--theme-dialog-ok: #1a7f37;
-	--theme-dialog-fail: #cf222e;
+	--theme-dialog-ok: #0f5f27;
+	--theme-dialog-fail: #951a13;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
 		--theme-dialog-text: #e6e6e6;
-		--theme-dialog-muted: #9a9a9a;
+		--theme-dialog-muted: #c8c8c8;
 		--theme-dialog-background: #1f1f1f;
 		--theme-dialog-panel: #2a2a2a;
 		--theme-dialog-border: #3a3a3a;
 		--theme-dialog-code-background: #111;
-		--theme-dialog-ok: #3fb950;
-		--theme-dialog-fail: #ff7b72;
+		--theme-dialog-ok: #5fd37a;
+		--theme-dialog-fail: #ffb3ae;
 	}
 }
 
 :root[data-theme='dark'] {
 	--theme-dialog-text: #e6e6e6;
-	--theme-dialog-muted: #9a9a9a;
+	--theme-dialog-muted: #c8c8c8;
 	--theme-dialog-background: #1f1f1f;
 	--theme-dialog-panel: #2a2a2a;
 	--theme-dialog-border: #3a3a3a;
 	--theme-dialog-code-background: #111;
-	--theme-dialog-ok: #3fb950;
-	--theme-dialog-fail: #ff7b72;
+	--theme-dialog-ok: #5fd37a;
+	--theme-dialog-fail: #ffb3ae;
 }
 
 /* =========================================== */
@@ -330,9 +332,9 @@
 	--theme-metrics-bg: var(--theme-page-background);
 	--theme-metrics-panel: #ffffff;
 	--theme-metrics-text: var(--theme-label);
-	/* 5.5:1 on the page, 4.8:1 on the table headers (WCAG 1.4.3); the system
+	/* 8.4:1 on the page, 7.3:1 on the table headers (WCAG 1.4.6); the system
 	   tertiary grey was 3.3:1 and 3.6:1. */
-	--theme-metrics-text-muted: var(--theme-hue-636366);
+	--theme-metrics-text-muted: var(--theme-hue-48484c);
 	--theme-metrics-strong: var(--theme-label);
 	--theme-metrics-border: #d2d2d7;
 	--theme-metrics-th-bg: var(--theme-gray5);
@@ -345,7 +347,7 @@
 		--theme-metrics-bg: #1e1e1e;
 		--theme-metrics-panel: #2d2d2d;
 		--theme-metrics-text: #f0f0f0;
-		--theme-metrics-text-muted: #aaaaaa;
+		--theme-metrics-text-muted: #c8c8c8;
 		--theme-metrics-strong: #ffffff;
 		--theme-metrics-border: #444444;
 		--theme-metrics-th-bg: #333333;
@@ -358,7 +360,7 @@
 	--theme-metrics-bg: #1e1e1e;
 	--theme-metrics-panel: #2d2d2d;
 	--theme-metrics-text: #f0f0f0;
-	--theme-metrics-text-muted: #aaaaaa;
+	--theme-metrics-text-muted: #c8c8c8;
 	--theme-metrics-strong: #ffffff;
 	--theme-metrics-border: #444444;
 	--theme-metrics-th-bg: #333333;
@@ -513,20 +515,20 @@
    reach it on the light and dark surfaces. A status also says itself in words
    or with a mark, never by its colour alone (WCAG 1.4.1). */
 :root {
-	--theme-good-text: #1a7f37;
-	--theme-bad-text: #c4271d;
+	--theme-good-text: #0f5f27;
+	--theme-bad-text: #951a13;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--theme-good-text: #30d158;
-		--theme-bad-text: #ff6961;
+		--theme-good-text: #5fd37a;
+		--theme-bad-text: #ffb3ae;
 	}
 }
 
 :root[data-theme='dark'] {
-	--theme-good-text: #30d158;
-	--theme-bad-text: #ff6961;
+	--theme-good-text: #5fd37a;
+	--theme-bad-text: #ffb3ae;
 }
 
 /* The colour-blind setting of the site (a11y_prefs.js): green and red merge
@@ -534,20 +536,20 @@
    5.5:1 on white, 5.7:1 and 6.8:1 on the dark surface (#2c2c2e). The charts'
    own palettes were already chosen for colour-blind readers. */
 :root[data-a11y-colors='cvd'] {
-	--theme-good-text: #0062cc;
-	--theme-bad-text: #b34700;
+	--theme-good-text: var(--theme-hue-004a99);
+	--theme-bad-text: #8a3700;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root[data-a11y-colors='cvd']:not([data-theme='light']) {
-		--theme-good-text: #64a8ff;
-		--theme-bad-text: #ff9f45;
+		--theme-good-text: #9ccaff;
+		--theme-bad-text: #ffb877;
 	}
 }
 
 :root[data-a11y-colors='cvd'][data-theme='dark'] {
-	--theme-good-text: #64a8ff;
-	--theme-bad-text: #ff9f45;
+	--theme-good-text: #9ccaff;
+	--theme-bad-text: #ffb877;
 }
 
 /* Windows high contrast (forced colours) drops background colours, which

@@ -35,7 +35,7 @@ h1 {
 }
 
 #prompt-hint {
-	color: var(--theme-hue-a0a0a6);
+	color: var(--theme-hue-c4c4ca);
 	font-size: 12px;
 	line-height: 1.45;
 }
@@ -64,7 +64,7 @@ h1 {
 
 /* Bright enough for small text on the window (WCAG 1.4.3: 4.5:1). */
 #range-hint {
-	color: var(--theme-hue-a0a0a6);
+	color: var(--theme-hue-c4c4ca);
 	font-size: 11px;
 }
 

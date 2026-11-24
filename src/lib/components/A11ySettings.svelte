@@ -316,9 +316,10 @@ says so with its own lang attribute inside the French header.
 		padding: 0 1rem;
 	}
 
+	/* White on this blue is 8.6:1 (WCAG 1.4.6, AAA), the accent of theme.css. */
 	.a11y-actions .a11y-close {
-		background: #0062cc;
-		border-color: #0062cc;
+		background: #004a99;
+		border-color: #004a99;
 	}
 
 	.a11y-statement {

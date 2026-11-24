@@ -348,6 +348,54 @@ for (const dark of [false, true]) {
 	readable(text, badge, mode + ': neutral productivity score');
 }
 
+// 7/ The shared text tokens at the AAA floor (a11y-aaa-2026-11-24)
+// WCAG 2.2 AAA asks 7:1 of text (1.4.6): the accent was 5.8:1 under white
+// text, the secondary and muted greys 4.5:1 to 6:1, the dialog and status
+// colours 5.1:1 to 6.5:1. Each shared text token must hold 7:1 on every
+// ground it is read on, in both themes; the browser scan measures the pages.
+const ENHANCED_CONTRAST = 7;
+const TEXT_ON_GROUNDS = [
+	['theme-text', SURFACES],
+	['theme-sub', SURFACES],
+	['theme-accent', SURFACES],
+	['theme-dialog-muted', ['theme-dialog-background', 'theme-dialog-panel']],
+	['theme-dialog-ok', ['theme-dialog-background', 'theme-dialog-panel']],
+	['theme-dialog-fail', ['theme-dialog-background', 'theme-dialog-panel']],
+	['theme-metrics-text-muted', ['theme-metrics-bg', 'theme-metrics-panel', 'theme-metrics-th-bg']],
+	['theme-good-text', ['theme-surface', 'theme-surface-2']],
+	['theme-bad-text', ['theme-surface', 'theme-surface-2']]
+];
+for (const dark of [false, true]) {
+	const mode = dark ? 'dark' : 'light';
+	/** A token's painted colour in this mode; a dark token that only light sets keeps it. */
+	const colourOf = (name) => {
+		const dialogDark =
+			dark && !THEME.match(new RegExp(":root\\[data-theme='dark'\\] \\{[^}]*--" + name + ':'));
+		return themeColour(name, dark && !dialogDark);
+	};
+	const fills = [
+		['theme-white', 'theme-accent-fill'],
+		['theme-dialog-accent-text', 'theme-dialog-accent']
+	];
+	for (const [text, grounds] of TEXT_ON_GROUNDS)
+		for (const groundName of grounds) {
+			const groundColour = channels(colourOf(groundName));
+			const fg = paint(colourOf(text), groundColour);
+			const ratio = contrast(fg, groundColour);
+			assert.ok(
+				ratio >= ENHANCED_CONTRAST,
+				`${mode}: --${text} must hold 7:1 on --${groundName}: ${ratio.toFixed(2)}:1`
+			);
+		}
+	for (const [text, fill] of fills) {
+		const ratio = contrast(channels(colourOf(text)), channels(colourOf(fill)));
+		assert.ok(
+			ratio >= ENHANCED_CONTRAST,
+			`${mode}: --${text} must hold 7:1 on --${fill}: ${ratio.toFixed(2)}:1`
+		);
+	}
+}
+
 console.log(
-	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window, section marks, neutral score)'
+	'test-app-colour-contrast: OK (heatmap edge, finger hues, metrics text, onboarding, download window, section marks, neutral score, AAA text tokens)'
 );

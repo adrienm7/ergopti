@@ -494,9 +494,10 @@ FEATURES & RATIONALE:
 		margin-right: 6px;
 	}
 
-	/* Greys and dimming keep a 4.5:1 contrast on the #101010 tooltip (WCAG 1.4.3). */
+	/* Greys and dimming keep a 7:1 contrast on the #101010 tooltip and on the
+	   selected line (WCAG 1.4.6, AAA). */
 	.tt-eq {
-		color: #a3a3a3;
+		color: #c8c8c8;
 	}
 
 	.tt-corr {
@@ -520,7 +521,7 @@ FEATURES & RATIONALE:
 	}
 
 	.tt-dim {
-		opacity: 0.75;
+		opacity: 0.9;
 	}
 
 	.tt-hint {

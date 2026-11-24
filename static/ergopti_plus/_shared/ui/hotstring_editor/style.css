@@ -34,7 +34,7 @@ body {
 	--text: var(--theme-text);
 	--sub: var(--theme-sub);
 	/* Hints are small text: 4.5:1 on the dialogs (WCAG 1.4.3). */
-	--hint: var(--theme-secondary-label);
+	--hint: var(--theme-hue-48484c);
 	--accent: var(--theme-accent);
 	--accent2: var(--theme-hue-5856d6);
 	--danger: var(--theme-danger);
