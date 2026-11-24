@@ -458,174 +458,22 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 - [ ] **[CODE] Parity audit continuation.** Take one bounded module at a time across Windows, macOS, Linux and shared;
       do not restart a finished campaign without source drift or a new hypothesis. The
-      [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`, S26 included: 190
-      areas, 108 drifted, 69 never campaigned; 316 units, 99 never campaigned) ranks what is left and proposes the
-      order. Its first campaign, secure-field detection, fixed SFC-01, SFC-02 (macOS `refresh()` fails closed), SFC-03
-      (the port spec and a fail-closed vector replayed on the three drivers) and SFC-05 (the RoboForm AHK case
-      asserts the application axis). The generated
-      [platform parity table](docs/platform-parity-table.md) now gives every feature, action, layer entry and menu
-      row its status, owner and reasons per OS, and `test-linux-feature-parity.cjs` gates it. Its Windows and macOS
-      `not_yet` reasons are closed: Ollama token streaming on Windows (streaming-parity, `test_engine_state.ahk`) and
-      the macOS Shortcuts restore and clear (shortcuts-scope-macos, `test_global_scope.lua`). Left:
-  - SFC-06 (Credential Manager inside `explorer.exe`, field path only; no fix possible by process name);
-  - logger engines, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-logger-engines/report.md)):
-    LOG-01 to LOG-05, LOG-07 and LOG-08 fixed, replayed from `_shared/tests/corpus/logger/parity_vectors.json` by
-    the three suites and the macOS native worker. Left: LOG-06, pair the 15 Lua files the report lists (among them
-    `text_cipher.lua` on both drivers and macOS `phase_stats.lua`), then gate Lua pairing like
-    `test_pairing.ahk`; the boot profilers, perf counters and keystroke integrity still need their own reading;
-    the Swift retention replay runs in macOS CI only;
-  - managed Ollama runtime, taken on 2026-11-20
-    ([report](docs/audits/platform-parity/2026-11-20-managed-ollama/report.md)): OLL-01 (Linux pulls a
-    digest-mismatched model once more, classes in `_shared/ai/data/ollama_pull_errors.json`, vectors replayed by the
-    Windows and Linux suites), OLL-02 (`[llm] ollama_model_pull_timeout_ms` bounds a Windows pull instead of the
-    30 min install budget) and OLL-03 (stale owners) fixed. Left: OLL-04 free-space check on macOS and Linux and an
-    `ollama.no_space` message; OLL-05 the install's network and checksum classes (macOS markers never printed);
-    OLL-06 one readiness bound once the cold start is measured (field checks); OLL-07 old runtime versions left on
-    Windows and Linux; OLL-08 Linux reuse without a re-hash; OLL-09 macOS model delete through `ollama rm`; OLL-12
-    the unused `ollama-release.sh`; OLL-13 Linux readiness without listener ownership or the pinned version;
-  - tray adapters, taken on 2026-11-20 ([report](docs/audits/platform-parity/2026-11-20-tray-adapters/report.md)):
-    TRAY-01 fixed (the Windows cold tray showed French startup rows to every user and an icon named by its file name
-    until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language).
-    Left: TRAY-03 a Linux desktop without a StatusNotifier host shows no icon and tells nothing (read the watcher, say so
-    in the user's language); TRAY-04 rewrite `TrayMenu.spec.js` on the two real icon states and the option map, with
-    vectors that can fail; TRAY-05 log a missing tray icon file on the three instead of drawing another;
-  - update and download windows, taken on 2026-11-21
-    ([report](docs/audits/platform-parity/2026-11-21-update-windows/report.md)): UPD-01 (a refused Windows digest
-    named as a failed download), UPD-02 (a cancelled Linux update read « Ollama download cancelled »), UPD-03
-    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed, then UPD-05 to
-    UPD-12 in the follow-up: closing an update's window no longer stops it on the three (agent decision, to review by
-    the maintainer, in `docs/memory/maintainer-decisions.md`), a failed check names its rate limit or proven network
-    cause, Windows and Linux show the download's progress with a Cancel, Linux keeps « Update now » and announces a
-    restart only once armed, a refused signature is named everywhere, the macOS Versions install keeps its failure
-    receipt and removes its stage, and the download page has no English fallback. Left: UPD-13 macOS names no proxy,
-    offline or certificate cause (hs.http proves none; route the check through the launcher's managed HTTP worker);
-  - metrics views, taken on 2026-11-21 ([report](docs/audits/platform-parity/2026-11-21-metrics-views/report.md)):
-    MET-01 to MET-12 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
-    names of every WPM surface; Linux apps read state and range failure, heatmap names from the active layout and
-    live n-gram tables; macOS missing and incomplete stores shown with their notice; the range status, numbers and
-    metric definitions in the interface language on the three, the hard-coded-strings gate now scanning the
-    pages' HTML). Left: MET-13 « Computing… » forever on an empty range; MET-14 the apps render-error alert; MET-15
-    banners after a late locale; MET-16 calendar day values and the chart reading font; MET-17 net or gross hotstring
-    counting in the live speed (maintainer decision);
-    MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
-    MET-01 to MET-08 fixed (Windows WPM idle reset, AI output privacy, warm hosts after a reading change and the
-    names of every WPM surface; Linux apps read state and range failure; the range status and numbers in the
-    interface language on the three), then MET-13 to MET-16, MET-18 and MET-19 (the empty state of an empty range,
-    the apps render alert cleared, the banners reworded when the locale lands, every value of the SVG drawings in a
-    keyboard disclosure with the app windows scan counting a drawing without one, the Windows pill from the first
-    key, a failed Reset told to the page on the three). Left: MET-09 Linux heatmap key names from the live XKB
-    keymap; MET-10 Linux n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as
-    the others do; MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision »,
-    « Acceptées ») to i18n keys, with the hard-coded-strings gate extended to the pages' HTML; the Chart.js reading
-    font (rest of MET-16); MET-17 net or gross hotstring counting in the live speed (maintainer decision); the
-    cosmetic Linux range reply `driver_meta` (rest of MET-19);
-    interface language on the three). Left: MET-09 Linux heatmap key names from the live XKB keymap; MET-10 Linux
-    n-gram tables refresh while focused; MET-11 macOS empty and incomplete states published as the others do;
-    MET-12 the 61 French `title` definitions and the French chart tooltip labels (« Précision », « Acceptées ») to
-    i18n keys, with the hard-coded-strings gate extended to the pages' HTML; MET-13 « Computing… » forever on an
-    empty range; MET-14 the apps render-error alert; MET-15 banners after a late locale; MET-16 calendar day values
-    (the chart reading font and spacing fixed); MET-17 net or gross hotstring counting in the live speed
-    (maintainer decision); MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the
-    page (the Linux range reply's `driver_meta` fixed);
-  - timing engines, taken on 2026-11-22 (census units `macos/core/timing` and `linux/core/timing`, with the Windows
-    reader, the `[budgets]` judges and the reload measures; tap-hold and key-combination timings left out): TIM-01
-    (a Windows reload is now logged « Reload completed in N ms » and judged against `[budgets] driver_reload_ms`,
-    the launch tick handed to the successor through its environment, `core/timing/engine/reload_timing.ahk`) and
-    TIM-02 (`TimingsGet` admits only a TOML integer and `TimingsGetNumber` only a TOML number, as the Lua reader
-    refuses a quoted value; English errors; the liveness gate refuses a non-integer key a Windows `TimingsGet`
-    reads) fixed. The macOS `deferred_work`, `paced_job` and `paced_json` and the Linux `native_sleep` and
-    `native_timer` are OS-specific by their reason. Then fixed: TIM-03 (the Linux Ollama chat is judged against
-    `llm_local_request_ms`, dispatch to terminal marker), TIM-04 (Windows and Linux judge the first prediction
-    display against `prediction_display_ms`, once per chain; Linux `ai/engine/prediction/display_budget.lua`) and
-    TIM-05 (the Windows developer field run has a `driver_reload` step: resume file, reload owner, the successor
-    records the measured reload and runs the next step; the collector follows the successor). Decided by the
-    maintainer on 2026-11-22 (`docs/memory/maintainer-decisions.md`): TIM-Q1 option 1, implemented (the Lua `ms`
-    and `sec` refuse a fraction, the liveness gate checks every key but `*_mm` and `*_factor`; no shipped value
-    changed), and TIM-Q2 option 1, documented. The questions as asked:
-    - TIM-Q1, a fractional duration: the Lua `ms` and `sec` accept 1.5 for a `*_ms` key, Windows now refuses it
-      and the gate refuses it only for the keys Windows reads. 1. **(recommended)** Integer milliseconds for every
-      duration key on the three: the gate checks every key that is not `*_mm` or `*_factor`, and the Lua `ms`
-      refuses a non-integer. 2. Keep fractional durations legal on macOS and Linux.
-    - TIM-Q2, where a reload starts: macOS counts from `hs.reload()`, Linux from its stamp after the cleanup-debt
-      checks, Windows from the successor launch (after the configuration lease, so a reload queued behind a
-      configuration write is not counted while it waits). 1. **(recommended)** Keep the three: each starts once
-      the reload is admitted, as the budget's teardown-plus-boot measure assumes. 2. Count from the user's
-      request, waits included, on the three.
-  - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
-    and the chart reading font; MET-17 net or gross hotstring counting in the live speed (maintainer decision);
-    MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
-  - layout tool pages, taken on 2026-11-21
-    ([report](docs/audits/platform-parity/2026-11-19-census/report.md#ninth-campaign-layout-tool-pages)): LTP-01 to
-    LTP-07 fixed (the Windows layout manager seeds the language and reading choices; Ergopti Studio answers its page
-    while paused on Windows through `WebViewHost` `RunsWhilePaused`; a Studio change refused during a Windows layout
-    reload is answered `busy`; six host refusals worded in the 21 locales; on the three, both pages name the
-    interface language, the layout manager keeps the focus on the row acted on and closes on Escape); desktop checks
-    are field points. LTP-09 and LTP-10 fixed afterwards: the Windows personal information editor, paths editor and
-    onboarding wizard seed the language and reading choices (`UNSEEDED_WINDOWS` is empty), and the physical shortcuts
-    editor and the configuration cleanup answer their page while paused, every `WebViewHost` window placed by
-    `test-webview-host-pause-census.cjs`. Left: LTP-08 `dir` on both pages (to PCK-22);
-  - the next campaigns in the report's order: pickers and prompts, small native units.
-  - small native units, taken on 2026-11-21
-    ([report](docs/audits/platform-parity/2026-11-21-small-native-units/report.md)): SNU-01 to SNU-09, SNU-11 and
-    SNU-13 to SNU-15 fixed (the Windows keep-awake reads the shared timings, credits its session to `awake_ms`,
-    also at an accepted exit, and logs it; macOS credits a session the pause or a quit ends; the jitter radius and
-    the Linux inhibitor's poll and ready bound are `[keep_awake]` registry entries; the Karabiner update and
-    old-rules dialogs say their cause in the user's language and the old-rules report logs a dialog that raises;
-    the Windows export host answers the shared refusal code; the Linux note logs its refusals and its Windows-only
-    settings say where the Linux note goes). Left: SNU-10 the shipped `D:\Bureau` default note folder on Windows
-    (maintainer decision); SNU-12 how each driver tells the end of a session (maintainer decision); the Linux
-    note's folder and dated choice (`not_yet`);
-  - the next campaigns in the report's order: pickers and prompts, layout tool pages.
-    and the chart reading font; MET-18 the Windows pill's second keystroke; MET-19 a failed dashboard reset told to the page;
-  - the next campaigns in the report's order: pickers and prompts, small native units, layout tool pages.
-    receipt and removes its stage, and the download page has no English fallback. UPD-13 fixed afterwards: the
-    macOS manual check runs through the launcher's native HTTP worker and names the offline, certificate or proxy
-    cause its closed reason proves (field check in `TODO-tests-macos.md`, Swift unchanged);
-  - the next campaigns in the report's order: pickers and prompts, metrics views, small native units, layout tool
-    (Escape closes the Updates window on the three) and UPD-04 (its answer is announced) fixed. Left: UPD-05 closing
-    the Linux download window refuses the downloaded update's install (decide cancel or install); UPD-06 carry the
-    fetch receipt into the Lua update check so macOS and Linux name the proxy, offline or certificate cause as
-    Windows does; UPD-07 update download progress on Windows and Linux (and a Windows cancel); UPD-08 a failed Linux
-    update download drops the menu's offer; UPD-09 Linux says « restarting » before trying; UPD-10 a refused
-    signature named on the three; UPD-11 the macOS Versions install passes no failure receipt and leaves its stage
-    folder; UPD-12 the download page's English fallbacks and fixed `lang`;
-  - pickers and prompts, taken on 2026-11-21
-    ([report](docs/audits/platform-parity/2026-11-21-pickers-prompts/report.md)): PCK-01 (macOS key prompts masked),
-    PCK-02 (macOS keys untrimmed), PCK-03, PCK-04 and PCK-14 (the shared entry grammar read by the macOS and Linux
-    numeric prompts, vectors replayed through both), PCK-05 and PCK-12 (Escape on the token and cleanup pages),
-    PCK-06 (Linux picker title-bar close), PCK-07 (a confirmation without an id refused on the three), PCK-08
-    (Windows application picker headers), PCK-09 (Linux open_app refusal told), PCK-10 (macOS prompt editor
-    validation), PCK-11 (Windows cleanup window focused), PCK-15 (a refused Windows pick keeps the picker open),
-    PCK-16 (Windows WebView windows take the keyboard on open), PCK-17 (one Windows input box at a time), PCK-18
-    (the dead Linux token bridge retired), PCK-19 (Escape on the model browser and physical shortcuts), PCK-20
-    (prompt editor fields saved alike, shared vectors), PCK-21 (Windows application names, no window titles) and
-    PCK-22 (`dir` from the locale on every page, logical CSS) fixed, then PCK-13 (a blank numeric answer resets a
-    global setting to its default and removes an override, maintainer 2026-11-21 and 2026-11-22, on the three OS);
-  - the next campaigns in the report's order: metrics views, small native units, layout tool
-    pages.
-    until `I18nInit`; it now appears in the configured locale, named, and a first run in the wizard's language),
-    TRAY-03 (a Linux desktop with no tray host is told, in the user's language, what to install), TRAY-04
-    (`TrayMenu.spec.js` 2.0.0 states the real `setIcon({ image })` contract and its vectors read the result on the
-    three drivers) and TRAY-05 (a missing tray icon file is logged once and drawn as a warning sign whose name says
-    so, never as the other state) fixed; their desktop checks are field points;
-  - the next campaigns in the report's order: update and download windows, pickers and prompts, metrics views,
-    small native units, layout tool pages.
-    30 min install budget), OLL-03 (stale owners), OLL-04 (one free-space rule before the download on the three, the
-    pinned archive plus `[limits] ollama_install_free_space_margin_bytes`), OLL-05 (the install failure's class and
-    message on the three, classes in `_shared/ai/data/ollama_install_errors.json`, vectors replayed by the three
-    suites), OLL-07 (Windows and Linux remove the earlier runtime once the
-    pinned one runs), OLL-08 (Linux re-hashes the tree against its seal at every start), OLL-09 (macOS bounds
-    `ollama rm` by `ollama_delete_timeout_ms`), OLL-12 (`ollama-release.sh` retired with its generator) and OLL-13
-    (Linux admits readiness only from its own process group's socket with the pinned version), OLL-10 (Windows and
-    Linux pull a model Ollama cannot load once more, one shared rule and its vectors) and OLL-11 (the lifecycle
-    actions are rows of « Ollama d’Ergopti » on the three, with an uninstall that keeps or deletes the models)
-    fixed, then OLL-14 (the free-space check counts the pinned unpacked runtime, and a pull that fills the disk
-    names it on the three). Left: OLL-06 one readiness bound once the cold start is measured (field checks); the
-    unpacked sizes of `ollama_release.json` are provisional (three times the archive): run
+      [2026-11-19 census](docs/audits/platform-parity/2026-11-19-census/report.md) (`b90ad8de`: 190 areas, 108
+      drifted, 69 never campaigned; 316 units, 99 never campaigned) ranks what is left. Its nine proposed campaigns
+      and the timing engines are taken, each report under
+      [docs/audits/platform-parity/](docs/audits/platform-parity/) naming its fixes and proof: secure-field
+      detection, logger engines, managed Ollama runtime, tray adapters, update and download windows, pickers and
+      prompts, metrics views, small native units, layout tool pages (the census report's ninth section) and timing
+      engines. Every finding they opened is fixed or decided (`docs/memory/maintainer-decisions.md`). Left:
+  - SFC-06 (Credential Manager inside `explorer.exe`): field path only, no fix possible by process name;
+  - OLL-06, one Ollama readiness bound once the cold start is measured on a quiet PC (field checks); the unpacked
+    sizes of `ollama_release.json` are provisional (three times the archive): run
     `node tools/build/pin-ollama-release.cjs --archives <folder> --write` in CI on the five pinned archives and
     commit its values, then keep its `--check` in the job that downloads them;
-  - the next campaigns in the report's order: tray adapters, update and download windows, pickers and prompts,
-    metrics views, small native units, layout tool pages.
+  - the logger engines' boot profilers, perf counters and keystroke integrity, read by the logger campaign only
+    where they reach a sink; the Swift retention replay runs in macOS CI only;
+  - the census's re-campaigns for drift: `shared/layouts` (with S29), `shared/core`, `shared/ui/layout_editor` and
+    the `ai` areas, then the remaining never-campaigned units of its table in rank order.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release
