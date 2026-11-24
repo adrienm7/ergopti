@@ -261,6 +261,9 @@ const MACOS_MODULES = {
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
 // entry (app gone from the manifest) fails, so this cannot quietly rot.
 const MACOS_EXCLUSIONS = {
+	field_report:
+		"no macOS host yet: the in-app field report shows its report in the one-click checks' " +
+		'dialog until the host of this window lands (TODO.md, « Lancer le field report », progress window)',
 	token_prompt:
 		'no macOS reader since the custom-model dialog left with the model selector page ' +
 		'(2026-10-27); the Hugging Face login that shares its title sizes its own frame',
@@ -413,6 +416,9 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
+	field_report:
+		"no Windows host yet: the in-app field report shows its report in the one-click checks' " +
+		'window until the host of this window lands (TODO.md, « Lancer le field report », progress window)',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',

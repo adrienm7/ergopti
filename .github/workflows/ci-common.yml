@@ -373,6 +373,9 @@ jobs:
       - name: Test shared personal info editor rendering
         run: npm run test:browser:personal-info-editor
 
+      - name: Test the field report window
+        run: npm run test:browser:field-report-window
+
       - name: Plan both production site targets
         id: site-plan
         run: node tools/ci/site-matrix.cjs plan

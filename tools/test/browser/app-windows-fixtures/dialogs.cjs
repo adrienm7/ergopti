@@ -279,6 +279,45 @@ module.exports = [
 		states: [{ name: 'details', enter: (page) => page.click('#details > summary') }]
 	},
 	{
+		id: 'field_report',
+		bridge: 'field_report',
+		host: function (message) {
+			if (message !== 'ready') return;
+			window.receiveFieldReport({
+				type: 'init',
+				steps: [
+					{ id: 'field_network', title: 'Tester le réseau (PAC, proxy, téléchargement)' },
+					{ id: 'field_composer', title: 'Tester la disposition composée' },
+					{ id: 'field_boot_cost', title: 'field_boot_cost' }
+				],
+				not_run: [{ id: 'driver_reload', reason: 'needs_collector' }],
+				open_key: 'field_report.open_explorer'
+			});
+			window.receiveFieldReport({ type: 'step', id: 'field_network', state: 'pass' });
+			window.receiveFieldReport({ type: 'step', id: 'field_composer', state: 'running' });
+		},
+		// Named by the locale strings: the step list rendered in the user's language.
+		ready: '#steps li.running',
+		states: [
+			{
+				name: 'done',
+				enter: (page) =>
+					page.evaluate(() => {
+						window.receiveFieldReport({ type: 'step', id: 'field_composer', state: 'fail' });
+						window.receiveFieldReport({ type: 'step', id: 'field_boot_cost', state: 'timeout' });
+						window.receiveFieldReport({
+							type: 'done',
+							passed: false,
+							interrupted: false,
+							counts: { pass: 1, fail: 1, timeout: 1 },
+							folder:
+								'C:\\Users\\me\\AppData\\Local\\Ergopti\\field-run\\results\\app-20261124T120000Z'
+						});
+					})
+			}
+		]
+	},
+	{
 		id: 'config_cleanup',
 		bridge: 'config_cleanup_bridge',
 		host: function (message) {

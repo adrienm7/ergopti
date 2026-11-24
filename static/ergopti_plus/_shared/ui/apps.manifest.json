@@ -96,6 +96,14 @@
 			"min_height": 520,
 			"vhost": "ergopti.permissiondialog"
 		},
+		"field_report": {
+			"title_key": "field_report.title",
+			"width": 560,
+			"height": 520,
+			"min_width": 440,
+			"min_height": 360,
+			"vhost": "ergopti.fieldreport"
+		},
 		"error_dialog": {
 			"title_key": "common.error_title",
 			"width": 560,
