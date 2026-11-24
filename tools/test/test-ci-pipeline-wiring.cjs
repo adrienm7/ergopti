@@ -3270,7 +3270,8 @@ function commonProblems(files) {
 		['Test the Studio keyboard walk', 'npm run test:browser:studio-keyboard'],
 		['Test the Studio undo and redo history', 'npm run test:browser:studio-history'],
 		['Test the Studio typing try', 'npm run test:browser:studio-try'],
-		['Test the app windows accessibility', 'npm run test:browser:app-accessibility']
+		['Test the app windows accessibility', 'npm run test:browser:app-accessibility'],
+		['Test the app windows reading preferences', 'npm run test:browser:app-reading']
 	])
 		exactStep(browser, name, command);
 	if (browser) {

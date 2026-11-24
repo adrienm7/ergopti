@@ -822,6 +822,7 @@
 		"test:browser:studio-history": "node ./tools/test/browser/studio-history.playwright.cjs",
 		"test:browser:studio-try": "node ./tools/test/browser/studio-try.playwright.cjs",
 		"test:browser:app-accessibility": "node ./tools/test/browser/app-windows-accessibility.playwright.cjs",
+		"test:browser:app-reading": "node ./tools/test/browser/app-windows-reading.playwright.cjs",
 		"test:browser:site-accessibility": "node ./tools/test/browser/site-accessibility.playwright.cjs build \"\"",
 		"test:site-accessibility-ratchet": "node ./tools/test/test-site-accessibility-ratchet.cjs",
 		"test:app-windows-accessibility-ratchet": "node ./tools/test/test-app-windows-accessibility-ratchet.cjs",

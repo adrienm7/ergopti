@@ -134,6 +134,15 @@
 	font-family: 'OpenDyslexic', 'Noto Sans', sans-serif !important;
 }
 
+/* OpenDyslexic's side bearings and space are far wider than Noto Sans's:
+   set as is, words read « M é t r i q u e s ». The default spacing gives back
+   the page's rhythm; the wide spacing adds the WCAG increments on top of it
+   (as static/ergopti_plus/_shared/ui/theme.css does in the app windows). */
+:root[data-a11y-font='dyslexic'] :is(body, body *):not([class^='icon-'], [class*=' icon-']) {
+	letter-spacing: -0.1em !important;
+	word-spacing: -0.25em !important;
+}
+
 /* Text size: the root size scales every rem and em of the site. */
 :root[data-a11y-text='125'],
 :root[data-a11y-text='125'] body {
@@ -156,6 +165,12 @@
 	letter-spacing: 0.12em !important;
 	line-height: 1.5 !important;
 	word-spacing: 0.16em !important;
+}
+
+:root[data-a11y-font='dyslexic'][data-a11y-spacing='wide']
+	:is(body, body *):not([class^='icon-'], [class*=' icon-']) {
+	letter-spacing: 0.02em !important;
+	word-spacing: -0.09em !important;
 }
 
 :root[data-a11y-spacing='wide'] p {

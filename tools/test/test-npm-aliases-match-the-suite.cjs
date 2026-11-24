@@ -119,6 +119,9 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium scans and walks the app's own WebView windows with a fake host
 	// in its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
 	'tools/test/browser/app-windows-accessibility.playwright.cjs',
+	// Real Chromium renders the app windows in each reading font and spacing in
+	// its own step of Core / js; test-ci-pipeline-wiring.cjs pins that step.
+	'tools/test/browser/app-windows-reading.playwright.cjs',
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
 	'tools/test/browser/physical-shortcuts.playwright.cjs',

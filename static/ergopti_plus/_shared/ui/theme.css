@@ -682,6 +682,16 @@
 	font-family: 'OpenDyslexic', system-ui, sans-serif !important;
 }
 
+/* OpenDyslexic draws its glyphs with side bearings about 0.1 em wider than
+   the system font's and a space about twice as wide: set as is, a title reads
+   « M é t r i q u e s » and the toolbars wrap (field report, macOS,
+   2026-11-24). The default spacing gives back the page's own rhythm; the wide
+   spacing below adds the WCAG 1.4.12 increments on top of that same base. */
+:root[data-a11y-font='dyslexic'] :is(body, body *) {
+	letter-spacing: -0.1em !important;
+	word-spacing: -0.25em !important;
+}
+
 /* Shorter lines and text aligned to the start, as on the site
    (src/lib/css/accessibility.css): running text only, not the tools' grids,
    tables and buttons. */
@@ -723,11 +733,21 @@
 	zoom: 2;
 }
 
-/* The WCAG 1.4.12 text spacing. */
+/* The WCAG 1.4.12 text spacing: line height 1.5, paragraph spacing 2 em,
+   letter spacing 0.12 em and word spacing 0.16 em more than the font's own. */
 :root[data-a11y-spacing='wide'] :is(body, body *) {
 	letter-spacing: 0.12em !important;
 	line-height: 1.5 !important;
 	word-spacing: 0.16em !important;
+}
+
+:root[data-a11y-font='dyslexic'][data-a11y-spacing='wide'] :is(body, body *) {
+	letter-spacing: 0.02em !important;
+	word-spacing: -0.09em !important;
+}
+
+:root[data-a11y-spacing='wide'] p {
+	margin-bottom: 2em !important;
 }
 
 /* High contrast: black surfaces, white text and separators, yellow accent. */
