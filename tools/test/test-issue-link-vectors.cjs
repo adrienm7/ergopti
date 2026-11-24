@@ -55,6 +55,8 @@ for (const vector of corpus.encode_vectors || []) {
 
 for (const vector of corpus.url_vectors || []) {
 	const templates = Object.assign({}, corpus.templates, { max_url_bytes: vector.max_url_bytes });
+	if (vector.max_redirect_bytes !== undefined)
+		templates.max_redirect_bytes = vector.max_redirect_bytes;
 	let got;
 	let error = null;
 	try {
@@ -76,6 +78,12 @@ for (const vector of corpus.url_vectors || []) {
 	else if (got !== vector.expected)
 		failures.push(`url ${vector.id}: got ${got}, expected ${vector.expected}`);
 	else if (got.length > vector.max_url_bytes) failures.push(`url ${vector.id}: over its budget`);
+	else if (
+		vector.max_redirect_bytes !== undefined &&
+		(corpus.templates.login_redirect_prefix + encodeURIComponent(got)).length >
+			vector.max_redirect_bytes
+	)
+		failures.push(`url ${vector.id}: its login redirect is over its budget`);
 }
 
 if (!Array.isArray(corpus.fit_vectors) || corpus.fit_vectors.length < 5) {

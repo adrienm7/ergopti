@@ -118,6 +118,8 @@ _TCD_IssueLink() {
 	for Vector in Data["url_vectors"] {
 		Templates := Data["templates"].Clone()
 		Templates["max_url_bytes"] := Vector["max_url_bytes"]
+		if Vector.Has("max_redirect_bytes")
+			Templates["max_redirect_bytes"] := Vector["max_redirect_bytes"]
 		Build := IssueLink_BuildUrl.Bind(Templates, Data["repository"], Vector["template"], Vector["values"], Vector.Get("notes", 0))
 		if Vector.Has("expect_error") {
 			AssertThrows(Build, Vector["id"] . ": an error was expected")

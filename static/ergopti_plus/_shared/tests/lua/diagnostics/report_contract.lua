@@ -59,8 +59,12 @@ return function(helpers, json, shared_root)
 			end
 			local document = Share.document(snapshot, schema)
 			local url = IssueLink.build_url(templates, repository, "bug", document.fields, document.notes)
+			-- A signed-out click's login redirect carries the URL encoded again
+			local redirect = #templates.login_redirect_prefix + #IssueLink.percent_encode(url)
 			helpers.assert_true(#url <= templates.max_url_bytes, "the bug link fits its budget")
-			helpers.assert_true(#url > templates.max_url_bytes - 64, "the bug link fills its budget")
+			helpers.assert_true(redirect <= templates.max_redirect_bytes, "its login redirect fits its budget")
+			helpers.assert_true(#url > templates.max_url_bytes - 64 or redirect > templates.max_redirect_bytes - 64,
+				"the bug link fills one of its budgets")
 			helpers.assert_eq(query_value(url, "driver"), "macOS", "the Driver dropdown option")
 			local prefilled = query_value(url, "diagnostics")
 			local title = "## " .. schema.export_strings["healthcheck.export.changed_settings"]

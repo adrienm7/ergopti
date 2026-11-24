@@ -565,10 +565,6 @@ share.lua, model.js and report.ahk, `configuration_vectors.json`, `test-issue-te
 - [ ] **No raw log line can be shared.** The closed sharing policy carries recognised error codes and counts, not
       the recent log lines (`project-shared-export-schema-is-closed`): the « recent log lines » of the request
       need a privacy decision before any schema change. Meanwhile the opt-in redacted day log stays the way.
-- [ ] **The URL budget stays 4,000 bytes.** It is set by the signed-out login redirect, which encodes the link
-      again (measured in `test-issue-templates.cjs`). A budget counted on the re-encoded length would let a
-      mostly-letter report grow by about a third; to measure on github.com before changing `issue_link` in its
-      three ports.
 
 ## CI acceptance
 
@@ -635,7 +631,14 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-None open.
+- [ ] **Bug link login-redirect budget (decided by the agent on 2026-11-24, to review by the maintainer).** Measured
+      anonymously on github.com (`tools/dev/measure-issue-url-limits.cjs`): `/issues/new` answers 500 from about
+      6,460 bytes and `/login` from about 6,500, so a 4,000-byte link dense in `%XX` failed after the signed-out
+      redirect encoded it again (6,670 bytes). Kept meanwhile: `max_url_bytes` 4,000 and a second budget,
+      `max_redirect_bytes` 5,000 on the re-encoded redirect, which leaves about 1,500 bytes for a browser's own
+      headers and cookies; a typical report's prefill is now cut a little earlier. Choose another redirect budget
+      after a measurement from a signed-in and a signed-out browser, or raise `max_url_bytes` (letter-dense links
+      reached 6,440 bytes) if a signed-in browser serves it.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 

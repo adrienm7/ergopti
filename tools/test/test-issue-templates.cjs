@@ -14,9 +14,11 @@
  * 2. the forms carry their labels (the URL's labels= only works for users with
  *    triage permission), each one a label the repository has, and blank
  *    issues are off;
- * 3. the repository comes from the updater defaults, and a worst-case prefill
- *    (long accented text and emoji in every field) stays within max_url_bytes,
- *    the report field is cut with the marker and the truncation note;
+ * 3. the repository comes from the updater defaults, both budgets keep room
+ *    under the limits measured on github.com, and a worst-case prefill (long
+ *    accented text and emoji in every field) stays within max_url_bytes and
+ *    its login redirect within max_redirect_bytes, the report field cut with
+ *    the marker and the truncation note;
  * 4. the bug form has the optional day log textarea (never prefilled), the
  *    required full report textarea the user pastes the clipboard into (never
  *    prefilled) and no consent checkbox;
@@ -99,29 +101,37 @@ if (
 ) {
 	failures.push('issue_new_url must take the repository from {owner} and {repo}');
 }
-// Measured anonymously on github.com on 2026-10-30, with synthetic values: a
-// request URL over about 7015 bytes answers 500, and over about 8200 bytes 414.
-// A signed-out click goes through /login?return_to=<the URL encoded again>, where
-// each %XX grows to %25XX: 4199 bytes of %XX still reached the login page (6996
-// bytes), 4298 answered 500, and from about 5000 the redirect dropped return_to,
-// losing the prefill. So the budget holds with the whole URL percent-encoded.
-const GITHUB_REQUEST_URL_LIMIT = 7000;
+// Measured anonymously on github.com with tools/dev/measure-issue-url-limits.cjs
+// on 2026-11-24 (synthetic values, minimal request headers): /issues/new
+// answered 302 up to 6440 bytes and 500 from 6460; a signed-out click goes
+// through /login?return_to=<the URL encoded again>, where each %XX grows to
+// %25XX, and /login answered 200 up to 6497 bytes and 500 from 6505. So a
+// 4000-byte URL dense in %XX (a 6670-byte redirect) failed while a letter-dense
+// one did not (on 2026-10-30 the limit was about 7000). A browser also sends its
+// own headers and cookies, which share GitHub's limit: both budgets keep that
+// room under what was measured.
+const MEASURED_ISSUE_URL_LIMIT = 6440;
+const MEASURED_LOGIN_URL_LIMIT = 6497;
+const BROWSER_HEADER_ROOM = 1400;
 const LOGIN_REDIRECT_PREFIX = 'https://github.com/login?return_to=';
-const percentDenseUrl = (bytes) => {
-	const base = 'https://github.com/owner/repo/issues/new?template=bug_report.yml&diagnostics=';
-	return base + '%20'.repeat(Math.ceil((bytes - base.length) / 3));
-};
-if (!(registry.max_url_bytes > 0)) {
-	failures.push(`max_url_bytes ${registry.max_url_bytes} must be positive`);
+if (registry.login_redirect_prefix !== LOGIN_REDIRECT_PREFIX) {
+	failures.push(`login_redirect_prefix must be GitHub's ${LOGIN_REDIRECT_PREFIX}`);
 }
-{
-	const redirected =
-		LOGIN_REDIRECT_PREFIX + encodeURIComponent(percentDenseUrl(registry.max_url_bytes));
-	if (redirected.length > GITHUB_REQUEST_URL_LIMIT) {
-		failures.push(
-			`max_url_bytes ${registry.max_url_bytes} becomes a ${redirected.length}-byte login redirect, over GitHub's ${GITHUB_REQUEST_URL_LIMIT}-byte request limit`
-		);
-	}
+if (
+	!(registry.max_url_bytes > 0) ||
+	registry.max_url_bytes + BROWSER_HEADER_ROOM > MEASURED_ISSUE_URL_LIMIT
+) {
+	failures.push(
+		`max_url_bytes ${registry.max_url_bytes} leaves under ${BROWSER_HEADER_ROOM} bytes for a browser's headers below the measured ${MEASURED_ISSUE_URL_LIMIT}`
+	);
+}
+if (
+	!(registry.max_redirect_bytes >= registry.max_url_bytes) ||
+	registry.max_redirect_bytes + BROWSER_HEADER_ROOM > MEASURED_LOGIN_URL_LIMIT
+) {
+	failures.push(
+		`max_redirect_bytes ${registry.max_redirect_bytes} must be at least max_url_bytes and leave ${BROWSER_HEADER_ROOM} bytes for a browser's headers below the measured ${MEASURED_LOGIN_URL_LIMIT}`
+	);
 }
 
 // GitHub refuses an issue body over 65,536 characters (its documented limit).
@@ -343,6 +353,12 @@ if (!repository || !repository.owner || !repository.repo) {
 	});
 	const expectedStart = `https://github.com/${repository.owner}/${repository.repo}/issues/new?template=bug_report.yml`;
 	if (!url.startsWith(expectedStart)) failures.push(`the URL does not start with ${expectedStart}`);
+	const redirected = LOGIN_REDIRECT_PREFIX + encodeURIComponent(url);
+	if (redirected.length > registry.max_redirect_bytes) {
+		failures.push(
+			`a worst-case prefill becomes a ${redirected.length}-byte login redirect, over the ${registry.max_redirect_bytes}-byte budget`
+		);
+	}
 	if (url.length > registry.max_url_bytes) {
 		failures.push(
 			`a worst-case prefill is ${url.length} bytes, over the ${registry.max_url_bytes}-byte budget`
