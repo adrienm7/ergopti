@@ -40,9 +40,6 @@ global FIELD_CHECK_ALL_TAG := "FieldCheckAll"
 ; Locale key of the row and of the combined report's title (the row's own label).
 global FIELD_CHECK_ALL_TITLE := "menu.debug." . MenuCommand.FIELD_CHECK_ALL
 
-; Platform token of this driver's plan.
-global FIELD_CHECK_ALL_PLATFORM := "ahk"
-
 ; True while the sequence runs.
 global _FieldCheckAllBusy := false
 
@@ -65,10 +62,10 @@ global _FieldCheckAllBusy := false
  *   "separate" (Array of Map row, step).
  */
 FieldCheckAll_Plan(Declaration, StepsById) {
-	global FIELD_CHECK_ALL_PLATFORM
 	if !(Declaration is Map) || !(Declaration.Get("platforms", 0) is Map)
 		throw Error("Test everything: the declaration has no platforms.")
-	Own := Declaration["platforms"].Get(FIELD_CHECK_ALL_PLATFORM, 0)
+	; The manifest's platform token of this driver
+	Own := Declaration["platforms"].Get("ahk", 0)
 	if !(Own is Map) || !(Own.Get("run", 0) is Array) || !(Own.Get("separate", 0) is Array)
 		throw Error("Test everything: the declaration has no Windows plan.")
 	Plan := Map("run", [], "separate", [])
