@@ -492,9 +492,10 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     `/dev/uinput` writable, an evdev node readable, the systemd user unit enabled, a polkit agent running, the
     compositor focus source ready), so the in-app run and the collector both decide `physical_acceptance` and
     `wayland_focus` by it. Windows: `TODO-tests-windows.md`
-    carries no `field-point` ids and no `field_todo_coverage.json`, so its report would name steps only. macOS: 196
-    step ids of the field run checks have no `field_check.step.*` label, so the report shows their steps as closed
-    codes.
+    carries no `field-point` ids and no `field_todo_coverage.json`, so its report would name steps only. macOS: every
+    literal step has its `field_check.step.*` label; the ids built at run time (`host_<name>`, `server_<id>`,
+    `tap_<name>`, `idle_timer_<n>`, `memory_region_<n>`, `menu_slowest_<n>`, `app_crash_<process>`) keep their code,
+    whose suffix names the subject.
 
 ### Linux
 
