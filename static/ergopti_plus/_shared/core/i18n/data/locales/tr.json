@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Sonuçlar yalnızca kaydedilen denetimleri kapsar. Yalıtılmış test grupları çalıştırılmadı.",
 	"healthcheck.problem.diagnostic_check": "Tanılama denetimi başarısız oldu: %s.",
 	"healthcheck.export.privacy_notice": "Yalnızca teknik bilgiler: günlük, yazılan metin, yol veya ad yok.",
+	"healthcheck.export.full_report_cut_note": "GitHub'ın bir kaydın uzunluğu sınırına sığması için kısaltıldı. Tam rapor onunla birlikte kaydedilen dosyada: o dosyayı bu kayda ekleyin.",
 	"healthcheck.export.url_truncated_note": "Bağlantıya sığması için kısaltıldı. Tam rapor panonuzda: aşağıdaki Full report alanına yapıştırın.",
 	"healthcheck.export.items": "öğe",
 	"healthcheck.export.characters": "karakter",

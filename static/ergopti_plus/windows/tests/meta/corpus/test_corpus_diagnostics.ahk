@@ -10,8 +10,8 @@
 ;    raw bytes with the production tail decoder so a read cut inside a UTF-8
 ;    sequence is replayed as the file reader sees it.
 ; 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
-;    IssueLink_PercentEncode and IssueLink_BuildUrl (the prefilled GitHub issue
-;    URL).
+;    IssueLink_PercentEncode, IssueLink_BuildUrl and IssueLink_FitLines (the
+;    prefilled GitHub issue URL and the pasted report).
 ; 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ;    Redact_Apply with the rules of _shared/diagnostics/data/redaction.json
 ;    (what leaves the machine).
@@ -124,6 +124,17 @@ _TCD_IssueLink() {
 			continue
 		}
 		AssertEqual(Vector["expected"], Build.Call(), Vector["id"])
+	}
+	Assert(Data["fit_vectors"].Length >= 5, "the issue-link corpus must hold its pasted-report vectors")
+	for Vector in Data["fit_vectors"] {
+		Fit := IssueLink_FitLines.Bind(Vector["text"], Vector["max_bytes"], Vector["marker"], Vector["note"])
+		if Vector.Has("expect_error") {
+			AssertThrows(Fit, Vector["id"] . ": an error was expected")
+			continue
+		}
+		Got := Fit.Call()
+		AssertEqual(Vector["expected"], Got, Vector["id"])
+		Assert(StrPut(Got, "UTF-8") - 1 <= Vector["max_bytes"], Vector["id"] . ": over its budget")
 	}
 }
 

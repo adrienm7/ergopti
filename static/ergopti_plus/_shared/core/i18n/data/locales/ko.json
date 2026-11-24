@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "결과는 기록된 검사에만 해당합니다. 격리된 테스트 모음은 실행되지 않았습니다.",
 	"healthcheck.problem.diagnostic_check": "진단 검사 실패: %s.",
 	"healthcheck.export.privacy_notice": "기술 정보만: 로그, 입력한 텍스트, 경로, 이름은 없습니다.",
+	"healthcheck.export.full_report_cut_note": "GitHub 이슈 길이 제한에 맞추려고 잘랐습니다. 전체 보고서는 함께 저장된 파일에 있습니다. 그 파일을 이 이슈에 첨부하세요.",
 	"healthcheck.export.url_truncated_note": "링크에 맞도록 줄였습니다. 전체 보고서는 클립보드에 있습니다. 아래 Full report 칸에 붙여 넣으세요.",
 	"healthcheck.export.items": "개",
 	"healthcheck.export.characters": "자",

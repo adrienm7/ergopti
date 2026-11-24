@@ -480,6 +480,33 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
 	end)
 
+	-- GitHub refuses an issue body over 65,536 characters; the pasted report is
+	-- bounded under it, at whole lines, and the saved file keeps everything
+	helpers.it("report bounds a very large report on the clipboard and saves it whole (report-body-budget)", function()
+		local snapshot = host_snapshot(false)
+		snapshot.sections.configuration = { items = {} }
+		for index = 1, 800 do
+			snapshot.sections.configuration.items[index] = { setting = string.format("gestures.swipe_%04d", index),
+				type = "text", value = "9" }
+		end
+		local text = Share.document(snapshot, documents().schema, "").text
+		local Report, calls, overrides = load_report()
+		local result = completed_action(Report, { action = "report", text = text, fields = { driver = "macos" } },
+			paths(), documents(), Report.redaction_context(overrides), overrides, snapshot)
+		local templates = documents().templates
+		helpers.assert_true(#text > templates.full_report_max_bytes, "the fixture exceeds the pasted report budget")
+		helpers.assert_eq(result.ok, true)
+		local pasted = calls.copy[1]
+		helpers.assert_true(#pasted <= templates.full_report_max_bytes, "the clipboard fits the bug form's body")
+		local note = documents().schema.export_strings[documents().schema.share_policy.full_report_cut_note_key]
+		local ending = templates.truncation_marker .. "\n\n" .. note
+		helpers.assert_eq(pasted:sub(-#ending), ending, "a cut report says the complete one is in the saved file")
+		local head = text:sub(1, text:find("\n```json\n", 1, true))
+		helpers.assert_eq(pasted:sub(1, #head), head, "every readable line is kept before the JSON block goes")
+		helpers.assert_true(not pasted:find("```json", 1, true), "an opened block it cannot hold is dropped whole")
+		helpers.assert_eq(calls.save[1].text, text, "the saved attachment keeps the whole report")
+	end)
+
 	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
 		local result, calls = perform({ action = "report", text = REPORT, fields = { driver = "macos" } },
 			function(overrides) overrides.copy = function() return false end end)

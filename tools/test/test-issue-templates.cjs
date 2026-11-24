@@ -20,7 +20,9 @@
  * 4. the bug form has the optional day log textarea (never prefilled), the
  *    required full report textarea the user pastes the clipboard into (never
  *    prefilled) and no consent checkbox;
- * 5. the driver field of both forms is a dropdown whose options are exactly
+ * 5. the pasted full report is bounded under GitHub's issue body limit with
+ *    room for the prefilled fields and the user's own text;
+ * 6. the driver field of both forms is a dropdown whose options are exactly
  *    the names the app sends, and the feature form requires only its title and
  *    the proposal.
  * ==============================================================================
@@ -120,6 +122,27 @@ if (!(registry.max_url_bytes > 0)) {
 			`max_url_bytes ${registry.max_url_bytes} becomes a ${redirected.length}-byte login redirect, over GitHub's ${GITHUB_REQUEST_URL_LIMIT}-byte request limit`
 		);
 	}
+}
+
+// GitHub refuses an issue body over 65,536 characters (its documented limit).
+// The pasted full report leaves room under it for the prefilled fields (at
+// most max_url_bytes, decoded or not), the form's headings and the user's own
+// text: the steps, the expected and the observed behaviour.
+const GITHUB_ISSUE_BODY_LIMIT = 65536;
+const USER_TEXT_ROOM = 4096;
+if (registry.max_issue_body_chars !== GITHUB_ISSUE_BODY_LIMIT) {
+	failures.push(
+		`max_issue_body_chars ${registry.max_issue_body_chars} must be GitHub's ${GITHUB_ISSUE_BODY_LIMIT}`
+	);
+}
+if (
+	!(registry.full_report_max_bytes > 0) ||
+	registry.full_report_max_bytes + registry.max_url_bytes + USER_TEXT_ROOM >
+		registry.max_issue_body_chars
+) {
+	failures.push(
+		`full_report_max_bytes ${registry.full_report_max_bytes} plus max_url_bytes ${registry.max_url_bytes} leaves under ${USER_TEXT_ROOM} characters of an issue body for the user's own text`
+	);
 }
 
 // ── Every template against its form ───────────────────────────────────────

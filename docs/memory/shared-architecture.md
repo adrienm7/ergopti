@@ -1047,7 +1047,12 @@ unbounded changed settings last, because the issue link cuts the end. The
 configuration section holds only settings that differ from their manifest
 default (`configuration.lua` and `configuration.ahk`). Action: change a label in
 en.json, the order in `report_order`, and the format in all three ports with a
-regenerated vector.
+regenerated vector. The clipboard of « Report a bug » is pasted into the form,
+whose body GitHub refuses past 65,536 characters: the runner copies
+`fit_lines(text, full_report_max_bytes)` of `issue_link` (whole lines, a cut
+code block closed, marker and note), the saved file stays whole, and the page's
+Copy button keeps the complete text. Action: change the budget in
+`issue_templates.json` only; `test-issue-templates.cjs` checks its room.
 
 ## Intentional asymmetries
 

@@ -18,7 +18,9 @@
 ---    how a failed reveal is judged, and whether the action is bound to the
 ---    loaded driver module.
 --- 3. A Debug menu row holds one request: a second click supersedes the first.
---- 4. The field report window's « Create a GitHub issue » opens the bug form
+--- 4. « Report a bug » copies the complete report bounded to the bug form's
+---    full_report_max_bytes, cut at whole lines with a note, and saves it whole.
+--- 5. The field report window's « Create a GitHub issue » opens the bug form
 ---    with this machine's version, OS and driver and the run's evidence line,
 ---    a closed vocabulary; its complete report goes redacted to the clipboard.
 --- ==============================================================================
@@ -163,7 +165,12 @@ function M.new(ports)
 			end
 			if not current() then return end
 			if action.action == "copy" or action.action == "report" then
-				local copied = effects.copy(action.text)
+				-- The report's clipboard is pasted into the bug form, whose body GitHub
+				-- refuses past its limit: a longer report is cut at whole lines with a
+				-- note, and the saved file stays complete
+				local copied = effects.copy(action.action == "report" and IssueLink.fit_lines(action.text,
+					documents.templates.full_report_max_bytes, documents.templates.truncation_marker,
+					action.notes.full_report) or action.text)
 				if not current() then return end
 				if copied ~= true then error("the clipboard refused the report") end
 			end

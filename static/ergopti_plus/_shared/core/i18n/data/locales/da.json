@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Resultaterne dækker kun de registrerede kontroller. Isolerede testsuiter blev ikke kørt.",
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontrol mislykkedes: %s.",
 	"healthcheck.export.privacy_notice": "Kun tekniske oplysninger: ingen logge, indtastet tekst, stier eller navne.",
+	"healthcheck.export.full_report_cut_note": "Afkortet for at holde sig inden for GitHubs grænse for en sags længde. Den fulde rapport ligger i filen, der blev gemt sammen med den: vedhæft filen til denne sag.",
 	"healthcheck.export.url_truncated_note": "Afkortet, så det passer i linket. Den fulde rapport ligger i din udklipsholder: indsæt den i feltet Full report nedenfor.",
 	"healthcheck.export.items": "elementer",
 	"healthcheck.export.characters": "tegn",

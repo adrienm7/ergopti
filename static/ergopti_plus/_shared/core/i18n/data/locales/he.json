@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "התוצאות מתייחסות רק לבדיקות שתועדו. חבילות הבדיקות המבודדות לא הופעלו.",
 	"healthcheck.problem.diagnostic_check": "בדיקת האבחון נכשלה: %s.",
 	"healthcheck.export.privacy_notice": "עובדות טכניות בלבד: ללא יומנים, טקסט מוקלד, נתיבים או שמות.",
+	"healthcheck.export.full_report_cut_note": "קוצר כדי לעמוד במגבלת האורך של GitHub לדיווח. הדוח המלא נמצא בקובץ שנשמר איתו: צרפו את הקובץ לדיווח הזה.",
 	"healthcheck.export.url_truncated_note": "קוצר כדי להיכנס לקישור. הדוח המלא נמצא בלוח הגזירים: הדביקו אותו בשדה Full report שלמטה.",
 	"healthcheck.export.items": "פריטים",
 	"healthcheck.export.characters": "תווים",

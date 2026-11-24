@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "تقتصر النتائج على الفحوصات المسجّلة. لم تُشغّل مجموعات الاختبارات المعزولة.",
 	"healthcheck.problem.diagnostic_check": "فشل فحص التشخيص: %s.",
 	"healthcheck.export.privacy_notice": "حقائق تقنية فقط: بلا سجلات أو نص مكتوب أو مسارات أو أسماء.",
+	"healthcheck.export.full_report_cut_note": "اقتُطع ليتسع ضمن حد GitHub لطول البلاغ. التقرير الكامل في الملف المحفوظ معه: أرفق ذلك الملف بهذا البلاغ.",
 	"healthcheck.export.url_truncated_note": "تم اقتطاعه ليتسع في الرابط. التقرير الكامل في الحافظة: الصقه في حقل Full report أدناه.",
 	"healthcheck.export.items": "عناصر",
 	"healthcheck.export.characters": "حرفًا",

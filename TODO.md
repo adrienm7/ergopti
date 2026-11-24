@@ -596,8 +596,6 @@ share.lua, model.js and report.ahk, `configuration_vectors.json`, `test-issue-te
       again (measured in `test-issue-templates.cjs`). A budget counted on the re-encoded length would let a
       mostly-letter report grow by about a third; to measure on github.com before changing `issue_link` in its
       three ports.
-- [ ] **A very large complete report.** GitHub refuses an issue body over 65,536 characters; a config.toml with
-      hundreds of changed settings plus the JSON block could reach it. Measure on a real report before trimming.
 
 ## CI acceptance
 

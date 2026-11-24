@@ -210,6 +210,35 @@ _THPA_ReportCutsALongReport() {
 Test("Diagnostics page: report cuts a long report in the URL and keeps it whole locally (report-bug-flow)",
 	_THPA_ReportCutsALongReport)
 
+; GitHub refuses an issue body over 65,536 characters; the pasted report is
+; bounded under it, at whole lines, and the saved file keeps everything
+_THPA_ReportBoundsTheBody() {
+	Calls := []
+	Config := HealthCheck_Config()
+	Templates := Config["templates"]
+	Snapshot := _THPA_Snapshot()
+	Rows := []
+	Loop 800
+		Rows.Push(Map("setting", Format("gestures.swipe_{:04d}", A_Index), "type", "text", "value", "9"))
+	Snapshot["sections"]["configuration"] := Map("items", Rows)
+	Text := HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"]
+	Assert(StrPut(Text, "UTF-8") - 1 > Templates["full_report_max_bytes"], "The fixture exceeds the pasted report budget")
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Text, "fields", Map("driver", "windows")),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertTrue(Outcome["ok"])
+	Pasted := SubStr(Calls[1], StrLen("copy:") + 1)
+	AssertTrue(StrPut(Pasted, "UTF-8") - 1 <= Templates["full_report_max_bytes"], "The clipboard fits the bug form's body")
+	Ending := Templates["truncation_marker"] . "`n`n"
+		. Config["schema"]["export_strings"][Config["schema"]["share_policy"]["full_report_cut_note_key"]]
+	AssertEqual(Ending, SubStr(Pasted, -StrLen(Ending)), "A cut report says the complete one is in the saved file")
+	Head := SubStr(Text, 1, InStr(Text, "`n" . Chr(96) . Chr(96) . Chr(96) . "json`n"))
+	AssertEqual(Head, SubStr(Pasted, 1, StrLen(Head)), "Every readable line is kept before the JSON block goes")
+	AssertFalse(InStr(Pasted, Chr(96) . Chr(96) . Chr(96) . "json"), "An opened block it cannot hold is dropped whole")
+	AssertEqual("save:" . Outcome["path"] . ":" . Text, Calls[2], "The local attachment keeps the whole report")
+}
+Test("Diagnostics page: report bounds a very large report on the clipboard and saves it whole (report-body-budget)",
+	_THPA_ReportBoundsTheBody)
+
 _THPA_ReportStopsOnRefusedClipboard() {
 	Calls := []
 	Outcome := _THPA_Perform(Map("action", "report", "text", "report", "fields", Map()),

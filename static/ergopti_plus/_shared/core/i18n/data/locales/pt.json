@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Os resultados abrangem apenas as verificações registadas. Os testes isolados não foram executados.",
 	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Apenas dados técnicos: sem registos, texto digitado, caminhos ou nomes.",
+	"healthcheck.export.full_report_cut_note": "Cortado para respeitar o limite do GitHub para o tamanho de uma issue. O relatório completo está no ficheiro guardado com ele: anexe esse ficheiro a esta issue.",
 	"healthcheck.export.url_truncated_note": "Cortado para caber na ligação. O relatório completo está na sua área de transferência: cole-o no campo Full report abaixo.",
 	"healthcheck.export.items": "itens",
 	"healthcheck.export.characters": "caracteres",

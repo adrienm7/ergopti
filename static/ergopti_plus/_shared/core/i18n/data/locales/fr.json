@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Les résultats portent uniquement sur les contrôles consignés. Les suites isolées n’ont pas été exécutées.",
 	"healthcheck.problem.diagnostic_check": "Échec du contrôle de diagnostic : %s.",
 	"healthcheck.export.privacy_notice": "Faits techniques uniquement : ni logs, ni texte saisi, ni chemins, ni noms.",
+	"healthcheck.export.full_report_cut_note": "Coupé pour respecter la limite de longueur d'un ticket GitHub. Le rapport complet est dans le fichier enregistré avec lui : joignez ce fichier à ce ticket.",
 	"healthcheck.export.url_truncated_note": "Coupé pour tenir dans le lien. Le rapport complet est dans votre presse-papiers : collez-le dans le champ Full report ci-dessous.",
 	"healthcheck.export.items": "éléments",
 	"healthcheck.export.characters": "caractères",
