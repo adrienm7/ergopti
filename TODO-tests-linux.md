@@ -234,3 +234,10 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       reads « Copyright: 2024–<year of the build> Adrien MOYAUX »; the Flatpak's `flatpak info --show-metadata` and
       `appstreamcli validate /app/share/metainfo/org.ergopti.Ergopti.metainfo.xml` (inside it) pass without error,
       and the menus list « Ergopti » under Utilities with the same comment in every package.
+- [ ] <!-- field-point: bug_report_link --> **Report a bug and Suggest a feature (2026-11-24):** the diagnostics
+      window's « Report a bug » opens the bug form with Driver « Linux » chosen in its dropdown, above Operating
+      system, and a Diagnostics field in readable English lines (Warnings and errors first, then the checks, the
+      permissions and, last, the « Settings that differ from the defaults », no table and no `healthcheck.` key);
+      Ctrl+V into the required Full report field pastes the complete report. Debug > Suggest a feature: the form reads
+      the running version, not `unknown`, and Driver « Linux »; only the title and « Your proposal » are required.
+      Whether GitHub selects a dropdown option from the link was not checked live: if Driver stays empty, report it.

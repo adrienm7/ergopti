@@ -305,3 +305,10 @@ Hands needed:
       Utilities. `plutil -p
       ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist | grep Copyright` names the same
       notice followed by Hammerspoon's own. `codesign --verify --deep --strict ErgoptiPlus.app` still passes.
+- [ ] <!-- field-point: bug_report_link --> **Report a bug and Suggest a feature (2026-11-24):** the diagnostics
+      window's « Report a bug » opens the bug form with Driver « macOS » chosen in its dropdown, above Operating
+      system, and a Diagnostics field in readable English lines (Warnings and errors first, then the checks, the
+      permissions and, last, the « Settings that differ from the defaults », no table and no `healthcheck.` key);
+      Cmd+V into the required Full report field pastes the complete report. Debug > Suggest a feature: the form reads
+      the running version, not `unknown`, and Driver « macOS »; only the title and « Your proposal » are required.
+      Whether GitHub selects a dropdown option from the link was not checked live: if Driver stays empty, report it.

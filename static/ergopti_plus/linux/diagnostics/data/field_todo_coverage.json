@@ -280,6 +280,12 @@
 			"title": "Software centres and menus show the package metadata",
 			"checks": [],
 			"not_testable": "Needs a person to install the release packages and read the software centre's page: the field report runs from a checkout and installs no package; tools/test/test-app-metadata.cjs pins the fields every packager writes."
+		},
+		{
+			"id": "bug_report_link",
+			"title": "Report a bug and Suggest a feature open GitHub forms with readable, complete facts (2026-11-24)",
+			"checks": [],
+			"not_testable": "Needs a person signed in to GitHub in a browser to look at the opened forms and paste the clipboard: the field report opens no browser and reads no web page."
 		}
 	]
 }

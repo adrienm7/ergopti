@@ -1035,6 +1035,20 @@ with no raw logs and no automatic upload; local log links stay out of
 attachments. A new field needs a schema change and a privacy decision, not a
 free-form string.
 
+### project-readable-report-three-ports
+
+The readable report (the bug form's Diagnostics prefill and the start of the
+complete report) is written three times: `share.lua` (macOS, Linux),
+`model.js` (the page preview) and `report.ahk`. The host refuses a page
+preview whose text differs from its own, so the three must agree byte for byte:
+`_shared/tests/corpus/healthcheck/report_vectors.json` pins them. Its groups
+follow `share_policy.report_order` in `schema.json`, most useful first, with the
+unbounded changed settings last, because the issue link cuts the end. The
+configuration section holds only settings that differ from their manifest
+default (`configuration.lua` and `configuration.ahk`). Action: change a label in
+en.json, the order in `report_order`, and the format in all three ports with a
+regenerated vector.
+
 ## Intentional asymmetries
 
 ### project-category-gating-ahk-only

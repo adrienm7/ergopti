@@ -867,6 +867,32 @@ equivalent mutant being allowed only in a reviewed list that says why.
 - [ ] **[CI] Mutation gate.** 100 % of mutants killed, red otherwise, with the same ratchet as coverage until then;
       every surviving mutant is either killed by a new test or listed as equivalent with its reason.
 
+## Bug report and feature links (maintainer request, 2026-11-24)
+
+Field report on `dev.178` (macOS, 12:18 Paris): the bug link's Diagnostics field was a Markdown table of
+config.toml rows (`gestures.enabled | boolean: true`…) cut before any error, with only a note pointing to the
+clipboard and the saved file; the feature link said `unknown` for the version. Done on 2026-11-24: the report is
+readable English lines grouped by diagnostic value (`share_policy.report_order`: errors, checks, permissions,
+files, input, versions, system, hardware, AI, developer, report, then the unbounded changed settings), the
+configuration keeps only the settings that differ from their manifest default, the bug form gained a required
+« Full report » textarea for the clipboard and a short intro, both forms put a Driver dropdown (macOS, Windows,
+Linux) before the system, and the feature form requires only the title and « Your proposal ». macOS's Suggest a
+feature now collects the local state, which holds the versions. Proofs: `report_vectors.json` replayed by
+share.lua, model.js and report.ahk, `configuration_vectors.json`, `test-issue-templates.cjs`.
+
+- [ ] **[CI] Run the AHK suite on the change.** `report.ahk`'s readable report port, the default filter of
+      `configuration.ahk` and their tests (`report-readable`, `report-budget`) were only parse-gated here: no
+      AutoHotkey ran.
+- [ ] **No raw log line can be shared.** The closed sharing policy carries recognised error codes and counts, not
+      the recent log lines (`project-shared-export-schema-is-closed`): the « recent log lines » of the request
+      need a privacy decision before any schema change. Meanwhile the opt-in redacted day log stays the way.
+- [ ] **The URL budget stays 4,000 bytes.** It is set by the signed-out login redirect, which encodes the link
+      again (measured in `test-issue-templates.cjs`). A budget counted on the re-encoded length would let a
+      mostly-letter report grow by about a third; to measure on github.com before changing `issue_link` in its
+      three ports.
+- [ ] **A very large complete report.** GitHub refuses an issue body over 65,536 characters; a config.toml with
+      hundreds of changed settings plus the JSON block could reach it. Measure on a real report before trimming.
+
 ## CI acceptance
 
 Each closes on a named green hosted or native run, recorded here.
@@ -915,6 +941,10 @@ Each question names the default kept meanwhile; an answer moves into the item or
       tracker; give a monitored address to replace it. The macOS category is `public.app-category.utilities` (the
       Linux entries' `Utility`) rather than productivity. The AppImage ships no AppStream file yet: appimagetool
       validates one when present and no `appstreamcli` ran here, so it is left for a run that can validate it.
+- [ ] **Feature form identity (decided by the agent on 2026-11-24, to review by the maintainer).** The feature
+      form keeps ErgoptiPlus version, Driver and Operating system, prefilled and optional, so an idea sent from an
+      old version whose feature already exists can be answered at once. Kept meanwhile: kept. The other choice is
+      to drop the three fields and keep only the title and the proposal.
 - [ ] **The left thumb's second key:** decided 2026-11-21: the left thumb types on one key (NonConvert) and no second
       left thumb key types on any board, the ErgoDox included; implementation pending integration.
 - [ ] **Renew the reviewed number-row test image:** decided 2026-11-21: renewal accepted; implementation pending

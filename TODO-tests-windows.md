@@ -275,6 +275,13 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 
 ### Pause, startup, updates and network
 
+- [ ] **Report a bug and Suggest a feature (2026-11-24):** the diagnostics window's « Report a bug » opens the bug
+      form with Driver « Windows » chosen in its dropdown, above Operating system, and a Diagnostics field in readable
+      English lines (Warnings and errors first, then the checks, the permissions and, last, the « Settings that differ
+      from the defaults », no table and no `healthcheck.` key); Ctrl+V into the required Full report field pastes the
+      complete report. Debug > Suggest a feature: the form reads the running version, not `unknown`, and Driver «
+      Windows »; only the title and « Your proposal » are required. Whether GitHub selects a dropdown option from the
+      link was not checked live: if Driver stays empty, report it.
 - [ ] TIM-04: an AI prediction whose first display takes over 2 s logs « Over budget: prediction.display » once.
       TIM-01 is automated (the live check `reload-command` counts one « Reload completed in N ms » per reload, none
       for the plain start, and the over-budget warnings against `driver_reload_ms`); TIM-05 passed on 2026-11-23 (the
