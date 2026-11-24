@@ -98,13 +98,14 @@ button:hover {
 	background: var(--theme-hue-3d3d41);
 }
 
-/* A deep blue under the light label (6:1, WCAG 1.4.3); hover darkens it
-   rather than lightening it below that ratio. */
+/* White on a deep blue (7.5:1, WCAG 1.4.6); hover darkens it rather than
+   lightening it below that ratio. */
 #save-button {
 	background: var(--theme-hue-1a4bbf);
 	border-color: var(--theme-hue-1a4bbf);
+	color: var(--theme-white);
 }
 
 #save-button:hover {
-	background: var(--theme-hue-0b4ea2);
+	background: var(--theme-hue-004a99);
 }

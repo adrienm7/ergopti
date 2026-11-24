@@ -12,6 +12,17 @@ select {
 	margin: 4px;
 	padding: 8px 12px;
 }
+/* The browser's own dark button and list are white on #6b6b6b, 5.3:1: a
+   darker ground gives their label 7:1 (WCAG 1.4.6). */
+@media (prefers-color-scheme: dark) {
+	button,
+	select {
+		background: var(--theme-gray4-dark);
+		border: 1px solid var(--theme-grey-888);
+		border-radius: 4px;
+		color: var(--theme-white);
+	}
+}
 #entries {
 	list-style: none;
 	margin: 0;

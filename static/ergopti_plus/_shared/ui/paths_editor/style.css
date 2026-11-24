@@ -47,10 +47,10 @@ h1 {
 	margin: 0 0 2px;
 }
 
-/* Every small text keeps 4.5:1 on its background (WCAG 1.4.3): grey-666
+/* Every small text keeps 7:1 on its background (WCAG 1.4.6): a dark grey
    for the notes, the deep blue and brown for the tags and the save button. */
 .subtitle {
-	color: var(--theme-grey-666);
+	color: var(--theme-hue-48484c);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 12px;
@@ -132,13 +132,13 @@ input[type='text']:focus {
 }
 
 input[type='text'].is-default {
-	color: var(--theme-grey-666);
+	color: var(--theme-hue-48484c);
 }
 
 /* The default folder shown under each field, and the logs field's note. */
 .row-default,
 .row-hint {
-	color: var(--theme-grey-666);
+	color: var(--theme-hue-48484c);
 	font-size: 10.5px;
 	margin: 5px 0 0;
 }
@@ -193,7 +193,7 @@ input[type='text'].is-default {
 .tag-modified {
 	background: var(--theme-hue-fff3e0);
 	border-radius: 4px;
-	color: var(--theme-hue-7a4b00);
+	color: var(--theme-hue-5c3800);
 	font-size: 10px;
 	font-weight: 500;
 	margin-inline-start: 4px;
@@ -247,7 +247,7 @@ button:hover {
 .reset {
 	background: transparent;
 	border: 1px solid var(--theme-grey-ccc);
-	color: var(--theme-grey-666);
+	color: var(--theme-hue-48484c);
 	font-size: 11.5px;
 	padding: 6px 12px;
 }

@@ -1315,6 +1315,28 @@ surveyed and every AAA criterion, measured or checked by hand, are in
 - **Also fixed:** the diagnostics window's day-log checkbox was 13 px, below
   the AA 24 px target of 2.5.8 (axe `target-size`, state `day-log`).
 
+## Thirteenth pass, enhanced contrast to zero (2026-11-24, Paris time)
+
+- **`color-contrast-enhanced` (1.4.6) at zero** in both gates, light and dark:
+  the 4 site nodes (the changelog frame) and the 389 app-window nodes left by
+  the twelfth pass are gone; both baselines hold no contrast row.
+- **What changed**, all colours a page spelled itself, each now 7:1 on its
+  ground: the changelog's dark palette (blue `#4da6ff` to `#a8d8ff`, purple
+  `#bf7af0` to `#d9b3f7`, greys `#999` and `#aaa` to `#c8c8cc` and `#ccc`,
+  green to `#9ae6ac`); the download window's greys and reds; the hotstring
+  editor's tags (`#005cc5` to `#0a3a6e` in light, `#64b5f6` to `#a8d8ff` in
+  dark), hints, bulk delete and the confirmation's filled button (`#b3261e`
+  and `#9a6700` under white to `#8a1a14` and `#5c3800`); the hotstrings
+  window's and layout manager's danger buttons, badges, meta greys and links;
+  the apps dashboard's drill-down tiles and the light chart cards (a dark veil
+  had turned the page grey under their headings); the typing dashboard's
+  hotstring and AI figures; the paths, token and numeric prompts; the prompt
+  editor's chips; the onboarding consent note; the release notes' links; the
+  physical-shortcut editor's buttons and list, which kept the browser's dark
+  `#6b6b6b`.
+- The tokens no page uses any more left `theme.css`, and
+  `native_theme_data.lua` was regenerated from it.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

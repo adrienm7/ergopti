@@ -47,6 +47,9 @@
 	--global-border: rgba(var(--kpi-wpm-rgb), 0.5);
 
 	--strong-color: var(--theme-metrics-strong);
+	/* The chart cards' ground: a dark veil turned the light page grey and
+	   held their headings at 6.4:1 (WCAG 1.4.6 asks for 7:1). */
+	--chart-panel: rgba(0, 0, 0, 0.04);
 
 	/* Score badge colors */
 	--score-pos-color: var(--theme-green);
@@ -68,6 +71,7 @@
 		--kpi-llm-color: rgb(var(--kpi-llm-rgb));
 		--kpi-wpm-color: rgb(var(--kpi-wpm-rgb));
 
+		--chart-panel: rgba(30, 30, 30, 0.4);
 		--hs-bg: rgba(var(--kpi-hs-rgb), 0.1);
 		--llm-bg: rgba(var(--kpi-llm-rgb), 0.1);
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
@@ -338,7 +342,7 @@ h1 {
 .app-modal-close {
 	background: transparent;
 	border: 0;
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	cursor: pointer;
 	font-size: 24px;
 	line-height: 1;
@@ -362,7 +366,7 @@ h1 {
 	padding: 10px 12px;
 }
 .app-modal-tile-label {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 10px;
 	letter-spacing: 0.5px;
 	margin: 0;
@@ -375,7 +379,7 @@ h1 {
 	margin: 2px 0 0 0;
 }
 .app-modal-tile-detail {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 10px;
 	margin: 2px 0 0 0;
 }
@@ -394,17 +398,17 @@ h1 {
 	justify-content: space-between;
 }
 .modal-list data {
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 }
 .modal-list .muted {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	padding: 0;
 }
 .app-modal-section {
 	margin-top: 14px;
 }
 .app-modal-section h3 {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 12px;
 	letter-spacing: 0.5px;
 	margin: 0 0 8px 0;
