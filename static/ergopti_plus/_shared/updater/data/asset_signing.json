@@ -5,6 +5,6 @@
 	"signature_suffix": ".sig",
 	"record_header": "ergopti-update-asset-v1",
 	"signature_bytes": 64,
-	"public_key_spki_base64": "",
+	"public_key_spki_base64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdtgYKb9lzLTCORPXr2S2QjYxSneIpKDmL5eSMpyAU6P1MOFYwUqxUpHPWfU8105aAHpJ6G8FGjlFS4JGJfVqgQ==",
 	"enforcement": "off"
 }

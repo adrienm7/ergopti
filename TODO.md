@@ -611,9 +611,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   after acceptance, set the secrets `SIGNPATH_API_TOKEN` and `WINDOWS_SIGNER_SUBJECT` and the variables
   `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG` and `SIGNPATH_SIGNING_POLICY_SLUG`, approve the first stable
   request, then delete `.github/ci/stable_windows_signing_exception.json` alone in a commit
-  ([steps](docs/tooling/signpath-foundation-application.md)). Update assets: run `keygen`, store `UPDATE_SIGNING_KEY`,
-  commit the public key, cut one `off` release and check both `.sig` files, then set `enforcement` to `required`
-  alone in a commit ([steps](docs/tooling/update-signing.md)). The relay exe and the vendor binaries stay unsigned
+  ([steps](docs/tooling/signpath-foundation-application.md)). Update assets: the key pair, the
+  `UPDATE_SIGNING_KEY` secret and the public key are in place (2026-11-24); cut one `off` release and check both
+  `.sig` files, then set `enforcement` to `required` alone in a commit ([steps](docs/tooling/update-signing.md)). The relay exe and the vendor binaries stay unsigned
   (a second SignPath request).
 - **Older findings** ([the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md)). Findings 1 to 4
   and 6 to 8 are fixed. Left: finding 5's native binaries and manifests, rebuilt in the official MSVC environment
