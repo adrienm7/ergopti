@@ -86,14 +86,14 @@ Notes:
 
 ## Open
 
-- **BPF-04 (low, Windows):** a second `BootProfile_Begin()` restarts the
-  profiler silently, and a mark before it anchors the origin there instead
-  of refusing (macOS keeps the same anchoring, pinned by its suite). One call
-  site (`ErgoptiPlus.ahk`), so nothing misreports today; the rule of
-  AGENTS.md (reject duplicate initialization) asks for the Linux and macOS
-  behaviour, which needs a reset seam in the AutoHotkey suites that call
-  `BootProfile_Begin` (seven files) and a run of them, so it waits for a
-  Windows host. macOS was fixed in this campaign (see the table).
+- **BPF-04 (low, Windows), fixed on 2026-11-25:** a second
+  `BootProfile_Begin()` restarted the profiler silently. It now throws
+  « boot has a single owner », as on macOS and Linux; a mark before it still
+  anchors the origin there (macOS keeps the same anchoring, pinned by its
+  suite). No suite called `BootProfile_Begin`, so the only seam needed is
+  `_BootProfileResetForTest()`, used by
+  `tests/unit/core/logger/test_boot_profiler_single_owner.ahk`, which fails on
+  the old code (no throw) and runs in CI's Windows lane.
 
 Native receiving: a Linux field log whose « Boot complete » line reads
 « since the process started » with the load phase of the « Process age at

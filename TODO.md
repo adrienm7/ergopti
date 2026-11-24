@@ -381,9 +381,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     ([report](docs/audits/platform-parity/2026-11-24-boot-profilers/report.md)): BPF-01 (the Linux boot total,
     budget and snapshot count the load phase, spawn to ready as on Windows), BPF-02 and BPF-03 (macOS names a stage
     left open and writes one boot summary), BPF-04 on macOS (a second `begin()` or `complete()` raises, as on Linux)
-    and BPF-05 (Windows logs the boot's process CPU) fixed. Left: BPF-04 on Windows, a second `BootProfile_Begin()`
-    restarts the profiler silently, which needs a reset seam in the seven AutoHotkey suites that call it and a
-    Windows run; the Swift logger retention replay runs in macOS CI only;
+    and BPF-05 (Windows logs the boot's process CPU) fixed, and BPF-04 on Windows since 2026-11-25 (a second
+    `BootProfile_Begin()` throws, `test_boot_profiler_single_owner.ahk`, first verified by the next Windows CI run).
+    Left: the Swift logger retention replay runs in macOS CI only;
   - the census's re-campaigns for drift: `shared/layouts` (with S29), `shared/core`, `shared/ui/layout_editor` and
     the `ai` areas, then the remaining never-campaigned units of its table in rank order.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
