@@ -12,6 +12,11 @@
  * `ui_typing.tooltip_*` string, or one a script writes into the card's
  * value. The AI and hotstring cards had none: their only words were `title`
  * attributes, which neither the keyboard nor a touch screen reaches.
+ *
+ * The apps dashboard's table (_shared/ui/metrics_apps) explained its columns
+ * in its headers' `title` only, the same pointer-only words: each explained
+ * header is now described by an entry of the « What the columns mean » list
+ * folded under the table, which holds the same string.
  * ==============================================================================
  */
 
@@ -125,4 +130,43 @@ const script =
 assert.deepEqual(unexplained(filled, script, known), ['y_card: unknown key ui_typing.tooltip_y']);
 assert.deepEqual(unexplained(filled, script, new Set(['ui_typing.tooltip_y'])), []);
 
-console.log(`PASS test-metrics-cards-explained (${cards.length} cards, each with its help text)`);
+/**
+ * The headers of the apps table whose explanation is not in the folded list
+ * they point to.
+ * @param {string} page - The apps dashboard's markup.
+ * @returns {string[]}
+ */
+function unexplainedColumns(page) {
+	const table = page.slice(page.indexOf('<table id="apps-table">'));
+	const head = table.slice(0, table.indexOf('</thead>'));
+	const help = table.slice(table.indexOf('<details class="column-help">'));
+	const missing = [];
+	for (const [header] of head.matchAll(/<th\b[^>]*>/g)) {
+		const title = /data-i18n-title="([a-z_.]+)"/.exec(header);
+		if (!title) continue;
+		const described = /aria-describedby="([a-z-]+)"/.exec(header);
+		const entry =
+			described && new RegExp(`<dd id="${described[1]}" data-i18n="([a-z_.]+)"`).exec(help);
+		if (!entry || !help.startsWith('<details class="column-help">'))
+			missing.push(title[1] + ': no entry in the column list');
+		else if (entry[1] !== title[1]) missing.push(title[1] + ': its entry says ' + entry[1]);
+	}
+	return missing;
+}
+
+const apps = fs.readFileSync(path.join(PAGE, '..', 'metrics_apps', 'index.html'), 'utf8');
+const columns = [...apps.matchAll(/<th\b[^>]*data-i18n-title=/g)].length;
+assert.ok(columns >= 8, `the apps table's explained columns are found (${columns})`);
+assert.deepEqual(unexplainedColumns(apps), [], 'Apps table columns explained by a title only');
+assert.ok(known.has('ui_apps.columns_help_title'), 'The column list is named');
+assert.deepEqual(
+	unexplainedColumns(
+		'<table id="apps-table"><thead><th data-i18n-title="ui_apps.tip_col_x"></th></thead></table>'
+	),
+	['ui_apps.tip_col_x: no entry in the column list'],
+	'A header explained by its title alone fails'
+);
+
+console.log(
+	`PASS test-metrics-cards-explained (${cards.length} cards and ${columns} apps table columns, each with its help text)`
+);

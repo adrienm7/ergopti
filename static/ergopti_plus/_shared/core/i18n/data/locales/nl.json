@@ -3605,6 +3605,7 @@
 	"ui_apps.col_top_dests": "Topbestemmingen",
 	"ui_apps.col_typing_pct": "Typ %",
 	"ui_apps.col_window": "Venster",
+	"ui_apps.columns_help_title": "Betekenis van de kolommen",
 	"ui_apps.compare_title": "Vergelijking met vorige periode",
 	"ui_apps.detail_global_activity": "Totale geregistreerde activiteit",
 	"ui_apps.detail_productivity_score": "Score berekend uit uw categorieën",

@@ -666,20 +666,42 @@
 							<tr>
 								<th data-i18n="ui_apps.col_app_name"></th>
 								<th data-i18n="ui_apps.col_category"></th>
-								<th data-i18n-title="ui_apps.tip_col_focus" data-i18n="ui_apps.col_focus"></th>
 								<th
+									aria-describedby="col-help-focus"
+									data-i18n-title="ui_apps.tip_col_focus"
+									data-i18n="ui_apps.col_focus"
+								></th>
+								<th
+									aria-describedby="col-help-typing-pct"
 									data-i18n-title="ui_apps.tip_col_typing_pct"
 									data-i18n="ui_apps.col_typing_pct"
 								></th>
-								<th data-i18n-title="ui_apps.tip_col_density" data-i18n="ui_apps.col_density"></th>
 								<th
+									aria-describedby="col-help-density"
+									data-i18n-title="ui_apps.tip_col_density"
+									data-i18n="ui_apps.col_density"
+								></th>
+								<th
+									aria-describedby="col-help-sessions"
 									data-i18n-title="ui_apps.tip_col_sessions"
 									data-i18n="ui_apps.col_sessions"
 								></th>
-								<th data-i18n-title="ui_apps.tip_col_latency" data-i18n="ui_apps.col_latency"></th>
-								<th data-i18n-title="ui_apps.tip_col_hs_pct" data-i18n="ui_apps.col_hs_pct"></th>
-								<th data-i18n-title="ui_apps.tip_col_sfb">SFB</th>
-								<th data-i18n-title="ui_apps.tip_col_hold" data-i18n="ui_apps.col_hold"></th>
+								<th
+									aria-describedby="col-help-latency"
+									data-i18n-title="ui_apps.tip_col_latency"
+									data-i18n="ui_apps.col_latency"
+								></th>
+								<th
+									aria-describedby="col-help-hs-pct"
+									data-i18n-title="ui_apps.tip_col_hs_pct"
+									data-i18n="ui_apps.col_hs_pct"
+								></th>
+								<th aria-describedby="col-help-sfb" data-i18n-title="ui_apps.tip_col_sfb">SFB</th>
+								<th
+									aria-describedby="col-help-hold"
+									data-i18n-title="ui_apps.tip_col_hold"
+									data-i18n="ui_apps.col_hold"
+								></th>
 								<th data-i18n="ui_apps.col_top_dests"></th>
 							</tr>
 						</thead>
@@ -694,6 +716,30 @@
 							</tr>
 						</tbody>
 					</table>
+					<!-- The columns' explanations, which a header's title shows to a
+					     pointer only: listed here for the keyboard, and each header
+					     is described by its entry (WCAG 2.1.1, 3.3.2). -->
+					<details class="column-help">
+						<summary data-i18n="ui_apps.columns_help_title"></summary>
+						<dl>
+							<dt data-i18n="ui_apps.col_focus"></dt>
+							<dd id="col-help-focus" data-i18n="ui_apps.tip_col_focus"></dd>
+							<dt data-i18n="ui_apps.col_typing_pct"></dt>
+							<dd id="col-help-typing-pct" data-i18n="ui_apps.tip_col_typing_pct"></dd>
+							<dt data-i18n="ui_apps.col_density"></dt>
+							<dd id="col-help-density" data-i18n="ui_apps.tip_col_density"></dd>
+							<dt data-i18n="ui_apps.col_sessions"></dt>
+							<dd id="col-help-sessions" data-i18n="ui_apps.tip_col_sessions"></dd>
+							<dt data-i18n="ui_apps.col_latency"></dt>
+							<dd id="col-help-latency" data-i18n="ui_apps.tip_col_latency"></dd>
+							<dt data-i18n="ui_apps.col_hs_pct"></dt>
+							<dd id="col-help-hs-pct" data-i18n="ui_apps.tip_col_hs_pct"></dd>
+							<dt>SFB</dt>
+							<dd id="col-help-sfb" data-i18n="ui_apps.tip_col_sfb"></dd>
+							<dt data-i18n="ui_apps.col_hold"></dt>
+							<dd id="col-help-hold" data-i18n="ui_apps.tip_col_hold"></dd>
+						</dl>
+					</details>
 				</figure>
 			</section>
 
