@@ -4672,6 +4672,246 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
+	// The events a trace names on a key pair and on a key triple: the bigram and
+	// trigram counters of the stream visitor that are a metric of their own.
+	const TRACE_PAIR_EVENTS = [
+		'sfb',
+		'repeat',
+		'lsb',
+		'scissors',
+		'half_scissors',
+		'pinky_ring',
+		'row_jump',
+		'roll_in',
+		'roll_out',
+		'hand_change'
+	];
+	const TRACE_TRIPLE_EVENTS = [
+		'sfs',
+		'roll3_in',
+		'roll3_out',
+		'alternation',
+		'redirect',
+		'redirect_bad'
+	];
+	// The characters that cut a traced text, as they cut the n-gram tables.
+	const TRACE_BREAK = /[\r\n\t]/;
+	// The longest text a trace types: a few sentences, drawn key by key.
+	const TRACE_MAX_CHARS = 2000;
+
+	/**
+	 * How a text is typed on a layout, keystroke by keystroke (an idea seen in
+	 * the Layouts Wiki playground's « Trace »): each character's way of typing
+	 * (its keys, their levels, a dead key) chosen as analyse() chooses it on
+	 * that text, then every key pair and key triple of the stream with the
+	 * events the stream visitor raises for it. The keys and events are the
+	 * metrics' own: the counts of a trace are the key n-grams analyse()
+	 * measures on that text alone. A line break, a tab or a character the
+	 * layout cannot type cuts the stream (no pair spans it), as in the tables.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {string} text - At most TRACE_MAX_CHARS code points.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keyboard: string, chars: Array<{char: string, kind: string|null,
+	 *   steps: Array<[string, string, number]>, held: string[], keys: number[]}>,
+	 *   keys: Array<{code: string, finger: string, char: number}>,
+	 *   pairs: Array<{keys: [number, number], events: string[]}>,
+	 *   triples: Array<{keys: [number, number, number], events: string[]}>,
+	 *   counts: object, bigrams: number, trigrams: number, unsupported: number}}
+	 *   chars: each character, kind null when the layout cannot type it (or a
+	 *   break), steps its [code, level id, level index in the rows] presses, held the modifiers held for
+	 *   it by name (« Shift », « AltGr », a layout's own: « Mod3 »), keys its indexes in `keys`; keys: the stream, each press with
+	 *   its finger (a model.fingers id) and the character it types; pairs and
+	 *   triples: index n-grams of `keys` with their events
+	 *   (TRACE_PAIR_EVENTS, TRACE_TRIPLE_EVENTS); counts: event → how many;
+	 *   bigrams and trigrams: the pairs and triples the metrics count (a pair
+	 *   with the space is in none, a thumb SFB aside).
+	 * @throws {Error} On a text that is not a string or is too long.
+	 */
+	function traceText(layoutInput, text, options) {
+		if (typeof text !== 'string') throw new Error('layout_analysis: traceText needs a text');
+		const chars = Array.from(text);
+		if (chars.length > TRACE_MAX_CHARS)
+			throw new Error(`layout_analysis: traceText types at most ${TRACE_MAX_CHARS} characters`);
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngramsFromText(text)),
+			planMode(opts)
+		);
+		const levels = levelTable(layout, board).ids;
+		const prefixes = levelPrefixes(layout);
+		const fingerIds = data().model.fingers;
+		const kindOf = (way) => {
+			if (way.substituted) return 'substitution';
+			if (way.dead) return 'dead';
+			if (way.altgr > 0) return 'altgr';
+			return way.shift > 0 ? 'shift' : 'direct';
+		};
+		const typed = (char) => !TRACE_BREAK.test(char) && plan.best.has(char);
+		const outChars = [];
+		const keys = [];
+		const segments = [];
+		let segment = [];
+		let unsupported = 0;
+		chars.forEach((char, i) => {
+			if (!typed(char)) {
+				if (!TRACE_BREAK.test(char)) unsupported++;
+				outChars.push({ char, kind: null, steps: [], held: [], keys: [] });
+				if (segment.length > 0) segments.push(segment);
+				segment = [];
+				return;
+			}
+			const before = i > 0 && typed(chars[i - 1]) ? chars[i - 1] : null;
+			const after = i + 1 < chars.length && typed(chars[i + 1]) ? chars[i + 1] : null;
+			const way = plan.multi.has(char)
+				? plan.ways.get(char)[plan.choose(before, char, after)]
+				: plan.best.get(char);
+			// The modifiers held for the character: its last key's level's, by name.
+			const last = way.layers[way.layers.length - 1];
+			const held = prefixes
+				.get(levels[last])
+				.split('+')
+				.filter((name) => name !== '');
+			const at = [];
+			for (const k of way.keys) {
+				at.push(keys.length);
+				segment.push(keys.length);
+				keys.push({ code: board.codes[k], finger: fingerIds[board.finger[k]], char: i, k });
+			}
+			outChars.push({
+				char,
+				kind: kindOf(way),
+				steps: way.keys.map((k, j) => [board.codes[k], levels[way.layers[j]], way.layers[j]]),
+				held,
+				keys: at
+			});
+		});
+		if (segment.length > 0) segments.push(segment);
+		const counts = {};
+		for (const event of TRACE_PAIR_EVENTS.concat(TRACE_TRIPLE_EVENTS)) counts[event] = 0;
+		const raised = (names, visit) => {
+			const c = streamCounts();
+			visit(streamVisitor(board, c, new Float64Array(board.codes.length), {}, null));
+			return { c, events: names.filter((name) => c[name] !== 0) };
+		};
+		const pairs = [];
+		const triples = [];
+		let bigrams = 0;
+		let trigrams = 0;
+		for (const seg of segments) {
+			for (let j = 0; j + 1 < seg.length; j++) {
+				const [a, b] = [seg[j], seg[j + 1]];
+				const { c, events } = raised(TRACE_PAIR_EVENTS, (v) => v.bigram(keys[a].k, keys[b].k, 1));
+				bigrams += c.bigrams;
+				for (const event of events) counts[event]++;
+				pairs.push({ keys: [a, b], events });
+			}
+			for (let j = 0; j + 2 < seg.length; j++) {
+				const [a, b, d] = [seg[j], seg[j + 1], seg[j + 2]];
+				const { c, events } = raised(TRACE_TRIPLE_EVENTS, (v) =>
+					v.trigram(keys[a].k, keys[b].k, keys[d].k, 1)
+				);
+				trigrams += c.trigrams;
+				for (const event of events) counts[event]++;
+				triples.push({ keys: [a, b, d], events });
+			}
+		}
+		return {
+			keyboard: board.id,
+			chars: outChars,
+			keys: keys.map(({ k, ...key }) => key),
+			pairs,
+			triples,
+			counts,
+			bigrams,
+			trigrams,
+			unsupported
+		};
+	}
+
+	const PARETO_DIRECTIONS = ['lower', 'higher'];
+
+	/**
+	 * The Pareto layers of points over several values (an idea seen in the
+	 * Layouts Wiki playground): a point is dominated when another is at least
+	 * as good on every value and better on one; the frontier (layer 1) holds
+	 * the points no other dominates, layer 2 those only the frontier
+	 * dominates, and so on. Points equal on every value share their layer and
+	 * do not dominate each other. No weight is involved: the frontier is every
+	 * best trade-off between the values.
+	 * @param {Array<{id: string, values: number[]}>} points - Distinct ids,
+	 *   one finite value per direction.
+	 * @param {string[]} directions - 'lower' or 'higher' (which is better), one
+	 *   per value, at least one.
+	 * @returns {Array<{id: string, layer: number, front: boolean,
+	 *   dominatedBy: string[]}>} In the points' order: layer ≥ 1, front when
+	 *   layer is 1, dominatedBy the ids of the points dominating it, in the
+	 *   points' order.
+	 * @throws {Error} On an unknown direction, a duplicate id or a value that
+	 *   is missing or not finite.
+	 */
+	function pareto(points, directions) {
+		if (!Array.isArray(directions) || directions.length === 0)
+			throw new Error('layout_analysis: pareto needs at least one direction');
+		for (const direction of directions)
+			if (!PARETO_DIRECTIONS.includes(direction))
+				throw new Error(
+					`layout_analysis: pareto direction ${JSON.stringify(direction)} is unknown`
+				);
+		if (!Array.isArray(points)) throw new Error('layout_analysis: pareto needs a list of points');
+		const ids = new Set();
+		for (const point of points) {
+			if (!point || typeof point.id !== 'string' || ids.has(point.id))
+				throw new Error(
+					`layout_analysis: pareto point ${JSON.stringify(point && point.id)} is not a distinct id`
+				);
+			ids.add(point.id);
+			if (
+				!Array.isArray(point.values) ||
+				point.values.length !== directions.length ||
+				!point.values.every(Number.isFinite)
+			)
+				throw new Error(
+					`layout_analysis: pareto point ${point.id} needs ${directions.length} finite values`
+				);
+		}
+		// Every value made « lower is better ».
+		const signs = directions.map((direction) => (direction === 'lower' ? 1 : -1));
+		const cost = points.map((point) => point.values.map((v, i) => signs[i] * v));
+		const dominates = (a, b) => {
+			let better = false;
+			for (let i = 0; i < signs.length; i++) {
+				if (cost[a][i] > cost[b][i]) return false;
+				if (cost[a][i] < cost[b][i]) better = true;
+			}
+			return better;
+		};
+		const n = points.length;
+		const dominatedBy = Array.from({ length: n }, () => []);
+		for (let a = 0; a < n; a++)
+			for (let b = 0; b < n; b++) if (a !== b && dominates(b, a)) dominatedBy[a].push(b);
+		// The layers: peel the points no remaining point dominates.
+		const layer = new Array(n).fill(0);
+		let remaining = Array.from({ length: n }, (_, i) => i);
+		for (let current = 1; remaining.length > 0; current++) {
+			// Dominance is a strict order: some remaining point is always free.
+			const peel = remaining.filter((i) => dominatedBy[i].every((j) => layer[j] !== 0));
+			if (peel.length === 0) throw new Error('layout_analysis: pareto found a dominance cycle');
+			for (const i of peel) layer[i] = current;
+			remaining = remaining.filter((i) => layer[i] === 0);
+		}
+		return points.map((point, i) => ({
+			id: point.id,
+			layer: layer[i],
+			front: layer[i] === 1,
+			dominatedBy: dominatedBy[i].map((j) => points[j].id)
+		}));
+	}
+
 	/**
 	 * The keyboard formats (100 %, TKL, 75 %, 65 %, 60 %), each with the keys
 	 * it lacks: the one table the editor's « Format », the Comparer's and the
@@ -7722,6 +7962,11 @@ var LAYOUT_ANALYSIS = (function () {
 		wordsFromText,
 		wordEfforts,
 		effortDistribution,
+		traceText,
+		TRACE_PAIR_EVENTS,
+		TRACE_TRIPLE_EVENTS,
+		TRACE_MAX_CHARS,
+		pareto,
 		defaultWeights,
 		defaultFloors,
 		scoreFloors,
