@@ -17,9 +17,9 @@
 ; Fix (AHK-33): add `if A_IsSuspended return` immediately after the visibility
 ; check in WPMWidget_MouseWatch, mirroring WPMWidget_Tick (ui/wpm/init.ahk:749).
 ;
-; This test asserts (source introspection on ui/wpm/init.ahk):
-;   WPMWidget_MouseWatch body must contain A_IsSuspended so the fast
-;   cursor-watch goes fully quiet while the driver is paused.
+; This test drives the real WPMWidget_MouseWatch on a visible widget with no
+; surface: paused, it must not even sample the cursor (its last position keeps
+; an impossible sentinel); resumed, the same call samples it (positive control).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,19 +28,39 @@
 
 
 
-; ==============================================================
-; ==============================================================
-; ======= 1/ WPMWidget_MouseWatch gates on A_IsSuspended =======
-; ==============================================================
-; ==============================================================
+; ================================================================
+; ================================================================
+; ======= 1/ WPMWidget_MouseWatch stays quiet while paused =======
+; ================================================================
+; ================================================================
 
-_TWMSG_CheckSuspendGuard() {
-	Body := _DriverFuncBody("WPMWidget_MouseWatch")
-	Assert(Body != "", "WPMWidget_MouseWatch() must exist in ui/wpm/init.ahk")
-	Assert(InStr(Body, "A_IsSuspended") > 0,
-		"AHK-33: WPMWidget_MouseWatch must early-return on A_IsSuspended so the fast cursor-watch goes quiet while paused — its sibling WPMWidget_Tick already has this guard (metrics-timers-bypass-pause)")
+_TWMSG_PausedWatchStaysQuiet() {
+	; No cursor coordinate can reach this value, so any sample replaces it.
+	Sentinel := -2147483000
+	Saved := {Visible: WPMWidget.visible, X: WPMWidget._last_mouse_x, Y: WPMWidget._last_mouse_y,
+		Gui: WPMWidget._gui, Graph: WPMWidget._graph_gui, Suspended: A_IsSuspended}
+	try {
+		; No surface exists, so the resumed control cannot hide a real window.
+		WPMWidget._gui := false, WPMWidget._graph_gui := false
+		WPMWidget.visible := true
+		WPMWidget._last_mouse_x := Sentinel, WPMWidget._last_mouse_y := Sentinel
+		Suspend(true)
+		WPMWidget_MouseWatch()
+		AssertEqual(Sentinel, WPMWidget._last_mouse_x,
+			"AHK-33: the paused mouse watch must return before sampling the cursor, as WPMWidget_Tick does (metrics-timers-bypass-pause)")
+		AssertEqual(Sentinel, WPMWidget._last_mouse_y, "the paused mouse watch keeps its last position untouched")
+		Suspend(false)
+		WPMWidget_MouseWatch()
+		AssertTrue(WPMWidget._last_mouse_x != Sentinel && WPMWidget._last_mouse_y != Sentinel,
+			"positive control: the running mouse watch samples the real cursor")
+	} finally {
+		WPMWidget.visible := Saved.Visible
+		WPMWidget._last_mouse_x := Saved.X, WPMWidget._last_mouse_y := Saved.Y
+		WPMWidget._gui := Saved.Gui, WPMWidget._graph_gui := Saved.Graph
+		Suspend(Saved.Suspended)
+	}
 }
 
 
-Test("meta ahk-33: WPMWidget_MouseWatch gates on A_IsSuspended to mirror its sibling WPMWidget_Tick",
-	_TWMSG_CheckSuspendGuard)
+Test("meta ahk-33: WPMWidget_MouseWatch stays quiet while paused, like its sibling WPMWidget_Tick",
+	_TWMSG_PausedWatchStaysQuiet)
