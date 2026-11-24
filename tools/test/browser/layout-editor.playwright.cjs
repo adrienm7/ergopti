@@ -38,6 +38,7 @@ const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const studioControls = require('./studio-controls.cjs');
 // A layout's own levels (Neo 2's Mod3 and Mod4) on the Comparer's boards.
 const layoutLevels = require('./layout-levels.cjs');
+const { TEXT_SPACING_CSS } = require('./site-reading.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const KEYLAYOUT = path.join(ROOT, 'static', 'layouts', 'registry', 'ergopti', 'ergopti.keylayout');
@@ -3351,6 +3352,45 @@ async function exerciseLongLabels(browser, origin) {
 	await page.context().close();
 }
 
+/**
+ * (reading-spacing-refit) A reader's text spacing that arrives once the board
+ * is drawn (the WCAG 1.4.12 style sheet, or the site's « wide » spacing chosen
+ * while the editor is open) refits the legends: the editor's width does not
+ * change, and before the key names were watched the legend kept its old size,
+ * so « Space », below it, crossed the key's bottom edge.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseSpacingRefit(browser, origin) {
+	const { page, errors, context } = await studioUx.openOnErgopti(browser, origin, {
+		lang: 'fr',
+		viewport: { width: 720, height: 450 }
+	});
+	const crossing = () =>
+		page.$$eval('#le-board .le-key', (keys) =>
+			keys
+				.filter((key) => {
+					const edge = key.getBoundingClientRect().bottom - key.clientTop;
+					return [...key.querySelectorAll('.le-legend, .le-code')].some(
+						(part) => part.getBoundingClientRect().bottom > edge + 1
+					);
+				})
+				.map((key) => key.dataset.code)
+		);
+	const frames = () =>
+		page.evaluate(
+			() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		);
+	await frames();
+	assert.deepEqual(await crossing(), [], 'the board fits before the spacing');
+	await page.addStyleTag({ content: TEXT_SPACING_CSS });
+	await frames();
+	await frames();
+	assert.deepEqual(await crossing(), [], 'the board refits under the WCAG 1.4.12 spacing');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 /** At phone width, in light and dark, the page never scrolls sideways and stacks its columns. */
 /**
  * (layout-editor-workspace) Several personal layouts, never lost, on the
@@ -4375,6 +4415,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseKeyboardOnly(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
+		await exerciseSpacingRefit(browser, origin);
 		await exerciseShortcuts(browser, origin);
 		await exerciseComparerLink(browser, origin);
 		await exerciseComparerPicker(browser, origin);
