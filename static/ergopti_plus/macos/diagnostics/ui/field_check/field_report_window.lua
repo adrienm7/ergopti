@@ -135,6 +135,7 @@ function M.open(owner)
 		return false
 	end
 	-- The page's bridge is named after its apps.manifest.json id
+	-- config-key-literal-ok: the window's app id and bridge, named like the menu row
 	local usercontent, why = Channel.new("field_report")
 	if not usercontent then
 		Logger.error(LOG, "The field report window message channel could not be created: %s.", tostring(why))
@@ -153,7 +154,7 @@ function M.open(owner)
 	end
 	local factory_ok, view = xpcall(function()
 		return ui_builder.show_webview({
-			app_id = "field_report",
+			app_id = "field_report", -- config-key-literal-ok: the window's app id
 			delete_on_close = true,
 			frame = ui_builder.get_centered_frame(geo.width, geo.height),
 			style_masks = Channel.resizable_style(),

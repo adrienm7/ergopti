@@ -446,7 +446,7 @@ class FieldReportWindow extends WebViewHost {
 		LoggerStart(FIELD_REPORT_TAG, "Opening the field report window…")
 		WebViewHost._LoadManifest()
 		Host := FieldReportWindow()
-		Host.AppId := "field_report"
+		Host.AppId := "field_report" ; config-key-literal-ok: the window's app id, named like the menu row
 		Host.Owner := Owner
 		Host.Opts := Map("RunsWhilePaused", true,
 			"OnReady", (ReadyHost) => ReadyHost._Owned("OnReady"),
