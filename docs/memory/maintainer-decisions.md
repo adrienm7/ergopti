@@ -5,6 +5,33 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The reading font draws the tray menus too (2026-11-24)
+
+The reading font chosen in Configuration › Accessibilité
+(`script.reading_font`) applies to the tray menus as well as to the app's
+windows; an earlier pass had judged it infeasible and kept the system font.
+Mechanisms, one source for the faces (`_shared/ui/fonts/menu_faces.json`,
+sfnt decodes of the bundled WOFF2 written by `tools/build/import-menu-fonts.py`,
+since GDI and Core Text cannot load WOFF2):
+
+- macOS: the Swift launcher registers the faces for the login session
+  (`MenuFontRegistration.swift`, `CTFontManagerScope.session`) before it
+  starts Hammerspoon, which has no call that loads a font file, and
+  unregisters them on quit; the builder restyles every plain title as
+  `hs.styledtext` at the system menu size (`menu/ui/builder/reading_font.lua`,
+  `tray/adapters/menu_font.lua`), drawing the disabled grey itself.
+- Windows: tray-tree rows become owner-drawn on WM_INITMENUPOPUP
+  (`tray/adapters/menu_font.ahk`, face loaded with `AddFontResourceEx`,
+  FR_PRIVATE); the default font owner-draws nothing.
+- Linux: not possible. dbusmenu items carry no font and the desktop shell
+  draws the menu in its theme; the Linux row says so in its label
+  (`menu.configuration.reading_font_windows_only`) and the parity table carries
+  `platform_reason.reading_font_menus_need_native_drawing`.
+
+The label is « Police des fenêtres et menus » where menus follow. Do not
+reintroduce the « menus keep the system font » rule; a new tray surface draws
+in the reading font or states why it cannot.
+
 ## Wikisource texts are checked by the importer (2026-11-24)
 
 Confirmed by the maintainer on 2026-11-24 (TODO « Wikisource texts as
