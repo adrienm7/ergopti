@@ -50,7 +50,7 @@
 	--kpi-delegation-color: rgb(0, 86, 179);
 	/* Teal — same-finger bigram indicator (was rep color); 7:1 on its tinted
 	   button, where rgb(0, 155, 150) was 3.3:1 on white (WCAG 1.4.6). */
-	--kpi-sfb-color: rgb(0, 92, 88);
+	--kpi-sfb-color: rgb(0, 74, 71);
 	/* The two heatmaps' captions, 7:1 on the page (their fixed hues were 3:1). */
 	--heatmap-keys-caption: rgb(11, 79, 156);
 	--heatmap-sfb-caption: rgb(20, 83, 45);
@@ -107,7 +107,7 @@
 /* Variables mode SOMBRE */
 @media (prefers-color-scheme: dark) {
 	:root {
-		--heatmap-keys-caption: var(--theme-hue-1e96ff);
+		--heatmap-keys-caption: rgb(124, 192, 255);
 		--heatmap-sfb-caption: var(--theme-hue-22c55e);
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
 		--mono-bg: var(--theme-grey-111);
