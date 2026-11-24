@@ -129,9 +129,8 @@ accepted. It moves the reviewed test image of
 matching values in `test_number_row_current_test_causal.py` and the test row
 of `fixtures/number-row-current-test/build-inputs.json.raw` with
 `ROSTER_SHA`), with a new approval record for the published commit, instead
-of keeping the selection inside the XCTest process. The renewal branch is not
-integrated yet; until it is, `NumberRowSourceProbeTests.swift` still selects
-in process.
+of keeping the selection inside the XCTest process. Integrated on dev by
+9a5867cc49 (the image) and a96fc3333d (its review and approval records).
 
 ## Every timing duration is integer milliseconds (2026-11-22)
 
