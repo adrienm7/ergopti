@@ -1077,8 +1077,14 @@ Shipped as of 2026-11-14:
   `action=parse&oldid`, one request per 1.5 s) and keeps only their
   paragraphs (`wikisourceText`: no header, navigation, caption, footnote,
   style or hidden verse indent). The parser's HTML carries render ids, so the
-  pin is the SHA-256 of the text written, and the register note names the
-  pages and revisions read.
+  pin is the SHA-256 of the text written, and the register note names each
+  page read as « <title> (revision <revid>) ». The importer refuses a work
+  (`wikisourceRefusal`, tested by `tools/test/test-corpus-text-sources.cjs`)
+  unless its register entry is CC BY-SA 4.0 and credits « Wikisource
+  contributors », its `gutenberg_absent` records when and how Project
+  Gutenberg was found to lack it, and its `public_domain` years were free in
+  the year of that check: first published more than 95 years before (United
+  States) and its author dead more than 70 years before (European Union).
 - Tatoeba: the first 30,000 French and English sentences of the « detailed »
   exports, CC BY 2.0 FR. Each line keeps its sentence id and author, as the
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the
