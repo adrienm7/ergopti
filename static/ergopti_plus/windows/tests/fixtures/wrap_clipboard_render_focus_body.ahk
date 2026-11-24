@@ -2,7 +2,8 @@
 
 ; Real delayed clipboard rendering changes only between two child-owned windows.
 ; The public wrapper consumes an actual native-focus-validated UIA snapshot;
-; no UIA provider/COM execution is claimed. Clipboard and native paste are real.
+; no UIA provider/COM execution is claimed. The clipboard and the native Ctrl+V
+; are real; the Edits read the clipboard through known_reader_paste_body.ahk.
 ; After public emission the exact registered restore callback is disarmed;
 ; receiving is observed while the authenticated payload lease remains owned.
 ; Cleanup uses retained receipts, never an inferred post-restore sequence.
@@ -167,6 +168,7 @@ _WRF_Main() {
 		_UIA_SelectionCache := {Text: _WRF.EditA.Value, Hwnd: Before["hwnd"], Control: Before["control"],
 			InputEpoch: _UIA_CurrentInputEpoch(), CapturedAt: A_TickCount, Consumed: false}
 		Snapshot := _UIA_SelectionCache
+		_KRP_Install(_WRF.EditA, _WRF.EditB)
 		_WRF.Armed := true
 		WasCritical := Critical("On")
 		try {
@@ -182,8 +184,10 @@ _WRF_Main() {
 			Sleep(5)
 		if IsObject(_WRF.Failure)
 			throw _WRF.Failure
+		if IsObject(_KRP.Failure)
+			throw Error("The known reader could not read the clipboard on Ctrl+V: " . _KRP.Failure.Message)
 		FileAppend("OBSERVATION wrap-render-focus mode=" . _WRF.Mode . " render_calls=" . _WRF.RenderCalls
-			. " snapshot_consumed=" . Snapshot.Consumed . " sends=" . _WRF.Sends.Length
+			. " snapshot_consumed=" . Snapshot.Consumed . " sends=" . _WRF.Sends.Length . " known_reader_pastes=" . _KRP.Pastes
 			. " wrong_target=" . (_WRF.Sends.Length ? _WRF.Sends[1]["hwnd"] != Before["hwnd"] : false)
 			. " a_wrapped=" . (_WRF.EditA.Value == _WRF.Payload) . " b_wrapped=" . (_WRF.EditB.Value == _WRF.Payload)
 			. " fallbacks=" . _WRF.Fallbacks.Length . "`n", "*")
@@ -222,6 +226,7 @@ _WRF_Main() {
 				Primary := Err
 		}
 		OnMessage(0x305, _WRF_Render, 0)
+		_KRP_Uninstall()
 		if IsObject(_WRF.A)
 			_WRF.A.Destroy()
 		if IsObject(_WRF.B)

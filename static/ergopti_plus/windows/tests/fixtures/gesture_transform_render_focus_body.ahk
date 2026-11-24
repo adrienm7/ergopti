@@ -164,6 +164,7 @@ _WRF_Main() {
 		_WRF_Require(CB_WriteTextWithReceipt(_WRF.Seed, &SeedSequence) && SeedSequence,
 			"The initial native seed must supply its actual publication receipt.")
 		_WRF.Mutated := true
+		_KRP_Install(_WRF.EditA, _WRF.EditB)
 		_WRF.Armed := true
 		GestureTransformSelection((Text) => "[" . Text . "]")
 		Started := A_TickCount
@@ -176,8 +177,10 @@ _WRF_Main() {
 			Sleep(5)
 		if IsObject(_WRF.Failure)
 			throw _WRF.Failure
+		if IsObject(_KRP.Failure)
+			throw Error("The known reader could not read the clipboard on Ctrl+V: " . _KRP.Failure.Message)
 		FileAppend("OBSERVATION gesture-transform-render-focus mode=" . _WRF.Mode . " render_calls=" . _WRF.RenderCalls
-			. " manager_publications=" . _WRF.ManagerPublications . " copy_calls=" . _WRF.CopyCalls . " sends=" . _WRF.Sends.Length
+			. " manager_publications=" . _WRF.ManagerPublications . " copy_calls=" . _WRF.CopyCalls . " sends=" . _WRF.Sends.Length . " known_reader_pastes=" . _KRP.Pastes
 			. " wrong_target=" . (_WRF.Sends.Length ? _WRF.Sends[1]["hwnd"] != Before["hwnd"] : false)
 			. " a_wrapped=" . (_WRF.EditA.Value == _WRF.Payload) . " b_wrapped=" . (_WRF.EditB.Value == _WRF.Payload)
 			. " fallbacks=" . _WRF.Fallbacks.Length . "`n", "*")
@@ -218,6 +221,7 @@ _WRF_Main() {
 				Primary := Err
 		}
 		OnMessage(0x305, _WRF_Render, 0)
+		_KRP_Uninstall()
 		if IsObject(_WRF.A)
 			_WRF.A.Destroy()
 		if IsObject(_WRF.B)
