@@ -92,6 +92,7 @@ helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 			local templates = {}
 			for key, value in pairs(corpus.templates) do templates[key] = value end
 			templates.max_url_bytes = vector.max_url_bytes
+			templates.max_redirect_bytes = vector.max_redirect_bytes
 			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values, vector.notes)
 			if vector.expect_error then
 				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))

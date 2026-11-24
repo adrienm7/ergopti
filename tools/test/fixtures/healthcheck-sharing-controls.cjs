@@ -297,8 +297,14 @@ exports.run = function run(root) {
 		{ version: '1.0.10-dev.178', driver: 'macOS', os: 'macOS 15.1', diagnostics: head },
 		{ diagnostics: note }
 	);
+	// A signed-out click's login redirect carries the URL encoded again
+	const redirect = (templates.login_redirect_prefix + encodeURIComponent(url)).length;
 	assert.ok(url.length <= templates.max_url_bytes, 'the bug link fits its budget');
-	assert.ok(url.length > templates.max_url_bytes - 64, 'the bug link fills its budget');
+	assert.ok(redirect <= templates.max_redirect_bytes, 'its login redirect fits its budget');
+	assert.ok(
+		url.length > templates.max_url_bytes - 64 || redirect > templates.max_redirect_bytes - 64,
+		'the bug link fills one of its budgets'
+	);
 	const prefilled = decodeURIComponent(/[?&]diagnostics=([^&]*)/.exec(url)[1]);
 	const settingsTitle = '## ' + schema.export_strings['healthcheck.export.changed_settings'];
 	assert.ok(

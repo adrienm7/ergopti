@@ -458,8 +458,12 @@ _THPA_ReportBudget() {
 		Items.Push(Map("setting", Large["setting_prefix"] . A_Index, "type", "text", "value", "9"))
 	Document := HealthCheck_ShareDocument(Snapshot, Schema)
 	Url := IssueLink_BuildUrl(Templates, Config["repository"], "bug", Document["fields"], Document["notes"])
+	; A signed-out click's login redirect carries the URL encoded again
+	Redirect := StrLen(Templates["login_redirect_prefix"]) + StrLen(IssueLink_PercentEncode(Url))
 	AssertTrue(StrLen(Url) <= Templates["max_url_bytes"], "the bug link fits its budget")
-	AssertTrue(StrLen(Url) > Templates["max_url_bytes"] - 64, "the bug link fills its budget")
+	AssertTrue(Redirect <= Templates["max_redirect_bytes"], "its login redirect fits its budget")
+	AssertTrue(StrLen(Url) > Templates["max_url_bytes"] - 64 || Redirect > Templates["max_redirect_bytes"] - 64,
+		"the bug link fills one of its budgets")
 	AssertEqual("macOS", _THPA_QueryValue(Url, "driver"), "the Driver dropdown option")
 	Prefilled := _THPA_QueryValue(Url, "diagnostics")
 	Title := "## " . Schema["export_strings"]["healthcheck.export.changed_settings"]
