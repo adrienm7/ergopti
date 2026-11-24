@@ -107,7 +107,13 @@ function tablesOf(vector) {
 		vector.text !== undefined
 			? vector.text
 			: fs.readFileSync(path.join(VECTORS_DIR, vector.file), 'utf8');
-	return vector.keep_line_breaks ? countsWithLineBreaks(text) : E.ngramsFromText(text);
+	if (vector.keep_line_breaks) return countsWithLineBreaks(text);
+	// A text corpus ships the counts only its text gives (genkey's and
+	// Oxeylyzer's skipgrams of every gap); « chain » scores without them, as a
+	// count table is scored.
+	const tables = E.ngramsFromText(text);
+	if (!vector.chain) tables.analysers = S.textTables(text);
+	return tables;
 }
 
 /** The layout of one vector: a library layout or a Kalamine JSON file. */
@@ -215,6 +221,61 @@ for (const self of ['dead:1dk', '**']) {
 		for (const [gram, n] of Object.entries(cut.breaks[key])) merged[gram] = (merged[gram] || 0) + n;
 		same(merged, whole[key], `with the main ${key}`);
 	}
+}
+// The counts only a text gives (textTables), hand-counted from genkey's
+// corpus reader (pairs up to 9 apart weighted 1/2^(g−1) inside a run of its
+// valid characters) and Oxeylyzer's counter (pairs 1 to 3 apart in its token
+// stream, Shift tokens counted in the totals only). On these texts the
+// trigrams' chain is not exact, so the scores must follow the text's counts.
+{
+	const same = (got, expected, what) =>
+		check(
+			JSON.stringify(Object.entries(got).sort()) ===
+				JSON.stringify(Object.entries(expected).sort()),
+			`textTables ${what}: ${JSON.stringify(got)}, expected ${JSON.stringify(expected)}`
+		);
+	const genkeyText = 'abcde\nxbcdy\nAb?c d';
+	same(
+		S.textTables(genkeyText).genkey.skipgrams,
+		{
+			ac: 1.5,
+			bd: 2,
+			ce: 1,
+			ad: 0.5,
+			be: 0.5,
+			ae: 0.25,
+			xc: 1,
+			cy: 1,
+			xd: 0.5,
+			by: 0.5,
+			xy: 0.25,
+			'a/': 1,
+			bc: 1
+		},
+		'genkey skipgrams'
+	);
+	const oxey = S.textTables('Ab c\n\nDe').oxeylyzer;
+	same(oxey.bigrams, { ab: 1, de: 1 }, 'oxeylyzer bigrams');
+	same(oxey.skipgrams[0], { bc: 1 }, 'oxeylyzer skip-1');
+	same(oxey.skipgrams[1], { ac: 1 }, 'oxeylyzer skip-2');
+	same(oxey.skipgrams[2], { cd: 1 }, 'oxeylyzer skip-3');
+	check(
+		oxey.chars === 7 &&
+			JSON.stringify(oxey.totals) ===
+				JSON.stringify({ bigrams: 4, skipgrams: [3, 2, 2], trigrams: 2 }),
+		`textTables oxeylyzer totals: ${oxey.chars} characters, ${JSON.stringify(oxey.totals)}`
+	);
+	// A chain that splits a continuation: the scores read the text's counts.
+	const qwerty = library.get('qwerty');
+	// Repeated: Oxeylyzer truncates each weighted pair count to an integer.
+	const split = 'edcxd\nqdcxe\nedcwe\n'.repeat(100);
+	const withText = Object.assign(E.ngramsFromText(split), { analysers: S.textTables(split) });
+	for (const id of ['genkey', 'oxeylyzer'])
+		check(
+			S.score(id, qwerty, withText, { keyboard: 'ansi' }).value !==
+				S.score(id, qwerty, E.ngramsFromText(split), { keyboard: 'ansi' }).value,
+			`${id}: the text's own skipgrams are not used`
+		);
 }
 // Two fingerings side by side: on a text without spaces or digits, where
 // carpalx, keygen, genkey and Oxeylyzer finger QWERTY as the default model

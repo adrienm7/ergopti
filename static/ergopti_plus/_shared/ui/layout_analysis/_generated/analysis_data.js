@@ -11,6 +11,7 @@
 // Source: static/ergopti_plus/_shared/layouts/data/analysis/board_geometries.json
 // Source: static/corpus/register.json
 // Source: static/ergopti_plus/_shared/layouts/data/analysis/analyser_models.json
+// Source: static/ergopti_plus/_shared/ui/layout_analysis/analyser_scores.js (textTables)
 // Source: static/ergopti_plus/_shared/layouts/data/keycodes/physical_keys.json
 // Source: static/ergopti_plus/_shared/layouts/data/keycodes/keyboard_forms.json
 // Source: ../../layouts/registry (through layout_composer)

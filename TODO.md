@@ -374,17 +374,14 @@ waits for the maintainer's review).
       layouts differently from `half_scissors`; any non-zero floor (Cyanophage: SFB 0.3 %, hand balance 1 point).
       The Comparer's score settings edit each floor and grade with its help, and its export file
       (`ergopti-score-settings`, version 3) requires them.
-- [ ] **Longer skipgrams (2026-11-19).** genkey's gaps 1 to 9 and Oxeylyzer's 1 to 3 need skipgram tables in the
-      corpus format. Measured: gaps 2–3 add 1.26 MB to the 9.2 MB of corpus files (about +40 % per text corpus,
-      57 KB on Don Quichotte's 148 KB), gaps 2–9 5.93 MB (about +185 %); the 12 count-table corpora have no text to
-      count them from, and a character pair at gap g is a key pair at gap g only when no character between takes
-      two keys, so the key stream would no longer be exact (docs/design/analyser-scores.md, « Taken into the
-      Ergopti score »).
-- [ ] **Other analysers, what is left (2026-11-19).** genkey (1.3 % mean, 8.3 % max on code) and Oxeylyzer (trigram
-      shares within 0.07–0.29 point) stay « close » until the corpus tables carry skipgrams of gap 2 to 9 and
-      Oxeylyzer's token totals exactly (its saved counts lose one at a rate set by its exact total's bits).
-      keycraft (BSD-3, Go, its score scaled on its own layout set) needs a Go toolchain to be checked; shirolyzer's
-      score is undocumented.
+- [ ] **Other analysers, what is left (2026-11-24).** Every text corpus now carries genkey's skipgrams of gaps 1 to
+      9 and Oxeylyzer's token pairs of gaps 1 to 3 with its exact totals, counted from its text
+      (`LAYOUT_ANALYSER_SCORES.textTables`, `analysers` of each `_generated/corpus_<id>.js`, 1.43 MB for the 31 text
+      corpora; docs/design/analyser-scores.md, « API »). Left: rerun `verify-analyser-scores.cjs` with `--genkey`
+      and `--oxeylyzer` on a machine that may run the two tools (this cloud session could build genkey but not run
+      it) and set their fidelity to `exact` on texts if the gaps are gone; the word lists and the 12 count-table
+      corpora keep the trigrams' chain (no text to count from). keycraft (BSD-3, Go, its score scaled on its own
+      layout set) needs its own run to be checked; shirolyzer's score is undocumented.
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
