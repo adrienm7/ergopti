@@ -6,10 +6,12 @@
 --- Débogage's « Lancer le field report (tous les tests) » on macOS:
 --- 1. the shared report's contract (_shared/tests/lua/diagnostics/field_report_contract.lua);
 --- 2. the row stands just before Tests and the builder routes it;
---- 3. a click hands the app's field run session its steps in-process and, when
----    the run ends, shows one report with each Tests row title, the rows a
----    person runs separately and the results folder; a second click, a busy
----    session and a missing session only notify.
+--- 3. a click hands the app's field run session its steps in-process and opens
+---    the progress window, which follows each step and, when the run ends,
+---    holds the report with each Tests row title, the rows a person runs
+---    separately and the results folder; a second click brings the window back,
+---    a busy session and a missing session only notify; without a window the
+---    run goes on and its report opens in the one-click checks' dialog.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -41,7 +43,11 @@ end)
 
 --- A session double that records the observer.
 local function fake_session(answer)
-	local session = {}
+	local session = { cancelled = 0 }
+	function session:cancel_in_app()
+		self.cancelled = self.cancelled + 1
+		return true
+	end
 	function session:submit_in_app(observer)
 		if answer then return nil, answer end
 		self.observer = observer
@@ -70,49 +76,113 @@ local function with_report(session, body)
 		package.loaded["diagnostics.ui.field_check"] = nil
 		local Window = require("diagnostics.ui.field_check")
 		Window._reset()
-		local world = { notes = {}, alerts = {}, copies = {} }
+		local world = { notes = {}, pushed = {}, copies = {}, windows = 0, alerts = {}, fronts = 0 }
 		local services = {
 			notify = function(_, text) table.insert(world.notes, text) end,
-			alert = function(title, text, copy)
+			alert = function(title, text)
 				table.insert(world.alerts, { title = title, text = text })
-				return copy
+				return "close"
 			end,
-			copy = function(text) table.insert(world.copies, text); return true end,
 			after = function(_, fn) fn() end,
+			bring_to_front = function() world.fronts = world.fronts + 1; return true end,
 			session = function() if session then return session end return nil, "no folder" end,
 			coverage = function() return { points = { { id = "lease_117_140", checks = { { step = "field_lease" } } } } } end,
+			window = function(owner)
+				world.windows = world.windows + 1
+				if world.refuse_window then return false end
+				world.owner = owner
+				owner.bind({
+					push = function(message) table.insert(world.pushed, message); return true end,
+					close = function() world.closed = true end,
+				})
+				return true
+			end,
+			effects = {
+				open_folder = function(dir, done) world.folder = dir; done(true) end,
+				copy = function(text) table.insert(world.copies, text); return true end,
+				issue = function(line, text, done) world.issue = { line = line, text = text }; done(true) end,
+			},
 		}
 		body(Window, services, world)
 	end)
 end
 
 helpers.describe("field report: the macOS run", function()
-	helpers.it("hands the session its steps and shows one report once the run ends", function()
+	helpers.it("opens the progress window, follows each step and holds the report once the run ends", function()
 		local session = fake_session()
 		with_report(session, function(Window, services, world)
 			helpers.assert_true(Window.run_field_report(services))
-			helpers.assert_eq(world.notes[1], "[field_check.all.started]2")
+			helpers.assert_eq(world.windows, 1)
+			helpers.assert_eq(#world.notes, 0, "the window replaces the start notice")
 			helpers.assert_true(not Window.run_field_report(services), "a second click starts nothing")
-			helpers.assert_eq(world.notes[2], "[field_check.busy]")
+			helpers.assert_eq(world.fronts, 1, "a second click brings the window back")
+			helpers.assert_eq(#world.notes, 0)
 			session.observer.step_started(1, { id = "field_lease", check = "lease" })
+			world.owner.on_ready()
+			local init = world.pushed[1]
+			helpers.assert_eq(init.type, "init")
+			helpers.assert_eq(init.open_key, "field_report.open_finder")
+			helpers.assert_eq(init.steps[1].title, "[menu.debug.field_check_lease]")
+			helpers.assert_eq(init.steps[1].state, "running", "the step started before the page loaded")
+			helpers.assert_eq(init.steps[2].title, "key_accounting")
+			helpers.assert_eq(init.not_run[1].id, "guided_menus")
 			session.observer.step_recorded(1, {}, { step = "field_lease", verdict = "pass", codes = {},
 				report = { check = "lease", passed = true, steps = { { id = "cli_present", state = "pass" } } } })
+			helpers.assert_eq(world.pushed[2].state, "pass")
 			session.observer.step_started(2, { id = "key_accounting", check = "typing_selftest" })
 			session.observer.step_recorded(2, {}, { step = "key_accounting", verdict = "fail", codes = { "fail_x" },
 				report = { check = "typing_selftest", passed = false, steps = { { id = "x", state = "fail" } } } })
 			session.observer.finished({ request_id = "app-1", interrupted = false }, "/Users/u/fr/results/app-1")
-			helpers.assert_eq(#world.alerts, 1)
-			local alert = world.alerts[1]
-			helpers.assert_eq(alert.title, "[menu.debug.field_report]")
-			helpers.assert_contains(alert.text, "[field_check.all.verdict_fail]")
-			helpers.assert_contains(alert.text, "✅ [menu.debug.field_check_lease] — field_lease, lease_117_140\n    ✅ [field_check.step.cli_present]")
-			helpers.assert_contains(alert.text, "❌ key_accounting\n    ❌ x")
-			helpers.assert_contains(alert.text, "➖ guided_menus : [field_check.all.reason.needs_person]")
+			local done = world.pushed[#world.pushed]
+			helpers.assert_eq(done.type, "done")
+			helpers.assert_eq(done.passed, false)
+			helpers.assert_eq(done.folder, "/Users/u/fr/results/app-1")
+			world.owner.on_action("copy")
+			local text = world.copies[1]
+			helpers.assert_contains(text, "[field_check.all.verdict_fail]")
+			helpers.assert_contains(text, "✅ [menu.debug.field_check_lease] — field_lease, lease_117_140\n    ✅ [field_check.step.cli_present]")
+			helpers.assert_contains(text, "❌ key_accounting\n    ❌ x")
+			helpers.assert_contains(text, "➖ guided_menus : [field_check.all.reason.needs_person]")
 			-- The key accounting row's own check needs a person; the run's typing self-test does not replace the row
-			helpers.assert_contains(alert.text, "[field_check.all.separate_header]\n➖ [menu.debug.field_check_key_accounting]")
-			helpers.assert_contains(alert.text, "saved /Users/u/fr/results/app-1")
-			helpers.assert_eq(world.copies[1], alert.text)
+			helpers.assert_contains(text, "[field_check.all.separate_header]\n➖ [menu.debug.field_check_key_accounting]")
+			helpers.assert_contains(text, "saved /Users/u/fr/results/app-1")
+			world.owner.on_action("open_folder")
+			helpers.assert_eq(world.folder, "/Users/u/fr/results/app-1")
+			world.owner.on_action("issue")
+			helpers.assert_eq(world.issue.text, text)
+			helpers.assert_contains(world.issue.line, "check=field_report verdict=fail request=app-1")
+			helpers.assert_eq(#world.alerts, 0, "the report stays in its window")
+			helpers.assert_eq(session.cancelled, 0)
 			helpers.assert_true(Window.run_field_report(services), "a finished run can start again")
+		end)
+	end)
+
+	helpers.it("cancels the run when its window closes during it", function()
+		local session = fake_session()
+		with_report(session, function(Window, services, world)
+			helpers.assert_true(Window.run_field_report(services))
+			world.owner.on_action("close")
+			helpers.assert_eq(session.cancelled, 1, "closing the window during the run cancels it")
+			helpers.assert_true(world.closed)
+			session.observer.finished({ request_id = "app-1", interrupted = true }, "/Users/u/fr/results/app-1")
+			helpers.assert_eq(#world.alerts, 0, "a window the person closed opens no dialog")
+		end)
+	end)
+
+	helpers.it("without a window, goes on and shows its report in the dialog", function()
+		local session = fake_session()
+		with_report(session, function(Window, services, world)
+			world.refuse_window = true
+			helpers.assert_true(Window.run_field_report(services))
+			helpers.assert_eq(world.notes[1], "[field_check.all.started]2")
+			helpers.assert_true(not Window.run_field_report(services))
+			helpers.assert_eq(world.fronts, 0, "no window to bring back")
+			helpers.assert_eq(world.notes[2], "[field_check.busy]")
+			session.observer.finished({ request_id = "app-1", interrupted = false }, "/Users/u/fr/results/app-1")
+			helpers.assert_eq(#world.alerts, 1)
+			helpers.assert_eq(world.alerts[1].title, "[menu.debug.field_report]")
+			helpers.assert_contains(world.alerts[1].text, "saved /Users/u/fr/results/app-1")
+			helpers.assert_eq(session.cancelled, 0)
 		end)
 	end)
 
@@ -123,6 +193,7 @@ helpers.describe("field report: the macOS run", function()
 			helpers.assert_true(Window.run_field_report({ notify = services.notify, session = function() return nil, "x" end,
 				coverage = services.coverage }) == false)
 			helpers.assert_eq(world.notes[2], "[field_check.all.unavailable]")
+			helpers.assert_eq(world.windows, 0, "no window opens for a refused run")
 		end)
 	end)
 end)
