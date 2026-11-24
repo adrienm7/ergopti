@@ -84,12 +84,20 @@ function declarationProblems(features, menu, values) {
 			problems.push(`${featurePath} does not default to ${values[name][0]}`);
 		if (JSON.stringify([...entry.platforms].sort()) !== JSON.stringify(['ahk', 'hs', 'linux']))
 			problems.push(`${featurePath} is not on the three drivers`);
-		const row = menu.configuration_menu.find(
+		// A choice may be worded per driver (the reading font names the menus
+		// only where they are drawn in it), so its rows together offer it on the
+		// three drivers, each driver once.
+		const rows = menu.configuration_menu.filter(
 			(item) => item.type === 'choice' && item.path === featurePath
 		);
-		if (!row) problems.push(`the Configuration menu has no choice row for ${featurePath}`);
-		else if (row.platforms)
-			problems.push(`the ${featurePath} row is restricted to ${row.platforms}`);
+		if (rows.length === 0)
+			problems.push(`the Configuration menu has no choice row for ${featurePath}`);
+		const offered = rows.flatMap((row) => row.platforms || ['ahk', 'hs', 'linux']);
+		if (
+			rows.length > 0 &&
+			JSON.stringify([...offered].sort()) !== JSON.stringify(['ahk', 'hs', 'linux'])
+		)
+			problems.push(`the ${featurePath} rows offer it on ${offered}, not once on each driver`);
 	}
 	return problems;
 }
@@ -270,6 +278,17 @@ assert.equal(
 	declarationProblems(featureList, withoutRow, values).length,
 	1,
 	'a missing menu row is found'
+);
+const withoutLinuxRow = {
+	...menu,
+	configuration_menu: menu.configuration_menu.filter(
+		(row) => !(row.id === 'reading_font' && (row.platforms || []).includes('linux'))
+	)
+};
+assert.equal(
+	declarationProblems(featureList, withoutLinuxRow, values).length,
+	1,
+	'a driver the rows leave without the choice is found'
 );
 assert.equal(
 	declarationProblems(featureList, menu, { ...values, spacing: ['default', 'wider'] }).length,
