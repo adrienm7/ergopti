@@ -315,11 +315,6 @@ waits for the maintainer's review).
       register entry and corpus with a `title_key` in the 21 locales, then run the importer with `--record-pins`.
       Languages with no Optimiser label yet (Portuguese, Dutch: Leipzig has `por_wikipedia_2021_1M` and
       `nld_wikipedia_2021_1M`) also need their `layout_optimizer.language.<code>` string and a library layout.
-- [ ] **[LATER] Site keyboard for other layouts.** The site's Ergopti drawing is generated from
-      `static/layouts/sources/ergopti.toml` (`tools/codegen/codegen-site-keyboard.cjs`, display patch
-      `src/lib/keyboard/data/ergopti_display_patch.json`). Left from the maintainer's 2026-11-14 request: display and
-      emulate any layout source the same way (a patch per layout, or a default patch for layouts without Ergopti+
-      levels); the selector's older Ergopti versions (1.1 to 2.1) stay frozen snapshots without a source.
 - [ ] **« Ma frappe » saved read on macOS and Linux, field check (2026-11-21).** macOS and Linux now save each
       complete Studio read beside their store, in the Windows format (`_shared/metrics/data/studio_ngrams.json`,
       `snapshot`; vectors in `_shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json`), show it at once and
@@ -940,6 +935,15 @@ Each question names the default kept meanwhile; an answer moves into the item or
      presented, read from the same catalogues.
   2. Type the ★ replacements in the Studio's « Essayer » tab when Ergopti+ is chosen.
   3. Leave them out: the app shows its own hotstrings.
+- [ ] **Where the site shows another layout's keyboard (decided by the agent on 2026-11-24, to review by the
+      maintainer).** `tools/codegen/codegen-site-keyboard.cjs` now draws any layout source of its `LAYOUTS` with the
+      default patch (Ergopti's drawings and modifiers, the source's characters and a level per dead key, no Ergopti+
+      level): `static/layouts/visualisation/bepo.json` is drawn and emulated by the same keyboard, its dead keys
+      opened from the data's `dead_levels` (`site-structure.playwright.cjs`, other-layout-keyboard). Kept
+      meanwhile: no page shows it, and `bepo_1_1rc2.toml` is not drawn (two dead keys share « ˰ »). Choose:
+  1. **(recommended) A layout select beside the version select** of the Disposition Ergopti pages, Ergopti first.
+  2. A bépo drawing on the « Genèse et sources » page only.
+  3. Keep it in the Studio (the Comparer's boards) and off the site pages.
 - [ ] **Row jumps in the global score (review note).** Decided 2026-11-21: `row_jump` counts same-hand bigrams on
       different fingers only (one finger's move stays an SFB) and weighs half the SFB weight (`sfb` 5, `row_jump`
       2.5), on dev since 732f924251 ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »).

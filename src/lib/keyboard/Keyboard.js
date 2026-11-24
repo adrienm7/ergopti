@@ -19,6 +19,18 @@ const FINGER_NAMES = Object.freeze({
 const HAND_NAMES = Object.freeze({ left: 'gauche', right: 'droit' });
 
 /**
+ * The dead levels of a layout data, each to the glyph its dead key shows.
+ * @param {object} data - The layout data (static/layouts/visualisation).
+ * @returns {Object<string,string>}
+ * @throws {Error} When the data does not name its dead levels.
+ */
+export function layoutDeadLevels(data) {
+	if (!data.dead_levels || typeof data.dead_levels !== 'object')
+		throw new Error(`The layout data of ${data.name} names no dead_levels`);
+	return data.dead_levels;
+}
+
+/**
  * The words for a key's finger, or null for a key that no finger owns.
  * @param {string|undefined} finger - The layout data's finger.
  * @param {string|undefined} hand - The layout data's hand.
@@ -340,6 +352,9 @@ export class Keyboard {
 		let pressedKeyContent = pressedKey.dataset['content'];
 		let deadKey = pressedKey.dataset['style'] === 'deadkey';
 		let newLayer = layer;
+		// Each layout data names its dead levels and the glyph their dead key
+		// shows (codegen-site-keyboard.cjs), so any layout's dead keys open.
+		const deadLevels = layoutDeadLevels(get(stores_infos['layoutData']));
 
 		if (
 			pressedKeyName === 'LShift' ||
@@ -355,20 +370,12 @@ export class Keyboard {
 				Shift: 'Visuel',
 				AltGr: 'ShiftAltGr',
 				ShiftAltGr: 'AltGr',
-				CirconflexeShift: 'Circonflexe',
-				Circonflexe: 'CirconflexeShift',
-				TremaShift: 'Trema',
-				Trema: 'TremaShift',
-				ExposantShift: 'Exposant',
-				Exposant: 'ExposantShift',
-				IndiceShift: 'Indice',
-				Indice: 'IndiceShift',
-				GreekShift: 'Greek',
-				Greek: 'GreekShift',
-				RShift: 'R',
-				R: 'RShift',
-				CurrencyShift: 'Currency',
-				Currency: 'CurrencyShift',
+				...Object.fromEntries(
+					Object.keys(deadLevels).flatMap((level) => [
+						[level, level + 'Shift'],
+						[level + 'Shift', level]
+					])
+				),
 				À: 'Shift',
 				',': 'Shift',
 				default: 'Shift'
@@ -409,26 +416,11 @@ export class Keyboard {
 		}
 
 		// Dead Keys
-		if (pressedKeyContent === '◌̂' && deadKey) {
-			newLayer = 'Circonflexe';
-		}
-		if (pressedKeyContent === '◌̈' && deadKey) {
-			newLayer = 'Trema';
-		}
-		if (pressedKeyContent === 'ᵉ' && deadKey) {
-			newLayer = 'Exposant';
-		}
-		if (pressedKeyContent === 'ᵢ' && deadKey) {
-			newLayer = 'Indice';
-		}
-		if (['µ', 'δ'].includes(pressedKeyContent) && deadKey) {
-			newLayer = 'Greek';
-		}
-		if (pressedKeyContent === 'ℝ' && deadKey) {
-			newLayer = 'R';
-		}
-		if (pressedKeyContent === '¤' && deadKey) {
-			newLayer = 'Currency';
+		if (deadKey) {
+			const opened = Object.keys(deadLevels).find(
+				(level) => deadLevels[level] === pressedKeyContent
+			);
+			if (opened !== undefined) newLayer = opened;
 		}
 
 		if (plus) {
@@ -541,13 +533,12 @@ export class Keyboard {
 			Ctrl: ['LCtrl'], // RCtrl is a special case
 			AltGr: ['RAlt'],
 			ShiftAltGr: ['LShift', 'RShift', 'RAlt'],
-			CirconflexeShift: ['LShift', 'RShift'],
-			TremaShift: ['LShift', 'RShift'],
-			ExposantShift: ['LShift', 'RShift'],
-			IndiceShift: ['LShift', 'RShift'],
-			GreekShift: ['LShift', 'RShift'],
-			RShift: ['LShift', 'RShift'],
-			CurrencyShift: ['LShift', 'RShift']
+			...Object.fromEntries(
+				Object.keys(layoutDeadLevels(get(stores_infos['layoutData']))).map((level) => [
+					level + 'Shift',
+					['LShift', 'RShift']
+				])
+			)
 		};
 
 		// pressKey keys for the current layer

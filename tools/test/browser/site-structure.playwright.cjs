@@ -640,6 +640,64 @@ async function exerciseGeneratedKeyboard(page, origin, basePath) {
 }
 
 /**
+ * (other-layout-keyboard) The same drawing and emulation show another layout
+ * generated from its own source by the default patch: bépo's data served in
+ * place of Ergopti's shows bépo's characters, lists its dead levels in the
+ * level select, and its circumflex dead key opens the level its source gives.
+ */
+async function exerciseOtherLayoutKeyboard(page, origin, basePath) {
+	const file = path.join(__dirname, '../../../static/layouts/visualisation/bepo.json');
+	const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+	const cell = (key) => data.keys.find((candidate) => candidate.key === key);
+	const served = '**/layouts/visualisation/ergopti_v2.2.json';
+	await page.route(served, (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) })
+	);
+	try {
+		await visit(page, origin, basePath, '/ergopti');
+		const board = page.locator('#keyboard_presentation');
+		const key = (name) => board.locator(`keyboard-key[data-key='${name}']`);
+		const text = async (name) =>
+			key(name).evaluate((node) => (node.querySelector('div') ?? node).textContent);
+		await key('a').waitFor({ state: 'attached' });
+		await page.waitForFunction(
+			(expected) =>
+				document.querySelector("#keyboard_presentation keyboard-key[data-key='i'] div")
+					?.textContent === expected,
+			cell('i').Primary
+		);
+		for (const name of ['a', 'i', 'e', 'b'])
+			assert.equal(await text(name), cell(name).Primary, `bépo shows ${cell(name).Primary}`);
+		const options = await page
+			.locator('#keyboard-layer-presentation option')
+			.evaluateAll((nodes) => nodes.map((node) => node.value));
+		for (const level of Object.keys(data.dead_levels))
+			assert.ok(options.includes(level), `The level select offers bépo's ${level}`);
+		assert.ok(!options.includes('Layer'), 'bépo has no Ergopti+ level');
+		const circumflex = data.keys.find(
+			(candidate) =>
+				candidate['Primary-style'] === 'deadkey' && candidate.Primary === data.dead_levels.dead_005e
+		);
+		assert.ok(circumflex, 'bépo has its circumflex dead key on the base level');
+		await key(circumflex.key).dispatchEvent('click');
+		for (const name of ['a', 'e'])
+			assert.equal(
+				await text(name),
+				cell(name).dead_005e,
+				`the circumflex gives ${cell(name).dead_005e}`
+			);
+		await key('LShift').dispatchEvent('click');
+		assert.equal(
+			await text('a'),
+			cell('a').dead_005eShift,
+			'Shift on the dead level gives its capital'
+		);
+	} finally {
+		await page.unroute(served);
+	}
+}
+
+/**
  * The ★ replacements of the magic key catalogue, read here straight from the
  * TOML files the drivers load: the language-neutral file then each language
  * pack _index.toml declares for it, every section table in sections_order.
@@ -750,6 +808,7 @@ async function exerciseSiteStructure(page, origin, basePath) {
 	await exerciseTextReplacements(page, origin, basePath);
 	await exerciseDeadKeyLegends(page, origin, basePath);
 	await exerciseGeneratedKeyboard(page, origin, basePath);
+	await exerciseOtherLayoutKeyboard(page, origin, basePath);
 	await exerciseStudioHandoff(page, origin, basePath);
 	await exerciseRedirects(page, origin, basePath);
 	await exercisePhone(page, origin, basePath);
@@ -865,6 +924,7 @@ module.exports = {
 	STUDIO_TABS,
 	exerciseSiteStructure,
 	exerciseGeneratedKeyboard,
+	exerciseOtherLayoutKeyboard,
 	runEngine,
 	main
 };

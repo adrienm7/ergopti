@@ -508,9 +508,12 @@ const GENERATORS = [
 		]
 	},
 	{
-		// The site's keyboard drawings: the Ergopti layout source plus the display patch.
+		// The site's keyboard drawings: each layout source plus its display patch.
 		script: 'codegen/codegen-site-keyboard.cjs',
-		outputs: ['static/layouts/visualisation/ergopti_v2.2.json']
+		outputs: [
+			'static/layouts/visualisation/ergopti_v2.2.json',
+			'static/layouts/visualisation/bepo.json'
+		]
 	},
 	{
 		script: 'codegen/codegen-keystats-roi-policy.cjs',

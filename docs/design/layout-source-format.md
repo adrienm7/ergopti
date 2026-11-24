@@ -636,6 +636,14 @@ patch does not name; `tools/test/test-site-keyboard-data.cjs` re-reads every
 source cell from the raw TOML, and `site-structure.playwright.cjs`
 (generated-keyboard) checks the rendered table. After editing the source, run
 the codegen; the older versions of the site's selector are frozen snapshots.
+The same generator draws other layout sources (its `LAYOUTS`, today
+`bepo.toml` into `bepo.json`) with a default patch made from Ergopti's: the
+same ISO and ErgoDox drawings and modifier keys, every character key from the
+source, a level per source dead key named after its id, and no Ergopti+ level.
+Every file, the frozen snapshots included, names its dead levels with the
+glyph their dead key shows (`dead_levels`) and the levels its drawing offers
+(`level_labels`), which the emulation reads instead of knowing Ergopti's dead
+keys; a source whose dead keys share a glyph is refused.
 
 ## A key's shortcut key
 
