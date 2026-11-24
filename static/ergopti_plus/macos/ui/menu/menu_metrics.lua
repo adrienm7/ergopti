@@ -36,6 +36,9 @@ local ParentSource = require("menu.engine.frames.parent_source")
 
 local LOG = "menu_metrics"
 local exclusion_transactions = setmetatable({}, { __mode = "k" })
+-- Token of the Metrics start waiting for the hardware UUID read; a later toggle
+-- replaces or clears it so a stale read cannot start the engine.
+local _pending_activation = nil
 
 
 
@@ -558,6 +561,65 @@ function M.build(ctx)
 		exclude_apps = rows_exclude_apps,
 	}
 
+	--- Starts the keystats engine and the WPM producers once Metrics is ON,
+	--- compensating the published preference when the engine refuses.
+	--- @param Keystats table The keystats module.
+	--- @param WpmMenubar table|nil The WPM menubar module.
+	--- @param WpmWidget table|nil The WPM widget module.
+	--- @return boolean committed
+	local function activate_runtime(Keystats, WpmMenubar, WpmWidget)
+		local start_ok, started = pcall(Keystats.start, script_control)
+		if not start_ok or started ~= true then
+			-- The preference was published before runtime activation. Compensate
+			-- transactionally so the checkmark cannot claim Metrics is active while
+			-- its security-context watcher (and therefore the engine) is absent.
+			state.keystats_enabled = false
+			local rollback_saved = save_prefs() == true
+			state.keystats_enabled = false
+			Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
+				tostring(rollback_saved))
+			if WpmMenubar then
+				call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+			end
+			if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
+			updateMenu()
+			return false
+		end
+		if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
+			pcall(WpmMenubar.set_use_source_colors, state.keystats_menubar_colors)
+		end
+		if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
+			pcall(WpmWidget.set_use_source_colors, state.keystats_float_colors)
+		end
+		-- Gate on pause exactly like the 5 sibling per-feature toggles above
+		-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
+		-- dyn_include_realtime): re-enabling the master switch while paused must
+		-- record the preference but NOT arm the widget's 0.2s render timer +
+		-- global mouse eventtap or the menubar's 0.5s timer until resume
+		-- (« pause = tout éteint », F-L10) — this call site was the one place
+		-- that still started both unconditionally on re-enable (F-LOW-13).
+		local wpm_committed = true
+		if state.keystats_menubar_wpm and not paused_now() then
+			if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
+				compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
+				wpm_committed = false
+			end
+		end
+		if state.keystats_float_wpm and not paused_now() then
+			if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+				state.keystats_float_graph) then
+				compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
+				wpm_committed = false
+			end
+		end
+		if not wpm_committed then
+			updateMenu()
+			return false
+		end
+		updateMenu()
+		return true
+	end
+
 	--- The category switch: the metrics submenu's first row (the manifest's
 	--- metrics_toggle). It used to be the parent row's action, which AppKit never
 	--- sends for an item that opens a submenu, so Metrics could not be switched on
@@ -601,55 +663,33 @@ function M.build(ctx)
 			if Keystats and type(Keystats.set_disabled_apps) == "function" then
 				pcall(Keystats.set_disabled_apps, state.keystats_disabled_apps or {})
 			end
-			local start_ok, started = pcall(Keystats.start, script_control)
-			if not start_ok or started ~= true then
-				-- The preference was published before runtime activation. Compensate
-				-- transactionally so the checkmark cannot claim Metrics is active while
-				-- its security-context watcher (and therefore the engine) is absent.
-				state.keystats_enabled = false
-				local rollback_saved = save_prefs() == true
-				state.keystats_enabled = false
-				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
-					tostring(rollback_saved))
-				if WpmMenubar then
-					call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+			-- The first start needs the hardware UUID. Read on the main thread it
+			-- holds the run loop about 150 ms (field report 2026-11-03), so a toggle
+			-- with no boot prefetch reads it in an ioreg child and starts once the
+			-- read settles. A failed read resumes too: the start then reads it
+			-- synchronously, as the boot path does.
+			if type(Keystats.prepare_start) == "function" then
+				local token = {}
+				_pending_activation = token
+				local prepared, ready = pcall(Keystats.prepare_start, function()
+					if _pending_activation ~= token then return end
+					_pending_activation = nil
+					if not state.keystats_enabled then return end
+					activate_runtime(Keystats, WpmMenubar, WpmWidget)
+				end)
+				if prepared and ready == false then
+					Logger.info(LOG, "Metrics start waits for the hardware UUID read.")
+					updateMenu()
+					return true
 				end
-				if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
-				updateMenu()
-				return false
-			end
-			if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
-				pcall(WpmMenubar.set_use_source_colors, state.keystats_menubar_colors)
-			end
-			if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
-				pcall(WpmWidget.set_use_source_colors, state.keystats_float_colors)
-			end
-			-- Gate on pause exactly like the 5 sibling per-feature toggles above
-			-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
-			-- dyn_include_realtime): re-enabling the master switch while paused must
-			-- record the preference but NOT arm the widget's 0.2s render timer +
-			-- global mouse eventtap or the menubar's 0.5s timer until resume
-			-- (« pause = tout éteint », F-L10) — this call site was the one place
-			-- that still started both unconditionally on re-enable (F-LOW-13).
-			local wpm_committed = true
-			if state.keystats_menubar_wpm and not paused_now() then
-				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-					compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
-					wpm_committed = false
+				_pending_activation = nil
+				if not prepared then
+					Logger.warn(LOG, "Metrics start preparation raised (%s); starting now.", tostring(ready))
 				end
 			end
-			if state.keystats_float_wpm and not paused_now() then
-				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-					state.keystats_float_graph) then
-					compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
-					wpm_committed = false
-				end
-			end
-			if not wpm_committed then
-				updateMenu()
-				return false
-			end
+			return activate_runtime(Keystats, WpmMenubar, WpmWidget)
 		else
+			_pending_activation = nil
 			local runtime_settled = true
 			local stop_ok, stopped = pcall(Keystats.stop)
 			if not stop_ok or stopped ~= true then
