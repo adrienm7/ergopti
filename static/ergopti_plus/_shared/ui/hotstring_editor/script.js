@@ -275,9 +275,9 @@ function showConfirm(msg, fn, opts = {}) {
 
 	const okBtn = document.getElementById('confirm-ok');
 	okBtn.textContent = opts.okLabel || _t('common.delete');
-	// Deep tones under the white label (4.5:1, WCAG 1.4.3): the system red and
+	// Deep tones under the white label (7:1, WCAG 1.4.6): the system red and
 	// orange are too light for it.
-	okBtn.style.background = opts.okColor || 'var(--theme-hue-b3261e)';
+	okBtn.style.background = opts.okColor || 'var(--theme-hue-8a1a14)';
 
 	_confirmCb = fn;
 	openModal('confirm-modal');
@@ -1489,7 +1489,7 @@ function saveEntry(andNew) {
 			executeSave,
 			{
 				okLabel: _t('editor.hotstrings.btn_redefine') || 'Redefine',
-				okColor: ThemeTokens.color('hue-9a6700'),
+				okColor: ThemeTokens.color('hue-5c3800'),
 				isWarning: true
 			}
 		);

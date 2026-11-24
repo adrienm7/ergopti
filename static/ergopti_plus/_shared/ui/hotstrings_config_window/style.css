@@ -105,12 +105,12 @@ body {
 }
 /* The system reds are too light for text on the window (WCAG 1.4.3). */
 .btn-danger {
-	color: var(--theme-hue-b3261e);
+	color: var(--theme-hue-8a1a14);
 }
 
 @media (prefers-color-scheme: dark) {
 	.btn-danger {
-		color: var(--theme-hue-ff8e85);
+		color: var(--theme-hue-ffc4bf);
 	}
 }
 

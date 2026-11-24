@@ -27,12 +27,12 @@
 	--border: var(--theme-separator);
 	--text: var(--theme-text);
 	--sub: var(--theme-sub);
-	/* Hints are small text: 4.5:1 on the window in both appearances (WCAG 1.4.3). */
+	/* Hints and chips are small text: 7:1 on their ground in both appearances (WCAG 1.4.6). */
 	--hint: var(--theme-hue-48484c);
 	--accent: var(--theme-accent);
 	--danger: var(--theme-danger);
 	--chip-bg: var(--theme-hue-ddeeff);
-	--chip-c: var(--theme-hue-1a4bbf);
+	--chip-c: var(--theme-hue-0a3a6e);
 	--chip-bd: rgba(26, 75, 191, 0.22);
 }
 
@@ -40,7 +40,7 @@
 	:root {
 		--hint: var(--theme-hue-c4c4ca);
 		--chip-bg: var(--theme-hue-183060);
-		--chip-c: var(--theme-hue-93b8f8);
+		--chip-c: var(--theme-hue-c6d8f5);
 		--chip-bd: rgba(147, 184, 248, 0.28);
 	}
 }

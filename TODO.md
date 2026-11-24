@@ -153,14 +153,12 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
 
 - [ ] **[CODE] AAA findings down to zero (maintainer, 2026-11-23).** axe-core's AAA rules (`wcag2aaa`,
       `wcag21aaa`, `wcag22aaa`, one list in `tools/test/lib/wcag-tags.cjs`) run in the site, Studio and app-window
-      gates: any new finding fails CI. The shared text tokens of `theme.css` now hold 7:1 in both themes
-      (`test-app-colour-contrast.cjs`, section 7); what is left is recorded in the baselines, all
-      `color-contrast-enhanced`: 4 site nodes (the changelog frame) and 402 app-window nodes, colours a page spells
-      itself (the changelog's dark palette, the download window, the metrics dashboards' tints, the editors' chips,
-      the paths, token and physical-shortcut editors). Left: lower both baselines to zero; a check that measures the 44 px of 2.5.5 (axe's
-      `target-size` stops at the AA 24 px); the public statement `/accessibilite` still names AA as the target
-      (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its check, are in
-      [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual audit below.
+      gates: any new finding fails CI. `color-contrast-enhanced` is at zero in both baselines since 2026-11-24
+      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). Left: a check that measures the 44 px
+      of 2.5.5 (axe's `target-size` stops at the AA 24 px); the public statement `/accessibilite` still names AA as
+      the target (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its
+      check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual
+      audit below.
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the

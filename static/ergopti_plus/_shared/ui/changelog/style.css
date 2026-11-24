@@ -66,7 +66,7 @@ body {
 	background: var(--theme-gray5-dark);
 	border: 1px solid var(--theme-gray4-dark);
 	border-radius: 6px;
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 	cursor: pointer;
 	flex: 1;
 	font-size: 11px;
@@ -86,7 +86,7 @@ body {
 .channel-btn.active {
 	background: rgba(10, 132, 255, 0.18);
 	border-color: rgba(10, 132, 255, 0.55);
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 }
 
 #release-list {
@@ -136,7 +136,7 @@ body {
 }
 
 .release-item.prerelease .release-item-tag {
-	color: var(--theme-hue-bf7af0);
+	color: var(--theme-hue-d9b3f7);
 }
 
 .release-item-tag {
@@ -147,9 +147,9 @@ body {
 	font-weight: 600;
 }
 
-/* #999: the #666 grey gave 2.6:1 on the dark sidebar (WCAG 1.4.3). */
+/* A light grey: 7:1 on the dark sidebar (WCAG 1.4.6). */
 .release-item-date {
-	color: var(--theme-grey-999);
+	color: var(--theme-hue-c8c8cc);
 	display: block;
 	font-size: 11px;
 	margin-top: 2px;
@@ -169,13 +169,13 @@ body {
 .badge-prerelease {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.35);
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 }
 
 .badge-latest {
 	background: rgba(48, 209, 88, 0.15);
 	border: 1px solid rgba(48, 209, 88, 0.35);
-	color: var(--theme-green-dark);
+	color: var(--theme-hue-9ae6ac);
 }
 
 /* The build that runs: the row is marked and has no install button. */
@@ -233,7 +233,7 @@ body {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.55);
 	border-radius: 6px;
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;
@@ -272,7 +272,7 @@ body {
 }
 
 #release-meta {
-	color: var(--theme-grey-999);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 12px;
 }
 
@@ -280,7 +280,7 @@ body {
 	background: rgba(48, 209, 88, 0.1);
 	border: 1px solid rgba(48, 209, 88, 0.4);
 	border-radius: 7px;
-	color: var(--theme-green-dark);
+	color: var(--theme-hue-9ae6ac);
 	cursor: pointer;
 	display: none;
 	font-size: 12px;
@@ -300,7 +300,7 @@ body {
 	background: rgba(10, 132, 255, 0.14);
 	border: 1px solid rgba(10, 132, 255, 0.5);
 	border-radius: 7px;
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 	cursor: pointer;
 	display: none;
 	font-size: 12px;
@@ -362,7 +362,7 @@ body {
 	background: rgba(10, 132, 255, 0.18);
 	border: 1px solid rgba(10, 132, 255, 0.55);
 	border-radius: 6px;
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;
@@ -428,7 +428,7 @@ body {
 	font-size: 14px;
 }
 #release-body h4 {
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 	font-size: 13px;
 }
 
@@ -454,7 +454,7 @@ body {
 #release-body code {
 	background: var(--theme-gray5-dark);
 	border-radius: 4px;
-	color: var(--theme-hue-bf7af0);
+	color: var(--theme-hue-d9b3f7);
 	font-family: 'SF Mono', 'Fira Mono', monospace;
 	font-size: 12px;
 	padding: 1px 5px;
@@ -494,7 +494,7 @@ body {
 /* Underlined at rest: a link inside a sentence must not differ from the text
    by its colour alone (WCAG 1.4.1). */
 #release-body a {
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 	cursor: pointer;
 	text-decoration: underline;
 }
@@ -542,7 +542,7 @@ body {
 
 #release-body th {
 	background: var(--theme-hue-111113);
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 	font-weight: 600;
 }
 
@@ -663,7 +663,7 @@ body {
 }
 
 #error-text {
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 	font-size: 13px;
 	line-height: 1.6;
 	max-width: 360px;
@@ -681,7 +681,7 @@ body {
 	background: rgba(10, 132, 255, 0.12);
 	border: 1px solid rgba(10, 132, 255, 0.45);
 	border-radius: 7px;
-	color: var(--theme-hue-4da6ff);
+	color: var(--theme-hue-a8d8ff);
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 500;
