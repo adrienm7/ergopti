@@ -274,7 +274,8 @@ tbody tr.active .name-cell::after {
 	background: var(--accent);
 	border: none;
 	border-radius: 6px;
-	color: var(--theme-hue-06243f);
+	/* Black on the light blue holds 7:1 (WCAG 1.4.6); the dark navy was 5.9:1. */
+	color: var(--theme-black);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 600;
@@ -391,8 +392,10 @@ tbody tr.group .group-active {
 	margin-inline-start: 8px;
 }
 
+/* A lighter blue than the accent: 9.8:1 on the dark rows, where the accent
+   was 6.2:1 (WCAG 1.4.6). */
 tbody tr.group .group-active {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
 }
 
 /* The thin line between the local backends and the remote API. */
