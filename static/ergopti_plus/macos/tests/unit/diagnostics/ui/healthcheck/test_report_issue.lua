@@ -696,6 +696,36 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 		helpers.assert_contains(calls.open_url[1], "version=2.4.0&driver=macOS&os=")
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
 	end)
+
+	helpers.it("the field report issue carries the evidence line, the clipboard the redacted report", function()
+		local Report, calls, overrides = load_report()
+		package.loaded["diagnostics.ui.healthcheck.core"] = {
+			DRIVER = "macos",
+			config = documents,
+			run = function(opts)
+				local versions = type(opts) == "table" and opts.local_state == true and { ergopti_version = "2.4.0" } or {}
+				return { driver = "macos", sections = { versions = versions, system = { os = "macOS 15.1" } } }
+			end,
+		}
+		local line = "check=field_report verdict=fail request=app-20261124T120000Z pass=1 fail=1 not_run=1"
+			.. " field_lease=pass key_accounting=fail"
+		local home = overrides.identity().home
+		local completed
+		Report.report_field_run(line, "Field report\nSaved in: " .. home .. "/Library/fr", async_effects(overrides),
+			function(ok) completed = ok end)
+		local refused = pcall(Report.report_field_run, "Saved in " .. home, "x", async_effects(overrides), function() end)
+		package.loaded["diagnostics.ui.healthcheck.core"] = nil
+		helpers.assert_eq(completed, true)
+		helpers.assert_true(not refused, "a line outside the evidence grammar never reaches a form")
+		helpers.assert_true(not calls.copy[1]:find(home, 1, true), "the clipboard holds the redacted report")
+		helpers.assert_contains(calls.copy[1], "Saved in: ")
+		local repo = documents().repository
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
+		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), line, "the form carries the evidence line")
+		helpers.assert_contains(calls.open_url[1], "driver=macOS")
+		helpers.assert_true(not calls.open_url[1]:find(home, 1, true), "the URL carries no home folder")
+	end)
 end)
 
 
