@@ -188,7 +188,7 @@ baseline as violations go.
 - [ ] **Manual audit.** A checklist per page and per native window (keyboard walk, NVDA, JAWS, Narrator, VoiceOver,
       Orca, 400 % zoom and 320 px reflow), recorded in docs/audits/accessibility/. The axe scan covers the app's own
       WebView windows since the fifth pass (21 windows, `npm run test:browser:app-accessibility`, fake host and
-      fixture data); left there: the layout manager's 35 contrast nodes (its files were being changed elsewhere).
+      fixture data); the layout manager's contrast nodes are gone too (0 in both schemes, 2026-11-24).
 - [ ] **Colour vision.** The onboarding, download window and hotstring palette review is done (fourth pass,
       [audit](docs/audits/accessibility/README.md#colour-vision-review)). The preview rows now carry a glyph per
       category beside the trigger label on the three drivers (✓ autocorrection, ✦ magic key, ✎ personal, • other;
