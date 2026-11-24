@@ -262,8 +262,8 @@ baseline as violations go.
       titles only; the app windows' check, proved first on a small page): every Studio page and tab passes.
       Since 2026-11-24 the typing heatmaps' keys take the focus (one Tab stop per drawing, the arrow keys
       between keys, the popup beside the focused key, Escape hides it) and the scan reads hover handlers written
-      in markup too. Left: the macOS and Linux native windows; the apps table's column explanations are still
-      hover only (the same counts are in the tables).
+      in markup too, and the apps table's column explanations are listed under it (« What the columns mean »),
+      each header described by its entry. Left: the macOS and Linux native windows.
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`

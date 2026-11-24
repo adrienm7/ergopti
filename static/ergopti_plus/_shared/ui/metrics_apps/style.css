@@ -727,3 +727,22 @@ tr:hover td {
 	white-space: pre-wrap;
 	z-index: 9999;
 }
+
+/* The apps table's column explanations, folded under it. */
+.column-help {
+	font-size: 0.9em;
+	margin-top: 10px;
+}
+.column-help > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+.column-help dl {
+	display: grid;
+	gap: 4px 12px;
+	grid-template-columns: max-content 1fr;
+	margin: 8px 0 0;
+}
+.column-help dd {
+	margin: 0;
+}
