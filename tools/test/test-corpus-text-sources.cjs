@@ -107,9 +107,7 @@ let checks = 0;
 		}
 		const entry = register[source.output];
 		assert(entry, `${source.output} has a register entry`);
-		assert.equal(entry.url, Import.workPage(source.work), `${source.output}: register URL`);
-		assert.equal(entry.licence, 'CC BY-SA 4.0', `${source.output}: Wikisource's licence`);
-		assert(/Wikisource contributors/.test(entry.attribution), `${source.output}: credited`);
+		assert.equal(Import.wikisourceRefusal(source, entry), '', `${source.output} may ship`);
 		assert.equal(entry.status, 'ship', `${source.output} ships`);
 		assert(shipped.has(`static/corpus/${source.output}`), `${source.output} is a corpus`);
 		const text = fs.readFileSync(path.join(CORPUS, source.output));
@@ -126,6 +124,61 @@ let checks = 0;
 	assert.equal(
 		Import.revisionParse(5672369),
 		'https://fr.wikisource.org/w/api.php?action=parse&oldid=5672369&prop=text&format=json&formatversion=2'
+	);
+	checks++;
+}
+
+// The maintainer's Wikisource rule (2026-11-21, confirmed 2026-11-24): each
+// broken piece of a valid work is refused with its own reason.
+{
+	const page = { title: 'Ouvrage/1', revid: 42 };
+	const valid = () => ({
+		source: {
+			work: 'Ouvrage',
+			public_domain: { author_died: 1900, published: 1890 },
+			gutenberg_absent: { checked_on: '2026-11-24', evidence: 'no ebook in the catalogue' },
+			pages: [{ ...page }]
+		},
+		entry: {
+			url: Import.workPage('Ouvrage'),
+			licence: Import.WIKISOURCE_LICENCE,
+			attribution: `An Author; ${Import.WIKISOURCE_CREDIT} (CC BY-SA 4.0)`,
+			note: `Pages and revisions read: ${Import.pageCitation(page)}.`
+		}
+	});
+	assert.equal(Import.wikisourceRefusal(valid().source, valid().entry), '');
+	assert.equal(Import.pageCitation(page), 'Ouvrage/1 (revision 42)');
+	const broken = [
+		[(w) => (w.entry = undefined), /must list it with url/],
+		[(w) => (w.entry.licence = 'Public domain'), /licence must be CC BY-SA 4\.0/],
+		[(w) => (w.entry.attribution = 'An Author'), /must credit « Wikisource contributors »/],
+		[(w) => (w.source.pages = []), /pages are not listed/],
+		[(w) => (w.source.pages[0].title = 'Autre/1'), /is not a page of Ouvrage/],
+		[(w) => (w.source.pages[0].revid = 0), /no revision/],
+		[
+			(w) => (w.entry.note = 'Pages read: Ouvrage/1.'),
+			/note must name « Ouvrage\/1 \(revision 42\) »/
+		],
+		[(w) => delete w.source.gutenberg_absent, /gutenberg_absent must record/],
+		[(w) => (w.source.gutenberg_absent.evidence = ' '), /gutenberg_absent must record/],
+		[(w) => (w.source.gutenberg_absent.checked_on = '24/11/2026'), /gutenberg_absent must record/],
+		// 2026 - 95: a work published in 1931 is still protected in the US.
+		[(w) => (w.source.public_domain.published = 1931), /published must be before 1931/],
+		// 2026 - 70: an author who died in 1956 is still protected in the EU.
+		[(w) => (w.source.public_domain.author_died = 1956), /author_died must be before 1956/],
+		[(w) => delete w.source.public_domain, /published must be before/]
+	];
+	for (const [breakIt, reason] of broken) {
+		const work = valid();
+		breakIt(work);
+		assert.match(Import.wikisourceRefusal(work.source, work.entry), reason);
+	}
+	const lastFree = valid();
+	lastFree.source.public_domain = { published: 1930, author_died: 1955 };
+	assert.equal(
+		Import.wikisourceRefusal(lastFree.source, lastFree.entry),
+		'',
+		'the last free years'
 	);
 	checks++;
 }

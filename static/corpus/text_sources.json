@@ -1,5 +1,5 @@
 {
-	"_description": "The Project Gutenberg ebooks and Wikisource works of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>. wikisource_texts: each French Wikisource work's page revisions, in reading order; the importer reads each revision's parse output (https://fr.wikisource.org/w/api.php?action=parse&oldid=<revid>, or <revid>.json from --archive-dir), keeps its paragraphs by one extraction rule and writes output only if the SHA-256 of the text is sha256 (the parser's HTML carries render ids, so the text is pinned, not the download). Its register entry is under the work's page URL https://fr.wikisource.org/wiki/<work>.",
+	"_description": "The Project Gutenberg ebooks and Wikisource works of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>. wikisource_texts: each French Wikisource work's page revisions, in reading order; the importer reads each revision's parse output (https://fr.wikisource.org/w/api.php?action=parse&oldid=<revid>, or <revid>.json from --archive-dir), keeps its paragraphs by one extraction rule and writes output only if the SHA-256 of the text is sha256 (the parser's HTML carries render ids, so the text is pinned, not the download). Its register entry is under the work's page URL https://fr.wikisource.org/wiki/<work>, licensed CC BY-SA 4.0, crediting « Wikisource contributors » and naming each page read as « <title> (revision <revid>) » in its note. public_domain gives the author's death year and the first publication year, gutenberg_absent when (checked_on) and how (evidence) Project Gutenberg was found to lack the work; the importer refuses a work published 95 years or less, or whose author died 70 years or less, before the year of checked_on (wikisourceRefusal).",
 	"schema_version": 1,
 	"texts": [
 		{
@@ -72,6 +72,14 @@
 		{
 			"output": "original/fr/hemon_maria_chapdelaine.txt",
 			"work": "Maria Chapdelaine",
+			"public_domain": {
+				"author_died": 1913,
+				"published": 1914
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the edition or the work (Q59688419, Q1369094); not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
 			"pages": [
 				{
 					"title": "Maria Chapdelaine/1",
@@ -143,6 +151,14 @@
 		{
 			"output": "original/fr/renard_poil_de_carotte.txt",
 			"work": "Poil de Carotte",
+			"public_domain": {
+				"author_died": 1910,
+				"published": 1894
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the edition or the work (Q131840645, Q128918); not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
 			"pages": [
 				{
 					"title": "Poil de Carotte/01",
@@ -346,6 +362,14 @@
 		{
 			"output": "original/fr/philippe_bubu_de_montparnasse.txt",
 			"work": "Bubu de Montparnasse",
+			"public_domain": {
+				"author_died": 1909,
+				"published": 1901
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the work; not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
 			"pages": [
 				{
 					"title": "Bubu de Montparnasse/Texte entier",

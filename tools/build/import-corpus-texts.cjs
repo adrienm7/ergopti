@@ -34,6 +34,12 @@
  *    footnotes go; footnote calls, page-number anchors, soft hyphens and zero-width characters
  *    go; entities are decoded, runs of spaces and line breaks become one
  *    space, and non-breaking spaces stay, as French typography types them.
+ * 6. A Wikisource work ships only under the maintainer's rule (2026-11-21,
+ *    confirmed 2026-11-24): a public-domain work Project Gutenberg lacks,
+ *    under CC BY-SA 4.0 with « Wikisource contributors » credited, its
+ *    register note naming every page and revision read (wikisourceRefusal).
+ *    The public-domain years are judged at the year the Gutenberg absence was
+ *    checked, so a pass stays a pass as the cut-offs only move forward.
  * ==============================================================================
  */
 
@@ -59,6 +65,14 @@ const WIKISOURCE_WIKI = 'fr.wikisource.org';
 // The named entities MediaWiki's parser writes in running text; it writes
 // every other character as itself or as a numeric reference.
 const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
+// Wikisource's page licence and credit, the register's spelling of both.
+const WIKISOURCE_LICENCE = 'CC BY-SA 4.0';
+const WIKISOURCE_CREDIT = 'Wikisource contributors';
+// United States: a work published 95 years before a year's 1 January is in
+// the public domain that year. European Union: 70 years after the end of the
+// year the author died.
+const US_TERM_YEARS = 95;
+const EU_TERM_YEARS = 70;
 
 /** Exits with a reason. */
 function fail(message) {
@@ -201,6 +215,43 @@ function wikisourceWork(source, archiveDir, scratch) {
 	return text;
 }
 
+/** How the register note names one page read: its title, then its revision. */
+const pageCitation = (page) => `${page.title} (revision ${page.revid})`;
+
+/**
+ * Why a Wikisource work may not ship, or '' when it may: the maintainer's rule
+ * of feature 6, checked on its text_sources.json entry and register entry.
+ * @param {object} source - Its wikisource_texts entry.
+ * @param {object|undefined} entry - Its static/corpus/register.json entry.
+ * @returns {string} The first refusal, or ''.
+ */
+function wikisourceRefusal(source, entry) {
+	if (!entry || entry.url !== workPage(source.work))
+		return `static/corpus/register.json must list it with url ${workPage(source.work)}`;
+	if (entry.licence !== WIKISOURCE_LICENCE) return `its licence must be ${WIKISOURCE_LICENCE}`;
+	if (!String(entry.attribution || '').includes(WIKISOURCE_CREDIT))
+		return `its attribution must credit « ${WIKISOURCE_CREDIT} »`;
+	if (!Array.isArray(source.pages) || source.pages.length === 0) return 'its pages are not listed';
+	for (const page of source.pages) {
+		if (typeof page.title !== 'string' || !page.title.startsWith(`${source.work}/`))
+			return `${page.title} is not a page of ${source.work}`;
+		if (!Number.isSafeInteger(page.revid) || page.revid <= 0) return `${page.title}: no revision`;
+		if (!String(entry.note || '').includes(pageCitation(page)))
+			return `its register note must name « ${pageCitation(page)} »`;
+	}
+	const absent = source.gutenberg_absent;
+	const checked = /^(\d{4})-\d{2}-\d{2}$/.exec(absent?.checked_on || '');
+	if (!checked || typeof absent.evidence !== 'string' || absent.evidence.trim() === '')
+		return 'gutenberg_absent must record when (checked_on) and how (evidence) Project Gutenberg was found to lack it';
+	const year = Number(checked[1]);
+	const domain = source.public_domain || {};
+	if (!Number.isSafeInteger(domain.published) || domain.published >= year - US_TERM_YEARS)
+		return `public_domain.published must be before ${year - US_TERM_YEARS} (US term in ${year})`;
+	if (!Number.isSafeInteger(domain.author_died) || domain.author_died >= year - EU_TERM_YEARS)
+		return `public_domain.author_died must be before ${year - EU_TERM_YEARS} (EU term in ${year})`;
+	return '';
+}
+
 /** The ebook of a source: given in --archive-dir, else downloaded; checked. */
 function ebookOf(source, archiveDir, scratch) {
 	const name = `pg${source.gutenberg_id}.txt`;
@@ -246,11 +297,8 @@ function main() {
 		}
 		for (const source of sources.wikisource_texts) {
 			if (only && source.output !== only) continue;
-			const entry = register[source.output];
-			if (!entry || entry.url !== workPage(source.work))
-				fail(
-					`${source.output}: static/corpus/register.json must list it with url ${workPage(source.work)}`
-				);
+			const refusal = wikisourceRefusal(source, register[source.output]);
+			if (refusal) fail(`${source.output}: ${refusal}`);
 			const text = wikisourceWork(source, archiveDir, scratch);
 			const target = path.join(CORPUS_DIR, source.output);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -264,4 +312,15 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { gutenbergText, ebookPage, ebookText, wikisourceText, workPage, revisionParse };
+module.exports = {
+	gutenbergText,
+	ebookPage,
+	ebookText,
+	wikisourceText,
+	workPage,
+	revisionParse,
+	pageCitation,
+	wikisourceRefusal,
+	WIKISOURCE_LICENCE,
+	WIKISOURCE_CREDIT
+};
