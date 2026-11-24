@@ -606,9 +606,6 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
       run « Mesurer SendEvent et SendInput » and « Enregistrer l'ordre des hooks clavier » inside the field report row,
       after a notice asking not to type, instead of listing them as « run separately ». On Windows; state in the
       menu's reason text why macOS and Linux have no such probe if they have none.
-- [ ] **[CODE] Identity gate false positive on PDF trailers (maintainer, 2026-11-24).** Fix it: the identity gate
-      flags every PDF's root trailer key in containers whose home is the root account's; ignore PDF internal structure
-      there, with a regression test.
 - [ ] **[CODE] The ErgoDox's left 2-unit outer thumb key types a letter (maintainer, 2026-11-24).** For
       KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e »), the outer key (key 66) becomes the left thumb's
       typing key instead of reading the letter on Space. The maintainer's reading: these layouts put the letter on the

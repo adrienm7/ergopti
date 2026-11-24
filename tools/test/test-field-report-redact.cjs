@@ -231,6 +231,55 @@ check('the pre-commit gate refuses an added line naming this machine', () => {
 	}
 });
 
+// A container run as root has a one-segment home that every PDF spells as its
+// trailer's Root key: the gate refused any PDF added there (2026-11-15). Both
+// spellings are built from their parts, since this file is itself staged on such
+// a container.
+const ROOT_HOME = `/${'ro'}ot`;
+const ROOT_KEY = `/${'Ro'}ot`;
+check('the pre-commit gate ignores a PDF name object that spells a one-segment home', () => {
+	const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-identity-gate-pdf-'));
+	try {
+		const git = (...args) => {
+			const run = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+			assert.equal(run.status, 0, run.stderr);
+		};
+		git('init', '-q');
+		const gate = () =>
+			spawnSync(python, ['-I', REDACT, '--staged'], {
+				cwd: repo,
+				encoding: 'utf8',
+				env: canaryEnv(ROOT_HOME)
+			});
+		const pdf = (body) =>
+			Buffer.from(`%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n${body}\n%%EOF\n`, 'latin1');
+		fs.writeFileSync(path.join(repo, 'layout.pdf'), pdf(`trailer << /Size 2 ${ROOT_KEY} 1 0 R >>`));
+		// Git ends a name with a space with a tab and quotes a non-ASCII one
+		fs.writeFileSync(
+			path.join(repo, 'the world’s best layout.pdf'),
+			pdf(`trailer << ${ROOT_KEY} 1 0 R >>`)
+		);
+		git('add', 'layout.pdf', 'the world’s best layout.pdf');
+		const accepted = gate();
+		assert.equal(accepted.status, 0, accepted.stderr);
+		git('reset', '-q');
+		fs.writeFileSync(
+			path.join(repo, 'leak.pdf'),
+			pdf(`(saved from ${ROOT_HOME}/Documents/x) ${ROOT_KEY} 1 0 R`)
+		);
+		git('add', 'leak.pdf');
+		const refused = gate();
+		assert.equal(refused.status, 1, 'a home path inside a PDF is still refused');
+		assert.match(refused.stderr, /leak\.pdf/);
+		git('reset', '-q');
+		fs.writeFileSync(path.join(repo, 'note.txt'), `HOME is ${ROOT_HOME} here\n`);
+		git('add', 'note.txt');
+		assert.equal(gate().status, 1, 'outside a PDF the home alone is still refused');
+	} finally {
+		fs.rmSync(repo, { recursive: true, force: true });
+	}
+});
+
 check('every collector redacts its folder before `git add`, the hook runs the gate', () => {
 	const shared = fs.readFileSync(path.join(ROOT, 'tools/dev/field-report-git.sh'), 'utf8');
 	const commit = shared.slice(shared.indexOf('field_report_commit() {'));

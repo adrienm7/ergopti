@@ -60,6 +60,7 @@ HOME_PATHS = (
     ),
 )
 PLACEHOLDER_EMAIL = "<email>"
+PLACEHOLDER_HOME = "~"
 # A network hardware address (Wi-Fi, Ethernet, a Bluetooth keyboard): it names
 # the device for life, so no report keeps one, whoever's it is.
 MAC_ADDRESS = re.compile(
@@ -288,7 +289,7 @@ def replacements(ident):
     pairs = []
     for home in sorted(ident["homes"], key=len, reverse=True):
         for spelling in _spellings(home):
-            pairs.append((re.compile(re.escape(spelling), re.IGNORECASE), "~"))
+            pairs.append((re.compile(re.escape(spelling), re.IGNORECASE), PLACEHOLDER_HOME))
     tokens = [(v, "<user>") for v in ident["logins"]]
     tokens += [(v, "<domain>") for v in ident["domains"]]
     tokens += [(v, "<host>") for v in ident["hosts"]]
@@ -397,6 +398,49 @@ def redact_folder(folder, pairs):
     return remaining
 
 
+def _diff_path(name):
+    """Reads the file name of a `+++` diff header.
+
+    Git ends a name holding a space with a tab, and quotes a name holding a
+    non-ASCII character, its bytes written as octal escapes.
+
+    Args:
+        name: The header after `+++ `.
+
+    Returns:
+        The path, without its `b/` prefix.
+    """
+    name = name.rstrip("\t")
+    if len(name) >= 2 and name.startswith('"') and name.endswith('"'):
+        raw = name[1:-1].encode("latin-1").decode("unicode_escape")
+        name = raw.encode("latin-1").decode("utf-8", errors="replace")
+    return name[2:] if name.startswith("b/") else name
+
+
+def _is_pdf_name(path, placeholder, line, match):
+    """Tells whether a home match in a PDF is one of its name objects.
+
+    A PDF names its structure with a slash and a word (its trailer's Root key,
+    `/Type`), so a home of one path segment, the root account's home in a
+    container run as root, spells the
+    trailer key of every PDF. In a PDF a home counts only as a path: followed
+    by a separator.
+
+    Args:
+        path: The staged file's path.
+        placeholder: The placeholder of the matching pattern.
+        line: The added line.
+        match: The match in that line.
+
+    Returns:
+        True when the match is to be ignored.
+    """
+    if placeholder != PLACEHOLDER_HOME or not path.lower().endswith(".pdf"):
+        return False
+    end = match.end()
+    return end >= len(line) or line[end] not in "/\\"
+
+
 def staged_leaks(pairs):
     """Lists the lines the index adds that hold this machine's identity.
 
@@ -418,9 +462,15 @@ def staged_leaks(pairs):
     found, current = [], None
     for line in diff.splitlines():
         if line.startswith("+++ "):
-            current = line[6:] if line.startswith("+++ b/") else line[4:]
+            current = _diff_path(line[4:])
         elif line.startswith("+") and current is not None:
-            found += [(current, m.group(0)) for p, _ in pairs for m in p.finditer(line[1:])]
+            added = line[1:]
+            found += [
+                (current, m.group(0))
+                for p, placeholder in pairs
+                for m in p.finditer(added)
+                if not _is_pdf_name(current, placeholder, added, m)
+            ]
     return found
 
 
