@@ -69,13 +69,11 @@ _HCPE_Case(Mode) {
 				"-Directory", Directory, "-WorkerPath", _VendorDir . "\ergopti_network_pac.ps1",
 				"-PolicyPath", _SharedDir . "\core\network\data\proxy_policy.json"], _HCPR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The private PAC source/HTTP owner must start")
-		Started := A_TickCount
-		while !FSStrictExists(Directory . "\ready.json") && State.Completed == 0 && TickElapsed(Started) < 20000 {
-			_SR_TreePoll()
-			Sleep(10)
-		}
-		AssertTrue(FSStrictExists(Directory . "\ready.json"), "The actual PAC fetcher must finish its source contract before diagnostics")
-		Ready := JsonParse(FSReadUtf8Exact(Directory . "\ready.json"))
+		; Readiness is a receipt that reads, not one whose name exists (child_receipt.ahk).
+		ReadyText := TestAwaitChildReceiptUtf8(Directory . "\ready.json", () => State.Completed != 0)
+		AssertTrue(ReadyText is String, "The actual PAC fetcher must finish its source contract before diagnostics: "
+			. State.Output . State.ErrorText)
+		Ready := JsonParse(ReadyText)
 		Raw := FSReadBytesStrict(Directory . "\response.bin")
 		AssertEqual(Mode, Ready["mode"])
 		AssertEqual(Raw.Size, Ready["raw_bytes"])
