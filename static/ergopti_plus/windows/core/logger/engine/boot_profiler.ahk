@@ -21,6 +21,7 @@
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
+global _BOOT_PROFILE_BEGUN  := false  ; True once BootProfile_Begin ran: the boot has a single owner
 
 
 
@@ -31,10 +32,15 @@ global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
 ; ============================================
 ; ============================================
 
-; Start (or restart) the boot timer. Call once, as early as the logger is
-; ready, so subsequent marks measure deltas from a known origin.
+; Start the boot timer. Call once, as early as the logger is ready, so
+; subsequent marks measure deltas from a known origin. A second call throws, as
+; on macOS and Linux: restarting the clock would silently drop every phase
+; measured so far and misreport the boot total.
 BootProfile_Begin() {
-	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START, _BOOT_PROFILE_BEGUN
+	if _BOOT_PROFILE_BEGUN
+		throw Error("BootProfile_Begin() called twice — boot has a single owner.")
+	_BOOT_PROFILE_BEGUN := true
 	_BOOT_PROFILE_START := A_TickCount
 	_BOOT_PROFILE_LAST  := _BOOT_PROFILE_START
 	try LoggerInfo("BootProfile", "Boot timing started.")
@@ -49,6 +55,15 @@ BootProfile_Begin() {
 				"Pre-logger initialization (including script parse + load): ~{1} ms.", Uptime)
 		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
 	}
+}
+
+; Forget the boot origin so a test can call BootProfile_Begin again. Test seam
+; only: the driver itself never resets its single boot owner.
+_BootProfileResetForTest() {
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START, _BOOT_PROFILE_BEGUN
+	_BOOT_PROFILE_BEGUN := false
+	_BOOT_PROFILE_START := 0
+	_BOOT_PROFILE_LAST  := 0
 }
 
 ; Record a phase boundary that happens BEFORE the logger is usable.

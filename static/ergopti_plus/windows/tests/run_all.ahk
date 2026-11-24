@@ -2477,6 +2477,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/ai/api/test_keep_alive_from_shared_defaults.ahk
 #Include unit/ai/prediction/test_parser_refuses_uninjectable_deletes.ahk
 #Include unit/core/logger/test_preinit_level.ahk
+#Include unit/core/logger/test_boot_profiler_single_owner.ahk
 #Include unit/core/logger/test_set_level_transaction.ahk
 #Include unit/core/logger/test_sub_files_multiline_arrays.ahk
 #Include unit/hotstrings/engine/engine/test_marker_substituted_in_replacement.ahk
