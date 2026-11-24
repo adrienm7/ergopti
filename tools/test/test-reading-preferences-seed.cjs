@@ -23,7 +23,13 @@
  * 4. a saved choice reaches the windows already open: every Windows host that
  *    adds a boot script hands its WebView to ReadingPrefs_Track, and the
  *    macOS and Linux menus push the choice once saved (field report,
- *    2026-11-24: a change reached only the windows opened after it).
+ *    2026-11-24: a change reached only the windows opened after it);
+ * 5. every Windows file that calls a ReadingPrefs_ function includes
+ *    core/ui/engine/webview/reading_preferences.ahk itself (or the WebView
+ *    utilities that include it): an owned test child assembles a host from
+ *    its own includes, and AutoHotkey v2 reads a call to a function the
+ *    script lacks as an unset local, so the action picker's children failed
+ *    on ReadingPrefs_Track (CI, 2026-11-24).
  * Each check runs again on a mutated source and must then fail.
  * The behaviour itself is pinned by the drivers' unit tests
  * (test_reading_preferences.ahk, reading_preferences_contract.lua).
@@ -99,6 +105,38 @@ function windowsProblems(files) {
 			problems.push(
 				`${file}: ${unpaired} of ${seeds.length} locale seed(s) without the reading seed`
 			);
+	}
+	return problems;
+}
+
+// The module that owns the ReadingPrefs_ functions, and the WebView utilities
+// that include it for the entry script.
+const READING_MODULE = 'windows/core/ui/engine/webview/reading_preferences.ahk';
+const WEBVIEW_UTILITIES = 'windows/core/ui/engine/webview/utils.ahk';
+
+/**
+ * The files one Windows file includes, as paths under static/ergopti_plus.
+ * `%A_LineFile%\..` is the file's folder, and a relative path is read from it.
+ */
+function includesOf(file, source) {
+	const folder = path.posix.dirname(file);
+	const included = [];
+	for (const match of source.matchAll(/^#Include\s+(.+?)\s*$/gm)) {
+		const target = match[1].replace(/\\/g, '/').replace(/^%A_LineFile%\/\.\.\//, '');
+		if (target.includes('%') || target.startsWith('<')) continue;
+		included.push(path.posix.normalize(path.posix.join(folder, target)));
+	}
+	return included;
+}
+
+/** Problems of the Windows callers: each one includes the module it calls. */
+function includeProblems(files) {
+	const problems = [];
+	for (const [file, source] of files) {
+		if (file === READING_MODULE || !/\bReadingPrefs_\w+\(/.test(source)) continue;
+		const included = includesOf(file, source);
+		if (!included.includes(READING_MODULE) && !included.includes(WEBVIEW_UTILITIES))
+			problems.push(`${file} calls ReadingPrefs_ without including ${READING_MODULE}`);
 	}
 	return problems;
 }
@@ -215,6 +253,11 @@ assert.deepEqual(windowsProblems(windows), []);
 assert.deepEqual(unseededProblems(windows), []);
 assert.deepEqual(luaProblems(builders, scopes), []);
 assert.deepEqual(trackProblems(windows), []);
+assert.deepEqual(includeProblems(windows), []);
+assert.ok(
+	windows.filter(([, source]) => /\bReadingPrefs_\w+\(/.test(source)).length >= 17,
+	'the ReadingPrefs_ callers are found'
+);
 const pushSources = Object.fromEntries(Object.keys(LUA_PUSHES).map((file) => [file, read(file)]));
 assert.deepEqual(pushProblems(pushSources), []);
 
@@ -284,6 +327,12 @@ assert.equal(
 	'a scope that does not bind a choice is found'
 );
 
+const picker = windows.find(([file]) => file === 'windows/ui/action_picker_webview.ahk');
+assert.deepEqual(
+	includeProblems([[picker[0], picker[1].replace(/^#Include .*reading_preferences\.ahk\n/m, '')]]),
+	[`${picker[0]} calls ReadingPrefs_ without including ${READING_MODULE}`],
+	'the action picker without its include is found (CI, 2026-11-24)'
+);
 const host = windows.find(([file]) => file === 'windows/ui/onboarding/webview.ahk');
 assert.deepEqual(
 	trackProblems([[host[0], host[1].replaceAll('ReadingPrefs_Track(', 'Other(')]]),

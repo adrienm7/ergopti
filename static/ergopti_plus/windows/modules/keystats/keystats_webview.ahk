@@ -26,6 +26,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 #Requires Autohotkey v2.0+
 #Include keystats_webview_range_script.ahk

@@ -14,6 +14,7 @@
 ; The generated menu-command constants; #Include skips a file the entry script
 ; already loaded.
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 
 

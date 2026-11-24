@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 ; Virtual host mapped to the _shared tree so the editor loads from a stable
 ; origin (https://<host>/…) instead of an opaque file:// origin — file:// pages

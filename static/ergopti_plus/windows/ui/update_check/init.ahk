@@ -30,6 +30,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 #Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 ; Geometry is resolved at open time by the existing WebViewHost manifest owner.

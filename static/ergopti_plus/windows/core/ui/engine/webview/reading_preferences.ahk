@@ -27,6 +27,8 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+; WebView_RunScriptAsync pushes a choice into the open windows.
+#Include %A_LineFile%\..\script.ahk
 
 ; The current values by config.toml key ([script]); 0 until ReadingPrefs_Init.
 global _ReadingPrefsValues := 0

@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 ; The wizard's id in _shared/ui/apps.manifest.json, which sizes it.
 global ONBOARDING_APP_ID := "onboarding"

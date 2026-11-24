@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 #Include %A_LineFile%\..\..\..\adapters\control.ahk
 

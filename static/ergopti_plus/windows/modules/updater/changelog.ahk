@@ -14,6 +14,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 
 

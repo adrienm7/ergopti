@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\..\_generated\identifiers.ahk
+#Include %A_LineFile%\..\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 #Requires AutoHotkey v2.0
 
