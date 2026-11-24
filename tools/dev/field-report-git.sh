@@ -33,6 +33,12 @@
 # 7. The branch is public: before the commit, every file of the report folder
 #    loses the home folder, the login (with its directory domain), the host
 #    name, the full name and any e-mail address, or the commit is refused.
+# 8. Local by default (maintainer decision, 2026-11-24): without --push the
+#    collector leaves git alone (no stash, no branch switch, no update, no
+#    commit, no push) and only saves the redacted report folder, which the
+#    person can attach to an issue. Only the maintainer can push, so only
+#    --push publishes the report on its field branch, as items 1 to 6 say.
+#    The caller sets push=true for --push and push=false otherwise.
 #
 # Sourced only; defines functions and runs nothing. Bash 3.2 compatible: the
 # macOS collector runs under the system bash.
@@ -43,6 +49,14 @@
 # Sets: branch (the field branch), base (the branch it is updated from).
 field_report_enter_branch() {
 	local tag="$1"
+	if [ "${push}" != true ]; then
+		# Local run: the report names the code it ran on, and git is not touched.
+		base="$(git branch --show-current)"
+		[ -n "${base}" ] || base="$(git rev-parse --short HEAD)" || fail "Cannot read HEAD."
+		branch="${base}"
+		log "Collecting on ${base}; the report is saved locally, nothing is committed or pushed (--push publishes it)."
+		return 0
+	fi
 	# A run cut short (window closed, kill) can leave tracked changes, and the
 	# next run refused to start (macOS field report 2026-11-15). A tester's
 	# clone holds no work of its own: the changes are stashed (git stash list
@@ -79,6 +93,8 @@ field_report_enter_branch() {
 field_report_update_from_base() {
 	local script="$1" depth base_head before
 	shift
+	# A local run tests the checkout as it is.
+	[ "${push}" = true ] || return 0
 	before="$(git rev-parse HEAD)" || fail "Cannot read HEAD."
 	if ! git ls-remote --exit-code --heads origin "${base}" >/dev/null 2>&1; then
 		log "${base} is not a branch on origin: ${branch} is not updated."
@@ -132,8 +148,9 @@ field_report_analyse() {
 	return 0
 }
 
-# Commits the report folder alone, then pushes unless push=false. The folder
-# is redacted first (tools/dev/field-report-redact.py): the step outputs are
+# Commits the report folder alone and pushes it with --push (push=true);
+# without it, only saves the folder and says where. The folder is redacted
+# first either way, since a saved report is meant to be attached to an issue (tools/dev/field-report-redact.py): the step outputs are
 # raw command output, and `ls -la` or `lsof` name the account that owns a file,
 # a company directory login with its domain included. Nothing is committed
 # when the redaction cannot prove the folder clean.
@@ -144,16 +161,17 @@ field_report_commit() {
 		|| fail "${out} still names this machine or its user; nothing was committed."
 	log "Collected into ${out}:"
 	ls -1 "${out}" | sed 's/^/  /'
+	if [ "${push}" != true ]; then
+		log "Saved locally in ${REPO_ROOT}/${out}: nothing was committed or pushed."
+		log "Attach that folder (or its 0_main/analysis.md) to an issue; --push publishes it on a field branch."
+		return 0
+	fi
 	git add -f -- "${out}" || fail "git add of ${out} failed."
 	git commit -q -m "${subject}" -- "${out}" || fail "git commit failed."
 	# A commit naming its paths runs the hooks on a temporary index: the
 	# formatter's rewrite reaches the commit and the files, not the real index,
 	# which kept the unformatted bytes and stopped the switch back to the base.
 	git add -f -- "${out}" || fail "git add of ${out} after the commit failed."
-	if [ "${push}" = true ]; then
-		git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
-		log "Pushed ${branch}. Tell the coordinator: report ${out}."
-	else
-		log "Committed on ${branch} without pushing."
-	fi
+	git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
+	log "Pushed ${branch}. Tell the coordinator: report ${out}."
 }

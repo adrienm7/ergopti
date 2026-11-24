@@ -4,11 +4,13 @@
 # ==============================================================================
 # MODULE: macOS field report collector
 # DESCRIPTION:
-# One command for a maintainer session on a real Mac: it updates the field
-# branch from its base (dev unless it was derived from another branch), gathers the evidence the coordinator reads (system and
-# toolchain facts, the field run of the developer app, the input-source probe,
-# today's ErgoptiPlus logs, their digest and their analysis), stores it under
-# docs/field-reports/, then commits and pushes the branch. The logs are
+# One command for a session on a real Mac: it gathers the evidence the
+# coordinator reads (system and toolchain facts, the field run of the
+# developer app, the input-source probe, today's ErgoptiPlus logs, their
+# digest and their analysis) and stores it under docs/field-reports/. With
+# --push only (the maintainer's run) it first updates the field branch from
+# its base (dev unless it was derived from another branch), then commits and
+# pushes the branch. The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the
 # summary lists every file it adds. The step outputs are raw command output, so
@@ -29,11 +31,14 @@
 # measured duration against the budget its code declares, lifecycle events,
 # check verdicts, what to fix first) and prints its summary.
 #
-# USAGE (from any branch: outside a field/ branch the collector switches to
-# field/mac-<today>-<branch>, derived from that branch and created when
-# missing; base.txt in the report names the base and the commit):
-#   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
-#   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
+# USAGE (base.txt in the report names the branch and the commit it ran on):
+#   bash tools/dev/collect-macos-field-report.sh         collect and save the
+#     report locally: git is left alone (no update, no commit, no push), and
+#     the terminal says where the folder is, to attach to an issue
+#   bash tools/dev/collect-macos-field-report.sh --push  the maintainer's run:
+#     from any branch outside a field/ branch it switches to
+#     field/mac-<today>-<branch>, derived from that branch and created when
+#     missing, updates it from its base, collects, commits and pushes
 #   bash tools/dev/collect-macos-field-report.sh --installed  the complete run,
 #     Karabiner included, on the signed dev prerelease instead of the developer
 #     app: installs or updates it from GitHub, verified
@@ -84,7 +89,7 @@
 # Each step records its exit status in steps.txt; a failed step never hides
 # the others, and the summary names it. Ctrl-C or a TERM never loses the
 # evidence: the collector still copies the results and logs that exist, then
-# commits and pushes them, marked interrupted.
+# saves them (with --push, commits and pushes them), marked interrupted.
 # ==============================================================================
 
 set -uo pipefail
@@ -147,13 +152,14 @@ FIELD_RUN_POLL_SECONDS="${FIELD_RUN_POLL_SECONDS_OVERRIDE:-5}"
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
 
-push=true
+# Local by default; only the maintainer can push (field-report-git.sh, item 8).
+push=false
 installed=false
 for argument in "$@"; do
 	case "${argument}" in
-		--no-push) push=false ;;
+		--push) push=true ;;
 		--installed) installed=true ;;
-		*) fail "Expected no argument, --no-push or --installed." ;;
+		*) fail "Expected no argument, --push or --installed." ;;
 	esac
 done
 
@@ -242,8 +248,9 @@ scrub_log() {
 	fi
 }
 
-# Copies the logs, commits and pushes, once: from the normal end and from the
-# INT/TERM trap, so an interrupted run still leaves its evidence on the branch.
+# Copies the logs and saves them (commits and pushes with --push), once: from
+# the normal end and from the INT/TERM trap, so an interrupted run still leaves
+# its evidence.
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
@@ -347,7 +354,8 @@ finalize() {
 }
 
 # Ctrl-C or TERM: the field run's partial results and today's logs are still
-# copied, committed and pushed. A second signal during that work is ignored.
+# copied and saved (committed and pushed with --push). A second signal during
+# that work is ignored.
 on_interrupt() {
 	trap '' INT TERM HUP
 	interrupted=true
@@ -391,9 +399,11 @@ step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
 # its .scpt stale (the Encryptor comment of the keystats rename). The rebuilt
 # files are committed on the field branch, apart from the report, so the push
 # carries them and the next run starts from a clean tree; cherry-pick that
-# commit to the base.
+# commit to the base. A local run leaves them in the tree and says so.
 step scpt_recompile python3 "${REPO_ROOT}/tools/dev/recompile-applescripts.py" "${REPO_ROOT}"
-if ! git -C "${REPO_ROOT}" diff --quiet -- '*.scpt'; then
+if [ "${push}" != true ] && ! git -C "${REPO_ROOT}" diff --quiet -- '*.scpt'; then
+	log "Recompiled AppleScript left uncommitted in the tree (a local run commits nothing)."
+elif ! git -C "${REPO_ROOT}" diff --quiet -- '*.scpt'; then
 	(cd "${REPO_ROOT}" && git add -u -- '*.scpt' \
 		&& git commit -q -m "chore(macos): recompile the AppleScript sources the field run found stale" -- '*.scpt') \
 		&& log "Recompiled AppleScript committed on ${branch}; cherry-pick that commit to ${base}." \

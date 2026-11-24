@@ -1,7 +1,7 @@
 # macOS field report coverage
 
 The "To confirm on the Mac" lines of `TODO-tests-macos.md` ask for things only a real Mac
-shows. One run of `bash tools/dev/collect-macos-field-report.sh --installed`
+shows. One run of `bash tools/dev/collect-macos-field-report.sh --installed --push`
 answers every open line: each line carries a `<!-- field-point: <id> -->` tag,
 `static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json` names the evidence
 that decides it, and the report ends with `todo_summary.md` (and

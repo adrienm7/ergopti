@@ -6,7 +6,7 @@ The macOS checks only a real Mac can answer; code work stays in [TODO.md](TODO.m
 
 ## To confirm on the Mac
 
-Every open line carries a `field-point` id; one `bash tools/dev/collect-macos-field-report.sh --installed` run
+Every open line carries a `field-point` id; one `bash tools/dev/collect-macos-field-report.sh --installed --push` run
 answers each of them in `docs/field-reports/mac-<stamp>/todo_summary.md` (guided steps prompt the gestures in the
 terminal): coverage table, verdicts and what no run can test in
 [docs/tooling/macos-field-report-coverage.md](docs/tooling/macos-field-report-coverage.md).
@@ -47,8 +47,9 @@ terminal): coverage table, verdicts and what no run can test in
       manager. Do not install or remove a layout you need.
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
-`bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in
-the developer app, writes the report under `docs/field-reports/`, commits and pushes. Needs Go, the Xcode Command
+`bash tools/dev/collect-macos-field-report.sh --push`: it creates `field/mac-<today>-<branch>`, runs the field
+checks in the developer app, writes the report under `docs/field-reports/`, commits and pushes (without `--push`
+the report is only saved locally). Needs Go, the Xcode Command
 Line Tools and python3 3.11.4 or newer; `swift test` needs full Xcode.app (install once from the App Store). Read a
 red step with its `proves` line in `static/ergopti_plus/macos/diagnostics/data/field_run.json` and
 [project-macos-field-run-step-details](docs/memory/macos-hammerspoon.md). Report each line as pass, fail or not run.
