@@ -607,6 +607,12 @@ async function booksShard() {
 		),
 		/unexpected end of file/
 	);
+	// Shards add up by own keys: Italian Google Books keeps « constructor »,
+	// which a plain lookup read as Object.prototype's function.
+	const total = {};
+	Import.addCounts(total, { constructor: 3, toString: 1 });
+	Import.addCounts(total, { constructor: 2, toString: 4 });
+	assert.deepEqual(total, { constructor: 5, toString: 5 }, 'prototype names count as words');
 	checks++;
 }
 
