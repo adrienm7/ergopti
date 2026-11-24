@@ -509,7 +509,7 @@ end
 InApp.install(Session, {
 	busy = function() return TerminationCoordinator.terminal_in_progress() end,
 	valid_id = function(session, id) return is_request_id(session.spec, id) end,
-	cancel = function(session) session:close_running({ kind = "cancelled", reason = "person" }) end,
+	cancel = function(session) session:close_running({ kind = "cancelled", reason = "user_cancelled" }) end,
 	logger = Logger,
 	log = LOG,
 })
