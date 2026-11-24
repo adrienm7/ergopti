@@ -318,8 +318,12 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		let content = try XCTUnwrap(panel.contentView)
 		content.layoutSubtreeIfNeeded()
 		let margin = UpdatePromptPanel.contentMargin
-		for row in try contentStack(of: panel).arrangedSubviews {
-			let frame = row.convert(row.bounds, to: content)
+		let stack = try contentStack(of: panel)
+		for row in stack.arrangedSubviews {
+			// Auto Layout places a control by its alignment rectangle: a
+			// button's bezel and a progress bar draw a few points beyond it,
+			// so their frames would read as eating into the margin.
+			let frame = stack.convert(row.alignmentRect(forFrame: row.frame), to: content)
 			XCTAssertGreaterThanOrEqual(frame.minX, margin - 0.5, "\(label): a row starts inside the left margin")
 			XCTAssertLessThanOrEqual(frame.maxX, content.bounds.width - margin + 0.5,
 				"\(label): a row ends inside the right margin")
