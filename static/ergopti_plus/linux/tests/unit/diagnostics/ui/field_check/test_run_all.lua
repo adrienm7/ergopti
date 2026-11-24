@@ -37,7 +37,7 @@ helpers.describe("test everything: the Linux plan", function()
 		local plan = RunAll.plan(read_json(SHARED .. "diagnostics/data/field_check_all.json"), "linux", spec.steps,
 			read_json(helpers.driver_root() .. "/diagnostics/data/field_todo_coverage.json"))
 		helpers.assert_true(#plan.run > 0)
-		local classified = { field_check_all = true }
+		local classified = { field_report = true }
 		for _, entry in ipairs(plan.run) do
 			helpers.assert_not_nil(FieldRun.CHECK_RUNNERS[entry.check], "no headless runner for " .. entry.check)
 			if entry.row then classified[entry.row] = true end
@@ -55,7 +55,7 @@ helpers.describe("test everything: the Linux plan", function()
 		local source = handle:read("*a")
 		handle:close()
 		helpers.assert_contains(source,
-			'[COMMAND.FIELD_CHECK_ALL] = function() require("diagnostics.ui.field_check.run_all").run() end')
+			'[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.run_all").run() end')
 	end)
 end)
 
@@ -128,7 +128,7 @@ helpers.describe("test everything: the Linux run", function()
 			helpers.assert_eq(#world.dialogs, 0, "the report opens from a fresh loop turn")
 			for _, fn in ipairs(world.deferred) do fn() end
 			helpers.assert_eq(#world.dialogs, 1)
-			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_check_all]")
+			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_report]")
 			helpers.assert_contains(world.dialogs[1].text, "[field_check.all.verdict_pass]")
 			helpers.assert_contains(world.dialogs[1].text, "✅ [menu.debug.composer_check] — one, composer_point")
 			helpers.assert_contains(world.dialogs[1].text, "✅ two")

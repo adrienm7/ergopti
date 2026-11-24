@@ -221,10 +221,11 @@ _MLG_AssertCleanSeparators(Labels, State) {
 			State . ": two separators in a row at " . Position)
 }
 
-; debug-tests-submenu (maintainer, 2026-11-03): the built Debug menu shows the
-; user-facing rows first (diagnostics, report a bug, suggest a feature, then the
-; logs), and one « Tests » submenu, after a separator, closes it with every
-; Windows check and probe in topic order; none of them stays among the rows.
+; debug-tests-submenu (maintainer, 2026-11-03 and 2026-11-24): the built Debug
+; menu shows the user-facing rows first (diagnostics, report a bug, suggest a
+; feature, then the logs), then after a separator the field report row and one
+; « Tests » submenu closing it with every Windows check and probe in its titled
+; topic groups; none of them stays among the rows.
 _MLG_DebugTestsCloseTheMenu() {
 	Built := _MI_BuildDebuggingMenu()
 	try {
@@ -239,18 +240,22 @@ _MLG_DebugTestsCloseTheMenu() {
 			. " " . Suggest . " " . Logs)
 		Last := TrayMenuItemCount(Built) - 1
 		AssertEqual(t("menu.debug.tests"), Labels[Last + 1], "the Tests submenu closes Debug")
-		AssertEqual("", Labels[Last], "one separator sets Tests apart")
+		AssertEqual(t("menu.debug.field_report"), Labels[Last], "the field report row stands just before Tests")
+		AssertEqual("", Labels[Last - 1], "one separator sets the field report and Tests apart")
 		Child := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Last, "ptr")
 		AssertTrue(Child != 0, "Tests opens a submenu")
 		Tests := _MLG_NativeLabels(MenuFromHandle(Child))
 		_MLG_AssertCleanSeparators(Tests, "Tests")
-		Keys := ["menu.debug.field_check_network", "menu.debug.composer_check",
-			"menu.debug.send_probe", "menu.debug.hook_probe"]
-		AssertEqual(Keys.Length, Tests.Length, "Tests holds the four Windows checks")
-		for Position, Key in Keys {
-			AssertEqual(t(Key), Tests[Position], "Tests keeps the topic order at " . Position)
+		; A group title is drawn through the one section header format; "" is a separator.
+		Expected := [MenuSectionTitle(t("menu.debug.header_tests_network")), t("menu.debug.field_check_network"), "",
+			MenuSectionTitle(t("menu.debug.header_tests_remapping")), t("menu.debug.composer_check"),
+			t("menu.debug.send_probe"), t("menu.debug.hook_probe")]
+		AssertEqual(Expected.Length, Tests.Length, "Tests holds the four Windows checks in two titled groups")
+		for Position, Label in Expected
+			AssertEqual(Label, Tests[Position], "Tests keeps the topic order at " . Position)
+		for Key in ["menu.debug.field_check_network", "menu.debug.composer_check", "menu.debug.send_probe",
+				"menu.debug.hook_probe"]
 			AssertEqual(-1, _MLG_RowStarting(Built, Key), "no check stays among the Debug rows: " . Key)
-		}
 	} finally _CTC_ReleaseMenu(Built)
 }
 Test("menu layout: the user-facing Debug rows come first and Tests closes the menu (debug-tests-submenu)",

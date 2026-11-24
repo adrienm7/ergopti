@@ -29,12 +29,14 @@ local function position_of(rows, text)
 end
 
 --- Asserts the Debug layout: the user-facing rows in their order before the
---- logs, then one separator and the « Tests » submenu closing the menu, which
---- holds every check and nothing else, and no separator out of place anywhere.
+--- logs, then one separator, the field report row and the « Tests » submenu
+--- closing the menu, which holds every check (in its titled groups) and nothing
+--- else, and no separator out of place anywhere.
 --- @param helpers table
 --- @param rows table Built Debug rows.
---- @param captions table { diagnostics, report, suggest, logs, tests, checks }:
----   exact titles; `checks` lists the titles the Tests submenu holds, in order.
+--- @param captions table { diagnostics, report, suggest, logs, field_report, tests, checks }:
+---   exact titles; `checks` lists the titles the Tests submenu holds, in order
+---   (its group headers and separators included).
 --- @param state string The state under test, for the failure message.
 function M.assert_layout(helpers, rows, captions, state)
 	Ai.assert_clean_separators(helpers, rows, state)
@@ -47,14 +49,17 @@ function M.assert_layout(helpers, rows, captions, state)
 		state .. ": diagnostics, report and suggest come first, then the logs")
 	local tests = rows[#rows]
 	helpers.assert_eq(tests.title, captions.tests, state .. ": the Tests submenu closes Debug")
-	helpers.assert_true(is_separator(rows[#rows - 1]), state .. ": one separator sets Tests apart")
+	helpers.assert_eq(rows[#rows - 1].title, captions.field_report, state .. ": the field report row stands just before Tests")
+	helpers.assert_true(is_separator(rows[#rows - 2]), state .. ": one separator sets the field report and Tests apart")
 	helpers.assert_true(type(tests.menu) == "table" and #tests.menu > 0, state .. ": Tests is never empty")
 	Ai.assert_clean_separators(helpers, tests.menu, state .. " (Tests)")
 	local titles = {}
 	for _, row in ipairs(tests.menu) do titles[#titles + 1] = row.title end
 	helpers.assert_eq(titles, captions.checks, state .. ": Tests holds every check, in topic order")
 	for _, check in ipairs(captions.checks) do
-		helpers.assert_nil(position_of(rows, check), state .. ": no check stays among the user rows: " .. check)
+		if check ~= "-" then
+			helpers.assert_nil(position_of(rows, check), state .. ": no check stays among the user rows: " .. check)
+		end
 	end
 	local groups = 0
 	for _, row in ipairs(rows) do

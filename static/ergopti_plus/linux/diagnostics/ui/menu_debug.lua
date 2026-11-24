@@ -82,7 +82,7 @@ local function _build_debug(ctx)
 		["healthcheck"]    = call_ctx("on_healthcheck"),
 		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
 		-- Self-contained: the run reads its own plan and starts each check's own runner
-		[COMMAND.FIELD_CHECK_ALL] = function() require("diagnostics.ui.field_check.run_all").run() end,
+		[COMMAND.FIELD_REPORT] = function() require("diagnostics.ui.field_check.run_all").run() end,
 		-- Self-contained like the report rows: the check reads its own settings and ports
 		[COMMAND.FIELD_CHECK_NETWORK] = function() require("diagnostics.ui.field_check.network_check").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
