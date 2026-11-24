@@ -62,6 +62,13 @@ global BUNDLE_VERSION := "__BUNDLE_VERSION__"
 ; diagnostic snapshot reports it; a source checkout reads .git/HEAD instead.
 global BUNDLE_COMMIT := "__BUNDLE_COMMIT__"
 
+; Year, in Paris time, of that commit, stamped by the CI step « Stamp
+; BUNDLE_BUILD_YEAR » (tools/lib/app-metadata.cjs build-year). The Ahk2Exe
+; directive after it hands it to _generated/exe_version_info.ahk, where the
+; exe's copyright notice ends at it; an unstamped build names the first year.
+global BUNDLE_BUILD_YEAR := "__BUNDLE_BUILD_YEAR__"
+;@Ahk2Exe-Let U_BundleBuildYear = %A_PriorLine~.*"(.*)".*~$1%
+
 ; GitHub release URL frozen at build time so the tray menu's first item can
 ; deep-link to *this exact release* without an extra API call. The release
 ; workflow rewrites the placeholder right after stamping BUNDLE_VERSION,

@@ -1112,6 +1112,23 @@ jobs:
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
           Write-Host "BUNDLE_CHANNEL     stamped: $channel"
 
+      # The exe's copyright notice ends at the year of the commit checked out
+      # (_generated/exe_version_info.ahk reads it through an Ahk2Exe directive).
+      # tools/lib/app-metadata.cjs owns that year for the three package builds.
+      - name: Stamp BUNDLE_BUILD_YEAR
+        shell: pwsh
+        run: |
+          $year = node tools/lib/app-metadata.cjs build-year
+          if ($LASTEXITCODE -ne 0 -or $year -notmatch '^[0-9]{4}$') {
+              throw "The build year could not be derived: '$year'."
+          }
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\core\lifecycle\engine\bundle.ahk"
+          $text = Get-Content -Raw -Path $bundlePath
+          if (-not $text.Contains("__BUNDLE_BUILD_YEAR__")) { throw "bundle.ahk has no BUNDLE_BUILD_YEAR placeholder." }
+          $text = $text.Replace("__BUNDLE_BUILD_YEAR__", $year)
+          [IO.File]::WriteAllText($bundlePath, $text, [Text.UTF8Encoding]::new($true))
+          Write-Host "BUNDLE_BUILD_YEAR  stamped: $year"
+
       - name: Download the authenticated compiler toolchain
         shell: pwsh
         run: |
@@ -1185,9 +1202,12 @@ jobs:
           }
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
 
-      # The identity fields are owned by the Ahk2Exe directives in ErgoptiPlus.ahk
-      # and the version by the BUNDLE_VERSION stamp; a compiler that drops them
-      # would ship the bare AutoHotkey defaults again.
+      # The identity fields are owned by tools/lib/app-metadata.cjs through the
+      # generated _generated/exe_version_info.ahk, the version by the
+      # BUNDLE_VERSION stamp and the copyright's end by BUNDLE_BUILD_YEAR; a
+      # compiler that drops them would ship the bare AutoHotkey defaults again.
+      # The expected values come as ASCII-escaped JSON, so the console code page
+      # cannot alter the copyright sign or the dash.
       - name: Verify the ErgoptiPlus.exe version resource
         shell: pwsh
         run: |

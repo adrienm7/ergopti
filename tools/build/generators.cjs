@@ -195,6 +195,10 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-exe-version-info.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/exe_version_info.ahk']
+	},
+	{
 		script: 'codegen/codegen-update-schedule.cjs',
 		outputs: ['static/ergopti_plus/windows/_generated/update_schedule.ahk']
 	},

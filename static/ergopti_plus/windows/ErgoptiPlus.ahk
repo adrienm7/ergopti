@@ -1,16 +1,10 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #Include %A_LineFile%\..\_generated\config_keys.ahk
-; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
-; the interpreter): without it the exe carries only the runtime's defaults. The
-; version comes from BUNDLE_VERSION in core/lifecycle/engine/bundle.ahk.
-;@Ahk2Exe-SetProductName Ergopti+
-;@Ahk2Exe-SetCompanyName Ergopti
-;@Ahk2Exe-SetDescription Ergopti+: hotstrings and shortcuts to type faster and more ergonomically
-;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
-;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
-;@Ahk2Exe-SetInternalName ErgoptiPlus
-;@Ahk2Exe-Set Comments, Open-source keyboard companion.
+; The version resource of the compiled exe (its identity, copyright and
+; version) is the generated _generated/exe_version_info.ahk, included right
+; after core/lifecycle/engine/bundle.ahk: without it the exe carries only the
+; runtime's defaults.
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
@@ -293,6 +287,7 @@ else
 ; the driver can keep reading from _StaticDir without caring whether it runs
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
 #Include core/lifecycle/engine/bundle.ahk
+#Include _generated/exe_version_info.ahk
 Bundle_Init()
 ; First of the retroactive boot stamps (core/logger/engine/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"

@@ -327,6 +327,11 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 - [ ] Updater: install a build with 5d6beccf83, update: the exe restarts, the three scripts are in
       `%LOCALAPPDATA%\Ergopti\vendor\`, the command line shows `-File`, no `-EncodedCommand`.
 - [ ] api.github.com blocked: the update check's Atom fallback reports the version.
+- [ ] Exe details (2026-11-24): right-click a CI-built `ErgoptiPlus.exe` > Properties > Details: « Copyright »
+      reads « Copyright © 2024–<year of the build> Adrien MOYAUX. MIT License. » with the © and the dash intact,
+      « Comments » names https://ergopti.fr and the issue tracker, and « File description », « Product name » and
+      « Company » are filled (`tools/ci/windows-exe-version-info.cjs`; the CI step compares every field, but the
+      Ahk2Exe `Let` regex that ends the years has only run in CI). A local, unstamped compile reads « 2024 » alone.
 - [ ] "Create a GitHub issue" signed in opens the form with no "Whoops" page (4e63c54c8a).
 - [ ] Developer mode: a source-mode driver ignores `taskkill /PID` without `/F` (2026-11-17; File > Exit closes it
       cleanly), and `run-windows-dev.ps1` closes the exe with the same `taskkill /IM`: check that the exe does close.
