@@ -2874,3 +2874,39 @@ same day: the readable bug report closes its warnings group with « Detailed
 log: off — turn on Debug › Detailed log and reproduce for more detail » while
 the switch is off, from the snapshot's `developer.detailed_log` that each
 driver fills from the same rule.
+
+## Agent decisions reviewed on 2026-11-24
+
+The maintainer answered the open agent decisions on 2026-11-24.
+
+Kept as the agents decided:
+
+- Linux packages name the maintainer's GitHub commit address (`maintainer_email`
+  in `_shared/core/text/data/app_metadata.json`) and send users to the issue
+  tracker; no personal address is published. The macOS category stays
+  `public.app-category.utilities`.
+- The feature form keeps ErgoptiPlus version, Driver and Operating system,
+  prefilled and optional.
+- `row_jump` weighs 2.5, half the SFB weight (`sfb` 5).
+- Tab, Caps Lock, Enter and the right Control are offered to the optimizer only
+  when its start layout already types there.
+- The Linux install ancestry walk is reused for
+  `[llm] install_ancestry_reuse_ms` = 1 ms.
+
+Changed by the maintainer (each a `[CODE]` item in TODO.md until done):
+
+- The SendEvent/SendInput comparison and the keyboard hook order recording run
+  inside « Lancer le field report », after a notice asking not to type.
+- The ErgoDox's left 2-unit outer thumb key types the letter of the layouts
+  that put one there (Einbinder Orthogonal, Yp Hina Fu); the maintainer reads
+  it as the key that is Alt on Windows and the left Command on macOS.
+- The Disposition Ergopti pages get a layout select beside the version select,
+  Ergopti first.
+- The AAA audit adds HTML_CodeSniffer (pinned npm package) beside axe-core.
+- CoMeRe's per-corpus licences are checked for a free, pseudonymised French
+  chat corpus; Tatoeba stays the French conversational register meanwhile.
+- The identity gate's false positive on PDF trailers is fixed.
+
+Deferred: 100 % line coverage and 100 % killed mutants as red CI gates are a
+far-future backlog (TODO.md, last section); the per-file coverage ratchets
+kept on 2026-11-24 only stop a file from dropping.

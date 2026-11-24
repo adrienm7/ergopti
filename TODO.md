@@ -546,33 +546,6 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `tools/test/test-ci-release-reruns.cjs` and replace the 2026-11-08 decision text. Sparkle is unaffected: its
       build number is the CI run number (`ci-macos.yml`, `ERGOPTI_BUILD`).
 
-## Test quality gates (maintainer request, 2026-11-23)
-
-The suites have unit, integration and end-to-end tests, but nothing measures how much of the code they run or
-whether they catch a change: no line coverage tool and no mutation testing exist (« coverage » in the CI files means
-the list of mandatory jobs, `.github/linux-ci-coverage.json`). Only a few fixes were proved by a hand-made source
-mutation (see « Open since the 2026-11-17 pass »). Target, red in CI otherwise: 100 % of lines covered and 100 % of
-mutants killed, an equivalent mutant being allowed only in a reviewed list that says why.
-
-- [ ] **[CI] Line coverage per language, in CI.** One report per language, merged per driver:
-  - Lua (macOS, Linux, shared): LuaCov under the existing runners (`tests/run.lua`), LuaJIT included;
-  - JavaScript (tools, shared UI pages, site): c8 over the `tools/test/features` suites;
-  - Swift (launcher): `swift test --enable-code-coverage` and `llvm-cov export`;
-  - Python: coverage.py; Go (`native_http`): `go test -coverprofile`;
-  - AutoHotkey: no coverage tool exists; instrument the sources in a copy (a counter call per statement) and
-    run `run_all.ahk` on that copy.
-- [ ] **[CI] Coverage gate.** Fails the lane below 100 %. Since today's figure is unknown, start with a per-file
-      ratchet (a baseline that may only rise, as the existing `*-baseline.json` gates do), then lower nothing and
-      raise each file to 100 %; generated files and vendored code are excluded by the generator registry and the
-      vendor list, never by hand.
-- [ ] **[CI] Mutation testing.** Stryker for JavaScript, mutmut for Python, a Go mutator (gremlins) for
-      `native_http`, Muter for Swift; Lua and AutoHotkey have no mature tool, so a repository mutator (operator,
-      boolean, comparison, return-value and removed-call mutants over a tokenized copy) runs their suites per
-      mutant. Mutants run on the files a change touches in each push and on the whole tree nightly, since a full
-      run is long.
-- [ ] **[CI] Mutation gate.** 100 % of mutants killed, red otherwise, with the same ratchet as coverage until then;
-      every surviving mutant is either killed by a new test or listed as equivalent with its reason.
-
 ## Bug report and feature links (maintainer request, 2026-11-24)
 
 Field report on `dev.178` (macOS, 12:18 Paris): the bug link's Diagnostics field was a Markdown table of
@@ -631,75 +604,69 @@ Each closes on a named green hosted or native run, recorded here.
     `model-browser-native-json` (43347126427, not reproduced; all four `config-*` groups, the bound check and
     `run_llm_model_browser.ahk` passed three times in a row locally on 2026-11-18, so only hosted runs are left).
 
+## Decided on 2026-11-24, to implement
+
+The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/maintainer-decisions.md),
+« Agent decisions reviewed on 2026-11-24 »).
+
+- [ ] **[CODE] Input probes inside « Lancer le field report » (maintainer, 2026-11-24).** The maintainer chose to
+      run « Mesurer SendEvent et SendInput » and « Enregistrer l'ordre des hooks clavier » inside the field report row,
+      after a notice asking not to type, instead of listing them as « run separately ». On Windows; state in the
+      menu's reason text why macOS and Linux have no such probe if they have none.
+- [ ] **[CODE] Identity gate false positive on PDF trailers (maintainer, 2026-11-24).** Fix it: the identity gate
+      flags every PDF's root trailer key in containers whose home is the root account's; ignore PDF internal structure
+      there, with a regression test.
+- [ ] **[CODE] The ErgoDox's left 2-unit outer thumb key types a letter (maintainer, 2026-11-24).** For
+      KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e »), the outer key (key 66) becomes the left thumb's
+      typing key instead of reading the letter on Space. The maintainer's reading: these layouts put the letter on the
+      key that is Alt on Windows and the left Command on macOS, so it should work there; check that mapping and make
+      both layouts complete on the ErgoDox (`docs/design/layout-analysis.md`, « ErgoDox keys »).
+- [ ] **[CODE] A layout select beside the version select (maintainer, 2026-11-24).** The Disposition Ergopti pages
+      get a layout select beside the version select, Ergopti first, drawing `static/layouts/visualisation/bepo.json`
+      through `tools/codegen/codegen-site-keyboard.cjs` (dead keys from `dead_levels`); `bepo_1_1rc2.toml` stays undrawn
+      while two dead keys share « ˰ ».
+- [ ] **[CODE] Add HTML_CodeSniffer to the AAA audit (maintainer, 2026-11-24).** Pinned npm package injected into the
+      same Playwright pages as axe-core, gating on its `WCAG2AAA` errors (its notices need a person and stay a list),
+      beside the repository's own checks for what both miss (2.5.5).
+- [ ] **[CODE] Check CoMeRe's per-corpus licences (maintainer, 2026-11-24).** Read the licence of each CoMeRe
+      sub-corpus (Ortolang) and import, as a count table, one under a free licence whose user names are already
+      pseudonymised; never a corpus holding personal data. Until then Tatoeba stays the French conversational register.
+
 ## Maintainer decisions pending
 
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-- [ ] **Package contact and category (2026-11-24):** decided by the agent on 2026-11-24, to review by the
-      maintainer. The repository publishes no contact address, so the Debian, RPM and Arch Maintainer fields name
-      the maintainer's GitHub commit address (`maintainer_email` in `_shared/core/text/data/app_metadata.json`) and
-      the AppStream `contact` URL, the Debian `Upstream-Contact` and the exe's comments send users to the issue
-      tracker; give a monitored address to replace it. The macOS category is `public.app-category.utilities` (the
-      Linux entries' `Utility`) rather than productivity. The AppImage ships no AppStream file yet: appimagetool
-      validates one when present and no `appstreamcli` ran here, so it is left for a run that can validate it.
-- [ ] **Feature form identity (decided by the agent on 2026-11-24, to review by the maintainer).** The feature
-      form keeps ErgoptiPlus version, Driver and Operating system, prefilled and optional, so an idea sent from an
-      old version whose feature already exists can be answered at once. Kept meanwhile: kept. The other choice is
-      to drop the three fields and keep only the title and the proposal.
-- [ ] **The input probes in « Lancer le field report » (decided by the agent on 2026-11-24, to review by the maintainer).**
-      « Mesurer SendEvent et SendInput » asks nothing, but it types into its own window for several seconds and any
-      key the person presses spoils it, like « Enregistrer l'ordre des hooks clavier »; both are listed in the
-      report as « run separately ». Kept meanwhile: separate. Choose:
-  1. **(recommended) Keep both separate.**
-  2. Run the SendInput comparison in the field report row, after a notice asking not to type.
-- [ ] **Row jumps' shipped scale (review note).** Decided 2026-11-21 and on dev since 732f924251: `row_jump` counts
-      same-hand bigrams on different fingers only and weighs half the SFB weight (`sfb` 5, `row_jump` 2.5)
-      ([decision](docs/memory/maintainer-decisions.md), « Layout score: graded costs »). Kept meanwhile: the agent's
-      starting scale. Review it against `docs/audits/layout-analysers/graded-costs-ranking.md`.
-- [ ] **Identity gate false positive (open question of the 2026-11-15 hand-off).** The identity gate flags every
-      PDF's root trailer key in containers whose home is the root account's. Kept meanwhile: unchanged.
-- [ ] **Tab, Caps Lock, Enter and the right Control as character keys (decided by the agent on 2026-11-24, to review
-      by the maintainer).** KLA's TypeMatrix, BvoFRak (ANSI), Arensito and AOEYK type there. Kept meanwhile: Tab,
-      Enter and the right Control are optional keys, on the board of a layout typing on one only (left pinky, right
-      pinky, right pinky; ISO Enter by its lower part), and Caps Lock is typed on by a layout holding no level
-      there, at its right end and never lateral; the optimizer offers them only when its start layout types there
-      (`docs/design/layout-analysis.md`, « Optional keys »). Choose whether the optimizer should offer them to any
-      start layout, and the right Control's finger (KLA gives AOEYK's the right thumb).
-- [ ] **A letter on the ErgoDox's left 2-unit outer thumb key (decided by the agent on 2026-11-24, to review by the
-      maintainer).** KLAnext's Einbinder Orthogonal (« u ») and Yp Hina Fu (« e ») put a letter on key 66, where the
-      board keeps Space, beside their space or « o » on the inner key. Kept meanwhile: the letter is read on Space,
-      the board's own key there (one key at its place on every drawing), and both layouts are in the library,
-      incomplete on the ErgoDox since the left thumb types on one key (`docs/design/layout-analysis.md`, « ErgoDox
-      keys »). Choose whether such a letter should instead make the outer key the left thumb's typing key.
-- [ ] **Linux install ancestry reuse window (decided by the agent on 2026-11-24, to review by the maintainer).** The
-      managed Ollama download re-admitted its install folder's ancestors about 14 times per 64 KiB chunk, from separate
-      callbacks, so no single turn could carry one walk. An admitted walk now answers the per-download owner's
-      `current()` for `[llm] install_ancestry_reuse_ms` = 1 ms; a refusal is never kept and each file mutation walks
-      before and after it. The walk was already a path-receipt fence, not proof against a same-user race, so 1 ms
-      widens no boundary it held. Choose another window, or 0 to walk every time.
-- [ ] **Where the site shows another layout's keyboard (decided by the agent on 2026-11-24, to review by the
-      maintainer).** `tools/codegen/codegen-site-keyboard.cjs` now draws any layout source of its `LAYOUTS` with the
-      default patch (Ergopti's drawings and modifiers, the source's characters and a level per dead key, no Ergopti+
-      level): `static/layouts/visualisation/bepo.json` is drawn and emulated by the same keyboard, its dead keys
-      opened from the data's `dead_levels` (`site-structure.playwright.cjs`, other-layout-keyboard). Kept
-      meanwhile: no page shows it, and `bepo_1_1rc2.toml` is not drawn (two dead keys share « ˰ »). Choose:
-  1. **(recommended) A layout select beside the version select** of the Disposition Ergopti pages, Ergopti first.
-  2. A bépo drawing on the « Genèse et sources » page only.
-  3. Keep it in the Studio (the Comparer's boards) and off the site pages.
-- [ ] **AAA tools: axe-core only (decided by the agent on 2026-11-24, to review by the maintainer).** Of the tools
-      surveyed ([aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md)), only axe-core measures AAA rules
-      without a new dependency or a network fetch; IBM Equal Access and Lighthouse have no AAA rule. Kept meanwhile:
-      axe-core's three AAA rules, no new dependency.
-  1. **(recommended) Keep axe-core alone** and write the repository's own checks for what it misses (2.5.5).
-  2. Add HTML_CodeSniffer (pinned npm package), injected into the same Playwright pages, for its `WCAG2AAA`
-     errors; its notices need a person anyway.
-- [ ] **A French chat corpus?** The chat corpus shipped on 2026-11-21 is English only (Taskmaster-1's written
-      dialogs, CC BY 4.0); Tatoeba's sentences stay the French conversational register. Candidates, none cleared,
-      none downloaded: CoMeRe (Ortolang, chats and forums; licence per sub-corpus, unchecked; pseudonymised user
-      names), 88milSMS (Montpellier, anonymised SMS; licence unchecked; private messages), the Claire French
-      Dialogue Dataset (OpenLLM-France; mostly CC BY-NC-SA, transcribed speech, not typed). Never Enron or any
-      corpus holding personal data. Kept meanwhile: no French chat corpus.
-  1. **(recommended) Check CoMeRe's per-corpus licences** and import, as a count table, a sub-corpus under a free
-     licence whose user names are already pseudonymised ([CODE]).
-  2. Keep Tatoeba as the French conversational register.
+None open.
+
+## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
+
+Not now (maintainer, 2026-11-24): « une todo lointaine, backlog ». A huge piece of work for later: measure line
+coverage everywhere (every language, every driver), then make CI red below 100 % coverage and below 100 % killed
+mutants. The per-file coverage ratchets kept on 2026-11-24 (Lua, JavaScript, Python) only stop a file from dropping;
+no agent starts the items below without a new request.
+
+The suites have unit, integration and end-to-end tests, but nothing measures how much of the code they run or
+whether they catch a change: no line coverage tool and no mutation testing exist (« coverage » in the CI files means
+the list of mandatory jobs, `.github/linux-ci-coverage.json`). Only a few fixes were proved by a hand-made source
+mutation (see « Open since the 2026-11-17 pass »). Target, red in CI otherwise: 100 % of lines covered and 100 % of
+mutants killed, an equivalent mutant being allowed only in a reviewed list that says why.
+
+- [ ] **[CI] Line coverage per language, in CI.** One report per language, merged per driver:
+  - Lua (macOS, Linux, shared): LuaCov under the existing runners (`tests/run.lua`), LuaJIT included;
+  - JavaScript (tools, shared UI pages, site): c8 over the `tools/test/features` suites;
+  - Swift (launcher): `swift test --enable-code-coverage` and `llvm-cov export`;
+  - Python: coverage.py; Go (`native_http`): `go test -coverprofile`;
+  - AutoHotkey: no coverage tool exists; instrument the sources in a copy (a counter call per statement) and
+    run `run_all.ahk` on that copy.
+- [ ] **[CI] Coverage gate.** Fails the lane below 100 %. Since today's figure is unknown, start with a per-file
+      ratchet (a baseline that may only rise, as the existing `*-baseline.json` gates do), then lower nothing and
+      raise each file to 100 %; generated files and vendored code are excluded by the generator registry and the
+      vendor list, never by hand.
+- [ ] **[CI] Mutation testing.** Stryker for JavaScript, mutmut for Python, a Go mutator (gremlins) for
+      `native_http`, Muter for Swift; Lua and AutoHotkey have no mature tool, so a repository mutator (operator,
+      boolean, comparison, return-value and removed-call mutants over a tokenized copy) runs their suites per
+      mutant. Mutants run on the files a change touches in each push and on the whole tree nightly, since a full
+      run is long.
+- [ ] **[CI] Mutation gate.** 100 % of mutants killed, red otherwise, with the same ratchet as coverage until then;
+      every surviving mutant is either killed by a new test or listed as equivalent with its reason.
