@@ -67,9 +67,10 @@ M.READY_POLL_INTERVAL_SEC = 0.25
 M.READY_TIMEOUT_SEC = 30
 
 --- The capture states the owner understands (diagnostics/adapters/runtime_capture_port.lua).
-M.CAPTURE_STARTING = "starting"
-M.CAPTURE_ADMITTED = "admitted"
-M.CAPTURE_STOPPED = "stopped"
+--- The port reports them in the owner's own words for the same three states.
+M.CAPTURE_STARTING = STATE.STARTING
+M.CAPTURE_ADMITTED = STATE.ADMITTED
+M.CAPTURE_STOPPED = STATE.STOPPED
 
 --- Stable reasons of the `unavailable` and `failed` states.
 M.REASON = {

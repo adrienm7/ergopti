@@ -100,7 +100,7 @@ local REASON = M.REASON
 
 --- The administrator shell's step that finds another install's journal still
 --- held (OwnedRuntimeUninstall.busyStep, UninstallWorker.swift).
-M.BUSY_STEP = "install_busy"
+M.BUSY_STEP = REASON.BUSY
 
 -- The administrator shell's exit statuses the helper uses (InstallerMain.swift).
 local HELPER_REFUSED = 77
