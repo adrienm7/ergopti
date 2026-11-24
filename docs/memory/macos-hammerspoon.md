@@ -1079,7 +1079,10 @@ at `OwnedRuntimeInstallJournal.swift:94` (field report 2026-11-24). The
 install's administrator shell (`OwnedRuntimeUninstall.staleRuntimeProgram`)
 retires the ledgers in `staleLedgers` and the `.runtime-install-<UUID>` stages
 after `lsof` proves no live helper holds them, and stops at `install_busy`
-otherwise. Action: a new durable ledger the first install writes goes into
+otherwise. `retireUnpublished` retires a header-only journal (no vnode
+recorded yet) by unlinking it, so the helper's own rollback no longer leaves
+that ledger; the fix reaches the Mac only with the next owned runtime build,
+because the helper is compiled into the signed runtime. Action: a new durable ledger the first install writes goes into
 `staleLedgers` or gets its own recovery owner, in the launcher, which ships
 without a runtime rebuild.
 

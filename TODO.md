@@ -54,13 +54,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `SR_TREE_TERMINATION_CONFIRM_BUDGET_MS` stays 500 ms unless a forced-termination test flakes alone), the Ubuntu APT and Playwright download retries,
       and the keyring proof readiness wait. A macOS Apple-silicon job « not acquired by Runner » is GitHub capacity:
       rerun the failed jobs, do not move it to Intel.
-- [ ] **[macOS] Install journal left by an interrupted install** (field report 2026-11-24, dev.178,
-      `refused-cleanupPending` at `OwnedRuntimeInstallJournal.swift:94`). Fixed in the launcher: the install's
-      administrator shell retires `.runtime-install-journal`, `.runtime-service-journal` and the
-      `.runtime-install-<UUID>` stages once `lsof` shows no helper holds them (field point
-      `owned_install_stale_journal`). Left for the `.7` helper: `OwnedRuntimeInstallJournal.retireUnpublished` still
-      refuses a journal with only its header (a failure between `create()` and the stage's first record), so that
-      helper leaves cleanup pending until the next install's shell retires it.
 - [ ] **[macOS] Menu requests of 2026-11-24 (maintainer, photo of the dev.178 menu).** Tap-Holds title without a
       dot while the owned runtime was not installed and its install refused: fixed, red 🔴 even with the switch off
       and repainted when the runtime fails after a build (field point `tap_holds_title_red_dot`). Windows and Linux
