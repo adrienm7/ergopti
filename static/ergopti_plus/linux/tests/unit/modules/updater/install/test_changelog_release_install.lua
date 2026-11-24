@@ -312,8 +312,9 @@ local function harness(opts)
 	}
 	ctx.manager = manager
 	if opts.feed_key then
-		-- The signing policy as it will ship once provisioned, with the
-		-- fixture's throwaway key and enforcement still off.
+		-- The shipped signing policy with the fixture's throwaway key (or no key
+		-- at all for ""), enforcement as shipped: each case states its key, so
+		-- the maintainer's provisioned key changes no fixture verdict.
 		local policy = Json.decode(assert(io.open(helpers.driver_root()
 			.. "/../_shared/updater/data/asset_signing.json", "rb")):read("*a"))
 		policy.public_key_spki_base64 = opts.feed_key
@@ -533,7 +534,7 @@ helpers.describe("changelog_bridge: one-click release install", function()
 	end)
 
 	helpers.it("refuses to install from the Atom feed, which lists no files", function()
-		local ctx = harness({ feed = true })
+		local ctx = harness({ feed = true, feed_key = "" })
 		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
 		ctx.restore_modules()
 		helpers.assert_eq(#ctx.events, 0)
@@ -581,11 +582,24 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		ctx.restore_modules()
 		helpers.assert_eq(#ctx.events, 0, "an older row backs nothing up and downloads nothing")
 		helpers.assert_eq(progress(ctx)[1].reason_key, "changelog_window.install_error_feed_not_newest")
-		local unkeyed = harness({ feed = true, feed_xml = FEED, signature = V.linux.signature_base64 })
+		local unkeyed = harness({ feed = true, feed_xml = FEED, feed_key = "", signature = V.linux.signature_base64 })
 		unkeyed.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, unkeyed.state)
 		unkeyed.restore_modules()
-		helpers.assert_eq(#unkeyed.events, 0, "the shipped policy holds no key: the refusal stays")
+		helpers.assert_eq(#unkeyed.events, 0, "a keyless policy: the refusal stays")
 		helpers.assert_eq(progress(unkeyed)[1].reason_key, "changelog_window.install_error_no_details")
+	end)
+
+	-- The shipped policy holds the maintainer's key with enforcement off: a feed
+	-- row still installs only on a signature of that key, and the fixture's
+	-- throwaway signature is not one.
+	helpers.it("(feed-only-install) the shipped key refuses a feed row it did not sign", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		helpers.assert_eq(#ctx.installs, 0, "nothing installs on a foreign signature")
+		helpers.assert_nil(index_of(ctx.events, "restart"))
+		helpers.assert_eq(progress(ctx)[#progress(ctx)].reason_key, "changelog_window.install_error_feed_signature")
 	end)
 
 	helpers.it("restores a backup and restarts the daemon on it", function()

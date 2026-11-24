@@ -229,12 +229,14 @@ _TAS_GateDecides() {
 
 Test("AssetSignature: the update gate follows the policy before anything downloads (asset-signature)", _TAS_GateDecides)
 
-; The shipped policy stays off until the maintainer provisions the key, and every
-; install path passes the gate before its transaction.
+; The shipped policy holds the maintainer's provisioned key with enforcement
+; still off, and every install path passes the gate before its transaction.
 _TAS_GateWired() {
 	global _SharedDir
 	Policy := JsonParse(FileRead(_SharedDir . "\updater\data\asset_signing.json", "UTF-8"))
 	AssertEqual("", AssetSignature_AdmitPolicy(Policy))
+	AssertEqual("off", Policy["enforcement"], "the shipped policy does not enforce yet")
+	AssertTrue(Policy["public_key_spki_base64"] != "", "the shipped policy holds the provisioned key")
 	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
 	Gate := InStr(Body, "AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)")
 	Begin := InStr(Body, "_Updater_BeginDownloadTransaction(")
