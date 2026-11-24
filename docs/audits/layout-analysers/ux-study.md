@@ -181,6 +181,9 @@ Screenshots: `oxey-01-playground.png`, `oxey-02-playground-full.png`.
 
 Screenshots: `layoutswiki-01-layout-page.png` to `layoutswiki-07-compare.png`.
 
+Revisited on 2026-11-25, its newer views compared feature by feature with
+Ergopti Studio: [layouts-wiki-playground.md](layouts-wiki-playground.md).
+
 - **Layout input.** A workspace selector, then MAIN and COMP layout pickers
   with type-ahead search over about 300 layouts (author and year in each row),
   and "New layout".

@@ -354,6 +354,16 @@ waits for the maintainer's review).
       it) and set their fidelity to `exact` on texts if the gaps are gone; the word lists and the 12 count-table
       corpora keep the trigrams' chain (no text to count from). keycraft (BSD-3, Go, its score scaled on its own
       layout set) needs its own run to be checked; shirolyzer's score is undocumented.
+- [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace »
+      tabs and their links (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in
+      order: (1) an n-gram to words drill-down: from a row of the worst n-grams (`board/worst_groups.js`) or a
+      penalised pair of the trace, list the words of the corpus's word table (`state.words`) whose key stream holds
+      that pair, through `E.traceText` of each word, most frequent first; (2) corpus blends: a weighted mix of
+      built-in corpora, their n-gram counts summed with the chosen weights before `prepareNgrams`, offered in the corpus picker and kept
+      with the conveniences; (3) magic and repeat keys: write a design first (`layout-source-format.md`, engine
+      ways of typing as a context-dependent output, and the three drivers' emulation, `cross-driver-parity`);
+      (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How do I compare,
+      rank, read a Pareto »), routed through `i18n`.
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -641,6 +651,16 @@ Each question names the default kept meanwhile; an answer moves into the item or
       headers and cookies; a typical report's prefill is now cut a little earlier. Choose another redirect budget
       after a measurement from a signed-in and a signed-out browser, or raise `max_url_bytes` (letter-dense links
       reached 6,440 bytes) if a signed-in browser serves it.
+- [ ] **Pareto tab defaults (decided by the agent on 2026-11-25, to review by the maintainer).** The tab opens on
+      SFB against lateral stretches, offers the mark and every metric the score weighs one way (not the metrics
+      shown without a direction), leaves incomplete layouts out of the frontier (their low counts are no
+      trade-off) and names at most 12 frontier layouts on the chart (the table names all). Choose other default
+      values or let incomplete layouts in.
+- [ ] **Trace sample text and stream rules (decided by the agent on 2026-11-25, to review by the maintainer).** The
+      trace types a sample sentence in the page's language until the visitor writes one (French: « Où êtes-vous
+      allés cet été ? Ça dépend : à Noël, chez Zoé et Gaëtan, près du lac. »), at most 2,000 characters, each
+      character on its own (chords not traced), a line break or an untyped character cutting the stream as in
+      the corpus tables. Choose another sample, or a sample taken from the chosen corpus's words.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 
