@@ -1043,11 +1043,29 @@ type = "---"
 type = "section_header"
 i18n = "menu.configuration.header_accessibility"
 
+# The reading font also draws the tray menus on Windows (owner-drawn items) and
+# macOS (styled titles); the label says so. A Linux tray menu crosses the
+# session bus as dbusmenu, whose items carry no font, and the desktop theme
+# draws it: the Linux row names the windows alone and says why (maintainer
+# decision 2026-11-24, docs/memory/maintainer-decisions.md).
 [[menu.configuration_menu]]
 type = "choice"
 id = "reading_font"
 i18n = "menu.configuration.reading_font"
 path = "script.reading_font"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+show_current_choice = true
+current_choice_label_value = true
+
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_font"
+i18n = "menu.configuration.reading_font_windows_only"
+path = "script.reading_font"
+platforms = ["linux"]
+unavailable = "hide"
+choice_label_prefix = "menu.configuration.reading_font."
 show_current_choice = true
 current_choice_label_value = true
 

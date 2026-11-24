@@ -108,7 +108,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			i18n.get("menu.debug.proxy_override"),
 			"-",
 			title("menu.configuration.header_accessibility"),
-			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_font"))
+			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_font_windows_only"))
 				:gsub("{2}", i18n.get("menu.configuration.reading_font.default"))),
 			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_spacing"))
 				:gsub("{2}", i18n.get("menu.configuration.reading_spacing.default"))),

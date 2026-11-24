@@ -157,6 +157,37 @@
 		}
 	},
 	{
+		"path": "configuration_menu.reading_font",
+		"visibility": "hide",
+		"labels": { "fr": "Police des fenêtres et menus", "en": "Font of the windows and menus" },
+		"platforms": { "windows": true, "macos": true, "linux": false },
+		"reasons": {
+			"linux": {
+				"en": "The Windows and macOS trays draw their menus themselves and can use the reading font. A Linux tray menu crosses the session bus as dbusmenu, whose items carry no font, and the desktop theme draws it: there the row names the windows alone.",
+				"fr": "Les zones de notification de Windows et de macOS dessinent leurs menus elles-mêmes et peuvent prendre la police de lecture. Sur Linux, le menu passe par le bus de session (dbusmenu), dont les éléments ne portent aucune police, et le thème du bureau le dessine : la ligne n'y nomme que les fenêtres."
+			}
+		}
+	},
+	{
+		"path": "configuration_menu.reading_font",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Police des fenêtres (les menus suivent le thème du bureau)",
+			"en": "Font of the windows (menus follow the desktop theme)"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "The Windows and macOS trays draw their menus themselves and can use the reading font. A Linux tray menu crosses the session bus as dbusmenu, whose items carry no font, and the desktop theme draws it: there the row names the windows alone.",
+				"fr": "Les zones de notification de Windows et de macOS dessinent leurs menus elles-mêmes et peuvent prendre la police de lecture. Sur Linux, le menu passe par le bus de session (dbusmenu), dont les éléments ne portent aucune police, et le thème du bureau le dessine : la ligne n'y nomme que les fenêtres."
+			},
+			"macos": {
+				"en": "The Windows and macOS trays draw their menus themselves and can use the reading font. A Linux tray menu crosses the session bus as dbusmenu, whose items carry no font, and the desktop theme draws it: there the row names the windows alone.",
+				"fr": "Les zones de notification de Windows et de macOS dessinent leurs menus elles-mêmes et peuvent prendre la police de lecture. Sur Linux, le menu passe par le bus de session (dbusmenu), dont les éléments ne portent aucune police, et le thème du bureau le dessine : la ligne n'y nomme que les fenêtres."
+			}
+		}
+	},
+	{
 		"path": "debug_menu.window_spy",
 		"visibility": "hide",
 		"labels": { "fr": "Window Spy", "en": "Window Spy" },

@@ -123,6 +123,10 @@ technical = "Linux groups CapsWord, case transforms, select word or line and pla
 kind = "os_concept"
 technical = "The in-app updater row exists on Linux, the suspend switch on Windows (AutoHotkey Suspend); each tray carries the top-level rows its runtime has."
 
+[reasons."platform_reason.reading_font_menus_need_native_drawing"]
+kind = "os_api"
+technical = "The Windows tray owner-draws its items (WM_MEASUREITEM, WM_DRAWITEM) in a face loaded with AddFontResourceEx, and macOS sets hs.styledtext titles in a face the launcher registers with Core Text; a Linux tray menu is a com.canonical.dbusmenu layout whose item properties (label, enabled, toggle-state, icon) carry no font, drawn by the desktop shell in its theme."
+
 [reasons."platform_reason.action_window_overview_is_each_systems"]
 kind = "os_equivalent"
 technical = "Mission Control and App Exposé on macOS, Task View on Windows; Linux desktops each bind their own overview key, bound as a keystroke there."
