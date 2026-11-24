@@ -6,7 +6,14 @@
 	import { asset, resolve } from '$app/paths';
 
 	import { getKeyboardData } from '#lib/keyboard/data/getKeyboardData.js';
-	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
+	import {
+		version,
+		layout,
+		layoutData,
+		versionsList,
+		layoutsList,
+		discordLink
+	} from '#lib/stores_infos.js';
 	import { PRODUCTS, isInSection } from '#lib/js/siteNavigation.js';
 
 	// Whether the narrow-screen menu is open; the menu button's aria-expanded
@@ -128,7 +135,7 @@
 	let onLayoutPages = $derived(isCurrent('/ergopti'));
 
 	$effect(() => {
-		getKeyboardData($version)
+		getKeyboardData($version, $layout)
 			.then((data) => {
 				layoutData.set(data);
 			})
@@ -153,7 +160,17 @@
 				<span class="min-width-400">
 					{#if onLayoutPages}
 						<select
+							id="layout-selection"
+							bind:value={$layout}
+							aria-label="Disposition affichée par les claviers"
+						>
+							{#each layoutsList as l}
+								<option value={l.id}>{l.label}</option>
+							{/each}
+						</select>
+						<select
 							id="version-selection"
+							disabled={$layout !== 'ergopti'}
 							bind:value={$version}
 							aria-label="Version de la Disposition Ergopti"
 						>
@@ -352,6 +369,7 @@
 		}
 	}
 
+	#layout-selection,
 	#version-selection {
 		border: 1px solid rgb(0, 76, 139);
 		border-radius: 5px;
@@ -363,6 +381,7 @@
 		padding-top: 1px;
 	}
 
+	#layout-selection option,
 	#version-selection option {
 		background-color: black;
 		color: white;

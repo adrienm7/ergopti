@@ -575,10 +575,6 @@ Each closes on a named green hosted or native run, recorded here.
 The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/maintainer-decisions.md),
 « Agent decisions reviewed on 2026-11-24 »).
 
-- [ ] **[CODE] A layout select beside the version select (maintainer, 2026-11-24).** The Disposition Ergopti pages
-      get a layout select beside the version select, Ergopti first, drawing `static/layouts/visualisation/bepo.json`
-      through `tools/codegen/codegen-site-keyboard.cjs` (dead keys from `dead_levels`); `bepo_1_1rc2.toml` stays undrawn
-      while two dead keys share « ˰ ».
 - [ ] **[CODE] Add HTML_CodeSniffer to the AAA audit (maintainer, 2026-11-24).** Pinned npm package injected into the
       same Playwright pages as axe-core, gating on its `WCAG2AAA` errors (its notices need a person and stay a list),
       beside the repository's own checks for what both miss (2.5.5).

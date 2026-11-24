@@ -2,6 +2,14 @@ import { writable } from 'svelte/store';
 export const versionsList = ['1.1', '2.0', '2.1', '2.2'].reverse();
 export const latestVersion = versionsList[0];
 export let version = writable(latestVersion); // Default value
+// The layouts the Disposition Ergopti pages can draw, Ergopti first
+// (maintainer, 2026-11-24); each other one is a file of
+// static/layouts/visualisation written by tools/codegen/codegen-site-keyboard.cjs.
+export const layoutsList = Object.freeze([
+	Object.freeze({ id: 'ergopti', label: 'Ergopti' }),
+	Object.freeze({ id: 'bepo', label: 'Bépo' })
+]);
+export const layout = writable(layoutsList[0].id);
 
 export const layoutData = writable();
 export const discordLink = 'https://discord.gg/ptxRzBqcQP';

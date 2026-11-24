@@ -1,7 +1,14 @@
 import { asset } from '$app/paths';
 
-export async function getKeyboardData(version) {
-	const fileName = `ergopti_v${version}`;
+/**
+ * The drawing data of one layout: Ergopti at a version, or another drawn
+ * layout (layoutsList), whose file has no version.
+ * @param {string} version - An Ergopti version of versionsList.
+ * @param {string} [layout] - A layoutsList id, Ergopti by default.
+ * @returns {Promise<object|null>} The data, or null when it does not load.
+ */
+export async function getKeyboardData(version, layout = 'ergopti') {
+	const fileName = layout === 'ergopti' ? `ergopti_v${version}` : layout;
 	const filePath = asset(`layouts/visualisation/${fileName}.json`);
 
 	console.info(`[KeyboardData] Trying to load file at path "${filePath}"`);
