@@ -1001,6 +1001,60 @@ CB_Write(Text) {
 	}
 }
 
+; Publishes Text as CF_UNICODETEXT, with the transient formats, under one native
+; lease. A_Clipboard cannot add formats to its own write, so a TextSend payload
+; published through it landed in Win+V and the cloud clipboard. The ownership
+; reservation precedes the change exactly as in CB_Write; once EmptyClipboard
+; has run the change is real and is never cancelled.
+; @param {String} Text Nonempty payload.
+; @returns {Boolean} True once the text and its markers are published.
+_CB_WriteTransientText(Text) {
+	if !_CB_ResolveRestoreDebtBeforeMutation()
+		return false
+	Handle := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42, "UPtr", (StrLen(Text) + 1) * 2, "Ptr")
+	if !Handle
+		return false
+	Opened := false, MutationId := 0, Changed := false, Failure := ""
+	PreviousCritical := 0, InCritical := false
+	try {
+		Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Handle, "Ptr")
+		if !Pointer
+			return false
+		StrPut(Text, Pointer, StrLen(Text) + 1, "UTF-16")
+		DllCall("Kernel32\GlobalUnlock", "Ptr", Handle)
+		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
+		if !Opened
+			return false
+		; No AHK thread may touch the clipboard while this lease is held.
+		PreviousCritical := Critical("On"), InCritical := true
+		MutationId := _CB_BeginOwnedMutation()
+		if !DllCall("User32\EmptyClipboard", "Int")
+			return false
+		Changed := true
+		if !DllCall("User32\SetClipboardData", "UInt", 13, "Ptr", Handle, "Ptr")
+			return false
+		; The clipboard owns the text now.
+		Handle := 0
+		_CB_MarkTransientPublication()
+		return true
+	} catch Any as Err {
+		Failure := Err
+		return false
+	} finally {
+		if Handle
+			DllCall("Kernel32\GlobalFree", "Ptr", Handle, "Ptr")
+		if MutationId && !Changed
+			_CB_CancelOwnedMutation(MutationId)
+		if Opened
+			DllCall("User32\CloseClipboard", "Int")
+		if InCritical
+			Critical(PreviousCritical)
+		; Logged once the lease is closed, never inside it.
+		if IsObject(Failure)
+			try LoggerError("Clipboard", "The transient text publication failed: {1}.", RTrim(Failure.Message, "."))
+	}
+}
+
 ; Windows-only publication receipt; the shared write port remains Boolean-only.
 ; A successful setter may already have been replaced when it returns. Authenticate
 ; this exact mutation under a new native read lease before lending its sequence.
@@ -1011,10 +1065,11 @@ CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
 	PreviousCritical := Critical("On")
 	try BeforeMutation := CBClipboardOwner.mutation_id
 	finally Critical(PreviousCritical)
-	Published := CB_Write(Text)
+	Length := StrLen(Text)
+	; Only a nonempty payload is published, so only it carries the transient formats.
+	Published := Length ? _CB_WriteTransientText(Text) : CB_Write(Text)
 	if !Published
 		return false
-	Length := StrLen(Text)
 	if !Length
 		return true
 	Opened := false
