@@ -220,6 +220,65 @@ _TFR_Text() {
 }
 Test("field report: the report names each verdict, the steps not run and the folder (field-report-in-app)", _TFR_Text)
 
+; The maintainer's choice of 2026-11-24: the two input probes run inside the
+; field report row, after a notice asking not to type, instead of being listed
+; as rows to run separately.
+_TFR_InputProbesAreSteps() {
+	global _DriverDir, _SharedDir
+	Results := [
+		Map("step", "field_send_probe", "verdict", "pass", "codes", ["rows_8", "exact_rows_8"], "report", 0),
+		Map("step", "field_hook_probe", "verdict", "skip", "codes", ["not_started_keys_held"], "report", 0)]
+	Steps := [Map("id", "field_send_probe", "check", "send_probe"), Map("id", "field_hook_probe", "check", "hook_probe")]
+	Summary := FieldReport_Summary(Results, [], Steps, Map("request_id", "app-1", "interrupted", false), "C:\fr")
+	for Row in Summary["separate"]
+		AssertTrue(Row != MenuCommand.SEND_PROBE && Row != MenuCommand.HOOK_PROBE,
+			"an input probe the run takes is not left to run separately: " . Row)
+	Text := FieldReport_Text(Summary, _TFR_Translate)
+	AssertTrue(InStr(Text, "[OK] [menu.debug.send_probe] — field_send_probe`n    rows_8, exact_rows_8") > 0, Text)
+	AssertTrue(InStr(Text, "[-] [menu.debug.hook_probe] — field_hook_probe`n    not_started_keys_held") > 0, Text)
+	Checks := ""
+	for Step in FieldRun_LoadSteps(_DriverDir . "\diagnostics\data\field_run_steps.json",
+		FieldRun_LoadProtocol(_SharedDir . "\diagnostics\data\field_run_protocol.json"), FieldRun_Runners())["steps"]
+		Checks .= " " . Step.Get("check", "")
+	AssertContains(Checks, " send_probe", "the shipped steps run the send comparison")
+	AssertContains(Checks, " hook_probe", "the shipped steps run the hook order check")
+}
+Test("field report: the input probes run inside the report, not separately (field-report-input-probes)",
+	_TFR_InputProbesAreSteps)
+
+; A probe that could not start is a skip naming why; a finished one passes or
+; fails with its closed codes, and one that raises fails the step.
+_TFR_InputProbeOutcome() {
+	Settled := []
+	Record := (Verdict, Codes) => Settled.Push(Verdict . ":" . _TFR_JoinCodes(Codes))
+	_FieldRun_InputProbeAfterNotice(() => Map("state", "aborted", "reason", "paused"), _FieldRun_SendProbeCodes, Record)
+	Rows := [Map("scenario", "burst", "exact", 4, "n", 4), Map("scenario", "paste", "exact", 3, "n", 4),
+		Map("scenario", "rival", "exact", 0, "n", 4)]
+	_FieldRun_InputProbeAfterNotice(() => Map("state", "done", "pass", false, "rows", Rows), _FieldRun_SendProbeCodes,
+		Record)
+	Hook := Map("state", "done", "pass", false,
+		"verdict", Map("before", "test_first", "after", "test_first", "rehook", "no"))
+	_FieldRun_InputProbeAfterNotice(() => Hook, _FieldRun_HookProbeCodes, Record)
+	_FieldRun_InputProbeAfterNotice(_TFR_RaisingProbe, _FieldRun_SendProbeCodes, Record)
+	AssertEqual("skip:not_started_paused", Settled[1], "a probe that did not start is a skip with its reason")
+	AssertEqual("fail:rows_3,exact_rows_2", Settled[2], "the send comparison counts its exact rows, the rival one included")
+	AssertEqual("fail:before_test_first,after_test_first,rehook_no", Settled[3], "the hook order names both phases")
+	AssertEqual("fail:raised", Settled[4], "a probe that raises fails the step")
+}
+Test("field report: an input probe step settles from the probe's result (field-report-input-probes)",
+	_TFR_InputProbeOutcome)
+
+_TFR_RaisingProbe() {
+	throw Error("fixture probe failure")
+}
+
+_TFR_JoinCodes(Codes) {
+	Joined := ""
+	for Code in Codes
+		Joined .= (Joined == "" ? "" : ",") . Code
+	return Joined
+}
+
 ; A progress over recording effects, bound to a recording window.
 _TFR_Progress(Box, CopyOk := true, IssueOk := true) {
 	Effects := Map(

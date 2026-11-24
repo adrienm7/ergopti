@@ -65,7 +65,8 @@
 #   (tools/dev/run-windows-dev.ps1): the collector asks it, through the shared
 #   protocol (_shared/diagnostics/data/field_run_protocol.json, diagnostics/engine/field_run/field_run.ahk), to
 #   run its steps (windows/diagnostics/data/field_run_steps.json: boot cost, network,
-#   composer) without their windows, and copies the results. It never starts
+#   composer, the two input probes after a notice asking not to type) without
+#   their windows, and copies the results. It never starts
 #   a driver itself: a second driver beside the maintainer's own spoils both.
 #   Without a ready developer driver the field run is a skip in the analysis;
 #   the tray checks clicked today are still read from the day log.

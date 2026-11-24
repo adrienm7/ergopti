@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Tutte le verifiche automatiche sono riuscite.",
 	"field_check.all.verdict_fail": "Almeno una verifica automatica non è riuscita.",
 	"field_check.all.separate_header": "Da eseguire separatamente (richiedono il tuo intervento):",
+	"field_check.all.input_probe_notice": "Tra pochi secondi parte un controllo dell'input che digita in una piccola finestra propria: non digitare né fare clic finché non termina.",
 	"field_report.title": "Rapporto sul campo",
 	"field_report.heading": "Rapporto sul campo in corso",
 	"field_report.heading_done": "Rapporto sul campo terminato",

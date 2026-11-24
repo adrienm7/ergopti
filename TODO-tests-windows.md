@@ -309,6 +309,12 @@ eader.sqlite` held open by another program, press Reset: the status line says th
       Ctrl+V into Full report pastes the complete report. Run it again and click « Stop the run », and once more and
       close the window with its close box during the run: the log says « cancelled by the person » and the report
       is interrupted. The window follows the Configuration menu's reading font and light or dark appearance.
+- [ ] **Input probes inside the field report (2026-11-24):** during « Lancer le field report », a notification
+      « Une mesure de saisie démarre dans quelques secondes… » appears about 4 s before each of `field_send_probe` and
+      `field_hook_probe`; without touching the keyboard both pass (or the hook one fails with `rehook_no` when another
+      AutoHotkey hook runs), and they read under « Mesurer SendEvent et SendInput » and « Enregistrer l'ordre des
+      hooks clavier » instead of « Run separately ». Holding Shift when it starts makes the step a skip
+      `not_started_keys_held`.
 - [ ] TIM-04: an AI prediction whose first display takes over 2 s logs « Over budget: prediction.display » once.
       TIM-01 is automated (the live check `reload-command` counts one « Reload completed in N ms » per reload, none
       for the plain start, and the over-budget warnings against `driver_reload_ms`); TIM-05 passed on 2026-11-23 (the

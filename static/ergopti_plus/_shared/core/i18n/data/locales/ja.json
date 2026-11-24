@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "すべての自動チェックに合格しました。",
 	"field_check.all.verdict_fail": "少なくとも 1 件の自動チェックが失敗しました。",
 	"field_check.all.separate_header": "個別に実行してください（操作が必要です）：",
+	"field_check.all.input_probe_notice": "数秒後に入力チェックが始まり、専用の小さなウィンドウに入力します。終わるまで入力やクリックをしないでください。",
 	"field_report.title": "フィールドレポート",
 	"field_report.heading": "フィールドレポートを実行中",
 	"field_report.heading_done": "フィールドレポートが終了しました",

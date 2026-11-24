@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "כל הבדיקות האוטומטיות עברו.",
 	"field_check.all.verdict_fail": "לפחות בדיקה אוטומטית אחת נכשלה.",
 	"field_check.all.separate_header": "הרץ בנפרד (הן זקוקות לך):",
+	"field_check.all.input_probe_notice": "בדיקת קלט תתחיל בעוד כמה שניות ותקליד בחלון קטן משלה: אל תקלידו ואל תלחצו עד שתסתיים.",
 	"field_report.title": "דוח שטח",
 	"field_report.heading": "דוח שטח בהרצה",
 	"field_report.heading_done": "דוח השטח הסתיים",

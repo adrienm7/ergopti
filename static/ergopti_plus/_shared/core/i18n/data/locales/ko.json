@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "모든 자동 검사를 통과했습니다.",
 	"field_check.all.verdict_fail": "자동 검사가 하나 이상 실패했습니다.",
 	"field_check.all.separate_header": "따로 실행하세요(직접 조작이 필요합니다):",
+	"field_check.all.input_probe_notice": "몇 초 후 입력 검사가 시작되어 자체의 작은 창에 입력합니다. 끝날 때까지 입력하거나 클릭하지 마세요.",
 	"field_report.title": "필드 보고서",
 	"field_report.heading": "필드 보고서 실행 중",
 	"field_report.heading_done": "필드 보고서 완료",

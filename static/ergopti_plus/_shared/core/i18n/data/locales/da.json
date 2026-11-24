@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Alle automatiske kontroller lykkedes.",
 	"field_check.all.verdict_fail": "Mindst én automatisk kontrol mislykkedes.",
 	"field_check.all.separate_header": "Kør separat (de kræver dig):",
+	"field_check.all.input_probe_notice": "Et inputtjek starter om få sekunder og skriver i sit eget lille vindue: skriv eller klik ikke, før det er færdigt.",
 	"field_report.title": "Feltrapport",
 	"field_report.heading": "Feltrapport i gang",
 	"field_report.heading_done": "Feltrapport færdig",

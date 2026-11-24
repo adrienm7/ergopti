@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "نجحت جميع الفحوصات التلقائية.",
 	"field_check.all.verdict_fail": "فشل فحص تلقائي واحد على الأقل.",
 	"field_check.all.separate_header": "شغّلها على حدة (تحتاج إليك):",
+	"field_check.all.input_probe_notice": "يبدأ فحص للإدخال خلال ثوانٍ ويكتب في نافذة صغيرة خاصة به: لا تكتب ولا تنقر حتى ينتهي.",
 	"field_report.title": "التقرير الميداني",
 	"field_report.heading": "التقرير الميداني قيد التشغيل",
 	"field_report.heading_done": "انتهى التقرير الميداني",

@@ -1,6 +1,6 @@
 {
-	"_comment": "The Windows developer field run's steps, run by diagnostics/engine/field_run/field_run.ahk under the shared protocol (_shared/diagnostics/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each field_check step is a Debug tray check run without its window, and the reload step reloads the driver and resumes the run in its successor: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
-	"deadline_seconds": { "default": 300, "min": 30, "max": 1800 },
+	"_comment": "The Windows developer field run's steps, run by diagnostics/engine/field_run/field_run.ahk under the shared protocol (_shared/diagnostics/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each field_check step is a Debug tray check run without its window; the two input probes first notify the person not to type, since they type into a window of their own for several seconds (maintainer, 2026-11-24). The reload step reloads the driver and resumes the run in its successor: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
+	"deadline_seconds": { "default": 420, "min": 30, "max": 1800 },
 	"steps": [
 		{
 			"id": "field_boot_cost",
@@ -22,6 +22,20 @@
 			"check": "composer",
 			"deadline_seconds": 90,
 			"proves": "The layout composer installs, enables and removes its check layout through the real path."
+		},
+		{
+			"id": "field_send_probe",
+			"kind": "field_check",
+			"check": "send_probe",
+			"deadline_seconds": 90,
+			"proves": "After a notice asking not to type, SendInput and SendEvent type every shape the driver sends into a window the check owns, each exactly."
+		},
+		{
+			"id": "field_hook_probe",
+			"kind": "field_check",
+			"check": "hook_probe",
+			"deadline_seconds": 60,
+			"proves": "After a notice asking not to type, the low-level keyboard hook order before and after a SendInput is recorded and AutoHotkey's hook runs first once it rehooks."
 		},
 		{
 			"id": "driver_reload",

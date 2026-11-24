@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "Alle automatische controles zijn geslaagd.",
 	"field_check.all.verdict_fail": "Ten minste één automatische controle is mislukt.",
 	"field_check.all.separate_header": "Apart uitvoeren (ze hebben u nodig):",
+	"field_check.all.input_probe_notice": "Over een paar seconden start een invoercontrole die in een eigen klein venster typt: typ of klik niet tot die klaar is.",
 	"field_report.title": "Veldrapport",
 	"field_report.heading": "Veldrapport bezig",
 	"field_report.heading_done": "Veldrapport voltooid",

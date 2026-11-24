@@ -291,6 +291,7 @@
 	"field_check.all.verdict_pass": "所有自动检查均已通过。",
 	"field_check.all.verdict_fail": "至少有一项自动检查失败。",
 	"field_check.all.separate_header": "请单独运行（需要您操作）：",
+	"field_check.all.input_probe_notice": "几秒后将开始输入检查，它会在自己的小窗口中输入：结束前请勿输入或点击。",
 	"field_report.title": "现场报告",
 	"field_report.heading": "现场报告运行中",
 	"field_report.heading_done": "现场报告已完成",
