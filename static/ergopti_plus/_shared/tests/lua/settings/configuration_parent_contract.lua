@@ -58,7 +58,13 @@ function M.register(helpers, fixture, corpus, platform)
 					helpers.assert_eq(observed.parents, 1)
 					helpers.assert_true(rawequal(observed.child, observed.retained), "finished child is passed by identity")
 					local labels = {}; for _, row in ipairs(parent.menu) do labels[#labels + 1] = row.title end
-					helpers.assert_eq(labels, expected.children, "complete hand-authored native child image")
+					-- The Linux tray cannot draw its menus in the reading font, so its
+					-- row names the windows alone (corpus linux_children).
+					local children = {}
+					for index, label in ipairs(expected.children) do
+						children[index] = platform == "linux" and expected.linux_children[label] or label
+					end
+					helpers.assert_eq(labels, children, "complete hand-authored native child image")
 					helpers.assert_eq(observed.effects, {}, "constructing Configuration invokes no action")
 					local expected_result
 					if platform == "hs" then expected_result = false end

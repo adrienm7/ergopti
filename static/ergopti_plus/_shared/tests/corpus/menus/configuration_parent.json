@@ -16,9 +16,12 @@
 			"Proxy for downloads…",
 			"-",
 			"— Accessibility —",
-			"Font of the windows: Default",
+			"Font of the windows and menus: Default",
 			"Text spacing of the windows: Default"
-		]
+		],
+		"linux_children": {
+			"Font of the windows and menus: Default": "Font of the windows (menus follow the desktop theme): Default"
+		}
 	},
 	"fr": {
 		"parent": "Configuration",
@@ -37,8 +40,11 @@
 			"Proxy des téléchargements…",
 			"-",
 			"— Accessibilité —",
-			"Police des fenêtres : Par défaut",
+			"Police des fenêtres et menus : Par défaut",
 			"Espacement du texte des fenêtres : Par défaut"
-		]
+		],
+		"linux_children": {
+			"Police des fenêtres et menus : Par défaut": "Police des fenêtres (les menus suivent le thème du bureau) : Par défaut"
+		}
 	}
 }
