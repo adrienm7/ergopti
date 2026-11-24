@@ -306,7 +306,10 @@ waits for the maintainer's review).
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
       no author, adnw.de has no page for it). The 53 « collection » credits come from KLA's « author » field, which
       can name the person who submitted the layout: check each against its author's page, first the doubtful ones
-      (Klausler « Kaimakides », Neo 2.0 « Julian Asamer », CarpalxQ and QWERTY Wide Mod « Dave Ferree »).
+      (Klausler « Kaimakides »: deskthority's « Keyboard layouts » page names neither; CarpalxQ and QWERTY Wide Mod
+      « Dave Ferree »: the CarpalxQ post, « jumpedthesynapse » 2007-07, names no author and credits Martin Krzywinski
+      for « 75-85% of this layout »; Arensito, KLA's « Dave Ferree », at Håkon Hallingstad's pvv.ntnu.no page,
+      which answered 502 on 2026-11-24). Neo 2 is credited from neo-layout.org's history since 2026-11-24.
 - [ ] **[LATER] More Google Books and Leipzig languages.** The importer (`tools/build/import-count-tables.cjs`)
       streams Google Books 1-gram shards without storing them (`google_books_1grams`, French shipped). Left, one
       language per session at about 1 MB/s: English (24 shards, 6.4 GB), German (8, 6.2 GB), Spanish (3, 1.9 GB),
