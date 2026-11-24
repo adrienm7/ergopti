@@ -355,10 +355,9 @@ waits for the maintainer's review).
       corpora keep the trigrams' chain (no text to count from). keycraft (BSD-3, Go, its score scaled on its own
       layout set) needs its own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace »
-      tabs and their links (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in
-      order: (1) an n-gram to words drill-down: from a row of the worst n-grams (`board/worst_groups.js`) or a
-      penalised pair of the trace, list the words of the corpus's word table (`state.words`) whose key stream holds
-      that pair, through `E.traceText` of each word, most frequent first; (2) corpus blends: a weighted mix of
+      tabs, their links, the movement table and the trace's « Corpus words » (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in
+      order: (1) the same « Corpus words » drill-down (`E.wordsWithKeys`, done in the trace) on each row of the
+      worst n-grams (`board/worst_groups.js`, shared with the editor panel); (2) corpus blends: a weighted mix of
       built-in corpora, their n-gram counts summed with the chosen weights before `prepareNgrams`, offered in the corpus picker and kept
       with the conveniences; (3) magic and repeat keys: write a design first (`layout-source-format.md`, engine
       ways of typing as a context-dependent output, and the three drivers' emulation, `cross-driver-parity`);

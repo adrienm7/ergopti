@@ -425,6 +425,8 @@
 	// The trace tab (an idea seen in the Layouts Wiki playground): the text it
 	// types when the visitor has written none.
 	const TRACE_SAMPLE_KEY = 'layout_analysis.trace.sample';
+	// How many corpus words the drill-down of a penalised group names.
+	const TRACE_WORDS_SHOWN = 12;
 	// A filter set to this value keeps everything.
 	const ALL = '';
 	const COMPLETE_CHOICES = ['all', 'yes', 'no'];
@@ -2687,17 +2689,57 @@
 					})
 					.join(' ');
 			const list = el('ul', 'la-trace-groups');
-			for (const group of marked)
-				list.append(
-					el(
-						'li',
-						'',
-						t('layout_analysis.trace.group', {
-							keys: groupText(group.keys),
-							events: group.events.map(metricName).join(', ')
-						})
-					)
+			marked.forEach((group, at) => {
+				const item = el(
+					'li',
+					'',
+					t('layout_analysis.trace.group', {
+						keys: groupText(group.keys),
+						events: group.events.map(metricName).join(', ')
+					})
 				);
+				// The drill-down to the corpus's words holding these keys in a row.
+				if (state.words) {
+					const button = el('button', 'la-trace-words-button', t('layout_analysis.trace.words'));
+					button.type = 'button';
+					// Its name starts with its visible text and says which keys (WCAG 2.5.3).
+					button.setAttribute(
+						'aria-label',
+						t('layout_analysis.trace.words_for', { keys: groupText(group.keys) })
+					);
+					const listId = `la-trace-${index}-words-${at}`;
+					button.setAttribute('aria-expanded', 'false');
+					button.setAttribute('aria-controls', listId);
+					const found = el('p', 'la-muted la-trace-words');
+					found.id = listId;
+					found.hidden = true;
+					button.addEventListener('click', () => {
+						const open = button.getAttribute('aria-expanded') !== 'true';
+						button.setAttribute('aria-expanded', String(open));
+						found.hidden = !open;
+						if (!open || found.textContent !== '') return;
+						const hits = E.wordsWithKeys(
+							layout,
+							state.words,
+							group.keys.map((k) => trace.keys[k].code),
+							{
+								keyboard: state.keyboard,
+								profile: FINGERING.current(state.keyboard) || undefined,
+								limit: TRACE_WORDS_SHOWN
+							}
+						);
+						found.textContent =
+							hits.words.length === 0
+								? t('layout_analysis.trace.words_none')
+								: t('layout_analysis.trace.words_found', {
+										words: hits.words.map((w) => w.word).join(', '),
+										count: hits.occurrences
+									});
+					});
+					item.append(' ', button, found);
+				}
+				list.append(item);
+			});
 			const groupsTitle = el('h4', '', t('layout_analysis.trace.groups', { count: marked.length }));
 			section.append(title, strip, legend, tableBox, groupsTitle);
 			if (marked.length > 0) section.append(list);

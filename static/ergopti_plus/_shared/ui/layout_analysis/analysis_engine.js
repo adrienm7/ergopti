@@ -4912,6 +4912,59 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	/**
+	 * The words of a word table whose key stream holds a key sequence (the
+	 * drill-down from an n-gram to its words, an idea seen in the Layouts Wiki
+	 * playground's Keystrokes and Words views): each word typed alone, each
+	 * character its cheapest way out of context (the ways compiled once), and
+	 * kept when the given codes follow each other in its keys.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object|Array} words - word → count, or [[word, count], ...].
+	 * @param {string[]} codes - Two or three KeyboardEvent codes, in order.
+	 * @param {{keyboard?: string, profile?: object, limit?: number}} [options] - limit: at most
+	 *   this many words (all when absent).
+	 * @returns {{words: Array<{word: string, count: number}>, occurrences: number}}
+	 *   The most frequent first (ties by code point); occurrences: their counts summed.
+	 * @throws {Error} On fewer than two codes or a code the board lacks.
+	 */
+	function wordsWithKeys(layoutInput, words, codes, options) {
+		const opts = options || {};
+		if (!Array.isArray(codes) || codes.length < 2)
+			throw new Error('layout_analysis: wordsWithKeys needs at least two key codes');
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const wanted = codes.map((code) => {
+			if (!board.index.has(code)) throw new Error(`layout_analysis: the board has no key ${code}`);
+			return board.index.get(code);
+		});
+		const best = compileWays(layout, board, null).best;
+		const entries = Array.isArray(words) ? words : Object.entries(words || {});
+		const out = [];
+		let occurrences = 0;
+		for (const [word, count] of entries) {
+			const keys = [];
+			let typed = true;
+			for (const char of word) {
+				const way = best.get(char);
+				if (!way) {
+					typed = false;
+					break;
+				}
+				keys.push(...way.keys);
+			}
+			if (!typed) continue;
+			const holds = keys.some((_, i) => wanted.every((k, j) => keys[i + j] === k));
+			if (!holds) continue;
+			out.push({ word, count });
+			occurrences += count;
+		}
+		out.sort((x, y) => y.count - x.count || (x.word < y.word ? -1 : x.word > y.word ? 1 : 0));
+		return {
+			words: opts.limit === undefined ? out : out.slice(0, opts.limit),
+			occurrences
+		};
+	}
+
 	const PARETO_DIRECTIONS = ['lower', 'higher'];
 
 	/**
@@ -8047,6 +8100,7 @@ var LAYOUT_ANALYSIS = (function () {
 		TRACE_MAX_CHARS,
 		MOVEMENT_CLASSES,
 		movementTable,
+		wordsWithKeys,
 		pareto,
 		defaultWeights,
 		defaultFloors,
