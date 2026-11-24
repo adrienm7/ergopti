@@ -402,6 +402,42 @@
 			"title_key": "layout_analysis.corpus.name.fr_books_words"
 		},
 		{
+			"id": "en_books_words",
+			"title": "Google Books 1950-2019 — English words (counts)",
+			"language": "en",
+			"kind": "words",
+			"file": "static/corpus/frequency/google_books/en_1grams_2020.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.en_books_words"
+		},
+		{
+			"id": "de_books_words",
+			"title": "Google Books 1950-2019 — German words (counts)",
+			"language": "de",
+			"kind": "words",
+			"file": "static/corpus/frequency/google_books/de_1grams_2020.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.de_books_words"
+		},
+		{
+			"id": "es_books_words",
+			"title": "Google Books 1950-2019 — Spanish words (counts)",
+			"language": "es",
+			"kind": "words",
+			"file": "static/corpus/frequency/google_books/es_1grams_2020.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.es_books_words"
+		},
+		{
+			"id": "it_books_words",
+			"title": "Google Books 1950-2019 — Italian words (counts)",
+			"language": "it",
+			"kind": "words",
+			"file": "static/corpus/frequency/google_books/it_1grams_2020.json",
+			"format": "count_table",
+			"title_key": "layout_analysis.corpus.name.it_books_words"
+		},
+		{
 			"id": "fr_tatoeba_all",
 			"title": "Tatoeba — all French sentences (counts)",
 			"title_key": "layout_analysis.corpus.name.fr_tatoeba_all",

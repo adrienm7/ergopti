@@ -345,13 +345,12 @@ waits for the maintainer's review).
       « Dave Ferree »: the CarpalxQ post, « jumpedthesynapse » 2007-07, names no author and credits Martin Krzywinski
       for « 75-85% of this layout »; Arensito, KLA's « Dave Ferree », at Håkon Hallingstad's pvv.ntnu.no page,
       which answered 502 on 2026-11-24). Neo 2 is credited from neo-layout.org's history since 2026-11-24.
-- [ ] **[LATER] More Google Books and Leipzig languages.** The importer (`tools/build/import-count-tables.cjs`)
-      streams Google Books 1-gram shards without storing them (`google_books_1grams`, French shipped). Left, one
-      language per session at about 1 MB/s: English (24 shards, 6.4 GB), German (8, 6.2 GB), Spanish (3, 1.9 GB),
-      Italian (2, 2.3 GB): add each to `static/corpus/count_table_sources.json` with empty `sha256` pins, its
-      register entry and corpus with a `title_key` in the 21 locales, then run the importer with `--record-pins`.
-      Languages with no Optimiser label yet (Portuguese, Dutch: Leipzig has `por_wikipedia_2021_1M` and
-      `nld_wikipedia_2021_1M`) also need their `layout_optimizer.language.<code>` string and a library layout.
+- [ ] **[LATER] More Leipzig languages.** Google Books' French, English, German, Spanish and Italian 1-grams ship
+      (`static/corpus/frequency/google_books`, pinned in `static/corpus/count_table_sources.json`). Left: Portuguese
+      and Dutch (Leipzig `por_wikipedia_2021_1M` and `nld_wikipedia_2021_1M`, Google Books has no Dutch export) need
+      a `layout_optimizer.language.<code>` string in the 21 locales and a library layout of the language before their
+      corpus can be listed; then add each to `count_table_sources.json`, its register entry and corpus with a
+      `title_key`, and run `tools/build/import-count-tables.cjs`.
 - [ ] **« Ma frappe » saved read on macOS and Linux, field check (2026-11-21).** macOS and Linux now save each
       complete Studio read beside their store, in the Windows format (`_shared/metrics/data/studio_ngrams.json`,
       `snapshot`; vectors in `_shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json`), show it at once and
