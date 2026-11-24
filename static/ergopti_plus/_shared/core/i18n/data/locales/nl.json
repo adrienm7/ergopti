@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Engelstalig nieuws — 1 miljoen zinnen (tellingen)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — Engelse woorden van het web (tellingen)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — geschreven Engelse dialogen (tellingen)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — Franse sms-berichten (tellingen)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — alle Engelse zinnen (tellingen)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Engelstalige Wikipedia — 1 miljoen zinnen (tellingen)",
 	"layout_analysis.corpus.name.es_news_1m": "Spaanstalig nieuws — 1 miljoen zinnen (tellingen)",

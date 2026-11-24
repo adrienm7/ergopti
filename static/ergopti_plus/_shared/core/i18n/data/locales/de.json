@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Englische Nachrichten — 1 Million Sätze (Zählungen)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — englische Wörter aus dem Web (Zählungen)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — geschriebene Dialoge auf Englisch (Zählungen)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — SMS auf Französisch (Zählungen)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — alle Sätze auf Englisch (Zählungen)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Englische Wikipedia — 1 Million Sätze (Zählungen)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanische Nachrichten — 1 Million Sätze (Zählungen)",

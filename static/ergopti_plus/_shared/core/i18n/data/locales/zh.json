@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "英语新闻 — 100 万句（计数）",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — 网络英语词语（计数）",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — 英语书面对话（计数）",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — 法语短信（计数）",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — 全部英语句子（计数）",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "英语维基百科 — 100 万句（计数）",
 	"layout_analysis.corpus.name.es_news_1m": "西班牙语新闻 — 100 万句（计数）",

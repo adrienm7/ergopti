@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Notizie in inglese — 1 milione di frasi (conteggi)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — parole inglesi del web (conteggi)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — dialoghi scritti in inglese (conteggi)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — SMS in francese (conteggi)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — tutte le frasi in inglese (conteggi)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipedia in inglese — 1 milione di frasi (conteggi)",
 	"layout_analysis.corpus.name.es_news_1m": "Notizie in spagnolo — 1 milione di frasi (conteggi)",

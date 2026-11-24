@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Presse en anglais — 1 million de phrases (comptages)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — mots anglais du Web (comptages)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — dialogues écrits en anglais (comptages)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — SMS en français (comptages)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — toutes les phrases en anglais (comptages)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Wikipédia en anglais — 1 million de phrases (comptages)",
 	"layout_analysis.corpus.name.es_news_1m": "Presse en espagnol — 1 million de phrases (comptages)",

@@ -499,6 +499,15 @@
 			"kind": "sentences",
 			"file": "static/corpus/frequency/taskmaster/en_tm1_self_dialogs.json",
 			"format": "count_table"
+		},
+		{
+			"id": "fr_88milsms_chat",
+			"title": "88milSMS — French text messages (counts)",
+			"title_key": "layout_analysis.corpus.name.fr_88milsms_chat",
+			"language": "fr",
+			"kind": "sentences",
+			"file": "static/corpus/frequency/comere/fr_88milsms.json",
+			"format": "count_table"
 		}
 	]
 }

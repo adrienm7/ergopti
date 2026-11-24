@@ -5029,6 +5029,7 @@
 	"layout_analysis.corpus.name.en_news_1m": "Engelske nyheder — 1 million sætninger (optællinger)",
 	"layout_analysis.corpus.name.en_norvig_words": "Norvig — engelske ord fra nettet (optællinger)",
 	"layout_analysis.corpus.name.en_taskmaster_chat": "Taskmaster — skrevne engelske dialoger (optællinger)",
+	"layout_analysis.corpus.name.fr_88milsms_chat": "88milSMS — franske sms-beskeder (optællinger)",
 	"layout_analysis.corpus.name.en_tatoeba_all": "Tatoeba — alle engelske sætninger (optællinger)",
 	"layout_analysis.corpus.name.en_wikipedia_1m": "Engelsk Wikipedia — 1 million sætninger (optællinger)",
 	"layout_analysis.corpus.name.es_news_1m": "Spanske nyheder — 1 million sætninger (optællinger)",

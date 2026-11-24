@@ -1,5 +1,5 @@
 {
-	"_description": "The sources of the count tables under static/corpus/frequency (format ergopti-count-table): one entry per table, read by tools/build/import-count-tables.cjs, which downloads url (or takes the archive from --archive-dir), refuses it unless its SHA-256 is sha256, reads member from it, counts it with the analysis engine's own rules and writes output. kind: leipzig_sentences (a Leipzig Corpora Collection sentence file, « number<TAB>sentence » per line, counted as text, so bigrams and trigrams cross words) or lexique_words (Lexique's TSV, each distinct word of word_column weighted by the sum of its rows' frequency_column per million, times scale, counted by the word-list rule, so its n-grams stay inside words and at their edges). The licence, attribution, status and prune_ratio of each table are in static/corpus/register.json, their one source: prune_ratio drops, from each table, the n-grams rarer than that share of its total, the table records the counts it kept from (pruned_below), and the importer refuses a table whose pruning changes a metric of its check layouts by more than its PRUNE_TOLERANCE (the table records the largest change, prune_check).",
+	"_description": "The sources of the count tables under static/corpus/frequency (format ergopti-count-table): one entry per table, read by tools/build/import-count-tables.cjs, which downloads url (or takes the archive from --archive-dir), refuses it unless its SHA-256 is sha256, reads member from it, counts it with the analysis engine's own rules and writes output. kind: leipzig_sentences (a Leipzig Corpora Collection sentence file, « number<TAB>sentence » per line, counted as text, so bigrams and trigrams cross words) comere_tei_posts (a CoMeRe TEI file of Ortolang, each <post> one line with its anonymisation placeholders left out, counted as text) or lexique_words (Lexique's TSV, each distinct word of word_column weighted by the sum of its rows' frequency_column per million, times scale, counted by the word-list rule, so its n-grams stay inside words and at their edges). The licence, attribution, status and prune_ratio of each table are in static/corpus/register.json, their one source: prune_ratio drops, from each table, the n-grams rarer than that share of its total, the table records the counts it kept from (pruned_below), and the importer refuses a table whose pruning changes a metric of its check layouts by more than its PRUNE_TOLERANCE (the table records the largest change, prune_check).",
 	"schema_version": 1,
 	"tables": [
 		{
@@ -340,6 +340,13 @@
 			"kind": "taskmaster_dialogs",
 			"url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/335324ca7afee220b6114e72d90f994e07a888c4/TM-1-2019/self-dialogs.json",
 			"sha256": "1e590ed0ccee279e40c2fb9e083d3b9417477c6bfe35ce5b2277167698dd858d"
+		},
+		{
+			"output": "frequency/comere/fr_88milsms.json",
+			"kind": "comere_tei_posts",
+			"url": "https://repository.ortolang.fr/api/content/comere/v3.3/cmr-88milsms/cmr-88milsms-tei-v1.zip",
+			"sha256": "762127bb35fd266c8725d92baff537b9415859ba4ff764d192e4ff92a27c6ccd",
+			"member": "cmr-88milsms-tei-v1.xml"
 		}
 	]
 }

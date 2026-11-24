@@ -184,6 +184,35 @@ let checks = 0;
 	checks++;
 }
 
+// A CoMeRe TEI file counts each <post> as one line of text: an anonymised
+// span (alone or in a <name>, its tag broken across lines as 88milSMS writes
+// it) is left out whole, an emoticon keeps its typed characters, entities
+// read as their characters; a file without posts, or a placeholder left in
+// a post, fails the import.
+{
+	const engine = Analysis.loadEngine();
+	const placeholder = (kind) =>
+		`<fs\n type="anonymisation"><f name="anonyString"><string>[_${kind}_]</string></f></fs>`;
+	const tei = [
+		'<TEI><post xml:id="a1" type="sms"><p>Coucou ',
+		placeholder('forename'),
+		' ! <distinct type="emoticon">:p</distinct></p></post>',
+		'<post xml:id="a2"><p>Toi &amp; <name ref="#x">',
+		placeholder('nickname'),
+		'</name> ok</p></post></TEI>'
+	].join('');
+	const counts = plain(Import.comereCounts(tei, engine));
+	assert.deepEqual(counts.words, { coucou: 1, toi: 1, ok: 1 });
+	delete counts.words;
+	assert.deepEqual(counts, mainTables(engine.ngramsFromText('Coucou ! :p\nToi & ok')));
+	assert.throws(() => Import.comereCounts('<TEI></TEI>', engine), /without posts/);
+	assert.throws(
+		() => Import.comereCounts('<post><p>Salut [_forename_]</p></post>', engine),
+		/placeholder is left/
+	);
+	checks++;
+}
+
 // A « word<TAB>count » list (Norvig's) counts by the word-list rule, as the
 // same list in Lexique's form does; a malformed line fails the import.
 {
