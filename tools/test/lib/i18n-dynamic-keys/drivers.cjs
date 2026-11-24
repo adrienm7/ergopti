@@ -75,6 +75,8 @@ const WIN_PROXY_OVERRIDE = ROOT + 'windows/core/network/proxy_override.ahk';
 const WIN_PROXY_PARSE = ROOT + 'windows/core/network/adapters/proxy_override.ahk';
 const WIN_BRIGHTNESS = ROOT + 'windows/adapters/screen_brightness.ahk';
 const WIN_TAP_HOLD_WRITER = ROOT + 'windows/platform/remap/tap_hold_writer.ahk';
+const WIN_FIELD_REPORT = ROOT + 'windows/diagnostics/ui/field_check/field_report.ahk';
+const WIN_CONFIG_KEYS = ROOT + 'windows/_generated/config_keys.ahk';
 
 // ==========================================
 // ==========================================
@@ -112,6 +114,30 @@ function functionBody(rel, header) {
 	const end = text.slice(start).search(close);
 	if (end < 0) throw new Error(`${rel}: ${header} is not closed`);
 	return text.slice(start, start + end);
+}
+
+/**
+ * The Tests rows the Windows field report names its steps by: the MenuCommand
+ * constants of FieldReport_RowChecks, resolved through the generated class.
+ * @returns {string[]}
+ */
+function fieldReportRows() {
+	const generated = ctx.read(WIN_CONFIG_KEYS);
+	const start = generated.search(/^class MenuCommand \{/m);
+	if (start < 0) throw new Error(`${WIN_CONFIG_KEYS} declares no MenuCommand class`);
+	const block = generated.slice(start, start + generated.slice(start).search(/^\}/m));
+	const commands = new Map(
+		Array.from(block.matchAll(/static ([A-Z0-9_]+) := "([^"]+)"/g), (m) => [m[1], m[2]])
+	);
+	const names = capture(
+		functionBody(WIN_FIELD_REPORT, 'FieldReport_RowChecks('),
+		/MenuCommand\.([A-Z0-9_]+)/g,
+		WIN_FIELD_REPORT
+	);
+	return names.map((name) => {
+		if (!commands.has(name)) throw new Error(`MenuCommand.${name} is not generated`);
+		return commands.get(name);
+	});
 }
 
 /**
@@ -366,9 +392,14 @@ module.exports = [
 	},
 	{
 		prefix: 'menu.debug.',
-		files: [DEBUG_REPORT],
-		source: 'the debug menu rows of the menu_slots table',
-		keys: () => ctx.keysOf('menu.debug.', Object.keys(ctx.literal(DEBUG_REPORT, 'menu_slots')))
+		files: [DEBUG_REPORT, WIN_FIELD_REPORT],
+		source:
+			'the debug menu rows of the menu_slots table, and the Tests rows of FieldReport_RowChecks',
+		keys: () =>
+			[
+				...ctx.keysOf('menu.debug.', Object.keys(ctx.literal(DEBUG_REPORT, 'menu_slots'))),
+				...ctx.keysOf('menu.debug.', fieldReportRows())
+			].filter((key, index, keys) => keys.indexOf(key) === index)
 	},
 	{
 		prefix: 'menu.hotstrings.user_code.problem_',
