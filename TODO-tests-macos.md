@@ -324,3 +324,12 @@ Hands needed:
       Cmd+V into the required Full report field pastes the complete report. Debug > Suggest a feature: the form reads
       the running version, not `unknown`, and Driver « macOS »; only the title and « Your proposal » are required.
       Whether GitHub selects a dropdown option from the link was not checked live: if Driver stays empty, report it.
+- [ ] <!-- field-point: field_report_window --> **Field report progress window (2026-11-24):** Debug > « Lancer le
+      field report (tous les tests) » opens the « Field report » window at once: each step reads waiting, then
+      running, then its verdict (VoiceOver says each change without moving the focus), the steps not run here read
+      « not run here » with their reason. At the end: the verdict, the counts and « Saved in: » the results folder;
+      « Show in Finder » opens that folder, « Copy report » puts the complete report on the clipboard, « Create a
+      GitHub issue » opens the bug form with the version, Driver « macOS » and the `check=field_report` line, and
+      Cmd+V into Full report pastes the complete report. Run it again and click « Stop the run », and once more and
+      close the window with its close box during the run: the log says « cancelled by the person » and the report
+      is interrupted. The window follows the Configuration menu's reading font and light or dark appearance.

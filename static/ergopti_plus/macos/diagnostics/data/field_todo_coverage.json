@@ -1016,6 +1016,12 @@
 			"title": "Report a bug and Suggest a feature open GitHub forms with readable, complete facts (2026-11-24)",
 			"checks": [],
 			"not_testable": "Needs a person signed in to GitHub in a browser to look at the opened forms and paste the clipboard: the field report opens no browser and reads no web page."
+		},
+		{
+			"id": "field_report_window",
+			"title": "Field report progress window (2026-11-24)",
+			"checks": [],
+			"not_testable": "The window is the person's: Debug > « Lancer le field report (tous les tests) » opened, then its Stop, its close box and its end buttons clicked, and the issue form looked at in a browser. The page, the observer's messages and each action are unit-tested (test_field_report_window, field_report_window_contract, field-report-window.playwright.cjs)."
 		}
 	]
 }
