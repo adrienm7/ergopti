@@ -291,9 +291,11 @@
 			"basis": "collection"
 		},
 		"neo2_new": {
-			"authors": ["Julian Asamer"],
-			"url": "http://neo-layout.org",
-			"basis": "collection"
+			"authors": ["Hanno Behrens", "Benjamin Kellermann", "the Neo community"],
+			"url": "https://neo-layout.org/Historisch/Geschichte/",
+			"basis": "source",
+			"checked": "2026-11-24",
+			"evidence": "neo-layout.org, « Die Geschichte von Neo »: « 2004 kam Hanno Behrens zu der Ansicht, dass keine der verfügbaren Tastaturbelegungen seinen Vorstellungen entsprach […] Also entwickelte er Version 1 des Neo-Layouts »; Neo 2: « Ben einen neuen Vorschlag für diese Ebene machte » (Benjamin Kellermann), « Zu nennen sind hier besonders Pascal und Erik, aber auch viele andere ». Julian Asamer, KLA's « author », is not named."
 		},
 		"ohdvorakl": {
 			"authors": ["Deborah Pickett"],

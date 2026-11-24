@@ -3072,6 +3072,15 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarScoreGap === 'fu
 			`collections: ${entry.id} (${entry.source}) has no credit with an author and a page, checked unless « knowledge »`
 		);
 	}
+	// (neo2-credit-2026-11-24) KLA's « author » of Neo 2, Julian Asamer, is in
+	// no Neo page: neo-layout.org's history names Hanno Behrens (Neo 1),
+	// Benjamin Kellermann and the community (Neo 2).
+	check(
+		credits.neo2_new.basis === 'source' &&
+			credits.neo2_new.authors.includes('Hanno Behrens') &&
+			!credits.neo2_new.authors.includes('Julian Asamer'),
+		`collections: Neo 2 is credited to ${credits.neo2_new.authors.join(', ')} (${credits.neo2_new.basis})`
+	);
 	// Key cells as each collection's official file states them.
 	const cell = (id, code, level) => {
 		const layout = byId.get(id);
