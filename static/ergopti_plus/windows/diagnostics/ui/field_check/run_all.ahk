@@ -6,8 +6,11 @@
 ; The Debug menu's « Test everything »: a click runs, one after the other, every
 ; check of the Windows plan (_shared/diagnostics/data/field_check_all.json) and
 ; shows one combined report with a « Copy report » button: each check's verdict
-; and its field run step, then the Tests rows to run separately. macOS and Linux
-; run the same plan and report in Lua (_shared/diagnostics/engine/field_check/run_all.lua).
+; and its field run step, then the Tests rows to run separately. This is the
+; interim Windows run: macOS and Linux hand their own field run session the
+; steps in-app (diagnostics/engine/field_run/field_run.lua Session:submit_in_app),
+; and Windows does the same once field_run.ahk can (TODO.md, « Lancer le field
+; report »).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Fail fast without stopping: a check that cannot start, raises or misses

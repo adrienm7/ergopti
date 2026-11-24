@@ -64,9 +64,6 @@ M.format_text = Report.format_text
 -- Check currently running, or nil. One at a time.
 local _running = nil
 
--- Identity of the pending run: a run another caller abandoned settles silently.
-local _run_token = nil
-
 
 
 
@@ -101,18 +98,12 @@ function M.run(check_id, ports, on_done)
 		return false
 	end
 	_running = check_id
-	local token = {}
-	_run_token = token
 	Logger.start(LOG, "Field check '%s' started.", check_id)
 	local report, settled = M.new_report(check_id), false
 	local function finish()
 		if settled then return end
 		settled = true
-		if _run_token ~= token then
-			Logger.warn(LOG, "Field check '%s' finished after it was abandoned; its result is dropped.", check_id)
-			return
-		end
-		_running, _run_token = nil, nil
+		_running = nil
 		local result = report.result()
 		Logger.evidence(LOG, "Field check result: %s", M.format_log_line(result))
 		Logger.success(LOG, "Field check '%s' finished: %s.", check_id, result.passed and "pass" or "fail")
@@ -127,20 +118,9 @@ function M.run(check_id, ports, on_done)
 	return true
 end
 
---- Abandons the pending run, so the next check can start: « Test everything »
---- does this when a check misses its deadline. The abandoned run's late result
---- is logged and dropped, never delivered.
---- @return boolean abandoned False when no check was pending.
-function M.abandon()
-	if _running == nil then return false end
-	Logger.warn(LOG, "Field check '%s' abandoned: it missed its deadline.", _running)
-	_running, _run_token = nil, nil
-	return true
-end
-
 --- Forgets a pending run; tests only.
 function M._reset()
-	_running, _run_token = nil, nil
+	_running = nil
 end
 
 return M

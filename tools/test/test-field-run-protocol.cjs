@@ -87,12 +87,16 @@ check('the shared declaration is well formed', () => {
 	assert.equal(new Set(protocol.verdicts).size, protocol.verdicts.length);
 	assert.equal(new Set(protocol.reasons).size, protocol.reasons.length);
 	assert.deepEqual(Object.keys(protocol.steps_file).sort(), [...protocol.drivers].sort());
-	for (const os of protocol.drivers.filter((name) => name !== 'macos')) {
+	for (const os of protocol.drivers) {
 		const folder = protocol.folder[os];
 		assert(folder && /^[A-Z_]+$/.test(folder.base) && folder.segments.length > 0, `${os} folder`);
 	}
 	// An installed driver's field run folder sits under its one root of
-	// app_dirs.toml: the Windows root, the Linux runtime folder.
+	// app_dirs.toml: the macOS and Windows roots, the Linux runtime folder. The
+	// macOS one serves the menu's in-app run of an installed app.
+	const macosRoot = AppDirs.segments('support.macos', 'macos');
+	assert.equal(protocol.folder.macos.base, AppDirs.data.support.macos.base);
+	assert.deepEqual(protocol.folder.macos.segments.slice(0, macosRoot.length), macosRoot);
 	const windowsRoot = AppDirs.segments('support.windows', 'windows');
 	assert.equal(protocol.folder.windows.base, AppDirs.data.support.windows.base);
 	assert.deepEqual(protocol.folder.windows.segments.slice(0, windowsRoot.length), windowsRoot);

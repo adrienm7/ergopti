@@ -1354,3 +1354,81 @@ helpers.describe("field run: model download bounds", function()
 		helpers.assert_true(spec.deadline_seconds.default >= total, "the default request covers every bound")
 	end)
 end)
+
+local InApp = require("diagnostics.engine.field_run.in_app")
+
+helpers.describe("field run: in-app run (field-report-in-app)", function()
+	helpers.it("runs the field check steps in-process, leaves the others out by reason and tells its observer", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local session = started(FieldRun, state)
+			local events = {}
+			local run = session:submit_in_app({
+				step_started = function(_, step) events[#events + 1] = "start:" .. step.id end,
+				step_recorded = function(_, step, result) events[#events + 1] = "record:" .. step.id .. ":" .. result.verdict end,
+				finished = function(done) events[#events + 1] = "done:" .. tostring(done.interrupted) end,
+			})
+			helpers.assert_not_nil(run)
+			helpers.assert_true(run.request_id:find("^" .. require("diagnostics.engine.field_run.in_app").PREFIX) ~= nil)
+			helpers.assert_nil(state.files[FOLDER .. "/request.json"], "no request file is written")
+			local spec = spec_of(FieldRun)
+			local expected_run, expected_not = {}, {}
+			for _, step in ipairs(spec.steps) do
+				if step.kind == "field_check" and not step.signed_app then expected_run[#expected_run + 1] = step.id
+				else expected_not[step.id] = InApp.NOT_RUN[step.kind] or InApp.NOT_RUN_DEFAULT end
+			end
+			helpers.assert_eq(#run.steps, #expected_run)
+			for _, item in ipairs(run.not_run) do helpers.assert_eq(item.reason, expected_not[item.step], item.step) end
+			helpers.assert_eq(#run.not_run + #run.steps, #spec.steps, "every step is run or listed back")
+			for _, item in ipairs(run.not_run) do
+				if item.step:find("^guided_") then helpers.assert_eq(item.reason, "needs_person") end
+			end
+			state.advance(10 ^ 7)
+			local done = state.json(FOLDER .. "/results/" .. run.request_id .. "/done.json")
+			helpers.assert_eq(done.interrupted, false)
+			helpers.assert_eq(events[#events], "done:false")
+			helpers.assert_eq(events[1], "start:" .. expected_run[1])
+			for _, id in ipairs(state.calls) do
+				helpers.assert_nil(expected_not[id], "a step left out never runs: " .. id)
+			end
+		end)
+	end)
+
+	helpers.it("refuses a second run, and a cancel closes the run as interrupted once", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world(setmetatable({}, { __index = function() return function() end end }))
+			local session = started(FieldRun, state)
+			local finished = {}
+			local run = session:submit_in_app({ finished = function(done) finished[#finished + 1] = done end })
+			local again, why = session:submit_in_app({})
+			helpers.assert_nil(again)
+			helpers.assert_eq(why, "busy")
+			helpers.assert_true(session:cancel_in_app())
+			helpers.assert_true(not session:cancel_in_app(), "nothing left to cancel")
+			local done = state.json(FOLDER .. "/results/" .. run.request_id .. "/done.json")
+			helpers.assert_eq({ done.interrupted, done.cause.kind }, { true, "cancelled" })
+			helpers.assert_eq(#finished, 1)
+			state.advance(10 ^ 7)
+			helpers.assert_eq(#finished, 1, "a late timer changes nothing")
+		end)
+	end)
+
+	helpers.it("starts a session on demand on the installed folder, and reuses a running one", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			FieldRun._reset()
+			local state = world()
+			state.ports.installed_folder = function() return "/Users/u/Library/Application Support/Ergopti/field-run" end
+			local session = FieldRun.start_in_app({ pid = 4242, ports = state.ports })
+			helpers.assert_not_nil(session)
+			helpers.assert_eq(session.folder, "/Users/u/Library/Application Support/Ergopti/field-run")
+			helpers.assert_true(rawequal(FieldRun.start_in_app({ pid = 4242, ports = state.ports }), session))
+			helpers.assert_true(rawequal(FieldRun.current(), session))
+			FieldRun.stop()
+			helpers.assert_nil(FieldRun.current())
+			FieldRun._reset()
+		end)
+	end)
+end)

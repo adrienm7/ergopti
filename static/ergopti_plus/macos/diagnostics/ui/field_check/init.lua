@@ -15,9 +15,8 @@
 ---    privacy-safe result as the log line.
 --- 3. Localized: every sentence comes from the locales; step values are raw
 ---    tokens (counts, states, versions).
---- 4. « Test everything » runs the plan's checks one after the other over the
----    same engine and shows one combined report; a check that misses its
----    deadline is abandoned so the next one can start.
+--- 4. « Lancer le field report » runs this app's own field run in-app and shows
+---    one report of its results (M.run_field_report).
 --- ==============================================================================
 
 local M = {}
@@ -25,7 +24,7 @@ local M = {}
 local Logger = require("core.logger.engine.logger")
 local I18n = require("core.i18n.engine.i18n")
 local Engine = require("diagnostics.engine.field_check.field_check")
-local RunAll = require("diagnostics.engine.field_check.run_all")
+local FieldReport = require("diagnostics.engine.field_check.field_report")
 
 local LOG = "diagnostics.ui.field_check"
 
@@ -45,9 +44,9 @@ M.SHARED_ROWS = {
 	composer_check = { check = "composer", title = "menu.debug.composer_check" },
 }
 
---- The « Test everything » row and the title of its combined report (the row's own label).
-M.ALL_ROW = require("settings.engine.keys").COMMAND.FIELD_REPORT
-M.ALL_TITLE = "menu.debug." .. M.ALL_ROW
+--- The « Lancer le field report » row and the title of its report (the row's own label).
+M.FIELD_REPORT_ROW = require("settings.engine.keys").COMMAND.FIELD_REPORT
+M.FIELD_REPORT_TITLE = "menu.debug." .. M.FIELD_REPORT_ROW
 
 --- Reads and decodes one bundled JSON declaration; a missing or broken file raises.
 --- @param path string|nil Absolute path.
@@ -59,16 +58,20 @@ local function read_json(path)
 	return value
 end
 
---- This driver's « Test everything » declarations: the shared plan, the field
---- run steps (their checks and deadlines) and the TODO-tests coverage.
---- @return table declaration, table steps, table coverage
-local function declarations()
+--- This app's field run session for the in-app run: the running one, or one
+--- started on demand on the installed folder.
+--- @return table|nil session, string|nil error
+local function in_app_session()
+	return require("diagnostics.engine.field_run.field_run").start_in_app({})
+end
+
+--- The TODO-tests coverage of this driver's field run steps.
+--- @return table coverage
+local function coverage()
 	local source = debug.getinfo(1, "S").source or ""
 	local root = assert((source:sub(1, 1) == "@" and source:sub(2) or source):match("^(.*)/diagnostics/ui/field_check/init%.lua$"),
 		"field check: the driver root is unresolved")
-	local data = root .. "/diagnostics/data/"
-	return read_json(require("core.fs.engine.paths").shared("diagnostics/data/field_check_all.json")),
-		read_json(data .. "field_run.json").steps, read_json(data .. "field_todo_coverage.json")
+	return read_json(root .. "/diagnostics/data/field_todo_coverage.json")
 end
 
 --- Native services, replaceable by tests.
@@ -81,8 +84,8 @@ local function native()
 		alert = function(...) return require("core.ui.engine.dialog_util").block_alert(...) end,
 		copy = function(text) return hs.pasteboard.setContents(text) end,
 		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
-		cancel = function(handle) return require("core.events.timer_scheduler").cancel(handle) end,
-		declarations = declarations,
+		session = in_app_session,
+		coverage = coverage,
 	}
 end
 
@@ -123,42 +126,91 @@ function M.run(row_id, services)
 	end)
 end
 
--- True while « Test everything » runs its sequence.
-local _all_running = false
+-- True while the in-app field report runs.
+local _report_running = false
 
---- Runs every check of this driver's « Test everything » plan one after the
---- other (_shared/diagnostics/engine/field_check/run_all.lua), then shows one
---- combined report and writes its evidence line.
+--- The Tests rows a person runs alone: a row whose check no step of the run takes.
+--- @param steps table The steps the in-app run takes.
+--- @return table rows { {row} }
+local function separate_rows(steps)
+	local taken = {}
+	for _, step in ipairs(steps) do taken[step.check] = true end
+	local rows = {}
+	for id, row in pairs(M.ROWS) do
+		if not taken[row.check] then rows[#rows + 1] = { row = id } end
+	end
+	table.sort(rows, function(a, b) return a.row < b.row end)
+	return rows
+end
+
+--- The Tests row title of a check, or nil for a developer field run check.
+--- @param check string|nil
+--- @return string|nil key
+local function title_key_of(check)
+	for _, rows in ipairs({ M.ROWS, M.SHARED_ROWS }) do
+		for _, row in pairs(rows) do
+			if row.check == check then return row.title end
+		end
+	end
+	return nil
+end
+
+--- Débogage's « Lancer le field report (tous les tests) »: hands this app's
+--- field run session (diagnostics/engine/field_run/field_run.lua; started on
+--- demand on the installed folder when no clone opened one) its steps
+--- in-process, then shows one report (_shared/diagnostics/engine/field_check/field_report.lua)
+--- and writes its evidence line. Nothing is committed or pushed: the report
+--- names the folder of the result files.
 --- @param services table|nil Test doubles for native services.
 --- @return boolean started
-function M.run_all(services)
+function M.run_field_report(services)
 	local env = services or native()
-	if _all_running or Engine.is_running() then
-		env.notify(I18n.get(M.ALL_TITLE), I18n.get("field_check.busy"), "warn")
+	if _report_running then
+		env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.get("field_check.busy"), "warn")
 		return false
 	end
-	local declaration, steps, coverage = env.declarations()
-	local plan = RunAll.plan(declaration, "hs", steps, coverage)
-	_all_running = true
-	Logger.start(LOG, "Test everything started: %d checks.", #plan.run)
-	env.notify(I18n.get(M.ALL_TITLE), I18n.format("field_check.all.started", #plan.run), "info")
-	RunAll.run(plan, {
-		start = function(entry, on_result) return Engine.run(entry.check, env.ports(), on_result) end,
-		after = env.after,
-		cancel = env.cancel,
-		abandon = function() Engine.abandon() end,
-	}, function(summary)
-		_all_running = false
-		Logger.evidence(LOG, "Test everything result: %s", RunAll.format_log_line(summary))
-		Logger.success(LOG, "Test everything finished: %s.", summary.passed and "pass" or "fail")
-		show_report(env, M.ALL_TITLE, RunAll.format_text(summary, I18n.get))
-	end)
+	local session, why = env.session()
+	if session == nil then
+		Logger.error(LOG, "The field report cannot run: no field run session (%s).", tostring(why))
+		env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.get("field_check.all.unavailable"), "warn")
+		return false
+	end
+	local coverage = env.coverage()
+	local results, checks = {}, {}
+	_report_running = true
+	Logger.start(LOG, "In-app field report started…")
+	-- Declared first: the observer reads the run the session hands back
+	local run
+	run, why = session:submit_in_app({
+		step_started = function(_, step) checks[step.id] = step.check end,
+		step_recorded = function(_, _, result) results[#results + 1] = result end,
+		finished = function(done, dir)
+			_report_running = false
+			local summary = FieldReport.summary({ results = results, not_run = run.not_run,
+				separate = separate_rows(run.steps), coverage = coverage, done = done, dir = dir })
+			Logger.evidence(LOG, "Field report result: %s", FieldReport.format_log_line(summary))
+			Logger.success(LOG, "In-app field report finished: %s.",
+				summary.interrupted and "interrupted" or summary.passed and "pass" or "fail")
+			show_report(env, M.FIELD_REPORT_TITLE, FieldReport.format_text(summary, I18n.get, function(step)
+				local key = title_key_of(checks[step])
+				return key and I18n.get(key) or nil
+			end))
+		end,
+	})
+	if run == nil then
+		_report_running = false
+		Logger.warn(LOG, "The field report refused by the field run session: %s.", tostring(why))
+		env.notify(I18n.get(M.FIELD_REPORT_TITLE),
+			I18n.get(why == "busy" and "field_check.busy" or "field_check.all.unavailable"), "warn")
+		return false
+	end
+	env.notify(I18n.get(M.FIELD_REPORT_TITLE), I18n.format("field_check.all.started", #run.steps), "info")
 	return true
 end
 
---- Forgets a pending « Test everything »; tests only.
+--- Forgets a pending field report; tests only.
 function M._reset()
-	_all_running = false
+	_report_running = false
 end
 
 return M

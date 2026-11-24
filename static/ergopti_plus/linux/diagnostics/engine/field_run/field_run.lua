@@ -27,6 +27,14 @@
 ---    that is still pending makes its step a skip, not a second run.
 --- 4. config.toml is compared before and after the run; a change is named in
 ---    the config_guard result, which then fails.
+--- 6. In-app run (maintainer decision, 2026-11-24): Débogage's « Lancer le
+---    field report » hands the session the same steps in-process
+---    (Session:submit_in_app), with no request file and no collector, and
+---    watches it through an observer: each step's start and result, then the
+---    done document. The results land in the same folder and files as a
+---    collector's run. The timed reload is left out (it ends the daemon that
+---    shows the run) and listed back as not run with its reason; the person can
+---    cancel the run, which closes it as interrupted.
 --- 5. A "reload" step restarts the daemon on purpose, as macOS reloads its
 ---    driver: it writes the run's state to the resume file and asks the reload
 ---    owner (core/lifecycle/engine/reload/restart.lua) for the restart. The stop of a run whose
@@ -43,8 +51,12 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
 local Report = require("diagnostics.engine.field_check.report")
+local InApp = require("diagnostics.engine.field_run.in_app")
 
 local LOG = "diagnostics.engine.field_run.field_run"
+
+-- The started session, for the menu's in-app run; nil when none started.
+local _current = nil
 local PRIVATE_MODE = 448 -- 0700
 local SCHEMA = 1
 
@@ -235,8 +247,8 @@ function M.steps_relative(steps_file)
 end
 
 --- Reads and decodes one JSON declaration; an unreadable or broken file raises.
---- « Test everything » (diagnostics/ui/field_check/run_all.lua) reads its plan
---- and the coverage file through it too.
+--- The in-app field report (diagnostics/ui/field_check/field_report.lua) reads
+--- the coverage file through it too.
 --- @param path string Absolute path.
 --- @return table
 function M.read_declaration(path)
@@ -483,16 +495,8 @@ function Session:stop()
 		Logger.info(LOG, "Field run %s suspended for its timed reload.", run.request.request_id)
 		self.run = nil
 	elseif run then
-		run.abandoned = true
-		for handle in pairs(run.timers) do pcall(self.ports.cancel, handle) end
-		self:publish("done", run.dir .. "/" .. self.spec.files.done, { schema = self.spec.schema,
-			request_id = run.request.request_id, pid = self.pid, interrupted = true,
-			cause = { kind = "teardown", step = run.current_step or "none" },
-			started_at = run.started_at, finished_at = self.ports.iso_now(),
-			verdicts = run.verdicts, order = Json.array(run.order) })
-		self.ports.remove(self:path("running"))
+		self:interrupt(run, "teardown")
 		Logger.warn(LOG, "Field run %s cut short by the daemon's stop; closed as interrupted.", run.request.request_id)
-		self.run = nil
 	end
 	local stopped = true
 	if self.watcher then
@@ -505,6 +509,31 @@ function Session:stop()
 	end
 	self.ports.remove(self:path("ready"))
 	return stopped
+end
+
+-- Session:submit_in_app, cancel_in_app and notify, shared with the other Lua driver
+InApp.install(Session, {
+	busy = function() return false end,
+	valid_id = function(session, id) return session.spec.is_request_id(id) end,
+	cancel = function(session, run) session:interrupt(run, "cancelled") end,
+	logger = Logger,
+	log = LOG,
+})
+
+--- Closes a run as interrupted: its timers stop, its done marker says why.
+--- @param run table The run.
+--- @param kind string Closed code of the cause.
+function Session:interrupt(run, kind)
+	run.abandoned = true
+	for handle in pairs(run.timers) do pcall(self.ports.cancel, handle) end
+	self:publish("done", run.dir .. "/" .. self.spec.files.done, { schema = self.spec.schema,
+		request_id = run.request.request_id, pid = self.pid, interrupted = true,
+		cause = { kind = kind, step = run.current_step or "none" },
+		started_at = run.started_at, finished_at = self.ports.iso_now(),
+		verdicts = run.verdicts, order = Json.array(run.order) })
+	self.ports.remove(self:path("running"))
+	self.run = nil
+	self:notify(run, "finished", { request_id = run.request.request_id, interrupted = true }, run.dir)
 end
 
 --- Consumes and admits one request, then starts its run.
@@ -549,10 +578,11 @@ end
 -- ======================
 
 --- Runs the admitted steps in order, then the configuration guard.
-function Session:begin(request, dir)
+--- @param observer table|nil The in-app run's observer (Session:submit_in_app).
+function Session:begin(request, dir, observer)
 	local spec, ports = self.spec, self.ports
 	local run = { request = request, dir = dir, verdicts = {}, order = {}, timers = {}, abandoned = false,
-		started_ms = ports.now_ms(), started_at = ports.iso_now(), config = ports.config_bytes() }
+		started_ms = ports.now_ms(), started_at = ports.iso_now(), config = ports.config_bytes(), observer = observer }
 	run.deadline_ms = run.started_ms + request.deadline_seconds * 1000
 	self.run = run
 	local ids = {}
@@ -598,6 +628,7 @@ function Session:run_step(index, step, continue)
 	local settled, timer = false, nil
 	run.current_step = step.id
 	Logger.info(LOG, "Field run step %d/%d '%s' started.", index, #run.request.steps, step.id)
+	self:notify(run, "step_started", index, step)
 	local function settle(verdict, codes, report)
 		if settled then
 			Logger.info(LOG, "Field run step '%s' answered %s after it was settled; dropped.", step.id, tostring(verdict))
@@ -772,13 +803,15 @@ function Session:record(index, step, fields)
 	if not spec.verdict_set[fields.verdict] then fields.verdict, codes = "fail", { "undeclared_verdict" } end
 	run.verdicts[step.id] = fields.verdict
 	run.order[#run.order + 1] = step.id
+	local report = type(fields.report) == "table" and fields.report or {}
 	self:publish("result", string.format("%s/%02d_%s.json", run.dir, index, step.id), {
 		schema = spec.schema, request_id = run.request.request_id, index = index, step = step.id,
 		kind = step.kind, verdict = fields.verdict, codes = Json.array(codes),
 		started_at = fields.started_at or self.ports.iso_now(), finished_at = self.ports.iso_now(),
 		elapsed_ms = math.floor(fields.elapsed_ms or 0), deadline_ms = math.floor(fields.deadline_ms or 0),
-		report = type(fields.report) == "table" and fields.report or {},
+		report = report,
 	})
+	self:notify(run, "step_recorded", index, step, { step = step.id, verdict = fields.verdict, codes = codes, report = report })
 	Logger.evidence(LOG, "Field run step result: step=%s verdict=%s codes=%s", step.id, fields.verdict,
 		#codes > 0 and table.concat(codes, ",") or "none")
 end
@@ -810,6 +843,7 @@ function Session:finish()
 	})
 	self.ports.remove(self:path("running"))
 	self.run = nil
+	self:notify(run, "finished", { request_id = run.request.request_id, interrupted = false }, run.dir)
 	if written then Logger.success(LOG, "Field run %s finished.", run.request.request_id)
 	else Logger.error(LOG, "Field run %s finished, but its done marker was not written.", run.request.request_id) end
 	return written
@@ -914,8 +948,16 @@ function M.start(opts)
 		Logger.error(LOG, "The field run session could not start: %s.", tostring(session_or_err))
 		return nil, tostring(session_or_err)
 	end
+	_current = session_or_err
 	Logger.success(LOG, "Field run session ready.")
 	return session_or_err
+end
+
+--- The started session, for the menu's in-app run.
+--- @return table|nil session nil when the daemon started none, or it stopped.
+function M.current()
+	if _current ~= nil and not _current.active then return nil end
+	return _current
 end
 
 return M

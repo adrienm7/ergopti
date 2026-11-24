@@ -821,24 +821,34 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods`.
 
-- [ ] **« Lancer le field report »: the field points no driver check covers yet (maintainer request, 2026-11-24).**
-      Débogage's « Lancer le field report (tous les tests) », just before « Tests », on the three drivers, runs, one
-      after the other, every check of `_shared/diagnostics/data/field_check_all.json` and shows one report with each
-      check's verdict, its field run step and the TODO-tests field points that step decides, then the rows to run
-      separately. On macOS it also runs the 22 read-only field run checks that had no menu row (boot and idle cost,
-      permissions, event taps, input sources, storage, launcher roles, network hosts, Ollama blob host, PAC fallback,
-      local AI, local servers, Ctrl+Caps Lock, gesture frames, physical shortcuts, tap-hold thresholds, tap copy, raw
-      telemetry, menu build, slow lines, log signals, FIFO safety, app health); on Windows the boot cost. Left,
-      automatic but not yet a driver check. Linux: the collector's probe steps `linux_input_access`, `linux_autostart`,
-      `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`) run only from
-      `collect-linux-field-report.sh`; a Linux field check reading the same probes from
-      `diagnostics/data/field_guided_steps.json` would put them in the field report row. Windows:
-      `TODO-tests-windows.md` carries no `field-point` ids and the driver no `field_todo_coverage.json`, so its report
-      names the field run step only; the automatable standing checks of `tools/maintainer/windows-live-checks.cjs` run
-      outside the driver. macOS: the checks that type into their own scratch field (`typing_selftest`,
-      `hotstring_roundtrip`, `prediction_tooltip`) or change state (`layout_rows`, `apple_shortcuts`, the owned
-      runtime's install, start and pause) stay field run only; the 196 step ids of the field run checks have no
-      `field_check.step.*` label, so the report shows their steps as closed codes.
+- [ ] **« Lancer le field report (tous les tests) » (maintainer requests, 2026-11-24).** Débogage's row just before «
+      Tests » runs the driver's own field run in-app: on macOS and Linux the menu hands the field run session its field
+      check steps in-process (`Session:submit_in_app`, `_shared/diagnostics/engine/field_run/in_app.lua`), with no clone
+      and no collector, and shows one report (`_shared/diagnostics/engine/field_check/field_report.lua`): verdict
+      counts, each step with its TODO-tests field points, the steps not run here with their reason (guided: a person;
+      reload, AI downloads, diagnostics, signed install: the collector), the Tests rows run separately and the folder of
+      the result files to attach to an issue. An installed Mac app starts its session on demand on `folder.macos` of the
+      shared protocol. Left:
+  - **Windows in-app run.** `field_run.ahk` starts its session in developer source mode only; start it on demand on
+    `folder.windows` (`LOCALAPPDATA\Ergopti\field-run`) and add the same in-process submit, observer and cancel, then
+    delete `windows/diagnostics/ui/field_check/run_all.ahk`, its test and
+    `_shared/diagnostics/data/field_check_all.json`, the interim sequencer the Windows row still runs (AutoHotkey
+    cannot run in the cloud containers: a Windows PC session).
+  - **Progress window (maintainer request, 2026-11-24).** A shared WebView app window (`_shared/ui`, each driver's
+    host, like the diagnostics and update windows; AAA tokens of `theme.css`, keyboard walk, live-region
+    announcements) showing each step's state (pending, running, pass, fail, skipped, needs you) from the observer,
+    then the counts and three buttons: open the results folder (Finder, Explorer, file manager), « Copier le rapport
+    », « Créer une issue GitHub » through the bug-report link builder's public function with the summary in the URL
+    and the report on the clipboard. Closing it during the run calls `Session:cancel_in_app` (logged pair). Add it to
+    the app-window accessibility scan with fake hosts. The macOS and Linux observers are in place; today the report
+    opens in the one-click checks' dialog.
+  - **Field points still without an automatic driver step.** Linux: the collector's probe steps `linux_input_access`,
+    `linux_autostart`, `linux_polkit_agent` and `linux_focus_listener` (points `physical_acceptance`, `wayland_focus`)
+    run only from `collect-linux-field-report.sh`; a Linux field check step reading the same probes from
+    `diagnostics/data/field_guided_steps.json` would put them in the in-app run. Windows: `TODO-tests-windows.md`
+    carries no `field-point` ids and no `field_todo_coverage.json`, so its report would name steps only. macOS: 196
+    step ids of the field run checks have no `field_check.step.*` label, so the report shows their steps as closed
+    codes.
 
 ### Linux
 
