@@ -943,6 +943,9 @@ Each closes on a named green hosted or native run, recorded here.
       `golang.org/x/sys/unix` on Linux and macOS); pin x/sys v0.37.0 there only if it does not (no `require` is added
       meanwhile, since CI runs with `GOPROXY=off`).
 - [ ] **[CI] Intermittent fixtures.** Close each once it stays green over further runs; no known code is left:
+  - Linux: desktop-webview's COSMIC toplevel fake, « the worker kept running after the compositor finished » (run
+    45119239568): its exit wait counted serve calls, which return at once on the closed socket; it is bounded in
+    wall-clock time since 2026-11-24 (`tests/hardware/lib/child_exit.lua`); close once desktop-webview stays green;
   - Windows: the `config` group, including the config-transition timer custody (bound 2048,
     `test-windows-config-timer-custody-bound.cjs`) and one `run_llm_model_browser` watchdog on
     `model-browser-native-json` (43347126427, not reproduced; all four `config-*` groups, the bound check and

@@ -43,17 +43,16 @@ ffi.cdef([[
 	int open(const char *path, int flags, ...);
 	int execvp(const char *file, char *const argv[]);
 	void _exit(int status);
-	int waitpid(int pid, int *status, int options);
 	int getpid(void);
 	int setenv(const char *name, const char *value, int overwrite);
 ]])
 
 local AF_UNIX, SOCK_STREAM = 1, 1
 local POLLIN = 1
-local WNOHANG = 1
 -- The worker reads its protocol names from the shared identifiers.
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local Worker = dofile("platform/focus/cosmic_toplevel_worker.lua")
+local ChildExit = require("tests.hardware.lib.child_exit")
 local MODE = arg and arg[1]
 local MODES = { v1 = { offer = 1, list = false, bound = 1 }, v2 = { offer = 3, list = true, bound = 2 },
 	["v2-without-list"] = { offer = 3, list = false, bound = 1 } }
@@ -375,14 +374,12 @@ if plan.list then
 else
 	send(message(info_id, 1)) -- finished
 end
-local status = ffi.new("int[1]")
-local exited = false
-for _ = 1, 100 do
-	serve(20)
-	if ffi.C.waitpid(child, status, WNOHANG) == child then exited = true; break end
-end
+-- Bounded in wall-clock time: the worker closes its connection before it is
+-- reaped, so serve then returns at once and a count of its calls bounded
+-- nothing (run 45119239568).
+local exited, status = ChildExit.wait(child, 5000, serve)
 if not exited then fail("the worker kept running after the compositor finished") end
-if status[0] == 0 then fail("a finished compositor must end the worker with a failure") end
+if status == 0 then fail("a finished compositor must end the worker with a failure") end
 print("ok  the worker exits with a failure once the compositor finishes")
 receipts = receipts + 1
 

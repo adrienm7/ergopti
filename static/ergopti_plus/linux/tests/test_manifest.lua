@@ -268,6 +268,7 @@ return {
 	"tests.unit.platform.input.synthetic_input.test_uinput_writer_constructor_retirement_refusal",
 	"tests.unit.platform.focus.atspi.test_window_info_focus",
 	"tests.unit.platform.focus.compositor_focus.test_compositor_focus",
+	"tests.unit.platform.focus.compositor_focus.test_cosmic_fake_exit_wait",
 	"tests.unit.platform.focus.compositor_focus.test_assets",
 	"tests.unit.platform.system.test_wpm_surface_lifecycle",
 	"tests.unit.adapters.layout.test_xkb_capture_exact_evdev_event",
