@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Site Accessibility Ratchet
  * DESCRIPTION:
- * Runs axe-core (WCAG 2.0, 2.1 and 2.2, levels A and AA) on every page of a
+ * Runs axe-core (WCAG 2.0, 2.1 and 2.2, levels A, AA and AAA) on every page of a
  * built static site and inside every Ergopti Studio frame it embeds, in the
  * light and the dark colour schemes, in headless Chromium. Each violation is
  * counted per page, scheme, frame and rule, and compared with the committed
@@ -32,21 +32,13 @@ const path = require('node:path');
 const smoke = require('./site-artifact-smoke.playwright.cjs');
 const reading = require('./site-reading.cjs');
 const { SITE_ROUTES } = require('../../ci/site-artifact.cjs');
+// WCAG 2.2 level AAA is the target: the tags axe runs (A, AA and AAA).
+const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
 
 // Pages audited: every real page of the site, plus the pages the artifact
 // smoke list does not carry (the Optimiser tab, the accessibility statement).
 const AUDITED_ROUTES = Object.freeze([...SITE_ROUTES, '/studio/optimiser', '/accessibilite']);
 const COLOR_SCHEMES = Object.freeze(['light', 'dark']);
-// WCAG 2.2 level AA is the target; axe tags each rule with the versions and
-// levels it checks.
-const WCAG_TAGS = Object.freeze([
-	'wcag2a',
-	'wcag2aa',
-	'wcag21a',
-	'wcag21aa',
-	'wcag22a',
-	'wcag22aa'
-]);
 const VIEWPORT = Object.freeze({ width: 1440, height: 900 });
 // A phone, for the reflow checks (WCAG 1.4.10 asks for 320 CSS pixels).
 const PHONE_VIEWPORT = Object.freeze({ width: 320, height: 800 });

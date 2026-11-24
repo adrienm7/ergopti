@@ -11,7 +11,7 @@
  * answers the page's bridge messages and fills it with fixture data
  * (app-windows-fixtures.cjs), so the scan sees the window as a user does.
  * Each window, in each of its fixture states, is then:
- * 1. scanned by axe-core (WCAG 2.0, 2.1 and 2.2, levels A and AA) in the light
+ * 1. scanned by axe-core (WCAG 2.0, 2.1 and 2.2, levels A, AA and AAA) in the light
  *    and the dark colour schemes;
  * 2. walked with Tab to the end and back with Shift+Tab (WCAG 2.1.2 no
  *    keyboard trap, 2.4.3 focus order, 2.4.7 focus visible), every stop
@@ -53,6 +53,8 @@ const operability = require('../lib/keyboard-operability.cjs');
 const appChecks = require('../lib/app-window-checks.cjs');
 const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const { WINDOWS } = require('./app-windows-fixtures.cjs');
+// WCAG 2.2 level AAA is the target: the tags axe runs (A, AA and AAA).
+const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
 
 // --root=dir serves another copy of static/ (an older commit's, to prove a fix
 // by scanning the code it replaced); the fixtures and the baseline stay these.
@@ -69,14 +71,6 @@ const BASELINE_PATH = path.join(__dirname, 'app-windows-accessibility-baseline.j
 const RAW_KEY_SHAPE = catalogueShape();
 const COLOR_SCHEMES = Object.freeze(['light', 'dark']);
 const BRIDGES = Object.freeze(['windows', 'webkit']);
-const WCAG_TAGS = Object.freeze([
-	'wcag2a',
-	'wcag2aa',
-	'wcag21a',
-	'wcag21aa',
-	'wcag22a',
-	'wcag22aa'
-]);
 // The rule name under which a window's keyboard-walk problems are counted.
 const WALK_RULE = 'keyboard-walk';
 // The rule name under which a window's heading and landmark problems are counted.
@@ -781,6 +775,7 @@ async function main(args = process.argv.slice(2)) {
 module.exports = {
 	BASELINE_PATH,
 	COLOR_SCHEMES,
+	WCAG_TAGS,
 	WALK_RULE,
 	OUTLINE_RULE,
 	OPERABILITY_RULE,

@@ -66,7 +66,9 @@ function checkBaseline() {
 		assert.ok(scan.COLOR_SCHEMES.includes(scheme), 'Baseline names an unknown scheme: ' + key);
 	}
 	assert.deepEqual([...scan.COLOR_SCHEMES], ['light', 'dark']);
-	assert.ok(scan.WCAG_TAGS.includes('wcag22aa'), 'The target is WCAG 2.2 AA');
+	// The target is WCAG 2.2 AAA (maintainer, 2026-11-23): every level of every version.
+	for (const tag of ['wcag22aa', 'wcag2aaa', 'wcag21aaa', 'wcag22aaa'])
+		assert.ok(scan.WCAG_TAGS.includes(tag), 'The site scan runs ' + tag);
 }
 
 /** Every page of src/routes is audited, except the former addresses that redirect. */

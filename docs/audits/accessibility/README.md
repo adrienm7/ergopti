@@ -5,14 +5,17 @@
 Started on 2026-11-17 (Paris time) for the TODO section « Full accessibility »
 (maintainer request of 2026-11-16). Target: WCAG 2.2 level AA on the site
 (ergopti.fr), Ergopti Studio (editor, Comparer, Optimiser, benchmarks) and
-Ergopti+ itself. The public statement is the site page `/accessibilite`
+Ergopti+ itself, raised to AAA on 2026-11-23 (what each AAA criterion is
+checked by: [aaa-criteria.md](aaa-criteria.md)). The public statement is the site page `/accessibilite`
 (`src/routes/accessibilite/+page.svelte`); its « known gaps » follow this file.
 
 ## Method and limits
 
 - **Automated scan.** `tools/test/browser/site-accessibility.playwright.cjs`
   serves a built site on loopback and runs axe-core 4.14.0 (tags `wcag2a`,
-  `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`) on every page of
+  `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and since
+  2026-11-24 `wcag2aaa`, `wcag21aaa`, `wcag22aaa`, one list in
+  `tools/test/lib/wcag-tags.cjs`) on every page of
   the site and inside every same-origin frame it embeds (the Studio pages and
   the Ergopti+ app windows shown as demos), in the light and dark colour
   schemes, with reduced motion emulated so that reveal animations do not hide
@@ -1283,6 +1286,34 @@ frame. `test-site-accessibility-ratchet`, `test-studio-reading-preferences`,
 semantic markup gates, the locale gates, format and convention lints.
 `npm run test:js` and `verify-change` refuse this host (Node 22.16, pinned
 22.22.2).
+
+## Twelfth pass, AAA in the gates (2026-11-24, Paris time)
+
+The maintainer raised the target to WCAG 2.2 AAA on 2026-11-23. The tools
+surveyed and every AAA criterion, measured or checked by hand, are in
+[aaa-criteria.md](aaa-criteria.md).
+
+- **Gates.** The site and Studio scan and the app windows' scan run axe-core's
+  AAA tags (`wcag2aaa`, `wcag21aaa`, `wcag22aaa`) beside the A and AA ones,
+  from one list (`tools/test/lib/wcag-tags.cjs`); both ratchet contracts fail
+  if an AAA tag leaves it. The settings dialog and the Comparer's panels keep
+  their zero assertions, now at AAA.
+- **First measure.** 1,505 app-window nodes and 686 site nodes of
+  `color-contrast-enhanced` (1.4.6, 7:1), nothing else at AAA.
+- **Fixed through the shared tokens of `theme.css`**, in both themes: the
+  accent (`#0062cc` to `#004a99` in light and under white text, `#4a9eff` to
+  `#9ccaff` in dark), the secondary and muted greys (`#6e6e73`, `#636366`,
+  `#666`, `#555` to `#48484c`; dark ones to `#c8c8c8`, `rgba(235, 235, 245,
+0.8)` and `#c4c4ca`), the dialog and status colours. Section 7 of
+  `tools/test/test-app-colour-contrast.cjs` holds every shared text token to
+  7:1 on its grounds without a browser. The site's own settings dialog and the
+  AI demo of `/ergopti-plus` were raised too.
+- **Left in the baselines:** 4 site nodes (the changelog frame) and 402
+  app-window nodes, all colours a page spells itself: the changelog's dark
+  palette, the download window, the metrics dashboards' tints, the hotstring
+  and prompt editors' chips, the paths, token and physical-shortcut editors.
+- **Also fixed:** the diagnostics window's day-log checkbox was 13 px, below
+  the AA 24 px target of 2.5.8 (axe `target-size`, state `day-log`).
 
 ## What remains
 

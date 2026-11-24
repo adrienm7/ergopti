@@ -185,11 +185,16 @@ benchmarks) on the site and inside the app, and Ergopti+ itself (menus, windows,
 Windows, macOS and Linux. Target WCAG 2.2 level AAA everywhere (maintainer, 2026-11-23: the latest WCAG, AAA on the
 site, Ergopti+ and every app window); every new page or window is held to it from now on.
 
-- [ ] **[CODE] AAA measured in CI, red below perfect (maintainer, 2026-11-23).** Survey the tools that measure
-      accessibility (axe-core's `wcag2aaa`/`wcag22aaa` tags beside the AA ones, Pa11y with HTML_CodeSniffer's
-      WCAG2AAA standard, IBM Equal Access, Lighthouse) and wire the ones that cover the AAA criteria into the site,
-      Studio and app-window gates, with a zero baseline: any finding fails CI. List the AAA criteria no tool can
-      measure (e.g. sign language, extended audio description, reading level) with how each is checked instead.
+- [ ] **[CODE] AAA findings down to zero (maintainer, 2026-11-23).** axe-core's AAA rules (`wcag2aaa`,
+      `wcag21aaa`, `wcag22aaa`, one list in `tools/test/lib/wcag-tags.cjs`) run in the site, Studio and app-window
+      gates: any new finding fails CI. The shared text tokens of `theme.css` now hold 7:1 in both themes
+      (`test-app-colour-contrast.cjs`, section 7); what is left is recorded in the baselines, all
+      `color-contrast-enhanced`: 4 site nodes (the changelog frame) and 402 app-window nodes, colours a page spells
+      itself (the changelog's dark palette, the download window, the metrics dashboards' tints, the editors' chips,
+      the paths, token and physical-shortcut editors). Left: lower both baselines to zero; a check that measures the 44 px of 2.5.5 (axe's
+      `target-size` stops at the AA 24 px); the public statement `/accessibilite` still names AA as the target
+      (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its check, are in
+      [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual audit below.
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the
@@ -973,6 +978,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Keep them French** until the site itself offers a language choice, then route them through it.
   2. Translate the dialog and the statement into English now, with the Ergopti+ `t()` dictionary.
   3. Give them the 21 locales, which first needs a locale system for the whole site.
+- [ ] **AAA tools: axe-core only (decided by the agent on 2026-11-24, to review by the maintainer).** Of the tools
+      surveyed ([aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md)), only axe-core measures AAA rules
+      without a new dependency or a network fetch; IBM Equal Access and Lighthouse have no AAA rule. Kept meanwhile:
+      axe-core's three AAA rules, no new dependency.
+  1. **(recommended) Keep axe-core alone** and write the repository's own checks for what it misses (2.5.5).
+  2. Add HTML_CodeSniffer (pinned npm package), injected into the same Playwright pages, for its `WCAG2AAA`
+     errors; its notices need a person anyway.
 - [ ] **Screen-reader announcements of tooltips, decided by the agent on 2026-11-17.** Hotstring previews and
       finished AI predictions are announced only while the system says a screen reader runs (Windows
       `SPI_GETSCREENREADER`, VoiceOver, Orca), with no Ergopti+ setting; add a menu switch if users find them noisy.

@@ -115,6 +115,9 @@ function checkBaseline() {
 		assert.ok(states.includes(state), 'Baseline names an unknown state: ' + key);
 	}
 	assert.deepEqual([...scan.COLOR_SCHEMES], ['light', 'dark']);
+	// The target is WCAG 2.2 AAA (maintainer, 2026-11-23): every level of every version.
+	for (const tag of ['wcag22aa', 'wcag2aaa', 'wcag21aaa', 'wcag22aaa'])
+		assert.ok(scan.WCAG_TAGS.includes(tag), 'The app windows scan runs ' + tag);
 }
 
 /** Every window page is audited once, or named above with its reason. */
