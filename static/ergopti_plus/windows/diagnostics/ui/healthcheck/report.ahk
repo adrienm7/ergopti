@@ -523,7 +523,8 @@ HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
 	return Map("snapshot", Safe, "text", Text, "name", Name, "summary", Summary,
 		"fields", Map("driver", _HCShare_OsName(Safe["driver"]), "version", _HCShare_FormVersion(Safe, Snapshot),
 			"os", _HCShare_FormOs(Safe), "diagnostics", Head),
-		"notes", Map("diagnostics", _HCShare_English(Schema, Schema["share_policy"]["truncated_note_key"])))
+		"notes", Map("diagnostics", _HCShare_English(Schema, Schema["share_policy"]["truncated_note_key"]),
+			"full_report", _HCShare_English(Schema, Schema["share_policy"]["full_report_cut_note_key"])))
 }
 
 
@@ -664,18 +665,24 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text, LogFile := 0) {
 	return Path
 }
 
-; Reports on GitHub: copies and saves the complete approved report, then
-; reveals its local attachment before opening the bug form with the host
-; version, OS and driver fields and the compact report (tables, no JSON block),
-; cut to the URL budget with a note that the complete report is on the
-; clipboard and in the saved file. The browser opens last and no attachment is
-; uploaded automatically.
+; Reports on GitHub: copies the approved report, bounded to the bug form's
+; full_report_max_bytes (GitHub refuses a longer issue body: a longer report
+; is cut at whole lines with a note), saves it complete, then reveals its local
+; attachment before opening the bug form with the host version, OS and driver
+; fields and the compact report (readable lines, no JSON block), cut to the URL
+; budget with a note that the complete report is on the clipboard and in the
+; saved file. The browser opens last and no attachment is uploaded
+; automatically.
 ; @param Action {Map} Host-approved report text and technical identity fields.
 ; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; Copy the complete approved report independently of its compact URL form
-	if !Effects["copy"].Call(Text)
+	Templates := Config["templates"]
+	; Copy the approved report independently of its compact URL form, within
+	; what the form's body can hold
+	Pasted := IssueLink_FitLines(Text, Templates["full_report_max_bytes"], Templates["truncation_marker"],
+		Action["notes"]["full_report"])
+	if !Effects["copy"].Call(Pasted)
 		throw Error("The clipboard refused the report.")
 	; The complete approved document stays in a local attachment; the URL carries its compact form.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text, Action.Get("day_log_file", 0))

@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Resultaten gäller endast de registrerade kontrollerna. Isolerade testsviter kördes inte.",
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s.",
 	"healthcheck.export.privacy_notice": "Endast tekniska uppgifter: inga loggar, inskriven text, sökvägar eller namn.",
+	"healthcheck.export.full_report_cut_note": "Förkortad för att hålla sig inom GitHubs längdgräns för ett ärende. Hela rapporten finns i filen som sparades med den: bifoga filen till det här ärendet.",
 	"healthcheck.export.url_truncated_note": "Förkortad för att rymmas i länken. Hela rapporten finns i urklipp: klistra in den i fältet Full report nedan.",
 	"healthcheck.export.items": "objekt",
 	"healthcheck.export.characters": "tecken",

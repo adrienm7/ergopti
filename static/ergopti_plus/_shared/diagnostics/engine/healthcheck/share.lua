@@ -477,13 +477,16 @@ end
 --- @param with_day_log boolean|nil See M.snapshot.
 --- @return table { text, fields, notes, name, snapshot }; fields.diagnostics is the
 ---   compact report (readable lines, no JSON block) the issue form is prefilled
----   with, and fields.driver the form's Driver dropdown option
+---   with, and fields.driver the form's Driver dropdown option; notes.diagnostics
+---   ends a cut prefill and notes.full_report a cut pasted report
 function M.document(snapshot, schema, notice, with_day_log)
 	local safe = M.snapshot(snapshot, schema, with_day_log)
 	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
 	assert(type(notice) == "string" and notice ~= "", "English export notice unavailable")
 	local truncated = schema.export_strings and schema.export_strings[schema.share_policy.truncated_note_key]
 	assert(type(truncated) == "string" and truncated ~= "", "English export truncation note unavailable")
+	local cut = schema.export_strings and schema.export_strings[schema.share_policy.full_report_cut_note_key]
+	assert(type(cut) == "string" and cut ~= "", "English export full report note unavailable")
 	local versions = safe.sections and safe.sections.versions or {}
 	local stamp = safe.generated_at or "unknown"
 	local head = "# ErgoptiPlus diagnostics\n\n" .. notice .. "\n\n" .. readable(safe, schema)
@@ -494,7 +497,7 @@ function M.document(snapshot, schema, notice, with_day_log)
 			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
 		text = head .. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
 		fields = { driver = OS_NAMES[safe.driver], version = form_version(safe, snapshot), os = form_os(safe), diagnostics = head },
-		notes = { diagnostics = truncated },
+		notes = { diagnostics = truncated, full_report = cut },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,
 	}
 end

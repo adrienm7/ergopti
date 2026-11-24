@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Results cover the recorded checks only. Isolated suites were not run.",
 	"healthcheck.problem.diagnostic_check": "Diagnostic check failed: %s.",
 	"healthcheck.export.privacy_notice": "Technical facts only: no logs, typed text, paths or names.",
+	"healthcheck.export.full_report_cut_note": "Cut to fit GitHub's limit on an issue's length. The complete report is in the file saved with it: attach that file to this issue.",
 	"healthcheck.export.url_truncated_note": "Cut to fit the link. The complete report is on your clipboard: paste it into the Full report field below.",
 	"healthcheck.export.items": "items",
 	"healthcheck.export.characters": "characters",

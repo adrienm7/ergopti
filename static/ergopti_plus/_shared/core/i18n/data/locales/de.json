@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "Die Ergebnisse gelten nur für die protokollierten Prüfungen. Isolierte Testsuiten wurden nicht ausgeführt.",
 	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s.",
 	"healthcheck.export.privacy_notice": "Nur technische Angaben: keine Protokolle, kein eingegebener Text, keine Pfade oder Namen.",
+	"healthcheck.export.full_report_cut_note": "Gekürzt, um GitHubs Längengrenze für ein Issue einzuhalten. Der vollständige Bericht steht in der mit ihm gespeicherten Datei: Hängen Sie diese Datei an dieses Issue an.",
 	"healthcheck.export.url_truncated_note": "Gekürzt, damit es in den Link passt. Der vollständige Bericht liegt in Ihrer Zwischenablage: Fügen Sie ihn unten in das Feld Full report ein.",
 	"healthcheck.export.items": "Einträge",
 	"healthcheck.export.characters": "Zeichen",

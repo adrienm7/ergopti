@@ -19,7 +19,11 @@
 ; 4. A cut field can carry a note (one line saying where the complete text is),
 ;    appended after the truncation marker and counted in the budget: the caller
 ;    passes it only for the field that holds the complete report.
-; 5. The JS original and the Lua port replay the same vectors:
+; 5. The complete report the user pastes into the form is bounded too:
+;    IssueLink_FitLines keeps whole lines under GitHub's issue body limit,
+;    closes a code block it cut open, and ends with the truncation marker and
+;    a note saying where the rest is.
+; 6. The JS original and the Lua port replay the same vectors:
 ;    _shared/tests/corpus/diagnostics/issue_link_vectors.json.
 ; ==============================================================================
 
@@ -195,4 +199,74 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	if (StrLen(Url) > MaxUrlBytes)
 		throw Error("issue_link: " . StrLen(Url) . " bytes left after every cut, budget " . MaxUrlBytes . ".")
 	return Url
+}
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 3/ The Pasted Report =======
+; ====================================
+; ====================================
+
+; UTF-8 length of a string. The system conversion writes a lone surrogate as
+; U+FFFD, three bytes, as the JS and Lua ports count it.
+; @param Text {String}
+; @returns {Integer}
+_IssueLink_Utf8Bytes(Text) {
+	; StrPut counts the terminating NUL
+	return StrPut(Text, "UTF-8") - 1
+}
+
+; Bounds a text to a UTF-8 byte budget at whole lines. A text that fits is
+; returned unchanged; otherwise the longest prefix of whole lines that fits
+; with its ending is kept, a code block it leaves open is closed (a kept
+; prefix ending on the opening line drops that line instead), and the
+; truncation marker, a blank line and the note follow.
+; @param Text {String}
+; @param MaxBytes {Integer}
+; @param Marker {String}
+; @param Note {String}
+; @returns {String}
+; @throws {Error} When not one line fits with the ending.
+IssueLink_FitLines(Text, MaxBytes, Marker, Note) {
+	; A line opening or closing a Markdown code block
+	static CODE_FENCE := Chr(96) . Chr(96) . Chr(96)
+	Text := String(Text)
+	if (_IssueLink_Utf8Bytes(Text) <= MaxBytes)
+		return Text
+	Ending := Marker . "`n`n" . Note
+	EndingBytes := _IssueLink_Utf8Bytes(Ending)
+	Lines := StrSplit(Text, "`n")
+	PrefixBytes := Map(0, 0)
+	Open := false
+	Best := 0
+	BestOpen := false
+	; Strictly fewer lines than the text: a cut that keeps everything is no cut
+	Loop Lines.Length - 1 {
+		K := A_Index
+		Line := Lines[K]
+		PrefixBytes[K] := (K == 1 ? 0 : PrefixBytes[K - 1] + 1) + _IssueLink_Utf8Bytes(Line)
+		IsFence := SubStr(Line, 1, StrLen(CODE_FENCE)) == CODE_FENCE
+		if IsFence
+			Open := !Open
+		; A block cut right after its opening line keeps nothing of it
+		Count := (IsFence && Open) ? K - 1 : K
+		CountOpen := (IsFence && Open) ? false : Open
+		if (Count < 1)
+			continue
+		Cost := PrefixBytes[Count] + 1 + (CountOpen ? StrLen(CODE_FENCE) + 1 : 0) + EndingBytes
+		if (Cost <= MaxBytes) {
+			Best := Count
+			BestOpen := CountOpen
+		}
+	}
+	if (Best < 1)
+		throw Error("issue_link: not one line fits " . MaxBytes . " bytes with its ending.")
+	Kept := ""
+	Loop Best
+		Kept .= (A_Index > 1 ? "`n" : "") . Lines[A_Index]
+	return Kept . "`n" . (BestOpen ? CODE_FENCE . "`n" : "") . Ending
 }

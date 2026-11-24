@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "結果は記録されたチェックのみを対象とします。隔離環境でのテストスイートは実行されていません。",
 	"healthcheck.problem.diagnostic_check": "診断チェックに失敗しました: %s。",
 	"healthcheck.export.privacy_notice": "技術情報のみ：ログ、入力したテキスト、パス、名前は含みません。",
+	"healthcheck.export.full_report_cut_note": "GitHub の Issue の長さの上限に収めるため切り詰めました。完全なレポートは一緒に保存されたファイルにあります。そのファイルをこの Issue に添付してください。",
 	"healthcheck.export.url_truncated_note": "リンクに収まるよう短縮しました。完全なレポートはクリップボードにあります。下の Full report 欄に貼り付けてください。",
 	"healthcheck.export.items": "件",
 	"healthcheck.export.characters": "文字",

@@ -4609,6 +4609,7 @@
 	"healthcheck.summary.scope": "De resultaten gelden alleen voor de vastgelegde controles. Geïsoleerde testsuites zijn niet uitgevoerd.",
 	"healthcheck.problem.diagnostic_check": "Diagnostische controle mislukt: %s.",
 	"healthcheck.export.privacy_notice": "Alleen technische gegevens: geen logs, getypte tekst, paden of namen.",
+	"healthcheck.export.full_report_cut_note": "Ingekort om binnen de lengtegrens van GitHub voor een issue te blijven. Het volledige rapport staat in het bestand dat ermee is opgeslagen: voeg dat bestand toe aan dit issue.",
 	"healthcheck.export.url_truncated_note": "Ingekort om in de link te passen. Het volledige rapport staat op uw klembord: plak het hieronder in het veld Full report.",
 	"healthcheck.export.items": "elementen",
 	"healthcheck.export.characters": "tekens",
