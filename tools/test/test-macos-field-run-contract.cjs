@@ -9,7 +9,8 @@
  * both of which read static/ergopti_plus/macos/diagnostics/data/field_run.json:
  * 1. the declaration: a step for every Debug field check, the person verdicts,
  *    progress-aware AI downloads, and a request deadline that covers every
- *    step at its bound and ends before the collector stops waiting;
+ *    step at its bound and ends before the collector stops waiting, and a
+ *    field_check.step label for every literal step the field checks report;
  * 2. the collector reads every name it uses from the declaration;
  * 3. the real collector, in a fixture clone with a recording driver, writes a
  *    request of the declared shape, waits for done, copies the results and
@@ -50,6 +51,11 @@ const COLLISIONS = 'tools/dev/hotstring-collisions.py';
 // The per-TODO-point summary and the coverage table it reads.
 const TODO_SUMMARY = 'tools/dev/field-todo-summary.py';
 const TODO_COVERAGE = 'static/ergopti_plus/macos/diagnostics/data/field_todo_coverage.json';
+const LOCALE_EN = 'static/ergopti_plus/_shared/core/i18n/data/locales/en.json';
+const FIELD_CHECK_DIRS = [
+	'static/ergopti_plus/macos/diagnostics/engine/field_check',
+	'static/ergopti_plus/_shared/diagnostics/engine/field_check'
+];
 // The app's own crash reports are summarized without paths or user data.
 const IPS_SUMMARY = 'tools/dev/field-ips-summary.py';
 // The analyser and the declarations it reads its budgets from.
@@ -569,6 +575,27 @@ function reportFolder(paths) {
 			}
 		);
 
+		await check('names every literal step of the field checks in the report', () => {
+			// The field report names a step by its field_check.step.<id> label; a
+			// missing one prints the closed code (TODO, 196 of them on 2026-11-24).
+			const english = JSON.parse(fs.readFileSync(path.join(ROOT, LOCALE_EN), 'utf8'));
+			const missing = new Set();
+			let seen = 0;
+			for (const dir of FIELD_CHECK_DIRS)
+				for (const name of fs
+					.readdirSync(path.join(ROOT, dir))
+					.filter((file) => file.endsWith('.lua'))) {
+					const source = fs.readFileSync(path.join(ROOT, dir, name), 'utf8');
+					// A step id built with .. names its subject in its suffix and keeps its code
+					for (const match of source.matchAll(/report\.step\(\s*"([a-z0-9_]+)"(?!\s*\.\.)/g)) {
+						seen++;
+						if (typeof english[`field_check.step.${match[1]}`] !== 'string')
+							missing.add(`${name}: ${match[1]}`);
+					}
+				}
+			assert(seen > 200, `too few steps parsed: ${seen}`);
+			assert.deepEqual([...missing], [], 'field check steps without a field_check.step label');
+		});
 		await check('the collector reads every name it uses from the declaration', () => {
 			const used = [...collector.matchAll(/spec_value ([\w.]+)/g)].map((match) => match[1]);
 			for (const key of [
