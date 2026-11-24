@@ -105,69 +105,15 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       Tap-Holds dot is settled (maintainer, 2026-11-24): 🔴 whenever the owned runtime is missing, refused or failed,
       even with the switch off; the warning keeps the shared yellow 🟡 (no orange).
 
-## Next session (state on 2026-11-17, read first)
+## Open since the 2026-11-17 pass
 
-- **Goal unchanged:** a fully green `dev` CI, then publish dev prerelease 176; then empty this file.
-- **Load and disk (maintainer):** at most 5-6 agents at once and at most 2 running heavy local suites (full AHK
-  groups, WSL Lua suites, interactive desktop checks); prefer CI on temporary `ci/verify-<sha>` branches (deleted
-  after reading). After each agent: remove its worktree and scratch files; purge stale scratch dirs, WSL `/root`
-  copies and the npm cache regularly; compact the WSL disk image when no agent uses WSL (C: reached 2.8 GB free).
 - [ ] **Exact-count ceilings in tests (maintainer: « ces tests avec seuil magic value c'est vraiment mauvais »).**
-      `toml.flat_values` was raised to 1500/2600 on 2026-11-17 to unblock CI. Replace exact operation counts and
-      similar magic thresholds (boot operation ceilings, literal ratchets where they only count) with budgets that
-      mean something (time, order of magnitude, or a named single source), one ratchet at a time.
-      Done 2026-11-18: the startup smoke has no count ceiling left. It names the owners of the boot's repeated
-      work (`BOOT_WORK_OWNERS`: re-parses, config.toml snapshot reads, registry deep compares), a lexer test
-      proves slow steps do not grow with run length, and the re-parse debts (personal-file activation,
-      terminator records, LLM privacy rows) read the admitted snapshot document. The unit ratchets of the flat
-      write and the typed transaction parses now name the owner that must not parse twice. The logger, the
-      feature loader and the metrics settings read config.toml through the boot read stretch
-      (`ConfigTomlReadBootServedSnapshot`), so the table has no snapshot-read debt left.
-      Done 2026-11-19: the Studio speed checks (13 ms per library layout in the engine test, 600 ms per layout in
-      the analyser scores) time the analysers against a reference walk of the same table in the same process
-      (`tools/test/lib/table-walk-speed.cjs`); an engine five times slower fails the bound on any load. The
-      best-swaps browser test reads the panel's `LIMIT`/`CYCLE_LIMIT`, the Studio and app-window keyboard walks
-      end when a stop repeats (bounded by the document's elements) instead of after 1500/800 presses, and the
-      shared-parse memo test reads `TOML_SHARED_PARSE_ENTRIES`. Reviewed and kept: the stretch counts in
-      test_journal_boot and the saved-options read in ai/menu test_persistence equal one comparison or read per
-      stretch or build, against loop counts the test itself chooses, never a product ceiling. Left: the two
-      speed bounds (120 and 5000 walks) rest on ratios measured with every core busy and a quiet ratio estimated
-      1.6 times higher; read the ratio each test prints on a quiet PC and on CI, and set each bound to twice the
-      highest.
-      Done 2026-11-20: the startup smoke times the slowest Hotstrings menu render against the same boot's other
-      deferred submenu builds (`HOTSTRINGS_RENDER_SHARE`, at most all of them together; clean boots 0.07-0.25,
-      a reparse per metadata question 9.5). The Ergopti extension tests of the three drivers read their bound
-      files from the extension manifest and the SFB, rolls, repeat-correction and suffix counts from the shipped
-      files; the Windows cache test counts the symbol rows of magickey.toml; the Linux and macOS preview-menu
-      tests expand `hotstrings_preview_frame`; the Linux id-less header test checks every menu keeps headers at
-      its top level, like the macOS one. Each was proved by a source mutation that made it fail. Reviewed and
-      kept: frozen historical references (the 101 distance rules, the 140 common autocorrections), corpus floors
-      (`tests/e2e/contract.lua`) and non-vacuity floors (`>= 10`, `> 400`). Later the same day the six row
-      counts left beside a declaration read it: the Windows delays frame and per-file controls from the shipped
-      manifest, the gesture list from its declared status templates, the profile frame corpus without its native
-      rows, the LLM source mutations from the canonical inventory, and the macOS preview menu from the shipped
-      `preview_presence_controls`. Each was proved by a source mutation that made it fail. Kept: the handwritten
-      canonical LLM rows, the oracle the manifest is compared with.
-- [ ] **The target's own paste can still lose to Windows' clipboard readers.** Done 2026-11-22: the paste
-      transport's leases (`CB_IsBusy`, the plain CAS and its authentication, the restore retry) outwait a reader
-      of another process for `CB_PASTE_READER_WAIT_MS` (100 ms) instead of refusing on the first try, a refused
-      SendInstant publication is logged with the holder, and the payload carries the clipboard-history and cloud
-      exclusion formats, so expansions no longer land in Win+V
-      (`test_clipboard_reader_wait.ahk`, a known reader process, red on the old code). Left: the application's
-      own single `OpenClipboard` after Ctrl+V. explorer.exe and msrdc.exe (WSLg) still open the clipboard after
-      writes, with or without the exclusion formats, and msrdc renders every delayed text format, so neither the
-      formats nor a delayed-rendering receipt can prove the paste (a single open 0-140 ms after a write failed
-      about 1 time in 60-120). The `gesture-transform-native-render-focus` and `wrap-native-render-focus` current
-      modes still fail that way now and then (sends=1, Edit empty), at the old head too. The TextSend payload
-      (`CB_WriteTextWithReceipt`, LLM and diagnostics) carries the same exclusion formats since 2026-11-24
-      (`_CB_WriteTransientText`, `test_clipboard_reader_wait.ahk`). macOS and Linux have no clipboard lock (NSPasteboard and X11/Wayland selections serve
-      each reader separately), so the race does not exist there. Since 2026-11-24 their paste payloads carry
-      the clipboard-manager hints too: `x-kde-passwordManagerHint` through the Linux multi-format owner
-      (`test_clipboard_transient_hint.lua`), `org.nspasteboard.TransientType` and `ConcealedType` on macOS
-      (`test_transient_markers.lua`); the managers' own reading is a field check (`clipboard_manager_hint`).
-      Count ratchets now compare named ledgers (a new item and a fixed entry both fail: `tools/test/lib/known-debt.cjs`
-      and the per-file OS-purity ledgers of both drivers) and the TOML cost tests compare two input sizes. What is
-      left needs a measurement or a design first.
+      Replace exact operation counts and similar magic thresholds with budgets that mean something (time, order of
+      magnitude, or a named single source), one ratchet at a time. Done from 2026-11-17 to 2026-11-22: the startup
+      smoke names the owners of the boot's repeated work (`BOOT_WORK_OWNERS`), the Studio speed checks time the
+      analysers against a reference table walk (`tools/test/lib/table-walk-speed.cjs`), row counts read their
+      declaration, count ratchets compare named ledgers (`tools/test/lib/known-debt.cjs`) and the TOML cost tests
+      compare two input sizes. Left, each needing a measurement or a design first:
   - `unit/ai/api/test_post_save_owner.ahk` still caps one API save at 400 registry deep compares for the owners
     its `_WAPO_GUARD_COMPARE_OWNERS` table does not name yet. Since 2026-11-24 the two anonymous transition guards
     (104 of the 152 compares measured 2026-11-22) are bounded by their traced unit instead,
@@ -181,20 +127,22 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
   - Kept on purpose: order-of-magnitude bounds that state their reason (the Linux e2e 3000 tray rows against the
     former 103 058), loop-progress bounds a test chooses for its own loop, frozen historical references, corpus
     floors and non-vacuity floors.
-- [ ] **SendInstant paste races Windows' own clipboard readers.** Rerun on a quiet PC on 2026-11-18 (no resident
-      driver, 3 runs per group): healthcheck, Ollama native, `groups247-*`, pickers, `idle-caret-context`,
-      `key-state-dllcall-uncaught`, `tap-keys-kana-native`, the `config-*` groups and the model browser stayed
-      green; the app picker refusal failed once among neighbours (BM_CLICK, now exclusive). Two clipboard fixtures
-      still failed once each, alone in the exclusive phase: `gesture-transform-native-render-focus` current
-      (sends=0) and `sendinstant-native-snapshot-copy` current. On this PC (clipboard history on) explorer.exe and
-      `cbdhsvc` open the clipboard after every write (probe: 40 writes, 492 foreign lock samples from the two).
-      The gesture child alone failed 13 of 40 runs: twice `CB_IsBusy` saw explorer.exe and SendInstant took the
-      clipboard-free path; three times SendInstant returned with no paste and no log, which an instrumented loop
-      put at `CB_WritePlainSnapshot` (its single-shot CAS and `_CB_PlainAuthenticate` both refuse any open
-      lease); seven times Ctrl+V was sent but the Edit never pasted (explorer.exe held the lock just after the
-      paste in 4 of the 6 instrumented cases); once the capture timed out. The production paste can lose an expansion the same way. Decide whether publication
-      waits for readers (bounded, like `CB_OpenClipboardWithin`) before authenticating and pasting, then make the
-      fixtures hold a known reader instead of depending on the desktop's.
+- [ ] **The target's own paste can still lose to Windows' clipboard readers.** Since 7de36977ab (2026-11-22) the
+      paste transport's leases (`CB_IsBusy`, the plain CAS and its authentication, the restore retry) outwait a
+      reader of another process for `CB_PASTE_READER_WAIT_MS` (100 ms), a refused SendInstant publication is logged
+      with the holder, and the payload carries the clipboard-history and cloud exclusion formats
+      (`test_clipboard_reader_wait.ahk`); the TextSend payload (`CB_WriteTextWithReceipt`, LLM and diagnostics)
+      carries them too since 2026-11-24 (`_CB_WriteTransientText`). Left: the application's own single
+      `OpenClipboard` after Ctrl+V. explorer.exe, `cbdhsvc` and msrdc.exe (WSLg) still open the clipboard after
+      writes, with or without the exclusion formats, and msrdc renders every delayed text format, so neither the
+      formats nor a delayed-rendering receipt can prove the paste (a single open 0-140 ms after a write failed about
+      1 time in 60-120). The `gesture-transform-native-render-focus` and `wrap-native-render-focus` current modes
+      still fail that way now and then (sends=1, Edit empty); make such fixtures hold a known reader instead of
+      depending on the desktop's. macOS and Linux have no clipboard lock, so the race does not exist there; since
+      2026-11-24 their paste payloads carry the clipboard-manager hints (`x-kde-passwordManagerHint` through the
+      Linux multi-format owner, `test_clipboard_transient_hint.lua`; `org.nspasteboard.TransientType` and
+      `ConcealedType` on macOS, `test_transient_markers.lua`), and the managers' own reading is a field check
+      (`clipboard_manager_hint`).
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
@@ -694,8 +642,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 The suites have unit, integration and end-to-end tests, but nothing measures how much of the code they run or
 whether they catch a change: no line coverage tool and no mutation testing exist (« coverage » in the CI files means
 the list of mandatory jobs, `.github/linux-ci-coverage.json`). Only a few fixes were proved by a hand-made source
-mutation (see Next session). Target, red in CI otherwise: 100 % of lines covered and 100 % of mutants killed, an
-equivalent mutant being allowed only in a reviewed list that says why.
+mutation (see « Open since the 2026-11-17 pass »). Target, red in CI otherwise: 100 % of lines covered and 100 % of
+mutants killed, an equivalent mutant being allowed only in a reviewed list that says why.
 
 - [ ] **[CI] Line coverage per language, in CI.** One report per language, merged per driver:
   - Lua (macOS, Linux, shared): LuaCov under the existing runners (`tests/run.lua`), LuaJIT included;
