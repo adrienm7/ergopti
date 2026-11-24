@@ -36,6 +36,7 @@ local function fake_owner()
 	function owner.on_ready() table.insert(owner.events, "ready") end
 	function owner.on_action(name) table.insert(owner.events, "action:" .. tostring(name)) end
 	function owner.on_closed() table.insert(owner.events, "closed") end
+	function owner.detach() table.insert(owner.events, "detached") end
 	return owner
 end
 
@@ -76,6 +77,7 @@ local function with_host(body)
 				local view = fake_view()
 				world.view = view
 				assert(opts.on_webview_created(view) == true)
+				if world.refuse_after_create then return nil end
 				return view
 			end,
 		}
@@ -145,6 +147,17 @@ helpers.describe("field report window: the macOS host", function()
 			second.window.close()
 			world.refuse = true
 			helpers.assert_true(not Host.open(fake_owner()))
+			helpers.assert_true(not Host.is_open())
+		end)
+	end)
+
+	helpers.it("detaches a window the factory refused after creating it, without closing the run", function()
+		with_host(function(Host, world)
+			world.refuse_after_create = true
+			local owner = fake_owner()
+			helpers.assert_true(not Host.open(owner))
+			helpers.assert_eq(table.concat(owner.events, " "), "detached", "the run goes on: no close is heard")
+			helpers.assert_eq(world.view.deleted, 1, "the refused window is deleted")
 			helpers.assert_true(not Host.is_open())
 		end)
 	end)

@@ -183,6 +183,9 @@ function M.open(owner)
 		})
 	end, debug.traceback)
 	if not factory_ok or view == nil or view ~= candidate then
+		-- A window that never opened is no close of the person's: the run goes on
+		_owner = nil
+		owner.detach()
 		if candidate ~= nil and candidate == _webview then close_window() else release_usercontent(usercontent) end
 		Logger.error(LOG, "The field report window could not be created: %s.", tostring(view))
 		return false
