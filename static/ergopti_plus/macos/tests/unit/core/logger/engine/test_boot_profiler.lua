@@ -295,7 +295,54 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		CLOCK_NS = CLOCK_NS + 300e6
 		cpu = cpu + 120
 		boot.complete()
-		helpers.assert_eq(lines[#lines], "Boot CPU: 120 ms of process CPU over 300 ms of boot.")
+		helpers.assert_eq(lines[1], "Boot CPU: 120 ms of process CPU over 300 ms of boot.")
+		boot.use_cpu_clock(nil)
+		package.loaded["core.logger.engine.logger"].evidence = nil
+	end)
+
+	helpers.it("names a stage still open when the boot completes (bpf-02)", function()
+		configure_journal()
+		reset_capture()
+		CLOCK_NS = 70e9
+		boot.begin()
+		boot.stage("Hotstring groups registered")
+		boot.complete()
+		local warned
+		for _, record in ipairs(captured) do
+			if record.lvl == "warn" and record.fmt:find("unclosed stage", 1, true) then warned = record end
+		end
+		helpers.assert_not_nil(warned, "a boot that leaves a stage open says which, as Windows and Linux do")
+		helpers.assert_eq(warned.args[1], "Hotstring groups registered")
+		local journaled = table.concat(journal_lines("/journal/fallback.log"), "")
+		helpers.assert_true(journaled:find("unclosed stage(s): Hotstring groups registered", 1, true) ~= nil,
+			"the warning survives an os.exit() in the boot journal")
+	end)
+
+	helpers.it("writes one boot summary with every closed stage (bpf-03)", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["core.logger.engine.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		local cpu = 5
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 80e9
+		boot.begin()
+		boot.stage("Core module requires")
+		CLOCK_NS = CLOCK_NS + 40e6; cpu = cpu + 30
+		boot.mark("Core module requires")
+		boot.stage("TOML discovery")
+		CLOCK_NS = CLOCK_NS + 10e6; cpu = cpu + 4
+		boot.mark("TOML discovery")
+		boot.complete()
+		local summary
+		for _, line in ipairs(lines) do
+			if line:find("Boot summary: ", 1, true) == 1 then summary = line end
+		end
+		helpers.assert_not_nil(summary, "no boot summary line")
+		helpers.assert_true(summary:match("^Boot summary: total=50ms %(cpu 34ms%) heap=%d+KB stages: "
+			.. "Core module requires=40ms%(cpu 30ms%) TOML discovery=10ms%(cpu 4ms%)%.$") ~= nil, summary)
 		boot.use_cpu_clock(nil)
 		package.loaded["core.logger.engine.logger"].evidence = nil
 	end)
