@@ -41,7 +41,14 @@ keyboards have no code for (a modifier key other than the optional keys and
 Caps Lock), places a letter twice, or has the same letters
 on the same keys and the same digits as a layout already in the library
 (`same_as`); a duplicate only credits that layout when it has no credit. The
-codegen refuses a `same_as` the library does not hold.
+codegen refuses a `same_as` the library does not hold. What the rules cannot
+find is stated in the importer, so a rerun reproduces the library: files left
+out by judgement with their reason and replacing layout (`LEFT_OUT`),
+duplicates whose entry names the XKB layout replacing them or the layout they
+repeat beyond a copy (`STATED_DUPLICATES`), and an entry's fields the import
+does not produce (BvoFRak's `dead_keys`), kept from the library; credits are
+replaced at their place. `tools/test/test-layout-formats.cjs` reruns it on its
+KLA fixtures and compares their entries with the library's.
 
 The KLA reader reads an ErgoDox or KLAnext matrix file's thumb keys onto the
 model's thumb keys when one of them types a letter, a digit or a punctuation

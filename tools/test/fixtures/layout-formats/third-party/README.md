@@ -13,6 +13,12 @@ write. Kept byte for byte as published; fetched on 2026-11-15 (Paris time).
 | `kla-european.bepo.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/european.bepo` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
 | `kla-standard.dvorakmod.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/standard.dvorakmod` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
 | `kla-ergodox.workman.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/ergodox.workman` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-european.bvofrak1.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/european.bvofrak1` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-standard.bvofrak1.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/standard.bvofrak1` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-standard.spanish-dvorak.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/standard.spanish-dvorak` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-standard.adnw.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/standard.adnw` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-standard.neo2_new.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/standard.neo2_new` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
+| `kla-european.qwerty-spanish.json` | KLA JSON | https://github.com/patorjk/keyboard-layout-analyzer, `layouts/european.qwerty-spanish` (commit c4f2f9bb43) | MIT, `LICENSE-kla.txt` |
 
 | `xkeyboard-config.fr.xkb_symbols` | XKB symbols | https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config, `symbols/fr` (commit f4d3ed8bb8) | MIT/HPND notices, `LICENSE-xkeyboard-config.txt` |
 | `xkeyboard-config.epo.xkb_symbols` | XKB symbols | https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config, `symbols/epo` (commit f4d3ed8bb8) | MIT/HPND notices, `LICENSE-xkeyboard-config.txt` |
@@ -23,8 +29,9 @@ write. Kept byte for byte as published; fetched on 2026-11-15 (Paris time).
 | `libdof.aptmak.dof` | Oxeylyzer DOF | https://github.com/o-x-e-y/libdof, `example_dofs/aptmak.dof` (commit 4868cf550e) | Apache-2.0, `LICENSE-libdof.txt` |
 | `libdof.buggy.dof` | Oxeylyzer DOF | https://github.com/o-x-e-y/libdof, `example_dofs/buggy.dof` (commit 4868cf550e) | Apache-2.0, `LICENSE-libdof.txt` |
 
-The four Keyboard Layout Analyzer files are its own built-in layouts, one per board it knows (european, standard,
-ergodox), fetched on 2026-11-17 (Paris time) at the pinned commit; they are the published bytes with their line ends
+The Keyboard Layout Analyzer files are its own built-in layouts: four, one per board it knows (european, standard,
+ergodox), fetched on 2026-11-17 (Paris time) at the pinned commit, and the six whose library entries are stated by
+hand in `tools/build/import-kla-layouts.cjs` (its rerun test), fetched on 2026-11-24; they are the published bytes with their line ends
 normalised to LF, and `.json` added to the name (KLA serves them without an extension).
 
 The XKB, KLC and DOF files were fetched on 2026-11-17 (Paris time) at the pinned commits. The UTF-16 KLC is the

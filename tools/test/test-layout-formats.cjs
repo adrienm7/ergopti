@@ -615,6 +615,55 @@ for (const [file, expected] of Object.entries(klaThirdParty)) {
 		'KLA library: a KLA ErgoDox file is left out but as a duplicate'
 	);
 }
+// A rerun of the importer reproduces the library's hand-made KLA entries
+// (2026-11-24): BvoFRak's stated dead keys and ANSI name, Spanish Dvorak left
+// out for its XKB file, the XKB reasons of Neo 2 and Spanish QWERTY, AdNW's
+// duplicate of the XKB AdNW, and every credit at its place. The fixtures
+// stand for the KLA checkout; only their entries are compared.
+{
+	const { importInto } = require('../build/import-kla-layouts.cjs');
+	const os = require('os');
+	const committedLibrary = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_library.json'), 'utf8')
+	);
+	const committedCredits = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'layout_credits.json'), 'utf8')
+	);
+	const klaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-kla-'));
+	const fixtureDir = path.join(__dirname, 'fixtures', 'layout-formats', 'third-party');
+	fs.mkdirSync(path.join(klaDir, 'layouts'));
+	const paths = [];
+	for (const file of fs.readdirSync(fixtureDir).filter((f) => /^kla-.*\.json$/.test(f))) {
+		const name = file.replace(/^kla-/, '').replace(/\.json$/, '');
+		fs.copyFileSync(path.join(fixtureDir, file), path.join(klaDir, 'layouts', name));
+		paths.push(`layouts/${name}`);
+	}
+	try {
+		const { library, creditFile } = importInto(klaDir, structuredClone(committedCredits));
+		const entryOf = (lib, sourcePath) =>
+			lib.layouts.find((e) => e.source === 'kla' && e.source_path === sourcePath) ||
+			lib.not_imported.find((e) => e.source === 'kla' && e.source_path === sourcePath);
+		for (const sourcePath of paths)
+			check(
+				JSON.stringify(entryOf(library, sourcePath)) ===
+					JSON.stringify(entryOf(committedLibrary, sourcePath)),
+				`KLA import: a rerun changes the library entry of ${sourcePath}: ` +
+					JSON.stringify(entryOf(library, sourcePath)).slice(0, 300)
+			);
+		const kept = Object.keys(creditFile.credits);
+		const committedOrder = Object.keys(committedCredits.credits).filter((id) => kept.includes(id));
+		check(
+			JSON.stringify(kept) === JSON.stringify(committedOrder) &&
+				kept.every(
+					(id) =>
+						JSON.stringify(creditFile.credits[id]) === JSON.stringify(committedCredits.credits[id])
+				),
+			'KLA import: a rerun moves or changes credits'
+		);
+	} finally {
+		fs.rmSync(klaDir, { recursive: true, force: true });
+	}
+}
 for (const [name, result] of [
 	['ergol.toml', ergolToml],
 	['ergol.json', ergolJson],
