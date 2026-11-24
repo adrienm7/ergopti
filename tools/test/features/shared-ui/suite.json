@@ -741,6 +741,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-menu-font-faces.cjs"],
 			"repro": "npm run test:menu-font-faces"
+		},
+		{
+			"id": "layout-analysis-views",
+			"ordinal": 734,
+			"name": "layout analysis Pareto layers match a brute-force dominance check and the text trace counts every event exactly as the analysis measures the same text",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-analysis-views.cjs"],
+			"repro": "npm run test:layout-analysis-views"
 		}
 	]
 }

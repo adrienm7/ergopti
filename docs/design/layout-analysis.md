@@ -207,6 +207,32 @@ count}`), `chords` the multi-character outputs used with their counts.
   `mean` is the effort averaged over the occurrences.
   `effortDistribution(words, bins)` spreads those occurrences over equal
   ranges of effort from 0 to the hardest word's.
+- `traceText(layout, text, {keyboard?, profile?, weights?, typing?})` →
+  `{keyboard, chars, keys, pairs, triples, counts, bigrams, trigrams,
+unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
+  keystroke by keystroke (the Comparer's « Trace » tab, an idea seen in the
+  Layouts Wiki playground). Each character's way is the one `analyse()`
+  chooses on that text (`typing` as there): `chars` gives its `kind`
+  (`direct`, `shift`, `altgr`, `dead`, `substitution`, `null` when untyped
+  or a break), its `steps` `[code, level id, level index]`, the modifiers
+  `held` for it by name (the level's prefix: « Shift », « AltGr », « Mod3 »)
+  and its indexes in `keys`, the stream of presses each with its finger.
+  `pairs` and `triples` are every consecutive key pair and triple of the
+  stream with the events the stream visitor raises for it
+  (`TRACE_PAIR_EVENTS`, `TRACE_TRIPLE_EVENTS`), `counts` their totals; a line
+  break, a tab or an untyped character cuts the stream, as in the n-gram
+  tables. The counts as shares of `bigrams` and `trigrams` are `analyse()`'s
+  metrics on the same text, to the last bit (`test-layout-analysis-views.cjs`).
+  Chords (multi-character outputs) are not traced: each character is typed
+  on its own.
+- `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
+  Pareto layers of points `{id, values}` over values each `lower` or
+  `higher` better (the Comparer's « Pareto » tab, an idea seen in the
+  Layouts Wiki playground). A point is dominated when another is at least as
+  good on every value and better on one; layer 1 (the frontier) holds the
+  points nothing dominates, layer n + 1 those dominated only by layers 1 to n;
+  equal points share a layer. An unknown direction, a duplicate id or a value
+  missing or not finite throws.
 
 - `keyScoreCost(result, weights?, floors?, grades?)` → `{code: points}`: what
   each key costs the global score, Σ weight × `cost` over `KEY_COST_METRICS`, a
@@ -1324,6 +1350,23 @@ format); the folded layout list; and the score settings folded in one
 « Layouts shown » filters, which « Home » hides. A fresh visit opens « Home »,
 a link to a comparison (`corpus` or `layouts`) its ranking. While a corpus
 loads, the status says so and the results carry `aria-busy`.
+
+**Pareto and Trace tabs** (2026-11-25, ideas seen in the Layouts Wiki
+playground, [the comparison](../audits/layout-analysers/layouts-wiki-playground.md)).
+« Pareto » places the complete layouts the filters keep on two values, the
+mark or any metric the score weighs one way (default SFB against LSB), each
+read « better to the right and up »: the frontier (`E.pareto`) filled and
+joined, the layout of « One layout » ringed, the spread of the horizontal
+value with that layout's place in words, and a table (values, Pareto layer,
+« beaten by ») that says every point. Incomplete layouts are left out (their
+low counts are no trade-off) and counted in the summary. No weight enters the
+frontier. « Trace » types a text (the locale's sample until the visitor
+writes one, kept with the conveniences) on a layout and an optional second
+one (`E.traceText`): the events of the text side by side with their
+difference, then for each layout a strip of characters over their keys (each
+key in its finger's hue with its finger printed under it, a key of a
+penalised pair or triple outlined; aria-hidden), the same keystroke by
+keystroke as a table, and the penalised pairs and triples in words.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
