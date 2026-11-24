@@ -43,6 +43,14 @@ const STATIC_ROOT = path.resolve(__dirname, '..', '..', '..', 'static');
 const SHARED_UI = path.join(STATIC_ROOT, 'ergopti_plus', '_shared', 'ui');
 const UI = '/ergopti_plus/_shared/ui/';
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(SHARED_UI, 'apps.manifest.json'), 'utf8'));
+// The wizard runs in French here; its labels are read from the catalogue so a
+// reworded label does not break the check that the wizard's language is used.
+const FRENCH = JSON.parse(
+	fs.readFileSync(
+		path.join(STATIC_ROOT, 'ergopti_plus', '_shared', 'core', 'i18n', 'data', 'locales', 'fr.json'),
+		'utf8'
+	)
+);
 const FONT_FOLDERS = { hyperlegible: 'atkinson-hyperlegible', dyslexic: 'opendyslexic' };
 const FAMILIES = { default: null, hyperlegible: 'Atkinson Hyperlegible', dyslexic: 'OpenDyslexic' };
 const DELIVERIES = Object.freeze(['linked', 'inline']);
@@ -339,7 +347,8 @@ async function checkWizard(browser, origin) {
 			);
 			check((await font.inputValue()) === 'default', `${where}: the current font is selected`);
 			check(
-				(await page.locator('#reading-font-label').textContent()) === 'Police des fenêtres',
+				(await page.locator('#reading-font-label').textContent()) ===
+					FRENCH['menu.configuration.reading_font'],
 				`${where}: the font list is named in the wizard's language`
 			);
 			// Chosen with the keyboard, as a reader who cannot use a pointer does.
