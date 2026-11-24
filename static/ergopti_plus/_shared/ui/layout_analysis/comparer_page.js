@@ -235,6 +235,8 @@
 		'rows',
 		'heatmaps',
 		'misc',
+		'pareto',
+		'trace',
 		'analysers',
 		'details'
 	];
@@ -316,6 +318,8 @@
 		rows: 'M3 6h18M5 12h16M7 18h14',
 		heatmaps: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
 		misc: 'M12 3v18M3 12h18M6 6l12 12M18 6L6 18',
+		pareto: 'M3 3v18h18M6 8h3v4h4v3h4v3',
+		trace: 'M3 17h4l3-8 4 10 3-6h4',
 		analysers: 'M10 4a6 6 0 1 0 0.01 0M15 15l6 6',
 		details: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6'
 	};
@@ -328,6 +332,8 @@
 		rows: 6,
 		heatmaps: 1,
 		misc: 2,
+		pareto: 5,
+		trace: 6,
 		analysers: 3,
 		details: 4
 	};
@@ -395,6 +401,18 @@
 	// another (a layout's own levels, Neo's Mod3 and Mod4, included).
 	const LEVEL_BASE = 'base';
 	const DEFAULT_HEATS_COUNT = 6;
+	// The Pareto tab (an idea seen in the Layouts Wiki playground): its two
+	// values are the mark (higher is better) or a metric the score weighs one
+	// way; the default trade-off is the SFB against the lateral stretches.
+	const PARETO_MARK = 'mark';
+	const PARETO_DEFAULT = { x: 'sfb', y: 'lsb', frontOnly: false };
+	// How many frontier layouts the chart names beside their point.
+	const PARETO_NAMED = 12;
+	// The chart's drawing box (SVG units; it scales to the page's width).
+	const PARETO_SIZE = { width: 640, height: 400, margin: 56 };
+	// The trace tab (an idea seen in the Layouts Wiki playground): the text it
+	// types when the visitor has written none.
+	const TRACE_SAMPLE_KEY = 'layout_analysis.trace.sample';
 	// A filter set to this value keeps everything.
 	const ALL = '';
 	const COMPLETE_CHOICES = ['all', 'yes', 'no'];
@@ -827,6 +845,60 @@
 		<div id="la-charts-misc" class="la-chart-grid"></div>
 	</section>
 
+	<section id="la-panel-pareto" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-pareto" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.pareto.intro"></p>
+		<p class="la-heat-controls">
+			<label class="la-filter-field" data-i18n-text="layout_analysis.pareto.x">
+				<select id="la-pareto-x"></select>
+			</label>
+			<label class="la-filter-field" data-i18n-text="layout_analysis.pareto.y">
+				<select id="la-pareto-y"></select>
+			</label>
+			<label class="la-check" data-i18n-text="layout_analysis.pareto.front_only">
+				<input id="la-pareto-front" type="checkbox" />
+			</label>
+		</p>
+		<p id="la-pareto-summary" class="la-muted"></p>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-pareto-chart-label">
+			<h3 id="la-pareto-chart-label" data-i18n="layout_analysis.pareto.chart"></h3>
+			<ul class="la-legend">
+				<li data-i18n-text="layout_analysis.pareto.legend_front"><span class="la-swatch la-swatch-cat-1" aria-hidden="true"></span></li>
+				<li data-i18n-text="layout_analysis.pareto.legend_other"><span class="la-swatch la-swatch-muted" aria-hidden="true"></span></li>
+				<li data-i18n-text="layout_analysis.pareto.legend_details"><span class="la-swatch la-swatch-ring" aria-hidden="true"></span></li>
+			</ul>
+			<div id="la-pareto-chart" class="la-pareto-chart"></div>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-pareto-spread-label">
+			<h3 id="la-pareto-spread-label"></h3>
+			<p id="la-pareto-spread-text" class="la-muted"></p>
+			<div id="la-pareto-spread" class="la-pareto-chart"></div>
+		</section>
+		<section class="la-figure la-figure-wide">
+			<h3 id="la-pareto-table-label" data-i18n="layout_analysis.pareto.table"></h3>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-pareto-table-label">
+				<table id="la-pareto-table" class="la-table"></table>
+			</section>
+		</section>
+	</section>
+
+	<section id="la-panel-trace" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-trace" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.trace.intro"></p>
+		<p class="la-field la-trace-field">
+			<label for="la-trace-text" data-i18n="layout_analysis.trace.text"></label>
+			<textarea id="la-trace-text" rows="3" maxlength="2000" aria-describedby="la-trace-note"></textarea>
+		</p>
+		<p class="la-heat-controls">
+			<label class="la-filter-field" data-i18n-text="layout_analysis.trace.layout">
+				<select id="la-trace-layout"></select>
+			</label>
+			<label class="la-filter-field" data-i18n-text="layout_analysis.trace.versus">
+				<select id="la-trace-versus"></select>
+			</label>
+		</p>
+		<p id="la-trace-note" class="la-muted" data-i18n="layout_analysis.trace.note"></p>
+		<div id="la-trace-out"></div>
+	</section>
+
 	<section id="la-panel-analysers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-analysers" hidden>
 		<section id="la-analysers" class="la-card" hidden></section>
 	</section>
@@ -1072,6 +1144,8 @@
 						// choices and the layout list's filters.
 						tab: state.tabSaved,
 						heats: state.heats,
+						pareto: state.pareto,
+						traceText: state.trace.text,
 						// The user's own score presets, each a score settings file and its name.
 						presets: state.presets,
 						pick: state.pick
@@ -1195,7 +1269,15 @@
 			// Each themed table's sort, by table name.
 			tabSorts: {},
 			heats: validHeats(saved.heats),
-			pick: validFilters(saved.pick, ['origin', 'language'])
+			pick: validFilters(saved.pick, ['origin', 'language']),
+			// The Pareto tab's two values and whether it shows the frontier only.
+			pareto: validPareto(saved.pareto),
+			// The trace tab's text (null: the sample) and its two layouts.
+			trace: {
+				text: typeof saved.traceText === 'string' ? saved.traceText : null,
+				layout: null,
+				versus: null
+			}
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
 		state.linkedSelection = Boolean(linked.layouts);
@@ -1405,6 +1487,26 @@
 				count: HEATS_COUNTS.includes(value.count) ? value.count : DEFAULT_HEATS_COUNT,
 				shared: value.shared !== false,
 				level: typeof value.level === 'string' ? value.level : LEVEL_BASE
+			};
+		}
+
+		/** The values the Pareto tab offers: the mark, then every metric the score weighs one way. */
+		function paretoChoices() {
+			return [PARETO_MARK].concat(
+				Object.keys(E.METRICS).filter((id) => E.METRICS[id].better !== 'none')
+			);
+		}
+
+		/** The saved Pareto choices; an unknown value takes the default. */
+		function validPareto(pareto) {
+			const value = pareto && typeof pareto === 'object' ? pareto : {};
+			const choices = paretoChoices();
+			const x = choices.includes(value.x) ? value.x : PARETO_DEFAULT.x;
+			const y = choices.includes(value.y) && value.y !== x ? value.y : PARETO_DEFAULT.y;
+			return {
+				x,
+				y: y === x ? choices.find((id) => id !== x) : y,
+				frontOnly: value.frontOnly === true
 			};
 		}
 
@@ -1809,6 +1911,8 @@
 			rows: () => t('layout_analysis.tab.rows'),
 			heatmaps: () => t('layout_analysis.tab.heatmaps'),
 			misc: () => t('layout_analysis.tab.misc'),
+			pareto: () => t('layout_analysis.tab.pareto'),
+			trace: () => t('layout_analysis.tab.trace'),
 			analysers: () => t('layout_analysis.tab.analysers'),
 			details: () => t('layout_analysis.tab.details')
 		};
@@ -1929,6 +2033,8 @@
 				home: () => {},
 				heatmaps: renderHeatGrid,
 				misc: () => renderMetricTab('misc'),
+				pareto: renderPareto,
+				trace: renderTrace,
 				// The other analysers' view follows the Comparer by itself (analyser_tab.js).
 				analysers: () => {},
 				details: () => {
@@ -1939,6 +2045,610 @@
 			// The ranking is cheap and always current, whichever tab is shown.
 			draw.overview();
 			if (state.tab !== DEFAULT_TAB) draw[state.tab]();
+		}
+
+		// ===================================
+		// ======= Pareto and trace tabs =====
+		// ===================================
+
+		/** A Pareto value's name: the mark's, or the metric's. */
+		function paretoName(id) {
+			return id === PARETO_MARK ? t('layout_analysis.pareto.mark') : metricName(id);
+		}
+
+		/** A Pareto value of a result. */
+		function paretoValue(result, id) {
+			return id === PARETO_MARK ? result.score.mark : result.metrics[id];
+		}
+
+		/** Which way a Pareto value is better. */
+		function paretoBetter(id) {
+			return id === PARETO_MARK ? 'higher' : E.METRICS[id].better;
+		}
+
+		/** A Pareto value as the tables write it, in its unit. */
+		function paretoText(id, value) {
+			return id === PARETO_MARK ? format(value, 1) : measure(value, metricDigits(id), unitText(id));
+		}
+
+		/**
+		 * The Pareto layers of the complete layouts the filters keep, on the two
+		 * chosen values: an incomplete layout's low counts are not a trade-off,
+		 * so it is left out (the summary says how many).
+		 * @returns {{rows: object[], layers: Map<string, object>, left: number}}
+		 */
+		function paretoView() {
+			const shown = shownRows();
+			const rows = shown.filter((r) => !r.incomplete);
+			const { x, y } = state.pareto;
+			const layers = new Map(
+				E.pareto(
+					rows.map((r) => ({ id: r.layout.id, values: [paretoValue(r, x), paretoValue(r, y)] })),
+					[paretoBetter(x), paretoBetter(y)]
+				).map((entry) => [entry.id, entry])
+			);
+			return { rows, layers, left: shown.length - rows.length };
+		}
+
+		/** Creates an SVG element with attributes. */
+		function svgEl(tag, attributes) {
+			const node = document.createElementNS(SVG_NS, tag);
+			for (const [name, value] of Object.entries(attributes || {}))
+				node.setAttribute(name, String(value));
+			return node;
+		}
+
+		/**
+		 * A linear scale from a value range to a pixel range, the better end of
+		 * the value on the right or at the top (the chart reads « up and right is
+		 * better »).
+		 */
+		function paretoScale(values, better, from, to) {
+			let min = Math.min(...values);
+			let max = Math.max(...values);
+			if (min === max) {
+				min -= 1;
+				max += 1;
+			}
+			const flip = better === 'lower';
+			return (v) => {
+				const at = (v - min) / (max - min);
+				return from + (flip ? 1 - at : at) * (to - from);
+			};
+		}
+
+		/** The Pareto tab: the chart, the spread of the X value and the table. */
+		function renderPareto() {
+			const choices = paretoChoices().map((id) => [id, paretoName(id)]);
+			state.pareto.x = fillSelect($('la-pareto-x'), choices, state.pareto.x);
+			state.pareto.y = fillSelect(
+				$('la-pareto-y'),
+				choices.filter(([id]) => id !== state.pareto.x),
+				state.pareto.y
+			);
+			$('la-pareto-front').checked = state.pareto.frontOnly;
+			const { rows, layers, left } = paretoView();
+			const { x, y } = state.pareto;
+			const front = rows.filter((r) => layers.get(r.layout.id).front);
+			$('la-pareto-summary').textContent =
+				rows.length === 0
+					? t('layout_analysis.status.empty')
+					: t('layout_analysis.pareto.summary', {
+							front: front.length,
+							count: rows.length,
+							x: paretoName(x),
+							y: paretoName(y)
+						}) +
+						(left > 0 ? ` ${t('layout_analysis.pareto.incomplete_left', { count: left })}` : '');
+			renderParetoChart(rows, layers, front);
+			renderParetoSpread(rows);
+			renderParetoTable(rows, layers);
+		}
+
+		/** The scatter plot: every layout, the frontier joined, the detailed one ringed. */
+		function renderParetoChart(rows, layers, front) {
+			const box = $('la-pareto-chart');
+			box.replaceChildren();
+			if (rows.length === 0) return;
+			const { x, y } = state.pareto;
+			const { width, height, margin } = PARETO_SIZE;
+			const sx = paretoScale(
+				rows.map((r) => paretoValue(r, x)),
+				paretoBetter(x),
+				margin,
+				width - margin / 2
+			);
+			const sy = paretoScale(
+				rows.map((r) => paretoValue(r, y)),
+				paretoBetter(y),
+				height - margin,
+				margin / 2
+			);
+			const svg = svgEl('svg', {
+				viewBox: `0 0 ${width} ${height}`,
+				class: 'la-pareto-svg',
+				role: 'img',
+				'aria-labelledby': 'la-pareto-chart-label la-pareto-summary'
+			});
+			// The axes, each titled with its value and its better end.
+			svg.append(
+				svgEl('line', {
+					x1: margin,
+					y1: height - margin,
+					x2: width - margin / 2,
+					y2: height - margin,
+					class: 'la-pareto-axis'
+				}),
+				svgEl('line', {
+					x1: margin,
+					y1: height - margin,
+					x2: margin,
+					y2: margin / 2,
+					class: 'la-pareto-axis'
+				})
+			);
+			const xTitle = svgEl('text', {
+				x: (width + margin / 2) / 2,
+				y: height - 14,
+				class: 'la-pareto-axis-title',
+				'text-anchor': 'middle'
+			});
+			xTitle.textContent = t('layout_analysis.pareto.axis', { name: paretoName(x) });
+			const yTitle = svgEl('text', {
+				x: 14,
+				y: (height - margin / 2) / 2,
+				class: 'la-pareto-axis-title',
+				'text-anchor': 'middle',
+				transform: `rotate(-90 14 ${(height - margin / 2) / 2})`
+			});
+			yTitle.textContent = t('layout_analysis.pareto.axis', { name: paretoName(y) });
+			svg.append(xTitle, yTitle);
+			// Each axis's two ends, as values.
+			const ends = (id, scale) => {
+				const values = rows.map((r) => paretoValue(r, id));
+				return [Math.min(...values), Math.max(...values)].map((v) => [v, scale(v)]);
+			};
+			for (const [v, px] of ends(x, sx)) {
+				const tick = svgEl('text', {
+					x: px,
+					y: height - margin + 18,
+					class: 'la-pareto-tick',
+					'text-anchor': 'middle'
+				});
+				tick.textContent = paretoText(x, v);
+				svg.append(tick);
+			}
+			for (const [v, py] of ends(y, sy)) {
+				const tick = svgEl('text', {
+					x: margin - 6,
+					y: py + 4,
+					class: 'la-pareto-tick',
+					'text-anchor': 'end'
+				});
+				tick.textContent = paretoText(y, v);
+				svg.append(tick);
+			}
+			// The frontier, joined as steps from left to right.
+			const steps = front
+				.map((r) => [sx(paretoValue(r, x)), sy(paretoValue(r, y))])
+				.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+			if (steps.length > 1) {
+				let d = `M${steps[0][0]} ${steps[0][1]}`;
+				for (let i = 1; i < steps.length; i++) d += ` H${steps[i][0]} V${steps[i][1]}`;
+				svg.append(svgEl('path', { d, class: 'la-pareto-front-line' }));
+			}
+			// The others first, the frontier over them, the detailed layout last.
+			const ordered = rows
+				.slice()
+				.sort(
+					(a, b) => Number(layers.get(a.layout.id).front) - Number(layers.get(b.layout.id).front)
+				);
+			let named = 0;
+			for (const result of ordered) {
+				const onFront = layers.get(result.layout.id).front;
+				const cx = sx(paretoValue(result, x));
+				const cy = sy(paretoValue(result, y));
+				const point = svgEl('circle', {
+					cx,
+					cy,
+					r: onFront ? 5 : 3.5,
+					class: onFront ? 'la-pareto-point la-pareto-point-front' : 'la-pareto-point'
+				});
+				svg.append(point);
+				if (onFront && named < PARETO_NAMED) {
+					named++;
+					// A name on the right half reads leftwards, so none leaves the chart.
+					const right = cx > width / 2;
+					const label = svgEl('text', {
+						x: right ? cx - 9 : cx + 9,
+						y: cy - 8,
+						class: 'la-pareto-label',
+						'text-anchor': right ? 'end' : 'start'
+					});
+					label.textContent = result.layout.name;
+					svg.append(label);
+				}
+			}
+			const detailed = rows.find((r) => r.layout.id === state.details);
+			if (detailed)
+				svg.append(
+					svgEl('circle', {
+						cx: sx(paretoValue(detailed, x)),
+						cy: sy(paretoValue(detailed, y)),
+						r: 9,
+						class: 'la-pareto-ring'
+					})
+				);
+			box.append(svg);
+		}
+
+		/**
+		 * Where the detailed layout stands among the others on the X value: one
+		 * tick per layout on a line, the detailed one marked, and its
+		 * percentile against the library in words.
+		 */
+		function renderParetoSpread(rows) {
+			const { x } = state.pareto;
+			setText(
+				$('la-pareto-spread-label'),
+				t('layout_analysis.pareto.spread', { name: paretoName(x) })
+			);
+			const box = $('la-pareto-spread');
+			box.replaceChildren();
+			const detailed = rows.find((r) => r.layout.id === state.details) || rows[0];
+			const text = $('la-pareto-spread-text');
+			if (!detailed) {
+				text.textContent = '';
+				return;
+			}
+			const value = paretoValue(detailed, x);
+			const better = paretoBetter(x);
+			const beaten = rows.filter((r) =>
+				better === 'lower' ? paretoValue(r, x) > value : paretoValue(r, x) < value
+			).length;
+			text.textContent = t('layout_analysis.pareto.spread_text', {
+				layout: detailed.layout.name,
+				value: paretoText(x, value),
+				beaten,
+				count: rows.length - 1
+			});
+			const { width, margin } = PARETO_SIZE;
+			const height = 56;
+			const sx = paretoScale(
+				rows.map((r) => paretoValue(r, x)),
+				better,
+				margin,
+				width - margin / 2
+			);
+			const svg = svgEl('svg', {
+				viewBox: `0 0 ${width} ${height}`,
+				class: 'la-pareto-svg',
+				role: 'img',
+				'aria-labelledby': 'la-pareto-spread-label la-pareto-spread-text'
+			});
+			svg.append(
+				svgEl('line', {
+					x1: margin,
+					y1: 28,
+					x2: width - margin / 2,
+					y2: 28,
+					class: 'la-pareto-axis'
+				})
+			);
+			for (const result of rows)
+				svg.append(
+					svgEl('line', {
+						x1: sx(paretoValue(result, x)),
+						x2: sx(paretoValue(result, x)),
+						y1: 20,
+						y2: 36,
+						class: 'la-pareto-spread-tick'
+					})
+				);
+			svg.append(svgEl('circle', { cx: sx(value), cy: 28, r: 8, class: 'la-pareto-ring' }));
+			box.append(svg);
+		}
+
+		/**
+		 * The table every chart of the tab stands for: each layout, its two
+		 * values, its Pareto layer and the layouts that beat it on both.
+		 */
+		function renderParetoTable(rows, layers) {
+			const table = $('la-pareto-table');
+			table.replaceChildren();
+			if (rows.length === 0) return;
+			const { x, y, frontOnly } = state.pareto;
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.table.layout'),
+				paretoName(x),
+				paretoName(y),
+				t('layout_analysis.pareto.layer'),
+				t('layout_analysis.pareto.dominated_by')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const nameOf = new Map(rows.map((r) => [r.layout.id, r.layout.name]));
+			const body = el('tbody');
+			const sorted = rows
+				.filter((r) => !frontOnly || layers.get(r.layout.id).front || r.layout.id === state.details)
+				.sort(
+					(a, b) =>
+						layers.get(a.layout.id).layer - layers.get(b.layout.id).layer ||
+						(paretoBetter(x) === 'lower' ? 1 : -1) * (paretoValue(a, x) - paretoValue(b, x)) ||
+						a.rank - b.rank
+				);
+			for (const result of sorted) {
+				const entry = layers.get(result.layout.id);
+				const row = el('tr');
+				if (entry.front) row.classList.add('la-pareto-row-front');
+				if (state.details === result.layout.id) row.classList.add('la-selected');
+				const name = el('th');
+				name.scope = 'row';
+				const button = el('button', 'la-chart-name', result.layout.name);
+				button.type = 'button';
+				button.addEventListener('click', () => showDetails(result.layout.id));
+				name.append(button);
+				const dominators = entry.dominatedBy.map((id) => nameOf.get(id));
+				const shownNames = dominators.slice(0, 3).join(', ');
+				row.append(
+					name,
+					el('td', 'la-num', paretoText(x, paretoValue(result, x))),
+					el('td', 'la-num', paretoText(y, paretoValue(result, y))),
+					el(
+						'td',
+						'',
+						entry.front ? t('layout_analysis.pareto.layer_front') : format(entry.layer, 0)
+					),
+					el(
+						'td',
+						'',
+						dominators.length > 3
+							? t('layout_analysis.pareto.dominated_more', {
+									names: shownNames,
+									count: dominators.length - 3
+								})
+							: shownNames
+					)
+				);
+				body.append(row);
+			}
+			table.append(thead, body);
+		}
+
+		/** The text the trace types: the visitor's, else the sample of the page's language. */
+		function traceInput() {
+			return state.trace.text === null ? t(TRACE_SAMPLE_KEY) : state.trace.text;
+		}
+
+		/**
+		 * The trace tab: the text typed on one layout, and on a second one to
+		 * compare, keystroke by keystroke, with the events of each key pair and
+		 * triple counted side by side.
+		 */
+		function renderTrace() {
+			const textBox = $('la-trace-text');
+			if (document.activeElement !== textBox) textBox.value = traceInput();
+			const ids = state.results.map((r) => r.layout.id);
+			if (!ids.includes(state.trace.layout))
+				state.trace.layout = ids.includes(state.details) ? state.details : ids[0] || null;
+			if (!ids.includes(state.trace.versus) || state.trace.versus === state.trace.layout)
+				state.trace.versus = null;
+			const entries = state.results.map((r) => [r.layout.id, r.layout.name]);
+			fillSelect(
+				$('la-trace-layout'),
+				entries.length > 0 ? entries : [['', t('layout_analysis.status.empty')]],
+				state.trace.layout || ''
+			);
+			fillSelect(
+				$('la-trace-versus'),
+				[['', t('layout_analysis.trace.versus_none')]].concat(
+					entries.filter(([id]) => id !== state.trace.layout)
+				),
+				state.trace.versus || ''
+			);
+			const out = $('la-trace-out');
+			out.replaceChildren();
+			if (!state.trace.layout) return;
+			const text = traceInput();
+			const options = {
+				keyboard: state.keyboard,
+				weights: state.weights,
+				profile: FINGERING.current(state.keyboard) || undefined
+			};
+			const traced = [state.trace.layout, state.trace.versus].filter(Boolean).map((id) => {
+				const layout = layoutOf(id);
+				return { id, layout, trace: E.traceText(layout, text, options) };
+			});
+			out.append(traceEvents(traced));
+			traced.forEach((entry, i) => out.append(traceLayout(entry, i)));
+		}
+
+		/** The events of the traced layouts side by side, with the difference of two. */
+		function traceEvents(traced) {
+			const section = el('section', 'la-figure la-figure-wide');
+			const titleId = 'la-trace-events-label';
+			const title = el('h3', '', t('layout_analysis.trace.events'));
+			title.id = titleId;
+			const wrap = el('section', 'la-table-wrap');
+			wrap.tabIndex = 0;
+			wrap.setAttribute('aria-labelledby', titleId);
+			const table = el('table', 'la-table');
+			table.id = 'la-trace-events';
+			const head = el('tr');
+			const columns = [t('layout_analysis.trace.event')]
+				.concat(traced.map((entry) => entry.layout.name))
+				.concat(traced.length === 2 ? [t('layout_analysis.trace.difference')] : []);
+			for (const label of columns) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			const share = (trace, event) => {
+				const whole = E.TRACE_TRIPLE_EVENTS.includes(event) ? trace.trigrams : trace.bigrams;
+				return whole > 0 ? (100 * trace.counts[event]) / whole : 0;
+			};
+			for (const event of E.TRACE_PAIR_EVENTS.concat(E.TRACE_TRIPLE_EVENTS)) {
+				const row = el('tr');
+				const name = el('th', '', metricName(event));
+				name.scope = 'row';
+				row.append(name);
+				for (const entry of traced)
+					row.append(
+						el(
+							'td',
+							'la-num',
+							t('layout_analysis.trace.count', {
+								count: entry.trace.counts[event],
+								share: measure(share(entry.trace, event), 1, '%')
+							})
+						)
+					);
+				if (traced.length === 2) {
+					const delta = traced[1].trace.counts[event] - traced[0].trace.counts[event];
+					row.append(el('td', 'la-num', `${delta > 0 ? '+' : ''}${format(delta, 0)}`));
+				}
+				body.append(row);
+			}
+			table.append(thead, body);
+			wrap.append(table);
+			section.append(title, el('p', 'la-muted', t('layout_analysis.trace.events_caption')), wrap);
+			return section;
+		}
+
+		/**
+		 * One traced layout: the text as a strip of characters over their keys
+		 * (each key in its finger's colour, its finger printed under it, a key of
+		 * a penalised pair or triple outlined), then the same keystroke by
+		 * keystroke as a table, and the penalised pairs and triples in words.
+		 */
+		function traceLayout({ layout, trace }, index) {
+			const section = el('section', 'la-figure la-figure-wide la-trace-layout');
+			const titleId = `la-trace-${index}-title`;
+			const title = el('h3', '', layout.name);
+			title.id = titleId;
+			section.setAttribute('aria-labelledby', titleId);
+			const penalties = (events) => events.filter((event) => E.METRICS[event].better === 'lower');
+			const bad = new Set();
+			const marked = [];
+			for (const group of trace.pairs.concat(trace.triples)) {
+				const events = penalties(group.events);
+				if (events.length === 0) continue;
+				for (const k of group.keys) bad.add(k);
+				marked.push({ keys: group.keys, events });
+			}
+			const keyLabel = (code, layer) => levelText(layout, code, layer) || code;
+			const fingerShort = (finger) => t(`layout_analysis.finger_short.${finger}`);
+			// The strip repeats the table below it for sighted readers.
+			const strip = el('ol', 'la-trace-strip');
+			strip.setAttribute('aria-hidden', 'true');
+			trace.chars.forEach((char) => {
+				const item = el(
+					'li',
+					char.kind === null ? 'la-trace-cell la-trace-missing' : 'la-trace-cell'
+				);
+				item.append(
+					el(
+						'span',
+						'la-trace-char',
+						char.char === ' ' ? '␣' : char.char === '\n' ? '↵' : char.char
+					)
+				);
+				char.steps.forEach(([code, , layer], j) => {
+					const index = char.keys[j];
+					const key = el('span', bad.has(index) ? 'la-trace-key la-trace-bad' : 'la-trace-key');
+					key.dataset.finger = trace.keys[index].finger;
+					key.append(
+						el('span', 'la-trace-key-text', keyLabel(code, layer)),
+						el('span', 'la-trace-finger', fingerShort(trace.keys[index].finger))
+					);
+					item.append(key);
+				});
+				strip.append(item);
+			});
+			const legend = el('p', 'la-muted', t('layout_analysis.trace.strip_caption'));
+			// The keystroke table.
+			const tableBox = el('details', 'la-section');
+			const summaryId = `la-trace-${index}-keys`;
+			const summary = el('summary', '', t('layout_analysis.trace.keys_table'));
+			summary.id = summaryId;
+			const wrap = el('section', 'la-table-wrap');
+			wrap.tabIndex = 0;
+			wrap.setAttribute('aria-labelledby', summaryId);
+			const table = el('table', 'la-table');
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.trace.char'),
+				t('layout_analysis.trace.keys'),
+				t('layout_analysis.trace.fingers'),
+				t('layout_analysis.trace.held')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			for (const char of trace.chars) {
+				const row = el('tr');
+				const name = el('th', '', char.char === ' ' ? '␣' : char.char === '\n' ? '↵' : char.char);
+				name.scope = 'row';
+				const keys =
+					char.kind === null
+						? t('layout_analysis.trace.not_typed')
+						: char.steps.map(([code, , layer]) => keyLabel(code, layer)).join(' → ');
+				const fingers = char.keys
+					.map((i) => t(`layout_analysis.finger.${trace.keys[i].finger}`))
+					.join(', ');
+				row.append(
+					name,
+					el('td', '', keys),
+					el('td', '', fingers),
+					el('td', '', char.held.join(', '))
+				);
+				body.append(row);
+			}
+			table.append(thead, body);
+			wrap.append(table);
+			tableBox.append(summary, wrap);
+			// The penalised groups, in the text's order.
+			const groupText = (keys) =>
+				keys
+					.map((i) => {
+						const key = trace.keys[i];
+						const char = trace.chars[key.char];
+						const step = char.steps[char.keys.indexOf(i)];
+						return keyLabel(step[0], step[2]);
+					})
+					.join(' ');
+			const list = el('ul', 'la-trace-groups');
+			for (const group of marked)
+				list.append(
+					el(
+						'li',
+						'',
+						t('layout_analysis.trace.group', {
+							keys: groupText(group.keys),
+							events: group.events.map(metricName).join(', ')
+						})
+					)
+				);
+			const groupsTitle = el('h4', '', t('layout_analysis.trace.groups', { count: marked.length }));
+			section.append(title, strip, legend, tableBox, groupsTitle);
+			if (marked.length > 0) section.append(list);
+			if (trace.unsupported > 0)
+				section.append(
+					el('p', 'la-muted', t('layout_analysis.trace.unsupported', { count: trace.unsupported }))
+				);
+			return section;
 		}
 
 		/** The tab strip: one button per sub-tab, its panel shown when it is chosen. */
@@ -6084,6 +6794,38 @@
 				renderDetails();
 			});
 			$('la-worst-event').addEventListener('change', renderDetails);
+			// The Pareto tab's choices, kept with the other conveniences.
+			$('la-pareto-x').addEventListener('change', (event) => {
+				state.pareto.x = event.target.value;
+				if (state.pareto.y === state.pareto.x)
+					state.pareto.y = paretoChoices().find((id) => id !== state.pareto.x);
+				save();
+				renderPareto();
+			});
+			$('la-pareto-y').addEventListener('change', (event) => {
+				state.pareto.y = event.target.value;
+				save();
+				renderPareto();
+			});
+			$('la-pareto-front').addEventListener('change', (event) => {
+				state.pareto.frontOnly = event.target.checked;
+				save();
+				renderPareto();
+			});
+			// The trace follows its text as it is typed, and its two layouts.
+			$('la-trace-text').addEventListener('input', (event) => {
+				state.trace.text = event.target.value;
+				save();
+				renderTrace();
+			});
+			$('la-trace-layout').addEventListener('change', (event) => {
+				state.trace.layout = event.target.value || null;
+				renderTrace();
+			});
+			$('la-trace-versus').addEventListener('change', (event) => {
+				state.trace.versus = event.target.value || null;
+				renderTrace();
+			});
 			$('la-matrix-by').addEventListener('change', (event) => {
 				state.matrixBy = event.target.value;
 				save();

@@ -1344,6 +1344,66 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "pt"]
 		},
+		"layout_analysis.tab.pareto": {
+			"reason": "brand-or-feature-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"layout_analysis.tab.trace": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"layout_analysis.trace.layout": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "it", "pt", "sv"]
+		},
+		"layout_analysis.trace.count": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"layout_analysis.trace.group": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"layout_analysis.finger_short.rr": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["de", "nl"]
+		},
 		"layout_analysis.table.layout": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "it", "pt", "sv"]

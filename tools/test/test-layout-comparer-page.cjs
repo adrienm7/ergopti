@@ -873,6 +873,10 @@ check(
 				'rows',
 				'heatmaps',
 				'misc',
+				// The Pareto frontier and the text trace (2026-11-25, ideas seen in
+				// the Layouts Wiki playground), before the other analysers.
+				'pareto',
+				'trace',
 				'analysers',
 				'details'
 			]),

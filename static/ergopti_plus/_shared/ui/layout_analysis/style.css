@@ -2151,3 +2151,173 @@ body:has(> main.layout-analysis) {
 .la-table tr.la-row-member td:nth-child(2) {
 	padding-left: 28px;
 }
+
+/* The Pareto tab (an idea seen in the Layouts Wiki playground): the scatter
+   plot and the spread scale to the page's width; every mark repeats a row of
+   the table under them, which names each layout and value in text. The
+   frontier is the first categorical hue, filled and larger; the others are
+   hollow in the secondary text colour; the detailed layout wears a ring in
+   the text colour (3:1 against the surface, WCAG 1.4.11). */
+.la-pareto-chart {
+	max-width: 900px;
+}
+
+.la-pareto-svg {
+	display: block;
+	height: auto;
+	width: 100%;
+}
+
+.la-pareto-axis {
+	stroke: var(--la-sub);
+	stroke-width: 1;
+}
+
+.la-pareto-axis-title,
+.la-pareto-tick,
+.la-pareto-label {
+	fill: var(--theme-text);
+	font-size: 12px;
+}
+
+.la-pareto-tick {
+	fill: var(--la-sub);
+}
+
+.la-pareto-point {
+	fill: none;
+	stroke: var(--la-sub);
+	stroke-width: 1.5;
+}
+
+.la-pareto-point-front {
+	fill: var(--la-cat-1);
+	stroke: var(--la-cat-1);
+}
+
+.la-pareto-front-line {
+	fill: none;
+	stroke: var(--la-cat-1);
+	stroke-dasharray: 4 3;
+	stroke-width: 1.5;
+}
+
+.la-pareto-ring {
+	fill: none;
+	stroke: var(--theme-text);
+	stroke-width: 2.5;
+}
+
+.la-pareto-spread-tick {
+	stroke: var(--la-sub);
+	stroke-width: 1.5;
+}
+
+.la-swatch-muted {
+	border: 1.5px solid var(--la-sub);
+}
+
+.la-swatch-ring {
+	border: 2.5px solid var(--theme-text);
+	border-radius: 50%;
+	height: 12px;
+	width: 12px;
+}
+
+.la-table tr.la-pareto-row-front th {
+	box-shadow: inset 4px 0 0 var(--la-cat-1);
+}
+
+/* The trace tab: each character over the keys that type it, each key in its
+   finger's hue (the fingering editor's four slots) with its finger printed
+   under its legend, so the colour is never the only cue; a key of a
+   penalised pair or triple wears a thick border in the loss colour and the
+   list under the strip names each such group in words. */
+.la-trace-field textarea {
+	box-sizing: border-box;
+	font: inherit;
+	max-width: 60em;
+	width: 100%;
+}
+
+.la-trace-strip {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 2px;
+	list-style: none;
+	margin: 8px 0;
+	padding: 0;
+}
+
+.la-trace-cell {
+	align-items: center;
+	display: inline-flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 2em;
+}
+
+.la-trace-char {
+	font-family: ui-monospace, monospace;
+	font-weight: 700;
+}
+
+.la-trace-missing .la-trace-char {
+	color: var(--la-bad);
+	text-decoration: line-through;
+}
+
+.la-trace-key {
+	align-items: center;
+	background: color-mix(in oklab, var(--la-finger, var(--la-surface)) 22%, var(--la-surface));
+	border: 2px solid var(--la-finger, var(--la-border));
+	border-radius: 4px;
+	display: inline-flex;
+	flex-direction: column;
+	font-family: ui-monospace, monospace;
+	line-height: 1.1;
+	min-width: 1.8em;
+	padding: 1px 3px;
+}
+
+.la-trace-key.la-trace-bad {
+	box-shadow: 0 0 0 2px var(--la-loss);
+}
+
+.la-trace-finger {
+	color: var(--theme-text);
+	font-family: system-ui, sans-serif;
+	font-size: 0.7em;
+}
+
+.la-trace-key[data-finger='lp'],
+.la-trace-key[data-finger='rp'] {
+	--la-finger: var(--la-cat-1);
+}
+
+.la-trace-key[data-finger='lr'],
+.la-trace-key[data-finger='rr'] {
+	--la-finger: var(--la-cat-2);
+}
+
+.la-trace-key[data-finger='lm'],
+.la-trace-key[data-finger='rm'] {
+	--la-finger: var(--la-cat-3);
+}
+
+.la-trace-key[data-finger='li'],
+.la-trace-key[data-finger='ri'] {
+	--la-finger: var(--la-cat-4);
+}
+
+.la-trace-groups {
+	columns: 18em;
+	margin: 4px 0 8px;
+}
+
+/* The numbers of the Pareto and trace tables line up on their right. */
+.la-table td.la-num {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
