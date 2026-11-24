@@ -82,6 +82,11 @@ for (const [file, expected] of [
 ])
 	assert.equal(isFixturePath(file), expected, `fixture classification of ${file}`);
 
+// A generator's committed output (windows/_generated/exe_version_info.ahk names
+// the issue tracker tools/lib/app-metadata.cjs derives from the defaults).
+const GENERATED_OUTPUT =
+	/^static\/ergopti_plus\/(?:windows|macos|linux|_shared)\/(?:[^/]+\/)*_generated\//;
+
 // Any GitHub repository whose name is an Ergopti one; "%." is the Lua pattern
 // spelling of the dot, which the changelog allow-pattern used
 const ERGOPTI_REPO = /github(?:\.|%\.)com\/(?:repos\/)?([A-Za-z0-9-]+)\/(ergopti[A-Za-z0-9_-]*)/gi;
@@ -96,7 +101,9 @@ const CANONICAL = new RegExp(
 function violations(file, text) {
 	const errors = [];
 	const fixture = isFixturePath(file);
-	const literalAllowed = fixture || EXAMPLE_EXTENSION.test(file);
+	// Generated output spells what its generator derived from the defaults, as the
+	// identifier scan below already admits; its generator is held to the rule.
+	const literalAllowed = fixture || EXAMPLE_EXTENSION.test(file) || GENERATED_OUTPUT.test(file);
 	text.split('\n').forEach((line, index) => {
 		for (const match of fixture ? [] : line.matchAll(ERGOPTI_REPO)) {
 			if (
@@ -115,6 +122,10 @@ function violations(file, text) {
 
 const canonicalUrl = `https://github.com/${owner}/${repo}`;
 const foreignUrl = `https://github.com/${owner}-other/${repo}`;
+// Generated output may carry the derived URL; a hand-written sibling may not.
+assert.deepEqual(violations('static/ergopti_plus/windows/_generated/x.ahk', canonicalUrl), []);
+assert.equal(violations('static/ergopti_plus/windows/x_generated/x.ahk', canonicalUrl).length, 1);
+assert.equal(violations('static/ergopti_plus/windows/x.ahk', canonicalUrl).length, 1);
 
 // Classify complete fixture roots, never a filename that production can inherit.
 const TEST_ROOT_CASES = [
