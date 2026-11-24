@@ -2300,6 +2300,14 @@ baseline` line (item 38).
   (each suppressed key has exactly one outcome; a stop inside the running action
   leaves its outcome to the action). Delivery unavailable, no slot bound or no
   press skip by name.
+- `field_engine_icon` reads the running engine's `Info.plist`
+  (`hs.processInfo.bundlePath`): `engine_icon_file` must be `ErgoptiPlus`,
+  `engine_icon_name` absent (a `CFBundleIconName` sends macOS to Hammerspoon's
+  asset catalogue) and `engine_icns` present. Hammerspoon sets no icon at run
+  time and `hs.dialog.blockAlert` gives its `NSAlert` none, so with all three
+  passing a hammer still drawn in an engine dialog is a stale Launch Services
+  entry (`lsregister -f` on the embedded app). An engine outside ErgoptiPlus.app
+  skips as `not_embedded`.
 - The guided steps (`kind = "guided"`, `diagnostics/engine/field_run/guided.lua`) run as
   one block before `field_owned_pause`: each publishes its gesture in
   `prompt.json`, the collector prints it (👉 GUIDED) and, on a terminal, writes

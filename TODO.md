@@ -83,12 +83,6 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       Linux in the label through `menu.global.shortcut_hint` (the appindicator tray exports no dbusmenu
       `shortcut`, which has no AltGr). Not covered: the keyboard-slot, tap-key and gesture bindings of the same
       actions. Field checks on the three OS (field point `tray_shortcut_hint`).
-- [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
-      that sets no icon and so shows the engine's application icon) still showed the hammer, although
-      `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`
-      (b3c3708a80). On the Mac: `plutil -p /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist | grep -i icon`
-      and `ls …/Hammerspoon.app/Contents/Resources/*.icns`; if both are right, the icon is a stale Launch Services
-      entry of the updated bundle (`lsregister -f` on it, then restart Ergopti); otherwise fix the build step.
 - [ ] **[macOS] Check `dev.178` on the Mac** (then move what stays open to TODO-tests-macos.md with its field
       point): no hammer icon in the menu bar, rounded icon in Quick Look, Accessibility guidance names
       ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not

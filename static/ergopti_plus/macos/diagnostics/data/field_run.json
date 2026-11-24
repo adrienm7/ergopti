@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 21310, "min": 60, "max": 21310 },
+	"deadline_seconds": { "default": 21320, "min": 60, "max": 21320 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -145,6 +145,13 @@
 			"check": "launcher_roles",
 			"deadline_seconds": 45,
 			"proves": "The launcher resolves, its headless HTTP worker role refuses malformed arguments with EX_USAGE, and it carries one direct GET to a loopback server the check owns."
+		},
+		{
+			"id": "field_engine_icon",
+			"kind": "field_check",
+			"check": "engine_icon",
+			"deadline_seconds": 10,
+			"proves": "The embedded engine's Info.plist names the ErgoptiPlus icon, carries no CFBundleIconName that would send macOS to Hammerspoon's hammer, and the icns it names is in its Resources."
 		},
 		{
 			"id": "field_network_hosts",
