@@ -3161,6 +3161,25 @@
 		"yp_hina_fu": {
 			"authors": ["Snarfangel"],
 			"basis": "collection"
+		},
+		"aoeyk": {
+			"authors": ["Jon in PDX"],
+			"url": "http://geekhack.org/index.php?topic=48689.0",
+			"basis": "collection"
+		},
+		"arensito_kla": {
+			"authors": ["Dave Ferree"],
+			"url": "http://web.archive.org/web/20050306181446/http://www.pvv.org/~hakonhal/keyboard/",
+			"basis": "collection"
+		},
+		"bvofrak1_kla": {
+			"authors": ["Hugues Dumez"],
+			"url": "http://bvofrak.blogspot.com",
+			"basis": "collection"
+		},
+		"typematrix": {
+			"authors": ["Ivan"],
+			"basis": "collection"
 		}
 	}
 }

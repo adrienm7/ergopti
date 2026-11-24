@@ -192,7 +192,8 @@ function fingeredCodes(model) {
 
 /**
  * The geometry of each finger-assigned key on the ISO and ANSI boards, and on
- * the JIS and ABNT boards a keyboard measures on (keyboard_forms.json).
+ * the JIS and ABNT boards a keyboard measures on (keyboard_forms.json); a
+ * two-row key by its lower part.
  * @param {object} model - analysis_model.json.
  * @returns {object} code → {iso: {row, col, width}, ansi: {...}, jis: {...}, abnt: {...}}.
  * @throws {Error} When a key has no geometry, or a keyboard names an unknown board.
@@ -215,7 +216,12 @@ function buildGeometry(model) {
 		for (const form of measured) {
 			const g = KeyboardForms.geometryOn(registry, forms, code, form);
 			if (!g) continue;
-			out[code][form] = { row: g.row, col: g.col, width: g.width };
+			// A two-row key (ISO Enter) is pressed on its lower part, level with
+			// the home row the pinky reaches it from.
+			out[code][form] =
+				g.height === 2 && g.bottom_col !== undefined
+					? { row: g.row + 1, col: g.bottom_col, width: g.bottom_width }
+					: { row: g.row, col: g.col, width: g.width };
 		}
 	}
 	return out;

@@ -37,8 +37,8 @@ layouts (`rows`, every key and level its file states), taken as they are.
 `tools/build/import-kla-layouts.cjs <KLA checkout>` re-encodes KLA's files
 through the Studio's own reader (`fromKla`). A file is left out, and listed in
 `not_imported` with its reason, when it has characters on keys the library's
-keyboards have no code for (ErgoDox outer columns, TypeMatrix's
-middle column, a modifier key), places a letter twice, or has the same letters
+keyboards have no code for (a modifier key other than the optional keys and
+Caps Lock), places a letter twice, or has the same letters
 on the same keys and the same digits as a layout already in the library
 (`same_as`); a duplicate only credits that layout when it has no credit. The
 codegen refuses a `same_as` the library does not hold.
@@ -417,6 +417,26 @@ pressed by the left thumb and Digit6 by the right index (maintainer,
 2026-11-14). Shift is pressed by the pinky of the other hand (ShiftRight for a
 left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
+
+**Optional keys** (decided by the agent on 2026-11-24, to review by the
+maintainer). Tab, Enter and the right Control (`optional_keys`) are typing
+keys of the row-staggered boards for a layout that types on one of them
+(KLA's TypeMatrix and BvoFRak put q on Tab, Arensito à on Enter, AOEYK \ on
+the right Control), on the left pinky, the right pinky and the right pinky.
+`keyboard()` leaves them out; `layoutKeyboard(layout, id)`, the board
+`boardFor` measures on and the pages draw, keeps them only for such a layout,
+so every other layout's board, values and drawings are those it always had
+(the 787 layouts on the eleven keyboards on Don Quichotte, bit for bit). The
+optimizer moves characters only between its start layout's keys, so it
+offers them only when the start types there, and its score session keeps the
+start's board when a trial empties Tab (an unpressed key changes no metric).
+ISO Enter is measured on its lower part, level with the home row. Caps Lock,
+a held key, is a typing key for a layout that holds no level there
+(TypeMatrix's a): it keeps its place at its right end and counts as no
+lateral key, and a layout holding a level there still may not type on it
+(the check runs for every copy of its levels, the optimizer's trials
+included). The split and column boards have no such keys: a character there
+is on a key they lack.
 
 **Levels.** A layout has four levels unless it declares its own: `levels` lists
 each level as `{id, shift?, hold?}`, `hold` naming the modifiers it holds
