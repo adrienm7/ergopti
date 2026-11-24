@@ -220,11 +220,20 @@ function memberText(source, archivePath) {
 	return bytes.toString('utf8');
 }
 
+/**
+ * Adds one count map into another, own keys only: « constructor » is a
+ * Google Books token, not Object.prototype's constructor.
+ * @param {Object<string,number>} into - The counts to add to.
+ * @param {Object<string,number>} from - The counts added.
+ */
+function addCounts(into, from) {
+	for (const [key, n] of Object.entries(from))
+		into[key] = (Object.hasOwn(into, key) ? into[key] : 0) + n;
+}
+
 /** Adds the counts of `from` into `into`. */
 function merge(into, from) {
-	for (const name of TABLES)
-		for (const [gram, n] of Object.entries(from[name]))
-			into[name][gram] = (into[name][gram] || 0) + n;
+	for (const name of TABLES) addCounts(into[name], from[name]);
 }
 
 // The characters CP1252 gives the bytes 0x80-0x9F (Latin-1 gives the others
@@ -550,8 +559,7 @@ async function booksCounts(source, engine, { archiveDir, recordPins }) {
 				continue;
 			}
 			merge(counts, own);
-			for (const [word, n] of Object.entries(own.words))
-				counts.words[word] = (counts.words[word] || 0) + n;
+			addCounts(counts.words, own.words);
 			break;
 		}
 		if (shard.sha256 !== streamed) {
@@ -786,6 +794,7 @@ if (require.main === module)
 	});
 
 module.exports = {
+	addCounts,
 	memberText,
 	bunzip2,
 	sentenceCounts,
