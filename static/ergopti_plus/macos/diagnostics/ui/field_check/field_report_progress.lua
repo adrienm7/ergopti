@@ -149,6 +149,12 @@ function M.new(opts)
 		self.window = window
 	end
 
+	--- Forgets a window that never opened, without touching the run: the run
+	--- goes on and its report opens in the one-click dialog.
+	function self.detach()
+		self.window, self.ready = nil, false
+	end
+
 	--- The observer's step_started.
 	--- @param step table
 	function self.started(step)
