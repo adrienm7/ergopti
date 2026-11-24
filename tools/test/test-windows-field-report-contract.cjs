@@ -16,9 +16,9 @@
  * 2. runtime: the real script runs in fixture clones with a file:// origin
  *    and a fixture LOCALAPPDATA, under Windows PowerShell 5.1 on Windows and
  *    pwsh elsewhere (a private copy without the unique platform guard; the
- *    Windows-only fact cmdlets then fail as recorded steps). From dev it
- *    reports on field/win-<today>-dev, names its base, commits the logs and
- *    pushes; on that branch a later run keeps the base and brings its new
+ *    Windows-only fact cmdlets then fail as recorded steps). With -Push, from
+ *    dev it reports on field/win-<today>-dev, names its base, commits the logs
+ *    and pushes; on that branch a later run keeps the base and brings its new
  *    commit. A host without PowerShell reports the runtime layer as not
  *    executed; a CI host must have it.
  * ==============================================================================
@@ -165,12 +165,25 @@ check('base.txt names the field branch, the base and the commit before any step'
 	assert(baseTxt < code.indexOf("Invoke-Step 'versions'"), 'base.txt is written first');
 });
 
-check('only the report folder is committed, logs included, and pushed unless -NoPush', () => {
-	assert.match(code, /Invoke-Git add '-f' \$OutRelative/);
-	assert.match(code, /Invoke-Git commit '-q' '-m' \$Subject \$OutRelative/);
-	assert.match(code, /Invoke-Git push '-u' origin HEAD/);
-	assert.match(code, /param\(\s*\[switch\]\$NoPush,/);
-});
+check(
+	'only -Push commits the report folder, logs included, and pushes; by default git is left alone',
+	() => {
+		assert.match(code, /Invoke-Git add '-f' \$OutRelative/);
+		assert.match(code, /Invoke-Git commit '-q' '-m' \$Subject \$OutRelative/);
+		assert.match(code, /Invoke-Git push '-u' origin HEAD/);
+		assert.match(code, /param\(\s*\[switch\]\$Push,/);
+		assert.doesNotMatch(code, /NoPush/, 'no opt-out flag: pushing is the opt-in');
+		// The local default touches no branch, stash or update, and saves before any commit
+		const local = code.indexOf("if (-not $Push) {\n\t$Base = Get-Git branch '--show-current'");
+		assert(
+			local > 0 && local < code.indexOf('Invoke-Git stash push'),
+			'the local run skips the stash and branch'
+		);
+		const saved = code.indexOf('Saved locally in');
+		assert(saved > code.indexOf('field-report-redact.py'), 'a saved report is redacted first');
+		assert(saved < code.indexOf("Invoke-Git commit '-q'"), 'a local run returns before the commit');
+	}
+);
 
 check('Ctrl-C still commits what was collected, marked interrupted', () => {
 	assert.match(
@@ -521,7 +534,7 @@ function fixture(name, start = 'dev') {
 }
 
 /** Runs the real collector inside a fixture. */
-function runCollector(paths, { push = false } = {}) {
+function runCollector(paths, { push = true } = {}) {
 	const args = [
 		'-NoProfile',
 		'-NonInteractive',
@@ -530,7 +543,7 @@ function runCollector(paths, { push = false } = {}) {
 		'-File',
 		paths.script
 	];
-	if (!push) args.push('-NoPush');
+	if (push) args.push('-Push');
 	return spawnSync(interpreter, args, {
 		cwd: paths.clone,
 		encoding: 'utf8',
@@ -569,7 +582,7 @@ try {
 		() => {
 			const paths = fixture('from-dev');
 			const devBefore = git(paths.clone, 'rev-parse', 'dev');
-			const result = runCollector(paths, { push: true });
+			const result = runCollector(paths);
 			assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 			const expected = `${names.branch_prefix}win-${today()}-dev`;
 			assert.equal(git(paths.clone, 'branch', '--show-current'), expected);

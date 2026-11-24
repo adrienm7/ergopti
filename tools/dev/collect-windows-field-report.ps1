@@ -5,13 +5,14 @@
 # DESCRIPTION:
 # One command for a maintainer session on a real Windows PC, the Windows
 # counterpart of tools/dev/collect-macos-field-report.sh and
-# collect-linux-field-report.sh: it updates the field branch from its base
-# (dev unless it was derived from another branch), gathers the evidence the
-# coordinator reads (system, toolchain, runtime, input-language, keyboard,
-# autostart, privilege, process, memory, listener, proxy, antivirus and crash
-# facts, the collector's own checks, today's ErgoptiPlus logs, their digest
-# and their analysis), stores it under docs/field-reports/, then commits and
-# pushes the branch. The logs are
+# collect-linux-field-report.sh: it gathers the evidence the coordinator reads
+# (system, toolchain, runtime, input-language, keyboard, autostart, privilege,
+# process, memory, listener, proxy, antivirus and crash facts, the collector's
+# own checks, today's ErgoptiPlus logs, their digest and their analysis) and
+# stores it under docs/field-reports/. With -Push only (the maintainer's run)
+# it first updates the field branch from its base (dev unless it was derived
+# from another branch), then commits and pushes the branch; without it git is
+# left alone (maintainer decision, 2026-11-24: only the maintainer can push). The logs are
 # gitignored, so they are added with `git add -f`; the logger already masks
 # secrets, the home folder, e-mail addresses and personal names, and the branch is
 # public, so only copies scrubbed of typed text by tools/dev/field-log-scrub.py
@@ -81,14 +82,20 @@
 # - A LogsDirPath override in paths.toml is not read: pass -LogsDir with the
 #   moved folder.
 # - Closing the console window cannot be intercepted. Ctrl-C still copies the
-#   logs and commits them, marked interrupted.
+#   logs and saves them (with -Push, commits them), marked interrupted.
 #
-# USAGE (from any branch: outside a field/ branch the collector switches to
-# field/win-<today>-<branch>, derived from that branch and created when
-# missing; base.txt in the report names the base and the commit). Windows
-# PowerShell 5.1 or PowerShell 7:
+# USAGE (base.txt in the report names the branch and the commit it ran on).
+# Windows PowerShell 5.1 or PowerShell 7:
 #   powershell -ExecutionPolicy Bypass -File tools/dev/collect-windows-field-report.ps1
-#   ... -NoPush                 same, without the push
+#                               collect and save the report locally: git is
+#                               left alone (no update, no commit, no push), and
+#                               the console says where the folder is, to
+#                               attach to an issue
+#   ... -Push                   the maintainer's run: from any branch outside a
+#                               field/ branch it switches to
+#                               field/win-<today>-<branch>, derived from that
+#                               branch and created when missing, updates it
+#                               from its base, collects, commits and pushes
 #   ... -LogsDir 'D:\logs'      the logs folder, when LogsDirPath moved it
 #   ... -ConfigDir 'D:\config'  the configuration folder, instead of the one
 #                               paths.toml names
@@ -100,7 +107,7 @@
 
 [CmdletBinding()]
 param(
-	[switch]$NoPush,
+	[switch]$Push,
 	[string]$LogsDir = '',
 	[string]$ConfigDir = ''
 )
@@ -356,83 +363,92 @@ $PathsFileSegments = @(Get-AppDir $ConfigWindows 'config.windows' 'paths_file')
 Set-Location -LiteralPath $RepoRoot
 $null = Get-Git rev-parse '--git-dir'
 if ($script:GitStatus -ne 0) { Fail 'Not inside the Ergopti clone.' }
-$Tracked = Get-Git status '--porcelain' '--untracked-files=no'
-if ($script:GitStatus -ne 0) { Fail 'git status failed.' }
-# A run cut short (window closed, kill) can leave tracked changes, and the next
-# run refused to start (macOS field report 2026-11-15). A tester's clone holds
-# no work of its own: the changes are stashed (git stash list keeps them) and
-# the tree is reset, so the collector always starts.
-if ($Tracked) {
-	Log 'Tracked changes found (a previous run cut short?): stashed (git stash list) and the clone reset.'
-	if (-not (Invoke-Git stash push '-q' '-m' "field-report auto-stash $(Get-Date -Format 'yyyy-MM-dd_HHmmss')")) {
-		Fail 'Tracked changes could not be stashed; commit or discard them first.'
-	}
-	if (-not (Invoke-Git reset '-q' '--hard')) { Fail 'git reset --hard failed.' }
-}
-
-# The base is the branch the field branch derives from and is updated from on
-# every run; git config remembers it so later runs on the field branch keep it.
-$Branch = Get-Git branch '--show-current'
-if ($Branch -and $Branch.StartsWith($Names.branch_prefix)) {
-	$Base = Get-Git config '--get' "branch.$Branch.$($Names.base_config_key)"
-	if ($script:GitStatus -ne 0 -or -not $Base) { $Base = 'dev' }
+if (-not $Push) {
+	# Local run: the report names the code it ran on, and git is not touched.
+	$Base = Get-Git branch '--show-current'
+	if (-not $Base) { $Base = Get-Git rev-parse '--short' HEAD }
+	if ($script:GitStatus -ne 0) { Fail 'Cannot read HEAD.' }
+	$Branch = $Base
+	Log "Collecting on $Base; the report is saved locally, nothing is committed or pushed (-Push publishes it)."
 } else {
-	# From dev, main or any other branch (or a detached commit) the report goes
-	# to a field branch derived from it; today's branch for that base is reused.
-	if ($Branch) { $Base = $Branch } else { $Base = Get-Git rev-parse '--short' HEAD }
-	$Branch = $Names.branch_prefix + 'win-' + (Get-Date -Format 'yyyy-MM-dd') + '-' + ($Base -replace '/', '-')
-	$null = Get-Git rev-parse '-q' '--verify' "refs/heads/$Branch"
-	if ($script:GitStatus -eq 0) {
-		if (-not (Invoke-Git switch '-q' $Branch)) { Fail "Cannot switch to $Branch." }
+	$Tracked = Get-Git status '--porcelain' '--untracked-files=no'
+	if ($script:GitStatus -ne 0) { Fail 'git status failed.' }
+	# A run cut short (window closed, kill) can leave tracked changes, and the next
+	# run refused to start (macOS field report 2026-11-15). A tester's clone holds
+	# no work of its own: the changes are stashed (git stash list keeps them) and
+	# the tree is reset, so the collector always starts.
+	if ($Tracked) {
+		Log 'Tracked changes found (a previous run cut short?): stashed (git stash list) and the clone reset.'
+		if (-not (Invoke-Git stash push '-q' '-m' "field-report auto-stash $(Get-Date -Format 'yyyy-MM-dd_HHmmss')")) {
+			Fail 'Tracked changes could not be stashed; commit or discard them first.'
+		}
+		if (-not (Invoke-Git reset '-q' '--hard')) { Fail 'git reset --hard failed.' }
+	}
+
+	# The base is the branch the field branch derives from and is updated from on
+	# every run; git config remembers it so later runs on the field branch keep it.
+	$Branch = Get-Git branch '--show-current'
+	if ($Branch -and $Branch.StartsWith($Names.branch_prefix)) {
+		$Base = Get-Git config '--get' "branch.$Branch.$($Names.base_config_key)"
+		if ($script:GitStatus -ne 0 -or -not $Base) { $Base = 'dev' }
 	} else {
-		if (-not (Invoke-Git switch '-q' '-c' $Branch)) { Fail "Cannot create $Branch." }
+		# From dev, main or any other branch (or a detached commit) the report goes
+		# to a field branch derived from it; today's branch for that base is reused.
+		if ($Branch) { $Base = $Branch } else { $Base = Get-Git rev-parse '--short' HEAD }
+		$Branch = $Names.branch_prefix + 'win-' + (Get-Date -Format 'yyyy-MM-dd') + '-' + ($Base -replace '/', '-')
+		$null = Get-Git rev-parse '-q' '--verify' "refs/heads/$Branch"
+		if ($script:GitStatus -eq 0) {
+			if (-not (Invoke-Git switch '-q' $Branch)) { Fail "Cannot switch to $Branch." }
+		} else {
+			if (-not (Invoke-Git switch '-q' '-c' $Branch)) { Fail "Cannot create $Branch." }
+		}
+		if (-not (Invoke-Git config "branch.$Branch.$($Names.base_config_key)" $Base)) {
+			Fail "Cannot record the base of $Branch."
+		}
+		Log "Collecting on $Branch, derived from $Base."
 	}
-	if (-not (Invoke-Git config "branch.$Branch.$($Names.base_config_key)" $Base)) {
-		Fail "Cannot record the base of $Branch."
-	}
-	Log "Collecting on $Branch, derived from $Base."
-}
 
-# A shallow clone (--depth 1) holds no common ancestor of the base and the
-# field branch, so the update deepens both until the merge base is known; full
-# history is never downloaded. A base that is not a branch on origin (a local
-# branch or a commit) is not updated.
-$Before = Get-Git rev-parse HEAD
-if ($script:GitStatus -ne 0) { Fail 'Cannot read HEAD.' }
-$null = Get-Git ls-remote '--exit-code' '--heads' origin $Base
-if ($script:GitStatus -eq 0) {
-	Log "Fetching $Base and bringing it into $Branch..."
-	$Depth = 50
-	while ($true) {
-		if (-not (Invoke-Git fetch '-q' '--depth' $Depth origin $Base)) { Fail "git fetch of $Base failed." }
-		$BaseHead = Get-Git rev-parse FETCH_HEAD
-		if ($script:GitStatus -ne 0) { Fail "Cannot read the fetched $Base head." }
-		$null = Get-Git merge-base HEAD $BaseHead
-		if ($script:GitStatus -eq 0) { break }
-		if ($Depth -ge 3200) { Fail "No common history with $Base within $Depth commits; re-clone with --depth 1." }
-		$Depth = $Depth * 4
+	# A shallow clone (--depth 1) holds no common ancestor of the base and the
+	# field branch, so the update deepens both until the merge base is known; full
+	# history is never downloaded. A base that is not a branch on origin (a local
+	# branch or a commit) is not updated.
+	$Before = Get-Git rev-parse HEAD
+	if ($script:GitStatus -ne 0) { Fail 'Cannot read HEAD.' }
+	$null = Get-Git ls-remote '--exit-code' '--heads' origin $Base
+	if ($script:GitStatus -eq 0) {
+		Log "Fetching $Base and bringing it into $Branch..."
+		$Depth = 50
+		while ($true) {
+			if (-not (Invoke-Git fetch '-q' '--depth' $Depth origin $Base)) { Fail "git fetch of $Base failed." }
+			$BaseHead = Get-Git rev-parse FETCH_HEAD
+			if ($script:GitStatus -ne 0) { Fail "Cannot read the fetched $Base head." }
+			$null = Get-Git merge-base HEAD $BaseHead
+			if ($script:GitStatus -eq 0) { break }
+			if ($Depth -ge 3200) { Fail "No common history with $Base within $Depth commits; re-clone with --depth 1." }
+			$Depth = $Depth * 4
+		}
+		$null = Get-Git merge '--ff-only' $BaseHead
+		if ($script:GitStatus -ne 0 -and -not (Invoke-Git merge '--no-edit' $BaseHead)) {
+			Fail "Could not bring $Base into $Branch; resolve the merge and run again."
+		}
+	} else {
+		Log "$Base is not a branch on origin: $Branch is not updated."
 	}
-	$null = Get-Git merge '--ff-only' $BaseHead
-	if ($script:GitStatus -ne 0 -and -not (Invoke-Git merge '--no-edit' $BaseHead)) {
-		Fail "Could not bring $Base into $Branch; resolve the merge and run again."
+	# PowerShell runs the version of this file it parsed at start, so when the
+	# update moved the branch the updated collector runs instead; it finds HEAD
+	# current and never reruns, the marker is a guard.
+	if ((Get-Git rev-parse HEAD) -ne $Before) {
+		if ($env:ERGOPTI_FIELD_REPORT_RERUN) { Fail "The rerun moved $Branch again; run the collector again." }
+		Log "$Branch updated: running the updated collector."
+		$env:ERGOPTI_FIELD_REPORT_RERUN = '1'
+		# -File takes plain arguments, not the "-Name:value" form of a splat.
+		$Rerun = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
+		$Rerun += '-Push'
+		if ($LogsDir) { $Rerun += @('-LogsDir', $LogsDir) }
+		if ($ConfigDir) { $Rerun += @('-ConfigDir', $ConfigDir) }
+		& (Get-Process -Id $PID).Path @Rerun
+		exit $LASTEXITCODE
 	}
-} else {
-	Log "$Base is not a branch on origin: $Branch is not updated."
-}
-# PowerShell runs the version of this file it parsed at start, so when the
-# update moved the branch the updated collector runs instead; it finds HEAD
-# current and never reruns, the marker is a guard.
-if ((Get-Git rev-parse HEAD) -ne $Before) {
-	if ($env:ERGOPTI_FIELD_REPORT_RERUN) { Fail "The rerun moved $Branch again; run the collector again." }
-	Log "$Branch updated: running the updated collector."
-	$env:ERGOPTI_FIELD_REPORT_RERUN = '1'
-	# -File takes plain arguments, not the "-Name:value" form of a splat.
-	$Rerun = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
-	if ($NoPush) { $Rerun += '-NoPush' }
-	if ($LogsDir) { $Rerun += @('-LogsDir', $LogsDir) }
-	if ($ConfigDir) { $Rerun += @('-ConfigDir', $ConfigDir) }
-	& (Get-Process -Id $PID).Path @Rerun
-	exit $LASTEXITCODE
 }
 
 $Stamp = Get-Date -Format 'yyyy-MM-dd_HHmmss'
@@ -758,7 +774,8 @@ function Copy-ScrubbedLog([string]$Source) {
 	return $false
 }
 
-# Copies the logs and the digest, commits and pushes, once: from the normal end
+# Copies the logs and the digest and saves them (with -Push, commits and pushes
+# them), once: from the normal end
 # and from the closing block after Ctrl-C.
 $script:Finalized = $false
 $script:Interrupted = $false
@@ -880,18 +897,19 @@ function Complete-Report {
 	$ErrorActionPreference = 'Continue'
 	& $script:Python (Join-Path $DevTools 'field-report-redact.py') $script:Out
 	if ($LASTEXITCODE -ne 0) { Fail "$OutRelative still names this PC or its user; nothing was committed." }
+	if (-not $Push) {
+		Log "Saved locally in ${script:Out}: nothing was committed or pushed."
+		Log 'Attach that folder (or its 0_main/analysis.md) to an issue; -Push publishes it on a field branch.'
+		return
+	}
 	if (-not (Invoke-Git add '-f' $OutRelative)) { Fail "git add of $OutRelative failed." }
 	if (-not (Invoke-Git commit '-q' '-m' $Subject $OutRelative)) { Fail 'git commit failed.' }
 	# A commit naming its paths runs the hooks on a temporary index: the
 	# formatter's rewrite reaches the commit and the files, not the real index,
 	# which kept the unformatted bytes and stopped the switch back to the base.
 	if (-not (Invoke-Git add '-f' $OutRelative)) { Fail "git add of $OutRelative after the commit failed." }
-	if ($NoPush) {
-		Log "Committed on $Branch without pushing."
-	} else {
-		if (-not (Invoke-Git push '-u' origin HEAD)) { Fail "git push failed; run 'git push -u origin HEAD' by hand." }
-		Log "Pushed $Branch. Tell the coordinator: report $OutRelative."
-	}
+	if (-not (Invoke-Git push '-u' origin HEAD)) { Fail "git push failed; run 'git push -u origin HEAD' by hand." }
+	Log "Pushed $Branch. Tell the coordinator: report $OutRelative."
 }
 
 # ===========================================

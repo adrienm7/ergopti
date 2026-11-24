@@ -11,7 +11,7 @@
 # input access and device facts, the driver's units, autostart, processes,
 # memory, listeners, proxy settings and crash dumps, the collector's own
 # checks, today's ErgoptiPlus logs, their digest and their analysis), stores
-# it under docs/field-reports/, then commits and pushes
+# it under docs/field-reports/ and, with --push only, commits and pushes
 # the branch. The logs are gitignored, so they are added with `git add -f`; the
 # logger already masks secrets, the home folder, e-mail addresses and personal
 # names, and the branch is public, so only copies scrubbed of typed text by
@@ -70,15 +70,19 @@
 # - The topical sub-logs (ErgoptiPlus_hotstrings.log, ...) are not copied:
 #   every line they hold is also in the day log.
 #
-# USAGE (from any branch: outside a field/ branch the collector switches to
-# field/linux-<today>-<branch>, derived from that branch and created when
-# missing; base.txt in the report names the base and the commit):
-#   bash tools/dev/collect-linux-field-report.sh            update, collect, commit, push
-#   bash tools/dev/collect-linux-field-report.sh --no-push  same, without the push
+# USAGE (base.txt in the report names the branch and the commit it ran on):
+#   bash tools/dev/collect-linux-field-report.sh         collect and save the
+#     report locally: git is left alone (no update, no commit, no push), and
+#     the terminal says where the folder is, to attach to an issue
+#   bash tools/dev/collect-linux-field-report.sh --push  the maintainer's run:
+#     from any branch outside a field/ branch it switches to
+#     field/linux-<today>-<branch>, derived from that branch and created when
+#     missing, updates it from its base, collects, commits and pushes
 #
 # Each step records its exit status in steps.txt; a failed step never hides
 # the others. Ctrl-C or a TERM never loses the evidence: the collector still
-# copies the logs that exist, then commits and pushes them, marked interrupted.
+# copies the logs that exist, then saves them (with --push, commits and pushes
+# them), marked interrupted.
 # ==============================================================================
 
 set -uo pipefail
@@ -110,11 +114,12 @@ BUNDLED_HOTSTRINGS="$REPO_ROOT/static/ergopti_plus/_shared/hotstrings/data/catal
 fail() { printf '[field-report] ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '[field-report] %s\n' "$*"; }
 
-push=true
+# Local by default; only the maintainer can push (field-report-git.sh, item 8).
+push=false
 case "$#:${1:-}" in
 	0:) ;;
-	1:--no-push) push=false ;;
-	*) fail "Expected no argument or --no-push." ;;
+	1:--push) push=true ;;
+	*) fail "Expected no argument or --push." ;;
 esac
 
 [ "$(uname -s)" = "Linux" ] || fail "This collector runs on Linux only."
@@ -241,7 +246,8 @@ scrub_log() {
 	fi
 }
 
-# Copies the logs and the digest, commits and pushes, once: from the normal end
+# Copies the logs and the digest, saves them (commits and pushes with --push),
+# once: from the normal end
 # and from the INT/TERM trap, so an interrupted run still leaves its evidence.
 finalize() {
 	"${finalized}" && return 0
@@ -354,7 +360,8 @@ finalize() {
 	field_report_commit "${subject}"
 }
 
-# Ctrl-C or TERM: the logs are still copied, committed and pushed. A second
+# Ctrl-C or TERM: the logs are still copied and saved (committed and pushed with
+# --push). A second
 # signal during that work is ignored.
 on_interrupt() {
 	trap '' INT TERM HUP

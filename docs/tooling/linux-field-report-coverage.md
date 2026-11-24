@@ -1,7 +1,7 @@
 # Linux field report coverage
 
 The "To confirm on Linux" lines of `TODO-tests-linux.md` ask for things only a real Linux
-desktop shows. One run of `bash tools/dev/collect-linux-field-report.sh`
+desktop shows. One run of `bash tools/dev/collect-linux-field-report.sh --push`
 answers every open line: each line carries a `<!-- field-point: <id> -->` tag,
 `static/ergopti_plus/linux/diagnostics/data/field_todo_coverage.json` names the evidence
 that decides it, and the report ends with `todo_summary.md` (and
