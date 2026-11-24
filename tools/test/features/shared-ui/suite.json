@@ -733,6 +733,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-collapsed-sections.cjs"],
 			"repro": "npm run test:hotstring-editor-collapsed-sections"
+		},
+		{
+			"id": "menu-font-faces",
+			"ordinal": 731,
+			"name": "every tray-menu reading-font face is an sfnt file whose name table carries the family and PostScript names the drivers select it by, one per non-default reading font",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-font-faces.cjs"],
+			"repro": "npm run test:menu-font-faces"
 		}
 	]
 }

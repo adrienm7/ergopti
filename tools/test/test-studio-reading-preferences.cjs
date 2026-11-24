@@ -116,4 +116,15 @@ for (const folder of fontFolders) {
 	}
 }
 
+// The tray menus draw with the sfnt faces menu_faces.json names: the Windows
+// tray loads them from the bundle (tray/adapters/menu_font.ahk).
+const menuFaces = 'static/ergopti_plus/_shared/ui/fonts/menu_faces.json';
+assert.ok(shipped.has(menuFaces), `the Windows app ships ${menuFaces}`);
+for (const face of Object.values(
+	JSON.parse(fs.readFileSync(path.join(REPO_ROOT, menuFaces), 'utf8')).faces
+)) {
+	const relative = `static/ergopti_plus/_shared/ui/fonts/${face.file}`;
+	assert.ok(shipped.has(relative), `the Windows app ships ${relative}`);
+}
+
 console.log(`PASS test-studio-reading-preferences (${PAGES.length} pages)`);

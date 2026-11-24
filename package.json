@@ -833,6 +833,7 @@
 		"test:site-semantic-html": "node ./tools/test/test-site-semantic-html.cjs",
 		"test:studio-semantic-html": "node ./tools/test/test-studio-semantic-html.cjs",
 		"test:studio-reading-preferences": "node ./tools/test/test-studio-reading-preferences.cjs",
+		"test:menu-font-faces": "node ./tools/test/test-menu-font-faces.cjs",
 		"test:reading-preferences-seed": "node ./tools/test/test-reading-preferences-seed.cjs",
 		"test:webview-host-pause-census": "node ./tools/test/test-webview-host-pause-census.cjs",
 		"test:page-images": "node ./tools/test/test-page-images.cjs",
