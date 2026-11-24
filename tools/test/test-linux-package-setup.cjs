@@ -1190,10 +1190,31 @@ else echo "users input uinput"; fi`
 	// the resulting desktop Exec arguments through the shipped launcher.
 	for (const kind of ['deb', 'rpm']) {
 		const builder = fs.readFileSync(path.join(ROOT, `tools/build/build-linux-${kind}.sh`), 'utf8');
-		const entry = builder.match(/\[Desktop Entry\][\s\S]*?\n(?=DESKTOP_EOF)/);
+		// The entry comes from the shared producer with the packager's own
+		// arguments (tools/lib/app-metadata.cjs desktop-entry).
+		const producer = builder.match(
+			/node "\$APP_METADATA" desktop-entry --exec "([^"]+)" --icon (\S+)( --autostart)?/
+		);
 		const transform = builder.match(/sed '(s\|\^Exec=.*?\|)'/);
-		assert.ok(entry && transform, `${kind}: actual desktop producer`);
-		const generated = spawnSync('sed', [transform[1]], { input: entry[0], encoding: 'utf8' });
+		assert.ok(producer && transform, `${kind}: actual desktop producer`);
+		const produced = spawnSync(
+			process.execPath,
+			[
+				path.join(ROOT, 'tools/lib/app-metadata.cjs'),
+				'desktop-entry',
+				'--exec',
+				producer[1],
+				'--icon',
+				producer[2],
+				...(producer[3] ? ['--autostart'] : [])
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(produced.status, 0, `${kind}: ${produced.stderr}`);
+		const generated = spawnSync('sed', [transform[1]], {
+			input: produced.stdout,
+			encoding: 'utf8'
+		});
 		assert.equal(generated.status, 0, generated.stderr);
 		const exec = generated.stdout.match(/^Exec=(.+)$/m);
 		assert.ok(exec, `${kind}: generated autostart Exec`);

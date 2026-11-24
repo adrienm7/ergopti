@@ -27,6 +27,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const metadata = require('../lib/app-metadata.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -121,7 +122,9 @@ check(() => {
 	const assignments = script.split('\n').filter((line) => /^APP_(COPYRIGHT|CATEGORY)=/.test(line));
 	assert.equal(assignments.length, 2, 'the build resolves the copyright and the category once');
 	const shell = `set -eu; REPO_ROOT="$1"; ${assignments.join('; ')}; printf '%s|%s' "$APP_COPYRIGHT" "$APP_CATEGORY"`;
-	const run = spawnSync('bash', ['-c', shell, '_', ROOT], { encoding: 'utf8' });
+	const run = spawnSync(bashExecutable(), ['-c', shell, '_', bashPath(ROOT)], {
+		encoding: 'utf8'
+	});
 	assert.equal(run.status, 0, run.stderr);
 	assert.equal(
 		run.stdout,
