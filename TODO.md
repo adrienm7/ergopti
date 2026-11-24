@@ -417,7 +417,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     budget and snapshot count the load phase, spawn to ready as on Windows), BPF-02 and BPF-03 (macOS names a stage
     left open and writes one boot summary), BPF-04 on macOS (a second `begin()` or `complete()` raises, as on Linux)
     and BPF-05 (Windows logs the boot's process CPU) fixed, and BPF-04 on Windows since 2026-11-25 (a second
-    `BootProfile_Begin()` throws, `test_boot_profiler_single_owner.ahk`, first verified by the next Windows CI run).
+    `BootProfile_Begin()` or a second recorded completion throws, `test_boot_profiler_single_owner.ahk`, first verified by the next Windows CI run).
     Left: the Swift logger retention replay runs in macOS CI only;
   - the census's re-campaigns for drift: `shared/layouts` (with S29), `shared/core`, `shared/ui/layout_editor` and
     the `ai` areas, then the remaining never-campaigned units of its table in rank order.

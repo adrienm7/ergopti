@@ -90,7 +90,10 @@ Notes:
   `BootProfile_Begin()` restarted the profiler silently. It now throws
   « boot has a single owner », as on macOS and Linux; a mark before it still
   anchors the origin there (macOS keeps the same anchoring, pinned by its
-  suite). No suite called `BootProfile_Begin`, so the only seam needed is
+  suite). A second recorded completion (`BootProfile_CompletedBootMs`) now
+  throws « boot completes once » too, as `complete()` does on macOS and
+  Linux, instead of replacing the logged total. No suite called
+  `BootProfile_Begin`, so the only seam needed is
   `_BootProfileResetForTest()`, used by
   `tests/unit/core/logger/test_boot_profiler_single_owner.ahk`, which fails on
   the old code (no throw) and runs in CI's Windows lane.
