@@ -120,6 +120,12 @@
 			"condition": "A slow local model; a mouse, a wheel and a touchpad."
 		},
 		{
+			"id": "tray_reading_font",
+			"title": "Reading font: windows follow, the tray keeps the theme",
+			"checks": [],
+			"not_testable": "The tray menu is drawn by the desktop shell, which no run captures: pick a reading font and look at the windows and the tray; the row's label and its Linux reason are unit-tested (test_languages_and_global_separator, the Configuration corpus)."
+		},
+		{
 			"id": "tray_suspend_row",
 			"title": "Tray « Suspendre » row before Reload",
 			"checks": [],

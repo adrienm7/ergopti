@@ -198,12 +198,11 @@ baseline as violations go.
       `webview_manager.push_reading_preferences`, Windows `ReadingPrefs_Track` and `ReadingPrefs_PushToOpen`); the
       setup wizard offers both lists above the languages from its first screen and saves through the menu's writer.
       Proof `tools/test/browser/app-windows-reading.playwright.cjs` (computed font, spacing, toolbar rows, live push
-      and the wizard, as the Windows and the inline hosts deliver them). The native menus keep the system font on
-      the three OS, which the menu label « Police des fenêtres » states: Windows tray menus would need owner-drawn
-      rows (AutoHotkey's Menu draws them itself), the Linux tray is drawn by the desktop shell from dbusmenu, which
-      carries no font, and macOS `hs.menubar` takes styled titles only in a font the process can resolve, which
-      Hammerspoon cannot register from a bundled file, and a styled title loses the disabled grey. Left: a look at
-      the dyslexia font in a real window on each OS (TODO-tests); the plain-language review of the Studio's own
+      and the wizard, as the Windows and the inline hosts deliver them). The tray menus take the reading font too (maintainer decision
+      2026-11-24): macOS restyles the titles in faces the launcher registers for the session, Windows owner-draws
+      the rows, Linux cannot (dbusmenu carries no font) and its row says so; proof `test_reading_font_titles.lua`,
+      `MenuFontRegistrationTests`, `test_menu_font.ahk`, `test-menu-font-faces.cjs`. Left: a look at
+      the dyslexia font in a real window and tray menu on each OS (TODO-tests); the plain-language review of the Studio's own
       strings (the 21 locales' catalogue, not measured).
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
