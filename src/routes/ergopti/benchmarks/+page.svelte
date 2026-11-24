@@ -111,9 +111,9 @@
 		Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
 	</p>
 	<p>
-		La note de chaque disposition est un indice sur QWERTY, sur le même corpus et avec les mêmes
-		réglages : QWERTY vaut toujours 100, une disposition qui coûte 23 % de moins que QWERTY vaut
-		123, et plus haut est mieux, sans plafond.
+		La note de chaque disposition est un indice sur QWERTY, mesuré sur le même corpus et avec les
+		mêmes réglages. QWERTY vaut toujours 100 : une disposition qui coûte 23 % de moins vaut 123.
+		Plus la note est haute, mieux c’est, sans plafond.
 	</p>
 	<SiteFrame
 		class="benchmark-frame"
