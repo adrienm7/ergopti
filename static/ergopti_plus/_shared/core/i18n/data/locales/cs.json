@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Spustit terénní zprávu (všechny testy)",
 	"menu.debug.header_tests_network": "Síť",
 	"menu.debug.header_tests_remapping": "Přemapování kláves",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Modul přemapování",
 	"menu.debug.header_tests_system": "Systém a nástroje třetích stran",
 	"menu.debug.title": "⚠ Ladění",
 	"menu.debug.window_spy": "Sledování okna",

@@ -392,17 +392,21 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		local i18n = require("core.i18n.engine.i18n")
 		local drawn = {}
 		for index, row in ipairs(rows) do drawn[index] = row.title end
+		local function header(key) return "— " .. i18n.get(key) .. " —" end
 		local expected = {
+			header("menu.configuration.header_reset"),
 			i18n.get("common.restore_recommended"),
 			i18n.get("common.clear_to_system"),
 			"-",
+			header("menu.configuration.header_files"),
 			i18n.get("menu.global.clean_unused_keys"),
-			"-",
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
 			"-",
+			header("menu.configuration.header_network"),
 			i18n.get("menu.debug.proxy_override"),
 			"-",
+			header("menu.configuration.header_accessibility"),
 		}
 		helpers.assert_eq(table.concat(drawn, " | ", 1, #expected), table.concat(expected, " | "))
 		-- The windows' reading choices close the submenu, each captioned with its

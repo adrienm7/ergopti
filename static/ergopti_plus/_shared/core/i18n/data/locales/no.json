@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Kjør feltrapporten (alle tester)",
 	"menu.debug.header_tests_network": "Nettverk",
 	"menu.debug.header_tests_remapping": "Omtilordning av taster",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Omtilordningsmotor",
 	"menu.debug.header_tests_system": "System og tredjepartsverktøy",
 	"menu.debug.title": "⚠ Feilsøking",
 	"menu.debug.window_spy": "Window Spy",

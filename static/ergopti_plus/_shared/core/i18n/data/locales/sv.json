@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Kör fältrapporten (alla tester)",
 	"menu.debug.header_tests_network": "Nätverk",
 	"menu.debug.header_tests_remapping": "Ommappning av tangenter",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Ommappningsmotor",
 	"menu.debug.header_tests_system": "System och verktyg från tredje part",
 	"menu.debug.title": "⚠ Felsökning",
 	"menu.debug.window_spy": "Window Spy",

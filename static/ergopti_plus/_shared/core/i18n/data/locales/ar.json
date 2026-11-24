@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "تشغيل التقرير الميداني (كل الاختبارات)",
 	"menu.debug.header_tests_network": "الشبكة",
 	"menu.debug.header_tests_remapping": "إعادة تعيين المفاتيح",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "محرك إعادة تعيين المفاتيح",
 	"menu.debug.header_tests_system": "النظام وأدوات الجهات الخارجية",
 	"menu.debug.title": "⚠ تشخيص",
 	"menu.debug.window_spy": "Window Spy",

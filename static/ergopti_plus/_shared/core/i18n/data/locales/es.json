@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Ejecutar el informe de campo (todas las pruebas)",
 	"menu.debug.header_tests_network": "Red",
 	"menu.debug.header_tests_remapping": "Reasignación de teclas",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Motor de reasignación",
 	"menu.debug.header_tests_system": "Sistema y herramientas de terceros",
 	"menu.debug.title": "⚠ Depuración",
 	"menu.debug.window_spy": "Window Spy",

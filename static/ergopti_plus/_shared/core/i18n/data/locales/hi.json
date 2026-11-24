@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "फ़ील्ड रिपोर्ट चलाएँ (सभी परीक्षण)",
 	"menu.debug.header_tests_network": "नेटवर्क",
 	"menu.debug.header_tests_remapping": "कुंजी रीमैपिंग",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "रीमैपिंग इंजन",
 	"menu.debug.header_tests_system": "सिस्टम और तृतीय-पक्ष टूल",
 	"menu.debug.title": "⚠ डिबग",
 	"menu.debug.window_spy": "Window Spy",

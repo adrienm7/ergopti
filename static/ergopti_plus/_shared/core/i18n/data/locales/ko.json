@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "필드 보고서 실행(모든 테스트)",
 	"menu.debug.header_tests_network": "네트워크",
 	"menu.debug.header_tests_remapping": "키 리매핑",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "키 재매핑 엔진",
 	"menu.debug.header_tests_system": "시스템 및 타사 도구",
 	"menu.debug.title": "⚠ 디버그",
 	"menu.debug.window_spy": "Window Spy",

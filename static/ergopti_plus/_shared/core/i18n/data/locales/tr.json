@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Saha raporunu çalıştır (tüm testler)",
 	"menu.debug.header_tests_network": "Ağ",
 	"menu.debug.header_tests_remapping": "Tuş yeniden eşleme",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Yeniden eşleme motoru",
 	"menu.debug.header_tests_system": "Sistem ve üçüncü taraf araçlar",
 	"menu.debug.title": "⚠ Hata ayıklama",
 	"menu.debug.window_spy": "Window Spy",

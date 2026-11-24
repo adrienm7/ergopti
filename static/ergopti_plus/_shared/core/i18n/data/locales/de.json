@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Feldbericht starten (alle Tests)",
 	"menu.debug.header_tests_network": "Netzwerk",
 	"menu.debug.header_tests_remapping": "Tastenbelegung",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Neubelegungs-Engine",
 	"menu.debug.header_tests_system": "System und Drittanbieter-Tools",
 	"menu.debug.title": "⚠ Debugging",
 	"menu.debug.window_spy": "Window Spy",

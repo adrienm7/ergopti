@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Veldrapport starten (alle tests)",
 	"menu.debug.header_tests_network": "Netwerk",
 	"menu.debug.header_tests_remapping": "Toetsen opnieuw toewijzen",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Hertoewijzingsengine",
 	"menu.debug.header_tests_system": "Systeem en tools van derden",
 	"menu.debug.title": "⚠ Foutopsporing",
 	"menu.debug.window_spy": "Window Spy",

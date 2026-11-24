@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Запустити польовий звіт (усі тести)",
 	"menu.debug.header_tests_network": "Мережа",
 	"menu.debug.header_tests_remapping": "Перепризначення клавіш",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Рушій перепризначення",
 	"menu.debug.header_tests_system": "Система й сторонні інструменти",
 	"menu.debug.title": "⚠ Налагодження",
 	"menu.debug.window_spy": "Спостерігач вікон",

@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Avvia il rapporto sul campo (tutti i test)",
 	"menu.debug.header_tests_network": "Rete",
 	"menu.debug.header_tests_remapping": "Rimappatura dei tasti",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Motore di rimappatura",
 	"menu.debug.header_tests_system": "Sistema e strumenti di terze parti",
 	"menu.debug.title": "⚠ Debug",
 	"menu.debug.window_spy": "Window Spy",

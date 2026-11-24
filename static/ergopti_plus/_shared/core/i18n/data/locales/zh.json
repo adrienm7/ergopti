@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "运行现场报告（全部测试）",
 	"menu.debug.header_tests_network": "网络",
 	"menu.debug.header_tests_remapping": "按键重映射",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "重映射引擎",
 	"menu.debug.header_tests_system": "系统和第三方工具",
 	"menu.debug.title": "⚠ 调试",
 	"menu.debug.window_spy": "窗口侦察",

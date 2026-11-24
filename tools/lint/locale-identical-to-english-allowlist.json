@@ -4204,31 +4204,6 @@
 				"zh"
 			]
 		},
-		"menu.debug.header_tests_remap_runtime": {
-			"reason": "brand-or-feature-name",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"fr",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
-		},
 		"field_report.title": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]

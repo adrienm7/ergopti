@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "フィールドレポートを実行（すべてのテスト）",
 	"menu.debug.header_tests_network": "ネットワーク",
 	"menu.debug.header_tests_remapping": "キーのリマップ",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "リマップエンジン",
 	"menu.debug.header_tests_system": "システムとサードパーティ製ツール",
 	"menu.debug.title": "⚠ デバッグ",
 	"menu.debug.window_spy": "ウィンドウスパイ",

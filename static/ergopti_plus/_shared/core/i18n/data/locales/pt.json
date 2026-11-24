@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Executar o relatório de campo (todos os testes)",
 	"menu.debug.header_tests_network": "Rede",
 	"menu.debug.header_tests_remapping": "Remapeamento de teclas",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Motor de remapeamento",
 	"menu.debug.header_tests_system": "Sistema e ferramentas de terceiros",
 	"menu.debug.title": "⚠ Depuração",
 	"menu.debug.window_spy": "Espião de Janela",

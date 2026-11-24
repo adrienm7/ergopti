@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Запустить полевой отчёт (все тесты)",
 	"menu.debug.header_tests_network": "Сеть",
 	"menu.debug.header_tests_remapping": "Переназначение клавиш",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Движок переназначения",
 	"menu.debug.header_tests_system": "Система и сторонние инструменты",
 	"menu.debug.title": "⚠ Отладка",
 	"menu.debug.window_spy": "Наблюдатель окон",

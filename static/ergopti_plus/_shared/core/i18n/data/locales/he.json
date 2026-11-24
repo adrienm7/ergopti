@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "הפעל את דוח השטח (כל הבדיקות)",
 	"menu.debug.header_tests_network": "רשת",
 	"menu.debug.header_tests_remapping": "מיפוי מקשים מחדש",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "מנוע מיפוי המקשים",
 	"menu.debug.header_tests_system": "מערכת וכלי צד שלישי",
 	"menu.debug.title": "⚠ ניפוי שגיאות",
 	"menu.debug.window_spy": "Window Spy",

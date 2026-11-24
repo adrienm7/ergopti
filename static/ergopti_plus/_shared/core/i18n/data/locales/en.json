@@ -1832,7 +1832,7 @@
 	"menu.debug.field_report": "Run the field report (every test)",
 	"menu.debug.header_tests_network": "Network",
 	"menu.debug.header_tests_remapping": "Key remapping",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Remapping engine",
 	"menu.debug.header_tests_system": "System and third-party tools",
 	"menu.debug.title": "⚠ Debug",
 	"menu.debug.window_spy": "Window Spy",

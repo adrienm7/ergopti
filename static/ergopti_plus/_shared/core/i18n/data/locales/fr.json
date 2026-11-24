@@ -1832,7 +1832,7 @@
 	"menu.debug.field_report": "Lancer le field report (tous les tests)",
 	"menu.debug.header_tests_network": "Réseau",
 	"menu.debug.header_tests_remapping": "Remappage des touches",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Moteur de remappage",
 	"menu.debug.header_tests_system": "Système et outils tiers",
 	"menu.debug.title": "⚠ Débogage",
 	"menu.debug.window_spy": "Window Spy",

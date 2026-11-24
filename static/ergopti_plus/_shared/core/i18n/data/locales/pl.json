@@ -1837,7 +1837,7 @@
 	"menu.debug.field_report": "Uruchom raport terenowy (wszystkie testy)",
 	"menu.debug.header_tests_network": "Sieć",
 	"menu.debug.header_tests_remapping": "Przemapowanie klawiszy",
-	"menu.debug.header_tests_remap_runtime": "Karabiner",
+	"menu.debug.header_tests_remap_runtime": "Silnik przemapowania",
 	"menu.debug.header_tests_system": "System i narzędzia innych firm",
 	"menu.debug.title": "⚠ Debugowanie",
 	"menu.debug.window_spy": "Window Spy",
