@@ -328,6 +328,8 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 				now_ms = function() return clock end,
 			})
 			package.loaded["core.logger.engine.boot_profiler"] = previous_profiler
+			-- A boot of 63 ms of loading before the 137 ms the clock measures.
+			Profiler._use_process_age(function() return 63 end)
 			Profiler.begin()
 			local env = { read = function(path)
 				assert_true(not frozen, "ready emission must not perform another discovery read")
@@ -347,7 +349,7 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 				log_level = "DEBUG", features_enabled = 3, features_total = 5,
 				driver = "forged driver", os = "forged OS", config_dir = "untrusted path" })
 			assert_eq(#lines, 1); assert_eq(message, lines[1])
-			assert_true(message:find("boot_ms=137", 1, true) ~= nil)
+			assert_true(message:find("boot_ms=200", 1, true) ~= nil, "the snapshot carries spawn to ready, the load phase included")
 			assert_true(message:find("features_enabled=3/5", 1, true) ~= nil)
 			assert_true(message:find("os=" .. Snapshot.render_value("Prepared Linux"), 1, true) ~= nil)
 			assert_true(not message:find("forged", 1, true) and not message:find("untrusted path", 1, true))
