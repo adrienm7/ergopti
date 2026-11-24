@@ -4833,6 +4833,85 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	// The pair classes the movement table shows, over adjacent key pairs and over
+	// skipgrams (the first and last keys of each key trigram): the pair events of
+	// the stream visitor (TRACE_PAIR_EVENTS).
+	const MOVEMENT_CLASSES = TRACE_PAIR_EVENTS;
+
+	/**
+	 * The movement table of a layout on a corpus (an idea seen in the Layouts
+	 * Wiki playground's « Movement » view): each pair class (SFB, same key,
+	 * lateral stretch, scissors, row jump, rolls, hand change…) as a share of the
+	 * adjacent key pairs, and the same class as a share of the skipgrams, the
+	 * first and last keys of every key trigram classified as if they were
+	 * adjacent. The stream is the one analyse() measures (its ways of typing),
+	 * so the bigram column is analyse()'s metric for each scored class. Shown,
+	 * never scored: the score keeps its own metrics and weights.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{bigram: object, skipgram: object, bigrams: number, skipgrams: number}}
+	 *   bigram and skipgram: class → share (%); bigrams and skipgrams: the pairs
+	 *   counted (a pair with the space is in none, a thumb SFB aside).
+	 */
+	function movementTable(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngrams),
+			planMode(opts)
+		);
+		const K = board.codes.length;
+		const classes = new Map();
+		// A pair's classes, probed once from the visitor; null when no metric counts it.
+		const classOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!classes.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				classes.set(at, c.bigrams === 0 ? null : MOVEMENT_CLASSES.filter((name) => c[name] !== 0));
+			}
+			return classes.get(at);
+		};
+		const zero = () => Object.fromEntries(MOVEMENT_CLASSES.map((name) => [name, 0]));
+		const bigram = zero();
+		const skipgram = zero();
+		let bigrams = 0;
+		let skipgrams = 0;
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				const found = classOf(k1, k2);
+				if (found === null) return;
+				bigrams += n;
+				for (const name of found) bigram[name] += n;
+			},
+			trigram(k1, k2, k3, n) {
+				const found = classOf(k1, k3);
+				if (found === null) return;
+				skipgrams += n;
+				for (const name of found) skipgram[name] += n;
+			}
+		});
+		const share = (counts, whole) => {
+			for (const name of MOVEMENT_CLASSES)
+				counts[name] = whole > 0 ? (100 * counts[name]) / whole : 0;
+			return counts;
+		};
+		return {
+			bigram: share(bigram, bigrams),
+			skipgram: share(skipgram, skipgrams),
+			bigrams,
+			skipgrams
+		};
+	}
+
 	const PARETO_DIRECTIONS = ['lower', 'higher'];
 
 	/**
@@ -7966,6 +8045,8 @@ var LAYOUT_ANALYSIS = (function () {
 		TRACE_PAIR_EVENTS,
 		TRACE_TRIPLE_EVENTS,
 		TRACE_MAX_CHARS,
+		MOVEMENT_CLASSES,
+		movementTable,
 		pareto,
 		defaultWeights,
 		defaultFloors,

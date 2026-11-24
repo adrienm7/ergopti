@@ -225,6 +225,15 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   metrics on the same text, to the last bit (`test-layout-analysis-views.cjs`).
   Chords (multi-character outputs) are not traced: each character is typed
   on its own.
+- `movementTable(layout, ngrams, {keyboard?, profile?, weights?, typing?})` →
+  `{bigram, skipgram, bigrams, skipgrams}`: each pair class of
+  `MOVEMENT_CLASSES` (the trace's pair events) as a share of the adjacent key
+  pairs and as a share of the skipgrams, the first and last keys of every key
+  trigram classified as if adjacent (an idea seen in the Layouts Wiki
+  playground's « Movement » view). The bigram column is `analyse()`'s metric
+  of each class; the skipgram column is shown only (our `sfs` keeps its own
+  definition). « One layout » shows it folded, with the compared layout and
+  the difference.
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the

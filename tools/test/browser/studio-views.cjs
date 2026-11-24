@@ -19,6 +19,8 @@
  *    character the layout cannot type is said in words.
  * 3. Links: « Copy the link » on a tab carries the tab, the Pareto values or
  *    the trace's text and layouts, and the link opens on them.
+ * 4. Movements: « One layout » lists each pair class over adjacent pairs and
+ *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
  */
 
@@ -198,4 +200,25 @@ async function exerciseViewLinks(browser, origin) {
 	await context.close();
 }
 
-module.exports = { exercisePareto, exerciseTrace, exerciseViewLinks };
+async function exerciseMovement(browser, origin) {
+	const { context, page, errors } = await openComparer(
+		browser,
+		origin,
+		`layouts=${LAYOUTS}&details=azerty&versus=ergopti`
+	);
+	await page.waitForSelector('#la-movement tbody tr', { state: 'attached' });
+	const header = await page.$$eval('#la-movement thead th', (ths) => ths.length);
+	assert.equal(header, 7, 'movement: class, two columns per layout, two differences');
+	const rows = await tableRows(page, '#la-movement');
+	const sfb = rows.find((cells) => cells[0] === EN['layout_analysis.metric.sfb']);
+	assert.ok(sfb, 'movement: the SFB row');
+	const value = (text) => Number(text.replace(/[^0-9.+−-]/g, '').replace('−', '-'));
+	assert.ok(
+		Math.abs(value(sfb[3]) - value(sfb[1]) - value(sfb[5])) < 0.011,
+		`movement: the difference is the second minus the first (${sfb})`
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+module.exports = { exercisePareto, exerciseTrace, exerciseViewLinks, exerciseMovement };
