@@ -76,6 +76,27 @@ for (const { file, names, waits } of RETIRED_LIMITS) {
 	assert.ok(reads >= waits, `${file}: ${waits} waits read ${BOUND}, found ${reads}`);
 }
 
+// A retired name is a global its owner no longer assigns, so a sibling test
+// that still reads it fails at run time ("not been assigned a value", CI run
+// 45373528275 in test_native_teardown.ahk): no Windows test may name one.
+function ahkFiles(directory) {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+		const full = path.join(directory, entry.name);
+		if (entry.isDirectory()) return ahkFiles(full);
+		return entry.name.endsWith('.ahk') ? [full] : [];
+	});
+}
+const retiredNames = RETIRED_LIMITS.flatMap(({ names }) => names);
+for (const file of ahkFiles(TESTS)) {
+	const source = fs.readFileSync(file, 'utf8');
+	for (const name of retiredNames)
+		assert.equal(
+			count(source, name),
+			0,
+			`${path.relative(TESTS, file)} still reads the retired ${name}; use ${BOUND}`
+		);
+}
+
 // Argument-fed children: the parent passes its bound, the child refuses to run
 // without it and keeps no literal of its own.
 const ARGUMENT_CHILDREN = [

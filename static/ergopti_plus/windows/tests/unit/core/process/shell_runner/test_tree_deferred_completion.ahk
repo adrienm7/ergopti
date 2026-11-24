@@ -109,7 +109,7 @@ _SRTDC_PauseAfterCapture(Action) {
 								"UInt", SR_TREE_TERMINATE_EXIT_CODE, "Int"))
 							Started := A_TickCount
 							while _SRTOW_ExactJobActiveProcessCount(GuardJob) != 0 {
-								AssertTrue(TickElapsed(Started) < SRTOW_EXIT_SIGNAL_SETTLE_MS)
+								AssertTrue(TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS)
 								Sleep(SRTOW_PID_POLL_MS)
 							}
 						}
