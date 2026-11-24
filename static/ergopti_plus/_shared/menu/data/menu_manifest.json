@@ -1359,6 +1359,11 @@
 	"debug_tests_menu": [
 		{
 			"type": "command",
+			"id": "field_check_all",
+			"i18n": "menu.debug.field_check_all"
+		},
+		{
+			"type": "command",
 			"id": "field_check_network",
 			"i18n": "menu.debug.field_check_network"
 		},

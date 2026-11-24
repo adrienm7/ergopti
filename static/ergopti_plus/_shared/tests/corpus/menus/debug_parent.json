@@ -21,6 +21,7 @@
 			"Tests"
 		],
 		"hs_tests": [
+			"Test everything",
 			"Test network (PAC, proxy, download)",
 			"Test the composed layout",
 			"Test key accounting (30 s)",
@@ -44,7 +45,11 @@
 			"-",
 			"Tests"
 		],
-		"linux_tests": ["Test network (PAC, proxy, download)", "Test the composed layout"]
+		"linux_tests": [
+			"Test everything",
+			"Test network (PAC, proxy, download)",
+			"Test the composed layout"
+		]
 	},
 	"fr": {
 		"parent": "⚠ Débogage",
@@ -68,6 +73,7 @@
 			"Tests"
 		],
 		"hs_tests": [
+			"Tout tester",
 			"Tester le réseau (PAC, proxy, téléchargement)",
 			"Tester la disposition composée",
 			"Tester le comptage des touches (30 s)",
@@ -92,6 +98,7 @@
 			"Tests"
 		],
 		"linux_tests": [
+			"Tout tester",
 			"Tester le réseau (PAC, proxy, téléchargement)",
 			"Tester la disposition composée"
 		]

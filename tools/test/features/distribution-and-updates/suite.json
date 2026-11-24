@@ -611,8 +611,16 @@
 			"repro": "npm run test:field-run-protocol"
 		},
 		{
+			"id": "js-0549",
+			"ordinal": 545,
+			"name": "« Test everything » runs only field checks of each driver's field run and classifies every Tests row",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-field-check-all-plan.cjs"],
+			"repro": "npm run test:field-check-all-plan"
+		},
+		{
 			"id": "js-managed-pyobjc",
-			"ordinal": 558,
+			"ordinal": 559,
 			"name": "the App Cloner's PyObjC wheels are pinned, verified, installed offline into the managed Python and imported",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-pyobjc.cjs"],
@@ -620,7 +628,7 @@
 		},
 		{
 			"id": "js-app-cloner-managed-python",
-			"ordinal": 559,
+			"ordinal": 560,
 			"name": "App Cloner refuses to start without the managed Python, never executes /usr/bin/python3, and its clones exec the versionless link",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-app-cloner-managed-python.cjs"],
@@ -628,7 +636,7 @@
 		},
 		{
 			"id": "js-windows-builder-boundaries",
-			"ordinal": 561,
+			"ordinal": 562,
 			"name": "Windows native builders enter literal paths and refuse a mistyped manifest schema",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-builder-boundaries.cjs"],
@@ -636,7 +644,7 @@
 		},
 		{
 			"id": "js-macos-owned-runtime-code-hash-rule",
-			"ordinal": 595,
+			"ordinal": 596,
 			"name": "macOS owned runtime install and report paths admit the helper's code hashes through one rule",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-owned-runtime-code-hash-rule.cjs"],
@@ -644,7 +652,7 @@
 		},
 		{
 			"id": "js-macos-build-scripts-bash32",
-			"ordinal": 603,
+			"ordinal": 604,
 			"name": "the macOS app build and the scripts it starts use only Bash 3.2 cd options",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-build-scripts-bash32.cjs"],
@@ -652,7 +660,7 @@
 		},
 		{
 			"id": "js-field-report-redact",
-			"ordinal": 606,
+			"ordinal": 607,
 			"name": "a field report names neither the user nor the machine: every collector redacts its folder before the commit and the pre-commit hook refuses an added line naming this machine",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-report-redact.cjs"],
@@ -660,7 +668,7 @@
 		},
 		{
 			"id": "linux-compositor-focus-install",
-			"ordinal": 608,
+			"ordinal": 609,
 			"name": "Linux installs, enables once and removes the GNOME Shell extension and KWin script that report the focused window",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-compositor-focus-install.cjs"],
@@ -669,7 +677,7 @@
 		},
 		{
 			"id": "js-field-todo-summary",
-			"ordinal": 612,
+			"ordinal": 613,
 			"name": "one macOS field report gives every TODO « To confirm on the Mac » point its verdict, and says why a point cannot be tested",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-todo-summary.cjs"],
@@ -677,7 +685,7 @@
 		},
 		{
 			"id": "js-field-guided",
-			"ordinal": 613,
+			"ordinal": 614,
 			"name": "a field report's collector-side probes and guided steps observe counts, name what they could not read and never pass without a gesture",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-guided.cjs"],
@@ -685,7 +693,7 @@
 		},
 		{
 			"id": "update-asset-signature",
-			"ordinal": 692,
+			"ordinal": 693,
 			"name": "update asset signatures sign and verify the canonical record, refuse enforcement without a key and reach both release lanes with the signing secret",
 			"cmd": "node",
 			"args": ["tools/test/test-update-asset-signature.cjs"],
@@ -693,7 +701,7 @@
 		},
 		{
 			"id": "linux-appimage-container-path",
-			"ordinal": 700,
+			"ordinal": 701,
 			"name": "the oldest-LTS AppImage container fronts the runner's node executable alone on its PATH, so no runner program is staged",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-appimage-container-path.cjs"],
@@ -701,7 +709,7 @@
 		},
 		{
 			"id": "macos-app-icon-shape",
-			"ordinal": 727,
+			"ordinal": 728,
 			"name": "macOS app icon is built from the shaped master so macOS 26 shows it in its own rounded shape",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-app-icon-shape.cjs"],
