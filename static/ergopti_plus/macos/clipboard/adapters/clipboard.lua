@@ -112,6 +112,38 @@ function M.write(text, receipt)
 	return true, receipt
 end
 
+-- The nspasteboard.org markers clipboard managers (Maccy, Raycast, Alfred,
+-- Paste) read to leave an item out of their history: transient, since the
+-- driver restores the user's clipboard right after the paste, and concealed,
+-- since an expansion or an LLM answer may hold private text.
+M.TRANSIENT_TYPES = { "org.nspasteboard.TransientType", "org.nspasteboard.ConcealedType" }
+
+--- Adds the transient markers to the payload the caller has just written. The
+--- add form keeps the payload and the change count; NSPasteboard refuses it
+--- once another process has written the pasteboard, so a marker never lands on
+--- a user's copy. A refusal leaves the paste valid, only visible to managers.
+--- @return boolean marked True when every marker was added.
+function M.mark_transient()
+	for _, uti in ipairs(M.TRANSIENT_TYPES) do
+		local ok, added = pcall(hs.pasteboard.writeDataForUTI, uti, "", true)
+		if not ok or added ~= true then
+			Logger.warn(LOG, "Transient pasteboard marker %s was not added (%s).", uti, tostring(added))
+			return false
+		end
+	end
+	return true
+end
+
+--- Writes a temporary paste payload: write() plus the transient markers.
+--- @param text string The text to place on the clipboard.
+--- @param receipt table|nil Private macOS conditional ownership receipt.
+--- @return boolean True on success, false on error.
+function M.write_transient(text, receipt)
+	local written, returned = M.write(text, receipt)
+	if written == true then M.mark_transient() end
+	return written, returned
+end
+
 --- Saves ALL current clipboard data (all pasteboard types: text, images, files, etc.).
 --- Uses readAllData() so non-text content (images, RTF, file URLs) is preserved.
 --- Returns nil when the clipboard is empty; a truthy table otherwise.

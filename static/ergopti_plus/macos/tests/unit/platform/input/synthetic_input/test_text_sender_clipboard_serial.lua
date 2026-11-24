@@ -42,7 +42,8 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		package.loaded["clipboard.adapters.clipboard"] = {
 			_change_count = function() return count end,
 			save    = function() saves = saves + 1; return "ORIGINAL", true end,
-			write = function(_, receipt)
+			-- TextSend publishes its payload through the transient writer.
+			write_transient = function(_, receipt)
 				count = count + 1
 				receipt.count, receipt.count_ok, receipt.attempted = count, true, true
 				return true, receipt
@@ -115,7 +116,8 @@ local function load_failure_fixture(options)
 	package.loaded["clipboard.adapters.clipboard"] = {
 		_change_count = function() return count end,
 		save = function() return original, true end,
-		write = function(text, receipt)
+		-- TextSend publishes its payload through the transient writer.
+		write_transient = function(text, receipt)
 			writes = writes + 1
 			current = text
 			count = count + 1

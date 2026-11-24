@@ -411,7 +411,7 @@ function M.send(text, opts, callback)
 			local write_generation = _paste_generation
 			_paste_mutations = _paste_mutations + 1
 			local ok_write, written = pcall(function()
-				local accepted = Clipboard.write(text, receipt)
+				local accepted = Clipboard.write_transient(text, receipt)
 				if receipt.attempted ~= false then
 					_paste_owned_count = receipt.count_ok == true and receipt.count or nil
 				end
