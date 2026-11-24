@@ -148,6 +148,15 @@ evidence. The maintainer has a Windows PC (physical tests on request) and a
 work Mac (reproduce on CI first, then ask for at most one short command); there
 is no Linux machine.
 
+### feedback-local-load-and-disk
+
+Maintainer, 2026-11-17: at most 5-6 agents at once on the maintainer's PC and
+at most 2 of them running heavy local suites (full AHK groups, WSL Lua suites,
+interactive desktop checks); prefer CI on temporary `ci/verify-<sha>` branches,
+deleted after reading. After each agent, remove its worktree and scratch files;
+purge stale scratch folders, the WSL root account's copies and the npm cache, and
+compact the WSL disk image when no agent uses WSL (C: once fell to 2.8 GB free).
+
 ### project-preserve-external-runtimes-during-tests
 
 Tests and probes never kill an external Ollama server, the personal locator or
