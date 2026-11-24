@@ -4,7 +4,7 @@
 ; MODULE: System Programs
 ; DESCRIPTION:
 ; The absolute paths of the programs Windows ships (PowerShell, Notepad,
-; Explorer, cmd). Kept apart from the ShellRunner adapter because separate
+; Explorer, cmd), and the Explorer launch that opens a folder. Kept apart from the ShellRunner adapter because separate
 ; processes with a small include graph (the bundled App Cloner and Encryptor
 ; entry point) start these programs too and must not load the whole adapter.
 ; ==============================================================================
@@ -50,4 +50,15 @@ ShellRunner_SystemProgramCommand(Name, Arguments := "") {
 	if !(Arguments is String)
 		throw TypeError("System program arguments must be a string.", -1, Type(Arguments))
 	return '"' . ShellRunner_SystemProgramPath(Name) . '"' . (Arguments == "" ? "" : " " . Arguments)
+}
+
+/**
+ * Opens a folder in Explorer, started by its absolute path.
+ * @param {String} Dir The folder to show.
+ * @throws {Error} When Explorer cannot be started.
+ */
+ShellRunner_OpenFolder(Dir) {
+	if !(Dir is String) || Dir == ""
+		throw ValueError("A folder to open is a nonempty path.", -1, Dir is String ? Dir : Type(Dir))
+	Run(ShellRunner_SystemProgramCommand("explorer.exe", '"' . Dir . '"'))
 }

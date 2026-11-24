@@ -539,7 +539,7 @@ _FieldReport_DefaultDeps() {
 ; Opens the results folder in Explorer.
 _FieldReport_OpenFolder(Dir) {
 	global FIELD_REPORT_TAG
-	try Run(ShellRunner_SystemProgramCommand("explorer.exe", '"' . Dir . '"'))
+	try ShellRunner_OpenFolder(Dir)
 	catch as Err {
 		LoggerWarn(FIELD_REPORT_TAG, "Explorer could not open the results folder: {1}", Err.Message)
 		return false
