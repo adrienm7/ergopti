@@ -18,7 +18,6 @@
 			</span>
 		</h1>
 		<KeyboardBasis id="presentation" />
-		<tiny-space></tiny-space>
 		<KeyboardControls id="presentation" />
 	</header>
 
@@ -28,8 +27,7 @@
 		>
 	</div>
 	<div id="debut">
-		<small-space />
-		<hr />
+		<hr class="space-before-small" />
 		<p class="encart-introduction">
 			<strong><Ergopti></Ergopti></strong> est une
 			<strong>disposition clavier ergonomique et optimisée</strong>
@@ -41,9 +39,7 @@
 		<hr />
 	</div>
 
-	<tiny-space></tiny-space>
-
-	<ul class="cards">
+	<ul class="cards space-before-tiny">
 		<li class="card">
 			<i class="icon-circle-1" aria-hidden="true"
 				><span class="path1"></span><span class="path2"></span></i
@@ -93,15 +89,11 @@
 		>.
 	</p>
 
-	<tiny-space></tiny-space>
-
-	<div style="text-align:center;">
+	<p class="space-before-tiny space-after-big" style="text-align:center;">
 		<a class="button-link alt-button" href={resolve('/studio/essayer') + '?layout=ergopti'}>
 			➜ Essayer en ligne
 		</a>
-	</div>
-
-	<big-space></big-space>
+	</p>
 </section>
 
 <style>

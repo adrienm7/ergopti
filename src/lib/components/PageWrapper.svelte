@@ -4,7 +4,7 @@
 
 <slot name="introduction" />
 
-<bloc-main>
+<div class="bloc-main">
 	<nav id="sidebar" aria-labelledby="sidebar-title">
 		<div>
 			<p
@@ -38,6 +38,6 @@
 			<slot />
 		</main>
 	</div>
-</bloc-main>
+</div>
 
 <slot name="bloc-fin" />

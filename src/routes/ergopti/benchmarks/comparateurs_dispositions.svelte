@@ -49,16 +49,14 @@
 			target="_blank">https://klanext.keyboard-design.com/</a
 		> et ses dérivés.
 	</p>
-	<tiny-space></tiny-space>
-	<p class="download">
+	<p class="download space-before-tiny">
 		Version ISO :&nbsp;<a
 			class="button-link"
 			href={asset(`layouts/kla_iso/ergopti.v${version_mineure_kla_iso}.fr.iso.json`)}
 			download>ergopti.v{version_mineure_kla_iso}.fr.iso.json</a
 		>
 	</p>
-	<tiny-space></tiny-space>
-	<p class="download">
+	<p class="download space-before-tiny">
 		Version ISO+ :&nbsp;<a
 			class="button-link"
 			href={asset(`layouts/kla_iso/ergopti.v${version_mineure_kla_iso_plus}.fr.iso+.json`)}
@@ -75,8 +73,7 @@
 		et
 		<kbd>Shift</kbd>, mais cela améliore déjà sensiblement les scores.
 	</p>
-	<tiny-space></tiny-space>
-	<p class="download">
+	<p class="download space-before-tiny">
 		Version Ergodox :&nbsp;<a
 			class="button-link"
 			href={asset(`layouts/kla_ergodox/ergopti.v${version_mineure_kla_ergodox}.fr.ergodox.json`)}
@@ -95,8 +92,7 @@
 			<option value="standard">Standard — Analyse</option>
 		</select>
 	</div>
-	<tiny-space></tiny-space>
-	<p class="download">
+	<p class="download space-before-tiny">
 		Version pour l’analyseur Ergo‑L :&nbsp;<a
 			class="button-link"
 			href={asset(

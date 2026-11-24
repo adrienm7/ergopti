@@ -26,8 +26,7 @@
 		sereinement tout en conservant la possibilité d’écrire un français typographiquement impeccable
 		avec <kbd>Shift</kbd>.
 	</p>
-	<tiny-space></tiny-space>
-	<div class="encadre">
+	<div class="encadre space-before-tiny">
 		<p class="important margin0">La règle est donc simple à mémoriser :</p>
 		<ul class="margin0">
 			<li><kbd>Shift</kbd> pour le français (typographie soignée) ;</li>

@@ -22,9 +22,9 @@
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
-		<bloc-introduction>
+		<section class="bloc-introduction">
 			<IntroductionInformations />
-		</bloc-introduction>
+		</section>
 	</svelte:fragment>
 
 	<GeneseSources></GeneseSources>
