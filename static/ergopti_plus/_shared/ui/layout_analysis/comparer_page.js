@@ -970,6 +970,13 @@
 			</section>
 		</div>
 		<details class="la-section">
+			<summary id="la-movement-name" data-i18n="layout_analysis.movement.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.movement.caption"></p>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-movement-name">
+				<table id="la-movement" class="la-table"></table>
+			</section>
+		</details>
+		<details class="la-section">
 			<summary id="la-worst-name" data-i18n="layout_analysis.worst.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
 			<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
@@ -4732,6 +4739,64 @@
 		 * screen; every pair is also in a sortable table, and each cell names
 		 * its pair, share, count, kind and points to assistive technology.
 		 */
+		/**
+		 * The movement table (an idea seen in the Layouts Wiki playground): each
+		 * pair class over adjacent key pairs and over skipgrams, for the detailed
+		 * layout and the one it is compared with, with their difference.
+		 */
+		function renderMovement(result) {
+			const versus = state.results.find((r) => r.layout.id === state.versus) || null;
+			const tableOf = (r) =>
+				cachedFigure(r, 'movement', () =>
+					E.movementTable(layoutOf(r.layout.id), tablesOf(r), analysisOptions())
+				);
+			const shown = [result].concat(versus ? [versus] : []).map((r) => ({ r, m: tableOf(r) }));
+			const table = $('la-movement');
+			table.replaceChildren();
+			const head = el('tr');
+			const columns = [t('layout_analysis.movement.class')];
+			for (const { r } of shown)
+				columns.push(
+					t('layout_analysis.movement.bigrams', { layout: r.layout.name }),
+					t('layout_analysis.movement.skipgrams', { layout: r.layout.name })
+				);
+			if (versus)
+				columns.push(
+					t('layout_analysis.movement.delta_bigrams'),
+					t('layout_analysis.movement.delta_skipgrams')
+				);
+			for (const label of columns) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			const pct = (v) => measure(v, 2, '%');
+			const signed = (v) => `${v > 0 ? '+' : ''}${format(v, 2)}`;
+			for (const id of E.MOVEMENT_CLASSES) {
+				const row = el('tr');
+				const name = el('th', '', metricName(id));
+				name.scope = 'row';
+				row.append(name);
+				for (const { m } of shown)
+					row.append(
+						el('td', 'la-num', pct(m.bigram[id])),
+						el('td', 'la-num', pct(m.skipgram[id]))
+					);
+				if (versus) {
+					const [a, b] = shown.map(({ m }) => m);
+					row.append(
+						el('td', 'la-num', signed(b.bigram[id] - a.bigram[id])),
+						el('td', 'la-num', signed(b.skipgram[id] - a.skipgram[id]))
+					);
+				}
+				body.append(row);
+			}
+			table.append(thead, body);
+		}
+
 		function renderMatrix(result) {
 			const layout = layoutOf(result.layout.id);
 			const matrix = cachedFigure(result, 'matrix', () =>
@@ -5204,6 +5269,7 @@
 			renderHeatmap(result);
 			renderWorst(result);
 			renderMatrix(result);
+			renderMovement(result);
 			renderWords(result);
 			renderFigures(result);
 			const contributions = Object.entries(result.score.contributions)

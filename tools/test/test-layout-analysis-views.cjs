@@ -209,6 +209,42 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	}
 }
 
+// ====================================
+// ======= 3/ Movement table ==========
+// ====================================
+
+{
+	const text = 'Le cœur a ses raisons que la raison ne connaît point. Où êtes-vous allés, Zoé ?';
+	for (const id of ['azerty', 'ergopti', 'qwerty']) {
+		const layout = byId.get(id);
+		const ngrams = E.ngramsFromText(text);
+		const table = E.movementTable(layout, ngrams, { keyboard: 'iso' });
+		const r = E.analyse(layout, ngrams, { keyboard: 'iso' });
+		for (const name of E.MOVEMENT_CLASSES)
+			check(
+				Math.abs(table.bigram[name] - r.metrics[name]) <= TOLERANCE,
+				`movement: ${id} ${name} pairs ${table.bigram[name]} against analyse() ${r.metrics[name]}`
+			);
+	}
+	// Skipgrams worked by hand on QWERTY: « ded » ends on the same key (a
+	// repeat), « dke » on the left middle finger twice (an SFB), « dkf » on two
+	// fingers of the left hand (no same-finger class).
+	const qwerty = byId.get('qwerty');
+	const skip = (text) => E.movementTable(qwerty, E.ngramsFromText(text), { keyboard: 'iso' });
+	const ded = skip('ded');
+	check(
+		ded.skipgrams === 1 && ded.skipgram.repeat === 100,
+		`movement: « ded » is a repeat skipgram`
+	);
+	const dke = skip('dke');
+	check(dke.skipgrams === 1 && dke.skipgram.sfb === 100, 'movement: « dke » is an SFB skipgram');
+	const dkf = skip('dkf');
+	check(
+		dkf.skipgrams === 1 && dkf.skipgram.sfb === 0 && dkf.skipgram.repeat === 0,
+		'movement: « dkf » is no same-finger skipgram'
+	);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-views: ${errors.length} problem(s)`);
