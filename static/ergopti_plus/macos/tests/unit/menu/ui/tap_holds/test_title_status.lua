@@ -158,6 +158,12 @@ helpers.describe("Tap-Holds title status: mapping", function()
 		helpers.assert_eq(Status.read(remap({ legacy_rule_conflicts = function() return { count = 1 } end }), true, false),
 			"unreachable")
 		helpers.assert_nil(Status.read(remap(), false, false), "no dot while the tap-holds are off")
+		helpers.assert_eq(Status.read(remap({ owned_runtime_status = function()
+			return { state = "unavailable", reason = "runtime_not_installed" }
+		end }), false, false), "unreachable", "a missing owned runtime is red with the switch off")
+		helpers.assert_nil(Status.read(remap({ owned_runtime_status = function()
+			return { state = "unavailable", reason = "other_karabiner_running" }
+		end }), false, false), "a warning block draws nothing with the switch off")
 		helpers.assert_nil(Status.read(remap(), true, true), "no dot while Ergopti is paused")
 	end)
 end)
@@ -203,7 +209,50 @@ helpers.describe("Tap-Holds title status: title", function()
 			helpers.assert_eq(repaints, 1, "a dot already repainted must not rebuild again")
 			menu.build({ karabiner = remap({ get_tap_holds_enabled = function() return false end }),
 				updateMenu = function() end })
-			helpers.assert_eq(timers.cancelled, 1, "a build without a dot must stop the watch")
+			helpers.assert_eq(timers.cancelled, 0, "a build without a dot keeps the Tap-Holds watch armed")
+			helpers.assert_eq(timers.armed, 1, "the armed watch is reused, never doubled")
+		end)
+	end)
+
+	helpers.it("is red while the owned runtime is not installed or failed, even with the switch off (2026-11-24)", function()
+		-- Field report dev.178: the install was refused and the runtime missing,
+		-- the install gate greyed the switch, and the title drew no dot at all.
+		with_menu(function(menu)
+			local glyphs = manifest_glyphs()
+			local off = function() return false end
+			local plain = title(menu, remap({ get_tap_holds_enabled = off }))
+			for _, status in ipairs({
+				{ state = "unavailable", reason = "runtime_not_installed" },
+				{ state = "unavailable", reason = "runtime_job_not_loaded" },
+				{ state = "failed", reason = "capture_lost" },
+			}) do
+				local karabiner = remap({ get_tap_holds_enabled = off,
+					owned_runtime_status = function() return status end,
+					install_owned_runtime = function() return true end })
+				helpers.assert_eq(title(menu, karabiner), plain .. " " .. glyphs.unreachable,
+					status.reason .. " must draw the red dot with the switch off")
+			end
+			helpers.assert_eq(title(menu, remap({ get_tap_holds_enabled = off,
+				owned_runtime_status = function() return { state = "starting" } end })), plain,
+				"a starting runtime draws nothing while the switch is off")
+			helpers.assert_eq(title(menu, remap({ owned_runtime_status = function()
+				return { state = "unavailable", reason = "runtime_not_installed" }
+			end }), { is_paused = function() return true end }), plain, "a paused Ergopti draws no dot")
+		end)
+	end)
+
+	helpers.it("repaints the title red when the runtime fails after a build that drew no dot", function()
+		with_menu(function(menu, timers)
+			local status, repaints = { state = "starting" }, 0
+			local karabiner = remap({ get_tap_holds_enabled = function() return false end,
+				owned_runtime_status = function() return status end })
+			menu.build({ karabiner = karabiner, updateMenu = function() repaints = repaints + 1 end })
+			helpers.assert_eq(timers.armed, 1, "a title without a dot must still be watched")
+			timers.tick()
+			helpers.assert_eq(repaints, 0, "nothing changed: no rebuild")
+			status = { state = "unavailable", reason = "runtime_not_installed" }
+			timers.tick()
+			helpers.assert_eq(repaints, 1, "the runtime failing must repaint the title red")
 		end)
 	end)
 end)

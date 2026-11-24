@@ -19,7 +19,8 @@
 --- 3. Repaint Watch: the menubar keeps a prebuilt menu, so a status that
 ---    changes after the build that painted it needs a rebuild. Each watch
 ---    re-reads its status on a timer and rebuilds once when the dot differs;
----    a build without a dot stops it.
+---    a build without a dot stops it, unless the title's dot can appear on its
+---    own (the Tap-Holds one, whose runtime can fail while the switch is off).
 --- ==============================================================================
 
 local M = {}
@@ -99,10 +100,15 @@ end
 --- Creates the repaint watch of one title.
 --- @param name string Title named in the log lines.
 --- @param interval_sec number Seconds between two reads.
+--- @param opts table|nil { keep_without_dot = true } keeps the watch armed by a
+---   build that paints no dot, for a title whose dot can appear on its own (the
+---   Tap-Holds runtime failing while the switch is off, maintainer 2026-11-24).
 --- @return table watch { watch(painted, read, repaint), check(), stop() }.
-function M.new_watch(name, interval_sec)
+function M.new_watch(name, interval_sec, opts)
 	assert(type(name) == "string" and name ~= "", "Missing title status watch name")
 	assert(type(interval_sec) == "number" and interval_sec > 0, "Invalid title status watch interval")
+	assert(opts == nil or type(opts) == "table", "Invalid title status watch options")
+	local keep_without_dot = opts ~= nil and opts.keep_without_dot == true
 	local state = { handle = nil, painted = nil, read = nil, repaint = nil }
 	local watch = {}
 
@@ -130,18 +136,19 @@ function M.new_watch(name, interval_sec)
 			name, tostring(state.painted), tostring(now))
 		-- Recorded before the repaint, so a coalesced rebuild never repaints twice
 		state.painted = now
-		if now == nil then watch.stop() end
+		if now == nil and not keep_without_dot then watch.stop() end
 		local repainted, err = pcall(repaint)
 		if not repainted then Logger.error(LOG, "The %s title repaint failed: %s.", name, tostring(err)) end
 	end
 
 	--- Keeps the title's dot in step with its feature after this build.
-	--- @param painted string|nil The status this build painted; nil stops the watch.
+	--- @param painted string|nil The status this build painted; nil stops the
+	---   watch unless it keeps watching without a dot.
 	--- @param read function Returns the status the dot should show now.
 	--- @param repaint function Rebuilds the menu.
 	function watch.watch(painted, read, repaint)
 		state.painted = painted
-		if painted == nil then watch.stop(); return end
+		if painted == nil and not keep_without_dot then watch.stop(); return end
 		state.read = read
 		state.repaint = repaint
 		if state.handle then return end

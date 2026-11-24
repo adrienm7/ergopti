@@ -64,6 +64,10 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `owned_install_stale_journal`). Left for the `.7` helper: `OwnedRuntimeInstallJournal.retireUnpublished` still
       refuses a journal with only its header (a failure between `create()` and the stage's first record), so that
       helper leaves cleanup pending until the next install's shell retires it.
+- [ ] **[macOS] Menu requests of 2026-11-24 (maintainer, photo of the dev.178 menu).** Tap-Holds title without a
+      dot while the owned runtime was not installed and its install refused: fixed, red 🔴 even with the switch off
+      and repainted when the runtime fails after a build (field point `tap_holds_title_red_dot`). Windows and Linux
+      draw no Tap-Holds dot: their tap-holds have no separate runtime.
 - [ ] **[macOS] Engine dialog icon.** On dev.178 the install result dialog (`hs.dialog.blockAlert`, an `NSAlert`
       that sets no icon and so shows the engine's application icon) still showed the hammer, although
       `build_icon` gives the embedded Hammerspoon.app `CFBundleIconFile` ErgoptiPlus and removes `CFBundleIconName`
@@ -75,8 +79,9 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       ErgoptiPlus.app, the Tap-Holds submenu is greyed except « Réessayer l'installation… » while the runtime is not
       installed, AltGr and Shift+AltGr are emulated once a layout is chosen, the update window keeps a right margin beside its progress bar and its button row (fixed 2026-11-24), no « Aggregate cache recovery failed »
       or `%s` in the log.
-- [ ] **[Maintainer] Questions left open:** the Tap-Holds warning dot stays the shared yellow 🟡 (orange asked
-      once, not confirmed); keystats day-by-day aggregate publication shipped, review welcome.
+- [ ] **[Maintainer] Questions left open:** keystats day-by-day aggregate publication shipped, review welcome. The
+      Tap-Holds dot is settled (maintainer, 2026-11-24): 🔴 whenever the owned runtime is missing, refused or failed,
+      even with the switch off; the warning keeps the shared yellow 🟡 (no orange).
 
 ## Next session (state on 2026-11-17, read first)
 

@@ -53,7 +53,10 @@ local Timings = require("core.timing.engine.timings")
 
 -- The title's status dot outlives the build that painted it: the runtime turns
 -- ready or fails later, so the shared watch repaints it (menu/ui/title_status.lua).
-local _status_watch = TitleStatus.new_watch("Tap-Holds", Timings.sec("tap_hold", "title_status_watch_ms"))
+-- It keeps watching a title without a dot: the runtime can fail after a build
+-- that drew none, and that failure is red even with the switch off.
+local _status_watch = TitleStatus.new_watch("Tap-Holds", Timings.sec("tap_hold", "title_status_watch_ms"),
+	{ keep_without_dot = true })
 
 -- The shared value schema declarations of the delays this menu asks for.
 local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS

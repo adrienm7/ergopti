@@ -86,6 +86,12 @@
 			"not_testable": "Needs the runtime rebuild that ships the repair role, then an administrator bootout of a system job: rebuild the owned runtime first; the Swift and Lua parsers are unit-tested (test_runtime_service_repair)."
 		},
 		{
+			"id": "tap_holds_title_red_dot",
+			"title": "Tap-Holds title red dot while the owned runtime is KO",
+			"checks": [],
+			"not_testable": "The dot is read on the menu-bar menu itself, which no run captures: open the menu with the owned runtime not installed or after a refused install, with the Tap-Holds switch on and off; the status mapping and its watch are unit-tested (test_title_status)."
+		},
+		{
 			"id": "rerun_2026_11_02",
 			"title": "Rerun of the 2026-11-02 report",
 			"checks": [

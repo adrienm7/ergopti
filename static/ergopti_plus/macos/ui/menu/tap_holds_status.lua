@@ -6,7 +6,8 @@
 --- Decides the status dot of the Tap-Holds title (maintainer, 2026-11-23): the
 --- AI title's dot (menu/ui/title_status.lua), green when the tap-holds work,
 --- red when they do not, the warning dot while they are on their way or wait
---- on the user. Like the AI title, no dot while the feature is off or paused.
+--- on the user. Like the AI title, no dot while the feature is off or paused,
+--- except a blocked owned runtime, red even with the switch off (2026-11-24).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read Only: every input is an in-memory read of the remap facade; a
@@ -131,14 +132,24 @@ end
 --- @param paused boolean Whether Ergopti is paused.
 --- @return string|nil status One of TitleStatus' statuses; nil draws no dot.
 function M.read(karabiner, tap_holds_on, paused)
-	if tap_holds_on ~= true or paused == true or type(karabiner) ~= "table" then return nil end
+	if paused == true or type(karabiner) ~= "table" then return nil end
+	local owned_present, owned = read(karabiner, "owned_runtime_status")
+	local owned_known = owned_present and type(owned) == "table"
+	if tap_holds_on ~= true then
+		-- A runtime that is not there or failed is red even with the switch off
+		-- (maintainer, 2026-11-24): the install gate greys that switch, so the
+		-- title is the one place that still says the tap-holds cannot run.
+		if owned_known and M.OWNED_STATES[owned.state] == false and owned_status(owned) == unreachable then
+			return unreachable
+		end
+		return nil
+	end
 	-- « Ergopti uses Karabiner » off: nothing can deploy the switched-on tap-holds
 	local _, integration_on = read(karabiner, "get_enabled")
 	if integration_on ~= true then return unreachable end
 	local _, conflicts = read(karabiner, "legacy_rule_conflicts")
 	if type(conflicts) == "table" then return unreachable end
-	local owned_present, owned = read(karabiner, "owned_runtime_status")
-	if owned_present and type(owned) == "table" then return owned_status(owned) end
+	if owned_known then return owned_status(owned) end
 	local _, guardian = read(karabiner, "guardian_state")
 	local by_guardian = M.GUARDIAN_STATES[guardian]
 	if by_guardian then return by_guardian end
