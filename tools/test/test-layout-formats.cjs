@@ -70,7 +70,7 @@
  * 13. KLA thumb keys: an ErgoDox file with a letter on a thumb key reads its
  *    thumbs to the model's thumb keys (a lone capital as its letter's Shift,
  *    a key on its own code, the big keys first on the codes left free, a
- *    letter on the left big outer key named), a space-only file or a space
+ *    letter on the left big outer key on Space), a space-only file or a space
  *    key's AltGr digit still reads the space bar, and the ErgoDox export
  *    reads back the same.
  * 14. KLAnext's janiso and ergolinear boards read: janiso by KLAnext's own
@@ -1587,12 +1587,19 @@ async function checkLinks() {
 			many.unmapped.length === 0,
 		`thumb keys: each thumb key on its own code, the big key on the free one: ${JSON.stringify(many.layout.rows)} ${JSON.stringify(many.unmapped)}`
 	);
-	// A letter on the left big outer key beside a space on the inner one has
-	// no code of its own (the board keeps Space there): it is named.
+	// (ergodox-left-outer-thumb-letter-2026-11-24) A letter on the left big
+	// outer key beside a space on the inner one (KLAnext's Einbinder
+	// Orthogonal: « u » on 66) was named unread: it is typed on Space, the key
+	// the board puts there, and written back at 66.
 	const outerLetter = F.fromKla(thumbFile([key(66, 117, 5), key(67, 32, 5), key(74, 32, 6)]));
+	const outerBack = F.fromKla(
+		JSON.parse(JSON.stringify(F.toKla(outerLetter.layout, DATA.model.fingerings.standard)))
+	);
 	check(
 		outerLetter.layout.rows.NonConvert[0] === ' ' &&
-			outerLetter.unmapped.some((entry) => /^66 \(u\)$/.test(entry.detail)),
+			(outerLetter.layout.rows.Space || [])[0] === 'u' &&
+			outerLetter.unmapped.length === 0 &&
+			canonical(outerBack.layout) === canonical(outerLetter.layout),
 		`thumb keys: the left big outer key's letter: ${JSON.stringify(outerLetter.layout.rows)} ${JSON.stringify(outerLetter.unmapped)}`
 	);
 	// The space alone on the thumbs reads as before: the shared space bar.

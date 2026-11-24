@@ -873,6 +873,15 @@ modifier of its bottom row right of the space bar (AOEYK's \): ISO and ANSI
 type no character there, and making them character keys would also offer
 them to the optimizer.
 
+On 2026-11-24 the letter on the left 2-unit outer thumb key took that key's own
+code, Space (decided by the agent, to review by the maintainer): Einbinder
+Orthogonal (« u ») and Yp Hina Fu (« e », with « o » on the inner key) came
+in, 787 layouts; the golden values of the 785 held before are unchanged. The
+left thumb types on one key, so each lacks that letter on the ErgoDox and is
+incomplete there, as on the boards without thumb keys. VCKB and VCKB2 stay
+out: they also type d (and l) on the right 2-unit outer key, the board's
+AltGr, a modifier with no code for a character.
+
 Values, proved by dumping every metric, score and cost of every layout on
 the eleven keyboards and two corpora (French Nemolivier, the first 300 000
 characters, and English Alice) before and after:
@@ -908,7 +917,7 @@ characters, and English Alice) before and after:
   the thumb-letter layouts, 41 of those 50 moved, Blickensderfer 5 left them
   and 26 new ones joined.
 
-The library holds 785 layouts.
+The library holds 787 layouts.
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
