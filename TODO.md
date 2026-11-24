@@ -94,9 +94,11 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
       `OpenClipboard` after Ctrl+V. explorer.exe, `cbdhsvc` and msrdc.exe (WSLg) still open the clipboard after
       writes, with or without the exclusion formats, and msrdc renders every delayed text format, so neither the
       formats nor a delayed-rendering receipt can prove the paste (a single open 0-140 ms after a write failed about
-      1 time in 60-120). The `gesture-transform-native-render-focus` and `wrap-native-render-focus` current modes
-      still fail that way now and then (sends=1, Edit empty); make such fixtures hold a known reader instead of
-      depending on the desktop's. macOS and Linux have no clipboard lock, so the race does not exist there; since
+      1 time in 60-120), so that open stays the target application's own and no driver code can win it. The
+      `gesture-transform-native-render-focus` and `wrap-native-render-focus` fixtures, which failed that way now
+      and then (sends=1, Edit empty), paste through a known reader since 2026-11-25
+      (`tests/fixtures/known_reader_paste_body.ahk`, A_Clipboard's retried open on the Edits' Ctrl+V); left: read
+      their `known_reader_pastes=1` observation in the next Windows CI runs. macOS and Linux have no clipboard lock, so the race does not exist there; since
       2026-11-24 their paste payloads carry the clipboard-manager hints (`x-kde-passwordManagerHint` through the
       Linux multi-format owner, `test_clipboard_transient_hint.lua`; `org.nspasteboard.TransientType` and
       `ConcealedType` on macOS, `test_transient_markers.lua`), and the managers' own reading is a field check

@@ -129,6 +129,7 @@ _WRCF_ChildSource() {
 	}
 	AssertEqual(3, Count, "Only the native paste/direct transports may be decorated with owned-window guards")
 	Code .= Overlaid . SubStr(Body, Position) . "`n"
+	Code .= FSReadStrict(_DriverDir . "\tests\fixtures\known_reader_paste_body.ahk")
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_clipboard_render_focus_body.ahk")
 }
 
@@ -361,6 +362,25 @@ _GTRF_Case(Mode) {
 
 for _GTRF_Mode in ["current", "redirect"]
 	Test("gesture transform native clipboard renderer: " . _GTRF_Mode . " (gesture-transform-native-render-focus)", _GTRF_Case.Bind(_GTRF_Mode))
+
+; The desktop's clipboard readers made the receiving Edit's own single open lose
+; now and then (sends=1, Edit empty); both children must read through the known
+; reader, installed before the public entry sends anything.
+_KRP_ChildrenReadThroughKnownReader() {
+	for Pair in [[_WRCF_ChildSource(), 'WrapTextIfSelected("[", "[", "]")'],
+			[_GTRF_ChildSource(), "GestureTransformSelection((Text) =>"]] {
+		Source := Pair[1]
+		AssertTrue(InStr(Source, "_KRP_OnChar(WParam, LParam, Msg, Hwnd) {") > 0,
+			"The child must define the known clipboard reader.")
+		Install := InStr(Source, "_KRP_Install(_WRF.EditA, _WRF.EditB)")
+		Entry := InStr(Source, Pair[2])
+		AssertTrue(Install > 0 && Entry > Install,
+			"The known reader must receive the Edits' Ctrl+V before the public entry " . Pair[2] . " sends.")
+		AssertTrue(InStr(Source, "_KRP_Uninstall()") > Entry, "The child must remove the known reader at cleanup.")
+	}
+}
+Test("native render-focus children paste through a known clipboard reader (gesture-transform-native-render-focus)",
+	_KRP_ChildrenReadThroughKnownReader)
 
 ; Requires the genuine gesture/capture composition defined alongside WRCF.
 _SCCF_ChildSource() {
