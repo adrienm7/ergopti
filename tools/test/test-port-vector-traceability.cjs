@@ -29,8 +29,11 @@
  *
  * WHY A RATCHET RATHER THAN A REQUIREMENT:
  * Demanding all 138 today would fail on arrival and be deleted within a week.
- * The baseline records where the link stands; adding a vector id to a Lua test
- * is a one-line change, so the number can only improve, and it must never fall.
+ * The ledger (port-vector-traceability-baseline.json) records which vectors
+ * the mirror names; adding a vector id to a Lua test is a one-line change, so
+ * the ledger can only grow. It names each id rather than counting them: a count
+ * (73 until 2026-11-24) let a vector that lost its mirror and an unrelated one
+ * that gained it cancel out unseen.
  * ==============================================================================
  */
 
@@ -55,10 +58,10 @@ const MIRROR =
 		? MIRROR_FILES[0]
 		: path.join(MIRROR_DIR, 'test_adapter_contract_vectors_*.lua');
 
-// Measured 2026-08-01, raised 2026-11-21 when the TrayMenu vectors were
-// rewritten to read their result (TRAY-04). Raise as ids are added to the Lua
-// tests; never lower.
-const BASELINE_TRACEABLE = 73;
+// Every traced vector as `<port>:<id>` (two ports may share an id). A traced
+// vector missing from the ledger is recorded with --record-traced, which
+// refuses while any recorded vector has lost its mirror.
+const LEDGER_PATH = path.join(__dirname, 'port-vector-traceability-baseline.json');
 
 const errors = [];
 
@@ -69,6 +72,7 @@ if (!fs.existsSync(MIRROR)) {
 const mirror = MIRROR_FILES.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 
 const perPort = [];
+const traced = new Set();
 let total = 0;
 let traceable = 0;
 
@@ -77,6 +81,7 @@ for (const file of fs.readdirSync(PORTS).filter((f) => f.endsWith('.spec.js'))) 
 	const ids = [...src.matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1]);
 	if (ids.length === 0) continue;
 	const hit = ids.filter((id) => mirror.includes(id));
+	for (const id of hit) traced.add(`${file.replace('.spec.js', '')}:${id}`);
 	perPort.push({ port: file.replace('.spec.js', ''), n: ids.length, hit: hit.length });
 	total += ids.length;
 	traceable += hit.length;
@@ -141,19 +146,41 @@ for (const mirror of [
 	}
 }
 
-if (traceable < BASELINE_TRACEABLE) {
-	const worst = perPort
-		.filter((p) => p.hit < p.n)
-		.sort((a, b) => b.n - b.hit - (a.n - a.hit))
-		.slice(0, 5)
-		.map((p) => `${p.port} ${p.hit}/${p.n}`)
-		.join(', ');
+let ledger;
+try {
+	ledger = JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8'));
+} catch (error) {
+	console.error(`[ERROR] ${path.relative(ROOT, LEDGER_PATH)} is unreadable: ${error.message}`);
+	process.exit(1);
+}
+if (!Array.isArray(ledger)) {
+	console.error(`[ERROR] ${path.relative(ROOT, LEDGER_PATH)} must be an array of <port>:<id>`);
+	process.exit(1);
+}
+const recorded = new Set(ledger);
+const lost = [...recorded].filter((vector) => !traced.has(vector)).sort();
+const gained = [...traced].filter((vector) => !recorded.has(vector)).sort();
+
+if (process.argv.includes('--record-traced')) {
+	if (lost.length > 0) {
+		console.error('[ERROR] --record-traced refuses while recorded vectors lost their mirror:');
+		for (const vector of lost) console.error(`    - ${vector}`);
+		process.exit(1);
+	}
+	fs.writeFileSync(LEDGER_PATH, JSON.stringify([...traced].sort(), null, '\t') + '\n');
+	for (const vector of gained) console.log(`[RECORD] ${vector} is traced by the macOS mirror`);
+	process.exit(0);
+}
+
+for (const vector of lost) {
 	errors.push(
-		`only ${traceable} of ${total} contract vector(s) are referenced by id in the macOS mirror, ` +
-			`below the recorded ${BASELINE_TRACEABLE}. A vector with no id in the mirror can change on ` +
-			`the JS side while the Lua test keeps passing against the old expectation. Largest gaps: ${worst}.`
+		`${vector} is no longer referenced by id in the macOS mirror. A vector with no id in the ` +
+			'mirror can change on the JS side while the Lua test keeps passing against the old ' +
+			'expectation: name it in its Lua test again.'
 	);
 }
+for (const vector of gained)
+	errors.push(`${vector} is now traced by the macOS mirror: record it with --record-traced.`);
 
 if (process.argv.includes('--measure')) {
 	console.log('port'.padEnd(22) + 'vectors  traceable');
@@ -165,7 +192,7 @@ if (process.argv.includes('--measure')) {
 				(p.hit < p.n ? '  <-- gap' : '')
 		);
 	}
-	console.log(`\nTOTAL ${traceable}/${total} (baseline ${BASELINE_TRACEABLE})`);
+	console.log(`\nTOTAL ${traceable}/${total} (ledger ${recorded.size})`);
 	process.exit(0);
 }
 
@@ -178,5 +205,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] ${traceable}/${total} port contract vector(s) traceable by id in the macOS mirror ` +
-		`(baseline ${BASELINE_TRACEABLE}).\x1b[0m`
+		`(every one in the ledger).\x1b[0m`
 );

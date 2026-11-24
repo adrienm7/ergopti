@@ -252,7 +252,7 @@
 		},
 		{
 			"id": "js-0430",
-			"ordinal": 336,
+			"ordinal": 337,
 			"name": "Native HTTP clock evidence retains source and command receiving boundaries",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-native-http-clock-evidence.cjs"],
@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "js-0326",
-			"ordinal": 343,
+			"ordinal": 344,
 			"name": "Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-release-stage-native-receiving.cjs"],
@@ -269,7 +269,7 @@
 		},
 		{
 			"id": "js-0438",
-			"ordinal": 420,
+			"ordinal": 421,
 			"name": "Linux E2E matrix rows keep every former harness once and every row required by the verdict",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-e2e-shards.cjs"],
@@ -277,7 +277,7 @@
 		},
 		{
 			"id": "js-0440",
-			"ordinal": 422,
+			"ordinal": 423,
 			"name": "Managed Ollama receiving admits only this commit and run clean build from its parallel build cell",
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-handoff.cjs"],
@@ -285,7 +285,7 @@
 		},
 		{
 			"id": "js-macos-swiftpm-cache-scope",
-			"ordinal": 549,
+			"ordinal": 550,
 			"name": "macOS SwiftPM build cache scope (only the Intel XCTest cell restores a build tree, by an exact key)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-swiftpm-cache-scope.cjs"],
@@ -293,7 +293,7 @@
 		},
 		{
 			"id": "js-linux-flatpak-module-cache",
-			"ordinal": 619,
+			"ordinal": 620,
 			"name": "the Linux Build job caches the flatpak-builder state directory the Flatpak packager uses",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-flatpak-module-cache.cjs"],
@@ -301,7 +301,7 @@
 		},
 		{
 			"id": "js-macos-tsm-refusal",
-			"ordinal": 628,
+			"ordinal": 629,
 			"name": "a keyboard-source refusal after an unanswered com.apple.tsm.uiserver message is named tsm_uiserver_unanswered",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tsm-refusal.cjs"],
@@ -309,7 +309,7 @@
 		},
 		{
 			"id": "js-0519",
-			"ordinal": 667,
+			"ordinal": 668,
 			"name": "a managed phase worker keeps its published closure status under a late owner TERM",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-managed-phase-late-term.cjs"],
@@ -317,7 +317,7 @@
 		},
 		{
 			"id": "macos-tis-cache-probe",
-			"ordinal": 685,
+			"ordinal": 686,
 			"name": "the macOS TIS current-source cache probe stays a manual workflow on the hosted images of the refusals, runs every run-loop mode the probe accepts in its own process, uploads its evidence on failure and is run by no other workflow",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-tis-cache-probe.cjs"],
@@ -325,7 +325,7 @@
 		},
 		{
 			"id": "windows-stable-signing-retirement",
-			"ordinal": 695,
+			"ordinal": 696,
 			"name": "deleting the unsigned stable Windows exception is one step that refuses unsigned stable receipts and still publishes signed releases",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-stable-signing-retirement.cjs"],

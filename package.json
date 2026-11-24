@@ -445,6 +445,7 @@
 		"test:feature-namespace-ratchet": "node ./tools/test/test-feature-namespace-ratchet.cjs",
 		"test:driver-scoped-features-stay-scoped": "node ./tools/test/test-driver-scoped-features-stay-scoped.cjs",
 		"test:driver-tree-parity-ledger": "node ./tools/test/test-driver-tree-parity-ledger.cjs",
+		"test:port-vector-traceability-ledger": "node ./tools/test/test-port-vector-traceability-ledger.cjs",
 		"test:platform-restrictions-explained": "node ./tools/test/test-platform-restrictions-explained.cjs",
 		"test:action-chord-notation": "node ./tools/test/test-action-chord-notation.cjs",
 		"test:action-catalogue-codegen": "node ./tools/test/test-action-catalogue-codegen.cjs",
