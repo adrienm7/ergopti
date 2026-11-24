@@ -234,12 +234,7 @@ waits for the maintainer's review).
       board-only codes and the Shift keys read as QMK's mod-tap (`docs/design/layout-analysis.md`, « ErgoDox keys »;
       the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Still in `not_imported`:
       KLAnext's VCKB and VCKB2 type a letter (d, l) on the ErgoDox's right 2-unit outer thumb key, the board's AltGr (a mod-tap code there, as the Shift keys' tapped characters
-      have, would read it; each would still lack its « u », on the left thumb's second key). The KLA importer
-      (`tools/build/import-kla-layouts.cjs`) no longer reproduces the library: run whole on 2026-11-24 it dropped
-      BvoFRak's stated dead keys, brought back KLA's Spanish Dvorak and the reasons of the entries replaced by
-      their XKB files (Neo 2, Spanish QWERTY) and moved AdNW's duplicate; teach it those hand-made entries
-      (`LEFT_OUT`, kept fields) before its next run, as the four standard-board files were added by its rules
-      alone.
+      have, would read it; each would still lack its « u », on the left thumb's second key).
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names

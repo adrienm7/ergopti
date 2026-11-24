@@ -108,6 +108,7 @@ const LANGUAGES = {
 // author's name as the label.
 const NAMES = {
 	'european.bvofrak1': 'BvoFRak 1.0 FR',
+	'standard.bvofrak1': 'BvoFRak 1.0 FR (ANSI)',
 	'standard.dangvu': 'Dangvu',
 	'standard.siwei': 'Siwei',
 	// The caps-lock key KLA turns into Backspace is not measured.
@@ -137,12 +138,50 @@ const IDS = {
 	'standard.tarmak4': 'tarmak4_etro',
 	'standard.tarmak4_': 'tarmak4'
 };
-// Files left out by judgement, with the reason (the rules find the others).
+// The reason the library gives a KLA file whose layout comes from
+// xkeyboard-config instead.
+const XKB_REPLACED =
+	'replaced by the official XKB layout of xkeyboard-config, with its dead keys and AltGr level';
+// Files left out by judgement, with the reason and the layout replacing them
+// (the rules find the others).
 const LEFT_OUT = {
-	'standard.neo2':
-		'an earlier entry of Neo 2 without its umlauts; standard.neo2_new holds the layout',
-	'standard.hackers-dvorak-on': 'the same keys as standard.programmer-dvorak-on, by the same author'
+	'standard.neo2': {
+		reason: 'an earlier entry of Neo 2 without its umlauts; standard.neo2_new holds the layout'
+	},
+	'standard.hackers-dvorak-on': {
+		reason: 'the same keys as standard.programmer-dvorak-on, by the same author'
+	},
+	// Not a duplicate by the rules: KLA's file exchanges R and H.
+	'standard.spanish-dvorak': {
+		reason:
+			`${XKB_REPLACED}; KLA's file exchanges R and H against it, a slip of its transcription: Jorge Sanz, ` +
+			"whom it credits, typed xkeyboard-config's es(dvorak) (his blog, 2011-04-16 and 2011-05-28), whose " +
+			'letters have not changed since it was added in 2005 (commit 2aca64fd)',
+		same_as: 'spanish_dvorak'
+	}
 };
+// Duplicates found by the rules whose entry states more: the reason naming
+// the layout replacing them, or the layout they repeat when the rules find a
+// copy of it.
+const STATED_DUPLICATES = {
+	'standard.neo2_new': { reason: XKB_REPLACED },
+	'european.qwerty-spanish': { reason: XKB_REPLACED },
+	// KLA's « ˆ » left of 1 stands for xkeyboard-config's dead circumflex, so
+	// the rules find KLAnext's copy; the library's AdNW is the XKB one, as for
+	// Oxeylyzer's adnw.dof.
+	'standard.adnw': { same_as: 'adnw' }
+};
+// Fields of a library entry the import does not produce (stated by hand, like
+// BvoFRak's dead keys): a rerun keeps them.
+const IMPORTED_FIELDS = new Set([
+	'id',
+	'name',
+	'language',
+	'source',
+	'source_path',
+	'fingering',
+	'rows'
+]);
 // Between two KLA files of one arrangement, the European (ISO) board's file is
 // kept: it also places the key between left Shift and Z.
 const BOARD_RANK = { european: 0, standard: 1, ergodox: 2 };
@@ -253,8 +292,11 @@ function classify(klaDir) {
 	// blocks completed), less any earlier KLA import.
 	const known = new Map();
 	const origins = new Map(DATA.layouts.map((layout) => [layout.id, layout.origin]));
-	for (const layout of DATA.layouts)
-		if (layout.source !== SOURCE_ID) known.set(signature(layout.rows, codes), layout.id);
+	// The first layout of an arrangement is the one a duplicate repeats.
+	for (const layout of DATA.layouts) {
+		const sig = signature(layout.rows, codes);
+		if (layout.source !== SOURCE_ID && !known.has(sig)) known.set(sig, layout.id);
+	}
 	const taken = new Set(DATA.layouts.filter((l) => l.source !== SOURCE_ID).map((l) => l.id));
 	const names = new Set(DATA.layouts.filter((l) => l.source !== SOURCE_ID).map((l) => l.name));
 	const files = fs.readdirSync(path.join(klaDir, 'layouts')).sort((a, b) => {
@@ -264,6 +306,7 @@ function classify(klaDir) {
 	const imported = [];
 	const notImported = [];
 	const credits = {};
+	const duplicates = new Set();
 	for (const file of files) {
 		const json = JSON.parse(fs.readFileSync(path.join(klaDir, 'layouts', file), 'utf8'));
 		const sourcePath = `layouts/${file}`;
@@ -275,7 +318,7 @@ function classify(klaDir) {
 				...(sameAs ? { same_as: sameAs } : {})
 			});
 		if (LEFT_OUT[file]) {
-			leave(LEFT_OUT[file]);
+			leave(LEFT_OUT[file].reason, LEFT_OUT[file].same_as);
 			continue;
 		}
 		const { layout, unmapped } = F.fromKla(json);
@@ -286,8 +329,10 @@ function classify(klaDir) {
 		}
 		const sig = signature(layout.rows, codes);
 		if (known.has(sig)) {
-			const sameAs = known.get(sig);
-			leave('the same letters and digits as a library layout', sameAs);
+			const stated = STATED_DUPLICATES[file] || {};
+			const sameAs = stated.same_as || known.get(sig);
+			duplicates.add(file);
+			leave(stated.reason || 'the same letters and digits as a library layout', sameAs);
 			// A registry or reference layout is credited from this repository.
 			const author = (AUTHORS[file] || [json.author])[0];
 			if (
@@ -332,6 +377,11 @@ function classify(klaDir) {
 		if (authors.length > 0 && !authors.some((author) => COLLECTION_AUTHOR.test(author)))
 			credits[id] = { authors, url: linkOf(json) };
 	}
+	// A stated reason whose file the rules no longer find a duplicate would be
+	// lost silently.
+	for (const file of Object.keys(STATED_DUPLICATES))
+		if (files.includes(file) && !duplicates.has(file))
+			throw new Error(`${file}: STATED_DUPLICATES names a file that is not a duplicate`);
 	return { imported, notImported, credits, library };
 }
 
@@ -350,7 +400,7 @@ function inPlace(list, fresh, keyOf) {
 	for (const entry of list) {
 		if (entry.source !== SOURCE_ID) out.push(entry);
 		else if (byKey.has(keyOf(entry))) {
-			out.push(byKey.get(keyOf(entry)));
+			out.push(keptFields(entry, byKey.get(keyOf(entry))));
 			byKey.delete(keyOf(entry));
 		}
 	}
@@ -358,14 +408,51 @@ function inPlace(list, fresh, keyOf) {
 }
 
 /**
- * Writes the library and the credits.
- * @param {string} klaDir - The KLA checkout.
+ * A fresh entry with the fields stated by hand on its earlier entry, which
+ * the import does not produce (a layout's `dead_keys`).
+ * @param {object} earlier - The library's entry.
+ * @param {object} fresh - This import's entry.
+ * @returns {object} The fresh entry, then the earlier entry's other fields.
  */
-function main(klaDir) {
-	if (!klaDir || !fs.existsSync(path.join(klaDir, 'layouts')))
-		throw new Error(
-			'usage: node tools/build/import-kla-layouts.cjs <checkout of patorjk/keyboard-layout-analyzer>'
-		);
+function keptFields(earlier, fresh) {
+	if (!('rows' in fresh)) return fresh;
+	const out = { ...fresh };
+	for (const [field, value] of Object.entries(earlier))
+		if (!IMPORTED_FIELDS.has(field)) out[field] = value;
+	return out;
+}
+
+/**
+ * The credits with this import's: an earlier KLA credit replaced at its place
+ * or removed, a checked credit kept, a new one appended. The other
+ * collections' credits, of the same basis, are not this import's.
+ * @param {object} credits - The credit file's credits (id → credit).
+ * @param {object} fresh - This import's credits (id → {authors, url}).
+ * @param {Set<string>} earlier - The ids of the library's earlier KLA layouts.
+ * @returns {object} The new credits.
+ */
+function creditsInPlace(credits, fresh, earlier) {
+	const entry = (credit) => ({
+		authors: credit.authors,
+		...(credit.url ? { url: credit.url } : {}),
+		basis: CREDIT_BASIS
+	});
+	const out = {};
+	for (const [id, credit] of Object.entries(credits)) {
+		if (credit.basis !== CREDIT_BASIS || !(earlier.has(id) || fresh[id])) out[id] = credit;
+		else if (fresh[id]) out[id] = entry(fresh[id]);
+	}
+	for (const [id, credit] of Object.entries(fresh)) if (!out[id]) out[id] = entry(credit);
+	return out;
+}
+
+/**
+ * The library and the credit file with this import's entries, unwritten.
+ * @param {string} klaDir - The KLA checkout.
+ * @param {object} creditFile - The parsed credit file.
+ * @returns {{library: object, creditFile: object, imported: object[], notImported: object[]}} The result.
+ */
+function importInto(klaDir, creditFile) {
 	const { imported, notImported, credits, library } = classify(klaDir);
 	const earlier = new Set(
 		library.layouts.filter((entry) => entry.source === SOURCE_ID).map((entry) => entry.id)
@@ -377,21 +464,24 @@ function main(klaDir) {
 		notImported,
 		(entry) => entry.source_path
 	);
+	creditFile.credits = creditsInPlace(creditFile.credits, credits, earlier);
+	return { library, creditFile, imported, notImported };
+}
+
+/**
+ * Writes the library and the credits.
+ * @param {string} klaDir - The KLA checkout.
+ */
+function main(klaDir) {
+	if (!klaDir || !fs.existsSync(path.join(klaDir, 'layouts')))
+		throw new Error(
+			'usage: node tools/build/import-kla-layouts.cjs <checkout of patorjk/keyboard-layout-analyzer>'
+		);
+	const { library, creditFile, imported, notImported } = importInto(
+		klaDir,
+		JSON.parse(fs.readFileSync(CREDITS_PATH, 'utf8'))
+	);
 	fs.writeFileSync(LIBRARY_PATH, `${JSON.stringify(library, null, '\t')}\n`);
-	const creditFile = JSON.parse(fs.readFileSync(CREDITS_PATH, 'utf8'));
-	// An earlier KLA import's credits are replaced and a checked credit kept;
-	// the other collections' credits, of the same basis, are not this file's.
-	for (const [id, entry] of Object.entries(creditFile.credits))
-		if (entry.basis === CREDIT_BASIS && (earlier.has(id) || credits[id]))
-			delete creditFile.credits[id];
-	for (const [id, credit] of Object.entries(credits)) {
-		if (creditFile.credits[id]) continue;
-		creditFile.credits[id] = {
-			authors: credit.authors,
-			...(credit.url ? { url: credit.url } : {}),
-			basis: CREDIT_BASIS
-		};
-	}
 	fs.writeFileSync(CREDITS_PATH, `${JSON.stringify(creditFile, null, '\t')}\n`);
 	console.log(
 		`import-kla-layouts — ${imported.length} imported, ${notImported.length} not imported ` +
@@ -405,4 +495,4 @@ function main(klaDir) {
 
 if (require.main === module) main(process.argv[2]);
 
-module.exports = { classify, signature, loadReaders };
+module.exports = { classify, importInto, signature, loadReaders };
