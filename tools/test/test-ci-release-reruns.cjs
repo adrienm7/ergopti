@@ -1025,6 +1025,26 @@ function requiredAssets(channel) {
 				.replace('$LINUX_BUNDLE_ASSET', LINUX_BUNDLE)
 		);
 }
+/**
+ * Whether the shipped signing policy requires the update assets' .sig files,
+ * asked of its owner exactly as the release preflight asks it.
+ * @returns {boolean}
+ */
+function updateSigningExpected() {
+	const answer = spawnSync(
+		process.execPath,
+		[path.join(ROOT, 'tools/build/update-asset-signature.cjs'), 'expects-signatures'],
+		{
+			cwd: ROOT,
+			encoding: 'utf8'
+		}
+	);
+	assert.equal(answer.status, 0, `expects-signatures failed: ${answer.stderr}`);
+	const value = answer.stdout.trim();
+	assert.ok(value === 'yes' || value === 'no', `expects-signatures answered ${value}`);
+	return value === 'yes';
+}
+
 if (requiredAssets('dev').length < 10)
 	throw new Error(`parsed only ${requiredAssets('dev').length} required asset(s)`);
 
@@ -1261,7 +1281,10 @@ function preflight(
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
 	const layout = uploaded ? uploadedLayout(channel) : new Map();
-	for (const name of requiredAssets(channel)) {
+	// Once asset_signing.json names the update key, the preflight also requires
+	// each update asset's detached signature: the lanes sign them, so do these.
+	const signed = updateSigningExpected() ? [`ErgoptiPlus.exe.sig`, `${LINUX_BUNDLE}.sig`] : [];
+	for (const name of [...requiredAssets(channel), ...signed]) {
 		if (name === missingAsset) continue;
 		const target = path.join(assets, ...(layout.get(name) || name).split('/'));
 		fs.mkdirSync(path.dirname(target), { recursive: true });
