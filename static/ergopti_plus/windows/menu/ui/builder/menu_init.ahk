@@ -731,6 +731,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,
 		MenuCommand.COMPOSER_CHECK, ComposerCheck_Command,
 		MenuCommand.FIELD_CHECK_NETWORK, NetworkCheck_Command,
+		MenuCommand.FIELD_CHECK_ALL, (*) => FieldCheckAll_Command(),
 		MenuCommand.REPORT_BUG,      (*) => HealthCheck_ReportBug(),
 		MenuCommand.SUGGEST_FEATURE, (*) => HealthCheck_SuggestFeature(),
 		ConfigLeaf.SHOW_ERROR_DIALOG, (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),

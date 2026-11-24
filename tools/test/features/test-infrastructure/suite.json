@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "js-no-pinned-source-reads-linux",
-			"ordinal": 545,
+			"ordinal": 546,
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
@@ -526,7 +526,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 557,
+			"ordinal": 558,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
@@ -534,7 +534,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 591,
+			"ordinal": 592,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],
@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 671,
+			"ordinal": 672,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],
@@ -550,7 +550,7 @@
 		},
 		{
 			"id": "js-0543",
-			"ordinal": 684,
+			"ordinal": 685,
 			"name": "startup benchmark fixture paths follow app_dirs.toml",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],
@@ -558,7 +558,7 @@
 		},
 		{
 			"id": "generators-registered",
-			"ordinal": 726,
+			"ordinal": 727,
 			"name": "every file-writing codegen script is in the generator registry, and the pre-commit hook regenerates before formatting",
 			"cmd": "node",
 			"args": ["tools/test/test-generators-registered.cjs"],
@@ -566,7 +566,7 @@
 		},
 		{
 			"id": "js-0548",
-			"ordinal": 728,
+			"ordinal": 730,
 			"name": "Windows native test waits read the shared settle bound, children included",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-native-settle-bound.cjs"],

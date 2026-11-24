@@ -709,7 +709,7 @@
 		},
 		{
 			"id": "js-user-action-vectors",
-			"ordinal": 556,
+			"ordinal": 557,
 			"name": "the run_command, open_path and run_apple_shortcut parameter rule is one shared corpus both Lua suites replay",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-user-action-vectors-shared.cjs"],
@@ -717,7 +717,7 @@
 		},
 		{
 			"id": "js-keystats-token-encoding",
-			"ordinal": 563,
+			"ordinal": 564,
 			"name": "n-gram keys read the same on the dashboard, and every driver emits the shared marker list",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-keystats-token-encoding.cjs"],
@@ -725,7 +725,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-preference-update",
-			"ordinal": 575,
+			"ordinal": 576,
 			"name": "hotstring editor preference updates preserve unsaved drafts",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-preference-update.cjs"],
@@ -733,7 +733,7 @@
 		},
 		{
 			"id": "js-personal-editor-initialization",
-			"ordinal": 576,
+			"ordinal": 577,
 			"name": "personal information editor preserves edits across delayed initialization",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-editor-initialization.cjs"],
@@ -741,7 +741,7 @@
 		},
 		{
 			"id": "js-token-prompt-focus",
-			"ordinal": 578,
+			"ordinal": 579,
 			"name": "token prompt focus retries preserve typing and user focus",
 			"cmd": "node",
 			"args": ["tools/test/test-token-prompt-focus.cjs"],
@@ -749,7 +749,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-trailing-enter",
-			"ordinal": 579,
+			"ordinal": 580,
 			"name": "hotstring editor preserves trailing Enter commands when saving",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-trailing-enter.cjs"],
@@ -757,7 +757,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-token-literals",
-			"ordinal": 580,
+			"ordinal": 581,
 			"name": "hotstring editor preserves literal brace groups and prototype names",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-token-literals.cjs"],
@@ -765,7 +765,7 @@
 		},
 		{
 			"id": "js-editors-ime-keyboard",
-			"ordinal": 581,
+			"ordinal": 582,
 			"name": "editor keyboard shortcuts preserve input method composition",
 			"cmd": "node",
 			"args": ["tools/test/test-editors-ime-keyboard.cjs"],
@@ -773,7 +773,7 @@
 		},
 		{
 			"id": "js-hotstrings-config-zero-delay",
-			"ordinal": 582,
+			"ordinal": 583,
 			"name": "hotstring settings display zero unlimited delay after saving",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-zero-delay.cjs"],
@@ -781,7 +781,7 @@
 		},
 		{
 			"id": "js-hotstrings-config-number-input",
-			"ordinal": 583,
+			"ordinal": 584,
 			"name": "hotstring numeric settings retain the entered numeric value",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-number-input.cjs"],
@@ -789,7 +789,7 @@
 		},
 		{
 			"id": "js-personal-editor-multiline",
-			"ordinal": 585,
+			"ordinal": 586,
 			"name": "personal information editor preserves multiline fields",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-editor-multiline.cjs"],
@@ -797,7 +797,7 @@
 		},
 		{
 			"id": "capsword-fixed-exits-single-source",
-			"ordinal": 597,
+			"ordinal": 598,
 			"name": "CapsWord fixed exits are one list: the shared policy, the macOS Karabiner anchor, Windows virtual keys and Linux hook names",
 			"cmd": "node",
 			"args": ["tools/test/test-capsword-fixed-exits-single-source.cjs"],
@@ -805,7 +805,7 @@
 		},
 		{
 			"id": "personal-info-tags-single-source",
-			"ordinal": 638,
+			"ordinal": 639,
 			"name": "personal-info named tags are one table: the shared Lua tags and the Windows map and order",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-tags-single-source.cjs"],
@@ -813,7 +813,7 @@
 		},
 		{
 			"id": "hotstring-bare-colon-catalogue",
-			"ordinal": 719,
+			"ordinal": 720,
 			"name": "a bare colon ends a trigger and no shipped catalogue rule rewrites text a bare colon follows",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-bare-colon-catalogue.cjs"],
@@ -821,7 +821,7 @@
 		},
 		{
 			"id": "chord-refused-actions-single-source",
-			"ordinal": 720,
+			"ordinal": 721,
 			"name": "key-combination chords refuse one list of actions: the shared one-shot Shift ids and the Windows and Linux copies",
 			"cmd": "node",
 			"args": ["tools/test/test-chord-refused-actions-single-source.cjs"],

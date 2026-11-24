@@ -33,14 +33,15 @@ local function logger()
 end
 
 --- Native services, replaceable by tests.
---- @param spec table The check's spec (supplies the environment).
+--- @param spec table|nil The check's spec (supplies the environment), or nil for
+---   a caller that runs no environment of its own (« Test everything »).
 --- @return table
 local function native(spec)
 	local I18n = require("core.i18n.engine.i18n")
 	local Shell = require("core.process.adapters.shell_runner")
 	return {
 		translate = I18n.get,
-		env = spec.env,
+		env = spec and spec.env,
 		notify = function(message) return require("platform.focus.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
@@ -53,6 +54,27 @@ local function native(spec)
 		copy = function(text) return require("clipboard.adapters.clipboard").write(text) end,
 		defer = function(fn) return require("core.events.loop").defer(fn, 0) end,
 	}
+end
+
+M.native_services = native
+
+--- Shows a finished report from a fresh turn of the event loop, with « Copy
+--- report » and « Close », and copies it on request.
+--- @param services table Native services (or test doubles).
+--- @param log string Logger module tag.
+--- @param title_key string Locale key of the window title.
+--- @param text string The report text.
+function M.show_report(services, log, title_key, text)
+	local translate = services.translate
+	-- The dialog blocks: it opens from a fresh turn of the event loop.
+	services.defer(function()
+		local copy_label, close_label = translate("field_check.copy"), translate("field_check.close")
+		if services.dialog(translate(title_key), text, copy_label, close_label) then
+			local copied = services.copy(text)
+			logger().info(log, "Report copy %s.", copied and "done" or "refused")
+			if copied then services.notify(translate("field_check.copied")) end
+		end
+	end)
 end
 
 --- Creates the runner of one check.
@@ -122,16 +144,7 @@ function M.new(spec)
 		local env_services = services or native(spec)
 		local translate = env_services.translate
 		local started = run_check(env_services, function(result)
-			local text = Report.format_text(result, translate)
-			-- The dialog blocks: it opens from a fresh turn of the event loop.
-			env_services.defer(function()
-				local copy_label, close_label = translate("field_check.copy"), translate("field_check.close")
-				if env_services.dialog(translate(spec.title_key), text, copy_label, close_label) then
-					local copied = env_services.copy(text)
-					logger().info(spec.log, "Report copy %s.", copied and "done" or "refused")
-					if copied then env_services.notify(translate("field_check.copied")) end
-				end
-			end)
+			M.show_report(env_services, spec.log, spec.title_key, Report.format_text(result, translate))
 		end)
 		if not started then env_services.notify(translate("field_check.busy")) end
 		return started
