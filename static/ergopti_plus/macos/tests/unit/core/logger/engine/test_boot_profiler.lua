@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: boot_profiler Unit Tests
 --- DESCRIPTION:
---- Validates the boot-phase profiler: begin() resets the origin, stage() opens
+--- Validates the boot-phase profiler: begin() sets the origin once, stage() opens
 --- a named stage with a START line, mark() closes it with a SUCCESS line that
 --- carries the stage duration, the delta since the previous mark and the
 --- running total, and every one of those lines also reaches the synchronous
@@ -107,6 +107,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 		reset_capture()
 		WALL_SEC = 100.0
 		CLOCK_NS = 1e12
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage("Phase A")
 		WALL_SEC = 50.0              -- NTP correction must not affect duration.
@@ -135,6 +136,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 		configure_journal()
 		reset_capture()
 		CLOCK_NS = 3e9
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage("Path: log file open")
 		CLOCK_NS = CLOCK_NS + 4e6
@@ -153,6 +155,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 
 	helpers.it("stops copying stages to launcher.log once the user log folder is ready", function()
 		configure_journal()
+		boot._reset_for_test()
 		boot.begin()
 		BootJournal.set_user_log_ready(true)
 		boot.stage("Keymap engine started")
@@ -181,6 +184,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 		configure_journal()
 		reset_capture()
 		CLOCK_NS = 7e9
+		boot._reset_for_test()
 		boot.begin()
 		CLOCK_NS = CLOCK_NS + 1234e6
 		boot.complete()
@@ -195,6 +199,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 	helpers.it("resumes a stage the boot is already inside (boot-stage-resume)", function()
 		reset_capture()
 		configure_journal()
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage_once("Waited stage")
 		CLOCK_NS = CLOCK_NS + 24000e6
@@ -223,6 +228,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 	helpers.it("warns when a mark closes no matching open stage", function()
 		configure_journal()
 		reset_capture()
+		boot._reset_for_test()
 		boot.begin()
 		boot.mark("Never opened")
 		local warning = first("warn")
@@ -232,6 +238,7 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 
 	helpers.it("elapsed_ms reports the running total without logging", function()
 		CLOCK_NS = 200e9
+		boot._reset_for_test()
 		boot.begin()
 		reset_capture()
 		CLOCK_NS = CLOCK_NS + 250e6
@@ -253,6 +260,30 @@ helpers.describe("core.logger.engine.boot_profiler stages (boot-stage-trail)", f
 	end)
 end)
 
+helpers.describe("core.logger.engine.boot_profiler ownership (bpf-04)", function()
+	helpers.it("refuses a second begin() instead of restarting the boot", function()
+		configure_journal()
+		boot._reset_for_test()
+		boot.begin()
+		boot.stage("Core module requires")
+		boot.mark("Core module requires")
+		local ok, err = pcall(boot.begin)
+		helpers.assert_true(not ok, "a second begin() must raise, as on Linux")
+		helpers.assert_true(tostring(err):find("single owner", 1, true) ~= nil, tostring(err))
+		helpers.assert_eq(#boot.slowest_stages(5), 1, "the closed stage survives the refused restart")
+	end)
+
+	helpers.it("refuses a second complete() instead of judging the boot again", function()
+		configure_journal()
+		boot._reset_for_test()
+		boot.begin()
+		boot.complete()
+		local ok, err = pcall(boot.complete)
+		helpers.assert_true(not ok, "a second complete() must raise")
+		helpers.assert_true(tostring(err):find("completes once", 1, true) ~= nil, tostring(err))
+	end)
+end)
+
 helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", function()
 	helpers.it("reports each stage's CPU milliseconds after its wall time", function()
 		configure_journal()
@@ -260,6 +291,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		local cpu = 500
 		boot.use_cpu_clock(function() return cpu end)
 		CLOCK_NS = 40e9
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage("Compute")
 		CLOCK_NS = CLOCK_NS + 100e6   -- 100 ms of wall time ...
@@ -291,6 +323,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		local cpu = 10
 		boot.use_cpu_clock(function() return cpu end)
 		CLOCK_NS = 60e9
+		boot._reset_for_test()
 		boot.begin()
 		CLOCK_NS = CLOCK_NS + 300e6
 		cpu = cpu + 120
@@ -304,6 +337,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		configure_journal()
 		reset_capture()
 		CLOCK_NS = 70e9
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage("Hotstring groups registered")
 		boot.complete()
@@ -328,6 +362,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		local cpu = 5
 		boot.use_cpu_clock(function() return cpu end)
 		CLOCK_NS = 80e9
+		boot._reset_for_test()
 		boot.begin()
 		boot.stage("Core module requires")
 		CLOCK_NS = CLOCK_NS + 40e6; cpu = cpu + 30
@@ -353,6 +388,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		local cpu = 0
 		boot.use_cpu_clock(function() return cpu end)
 		CLOCK_NS = 90e9
+		boot._reset_for_test()
 		boot.begin()
 		for _, stage in ipairs({ { "short", 5e6 }, { "long", 40e6 }, { "middle", 20e6 } }) do
 			boot.stage(stage[1])
@@ -367,6 +403,7 @@ helpers.describe("core.logger.engine.boot_profiler CPU time beside wall time", f
 		helpers.assert_eq(#slowest, 2)
 		helpers.assert_eq(slowest[1].name, "long")
 		helpers.assert_eq(slowest[2].name, "middle")
+		boot._reset_for_test()
 		boot.begin()
 		helpers.assert_nil(boot.boot_cpu_ms(), "a new boot starts without the previous figures")
 		helpers.assert_eq(#boot.slowest_stages(3), 0)
@@ -394,6 +431,7 @@ helpers.describe("core.logger.engine.boot_profiler sub-stages and require trace"
 			return {}
 		end
 		local native_require = require
+		boot._reset_for_test()
 		boot.begin()
 		boot.trace_requires()
 		boot.stage("Traced stage")
@@ -417,6 +455,7 @@ helpers.describe("core.logger.engine.boot_profiler sub-stages and require trace"
 			lines[#lines + 1] = string.format(fmt, ...)
 			return true
 		end
+		boot._reset_for_test()
 		boot.begin()
 		helpers.assert_eq(boot.sub("orphan"), nil, "no open stage, no sub-stage")
 		boot.stage("Long stage")
