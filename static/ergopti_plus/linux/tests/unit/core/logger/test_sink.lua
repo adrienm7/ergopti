@@ -1172,7 +1172,11 @@ helpers.describe("linux-bootstrap-log", function()
 			local content = read_file(dir .. "/" .. require("core.fs.engine.app_dirs").files.bootstrap_log)
 			helpers.assert_not_nil(content, "the pre-configuration log must exist")
 			helpers.assert_contains(content, "[ERROR] [bootstrap] Privacy initialization refused; daemon not started.")
-			helpers.assert_contains(content, "this start yielded")
+			-- A second start yielding to the live daemon is the single-owner rule
+			-- working, a WARNING as on Windows: the field log read it as a failure.
+			helpers.assert_contains(content, "[WARNING] [bootstrap] Another daemon owns the session lock; this start yielded.")
+			helpers.assert_eq(content:find("[ERROR] [bootstrap] Another daemon", 1, true), nil,
+				"a yielding second start is not an ERROR (linux-bootstrap-yield-severity)")
 			local lines = 0
 			for _ in content:gmatch("[^\n]+") do lines = lines + 1 end
 			helpers.assert_eq(lines, 2)
