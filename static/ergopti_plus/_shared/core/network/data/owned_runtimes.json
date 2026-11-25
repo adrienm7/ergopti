@@ -977,6 +977,21 @@
 		},
 		{
 			"os": "linux",
+			"tool": "`busctl` (session bus)",
+			"programs": ["busctl"],
+			"used_for": "The field run's live tray and session checks read the tray menu and the session over the session bus (`linux/diagnostics/adapters/bus_query.lua`)",
+			"today": "Host (systemd)",
+			"current_class": "OPT",
+			"version_needed": "any",
+			"if_missing": "The tray and session checks report busctl as missing",
+			"pin_possible": "No (ships with systemd)",
+			"decision": "OPT",
+			"decision_text": "OPT",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
 			"tool": "`kanata --version`, `df`, `ls` in the health check",
 			"programs": ["df", "ls"],
 			"used_for": "Probe line only (`linux/diagnostics/ui/healthcheck/probes.lua:17,270`)",

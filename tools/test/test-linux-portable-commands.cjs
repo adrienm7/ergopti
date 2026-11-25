@@ -654,7 +654,10 @@ const PROGRAMS = {
 	foot: packageManager('Wayland terminal window of the container desktop proofs', HOST),
 	kwin_wayland: packageManager('KWin compositor of the container desktop proofs', HOST),
 	'gnome-shell': packageManager('GNOME Shell compositor of the container desktop proofs', HOST),
-	busctl: packageManager("reads logind's inhibitor list in the container desktop proofs", HOST),
+	busctl: optionalTool(
+		"session bus requests of the field run's tray and session checks, and logind's inhibitor list in the container desktop proofs",
+		DRIVER_HOST
+	),
 	'systemd-inhibit': packageManager(
 		"lists logind's inhibitors in the container desktop proofs",
 		HOST
