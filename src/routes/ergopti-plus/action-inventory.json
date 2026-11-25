@@ -1593,23 +1593,6 @@
 		"reasons": {}
 	},
 	{
-		"path": "sg_actions.microsoft_bold",
-		"labels": { "fr": "𝐁 Ctrl+B Microsoft (→ Ctrl+G)", "en": "𝐁 Ctrl+B Microsoft (→ Ctrl+G)" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
-		"reasons": {
-			"macos": {
-				"en": "Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.",
-				"fr": "Windows uniquement : Microsoft Office en français met en gras avec Ctrl+G là où les autres applications utilisent Ctrl+B, d’où le choix de la touche selon l’application. Sous macOS (Cmd+B) et Linux (Ctrl+B), une seule combinaison convient partout : associez-la depuis « Raccourcis ».",
-				"equivalents": []
-			},
-			"linux": {
-				"en": "Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.",
-				"fr": "Windows uniquement : Microsoft Office en français met en gras avec Ctrl+G là où les autres applications utilisent Ctrl+B, d’où le choix de la touche selon l’application. Sous macOS (Cmd+B) et Linux (Ctrl+B), une seule combinaison convient partout : associez-la depuis « Raccourcis ».",
-				"equivalents": []
-			}
-		}
-	},
-	{
 		"path": "sg_actions.paste_plain",
 		"labels": { "fr": "⎘ Coller sans mise en forme", "en": "⎘ Paste without formatting" },
 		"platforms": { "windows": true, "macos": true, "linux": true },

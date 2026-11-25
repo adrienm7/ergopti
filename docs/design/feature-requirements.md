@@ -202,7 +202,6 @@ two disagree in either direction.
 | `shortcuts.keyboard.secondary_star`                           | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.primary_b`                                | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keyboard.primary_o`                                | n/a             | `evdev`, `uinput`                      | —                    |
-| `shortcuts.keyboard.primary_q`                                | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_a`                                   | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_d`                                   | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_g`                                   | n/a             | n/a                                    | —                    |

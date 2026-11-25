@@ -233,7 +233,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 Test("neutral slots: a Win slot binds its physical key, not a textual chord (win-s-open-target)", _KSNR_WinSlotBindsItsPhysicalKey)
 
 ; RemapKey registers Ctrl and Alt of every key it remaps, so a slot on that chord was
-; refused as another producer's on each boot: Ctrl+B never ran microsoft_bold.
+; refused as another producer's on each boot: a Ctrl+B slot never ran its action.
 _KSNR_CtrlSlotSharesTheLayoutChord() {
 	global RemappedList, KeyboardShortcutAssignments
 	SavedList := RemappedList

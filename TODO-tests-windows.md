@@ -166,7 +166,7 @@ Layouts` key. Re-saving the source under another `dll_name` with « Installer et
 - [ ] Shortcuts > Key combinations > « Copy tap → combo », then a chord fires the copied action.
 - [ ] SCD-3 (2026-11-13): with a non-Ergopti layout emulated and « Ctrl+B » set to an action, Ctrl+AltGr+B runs it;
       with the slot set to nothing, Ctrl+AltGr+B sends Ctrl+B.
-- [ ] Win+S, Win+E, Win+H and Ctrl+B on a real keyboard (Ctrl+B now runs `microsoft_bold`).
+- [ ] Win+S, Win+E, Win+H and Ctrl+B on a real keyboard (Ctrl+B now wraps the line in parentheses).
 - [ ] Hold LCtrl through Ctrl+Alt+Del or UAC, come back, press AltGr: it stays AltGr. Confirm raw 0x21D in the log for an
       AltGr press: it unblocks the `left_ctrl` + `alt_gr` pair and the terminal recipe alias.
 - [ ] Item 49: the terminal-capture hardware list. Item 91: held-alone-then-joined order, AltGr hook provenance.

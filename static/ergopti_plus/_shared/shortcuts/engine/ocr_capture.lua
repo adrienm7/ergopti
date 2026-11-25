@@ -42,9 +42,7 @@ M.NOTICES = {
 	failed = { key = "ocr_capture.failed", level = "error" },
 }
 
-local function trim(text)
-	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
-end
+local trim = require("core.text.engine.utils_core").trim
 
 --- The clipboard text of OCR words: one line per OCR line, in reading order.
 --- @param words table { { text, line } } as the screen vision service returns them.

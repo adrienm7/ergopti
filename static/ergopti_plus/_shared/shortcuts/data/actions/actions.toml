@@ -1528,11 +1528,6 @@ requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 platform = "all"
 emit_linux = "Caps_Lock"
 
-[sg_actions.microsoft_bold]
-platform = "ahk"
-reason_hs = "platform_reason.action_office_bold_key_is_windows"
-reason_linux = "platform_reason.action_office_bold_key_is_windows"
-
 [sg_actions.paste_plain]
 # Windows and macOS put the text form alone back on the clipboard and paste it,
 # then restore the clipboard; Linux types the clipboard text through its
@@ -2098,7 +2093,6 @@ items = [
     "teleport_mouse",
     "spotlight_mouse",
     "toggle_capslock",
-    "microsoft_bold",
     "--",
     "##tapholds",
     "one_shot_shift",

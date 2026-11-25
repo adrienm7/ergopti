@@ -477,7 +477,7 @@ meta_t = "teleport_mouse"
 meta_u = "uppercase_selection"
 meta_w = "titlecase_selection"
 meta_x = "pick_color"
-primary_b = "microsoft_bold"
+primary_b = "surround_parens"
 primary_shift_v = "none"
 
 [shortcuts.search]

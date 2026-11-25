@@ -297,7 +297,6 @@ list = []
 
 [shortcuts]
 get_hex_value = false
-microsoft_bold = false
 title_case = true
 uppercase = true
 paste_without_formatting = true

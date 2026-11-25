@@ -75,7 +75,7 @@ OcrCaptureText(Words) {
 ; Runs one capture: select, recognise, copy, notify.
 ; Ports: Map select(Callback(Path, Reason)) — Path "" and Reason "cancelled"
 ; on Escape; recognize(Path, Callback(Words, Reason)); set_clipboard(Text) ->
-; Boolean; notify(Key, Level, Lines); remove(Path); log(Level, Message).
+; Boolean; notify(Key, Level, Lines); remove(Path); log(Level, Message, Args*).
 ; Done: Callback(Outcome, Reason) once the run ended, or "".
 OcrCaptureRun(Ports, Done := "") {
 	for Name in ["select", "recognize", "set_clipboard", "notify", "remove", "log"]
@@ -89,7 +89,7 @@ _OcrCaptureFinish(Ports, Done, Outcome, Reason := "", Lines := "") {
 	if Notices.Has(Outcome)
 		Ports["notify"].Call(Notices[Outcome][1], Notices[Outcome][2], Lines)
 	if (Outcome == "failed")
-		Ports["log"].Call("warn", "OCR capture failed: reason=" . Reason . ".")
+		Ports["log"].Call("warn", "OCR capture failed: reason={1}.", Reason)
 	else if (Outcome == "cancelled")
 		Ports["log"].Call("info", "OCR capture cancelled.")
 	if HasMethod(Done)
@@ -116,6 +116,6 @@ _OcrCaptureRecognised(Ports, Done, Path, Words, Reason := "") {
 	}
 	if !Ports["set_clipboard"].Call(Result[1])
 		return _OcrCaptureFinish(Ports, Done, "failed", "clipboard_write_failed")
-	Ports["log"].Call("info", "OCR capture copied " . Result[2] . " line(s), " . StrLen(Result[1]) . " character(s).")
+	Ports["log"].Call("info", "OCR capture copied {1} line(s), {2} character(s).", Result[2], StrLen(Result[1]))
 	_OcrCaptureFinish(Ports, Done, "copied", "", Result[2])
 }

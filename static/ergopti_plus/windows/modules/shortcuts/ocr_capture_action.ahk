@@ -50,11 +50,11 @@ _OcrCaptureNotify(Key, Level, Lines) {
 	try NotifierSend(StrReplace(t(Key), "{1}", Lines), Map("level", Level))
 }
 
-_OcrCaptureLog(Level, Message) {
+_OcrCaptureLog(Level, Message, Args*) {
 	switch Level {
-		case "warn": LoggerWarn("OcrCapture", Message)
-		case "error": LoggerError("OcrCapture", Message)
-		default: LoggerInfo("OcrCapture", Message)
+		case "warn": LoggerWarn("OcrCapture", Message, Args*)
+		case "error": LoggerError("OcrCapture", Message, Args*)
+		default: LoggerInfo("OcrCapture", Message, Args*)
 	}
 }
 
