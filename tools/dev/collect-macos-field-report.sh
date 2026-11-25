@@ -117,11 +117,8 @@ bash "$REPO_ROOT/tools/dev/macos-accept-xcode-license.sh" \
 	|| { printf '[field-report] ERROR: the Xcode license blocks python3 and swift (reason above).\n' >&2; exit 1; }
 set +e
 # The folders and file names come from their shared declarations, never from
-# a copy here (tools/dev/field-report-paths.py). The topical logs that help a
-# diagnosis; the hotstring and keystroke logs can carry typed text and stay.
-FIELD_TOPICAL_LOGS="llm ollama mlx boot karabiner menu gestures"
-# shellcheck disable=SC2086 # one word per log name
-field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
+# a copy here (tools/dev/field-report-paths.py).
+field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared")" \
 	|| { printf '[field-report] ERROR: cannot resolve the driver folders.\n' >&2; exit 1; }
 eval "${field_paths}"
 BUNDLED_HOTSTRINGS="static/ergopti_plus/_shared/hotstrings/data/catalogue"
@@ -262,8 +259,7 @@ finalize() {
 	# Resolved again: the app's first boot can write LogsDirPath during the run,
 	# and the folders read at start then pointed at yesterday's logs (field
 	# report 2026-11-05). Which one is said without the path, which names the home.
-	# shellcheck disable=SC2086 # one word per log name
-	field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
+	field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared")" \
 		&& eval "${field_paths}"
 	if [ "${LOG_DIR}" = "${LOG_DEFAULT_DIR}" ]; then
 		printf '%-28s default folder\n' "log_folder" >> "${steps}"
@@ -284,10 +280,6 @@ finalize() {
 			for f in "${LOG_DIR}/${LOG_UNIFIED_PREFIX}${d}${LOG_EXTENSION}" "${LOG_DIR}/${LOG_ERRORS_PREFIX}${d}${LOG_EXTENSION}"; do
 				[ -f "${f}" ] && scrub_log "${f}"
 			done
-		done
-		for f in ${LOG_TOPICAL}; do
-			f="${LOG_DIR}/${f}"
-			[ -f "${f}" ] && scrub_log "${f}"
 		done
 		for d in "${days[@]}"; do
 			f="${out}/${LOG_UNIFIED_PREFIX}${d}${LOG_EXTENSION}"
