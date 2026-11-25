@@ -621,7 +621,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
       more than one character (most of them, `ion` ← `i#`), with letter conditions or on the repeat key are left
       out and listed, since a magic rule types one character after at most two. Choose: keep this, or let a table
       outlive its keys (then the format must accept an unused table) and let a rule type a text.
-
+- [ ] **Source reads a behaviour test already covers (decided by the agent on 2026-11-25, to review by the
+      maintainer).** Converting the Windows meta tests, a source read whose invariant an existing behaviour test
+      already fails on (`PLC_Stop`'s three resets, the SHA-256 sentinel's « no DJB2 ») is deleted rather than kept
+      beside it, and a functions-only production file the runner did not load (`infra/script_altgr_hotkeys.ahk`)
+      is now loaded so its functions run instead of being scanned. Kept meanwhile: both. Choose:
+  1. **(recommended) Keep it**: one behaviour test per invariant, a meta test only where no behaviour can fail.
+  2. Keep each source read beside its behaviour test as a second, structural witness.
 - [ ] **Where a tray setting shows its help (decided by the agent on 2026-11-25, to review by the maintainer).** The
       review of `docs/audits/accessibility/tray-settings-help-review.json` found 17 setting rows whose label does not say their
       effect (« WPM », « CapsWord », « Copilot-style », « ROI », « Chained hotstrings (a → b → c) »…). A native menu
