@@ -400,6 +400,15 @@ function M.on_message(payload, _state, context)
 	return answer
 end
 
+--- Answers the webview manager's windowless delivery: open_window() announces
+--- the error itself by a notification when show() fails, so the manager's own
+--- missing-component notice would only repeat it.
+--- @param _info table { app_name, component, locale, detail }
+--- @return boolean delivered
+function M.on_window_unavailable(_info)
+	return true
+end
+
 --- Frees the policy when the user closes the window with its close box.
 --- @param epoch number|nil
 function M.on_window_closed(epoch)

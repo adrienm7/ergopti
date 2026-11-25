@@ -910,6 +910,15 @@ function M.on_window_closed(epoch)
 	cancel_probes(previous)
 end
 
+--- Delivers the report when the webview manager cannot acquire a native window
+--- (lgi or WebKitGTK 4.1 missing, or the window refused): a report exists to be
+--- read when things are broken, so it never depends on the window toolkit.
+--- @param info table { app_name, component, locale, detail } from the webview manager.
+--- @return boolean delivered
+function M.on_window_unavailable(info)
+	return require("diagnostics.ui.healthcheck.report").deliver_without_window(info)
+end
+
 --- Opens the diagnostics window. An open window is replaced, as on macOS and
 --- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened

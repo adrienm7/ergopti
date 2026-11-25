@@ -318,6 +318,15 @@ function M.on_message(payload, _state, context)
 	return answer
 end
 
+--- Answers the webview manager's windowless delivery: run() goes on without
+--- the window, says so in a notice, and at the end shows the report in a
+--- dialog, so the manager's notice would only repeat it.
+--- @param _info table { app_name, component, locale, detail }
+--- @return boolean delivered
+function M.on_window_unavailable(_info)
+	return true
+end
+
 --- The person closed the window with its close box: the run stops with it.
 --- @param _epoch number|nil
 function M.on_window_closed(_epoch)
