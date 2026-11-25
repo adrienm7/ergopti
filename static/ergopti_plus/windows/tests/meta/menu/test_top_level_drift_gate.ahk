@@ -192,6 +192,7 @@ global _DG_BUILDER_TITLES := Map(
 	"llm",             'LLM_Menu_TrayTitle()',
 	"agent",           't("menu.agent.title")',
 	"metrics",         't("menu.metrics.title")',
+	"keep_awake",      't("menu.keep_awake.title")',
 	"shortcuts",       'MenuRenderer_GroupReceiver("top_level", "shortcuts")',
 	"tap_holds",       'MenuRenderer_GroupReceiver("top_level", "tap_holds")',
 	"gestures",        'MenuRenderer_GroupReceiver("top_level", "gestures")',
