@@ -576,7 +576,10 @@ window can be refused on a working daemon. Every refusal ends in
 write their approved report as a self-contained HTML file under the logs'
 `diagnostics/` folder and open it in the browser, and the field report and
 error window answer true because their callers already go on without the
-window. Any other page gets one notice naming the missing component, logged at
+window. The layout manager is core: its bridge offers, in a native question,
+to install and activate Ergopti through the same registry operations, and the
+Layout menu carries those actions as rows (`ui/layout_manager/tray_actions.lua`).
+Any other page gets one notice naming the missing component, logged at
 WARN; only a refusal with the toolkit present and no delivery still logs the
 ERROR whose text the error notice repeats. Action: a new page whose content
 must survive a missing toolkit declares `on_window_unavailable`; never add

@@ -1261,6 +1261,17 @@ OPENS_SUBMENU.layout_system_install = [
 	kind: 'compose',
 	native_sources: { ahk: 'windows/modules/keymap/system_layout_install.ahk' }
 }));
+// Linux draws the Ergopti rows of the Layout menu from the registry state: the
+// install command when absent, activate and uninstall under an installed one.
+OPENS_SUBMENU.layout_user_install = [
+	'layout_user_install_commands',
+	'layout_user_installed_commands'
+].map((menu) => ({
+	menu,
+	platforms: ['linux'],
+	kind: 'compose',
+	native_sources: { linux: 'linux/ui/layout_manager/tray_actions.lua' }
+}));
 // Each Linux accented-letter shortcut opens its letter picker frame.
 for (const id of ['e_grave', 'e_circ', 'e_acute', 'a_grave'])
 	OPENS_SUBMENU[id] = {

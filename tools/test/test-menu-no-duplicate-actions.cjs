@@ -103,6 +103,7 @@ const LAYOUT_SECTIONS = [
 			'list:layout_switching',
 			'list:compose_input_method',
 			'command:layout_manager',
+			'list:layout_user_install',
 			'list:layout_bundle',
 			'list:layout_system_install'
 		]
