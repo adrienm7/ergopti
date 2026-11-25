@@ -383,6 +383,8 @@ InstallHotstringHooks()
 #Include ../platform/input/text_sender.ahk
 #Include ../core/network/adapters/http_client.ahk
 #Include ../platform/focus/secure_field_detector.ahk
+#Include ../modules/shortcuts/auto_click_matcher.ahk
+#Include ../modules/shortcuts/auto_click_policy.ahk
 #Include ../clipboard/adapters/clipboard.ahk
 #Include ../diagnostics/engine/field_run/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
@@ -714,6 +716,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_swap_cleanup.ahk
 #Include unit/gestures/engine/test_emit_actions.ahk
 #Include unit/gestures/engine/test_incremental_rule.ahk
+#Include unit/modules/shortcuts/test_auto_click_matcher.ahk
 #Include unit/gestures/adapters/test_touchpad_hid.ahk
 #Include unit/gestures/adapters/test_raw_touchpad_owner.ahk
 #Include unit/gestures/engine/test_swipe_slot_menu.ahk

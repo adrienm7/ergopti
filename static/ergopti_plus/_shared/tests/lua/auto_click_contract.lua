@@ -135,6 +135,10 @@ function M.register(helpers, options)
 			helpers.assert_eq(Matcher.check_template(M.template(match_corpus, "button")), true, "button template")
 		end)
 
+		helpers.it("rounds gray as every driver does", function()
+			helpers.assert_eq(Matcher.gray(255, 0, 255), 105, "BT.601 gray of magenta")
+		end)
+
 		helpers.it("clicks the centre of a match in screen points", function()
 			local x, y = Matcher.click_point({ x = 100, y = 50 }, 2, { x = 50, y = 30, width = 48, height = 24 })
 			helpers.assert_eq(x, 137, "x")
