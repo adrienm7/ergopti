@@ -342,6 +342,7 @@
 		"test:error-dialog-page": "node ./tools/test/test-error-dialog-page.cjs",
 		"test:update-check-dialog": "node ./tools/test/test-update-check-dialog.cjs",
 		"test:config-cleanup-page": "node ./tools/test/test-config-cleanup-page.cjs",
+		"test:emulation-picker-page": "node ./tools/test/test-emulation-picker-page.cjs",
 		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",
 		"test:js-feature-inventory": "node ./tools/test/test-js-feature-inventory.cjs",
 		"test:js-feature-results": "node ./tools/test/test-js-feature-results.cjs",

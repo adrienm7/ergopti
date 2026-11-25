@@ -1,0 +1,73 @@
+{
+	"_comment": "The layouts chosen last for the emulation (layout.emulated_layout_recents) and the quick choices of the « Layout to emulate » menu, replayed by macOS and Linux (_shared/layouts/engine/emulation/recents.lua) and Windows (windows/modules/keymap/keylayout/emulation_recents.ahk) so the three menus draw the same rows. Each case uses count 3, the shipped emulation.recent_count of _shared/layouts/data/defaults.json, which the count field pins. after: the list once choice is chosen. quick: the ids drawn under « None » while current is in force, offered naming the layouts the catalogue lists.",
+	"count": 3,
+	"after": [
+		{
+			"name": "a first choice starts the list",
+			"recents": [],
+			"choice": "bepo",
+			"expected": ["bepo"]
+		},
+		{
+			"name": "the chosen layout moves to the head",
+			"recents": ["bepo", "ergol", "ergopti"],
+			"choice": "ergopti",
+			"expected": ["ergopti", "bepo", "ergol"]
+		},
+		{
+			"name": "a fourth layout drops the oldest",
+			"recents": ["bepo", "ergol", "ergopti"],
+			"choice": "colemak",
+			"expected": ["colemak", "bepo", "ergol"]
+		},
+		{
+			"name": "None is never recorded",
+			"recents": ["bepo", "ergol"],
+			"choice": "none",
+			"expected": ["bepo", "ergol"]
+		},
+		{
+			"name": "choosing the head again keeps the order",
+			"recents": ["bepo", "ergol"],
+			"choice": "bepo",
+			"expected": ["bepo", "ergol"]
+		}
+	],
+	"quick": [
+		{
+			"name": "nothing chosen yet offers None alone",
+			"current": "none",
+			"recents": [],
+			"offered": ["ergopti", "ergopti_plus", "bepo"],
+			"expected": []
+		},
+		{
+			"name": "None in force still offers the recent layouts",
+			"current": "none",
+			"recents": ["bepo", "ergol", "ergopti"],
+			"offered": ["ergopti", "ergopti_plus", "bepo", "ergol"],
+			"expected": ["bepo", "ergol", "ergopti"]
+		},
+		{
+			"name": "the layout in force leads even when no menu chose it",
+			"current": "colemak",
+			"recents": ["bepo", "ergol", "ergopti"],
+			"offered": ["ergopti", "bepo", "ergol", "colemak"],
+			"expected": ["colemak", "bepo", "ergol"]
+		},
+		{
+			"name": "the layout in force is not drawn twice",
+			"current": "ergol",
+			"recents": ["bepo", "ergol", "ergopti"],
+			"offered": ["ergopti", "bepo", "ergol"],
+			"expected": ["ergol", "bepo", "ergopti"]
+		},
+		{
+			"name": "a recent layout the catalogue no longer lists is left out",
+			"current": "none",
+			"recents": ["gone", "bepo"],
+			"offered": ["ergopti", "bepo"],
+			"expected": ["bepo"]
+		}
+	]
+}

@@ -385,7 +385,11 @@
 				"emulate_bottom_row": { "type": "boolean" },
 				"ergopti_alt_gr": { "type": "boolean" },
 				"ergopti_variant": { "type": "string", "enum": ["none", "ergopti", "ergopti_plus"] },
-				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
+				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" },
+				"emulated_layout_recents": {
+					"type": "array",
+					"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+				}
 			}
 		},
 

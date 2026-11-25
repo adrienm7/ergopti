@@ -31,6 +31,7 @@ local ConfigKeys = require("settings.engine.keys")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local ManifestData = require("settings.engine.features.manifest_data")
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
+local Recents = require("layouts.engine.emulation.recents")
 local RowsPolicy = require("layouts.engine.layout.rows_policy")
 local TableUtil = require("core.text.engine.table_util")
 
@@ -71,6 +72,7 @@ end
 -- Every leaf read, with its validator.
 M.LEAVES = {
 	{ name = "emulated_layout", path = KEY.LAYOUT_EMULATED_LAYOUT, valid = layout_id },
+	{ name = "recents", path = KEY.LAYOUT_EMULATED_LAYOUT_RECENTS, valid = Recents.valid },
 	{ name = "variant", path = KEY.LAYOUT_ERGOPTI_VARIANT, valid = variant },
 	{ name = "base", path = KEY.LAYOUT_ERGOPTI_BASE, valid = boolean },
 	{ name = "alt_gr", path = KEY.LAYOUT_ERGOPTI_ALT_GR, valid = boolean },
@@ -87,7 +89,7 @@ M.LEAVES = {
 --- @param default_for function (path) -> the manifest default.
 --- @param report function|nil (segments, detail) Called for an outdated leaf.
 --- @return table settings { id = registry id, nil while « None » is selected, base, alt_gr,
----   layout = { emulate_<row> }, number_row, edges }
+---   layout = { emulate_<row> }, number_row, edges, recents = the layouts chosen last }
 function M.resolve(config, default_for, report)
 	if type(config) ~= "table" then error("The emulation settings need a parsed configuration.") end
 	if type(default_for) ~= "function" then error("The emulation settings need the manifest defaults.") end
@@ -116,7 +118,7 @@ function M.resolve(config, default_for, report)
 	-- switches never select one.
 	local id = values.emulated_layout ~= "" and values.emulated_layout or M.VARIANT_LAYOUTS[values.variant] or nil
 	return { id = id, base = values.base, alt_gr = values.alt_gr, layout = layout,
-		number_row = values.number_row, edges = values.edges }
+		number_row = values.number_row, edges = values.edges, recents = values.recents }
 end
 
 --- Whether the settings emulate anything: a selected layout and at least one
@@ -145,12 +147,10 @@ function M.switch_value(settings, path)
 	return settings.layout[name] == true
 end
 
---- The leaves a layout choice writes, as the onboarding choice and the Windows
---- layout manager (_LayMgrWeb_SelectionOperations) write them: the selection
---- only, never a layer switch.
---- @param choice string "none", "ergopti", "ergopti_plus" or a registry id.
---- @return table|nil values path -> value; nil for an invalid choice.
-function M.choice_values(choice)
+--- The selection leaves of a choice alone.
+--- @param choice string
+--- @return table|nil values
+local function selection_values(choice)
 	if choice == "none" then
 		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_VARIANT] = "none" }
 	end
@@ -159,6 +159,22 @@ function M.choice_values(choice)
 	end
 	if type(choice) ~= "string" or not choice:match("^[a-z][a-z0-9_]*$") then return nil end
 	return { [KEY.LAYOUT_EMULATED_LAYOUT] = choice }
+end
+
+--- The leaves a layout choice writes, as the onboarding choice and the Windows
+--- layout manager (_LayMgrWeb_SelectionOperations) write them: the selection
+--- only, never a layer switch. A choice of a layout also moves it to the head
+--- of the recent layouts when the caller passes them
+--- (layouts/engine/emulation/recents.lua); « None » leaves them as they are.
+--- @param choice string "none", "ergopti", "ergopti_plus" or a registry id.
+--- @param recents table|nil The recent layouts in force (M.resolve's recents).
+--- @return table|nil values path -> value; nil for an invalid choice.
+function M.choice_values(choice, recents)
+	local values = selection_values(choice)
+	if values ~= nil and recents ~= nil and choice ~= "none" then
+		values[KEY.LAYOUT_EMULATED_LAYOUT_RECENTS] = Recents.after(recents, choice)
+	end
+	return values
 end
 
 --- Sparse write operations for path -> value, in a stable order.

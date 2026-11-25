@@ -88,6 +88,14 @@
 			"min_height": 380,
 			"vhost": "ergopti.download"
 		},
+		"emulation_picker": {
+			"title_key": "menu.layout.emulated_layout",
+			"width": 440,
+			"height": 520,
+			"min_width": 360,
+			"min_height": 360,
+			"vhost": "ergopti.emulationpicker"
+		},
 		"permission_dialog": {
 			"title_key": "permission_dialog.window_title",
 			"width": 560,

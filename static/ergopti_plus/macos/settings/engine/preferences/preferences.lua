@@ -200,6 +200,8 @@ local KEY_MAP = {
 	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
 	-- types, its two layers and its four rows, as on Windows and Linux.
 	layout_emulated_layout               = { sec = "layout", key = LEAF.EMULATED_LAYOUT          },
+	-- The layouts chosen last, most recent first (layouts/engine/emulation/recents.lua).
+	layout_emulated_layout_recents       = { sec = "layout", key = LEAF.EMULATED_LAYOUT_RECENTS  },
 	layout_ergopti_variant               = { sec = "layout", key = LEAF.ERGOPTI_VARIANT, enum = true },
 	layout_ergopti_base                  = { sec = "layout", key = LEAF.ERGOPTI_BASE             },
 	layout_ergopti_alt_gr                = { sec = "layout", key = LEAF.ERGOPTI_ALT_GR           },

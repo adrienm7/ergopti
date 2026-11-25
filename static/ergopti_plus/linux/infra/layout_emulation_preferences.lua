@@ -79,10 +79,11 @@ function M.set_switch(path, value)
 end
 
 --- Chooses the emulated layout: "none", a built-in Ergopti variant or a registry id.
+--- The layout chosen leads the recent layouts, written in the same batch.
 --- @param choice string
 --- @return boolean committed
 function M.choose(choice)
-	local values = Settings.choice_values(choice)
+	local values = Settings.choice_values(choice, M.settings().recents)
 	if values == nil then
 		Logger.error(LOG, "Refused emulated layout choice %s.", tostring(choice))
 		return false

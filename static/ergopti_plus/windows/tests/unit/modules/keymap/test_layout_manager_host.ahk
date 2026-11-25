@@ -237,7 +237,8 @@ _LMH_EmulationChoiceInstallsFirst() {
 	AssertEqual("install ergol; install ergol", _LMH_JoinLog(Log),
 		"choosing it again installs it and reloads the emulation, never a second selection")
 	Log := []
-	Other := Map("layout", Map("emulated_layout", "", "ergopti_base", false))
+	; Chosen before, Ergo-L is a quick choice of the menu (emulation-quick-picker).
+	Other := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "emulated_layout_recents", ["ergol"]))
 	Rows := _LAY_EmulationChoiceRows(Other, Select, Index, Map(), Refuse, Install, "", After)
 	AssertFalse(InStr(Rows[1]["label"], t("menu.layout.emulation_failed")) > 0, "nothing failed, nothing named")
 	Item(Rows, "Ergo-L")["action"].Call()

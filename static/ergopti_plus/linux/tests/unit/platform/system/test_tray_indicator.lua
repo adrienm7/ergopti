@@ -959,4 +959,72 @@ helpers.describe("tray indicator: dbusmenu toggle export (tray-radio-export)", f
 		end
 		indicator.destroy(); indicator._set_binding_for_test(nil)
 	end)
+
+	helpers.it("(emulation-quick-picker) the recent layouts export as one radio group above « Others… »", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local EmulationRows = require("layouts.engine.emulation.menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
+		local index = { layouts = { { id = "ergopti", name = "Ergopti" }, { id = "bepo", name = "bépo" },
+			{ id = "ergol", name = "Ergo-L" }, { id = "qwerty_lafayette", name = "Lafayette" } } }
+		local current, recents, opened = "ergol", { "ergol", "bepo", "ergopti" }, 0
+		local function tree()
+			local data = EmulationRows.choice_rows({ t = function(key) return key end,
+				settings = { id = current ~= "none" and current or nil, recents = recents },
+				snapshot = { index = index },
+				choose = function(choice)
+					current = choice
+					recents = require("layouts.engine.emulation.recents").after(recents, choice)
+				end,
+				open_picker = function() opened = opened + 1 end, others_rows = function(open)
+					return ManifestMenu.template_rows("layout_emulation_others_commands", { layout_emulation_others = open }, {}, {})
+				end })
+			return ManifestMenu.render_rows(data, "layout_emulation")
+		end
+		-- The rows of the « Layout to emulate » submenu the panel shows now.
+		local function submenu()
+			for _, widget in ipairs(log.widgets) do
+				if widget.submenu and not widget.destroyed and type(widget.label) == "string"
+						and widget.label:find("menu.layout.emulated_layout", 1, true) == 1 then
+					widget.activate()
+					return rows_of(widget.submenu)
+				end
+			end
+			error("no « Layout to emulate » row")
+		end
+		indicator.set_menu(tree())
+		for _, value in ipairs({ "bépo", "onboarding.layout.emulated_none", "onboarding.layout.emulated_ergopti", "Ergo-L" }) do
+			local rows = submenu()
+			local names, ticked, others = {}, {}, nil
+			for _, child in ipairs(rows) do
+				if child.kind == "check" then
+					helpers.assert_eq(child.export.toggle_type, "radio", child.label .. " is one choice of the group")
+					names[#names + 1] = child.label
+					if child.active == 1 then ticked[#ticked + 1] = child.label end
+				elseif child.kind == "item" then
+					helpers.assert_eq(child.label, require("core.i18n.engine.i18n").get("menu.layout.emulation_others"))
+					helpers.assert_nil(child.export, "« Others… » exports no toggle")
+					others = child
+				end
+			end
+			helpers.assert_true(#names <= 4, "None and the three layouts chosen last")
+			helpers.assert_eq(names[1], "onboarding.layout.emulated_none")
+			helpers.assert_eq(#ticked, 1, "exactly one row of the group is ticked")
+			helpers.assert_true(others ~= nil and rows[#rows] == others, "« Others… » closes the submenu")
+			helpers.assert_eq(rows[#rows - 1].kind, "separator", "after a separator")
+			local target = nil
+			for _, child in ipairs(rows) do if child.label == value then target = child end end
+			assert(target, "no quick choice " .. value)
+			target.activate()
+			indicator.set_menu(tree())
+			local after = {}
+			for _, child in ipairs(submenu()) do
+				if child.kind == "check" and child.active == 1 then after[#after + 1] = child.label end
+			end
+			helpers.assert_eq(table.concat(after, ","), value, "the click's choice is the one ticked")
+		end
+		submenu()[#submenu()].activate()
+		helpers.assert_eq(opened, 1, "« Others… » opens the picker")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
 end)

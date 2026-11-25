@@ -18,6 +18,7 @@
 //   changelog_bridge          — _shared/ui/changelog
 //   config_cleanup_bridge     — _shared/ui/config_cleanup
 //   dl_bridge                 — _shared/ui/download_window
+//   emulation_picker_bridge   — _shared/ui/emulation_picker
 //   error_dialog              — _shared/ui/error_dialog
 //   hsEditor                  — _shared/ui/hotstring_editor
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window

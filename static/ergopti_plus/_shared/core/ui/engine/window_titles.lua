@@ -12,6 +12,7 @@ local TITLE_KEYS = {
 	["changelog"] = "changelog_window.window_title",
 	["config_cleanup"] = "dialog.unused_keys.title",
 	["download_window"] = "download_window.window_title",
+	["emulation_picker"] = "menu.layout.emulated_layout",
 	["error_dialog"] = "common.error_title",
 	["field_report"] = "field_report.title",
 	["healthcheck"] = "menu.debug.healthcheck",

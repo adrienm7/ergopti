@@ -98,6 +98,12 @@ local function _build_layouts(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	local EmulationRows = require("layouts.engine.emulation.menu")
+	-- One write for the radio rows and the picker window: stored, then applied live.
+	local function choose_emulation(choice)
+		local committed = require("infra.layout_emulation_preferences").choose(choice)
+		emulation_changed(committed)
+		return committed
+	end
 	providers["layout_emulation"] = function()
 		local Preferences = require("infra.layout_emulation_preferences")
 		local Registry = require("modules.keymap.layout_registry")
@@ -106,7 +112,13 @@ local function _build_layouts(ctx)
 			settings = Preferences.settings(),
 			status = require("modules.keymap.layout_emulation").status(),
 			snapshot = Registry.snapshot(),
-			choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+			choose = choose_emulation,
+			-- « Others… »: every layout, searchable, in the shared picker window.
+			open_picker = require("ui.emulation_picker.bridge").open,
+			others_rows = function(open)
+				return ManifestMenu.template_rows("layout_emulation_others_commands",
+					{ [require("settings.engine.keys").COMMAND.LAYOUT_EMULATION_OTHERS] = open }, {}, {})
+			end,
 		})
 	end
 	local function switch_rows(path, label_key)

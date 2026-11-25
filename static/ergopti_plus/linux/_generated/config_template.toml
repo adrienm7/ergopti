@@ -726,6 +726,7 @@ emulate_top_row = true
 emulate_home_row = true
 emulate_bottom_row = true
 emulated_layout = ""
+emulated_layout_recents = []
 pause_switch_enabled = false
 on_pause = ""
 on_resume = ""

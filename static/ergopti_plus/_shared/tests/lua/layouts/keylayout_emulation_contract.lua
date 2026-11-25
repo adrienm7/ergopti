@@ -249,7 +249,8 @@ function M.register(helpers, shared)
 				return Menu.choice_rows({ t = function(key) return key end,
 					settings = Settings.resolve({ layout = layout }, default_for),
 					status = status or { active = true }, snapshot = index_snapshot(),
-					choose = function(choice) chosen = choice end })
+					choose = function(choice) chosen = choice end, open_picker = function() chosen = "others" end,
+					others_rows = function(open) return require("menu.engine.manifest_menu").template_rows("layout_emulation_others_commands", { layout_emulation_others = open }, {}, {}) end })
 			end
 			local rows = rows_for({ emulated_layout = "bepo", ergopti_base = true })
 			helpers.assert_eq(#rows, 1, "one submenu")
@@ -262,6 +263,17 @@ function M.register(helpers, shared)
 			helpers.assert_eq(labels[1], "onboarding.layout.emulated_none", "none comes first")
 			rows[1].items[1].action()
 			helpers.assert_eq(chosen, "none", "a row chooses its value")
+			-- The quick choices end on « Others… », the picker of every layout
+			-- (maintainer decision of 2026-11-25).
+			local items = rows[1].items
+			helpers.assert_true(items[#items - 1].separator == true, "a separator closes the group")
+			helpers.assert_eq(items[#items].label, require("core.i18n.engine.i18n").get("menu.layout.emulation_others"))
+			items[#items].action()
+			helpers.assert_eq(chosen, "others", "« Others… » opens the picker")
+			local recents = Settings.choice_values("ergol", { "bepo", "ergol" })["layout.emulated_layout_recents"]
+			helpers.assert_eq(recents, { "ergol", "bepo" }, "a choice leads the recent layouts")
+			helpers.assert_nil(Settings.choice_values("none", { "bepo" })["layout.emulated_layout_recents"],
+				"None is never recorded")
 			local off = rows_for({})
 			helpers.assert_true(off[1].items[1].checked, "nothing emulated ticks none")
 			local layers_on = rows_for({ ergopti_base = true, ergopti_alt_gr = true, ergopti_variant = "none" })

@@ -508,10 +508,14 @@
 				"static/ergopti_plus/_shared/layouts/engine/composer/keylayout_emulation.lua",
 				"static/ergopti_plus/_shared/layouts/engine/emulation/settings.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_emulation.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua",
+				"static/ergopti_plus/_shared/layouts/engine/emulation/recents.lua",
+				"static/ergopti_plus/linux/ui/emulation_picker/bridge.lua",
+				"static/ergopti_plus/linux/tests/unit/menu/structure/test_layout_emulation_choice.lua"
 			],
 			"members": [
 				"layout.emulated_layout",
+				"layout.emulated_layout_recents",
 				"layout.ergopti_variant",
 				"layout.ergopti_base",
 				"layout.ergopti_alt_gr",

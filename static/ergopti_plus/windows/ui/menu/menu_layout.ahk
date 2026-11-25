@@ -12,15 +12,20 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\emulation_recents.ahk
+#Include %A_LineFile%\..\..\emulation_picker\init.ahk
 
 
 
 
 /**
- * Layout > « Disposition à émuler »: the same choices as macOS and Linux
- * (_shared/layouts/engine/emulation/menu.lua): none, the built-in Ergopti
- * variants, then the registry layouts the app lists or the layout manager
- * installed. A choice goes through the layout manager's acknowledged handoff,
+ * Layout > « Disposition à émuler »: the same rows as macOS and Linux
+ * (_shared/layouts/engine/emulation/menu.lua): one radio group of « None » and
+ * the quick choices (the layout in force and the ones chosen last,
+ * modules/keymap/keylayout/emulation_recents.ahk), then « Others… », which opens
+ * the picker of every layout: the built-in Ergopti variants, then the registry
+ * layouts the app lists or the layout manager installed (maintainer decision of
+ * 2026-11-25). A choice goes through the layout manager's acknowledged handoff,
  * which restarts the driver on the new selection. A registry layout that is not
  * installed is installed first: the boot never installs (decided on 2026-11-12,
  * as macOS and Linux), so an uninstalled layout stays chosen, named « cannot be
@@ -36,10 +41,12 @@
  *   KeylayoutEmulation_FailedId() by default.
  * @param {Func} AfterFn Port: AfterFn(Id, Action, OnDone) reloads the emulation
  *   after an install; _LayMgrWeb_After by default.
+ * @param {Func} OthersFn Port: OthersFn(Choices, ChooseFn) opens the picker of
+ *   every choice; EmulationPicker_Open by default.
  * @returns {Array} One submenu row holding the choices.
  */
 _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0,
-		InstallFn := 0, FailedId := unset, AfterFn := 0) {
+		InstallFn := 0, FailedId := unset, AfterFn := 0, OthersFn := 0) {
 	global Features, _ConfigDir, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
 	if !IsSet(FeaturesSource)
 		FeaturesSource := Features
@@ -60,6 +67,8 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 		FailedId := KeylayoutEmulation_FailedId()
 	if !HasMethod(AfterFn, "Call")
 		AfterFn := _LayMgrWeb_After
+	if !HasMethod(OthersFn, "Call")
+		OthersFn := EmulationPicker_Open
 	ComposerId := LayoutRegistry_Composer()["id"]
 	Current := LayoutManager_ActiveId(FeaturesSource)
 	Registry := Map()
@@ -95,13 +104,30 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn, NeedsInstall ? InstallFn : 0,
 			Id == Current ? AfterFn : 0)
 	}
-	Items := []
+	Labels := Map()
 	for Pair in Choices {
-		Checked := Pair[1] == Current
-		if Checked
+		Labels[Pair[1]] := Pair[2]
+		if Pair[1] == Current
 			Shown := Pair[2]
-		Items.Push(Map("label", Pair[2], "checked", Checked, "action", ChooseAction(Pair[1])))
 	}
+	; The picker lists every choice but « None », the menu's first row.
+	Picked := []
+	for Pair in Choices
+		if Pair[1] != ""
+			Picked.Push(Map("id", Pair[1], "label", Pair[2], "current", Pair[1] == Current))
+	ChooseFn := (Id) => ChooseAction(Id).Call()
+	; One single-choice group: « None » and the quick choices, exactly one ticked
+	; (a Win32 tray draws the tick the Linux tray draws as a radio).
+	Items := [Map("label", Labels[""], "checked", Current == "", "action", ChooseAction(""))]
+	for Id in EmulationRecents_Quick(Current, EmulationRecents_Read(FeaturesSource), (Id) => Labels.Has(Id))
+		Items.Push(Map("label", Labels[Id], "checked", Id == Current, "action", ChooseAction(Id)))
+	; « Others… » and the separator before it are the menu manifest's rows.
+	Others := MenuRenderer_TemplateRows("layout_emulation_others_commands",
+		Map(MenuCommand.LAYOUT_EMULATION_OTHERS, (*) => OthersFn.Call(Picked, ChooseFn)), Map(), Map())
+	if !(Others is Array)
+		throw Error("The menu manifest refused layout_emulation_others_commands.")
+	for Row in Others
+		Items.Push(Row)
 	; A chosen layout the boot could not emulate stays ticked and named, as macOS
 	; and Linux show their emulation status error.
 	if (Current != "" && FailedId == Current)

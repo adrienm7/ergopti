@@ -1083,6 +1083,9 @@ M.features = {
 		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
 	},
 	{
+		path = "layout.emulated_layout_recents", id = "emulated_layout_recents", section = "layout", default = {  }, type = "array", description_key = "menu.layout.emulation_recents", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
+	},
+	{
 		path = "category_enabled.hotstrings", section = "category_enabled", platforms = { "ahk" },
 	},
 	{

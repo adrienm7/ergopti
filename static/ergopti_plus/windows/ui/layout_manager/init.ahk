@@ -32,6 +32,7 @@
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
 #Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\emulation_recents.ahk
 
 
 
@@ -751,6 +752,9 @@ LayoutManager_SelectTransition(Id, Options := unset) {
 ; Built-in selections keep the existing empty-emulation contract and overlays.
 ; A selection writes only its source: the selection is the one gate of the
 ; layer switches, which it never writes (maintainer decision of 2026-11-23).
+; A layout selected also leads the recent layouts the « Layout to emulate »
+; menu offers, in the same write, as macOS and Linux record it
+; (layouts/engine/emulation/settings.lua choice_values); « None » is never recorded.
 _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 	global ERGOPTI_PLUS_LAYOUT_ID
 	Current := SnapshotFn.Call(Path)
@@ -766,12 +770,15 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, "none"),
 		]
+	Recents := ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT_RECENTS,
+		EmulationRecents_After(Current.Get("recents", []), Id))
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
+			Recents,
 		]
-	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
+	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id), Recents]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
@@ -1248,6 +1255,12 @@ _LayMgrWeb_BuiltinVariantSnapshot(Path) {
 				return Snapshot
 			Snapshot["values"][Field] := Value
 		}
+		; The recent layouts a selection moves its layout to the head of: a list in
+		; another shape is outdated, read as none and replaced by the selection.
+		Recents := _TOML_DocumentLookup(Document, StrSplit(ConfigKey.LAYOUT_EMULATED_LAYOUT_RECENTS, "."))
+		if Recents["blocked"]
+			return Snapshot
+		Snapshot["recents"] := Recents["found"] && EmulationRecents_IsValid(Recents["value"]) ? Recents["value"] : []
 		Snapshot["valid"] := _TOML_WriteSourceMatches(Path, Snapshot["presence"], Snapshot["content"])
 	} catch {
 		Snapshot["valid"] := false
