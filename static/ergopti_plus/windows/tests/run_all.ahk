@@ -181,7 +181,6 @@ OnError(_FatalErrorHandler)
 #Include ../_generated/window_titles.ahk
 #Include ../core/ui/engine/native_dialogs.ahk
 #Include ../core/ui/engine/style.ahk
-#Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk
@@ -489,6 +488,7 @@ InstallSendNoOps()
 #Include unit/core/lifecycle/engine/test_build_commit.ahk
 #Include unit/modules/updater/test_version_display_strips_build_metadata.ahk
 #Include unit/core/logger/test_daily_rotation.ahk
+#Include unit/core/logger/test_retired_topical_logs.ahk
 #Include unit/core/logger/test_volume.ahk
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
@@ -1656,7 +1656,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/hotstrings/engine/engine/test_hse_conform_double_fire.ahk
 #Include meta/ai/menu/test_deferred_build.ahk
 #Include meta/core/logger/test_format_placeholders.ahk
-#Include meta/core/logger/test_sub_files_routing.ahk
 #Include meta/hotstrings/engine/prefix/test_render_deferred.ahk
 #Include meta/hotstrings/engine/prefix/test_visible_suggestion_epoch.ahk
 #Include meta/platform/input/test_serialization.ahk
@@ -2224,7 +2223,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/shortcuts/test_case_transform_synthetic_mark.ahk
 #Include meta/gestures/test_color_picker_hotkey_nonblocking.ahk
 #Include meta/hotstrings/engine/magic_key/test_no_regex_inject.ahk
-#Include meta/core/logger/test_fanout_batched.ahk
 #Include meta/diagnostics/adapters/test_crash_reporter_slash_precedence.ahk
 #Include meta/core/logger/test_flush_on_error.ahk
 #Include meta/platform/system/test_atomic_write_unique_scratch.ahk
@@ -2480,7 +2478,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/core/logger/test_preinit_level.ahk
 #Include unit/core/logger/test_boot_profiler_single_owner.ahk
 #Include unit/core/logger/test_set_level_transaction.ahk
-#Include unit/core/logger/test_sub_files_multiline_arrays.ahk
 #Include unit/hotstrings/engine/engine/test_marker_substituted_in_replacement.ahk
 #Include unit/settings/engine/persistence/test_master_gates_not_persisted.ahk
 #Include unit/core/text/toml/test_parse_toml_file_sticky_unreadable.ahk

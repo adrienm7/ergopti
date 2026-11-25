@@ -18,7 +18,6 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../_generated/app_dirs.ahk
 #Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk
-#Include ../_generated/logger_sub_files.ahk
 #Include ../core/logger/engine/logger.ahk
 #Include ../core/crypto/crypto.ahk
 #Include ../core/fs/adapters/file_system.ahk

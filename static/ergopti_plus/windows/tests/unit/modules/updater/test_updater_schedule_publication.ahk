@@ -183,7 +183,6 @@ _USP_Case(Mode) {
 	global _UpdaterAsyncActionLeases, _UpdaterBackgroundOwner, _UpdaterBackgroundFn
 	global _UpdaterFetchCache, _UpdaterListDiskLoaded, _UpdaterListDiskEntry
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy, _ED_Busy, _ED_PendingRecord
 	AssertFalse(A_IsSuspended)
 	AssertEqual(0, _UpdaterAsyncRequests.Count)
@@ -228,7 +227,6 @@ _USP_Case(Mode) {
 		_UpdaterFetchCache := Map(), _UpdaterListDiskLoaded := true, _UpdaterListDiskEntry := 0
 		_ED_Policy := 0
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		Critical("Off")

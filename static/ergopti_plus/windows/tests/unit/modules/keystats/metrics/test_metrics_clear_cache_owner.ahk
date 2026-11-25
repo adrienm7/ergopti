@@ -207,7 +207,7 @@ _MWCP_Case(Mode) {
 _MWCP_OwnedCase(Mode) {
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
+	global KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
 	static Serial := 0
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedReader := Map()
 	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN",
@@ -242,7 +242,6 @@ _MWCP_OwnedCase(Mode) {
 		AssertTrue(FSWriteCreateDurable(World.ForeignPath, "foreign-disk"))
 		CreatedPaths.Push(World.ForeignPath)
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		LoggerSetTestSink(_MWCP_PurgeLog.Bind(World))
 		KLRCache.db := 0, KLRCache.readonly := false, KLRCache.disposable := false, KLRCache.saved_at := ""

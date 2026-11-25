@@ -32,8 +32,8 @@
 ; `finally` so a red scenario cannot leak suppression into later tests.
 _TLRC_WithDrivenLogger(Scenario) {
 	global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_SUB_PATHS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 
@@ -43,11 +43,9 @@ _TLRC_WithDrivenLogger(Scenario) {
 	SavedLog := LOGGER_LOG_PATH
 	SavedErrors := LOGGER_ERRORS_LOG_PATH
 	SavedDate := _LOGGER_PATH_DATE
-	SavedSubPaths := _LOGGER_SUB_PATHS
 	LOGGER_LOG_PATH := ""
 	LOGGER_ERRORS_LOG_PATH := ""
 	_LOGGER_PATH_DATE := ""
-	_LOGGER_SUB_PATHS := Map()
 	LOGGER_MIN_LEVEL := "DEBUG"
 	_LoggerRefreshFastFlags()
 	_LOGGER_DEDUP_KEY := ""
@@ -73,11 +71,9 @@ _TLRC_WithDrivenLogger(Scenario) {
 		LOGGER_RING_CURSOR := 0
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		LOGGER_LOG_PATH := SavedLog
 		LOGGER_ERRORS_LOG_PATH := SavedErrors
 		_LOGGER_PATH_DATE := SavedDate
-		_LOGGER_SUB_PATHS := SavedSubPaths
 		LOGGER_MIN_LEVEL := SavedLevel
 		_LoggerRefreshFastFlags()
 	}

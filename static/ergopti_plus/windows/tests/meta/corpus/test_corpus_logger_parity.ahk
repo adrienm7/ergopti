@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays the sections of _shared/tests/corpus/logger/parity_vectors.json that
 ; name this driver: the stored log level, a failed format, and the retention of
-; dated and topical files. The macOS and Linux suites replay the same file, so
+; dated files. The macOS and Linux suites replay the same file, so
 ; a rule cannot change on one driver without the corpus saying so.
 ;
 ; CONTRACT:
@@ -14,7 +14,7 @@
 ;    LOGGER_DEFAULT_LEVEL is the corpus default.
 ; 3. A failed Format keeps the template and appends the shared marker; a
 ;    well-formed line carries none.
-; 4. _LoggerDatedLogExpired and _LoggerTopicalLogStale give each case's verdict.
+; 4. _LoggerDatedLogExpired gives each case's verdict.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -89,7 +89,7 @@ _LogParity_RunAll() {
 	Data := JsonParse(FileRead(CorpusPath, "UTF-8"))
 
 	_LogParity_Sections() {
-		for Name in ["level_setting", "detailed_log", "format_failure", "dated_retention", "topical_retention"] {
+		for Name in ["level_setting", "detailed_log", "format_failure", "dated_retention"] {
 			AssertTrue(Data.Has(Name) && Data[Name]["cases"].Length > 0, "the " . Name . " section is empty")
 			Named := false
 			for Driver in Data[Name]["drivers"]
@@ -166,16 +166,6 @@ _LogParity_RunAll() {
 	}
 	for _, Vector in Data["dated_retention"]["cases"]
 		Test("logger parity dated_retention: " . Vector["id"], _LogParity_MakeDatedCase(Vector))
-
-	_LogParity_MakeTopicalCase(Vector) {
-		_Run() {
-			Stale := _LoggerTopicalLogStale(_LogParity_Stamp(Vector["modified"]), _LogParity_Stamp(Vector["now"]))
-			AssertEqual(Vector["removed"] ? true : false, Stale ? true : false, Vector["id"])
-		}
-		return _Run
-	}
-	for _, Vector in Data["topical_retention"]["cases"]
-		Test("logger parity topical_retention: " . Vector["id"], _LogParity_MakeTopicalCase(Vector))
 }
 
 _LogParity_RunAll()

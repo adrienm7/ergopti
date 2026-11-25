@@ -114,7 +114,6 @@ _TCRP_Bytes(Expected, Actual) {
 _TCRP_Case(Mode) {
 	global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles, _TimingsCache
 	global _HealthCheckWarnCount, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	static Sequence := 0
 	AssertFalse(A_IsSuspended)
 	AssertEqual(0, _LOGGER_TEST_SINK, "the test cannot replace a foreign logger observer")
@@ -130,7 +129,6 @@ _TCRP_Case(Mode) {
 	try {
 		DirCreate(Root . "\core\timing\data")
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
 		Critical("Off")
 		F.Exercise()

@@ -143,7 +143,6 @@ _LFO_Case(Mode) {
 	global _LLM_ProfilesCache, _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
@@ -168,7 +167,6 @@ _LFO_Case(Mode) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
 		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true
 		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
@@ -348,7 +346,6 @@ _LSP_Case(Mode) {
 	global _LLM_ProfilesCache, _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
@@ -373,7 +370,6 @@ _LSP_Case(Mode) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
 		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true
 		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
@@ -511,7 +507,6 @@ _RUAG_Case(Mode) {
 	global _LLM_ProfilesCache, _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	Names := ["LLM_REMOTE_MODEL_PRICES", "_LLM_Engine", "_LLM_Menu", "_LLM_Live",
 		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
@@ -536,7 +531,6 @@ _RUAG_Case(Mode) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
 		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true
 		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0

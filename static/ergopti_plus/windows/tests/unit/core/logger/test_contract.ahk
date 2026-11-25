@@ -279,8 +279,8 @@ global _LEV_NOW := 0
 ; Lines receives each line the sink saw, in delivery order.
 _LEV_WithArmedLogger(Body, Path := "") {
 	global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_SUB_PATHS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_REPEAT_ENABLED
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 	global _LEV_NOW
@@ -289,14 +289,12 @@ _LEV_WithArmedLogger(Body, Path := "") {
 	SavedLog := LOGGER_LOG_PATH
 	SavedErrors := LOGGER_ERRORS_LOG_PATH
 	SavedDate := _LOGGER_PATH_DATE
-	SavedSubPaths := _LOGGER_SUB_PATHS
 	SavedArmed := _LOGGER_REPEAT_ENABLED
 	Lines := []
 	_LEV_NOW := 0
 	LOGGER_LOG_PATH := Path
 	LOGGER_ERRORS_LOG_PATH := ""
 	_LOGGER_PATH_DATE := ""
-	_LOGGER_SUB_PATHS := Map()
 	LOGGER_MIN_LEVEL := "DEBUG"
 	_LoggerRefreshFastFlags()
 	_LOGGER_DEDUP_KEY := ""
@@ -307,7 +305,6 @@ _LEV_WithArmedLogger(Body, Path := "") {
 	LOGGER_RING_CURSOR := 0
 	_LOGGER_PENDING := []
 	_LOGGER_PENDING_ERRORS := []
-	_LOGGER_SUB_PENDING := Map()
 	_LOGGER_CLOCK_FN := () => _LEV_NOW * 1000
 	_LOGGER_STAMP_FN := () => FormatTime(DateAdd("20260115100000", _LEV_NOW, "Seconds"), "yyyy-MM-dd HH:mm:ss") . ":000"
 	LoggerSetTestSink((L) => Lines.Push(L))
@@ -331,11 +328,9 @@ _LEV_WithArmedLogger(Body, Path := "") {
 		LOGGER_RING_CURSOR := 0
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		LOGGER_LOG_PATH := SavedLog
 		LOGGER_ERRORS_LOG_PATH := SavedErrors
 		_LOGGER_PATH_DATE := SavedDate
-		_LOGGER_SUB_PATHS := SavedSubPaths
 		LOGGER_MIN_LEVEL := SavedLevel
 		_LoggerRefreshFastFlags()
 	}

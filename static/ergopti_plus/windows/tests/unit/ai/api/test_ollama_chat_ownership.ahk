@@ -109,7 +109,6 @@ _ORPR_PrivateResponseDiagnostics(Mode) {
 	global _LLM_Ollama_IsReady, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	PreviousCritical := Critical("On")
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
@@ -125,7 +124,6 @@ _ORPR_PrivateResponseDiagnostics(Mode) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "a foreign logger flush cannot be detached")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
 		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
 		LoggerSetTestSink((Line) => Lines.Push(Line))

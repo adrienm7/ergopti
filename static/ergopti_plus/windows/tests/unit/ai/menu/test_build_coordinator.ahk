@@ -180,11 +180,11 @@ _LMBCO_ClosedBuildObservation() {
 	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE
 	global _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_REPEAT_ENABLED, _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT
-	global _LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LOGGER_SUB_PENDING
+	global _LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
 	Saved := [_LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE,
 		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS,
 		_LOGGER_REPEAT_ENABLED, _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT,
-		_LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LOGGER_SUB_PENDING]
+		_LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR]
 	Lines := [], State := Map("suspended", false, "builds", 0)
 	Coordinator := LLMMenuBuildCoordinator(_LMBCO_BuildCount.Bind(State),
 		_LMBCO_IsSuspended.Bind(State))
@@ -196,7 +196,6 @@ _LMBCO_ClosedBuildObservation() {
 		_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
 		_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_LEVEL := "INFO", _LOGGER_DEDUP_COUNT := 0
 		_LastErrTime := 0, LOGGER_RING_BUFFER := [], LOGGER_RING_CURSOR := 0
-		_LOGGER_SUB_PENDING := Map()
 		AssertTrue(Coordinator.Request("toggle_committed"))
 		AssertTrue(Coordinator.Request("private-build-reason-sentinel"))
 		AssertEqual(2, State["builds"], "observation must preserve actual build execution")
@@ -220,7 +219,6 @@ _LMBCO_ClosedBuildObservation() {
 		_LOGGER_REPEAT_ENABLED := Saved[7]
 		_LOGGER_DEDUP_KEY := Saved[8], _LOGGER_DEDUP_LEVEL := Saved[9], _LOGGER_DEDUP_COUNT := Saved[10]
 		_LastErrTime := Saved[11], LOGGER_RING_BUFFER := Saved[12], LOGGER_RING_CURSOR := Saved[13]
-		_LOGGER_SUB_PENDING := Saved[14]
 	}
 }
 Test("llm menu coordinator: real requests emit only closed buffered metadata (llm-build-reason-observation)",

@@ -141,7 +141,6 @@ _PIRP_Case(Mode) {
 	global ScriptInformation, HSE_RuntimeDecisionGeneration, _TomlUnreadableFiles
 	global _PrefixInputHook, _PrefixVisibleFireDecisions, _HealthCheckWarnCount
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	static Sequence := 0
 	AssertFalse(A_IsSuspended)
 	AssertFalse(_PrefixInputHook)
@@ -167,7 +166,6 @@ _PIRP_Case(Mode) {
 		_ReadPersonalInfoTomlCache := false
 		ScriptInformation["PersonalInfoTomlPath"] := Path
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false
 		_LOGGER_PATH_DATE := ""
 		Critical("Off")

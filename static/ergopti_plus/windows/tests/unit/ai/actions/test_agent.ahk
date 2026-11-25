@@ -950,7 +950,7 @@ class _TZF_ClockProbe {
 _TZF_ContextFromMissingRegistry(Probe) {
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _LOGGER_VOLUME
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	PreviousCritical := Critical("On")
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
@@ -962,7 +962,6 @@ _TZF_ContextFromMissingRegistry(Probe) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""

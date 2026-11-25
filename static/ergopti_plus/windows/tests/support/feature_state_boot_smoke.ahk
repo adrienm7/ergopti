@@ -34,7 +34,6 @@ global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
-#Include ..\..\_generated\logger_sub_files.ahk
 #Include ..\..\_generated\app_dirs.ahk
 #Include ..\..\apps\engine\folders.ahk
 #Include ..\..\settings\engine\migration\legacy_folder_migration.ahk

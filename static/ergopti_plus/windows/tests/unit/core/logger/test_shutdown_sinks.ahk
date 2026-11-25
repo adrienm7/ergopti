@@ -11,18 +11,17 @@
 
 #Include ../../../support/filesystem_write_lock.ahk
 _LSS_Queue(Sink) {
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
-	return Sink == "main" ? _LOGGER_PENDING
-		: Sink == "errors" ? _LOGGER_PENDING_ERRORS : _LOGGER_SUB_PENDING.Get("fixture", [])
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	return Sink == "main" ? _LOGGER_PENDING : _LOGGER_PENDING_ERRORS
 }
 
 _LSS_Shutdown(Sink) {
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
 	Saved := {
-		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING],
-		Paths: [LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE],
+		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS],
+		Paths: [LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE],
 		Flags: [_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES]
 	}
 	Path := _FSWL_Path()
@@ -37,10 +36,8 @@ _LSS_Shutdown(Sink) {
 		AssertTrue(IsObject(Lock), "the real read handle must deny concurrent writers")
 		_LOGGER_PENDING := Sink == "main" ? [Line] : []
 		_LOGGER_PENDING_ERRORS := Sink == "errors" ? [Line] : []
-		_LOGGER_SUB_PENDING := Sink == "topical" ? Map("fixture", [Line]) : Map()
 		LOGGER_LOG_PATH := Sink == "main" ? Path : ""
 		LOGGER_ERRORS_LOG_PATH := Sink == "errors" ? Path : ""
-		_LOGGER_SUB_PATHS := Sink == "topical" ? Map("fixture", Path) : Map()
 		; An empty date preserves the exact fixture paths without a rollover.
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_DROPPED_LINES := 0
@@ -62,7 +59,6 @@ _LSS_Shutdown(Sink) {
 		AssertTrue(LoggerPrepareShutdown(), "released sharing denial must permit durable shutdown")
 		AssertEqual(0, _LOGGER_PENDING.Length)
 		AssertEqual(0, _LOGGER_PENDING_ERRORS.Length)
-		AssertEqual(0, _LOGGER_SUB_PENDING.Count)
 		Expected := Seed . Line . "`r`n"
 		AssertEqual(Expected, FileRead(Path, "UTF-8"), "the exact debt must reach its own sink once")
 		AssertEqual(StrPut(Expected, "UTF-8") - 1, FileGetSize(Path))
@@ -77,11 +73,9 @@ _LSS_Shutdown(Sink) {
 		} finally {
 			_LOGGER_PENDING := Saved.Queues[1]
 			_LOGGER_PENDING_ERRORS := Saved.Queues[2]
-			_LOGGER_SUB_PENDING := Saved.Queues[3]
 			LOGGER_LOG_PATH := Saved.Paths[1]
 			LOGGER_ERRORS_LOG_PATH := Saved.Paths[2]
-			_LOGGER_SUB_PATHS := Saved.Paths[3]
-			_LOGGER_PATH_DATE := Saved.Paths[4]
+			_LOGGER_PATH_DATE := Saved.Paths[3]
 			_LOGGER_FLUSH_ACTIVE := Saved.Flags[1]
 			_LOGGER_FORCE_FLUSH_PENDING := Saved.Flags[2]
 			_LOGGER_DROPPED_LINES := Saved.Flags[3]
@@ -90,26 +84,23 @@ _LSS_Shutdown(Sink) {
 }
 Test("Logger: shutdown refuses active or non-durable flush debt (AHK-090)",
 	_LSS_Shutdown.Bind("main"))
-for Sink in ["errors", "topical"]
-	Test("Logger: shutdown retains independent " . Sink . " sink debt (AHK-090)",
-		_LSS_Shutdown.Bind(Sink))
+Test("Logger: shutdown retains independent errors sink debt (AHK-090)",
+	_LSS_Shutdown.Bind("errors"))
 
-; The new privacy fixture owns an explicit topical key, unlike the older fixture.
 _LSS_ReceiptQueue(Sink, Name) {
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
-	return Sink == "main" ? _LOGGER_PENDING
-		: Sink == "errors" ? _LOGGER_PENDING_ERRORS : _LOGGER_SUB_PENDING[Name]
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	return Sink == "main" ? _LOGGER_PENDING : _LOGGER_PENDING_ERRORS
 }
 
 ; Refusal evidence observes the real shutdown owner without owning its queues.
 _LSS_RefusalReceipt(Sink) {
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
 	global _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	Saved := {
-		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING],
-		Paths: [LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE],
+		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS],
+		Paths: [LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE],
 		Flags: [_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES],
 		Owners: [_LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS]
 	}
@@ -125,10 +116,8 @@ _LSS_RefusalReceipt(Sink) {
 		AssertTrue(IsObject(Lock))
 		_LOGGER_PENDING := Sink == "main" ? [PrivateMarker] : []
 		_LOGGER_PENDING_ERRORS := Sink == "errors" ? [PrivateMarker] : []
-		_LOGGER_SUB_PENDING := Sink == "topical" ? Map(PrivateMarker, [PrivateMarker]) : Map()
 		LOGGER_LOG_PATH := Sink == "main" ? Path : ""
 		LOGGER_ERRORS_LOG_PATH := Sink == "errors" ? Path : ""
-		_LOGGER_SUB_PATHS := Sink == "topical" ? Map(PrivateMarker, Path) : Map()
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_DROPPED_LINES := 0
 		_LOGGER_FORCE_FLUSH_PENDING := false
@@ -173,16 +162,13 @@ _LSS_RefusalReceipt(Sink) {
 		AssertEqual(0, Denied["force_flush_pending"])
 		AssertEqual(Sink == "main" ? 1 : 0, Denied["main_lines"])
 		AssertEqual(Sink == "errors" ? 1 : 0, Denied["error_lines"])
-		AssertEqual(Sink == "topical" ? 1 : 0, Denied["topical_queues"])
-		AssertEqual(Sink == "topical" ? 1 : 0, Denied["topical_lines"])
 		AssertEqual(Seed, FileRead(Path, "UTF-8"))
 		AssertEqual(1, _LSS_ReceiptQueue(Sink, PrivateMarker).Length)
 		AssertEqual(PrivateMarker, _LSS_ReceiptQueue(Sink, PrivateMarker)[1])
-		AssertEqual(11, Denied.Count, "only the closed primitive schema may leave the logger")
+		AssertEqual(9, Denied.Count, "only the closed primitive schema may leave the logger")
 		ExpectedKeys := Map("phase", true, "flush_active", true, "force_flush_pending", true,
 			"append_owners", true, "append_debts", true, "append_repairs", true,
-			"main_lines", true, "error_lines", true, "topical_queues", true, "topical_lines", true,
-			"last_append_failure", true)
+			"main_lines", true, "error_lines", true, "last_append_failure", true)
 		AssertTrue(RegExMatch(Denied["last_append_failure"],
 			"^(none|owner|privacy_config|redaction|debt_repair|open|write|flush)$"),
 			"the refused append stage comes from the closed set, never log text")
@@ -197,8 +183,7 @@ _LSS_RefusalReceipt(Sink) {
 			}
 		}
 		_LSS_ReceiptQueue(Sink, PrivateMarker).Push(PrivateMarker)
-		AssertEqual(1, Denied[Sink == "main" ? "main_lines"
-			: Sink == "errors" ? "error_lines" : "topical_lines"], "receipt must be detached")
+		AssertEqual(1, Denied[Sink == "main" ? "main_lines" : "error_lines"], "receipt must be detached")
 		_LSS_ReceiptQueue(Sink, PrivateMarker).Pop()
 		Denied["main_lines"] := 999
 		AssertEqual(1, _LSS_ReceiptQueue(Sink, PrivateMarker).Length, "caller changes cannot mutate a logger queue")
@@ -217,11 +202,9 @@ _LSS_RefusalReceipt(Sink) {
 		} finally {
 			_LOGGER_PENDING := Saved.Queues[1]
 			_LOGGER_PENDING_ERRORS := Saved.Queues[2]
-			_LOGGER_SUB_PENDING := Saved.Queues[3]
 			LOGGER_LOG_PATH := Saved.Paths[1]
 			LOGGER_ERRORS_LOG_PATH := Saved.Paths[2]
-			_LOGGER_SUB_PATHS := Saved.Paths[3]
-			_LOGGER_PATH_DATE := Saved.Paths[4]
+			_LOGGER_PATH_DATE := Saved.Paths[3]
 			_LOGGER_FLUSH_ACTIVE := Saved.Flags[1]
 			_LOGGER_FORCE_FLUSH_PENDING := Saved.Flags[2]
 			_LOGGER_DROPPED_LINES := Saved.Flags[3]
@@ -231,7 +214,7 @@ _LSS_RefusalReceipt(Sink) {
 		}
 	}
 }
-for Sink in ["main", "errors", "topical"]
+for Sink in ["main", "errors"]
 	Test("Logger: refusal evidence keeps " . Sink . " ownership and private data intact (AHK-090)",
 		_LSS_RefusalReceipt.Bind(Sink))
 
@@ -248,20 +231,18 @@ _LSS_BurstFlush(State, Force := false) {
 }
 
 _LSS_ShutdownDrainsBurst() {
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
-	Saved := [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, LOGGER_LOG_PATH,
-		LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE, _LOGGER_FLUSH_ACTIVE,
+	Saved := [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH,
+		LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_FLUSH_ACTIVE,
 		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES]
 	Path := _FSWL_Path()
 	try {
 		_LOGGER_PENDING := ["first-line"]
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		LOGGER_LOG_PATH := Path
 		LOGGER_ERRORS_LOG_PATH := ""
-		_LOGGER_SUB_PATHS := Map()
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_FLUSH_ACTIVE := false
 		_LOGGER_FORCE_FLUSH_PENDING := false
@@ -278,10 +259,9 @@ _LSS_ShutdownDrainsBurst() {
 	} finally {
 		try FileDelete(Path)
 		_LOGGER_PENDING := Saved[1], _LOGGER_PENDING_ERRORS := Saved[2]
-		_LOGGER_SUB_PENDING := Saved[3], LOGGER_LOG_PATH := Saved[4]
-		LOGGER_ERRORS_LOG_PATH := Saved[5], _LOGGER_SUB_PATHS := Saved[6]
-		_LOGGER_PATH_DATE := Saved[7], _LOGGER_FLUSH_ACTIVE := Saved[8]
-		_LOGGER_FORCE_FLUSH_PENDING := Saved[9], _LOGGER_DROPPED_LINES := Saved[10]
+		LOGGER_LOG_PATH := Saved[3], LOGGER_ERRORS_LOG_PATH := Saved[4]
+		_LOGGER_PATH_DATE := Saved[5], _LOGGER_FLUSH_ACTIVE := Saved[6]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[7], _LOGGER_DROPPED_LINES := Saved[8]
 	}
 }
 Test("Logger: shutdown drains lines logged during its own flushes (logger-shutdown-burst)",

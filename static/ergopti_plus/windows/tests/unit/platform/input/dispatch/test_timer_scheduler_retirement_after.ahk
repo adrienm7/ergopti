@@ -183,7 +183,6 @@ _TSRA_Case(Mode) {
 	global _TIMER_ADAPTER_REGISTRY
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	PreviousCritical := Critical("On")
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
@@ -200,7 +199,6 @@ _TSRA_Case(Mode) {
 		AssertFalse(SavedLogger.FlushActive,
 			"a foreign logger flush cannot be detached by a timer continuation control")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_TEST_SINK := _TSRA_Log.Bind(State), _LOGGER_REPEAT_ENABLED := false
 		_LOGGER_ERROR_ENABLED := true
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""

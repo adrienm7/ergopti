@@ -129,7 +129,6 @@ _TCWP_Bytes(Expected, Actual) {
 _TCWP_Case(Mode) {
 	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, _TomlUnreadableFiles, _HSResolveGen
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy, _ED_Busy, _ED_PendingRecord
 	static Sequence := 0
 	AssertFalse(A_IsSuspended)
@@ -157,7 +156,6 @@ _TCWP_Case(Mode) {
 		; Keep the genuine error logger and health hook, with no UI policy admitted.
 		_ED_Policy := 0
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		Critical("Off")
