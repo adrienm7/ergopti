@@ -305,6 +305,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-menu-no-duplicate-actions.cjs"],
 			"repro": "node tools/test/test-menu-no-duplicate-actions.cjs"
+		},
+		{
+			"id": "menu-settings-help-review",
+			"ordinal": 737,
+			"name": "every tray setting row is reviewed for help text, self-explained or needing help with its reason (WCAG 3.3.5)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-settings-help-review.cjs"],
+			"repro": "npm run test:menu-settings-help-review"
 		}
 	]
 }

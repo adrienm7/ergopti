@@ -1293,6 +1293,25 @@ test:metrics-cards-explained`) requires help text on every card and fails
 on the page before. The Studio's 37 metrics all have their definition
 (`layout_analysis.info.<id>`).
 
+### Help text of the tray settings (WCAG 3.3.5, 2026-11-25, Paris time)
+
+A tray row has no help line: Win32 menus have no item tooltips and dbusmenu
+carries none, only macOS could show one. Every setting row of menu.toml
+(87 checks, choices and toggles) was read for whether its label says its
+effect; the verdict and its reason per row are in
+[tray-settings-help-review.json](tray-settings-help-review.json), and
+`tools/test/test-menu-settings-help-review.cjs` refuses a setting row that
+has none, or an entry whose row is gone. 70 rows say their effect (a master
+switch, a row nested under the one it changes, a value among its siblings,
+a label with its own parenthesis); 17 do not: an abbreviation never
+expanded (« WPM », twice), a community term (« CapsWord »), another
+product's name as the explanation (« Copilot-style », twice), jargon
+(« temperature », « ROI »), a symbol or a diagram instead of words (« ★
+Preview », « a → b → c », « x1 »), or a label that names a place and no
+effect (« Number row », « Karabiner virtual keyboard », the edge keys, the
+update channel, the personal file's tooltip, the suggestion's
+indentation). Where their help goes is a maintainer decision (TODO.md).
+
 ### Reading preferences in the app windows, done
 
 The fonts moved from `static/fonts/` to `_shared/ui/fonts/`, beside the

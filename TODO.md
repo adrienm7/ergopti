@@ -211,8 +211,12 @@ baseline as violations go.
       are done too: 8 more end with their step and the 32 others are classified, each with its reason, so a new
       code fails the test until it has one or the other. Every card of the typing dashboard says what it counts
       behind its « i » (the AI and hotstring cards had `title` attributes only;
-      `npm run test:metrics-cards-explained`), and the Studio's 37 metrics all have their definition. Left: the
-      tray settings, whose rows carry no help line of their own, were not reviewed for one.
+      `npm run test:metrics-cards-explained`), and the Studio's 37 metrics all have their definition. The tray
+      settings were reviewed on 2026-11-25: each of the 87 setting rows of menu.toml is classified in
+      `docs/audits/accessibility/tray-settings-help-review.json` (`npm run test:menu-settings-help-review` refuses an unreviewed
+      row); 70 say their effect in their label, 17 need a help text, each with what it must add. Left: those 17
+      help texts, in 21 locales, once the maintainer has chosen where a tray row shows its help (« Maintainer
+      decisions pending »).
 
 ## Ergopti Studio
 
@@ -610,6 +614,15 @@ Each question names the default kept meanwhile; an answer moves into the item or
       never sees. Kept meanwhile: both, proved by the app windows gate's self-check. The other choice is to count
       them and add a fixture state per hidden screen and a pixel check for SVG labels.
 
+- [ ] **Where a tray setting shows its help (decided by the agent on 2026-11-25, to review by the maintainer).** The
+      review of `docs/audits/accessibility/tray-settings-help-review.json` found 17 setting rows whose label does not say their
+      effect (« WPM », « CapsWord », « Copilot-style », « ROI », « Chained hotstrings (a → b → c) »…). A native menu
+      row has no help line on Windows (Win32 menus have no item tooltips) nor Linux (dbusmenu carries none); macOS
+      can show a tooltip. Kept meanwhile: the labels as they are, the review held by its test. Choose:
+  1. **(recommended) Reword each of the 17 labels** so that it says its effect (« Words per minute in the menu
+     bar »), in the 21 locales: the same on the three OS, nothing to hover.
+  2. A help tooltip per row on macOS and a « What do these settings do? » row opening the configuration page on the
+     three OS.
 - [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
       maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
       nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
