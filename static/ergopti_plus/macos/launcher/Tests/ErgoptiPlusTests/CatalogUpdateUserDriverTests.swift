@@ -386,6 +386,24 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		XCTAssertEqual(cancellations, 0, "retitling must not invoke the cancellation action")
 	}
 
+	func testEscapeClosesThePromptAsItsCloseButtonDoes() throws {
+		_ = NSApplication.shared
+		let presenter = UpdatePromptPanel()
+		defer { presenter.closeAll() }
+		var choices: [Int?] = []
+		let previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
+		presenter.present(UpdatePrompt(title: "t", message: "m", buttons: ["a", "b"]), activate: false) {
+			choices.append($0)
+		}
+		let panel = try newNativePanel(since: previous)
+		let escape = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+			timestamp: 0, windowNumber: panel.windowNumber, context: nil, characters: "\u{1b}",
+			charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: UpdatePromptWindow.escapeKeyCode))
+		panel.keyDown(with: escape)
+		XCTAssertEqual(choices, [nil], "Escape answers once with the close button's « no choice », never a download")
+		XCTAssertFalse(panel.isVisible, "Escape closes the prompt")
+	}
+
 	func testPanelOpensAndClosesWithoutReportingAChoice() {
 		_ = NSApplication.shared
 		let panel = UpdatePromptPanel()
