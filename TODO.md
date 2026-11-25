@@ -192,9 +192,9 @@ baseline as violations go.
       Tab, Shift+Tab and Escape on Xvfb) are walked in CI; none traps the keyboard
       ([audit](docs/audits/accessibility/README.md#keyboard-walk-of-the-native-windows-linux-2026-11-25-paris-time)).
       Left: macOS, whose one native window of its own is the Swift update panel (the others are AppKit's and
-      Hammerspoon's system dialogs). Escape is not bound by its code (no cancel key equivalent, no
-      `cancelOperation(_:)`): make it close the panel as its close button does, with an XCTest run on a Mac, and the
-      walk with Full Keyboard Access (TODO-tests-macos.md `accessibility_voiceover`).
+      Hammerspoon's system dialogs): it closes with Escape as its close button does (« no choice », no download;
+      `testEscapeClosesThePromptAsItsCloseButtonDoes`, proved by the macOS launcher XCTest CI cell). Left: the walk
+      with Full Keyboard Access (TODO-tests-macos.md `accessibility_voiceover`).
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`

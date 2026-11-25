@@ -4,8 +4,8 @@
 // launcher's main queue, which supervises the embedded Hammerspoon process
 // (a Sparkle modal once stalled that supervision in CI). One panel at
 // a time: a prompt with its buttons, or a progress bar. Closing a prompt with
-// its close button reports "no choice", and a progress window reports its
-// onClose; closing either programmatically reports nothing.
+// its close button or Escape reports "no choice", and a progress window
+// reports its onClose; closing either programmatically reports nothing.
 
 import AppKit
 
@@ -22,6 +22,23 @@ private final class UpdatePromptAction: NSObject {
 		// out first and never touch self after running it.
 		let run = handler
 		run()
+	}
+}
+
+/// The update window. Escape closes it as its close button does (WCAG 2.1.2):
+/// the panel has no Cancel button carrying the Escape key equivalent, so a
+/// keyboard user had no way out of a prompt but a choice. The close goes
+/// through the delegate, which reports « no choice » and starts no download.
+final class UpdatePromptWindow: NSPanel {
+	/// The virtual key code of Escape (kVK_Escape, Carbon HIToolbox Events.h).
+	static let escapeKeyCode: UInt16 = 0x35
+
+	override func keyDown(with event: NSEvent) {
+		if event.keyCode == Self.escapeKeyCode && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
+			performClose(nil)
+			return
+		}
+		super.keyDown(with: event)
 	}
 }
 
@@ -190,7 +207,7 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		// fixed autoresizing constraints from the window's frame, which would
 		// win over the rows' own widths.
 		let size = content.fittingSize
-		let panel = NSPanel(
+		let panel = UpdatePromptWindow(
 			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.titled, .closable],
 			backing: .buffered,
