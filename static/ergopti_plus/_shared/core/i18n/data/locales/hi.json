@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "मॉडल रखें",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: हॉटस्ट्रिंग संपादक खोलें",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: हॉटस्ट्रिंग संपादक खोलें",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Windows पर Win+★, Linux पर Super+★, macOS पर Ctrl+★: Mac कीबोर्ड में Windows कुंजी नहीं होती, और वहाँ Ctrl, Cmd के पास खाली मॉडिफ़ायर है।"
+	"platform_reason.star_slot_is_ctrl_on_macos": "Windows पर Win+★, Linux पर Super+★, macOS पर Ctrl+★: Mac कीबोर्ड में Windows कुंजी नहीं होती, और वहाँ Ctrl, Cmd के पास खाली मॉडिफ़ायर है।",
+	"menu.keep_awake.title": "जागृत रखें",
+	"menu.keep_awake.header_presets": "प्रीसेट",
+	"menu.keep_awake.header_options": "सक्रिय प्रीसेट",
+	"menu.keep_awake.keep_awake": "स्लीप रोकें",
+	"menu.keep_awake.auto_click": "स्वचालित क्लिक",
+	"menu.keep_awake.click_count": "किए गए स्वचालित क्लिक: {1}",
+	"keepawake.preset.simple": "साधारण जागृत रखें",
+	"keepawake.preset.vscode": "VS Code में जागृत रखें",
+	"keepawake.preset.teams": "Teams में जागृत रखें",
+	"keepawake.preset_empty": "यह प्रीसेट न स्लीप रोकता है न कुछ क्लिक करता है: « जागृत रखें » मेनू में इसका कोई विकल्प चालू करें।",
+	"keepawake.auto_click_refused": "स्वचालित क्लिक शुरू नहीं हो सके: कारण « जागृत रखें » मेनू में है।",
+	"keepawake.reason.auto_click_wayland": "Wayland किसी ऐप्लिकेशन को पॉइंटर हिलाने नहीं देता; स्वचालित क्लिक के लिए X11 सत्र का उपयोग करें",
+	"keepawake.reason.auto_click_tool_missing": "xdotool इंस्टॉल नहीं है; स्वचालित क्लिक के लिए इसे इंस्टॉल करें",
+	"keepawake.reason.capture_permission_missing": "Ergopti के लिए स्क्रीन रिकॉर्डिंग की अनुमति नहीं है: इसे सिस्टम सेटिंग्स › गोपनीयता और सुरक्षा में अनुमति दें",
+	"keepawake.reason.capture_unavailable": "यहाँ स्क्रीन पढ़ी नहीं जा सकती",
+	"keepawake.reason.ocr_engine_missing": "टेक्स्ट पहचान उपलब्ध नहीं है (Linux पर tesseract इंस्टॉल करें); छवि लक्ष्य अब भी काम करते हैं",
+	"keepawake.reason.ocr_language_missing": "आपकी भाषाओं के लिए कोई टेक्स्ट पहचान भाषा इंस्टॉल नहीं है"
 }

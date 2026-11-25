@@ -42,6 +42,7 @@ const PART_MODULES = new Set([
 	'settings.ui.menu.configuration',
 	'diagnostics.ui.menu_debug',
 	'menu.ui.builder.dialogs',
+	'menu.ui.builder.keep_awake',
 	'menu.ui.ergopti_studio',
 	'gestures.ui.menu.gestures',
 	'hotstrings.ui.menu.hotstrings',

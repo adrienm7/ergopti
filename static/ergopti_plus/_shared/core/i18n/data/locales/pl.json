@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "Zachowaj modele",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Otwórz edytor hotstringów",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Otwórz edytor hotstringów",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ w Windows, Super+★ w Linuksie, Ctrl+★ w macOS: klawiatura Maca nie ma klawisza Windows, a Ctrl jest tam wolnym modyfikatorem obok Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ w Windows, Super+★ w Linuksie, Ctrl+★ w macOS: klawiatura Maca nie ma klawisza Windows, a Ctrl jest tam wolnym modyfikatorem obok Cmd.",
+	"menu.keep_awake.title": "Zapobieganie uśpieniu",
+	"menu.keep_awake.header_presets": "Ustawienia wstępne",
+	"menu.keep_awake.header_options": "Aktywne ustawienie",
+	"menu.keep_awake.keep_awake": "Zapobiegaj uśpieniu",
+	"menu.keep_awake.auto_click": "Automatyczne kliknięcia",
+	"menu.keep_awake.click_count": "Wykonane automatyczne kliknięcia: {1}",
+	"keepawake.preset.simple": "Proste zapobieganie uśpieniu",
+	"keepawake.preset.vscode": "Zapobieganie uśpieniu w VS Code",
+	"keepawake.preset.teams": "Zapobieganie uśpieniu w Teams",
+	"keepawake.preset_empty": "To ustawienie nie zapobiega uśpieniu ani niczego nie klika: włącz jedną z jego opcji w menu « Zapobieganie uśpieniu ».",
+	"keepawake.auto_click_refused": "Nie udało się uruchomić automatycznych kliknięć: menu « Zapobieganie uśpieniu » podaje przyczynę.",
+	"keepawake.reason.auto_click_wayland": "Wayland nie pozwala aplikacjom przesuwać wskaźnika; użyj sesji X11, aby klikać automatycznie",
+	"keepawake.reason.auto_click_tool_missing": "xdotool nie jest zainstalowany; zainstaluj go, aby klikać automatycznie",
+	"keepawake.reason.capture_permission_missing": "Nagrywanie ekranu nie jest dozwolone dla Ergopti: zezwól na nie w Ustawieniach systemowych › Prywatność i ochrona",
+	"keepawake.reason.capture_unavailable": "Nie można tu odczytać ekranu",
+	"keepawake.reason.ocr_engine_missing": "Rozpoznawanie tekstu jest niedostępne (w Linuksie zainstaluj tesseract); cele obrazowe nadal działają",
+	"keepawake.reason.ocr_language_missing": "Nie zainstalowano języka rozpoznawania tekstu dla Twoich języków"
 }

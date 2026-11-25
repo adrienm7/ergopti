@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "Garder les modèles",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★ : Ouvrir l’éditeur de hotstrings",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★ : Ouvrir l’éditeur de hotstrings",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ sous Windows, Super+★ sous Linux, Ctrl+★ sous macOS : un clavier Mac n’a pas de touche Windows, et Ctrl y est le modificateur resté libre à côté de Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ sous Windows, Super+★ sous Linux, Ctrl+★ sous macOS : un clavier Mac n’a pas de touche Windows, et Ctrl y est le modificateur resté libre à côté de Cmd.",
+	"menu.keep_awake.title": "Anti-veille",
+	"menu.keep_awake.header_presets": "Préréglages",
+	"menu.keep_awake.header_options": "Préréglage actif",
+	"menu.keep_awake.keep_awake": "Empêcher la mise en veille",
+	"menu.keep_awake.auto_click": "Clics automatiques",
+	"menu.keep_awake.click_count": "Clics automatiques effectués : {1}",
+	"keepawake.preset.simple": "Anti-veille simple",
+	"keepawake.preset.vscode": "Anti-veille dans VS Code",
+	"keepawake.preset.teams": "Anti-veille dans Teams",
+	"keepawake.preset_empty": "Ce préréglage n’empêche pas la mise en veille et ne clique rien : activez l’une de ses options dans le menu « Anti-veille ».",
+	"keepawake.auto_click_refused": "Les clics automatiques n’ont pas pu démarrer : le menu « Anti-veille » indique pourquoi.",
+	"keepawake.reason.auto_click_wayland": "Wayland ne laisse aucune application déplacer le pointeur ; ouvrez une session X11 pour cliquer automatiquement",
+	"keepawake.reason.auto_click_tool_missing": "xdotool n’est pas installé ; installez-le pour cliquer automatiquement",
+	"keepawake.reason.capture_permission_missing": "L’enregistrement de l’écran n’est pas autorisé pour Ergopti : autorisez-le dans Réglages Système › Confidentialité et sécurité",
+	"keepawake.reason.capture_unavailable": "L’écran ne peut pas être lu ici",
+	"keepawake.reason.ocr_engine_missing": "Aucune reconnaissance de texte n’est disponible (sous Linux, installez tesseract) ; les cibles en image fonctionnent toujours",
+	"keepawake.reason.ocr_language_missing": "Aucune langue de reconnaissance de texte n’est installée pour vos langues"
 }

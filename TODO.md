@@ -552,29 +552,32 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ## Anti-sleep auto-clicker (maintainer request, 2026-11-25)
 
-The decision is in [maintainer decisions](docs/memory/maintainer-decisions.md) (« The anti-sleep mode gains an
-optional auto-clicker »). Done: the shared matcher and policy with their corpora
-(`_shared/shortcuts/engine/auto_click_*.lua`, `_shared/tests/corpus/keep_awake/`), replayed on Lua 5.4 and LuaJIT, and
-their Windows twin (`windows/modules/shortcuts/auto_click_{matcher,policy}.ahk`), replayed by the AHK suite; its first
-hosted Windows run is still to read.
+The decisions are in [maintainer decisions](docs/memory/maintainer-decisions.md) (« The anti-sleep mode gains an
+optional auto-clicker », « Ctrl+O is the OCR capture »). Done: the screen vision service on the three OS
+([docs/design/screen-vision.md](docs/design/screen-vision.md)), the shared matcher, text targets, policy, presets and
+session with their corpora (replayed by the three suites), the « Anti-veille » submenu (presets as a radio group, the
+switches, the click counter, the reasons), Ctrl+M running the active preset on the three OS.
 
-- [ ] **Windows capture:** GDI capture (`PrintWindow` or `BitBlt` + `GetDIBits`) of the foreground window rect into
-      the port's gray image; the AHK loops of the port are slow, so measure a 1600 × 1000 window first and move the
-      scoring loop into the native DLL if a tick exceeds its budget.
-- [ ] **macOS native matcher.** The shared Lua matcher takes about 0.8 s per scale on Lua 5.4 for an 800 × 600
-      window and a 96 × 48 button, too slow for the 700 ms tick in Hammerspoon; capture (`hs.window:snapshot`) and
-      match on the Swift side, pinned by the same corpus, with Screen Recording permission shown as a red
-      `component_status` row when missing.
-- [ ] **Linux capture:** X11 through XGetImage (LuaJIT FFI) of the foreground window, Wayland through the
-      xdg-desktop-portal Screenshot where it runs unattended; elsewhere the option is greyed with a translated reason.
-- [ ] **Menu and runtime on the three OS:** the « Anti-veille » submenu (keep awake, auto-click, « Ajouter un
-      bouton… », import a PNG, the library window, the « clics automatiques » counter), the 700 ms tick and the
-      cooldown in the timings registry, the click then pointer restore, logs through the central logger with the
-      policy's closed reasons, and the library window (`_shared/ui/`, 21 locales, a11y gates, 44 px targets).
+- [ ] **First hosted runs to read:** the macOS launcher worker (`ScreenVisionWorker.swift`, typechecked only against
+      stubs here) and the Windows AHK twins, worker and C# (the C# compiled against .NET Framework 4.8 here; the AHK and
+      PowerShell never ran here).
+- [ ] **Windows C# replay in CI:** the C# matcher replayed the corpus here; add a Windows CI step that runs it from
+      the worker so it stays pinned.
+- [ ] **macOS ScreenCaptureKit:** `CGWindowListCreateImage` is obsoleted from macOS 15; move the capture to
+      `SCScreenshotManager` (macOS 14+) and keep CoreGraphics below it.
+- [ ] **Linux Wayland region capture:** the xdg-desktop-portal Screenshot for a region; today a region needs X11 and
+      the Ctrl+O action keeps the screenshot tool cascade.
+- [ ] **component_status rows:** the capture and OCR problems are red rows of the « Anti-veille » submenu; add them to
+      each driver's component_status list too.
+- [ ] **« Ajouter un bouton… », image import and the library/preset window** (shared WebView, 21 locales, a11y gates,
+      44 px targets, export and import of a preset with its images).
+- [ ] **Ctrl+O OCR capture and the parentheses wrap on Ctrl+B** with its configuration migration.
 - [ ] **Field checks, one per OS**, with a real VS Code Copilot « Autoriser une fois » / « Allow once » prompt:
-      capture the button, turn on auto-click, Ctrl+M: the prompt is clicked once, the pointer returns, the counter
-      rises by one; the same prompt in another app, a system « Allow » dialog, a locked screen and a paused Ergopti
-      are never clicked. macOS on a Retina and a 1x screen, Windows at 100 % and 150 %, Linux on X11 and Wayland.
+      choose « Anti-veille dans VS Code », Ctrl+M: the prompt is clicked once by its caption (light and dark or red
+      theme), the pointer returns, the counter rises by one; a captured image target is clicked the same way; the
+      same prompt in another app, a system « Allow » dialog, a locked screen and a paused Ergopti are never clicked;
+      the first physical input ends the mode. macOS on a Retina and a 1x screen, Windows at 100 % and 150 %, Linux on
+      X11 and on Wayland with VS Code under XWayland.
 
 ## Dev prerelease numbering (maintainer request, 2026-11-23)
 
@@ -681,8 +684,10 @@ Each question names the default kept meanwhile; an answer moves into the item or
       auto-clicker's own pointer move is not taken for the user's. (2) One click per match, then the pointer goes
       back, and one image is not clicked again for 3 s (its cooldown). (3) Only power-of-two scales (½, 1, 2): a
       button captured at 150 % matches at 150 %, not at 100 %; capture it again on the other screen. (4) A flat
-      image (a single colour) is refused at import, since it would match anywhere. The other choices: keep the
-      auto-clicker running through physical input, or add 1.25 / 1.5 scales at the cost of exact integer resizing.
+      image (a single colour) is refused at import, since it would match anywhere. (5) Linux clicks need an X11
+      session or XWayland's pointer (xdotool); under a Wayland session the auto-click switch is greyed with its
+      reason. (6) An unknown lock state counts as locked. The other choices: keep the auto-clicker running through
+      physical input, or add 1.25 / 1.5 scales at the cost of exact integer resizing.
 
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)

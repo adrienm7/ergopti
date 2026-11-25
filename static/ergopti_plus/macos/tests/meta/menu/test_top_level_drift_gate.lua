@@ -39,6 +39,7 @@ local TITLE_KEYS = {
 	llm             = "menu.llm.title",
 	agent           = "menu.agent.title",
 	metrics         = "menu.metrics.title",
+	keep_awake      = "menu.keep_awake.title",
 	shortcuts       = "menu.shortcuts.title",
 	tap_holds       = "menu.tapholds.title",
 	gestures        = "menu.gestures.title",
@@ -218,6 +219,7 @@ local function render_root(manifest_text, paused, command_actions)
 				tap_holds       = build("menu.tapholds.title"),
 				gestures        = build("menu.gestures.title"),
 				apps            = build("menu.apps.title"),
+				keep_awake      = build("menu.keep_awake.title"),
 				about           = build("menu.about.title"),
 			}
 			local ctx = {
@@ -534,6 +536,7 @@ local function with_native_separator_root(body)
 			keystats = component("menu.metrics.title"), shortcuts = component("menu.shortcuts.title"),
 			tap_holds = component("menu.tapholds.title"), gestures = component("menu.gestures.title"),
 			apps = component("menu.apps.title"), about = component("menu.about.title"),
+			keep_awake = component("menu.keep_awake.title"),
 		}
 		local ctx = {paused = false, config = {log_level = 2}, hotfiles = {}, state = {hotstrings = {}},
 			save_prefs = function() return true end, updateMenu = function() end, notify_feature = function() end,

@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "Modelle behalten",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Hotstring-Editor öffnen",
 	"menu.shortcuts.keyboard.secondary_star": "Strg + ★: Hotstring-Editor öffnen",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ unter Windows, Super+★ unter Linux, Strg+★ unter macOS: Eine Mac-Tastatur hat keine Windows-Taste, und Strg ist dort die freie Zusatztaste neben Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ unter Windows, Super+★ unter Linux, Strg+★ unter macOS: Eine Mac-Tastatur hat keine Windows-Taste, und Strg ist dort die freie Zusatztaste neben Cmd.",
+	"menu.keep_awake.title": "Wachhalten",
+	"menu.keep_awake.header_presets": "Voreinstellungen",
+	"menu.keep_awake.header_options": "Aktive Voreinstellung",
+	"menu.keep_awake.keep_awake": "Ruhezustand verhindern",
+	"menu.keep_awake.auto_click": "Automatische Klicks",
+	"menu.keep_awake.click_count": "Automatische Klicks: {1}",
+	"keepawake.preset.simple": "Einfaches Wachhalten",
+	"keepawake.preset.vscode": "Wachhalten in VS Code",
+	"keepawake.preset.teams": "Wachhalten in Teams",
+	"keepawake.preset_empty": "Diese Voreinstellung verhindert weder den Ruhezustand noch klickt sie: Aktivieren Sie eine ihrer Optionen im Menü « Wachhalten ».",
+	"keepawake.auto_click_refused": "Automatische Klicks konnten nicht starten: Das Menü « Wachhalten » nennt den Grund.",
+	"keepawake.reason.auto_click_wayland": "Wayland erlaubt keiner Anwendung, den Zeiger zu bewegen; verwenden Sie für automatische Klicks eine X11-Sitzung",
+	"keepawake.reason.auto_click_tool_missing": "xdotool ist nicht installiert; installieren Sie es für automatische Klicks",
+	"keepawake.reason.capture_permission_missing": "Die Bildschirmaufnahme ist für Ergopti nicht erlaubt: erlauben Sie sie unter Systemeinstellungen › Datenschutz & Sicherheit",
+	"keepawake.reason.capture_unavailable": "Der Bildschirm kann hier nicht gelesen werden",
+	"keepawake.reason.ocr_engine_missing": "Keine Texterkennung verfügbar (unter Linux tesseract installieren); Bildziele funktionieren weiterhin",
+	"keepawake.reason.ocr_language_missing": "Für Ihre Sprachen ist keine Texterkennungssprache installiert"
 }

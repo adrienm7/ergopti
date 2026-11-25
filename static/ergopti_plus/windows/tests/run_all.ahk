@@ -389,6 +389,9 @@ InstallHotstringHooks()
 #Include ../modules/shortcuts/auto_click_matcher.ahk
 #Include ../modules/shortcuts/auto_click_policy.ahk
 #Include ../modules/shortcuts/text_target.ahk
+#Include ../modules/shortcuts/keep_awake_presets.ahk
+#Include ../modules/shortcuts/auto_click_session.ahk
+#Include ../modules/shortcuts/auto_click.ahk
 #Include ../platform/vision/screen_vision.ahk
 #Include ../clipboard/adapters/clipboard.ahk
 #Include ../diagnostics/engine/field_run/input_probe.ahk
@@ -730,6 +733,8 @@ InstallSendNoOps()
 #Include unit/gestures/engine/test_incremental_rule.ahk
 #Include unit/modules/shortcuts/test_auto_click_matcher.ahk
 #Include unit/modules/shortcuts/test_text_target.ahk
+#Include unit/modules/shortcuts/test_keep_awake_presets.ahk
+#Include unit/modules/shortcuts/test_auto_click_session.ahk
 #Include unit/platform/vision/test_screen_vision.ahk
 #Include unit/gestures/adapters/test_touchpad_hid.ahk
 #Include unit/gestures/adapters/test_raw_touchpad_owner.ahk

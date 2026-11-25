@@ -1500,12 +1500,14 @@ sg("pick_color", owner_action("modules.shortcuts.actions.system_pixel", "copy_pi
 -- itself at the first physical input, so a gesture leaves nothing that outlives
 -- the user's next action.
 sg("activity_simulation", function()
-	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
-	if not ok or type(Sys.toggle_awake) ~= "function" then
-		Logger.error(LOG, "Keep-awake is unavailable: %s.", tostring(Sys))
+	-- The anti-sleep mode runs the active preset: keep awake, automatic clicks
+	-- or both (modules/shortcuts/actions/auto_click.lua).
+	local ok, Mode = pcall(require, "modules.shortcuts.actions.auto_click")
+	if not ok or type(Mode.toggle_mode) ~= "function" then
+		Logger.error(LOG, "Keep-awake is unavailable: %s.", tostring(Mode))
 		return false
 	end
-	return Sys.toggle_awake()
+	return Mode.toggle_mode()
 end)
 
 sg("lock_screen", function()

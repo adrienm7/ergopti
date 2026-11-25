@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "Conserva i modelli",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Apri l’editor degli hotstring",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Apri l’editor degli hotstring",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ su Windows, Super+★ su Linux, Ctrl+★ su macOS: una tastiera Mac non ha il tasto Windows, e Ctrl è il modificatore libero accanto a Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ su Windows, Super+★ su Linux, Ctrl+★ su macOS: una tastiera Mac non ha il tasto Windows, e Ctrl è il modificatore libero accanto a Cmd.",
+	"menu.keep_awake.title": "Anti-sospensione",
+	"menu.keep_awake.header_presets": "Preimpostazioni",
+	"menu.keep_awake.header_options": "Preimpostazione attiva",
+	"menu.keep_awake.keep_awake": "Impedisci la sospensione",
+	"menu.keep_awake.auto_click": "Clic automatici",
+	"menu.keep_awake.click_count": "Clic automatici eseguiti: {1}",
+	"keepawake.preset.simple": "Anti-sospensione semplice",
+	"keepawake.preset.vscode": "Anti-sospensione in VS Code",
+	"keepawake.preset.teams": "Anti-sospensione in Teams",
+	"keepawake.preset_empty": "Questa preimpostazione non impedisce la sospensione né fa clic: attiva una delle sue opzioni nel menu « Anti-sospensione ».",
+	"keepawake.auto_click_refused": "Impossibile avviare i clic automatici: il menu « Anti-sospensione » ne indica il motivo.",
+	"keepawake.reason.auto_click_wayland": "Wayland non consente ad alcuna applicazione di spostare il puntatore; usa una sessione X11 per i clic automatici",
+	"keepawake.reason.auto_click_tool_missing": "xdotool non è installato; installalo per i clic automatici",
+	"keepawake.reason.capture_permission_missing": "La registrazione dello schermo non è consentita a Ergopti: consentila in Impostazioni di Sistema › Privacy e sicurezza",
+	"keepawake.reason.capture_unavailable": "Qui non è possibile leggere lo schermo",
+	"keepawake.reason.ocr_engine_missing": "Nessun riconoscimento del testo disponibile (su Linux, installa tesseract); i bersagli immagine funzionano comunque",
+	"keepawake.reason.ocr_language_missing": "Nessuna lingua di riconoscimento del testo è installata per le tue lingue"
 }

@@ -6623,5 +6623,22 @@
 	"ollama.uninstall.keep_models_button": "שמירת המודלים",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: פתיחת עורך ה-hotstrings",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: פתיחת עורך ה-hotstrings",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ ב-Windows, ‏Super+★ ב-Linux, ‏Ctrl+★ ב-macOS: למקלדת Mac אין מקש Windows, ו-Ctrl הוא מקש המשנה הפנוי לצד Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ ב-Windows, ‏Super+★ ב-Linux, ‏Ctrl+★ ב-macOS: למקלדת Mac אין מקש Windows, ו-Ctrl הוא מקש המשנה הפנוי לצד Cmd.",
+	"menu.keep_awake.title": "מניעת שינה",
+	"menu.keep_awake.header_presets": "הגדרות קבועות מראש",
+	"menu.keep_awake.header_options": "הגדרה פעילה",
+	"menu.keep_awake.keep_awake": "מנע מצב שינה",
+	"menu.keep_awake.auto_click": "לחיצות אוטומטיות",
+	"menu.keep_awake.click_count": "לחיצות אוטומטיות שבוצעו: {1}",
+	"keepawake.preset.simple": "מניעת שינה פשוטה",
+	"keepawake.preset.vscode": "מניעת שינה ב-VS Code",
+	"keepawake.preset.teams": "מניעת שינה ב-Teams",
+	"keepawake.preset_empty": "הגדרה זו אינה מונעת שינה ואינה לוחצת על דבר: הפעילו אחת מהאפשרויות שלה בתפריט « מניעת שינה ».",
+	"keepawake.auto_click_refused": "לא ניתן להפעיל לחיצות אוטומטיות: הסיבה מופיעה בתפריט « מניעת שינה ».",
+	"keepawake.reason.auto_click_wayland": "Wayland אינו מאפשר לאף יישום להזיז את הסמן; השתמשו בהפעלת X11 ללחיצות אוטומטיות",
+	"keepawake.reason.auto_click_tool_missing": "xdotool אינו מותקן; התקינו אותו ללחיצות אוטומטיות",
+	"keepawake.reason.capture_permission_missing": "הקלטת מסך אינה מותרת ל-Ergopti: אפשרו אותה בהגדרות המערכת › פרטיות ואבטחה",
+	"keepawake.reason.capture_unavailable": "לא ניתן לקרוא כאן את המסך",
+	"keepawake.reason.ocr_engine_missing": "זיהוי טקסט אינו זמין (בלינוקס התקינו את tesseract); יעדי תמונה עדיין פועלים",
+	"keepawake.reason.ocr_language_missing": "לא הותקנה שפת זיהוי טקסט עבור השפות שלך"
 }

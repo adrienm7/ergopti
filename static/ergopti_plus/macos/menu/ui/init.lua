@@ -112,6 +112,7 @@ local menu_mods = _branch_rows.wrap({
 	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("apps.ui.menu.apps",            "apps menu"),
+	keep_awake      = safe_require("menu.ui.builder.keep_awake",   "keep-awake menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 })
 
@@ -1277,6 +1278,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 		end,
 	}
+
+	-- A preset edit or an automatic click changes the « Anti-veille » rows.
+	require("modules.shortcuts.actions.auto_click").on_change(function()
+		_menu_dirty = true
+		if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+	end)
 
 	if type(core_mods.shortcuts_mod) == "table"
 		and type(core_mods.shortcuts_mod.set_extras) == "function" then

@@ -26,5 +26,10 @@
 
 #Include shortcuts/utils.ahk
 #Include shortcuts/win.ahk
+#Include shortcuts/auto_click_matcher.ahk
+#Include shortcuts/auto_click_policy.ahk
+#Include shortcuts/keep_awake_presets.ahk
+#Include shortcuts/auto_click_session.ahk
+#Include shortcuts/auto_click.ahk
 #Include shortcuts/capsword_auto_off.ahk
 #Include shortcuts/capsword.ahk
