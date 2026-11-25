@@ -340,12 +340,17 @@ Design: [docs/design/magic-and-repeat-keys.md](docs/design/magic-and-repeat-keys
 `_shared/tests/corpus/layouts/magic_vectors.json`, the context tokens of the best typing, `context_key_usage`, the
 typing paths, the trace and the boards' labels; `tools/test/test-layout-context-keys.cjs`).
 
-- [ ] **Emulation by the three drivers.** The layout source's `repeat` and `magic` mappings and `magic[]` record,
-      the emulation table carrying them, the web, Lua (macOS, Linux) and AutoHotkey engines typing them from the
-      drivers' last typed text and replaying `magic_vectors.json`, the exports (`.keylayout`, XKB, KLC) listing them
-      as omitted, and the editor reading them into the Studio's analysis.
+- [ ] **Field checks of the drivers' emulation.** Built on 2026-11-25: the layout source's `repeat` and `magic`
+      mappings and `magic[]` record, the emulation table carrying them (`context_source.toml`,
+      `context_emulation.json`, `context_vectors.json`), the web, Lua (macOS, Linux) and AutoHotkey engines typing
+      them from each driver's hotstring buffer (`CoreState.buffer`, `engine:current_buffer()`, `HSE_Buffer`), the
+      exports listing them as `context_key_not_in_<format>`, and the editor reading them into the Studio. Left: a
+      look on each OS at a real layout with a repeat and a magic key (the AutoHotkey cases are written from source,
+      never run here; the buffer is what each driver last saw typed, so a click or a navigation key that resets it
+      makes the key type nothing until a character is typed).
 - [ ] **Importers and the editor's key panel.** The playground's, Kawalyzer's and chogalyzer's formats when their
-      licences allow reading them; a key panel choice to place a repeat or magic key and edit its table.
+      licences allow reading them; a key panel choice to place a repeat or magic key and edit its table (the panel
+      shows and keeps such a key today, edited in the source file).
 
 ## Layout generator from an Ergopti TOML source
 

@@ -68,6 +68,7 @@ local function fixture(layout, form, source_override)
 		autorepeat = function(e) return e.autorepeat == true end,
 		now_ms = function() return record.now end,
 		option_sides = function(e) return { left = e.left_option == true, right = e.right_option == true } end,
+		typed_text = function() return record.before or "" end,
 		post = function(outputs)
 			for _, output in ipairs(outputs) do
 				if output.type == "text" then record.posted[#record.posted + 1] = output.text
@@ -323,6 +324,25 @@ local function source_fixture(table_)
 end
 
 helpers.describe("layout emulation (macOS): a layout source's records", function()
+	-- layout-context-keys-emulation: a layout's own repeat and magic keys type
+	-- from the hotstrings' buffer, the text typed before the key-down.
+	helpers.it("types a layout's repeat and magic keys from the text typed before (layout-context-keys)", function()
+		local corpus = "tests/corpus/layouts/source/"
+		local M, record = source_fixture(Json.decode(read_all(helpers.shared(corpus .. "context_emulation.json"))).macos)
+		helpers.assert_true(M.reload(), "the composed layout and its table load")
+		local KC_QUOTE = 39
+		for _, case in ipairs({ { KC_INTL, "book", "k" }, { KC_QUOTE, "the", "d" }, { KC_QUOTE, "ace", "s" } }) do
+			record.before = case[2]
+			local e = event({}, "x")
+			M.key_down(e, case[1])
+			helpers.assert_eq(e.unicode, case[3], "after " .. case[2])
+		end
+		record.before = "x"
+		local nothing = event({}, "x")
+		helpers.assert_true(M.key_down(nothing, KC_QUOTE), "a magic key typing nothing is deleted")
+		helpers.assert_nil(nothing.unicode, "and types nothing")
+	end)
+
 	helpers.it("types a held custom modifier's layer until its key-up (source-emulation)", function()
 		local M = source_fixture()
 		helpers.assert_true(M.reload(), "the composed layout and its table load")

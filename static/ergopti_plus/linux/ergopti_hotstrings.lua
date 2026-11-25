@@ -2653,6 +2653,8 @@ local function main()
 		is_paused = function() return script_actions.is_paused() end,
 		dispatch_char = function(char, code) on_char(char, code) end,
 		dry_run = opts.dry_run == true,
+		-- What a layout's own repeat and magic keys read: the hotstrings' buffer.
+		typed_text = function() return engine:current_buffer() end,
 	})
 	-- apply-x11 lasts for the X session and Hyprland's runtime layout until its
 	-- configuration is read again: the layout chosen in an earlier session is

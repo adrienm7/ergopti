@@ -151,8 +151,15 @@ SourceEmulation_SelectorMatches(Selector, Pressed) {
 
 ; Checks one mapping of the table and copies it. A dead key must be one of the
 ; table's; a text's compose identity, when it differs from the text, is kept.
-_SrcEmu_MappingOf(Value, Where, DeadKeys) {
+; A repeat key reaches one or two characters back; a magic key names one of
+; the table's magic tables (an empty Map admits none).
+_SrcEmu_MappingOf(Value, Where, DeadKeys, MagicTables) {
 	if Value is Map {
+		Depth := Value.Get("repeat", 0)
+		if (Depth is Integer) && (Depth == 1 || Depth == 2)
+			return Map("repeat", Depth)
+		if (Value.Get("magic", 0) is String) && MagicTables.Has(Value["magic"])
+			return Map("magic", Value["magic"])
 		if Value.Get("text", 0) is String {
 			if !Value.Has("compose")
 				return Map("text", Value["text"])
@@ -180,7 +187,7 @@ _SrcEmu_MappingOf(Value, Where, DeadKeys) {
 _SrcEmu_ComposeKeyOf(Value, Where, DeadKeys) {
 	if (Value is Map) && (Value.Get("dead_key", 0) is String)
 		return Map("dead_key", Value["dead_key"])
-	Mapping := _SrcEmu_MappingOf(Value, Where, DeadKeys)
+	Mapping := _SrcEmu_MappingOf(Value, Where, DeadKeys, Map())
 	if !Mapping.Has("text")
 		throw Error("The emulation table holds a malformed mapping at " . Where . ".")
 	return Mapping
@@ -200,6 +207,70 @@ _SrcEmu_DeadOutcomes(Rules, Where, Source) {
 		Out[Input] := Map("text", Rule.Get("text", 0), "next", Rule.Get("next", ""))
 	}
 	return Out
+}
+
+; Checks the table's magic keys' tables: each rule types one text after its
+; context; the fallback when no rule's context ends the text typed.
+_SrcEmu_MagicOf(Table) {
+	Out := Map()
+	if !Table.Has("magic")
+		return Out
+	Source := Table["magic"]
+	if !(Source is Map)
+		throw Error("The emulation table holds malformed magic keys.")
+	for Id, Entry in Source {
+		if !(Entry is Map) || !(Entry.Get("rules", 0) is Array) || !(Entry.Get("fallback", 0) is String)
+			throw Error("The emulation table holds a malformed magic key at magic." . Id . ".")
+		Rules := []
+		for Index, Rule in Entry["rules"] {
+			if !(Rule is Map) || !(Rule.Get("after", 0) is String) || Rule["after"] == ""
+					|| !(Rule.Get("types", 0) is String)
+				throw Error("The emulation table holds a malformed rule at magic." . Id . ".rules[" . Index . "].")
+			Rules.Push(Map("after", Rule["after"], "types", Rule["types"]))
+		}
+		Out[Id] := Map("rules", Rules, "fallback", Entry["fallback"])
+	}
+	return Out
+}
+
+/**
+ * What a repeat or magic key types after a text: the character "repeat"
+ * places back (a surrogate pair is one character), or the rule whose context
+ * is the longest end of the text, else the table's fallback; "" when it types
+ * nothing. The definition of _shared/tests/corpus/layouts/magic_vectors.json,
+ * as the web and Lua engines and the Studio's analysis.
+ * @param {Map} MagicTables - Id -> Map("rules", [Map("after", "types")], "fallback").
+ * @param {Map} Mapping - Map("repeat", 1|2) or Map("magic", Id).
+ * @param {String} Before - The text typed so far.
+ * @returns {String}
+ */
+SourceEmulation_ContextText(MagicTables, Mapping, Before) {
+	if Mapping.Has("repeat") {
+		At := StrLen(Before) + 1, Width := 0
+		Loop Mapping["repeat"] {
+			At -= 1
+			if At < 1
+				return ""
+			Width := 1
+			Unit := Ord(SubStr(Before, At, 1))
+			; Ord reads a whole pair at its high half: a low half steps back onto it.
+			if At > 1 && Unit >= 0xDC00 && Unit <= 0xDFFF {
+				High := NumGet(StrPtr(Before), (At - 2) * 2, "UShort")
+				if High >= 0xD800 && High <= 0xDBFF
+					At -= 1, Width := 2
+			}
+		}
+		return SubStr(Before, At, Width)
+	}
+	Table := MagicTables[Mapping["magic"]]
+	Best := 0
+	for Rule in Table["rules"] {
+		Length := StrLen(Rule["after"])
+		if StrLen(Before) >= Length && SubStr(Before, -Length) == Rule["after"]
+				&& (!(Best is Map) || Length > StrLen(Best["after"]))
+			Best := Rule
+	}
+	return (Best is Map) ? Best["types"] : Table["fallback"]
 }
 
 ; Checks the table's dead keys: each rule types a text, leads to a dead key, or both.
@@ -254,7 +325,7 @@ SourceEmulation_Compile(Table) {
 			. SourceEmulation_Contract("version") . " table.")
 	Model := Map("layout", Table.Get("layout", ""), "modifier_keys", Map(), "custom", Map(), "layers", [],
 		"layer_by_id", Map(), "shortcuts", [], _SrcEmu_TapHoldsField(), Map(), "remaps", Map(),
-		"dead_keys", _SrcEmu_DeadKeysOf(Table))
+		"dead_keys", _SrcEmu_DeadKeysOf(Table), "magic", _SrcEmu_MagicOf(Table))
 	for Modifier in _SrcEmu_List(Table, "modifiers") {
 		if !(Modifier is Map) || !(Modifier.Get("id", 0) is String)
 				|| (Modifier.Get("mode", "") != "held" && Modifier.Get("mode", "") != "locked")
@@ -288,7 +359,8 @@ SourceEmulation_Compile(Table) {
 		}
 		Keys := Map()
 		for Code, Value in Layer["keys"]
-			Keys[Code] := _SrcEmu_MappingOf(Value, "layers." . Layer["id"] . "." . Code, Model["dead_keys"])
+			Keys[Code] := _SrcEmu_MappingOf(Value, "layers." . Layer["id"] . "." . Code, Model["dead_keys"],
+				Model["magic"])
 		ComposeKeys := Map()
 		if Layer.Has("compose_keys") {
 			if !(Layer["compose_keys"] is Map)
@@ -327,8 +399,12 @@ SourceEmulation_Compile(Table) {
 			throw Error("A tap-hold holds the unknown modifier '" . String(Entry["hold_modifier"]) . "'.")
 		if Model[_SrcEmu_TapHoldsField()].Has(Entry["key"]) || Model["modifier_keys"].Has(Entry["key"])
 			throw Error("The key " . Entry["key"] . " has two roles in the emulation table.")
+		; A tap's text is chosen at its release, with no text typed before it to read.
+		Tap := _SrcEmu_MappingOf(Entry.Get("tap", 0), Where . ".tap", Model["dead_keys"], Map())
+		if Tap.Has("repeat")
+			throw Error("The emulation table holds a malformed mapping at " . Where . ".tap.")
 		Model[_SrcEmu_TapHoldsField()][Entry["key"]] := Map("key", Entry["key"],
-			"tap", _SrcEmu_MappingOf(Entry.Get("tap", 0), Where . ".tap", Model["dead_keys"]),
+			"tap", Tap,
 			"hold_layer", Entry.Get("hold_layer", ""), "hold_modifier", Entry.Get("hold_modifier", ""),
 			"threshold_ms", Threshold)
 	}
@@ -573,11 +649,14 @@ _SrcEmu_Result(Consumed, Actions) => Map("consumed", Consumed ? true : false, "a
  * @param {Map} Held - Built-in modifier id -> true for those the driver reports
  *   held (shift, control, alt, alt_right, meta) and caps_lock when it is on.
  * @param {Integer} Now - Milliseconds of the press, on any monotonic clock.
+ * @param {String} [Before] - The text typed so far (the driver's last typed
+ *   text), which a repeat or magic key reads; required for such a key.
  * @returns {Map} "consumed" (the key itself must not reach the OS or the
  *   keylayout emulation) and "actions", ordered Maps of type text (text), key
  *   (key, modifiers) or modifier (id, down).
+ * @throws {Error} When a repeat or magic key is pressed without the text before.
  */
-SourceEmulation_Press(Session, Code, Held, Now) {
+SourceEmulation_Press(Session, Code, Held, Now, Before := 0) {
 	Model := Session["model"]
 	Actions := []
 	if Session["held_keys"].Has(Code)
@@ -626,6 +705,15 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 	}
 	if Layer["keys"].Has(Code) {
 		Mapping := Layer["keys"][Code]
+		if Mapping.Has("repeat") || Mapping.Has("magic") {
+			if !(Before is String)
+				throw Error("A repeat or magic key needs the text typed before it.")
+			; Its text types as a text key would; typing nothing leaves a dead key pending.
+			Text := SourceEmulation_ContextText(Model["magic"], Mapping, Before)
+			if Text != ""
+				_SrcEmu_Perform(Session, Map("text", Text), Actions)
+			return _SrcEmu_Result(true, Actions)
+		}
 		_SrcEmu_Perform(Session, Mapping, Actions)
 		; A dead key's auto-repeat and release are its own: they type nothing.
 		if Mapping.Has("dead_key")
