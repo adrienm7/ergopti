@@ -1020,6 +1020,11 @@ body {
 	margin-top: 12px;
 }
 
+/* « Help »: prose kept to a readable measure, under 80 characters a line. */
+.le-help p {
+	max-width: 66ch;
+}
+
 /* =============================== */
 /* =============================== */
 /* ======= 7/ Tools & Panels ===== */

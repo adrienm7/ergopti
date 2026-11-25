@@ -179,11 +179,42 @@
 
 	// The page's markup; data-i18n attributes are filled by applyStrings(). Four
 	// numbered steps (corpus and start, what may move, run, result); the
-	// position constraints are sub-tabs, the search budget is folded.
+	// position constraints are sub-tabs, the search budget is folded. The task
+	// help under the header (an idea seen in the Layouts Wiki playground's Docs
+	// pane) is folded too, its title the disclosure's own heading.
 	const MARKUP = `<header class="lo-header">
 	<h1 data-i18n="layout_optimizer.title"></h1>
 	<p class="lo-muted lo-lead" data-i18n="layout_optimizer.intro"></p>
 </header>
+<details id="lo-help" class="lo-card lo-help">
+	<summary><h2 id="lo-help-title" data-i18n="layout_optimizer.help.title"></h2></summary>
+	<p class="lo-muted" data-i18n="layout_optimizer.help.intro"></p>
+	<section class="lo-help-topic" aria-labelledby="lo-help-setup">
+		<h3 id="lo-help-setup" data-i18n="layout_optimizer.help.setup_title"></h3>
+		<p data-i18n="layout_optimizer.help.setup_text"></p>
+	</section>
+	<section class="lo-help-topic" aria-labelledby="lo-help-move">
+		<h3 id="lo-help-move" data-i18n="layout_optimizer.help.move_title"></h3>
+		<p data-i18n="layout_optimizer.help.move_text"></p>
+	</section>
+	<section class="lo-help-topic" aria-labelledby="lo-help-run">
+		<h3 id="lo-help-run" data-i18n="layout_optimizer.help.run_title"></h3>
+		<p data-i18n="layout_optimizer.help.run_text"></p>
+	</section>
+	<section class="lo-help-topic" aria-labelledby="lo-help-result">
+		<h3 id="lo-help-result" data-i18n="layout_optimizer.help.result_title"></h3>
+		<p data-i18n="layout_optimizer.help.result_text"></p>
+	</section>
+	<section class="lo-help-topic" aria-labelledby="lo-help-get">
+		<h3 id="lo-help-get" data-i18n="layout_optimizer.help.get_title"></h3>
+		<p data-i18n="layout_optimizer.help.get_text"></p>
+	</section>
+	<section class="lo-help-topic" aria-labelledby="lo-help-shelf">
+		<h3 id="lo-help-shelf" data-i18n="layout_optimizer.help.shelf_title"></h3>
+		<p data-i18n="layout_optimizer.help.shelf_text"></p>
+	</section>
+	<p class="lo-muted" data-i18n="layout_optimizer.help.credit"></p>
+</details>
 <div class="lo-steps">
 <section class="lo-card lo-step lo-step-setup" aria-labelledby="lo-setup-title">
 	<h2 id="lo-setup-title" data-i18n="layout_optimizer.setup.title"></h2>

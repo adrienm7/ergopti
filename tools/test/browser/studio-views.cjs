@@ -31,6 +31,9 @@
  *    same pair in « One layout ».
  * 9. Help: the « Help » tab names each task in a titled section, without the
  *    filters or the layout frame.
+ * 10. Help in the editor and the Optimiser: the editor's last tool, « Help »,
+ *    and the Optimiser's folded help under its header name each task in a
+ *    titled section, the Optimiser's opened from the keyboard.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -374,7 +377,56 @@ async function exerciseHelp(browser, origin) {
 	await context.close();
 }
 
+async function exerciseEditorOptimizerHelp(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
+	await page.waitForSelector('#le-board .le-key');
+	const tools = await page.$$eval('.le-tool-tabs [role="tab"]', (tabs) =>
+		tabs.map((tab) => tab.id)
+	);
+	assert.equal(tools[tools.length - 1], 'le-tool-tab-help', 'editor help: the last tool');
+	await page.click('#le-tool-tab-help');
+	assert.deepEqual(
+		await page.$$eval('#le-help h3', (hs) => hs.map((h) => h.textContent)),
+		['start', 'keys', 'layers', 'undo', 'versions', 'analyse', 'save', 'export'].map(
+			(id) => EN[`layout_editor.help.${id}_title`]
+		),
+		'editor help: one titled section per task'
+	);
+	assert.ok(
+		(await page.textContent('#le-help')).includes(EN['layout_editor.btn.undo']),
+		'editor help: the labels are the buttons’ own'
+	);
+	await page.goto(`${origin}/ui/layout_optimizer/index.html?lang=en`);
+	await page.waitForSelector('#lo-help-title:not(:empty)');
+	assert.equal(
+		await page.getAttribute('#lo-help', 'open'),
+		null,
+		'Optimiser help: folded at first'
+	);
+	await page.focus('#lo-help > summary');
+	await page.keyboard.press('Enter');
+	assert.equal(
+		await page.getAttribute('#lo-help', 'open'),
+		'',
+		'Optimiser help: opened by keyboard'
+	);
+	assert.deepEqual(
+		await page.$$eval('#lo-help h3', (hs) => hs.map((h) => h.textContent)),
+		['setup', 'move', 'run', 'result', 'get', 'shelf'].map(
+			(id) => EN[`layout_optimizer.help.${id}_title`]
+		),
+		'Optimiser help: one titled section per task'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseEditorOptimizerHelp,
 	exerciseHelp,
 	exerciseFrameEverywhere,
 	exercisePanelWords,

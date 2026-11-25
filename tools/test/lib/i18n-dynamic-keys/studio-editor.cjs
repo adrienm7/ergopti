@@ -303,6 +303,18 @@ module.exports = [
 			)
 	},
 	{
+		prefix: 'layout_editor.help.',
+		files: [PAGE],
+		source: 'HELP_TOPICS of editor_page.js (a title and a text each)',
+		keys: () =>
+			['_title', '_text'].flatMap((end) =>
+				ctx.keysOf(
+					'layout_editor.help.',
+					ctx.literal(PAGE, 'HELP_TOPICS').map((id) => id + end)
+				)
+			)
+	},
+	{
 		prefix: 'layout_editor.tools.',
 		files: [PAGE],
 		source: 'TOOLS of editor_page.js',
