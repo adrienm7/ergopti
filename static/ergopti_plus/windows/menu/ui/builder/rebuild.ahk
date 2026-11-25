@@ -111,6 +111,14 @@ TrayMenuStage_Add(Label := "", Target := "") {
 	_TrayMenuStage.Push(Map("kind", "submenu", "label", Label, "target", Target))
 }
 
+; How many records the active staging holds, so a caller can tell whether a
+; builder staged anything.
+; @returns {Integer} -1 outside staging.
+TrayMenuStage_Length() {
+	global _TrayMenuStage
+	return IsObject(_TrayMenuStage) ? _TrayMenuStage.Length : -1
+}
+
 TrayMenuStage_AddAction(Label, Callback) {
 	global _TrayMenuStage
 	if !IsObject(_TrayMenuStage)

@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "重映射引擎",
 	"menu.debug.header_tests_system": "系统和第三方工具",
 	"menu.debug.title": "⚠ 调试",
+	"menu.keyboard_core.degraded": "键盘核心功能受限",
+	"menu.keyboard_core.degraded_body": "Ergopti+ 无法启动其原生键盘组件 (ergopti_nav_owner.dll)，因此只能读取 AutoHotkey 看到的内容：快速连按的按键可能按错误顺序处理，AltGr 的识别可能不够可靠，部分 AI 快捷键可能没有响应。阻止此文件的杀毒软件是常见原因。请从托盘重新加载 Ergopti+；如果此行仍然存在，请使用 « {1} »：报告中包含说明原因的日志。",
 	"menu.debug.window_spy": "窗口侦察",
 	"menu.debug.send_probe": "测量 SendEvent 与 SendInput",
 	"menu.debug.hook_probe": "记录键盘钩子顺序",

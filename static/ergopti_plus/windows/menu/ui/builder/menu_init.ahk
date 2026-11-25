@@ -140,6 +140,7 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false, PrebuiltLlm := unset) {
 _MI_TopLevelBuilders() {
 	return Map(
 		"keyboard_layout", _MI_StageLayout,
+		MenuCommand.KEYBOARD_CORE_STATUS, _MI_StageKeyboardCoreStatus,
 		MenuCommand.ERGOPTI_STUDIO, _MI_StageErgoptiStudio,
 		"hotstrings",      _MI_StageHotstrings,
 		"llm",             _MI_StageLlm,
@@ -162,8 +163,8 @@ _MI_TopLevelBuilders() {
 
 ; Stages every row of TopLevel visible on this platform through its builder,
 ; in the array's order. A separator is staged only between two staged rows, so
-; a row filtered out for this platform never leaves two in a row or one at
-; either end. A declared id with no builder is a row the user was promised and
+; a row filtered out for this platform, or a status row whose builder staged
+; nothing, never leaves two in a row or one at either end. A declared id with no builder is a row the user was promised and
 ; will not see: it is reported, and the rest of the root still builds.
 ; @param TopLevel {Array} The manifest's top_level rows.
 ; @param Builders {Map} Id → builder that stages the row.
@@ -193,6 +194,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 			SeparatorPending := false
 		}
 		BootProfile_StageBegin("menu row " . Id)
+		Before := TrayMenuStage_Length()
 		try {
 			if Entry.Get("disabled", false)
 				MenuRenderer_StageDisabledTopLevel(Entry)
@@ -203,7 +205,10 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 			BootProfile_StageAbort("menu row " . Id, ErrorNet_Describe(Err))
 			throw Err
 		}
-		Dispatched += 1
+		; A builder that staged nothing (the keyboard core status with nothing to
+		; report) is no row: the separator that follows it must not open the root.
+		if Before < 0 || TrayMenuStage_Length() > Before
+			Dispatched += 1
 	}
 	return Dispatched
 }
@@ -272,6 +277,27 @@ _MI_LayoutRearmForPause() {
 ; « Create or edit a layout… » row. A click made before input readiness waits in
 ; the startup admission like the other command rows, and it stays live while
 ; paused (EDD-1).
+; The keyboard core's status row, drawn only while the native owner of the
+; press ledger could not start (KS_LedgerFailure): the red dot the manifest's
+; health_dot declares for "unreachable", then the problem's name. A click shows
+; what is degraded and what to do. Before it, only a log warning said so.
+_MI_StageKeyboardCoreStatus() {
+	if KS_LedgerFailure() == ""
+		return
+	Row := MenuRenderer_CommandRow("top_level", MenuCommand.KEYBOARD_CORE_STATUS,
+		Map(MenuCommand.KEYBOARD_CORE_STATUS, _MI_ShowKeyboardCoreStatus))
+	if !(Row is Map) || !Row.Has("action")
+		return
+	Glyph := MenuManifest_HealthDot("unreachable")
+	TrayMenuStage_AddAction(Glyph == "" ? Row["label"] : Glyph . " " . Row["label"], Row["action"])
+}
+
+; Explains the keyboard core problem in a message box that stays until closed.
+_MI_ShowKeyboardCoreStatus(*) {
+	Where := t("menu.debug.title") . " › " . t("menu.debug.report_bug")
+	Ui_MsgBox(StrReplace(t("menu.keyboard_core.degraded_body"), "{1}", Where), t("menu.keyboard_core.degraded"), "Icon!")
+}
+
 _MI_StageErgoptiStudio() {
 	Row := MenuRenderer_CommandRow("top_level", MenuCommand.ERGOPTI_STUDIO,
 		Map(MenuCommand.ERGOPTI_STUDIO, LayoutEditorWindow_Open))

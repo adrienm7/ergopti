@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "Neubelegungs-Engine",
 	"menu.debug.header_tests_system": "System und Drittanbieter-Tools",
 	"menu.debug.title": "⚠ Debugging",
+	"menu.keyboard_core.degraded": "Tastaturkern eingeschränkt",
+	"menu.keyboard_core.degraded_body": "Ergopti+ konnte seine native Tastaturkomponente (ergopti_nav_owner.dll) nicht starten und liest daher nur, was AutoHotkey sieht: schnell gerollte Tasten können in falscher Reihenfolge verarbeitet werden, AltGr wird womöglich weniger zuverlässig erkannt und einige KI-Kurzbefehle reagieren eventuell nicht. Häufige Ursache ist ein Virenschutz, der diese Datei blockiert. Laden Sie Ergopti+ über den Infobereich neu; bleibt diese Zeile bestehen, verwenden Sie « {1} »: Der Bericht enthält das Protokoll mit der Ursache.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent und SendInput messen",
 	"menu.debug.hook_probe": "Reihenfolge der Tastatur-Hooks aufzeichnen",

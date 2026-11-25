@@ -2037,6 +2037,8 @@
 	"menu.debug.header_tests_remap_runtime": "Moteur de remappage",
 	"menu.debug.header_tests_system": "Système et outils tiers",
 	"menu.debug.title": "⚠ Débogage",
+	"menu.keyboard_core.degraded": "Cœur du clavier dégradé",
+	"menu.keyboard_core.degraded_body": "Ergopti+ n’a pas pu démarrer son composant clavier natif (ergopti_nav_owner.dll) : il ne lit plus que ce qu’AutoHotkey voit. Des touches enchaînées rapidement peuvent être traitées dans le désordre, AltGr peut être moins bien reconnu et certains raccourcis de l’IA peuvent ne pas répondre. Un antivirus qui bloque ce fichier en est une cause fréquente. Rechargez Ergopti+ depuis la barre d’état ; si cette ligne reste, utilisez « {1} » : le rapport contient le journal qui en donne la cause.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Mesurer SendEvent et SendInput",
 	"menu.debug.hook_probe": "Enregistrer l'ordre des hooks clavier",

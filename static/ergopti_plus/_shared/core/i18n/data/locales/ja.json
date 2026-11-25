@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "リマップエンジン",
 	"menu.debug.header_tests_system": "システムとサードパーティ製ツール",
 	"menu.debug.title": "⚠ デバッグ",
+	"menu.keyboard_core.degraded": "キーボードコアが低下しています",
+	"menu.keyboard_core.degraded_body": "Ergopti+ はネイティブのキーボードコンポーネント (ergopti_nav_owner.dll) を起動できなかったため、AutoHotkey が認識する内容しか読み取れません。素早く続けて押したキーが誤った順序で処理されたり、AltGr の認識精度が下がったり、一部の AI ショートカットが反応しなかったりする場合があります。このファイルをブロックするウイルス対策ソフトがよくある原因です。トレイから Ergopti+ を再読み込みしてください。この行が残る場合は « {1} » を使ってください。レポートには原因を示すログが含まれます。",
 	"menu.debug.window_spy": "ウィンドウスパイ",
 	"menu.debug.send_probe": "SendEvent と SendInput を計測",
 	"menu.debug.hook_probe": "キーボードフックの順序を記録",

@@ -73,6 +73,10 @@ global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
 global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS := 3
 global _LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
 global _LLM_NavEventOwnerReportTimes := Map()
+; Why the last start failed (the DLL, an export, the hook or its publication),
+; "" once a start succeeds. A start a pause or a concurrent stop invalidated
+; leaves it as it was: that is no failure (LLM_NavEventOwner_LastStartFailure).
+global _LLM_NavEventOwnerLastStartFailure := ""
 global _LLM_NavEventOwnerTerminalRouteOwner := A_ScriptHwnd
 global _LLM_NavEventOwnerTerminalRouteGeneration := 0
 global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
@@ -167,7 +171,7 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 	global _LLM_NavEventOwnerRuntimeEpoch
 	global _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
-	global _LLM_NavEventOwnerServiceFn
+	global _LLM_NavEventOwnerServiceFn, _LLM_NavEventOwnerLastStartFailure
 	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
 	StartTicket := 0
 	StartEpoch := 0
@@ -206,6 +210,7 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 	if !((StartStatus is Integer) && StartStatus == 1) {
 		if FailureDetail == ""
 			FailureDetail := "Navigation event owner start was not acknowledged."
+		_LLM_NavEventOwnerLastStartFailure := FailureDetail
 		_LLM_NavEventOwnerRollbackStart(
 			StartTicket, FailureDetail, AllowLifecycleResume)
 		return false
@@ -271,8 +276,11 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 		if Published {
 			_LLM_NavEventOwnerStarting := false
 			_LLM_NavEventOwnerActiveStartTicket := 0
+			_LLM_NavEventOwnerLastStartFailure := ""
 		} else if FailureDetail == "" {
 			FailureDetail := "Navigation event owner startup was invalidated."
+		} else {
+			_LLM_NavEventOwnerLastStartFailure := FailureDetail
 		}
 	} finally Critical(PreviousCritical)
 	if Published
@@ -3676,6 +3684,14 @@ LLM_NavEventOwner_KeyPress(Sc, Export := 0) {
 		"UShort", Sc, "Ptr", Press, "Int")
 	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key press query")
 	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }
+}
+
+; Why the last start of the owner failed, for the keyboard core's tray status.
+; @returns {String} "" after a successful start, before any start, or when the
+;   last start was only invalidated by a pause or a concurrent stop.
+LLM_NavEventOwner_LastStartFailure() {
+	global _LLM_NavEventOwnerLastStartFailure
+	return _LLM_NavEventOwnerLastStartFailure
 }
 
 ; How the ledger is kept honest: a release no hook sees must not leave a key held.

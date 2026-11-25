@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "Motore di rimappatura",
 	"menu.debug.header_tests_system": "Sistema e strumenti di terze parti",
 	"menu.debug.title": "⚠ Debug",
+	"menu.keyboard_core.degraded": "Nucleo della tastiera degradato",
+	"menu.keyboard_core.degraded_body": "Ergopti+ non è riuscito ad avviare il suo componente tastiera nativo (ergopti_nav_owner.dll), quindi legge solo ciò che vede AutoHotkey: i tasti premuti in rapida sequenza possono essere gestiti in disordine, AltGr può essere riconosciuto in modo meno affidabile e alcune scorciatoie dell’IA possono non rispondere. Un antivirus che blocca questo file ne è una causa frequente. Ricarica Ergopti+ dall’area di notifica; se questa riga resta, usa « {1} »: il rapporto contiene il registro che ne spiega la causa.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Misura SendEvent e SendInput",
 	"menu.debug.hook_probe": "Registra l'ordine degli hook della tastiera",

@@ -918,6 +918,21 @@ Action: a consumer that must treat a replayed edge as physical reads `KS_IsHeld`
 the DLL is published only through `-UpdateTracked` on the pinned toolset
 (`docs/tooling/windows-native-dll.md`).
 
+### project-keyboard-core-failure-is-a-tray-row
+
+A press-ledger owner that cannot start (DLL blocked, export missing, hook
+refused) leaves the keyboard working on AutoHotkey's view alone. That was a
+log warning only. `KeyboardArbiterEnsureForLedger` now records the failure in
+`KS_LedgerFailure`, read from `LLM_NavEventOwner_LastStartFailure`, which a
+start invalidated by a pause or a concurrent stop leaves unchanged: `false`
+from `EnsureStarted` alone is no failure. The manifest's first top-level row
+(`keyboard_core_status`, Windows only) is staged by `_MI_StageKeyboardCoreStatus`
+only while a failure holds, with the `health_dot` "unreachable" glyph, and its
+click explains it. `_MI_StageTopLevel` counts a builder that staged nothing as
+no row, so the separator after it is not drawn. Action: a new tray status
+row follows the same shape; the boot starts the owner before the configured
+root, and a resume before the pause-state rebuild, so no extra rebuild is due.
+
 ### project-native-export-lookup-is-not-for-the-keystroke-path
 
 `_LLM_NavEventOwnerNativeExport` re-proves the whole issued image on every call: about

@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "Omtildelingsmotor",
 	"menu.debug.header_tests_system": "System og tredjepartsværktøjer",
 	"menu.debug.title": "⚠ Fejlfinding",
+	"menu.keyboard_core.degraded": "Tastaturkernen er nedsat",
+	"menu.keyboard_core.degraded_body": "Ergopti+ kunne ikke starte sin indbyggede tastaturkomponent (ergopti_nav_owner.dll), så den læser kun det, AutoHotkey ser: taster, der rulles hurtigt, kan blive behandlet i forkert rækkefølge, AltGr kan blive genkendt mindre pålideligt, og nogle AI-genveje svarer måske ikke. Et antivirusprogram, der blokerer filen, er en almindelig årsag. Genindlæs Ergopti+ fra meddelelsesområdet; hvis denne linje bliver, så brug « {1} »: rapporten indeholder loggen, der fortæller hvorfor.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Mål SendEvent mod SendInput",
 	"menu.debug.hook_probe": "Optag rækkefølgen af tastaturhooks",

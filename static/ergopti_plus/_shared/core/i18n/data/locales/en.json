@@ -2037,6 +2037,8 @@
 	"menu.debug.header_tests_remap_runtime": "Remapping engine",
 	"menu.debug.header_tests_system": "System and third-party tools",
 	"menu.debug.title": "⚠ Debug",
+	"menu.keyboard_core.degraded": "Keyboard core degraded",
+	"menu.keyboard_core.degraded_body": "Ergopti+ could not start its native keyboard component (ergopti_nav_owner.dll), so it only reads what AutoHotkey sees: keys rolled quickly may be handled out of order, AltGr may be recognised less reliably and some AI shortcuts may not respond. An antivirus that blocks this file is a common cause. Reload Ergopti+ from the tray; if this row stays, use « {1} »: the report carries the log that says why.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Measure SendEvent vs SendInput",
 	"menu.debug.hook_probe": "Record keyboard hook order",

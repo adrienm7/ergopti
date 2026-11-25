@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "Silnik przemapowania",
 	"menu.debug.header_tests_system": "System i narzędzia innych firm",
 	"menu.debug.title": "⚠ Debugowanie",
+	"menu.keyboard_core.degraded": "Rdzeń klawiatury ograniczony",
+	"menu.keyboard_core.degraded_body": "Ergopti+ nie mógł uruchomić swojego natywnego komponentu klawiatury (ergopti_nav_owner.dll), więc odczytuje tylko to, co widzi AutoHotkey: szybko naciskane po sobie klawisze mogą zostać obsłużone w złej kolejności, AltGr może być rozpoznawany mniej niezawodnie, a niektóre skróty AI mogą nie reagować. Częstą przyczyną jest antywirus blokujący ten plik. Przeładuj Ergopti+ z zasobnika; jeśli ten wiersz pozostanie, użyj « {1} »: raport zawiera dziennik z przyczyną.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Zmierz SendEvent i SendInput",
 	"menu.debug.hook_probe": "Zapisz kolejność hooków klawiatury",

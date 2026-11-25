@@ -2042,6 +2042,8 @@
 	"menu.debug.header_tests_remap_runtime": "Motor de reasignación",
 	"menu.debug.header_tests_system": "Sistema y herramientas de terceros",
 	"menu.debug.title": "⚠ Depuración",
+	"menu.keyboard_core.degraded": "Núcleo del teclado degradado",
+	"menu.keyboard_core.degraded_body": "Ergopti+ no pudo iniciar su componente de teclado nativo (ergopti_nav_owner.dll), así que solo lee lo que ve AutoHotkey: las teclas encadenadas rápidamente pueden tratarse en desorden, AltGr puede reconocerse con menos fiabilidad y algunos atajos de la IA pueden no responder. Un antivirus que bloquea este archivo es una causa frecuente. Recargue Ergopti+ desde la bandeja; si esta línea sigue, use « {1} »: el informe incluye el registro que explica la causa.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Medir SendEvent y SendInput",
 	"menu.debug.hook_probe": "Registrar el orden de los hooks de teclado",
