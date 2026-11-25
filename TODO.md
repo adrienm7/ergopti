@@ -303,9 +303,9 @@ waits for the maintainer's review).
       corpus; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Every idea of
       `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where) but two: magic
-      and repeat keys with Kawalyzer's « Clever Keys » (designed in `docs/design/magic-and-repeat-keys.md`, waiting
-      for the maintainer's choice under « Maintainer decisions pending »), and dockable panes (not built, see the
-      decision of 2026-11-25 there).
+      and repeat keys with Kawalyzer's « Clever Keys », whose analysis is built (`docs/design/magic-and-repeat-keys.md`,
+      `context_key_usage`) while the source format, the drivers' emulation and the exports' refusals are under « Layout
+      repeat and magic keys », and dockable panes (not built, see the decision of 2026-11-25 there).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -324,6 +324,20 @@ simplicity bonuses ».
     mechanisms;
   - the trigram metrics of a layout with choices complete a fourth character as a Markov chain (SFS within 0.04
     points of the text’s own stream on Swann and Nemolivier).
+
+## Layout repeat and magic keys (maintainer choice, 2026-11-25)
+
+Design: [docs/design/magic-and-repeat-keys.md](docs/design/magic-and-repeat-keys.md). Done: the analysis (the
+`context` and `magic` records of a layout, `contextOutput` and its shared vectors
+`_shared/tests/corpus/layouts/magic_vectors.json`, the context tokens of the best typing, `context_key_usage`, the
+typing paths, the trace and the boards' labels; `tools/test/test-layout-context-keys.cjs`).
+
+- [ ] **Emulation by the three drivers.** The layout source's `repeat` and `magic` mappings and `magic[]` record,
+      the emulation table carrying them, the web, Lua (macOS, Linux) and AutoHotkey engines typing them from the
+      drivers' last typed text and replaying `magic_vectors.json`, the exports (`.keylayout`, XKB, KLC) listing them
+      as omitted, and the editor reading them into the Studio's analysis.
+- [ ] **Importers and the editor's key panel.** The playground's, Kawalyzer's and chogalyzer's formats when their
+      licences allow reading them; a key panel choice to place a repeat or magic key and edit its table.
 
 ## Layout generator from an Ergopti TOML source
 
@@ -623,14 +637,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
       whose Principal and Comparison frame and the Principal − Comparison table on every tab give the side-by-side
       reading. Dockable panes would need a drag-free, keyboard and screen-reader layout manager. Choose: keep the
       tabs, or ask for panes.
-- [ ] **Magic and repeat keys in the Studio's analysis (asked by the agent on 2026-11-25, to review by the
-      maintainer).** The maintainer wants every idea of the Layouts Wiki playground and Kawalyzer, which analyse
-      repeat, skip-repeat and magic (« Clever Keys ») keys; the decision of 2026-11-21 says « Studio shows layouts,
-      not the magic key » (the ★ of Ergopti+). The design is written (`docs/design/magic-and-repeat-keys.md`: a
-      layout's own repeat and magic keys, output-context rules of at most two characters, analysed as
-      context-dependent ways of typing, emulated by the three drivers, kept apart from ★). Kept meanwhile: nothing
-      built. Choose: (1) build it as designed, the analysis first; (2) analysis only, no driver emulation (the
-      Studio then rates keys no Ergopti driver can type); (3) not now.
+- [ ] **Repeat and magic keys: what the analysis decided (decided by the agent on 2026-11-25, to review by the
+      maintainer).** Built as the maintainer chose (« build it as designed, the analysis first »,
+      `docs/memory/maintainer-decisions.md`, « Maintainer answers of 2026-11-25 »). Choices made: a layout's keys
+      sit in a `context` record beside its rows (every reader of the rows keeps reading characters), each rule's
+      output and the fallback are one character (Kawalyzer's longer outputs are refused), the fixed typing never
+      takes them, the best typing keeps them only when its whole path costs less than without them (the planner
+      weighs each way with its neighbours typed their own way, so two such ways in a row can meet on one finger),
+      and the boards show ↻ (repeat), ↻² (skip-repeat) and ◆ (magic), never ★ or ✦. Choose otherwise if needed.
 - [ ] **AltGr's ErgoDox key read as a mod-tap (decided by the agent on 2026-11-25, to review by the
       maintainer).** KLAnext's VCKB and VCKB2 type six right thumb letters, one (d, l) on the ErgoDox's right 2-unit
       outer key, the board's AltGr, and stayed out. Kept: that letter reads as QMK's mod-tap (`RALT_T`), as the Shift
