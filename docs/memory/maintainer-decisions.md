@@ -5,6 +5,18 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Maintainer answers of 2026-11-25
+
+- **Repeat and magic keys in the Studio's analysis: build it as designed, the
+  analysis first** (choice 1 of the pending item). A layout's own repeat,
+  skip-repeat and magic keys (output-context rules of at most two characters,
+  `docs/design/magic-and-repeat-keys.md`) are analysed as context-dependent
+  ways of typing, then emulated by the three drivers from one shared data
+  source; they stay apart from Ergopti+'s ★, a hotstring trigger. Action:
+  `contextOutput` and `_shared/tests/corpus/layouts/magic_vectors.json` define
+  what such a key types for the analysis and every driver; a driver change
+  replays those vectors, and no layout key takes ★ or ✦ as its label.
+
 ## The reading font draws the tray menus too (2026-11-24)
 
 The reading font chosen in Configuration › Accessibilité

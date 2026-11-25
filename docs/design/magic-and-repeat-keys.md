@@ -1,6 +1,11 @@
 <!-- docs/design/magic-and-repeat-keys.md -->
 
-# Magic and repeat keys in the layout model (design, not built)
+# Magic and repeat keys in the layout model
+
+Status: the maintainer chose on 2026-11-25 to build this design, the analysis
+first. Built: the engine model and the analysis (step 1 below, as
+[Ways of typing](layout-analysis.md#ways-of-typing) describes it). The other
+steps are under « Layout repeat and magic keys » in TODO.md.
 
 Written on 2026-11-25 for the Layouts Wiki playground follow-up
 ([the comparison](../audits/layout-analysers/layouts-wiki-playground.md),
@@ -19,20 +24,26 @@ they would enter it, and what waits for the maintainer.
   configured character », 2026-11-21). It is not part of a layout: the
   replacements live in the hotstring catalogues.
 - The same decision says « Studio shows layouts, not the magic key ». Analysing
-  a layout's repeat or magic key in the Studio is therefore a new product
-  choice (« Maintainer decisions pending » in TODO.md), not an engine detail.
+  a layout's repeat or magic key in the Studio was therefore a new product
+  choice, which the maintainer made on 2026-11-25
+  (`docs/memory/maintainer-decisions.md`, « Maintainer answers of 2026-11-25 »).
 
 ## Model
 
-A key cell (`layoutFromRows`, one per level) gains two action kinds beside a
-string, `null` and `{dead}`:
+A layout's `context` record (`layoutFromRows`) maps a key to one action per
+level, beside its rows, whose cell is `null` there (decided by the agent on
+2026-11-25, to review by the maintainer: every reader of the rows, the
+exports, drawings and the optimiser, keeps reading characters). An action is
+one of:
 
 - `{repeat: 1}` types the last character typed again; `{repeat: 2}` the one
   before it (skip-repeat). Nothing typed yet: the key types nothing.
 - `{magic: "<id>"}` types what the magic table `<id>` gives for the context: a
-  layout's `magic` maps an id to `{rules: [{after: "<text>", types: "<text>"}],
-fallback: "<text>"}`. The longest `after` that ends the typed text wins (a
+  layout's `magic` maps an id to `{rules: [{after: "<text>", types: "<char>"}],
+fallback: "<char>"}`. The longest `after` that ends the typed text wins (a
   rule list is checked for duplicate contexts); no rule matches: the fallback.
+  Each output is one character (decided by the agent on 2026-11-25, to review
+  by the maintainer: a longer one would be a chord of the context).
 
 The context is the **output** text, never the keys pressed, so a dead key, an
 AltGr level or another magic key all feed it the same way, and the model stays
