@@ -27,6 +27,8 @@
  *    corpus, named with their shares; an invalid weight is refused in words;
  *    the link carries the recipe and the next visit mixes it again.
  * 7. The editor's analysis panel: its worst n-grams open their corpus words too.
+ * 8. The frame on every result tab: both layouts marked in the figures, the
+ *    same pair in « One layout ».
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -331,7 +333,30 @@ async function exercisePanelWords(browser, origin) {
 	await context.close();
 }
 
+async function exerciseFrameEverywhere(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-bigrams');
+	assert.ok(await page.isVisible('#la-frame'), 'frame: shown on a themed tab');
+	await page.selectOption('#la-frame-main', 'qwerty');
+	await page.selectOption('#la-frame-comp', 'ergopti');
+	const marked = await page.$$eval('#la-charts-bigrams .la-chart-row', (rows) => ({
+		main: rows.filter((r) => r.classList.contains('la-selected')).length,
+		comp: rows.filter((r) => r.classList.contains('la-versus')).length
+	}));
+	assert.ok(
+		marked.main > 0 && marked.comp > 0,
+		`frame: both layouts marked (${JSON.stringify(marked)})`
+	);
+	await page.click('#la-tab-details');
+	assert.ok(await page.isHidden('#la-frame'), 'frame: « One layout » keeps its own pickers');
+	assert.equal(await page.inputValue('#la-details-layout'), 'qwerty', 'frame: the same Principal');
+	assert.equal(await page.inputValue('#la-versus'), 'ergopti', 'frame: the same Comparison');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseFrameEverywhere,
 	exercisePanelWords,
 	exerciseBlend,
 	exercisePareto,

@@ -312,9 +312,7 @@ waits for the maintainer's review).
       read a Pareto »), routed through `i18n`; (6) the movement cells' percentiles among the compared layouts (done: row
       changes concordant and discordant, the trigram rhythm with same-finger ends, all and without thumbs;
       `movementTable` costs 20 to 60 ms a layout on a large corpus: compute it on demand, or in a worker, for the whole
-      comparison); (7) the Principal and Comparison frame on the other result tabs too (done on Pareto and Trace,
-      `FRAME_TABS`; the overview and the themed tabs could mark both layouts in their charts and tables); (8)
-      Kawalyzer's « Clever Keys » (context outputs) with item (3).
+      comparison); (8) Kawalyzer's « Clever Keys » (context outputs) with item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

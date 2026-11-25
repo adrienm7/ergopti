@@ -429,7 +429,17 @@
 	// The tabs under the Principal and Comparison frame (an idea seen in the
 	// Layouts Wiki playground's Main and Comp pickers): the detailed layout and
 	// the one it is compared with, the same as « One layout »'s own pickers.
-	const FRAME_TABS = ['pareto', 'trace'];
+	const FRAME_TABS = [
+		'overview',
+		'fingers',
+		'bigrams',
+		'trigrams',
+		'rows',
+		'heatmaps',
+		'misc',
+		'pareto',
+		'trace'
+	];
 	// Corpus blends (an idea seen in the Layouts Wiki playground): how many
 	// corpora a blend mixes, its id in the corpus list, and the first parts.
 	const BLEND_PARTS = 3;
@@ -2138,6 +2148,7 @@
 		 * they are chosen.
 		 */
 		function renderActive() {
+			fillFrame();
 			const draw = {
 				overview: () => {
 					renderLeaders();
@@ -2519,6 +2530,7 @@
 				const row = el('tr');
 				if (entry.front) row.classList.add('la-pareto-row-front');
 				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (state.versus === result.layout.id) row.classList.add('la-versus');
 				const name = el('th');
 				name.scope = 'row';
 				const button = el('button', 'la-chart-name', result.layout.name);
@@ -2941,6 +2953,7 @@
 					})
 				);
 				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (state.versus === result.layout.id) row.classList.add('la-versus');
 				if (flag) {
 					row.classList.add('la-incomplete');
 					rowName(row).append(' ', flag);
@@ -3622,6 +3635,7 @@
 				rowName(row).append(' ', flag);
 			}
 			if (state.details === result.layout.id) row.classList.add('la-selected');
+			if (state.versus === result.layout.id) row.classList.add('la-versus');
 			row.title = `${result.layout.name}: ${text}${flag ? ` (${flag.textContent})` : ''}`;
 			return row;
 		}
@@ -3889,6 +3903,7 @@
 					rowName(row).append(' ', incompleteFlag(result));
 				}
 				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (state.versus === result.layout.id) row.classList.add('la-versus');
 				row.title = `${result.layout.name}: ${left} ${measure(result.hands.left, 1, '%')}, ${right} ${measure(result.hands.right, 1, '%')}`;
 				box.append(row);
 			}
@@ -3969,6 +3984,7 @@
 					rowName(row).append(' ', incompleteFlag(result));
 				}
 				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (state.versus === result.layout.id) row.classList.add('la-versus');
 				row.title = `${result.layout.name}: ${said}`;
 				bars.append(row);
 			}
