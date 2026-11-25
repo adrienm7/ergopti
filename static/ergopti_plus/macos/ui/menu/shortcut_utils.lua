@@ -435,10 +435,38 @@ function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
 	return UserActionParameter.encode("apple_shortcut", fields) or UserActionParameter.spell("apple_shortcut", fields)
 end
 
+--- Asks for a run_workflow value: one of the user's workflows, by name.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string|nil The stored workflow id.
+--- @param workflows table|nil The workflow owner (tests).
+--- @return string|nil value The workflow id; nil when cancelled or none exists.
+function M.ask_workflow_parameter(gestures, action, title, prior, workflows)
+	workflows = workflows or require("modules.shortcuts.workflows")
+	local choices = workflows.choices()
+	if choices == nil then return nil end
+	if #choices == 0 then
+		Logger.info(LOG, "No workflow to assign: the user has none yet.")
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"), i18n.get("workflows.none_defined"),
+			i18n.get("button.ok"), nil, "informational")
+		return nil
+	end
+	local ordered, labels = {}, {}
+	for _, choice in ipairs(choices) do
+		if choice.value == prior then table.insert(ordered, 1, choice) else ordered[#ordered + 1] = choice end
+	end
+	for index, choice in ipairs(ordered) do labels[index] = choice.label end
+	local picked = dialog.choose(title, gestures.parameter_prompt(action), labels,
+		i18n.get("button.cancel"), i18n.get("button.save"))
+	if not picked then return nil end
+	return ordered[picked].value
+end
+
 --- Asks for one parameter value the way its kind is chosen: an application is
 --- picked in the /Applications chooser, a vision backend in a list, every other
 --- kind is typed.
---- run_command, open_path and run_apple_shortcut have their own editors.
+--- run_command, open_path, run_apple_shortcut and run_workflow have their own editors.
 --- @param gestures table The gestures facade.
 --- @param action string The action being configured.
 --- @param spec string Its parameter kind.
@@ -454,6 +482,7 @@ function M.ask_parameter_value(gestures, action, spec, title, prior)
 	if spec == "path" then return dialog.choose_path(prompt, title) end
 	if spec == "command" then return M.ask_command_parameter(gestures, action, title, prior) end
 	if spec == "apple_shortcut" then return M.ask_apple_shortcut_parameter(gestures, action, title, prior) end
+	if spec == "workflow" then return M.ask_workflow_parameter(gestures, action, title, prior) end
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))

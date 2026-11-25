@@ -1,6 +1,6 @@
 {
-	"description": "Golden vectors for the parameters of run_command (kind command), open_path (kind path) and run_apple_shortcut (kind apple_shortcut): which stored values are valid and what they hold. Replayed by the macOS and Linux suites through their gesture validators and _shared/shortcuts/engine/user_action_parameter.lua.",
-	"rule": "command: versioned JSON {\"version\":1,\"command\",\"mode\",\"output\"} with no other key; the command is UTF-8 text of 1 to 4096 bytes with a non-blank character and no control character other than tab and line feed; mode is hidden or terminal; output is none, type or copy, and must be none in a terminal. path: an absolute POSIX path of at most 4096 bytes, UTF-8, with no control character and no . or .. component; windows_path_vectors hold the Windows spelling the AutoHotkey driver replays instead: a drive letter or a UNC share, backslashes only, no character a Windows file name cannot hold, the same bound and the same components. apple_shortcut: versioned JSON {\"version\":1,\"id\",\"name\",\"input\",\"output\"} with no other key; id is the shortcut's UUID, name its library name (1 to 4096 bytes, no control character), input none or selection, output none, type or copy. Whether the path exists or the shortcut is still in the library under that name is checked when the action runs.",
+	"description": "Golden vectors for the parameters of run_command (kind command), open_path (kind path), run_apple_shortcut (kind apple_shortcut) and run_workflow (kind workflow): which stored values are valid and what they hold. Replayed by the macOS and Linux suites through their gesture validators and _shared/shortcuts/engine/user_action_parameter.lua.",
+	"rule": "command: versioned JSON {\"version\":1,\"command\",\"mode\",\"output\"} with no other key; the command is UTF-8 text of 1 to 4096 bytes with a non-blank character and no control character other than tab and line feed; mode is hidden or terminal; output is none, type or copy, and must be none in a terminal. path: an absolute POSIX path of at most 4096 bytes, UTF-8, with no control character and no . or .. component; windows_path_vectors hold the Windows spelling the AutoHotkey driver replays instead: a drive letter or a UNC share, backslashes only, no character a Windows file name cannot hold, the same bound and the same components. apple_shortcut: versioned JSON {\"version\":1,\"id\",\"name\",\"input\",\"output\"} with no other key; id is the shortcut's UUID, name its library name (1 to 4096 bytes, no control character), input none or selection, output none, type or copy. Whether the path exists or the shortcut is still in the library under that name is checked when the action runs. workflow: the id of one of the user's workflows, 1 to 64 bytes of ASCII letters, digits, underscore and hyphen (workflow_id_pattern of _shared/shortcuts/data/workflows/steps.json); whether it still exists is checked when it runs.",
 	"vectors": [
 		{
 			"kind": "command",
@@ -407,6 +407,78 @@
 			"kind": "apple_shortcut",
 			"id": "future_version",
 			"value": "{\"version\":2,\"id\":\"1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516\",\"name\":\"x\",\"input\":\"none\",\"output\":\"none\"}",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "plain",
+			"value": "wf_3f9a",
+			"valid": true,
+			"parsed": {
+				"id": "wf_3f9a"
+			}
+		},
+		{
+			"kind": "workflow",
+			"id": "hyphen_digits",
+			"value": "2026-a_b",
+			"valid": true,
+			"parsed": {
+				"id": "2026-a_b"
+			}
+		},
+		{
+			"kind": "workflow",
+			"id": "one_char",
+			"value": "a",
+			"valid": true,
+			"parsed": {
+				"id": "a"
+			}
+		},
+		{
+			"kind": "workflow",
+			"id": "max_length",
+			"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"valid": true,
+			"parsed": {
+				"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			}
+		},
+		{
+			"kind": "workflow",
+			"id": "empty",
+			"value": "",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "too_long",
+			"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "space",
+			"value": "wf 1",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "slash",
+			"value": "../wf",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "accent",
+			"value": "wfé",
+			"valid": false
+		},
+		{
+			"kind": "workflow",
+			"id": "newline",
+			"value": "wf\n",
 			"valid": false
 		}
 	],

@@ -1656,6 +1656,10 @@ end
 -- =========================================
 -- =========================================
 
+-- Escape (53) and the Karabiner Escape sentinel F15 (113): either stops the
+-- running user workflows (modules/shortcuts/workflows).
+local WORKFLOW_ABORT_KEYCODES = { [53] = true, [113] = true }
+
 --- Inner keyboard handler — never called directly; always wrapped in a pcall.
 --- @param e table The macOS keystroke event payload.
 --- @return boolean True to consume the event, false to pass it through.
@@ -1814,6 +1818,14 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
 	local keyCode = _key_down_context.keycode or e:getKeyCode()
+	-- Escape stops every running user workflow at once; the key still reaches
+	-- the application. Karabiner signals a physical Escape with its F15 sentinel,
+	-- which fast-exits below, so both codes are read here. Only a loaded owner
+	-- is asked.
+	if WORKFLOW_ABORT_KEYCODES[keyCode] then
+		local workflows = package.loaded["modules.shortcuts.workflows"]
+		if workflows then workflows.on_escape() end
+	end
 
 	-- Explicit user-data tags are the only synthetic identity. The wrapper reads
 	-- provenance once before its physical-ordering fence and passes the result in,

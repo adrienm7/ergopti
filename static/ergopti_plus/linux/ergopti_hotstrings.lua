@@ -2305,6 +2305,9 @@ local function main()
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
 	local function handle_control(key_name, detail)
+		-- Escape stops every running user workflow at once, paused or not; the
+		-- key still reaches the application.
+		if key_name == "escape" then require("modules.shortcuts.workflows").on_escape() end
 		if script_actions.is_paused() or (physical_privacy_admission and not physical_privacy_admission.allowed)
 			or secure_focus_guard.blocks_text() then
 			keystats.discard_roi()

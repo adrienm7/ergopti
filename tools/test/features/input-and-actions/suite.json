@@ -833,7 +833,7 @@
 			"name": "a user workflow file is accepted and refused alike by the editor's JS check and the shared Lua model, which both Lua suites replay with its interpreter and runner",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-workflow-model-vectors.cjs"],
-			"repro": "node tools/test/test-workflow-model-vectors.cjs"
+			"repro": "npm run test:workflow-model-vectors"
 		}
 	]
 }

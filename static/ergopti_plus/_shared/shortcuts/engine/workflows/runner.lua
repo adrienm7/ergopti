@@ -46,7 +46,7 @@ end
 ---   catalogue = decoded steps.json,
 ---   timeouts = table|nil the registry deadlines (default registry_timeouts()),
 ---   after = function(ms, fn) -> cancel function: one timer,
----   perform = function(effect, done): run one effect; done({ ok, value, reason }) once,
+---   perform = function(effect, done, workflow): run one effect; done({ ok, value, reason }) once,
 ---   cancel = function(effect): stop a pending effect (abort or deadline), optional,
 ---   approvals = { get = function(id) -> digest|nil, set = function(id, digest) },
 ---   on_step = function(workflow, effect): a step starts (the editor's highlight), optional,
@@ -111,7 +111,7 @@ function M.new(ports)
 				if state.cancel_timer then state.cancel_timer(); state.cancel_timer = nil end
 				state.run.complete(type(result) == "table" and result or { ok = false })
 				drive(state)
-			end)
+			end, state.workflow)
 		until not state.again
 		state.driving = false
 	end
