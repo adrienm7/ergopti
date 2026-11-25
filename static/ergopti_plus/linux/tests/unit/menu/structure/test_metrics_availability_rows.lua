@@ -35,13 +35,13 @@ end
 --- Titles of the inert rows that start with a metric's name.
 local function unmeasured(rows, name_key)
 	local i18n = require("core.i18n.engine.i18n")
-	local prefix = string.format(i18n.get("menu.metrics.not_measured"), i18n.get(name_key), "")
+	local prefix = string.format(i18n.get("menu.metrics.not_measured"), i18n.get(name_key))
 	local found = {}
 	for _, row in ipairs(rows) do
 		if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then
 			helpers.assert_eq(row.disabled, true, "an availability row is inert")
 			helpers.assert_nil(row.fn)
-			found[#found + 1] = row.title
+			found[#found + 1] = row.title .. " | " .. tostring(row.tooltip)
 		end
 	end
 	return found
@@ -53,9 +53,9 @@ helpers.describe("metrics menu: what this session cannot measure", function()
 			function(System) System.bind_desktop_source(nil, "platform_reason.desktop_changes_need_workspace_interface") end)
 		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.pointer_distance"), { string.format(i18n.get("menu.metrics.not_measured"),
-			i18n.get("menu.metrics.pointer_distance"), i18n.get("platform_reason.pointer_distance_needs_cursor_position")) })
+			i18n.get("menu.metrics.pointer_distance")) .. " | " .. i18n.get("platform_reason.pointer_distance_needs_cursor_position") })
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.space_changes"), { string.format(i18n.get("menu.metrics.not_measured"),
-			i18n.get("menu.metrics.space_changes"), i18n.get("platform_reason.desktop_changes_need_workspace_interface")) })
+			i18n.get("menu.metrics.space_changes")) .. " | " .. i18n.get("platform_reason.desktop_changes_need_workspace_interface") })
 	end)
 
 	helpers.it("(tap-click) names the touchpad taps when the desktop's tap setting is unreadable", function()
@@ -64,7 +64,7 @@ helpers.describe("metrics menu: what this session cannot measure", function()
 			function(System) System.bind_desktop_source(function() return 0 end) end, { measured = false, reason = reason })
 		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.touchpad_taps"), { string.format(i18n.get("menu.metrics.not_measured"),
-			i18n.get("menu.metrics.touchpad_taps"), i18n.get(reason)) })
+			i18n.get("menu.metrics.touchpad_taps")) .. " | " .. i18n.get(reason) })
 		helpers.assert_true(i18n.get(reason) ~= reason, "the reason is a real string")
 		require("modules.keystats.system.system_metrics")._reset()
 	end)

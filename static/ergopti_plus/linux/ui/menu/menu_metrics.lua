@@ -59,9 +59,11 @@ local function _availability_rows(k)
 	local rows = {}
 	local function add(name_key, availability)
 		if type(availability) == "table" and availability.measured == false then
+			-- The reason is the row's tooltip, which the Linux tray draws below the
+			-- row: inline it made rows of 120 columns and more, cut by the panel.
 			rows[#rows + 1] = {
-				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key),
-					i18n_safe(assert(availability.reason, "an unmeasured metric names its reason"))),
+				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key)),
+				tooltip = i18n_safe(assert(availability.reason, "an unmeasured metric names its reason")),
 				disabled = true,
 			}
 		end

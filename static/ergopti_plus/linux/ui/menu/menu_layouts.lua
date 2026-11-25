@@ -274,10 +274,17 @@ local function _build_layouts(ctx)
 			}, {
 				["accented_letter_off_checked"] = function() return not entry.enabled end,
 			}, { ["accented_letter_choices"] = function() return choices end }) or {}
-			-- The Windows title: « Tous les raccourcis sur la touche É correspondent
-			-- à ceux de » and the current letter (GetMenuTitleByPath).
-			local caption = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
-			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters }
+			-- « É → raccourcis de C », not the Windows title « Tous les raccourcis
+			-- sur la touche É correspondent à ceux de C »: KDE Plasma cut that
+			-- sentence before the letter, five rows read alike and a menu
+			-- cannot scroll sideways (Arch field report, 2026-11-25). The whole
+			-- sentence stays the row's tooltip.
+			local key = require("core.text.engine.unicode_case").upper(Accented.LETTERS[id])
+			local caption = i18n_safe("shortcuts.accented_row"):gsub("{([12])}", function(slot)
+				return slot == "1" and key or entry.letter:upper()
+			end)
+			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters,
+				tooltip = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper() }
 		end
 		return { items = items }
 	end

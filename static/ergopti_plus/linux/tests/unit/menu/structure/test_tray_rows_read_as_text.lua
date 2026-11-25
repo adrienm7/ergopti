@@ -310,4 +310,42 @@ helpers.describe("the real Linux tray reads as text", function()
 		helpers.assert_eq(raw, {}, "a section row reads as text")
 		helpers.assert_true(sections >= 1, "the text expansion section is drawn by its description")
 	end)
+	-- Arch field report of 2026-11-25: the five rows of « Raccourcis sur é è
+	-- ê à ★ » each read « Tous les raccourcis sur la touche È correspondent à
+	-- ceux de … »; KDE Plasma cut them before the letter and they read alike,
+	-- and a menu cannot scroll sideways. A panel shows the start of a row.
+	for _, locale in ipairs({ "fr", "en" }) do
+		helpers.it("keeps tray rows short and siblings apart in their first words in " .. locale, function()
+			-- The widest rows drawn today, the metrics problem rows, stop at 120.
+			local DISTINCT, LONGEST = 32, 120
+			local function columns(text)
+				local out, count = {}, 0
+				for character in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+					count = count + 1
+					if count <= DISTINCT then out[#out + 1] = character end
+				end
+				return table.concat(out), count
+			end
+			local alike, long, rows = {}, {}, 0
+			local function walk(items, path)
+				local seen = {}
+				for _, row in ipairs(items or {}) do
+					local title = type(row.title) == "string" and row.title or ""
+					if title ~= "-" and not title:match("^    ") then
+						rows = rows + 1
+						local start, count = columns(title)
+						if count > LONGEST then long[#long + 1] = title end
+						if count > DISTINCT and seen[start] then alike[#alike + 1] = seen[start] .. " | " .. title end
+						seen[start] = seen[start] or title
+					end
+					walk(row.menu, path .. " > " .. title)
+				end
+			end
+			walk(tray(locale), "")
+			helpers.assert_true(rows >= MIN_ROWS, "the walk stopped early at " .. rows .. " rows")
+			helpers.assert_eq(alike, {}, "two rows of one menu must differ in what a panel shows of them")
+			helpers.assert_eq(long, {}, "a row wider than a panel can show")
+		end)
+	end
+
 end)
