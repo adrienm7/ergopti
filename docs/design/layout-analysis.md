@@ -1479,6 +1479,24 @@ it says how to choose one. The Pareto chart and spread mark the Comparison
 with a dashed square beside the Principal's ring, and « One layout »'s
 words name the Comparison's mean effort and the gap.
 
+**User metrics over key windows** (2026-11-25, an idea seen in the Layouts
+Wiki playground's metric queries). « One layout » holds « Your metrics »: each
+a name, a window (adjacent key pairs, skipgrams, key trigrams) and a query in
+the values query's language (`E.compileQuery`, which now reads negative
+numbers). `E.windowMetrics` walks the key stream `analyse()` measures, over
+the windows the metrics count (the movement table's), and gives the share of
+them the query holds for. A query names each key's values by place
+(`finger1` 1 index to 4 pinky, 0 a thumb; `hand1`; `row1` against the home
+row, −1 above; `reach1` in mm; `thumb1`, `home1`), a pair's own
+(`rows_apart`, `columns_apart`, `distance`, `same_finger`, `same_hand`,
+`same_key`) and the stream visitor's events as yes-or-no values (`sfb`,
+`lsb`, `redirect`…; `E.windowNames`). Shown with the Principal, the
+Comparison and their difference, measured on every layout shown on request
+(one per slice), never scored; at most `WINDOW_MAX_METRICS` (12), kept in the
+browser with three examples on a first visit, named in the page's language
+until renamed. The Help tab's « Write your own metric » documents the
+language.
+
 **Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
 pane). « Help », before « One layout » (which stays last), holds one titled
 section per common task: compare two layouts, rank on a metric, read the

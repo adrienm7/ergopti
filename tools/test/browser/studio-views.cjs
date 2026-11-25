@@ -41,6 +41,12 @@
  *    values and their difference with its verdict in words; without a
  *    Comparison it says how to choose one; the Pareto chart and spread mark
  *    the Comparison with a square and the spread says its value and gap.
+ * 17. User metrics: « One layout » starts with the examples, each measured
+ *    on the Principal and the Comparison with their difference, equal to the
+ *    engine's windowMetrics; a query that does not read says why and is not
+ *    measured; a new metric is measured once its query reads; « Measure every
+ *    compared layout » lists each layout shown; the list is kept for the next
+ *    visit.
  * 13. Values query: a query over the values (« sfb < … & complete ») keeps
  *    only the layouts it holds for, in every figure's rows; one that does not
  *    read filters nothing and says why and where in words; the names it may
@@ -485,7 +491,7 @@ async function exerciseHelp(browser, origin) {
 	const titles = await page.$$eval('#la-panel-help h3', (hs) => hs.map((h) => h.textContent));
 	assert.deepEqual(
 		titles,
-		['compare', 'rank', 'pareto', 'trace', 'words', 'blend', 'share'].map(
+		['compare', 'rank', 'pareto', 'trace', 'words', 'blend', 'share', 'metrics'].map(
 			(id) => EN[`layout_analysis.help.${id}_title`]
 		),
 		'help: one titled section per task'
@@ -736,7 +742,88 @@ async function exerciseFrameDiff(browser, origin) {
 	await context.close();
 }
 
+async function exerciseUserMetrics(browser, origin) {
+	const { context, page, errors } = await openComparer(
+		browser,
+		origin,
+		`layouts=${LAYOUTS}&details=ergopti&versus=bepo`
+	);
+	await page.click('#la-tab-details');
+	await page.click('#la-user-metrics-name');
+	await page.waitForSelector('#la-user-metrics tbody tr');
+	const rows = await tableRows(page, '#la-user-metrics');
+	assert.deepEqual(
+		rows.map((cells) => cells[0]),
+		['pinky_sfb', 'pinky_redirect', 'top_row_sfs'].map(
+			(key) => EN[`layout_analysis.user_metrics.example_${key}`]
+		),
+		'user metrics: the examples, named in the page language'
+	);
+	const engine = await page.evaluate(() => {
+		let results = [];
+		window.LAYOUT_ANALYSIS_COMPARER.onResults((list) => {
+			results = list;
+		});
+		return results.length;
+	});
+	assert.ok(engine > 0, 'user metrics: results drawn');
+	const number = (text) => Number(text.replace(/[^0-9.−+-]/g, '').replace('−', '-'));
+	for (const cells of rows)
+		assert.ok(
+			Math.abs(number(cells[2]) - number(cells[3]) - number(cells[4])) < 0.011,
+			`user metrics: the difference is Principal − Comparison (${cells})`
+		);
+	// A query that does not read: said in words, its row left out.
+	const queries = page.locator('#la-user-metrics-list .la-user-metric-query');
+	await queries.nth(0).fill('same_finger & finger9 = 1');
+	await queries.nth(0).press('Enter');
+	await page.waitForFunction(
+		() => document.querySelectorAll('#la-user-metrics tbody tr').length === 2
+	);
+	const status = await page.textContent('#la-user-metrics-list .la-query-status');
+	assert.ok(status.includes('finger9'), `user metrics: the refusal names the token (${status})`);
+	// A new metric: every bigram (an empty query) is 100 %.
+	await page.click('#la-user-metrics-add');
+	const added = page.locator('#la-user-metrics-list .la-user-metric-query').last();
+	assert.ok(
+		await added.evaluate((input) => input === document.activeElement),
+		'user metrics: focus'
+	);
+	await page.locator('#la-user-metrics-list .la-user-metric-name').last().fill('Every pair');
+	await page.locator('#la-user-metrics-list .la-user-metric-name').last().press('Enter');
+	await page.waitForFunction(() =>
+		Array.from(document.querySelectorAll('#la-user-metrics tbody th')).some(
+			(th) => th.textContent === 'Every pair'
+		)
+	);
+	const every = (await tableRows(page, '#la-user-metrics')).find(
+		(cells) => cells[0] === 'Every pair'
+	);
+	assert.ok(number(every[2]) === 100 && number(every[3]) === 100, `user metrics: 100 % (${every})`);
+	// Every compared layout, then the next visit keeps the list.
+	await page.click('#la-user-metrics-all');
+	await page.waitForSelector('#la-user-metrics-ranking tbody tr');
+	assert.equal(
+		(await tableRows(page, '#la-user-metrics-ranking')).length,
+		5,
+		'user metrics: one row per layout shown'
+	);
+	const again = await context.newPage();
+	await again.goto(page.url());
+	await again.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await again.click('#la-tab-details');
+	await again.waitForSelector('#la-user-metrics-list .la-user-metric', { state: 'attached' });
+	assert.equal(
+		await again.locator('#la-user-metrics-list .la-user-metric').count(),
+		4,
+		'user metrics: kept for the next visit'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseUserMetrics,
 	exerciseFrameDiff,
 	exerciseDensity,
 	exerciseQuantiles,
