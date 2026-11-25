@@ -739,6 +739,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_text_migration",
 	"tests.unit.modules.keystats.privacy.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",
+	"tests.unit.modules.keymap.test_kde_layout_watch",
 	"tests.unit.modules.keymap.test_layout_registry",
 	"tests.unit.modules.keymap.test_keylayout_emulation",
 	"tests.unit.hotstrings.engine.expander.test_source_emulation",

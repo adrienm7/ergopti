@@ -2655,6 +2655,25 @@ local function main()
 		LayoutRegistry.restore_session_selection()
 		LayoutRegistry.watch_session_reloads()
 	end
+	-- KWin switches the active layout without a new keymap: each switch the KDE
+	-- keyboard daemon announces resolves the keymap again on the layout now
+	-- active (modules/keymap/kde_layout_watch.lua). A keymap override is fixed.
+	local SessionDisplay = require("core.ui.engine.display_server")
+	if opts.keymap == nil and SessionDisplay.is_wayland() and SessionDisplay.desktop_is("kde") then
+		require("modules.keymap.kde_layout_watch").start(function()
+			local refresh, set_layout = keyboard_layout.refresh, keyboard_hook.set_layout
+			local function selected_map_current()
+				return package.loaded["adapters.keyboard_layout"] == keyboard_layout
+					and keyboard_layout.refresh == refresh and opts.keymap == nil
+			end
+			if not keyboard_hook.refresh_capture(opts.layout, function()
+				return selected_map_current() and set_layout(opts.layout) == true
+					and selected_map_current() and refresh(nil) == true
+			end, selected_map_current) then
+				Logger.error(LOG, "The layout KDE switched to is not followed — capture was not published.")
+			end
+		end)
+	end
 
 	local function on_click(code)
 		-- A physical button press ends a gesture's click hold, as Windows' mouse

@@ -1804,6 +1804,8 @@ function M.shutdown()
 	if Reapply then Reapply.shutdown() end
 	local ReloadWatch = package.loaded["modules.keymap.hyprland_reload_watch"]
 	if ReloadWatch then ReloadWatch.shutdown() end
+	local KdeWatch = package.loaded["modules.keymap.kde_layout_watch"]
+	if KdeWatch then KdeWatch.shutdown() end
 	if _checking_shutdown then return false end
 	_checking_shutdown = true
 	if not _transports_cancelled then
