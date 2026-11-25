@@ -32,6 +32,7 @@ local TITLE_KEYS = {
 	["prompt_editor"] = "prompt_editor.title_new",
 	["token_prompt"] = "token_prompt.window_title",
 	["update_check"] = "update_check.window_title",
+	["user_workflows"] = "workflows.editor.window_title",
 }
 local PRESENTATIONS = {
 	["action_picker"] = {

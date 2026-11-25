@@ -134,6 +134,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium drives the field report window's progress, end of run and
 	// actions; the shared UI browser lane of Core / js runs it as its own step.
 	'tools/test/browser/field-report-window.playwright.cjs',
+	// Real Chromium drives the user workflows editor's reorder, save check, run
+	// highlight, import stamp and delete; the shared UI browser lane of Core / js
+	// runs it as its own step.
+	'tools/test/browser/user-workflows-window.playwright.cjs',
 	// Real Chromium reads the typing metrics cards' painted colours; the shared
 	// UI browser lane of Core / js runs it as its own step.
 	'tools/test/browser/metrics-card-colours.playwright.cjs',

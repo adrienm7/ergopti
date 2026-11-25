@@ -604,6 +604,7 @@ class MenuCommand {
 	static USER_LAYOUT_ACTIVATE := "user_layout_activate"
 	static USER_LAYOUT_INSTALL := "user_layout_install"
 	static USER_LAYOUT_UNINSTALL := "user_layout_uninstall"
+	static USER_WORKFLOWS_EDITOR := "user_workflows_editor"
 	static VIRTUAL_KEYBOARD := "virtual_keyboard"
 	static WIDGET_COLORS := "widget_colors"
 	static WINDOW_SPY := "window_spy"

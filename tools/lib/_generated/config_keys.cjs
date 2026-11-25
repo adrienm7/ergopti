@@ -613,6 +613,7 @@ module.exports = Object.freeze({
 		USER_LAYOUT_ACTIVATE: "user_layout_activate",
 		USER_LAYOUT_INSTALL: "user_layout_install",
 		USER_LAYOUT_UNINSTALL: "user_layout_uninstall",
+		USER_WORKFLOWS_EDITOR: "user_workflows_editor",
 		VIRTUAL_KEYBOARD: "virtual_keyboard",
 		WIDGET_COLORS: "widget_colors",
 		WINDOW_SPY: "window_spy",

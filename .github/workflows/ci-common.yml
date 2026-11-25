@@ -343,6 +343,9 @@ jobs:
       - name: Test shared physical shortcut rendering
         run: npm run test:browser:physical-shortcuts
 
+      - name: Test the shared user workflows window
+        run: npm run test:browser:user-workflows-window
+
       - name: Test shared Versions installation rendering
         run: npm run test:browser:changelog-install
 

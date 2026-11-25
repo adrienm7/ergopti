@@ -1625,6 +1625,16 @@
 			]
 		},
 		{
+			"type": "command",
+			"id": "user_workflows_editor",
+			"i18n": "menu.shortcuts.user_workflows",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"reason_key": "platform_reason.action_workflows_windows_pending"
+		},
+		{
 			"type": "---"
 		},
 		{

@@ -796,6 +796,10 @@ local function _build_shortcuts(ctx)
 	})
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	-- The user's workflows open in their shared window (ui/user_workflows_bridge).
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.USER_WORKFLOWS_EDITOR] = function()
+		return require("ui.user_workflows_bridge").open()
+	end
 	-- The editor's honest cause while physical delivery is unqualified.
 	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
 		local ok, host = pcall(require, "ui.physical_shortcuts.bridge")

@@ -944,6 +944,10 @@ function M.build(ctx)
 		end,
 	})
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
+	-- The user's workflows open in their shared window (ui/menu/menu_user_workflows).
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.USER_WORKFLOWS_EDITOR] = function()
+		return require("ui.menu.menu_user_workflows").open()
+	end
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	-- The editor's honest cause while physical delivery is unqualified.
 	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()

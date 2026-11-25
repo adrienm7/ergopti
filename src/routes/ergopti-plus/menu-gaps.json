@@ -421,6 +421,18 @@
 		}
 	},
 	{
+		"path": "shortcuts_menu.user_workflows_editor",
+		"visibility": "hide",
+		"labels": { "fr": "🧩 Workflows personnalisés…", "en": "🧩 Custom workflows…" },
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Not on Windows yet: the workflow runner is being ported to AutoHotkey.",
+				"fr": "Pas encore sous Windows : l’exécution des workflows est en cours de portage vers AutoHotkey."
+			}
+		}
+	},
+	{
 		"path": "shortcuts_menu.personal_shortcuts",
 		"visibility": "hide",
 		"labels": { "fr": "personal_shortcuts", "en": "personal_shortcuts" },
