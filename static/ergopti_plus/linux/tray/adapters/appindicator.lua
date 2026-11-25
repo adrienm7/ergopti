@@ -110,6 +110,9 @@ local _menu = nil
 -- The status window, created on first show and kept (hidden on close) until
 -- destroy(), so a second show re-presents it instead of stacking copies.
 local _window = nil
+-- Its label, rewritten on every show: two problems share the one window, and
+-- the second used to open with the first one's text.
+local _window_label = nil
 
 -- Menu actions by id, and the one C callback that dispatches to them.
 --
@@ -199,6 +202,7 @@ local function bind()
 		void         gtk_container_add(GtkWidget *container, GtkWidget *widget);
 		void         gtk_container_set_border_width(GtkWidget *container, unsigned int width);
 		GtkWidget*   gtk_label_new(const char *text);
+		void         gtk_label_set_text(GtkWidget *label, const char *text);
 		void         gtk_label_set_line_wrap(GtkWidget *label, gboolean wrap);
 		void         gtk_label_set_max_width_chars(GtkWidget *label, int n_chars);
 		void         gtk_label_set_selectable(GtkWidget *label, gboolean selectable);
@@ -742,6 +746,7 @@ function M.destroy()
 	if _window ~= nil then
 		lib.gtk.gtk_widget_destroy(_window)
 		_window = nil
+		_window_label = nil
 	end
 	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
 	_menu_actions = {}
@@ -787,12 +792,15 @@ function M.show_window(title, text)
 		lib.gtk.gtk_label_set_max_width_chars(label, 60)
 		lib.gtk.gtk_label_set_selectable(label, 1)
 		lib.gtk.gtk_container_add(window, label)
+		_window_label = label
 		-- A C handler, not a Lua callback: hiding needs no Lua and spends no
 		-- FFI callback slot.
 		lib.gobject.g_signal_connect_data(window, "delete-event",
 			lib.ffi.cast("GCallback", lib.gtk.gtk_widget_hide_on_delete), nil, nil, 0)
 		_window = window
 	end
+	lib.gtk.gtk_window_set_title(_window, tostring(title))
+	lib.gtk.gtk_label_set_text(_window_label, tostring(text))
 	lib.gtk.gtk_widget_show_all(_window)
 	lib.gtk.gtk_window_present(_window)
 	Logger.info(LOG, "Status window shown (%s).", tostring(title))
