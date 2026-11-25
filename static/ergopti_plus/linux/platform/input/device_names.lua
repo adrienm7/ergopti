@@ -32,6 +32,12 @@ local M = {}
 --- Stamped into struct uinput_setup by platform/input/uinput_writer.lua.
 M.VIRTUAL_KEYBOARD = "Ergopti Virtual Keyboard"
 
+--- The separate uinput device that carries mouse motion, wheel and buttons
+--- while the navigation layer holds a mouse. Kept apart from the keyboard so
+--- udev never classifies the keyboard as a mouse, which made desktops disable
+--- the touchpad for as long as the daemon ran ("mouse connected").
+M.VIRTUAL_POINTER = "Ergopti Virtual Pointer"
+
 
 
 

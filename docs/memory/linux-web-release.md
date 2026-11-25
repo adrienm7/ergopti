@@ -105,8 +105,13 @@ left a child running and checks the keyboard comes back.
 The hook observes the pointer and never grabs it, except while the navigation
 layer is held and binds a wheel direction: then it grabs the mice (EV_REL and
 no EV_ABS; a touchpad is never taken), forwards every report through the
-virtual device (created with the relative axes for that reason) and turns a
-bound notch into its key press and release, dropping the high-resolution twin.
+separate "Ergopti Virtual Pointer" device and turns a bound notch into its
+key press and release, dropping the high-resolution twin. The pointer device
+is created at the first forwarded report and retired once every mouse is
+given back; the keyboard device advertises no relative axis and no button
+code, because a keyboard with pointer axes and a left button is a mouse to
+udev and KDE Plasma then disabled the touchpad while the daemon ran
+(2026-11-25).
 The grab ends with the layer, after the last forwarded button is released, or
 the desktop keeps a button down. `EVIOCGRAB` does not label reports already
 queued at acquisition or release. The current grab state, event timestamps and

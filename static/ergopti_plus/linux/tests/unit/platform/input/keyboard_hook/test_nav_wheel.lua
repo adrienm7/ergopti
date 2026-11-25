@@ -141,6 +141,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				if on_relative and on_relative(kh, keyboard, pointer, second, grabs, emitted) == false then return false end
 				return true
 			end,
+			onReleasePointer = function() emitted[#emitted + 1] = "release-pointer"; return true end,
 			onClick = not omit_click and function(code) if on_click then on_click(kh, code) end end or nil,
 			onPointerEvent = observer and function(kind, code, value, slot, at_us)
 				return observer(kind, code, value, slot, kh, start_options, grabs, at_us)
@@ -201,6 +202,9 @@ helpers.describe("keyboard hook: the navigation layer's mouse buttons (layer-mou
 		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1, "an unbound button still clicks")
 		helpers.assert_eq(grabs.on, 1, "the mouse is taken for the hold")
 		helpers.assert_eq(grabs.off, 1, "and given back after it")
+		-- While the pointer device exists desktops count a mouse as connected
+		-- and may disable the touchpad (KDE Plasma 6 field report, 2026-11-25).
+		helpers.assert_eq(count(emitted, "release-pointer"), 1, "giving the mouse back retires the virtual pointer")
 	end)
 end)
 

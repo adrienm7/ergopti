@@ -847,6 +847,13 @@ function M.emit_relative(axis, value)
 	return _uinput.emit_relative(axis, value)
 end
 
+--- Retires the virtual pointer once the navigation layer gave every mouse back.
+--- @return boolean released True when no pointer device remains.
+function M.release_pointer()
+	if not _uinput or type(_uinput.release_pointer) ~= "function" then return true end
+	return _uinput.release_pointer()
+end
+
 --- Opens the non-forking uinput channel, if this system can provide one.
 ---
 --- Called by the daemon before taking a grab. Returns false rather than raising

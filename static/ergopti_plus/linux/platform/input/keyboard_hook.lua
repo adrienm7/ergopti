@@ -135,9 +135,10 @@ local _device = nil
 -- or button (LayerPointer.sync).
 -- slots maps each taken reader slot to its path; buttons holds the forwarded
 -- buttons still down: the grab ends after them. emit_relative writes one
--- relative report on the virtual device (onEmitRelative). One table: the
+-- relative report on the virtual pointer (onEmitRelative); release_output
+-- retires that pointer once every mouse is given back (onReleasePointer). One table: the
 -- module's main chunk is at LuaJIT's 200-local ceiling.
-local LayerPointer = { slots = {}, buttons = {}, emit_relative = nil }
+local LayerPointer = { slots = {}, buttons = {}, emit_relative = nil, release_output = nil }
 
 -- One unread event per source for the timestamp merge. Heads survive a bounded
 -- pump so an older backlog entry can never be overtaken on the next iteration.
@@ -2843,6 +2844,12 @@ function LayerPointer.sync()
 		end
 		LayerPointer.slots = {}
 		Logger.debug(LOG, "The navigation layer gave the mouse back.")
+		-- The pointer device lives only while a mouse is held: while it exists
+		-- desktops count a mouse as connected and may disable the touchpad.
+		if LayerPointer.release_output then
+			local called, released = pcall(LayerPointer.release_output)
+			if not called or released ~= true then Logger.warn(LOG, "The virtual pointer was not retired; it stays until the daemon stops.") end
+		end
 	end
 end
 
@@ -4492,6 +4499,7 @@ function M.start(opts)
 	-- while pointing at a channel this session never asked for.
 	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
 	LayerPointer.emit_relative = type(options.onEmitRelative) == "function" and options.onEmitRelative or nil
+	LayerPointer.release_output = type(options.onReleasePointer) == "function" and options.onReleasePointer or nil
 
 	local ok_capture, refusal = M.can_capture(_intercept, _emit_raw)
 	if not ok_capture then
@@ -5073,6 +5081,7 @@ function M._test_drive(events, callbacks, intercept)
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	LayerPointer.emit_relative = cb.onEmitRelative
+	LayerPointer.release_output = cb.onReleasePointer
 	_intercept   = intercept and true or false
 	-- liveXkb drives the production path through adapters/xkb_capture, whose
 	-- backend and keymap the test has installed; otherwise a capture double.

@@ -151,10 +151,17 @@ helpers.describe("uinput_writer: device creation", function()
 
 		helpers.assert_true(saw_ev_key, "EV_KEY must be enabled or the device reports no keys at all")
 		helpers.assert_true(saw_ev_syn, "EV_SYN must be enabled or no SYN_REPORT is ever delivered")
+		-- The BTN_* blocks belong to the separate pointer device: a keyboard
+		-- advertising them was classified as a mouse and a joystick by udev.
+		local function button(code) return (code >= 0x100 and code <= 0x15f) or code >= 0x2c0 end
 		for code = 1, U.KEY_CODE_MAX do
-			helpers.assert_true(keybits[code] == true,
-				"keycode " .. code .. " was never registered — an unregistered code is dropped "
-				.. "silently by the kernel, so that one key would simply stop working under a grab")
+			if button(code) then
+				helpers.assert_true(keybits[code] == nil, "button " .. code .. " must not make the keyboard a mouse")
+			else
+				helpers.assert_true(keybits[code] == true,
+					"keycode " .. code .. " was never registered — an unregistered code is dropped "
+					.. "silently by the kernel, so that one key would simply stop working under a grab")
+			end
 		end
 
 		U._reset_backend()
@@ -184,32 +191,87 @@ helpers.describe("uinput_writer: device creation", function()
 		helpers.assert_true(keybits[352] == true,
 			"KEY_OK (352) must be registered: a grabbed extended key re-emitted to an "
 			.. "unregistered code is dropped silently after UI_DEV_CREATE freezes the bits")
-		helpers.assert_true(keybits[0x2FF] == true,
-			"KEY_MAX itself must be registered — the top of the range is the point of the range")
+		helpers.assert_true(keybits[0x2BF] == true,
+			"the last keyboard key below the trigger-happy buttons must be registered — the top of the range is the point of the range")
 
 		U._reset_backend()
 	end)
 
-	helpers.it("registers the mouse's relative axes for the navigation layer's forwarding (layer-wheel-linux)", function()
-		-- A mouse the navigation layer holds for its wheel moves on through this
-		-- device: an axis missing here is frozen by UI_DEV_CREATE and a forwarded
-		-- movement on it vanishes. Literal kernel codes: REL_X, REL_Y, REL_HWHEEL,
-		-- REL_WHEEL, REL_WHEEL_HI_RES, REL_HWHEEL_HI_RES.
+	-- KDE Plasma 6 (2026-11-25): one device advertising keys, BTN_LEFT and
+	-- REL_X/REL_Y was a mouse to udev, and the desktop disabled the touchpad
+	-- for as long as the daemon ran. Pointer output has its own device, made
+	-- only when a mouse report is forwarded and destroyed once released.
+	helpers.it("keeps the keyboard free of pointer capabilities and creates the pointer device on demand (layer-wheel-linux)", function()
 		local U = helpers.load_module("platform.input.uinput_writer")
-		local rec = recorder()
-		U._set_backend(rec.backend)
-		U.open()
-		local saw_ev_rel, relbits, created_at = false, {}, nil
-		for index, call in ipairs(rec.ioctls) do
-			if call.request == 0x40045564 and call.arg == 0x02 then saw_ev_rel = true end
-			if call.request == 0x40045566 then relbits[call.arg] = index end
-			if call.request == U.UI_DEV_CREATE then created_at = index end
+		local next_fd, ioctls, writes, closed = 40, {}, {}, {}
+		U._set_backend({
+			open = function() next_fd = next_fd + 1; return next_fd end,
+			ioctl = function(fd, request, arg) ioctls[#ioctls + 1] = { fd = fd, request = request, arg = arg }; return true end,
+			write = function(fd, bytes) writes[#writes + 1] = { fd = fd, bytes = bytes }; return true end,
+			close = function(fd) closed[#closed + 1] = fd; return true end,
+		})
+		helpers.assert_true(U.open())
+		local keyboard = next_fd
+		local function bits(fd)
+			local result = { ev = {}, key = {}, rel = {}, name = nil }
+			for _, call in ipairs(ioctls) do
+				if call.fd == fd then
+					if call.request == U.UI_SET_EVBIT then result.ev[call.arg] = true end
+					if call.request == U.UI_SET_KEYBIT then result.key[call.arg] = true end
+					if call.request == U.UI_SET_RELBIT then result.rel[call.arg] = true end
+					if type(call.arg) == "string" and #call.arg == 92 then result.name = call.arg:sub(9, 88):gsub("%z+$", "") end
+				end
+			end
+			return result
 		end
-		helpers.assert_true(saw_ev_rel, "EV_REL must be enabled")
+		local kb = bits(keyboard)
+		helpers.assert_nil(kb.ev[U.EV_REL], "the keyboard has no EV_REL")
+		helpers.assert_eq(next(kb.rel), nil, "the keyboard has no relative axis")
+		helpers.assert_nil(kb.key[0x110], "the keyboard has no BTN_LEFT")
+		helpers.assert_eq(kb.name, "Ergopti Virtual Keyboard")
+		helpers.assert_eq(U.has_pointer(), false, "no pointer device before any pointer report")
+
+		helpers.assert_true(U.emit_relative(0x00, 3))
+		helpers.assert_true(U.emit(0x110, 1), "a forwarded button goes to the pointer device")
+		local pointer = next_fd
+		helpers.assert_true(pointer ~= keyboard)
+		local pt = bits(pointer)
+		helpers.assert_eq(pt.name, "Ergopti Virtual Pointer")
+		helpers.assert_true(pt.ev[U.EV_REL] and pt.key[0x110] and pt.key[0x111] and pt.key[0x112], "a mouse's axes and buttons")
 		for _, axis in ipairs({ 0x00, 0x01, 0x06, 0x08, 0x0b, 0x0c }) do
-			helpers.assert_true(relbits[axis] ~= nil and relbits[axis] < created_at,
-				"relative axis " .. axis .. " is registered before UI_DEV_CREATE")
+			helpers.assert_true(pt.rel[axis] == true, "relative axis " .. axis .. " is registered")
 		end
+		helpers.assert_nil(pt.key[30], "the pointer has no keyboard key")
+		for _, write in ipairs(writes) do helpers.assert_eq(write.fd, pointer, "pointer reports never reach the keyboard") end
+		helpers.assert_true(U.emit(30, 1) and U.emit(30, 0))
+		helpers.assert_eq(writes[#writes].fd, keyboard, "keys stay on the keyboard")
+
+		helpers.assert_true(U.emit(0x110, 0))
+		helpers.assert_true(U.release_pointer(), "a released mouse retires the pointer device")
+		helpers.assert_eq(U.has_pointer(), false)
+		helpers.assert_eq(closed, { pointer })
+		helpers.assert_true(U.emit_relative(0x08, -1), "a later report recreates it")
+		helpers.assert_true(U.has_pointer())
+		helpers.assert_true(U.close())
+		helpers.assert_eq(U.has_pointer(), false, "closing the keyboard retires the pointer device too")
+		helpers.assert_eq(#closed, 3)
+		U._reset_backend()
+	end)
+
+	helpers.it("keeps the owned pointer device while a forwarded button is down and retires it with the output", function()
+		local U, rec, capability = owned_channel()
+		helpers.assert_true(capability ~= nil)
+		helpers.assert_true(U.emit_owned(capability, 0x110, 1))
+		helpers.assert_true(U.has_pointer())
+		helpers.assert_eq(U.release_pointer(), false, "a held button keeps its device")
+		helpers.assert_true(U.emit_owned(capability, 0x110, 0))
+		helpers.assert_true(U.release_pointer())
+		helpers.assert_true(U.output_current(capability), "retiring the pointer leaves the keyboard output current")
+		helpers.assert_true(U.emit_owned(capability, 0x111, 1) and U.emit_owned(capability, 0x111, 0))
+		local closed = rec.closed
+		helpers.assert_true(U.close_owned(capability))
+		helpers.assert_eq(rec.closed, closed + 2, "the owned retirement destroys both devices")
+		helpers.assert_eq(U.has_pointer(), false)
 		U._reset_backend()
 	end)
 
