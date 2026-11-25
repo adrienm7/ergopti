@@ -166,15 +166,15 @@ export class Keyboard {
 		// A row whose keys are all removed (data-key '' is display: none, such as
 		// the thumb rows of a standard board) would be an empty row of the
 		// keyboard's table for assistive technology (KeyboardBasis.svelte).
-		for (const row of this.location.querySelectorAll('keyboard-row')) {
-			const filled = [...row.querySelectorAll('keyboard-key')].some((key) => key.dataset['key']);
+		for (const row of this.location.querySelectorAll('.keyboard-row')) {
+			const filled = [...row.querySelectorAll('.keyboard-key')].some((key) => key.dataset['key']);
 			if (filled) row.removeAttribute('aria-hidden');
 			else row.setAttribute('aria-hidden', 'true');
 		}
 	}
 
 	cleanKey(location, row, column) {
-		const keySelector = `keyboard-key[data-row='${row}'][data-column='${column}']`;
+		const keySelector = `.keyboard-key[data-row='${row}'][data-column='${column}']`;
 
 		// Event listeners cleaning
 		const oldKey = location.querySelector(keySelector);
@@ -195,7 +195,9 @@ export class Keyboard {
 
 		// Key content and style cleaning
 		newKey.replaceChildren(document.createElement('div'));
-		newKey.className = '';
+		// The base class draws the key (Keyboard.css): only the classes the
+		// previous content added go.
+		newKey.className = 'keyboard-key';
 		newKey.style = '';
 
 		return newKey;
@@ -632,7 +634,7 @@ export class Keyboard {
 			if (i >= text.length) return; // stop condition
 
 			const nextLetter = text.charAt(i);
-			const nextKey = location.querySelector(`keyboard-key[data-key='${nextLetter}']`);
+			const nextKey = location.querySelector(`.keyboard-key[data-key='${nextLetter}']`);
 
 			if (nextKey) {
 				nextKey.classList.add('pressed-key');
@@ -640,7 +642,7 @@ export class Keyboard {
 
 			if (makePreviousKeysDisappear && i > 0) {
 				const previousLetter = text.charAt(i - 1);
-				const previousKey = location.querySelector(`keyboard-key[data-key='${previousLetter}']`);
+				const previousKey = location.querySelector(`.keyboard-key[data-key='${previousLetter}']`);
 				if (previousKey) {
 					previousKey.classList.remove('pressed-key');
 				}

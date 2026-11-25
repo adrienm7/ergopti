@@ -165,9 +165,9 @@ brew install --cask ergoptiplus@dev   # versions de développement</code
 	</li>
 	<li>
 		Les touches mortes ne fonctionnent pas sur l'écran de verrouillage, ni les touches envoyant plus
-		d'un caractère d'un coup, comme <kbd><nbsp></nbsp>:</kbd>. Ce problème cause surtout des
-		difficultés avec ErgoptiPlus qui contient beaucoup de nouvelles touches mortes. Le keylayout
-		Ergopti standard ne présente pas ce problème n'ayant que des touches mortes simples.
+		d'un caractère d'un coup, comme <kbd><span class="nbsp"></span>:</kbd>. Ce problème cause
+		surtout des difficultés avec ErgoptiPlus qui contient beaucoup de nouvelles touches mortes. Le
+		keylayout Ergopti standard ne présente pas ce problème n'ayant que des touches mortes simples.
 	</li>
 	<li>
 		Parfois, Ergopti peut ne pas s'afficher dans la liste des dispositions clavier. Pour résoudre ce

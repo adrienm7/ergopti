@@ -2,6 +2,6 @@
 	import Ergopti from './Ergopti.svelte';
 </script>
 
-<name-ergopti-plus>
+<span class="name-ergopti-plus">
 	<Ergopti /><span class="glow plus">+</span>
-</name-ergopti-plus>
+</span>

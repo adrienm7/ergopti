@@ -28,38 +28,38 @@
 		de la rangée de repos et ne vont sur les autres rangées que pour les lettres les moins
 		fréquentes.
 	</p>
-	<keyboard data-color="azerty">
-		<keyboard-row class="center">
-			<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;">
+	<div class="keyboard-drawing" data-color="azerty">
+		<div class="keyboard-row center">
+			<div class="keyboard-key" data-finger="auriculaire" data-hand="left" style="--size: 1;">
 				<div>Q</div>
-			</keyboard-key>
-			<keyboard-key data-finger="annulaire" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="annulaire" data-hand="left" style="--size: 1;">
 				<div>S</div>
-			</keyboard-key>
-			<keyboard-key data-finger="majeur" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="majeur" data-hand="left" style="--size: 1;">
 				<div>D</div>
-			</keyboard-key>
-			<keyboard-key data-finger="index" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="index" data-hand="left" style="--size: 1;">
 				<div>F</div>
-			</keyboard-key>
+			</div>
 
 			<div style="display: inline-block; width: 50px;"></div>
 
-			<keyboard-key data-finger="index" data-hand="right" style="--size: 1;">
+			<div class="keyboard-key" data-finger="index" data-hand="right" style="--size: 1;">
 				<div>J</div>
-			</keyboard-key>
-			<keyboard-key data-finger="majeur" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="majeur" data-hand="right" style="--size: 1;">
 				<div>K</div>
-			</keyboard-key>
-			<keyboard-key data-finger="annulaire" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="annulaire" data-hand="right" style="--size: 1;">
 				<div>L</div>
-			</keyboard-key>
-			<keyboard-key data-finger="auriculaire" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="auriculaire" data-hand="right" style="--size: 1;">
 				<div>M</div>
-			</keyboard-key>
-		</keyboard-row>
-		<keyboard-legend>Rangée du milieu en AZERTY</keyboard-legend>
-	</keyboard>
+			</div>
+		</div>
+		<p class="keyboard-legend">Rangée du milieu en AZERTY</p>
+	</div>
 
 	<p>
 		Pourtant, le QWERTY (et donc l’AZERTY) ne fait pas mieux qu’une disposition aléatoire sur ce
@@ -79,38 +79,38 @@
 		face aux consonnes, mais chaque mot en contient.
 	</p>
 
-	<keyboard data-color="ergopti">
-		<keyboard-row class="center">
-			<keyboard-key data-finger="auriculaire" data-hand="left" style="--size: 1;">
+	<div class="keyboard-drawing" data-color="ergopti">
+		<div class="keyboard-row center">
+			<div class="keyboard-key" data-finger="auriculaire" data-hand="left" style="--size: 1;">
 				<div>A</div>
-			</keyboard-key>
-			<keyboard-key data-finger="annulaire" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="annulaire" data-hand="left" style="--size: 1;">
 				<div>I</div>
-			</keyboard-key>
-			<keyboard-key data-finger="majeur" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="majeur" data-hand="left" style="--size: 1;">
 				<div>E</div>
-			</keyboard-key>
-			<keyboard-key data-finger="index" data-hand="left" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="index" data-hand="left" style="--size: 1;">
 				<div>U</div>
-			</keyboard-key>
+			</div>
 
 			<div style="display: inline-block; width: 50px;"></div>
 
-			<keyboard-key data-finger="index" data-hand="right" style="--size: 1;">
+			<div class="keyboard-key" data-finger="index" data-hand="right" style="--size: 1;">
 				<div>S</div>
-			</keyboard-key>
-			<keyboard-key data-finger="majeur" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="majeur" data-hand="right" style="--size: 1;">
 				<div>N</div>
-			</keyboard-key>
-			<keyboard-key data-finger="annulaire" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="annulaire" data-hand="right" style="--size: 1;">
 				<div>T</div>
-			</keyboard-key>
-			<keyboard-key data-finger="auriculaire" data-hand="right" style="--size: 1;">
+			</div>
+			<div class="keyboard-key" data-finger="auriculaire" data-hand="right" style="--size: 1;">
 				<div>R</div>
-			</keyboard-key>
-		</keyboard-row>
-		<keyboard-legend>Rangée du milieu en <Ergopti></Ergopti></keyboard-legend>
-	</keyboard>
+			</div>
+		</div>
+		<p class="keyboard-legend">Rangée du milieu en <Ergopti></Ergopti></p>
+	</div>
 	<p>
 		En français et en anglais, le <kbd>E</kbd> est de très loin la lettre la plus fréquente.
 		Viennent ensuite les voyelles <kbd>A</kbd>, <kbd>I</kbd>, <kbd>O</kbd> et <kbd>U</kbd>, ainsi

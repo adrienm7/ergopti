@@ -19,7 +19,7 @@
 	}
 </script>
 
-<keyboard-control-color>
+<div class="keyboard-control-color">
 	<button onclick={toggleColor}>
 		{#if colorValue === 'yes'}
 			<span class="color-text-gradient">Couleur</span>&nbsp;➜ Bicolore
@@ -27,4 +27,4 @@
 			Bicolore ➜&nbsp;<span class="color-text-gradient">Couleur</span>
 		{/if}
 	</button>
-</keyboard-control-color>
+</div>

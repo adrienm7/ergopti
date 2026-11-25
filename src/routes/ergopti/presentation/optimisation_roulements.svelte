@@ -84,7 +84,8 @@
 	</p>
 	<KeyboardBasis id="roulements" />
 	<div style="height: 20px" />
-	<keyboard-control-rolls
+	<div
+		class="keyboard-control-rolls"
 		style="width: 100%; margin: 0 auto; display: inline-block; text-align: center"
 	>
 		<select
@@ -98,7 +99,7 @@
 			<option disabled>— Roulements consonnes —</option>
 			{#each roulements_consonnes as value}<option {value}>{value.toUpperCase()}</option>{/each}
 		</select>
-	</keyboard-control-rolls>
+	</div>
 
 	<h3>Bons bigrammes voyelle-voyelle</h3>
 	<ul>
