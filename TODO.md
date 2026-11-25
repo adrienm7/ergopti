@@ -489,6 +489,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### All drivers
 
+- [ ] **[Tester request, 2026-11-26] Games with an in-game chat.** Switching Ergopti on and off to chat is not fluid
+      (AltGr+Enter, then type): find a smooth per-app or quick-toggle flow for games. Not designed or implemented
+      yet.
 - [ ] **User workflows, what is left (maintainer request, 2026-11-25; branch `feat/user-workflows`).** On macOS and
       Linux the model, runner, `run_workflow` action and editor window are built
       ([data README](static/ergopti_plus/_shared/shortcuts/data/workflows/README.md)). Left, in this order:
