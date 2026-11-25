@@ -1355,6 +1355,36 @@ body:has(> main.layout-analysis) {
 	width: 7em;
 }
 
+/* The values query: wide enough for a few comparisons, its hint, its
+   refusal in words and the names it may use under the filters. */
+.la-filter-query {
+	flex: 1 1 18em;
+}
+
+.la-filter-query input {
+	font-family: ui-monospace, monospace;
+	width: 100%;
+}
+
+.la-query-hint,
+.la-query-status {
+	margin: 0 0 4px;
+	max-width: 66ch;
+}
+
+.la-query-status:empty {
+	display: none;
+}
+
+.la-query-names > summary {
+	cursor: pointer;
+}
+
+.la-query-names ul {
+	columns: 16em;
+	margin: 4px 0 8px;
+}
+
 /* The tab strip leads the page and wraps instead of scrolling it at phone
    width, so no tab is ever hidden. Each tab carries its icon in its accent
    slot; the chosen one stands on the surface with a bar in that colour and

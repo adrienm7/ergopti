@@ -287,6 +287,17 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   carried in the share link (`blend=<id>:<weight>,…`) only when every part is
   built-in: a blend of the user's own text stays on the device, as the text
   does, and its status line and the copied link's say so.
+- `compileQuery(text, {numbers, flags})` → a test over `{name: value}` (an
+  idea seen in the Layouts Wiki playground's Boolean filter of its library,
+  « year >= 2020 & !has_magic »): comparisons of a value with a number (`<`,
+  `<=`, `>`, `>=`, `=`, `!=`; a decimal comma reads as a point), a yes-or-no
+  value alone, joined by `&` (`and`) and `|` (`or`), negated by `!` (`not`),
+  grouped by parentheses, `&` before `|`. A text that does not read throws a
+  `QueryError` with a stable code and its place. The Comparer's filters take
+  it as « Values query » over the mark, every metric by its id, `complete`
+  and `mine`, listed under the field (« Names you can use »); a query that
+  does not read filters nothing and says why and where, never applied in
+  part. It is kept with the table's other filters.
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the

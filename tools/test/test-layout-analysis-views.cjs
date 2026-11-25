@@ -394,6 +394,47 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	throws(() => E.movementBetter('sfb_typo'), 'movementBetter: another id throws');
 }
 
+// ===========================================
+// ======= Values query ======================
+// ===========================================
+
+// The library filter's query (an idea seen in the Layouts Wiki playground):
+// comparisons and yes-or-no values joined by & and |, negated by !.
+{
+	const names = { numbers: ['sfb', 'mark', 'roll_in'], flags: ['complete', 'mine'] };
+	const values = { sfb: 1.1, mark: 120, roll_in: 30, complete: true, mine: false };
+	const holds = (text) => E.compileQuery(text, names)(values);
+	check(holds(''), 'query: an empty query keeps every layout');
+	check(holds('sfb < 1.2'), 'query: a comparison');
+	check(holds('sfb<1,2 & roll_in >= 30'), 'query: a decimal comma and &');
+	check(!holds('sfb >= 1.2'), 'query: a comparison that fails');
+	check(holds('not complete | mark > 100'), 'query: | and the word not');
+	check(!holds('!(sfb > 1 and complete)'), 'query: ! over parentheses');
+	check(holds('sfb > 2 | roll_in = 30 & complete'), 'query: & binds before |');
+	check(!holds('(sfb > 2 | roll_in = 30) & mine'), 'query: parentheses group first');
+	check(!E.compileQuery('sfb < 5', names)({ sfb: Number.NaN }), 'query: a missing value fails');
+	const refusal = (text, code, at) => {
+		try {
+			E.compileQuery(text, names);
+		} catch (error) {
+			check(
+				error instanceof E.QueryError && error.code === code && error.at === at,
+				`query: « ${text} » is ${code} at ${at}, not ${error.code} at ${error.at}`
+			);
+			return;
+		}
+		errors.push(`query: « ${text} » should not read`);
+	};
+	refusal('sfb', 'query_comparison', 3);
+	refusal('foo < 1', 'query_unknown_name', 0);
+	refusal('sfb < ', 'query_number', 6);
+	refusal('complete > 1', 'query_flag', 9);
+	refusal('(sfb < 1', 'query_parenthesis', 8);
+	refusal('sfb < 1 1', 'query_unexpected', 8);
+	refusal('sfb ~ 2', 'query_unexpected', 4);
+	refusal('sfb < 1 &', 'query_end', 9);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-views: ${errors.length} problem(s)`);
