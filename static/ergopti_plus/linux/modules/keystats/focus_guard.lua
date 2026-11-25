@@ -589,9 +589,16 @@ function M.new(opts)
 			local called, allowed = pcall(options.window_policy)
 			return called and allowed == true
 		end
+		-- The input budget, never OUTPUT_BARRIER_MS: the window mode exists
+		-- because the worker gives no field answer, so the long barrier only
+		-- timed out, and an expansion's preflight waits here while the
+		-- hook's forwarded trigger key is still down on the virtual keyboard.
+		-- On KDE Wayland ",e" then autorepeated into ",eeeeeeeeeje" before the
+		-- release reached the desktop (Arch field report, 2026-11-25). Once the
+		-- worker left a barrier unanswered, text_admission polls without waiting.
 		function window_owner.current()
 			if not window_owner.cached() then return false end
-			local allowed, mode = guard.text_automation(OUTPUT_BARRIER_MS)
+			local allowed, mode = guard.text_automation()
 			return allowed and mode == "window" and window_owner.cached()
 		end
 		return window_owner.cached() and window_owner or nil

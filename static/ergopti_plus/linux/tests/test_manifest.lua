@@ -689,6 +689,7 @@ return {
 	"tests.unit.hotstrings.engine.injector.test_caps_lock",
 	"tests.unit.hotstrings.engine.injector.test_erase_pacing",
 	"tests.unit.hotstrings.engine.injector.test_held_terminator",
+	"tests.unit.hotstrings.engine.injector.test_window_mode_held_trigger",
 	"tests.unit.hotstrings.engine.injector.test_fast_channel",
 	"tests.unit.hotstrings.engine.injector.test_untypable_text",
 	"tests.unit.hotstrings.engine.injector.test_destination",
