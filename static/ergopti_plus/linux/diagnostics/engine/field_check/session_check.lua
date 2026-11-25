@@ -39,7 +39,7 @@ M.TOUCHPAD_PROPERTY = "ID_INPUT_TOUCHPAD"
 M.INPUT_GROUPS = { "input", "uinput" }
 
 -- The notification server's capability for a notice that stays until closed.
-M.PERSISTENCE_CAPABILITY = "persistence"
+M.PERSISTENCE_CAPABILITY = require("core.text.engine.identifiers").linux_desktop.notification_persistence
 
 M.NOTIFICATIONS_NAME = "org.freedesktop.Notifications"
 M.NOTIFICATIONS_PATH = "/org/freedesktop/Notifications"

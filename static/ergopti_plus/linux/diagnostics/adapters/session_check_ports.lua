@@ -21,14 +21,16 @@
 
 local M = {}
 
--- The udev rule install/setup_permissions.sh installs (the packages ship the
--- same path, tools/test/test-linux-arch-package.cjs).
-M.UINPUT_RULE = "/etc/udev/rules.d/99-ergopti-uinput.rules"
+-- The udev rule install/setup_permissions.sh installs into the system rules
+-- folder (the packages ship the same path, tools/test/test-linux-arch-package.cjs).
+local UDEV_RULES_DIR = "/etc/udev/rules.d/"
+M.UINPUT_RULE = UDEV_RULES_DIR .. require("core.text.engine.identifiers").linux_desktop.uinput_udev_rule_file
 M.UINPUT_PATH = "/dev/uinput"
 M.INPUT_CLASS_DIR = "/sys/class/input"
 
--- The check runs at most about eight commands and bus requests in turn.
-M.COMMAND_SHARE = 8
+-- The check runs at most about eight commands and bus requests in turn
+-- (constants.toml [adapters]).
+M.COMMAND_SHARE = require("core.timing.engine.timings").count("adapters", "field_session_command_share")
 
 --- Reads a small file, nil when it cannot be read.
 local function read_file(path)

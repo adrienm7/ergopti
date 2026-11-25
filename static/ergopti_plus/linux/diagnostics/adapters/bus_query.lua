@@ -22,8 +22,9 @@
 
 local M = {}
 
--- A menu with every branch filled is a few hundred kilobytes of JSON.
-M.MAX_OUTPUT_BYTES = 8 * 1024 * 1024
+-- A menu with every branch filled is a few hundred kilobytes of JSON
+-- (constants.toml [limits]).
+M.MAX_OUTPUT_BYTES = require("core.timing.engine.timings").count("limits", "field_check_output_bytes")
 
 --- Builds the request function.
 --- @param timeout_ms number The bound of one request.

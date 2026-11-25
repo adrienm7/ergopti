@@ -79,6 +79,9 @@ return {
 		wayland_toplevel_handle = "ext_foreign_toplevel_handle_v1",
 		dialog_host_guard_env = "ERGOPTI_DIALOG_HOST_GUARD",
 		dialog_host_guard_case_env = "ERGOPTI_DIALOG_HOST_GUARD_CASE",
+		dbusmenu_interface = "com.canonical.dbusmenu",
+		notification_persistence = "persistence",
+		uinput_udev_rule_file = "99-ergopti-uinput.rules",
 	},
 	linux_host_environment = {
 		names_env = "ERGOPTI_HOST_ENV_NAMES",

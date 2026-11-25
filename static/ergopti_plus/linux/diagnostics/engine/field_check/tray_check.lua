@@ -33,10 +33,11 @@
 --- ==============================================================================
 
 local Report = require("diagnostics.engine.field_check.report")
+local Timings = require("core.timing.engine.timings")
 
 local M = {}
 
-M.MENU_INTERFACE = "com.canonical.dbusmenu"
+M.MENU_INTERFACE = require("core.text.engine.identifiers").linux_desktop.dbusmenu_interface
 M.ITEM_INTERFACE = "org.kde.StatusNotifierItem"
 M.WATCHER_NAME = "org.kde.StatusNotifierWatcher"
 M.WATCHER_PATH = "/StatusNotifierWatcher"
@@ -44,15 +45,15 @@ M.WATCHER_PATH = "/StatusNotifierWatcher"
 M.DEFAULT_ITEM_PATH = "/StatusNotifierItem"
 
 -- A clicked row rebuilds the menu on a later turn: the check reads it again
--- this many times, this far apart, before it gives up.
-M.SETTLE_ATTEMPTS = 12
-M.SETTLE_MS = 250
+-- this many times, this far apart, before it gives up (constants.toml [adapters]).
+M.SETTLE_ATTEMPTS = Timings.count("adapters", "field_tray_settle_attempts")
+M.SETTLE_MS = Timings.ms("adapters", "field_tray_settle_ms")
 
 -- The panel events a hover sends to a submenu row, in the order Plasma sends them.
 M.HOVER_EVENTS = { "hovered", "opened" }
 
 -- How deep the check looks under a top-level group for a row.
-local MAX_SEARCH_DEPTH = 2
+local MAX_SEARCH_DEPTH = Timings.count("adapters", "field_tray_search_depth")
 
 
 
