@@ -175,7 +175,7 @@ baseline as violations go.
       `MenuFontRegistrationTests`, `test_menu_font.ahk`, `test-menu-font-faces.cjs`. Left: a look at
       the dyslexia font in a real window and tray menu on each OS (TODO-tests). The Studio's own strings are measured
       now (`npm run test:studio-plain-language`, WCAG 3.1.5 on the 21 locales' catalogue): English and French have no
-      sentence of 30 words or more; left, the 315 rows the other 17 spaced locales still pin in
+      sentence of 30 words or more; left, the 224 rows the other 17 spaced locales still pin in
       `tools/test/studio-plain-language-baseline.json`, and a review of Japanese and Chinese, which a word count
       cannot measure.
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's

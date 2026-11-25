@@ -1293,8 +1293,10 @@ The frames' words are now measured in the catalogue itself:
 namespaces into sentences by the reading gate's rule (widened to scripts
 without capitals) and counts those of 30 words or more. English had 28 and
 French 36; each was cut in two or three, without a rewrite, and the test
-refuses an English or French row. The other spaced locales keep 315 rows in
-`studio-plain-language-baseline.json`, which only shrinks; formulas are not
+refuses an English or French row. The other spaced locales had 315 rows;
+91 were cut the same way, at the semicolons of the long sentence only (a
+danda in Hindi), wherever that left no long sentence. The 224 left are
+pinned in `studio-plain-language-baseline.json`, which only shrinks; formulas are not
 prose, and Japanese and Chinese, which put no space between words, are left
 to the manual review.
 
