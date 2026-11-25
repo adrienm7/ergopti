@@ -372,7 +372,7 @@ two disagree in either direction.
 | `layout.emulate_home_row`                                     | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulate_bottom_row`                                   | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulated_layout`                                      | —               | `evdev`, `uinput`                      | —                    |
-| `layout.emulated_layout_recents`                              | —               | `evdev`, `uinput`                      | —                    |
+| `layout.emulated_layout_recents`                              | —               | —                                      | —                    |
 | `category_enabled.hotstrings`                                 | n/a             | n/a                                    | —                    |
 | `category_enabled.layout`                                     | n/a             | n/a                                    | —                    |
 | `category_enabled.shortcuts`                                  | n/a             | n/a                                    | —                    |

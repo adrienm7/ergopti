@@ -193,6 +193,7 @@ content = [
 "gestures/ui/menu/gestures.lua" = "the gestures menu edits the settings"
 "core/ui/ui/modal.lua" = "releases the grab while a dialog is open, for every feature alike"
 "ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
+"diagnostics/adapters/session_check_ports.lua" = "the field run's session check reads the grab and the device access"
 
 [detection.linux.uinput]
 content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '"hotstrings\.engine\.injector"']
@@ -211,6 +212,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "diagnostics/ui/healthcheck/" = "the health check probes the device access"
 "diagnostics/engine/field_check/setup_check.lua" = "the field run's setup check probes the device access"
+"diagnostics/adapters/session_check_ports.lua" = "the field run's session check reads the grab and the device access"
 
 [detection.linux.xdotool]
 content = ['["\x27]xdotool[ "\x27]']
@@ -233,6 +235,8 @@ content = ['["\x27]xdotool[ "\x27]']
 
 [detection.linux.xdotool.plumbing]
 "platform/focus/window_info.lua" = "the focused-window port answers through libxcb in process; xdotool is only its fallback when libxcb is missing"
+"modules/auto_click.lua" = "the anti-sleep auto-clicker is not a manifest feature on Linux; without xdotool its switch is refused with a named reason"
+"modules/shortcuts/workflows.lua" = "user workflows are not a manifest feature: only a pointer step the user writes reaches xdotool, and without it that step fails"
 
 [detection.linux.wmctrl]
 content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
@@ -243,6 +247,7 @@ content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 
 [detection.linux.wmctrl.plumbing]
 "platform/focus/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"
+"modules/shortcuts/workflows.lua" = "user workflows are not a manifest feature: only a focus step the user writes reaches wmctrl, and without it that step fails"
 
 [detection.linux.ollama]
 file_name = 'ollama'

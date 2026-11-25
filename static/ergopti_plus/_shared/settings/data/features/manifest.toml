@@ -4497,7 +4497,7 @@ description_key = "menu.layout.emulated_layout"
 [[features.layout]]
 id = "emulated_layout_recents"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+requires = { macos = [], linux = [], windows = [] }
 default = []
 recommended = []
 family = "setting"
