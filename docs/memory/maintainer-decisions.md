@@ -27,6 +27,38 @@ single defaults source (`_shared/shortcuts/data/auto_click_defaults.json`).
   same corpus replayed by every driver
   (`_shared/tests/corpus/keep_awake/`). Do not replace it by a learned or
   OCR-based detector: the maintainer chose a predictable tolerance.
+- Text targets too (2026-11-25, later the same day): a target may be a
+  caption (« Autoriser une fois », « Allow once » and variants) found by the
+  OS's own OCR on the allowed window (Vision on macOS, Windows.Media.Ocr,
+  tesseract on Linux as an optional dependency), compared without case,
+  accents or spacing with an edit distance per target
+  (`_shared/shortcuts/engine/text_target.lua`), so a red theme still matches.
+- Import: every common image format the OS decodes (PNG, JPEG, WebP, GIF's
+  first frame, BMP, TIFF, HEIC where available) is converted to the library's
+  PNG; anything else is refused with a translated message.
+- Presets: the library persists; named presets hold the allowed apps, the
+  targets and the keep-awake and auto-click switches. Starters are data
+  (`_shared/shortcuts/data/keep_awake_presets.json`): « Anti-veille dans
+  VS Code » (Copilot captions, auto-click on), « Anti-veille dans Teams »
+  (keep-awake only) and « Anti-veille simple ». The « Anti-veille » submenu
+  shows them as a radio group, the active one remembered; Ctrl+M runs it. A
+  management window creates, duplicates, renames, deletes, exports and imports
+  presets (one JSON file with its images, portable between OSes).
+- Screen vision is one service per driver (`docs/design/screen-vision.md`):
+  capture, image matching and OCR behind one interface that the auto-clicker,
+  the Ctrl+O capture and the user workflows share.
+
+## Ctrl+O is the OCR capture; the parentheses wrap moves to Ctrl+B (2026-11-25)
+
+Ctrl+O = OCR capture to clipboard (text + notification); the parentheses wrap
+(« Entourer la ligne de parenthèses ») moves to Ctrl+B on the three OS, with a
+migration that keeps a configuration that bound it explicitly working. The
+capture reuses the interactive region selection of Ctrl+H, recognises the
+text with the OS's OCR in the user's languages, puts it on the clipboard with
+its line breaks and shows a short notification of its beginning; nothing
+recognised leaves the clipboard alone with a « aucun texte reconnu » notice,
+Escape changes nothing, and missing OCR or capture permission greys the action
+with its reason. No recognised text is ever logged.
 
 ## The reading font draws the tray menus too (2026-11-24)
 

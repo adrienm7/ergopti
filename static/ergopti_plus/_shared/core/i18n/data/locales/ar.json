@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "الإبقاء على النماذج",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: فتح محرر الاختصارات النصية",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: فتح محرر الاختصارات النصية",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ على Windows وSuper+★ على Linux وCtrl+★ على macOS: لا تحتوي لوحة مفاتيح Mac على مفتاح Windows، وCtrl هو مفتاح التعديل الحر بجانب Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ على Windows وSuper+★ على Linux وCtrl+★ على macOS: لا تحتوي لوحة مفاتيح Mac على مفتاح Windows، وCtrl هو مفتاح التعديل الحر بجانب Cmd.",
+	"menu.keep_awake.title": "منع السكون",
+	"menu.keep_awake.header_presets": "الإعدادات المسبقة",
+	"menu.keep_awake.header_options": "الإعداد المسبق النشط",
+	"menu.keep_awake.keep_awake": "منع وضع السكون",
+	"menu.keep_awake.auto_click": "نقرات تلقائية",
+	"menu.keep_awake.click_count": "النقرات التلقائية المنفذة: {1}",
+	"keepawake.preset.simple": "منع السكون البسيط",
+	"keepawake.preset.vscode": "منع السكون في VS Code",
+	"keepawake.preset.teams": "منع السكون في Teams",
+	"keepawake.preset_empty": "هذا الإعداد المسبق لا يمنع السكون ولا ينقر على شيء: فعّل أحد خياراته من قائمة « منع السكون ».",
+	"keepawake.auto_click_refused": "تعذّر بدء النقرات التلقائية: تجد السبب في قائمة « منع السكون ».",
+	"keepawake.reason.auto_click_wayland": "لا يسمح Wayland لأي تطبيق بتحريك المؤشر؛ استخدم جلسة X11 للنقر تلقائيًا",
+	"keepawake.reason.auto_click_tool_missing": "xdotool غير مثبت؛ ثبّته للنقر تلقائيًا",
+	"keepawake.reason.capture_permission_missing": "تسجيل الشاشة غير مسموح لـ Ergopti: اسمح به من إعدادات النظام › الخصوصية والأمن",
+	"keepawake.reason.capture_unavailable": "لا يمكن قراءة الشاشة هنا",
+	"keepawake.reason.ocr_engine_missing": "لا يتوفر التعرف على النص (ثبّت tesseract على Linux)؛ ما تزال أهداف الصور تعمل",
+	"keepawake.reason.ocr_language_missing": "لا توجد لغة تعرّف على النص مثبتة للغاتك"
 }

@@ -226,6 +226,8 @@ local _build_configuration = require("settings.ui.menu.configuration").build
 local _build_language = require("settings.ui.menu.language").build
 local _build_apps = require("apps.ui.menu.apps").build
 
+local _build_keep_awake = require("menu.ui.builder.keep_awake").build
+
 local _about_update_rows = require("ui.menu.menu_about")._about_update_rows
 local _build_about = require("ui.menu.menu_about").build
 
@@ -337,6 +339,7 @@ function M.build(ctx)
 		["llm"]             = _build_llm,
 		["agent"]           = _build_agent,
 		["metrics"]         = _build_metrics,
+		["keep_awake"]      = _build_keep_awake,
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,

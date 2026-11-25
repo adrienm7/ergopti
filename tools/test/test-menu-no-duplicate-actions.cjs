@@ -61,6 +61,7 @@ const ROOT_SUBMENUS = {
 	keyboard_layout: 'layout_menu',
 	hotstrings: 'hotstrings_menu',
 	metrics: 'metrics_menu',
+	keep_awake: 'keep_awake_menu',
 	llm: 'llm_menu',
 	agent: 'agent_menu',
 	apps: 'apps_menu',

@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Сохранить модели",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Открыть редактор хотстрингов",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Открыть редактор хотстрингов",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ в Windows, Super+★ в Linux, Ctrl+★ в macOS: на клавиатуре Mac нет клавиши Windows, а Ctrl там свободный модификатор рядом с Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ в Windows, Super+★ в Linux, Ctrl+★ в macOS: на клавиатуре Mac нет клавиши Windows, а Ctrl там свободный модификатор рядом с Cmd.",
+	"menu.keep_awake.title": "Без сна",
+	"menu.keep_awake.header_presets": "Предустановки",
+	"menu.keep_awake.header_options": "Активная предустановка",
+	"menu.keep_awake.keep_awake": "Не давать уснуть",
+	"menu.keep_awake.auto_click": "Автоматические щелчки",
+	"menu.keep_awake.click_count": "Выполнено автоматических щелчков: {1}",
+	"keepawake.preset.simple": "Простой режим без сна",
+	"keepawake.preset.vscode": "Без сна в VS Code",
+	"keepawake.preset.teams": "Без сна в Teams",
+	"keepawake.preset_empty": "Эта предустановка не мешает сну и ничего не нажимает: включите один из её параметров в меню « Без сна ».",
+	"keepawake.auto_click_refused": "Не удалось запустить автоматические щелчки: причина указана в меню « Без сна ».",
+	"keepawake.reason.auto_click_wayland": "Wayland не позволяет приложениям перемещать указатель; для автоматических щелчков используйте сеанс X11",
+	"keepawake.reason.auto_click_tool_missing": "xdotool не установлен; установите его для автоматических щелчков",
+	"keepawake.reason.capture_permission_missing": "Запись экрана для Ergopti не разрешена: разрешите её в Системных настройках › Конфиденциальность и безопасность",
+	"keepawake.reason.capture_unavailable": "Здесь невозможно прочитать экран",
+	"keepawake.reason.ocr_engine_missing": "Распознавание текста недоступно (в Linux установите tesseract); цели-изображения по-прежнему работают",
+	"keepawake.reason.ocr_language_missing": "Для ваших языков не установлен язык распознавания текста"
 }

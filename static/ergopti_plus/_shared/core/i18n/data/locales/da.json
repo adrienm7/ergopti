@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Behold modellerne",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Åbn hotstring-editoren",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Åbn hotstring-editoren",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ på Windows, Super+★ på Linux, Ctrl+★ på macOS: et Mac-tastatur har ingen Windows-tast, og Ctrl er den ledige modifikatortast ved siden af Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ på Windows, Super+★ på Linux, Ctrl+★ på macOS: et Mac-tastatur har ingen Windows-tast, og Ctrl er den ledige modifikatortast ved siden af Cmd.",
+	"menu.keep_awake.title": "Hold vågen",
+	"menu.keep_awake.header_presets": "Forudindstillinger",
+	"menu.keep_awake.header_options": "Aktiv forudindstilling",
+	"menu.keep_awake.keep_awake": "Forhindr dvale",
+	"menu.keep_awake.auto_click": "Automatiske klik",
+	"menu.keep_awake.click_count": "Automatiske klik udført: {1}",
+	"keepawake.preset.simple": "Enkel hold vågen",
+	"keepawake.preset.vscode": "Hold vågen i VS Code",
+	"keepawake.preset.teams": "Hold vågen i Teams",
+	"keepawake.preset_empty": "Denne forudindstilling forhindrer ikke dvale og klikker ikke: slå en af dens indstillinger til i menuen « Hold vågen ».",
+	"keepawake.auto_click_refused": "Automatiske klik kunne ikke starte: menuen « Hold vågen » viser hvorfor.",
+	"keepawake.reason.auto_click_wayland": "Wayland lader ingen programmer flytte markøren; brug en X11-session til automatiske klik",
+	"keepawake.reason.auto_click_tool_missing": "xdotool er ikke installeret; installer det til automatiske klik",
+	"keepawake.reason.capture_permission_missing": "Skærmoptagelse er ikke tilladt for Ergopti: tillad det i Systemindstillinger › Anonymitet og sikkerhed",
+	"keepawake.reason.capture_unavailable": "Skærmen kan ikke læses her",
+	"keepawake.reason.ocr_engine_missing": "Ingen tekstgenkendelse er tilgængelig (installer tesseract på Linux); billedmål virker stadig",
+	"keepawake.reason.ocr_language_missing": "Intet sprog til tekstgenkendelse er installeret for dine sprog"
 }

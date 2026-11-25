@@ -124,13 +124,11 @@ AwakeCreditSession(StartedTick) {
 		return Credited == true
 }
 
+; Ctrl+M: the anti-sleep mode runs the active preset, keep awake, automatic
+; clicks or both (modules/shortcuts/auto_click.ahk); a second press stops both.
 ToggleActivitySimulation(*) {
 		global ActivitySimulation
-		if ActivitySimulation {
-				StopActivitySimulation()
-		} else {
-				StartActivitySimulation()
-		}
+		return AutoClickToggleMode(StartActivitySimulation, StopActivitySimulation, (*) => ActivitySimulation)
 }
 
 StopActivitySimulation(Notify := true) {

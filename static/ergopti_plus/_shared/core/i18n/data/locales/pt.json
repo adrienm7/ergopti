@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Manter os modelos",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Abrir o editor de hotstrings",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Abrir o editor de hotstrings",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ no Windows, Super+★ no Linux, Ctrl+★ no macOS: um teclado Mac não tem tecla Windows, e Ctrl é o modificador livre ao lado de Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ no Windows, Super+★ no Linux, Ctrl+★ no macOS: um teclado Mac não tem tecla Windows, e Ctrl é o modificador livre ao lado de Cmd.",
+	"menu.keep_awake.title": "Anti-suspensão",
+	"menu.keep_awake.header_presets": "Predefinições",
+	"menu.keep_awake.header_options": "Predefinição ativa",
+	"menu.keep_awake.keep_awake": "Impedir a suspensão",
+	"menu.keep_awake.auto_click": "Cliques automáticos",
+	"menu.keep_awake.click_count": "Cliques automáticos feitos: {1}",
+	"keepawake.preset.simple": "Anti-suspensão simples",
+	"keepawake.preset.vscode": "Anti-suspensão no VS Code",
+	"keepawake.preset.teams": "Anti-suspensão no Teams",
+	"keepawake.preset_empty": "Esta predefinição não impede a suspensão nem clica em nada: ative uma das suas opções no menu « Anti-suspensão ».",
+	"keepawake.auto_click_refused": "Não foi possível iniciar os cliques automáticos: o menu « Anti-suspensão » indica o motivo.",
+	"keepawake.reason.auto_click_wayland": "O Wayland não deixa nenhuma aplicação mover o ponteiro; use uma sessão X11 para clicar automaticamente",
+	"keepawake.reason.auto_click_tool_missing": "O xdotool não está instalado; instale-o para clicar automaticamente",
+	"keepawake.reason.capture_permission_missing": "A gravação de ecrã não está autorizada para o Ergopti: autorize-a em Definições do Sistema › Privacidade e segurança",
+	"keepawake.reason.capture_unavailable": "O ecrã não pode ser lido aqui",
+	"keepawake.reason.ocr_engine_missing": "Não há reconhecimento de texto disponível (no Linux, instale o tesseract); os alvos de imagem continuam a funcionar",
+	"keepawake.reason.ocr_language_missing": "Nenhum idioma de reconhecimento de texto está instalado para os seus idiomas"
 }

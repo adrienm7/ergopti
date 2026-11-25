@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "モデルを残す",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: ホットストリングエディターを開く",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: ホットストリングエディターを開く",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Windows では Win+★、Linux では Super+★、macOS では Ctrl+★：Mac のキーボードには Windows キーがなく、Ctrl は Cmd の隣で空いている修飾キーです。"
+	"platform_reason.star_slot_is_ctrl_on_macos": "Windows では Win+★、Linux では Super+★、macOS では Ctrl+★：Mac のキーボードには Windows キーがなく、Ctrl は Cmd の隣で空いている修飾キーです。",
+	"menu.keep_awake.title": "スリープ防止",
+	"menu.keep_awake.header_presets": "プリセット",
+	"menu.keep_awake.header_options": "有効なプリセット",
+	"menu.keep_awake.keep_awake": "スリープを防ぐ",
+	"menu.keep_awake.auto_click": "自動クリック",
+	"menu.keep_awake.click_count": "実行した自動クリック: {1}",
+	"keepawake.preset.simple": "シンプルなスリープ防止",
+	"keepawake.preset.vscode": "VS Code でスリープ防止",
+	"keepawake.preset.teams": "Teams でスリープ防止",
+	"keepawake.preset_empty": "このプリセットはスリープを防がず、何もクリックしません。« スリープ防止 » メニューでいずれかのオプションをオンにしてください。",
+	"keepawake.auto_click_refused": "自動クリックを開始できませんでした。理由は « スリープ防止 » メニューに表示されます。",
+	"keepawake.reason.auto_click_wayland": "Wayland ではアプリがポインターを動かせません。自動クリックには X11 セッションを使用してください",
+	"keepawake.reason.auto_click_tool_missing": "xdotool がインストールされていません。自動クリックにはインストールしてください",
+	"keepawake.reason.capture_permission_missing": "Ergopti に画面収録が許可されていません。システム設定 › プライバシーとセキュリティで許可してください",
+	"keepawake.reason.capture_unavailable": "ここでは画面を読み取れません",
+	"keepawake.reason.ocr_engine_missing": "文字認識を利用できません（Linux では tesseract をインストール）。画像ターゲットは引き続き動作します",
+	"keepawake.reason.ocr_language_missing": "お使いの言語の文字認識言語がインストールされていません"
 }

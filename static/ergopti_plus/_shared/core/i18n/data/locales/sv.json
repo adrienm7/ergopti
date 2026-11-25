@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Behåll modellerna",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Öppna hotstring-redigeraren",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Öppna hotstring-redigeraren",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ i Windows, Super+★ i Linux, Ctrl+★ i macOS: ett Mac-tangentbord har ingen Windows-tangent, och Ctrl är den lediga modifieraren bredvid Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ i Windows, Super+★ i Linux, Ctrl+★ i macOS: ett Mac-tangentbord har ingen Windows-tangent, och Ctrl är den lediga modifieraren bredvid Cmd.",
+	"menu.keep_awake.title": "Håll vaken",
+	"menu.keep_awake.header_presets": "Förinställningar",
+	"menu.keep_awake.header_options": "Aktiv förinställning",
+	"menu.keep_awake.keep_awake": "Förhindra viloläge",
+	"menu.keep_awake.auto_click": "Automatiska klick",
+	"menu.keep_awake.click_count": "Automatiska klick gjorda: {1}",
+	"keepawake.preset.simple": "Enkel håll vaken",
+	"keepawake.preset.vscode": "Håll vaken i VS Code",
+	"keepawake.preset.teams": "Håll vaken i Teams",
+	"keepawake.preset_empty": "Den här förinställningen förhindrar inte viloläge och klickar inte: aktivera ett av dess alternativ i menyn « Håll vaken ».",
+	"keepawake.auto_click_refused": "Automatiska klick kunde inte starta: menyn « Håll vaken » anger varför.",
+	"keepawake.reason.auto_click_wayland": "Wayland låter inget program flytta pekaren; använd en X11-session för automatiska klick",
+	"keepawake.reason.auto_click_tool_missing": "xdotool är inte installerat; installera det för automatiska klick",
+	"keepawake.reason.capture_permission_missing": "Skärminspelning är inte tillåten för Ergopti: tillåt det i Systeminställningar › Integritet och säkerhet",
+	"keepawake.reason.capture_unavailable": "Skärmen kan inte läsas här",
+	"keepawake.reason.ocr_engine_missing": "Ingen textigenkänning finns (installera tesseract på Linux); bildmål fungerar fortfarande",
+	"keepawake.reason.ocr_language_missing": "Inget språk för textigenkänning är installerat för dina språk"
 }

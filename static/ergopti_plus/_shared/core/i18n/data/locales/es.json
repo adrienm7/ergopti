@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Conservar los modelos",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Abrir el editor de hotstrings",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Abrir el editor de hotstrings",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ en Windows, Super+★ en Linux, Ctrl+★ en macOS: un teclado Mac no tiene tecla Windows, y Ctrl es allí el modificador libre junto a Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ en Windows, Super+★ en Linux, Ctrl+★ en macOS: un teclado Mac no tiene tecla Windows, y Ctrl es allí el modificador libre junto a Cmd.",
+	"menu.keep_awake.title": "Antisuspensión",
+	"menu.keep_awake.header_presets": "Ajustes predefinidos",
+	"menu.keep_awake.header_options": "Ajuste activo",
+	"menu.keep_awake.keep_awake": "Impedir la suspensión",
+	"menu.keep_awake.auto_click": "Clics automáticos",
+	"menu.keep_awake.click_count": "Clics automáticos realizados: {1}",
+	"keepawake.preset.simple": "Antisuspensión simple",
+	"keepawake.preset.vscode": "Antisuspensión en VS Code",
+	"keepawake.preset.teams": "Antisuspensión en Teams",
+	"keepawake.preset_empty": "Este ajuste no impide la suspensión ni hace clic en nada: active una de sus opciones en el menú « Antisuspensión ».",
+	"keepawake.auto_click_refused": "No se pudieron iniciar los clics automáticos: el menú « Antisuspensión » indica el motivo.",
+	"keepawake.reason.auto_click_wayland": "Wayland no permite a ninguna aplicación mover el puntero; use una sesión X11 para hacer clics automáticos",
+	"keepawake.reason.auto_click_tool_missing": "xdotool no está instalado; instálelo para hacer clics automáticos",
+	"keepawake.reason.capture_permission_missing": "La grabación de pantalla no está permitida para Ergopti: permítala en Ajustes del Sistema › Privacidad y seguridad",
+	"keepawake.reason.capture_unavailable": "Aquí no se puede leer la pantalla",
+	"keepawake.reason.ocr_engine_missing": "No hay reconocimiento de texto disponible (en Linux, instale tesseract); los objetivos de imagen siguen funcionando",
+	"keepawake.reason.ocr_language_missing": "No hay ningún idioma de reconocimiento de texto instalado para sus idiomas"
 }

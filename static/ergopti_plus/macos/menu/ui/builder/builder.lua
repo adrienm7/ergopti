@@ -739,6 +739,7 @@ function M.generate(ctx, menu_mods, actions)
 			return row and { row } or {}
 		end,
 		["apps"]            = function() return module_rows("apps") end,
+		["keep_awake"]      = function() return module_rows("keep_awake") end,
 		["configuration"]   = function()
 			local root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")
 			if root == nil then return {} end

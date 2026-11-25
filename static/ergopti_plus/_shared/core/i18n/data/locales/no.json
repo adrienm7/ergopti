@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Behold modellene",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Åpne hotstring-redigeringen",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Åpne hotstring-redigeringen",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ på Windows, Super+★ på Linux, Ctrl+★ på macOS: et Mac-tastatur har ingen Windows-tast, og Ctrl er den ledige modifikatortasten ved siden av Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ på Windows, Super+★ på Linux, Ctrl+★ på macOS: et Mac-tastatur har ingen Windows-tast, og Ctrl er den ledige modifikatortasten ved siden av Cmd.",
+	"menu.keep_awake.title": "Hold våken",
+	"menu.keep_awake.header_presets": "Forhåndsinnstillinger",
+	"menu.keep_awake.header_options": "Aktiv forhåndsinnstilling",
+	"menu.keep_awake.keep_awake": "Hindre dvale",
+	"menu.keep_awake.auto_click": "Automatiske klikk",
+	"menu.keep_awake.click_count": "Automatiske klikk utført: {1}",
+	"keepawake.preset.simple": "Enkel hold våken",
+	"keepawake.preset.vscode": "Hold våken i VS Code",
+	"keepawake.preset.teams": "Hold våken i Teams",
+	"keepawake.preset_empty": "Denne forhåndsinnstillingen hindrer ikke dvale og klikker ikke: slå på ett av valgene i menyen « Hold våken ».",
+	"keepawake.auto_click_refused": "Automatiske klikk kunne ikke starte: menyen « Hold våken » viser hvorfor.",
+	"keepawake.reason.auto_click_wayland": "Wayland lar ingen programmer flytte pekeren; bruk en X11-økt for automatiske klikk",
+	"keepawake.reason.auto_click_tool_missing": "xdotool er ikke installert; installer det for automatiske klikk",
+	"keepawake.reason.capture_permission_missing": "Skjermopptak er ikke tillatt for Ergopti: tillat det i Systeminnstillinger › Personvern og sikkerhet",
+	"keepawake.reason.capture_unavailable": "Skjermen kan ikke leses her",
+	"keepawake.reason.ocr_engine_missing": "Ingen tekstgjenkjenning er tilgjengelig (installer tesseract på Linux); bildemål virker fortsatt",
+	"keepawake.reason.ocr_language_missing": "Ingen tekstgjenkjenningsspråk er installert for språkene dine"
 }

@@ -51,6 +51,7 @@ graph TD
         MACOS_apple_shortcuts["AppleShortcuts.lua"]
         MACOS_apple_shortcuts_cli["AppleShortcutsCli.lua"]
         MACOS_apple_shortcuts_native["AppleShortcutsNative.lua"]
+        MACOS_auto_click_ports["AutoClickPorts.lua"]
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_installed_physical_source["InstalledPhysicalSource.lua"]

@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Keep the models",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Open the hotstrings editor",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Open the hotstrings editor",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ on Windows, Super+★ on Linux, Ctrl+★ on macOS: a Mac keyboard has no Windows key, and Ctrl is the modifier left free beside Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ on Windows, Super+★ on Linux, Ctrl+★ on macOS: a Mac keyboard has no Windows key, and Ctrl is the modifier left free beside Cmd.",
+	"menu.keep_awake.title": "Keep awake",
+	"menu.keep_awake.header_presets": "Presets",
+	"menu.keep_awake.header_options": "Active preset",
+	"menu.keep_awake.keep_awake": "Prevent sleep",
+	"menu.keep_awake.auto_click": "Automatic clicks",
+	"menu.keep_awake.click_count": "Automatic clicks made: {1}",
+	"keepawake.preset.simple": "Plain keep-awake",
+	"keepawake.preset.vscode": "Keep awake in VS Code",
+	"keepawake.preset.teams": "Keep awake in Teams",
+	"keepawake.preset_empty": "This preset neither prevents sleep nor clicks anything: turn one of its options on in the « Keep awake » menu.",
+	"keepawake.auto_click_refused": "Automatic clicks could not start: the « Keep awake » menu says why.",
+	"keepawake.reason.auto_click_wayland": "Wayland lets no application move the pointer; use an X11 session to click automatically",
+	"keepawake.reason.auto_click_tool_missing": "xdotool is not installed; install it to click automatically",
+	"keepawake.reason.capture_permission_missing": "Screen recording is not allowed for Ergopti: allow it in System Settings › Privacy & Security",
+	"keepawake.reason.capture_unavailable": "The screen cannot be read here",
+	"keepawake.reason.ocr_engine_missing": "No text recognition is available (on Linux, install tesseract); image targets still work",
+	"keepawake.reason.ocr_language_missing": "No text recognition language is installed for your languages"
 }

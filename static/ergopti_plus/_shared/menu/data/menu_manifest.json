@@ -343,6 +343,13 @@
 			"boot_deferred": true
 		},
 		{
+			"type": "group",
+			"id": "keep_awake",
+			"i18n": "menu.keep_awake.title",
+			"rows": [],
+			"boot_deferred": true
+		},
+		{
 			"id": "---"
 		},
 		{
@@ -1167,6 +1174,24 @@
 				"hs",
 				"linux"
 			]
+		}
+	],
+	"keep_awake_menu": [
+		{
+			"type": "section_header",
+			"i18n": "menu.keep_awake.header_presets"
+		},
+		{
+			"type": "list",
+			"id": "keep_awake_presets"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.keep_awake.header_options"
+		},
+		{
+			"type": "list",
+			"id": "keep_awake_options"
 		}
 	],
 	"language_menu": [

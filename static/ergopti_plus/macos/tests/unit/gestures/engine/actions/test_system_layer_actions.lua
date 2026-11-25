@@ -31,18 +31,21 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 		end
 	end)
 
-	it("toggles keep-awake through the shortcut layer's session", function(fresh_actions)
-		local saved = package.loaded["modules.shortcuts.actions.system"]
+	it("toggles the anti-sleep mode through its coordinator", function(fresh_actions)
+		-- Ctrl+M runs the active preset's parts through
+		-- modules/shortcuts/actions/auto_click.lua, which owns the keep-awake
+		-- session and the auto-clicker; its own tests drive the parts.
+		local saved = package.loaded["modules.shortcuts.actions.auto_click"]
 		local toggles = 0
-		package.loaded["modules.shortcuts.actions.system"] = {
-			toggle_awake = function() toggles = toggles + 1; return true end,
+		package.loaded["modules.shortcuts.actions.auto_click"] = {
+			toggle_mode = function() toggles = toggles + 1; return true end,
 		}
 		local ok, err = pcall(function()
 			local actions = fresh_actions()
 			helpers.assert_eq(actions.execute_single("activity_simulation"), true)
-			helpers.assert_eq(toggles, 1, "activity_simulation must toggle the keep-awake session")
+			helpers.assert_eq(toggles, 1, "activity_simulation must toggle the anti-sleep mode")
 		end)
-		package.loaded["modules.shortcuts.actions.system"] = saved
+		package.loaded["modules.shortcuts.actions.auto_click"] = saved
 		helpers.assert_true(ok, tostring(err))
 	end)
 

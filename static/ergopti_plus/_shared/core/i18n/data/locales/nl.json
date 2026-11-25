@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Modellen bewaren",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: De hotstring-editor openen",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: De hotstring-editor openen",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ op Windows, Super+★ op Linux, Ctrl+★ op macOS: een Mac-toetsenbord heeft geen Windows-toets, en Ctrl is daar de vrije modificatietoets naast Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ op Windows, Super+★ op Linux, Ctrl+★ op macOS: een Mac-toetsenbord heeft geen Windows-toets, en Ctrl is daar de vrije modificatietoets naast Cmd.",
+	"menu.keep_awake.title": "Wakker houden",
+	"menu.keep_awake.header_presets": "Voorinstellingen",
+	"menu.keep_awake.header_options": "Actieve voorinstelling",
+	"menu.keep_awake.keep_awake": "Slaapstand voorkomen",
+	"menu.keep_awake.auto_click": "Automatische klikken",
+	"menu.keep_awake.click_count": "Automatische klikken: {1}",
+	"keepawake.preset.simple": "Eenvoudig wakker houden",
+	"keepawake.preset.vscode": "Wakker houden in VS Code",
+	"keepawake.preset.teams": "Wakker houden in Teams",
+	"keepawake.preset_empty": "Deze voorinstelling voorkomt de slaapstand niet en klikt nergens op: schakel een van de opties in via het menu « Wakker houden ».",
+	"keepawake.auto_click_refused": "Automatische klikken konden niet starten: het menu « Wakker houden » vermeldt waarom.",
+	"keepawake.reason.auto_click_wayland": "Wayland laat geen toepassing de aanwijzer verplaatsen; gebruik een X11-sessie om automatisch te klikken",
+	"keepawake.reason.auto_click_tool_missing": "xdotool is niet geïnstalleerd; installeer het om automatisch te klikken",
+	"keepawake.reason.capture_permission_missing": "Schermopname is niet toegestaan voor Ergopti: sta het toe in Systeeminstellingen › Privacy en beveiliging",
+	"keepawake.reason.capture_unavailable": "Het scherm kan hier niet worden gelezen",
+	"keepawake.reason.ocr_engine_missing": "Geen tekstherkenning beschikbaar (installeer tesseract op Linux); afbeeldingsdoelen werken nog wel",
+	"keepawake.reason.ocr_language_missing": "Er is geen tekstherkenningstaal voor uw talen geïnstalleerd"
 }

@@ -1003,6 +1003,9 @@ const OPENS_SUBMENU = {
 	// macOS and Linux — and each declaration inside is narrower than that, for the
 	// reason each carries.
 	apps: 'apps_menu',
+	// The « Anti-veille » submenu (2026-11-25): presets and the active preset's
+	// options, both lists of runtime rows, on the three drivers.
+	keep_awake: 'keep_awake_menu',
 	// The About submenu, declared 2026-08-07. Visible on all three, with the same
 	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',

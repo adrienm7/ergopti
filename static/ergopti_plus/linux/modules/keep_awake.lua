@@ -15,6 +15,8 @@ local i18n = require("core.i18n.engine.i18n")
 local LOG = "modules.keep_awake"
 local READY = "ERGOPTI_INHIBITED\n"
 local _owner
+-- Whether the auto-clicker ran when the driver paused; the resume restarts it.
+local _auto_click_paused = false
 
 --- Holds an unwritten pipe until cancellation. OwnedProcess owns its closure.
 --- @return table source
@@ -207,17 +209,44 @@ function M.new(ports)
 	return owner
 end
 
---- Toggles the daemon's only inhibitor.
+--- Toggles the anti-sleep mode with the active preset: its keep-awake part
+--- holds the daemon's only inhibitor, its auto-click part runs the
+--- auto-clicker (modules/auto_click.lua). A second Ctrl+M stops both.
 --- @return boolean admitted
 function M.toggle()
 	if not _owner then _owner = M.new() end
-	return _owner.toggle()
+	local AutoClick = require("modules.auto_click")
+	if AutoClick.running() then
+		AutoClick.stop()
+		return _owner.stop()
+	end
+	if _owner.is_active() then return _owner.toggle() end
+	local plan = AutoClick.active_plan()
+	if not plan.keep_awake and not plan.auto_click then
+		Logger.warn(LOG, "The active anti-sleep preset keeps nothing awake and clicks nothing.")
+		require("platform.focus.application_notifier").send(i18n.get("keepawake.preset_empty"))
+		return false
+	end
+	local admitted = true
+	if plan.keep_awake then admitted = _owner.toggle() end
+	if plan.auto_click then
+		local started, reason = AutoClick.start(plan)
+		if not started then
+			require("platform.focus.application_notifier").send(i18n.get("keepawake.auto_click_refused"))
+			Logger.warn(LOG, "Auto-click did not start with the mode: reason=%s.", tostring(reason))
+		end
+		admitted = admitted and started
+	end
+	return admitted
 end
 
 --- Releases the daemon's inhibitor before its event loop stops, silently:
---- the driver is leaving, as on macOS.
+--- the driver is leaving, as on macOS. The auto-clicker stops with it.
 --- @return boolean settled
-function M.stop() return not _owner or _owner.stop({ quiet = true }) end
+function M.stop()
+	require("modules.auto_click").stop()
+	return not _owner or _owner.stop({ quiet = true })
+end
 
 --- Follows the driver's pause: the daemon's inhibitor stops with it and comes
 --- back on resume when it ran at the pause.
@@ -225,6 +254,14 @@ function M.stop() return not _owner or _owner.stop({ quiet = true }) end
 --- @return boolean settled
 function M.set_paused(paused)
 	if type(paused) ~= "boolean" then error("keep_awake.set_paused() needs a boolean pause state", 2) end
+	local AutoClick = require("modules.auto_click")
+	if paused and AutoClick.running() then
+		_auto_click_paused = true
+		AutoClick.stop()
+	elseif not paused and _auto_click_paused then
+		_auto_click_paused = false
+		AutoClick.start(AutoClick.active_plan())
+	end
 	if not _owner then return true end
 	return _owner.set_paused(paused)
 end

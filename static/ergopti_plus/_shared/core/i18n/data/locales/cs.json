@@ -6227,5 +6227,22 @@
 	"ollama.uninstall.keep_models_button": "Ponechat modely",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Otevřít editor hotstringů",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Otevřít editor hotstringů",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ ve Windows, Super+★ v Linuxu, Ctrl+★ v macOS: klávesnice Macu nemá klávesu Windows a Ctrl je tam volný modifikátor vedle Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ ve Windows, Super+★ v Linuxu, Ctrl+★ v macOS: klávesnice Macu nemá klávesu Windows a Ctrl je tam volný modifikátor vedle Cmd.",
+	"menu.keep_awake.title": "Zabránit uspání",
+	"menu.keep_awake.header_presets": "Předvolby",
+	"menu.keep_awake.header_options": "Aktivní předvolba",
+	"menu.keep_awake.keep_awake": "Zabránit režimu spánku",
+	"menu.keep_awake.auto_click": "Automatická kliknutí",
+	"menu.keep_awake.click_count": "Provedená automatická kliknutí: {1}",
+	"keepawake.preset.simple": "Jednoduché zabránění uspání",
+	"keepawake.preset.vscode": "Zabránit uspání ve VS Code",
+	"keepawake.preset.teams": "Zabránit uspání v Teams",
+	"keepawake.preset_empty": "Tato předvolba nebrání uspání ani nic nekliká: zapněte jednu z jejích voleb v nabídce « Zabránit uspání ».",
+	"keepawake.auto_click_refused": "Automatická kliknutí se nepodařilo spustit: nabídka « Zabránit uspání » uvádí proč.",
+	"keepawake.reason.auto_click_wayland": "Wayland nedovolí žádné aplikaci pohnout ukazatelem; pro automatická kliknutí použijte relaci X11",
+	"keepawake.reason.auto_click_tool_missing": "xdotool není nainstalován; pro automatická kliknutí jej nainstalujte",
+	"keepawake.reason.capture_permission_missing": "Nahrávání obrazovky není pro Ergopti povoleno: povolte jej v Nastavení systému › Soukromí a zabezpečení",
+	"keepawake.reason.capture_unavailable": "Obrazovku zde nelze přečíst",
+	"keepawake.reason.ocr_engine_missing": "Rozpoznávání textu není k dispozici (v Linuxu nainstalujte tesseract); obrázkové cíle stále fungují",
+	"keepawake.reason.ocr_language_missing": "Pro vaše jazyky není nainstalován žádný jazyk rozpoznávání textu"
 }
