@@ -70,6 +70,7 @@ install.section_tray=Ikon i systembakken og vinduer
 install.security_warning_body=Medlemskab af gruppen 'input' gør det muligt at læse HVERT tastetryk i sessionen, også adgangskoder indtastet i et hvilket som helst program. Det er netop, hvad en hotstring-motor kræver, og det gør keyd og xremap også.
 install.security_warning_title=SIKKERHEDSADVARSEL
 install.service_started=tjenesten ergopti-hotstrings aktiveret og startet
+install.session_without_graphical_target=Denne session starter aldrig systemds graphical-session.target (i3, Openbox, Xfce, sway uden sessionsstyring), så brugerenheden ville aldrig køre: Ergopti+ starter i stedet fra XDG-autostartposten ved næste login. En vindueshåndtering, der ignorerer XDG-autostart (i3, sway), skal have linjen exec {1} i sin konfiguration.
 install.source_toolchain_unavailable=den installerede compiler kan ikke bygge den native arkivmotor.
 install.startup_choice_unreadable=Startvalget kunne ikke læses.
 install.summary_config=Konfiguration: {1}

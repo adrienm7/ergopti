@@ -70,6 +70,7 @@ install.section_tray=Icona dell’area di notifica e finestre
 install.security_warning_body=Far parte del gruppo «input» permette di leggere OGNI tasto premuto nella sessione, comprese le password digitate in qualsiasi applicazione. È ciò che serve a un motore di hotstring, ed è ciò che fanno keyd e xremap.
 install.security_warning_title=AVVISO DI SICUREZZA
 install.service_started=servizio ergopti-hotstrings attivato e avviato
+install.session_without_graphical_target=Questa sessione non avvia mai graphical-session.target di systemd (i3, Openbox, Xfce, sway senza gestore di sessione), quindi l’unità utente non verrebbe mai eseguita: Ergopti+ si avvia invece dalla voce di avvio automatico XDG al prossimo accesso. Un gestore di finestre che ignora l’avvio automatico XDG (i3, sway) ha bisogno della riga exec {1} nella sua configurazione.
 install.source_toolchain_unavailable=il compilatore installato non può compilare il motore di archivi nativo.
 install.startup_choice_unreadable=Impossibile leggere la scelta di avvio.
 install.summary_config=Configurazione: {1}

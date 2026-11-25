@@ -1797,6 +1797,7 @@
 	"linux_shell.install.security_warning_body": "Die Mitgliedschaft in der Gruppe „input“ erlaubt, JEDEN Tastenanschlag der Sitzung zu lesen, auch in beliebigen Anwendungen eingegebene Passwörter. Genau das braucht eine Hotstring-Engine, und so arbeiten auch keyd und xremap.",
 	"linux_shell.install.security_warning_title": "SICHERHEITSHINWEIS",
 	"linux_shell.install.service_started": "Dienst ergopti-hotstrings aktiviert und gestartet",
+	"linux_shell.install.session_without_graphical_target": "Diese Sitzung startet systemds graphical-session.target nie (i3, Openbox, Xfce, sway ohne Sitzungsverwaltung), daher würde die Benutzer-Unit nie laufen: Ergopti+ startet stattdessen bei der nächsten Anmeldung über den XDG-Autostart-Eintrag. Ein Fenstermanager, der XDG-Autostart ignoriert (i3, sway), braucht die Zeile exec {1} in seiner Konfiguration.",
 	"linux_shell.install.source_toolchain_unavailable": "der installierte Compiler kann das native Archiv-Backend nicht bauen.",
 	"linux_shell.install.startup_choice_unreadable": "Die Startauswahl konnte nicht gelesen werden.",
 	"linux_shell.install.summary_config": "Konfiguration: {1}",

@@ -1797,6 +1797,7 @@
 	"linux_shell.install.security_warning_body": "Medlemskap i gruppen 'input' gjør det mulig å lese HVERT tastetrykk i økten, også passord som skrives inn i hvilket som helst program. Det er nettopp det en hotstring-motor krever, og det gjør også keyd og xremap.",
 	"linux_shell.install.security_warning_title": "SIKKERHETSADVARSEL",
 	"linux_shell.install.service_started": "tjenesten ergopti-hotstrings aktivert og startet",
+	"linux_shell.install.session_without_graphical_target": "Denne økten starter aldri systemds graphical-session.target (i3, Openbox, Xfce, sway uten økthåndterer), så brukerenheten ville aldri kjøre: Ergopti+ starter i stedet fra XDG-autostartoppføringen ved neste innlogging. En vindusbehandler som ignorerer XDG-autostart (i3, sway), trenger linjen exec {1} i konfigurasjonen sin.",
 	"linux_shell.install.source_toolchain_unavailable": "den installerte kompilatoren kan ikke bygge den native arkivmotoren.",
 	"linux_shell.install.startup_choice_unreadable": "Oppstartsvalget kunne ikke leses.",
 	"linux_shell.install.summary_config": "Konfigurasjon: {1}",

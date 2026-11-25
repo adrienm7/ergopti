@@ -70,6 +70,7 @@ install.section_tray=סמל במגש המערכת וחלונות
 install.security_warning_body=חברות בקבוצה 'input' מאפשרת לקרוא כל הקשה בהפעלה, כולל סיסמאות שמוקלדות בכל יישום. זה בדיוק מה שמנוע hotstrings צריך, וכך פועלים גם keyd ו-xremap.
 install.security_warning_title=אזהרת אבטחה
 install.service_started=השירות ergopti-hotstrings הופעל והתחיל לפעול
+install.session_without_graphical_target=הפעלה זו אף פעם אינה מפעילה את graphical-session.target של systemd (i3, Openbox, Xfce, sway ללא מנהל הפעלות), ולכן יחידת המשתמש לעולם לא תרוץ: Ergopti+ יופעל במקום זאת מרשומת ההפעלה האוטומטית של XDG בכניסה הבאה. מנהל חלונות שמתעלם מהפעלה אוטומטית של XDG (i3, sway) צריך את השורה exec {1} בהגדרות שלו.
 install.source_toolchain_unavailable=המהדר המותקן אינו יכול לבנות את מנוע הארכיונים המקורי.
 install.startup_choice_unreadable=לא ניתן היה לקרוא את בחירת ההפעלה.
 install.summary_config=הגדרות: {1}
