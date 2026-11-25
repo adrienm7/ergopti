@@ -118,8 +118,7 @@
 							},
 							{
 								"kind": "run_action",
-								"action": "run_command",
-								"parameter": "x"
+								"action": "select_all"
 							},
 							{
 								"kind": "notify",
@@ -1351,6 +1350,31 @@
 			},
 			"expected": {
 				"ok": true
+			}
+		},
+		{
+			"id": "run_action_takes_no_parameter",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "run_action",
+								"action": "run_command",
+								"parameter": "x"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/workflows/0/steps/0/parameter"
 			}
 		},
 		{
