@@ -438,6 +438,23 @@ module.exports = [
 		keys: () => ctx.keysOf('layout_analysis.swaps.', ternaryArms(SWAPS, 'layout_analysis.swaps.'))
 	},
 	{
+		prefix: 'layout_analysis.tap_hold.col_',
+		files: [PANEL, COMPARER],
+		source: 'the column arrays the panel and the Comparer tap-hold tables loop over',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.tap_hold.col_',
+				[PANEL, COMPARER].flatMap((rel) =>
+					quoted(
+						capture(
+							rel,
+							/for \(const id of (\[[^\]]*\])\) \{\s*const th = el\('th', '', t\(`layout_analysis\.tap_hold\.col_/
+						)
+					)
+				)
+			)
+	},
+	{
 		prefix: 'layout_analysis.text_mode.info_',
 		files: [COMPARER],
 		source: 'corpus_files.js TEXT_MODES',
@@ -456,6 +473,32 @@ module.exports = [
 				'layout_analysis.typing.',
 				quoted(capture(ENGINE, /const kind = \(way\) => \{([\s\S]*?)\n\t\t\};/))
 			)
+	},
+	{
+		prefix: 'layout_analysis.user_metrics.example_',
+		files: [COMPARER],
+		source: 'the keys of comparer_page.js USER_METRIC_EXAMPLES',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.user_metrics.example_',
+				ctx.literal(COMPARER, 'USER_METRIC_EXAMPLES').map((example) => example.key)
+			)
+	},
+	{
+		prefix: 'layout_analysis.user_metrics.name_',
+		files: [COMPARER],
+		source: 'the query name arrays comparer_page.js fillUserMetricNames words',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.user_metrics.name_',
+				ctx.matches(COMPARER, /\.\.\.(\[[^\]]*\])\.map\(\s*\(id\) =>\s*item\(/g).flatMap(quoted)
+			)
+	},
+	{
+		prefix: 'layout_analysis.user_metrics.window_',
+		files: [COMPARER],
+		source: 'LAYOUT_ANALYSIS.WINDOW_KINDS',
+		keys: () => ctx.keysOf('layout_analysis.user_metrics.window_', engine().WINDOW_KINDS)
 	},
 	{
 		prefix: 'layout_analysis.weights.group.',
