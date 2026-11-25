@@ -1685,7 +1685,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/hotstrings/engine/engine/test_hse_consumed_endchar_ring.ahk
 #Include meta/hotstrings/engine/engine/test_expansion_burst_atomic.ahk
 #Include meta/core/text/test_parsetomlfile_unterminated_array_recovers.ahk
-#Include meta/platform/input/dispatch/test_dispatcher_register_duplicate_label.ahk
 #Include meta/modules/updater/test_updater_cancel_fires_on_json.ahk
 #Include meta/modules/updater/test_updater_download_receive_timeout.ahk
 #Include meta/modules/updater/test_updater_download_reentrancy_guard.ahk
@@ -1706,6 +1705,7 @@ _LogBootProgress("keystats modules + tests included")
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../menu/engine/manifest_menu.ahk
 #Include unit/menu/test_population.ahk
+#Include unit/menu/test_register_duplicate_label.ahk
 #Include unit/menu/test_startup_commands.ahk
 #Include unit/menu/builder/test_tray_shortcut_hint.ahk
 #Include unit/menu/builder/test_tray_suspend_checkmark.ahk
