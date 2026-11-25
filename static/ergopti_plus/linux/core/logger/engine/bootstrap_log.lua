@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Pre-sink Fatal Record (Linux)
 --- DESCRIPTION:
---- Appends one line to bootstrap.log in the DEFAULT logs folder for the fatal
+--- Appends one line to bootstrap.log in the DEFAULT logs folder for the
 --- outcomes that happen before the logger sink can exist: a refused session lock,
---- a refused privacy admission, and a boot that failed before the sink opened
---- (the entry point's boot guard). Windows keeps the same file for the same
+--- a refused privacy admission, a boot that failed before the sink opened (the
+--- entry point's boot guard), and a second start that yielded to the live daemon. Windows keeps the same file for the same
 --- purpose (a yielding second instance, a refused configuration transition) and
 --- macOS keeps launcher.log and a fatal report in the native launcher; the name is
 --- declared once in _shared/core/fs/data/paths/app_dirs.toml.
@@ -44,6 +44,21 @@ M.CODES = {
 	second_instance_yielded = "Another daemon owns the session lock; this start yielded.",
 	boot_failed = "Daemon boot failed before its log opened; the error is on stderr.",
 }
+
+--- The severity of each code that is not a failure. A second start yielding to
+--- the live daemon is the single-owner rule working: the record is a WARNING,
+--- as the Windows driver writes for its yielding second instance, never an
+--- ERROR that reads as a broken boot. Every other code is a refused boot.
+M.SEVERITIES = {
+	second_instance_yielded = "WARNING",
+}
+
+--- The severity a code is written with.
+--- @param code string A key of M.CODES.
+--- @return string severity "WARNING" or "ERROR".
+function M.severity(code)
+	return M.SEVERITIES[code] or "ERROR"
+end
 
 local AppDirs = require("core.fs.engine.app_dirs")
 local NativePath = require("core.fs.engine.native_path")
@@ -83,7 +98,7 @@ function M.append(code, opts)
 	os.execute("mkdir -p " .. require("core.text.engine.utils_core").shell_quote(dir) .. " 2>/dev/null")
 	local handle = require("core.fs.engine.regular_file_writer").open(path, "a")
 	if not handle then return false, "bootstrap log not writable" end
-	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [ERROR] [bootstrap] ", message, "\n")
+	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [", M.severity(code), "] [bootstrap] ", message, "\n")
 	local closed = handle:close()
 	if not wrote or not closed then return false, "bootstrap log write refused" end
 	return true
