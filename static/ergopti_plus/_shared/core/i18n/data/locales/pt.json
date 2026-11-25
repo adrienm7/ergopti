@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Registrar a ordem dos hooks do teclado",
 	"menu.debug.composer_check": "Testar o layout composto",
 	"platform_reason.action_apple_shortcuts_are_macos": "Apenas macOS: os Atalhos da Apple só existem no macOS. Noutros sistemas, execute antes um comando ou um programa.",
-	"platform_reason.action_workflows_windows_pending": "Não no Windows: o executor de fluxos de trabalho faz parte apenas dos drivers do macOS e do Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Estas verificações medem o SendInput do AutoHotkey e o seu hook de teclado, que só o driver do Windows tem.",
 	"input_probe.title": "Verificação de entrada",
 	"input_probe.field_label": "Texto digitado pela verificação (não digite aqui):",

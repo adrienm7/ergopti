@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Spela in ordningen på tangentbordshookar",
 	"menu.debug.composer_check": "Testa den sammansatta layouten",
 	"platform_reason.action_apple_shortcuts_are_macos": "Endast macOS: Apple Genvägar finns bara på macOS. Kör i stället ett kommando eller ett program på andra system.",
-	"platform_reason.action_workflows_windows_pending": "Inte på Windows: arbetsflödeskörningen finns bara i drivrutinerna för macOS och Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Dessa kontroller mäter AutoHotkeys SendInput och dess tangentbordshook, som bara Windows-drivrutinen har.",
 	"input_probe.title": "Inmatningskontroll",
 	"input_probe.field_label": "Text som kontrollen skriver (skriv inte här):",

@@ -38,5 +38,6 @@
 #Include shortcuts/workflows/interpreter.ahk
 #Include shortcuts/workflows/runner.ahk
 #Include shortcuts/workflows/effects.ahk
+#Include shortcuts/workflows/editor_host.ahk
 #Include shortcuts/capsword_auto_off.ahk
 #Include shortcuts/capsword.ahk

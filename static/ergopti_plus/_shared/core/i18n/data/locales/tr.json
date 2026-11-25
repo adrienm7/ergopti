@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Klavye hook sırasını kaydet",
 	"menu.debug.composer_check": "Oluşturulan düzeni sına",
 	"platform_reason.action_apple_shortcuts_are_macos": "Yalnızca macOS: Apple Kestirmeler yalnızca macOS’te bulunur. Başka sistemlerde bunun yerine bir komut veya program çalıştırın.",
-	"platform_reason.action_workflows_windows_pending": "Windows’ta yok: iş akışı çalıştırıcısı yalnızca macOS ve Linux sürücülerinde bulunur.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Bu denetimler AutoHotkey'in SendInput'unu ve yalnızca Windows sürücüsünde bulunan klavye hook'unu ölçer.",
 	"input_probe.title": "Giriş denetimi",
 	"input_probe.field_label": "Denetimin yazdığı metin (buraya yazmayın):",
