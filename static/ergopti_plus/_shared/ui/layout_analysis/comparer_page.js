@@ -4857,9 +4857,12 @@
 			const body = el('tbody');
 			const pct = (v) => measure(v, 2, '%');
 			const signed = (v) => `${v > 0 ? '+' : ''}${format(v, 2)}`;
-			for (const id of E.MOVEMENT_CLASSES) {
+			// The movement table's own classes have their words; the others are metrics.
+			const className = (id) =>
+				E.MOVEMENT_EXTRA.includes(id) ? t(`layout_analysis.movement.${id}`) : metricName(id);
+			for (const id of E.MOVEMENT_CLASSES.concat(E.MOVEMENT_EXTRA)) {
 				const row = el('tr');
-				const name = el('th', '', metricName(id));
+				const name = el('th', '', className(id));
 				name.scope = 'row';
 				row.append(name);
 				for (const { m } of shown)
