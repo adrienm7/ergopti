@@ -2301,7 +2301,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/test_keystats_pause_metrics.ahk
 #Include meta/core/process/test_processentry32w_size.ahk
 #Include meta/platform/remap/altgr/test_script_altgr_hotkeys.ahk
-#Include meta/platform/remap/keys/test_space_hold_exception_guard.ahk
 #Include meta/ai/api/test_stream_handle_type.ahk
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.

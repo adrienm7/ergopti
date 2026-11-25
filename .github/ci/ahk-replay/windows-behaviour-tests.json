@@ -1,5 +1,5 @@
 {
-	"expected_count": 11,
+	"expected_count": 12,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -42,6 +42,10 @@
 		},
 		{
 			"contains": "re-registering a label rebinds its own row",
+			"expected_count": 1
+		},
+		{
+			"contains": "a throwing wait still releases its modifier",
 			"expected_count": 1
 		}
 	]
