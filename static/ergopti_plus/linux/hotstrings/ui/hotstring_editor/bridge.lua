@@ -106,7 +106,7 @@ end
 --- @return table|nil
 local function get_reader()
 	if _reader then return _reader end
-	local ok, mod = pcall(require, "core.text.engine.toml_codec.reader")
+	local ok, mod = pcall(require, "core.text.engine.toml.reader")
 	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
 	return _reader
 end

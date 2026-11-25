@@ -376,7 +376,10 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     `BootProfile_Begin()` or a second recorded completion throws, `test_boot_profiler_single_owner.ahk`, first verified by the next Windows CI run).
     Left: the Swift logger retention replay runs in macOS CI only;
   - the census's re-campaigns for drift: `shared/layouts` (with S29), `shared/core`, `shared/ui/layout_editor` and
-    the `ai` areas, then the remaining never-campaigned units of its table in rank order.
+    the `ai` areas, then the remaining never-campaigned units of its table in rank order. Taken on 2026-11-25:
+    `macos/core/text` and `linux/core/text` ([report](docs/audits/platform-parity/2026-11-25-core-text/report.md),
+    TXT-01 fixed: every Linux TOML file parse is counted as `toml.parse`); left from it: compare the catalogue
+    override writes of macOS and Linux on one hand-edited `config.toml`.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release
