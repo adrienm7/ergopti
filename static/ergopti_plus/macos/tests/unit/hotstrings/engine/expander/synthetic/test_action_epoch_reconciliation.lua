@@ -197,6 +197,7 @@ local function load_fixture()
 		prewarm_ignored_win_watchers = function() return true end,
 		stop = function() return true end,
 		is_ignored_window = function() return false, 1 end,
+		window_mode_admits = function() return false end,
 		is_secure_field = function() return false, 1 end,
 	})
 	local mailbox_running = false

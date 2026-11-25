@@ -76,6 +76,7 @@ local function load_filter(bundle, subrole_throws)
 
 	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
+		window_mode_admits = function() return false end,
 	}
 	package.loaded["ai.engine.prediction.app_filter"] = nil
 	local AF = helpers.load_with_stubs("ai.engine.prediction.app_filter", {

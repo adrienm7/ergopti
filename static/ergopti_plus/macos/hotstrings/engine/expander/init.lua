@@ -1881,9 +1881,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	local undo = CoreState.undoable
 	CoreState.undoable = nil
 	local is_secure = km_utils.is_secure_field(context_now)
-	if is_secure ~= false then
+	-- An unreadable focused element in an ordinary window admits the plain
+	-- hotstrings only (km_utils.window_mode_admits, as on Linux): the AI keys,
+	-- its context and the preview keep needing a field verdict. Withholding
+	-- every hotstring there with a debug line only was silent (TODO.md,
+	-- maintainer 2026-11-25).
+	local window_mode = is_secure == nil and km_utils.window_mode_admits(context_now) == true
+	if is_secure ~= false and not window_mode then
 		return internal_loopback == true
 	end
+	if window_mode then LlmContext.reset(CoreState) end
 	if _window_context_reconcile_pending then
 		_window_context_reconcile_pending = false
 		arm_observed_context_reconcile(true)
@@ -1906,11 +1913,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- F16 is an internal control channel only when its exact Quartz tag says so.
 	-- A physical/programmable F16 must never satisfy chain_pending ahead of the
 	-- delayed loopback that owns that edge.
-	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
+	if not internal_loopback and not window_mode and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 	-- Any other key is user activity: a pending prediction is cancelled before
 	-- the typing path below can arm the next debounce.
-	if not internal_loopback then LLMBridge.note_key_activity(keyCode) end
+	if not internal_loopback and not window_mode then LLMBridge.note_key_activity(keyCode) end
 
 	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
 	-- the pause itself stands in for a word terminator, so the post-wipe
@@ -2054,8 +2061,10 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 				CoreState.start_is_line_start = false
 				LlmContext.reset(CoreState)
 			end
-			LlmContext.backspace(CoreState)
-			update_preview_with_action_recovery(CoreState.buffer)
+			if not window_mode then
+				LlmContext.backspace(CoreState)
+				update_preview_with_action_recovery(CoreState.buffer)
+			end
 		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
 			-- The start of an empty line: the Backspace deleted nothing.
 			cancel_action_preview_recovery()
@@ -2067,7 +2076,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			-- triggers refuse to fire until a real terminator is observed.
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
-			LlmContext.backspace(CoreState)
+			if not window_mode then LlmContext.backspace(CoreState) end
 			cancel_action_preview_recovery()
 		end
 		return false
@@ -2109,7 +2118,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- utf8.offset call against a count that didn't exist returned nil, leaving
 	-- the buffer untrimmed. The fast-path byte gate avoids paying for the
 	-- utf8 scan on every keystroke.
-	local observed = pcall(LlmContext.append, CoreState, chars)
+	local observed = window_mode or pcall(LlmContext.append, CoreState, chars)
 	if not observed then
 		invalidate_observed_context()
 		return false
@@ -2145,7 +2154,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		and (internal_loopback or CoreState.no_rescan_keeps_buffer == true)
 	if suppress_triggers or rescan_suppressed then
 		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
-		update_preview_with_action_recovery(CoreState.buffer)
+		if not window_mode then update_preview_with_action_recovery(CoreState.buffer) end
 		return false
 	end
 
@@ -2198,7 +2207,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
 	local pv0 = HotPath.now()
-	update_preview_with_action_recovery(CoreState.buffer)
+	if not window_mode then update_preview_with_action_recovery(CoreState.buffer) end
 	HotPath.log_if_slow("preview.rebuild", pv0)
 
 	-- Enter / Tab with no predictions visible clears prediction state.
@@ -2982,6 +2991,16 @@ function M.tap_states()
 		taps[#taps + 1] = { name = entry[1], state = state }
 	end
 	return { started = _started == true, watchdog = _watchdog_committed == true, taps = taps }
+end
+
+--- The text automation mode of the focused window, for the Hotstrings title
+--- (hotstrings/ui/menu/status.lua): mode, reason and its start in monotonic
+--- nanoseconds (km_utils.text_automation_state). An in-memory read.
+--- @return string mode
+--- @return string reason
+--- @return number|nil since_ns
+function M.text_automation_state()
+	return km_utils.text_automation_state()
 end
 
 --- The typing taps the watchdog could not re-enable, for the Hotstrings title

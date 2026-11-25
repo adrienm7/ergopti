@@ -531,18 +531,33 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- The title's red dot (maintainer, 2026-11-25), read again live by the
 	-- watch: a typing event tap the watchdog cannot re-enable leaves every
 	-- switch on while nothing expands, which only the log said.
+	-- The same dot names hotstrings left without the password-field check: an
+	-- unreadable focused element that lasts (HotstringsStatus.conditions). The
+	-- watch compares the conditions, so a second one appearing repaints too.
 	local function read_status()
 		local paused = ctx.paused == true
 		if type(ctx.is_paused) == "function" then paused = ctx.is_paused() == true end
 		return HotstringsStatus.read(ctx.keymap, paused)
 	end
-	local status = read_status()
+	local function read_signature()
+		local _, signature = read_status()
+		return signature
+	end
+	local status, signature = read_status()
+	local holds = {}
+	for condition in tostring(signature or ""):gmatch("[^,]+") do holds[condition] = true end
 
 	local providers = {
 		-- Greyed under the switch while a typing tap is down: what stopped and what to check
 		["hotstrings_taps_down"]          = function()
-			if status == nil then return {} end
+			if not holds.taps_down then return {} end
 			return ManifestMenu.status_rows("hotstrings_menu", "hotstrings_taps_down", "taps_down") or {}
+		end,
+		-- Greyed under the switch while the focused field stays unread: hotstrings
+		-- still expand, without the password-field check
+		["hotstrings_focus_unchecked"]    = function()
+			if not holds.focus_unchecked then return {} end
+			return ManifestMenu.status_rows("hotstrings_menu", "hotstrings_focus_unchecked", "focus_unchecked") or {}
 		end,
 		["hotstring_categories_standard"] = function() return std_groups end,
 		["hotstring_languages"]           = function() return language_rows end,
@@ -596,7 +611,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local parent = receive(hotstrings_menu, { hotstrings_enabled = function() return master_on or nil end,
 		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return grand_has_count end })
 	if parent then TitleStatus.decorate(parent, status) end
-	if type(ctx.updateMenu) == "function" then _hotstrings_status_watch.watch(status, read_status, ctx.updateMenu) end
+	if type(ctx.updateMenu) == "function" then _hotstrings_status_watch.watch(signature, read_signature, ctx.updateMenu) end
 	return parent and { parent } or {}
 end
 

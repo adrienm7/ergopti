@@ -843,6 +843,22 @@
 		}
 	},
 	{
+		"path": "hotstrings_menu.hotstrings_focus_unchecked",
+		"visibility": "hide",
+		"labels": { "fr": "hotstrings_focus_unchecked", "en": "hotstrings_focus_unchecked" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: this row says that macOS Accessibility cannot tell which field of the front application has focus, so hotstrings expand there without the password-field check. Linux shows the same condition as a row at the top of its tray; Windows expands hotstrings without reading the focused field, so it has no such condition to report.",
+				"fr": "macOS uniquement : cette ligne signale que l’accessibilité de macOS ne dit pas quel champ de l’application au premier plan est actif ; les hotstrings s’y étendent donc sans contrôle des champs de mot de passe. Linux montre la même situation par une ligne en haut de son menu de barre des tâches ; Windows étend les hotstrings sans lire le champ actif et n’a donc rien de tel à signaler."
+			},
+			"linux": {
+				"en": "macOS only: this row says that macOS Accessibility cannot tell which field of the front application has focus, so hotstrings expand there without the password-field check. Linux shows the same condition as a row at the top of its tray; Windows expands hotstrings without reading the focused field, so it has no such condition to report.",
+				"fr": "macOS uniquement : cette ligne signale que l’accessibilité de macOS ne dit pas quel champ de l’application au premier plan est actif ; les hotstrings s’y étendent donc sans contrôle des champs de mot de passe. Linux montre la même situation par une ligne en haut de son menu de barre des tâches ; Windows étend les hotstrings sans lire le champ actif et n’a donc rien de tel à signaler."
+			}
+		}
+	},
+	{
 		"path": "hotstrings_menu.hotstrings_reload",
 		"visibility": "hide",
 		"labels": { "fr": "🔄 Recharger", "en": "🔄 Reload" },

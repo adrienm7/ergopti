@@ -283,6 +283,10 @@ technical = "A PC keyboard resolves Fn in its firmware and never reports it to t
 kind = "os_concept"
 technical = "macOS disables a CGEventTap (timeout, revoked Accessibility or Input Monitoring) and the keymap watchdog can fail to re-enable it; the Windows AutoHotkey hook and the Linux evdev daemon have no such tap state to report."
 
+[reasons."platform_reason.focus_unchecked_row_is_macos"]
+kind = "menu_layout"
+technical = "macOS greys this reason under the Hotstrings switch while AXFocusedUIElement stays unreadable; Linux names the same window mode in its tray's component_status rows, and Windows hotstrings read no focused field."
+
 [reasons."platform_reason.chatgpt_url_editor_is_placed_per_driver"]
 kind = "menu_layout"
 technical = "macOS embeds the URL editor below its Ctrl+G shortcut and Windows keeps a GPT shortcut setting; only Linux shows it as a separate row."

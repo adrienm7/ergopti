@@ -2623,6 +2623,20 @@ status_rows.taps_down = [{ type = "label", i18n = "menu.hotstrings.taps_down" }]
 platforms = ["hs"]
 unavailable = "hide"
 
+# Why the macOS hotstrings expand without the password-field check: macOS
+# Accessibility has not said for a while which field of the front application
+# has focus, so only the window mode admits them there (hotstrings/engine/
+# expander/utils.lua window_mode_admits, maintainer 2026-11-25: « Oui, comme
+# Linux »). Greyed under the switch's head while the title carries the red dot;
+# empty otherwise. Linux names the same condition in its component_status rows
+# (linux_component_problems); Windows reads no field before a hotstring.
+[[menu.hotstrings_menu]]
+type = "list"
+id = "hotstrings_focus_unchecked"
+status_rows.focus_unchecked = [{ type = "label", i18n = "menu.hotstrings.focus_unchecked" }]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.hotstrings_menu]]
 type = "group"
 id = "hotstrings_params"

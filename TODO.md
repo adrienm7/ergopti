@@ -649,11 +649,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       keys' letters do since 2026-11-19, on the board-only thumb key `RightThumbOuter` at AltGr's place, taken only
       when the right thumb has no code left, so no other layout moved (`docs/design/layout-analysis.md`, « ErgoDox
       keys »). Both came in complete on the ErgoDox. The other choice is to keep them out.
-- [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
-      `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
-      unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.
-      Give it the Linux treatment (a window-mode admission outside a known secure field and password apps, and a
-      red menu row for a lasting reason), checked on a real Mac.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 
