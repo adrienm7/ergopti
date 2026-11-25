@@ -1,4 +1,4 @@
---- tests/unit/platform/focus/text_automation/test_text_automation_status.lua
+--- tests/unit/platform/focus/atspi/test_text_automation_status.lua
 
 --- ==============================================================================
 --- MODULE: Text Automation Status Tests (Linux)
