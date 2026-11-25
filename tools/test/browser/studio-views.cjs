@@ -243,6 +243,9 @@ async function exerciseMovement(browser, origin) {
 		Math.abs(value(sfb[3]) - value(sfb[1]) - value(sfb[5])) < 0.011,
 		`movement: the difference is the second minus the first (${sfb})`
 	);
+	const rhythmHeader = await page.$$eval('#la-rhythm thead th', (ths) => ths.length);
+	assert.equal(rhythmHeader, 6, 'rhythm: class, all and no thumbs per layout, one difference');
+	assert.equal((await tableRows(page, '#la-rhythm')).length, 8, 'rhythm: eight classes');
 	assert.deepEqual(errors, []);
 	await context.close();
 }

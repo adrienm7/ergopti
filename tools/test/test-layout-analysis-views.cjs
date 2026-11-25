@@ -226,6 +226,28 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 				`movement: ${id} ${name} pairs ${table.bigram[name]} against analyse() ${r.metrics[name]}`
 			);
 	}
+	// The trigram rhythm over all trigrams is analyse()'s metric of each class.
+	for (const id of ['azerty', 'ergopti', 'bepo']) {
+		const layout = byId.get(id);
+		const ngrams = E.ngramsFromText(text);
+		const table = E.movementTable(layout, ngrams, { keyboard: 'iso' });
+		const r = E.analyse(layout, ngrams, { keyboard: 'iso' });
+		for (const name of ['alternation', 'roll3_in', 'roll3_out', 'redirect', 'redirect_bad'])
+			check(
+				Math.abs(table.rhythm.all[name] - r.metrics[name]) <= TOLERANCE,
+				`rhythm: ${id} ${name} ${table.rhythm.all[name]} against analyse() ${r.metrics[name]}`
+			);
+		check(table.trigramsNoThumbs <= table.trigrams, `rhythm: ${id} no-thumb trigrams are a subset`);
+	}
+	// « dke » on QWERTY: left middle, right middle, left middle again, an
+	// alternation whose ends share a finger.
+	const dkeRhythm = E.movementTable(byId.get('qwerty'), E.ngramsFromText('dke'), {
+		keyboard: 'iso'
+	}).rhythm.all;
+	check(
+		dkeRhythm.alternation === 100 && dkeRhythm.alternation_sfs === 100,
+		`rhythm: « dke » is an alternation with same-finger ends (${JSON.stringify(dkeRhythm)})`
+	);
 	// Skipgrams worked by hand on QWERTY: « ded » ends on the same key (a
 	// repeat), « dke » on the left middle finger twice (an SFB), « dkf » on two
 	// fingers of the left hand (no same-finger class).

@@ -243,7 +243,12 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   the score: row changes (two fingers of one hand, thumbs aside, on different
   rows), concordant when the longer finger takes the upper row and discordant
   when it takes the lower one. « One layout » shows it folded, with the
-  compared layout and the difference.
+  compared layout and the difference. `rhythm.all` and `rhythm.noThumbs` give
+  each of `RHYTHM_CLASSES` (alternation, rolls, redirects, bad redirects and
+  those whose ends are the same finger) as a share of the key trigrams, then of
+  those without a thumb key (`trigrams`, `trigramsNoThumbs`); the « all »
+  share of each scored class is `analyse()`'s metric. A second table under the
+  movements shows them.
 - `wordsWithKeys(layout, words, codes, {keyboard?, profile?, limit?})` →
   `{words, occurrences}`: the words of a word table whose key stream (each
   character its cheapest way, the ways compiled once) holds the given two or
