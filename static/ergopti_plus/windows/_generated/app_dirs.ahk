@@ -44,11 +44,6 @@ AppDirsLogErrorsPrefix() {
 	return "ErgoptiPlus_errors_"
 }
 
-; Topical sub-files: <prefix><name><extension>.
-AppDirsLogTopicalPrefix() {
-	return "ErgoptiPlus_"
-}
-
 ; Extension of every log file.
 AppDirsLogExtension() {
 	return ".log"

@@ -49,10 +49,6 @@ const GENERATED_OWNERS = [
 	'macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift'
 ];
 
-// Generated from those owners by another generator, outside a _generated/
-// folder because SwiftPM compiles only its Sources tree.
-const GENERATED_DERIVED = ['macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'];
-
 const SCANNED_ROOTS = [
 	{ dir: path.join(SP, 'macos'), rel: 'static/ergopti_plus/macos' },
 	{ dir: path.join(SP, 'windows'), rel: 'static/ergopti_plus/windows' },
@@ -173,7 +169,7 @@ let scannedLiterals = 0;
 for (const root of SCANNED_ROOTS) {
 	for (const abs of walk(root.dir, [])) {
 		const rel = path.relative(SP, abs).split(path.sep).join('/');
-		if (GENERATED_OWNERS.includes(rel) || GENERATED_DERIVED.includes(rel)) continue;
+		if (GENERATED_OWNERS.includes(rel)) continue;
 		scannedFiles++;
 		const src = fs.readFileSync(abs, 'utf8');
 		for (const literal of literals(src, path.extname(abs))) {

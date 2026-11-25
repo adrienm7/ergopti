@@ -29,6 +29,16 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
    family, the terminator a Backspace gives back, a migration read before the boot's save) and were fixed;
    `backspace-restore-rules` and TIM-01 in `reload-command` are new.
 
+### Logs
+
+- [ ] **« Exporter les logs (zip) » (maintainer, 2026-11-25):** to send logs, use only Débogage › « Exporter les logs
+      (zip) »: it writes one `Ergopti-logs_<date>_<time>.zip` to the Downloads folder (the Desktop without one),
+      selects it in File Explorer, puts its path on the clipboard and says so in a notification; the archive holds
+      the day logs and errors files of the last three days, `bootstrap.log` and `crash_reports\*.json` when they exist
+      and nothing else, and no expanded hotstring text (search the extracted files for `Auto-expand: '` and
+      `KL_LogHotstring: trigger='`: no match). The old `ErgoptiPlus_<topic>.log` files are gone from
+      `%LOCALAPPDATA%\Ergopti\logs` after the first start.
+
 ### Layouts and Ergopti Studio
 
 - [ ] **Tray menu in the reading font (maintainer, 2026-11-24):** in Configuration › Accessibilité pick

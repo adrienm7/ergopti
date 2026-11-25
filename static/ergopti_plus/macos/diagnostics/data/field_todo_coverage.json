@@ -98,6 +98,12 @@
 			"not_testable": "The submenu is read in the open menu-bar menu, which no run captures: open Configuration; the order is unit-tested (test_menu, configuration_parent.json)."
 		},
 		{
+			"id": "log_export_zip",
+			"title": "\u00ab Export the logs (zip) \u00bb writes one scrubbed archive",
+			"checks": [],
+			"not_testable": "The archive is written to ~/Downloads and selected in Finder, which no run captures: click the row and inspect the zip; the selection, the scrub and the archive are unit-tested (test_log_export_vectors, test_log_export)."
+		},
+		{
 			"id": "debug_logs_rows",
 			"title": "D\u00e9bogage logs rows and the detailed log switch",
 			"checks": [],

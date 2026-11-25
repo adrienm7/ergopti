@@ -108,7 +108,6 @@ const data = {
 	crashReportsDir: requireString(logs, 'crash_reports_dir', 'logs'),
 	unifiedPrefix: requireString(files, 'unified_prefix', 'logs.files'),
 	errorsPrefix: requireString(files, 'errors_prefix', 'logs.files'),
-	topicalPrefix: requireString(files, 'topical_prefix', 'logs.files'),
 	extension: requireString(files, 'extension', 'logs.files'),
 	bootstrapLog: requireString(files, 'bootstrap_log', 'logs.files'),
 	macos: logs.macos || fail('[logs.macos] is missing.'),
@@ -391,7 +390,6 @@ function emitLua() {
 		'\tfiles = {\n' +
 		`\t\tunified_prefix = ${luaStr(data.unifiedPrefix)},\n` +
 		`\t\terrors_prefix = ${luaStr(data.errorsPrefix)},\n` +
-		`\t\ttopical_prefix = ${luaStr(data.topicalPrefix)},\n` +
 		`\t\textension = ${luaStr(data.extension)},\n` +
 		`\t\tbootstrap_log = ${luaStr(data.bootstrapLog)},\n` +
 		'\t\t-- Exact names the retention sweep deletes: the retired topical sub-files.\n' +
@@ -506,12 +504,6 @@ function emitAhk() {
 			'AppDirsLogErrorsPrefix',
 			data.errorsPrefix,
 			'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.'
-		) +
-		'\n' +
-		fn(
-			'AppDirsLogTopicalPrefix',
-			data.topicalPrefix,
-			'Topical sub-files: <prefix><name><extension>.'
 		) +
 		'\n' +
 		fn('AppDirsLogExtension', data.extension, 'Extension of every log file.') +
@@ -665,12 +657,6 @@ function emitSwift() {
 			'kLogErrorsPrefix',
 			data.errorsPrefix,
 			'Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.'
-		) +
-		'\n' +
-		constant(
-			'kLogTopicalPrefix',
-			data.topicalPrefix,
-			'Topical sub-files: <prefix><name><extension>.'
 		) +
 		'\n' +
 		constant('kLogFileExtension', data.extension, 'Extension of every log file.') +

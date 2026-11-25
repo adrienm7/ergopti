@@ -42,8 +42,10 @@ ce qui a été vu.
 10. **Fenêtre du field report.** Relancer le field report et cliquer « Arrêter » : la fenêtre dit « interrompu ». Au
     troisième lancement, attendre la fin puis « Créer une issue GitHub » : le formulaire s’ouvre dans le navigateur
     (ne pas l’envoyer). À envoyer : OK/KO.
-11. **Journaux.** À joindre à la fin : `journalctl --user -u ergopti-hotstrings -b > ~/ergopti-journal.txt` et le
-    dossier `~/.local/state/ergopti/logs` (par exemple `tar czf ~/ergopti-logs.tgz -C ~/.local/state/ergopti logs`).
+11. **Journaux.** Débogage › « Exporter les logs (zip) ». Attendu : une notification dit que les logs sont dans
+    `~/Téléchargements` (ou `~/Downloads`), le gestionnaire de fichiers montre le fichier `Ergopti-logs_<date>.zip` et
+    son chemin est dans le presse-papiers. À joindre à la fin : ce seul fichier `.zip` (les logs des trois derniers
+    jours, sans le texte tapé) et `journalctl --user -u ergopti-hotstrings -b > ~/ergopti-journal.txt`.
 
 ## To confirm on Linux
 
@@ -55,6 +57,7 @@ gestures in the terminal): coverage table, verdicts and what no run can test in
 yet; the first run also proves the field run without a click (53c1766514), the report marks, and `driver_reload`
 (one daemon restart under a real user manager). Container and CI proofs are not physical evidence.
 
+- [ ] <!-- field-point: log_export_zip --> **« Exporter les logs (zip) » (maintainer, 2026-11-25):** Débogage › « Exporter les logs (zip) » writes one `Ergopti-logs_<date>_<time>.zip` to the Downloads folder (the Desktop without one), shows it in the file manager, puts its path on the clipboard and says so in a notification; `unzip -l` lists the day logs and errors files of the last three days, `bootstrap.log` and `crash_reports/*.json` when they exist and nothing else, and no expanded hotstring text appears in it (`unzip -p <zip> | grep -c "Auto-expand: '"` is 0). The old `ErgoptiPlus_<topic>.log` files are gone from `~/.local/state/ergopti/logs` after the first start.
 - [ ] <!-- field-point: tray_suspend_row --> **« Suspendre » row (maintainer, 2026-11-24):** the tray menu shows « ⏸︎ Suspendre » right above « Recharger »; click it: the row is ticked, the header reads paused and a hotstring no longer expands; click it again, or the paused header row: the daemon resumes and the row is unticked.
 - [ ] <!-- field-point: configuration_titles --> **Configuration titles (maintainer, 2026-11-24):** the Configuration submenu reads « — Réinitialisation — » over the restore and clear rows, « — Fichiers et assistant — » over « Nettoyer config.toml », the paths and the wizard, « — Réseau — » over the download proxy and « — Accessibilité — » over the window font and spacing, each title greyed and each group set apart by one separator.
 - [ ] <!-- field-point: debug_logs_rows --> **Débogage logs rows (maintainer, 2026-11-24):** Débogage has no console row; its Logs section opens with « Afficher une fenêtre à chaque erreur », then a separator; « Journal détaillé » stands where the log-level selector was, unticked at INFO: tick it and `script.log_level` reads DEBUG in config.toml, untick it and it reads INFO. With it unticked, « Signaler un bug » ends its warnings with « Detailed log: off — turn on Debug › Detailed log and reproduce for more detail ».

@@ -20,9 +20,6 @@ let kLogUnifiedPrefix = "ErgoptiPlus_"
 /// Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.
 let kLogErrorsPrefix = "ErgoptiPlus_errors_"
 
-/// Topical sub-files: <prefix><name><extension>.
-let kLogTopicalPrefix = "ErgoptiPlus_"
-
 /// Extension of every log file.
 let kLogFileExtension = ".log"
 

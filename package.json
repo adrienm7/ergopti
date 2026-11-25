@@ -394,7 +394,6 @@
 		"codegen:app-dirs": "node ./tools/codegen/codegen-app-dirs.cjs",
 		"codegen:identifiers": "node ./tools/codegen/codegen-identifiers.cjs",
 		"codegen:log-export": "node ./tools/codegen/codegen-log-export.cjs",
-		"codegen:logger-sub-files": "node ./tools/codegen/codegen-logger-sub-files.cjs",
 		"codegen:registry-constants": "node ./tools/codegen/codegen-registry-constants.cjs",
 		"codegen:locale-tables": "node ./tools/codegen/codegen-locale-tables.cjs",
 		"codegen:linux-shell-messages": "node ./tools/codegen/codegen-linux-shell-messages.cjs",

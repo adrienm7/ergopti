@@ -24,8 +24,7 @@ end
 ---   resolve_level = fn(stored, absent) -> level, threshold, refused,
 ---   detailed_log = fn(stored, absent) -> ticked, level a click stores,
 ---   default_level = string, emit_body = fn(template, argument) -> body,
----   dated_expired = fn(date, now, days) -> boolean,
----   topical_stale = fn(modified, now) -> boolean | nil (no topical files) }
+---   dated_expired = fn(date, now, days) -> boolean }
 return function(ctx)
 	local helpers, corpus = ctx.helpers, ctx.corpus
 	local describe, it = helpers.describe, helpers.it
@@ -90,15 +89,6 @@ return function(ctx)
 				assert_eq(ctx.dated_expired(case.file_date, epoch(case.now), case.retention_days) == true,
 					case.purged, case.id)
 			end)
-		end
-		-- The topical sub-files are retired driver by driver (one daily log,
-		-- 2026-11-25): a driver that no longer writes them passes no topical_stale.
-		if ctx.topical_stale then
-			for _, case in ipairs(replayed("topical_retention").cases) do
-				it("logger parity topical_retention: " .. case.id, function()
-					assert_eq(ctx.topical_stale(epoch(case.modified), epoch(case.now)) == true, case.removed, case.id)
-				end)
-			end
 		end
 	end)
 

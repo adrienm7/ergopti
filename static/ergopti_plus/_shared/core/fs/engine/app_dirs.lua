@@ -21,7 +21,6 @@ return {
 	files = {
 		unified_prefix = "ErgoptiPlus_",
 		errors_prefix = "ErgoptiPlus_errors_",
-		topical_prefix = "ErgoptiPlus_",
 		extension = ".log",
 		bootstrap_log = "bootstrap.log",
 		-- Exact names the retention sweep deletes: the retired topical sub-files.

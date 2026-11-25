@@ -171,6 +171,12 @@
 			]
 		},
 		{
+			"id": "log_export_zip",
+			"title": "« Export the logs (zip) » writes one scrubbed archive",
+			"checks": [],
+			"not_testable": "The archive is written to the Downloads folder and shown in the file manager, which no run captures: click the row and inspect the zip; the selection, the scrub and the archive are unit-tested (test_log_export_vectors, test_log_export)."
+		},
+		{
 			"id": "debug_logs_rows",
 			"title": "Débogage logs rows and the detailed log switch",
 			"checks": [
