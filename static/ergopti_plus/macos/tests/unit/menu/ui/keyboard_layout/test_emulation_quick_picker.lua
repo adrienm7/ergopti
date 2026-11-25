@@ -137,6 +137,10 @@ local function with_window(run)
 		["core.ui.ui.builder"] = {
 			get_app_geometry = function(app_id) context.geometry = app_id; return { width = 440, height = 520 } end,
 			force_focus = function() context.focused = true; return true end,
+			get_centered_frame = function(width, height)
+				context.frame = { width, height }
+				return { x = 0, y = 0, w = width, h = height }
+			end,
 			show_webview = function(options)
 				context.options = options
 				local view = { deleted = 0 }
@@ -181,6 +185,7 @@ helpers.describe("emulation picker window (macOS, emulation-quick-picker)", func
 			helpers.assert_eq(context.bridge, "emulation_picker_bridge")
 			helpers.assert_eq(context.options.app_id, "emulation_picker", "the shared manifest names the window")
 			helpers.assert_eq(context.geometry, "emulation_picker")
+			helpers.assert_eq(context.frame, { 440, 520 }, "the window is centred at the manifest's size")
 			context.callbacks[1]({ body = "ready" })
 			helpers.assert_eq(#context.scripts, 1)
 			local state = Json.decode(context.scripts[1]:match("receiveEmulationPicker%((.*)%)$"))

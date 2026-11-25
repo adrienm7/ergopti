@@ -15,6 +15,8 @@ local Logger = require("core.logger.engine.logger")
 local ui_builder = require("core.ui.ui.builder")
 local Session = require("layouts.engine.emulation.picker_session")
 local WebviewResult = require("core.ui.adapters.webview_result")
+local WebviewChannel = require("core.ui.adapters.webview_channel")
+local Json = require("core.text.engine.json")
 local LOG = Session.APP_ID
 local BRIDGE = Session.BRIDGE_NAME
 local active, retiring
@@ -62,7 +64,7 @@ end
 local function send(owner, state)
 	if active ~= owner or not owner.view then return false end
 	local view = owner.view
-	local encoded_ok, encoded = pcall(hs.json.encode, state)
+	local encoded_ok, encoded = pcall(Json.encode, state)
 	if not encoded_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "The emulation picker state could not be encoded.")
 		return false
@@ -101,11 +103,9 @@ function M.open(options)
 	active = owner
 	local ok, result = xpcall(function()
 		local geometry = assert(ui_builder.get_app_geometry("emulation_picker"), "emulation picker geometry is missing")
-		local screen = assert(hs.screen.mainScreen(), "the main screen is unavailable"):frame()
-		local width, height = math.min(geometry.width, screen.w), math.min(geometry.height, screen.h)
-		local frame = { x = screen.x + (screen.w - width) / 2, y = screen.y + (screen.h - height) / 2,
-			w = width, h = height }
-		owner.controller = assert(hs.webview.usercontent.new(BRIDGE), "emulation picker bridge creation failed")
+		local frame = ui_builder.get_centered_frame(geometry.width, geometry.height)
+		local channel, refusal = WebviewChannel.new(BRIDGE)
+		owner.controller = assert(channel, "emulation picker bridge creation failed: " .. tostring(refusal))
 		local callback_result = owner.controller:setCallback(function(message)
 			if active ~= owner then return end
 			local payload = type(message) == "table" and message.body or nil
@@ -119,12 +119,11 @@ function M.open(options)
 			if type(reply) == "table" then send(owner, reply) end
 		end)
 		if callback_result == false then error("emulation picker bridge callback was refused") end
-		local masks = assert(hs.webview.windowMasks, "native window styles are unavailable")
 		return ui_builder.show_webview({
 			delete_on_close = true,
 			-- The factory names the window from the shared manifest and brands it once.
 			frame = frame, app_id = Session.APP_ID,
-			style_masks = masks.titled + masks.closable + masks.resizable,
+			style_masks = WebviewChannel.resizable_style(),
 			assets_dir = require("core.fs.engine.paths").shared("ui/" .. Session.APP_ID) .. "/",
 			usercontent = owner.controller, allow_new_windows = false,
 			is_current = function() return active == owner end,
