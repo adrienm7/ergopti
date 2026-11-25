@@ -1547,6 +1547,32 @@ proxy_relay_probe_timeout_ms = 30000
 
 
 # ──────────────────────────────────────────────────────────────────────
+# User workflows
+# ──────────────────────────────────────────────────────────────────────
+#
+# The deadlines of the steps of a user workflow, named by the `timeout` of each
+# kind in _shared/shortcuts/data/workflows/steps.json (a wait adds its own
+# duration, a wait-for its own timeout). A step past its deadline stops the
+# workflow with a notice naming it. Lua: shortcuts/engine/workflows/runner.lua.
+
+[workflows]
+# Keys, text, open, focus, clipboard, mouse, a notification or an Ergopti action.
+step_timeout_ms = 10000
+
+# A screen capture, an OCR pass, a click on a found image or text, an « if »
+# probe of the screen: one capture and one match on a 4K screen.
+screen_step_timeout_ms = 20000
+
+# A shell step, as long as a hidden run_command child ([gestures]).
+shell_timeout_ms = 30000
+
+# Longest wait or wait-for timeout a workflow may ask for (ten minutes).
+wait_max_ms = 600000
+
+# How often a wait-for step looks at the screen again.
+wait_for_poll_ms = 250
+
+# ──────────────────────────────────────────────────────────────────────
 # Byte limits
 # ──────────────────────────────────────────────────────────────────────
 #

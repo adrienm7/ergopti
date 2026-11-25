@@ -1,0 +1,2484 @@
+{
+	"$description": "Workflow file checks every implementation replays: the canonical JS check (tools/test/test-workflow-model-vectors.cjs), the shared Lua model (_shared/tests/lua/workflows/workflow_model_contract.lua, macOS and Linux) and the AutoHotkey port. Each vector holds a decoded file (`doc`), optional `limits` merged over steps.json's so bound cases stay small, and the outcome: ok, or the closed reason and the JSON Pointer of the first refusal. Context: send_keys.json and the `timings` below.",
+	"timings": {
+		"wait_max_ms": 600000
+	},
+	"vectors": [
+		{
+			"id": "empty_file",
+			"doc": {
+				"schema_version": 1,
+				"workflows": []
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "minimal",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "every_kind",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": "ctrl+shift+a"
+							},
+							{
+								"kind": "type_text",
+								"text": "Hello {{name}}\n"
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 500
+							},
+							{
+								"kind": "wait_for",
+								"target": {
+									"type": "text",
+									"text": "OK"
+								},
+								"timeout_ms": 3000
+							},
+							{
+								"kind": "wait_for",
+								"target": {
+									"type": "image",
+									"image": "button"
+								},
+								"timeout_ms": 3000
+							},
+							{
+								"kind": "open",
+								"target_kind": "url",
+								"value": "https://example.invalid/?q={{name}}"
+							},
+							{
+								"kind": "focus_app",
+								"app": "Firefox"
+							},
+							{
+								"kind": "capture",
+								"mode": "region",
+								"into": "shot"
+							},
+							{
+								"kind": "ocr",
+								"mode": "window",
+								"into": "seen"
+							},
+							{
+								"kind": "clipboard_get",
+								"into": "clip"
+							},
+							{
+								"kind": "clipboard_set",
+								"text": "{{seen}}"
+							},
+							{
+								"kind": "click_target",
+								"target": {
+									"type": "image",
+									"image": "button"
+								},
+								"button": "right"
+							},
+							{
+								"kind": "mouse_move",
+								"x": 10,
+								"y": 20
+							},
+							{
+								"kind": "mouse_click",
+								"x": 10,
+								"y": 20,
+								"button": "left",
+								"count": 2
+							},
+							{
+								"kind": "run_action",
+								"action": "run_command",
+								"parameter": "x"
+							},
+							{
+								"kind": "notify",
+								"text": "Done",
+								"note": "tell me"
+							},
+							{
+								"kind": "shell",
+								"command": "echo hi",
+								"into": "out"
+							},
+							{
+								"kind": "set_variable",
+								"name": "name",
+								"value": ""
+							},
+							{
+								"kind": "if",
+								"condition": {
+									"type": "matches",
+									"source": "variable",
+									"variable": "clip",
+									"op": "contains",
+									"value": "a"
+								},
+								"then": [
+									{
+										"kind": "wait",
+										"duration_ms": 1
+									}
+								],
+								"else": []
+							},
+							{
+								"kind": "if",
+								"condition": {
+									"type": "visible",
+									"target": {
+										"type": "text",
+										"text": "x"
+									}
+								},
+								"then": []
+							},
+							{
+								"kind": "if",
+								"condition": {
+									"type": "app_front",
+									"app": "Code"
+								},
+								"then": []
+							},
+							{
+								"kind": "if",
+								"condition": {
+									"type": "matches",
+									"source": "clipboard",
+									"op": "empty"
+								},
+								"then": []
+							},
+							{
+								"kind": "repeat",
+								"count": 3,
+								"steps": [
+									{
+										"kind": "wait",
+										"duration_ms": 1
+									}
+								]
+							}
+						],
+						"images": {
+							"button": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "not_object",
+			"doc": [],
+			"expected": {
+				"ok": false,
+				"reason": "not_object",
+				"path": ""
+			}
+		},
+		{
+			"id": "root_unknown_key",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [],
+				"zeta": 1,
+				"extra": 2
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/extra"
+			}
+		},
+		{
+			"id": "schema_version_wrong",
+			"doc": {
+				"schema_version": 2,
+				"workflows": []
+			},
+			"expected": {
+				"ok": false,
+				"reason": "schema_version",
+				"path": "/schema_version"
+			}
+		},
+		{
+			"id": "schema_version_missing",
+			"doc": {
+				"workflows": []
+			},
+			"expected": {
+				"ok": false,
+				"reason": "schema_version",
+				"path": "/schema_version"
+			}
+		},
+		{
+			"id": "workflows_missing",
+			"doc": {
+				"schema_version": 1
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows"
+			}
+		},
+		{
+			"id": "workflows_not_list",
+			"doc": {
+				"schema_version": 1,
+				"workflows": {}
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows"
+			}
+		},
+		{
+			"id": "duplicate_id",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					},
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "duplicate_id",
+				"path": "/workflows/1/id"
+			}
+		},
+		{
+			"id": "workflow_not_object",
+			"doc": {
+				"schema_version": 1,
+				"workflows": ["x"]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "not_object",
+				"path": "/workflows/0"
+			}
+		},
+		{
+			"id": "workflow_unknown_key",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"revision": 3
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/workflows/0/revision"
+			}
+		},
+		{
+			"id": "workflow_missing_origin",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "a",
+						"name": "n",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/origin"
+			}
+		},
+		{
+			"id": "workflow_bad_id",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "a b",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/id"
+			}
+		},
+		{
+			"id": "workflow_id_too_long",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/id"
+			}
+		},
+		{
+			"id": "workflow_name_empty",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/name"
+			}
+		},
+		{
+			"id": "workflow_name_newline",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "a\nb",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/name"
+			}
+		},
+		{
+			"id": "workflow_name_too_long",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_long",
+				"path": "/workflows/0/name"
+			}
+		},
+		{
+			"id": "workflow_name_null",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": null,
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/name"
+			}
+		},
+		{
+			"id": "workflow_bad_origin",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "web",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_enum",
+				"path": "/workflows/0/origin"
+			}
+		},
+		{
+			"id": "steps_not_list",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": {}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps"
+			}
+		},
+		{
+			"id": "step_not_object",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [3]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "not_object",
+				"path": "/workflows/0/steps/0"
+			}
+		},
+		{
+			"id": "step_missing_kind",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"text": "a"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/kind"
+			}
+		},
+		{
+			"id": "step_kind_not_string",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": 1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/kind"
+			}
+		},
+		{
+			"id": "step_unknown_kind",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "format_disk"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_kind",
+				"path": "/workflows/0/steps/0/kind"
+			}
+		},
+		{
+			"id": "step_unknown_key",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1,
+								"timeout_ms": 5
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/workflows/0/steps/0/timeout_ms"
+			}
+		},
+		{
+			"id": "step_missing_field",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "type_text"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/text"
+			}
+		},
+		{
+			"id": "text_bad_type",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "type_text",
+								"text": 5
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/text"
+			}
+		},
+		{
+			"id": "text_too_long",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "type_text",
+								"text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_long",
+				"path": "/workflows/0/steps/0/text"
+			}
+		},
+		{
+			"id": "text_max_bytes",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "type_text",
+								"text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "text_nul",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "type_text",
+								"text": "a\u0000b"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/steps/0/text"
+			}
+		},
+		{
+			"id": "text_delete",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "notify",
+								"text": "ab"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/steps/0/text"
+			}
+		},
+		{
+			"id": "text_tab_multiline",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "notify",
+								"text": "a\tb\r\n"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "app_newline",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "focus_app",
+								"app": "a\nb"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/steps/0/app"
+			}
+		},
+		{
+			"id": "note_bad",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1,
+								"note": ""
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_text",
+				"path": "/workflows/0/steps/0/note"
+			}
+		},
+		{
+			"id": "shortcut_bad",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": "ctrl+"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_shortcut",
+				"path": "/workflows/0/steps/0/combo"
+			}
+		},
+		{
+			"id": "shortcut_no_modifier",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": "a"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_shortcut",
+				"path": "/workflows/0/steps/0/combo"
+			}
+		},
+		{
+			"id": "shortcut_repeat_modifier",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": "ctrl+control+a"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_shortcut",
+				"path": "/workflows/0/steps/0/combo"
+			}
+		},
+		{
+			"id": "shortcut_plus_key",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": "shift++"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "shortcut_named",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": " Alt + Enter "
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "shortcut_not_string",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "send_keys",
+								"combo": ["ctrl", "a"]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/combo"
+			}
+		},
+		{
+			"id": "integer_fraction",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1.5
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		},
+		{
+			"id": "integer_string",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": "5"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		},
+		{
+			"id": "integer_bool",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": true
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		},
+		{
+			"id": "integer_negative",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": -1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		},
+		{
+			"id": "wait_max",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 600000
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "wait_over_max",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 600001
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		},
+		{
+			"id": "wait_for_min",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait_for",
+								"target": {
+									"type": "text",
+									"text": "a"
+								},
+								"timeout_ms": 99
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/timeout_ms"
+			}
+		},
+		{
+			"id": "click_count_over",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "mouse_click",
+								"x": 1,
+								"y": 1,
+								"count": 4
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/count"
+			}
+		},
+		{
+			"id": "coordinate_over",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "mouse_move",
+								"x": 100001,
+								"y": 0
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/x"
+			}
+		},
+		{
+			"id": "repeat_zero",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 0,
+								"steps": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/count"
+			}
+		},
+		{
+			"id": "repeat_over",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1001,
+								"steps": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "out_of_range",
+				"path": "/workflows/0/steps/0/count"
+			}
+		},
+		{
+			"id": "enum_bad",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "open",
+								"target_kind": "folder",
+								"value": "x"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_enum",
+				"path": "/workflows/0/steps/0/target_kind"
+			}
+		},
+		{
+			"id": "enum_not_string",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "capture",
+								"mode": 1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/mode"
+			}
+		},
+		{
+			"id": "variable_bad",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "clipboard_get",
+								"into": "1abc"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/steps/0/into"
+			}
+		},
+		{
+			"id": "variable_too_long",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "clipboard_get",
+								"into": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/steps/0/into"
+			}
+		},
+		{
+			"id": "variable_max_len",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "clipboard_get",
+								"into": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "action_bad",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "run_action",
+								"action": "Run-It"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/steps/0/action"
+			}
+		},
+		{
+			"id": "target_not_object",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": "OK"
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "not_object",
+				"path": "/workflows/0/steps/0/target"
+			}
+		},
+		{
+			"id": "target_missing_type",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": {
+									"text": "OK"
+								}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/target/type"
+			}
+		},
+		{
+			"id": "target_bad_type",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": {
+									"type": "color"
+								}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_enum",
+				"path": "/workflows/0/steps/0/target/type"
+			}
+		},
+		{
+			"id": "target_unknown_key",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": {
+									"type": "text",
+									"text": "OK",
+									"score": 1
+								}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/workflows/0/steps/0/target/score"
+			}
+		},
+		{
+			"id": "target_unknown_image",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": {
+									"type": "image",
+									"image": "nope"
+								}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_image",
+				"path": "/workflows/0/steps/0/target/image"
+			}
+		},
+		{
+			"id": "target_image_bad_id",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "click_target",
+								"target": {
+									"type": "image",
+									"image": "a-b"
+								}
+							}
+						],
+						"images": {}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/steps/0/target/image"
+			}
+		},
+		{
+			"id": "condition_missing",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"then": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/condition"
+			}
+		},
+		{
+			"id": "condition_bad_type",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "always"
+								},
+								"then": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_enum",
+				"path": "/workflows/0/steps/0/condition/type"
+			}
+		},
+		{
+			"id": "condition_variable_required",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "matches",
+									"source": "variable",
+									"op": "empty"
+								},
+								"then": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "variable_required",
+				"path": "/workflows/0/steps/0/condition/variable"
+			}
+		},
+		{
+			"id": "condition_value_required",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "matches",
+									"source": "clipboard",
+									"op": "equals"
+								},
+								"then": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "value_required",
+				"path": "/workflows/0/steps/0/condition/value"
+			}
+		},
+		{
+			"id": "condition_bad_op",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "matches",
+									"source": "clipboard",
+									"op": "regex",
+									"value": "a"
+								},
+								"then": []
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_enum",
+				"path": "/workflows/0/steps/0/condition/op"
+			}
+		},
+		{
+			"id": "then_missing",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "app_front",
+									"app": "x"
+								}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/then"
+			}
+		},
+		{
+			"id": "else_not_list",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "app_front",
+									"app": "x"
+								},
+								"then": [],
+								"else": {}
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/else"
+			}
+		},
+		{
+			"id": "nested_error_path",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 2,
+								"steps": [
+									{
+										"kind": "if",
+										"condition": {
+											"type": "app_front",
+											"app": "x"
+										},
+										"then": [
+											{
+												"kind": "wait"
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "missing_field",
+				"path": "/workflows/0/steps/0/steps/0/then/0/duration_ms"
+			}
+		},
+		{
+			"id": "images_not_object",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "not_object",
+				"path": "/workflows/0/images"
+			}
+		},
+		{
+			"id": "image_bad_name",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"9x": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_identifier",
+				"path": "/workflows/0/images/9x"
+			}
+		},
+		{
+			"id": "image_not_png",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "R0lGODlhAQABAAAAACw="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_image",
+				"path": "/workflows/0/images/a"
+			}
+		},
+		{
+			"id": "image_bad_base64",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==!"
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_image",
+				"path": "/workflows/0/images/a"
+			}
+		},
+		{
+			"id": "image_bad_length",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_image",
+				"path": "/workflows/0/images/a"
+			}
+		},
+		{
+			"id": "image_not_string",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": 5
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/images/a"
+			}
+		},
+		{
+			"id": "image_too_long",
+			"limits": {
+				"image_base64_bytes": 64
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_long",
+				"path": "/workflows/0/images/a"
+			}
+		},
+		{
+			"id": "images_max",
+			"limits": {
+				"images_max": 2
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",
+							"b": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "too_many_images",
+			"limits": {
+				"images_max": 2
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [],
+						"images": {
+							"a": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",
+							"b": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==",
+							"c": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+						}
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_many_images",
+				"path": "/workflows/0/images"
+			}
+		},
+		{
+			"id": "workflows_max",
+			"limits": {
+				"workflows_max": 2
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "a",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					},
+					{
+						"id": "b",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "too_many_workflows",
+			"limits": {
+				"workflows_max": 2
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "a",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					},
+					{
+						"id": "b",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					},
+					{
+						"id": "c",
+						"name": "Test",
+						"origin": "local",
+						"steps": []
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_many_workflows",
+				"path": "/workflows"
+			}
+		},
+		{
+			"id": "steps_max",
+			"limits": {
+				"steps_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "too_many_steps",
+			"limits": {
+				"steps_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							},
+							{
+								"kind": "wait",
+								"duration_ms": 1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_many_steps",
+				"path": "/workflows/0/steps"
+			}
+		},
+		{
+			"id": "too_many_steps_nested",
+			"limits": {
+				"steps_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "wait",
+										"duration_ms": 1
+									},
+									{
+										"kind": "wait",
+										"duration_ms": 1
+									},
+									{
+										"kind": "wait",
+										"duration_ms": 1
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_many_steps",
+				"path": "/workflows/0/steps"
+			}
+		},
+		{
+			"id": "depth_max",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "repeat",
+										"count": 1,
+										"steps": [
+											{
+												"kind": "repeat",
+												"count": 1,
+												"steps": [
+													{
+														"kind": "repeat",
+														"count": 1,
+														"steps": [
+															{
+																"kind": "repeat",
+																"count": 1,
+																"steps": [
+																	{
+																		"kind": "repeat",
+																		"count": 1,
+																		"steps": [
+																			{
+																				"kind": "repeat",
+																				"count": 1,
+																				"steps": [
+																					{
+																						"kind": "wait",
+																						"duration_ms": 1
+																					}
+																				]
+																			}
+																		]
+																	}
+																]
+															}
+														]
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "too_deep",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "repeat",
+										"count": 1,
+										"steps": [
+											{
+												"kind": "repeat",
+												"count": 1,
+												"steps": [
+													{
+														"kind": "repeat",
+														"count": 1,
+														"steps": [
+															{
+																"kind": "repeat",
+																"count": 1,
+																"steps": [
+																	{
+																		"kind": "repeat",
+																		"count": 1,
+																		"steps": [
+																			{
+																				"kind": "repeat",
+																				"count": 1,
+																				"steps": [
+																					{
+																						"kind": "repeat",
+																						"count": 1,
+																						"steps": [
+																							{
+																								"kind": "wait",
+																								"duration_ms": 1
+																							}
+																						]
+																					}
+																				]
+																			}
+																		]
+																	}
+																]
+															}
+														]
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_deep",
+				"path": "/workflows/0/steps/0/steps/0/steps/0/steps/0/steps/0/steps/0/steps/0/steps/0/steps/0"
+			}
+		},
+		{
+			"id": "variables_max",
+			"limits": {
+				"variables_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "clipboard_get",
+										"into": "v0"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v1"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v2"
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "too_many_variables",
+			"limits": {
+				"variables_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "clipboard_get",
+										"into": "v0"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v1"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v2"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v3"
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "too_many_variables",
+				"path": "/workflows/0/steps/0/steps/3/into"
+			}
+		},
+		{
+			"id": "variable_reused_counts_once",
+			"limits": {
+				"variables_max": 3
+			},
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "repeat",
+								"count": 1,
+								"steps": [
+									{
+										"kind": "clipboard_get",
+										"into": "v0"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v1"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v2"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v0"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v1"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v2"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v0"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v1"
+									},
+									{
+										"kind": "clipboard_get",
+										"into": "v2"
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": true
+			}
+		},
+		{
+			"id": "unknown_key_escaped",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 1,
+								"a/b~c": 1
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "unknown_key",
+				"path": "/workflows/0/steps/0/a~1b~0c"
+			}
+		},
+		{
+			"id": "null_field",
+			"doc": {
+				"schema_version": 1,
+				"workflows": [
+					{
+						"id": "wf_1",
+						"name": "Test",
+						"origin": "local",
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": null
+							}
+						]
+					}
+				]
+			},
+			"expected": {
+				"ok": false,
+				"reason": "bad_type",
+				"path": "/workflows/0/steps/0/duration_ms"
+			}
+		}
+	]
+}
