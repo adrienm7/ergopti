@@ -74,6 +74,7 @@ return {
 	"tests.unit.settings.test_value_check_vectors",
 	"tests.unit.modules.shortcuts.test_workflow_model",
 	"tests.unit.modules.shortcuts.test_workflows_linux",
+	"tests.unit.hotstrings.engine.test_hotstring_actions",
 	"tests.unit.settings.test_shared_manifest_reader",
 	"tests.unit.diagnostics.engine.control.test_driver_control",
 	"tests.unit.diagnostics.engine.control.test_field_run",

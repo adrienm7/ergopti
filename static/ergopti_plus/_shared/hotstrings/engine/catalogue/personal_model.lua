@@ -13,6 +13,7 @@ local Reader = require("core.text.engine.toml_codec.reader")
 local Scanner = require("core.text.engine.toml_codec.record_scanner")
 local Keys = require("core.text.engine.toml_codec.key_path")
 local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 local FLAGS = { "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }
 
 local function section_name(header)
@@ -41,12 +42,20 @@ local function normalized(entry, normalize)
 	local result = { output = normalize(entry.output) }
 	for _, field in ipairs(FLAGS) do result[field] = entry[field] == true end
 	if entry.priority ~= nil then result.priority = entry.priority end
+	-- An action entry's fields; the default erase_trigger is never written.
+	if entry.action ~= nil then
+		result.action, result.workflow = entry.action, entry.workflow
+		if entry.erase_trigger == false then result.erase_trigger = false end
+	end
 	return result
 end
 
-local OWNED = { output = true, priority = true }
+local OWNED = { output = true, priority = true, action = true, workflow = true, erase_trigger = true }
+-- The owned fields an edit may remove: an absent value drops the source's.
+local REMOVABLE = { priority = true, action = true, workflow = true, erase_trigger = true }
 for _, field in ipairs(FLAGS) do OWNED[field] = true end
-local OWNED_ORDER = { "output", "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict", "priority" }
+local OWNED_ORDER = { "output", "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict",
+	"priority", "action", "workflow", "erase_trigger" }
 local function render_value(value, record)
 	if not record or type(record.value) ~= "table" then return Codec.encode_value(value) end
 	local keys, members = {}, {}
@@ -68,6 +77,9 @@ end
 
 local function same_entry(a, b)
 	if a.output ~= b.output or a.priority ~= b.priority then return false end
+	if a.action ~= b.action or a.workflow ~= b.workflow or ActionEntry.erase_of(a) ~= ActionEntry.erase_of(b) then
+		return false
+	end
 	for _, field in ipairs(FLAGS) do if (a[field] == true) ~= (b[field] == true) then return false end end
 	return true
 end
@@ -114,6 +126,8 @@ function M.prepare(source, model, normalize)
 				or entry.priority ~= nil and not Metadata.valid("priority", entry.priority) then return nil, "invalid-personal-row" end
 			seen[entry.trigger] = true
 			for _, flag in ipairs(FLAGS) do if entry[flag] ~= nil and type(entry[flag]) ~= "boolean" then return nil, "invalid-personal-row" end end
+			local _, action_refusal = ActionEntry.fields(entry)
+			if action_refusal then return nil, "invalid-personal-row" end
 		end
 	end
 	for _, header in ipairs(scan.headers) do
@@ -189,7 +203,7 @@ function M.prepare(source, model, normalize)
 			local value = normalized(entry, normalize)
 			if record and type(record.value) == "table" then
 				for key, previous in pairs(record.value) do
-					if value[key] == nil and key ~= "priority" then value[key] = previous end
+					if value[key] == nil and not REMOVABLE[key] then value[key] = previous end
 				end
 			end
 			local comment, eol = "", "\n"

@@ -50,6 +50,7 @@ local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local TableUtil = require("core.text.engine.table_util")
 local NativePath = require("core.fs.engine.native_path")
 local OutputTokens = require("hotstrings.engine.output_tokens")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 
 local LOG = "hotstrings.engine.loader"
 
@@ -317,7 +318,11 @@ function M.load_catalogue(paths, options, prepared_sources, inverse_receipt)
 					local entry_count = 0
 					registrations[sec_name] = {}
 					for index, entry in ipairs(section.entries) do
-						if type(entry.trigger) == "string" and type(entry.output) == "string" then
+						local action_fields, action_refusal = ActionEntry.fields(entry)
+						if action_refusal then
+							Logger.warn(LOG, "A hotstring of section '%s' was skipped: its action fields are invalid (%s).",
+								tostring(sec_name), action_refusal)
+						elseif type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
 							local replacement, has_key_tokens = OutputTokens.resolve(entry.output)
 							registrations[sec_name][index] = {
@@ -359,6 +364,9 @@ function M.load_catalogue(paths, options, prepared_sources, inverse_receipt)
 								group             = group,
 								personal_source   = personal_source and PersonalFiles.copy(personal_source) or nil,
 								section           = sec_name,
+								action            = action_fields and action_fields.action or nil,
+								workflow          = action_fields and action_fields.workflow or nil,
+								erase_trigger     = action_fields and action_fields.erase_trigger or nil,
 							}
 						end
 					end

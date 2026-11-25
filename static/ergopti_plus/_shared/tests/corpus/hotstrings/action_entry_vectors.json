@@ -1,0 +1,409 @@
+{
+	"$description": "Hotstring action entries (_shared/hotstrings/engine/matcher/action_entry.lua): `fields` are the action fields a parsed entry carries or the refusal that skips it; `plans` the edit before the action, with the trigger erased (default) or kept as typed, end character included (« effacer le déclencheur » off); `saves` are editor saves through the personal-file model (what the written entry contains, lacks, or why the save is refused); `matches` replay a TOML line through the shared reader and matcher (the event on screen, as on Linux and Windows). Replayed by the macOS and Linux suites (_shared/tests/lua/hotstrings/action_entry_contract.lua) and the AutoHotkey port. null means the key is absent.",
+	"fields": [
+		{
+			"id": "text_entry",
+			"entry": {
+				"output": "x"
+			},
+			"fields": null
+		},
+		{
+			"id": "workflow",
+			"entry": {
+				"output": "",
+				"action": "run_workflow",
+				"workflow": "wf_3f9a"
+			},
+			"fields": {
+				"action": "run_workflow",
+				"workflow": "wf_3f9a",
+				"erase_trigger": true
+			}
+		},
+		{
+			"id": "action_keeps_text",
+			"entry": {
+				"action": "select_all",
+				"erase_trigger": false
+			},
+			"fields": {
+				"action": "select_all",
+				"erase_trigger": false
+			}
+		},
+		{
+			"id": "erase_default_true",
+			"entry": {
+				"action": "select_all"
+			},
+			"fields": {
+				"action": "select_all",
+				"erase_trigger": true
+			}
+		},
+		{
+			"id": "bad_action_case",
+			"entry": {
+				"action": "Select"
+			},
+			"refusal": "bad_action"
+		},
+		{
+			"id": "bad_action_type",
+			"entry": {
+				"action": 5
+			},
+			"refusal": "bad_action"
+		},
+		{
+			"id": "workflow_missing",
+			"entry": {
+				"action": "run_workflow"
+			},
+			"refusal": "bad_workflow"
+		},
+		{
+			"id": "workflow_bad_id",
+			"entry": {
+				"action": "run_workflow",
+				"workflow": "a b"
+			},
+			"refusal": "bad_workflow"
+		},
+		{
+			"id": "workflow_without_its_action",
+			"entry": {
+				"action": "select_all",
+				"workflow": "wf"
+			},
+			"refusal": "workflow_without_action"
+		},
+		{
+			"id": "workflow_alone",
+			"entry": {
+				"workflow": "wf"
+			},
+			"refusal": "workflow_without_action"
+		},
+		{
+			"id": "erase_not_boolean",
+			"entry": {
+				"action": "select_all",
+				"erase_trigger": "no"
+			},
+			"refusal": "bad_erase_trigger"
+		}
+	],
+	"plans": [
+		{
+			"id": "erase_auto_on_screen",
+			"spec": {
+				"path": "auto",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": "1",
+				"output": "",
+				"erase_trigger": true
+			},
+			"plan": {
+				"erase": 4,
+				"text": ""
+			}
+		},
+		{
+			"id": "erase_auto_held",
+			"spec": {
+				"path": "auto",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": false,
+				"event_text": "1",
+				"output": "",
+				"erase_trigger": true
+			},
+			"plan": {
+				"erase": 3,
+				"text": ""
+			}
+		},
+		{
+			"id": "erase_types_output",
+			"spec": {
+				"path": "auto",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": "1",
+				"output": "Hi",
+				"erase_trigger": true
+			},
+			"plan": {
+				"erase": 4,
+				"text": "Hi"
+			}
+		},
+		{
+			"id": "erase_terminator_replayed",
+			"spec": {
+				"path": "terminator",
+				"trigger_len": 7,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": " ",
+				"terminator": " ",
+				"consume_terminator": false,
+				"output": "",
+				"erase_trigger": true
+			},
+			"plan": {
+				"erase": 8,
+				"text": "",
+				"tail": " "
+			}
+		},
+		{
+			"id": "erase_terminator_consumed",
+			"spec": {
+				"path": "terminator",
+				"trigger_len": 7,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": " ",
+				"terminator": " ",
+				"consume_terminator": true,
+				"output": "",
+				"erase_trigger": true
+			},
+			"plan": {
+				"erase": 8,
+				"text": ""
+			}
+		},
+		{
+			"id": "keep_on_screen",
+			"spec": {
+				"path": "terminator",
+				"trigger_len": 7,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": " ",
+				"terminator": " ",
+				"output": "",
+				"erase_trigger": false
+			},
+			"plan": {
+				"erase": 0,
+				"text": ""
+			}
+		},
+		{
+			"id": "keep_held_terminator_typed_back",
+			"spec": {
+				"path": "terminator",
+				"trigger_len": 7,
+				"event_len": 1,
+				"event_on_screen": false,
+				"event_text": ".",
+				"terminator": ".",
+				"output": "",
+				"erase_trigger": false
+			},
+			"plan": {
+				"erase": 0,
+				"text": "."
+			}
+		},
+		{
+			"id": "keep_held_auto_char_typed_back",
+			"spec": {
+				"path": "auto",
+				"trigger_len": 4,
+				"event_len": 1,
+				"event_on_screen": false,
+				"event_text": "1",
+				"output": "",
+				"erase_trigger": false
+			},
+			"plan": {
+				"erase": 0,
+				"text": "1"
+			}
+		},
+		{
+			"id": "keep_then_output",
+			"spec": {
+				"path": "terminator",
+				"trigger_len": 7,
+				"event_len": 1,
+				"event_on_screen": true,
+				"event_text": "\n",
+				"terminator": "\n",
+				"output": "Cordialement",
+				"erase_trigger": false
+			},
+			"plan": {
+				"erase": 0,
+				"text": "Cordialement"
+			}
+		}
+	],
+	"matches": [
+		{
+			"id": "auto_workflow_erases",
+			"line": "\";wf1\" = { action = \"run_workflow\", workflow = \"wf_a\", auto_expand = true }",
+			"typed": ";wf1",
+			"expected": {
+				"backspace_count": 4,
+				"replacement": "",
+				"action": "run_workflow",
+				"workflow": "wf_a",
+				"erase_trigger": true
+			}
+		},
+		{
+			"id": "word_keeps_text_and_end_char",
+			"line": "\"bonjour\" = { action = \"select_all\", erase_trigger = false, is_word = true }",
+			"typed": "bonjour",
+			"terminator": " ",
+			"expected": {
+				"backspace_count": 0,
+				"replacement": "",
+				"action": "select_all",
+				"erase_trigger": false,
+				"replay_terminator": null
+			}
+		},
+		{
+			"id": "word_erases_and_replays_end_char",
+			"line": "\"bonjour\" = { action = \"select_all\", is_word = true }",
+			"typed": "bonjour",
+			"terminator": " ",
+			"expected": {
+				"backspace_count": 8,
+				"replacement": "",
+				"action": "select_all",
+				"erase_trigger": true,
+				"replay_terminator": " "
+			}
+		},
+		{
+			"id": "output_with_action",
+			"line": "\";sig\" = { output = \"Best,\", action = \"select_all\", auto_expand = true }",
+			"typed": ";sig",
+			"expected": {
+				"backspace_count": 4,
+				"replacement": "Best,",
+				"action": "select_all"
+			}
+		},
+		{
+			"id": "text_entry_has_no_action",
+			"line": "\";a\" = { output = \"b\", auto_expand = true }",
+			"typed": ";a",
+			"expected": {
+				"backspace_count": 2,
+				"replacement": "b",
+				"action": null
+			}
+		}
+	],
+	"saves": [
+		{
+			"name": "an action entry writes its action and workflow, never the default erase",
+			"source": "[_meta]\nsections_order = [\"words\"]\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false,
+								"action": "run_workflow",
+								"workflow": "wf_a"
+							}
+						]
+					}
+				}
+			},
+			"contains": ["action = \"run_workflow\"", "workflow = \"wf_a\""],
+			"absent": ["erase_trigger"]
+		},
+		{
+			"name": "a kept trigger is written as erase_trigger = false",
+			"source": "[_meta]\nsections_order = [\"words\"]\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false,
+								"action": "select_all",
+								"erase_trigger": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["action = \"select_all\"", "erase_trigger = false"]
+		},
+		{
+			"name": "clearing the action drops its fields from the source",
+			"source": "[_meta]\nsections_order = [\"words\"]\n[[words]]\n\"hello\" = { output = \"\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false, action = \"select_all\", erase_trigger = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "Bonjour",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false
+							}
+						]
+					}
+				}
+			},
+			"contains": ["output = \"Bonjour\""],
+			"absent": ["action", "erase_trigger"]
+		},
+		{
+			"name": "an invalid action refuses the save",
+			"source": "[_meta]\nsections_order = [\"words\"]\n[[words]]\n\"hello\" = { output = \"Bonjour\", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }\n",
+			"model": {
+				"sections_order": ["words"],
+				"sections": {
+					"words": {
+						"entries": [
+							{
+								"trigger": "hello",
+								"output": "",
+								"is_word": true,
+								"auto_expand": false,
+								"is_case_sensitive": false,
+								"final_result": false,
+								"action": "Bad Action"
+							}
+						]
+					}
+				}
+			},
+			"refusal": "invalid-personal-row"
+		}
+	]
+}

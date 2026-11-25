@@ -36,6 +36,7 @@ local RI          = require("hotstrings.engine.expander.registry_index")
 for k, v in pairs(RI) do M[k] = v end
 
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
@@ -743,12 +744,20 @@ function M.add(trigger, replacement, opts)
 			existing.star_base           = star_base
 			existing.star_base_bytes     = star_base_bytes
 			existing.star_base_tail_char = star_base_tail_char
+			existing.action              = opts.action
+			existing.workflow            = opts.workflow
+			existing.erase_trigger       = ActionEntry.erase_of(opts)
 			return
 		end
 		_state.seq_counter = _state.seq_counter + 1
 		local entry = {
 			trigger      = t,
 			repl         = r,
+			-- An action entry (hotstrings/engine/matcher/action_entry.lua): what runs
+			-- after the edit, and whether the trigger is erased first.
+			action        = opts.action,
+			workflow      = opts.workflow,
+			erase_trigger = ActionEntry.erase_of(opts),
 			-- Precomputed once at load time; avoids tokens_from_repl() + plain_text()
 			-- being called on every keystroke in update_preview() and the expander
 			plain_repl   = plain_r,

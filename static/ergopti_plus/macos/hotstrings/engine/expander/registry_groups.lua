@@ -26,6 +26,7 @@ local Logger = require("core.logger.engine.logger")
 
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local PrivateLabel = require("diagnostics.engine.private_label")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 local TableUtil = require("core.text.engine.table_util")
 local LOG = "keymap.registry"
 
@@ -810,6 +811,11 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 				or sec_meta_priority or file_meta_priority
 			registrations[sec_name] = {}
 			for index, entry in ipairs(entries) do
+				local action_fields, action_refusal = ActionEntry.fields(entry)
+				if action_refusal then
+					Logger.warn(LOG, "A hotstring of '%s/%s' was skipped: its action fields are invalid (%s).",
+						PrivateLabel.mask(name), sec_name, action_refusal)
+				else
 				registrations[sec_name][index] = { entry = entry, options = {
 					is_word           = entry.is_word,
 					auto_expand       = entry.auto_expand,
@@ -819,7 +825,11 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 					section           = sec_name,
 					personal_source   = owned_source,
 					priority          = _callbacks.resolve_priority(entry.priority, override_priority, nil, name),
+					action            = action_fields and action_fields.action or nil,
+					workflow          = action_fields and action_fields.workflow or nil,
+					erase_trigger     = action_fields and action_fields.erase_trigger,
 				} }
+				end
 			end
 		else
 			disabled_sections = disabled_sections + 1
