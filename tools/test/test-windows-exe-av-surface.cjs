@@ -428,6 +428,35 @@ assert.deepEqual(
 	'the tracked bundle selection stays under every bundle ceiling'
 );
 
+// 13. The shipped AutoHotkey sources hold the script surface that names a
+// Win32 API before any Windows build. Ahk2Exe embeds them without comments,
+// so with comments stripped an API name counts as in the compiled script: the
+// e14155d93f6 build failed when the owner-drawn tray menu added a BitBlt.
+const stripAhkComments = (text) =>
+	text
+		.replace(/^\s*\/\*[\s\S]*?^\s*\*\//gm, '')
+		.split('\n')
+		.map((line) => line.replace(/(^|\s);.*$/, ''))
+		.join('\n');
+const shippedScript = readSourceFiles(path.join(root, 'static/ergopti_plus/windows'))
+	.map((file) => stripAhkComments(file.text))
+	.join('\n');
+assert.ok(shippedScript.length > 0, 'the shipped Windows sources are read');
+const apiSurface = {
+	forbidden: policy.script.forbidden,
+	ceilings: Object.fromEntries(
+		['keyboard_hook_api', 'clipboard_listener', 'screen_capture_api'].map((id) => {
+			assert.ok(policy.script.ceilings[id], `the script policy caps ${id}`);
+			return [id, policy.script.ceilings[id]];
+		})
+	)
+};
+assert.deepEqual(
+	checkSection('sources', shippedScript, apiSurface).errors,
+	[],
+	'the shipped Windows sources stay under every script API ceiling'
+);
+
 console.log(
 	'[OK] ErgoptiPlus.exe antivirus surface: resources read, stages forbidden, ceilings held.'
 );

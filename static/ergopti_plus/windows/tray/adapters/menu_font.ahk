@@ -541,7 +541,7 @@ _TrayMenuFont_Paint(Dc, Rect, Row) {
 _TrayMenuFont_PaintBitmap(Dc, Bitmap, CheckRect, Disabled) {
 	; HBMMENU_* are small predefined values and -1 (HBMMENU_CALLBACK), not bitmaps.
 	; NumGet reads a 64-bit HBMMENU_CALLBACK as -1, a 32-bit one as 0xFFFFFFFF.
-	static HBMMENU_LAST := 11, HBMMENU_CALLBACK_32 := 0xFFFFFFFF, SRCCOPY := 0x00CC0020
+	static HBMMENU_LAST := 11, HBMMENU_CALLBACK_32 := 0xFFFFFFFF
 	static AC_SRC_ALPHA := 0x01, OPAQUE_ALPHA := 0xFF, FADED_ALPHA := 0x60
 	if (Bitmap <= HBMMENU_LAST) || (Bitmap == HBMMENU_CALLBACK_32)
 		return
@@ -555,15 +555,12 @@ _TrayMenuFont_PaintBitmap(Dc, Bitmap, CheckRect, Disabled) {
 	Memory := DllCall("gdi32\CreateCompatibleDC", "ptr", Dc, "ptr")
 	Previous := DllCall("gdi32\SelectObject", "ptr", Memory, "ptr", Bitmap, "ptr")
 	try {
-		if (Bits == 32) {
-			; BLENDFUNCTION { AC_SRC_OVER, 0, constant alpha, AC_SRC_ALPHA }: a disabled row's icon is faded.
-			Blend := ((Disabled ? FADED_ALPHA : OPAQUE_ALPHA) << 16) | (AC_SRC_ALPHA << 24)
-			DllCall("msimg32\AlphaBlend", "ptr", Dc, "int", X, "int", Y, "int", Width, "int", Height,
-				"ptr", Memory, "int", 0, "int", 0, "int", Width, "int", Height, "uint", Blend)
-		} else {
-			DllCall("gdi32\BitBlt", "ptr", Dc, "int", X, "int", Y, "int", Width, "int", Height,
-				"ptr", Memory, "int", 0, "int", 0, "uint", SRCCOPY)
-		}
+		; BLENDFUNCTION { AC_SRC_OVER, 0, constant alpha, alpha format }: a disabled row's icon is
+		; faded. Only a 32-bit bitmap carries per-pixel alpha; an opaque constant alpha copies any
+		; other depth unchanged, so no screen-capture-shaped blit reaches the compiled exe.
+		Blend := ((Disabled ? FADED_ALPHA : OPAQUE_ALPHA) << 16) | ((Bits == 32 ? AC_SRC_ALPHA : 0) << 24)
+		DllCall("msimg32\AlphaBlend", "ptr", Dc, "int", X, "int", Y, "int", Width, "int", Height,
+			"ptr", Memory, "int", 0, "int", 0, "int", Width, "int", Height, "uint", Blend)
 	} finally {
 		DllCall("gdi32\SelectObject", "ptr", Memory, "ptr", Previous)
 		DllCall("gdi32\DeleteDC", "ptr", Memory)
