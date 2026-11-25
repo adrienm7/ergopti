@@ -761,6 +761,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		MenuCommand.OPEN_LOGS,      OpenLogsFolder,
 		MenuCommand.OPEN_TODAY_LOG, OpenTodayLog,
 		MenuCommand.OPEN_ERROR_LOG, OpenErrorLog,
+		MenuCommand.EXPORT_LOGS, (*) => LogExport_Command(),
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		MenuCommand.SEND_PROBE, InputProbe_SendComparisonCommand,
 		MenuCommand.HOOK_PROBE, InputProbe_HookOrderCommand,

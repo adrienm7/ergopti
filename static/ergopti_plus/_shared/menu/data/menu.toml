@@ -1215,7 +1215,7 @@ i18n = "menu.debug.open_error_log"
 type = "command"
 id = "export_logs"
 i18n = "menu.debug.export_logs"
-platforms = ["linux"]
+platforms = ["ahk", "linux"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
 [[menu.debug_menu]]

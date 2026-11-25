@@ -276,6 +276,7 @@ _MM_DebugFallback() {
 		Map("id", MenuCommand.OPEN_LOGS),
 		Map("id", MenuCommand.OPEN_TODAY_LOG),
 		Map("id", MenuCommand.OPEN_ERROR_LOG),
+		Map("id", MenuCommand.EXPORT_LOGS),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
 		Map("id", MenuCommand.SEND_PROBE),

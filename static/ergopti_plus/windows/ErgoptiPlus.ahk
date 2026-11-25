@@ -366,6 +366,9 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; Application folder, logs folder and log file names, generated from
 ; _shared/core/fs/data/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
+; What « Export the logs (zip) » archives and its privacy rules, generated from
+; _shared/core/logger/data/log_export.toml; a function, read at click time.
+#Include _generated/log_export_data.ahk
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
 ; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
 #Include apps/engine/folders.ahk
