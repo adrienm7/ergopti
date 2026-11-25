@@ -36,6 +36,12 @@ export GIO_MODULE_DIR="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GIO_EXTRA_MODULES="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
 export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"
 export XDG_DATA_DIRS="$ERGOPTI_PACKAGE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+# The prefix's lgi links the build host's libgirepository, whose built-in search
+# names only the Debian multiarch directory. The recipient's typelibs come
+# first (Fedora and openSUSE, Debian and Ubuntu, then Arch, whose lib64 is a
+# link to lib), so the recipient's GTK and WebKitGTK describe themselves; the
+# prefix's GLib and freedesktop typelibs only fill a recipient without them.
+export GI_TYPELIB_PATH="${GI_TYPELIB_PATH:+$GI_TYPELIB_PATH:}/usr/lib64/girepository-1.0:/usr/lib/x86_64-linux-gnu/girepository-1.0:/usr/lib/girepository-1.0:$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0"
 
 for ERGOPTI_PACKAGE_COMPONENT in \
   "$ERGOPTI_PACKAGE_PREFIX/bin/luajit" \
@@ -47,6 +53,9 @@ for ERGOPTI_PACKAGE_COMPONENT in \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lfs.so" \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/posix/sys/stat.so" \
   "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/posix/init.lua" \
+  "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lgi/corelgilua51.so" \
+  "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/lgi.lua" \
+  "$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0/GObject-2.0.typelib" \
   "$GIO_MODULE_DIR/libgiolibproxy.so" \
   "$GSETTINGS_SCHEMA_DIR/gschemas.compiled"; do
   if [ ! -f "$ERGOPTI_PACKAGE_COMPONENT" ]; then
