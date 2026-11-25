@@ -22,13 +22,13 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Monotonic = require("core.logger.engine.monotonic")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "platform.focus.text_automation_status"
 
--- How long one window-mode reason must hold before the tray names it: longer
--- than the focus settle delay and a context join (about one second), short
--- enough that a user testing a hotstring sees the row at the next menu open.
-local NOTICE_AFTER_MS = 5000
+-- How long one window-mode reason must hold before the tray names it
+-- (constants.toml [privacy]).
+local NOTICE_AFTER_MS = Timings.ms("privacy", "text_automation_notice_after_ms")
 
 -- The lasting reasons the tray names, by mode: "window" ones leave hotstrings
 -- on without the password-field check, "closed" ones withhold them all. The

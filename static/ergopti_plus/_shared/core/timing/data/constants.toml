@@ -790,6 +790,12 @@ focus_barrier_timeout_ms = 20
 # Linux: platform/focus/atspi_focus_watch.lua.
 focus_pump_sleep_ms = 1
 
+# Linux: how long one text automation reason must hold before the tray names it.
+# Longer than focus_settle_ms plus a context join (about one second), short
+# enough that a user testing a hotstring sees the row at the next menu open.
+# Linux: platform/focus/text_automation_status.lua.
+text_automation_notice_after_ms = 5000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)

@@ -59,6 +59,20 @@ helpers.describe("text automation status", function()
 		helpers.assert_eq(reports[1].active(), false, "hidden once a field verdict is back")
 	end)
 
+	helpers.it("(text-automation-visible) the tray waits the registry's notice delay, not a typed one", function()
+		local previous_clock = package.loaded["core.logger.engine.monotonic"]
+		package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return 1000 end }
+		local loaded, Status, reports = pcall(fresh)
+		package.loaded["core.logger.engine.monotonic"] = previous_clock
+		helpers.assert_true(loaded, tostring(Status))
+		local after_ms = require("core.timing.engine.timings").ms("privacy", "text_automation_notice_after_ms")
+		helpers.assert_true(after_ms > 0, "the registry holds a positive delay")
+		Status.publish("window", "no_accessible_window")
+		helpers.assert_eq(Status.tick(1000 + after_ms - 1), false, "one millisecond short of the delay")
+		helpers.assert_true(Status.tick(1000 + after_ms), "named once the delay has passed")
+		helpers.assert_eq(#reports, 1)
+	end)
+
 	helpers.it("(text-automation-visible) a closed condition that withholds everything is named", function()
 		local Status, reports = fresh()
 		Status.publish("closed", "no_detector")
