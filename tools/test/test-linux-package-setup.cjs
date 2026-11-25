@@ -996,6 +996,12 @@ show-session) case "$2" in
 	assert.doesNotMatch(busyboxCalls, /usermod|groupadd/);
 	const launcher = path.join(sandbox, 'installed/install/launch.sh');
 	provideShellMessages(path.dirname(launcher));
+	// The privileged payload a portable launch copies for pkexec.
+	for (const name of ['setup_permissions.sh', '99-ergopti-uinput.rules', 'ergopti-uinput.conf'])
+		fs.copyFileSync(
+			path.join(ROOT, 'static/ergopti_plus/linux/install', name),
+			path.join(path.dirname(launcher), name)
+		);
 	fs.writeFileSync(
 		launcher,
 		fs
@@ -1006,7 +1012,7 @@ show-session) case "$2" in
 	stub(
 		'id',
 		`if [ "$1" = -u ]; then echo 1000
-elif [ "$TEST_CASE" = cancel ] || [[ "$TEST_CASE" = help-no-groups-* ]]; then echo users
+elif [ "$TEST_CASE" = cancel ] || [ "$TEST_CASE" = portable-cancel ] || [[ "$TEST_CASE" = help-no-groups-* ]]; then echo users
 elif [ "$TEST_CASE" = stale ] && [ "$#" = 1 ]; then echo "users \${ACQUIRED_GROUPS:-}"
 else echo "users input uinput"; fi`
 	);
@@ -1019,7 +1025,16 @@ else echo "users input uinput"; fi`
 			'exit 0'
 	);
 	stub('luajit', logCall + '\nexit 0');
-	stub('pkexec', logCall + '\nexit 126');
+	// Records whether the privileged payload is a readable copy outside the
+	// driver root: root cannot read the AppImage's FUSE mount.
+	stub(
+		'pkexec',
+		logCall +
+			'\nfor f in setup_permissions.sh messages.sh 99-ergopti-uinput.rules ergopti-uinput.conf; do' +
+			' [ -f "${2%/*}/$f" ] || exit 70; done\n' +
+			'[ -d "${2%/*}/../_generated/shell_messages" ] || exit 70\n' +
+			'case "$2" in "$LAUNCH_ROOT"/*) echo "pkexec-in-driver-root" >> "$CALL_LOG";; esac\nexit 126'
+	);
 	stub(
 		'sg',
 		logCall + '\nexport ACQUIRED_GROUPS="${ACQUIRED_GROUPS:-} $1"\nexec /bin/bash -c "$3"'
@@ -1144,6 +1159,23 @@ else echo "users input uinput"; fi`
 			0,
 			/luajit .* --tray an argument's value/,
 			/pkexec|systemctl/
+		],
+		// The AppImage installs no unit, and its desktop launch must reach the
+		// daemon even when the authorization is refused: the tray then says why
+		// (field report, Arch Linux, KDE Plasma 6, 2026-11-25).
+		[
+			'portable',
+			['--tray'],
+			0,
+			/^flock -n 9\nluajit .*ergopti_hotstrings\.lua --tray$/m,
+			/systemctl|pkexec/
+		],
+		[
+			'portable-cancel',
+			['--tray'],
+			0,
+			/pkexec \/bin\/bash .*ergopti-permissions\.[^/]+\/install\/setup_permissions\.sh --user 1000\n(?:.*\n)*luajit .*ergopti_hotstrings\.lua --tray$/m,
+			/systemctl|pkexec-in-driver-root/
 		]
 	]) {
 		fs.writeFileSync(callLog, '');
@@ -1156,7 +1188,9 @@ else echo "users input uinput"; fi`
 					? bashPath(noSystemdStubs)
 					: `${bashPath(stubs)}:/usr/bin:/bin`,
 				CALL_LOG: bashPath(callLog),
-				TEST_CASE: scenario
+				TEST_CASE: scenario,
+				LAUNCH_ROOT: bashPath(path.dirname(path.dirname(launcher))),
+				...(scenario.startsWith('portable') ? { ERGOPTI_PORTABLE_LAUNCH: '1' } : {})
 			}
 		});
 		assert.equal(launched.status, status, `${scenario}: ${launched.stderr}`);

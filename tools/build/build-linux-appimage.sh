@@ -131,6 +131,11 @@ REQUIRED_PAYLOAD=(
   "core/fs/engine/paths.lua"
   "tray/adapters/menu.lua"
   "core/ui/ui/webkit_host.lua"
+  "install/launch.sh"
+  "install/setup_permissions.sh"
+  "install/99-ergopti-uinput.rules"
+  "install/ergopti-uinput.conf"
+  "_generated/shell_messages/en.msg"
   "_shared/hotstrings/engine/matcher/init.lua"
   "_shared/hotstrings/engine/matcher/cascade.lua"
   "_shared/layouts/engine/composer/keylayout.lua"
@@ -219,9 +224,19 @@ LUAJIT_BIN="$HERE/usr/bin/luajit"
 # No arguments means a desktop launch, and the driver gates its whole tray and
 # menu block on --tray. Without it the user gets a running daemon with no icon
 # and no menu, and no way to tell it started at all.
-if [ "$#" -eq 0 ]; then
-  exec "$LUAJIT_BIN" "$DRIVER_ROOT/ergopti_hotstrings.lua" --tray
-fi
+if [ "$#" -eq 0 ]; then set -- --tray; fi
+
+# A tray launch goes through the packages' launcher, which sets up the input
+# groups, the uinput rule and module with one pkexec prompt and takes the
+# instance lock. AppRun used to run the daemon directly, so the AppImage never
+# reached the keyboard on a system without those (field report, Arch Linux,
+# KDE Plasma 6, 2026-11-25). The launcher installs no unit for this image.
+for ERGOPTI_ARGUMENT in "$@"; do
+  if [ "$ERGOPTI_ARGUMENT" = --tray ]; then
+    export ERGOPTI_PORTABLE_LAUNCH=1
+    exec bash "$DRIVER_ROOT/install/launch.sh" "$@"
+  fi
+done
 
 exec "$LUAJIT_BIN" "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"
 APPRUN_EOF
