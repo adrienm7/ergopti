@@ -32,26 +32,37 @@ shared code pinned by shared corpora, so a hit means the same thing on every OS.
 
 ## Interface
 
-Lua drivers (`platform/vision/screen_vision.lua`):
+Lua drivers (`platform/vision/screen_vision.lua`). Every call that captures,
+matches or recognises answers through a callback, so the macOS driver can run
+it in the launcher; Linux calls back before returning.
 
-| Call                                       | Answer                                                         |
-| ------------------------------------------ | -------------------------------------------------------------- |
-| `init(options)` / `stop()`                 | one owner; a second `init` is refused                          |
-| `availability()`                           | `{ capture, region, ocr }`, each `{ ok, reason }`              |
-| `capture_window(window)`                   | image, or `nil, reason`                                        |
-| `capture_region(rect)`                     | image, or `nil, reason`                                        |
-| `match(image, templates, options)`         | image hits, and `{ [id] = reason }` for templates that refused |
-| `recognize_text(image, options, callback)` | `callback(words)` or `callback(nil, reason)`, asynchronous     |
-| `recognize_file(path, options, callback)`  | the same for an image file                                     |
-| `find_text(words, targets)`                | text hits                                                      |
+| Call                                         | Answer                                                          |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `init(options)` / `stop()`                   | one owner; a second `init` is refused                           |
+| `availability()`                             | `{ capture, region, ocr }`, each `{ ok, reason }`               |
+| `capture_window(window, callback)`           | `callback(image)` or `callback(nil, reason)`                    |
+| `capture_region(rect, callback)`             | the same for a screen rectangle                                 |
+| `match(image, templates, options, callback)` | `callback(hits, refused)`, `refused` = `{ [id] = reason }`      |
+| `recognize_text(image, options, callback)`   | `callback(words)` or `callback(nil, reason)`                    |
+| `recognize_file(path, options, callback)`    | the same for an image file                                      |
+| `scan_window(window, request, callback)`     | capture, match and text targets in one call: `callback(result)` |
+| `find_text(words, targets)`                  | text hits, synchronously (pure)                                 |
+
+`request` of `scan_window` is `{ templates, options, text_targets, ocr }`;
+`result` is `{ image, hits, text_hits, refused, text_reason }`. It is the
+auto-clicker's tick: on macOS one launcher run captures, matches and reads.
 
 `options` of a recognition is `{ layout = "sparse" | "block", locale }`:
 sparse finds scattered words such as a button caption, block keeps the reading
 order of a region the user selected. The matcher options are the keys of
 `_shared/shortcuts/data/auto_click_defaults.json`.
 
+An image returned by the macOS service keeps its pixels in the launcher: it
+has no `pixels` field but a private `source` file, and is only ever passed
+back to the service. A caller never reads `pixels` itself.
+
 The Windows driver exposes the same calls as `ScreenVision*` functions
-(`ScreenVisionAvailability()`, `ScreenVisionCaptureWindow(Hwnd, &Reason)`, …),
+(`ScreenVisionAvailability()`, `ScreenVisionCaptureWindow(Hwnd, Callback)`, …),
 with the shared matcher and text targets ported and replayed on the same
 corpora.
 
