@@ -487,6 +487,12 @@
 					]
 				}
 			]
+		},
+		{
+			"id": "user_workflows",
+			"title": "User workflows window, assignment, hotstring and shell approval",
+			"checks": [],
+			"not_testable": "A person edits the window and triggers the workflow on a real desktop; the step model, validator, interpreter and shell approval replay `_shared/tests/corpus/workflows/` in the unit suites."
 		}
 	]
 }
