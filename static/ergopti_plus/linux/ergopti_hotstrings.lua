@@ -3012,9 +3012,14 @@ local function main()
 			system_metrics.bind_desktop_source(desktop,
 				not desktop and "platform_reason.desktop_changes_need_workspace_interface" or nil)
 		end
-		-- The diagnostics trail of the menu's « not measured » rows.
+		-- The diagnostics trail of the menu's « not measured » rows. Wayland
+		-- grants no client the cursor position or window geometry: that is the
+		-- platform's limit, an expected INFO, while an X11 session without them
+		-- lost a source it should have, a WARNING to investigate.
+		local platform_limit = require("core.ui.engine.display_server").is_wayland()
+		local note_unmeasured = platform_limit and Logger.info or Logger.warn
 		if not sources.pointer then
-			Logger.warn(LOG, "Metrics: pointer distance is not measured in this session "
+			note_unmeasured(LOG, "Metrics: pointer distance is not measured in this session "
 				.. "(no X11 cursor position; Wayland exposes none to a client).")
 		end
 		if not desktop then
@@ -3024,7 +3029,7 @@ local function main()
 		require("modules.keystats.system.topology_metrics").bind_topology_source(sources.topology,
 			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
 		if not sources.topology then
-			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
+			note_unmeasured(LOG, "Metrics: window topology is not measured in this session "
 				.. "(no X11 window geometry; Wayland exposes none to a client).")
 		end
 		-- A touchpad tap-to-click never reaches evdev as a button: the metrics

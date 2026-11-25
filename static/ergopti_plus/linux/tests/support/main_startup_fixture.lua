@@ -26,7 +26,7 @@ function M.run(options)
 		loops = 0, loop_stops = 0, service_stops = 0, callbacks = {}, services = false,
 		preparing = false, ui_entered = false, ui_returned = false, signals_active = false, signal_stops = 0,
 		application_loops = 0, owner_after_request = false, automation = 0, loop_after_complete = false,
-		foreign_loops = 0, layout_refreshes = 0 }
+		foreign_loops = 0, layout_refreshes = 0, warnings = {} }
 	local env = setmetatable({}, { __index = _G })
 	local function record(name) observed.events[#observed.events + 1] = name end
 	local function native_callback(boundary)
@@ -152,7 +152,9 @@ function M.run(options)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
 	end, error = function(_, message)
 		if tostring(message):find("Diagnostic snapshot", 1, true) then observed.snapshot_errors = (observed.snapshot_errors or 0) + 1 end
-	end, warn = noop, debug = noop, success = function(_, message)
+	end, warn = function(_, message)
+		observed.warnings[#observed.warnings + 1] = tostring(message)
+	end, debug = noop, success = function(_, message)
 		if tostring(message):find("Daemon ready (", 1, true) then record("daemon.ready"); native_callback("daemon.ready") end
 	end, flush_repeats = noop }
 	if options.terminal_logger_throws then env.Logger.error = function() error("controlled terminal logger failure", 0) end end
@@ -279,6 +281,9 @@ function M.run(options)
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
+		elseif name == "core.ui.engine.display_server" then
+			-- A Wayland session unless the case asks for X11.
+			return { is_wayland = function() return options.display ~= "x11" end }
 		elseif name == "settings.engine.paths" then
 			return { config = function() return "/controlled/config.toml" end }
 		elseif name == "hotstrings.engine.word_reset" then

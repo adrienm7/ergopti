@@ -75,6 +75,24 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(state.ok, tostring(state.error))
 		helpers.assert_true(position(state.events, "metrics.pointer_bound") < position(state.events, "tray"))
 	end)
+	helpers.it("(metrics-platform-limit) Wayland's missing cursor and geometry are INFO, an X11 loss a WARNING", function()
+		-- A KDE Plasma Wayland field log warned on every boot about what no
+		-- Wayland client can read; a warning is for what must be investigated.
+		local function unmeasured(state)
+			local found = {}
+			for _, message in ipairs(state.warnings) do
+				if message:find("is not measured in this session", 1, true)
+					and not message:find("desktop changes", 1, true) then found[#found + 1] = message end
+			end
+			return found
+		end
+		local wayland = MainStartup.run()
+		helpers.assert_true(wayland.ok, tostring(wayland.error))
+		helpers.assert_eq(unmeasured(wayland), {})
+		local x11 = MainStartup.run({ display = "x11" })
+		helpers.assert_true(x11.ok, tostring(x11.error))
+		helpers.assert_eq(#unmeasured(x11), 2, table.concat(unmeasured(x11), " | "))
+	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a
 		-- scenario. Adding SIGUSR1 to Main without updating that count killed
