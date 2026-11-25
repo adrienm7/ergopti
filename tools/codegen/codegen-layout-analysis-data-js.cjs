@@ -797,6 +797,47 @@ function countTableCounts(text, id) {
 }
 
 /**
+ * The text of one built-in corpus as the engine counts it: without its byte
+ * order marks, its dead-key pairs restored, a Leipzig file's sentence numbers
+ * and a tab-separated file's other columns dropped. A word list or a count
+ * table is returned as read, for its own reader.
+ * @param {object} corpus - Its corpora.json entry.
+ * @returns {string} The text.
+ * @throws {Error} On an unknown kind or format, or a malformed entry.
+ */
+function corpusText(corpus) {
+	let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/\uFEFF/g, '');
+	if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
+	// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
+	if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
+	if (!CORPUS_KINDS.includes(corpus.kind))
+		throw new Error(`corpora.json: ${corpus.id} has kind ${corpus.kind}`);
+	// Code, and only code, has no natural language.
+	if ((corpus.kind === 'code') !== (corpus.language === CODE_LANGUAGE))
+		throw new Error(
+			`corpora.json: ${corpus.id} is kind ${corpus.kind} in language ${corpus.language}`
+		);
+	const format = corpus.format || 'text';
+	if (!CORPUS_FORMATS.includes(format))
+		throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
+	// A tab-separated file (Tatoeba): one sentence per line, in one column.
+	if (format === 'tsv') {
+		if (!Number.isInteger(corpus.tsv_text_column))
+			throw new Error(`corpora.json: ${corpus.id} needs tsv_text_column`);
+		text = text
+			.split('\n')
+			.filter((line) => line !== '')
+			.map((line) => {
+				const cell = line.split('\t')[corpus.tsv_text_column];
+				if (cell === undefined) throw new Error(`corpora.json: ${corpus.id} has a short line`);
+				return cell;
+			})
+			.join('\n');
+	}
+	return text;
+}
+
+/**
  * The n-gram tables of every built-in corpus, counted by the engine itself.
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @returns {{catalogue: object[], tables: object}} The list the page shows and
@@ -813,34 +854,8 @@ function buildCorpora(engine, scores) {
 			throw new Error(
 				`corpora.json: ${corpus.id} is not cleared to ship in static/corpus/register.json`
 			);
-		let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/\uFEFF/g, '');
-		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
-		// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
-		if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
-		if (!CORPUS_KINDS.includes(corpus.kind))
-			throw new Error(`corpora.json: ${corpus.id} has kind ${corpus.kind}`);
-		// Code, and only code, has no natural language.
-		if ((corpus.kind === 'code') !== (corpus.language === CODE_LANGUAGE))
-			throw new Error(
-				`corpora.json: ${corpus.id} is kind ${corpus.kind} in language ${corpus.language}`
-			);
+		const text = corpusText(corpus);
 		const format = corpus.format || 'text';
-		if (!CORPUS_FORMATS.includes(format))
-			throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
-		// A tab-separated file (Tatoeba): one sentence per line, in one column.
-		if (format === 'tsv') {
-			if (!Number.isInteger(corpus.tsv_text_column))
-				throw new Error(`corpora.json: ${corpus.id} needs tsv_text_column`);
-			text = text
-				.split('\n')
-				.filter((line) => line !== '')
-				.map((line) => {
-					const cell = line.split('\t')[corpus.tsv_text_column];
-					if (cell === undefined) throw new Error(`corpora.json: ${corpus.id} has a short line`);
-					return cell;
-				})
-				.join('\n');
-		}
 		const counts =
 			format === 'word_frequencies'
 				? wordListCounts(text, corpus.id)
@@ -1537,6 +1552,7 @@ module.exports = {
 	buildData,
 	buildSource,
 	corpusSource,
+	corpusText,
 	restoreDeadKeyPairs,
 	wordListCounts,
 	OUT_PATH
