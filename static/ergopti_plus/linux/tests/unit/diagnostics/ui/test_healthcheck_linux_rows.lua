@@ -207,6 +207,25 @@ helpers.describe("healthcheck (linux): the features the page lists", function()
 		helpers.assert_eq(features.hotstrings, false)
 	end)
 
+	-- Arch field report of 2026-11-25: config.toml had the tap-holds off and
+	-- no key, the runtime switch stayed on, and the page read « Tap-Holds: on ».
+	for _, case in ipairs({ { feature = false, runtime = true }, { feature = true, runtime = true } }) do
+		helpers.it("reports the tap-hold feature state the tray shows, feature=" .. tostring(case.feature), function()
+			local name = "platform.remap.tap_hold_manager"
+			local previous = package.loaded[name]
+			package.loaded[name] = {
+				is_enabled = function() return case.runtime end,
+				is_active = function() return true end,
+				feature_enabled = function() return case.feature end,
+			}
+			local ok, features = pcall(features_of, { config = hotstrings_config({ base = true }) })
+			package.loaded[name] = previous
+			helpers.assert_true(ok, tostring(features))
+			helpers.assert_eq(features.tapholds, case.feature,
+				"the runtime switch alone, or an engine running for key combinations, is not the feature")
+		end)
+	end
+
 	helpers.it("leaves out a feature whose module the daemon does not run (features-parity)", function()
 		local features = features_of({ config = hotstrings_config({ base = true }) })
 		helpers.assert_nil(features.shortcuts, "no shortcuts module: no row, rather than a guessed off")

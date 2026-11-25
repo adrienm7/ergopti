@@ -3999,7 +3999,7 @@ local function main()
 
 	-- Tap-holds rewrite the grabbed stream, so they need the grab: without it the
 	-- physical key already reached the desktop and there is nothing to rewrite.
-	Logger.info(LOG, "Tap-holds: %s.", not TapHold.is_active() and "inactive"
+	Logger.info(LOG, "Tap-holds: %s.", not TapHold.feature_enabled() and "off" or not TapHold.is_active() and "inactive"
 		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
 		or "configured, but inert without the keyboard grab (--no-grab)")
 

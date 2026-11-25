@@ -812,7 +812,8 @@ function M.init(opts)
 		if _installed_engine == nil then _initialized = false end
 		return false
 	end
-	Logger.success(LOG, "Tap-holds initialised (%s).", M.is_active() and "active" or "inactive")
+	Logger.success(LOG, "Tap-holds initialised (feature %s, engine %s).", M.feature_enabled() and "on" or "off",
+		M.is_active() and "active" or "inactive")
 	return true
 end
 
@@ -979,6 +980,16 @@ end
 --- @return boolean
 function M.is_active()
 	return _initialized and _active() and _installed_engine == _engine
+end
+
+--- Whether the tap-hold feature is on: the config.toml switch and the runtime
+--- switch both. The one state the tray row, its check, the diagnostic page and
+--- the start-up lines report. is_active() is not it: the engine also runs for
+--- key combinations alone, with the feature off and no tap-hold key at all.
+--- @return boolean|nil nil before init(): no state to report yet.
+function M.feature_enabled()
+	if not _initialized then return nil end
+	return _enabled == true and _loaded.enabled == true
 end
 
 --- The effective keys, key id → fields, as the engine runs them.

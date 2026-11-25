@@ -509,6 +509,29 @@ os.remove(user_path)
 		end)
 	end
 
+	-- Arch field report of 2026-11-25: « Tap-holds loaded: 0 key(s), feature
+	-- off » then « Tap-holds initialised (active) » and « Tap-Holds: on » on
+	-- the diagnostic page, three answers to one question.
+	helpers.it("names one feature state: the file switch and the runtime switch both", function()
+		local Manager, _, _, user_path = manager()
+		local before = Manager.feature_enabled()
+		local applied = Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil,
+			{ tap_holds = { enabled = false } })
+		local file_off, runtime_on = Manager.feature_enabled(), Manager.is_enabled()
+		local switched = Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil,
+			{ tap_holds = { enabled = true } }) and Manager.set_enabled(false)
+		local runtime_off = Manager.feature_enabled()
+		Manager._reset_for_test()
+		local uninitialised = Manager.feature_enabled()
+		os.remove(user_path)
+		helpers.assert_eq(before, true)
+		helpers.assert_true(applied and switched)
+		helpers.assert_eq(runtime_on, true, "the runtime switch stays on")
+		helpers.assert_eq(file_off, false, "a feature config.toml switched off is off, whatever the runtime switch says")
+		helpers.assert_eq(runtime_off, false)
+		helpers.assert_nil(uninitialised, "no state before init")
+	end)
+
 	helpers.it("keeps the current configuration when snapshot restoration is refused (snapshot-apply-refusal)", function()
 		local Manager, hook, _, user_path = manager()
 		local enabled = Manager.configuration_snapshot()

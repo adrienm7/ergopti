@@ -348,7 +348,7 @@ local function collect_features(state)
 	add("hotstrings", hotstrings_enabled(state.config))
 	add("shortcuts", module_enabled(state.shortcuts))
 	add("gestures", module_enabled(state.gestures))
-	add("tapholds", require("platform.remap.tap_hold_manager").is_enabled())
+	add("tapholds", require("platform.remap.tap_hold_manager").feature_enabled())
 	add("llm", module_enabled(state.llm))
 	add("metrics", module_enabled(state.keystats))
 	return { items = items }

@@ -112,7 +112,7 @@ local function _build_tap_holds(ctx)
 
 	local keys = th.keys()
 	local options = th.hold_options()
-	local feature_on = th.file_enabled() and th.is_enabled()
+	local feature_on = th.feature_enabled() == true
 
 	local capture_edit = th.capture_configuration_edit
 	-- Runs while paused: a pause stops typing, not configuration (EDD-1). The
@@ -446,7 +446,8 @@ local function _build_tap_holds(ctx)
 	local rows = ManifestMenu
 		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
 		or {}
-	return receive(rows, { tapholds_enabled = function() return nil end })
+	-- The parent row ticks like Shortcuts and Gestures: the same state as the switch.
+	return receive(rows, { tapholds_enabled = function() return feature_on end })
 end
 
 M.build = _build_tap_holds

@@ -408,6 +408,7 @@ local function full_context()
 		tap_holds = {
 			is_enabled    = function() return true end,
 			file_enabled  = function() return true end,
+			feature_enabled = function() return true end,
 			set_enabled   = noop,
 			keys          = function() return {} end,
 			-- The shared builder, so every hold picker holds at least « none ».
@@ -692,6 +693,19 @@ helpers.describe("menu certification: no empty submenu", function()
 				.. "cannot tell it apart from a feature that failed to load. "
 				.. table.concat(empty, ", "))
 	end)
+
+	-- Arch field report of 2026-11-25: Shortcuts, Gestures and Hotstrings had a
+	-- check on the root and Tap-Holds none, its receiver answering nil.
+	for _, on in ipairs({ true, false }) do
+		helpers.it("ticks the root Tap-Holds row like its siblings, feature=" .. tostring(on), function()
+			local context = full_context()
+			context.tap_holds.feature_enabled = function() return on end
+			local row = find_item(build_full_menu(context), i18n.get("menu.tapholds.title"))
+			helpers.assert_true(row ~= nil and type(row.menu) == "table", "the Tap-Holds row and its submenu")
+			helpers.assert_eq(row.checked, on, "the parent shows the feature state its switch shows")
+			helpers.assert_eq(row.menu[1].checked, on, "the switch, first row of the submenu")
+		end)
+	end
 
 	-- The group builder handed the renderer's finished rows back as row data:
 	-- none had a label, so « Rangées émulées » opened onto nothing.
