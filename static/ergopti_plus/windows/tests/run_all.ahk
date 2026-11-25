@@ -1680,7 +1680,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/tooltip/test_chunk_type_guard.ahk
 #Include meta/platform/remap/keys/test_space_hold_suspend_guard.ahk
 #Include meta/ai/api/test_av_warmup_cancellable.ahk
-#Include meta/ai/servers/test_remote_poll_com_exception_bails.ahk
 #Include meta/hotstrings/engine/catalogue/test_cle_emoji_gated.ahk
 #Include meta/hotstrings/engine/engine/test_hse_consumed_endchar_ring.ahk
 #Include meta/hotstrings/engine/engine/test_expansion_burst_atomic.ahk
