@@ -2468,8 +2468,8 @@
 			"authors": ["Cedric Rossi"],
 			"url": "https://codeberg.org/cedricr/colemak-french-touch",
 			"basis": "source",
-			"checked": "2026-11-19",
-			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr/colemak-french-touch.toml: « author = Cedric Rossi », « url = https://codeberg.org/cedricr/colemak-french-touch »."
+			"checked": "2026-11-25",
+			"evidence": "cedricr/colemak-french-touch e3bfbd4385, colemak-french-touch.toml: « author = Cedric Rossi », « version = 0.4 »; LICENSE: « Copyright (c) 2024 Cédric Rossi »."
 		},
 		"erglace": {
 			"authors": ["Lysquid"],
@@ -2503,15 +2503,15 @@
 			"authors": ["cmoinard"],
 			"url": "https://github.com/cmoinard/Erglace",
 			"basis": "source",
-			"checked": "2026-11-19",
-			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/erglace_jf.toml: « author = cmoinard », « url = https://github.com/cmoinard/Erglace »."
+			"checked": "2026-11-25",
+			"evidence": "cmoinard/Erglace 5ec95161ac, erglace.toml: « author = Lysquid », « version = 0.6.19 », in cmoinard's repository; Nuclear-Squid/ergol's erglace_jf.toml (0.6.17) names « author = cmoinard », and its www/content/alternatives/erglace/index.md calls it JF's variant."
 		},
 		"erglace_nuke": {
-			"authors": ["Lysquid"],
-			"url": "https://github.com/Lysquid/Erglace",
+			"authors": ["Nuclear-Squid"],
+			"url": "https://github.com/Nuclear-Squid",
 			"basis": "source",
-			"checked": "2026-11-19",
-			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/erglace_nuke.toml: « author = Lysquid », « url = https://github.com/Lysquid/Erglace »."
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, www/content/alternatives/erglace/index.md: « [Nuclear-Squid] a développé une variante AIE [erglace_nuke] »; its keymaps/fr.contrib/erglace_nuke.toml keeps Erglace's header (« author = Lysquid »), from which it derives."
 		},
 		"kazerty": {
 			"authors": ["Fabien Cazenave"],
@@ -3190,6 +3190,97 @@
 		"typematrix": {
 			"authors": ["Ivan"],
 			"basis": "collection"
+		},
+		"erglace_jf_0_6_17": {
+			"authors": ["cmoinard"],
+			"url": "https://github.com/cmoinard/Erglace",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 03c6c7c8b3, keymaps/fr.contrib/erglace_jf.toml: « author = cmoinard », « url = https://github.com/cmoinard/Erglace », « version = 0.6.17 »."
+		},
+		"erglace_jf_0_6_14": {
+			"authors": ["cmoinard"],
+			"url": "https://github.com/cmoinard/Erglace",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "cmoinard/Erglace 5ec95161ac, Historique/0.6.14/erglace-0.6.14.toml, kept by cmoinard (commit 5c0766a, « Version 0.6.14 »)."
+		},
+		"erglace_jf_0_6_13": {
+			"authors": ["cmoinard"],
+			"url": "https://github.com/cmoinard/Erglace",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "cmoinard/Erglace 5ec95161ac, Historique/0.6.13/erglace-0.6.13.toml, kept by cmoinard (commit 813b8f0, « Version 0.6.13 + historique »)."
+		},
+		"erglace_0_1": {
+			"authors": ["Lysquid"],
+			"url": "https://github.com/Lysquid/Erglace",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Lysquid/Erglace tag v0.1.0 (285a77409d), erglace.toml: « author = Lysquid », « version = 0.1.0 »."
+		},
+		"ergaie_miroir": {
+			"authors": ["MacDamien"],
+			"url": "https://github.com/MacDamien/Ergaie",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "MacDamien/Ergaie 4bb64d98eb, layouts/ergaie_miroir.toml: « author = MacDamien », « version = 0.9.1.7 »; README.md: « This Ergaie_miroir version could be useful for people who are accustomated to the dvorak like dispositions with vowels on the left »."
+		},
+		"ergol_0_7": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 4eaf924e61 (« v0.7: release candidate », on main), 0_7_0/ergol.toml: « author = NuclearSquid », « version = 0.7.0 LTS », « url = https://github.com/Nuclear-Squid/ergol »; LICENSE: « Copyright © 2024 Léo Cazenave »."
+		},
+		"ergol_0_5": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 4eaf924e61 (« v0.7: release candidate », on main), layouts/ergolv05.yaml: « version: 0.5.0 », « url = https://github.com/Nuclear-Squid/ergol »; LICENSE: « Copyright © 2024 Léo Cazenave »."
+		},
+		"ergol_0_4": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 4eaf924e61 (« v0.7: release candidate », on main), layouts/ergolv03_4.yaml: « version: 0.4.1 », « url = https://github.com/Nuclear-Squid/ergol »; LICENSE: « Copyright © 2024 Léo Cazenave »."
+		},
+		"ergol_0_2": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 4eaf924e61 (« v0.7: release candidate », on main), layouts/ergolv02.yaml: its file name (its header keeps « version: 0.7.0 »), « url = https://github.com/Nuclear-Squid/ergol »; LICENSE: « Copyright © 2024 Léo Cazenave »."
+		},
+		"ergol_0_1": {
+			"authors": ["Léo Cazenave (NuclearSquid)"],
+			"url": "https://ergol.org",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol 4eaf924e61 (« v0.7: release candidate », on main), layouts/ergolv01.yaml: its file name (its header keeps « version: 0.7.0 »), « url = https://github.com/Nuclear-Squid/ergol »; LICENSE: « Copyright © 2024 Léo Cazenave »."
+		},
+		"optergol": {
+			"authors": ["Auk_Bear"],
+			"url": "https://github.com/Nuclear-Squid/ergol/blob/e561e4b30545525af1958740a52f159e254c5e3d/keymaps/fr.contrib/optergol.toml",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol e561e4b305 (in the ergol-v1.0.1 and v1.0.2 tags), keymaps/fr.contrib/optergol.toml: « author = Auk_Bear », « version = 0.2 » (its « url » is empty)."
+		},
+		"ergopti_2_1_2_1dk": {
+			"authors": ["Adrien MOYAUX"],
+			"url": "https://ergopti.fr",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol e561e4b305, keymaps/fr.contrib/ergo_1dk.toml: « name = Ergopti », « author = Adrien MOYAUX », « url = https://ergopti.fr », « version = 2.1.2 »."
+		},
+		"hypertexte_1dfh": {
+			"authors": ["Adrien MOYAUX"],
+			"url": "https://hypertexte.beseven.fr",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "Nuclear-Squid/ergol e078a83b74, layouts/fr.contrib/hypertexte_1dk.toml: « name = HyperTexte 1DFH », « author = Adrien MOYAUX », « url = https://hypertexte.beseven.fr », « version = 1.1.2 »."
 		}
 	}
 }

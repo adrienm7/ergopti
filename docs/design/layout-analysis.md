@@ -65,6 +65,20 @@ its ErgoDox outer keys have no code (they count as unsupported). An
 alphabetic block may state its space key (the space on a thumb key); the
 codegen then adds no space bar.
 
+`tools/build/import-kalamine-layouts.cjs <folder of checkouts> [--check]`
+re-encodes the Ergo-L family (the Ergo-L repository's keymaps and the
+earlier versions its history keeps, Erglace, Ergaie and Colemak French
+Touch from their authors' repositories) through the Studio's
+`fromKalamineJson`, each file read with `git show` at a pinned commit and
+checked against its SHA-256. A TOML without its JSON is built by `kalamine
+build` once the run has rebuilt the Ergo-L repository's own
+`erglace_jf.json` from its TOML, so another Kalamine fails instead of
+re-encoding. An entry keeps every dead key's rules but the compositions the
+codegen makes (`composeAccent`), and a rule entering another state with that
+state's whole table (Ergo-L's 1DK typed twice enters the diaeresis); a rule
+entering a state without rules is dropped. A version with the letters and
+digits of a later one is listed in `not_imported`.
+
 A page loads, from the `_shared/ui/<page>/` folder:
 
 ```html
