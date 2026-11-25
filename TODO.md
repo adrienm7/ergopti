@@ -567,8 +567,10 @@ switches, the click counter, the reasons), Ctrl+M running the active preset on t
       `SCScreenshotManager` (macOS 14+) and keep CoreGraphics below it.
 - [ ] **Linux Wayland region capture:** the xdg-desktop-portal Screenshot for a region; today a region needs X11 and
       the Ctrl+O action uses the screenshot tool cascade (grim and slurp, GNOME, KDE, maim).
-- [ ] **component_status rows:** the capture and OCR problems are red rows of the « Anti-veille » submenu; add them to
-      each driver's component_status list too.
+- [ ] **component_status rows, field check on Linux:** a missing tesseract (Ctrl+O, a text target) or X11 capture
+      (auto-click) is a red tray row once a feature asks for it, and the row leaves once the tool is installed. macOS
+      and Windows show the same problems as red rows of the « Anti-veille » submenu (component_status rows are
+      Linux's, platform_reason.component_status_rows_are_linux).
 - [ ] **Library window field checks, one per OS** (done in code: « Anti-veille › Bibliothèque… » opens
       `_shared/ui/keep_awake_library` on the three OS through one protocol, `keep_awake_library.json`): create, duplicate,
       rename, delete and activate a preset; « Ajouter un bouton… » on a real Copilot prompt then Ctrl+M clicks it; an

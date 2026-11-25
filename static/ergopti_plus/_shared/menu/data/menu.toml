@@ -5725,6 +5725,30 @@ caption_joiner = " "
 platforms = ["linux"]
 reason_key = "platform_reason.component_status_rows_are_linux"
 
+# The screen vision service (platform/vision/screen_vision.lua) names the part
+# a feature asked for that does not work (the auto-clicker's capture, OCR).
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_screen_vision_capture"
+i18n = "keepawake.reason.capture_unavailable"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+# The screen vision service (platform/vision/screen_vision.lua) names the part
+# a feature asked for that does not work (the auto-clicker's capture, OCR).
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_screen_vision_ocr"
+i18n = "keepawake.reason.ocr_engine_missing"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
 [[menu.linux_component_problems]]
 type = "command"
 id = "component_problem_kwin_focus_script"

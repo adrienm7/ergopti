@@ -3282,6 +3282,41 @@
 		}
 	},
 	{
+		"path": "linux_component_problems.component_problem_screen_vision_capture",
+		"visibility": "hide",
+		"labels": { "fr": "L’écran ne peut pas être lu ici", "en": "The screen cannot be read here" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_screen_vision_ocr",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Aucune reconnaissance de texte n’est disponible (sous Linux, installez tesseract) ; les cibles en image fonctionnent toujours",
+			"en": "No text recognition is available (on Linux, install tesseract); image targets still work"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
 		"path": "linux_component_problems.component_problem_kwin_focus_script",
 		"visibility": "hide",
 		"labels": {
