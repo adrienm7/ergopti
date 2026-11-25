@@ -43,7 +43,7 @@ helpers.describe("hook supervisor: an unexpected stop is restarted, never a shut
 			restarts = restarts + 1; h.running = true; return true
 		end)
 		helpers.assert_eq(supervisor.poll(), "running")
-		hook.running, hook.stop = false, { deliberate = false, reason = "source reconciliation refused" }
+		hook.running, hook.stop = false, { deliberate = false, reason = "capture_retired", detail = "source reconciliation refused" }
 		helpers.assert_eq(supervisor.poll(), "waiting", "the stop is noticed and a restart is scheduled")
 		helpers.assert_eq(restarts, 0, "no restart before the named pause")
 		clock.now = Supervisor.RESTART_BACKOFF_MS[1] - 1
@@ -57,7 +57,7 @@ helpers.describe("hook supervisor: an unexpected stop is restarted, never a shut
 	helpers.it("hook-supervisor: leaves a deliberate stop alone", function()
 		local restarts = 0
 		local supervisor, hook, clock = supervised(function() restarts = restarts + 1; return true end)
-		hook.running, hook.stop = false, { deliberate = true, reason = "stopped by its owner" }
+		hook.running, hook.stop = false, { deliberate = true, reason = "owner_stop", detail = "stopped by its owner" }
 		for _ = 1, 3 do
 			clock.now = clock.now + 60000
 			helpers.assert_eq(supervisor.poll(), "stopped")
@@ -70,7 +70,7 @@ helpers.describe("hook supervisor: an unexpected stop is restarted, never a shut
 		local supervisor, hook, clock, Supervisor = supervised(function(_, at)
 			attempts_at[#attempts_at + 1] = at.now; return false, "open refused"
 		end)
-		hook.running, hook.stop = false, { deliberate = false, reason = "emergency" }
+		hook.running, hook.stop = false, { deliberate = false, reason = "emergency_stop", detail = "emergency" }
 		local states, budget = {}, #Supervisor.RESTART_BACKOFF_MS
 		for step = 0, 200000, 250 do
 			clock.now = step
@@ -91,7 +91,7 @@ helpers.describe("hook supervisor: an unexpected stop is restarted, never a shut
 			restarts = restarts + 1; h.running = true; return true
 		end)
 		for _ = 1, #Supervisor.RESTART_BACKOFF_MS + 2 do
-			hook.running, hook.stop = false, { deliberate = false, reason = "emergency" }
+			hook.running, hook.stop = false, { deliberate = false, reason = "emergency_stop", detail = "emergency" }
 			helpers.assert_eq(supervisor.poll(), "waiting")
 			clock.now = clock.now + Supervisor.RESTART_BACKOFF_MS[1]
 			helpers.assert_eq(supervisor.poll(), "restarted")
@@ -113,7 +113,8 @@ helpers.describe("hook supervisor: the real hook after a silent retirement", fun
 			helpers.assert_eq(s.hook.isRecovering(), false)
 			local stop = s.hook.last_stop()
 			helpers.assert_true(stop ~= nil and stop.deliberate == false, "the retirement is not a quit")
-			helpers.assert_eq(stop.reason, "native state reconciliation refused")
+			helpers.assert_eq(stop.reason, "capture_retired")
+			helpers.assert_eq(stop.detail, "native state reconciliation refused")
 
 			local Injector = helpers.load_module("hotstrings.engine.injector")
 			Injector._set_uinput(s.writer)
@@ -152,7 +153,8 @@ helpers.describe("hook supervisor: the real hook after a silent retirement", fun
 			helpers.assert_eq(s.hook.isRunning(), false)
 			local stop = s.hook.last_stop()
 			helpers.assert_true(stop ~= nil and stop.deliberate == false, "an emergency is not a quit")
-			helpers.assert_eq(stop.reason, "inject(): clipboard restoration failed")
+			helpers.assert_eq(stop.reason, "emergency_stop")
+			helpers.assert_eq(stop.detail, "inject(): clipboard restoration failed")
 			local Supervisor = helpers.load_module("platform.input.hook_supervisor")
 			local clock, restarts = 0, 0
 			local supervisor = Supervisor.new({ hook = s.hook, now_ms = function() return clock end,

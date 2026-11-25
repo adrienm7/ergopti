@@ -31,6 +31,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local Timings = require("core.timing.engine.timings")
 local LOG = "adapters.hook_supervisor"
 
 
@@ -43,11 +44,18 @@ local LOG = "adapters.hook_supervisor"
 -- =====================================
 
 --- The pause before each restart attempt, in milliseconds; its length is the
---- number of attempts allowed before the supervisor gives up.
-M.RESTART_BACKOFF_MS = { 1000, 2000, 4000, 8000, 16000 }
+--- number of attempts allowed before the supervisor gives up. Each pause
+--- doubles the one before it (constants.toml [adapters]).
+M.RESTART_BACKOFF_MS = {}
+do
+	local first = Timings.ms("adapters", "hook_restart_first_backoff_ms")
+	for attempt = 1, Timings.count("adapters", "hook_restart_attempts") do
+		M.RESTART_BACKOFF_MS[attempt] = first * 2 ^ (attempt - 1)
+	end
+end
 
 --- How long a restarted hook must stay up before its retry budget is restored.
-M.STABLE_RESET_MS = 60000
+M.STABLE_RESET_MS = Timings.ms("adapters", "hook_restart_stable_ms")
 
 
 
@@ -107,7 +115,7 @@ function M.new(options)
 			restarted_at = nil
 			outage = { due = now + backoff[attempts + 1] }
 			Logger.error(LOG, "Keyboard hook stopped unexpectedly (%s) — restarting it in %.1f s (attempt %d of %d).",
-				tostring(stop and stop.reason or "no cause recorded"), backoff[attempts + 1] / 1000,
+				tostring(stop and (stop.detail or stop.reason) or "no cause recorded"), backoff[attempts + 1] / 1000,
 				attempts + 1, #backoff)
 			return "waiting"
 		end

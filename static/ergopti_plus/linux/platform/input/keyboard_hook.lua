@@ -111,7 +111,9 @@ local _context  = { appId = "", windowTitle = "" }
 -- Running flag — set after the device is successfully opened.
 local _running  = false
 
--- Why the last capture session ended: { deliberate, reason }, nil while one runs.
+-- Why the last capture session ended, nil while one runs: { deliberate, reason,
+-- detail }, reason a closed log id (owner_stop, capture_retired, emergency_stop)
+-- and detail the sentence that names the cause.
 -- The daemon's hook supervisor reads it to tell a quit from a failure and to
 -- name the cause; a retirement that said nothing left the daemon exiting with
 -- « keyboard hook stopped » and no reason anywhere in the log.
@@ -3838,9 +3840,10 @@ local function _retire_source_transaction(tx, reason)
 		end
 		if _capture_session == tx.session then
 			if _running or _reacquiring then
-				_last_stop = { deliberate = false, reason = tostring(reason or "source transaction retired") }
+				_last_stop = { deliberate = false, reason = "capture_retired",
+					detail = tostring(reason or "source transaction retired") }
 				pcall(Logger.error, LOG, "Keyboard capture retired — %s; the keyboard is back with the desktop.",
-					_last_stop.reason)
+					_last_stop.detail)
 			end
 			_running, _reacquiring, _capture_session = false, false, nil
 			_devices, _pointer_devices, _device = {}, {}, nil
@@ -4682,7 +4685,7 @@ function M.stop()
 	_locks.end_word(true, "keyboard hook stopped")
 	if _capture_session ~= session then return false end
 	_capture_session = nil
-	_last_stop = { deliberate = true, reason = "stopped by its owner" }
+	_last_stop = { deliberate = true, reason = "owner_stop", detail = "stopped by its owner" }
 	if not _running and not _reacquiring then return end
 	local remaps_released = _release_remapped()
 	if _capture_session ~= nil then return false end
@@ -4737,7 +4740,7 @@ function M.emergency_stop(reason)
 	if _capture_session ~= session then return false end
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
-	_last_stop = { deliberate = false, reason = message }
+	_last_stop = { deliberate = false, reason = "emergency_stop", detail = message }
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
 	if _capture_session ~= nil then return false end
 	-- Best effort as below: a CapsLock left locked types every later letter in
@@ -4968,10 +4971,10 @@ function M.isRunning()
 end
 
 --- Why the last capture session ended, nil while one runs or before any start.
---- @return table|nil stop { deliberate = boolean, reason = string } (a copy).
+--- @return table|nil stop { deliberate = boolean, reason = string, detail = string } (a copy).
 function M.last_stop()
 	if not _last_stop then return nil end
-	return { deliberate = _last_stop.deliberate == true, reason = _last_stop.reason }
+	return { deliberate = _last_stop.deliberate == true, reason = _last_stop.reason, detail = _last_stop.detail }
 end
 
 --- Returns true while a previously live source set is waiting to be acquired

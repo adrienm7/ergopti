@@ -63,11 +63,11 @@ function M.run(options)
 		isRecovering = function() return false end,
 		stop = function()
 			record("hook.stop"); observed.grabbed = false
-			observed.hook_stop = { deliberate = true, reason = "stopped by its owner" }; return true
+			observed.hook_stop = { deliberate = true, reason = "owner_stop", detail = "stopped by its owner" }; return true
 		end,
 		emergency_stop = function(reason)
 			record("hook.emergency"); observed.grabbed = false
-			observed.hook_stop = { deliberate = false, reason = tostring(reason) }; return true
+			observed.hook_stop = { deliberate = false, reason = "emergency_stop", detail = tostring(reason) }; return true
 		end,
 		-- The daemon's hook supervisor tells a quit from a failure by this.
 		last_stop = function() return observed.hook_stop end,

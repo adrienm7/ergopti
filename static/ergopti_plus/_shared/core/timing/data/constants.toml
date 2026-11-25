@@ -1462,6 +1462,15 @@ layout_registry_watch_poll_ms = 100
 # which a seat without a keyboard never sends: unbounded, the start-up hung.
 # LX: adapters/keyboard_layout.lua.
 wayland_keymap_dump_timeout_ms = 3000
+# Linux: the pause before the first restart of a keyboard hook that stopped
+# while nobody asked it to; each later attempt waits twice the one before.
+# A restart that stays up for hook_restart_stable_ms earns the whole budget back.
+# LX: platform/input/hook_supervisor.lua.
+hook_restart_first_backoff_ms = 1000
+hook_restart_stable_ms = 60000
+# Linux: restart attempts the hook supervisor makes before it gives up and
+# keeps the run-time failure exit.
+hook_restart_attempts = 5
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: core/text/engine/toml/helpers.ahk StaleTempAgeMs (pinned copy).
