@@ -117,6 +117,37 @@ helpers.describe("tray_menu: with a backend", function()
 		helpers.assert_eq(#tree[1].menu, 2)
 	end)
 
+	-- Arch field report of 2026-11-25 (KDE Plasma, Wayland): a feature switched
+	-- off greyed every row of its submenu with one reason, said under each, and
+	-- Plasma could not scroll back up to the switch.
+	helpers.it("(tray-submenu-height) says a shared reason once and folds an overlong submenu", function()
+		local tray, log = with_indicator(true)
+		local reason = "Category off: tick the first row of this menu to use it"
+		local rows = { { title = "Enable", checked = false, fn = function() end }, { title = "-" } }
+		for group = 1, 3 do
+			rows[#rows + 1] = { title = "— Group " .. group .. " —", disabled = true }
+			for slot = 1, 9 do
+				rows[#rows + 1] = { title = "Slot " .. group .. "." .. slot .. " — Category off", disabled = true, tooltip = reason }
+			end
+			rows[#rows + 1] = { title = "-" }
+		end
+		tray.setMenu({ { title = "Gestures", checked = false, menu = rows } })
+		local drawn = log.menus[#log.menus][1].menu
+		helpers.assert_eq(drawn[1].title, "Enable", "the switch stays the first row")
+		helpers.assert_true(#drawn <= require("tray.adapters.menu").MAX_SUBMENU_ENTRIES, "drawn: " .. #drawn)
+		local told = 0
+		local function count(items)
+			for _, row in ipairs(items) do
+				if row.title == "    tick the first row of this menu to use it" then told = told + 1 end
+				if row.menu then count(row.menu) end
+			end
+		end
+		count(drawn)
+		helpers.assert_eq(told, 1, "the reason is said below its first greyed row only")
+		helpers.assert_eq(drawn[3].title, "Group 1", "each section opens as a submenu named by its header")
+		helpers.assert_eq(#tray.getMenu()[1].menu, #rows, "the menu model itself is kept as the builder made it")
+	end)
+
 	helpers.it("(greyed-reason-rows) says a reason whole when the label lacks its head, and wraps CJK text", function()
 		local tray = require("menu.engine.renderer")
 		local drawn = tray.with_reason_rows({ { title = "Row", disabled = true, tooltip = "Not here: never" } })

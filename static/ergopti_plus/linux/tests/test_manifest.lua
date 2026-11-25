@@ -599,6 +599,7 @@ return {
 	"tests.unit.settings.test_toml_codec_shapes",
 	"tests.unit.menu.structure.test_top_level_order_is_the_manifest",
 	"tests.unit.menu.structure.test_tray_rows_read_as_text",
+	"tests.unit.menu.structure.test_tall_submenus",
 	"tests.unit.core.ui.editors.test_bridge_handlers_webview_manager",
 	"tests.unit.core.ui.editors.test_bridge_handlers_healthcheck_bridge",
 	"tests.unit.core.ui.editors.test_bridge_handlers_onboarding",

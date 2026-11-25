@@ -139,6 +139,8 @@ helpers.describe("the real Linux tray reads as text", function()
 		local greyed, problems = 0, {}
 		local function walk(rows)
 			local drawn = Renderer.with_reason_rows(rows)
+			-- A reason is said once per menu, below its first greyed row.
+			local told = {}
 			local at = 0
 			for _, row in ipairs(rows) do
 				at = at + 1
@@ -157,9 +159,13 @@ helpers.describe("the real Linux tray reads as text", function()
 							said[#said + 1] = trim(drawn[index].title)
 							index = index + 1
 						end
-						if rest ~= nil and rest ~= "" and table.concat(said, " ") ~= rest:gsub("%s+", " ") then
+						local whole = rest ~= nil and rest:gsub("%s+", " ") or nil
+						if whole ~= nil and whole ~= "" and not told[whole] and table.concat(said, " ") ~= whole then
 							problems[#problems + 1] = row.title .. " is drawn without « " .. rest .. " »"
+						elseif whole ~= nil and told[whole] and #said > 0 then
+							problems[#problems + 1] = row.title .. " says again « " .. rest .. " »"
 						end
+						if whole ~= nil then told[whole] = true end
 					end
 				end
 				if type(row.menu) == "table" then walk(row.menu) end

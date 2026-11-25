@@ -2524,11 +2524,18 @@ end
 --- « — Unavailable ». Module-level: it needs no manifest, decoder or i18n. A list with
 --- nothing to add is returned as it is, so an unchanged menu stays the same
 --- table for the in-place patch.
+---
+--- A reason is said once per menu, below the first greyed row that carries
+--- it: a category switched off greys every row of its submenu with the same
+--- reason, and saying it under each one doubled Shortcuts, Gestures and
+--- Tap-Holds until KDE Plasma could not show their first row, the very switch
+--- the reason points to (Arch field report, 2026-11-25). The later rows keep
+--- their head, « — Category off », and their tooltip.
 --- @param items table Array of rows.
 --- @return table items
 function M.with_reason_rows(items)
 	if type(items) ~= "table" then return items end
-	local out, changed = {}, false
+	local out, changed, said = {}, false, {}
 	for _, item in ipairs(items) do
 		local row = item
 		if type(item) == "table" and type(item.menu) == "table" then
@@ -2543,7 +2550,8 @@ function M.with_reason_rows(items)
 		if type(item) == "table" and item.disabled == true and type(item.tooltip) == "string"
 			and type(item.title) == "string" and item.title ~= "-" then
 			local rest = reason_rest(item.title, item.tooltip)
-			if rest then
+			if rest and not said[rest] then
+				said[rest] = true
 				for _, line in ipairs(wrap_reason(rest)) do
 					out[#out + 1] = { title = REASON_INDENT .. line, disabled = true }
 				end
@@ -2554,5 +2562,158 @@ function M.with_reason_rows(items)
 	return changed and out or items
 end
 
+--- The tree a tray that cannot scroll back up draws (KDE Plasma's dbusmenu
+--- client on Wayland opens a menu taller than the screen from the panel up,
+--- with a scroll arrow at the bottom only, so the first rows of Gestures and
+--- Shortcuts, their switch among them, could not be reached: Arch field
+--- report, 2026-11-25). A submenu holding more than `limit` rows and
+--- separators turns each titled section (a « — Title — » header and the rows
+--- below it, up to the next separator or header) into a submenu named by that
+--- title, and a list still too long, such as the forty-odd Ctrl + letter
+--- slots, into submenus named by their first and last rows. AppKit and Win32
+--- scroll a long menu both ways, so only the Linux tray adapter calls this;
+--- the menu model, the click replay and every row's action stay as built.
+
+--- Whether a row is a separator.
+--- @param row table
+--- @return boolean
+local function is_fold_separator(row)
+	return row.separator == true or row.title == "-"
+end
+
+--- The title a section header names, or nil for any other row: an inert,
+--- greyed row whose label the shared header decoration frames.
+--- @param row table
+--- @return string|nil
+local function fold_header_title(row)
+	if row.disabled ~= true or row.fn ~= nil or row.menu ~= nil or type(row.title) ~= "string" then return nil end
+	local Header = require("menu.engine.section_header_data")
+	local prefix, suffix = Header.prefix, Header.suffix
+	local title = row.title
+	if #title <= #prefix + #suffix or title:sub(1, #prefix) ~= prefix or title:sub(-#suffix) ~= suffix then
+		return nil
+	end
+	return title:sub(#prefix + 1, -#suffix - 1)
+end
+
+--- Folds the sections of an overlong list into submenus.
+--- @param items table
+--- @param limit integer
+--- @return table
+local function fold_menu_sections(items, limit)
+	local out, index, folded = {}, 1, {}
+	while index <= #items do
+		local row = items[index]
+		local title = fold_header_title(row)
+		if title == nil then
+			out[#out + 1] = row
+			index = index + 1
+		else
+			local body, next_index = {}, index + 1
+			while next_index <= #items and not is_fold_separator(items[next_index])
+				and fold_header_title(items[next_index]) == nil do
+				body[#body + 1] = items[next_index]
+				next_index = next_index + 1
+			end
+			if #body > 0 then
+				-- Two folded sections read as one list: the separator between them goes.
+				if #out >= 2 and is_fold_separator(out[#out]) and folded[out[#out - 1]] then out[#out] = nil end
+				local section = { title = title, menu = M.fold_tall_menus(body, limit) }
+				folded[section] = true
+				out[#out + 1] = section
+			else
+				out[#out + 1] = row
+			end
+			index = next_index
+		end
+	end
+	return out
+end
+
+--- The part of a row's label that names it: the text before its value
+--- (« Ctrl + A » of « Ctrl + A → Copy »), without a reason row's indent.
+--- @param row table
+--- @return string
+local function fold_row_head(row)
+	local title = tostring(row.title or "")
+	return (title:match("^(.-) → ") or title):gsub("^%s+", "")
+end
+
+--- Whether a row is the indented reason line drawn below a greyed row: it
+--- stays in the same chunk as its row.
+--- @param row table
+--- @return boolean
+local function is_fold_reason(row)
+	return row.disabled == true and row.fn == nil and type(row.title) == "string" and row.title:match("^    %S") ~= nil
+end
+
+--- Splits the longest run of rows between separators into submenus named by
+--- their first and last rows (« Ctrl + A … Ctrl + M »), until the list fits.
+--- The names come from the rows' own labels, already in the user's language.
+--- @param items table
+--- @param limit integer
+--- @return table
+local function fold_long_runs(items, limit)
+	local out = items
+	while #out > limit do
+		local best_start, best_count, start = nil, 0, nil
+		for index = 1, #out + 1 do
+			local row = out[index]
+			if row == nil or is_fold_separator(row) then
+				if start and index - start > best_count then best_start, best_count = start, index - start end
+				start = nil
+			elseif start == nil then
+				start = index
+			end
+		end
+		if best_count < 2 then break end
+		local chunks = math.ceil(best_count / limit)
+		if chunks < 2 then chunks = 2 end
+		local size = math.ceil(best_count / chunks)
+		local rebuilt = {}
+		for index = 1, best_start - 1 do rebuilt[#rebuilt + 1] = out[index] end
+		local index, last = best_start, best_start + best_count - 1
+		while index <= last do
+			local chunk = {}
+			while index <= last and (#chunk < size or is_fold_reason(out[index])) do
+				chunk[#chunk + 1] = out[index]
+				index = index + 1
+			end
+			rebuilt[#rebuilt + 1] = { title = fold_row_head(chunk[1]) .. " … " .. fold_row_head(chunk[#chunk]), menu = M.fold_tall_menus(chunk, limit) }
+		end
+		for rest = last + 1, #out do rebuilt[#rebuilt + 1] = out[rest] end
+		if #rebuilt >= #out then break end
+		out = rebuilt
+	end
+	return out
+end
+
+--- Bounds every submenu of a tree, at every depth.
+--- @param items table Array of rows, as the renderer draws them.
+--- @param limit integer Entries per submenu.
+--- @return table items The same table when nothing had to change.
+function M.fold_tall_menus(items, limit)
+	if type(items) ~= "table" then return items end
+	assert(type(limit) == "number" and limit >= 2, "a submenu bound is required")
+	local out, changed = {}, false
+	for index, item in ipairs(items) do
+		local row = item
+		if type(item) == "table" and type(item.menu) == "table" then
+			local menu = M.fold_tall_menus(item.menu, limit)
+			if menu ~= item.menu then
+				row = {}
+				for key, value in pairs(item) do row[key] = value end
+				row.menu, changed = menu, true
+			end
+		end
+		out[index] = row
+	end
+	if #out > limit then
+		local folded = fold_menu_sections(out, limit)
+		if #folded > limit then folded = fold_long_runs(folded, limit) end
+		if #folded < #out then return folded end
+	end
+	return changed and out or items
+end
 
 return M

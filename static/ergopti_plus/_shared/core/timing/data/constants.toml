@@ -1531,6 +1531,12 @@ hook_restart_attempts = 5
 field_tray_settle_ms = 250
 field_tray_settle_attempts = 12
 field_tray_search_depth = 2
+# Linux: the rows and separators one tray submenu may hold before its sections
+# fold into submenus of their own. KDE Plasma on Wayland draws a taller menu
+# from the panel up and offers no way back to its first rows, the submenu's
+# switch among them; thirty rows keep a submenu on a 1080-pixel screen.
+# LX: tray/adapters/menu.lua.
+tray_submenu_entries = 30
 # Linux: the field run's tray and session checks run their bus requests and
 # commands one after the other; each is bounded by its step's deadline divided
 # by this share, so together they never outlast the step.

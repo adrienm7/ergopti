@@ -49,6 +49,10 @@ local Renderer = require("menu.engine.renderer")
 
 local LOG = "tray.adapters.menu"
 
+-- The rows and separators one submenu may hold before it folds
+-- (constants.toml [adapters]; renderer fold_tall_menus says why).
+M.MAX_SUBMENU_ENTRIES = require("core.timing.engine.timings").count("adapters", "tray_submenu_entries")
+
 -- The application id panels use to remember this icon's position between
 -- sessions. Stable on purpose: a generated one makes the icon jump every start.
 local INDICATOR_ID = "ergopti-plus"
@@ -211,7 +215,9 @@ local function replace_menu(items)
 		return false
 	end
 	-- dbusmenu has no item tooltips: a greyed row's reason is drawn below it.
-	if Indicator.set_menu(Renderer.with_reason_rows(_items)) ~= true then return false end
+	-- Plasma cannot scroll back to the top of a menu taller than the screen,
+	-- so an overlong submenu folds its sections.
+	if Indicator.set_menu(Renderer.fold_tall_menus(Renderer.with_reason_rows(_items), M.MAX_SUBMENU_ENTRIES)) ~= true then return false end
 	if describe(_paused) ~= _description then send_icon(nil) end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 	return true

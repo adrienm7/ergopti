@@ -707,6 +707,46 @@ helpers.describe("menu certification: no empty submenu", function()
 		end)
 	end
 
+	-- Arch field report of 2026-11-25 (KDE Plasma, Wayland): with a feature off,
+	-- every row of its submenu was greyed and followed by the same reason row,
+	-- and Plasma could not scroll back to the first row, the switch itself.
+	for _, case in ipairs({
+		{ id = "shortcuts", title = "menu.shortcuts.title", off = function(ctx) ctx.shortcuts.is_enabled = function() return false end end },
+		{ id = "gestures", title = "menu.gestures.title", off = function(ctx) ctx.gestures.is_enabled = function() return false end end },
+		{ id = "tap_holds", title = "menu.tapholds.title", off = function(ctx) ctx.tap_holds.feature_enabled = function() return false end end },
+		{ id = "gestures_on", title = "menu.gestures.title", off = function() end },
+	}) do
+		helpers.it("(tray-submenu-height) bounds every tray submenu, the " .. case.id .. " switch first", function()
+			local Renderer = require("menu.engine.renderer")
+			local limit = require("tray.adapters.menu").MAX_SUBMENU_ENTRIES
+			local context = full_context()
+			case.off(context)
+			local built = build_full_menu(context)
+			local shown = Renderer.fold_tall_menus(Renderer.with_reason_rows(built), limit)
+			local tall = {}
+			local function walk(items, path)
+				if #items > limit then tall[#tall + 1] = path .. " (" .. #items .. ")" end
+				for _, row in ipairs(items) do
+					if type(row.menu) == "table" then walk(row.menu, path .. " > " .. tostring(row.title)) end
+				end
+			end
+			walk(shown, "root")
+			helpers.assert_eq(tall, {}, "every submenu fits the panel's screen")
+			local group = find_item(shown, i18n.get(case.title))
+			helpers.assert_true(group ~= nil and type(group.menu) == "table", "the feature's submenu")
+			local switch = group.menu[1]
+			helpers.assert_true(type(switch.fn) == "function" and type(switch.checked) == "boolean",
+				"the first row is the feature's switch, live: " .. tostring(switch.title))
+			local reasons = {}
+			for _, row in ipairs(group.menu) do
+				if type(row.title) == "string" and row.title:match("^    %S") then
+					reasons[row.title] = (reasons[row.title] or 0) + 1
+					helpers.assert_eq(reasons[row.title], 1, "a reason is said once per menu: " .. row.title)
+				end
+			end
+		end)
+	end
+
 	-- The group builder handed the renderer's finished rows back as row data:
 	-- none had a label, so « Rangées émulées » opened onto nothing.
 	helpers.it("lists the four emulated row switches under « Rangées émulées »", function()
