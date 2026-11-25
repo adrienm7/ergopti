@@ -200,7 +200,9 @@ two disagree in either direction.
 | `shortcuts.script_control.script_altgr_escape`                | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keyboard.meta_star`                                | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.keyboard.secondary_star`                           | —               | n/a                                    | n/a                  |
-| `shortcuts.keyboard.primary_b`                                | n/a             | n/a                                    | —                    |
+| `shortcuts.keyboard.primary_b`                                | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.keyboard.primary_o`                                | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.keyboard.primary_q`                                | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_a`                                   | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_d`                                   | n/a             | n/a                                    | —                    |
 | `shortcuts.keyboard.meta_g`                                   | n/a             | n/a                                    | —                    |
@@ -224,6 +226,7 @@ two disagree in either direction.
 | `shortcuts.keyboard.secondary_h`                              | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.secondary_i`                              | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.secondary_m`                              | —               | n/a                                    | n/a                  |
+| `shortcuts.keyboard.secondary_b`                              | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.secondary_o`                              | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.secondary_p`                              | —               | n/a                                    | n/a                  |
 | `shortcuts.keyboard.secondary_s`                              | —               | n/a                                    | n/a                  |

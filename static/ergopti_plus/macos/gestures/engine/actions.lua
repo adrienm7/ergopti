@@ -1474,6 +1474,10 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- The frontmost window saved to the screenshots folder, under the dispatching
 -- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
 sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
+-- « Capture → texte » (Ctrl+O): a region read by Vision, its text on the clipboard.
+sg("ocr_screenshot", function()
+	return require("modules.shortcuts.actions.ocr_capture").run()
+end)
 -- Formerly the fixed Ctrl+G hotkey (schema v20 made it the secondary_g slot).
 -- The URL is read from its owner at each run, so a changed
 -- shortcuts.chatgpt_url applies at once to every binding.

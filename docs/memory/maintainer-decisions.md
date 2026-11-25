@@ -95,6 +95,18 @@ recognised leaves the clipboard alone with a « aucun texte reconnu » notice,
 Escape changes nothing, and missing OCR or capture permission greys the action
 with its reason. No recognised text is ever logged.
 
+Maintainer's answer « Ctrl+B partout »: the wrap moves to Ctrl+B on Windows
+too (slot `primary_b`, also created on Linux, and `secondary_b` on macOS), and
+Ctrl+O becomes the capture on the three OS (`primary_o` created on Windows and
+Linux, `secondary_o` on macOS). The Microsoft bold remap that Windows
+recommended on Ctrl+B moves to another free Ctrl letter; the letter (Ctrl+Q)
+is the agent's choice, listed in TODO.md under « Maintainer decisions
+pending ». The slot ids are unchanged, so a configuration that binds
+`primary_b` or `secondary_o` explicitly keeps its binding with no migration
+step; only « Restaurer les recommandations » applies the new letters. On
+Windows the capture no longer needs PowerToys: an overlay selects the region
+and Windows.Media.Ocr reads it.
+
 ## User workflows are actions, also run by hotstring (2026-11-25)
 
 Answers of the maintainer's QCM of 2026-11-25:

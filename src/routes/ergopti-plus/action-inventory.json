@@ -1201,15 +1201,9 @@
 	},
 	{
 		"path": "sg_actions.ocr_screenshot",
-		"labels": { "fr": "📷 Capture OCR (Win+Shift+T)", "en": "📷 OCR screenshot (Win+Shift+T)" },
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": {
-			"macos": {
-				"en": "On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text.",
-				"fr": "Sous macOS, Texte en direct lit le texte de toute capture ou image : prenez-en une avec l’action équivalente, puis sélectionnez son texte.",
-				"equivalents": ["screen_capture"]
-			}
-		}
+		"labels": { "fr": "📷 Capture → texte", "en": "📷 Capture → text" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.open_chatgpt",

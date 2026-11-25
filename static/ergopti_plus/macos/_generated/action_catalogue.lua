@@ -26,7 +26,6 @@ return require("shortcuts.engine.actions.catalogue").for_platform("hs", {
 		["opt_backspace"] = "ctrl_backspace",
 		["opt_delete_fwd"] = "ctrl_delete",
 		["return"] = "enter",
-		["screen_capture"] = "ocr_screenshot",
 		["space_next"] = "desktop_next",
 		["space_next_wrap"] = "desktop_next_wrap",
 		["space_prev"] = "desktop_prev",

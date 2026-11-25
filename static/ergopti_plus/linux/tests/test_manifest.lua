@@ -616,6 +616,7 @@ return {
 	"tests.unit.gestures.engine.actions.test_keep_awake",
 	"tests.unit.modules.shortcuts.test_auto_click_contract",
 	"tests.unit.modules.shortcuts.test_auto_click_module",
+	"tests.unit.modules.shortcuts.test_ocr_capture_module",
 	"tests.unit.platform.vision.test_screen_vision",
 	"tests.unit.gestures.engine.actions.test_click_hold_pointer_release",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",

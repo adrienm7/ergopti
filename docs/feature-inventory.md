@@ -6,7 +6,7 @@ These are complete projections of the shared configuration and action catalogues
 
 Each unchecked row is a triage item, not a confirmed missing feature. To update this queue and the website data, edit the manifest and run `node tools/codegen/codegen-feature-inventory.cjs`; the Linux parity gate checks for stale outputs.
 
-## windows — 114 paths not declared
+## windows — 115 paths not declared
 
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
 - [ ] `llm.models.user_models` (setting; declared: macos; reason: `platform_reason.llm_saved_user_models_are_macos`)
@@ -22,6 +22,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.secondary_h` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_i` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_m` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.secondary_b` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_o` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_p` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_s` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -123,7 +124,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_holds.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 49 paths not declared
+## macos — 51 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
@@ -146,7 +147,9 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.left_alt_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.keyboard.meta_star` (feature; declared: windows, linux; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
-- [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.primary_o` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.primary_q` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_g` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -175,7 +178,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 60 paths not declared
+## linux — 61 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -188,7 +191,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.keyboard.secondary_star` (feature; declared: macos; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
-- [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.primary_q` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_g` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -212,6 +215,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.secondary_h` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_i` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_m` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
+- [ ] `shortcuts.keyboard.secondary_b` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_o` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_p` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_s` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -286,7 +290,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layers.actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
 - [ ] `layers.modifiers.fn`: macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.
 
-## macos — 32 actions not declared
+## macos — 31 actions not declared
 
 - [ ] `sg_actions.app_switcher`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `system_app_switcher`.
 - [ ] `sg_actions.app_window_previous`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `win_app_next`.
@@ -309,7 +313,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.screen_record`: This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. Equivalent actions: `screen_capture`.
 - [ ] `sg_actions.clear_notifications`: This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. Equivalent actions: `notification_center`.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. Equivalent actions: `remove_quarantine_selection`.
-- [ ] `sg_actions.ocr_screenshot`: On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. Equivalent actions: `screen_capture`.
 - [ ] `sg_actions.take_note`: macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.one_shot_shift`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `sticky_shift`.

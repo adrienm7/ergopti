@@ -83,7 +83,6 @@ GestureEmitActionsData() {
 		"vol_up", { Key: "Volume_Up", Mods: [] },
 		"word_next", { Key: "Right", Mods: ["Ctrl"] },
 		"word_prev", { Key: "Left", Mods: ["Ctrl"] },
-		"ocr_screenshot", { Seq: "#+t" },
 		"open_emoji_picker", { Seq: "#." },
 		"screen_capture", { Seq: "#+s" },
 		"select_line", { Seq: "{Home}{Shift Down}{End}{Shift Up}" },

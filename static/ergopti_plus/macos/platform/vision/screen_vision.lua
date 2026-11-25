@@ -201,6 +201,13 @@ function M.availability()
 		region = { ok = false, reason = "capture_unavailable" }, ocr = { ok = false, reason = "ocr_failed" } }
 end
 
+--- A private path in the vision cache for a capture the caller writes.
+--- @return string path
+function M.new_capture_path()
+	require_init()
+	return capture_path()
+end
+
 --- Captures one window into a private file.
 --- @param window number The CGWindowID (hs.window:id()).
 --- @param callback function (image|nil, reason)
