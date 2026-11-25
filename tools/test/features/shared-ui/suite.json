@@ -773,6 +773,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-context-keys.cjs"],
 			"repro": "npm run test:layout-context-keys"
+		},
+		{
+			"id": "macos-permission-dialog-keys",
+			"ordinal": 739,
+			"name": "the macOS permission dialog answers Enter once, with the focused button, and Escape with later",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-permission-dialog-keys.cjs"],
+			"repro": "node tools/test/test-macos-permission-dialog-keys.cjs"
 		}
 	]
 }
