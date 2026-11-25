@@ -1,0 +1,315 @@
+{
+	"//": "Shared vectors of « Export the logs (zip) »: the file selection and the privacy scrub of _shared/core/logger/data/log_export.toml. Replayed by the macOS and Linux Lua suites (_shared/tests/lua/core/log_export_contract.lua), the Windows AHK suite and tools/test/test-log-export-contract.cjs, which also runs field-log-scrub.py on every scrub input: neither may keep a listed secret.",
+	"archive_name": {
+		"stamp": {
+			"year": 2026,
+			"month": 11,
+			"day": 5,
+			"hour": 9,
+			"min": 7,
+			"sec": 3
+		},
+		"expected": "Ergopti-logs_2026-11-05_09-07-03.zip"
+	},
+	"selection": [
+		{
+			"name": "the last three days of daily logs and errors mirrors, plus the bootstrap log",
+			"platform": "linux",
+			"today": "2026-11-25",
+			"days": 3,
+			"logs": [
+				"ErgoptiPlus_2026-11-25.log",
+				"ErgoptiPlus_2026-11-24.log",
+				"ErgoptiPlus_2026-11-23.log",
+				"ErgoptiPlus_2026-11-22.log",
+				"ErgoptiPlus_errors_2026-11-25.log",
+				"ErgoptiPlus_errors_2026-11-21.log",
+				"ErgoptiPlus_hotstrings.log",
+				"notes.txt",
+				".ergopti-log-probe-abc"
+			],
+			"default": ["bootstrap.log", "launcher.log"],
+			"crash_reports": ["crash_2026-11-24.json", ".hidden.json", "readme.txt"],
+			"expected": [
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-11-23.log",
+					"archive": "ErgoptiPlus_2026-11-23.log"
+				},
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-11-24.log",
+					"archive": "ErgoptiPlus_2026-11-24.log"
+				},
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-11-25.log",
+					"archive": "ErgoptiPlus_2026-11-25.log"
+				},
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_errors_2026-11-25.log",
+					"archive": "ErgoptiPlus_errors_2026-11-25.log"
+				},
+				{
+					"folder": "default",
+					"name": "bootstrap.log",
+					"archive": "bootstrap.log"
+				},
+				{
+					"folder": "crash_reports",
+					"name": "crash_2026-11-24.json",
+					"archive": "crash_reports/crash_2026-11-24.json"
+				}
+			]
+		},
+		{
+			"name": "macOS adds the native launcher's files from the default folder",
+			"platform": "hs",
+			"today": "2026-03-01",
+			"days": 2,
+			"logs": [
+				"ErgoptiPlus_2026-03-01.log",
+				"ErgoptiPlus_2026-02-28.log",
+				"ErgoptiPlus_2026-02-27.log",
+				"ErgoptiPlus_karabiner.log"
+			],
+			"default": [
+				"launcher.log",
+				"hammerspoon-fatal.txt",
+				"reload_breadcrumb.txt",
+				"ErgoptiPlus_2026-03-01.log"
+			],
+			"crash_reports": [],
+			"expected": [
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-02-28.log",
+					"archive": "ErgoptiPlus_2026-02-28.log"
+				},
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-03-01.log",
+					"archive": "ErgoptiPlus_2026-03-01.log"
+				},
+				{
+					"folder": "default",
+					"name": "hammerspoon-fatal.txt",
+					"archive": "hammerspoon-fatal.txt"
+				},
+				{
+					"folder": "default",
+					"name": "launcher.log",
+					"archive": "launcher.log"
+				},
+				{
+					"folder": "default",
+					"name": "reload_breadcrumb.txt",
+					"archive": "reload_breadcrumb.txt"
+				}
+			]
+		},
+		{
+			"name": "Windows takes only the bootstrap log from the default folder, across a year boundary",
+			"platform": "ahk",
+			"today": "2027-01-01",
+			"days": 3,
+			"logs": [
+				"ErgoptiPlus_2026-12-30.log",
+				"ErgoptiPlus_2026-12-29.log",
+				"ErgoptiPlus_errors_2026-12-31.log"
+			],
+			"default": ["bootstrap.log", "launcher.log"],
+			"crash_reports": ["a.json"],
+			"expected": [
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_2026-12-30.log",
+					"archive": "ErgoptiPlus_2026-12-30.log"
+				},
+				{
+					"folder": "logs",
+					"name": "ErgoptiPlus_errors_2026-12-31.log",
+					"archive": "ErgoptiPlus_errors_2026-12-31.log"
+				},
+				{
+					"folder": "default",
+					"name": "bootstrap.log",
+					"archive": "bootstrap.log"
+				},
+				{
+					"folder": "crash_reports",
+					"name": "a.json",
+					"archive": "crash_reports/a.json"
+				}
+			]
+		},
+		{
+			"name": "an empty folder selects nothing",
+			"platform": "linux",
+			"today": "2026-11-25",
+			"days": 3,
+			"logs": [],
+			"default": [],
+			"crash_reports": [],
+			"expected": []
+		}
+	],
+	"scrub": [
+		{
+			"name": "an expansion loses both sides",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [hotstrings] Auto-expand: 'mysecret' → 'My Secret Text'."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [hotstrings] Auto-expand: <text withheld>"],
+			"secrets": ["mysecret", "My Secret Text"]
+		},
+		{
+			"name": "a terminator expansion loses both sides",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] Terminator-expand: 'adr' → '12 rue Privée'."],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Terminator-expand: <text withheld>"],
+			"secrets": ["12 rue Privée"]
+		},
+		{
+			"name": "a Windows fired trigger is withheld",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] KL_LogHotstring: trigger='pwdx' cat=personal"],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] KL_LogHotstring: trigger=<text withheld>"],
+			"secrets": ["pwdx"]
+		},
+		{
+			"name": "a prompt keeps its size",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] STREAM_PROMPT (42 chars) model=m -> Translate my diary entry"
+			],
+			"expected": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] STREAM_PROMPT (42 chars) model=m -> <text withheld>"
+			],
+			"secrets": ["my diary entry"]
+		},
+		{
+			"name": "a streamed chunk keeps its size",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] STREAM chunk (9 bytes): 'cher ami'"],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] STREAM chunk (9 bytes): <text withheld>"],
+			"secrets": ["cher ami"]
+		},
+		{
+			"name": "a typed character is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] KEEP: keystroke 'q' typed while the tooltip shows."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] KEEP: keystroke <text withheld>"],
+			"secrets": ["'q'"]
+		},
+		{
+			"name": "the first tooltip row is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] DBG calling TooltipShow: 2 item(s), first='Bonjour Paul'."
+			],
+			"expected": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] DBG calling TooltipShow: 2 item(s), first=<text withheld>"
+			],
+			"secrets": ["Bonjour Paul"]
+		},
+		{
+			"name": "a selected path is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Opening the selected path '/home/paul/Taxes.pdf' to the shell."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Opening the selected path <text withheld>"],
+			"secrets": ["Taxes.pdf"]
+		},
+		{
+			"name": "a Linux injected replacement is withheld",
+			"input": ["2026-11-25 10:00:00:000 [TRACE] [x] inject(): bc=3 text='Signature privée'"],
+			"expected": ["2026-11-25 10:00:00:000 [TRACE] [x] inject(): bc=3 text=<text withheld>"],
+			"secrets": ["Signature privée"]
+		},
+		{
+			"name": "model text in guillemets and its continuation lines are withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [INFO] [x] Model answered «Dear Paul,",
+				"the meeting is moved»",
+				"2026-11-25 10:00:00:000 [INFO] [x] Next record stays."
+			],
+			"expected": [
+				"2026-11-25 10:00:00:000 [INFO] [x] Model answered «<text withheld>",
+				"2026-11-25 10:00:00:000 [INFO] [x] Next record stays."
+			],
+			"secrets": ["Dear Paul", "meeting is moved"]
+		},
+		{
+			"name": "an ordinary record and its stack trace are kept",
+			"input": ["2026-11-25 10:00:00:000 [INFO] [x] Config loaded in 12 ms.", "\tstack line 1"],
+			"expected": ["2026-11-25 10:00:00:000 [INFO] [x] Config loaded in 12 ms.", "\tstack line 1"],
+			"secrets": []
+		},
+		{
+			"name": "a failed fire-log drain withholds its trigger",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Fire-log drain failed for trigger 'adrx': disk full"
+			],
+			"expected": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Fire-log drain failed for trigger <text withheld>"
+			],
+			"secrets": ["adrx"]
+		},
+		{
+			"name": "a dismissed keystroke is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] DISMISS: keystroke 'z' ignored by the tooltip."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] DISMISS: keystroke <text withheld>"],
+			"secrets": ["'z'"]
+		},
+		{
+			"name": "a character error withholds the character",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] OnChar error for char 'é': no window"],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] OnChar error for char <text withheld>"],
+			"secrets": ["'é'"]
+		},
+		{
+			"name": "a UIA wrap error withholds the character",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] UIA wrap error for char 'ç': timeout"],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] UIA wrap error for char <text withheld>"],
+			"secrets": ["'ç'"]
+		},
+		{
+			"name": "raw model text is withheld",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] Raw (14c): Chère Madame X"],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Raw (14c): <text withheld>"],
+			"secrets": ["Chère Madame"]
+		},
+		{
+			"name": "a handed selection is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Handed the selected url 'https://bank.example/acct' to the shell."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Handed the selected url <text withheld>"],
+			"secrets": ["bank.example"]
+		},
+		{
+			"name": "a registry navigation target is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Registry navigation to 'HKCU\\Software\\Private' did not open."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Registry navigation to <text withheld>"],
+			"secrets": ["Private"]
+		},
+		{
+			"name": "a refused replacement is withheld",
+			"input": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] Cannot deliver 'Mon adresse' before the focus returns."
+			],
+			"expected": ["2026-11-25 10:00:00:000 [DEBUG] [x] Cannot deliver '<text withheld>"],
+			"secrets": ["Mon adresse"]
+		},
+		{
+			"name": "a typed symbol is withheld",
+			"input": ["2026-11-25 10:00:00:000 [DEBUG] [x] selection window opened — typing '€'."],
+			"expected": [
+				"2026-11-25 10:00:00:000 [DEBUG] [x] selection window opened — typing <text withheld>"
+			],
+			"secrets": ["'€'"]
+		}
+	]
+}

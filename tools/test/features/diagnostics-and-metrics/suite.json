@@ -514,6 +514,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-view-states.cjs"],
 			"repro": "npm run test:metrics-view-states"
+		},
+		{
+			"id": "log-export-contract",
+			"ordinal": 878,
+			"name": "log export archive: generated data, every scrub rule exercised, field report scrubber agrees",
+			"cmd": "node",
+			"args": ["tools/test/test-log-export-contract.cjs"],
+			"repro": "npm run test:log-export-contract"
 		}
 	]
 }
