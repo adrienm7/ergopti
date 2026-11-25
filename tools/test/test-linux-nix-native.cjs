@@ -331,14 +331,43 @@ check('the pinned help is the daemon print_usage text', () => {
 		path.join(root, 'static/ergopti_plus/linux/ergopti_hotstrings.lua'),
 		'utf8'
 	);
-	const body = daemon.match(/\nlocal function print_usage\(\)\n([\s\S]*?)\nend\n/);
+	const body = daemon.match(/\nlocal function print_usage\(\)\n[\s\S]*?\nend\n/);
 	assert.ok(body, 'ergopti_hotstrings.lua defines print_usage');
-	const lines = body[1].split('\n').map((line) => {
-		const printed = line.match(/^\tprint\("([^"\\]*)"\)$/);
-		assert.ok(printed, `print_usage prints one plain literal per line: ${line}`);
-		return printed[1];
-	});
-	assert.equal(HELP, lines.join('\n') + '\n');
+	// The usage names its config default from app_dirs, so the function runs
+	// against the real declaration instead of being read as literals.
+	const { spawnSync } = require('node:child_process');
+	const run = spawnSync(
+		'lua',
+		[
+			'-e',
+			[
+				'local app_dirs = dofile(os.getenv("ERGOPTI_APP_DIRS"))',
+				'require = function(name)',
+				'\tassert(name == "core.fs.engine.app_dirs", "print_usage requires " .. name)',
+				'\treturn app_dirs',
+				'end',
+				'local printed = {}',
+				'print = function(line) printed[#printed + 1] = line end',
+				'local chunk = assert((loadstring or load)(os.getenv("ERGOPTI_USAGE") .. "\\nreturn print_usage"))',
+				'chunk()()',
+				'io.write(table.concat(printed, "\\n"), "\\n")'
+			].join('\n')
+		],
+		{
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				ERGOPTI_APP_DIRS: path.join(
+					root,
+					'static/ergopti_plus/_shared/core/fs/engine/app_dirs.lua'
+				),
+				ERGOPTI_USAGE: body[0]
+			}
+		}
+	);
+	assert.equal(run.error, undefined, String(run.error));
+	assert.equal(run.status, 0, run.stderr);
+	assert.equal(run.stdout, HELP);
 	assert.equal(retainedHelp, HELP);
 });
 check('benign pre-Usage startup logs retained', () =>
