@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { hosts } = require('../lib/identifiers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 // The repository the bug link opens, from its single source
@@ -75,7 +76,7 @@ function parseArguments(argv) {
  * @returns {string}
  */
 function issueUrl(repository, unit, length) {
-	const base = `https://github.com/${repository}/issues/new?template=bug_report.yml&diagnostics=`;
+	const base = `https://${hosts.github}/${repository}/issues/new?template=bug_report.yml&diagnostics=`;
 	const encoded = encodeURIComponent(unit);
 	return base + encoded.repeat(Math.max(1, Math.ceil((length - base.length) / encoded.length)));
 }
