@@ -66,6 +66,33 @@
 	padding: 0;
 }
 
+/* « Corpus words » under a row: a small text button in the accent ink, its
+   words in a muted paragraph once opened. */
+.la-ngram-words {
+	background: transparent;
+	border: 0;
+	color: var(--theme-accent);
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.85em;
+	min-height: 24px;
+	padding: 2px 4px;
+	text-decoration: underline;
+}
+
+.la-ngram-words::before {
+	content: '▾ ';
+}
+
+.la-ngram-words[aria-expanded='true']::before {
+	content: '▴ ';
+}
+
+.la-ngram-found {
+	font-size: 0.85em;
+	margin: 2px 0 4px;
+}
+
 /* « Show more » under a card: a full-width link-like button in the card's ink,
    its chevron turning when the list is unfolded. */
 .la-ngram-more {

@@ -20,6 +20,8 @@
  *    opens the corpus words that type its keys in a row.
  * 3. Links: « Copy the link » on a tab carries the tab, the Pareto values or
  *    the trace's text and layouts, and the link opens on them.
+ * 5. Worst n-grams: each row of the overview's cards opens the corpus words
+ *    typing its keys in a row.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -231,4 +233,30 @@ async function exerciseMovement(browser, origin) {
 	await context.close();
 }
 
-module.exports = { exercisePareto, exerciseTrace, exerciseViewLinks, exerciseMovement };
+async function exerciseWorstWords(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	const button = page.locator('#la-ngrams-list .la-ngram-words').first();
+	await button.waitFor();
+	const name = await button.getAttribute('aria-label');
+	assert.ok(
+		name.startsWith(EN['layout_analysis.trace.words']),
+		`worst words: the name starts with the visible text (${name})`
+	);
+	await button.click();
+	assert.equal(await button.getAttribute('aria-expanded'), 'true', 'worst words: opened');
+	const found = page.locator(`#${await button.getAttribute('aria-controls')}`);
+	assert.ok(await found.isVisible(), 'worst words: the words are shown');
+	assert.notEqual((await found.textContent()).trim(), '', 'worst words: listed');
+	await button.click();
+	assert.ok(await found.isHidden(), 'worst words: folded again');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+module.exports = {
+	exercisePareto,
+	exerciseTrace,
+	exerciseViewLinks,
+	exerciseMovement,
+	exerciseWorstWords
+};
