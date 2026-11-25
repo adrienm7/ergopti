@@ -127,6 +127,27 @@ helpers.describe("log export: one archive of the logs (macOS)", function()
 		helpers.assert_eq(#seen.copies + #seen.reveals, 0)
 	end)
 
+	helpers.it("names the archive in the done notice, as the shared text spells its slot", function()
+		local Json = require("core.text.engine.json")
+		local source = assert(io.open(require("core.fs.engine.paths").shared("core/i18n/data/locales/en.json"), "rb"))
+		local english = Json.decode(source:read("*a")); source:close()
+		local real = package.loaded["core.i18n.engine.i18n"]
+		-- The driver's format fills {1}, {2}: a %s text read through it keeps its slot.
+		local fake = { get = function(key) return english[key] or key end }
+		function fake.format(key, ...)
+			local args = { ... }
+			return (fake.get(key):gsub("{(%d)}", function(index) return tostring(args[tonumber(index)]) end))
+		end
+		package.loaded["core.i18n.engine.i18n"] = fake
+		local ok, path, _, seen = pcall(run, { [LOGS] = { ["ErgoptiPlus_2026-11-25.log"] = "line\n" } })
+		package.loaded["core.i18n.engine.i18n"] = real
+		helpers.assert_true(ok, tostring(path))
+		helpers.assert_true(english["log_export.done"]:find("%s", 1, true) ~= nil, "the shared text holds %s")
+		helpers.assert_true(seen.notices[1].body:find(path, 1, true) ~= nil,
+			"the notice must name the archive: " .. seen.notices[1].body)
+		helpers.assert_nil(seen.notices[1].body:find("%s", 1, true), "no slot is left unfilled")
+	end)
+
 	helpers.it("notifies a refused write and hands over no path", function()
 		local path, written, seen = run({ [LOGS] = { ["ErgoptiPlus_2026-11-25.log"] = "line\n" } },
 			"Permission denied")

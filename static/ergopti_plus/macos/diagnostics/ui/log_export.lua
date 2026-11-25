@@ -118,7 +118,9 @@ function M.export(overrides)
 				tostring(type(receipt) == "table" and receipt.error or receipt))
 		end
 	end)
-	effects.notify(i18n.get("log_export.done_title"), i18n.format("log_export.done", path), "info")
+	-- The shared text holds %s, as Windows and Linux read it; i18n.format only fills {1}.
+	local done = (i18n.get("log_export.done"):gsub("%%s", function() return path end))
+	effects.notify(i18n.get("log_export.done_title"), done, "info")
 	Logger.success(LOG, "Exported %d log file(s) to %s.", #entries, path)
 	return path
 end
