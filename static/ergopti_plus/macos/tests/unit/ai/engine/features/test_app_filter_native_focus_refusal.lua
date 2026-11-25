@@ -60,7 +60,7 @@ local function with_filter(callback)
 				return app_element
 			end } }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return c.ignored end }
+		package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return c.ignored end, window_mode_admits = function() return false end }
 		return callback(require("ai.engine.prediction.app_filter"), c)
 	end)
 end

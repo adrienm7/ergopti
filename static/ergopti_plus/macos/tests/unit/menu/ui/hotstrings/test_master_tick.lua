@@ -380,6 +380,7 @@ local function drive_watch_ticks()
 		every = function(_, tick) timers.tick = tick; return {}, true end,
 		cancel = function() timers.cancelled = timers.cancelled + 1; timers.tick = nil; return true end,
 		after = function() return {}, true end,
+		now_ns = function() return timers.now_ns or 0 end,
 	}
 	return timers
 end
@@ -431,6 +432,67 @@ helpers.describe("the Hotstrings title says when its typing taps are down (hotst
 			local parent = hotstrings_row(world)
 			helpers.assert_true(parent.title:find(red_dot(), 1, true) == nil, "no dot while Ergopti is paused")
 			switch_of(parent)
+		end)
+	end)
+
+end)
+
+
+helpers.describe("the Hotstrings title says when the focused field stays unread (hotstrings-focus-unchecked)", function()
+
+	--- Finds the greyed reason row of the unread focused field.
+	--- @param parent table Hotstrings top-level row.
+	--- @return table|nil row
+	local function unchecked_row(parent)
+		local wanted = require("core.i18n.engine.i18n").get("menu.hotstrings.focus_unchecked")
+		for _, row in ipairs(parent.menu) do
+			if row.title == wanted then return row end
+		end
+		return nil
+	end
+
+	helpers.it("(hotstrings-focus-unchecked) a lasting window mode paints the red dot and its greyed reason", function()
+		with_wizard(true, function(world)
+			boot(world)
+			local timers = drive_watch_ticks()
+			local after_ms = require("core.timing.engine.timings").ms("privacy", "text_automation_notice_after_ms")
+			local mode = "window"
+			timers.now_ns = 1e9
+			world.engine.text_automation_state = function() return mode, "focus_unreadable", 1e9 end
+
+			-- A moment of window mode is a focus change passing through: no dot
+			local fresh = hotstrings_row(world)
+			helpers.assert_true(fresh.title:find(red_dot(), 1, true) == nil, "a passing window mode draws no dot")
+			switch_of(fresh)
+			helpers.assert_nil(unchecked_row(fresh), "nor its reason")
+
+			-- Held for the notice delay: the watch repaints with the dot and the row
+			timers.now_ns = 1e9 + after_ms * 1e6
+			local before = world.repaints or 0
+			timers.tick()
+			helpers.assert_eq(world.repaints, before + 1, "a lasting window mode repaints the title")
+			local parent = hotstrings_row(world)
+			local glyph = red_dot()
+			helpers.assert_eq(parent.title:sub(-#glyph), glyph, "the Hotstrings title ends with the red dot")
+			switch_of(parent)
+			local reason = unchecked_row(parent)
+			helpers.assert_not_nil(reason, "the submenu says hotstrings expand without the password-field check")
+			helpers.assert_eq(reason.disabled, true, "the reason row is greyed")
+
+			-- A tap outage joining it repaints too, although the dot stays red
+			world.engine.taps_down = function() return { "keyDown" } end
+			before = world.repaints
+			timers.tick()
+			helpers.assert_eq(world.repaints, before + 1, "a second condition repaints the submenu")
+
+			-- The field is read again: both go once the outage heals too
+			world.engine.taps_down = function() return nil end
+			mode = "field"
+			timers.tick()
+			local healed = hotstrings_row(world)
+			helpers.assert_true(healed.title:find(glyph, 1, true) == nil, "a read field draws no dot")
+			switch_of(healed)
+			helpers.assert_nil(unchecked_row(healed), "nor its reason")
 		end)
 	end)
 

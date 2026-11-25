@@ -38,6 +38,7 @@ local function load_fixture()
 	end
 	package.loaded["hotstrings.engine.expander.utils"] = setmetatable({
 		is_ignored_window = function() return false, 0 end,
+		window_mode_admits = function() return false end,
 		is_secure_field = function() return false end,
 	}, { __index = function() return function() return true end end })
 

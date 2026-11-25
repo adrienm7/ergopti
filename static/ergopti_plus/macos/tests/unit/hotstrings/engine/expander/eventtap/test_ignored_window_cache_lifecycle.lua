@@ -390,6 +390,106 @@ helpers.describe("ignored-window cache lifecycle: eventtap-safe transitions", fu
 			"a security-sensitive app must remain a total pass-through surface")
 		helpers.assert_eq(f.state.secure_reads, 0,
 			"a known secure app must not depend on a readable focused element")
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), false,
+			"a password manager closes even the window mode")
+	end)
+end)
+
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 1b/ Unreadable focused element =============
+-- ====================================================
+-- ====================================================
+
+helpers.describe("ignored-window cache lifecycle: unreadable focused element (window mode)", function()
+	--- Starts tracking and runs the prewarm probe against the fixture's state.
+	local function probed(f)
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		return f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+	end
+
+	helpers.it("window mode: an unreadable AXFocusedUIElement admits plain hotstrings in an ordinary window", function()
+		local f = new_fixture()
+		f.state.secure_read_fail = true
+		helpers.assert_eq(probed(f), true,
+			"an unreadable field must not leave the window unclassified (silent withholding)")
+		helpers.assert_eq(f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now), false,
+			"the title rules still judge the window")
+		helpers.assert_nil(f.Utils.is_secure_field(f.state.now),
+			"the field itself stays without a verdict: metrics and AI keep reading nil")
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), true,
+			"plain hotstrings follow the window mode, as on Linux")
+		helpers.assert_nil(f.Utils.capture_text_destination(),
+			"no destination receipt exists without a classified field")
+		local mode, reason = f.Utils.text_automation_state()
+		helpers.assert_eq(mode, "window")
+		helpers.assert_eq(reason, "focus_unreadable")
+	end)
+
+	helpers.it("window mode: a readable ordinary field is the field mode, not the window mode", function()
+		local f = new_fixture()
+		probed(f)
+		helpers.assert_eq(f.Utils.is_secure_field(f.state.now), false)
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), false)
+		helpers.assert_eq((f.Utils.text_automation_state()), "field")
+	end)
+
+	helpers.it("window mode: a password field seen and not left closes the window mode", function()
+		local f = new_fixture()
+		f.state.secure = true
+		probed(f)
+		helpers.assert_eq(f.Utils.is_secure_field(f.state.now), true)
+		f.state.secure_read_fail = true
+		f.state.secure_callback()
+		f.scheduler.fire_all(0)
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), false,
+			"an unreadable element after a password field may be that field")
+		local _, reason = f.Utils.text_automation_state()
+		helpers.assert_eq(reason, "password_field_latched")
+
+		f.state.secure_read_fail = false
+		f.state.secure = false
+		f.state.secure_callback()
+		f.scheduler.fire_all(0)
+		helpers.assert_eq(f.Utils.is_secure_field(f.state.now), false)
+		f.state.secure_read_fail = true
+		f.state.secure_callback()
+		f.scheduler.fire_all(0)
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), true,
+			"an ordinary field read since then releases the latch")
+	end)
+
+	helpers.it("window mode: a private browsing window stays closed", function()
+		local f = new_fixture()
+		f.state.secure_read_fail = true
+		f.state.title = "Search — Private Browsing"
+		probed(f)
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), false)
+		local _, reason = f.Utils.text_automation_state()
+		helpers.assert_eq(reason, "private_window")
+	end)
+
+	helpers.it("window mode: an ignored window and an expired TTL admit nothing", function()
+		local f = new_fixture()
+		f.state.secure_read_fail = true
+		f.state.title = "Sensitive Entry"
+		probed(f)
+		helpers.assert_eq(f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now), true)
+		helpers.assert_eq(f.Utils.window_mode_admits(f.state.now), false)
+
+		local g = new_fixture()
+		g.state.secure_read_fail = true
+		probed(g)
+		helpers.assert_eq(g.Utils.window_mode_admits(g.state.now), true)
+		helpers.assert_eq(g.Utils.window_mode_admits(g.state.now + 5), false,
+			"a stale classification never admits the next window's text")
+		helpers.assert_true(g.Utils.stop())
+		helpers.assert_eq(g.Utils.window_mode_admits(g.state.now), false)
+		helpers.assert_eq((g.Utils.text_automation_state()), "closed")
 	end)
 end)
 

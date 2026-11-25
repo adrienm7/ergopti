@@ -236,4 +236,61 @@ helpers.describe("secure fields are a total keymap pass-through boundary", funct
 		Utils.is_secure_field = original_secure
 		if not ok then error(err, 0) end
 	end)
+
+	helpers.it("(focus-window-mode) an unread field in an admitted window expands hotstrings and nothing of the AI", function()
+		local effects = { emitted = {}, llm_resets = 0, llm_visibility_reads = 0, visible = false }
+		install_collaborators(effects)
+		local Keymap = helpers.load_with_stubs("hotstrings.engine.expander")
+		local hs_stub = _G.hs
+		local Utils = package.loaded["hotstrings.engine.expander.utils"]
+		local Bridge = package.loaded["ai.engine.bridge"]
+		helpers.assert_not_nil(Bridge, "the real keymap must load its AI bridge")
+		local originals = { ignored = Utils.is_ignored_window, secure = Utils.is_secure_field,
+			admits = Utils.window_mode_admits, keys = Bridge.handle_llm_keys,
+			activity = Bridge.note_key_activity, preview = Bridge.update_preview }
+		local admitted = true
+		local ai_calls = 0
+		Utils.is_ignored_window = function() return false, 0 end
+		Utils.is_secure_field = function() return nil, 0 end
+		Utils.window_mode_admits = function() return admitted end
+		Bridge.handle_llm_keys = function(...) ai_calls = ai_calls + 1; return originals.keys(...) end
+		Bridge.note_key_activity = function(...) ai_calls = ai_calls + 1; return originals.activity(...) end
+		Bridge.update_preview = function(...) ai_calls = ai_calls + 1; return originals.preview(...) end
+
+		Keymap.add("ab" .. STAR, REPLACEMENT, {
+			auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true,
+		})
+		Keymap.sort_mappings()
+		local tap = find_keydown_tap(hs_stub)
+		local now = 100
+		hs_stub.timer.secondsSinceEpoch = function() return now end
+		local function press(character)
+			now = now + 0.01
+			return tap.fn(physical_key(character))
+		end
+
+		local ok, err = xpcall(function()
+			-- Not admitted (a password field latched, a private window): withheld
+			admitted = false
+			press("a"); press("b")
+			helpers.assert_eq(press(STAR), false, "a closed window mode passes the key through")
+			helpers.assert_eq(#effects.emitted, 0, "and expands nothing")
+
+			admitted = true
+			press(" ")
+			helpers.assert_eq(press("a"), false)
+			helpers.assert_eq(press("b"), false)
+			helpers.assert_eq(press(STAR), true,
+				"an unread field in an ordinary window expands the hotstring instead of withholding it in silence")
+			helpers.assert_eq(effects.emitted[1], REPLACEMENT)
+			drain_immediate_timers(hs_stub)
+			helpers.assert_eq(ai_calls, 0, "no AI key, activity or preview runs without a field verdict")
+		end, debug.traceback)
+
+		Utils.is_ignored_window, Utils.is_secure_field = originals.ignored, originals.secure
+		Utils.window_mode_admits = originals.admits
+		Bridge.handle_llm_keys, Bridge.note_key_activity = originals.keys, originals.activity
+		Bridge.update_preview = originals.preview
+		if not ok then error(err, 0) end
+	end)
 end)

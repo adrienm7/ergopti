@@ -54,6 +54,7 @@ helpers.describe("Shipped Ergopti menu without a physical replacement", function
 			"hotstrings.engine.catalogue.extension_packs", "settings.engine.preferences.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
 			package.loaded["hotstrings.engine.expander.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
+				window_mode_admits = function() return false end,
 				is_secure_field = function() return false end,
 				start_ignored_win_tracking = function() return 1 end,
 			}, { __index = function() return function() return true end end })

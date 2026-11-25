@@ -189,4 +189,24 @@ helpers.describe("Prediction dispatch under native AX focus refusal", function()
 			helpers.assert_eq(fixture.last_fetch.context, "hello world")
 		end)
 	end)
+	helpers.it("(focus-window-mode) refuses dispatch while hotstrings follow the window mode, filters off", function()
+		with_pipeline(function(fixture, controls)
+			controls.mode = "ordinary"
+			fixture.engine.set_llm_secure_field_filter_enabled(false)
+			local Utils = require("hotstrings.engine.expander.utils")
+			local original = Utils.window_mode_admits
+			local ok, err = pcall(function()
+				Utils.window_mode_admits = function() return true end
+				fixture.engine.perform_check(true)
+				helpers.assert_eq(fixture.fetches, 0,
+					"an unread field admits plain hotstrings only, never AI text, whatever the filters")
+				helpers.assert_eq(fixture.loading_calls, 0)
+				Utils.window_mode_admits = function() return false end
+				fixture.engine.perform_check(true)
+				helpers.assert_eq(fixture.fetches, 1, "a field verdict reopens the dispatch")
+			end)
+			Utils.window_mode_admits = original
+			if not ok then error(err, 0) end
+		end)
+	end)
 end)

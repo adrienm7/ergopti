@@ -665,11 +665,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
   2. Close the window mode whenever the compositor names no application (KDE without the KWin script, GNOME
      without the extension): no hotstring there until the integration runs.
   3. Leave `org.a11y.Status` as the user set it and only say in the tray row that turning it on would help.
-- [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
-      `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
-      unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.
-      Give it the Linux treatment (a window-mode admission outside a known secure field and password apps, and a
-      red menu row for a lasting reason), checked on a real Mac.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 

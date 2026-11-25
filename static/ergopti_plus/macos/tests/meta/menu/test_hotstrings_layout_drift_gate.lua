@@ -71,6 +71,9 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- the switch's head (maintainer, 2026-11-25); macOS only, empty while the
 	-- taps run.
 	"list:hotstrings_taps_down",
+	-- Why hotstrings expand without the password-field check while macOS
+	-- Accessibility does not read the focused field (maintainer, 2026-11-25).
+	"list:hotstrings_focus_unchecked",
 	"group:hotstrings_params",
 	-- No whole-tree « all sections » row since 2026-10-17: it switched on the
 	-- packs of every language at once. Each submenu owns its bulk rows.

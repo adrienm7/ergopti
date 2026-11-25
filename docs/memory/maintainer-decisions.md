@@ -5,6 +5,26 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Maintainer answers of 2026-11-25
+
+### macOS admits hotstrings on an unreadable AX focus, as Linux
+
+Asked whether macOS should get the Linux window mode when
+`AXFocusedUIElement` cannot be read, the maintainer answered « Oui, comme
+Linux ». The probe (`hotstrings/engine/expander/utils.lua`) then keeps the
+window classified and concludes the mode `window` (reason `focus_unreadable`),
+unless the application is a password manager (`_shared/data/secure_apps.json`),
+the title marks a private window (`metrics/engine/view/private_window.lua`), an
+ignored-window rule matches, or a password field was the last field read
+(`password_field_latched`). `is_secure_field` still answers nil there, so only
+plain hotstrings pass, through `window_mode_admits`; metrics, the AI (keys,
+context, preview, dispatch through `ai/engine/prediction/app_filter.lua`) and
+the receipt-bound actions keep needing a field verdict. A window mode held for
+`privacy.text_automation_notice_after_ms` paints the red dot on the Hotstrings
+title and a greyed reason row (`hotstrings_menu` list
+`hotstrings_focus_unchecked`), never a notification. Do not withhold every
+hotstring again on an unread focus, and do not open the AI there.
+
 ## The reading font draws the tray menus too (2026-11-24)
 
 The reading font chosen in Configuration › Accessibilité

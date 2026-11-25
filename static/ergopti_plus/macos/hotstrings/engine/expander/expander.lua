@@ -176,6 +176,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			transaction, function(_completed_tx, status)
 				if status ~= "complete" or _state ~= preview_state or _llm ~= preview_llm
 					or preview_state.lifecycle_generation ~= preview_generation then return end
+				-- An unread field admitted plain hotstrings only (window mode): no
+				-- preview, whose AI half needs a field verdict.
+				if km_utils.window_mode_admits() then return end
 				local ok, err = pcall(preview_llm.update_preview, preview_state.buffer)
 				if not ok then
 					Logger.error(LOG, "Replacement preview refresh failed: %s.", tostring(err))
