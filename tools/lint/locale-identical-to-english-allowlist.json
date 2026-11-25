@@ -1352,10 +1352,6 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
 		},
-		"layout_analysis.trace.layout": {
-			"reason": "loanword-or-cognate",
-			"locales": ["da", "de", "it", "pt", "sv"]
-		},
 		"layout_analysis.trace.count": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": [

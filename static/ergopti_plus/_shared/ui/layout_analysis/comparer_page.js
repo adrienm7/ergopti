@@ -425,6 +425,10 @@
 	// The trace tab (an idea seen in the Layouts Wiki playground): the text it
 	// types when the visitor has written none.
 	const TRACE_SAMPLE_KEY = 'layout_analysis.trace.sample';
+	// The tabs under the Principal and Comparison frame (an idea seen in the
+	// Layouts Wiki playground's Main and Comp pickers): the detailed layout and
+	// the one it is compared with, the same as « One layout »'s own pickers.
+	const FRAME_TABS = ['pareto', 'trace'];
 	// Corpus blends (an idea seen in the Layouts Wiki playground): how many
 	// corpora a blend mixes, its id in the corpus list, and the first parts.
 	const BLEND_PARTS = 3;
@@ -727,6 +731,14 @@
 
 <section id="la-results" class="la-results" aria-labelledby="la-results-label">
 	<h2 id="la-results-label" class="la-sr-only" data-i18n="layout_analysis.results.title"></h2>
+	<p id="la-frame" class="la-heat-controls la-frame" hidden>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.frame.main">
+			<select id="la-frame-main"></select>
+		</label>
+		<label class="la-filter-field" data-i18n-text="layout_analysis.frame.comp">
+			<select id="la-frame-comp"></select>
+		</label>
+	</p>
 	<details id="la-filters-box" class="la-filters-box">
 	<summary>
 		<b id="la-filters-label" class="la-filters-title" data-i18n="layout_analysis.filter.title"></b>
@@ -931,14 +943,6 @@
 		<p class="la-field la-trace-field">
 			<label for="la-trace-text" data-i18n="layout_analysis.trace.text"></label>
 			<textarea id="la-trace-text" rows="3" maxlength="2000" aria-describedby="la-trace-note"></textarea>
-		</p>
-		<p class="la-heat-controls">
-			<label class="la-filter-field" data-i18n-text="layout_analysis.trace.layout">
-				<select id="la-trace-layout"></select>
-			</label>
-			<label class="la-filter-field" data-i18n-text="layout_analysis.trace.versus">
-				<select id="la-trace-versus"></select>
-			</label>
 		</p>
 		<p id="la-trace-note" class="la-muted" data-i18n="layout_analysis.trace.note"></p>
 		<div id="la-trace-out"></div>
@@ -1336,16 +1340,14 @@
 					: saved.pareto
 			),
 			// The trace tab's text (null: the sample) and its two layouts.
-			// A link's trace opens on its detailed layout and the one it is compared with.
+			// The trace's text; its layouts are the frame's (state.details, state.versus).
 			trace: {
 				text:
 					linked.text !== undefined
 						? linked.text
 						: typeof saved.traceText === 'string'
 							? saved.traceText
-							: null,
-				layout: null,
-				versus: linked.versus || null
+							: null
 			}
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
@@ -2205,6 +2207,7 @@
 
 		/** The Pareto tab: the chart, the spread of the X value and the table. */
 		function renderPareto() {
+			fillFrame();
 			const choices = paretoChoices().map((id) => [id, paretoName(id)]);
 			state.pareto.x = fillSelect($('la-pareto-x'), choices, state.pareto.x);
 			state.pareto.y = fillSelect(
@@ -2519,38 +2522,17 @@
 		function renderTrace() {
 			const textBox = $('la-trace-text');
 			if (document.activeElement !== textBox) textBox.value = traceInput();
-			const ids = state.results.map((r) => r.layout.id);
-			// Before the first results (a link's layouts wait for them) nothing is replaced.
-			if (ids.length > 0 && !ids.includes(state.trace.layout))
-				state.trace.layout = ids.includes(state.details) ? state.details : ids[0] || null;
-			if (
-				ids.length > 0 &&
-				(!ids.includes(state.trace.versus) || state.trace.versus === state.trace.layout)
-			)
-				state.trace.versus = null;
-			const entries = state.results.map((r) => [r.layout.id, r.layout.name]);
-			fillSelect(
-				$('la-trace-layout'),
-				entries.length > 0 ? entries : [['', t('layout_analysis.status.empty')]],
-				state.trace.layout || ''
-			);
-			fillSelect(
-				$('la-trace-versus'),
-				[['', t('layout_analysis.trace.versus_none')]].concat(
-					entries.filter(([id]) => id !== state.trace.layout)
-				),
-				state.trace.versus || ''
-			);
+			fillFrame();
 			const out = $('la-trace-out');
 			out.replaceChildren();
-			if (!state.trace.layout) return;
+			if (!state.details) return;
 			const text = traceInput();
 			const options = {
 				keyboard: state.keyboard,
 				weights: state.weights,
 				profile: FINGERING.current(state.keyboard) || undefined
 			};
-			const traced = [state.trace.layout, state.trace.versus].filter(Boolean).map((id) => {
+			const traced = [state.details, state.versus].filter(Boolean).map((id) => {
 				const layout = layoutOf(id);
 				return { id, layout, trace: E.traceText(layout, text, options) };
 			});
@@ -2837,6 +2819,35 @@
 			}
 			// The results' filters narrow the figures, not « Home »'s controls.
 			$('la-filters-box').hidden = state.tab === HOME_TAB;
+			$('la-frame').hidden = !FRAME_TABS.includes(state.tab);
+		}
+
+		/**
+		 * The Principal and Comparison frame: the detailed layout and the one it
+		 * is compared with (state.details, state.versus), which « One layout »,
+		 * the Pareto tab's ring and the trace all follow.
+		 */
+		function fillFrame() {
+			const entries = state.results.map((r) => [r.layout.id, r.layout.name]);
+			if (entries.length > 0 && !entries.some(([id]) => id === state.details))
+				state.details = entries[0][0];
+			if (
+				entries.length > 0 &&
+				(!entries.some(([id]) => id === state.versus) || state.versus === state.details)
+			)
+				state.versus = null;
+			fillSelect(
+				$('la-frame-main'),
+				entries.length > 0 ? entries : [['', t('layout_analysis.status.empty')]],
+				state.details || ''
+			);
+			fillSelect(
+				$('la-frame-comp'),
+				[['', t('layout_analysis.details.versus_none')]].concat(
+					entries.filter(([id]) => id !== state.details)
+				),
+				state.versus || ''
+			);
 		}
 
 		/** Shows a sub-tab; the visitor's own choice is kept for the next visit. */
@@ -5450,13 +5461,8 @@
 			query.set('format', state.format);
 			query.set('layouts', shareable.map((l) => l.id).join(','));
 			const canShare = (id) => shareable.some((l) => l.id === id);
-			// A trace link names the traced layouts as the detailed one and its versus.
-			const [details, versus] =
-				state.tab === 'trace'
-					? [state.trace.layout, state.trace.versus]
-					: [state.details, state.versus];
-			if (details && canShare(details)) query.set('details', details);
-			if (versus && canShare(versus)) query.set('versus', versus);
+			if (state.details && canShare(state.details)) query.set('details', state.details);
+			if (state.versus && canShare(state.versus)) query.set('versus', state.versus);
 			// The tab shown, with the Pareto tab's values or the trace's own text.
 			if (state.tab !== HOME_TAB) query.set('tab', state.tab);
 			if (state.tab === 'pareto') {
@@ -7107,13 +7113,16 @@
 				save();
 				renderTrace();
 			});
-			$('la-trace-layout').addEventListener('change', (event) => {
-				state.trace.layout = event.target.value || null;
-				renderTrace();
+			// The frame chooses the detailed layout and its comparison for every tab.
+			$('la-frame-main').addEventListener('change', (event) => {
+				if (!event.target.value) return;
+				state.details = event.target.value;
+				if (state.versus === state.details) state.versus = null;
+				render();
 			});
-			$('la-trace-versus').addEventListener('change', (event) => {
-				state.trace.versus = event.target.value || null;
-				renderTrace();
+			$('la-frame-comp').addEventListener('change', (event) => {
+				state.versus = event.target.value || null;
+				render();
 			});
 			$('la-matrix-by').addEventListener('change', (event) => {
 				state.matrixBy = event.target.value;
