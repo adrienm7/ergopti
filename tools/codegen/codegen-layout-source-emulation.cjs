@@ -26,7 +26,8 @@ const CORPUS = 'static/ergopti_plus/_shared/tests/corpus/layouts/source';
 const OUTPUTS = [
 	['emulation_source.toml', 'emulation.json'],
 	['source.toml', 'source_emulation.json'],
-	['neo2_source.toml', 'neo2_emulation.json']
+	['neo2_source.toml', 'neo2_emulation.json'],
+	['context_source.toml', 'context_emulation.json']
 ];
 const PLATFORMS = ['macos', 'linux', 'windows'];
 // The Ergopti layouts: the structured source and the registry's .keylayout files.

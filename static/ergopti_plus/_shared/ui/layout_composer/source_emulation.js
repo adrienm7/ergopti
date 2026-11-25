@@ -85,9 +85,13 @@ var LayoutSourceEmulation = (function () {
 	 * Check one mapping of the table and copy it. A dead key must be one of the
 	 * table's; a text's compose identity, when it differs from the text, is kept.
 	 */
-	function mappingOf(value, where, deadKeys) {
+	function mappingOf(value, where, deadKeys, magic) {
 		if (value === null || typeof value !== 'object')
 			fail(`The emulation table holds a malformed mapping at ${where}.`);
+		// A repeat key types the character typed `repeat` places back; a magic key
+		// what its table gives after the text typed before it (contextText).
+		if (value.repeat === 1 || value.repeat === 2) return { repeat: value.repeat };
+		if (typeof value.magic === 'string' && magic.has(value.magic)) return { magic: value.magic };
 		if (typeof value.text === 'string') {
 			if (value.compose === undefined) return { text: value.text };
 			if (typeof value.compose !== 'string')
@@ -100,6 +104,57 @@ var LayoutSourceEmulation = (function () {
 		if (typeof value.dead_key === 'string' && deadKeys.has(value.dead_key))
 			return { deadKey: value.dead_key };
 		return fail(`The emulation table holds a malformed mapping at ${where}.`);
+	}
+
+	/**
+	 * Check the table's magic keys' tables: each rule types one text after its
+	 * context; the fallback, when no rule's context ends the text typed.
+	 */
+	function magicOf(table) {
+		const source = table.magic === undefined ? {} : table.magic;
+		if (source === null || typeof source !== 'object' || Array.isArray(source))
+			fail('The emulation table holds malformed magic keys.');
+		const out = new Map();
+		for (const [id, entry] of Object.entries(source)) {
+			if (!entry || !Array.isArray(entry.rules) || typeof entry.fallback !== 'string')
+				fail(`The emulation table holds a malformed magic key at magic.${id}.`);
+			const rules = entry.rules.map((rule, index) => {
+				if (
+					!rule ||
+					typeof rule.after !== 'string' ||
+					rule.after === '' ||
+					typeof rule.types !== 'string'
+				)
+					fail(`The emulation table holds a malformed rule at magic.${id}.rules[${index}].`);
+				return { after: rule.after, types: rule.types };
+			});
+			out.set(id, { rules, fallback: entry.fallback });
+		}
+		return out;
+	}
+
+	/**
+	 * What a repeat or magic key types after a text: the character `repeat`
+	 * places back, or the rule whose context is the longest end of the text,
+	 * else the table's fallback; '' when it types nothing. The definition of
+	 * _shared/tests/corpus/layouts/magic_vectors.json, as the Studio's analysis.
+	 * @param {object} model - The compiled table.
+	 * @param {{repeat?: number, magic?: string}} mapping
+	 * @param {string} before - The text typed so far.
+	 * @returns {string}
+	 */
+	function contextText(model, mapping, before) {
+		if (mapping.repeat !== undefined) {
+			const points = Array.from(before.slice(-2 * mapping.repeat));
+			const at = points.length - mapping.repeat;
+			return at >= 0 ? points[at] : '';
+		}
+		const table = model.magic.get(mapping.magic);
+		let best = null;
+		for (const rule of table.rules)
+			if (before.endsWith(rule.after) && (best === null || rule.after.length > best.after.length))
+				best = rule;
+		return best !== null ? best.types : table.fallback;
 	}
 
 	/** Check the table's dead keys: each rule types a text, leads to a dead key, or both. */
@@ -137,6 +192,14 @@ var LayoutSourceEmulation = (function () {
 		return deadKeys;
 	}
 
+	/** A tap-hold's tap: never a repeat or magic key, whose text is read at the press. */
+	function tapOf(value, where, deadKeys) {
+		const mapping = mappingOf(value, where, deadKeys, new Map());
+		if (mapping.repeat !== undefined)
+			fail(`The emulation table holds a malformed mapping at ${where}.`);
+		return mapping;
+	}
+
 	/**
 	 * Compile a decoded emulation table into the lookups the key path walks.
 	 * @param {object} table - compileEmulation's table.
@@ -153,7 +216,8 @@ var LayoutSourceEmulation = (function () {
 			shortcuts: [],
 			tapHolds: new Map(),
 			remaps: new Map(),
-			deadKeys: deadKeysOf(table)
+			deadKeys: deadKeysOf(table),
+			magic: magicOf(table)
 		};
 		for (const modifier of table.modifiers || []) {
 			if (typeof modifier.id !== 'string' || !['held', 'locked'].includes(modifier.mode))
@@ -192,7 +256,7 @@ var LayoutSourceEmulation = (function () {
 				keys: new Map(
 					Object.entries(layer.keys).map(([code, value]) => [
 						code,
-						mappingOf(value, `layers.${layer.id}.${code}`, model.deadKeys)
+						mappingOf(value, `layers.${layer.id}.${code}`, model.deadKeys, model.magic)
 					])
 				),
 				// What a native layer's keys answer a pending dead key with: a text, or
@@ -202,7 +266,7 @@ var LayoutSourceEmulation = (function () {
 						const where = `layers.${layer.id}.compose_keys.${code}`;
 						if (value && typeof value.dead_key === 'string')
 							return [code, { deadKey: value.dead_key }];
-						const mapping = mappingOf(value, where, model.deadKeys);
+						const mapping = mappingOf(value, where, model.deadKeys, model.magic);
 						if (mapping.text === undefined)
 							fail(`The emulation table holds a malformed mapping at ${where}.`);
 						return [code, mapping];
@@ -241,7 +305,7 @@ var LayoutSourceEmulation = (function () {
 				fail(`The key ${entry.key} has two roles in the emulation table.`);
 			model.tapHolds.set(entry.key, {
 				key: entry.key,
-				tap: mappingOf(entry.tap, `${where}.tap`, model.deadKeys),
+				tap: tapOf(entry.tap, `${where}.tap`, model.deadKeys),
 				holdLayer: entry.hold_layer,
 				holdModifier: entry.hold_modifier,
 				threshold: entry.threshold_ms
@@ -385,9 +449,12 @@ var LayoutSourceEmulation = (function () {
 	 * @param {string} code - KeyboardEvent.code.
 	 * @param {string[]} held - Built-in modifier ids held, caps_lock when on.
 	 * @param {number} now - Milliseconds of the press.
+	 * @param {string} [before] - The text typed so far (the driver's last typed
+	 *   text), which a repeat or magic key reads; required for such a key.
 	 * @returns {{consumed: boolean, actions: object[]}}
+	 * @throws {Error} When a repeat or magic key is pressed without the text before.
 	 */
-	function press(session, code, held, now) {
+	function press(session, code, held, now, before) {
 		const model = session.model;
 		const actions = [];
 		if (session.heldKeys.has(code)) return { consumed: true, actions };
@@ -431,6 +498,14 @@ var LayoutSourceEmulation = (function () {
 		}
 		if (layer.keys.has(code)) {
 			const mapping = layer.keys.get(code);
+			if (mapping.repeat !== undefined || mapping.magic !== undefined) {
+				if (typeof before !== 'string')
+					fail('A repeat or magic key needs the text typed before it.');
+				// Its text types as a text key would; typing nothing leaves a dead key pending.
+				const text = contextText(model, mapping, before);
+				if (text !== '') perform(session, { text }, actions);
+				return { consumed: true, actions };
+			}
 			perform(session, mapping, actions);
 			// A dead key's auto-repeat and release are its own: they type nothing.
 			if (mapping.deadKey !== undefined) session.heldKeys.set(code, 'dead');
@@ -519,6 +594,7 @@ var LayoutSourceEmulation = (function () {
 		VERSION,
 		REPORTED,
 		selectorMatches,
+		contextText,
 		compile,
 		newSession,
 		press,

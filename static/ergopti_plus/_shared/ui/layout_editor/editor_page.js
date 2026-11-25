@@ -54,6 +54,9 @@ var LayoutEditorPage = (function () {
 
 	const PREFIX = 'layout_editor.';
 	const MAPPING_CHOICES = ['none', 'text', 'dead_key', 'action', 'key', 'disabled'];
+	// A layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
+	// shown and kept as the source writes them; the key panel does not edit them yet.
+	const CONTEXT_KINDS = ['repeat', 'magic'];
 	const BUILTIN_MODIFIERS = ['shift', 'control', 'alt', 'meta', 'caps_lock', 'kana'];
 	// Ranges of the Unicode palette; the block name is a locale key.
 	const PALETTE_BLOCKS = [
@@ -339,6 +342,11 @@ var LayoutEditorPage = (function () {
 		}
 		if (kind === 'action') return actionLabel(mapping.action);
 		if (kind === 'key') return (mapping.modifiers || []).concat([keyName(mapping.key)]).join('+');
+		if (CONTEXT_KINDS.includes(kind)) {
+			// The boards' own labels (analysis_model.json « context_keys »).
+			const labels = LAYOUT_ANALYSIS_DATA.model.context_keys.labels;
+			return kind === 'repeat' ? labels[`repeat_${mapping.repeat}`] : labels.magic;
+		}
 		return '⊘';
 	}
 
@@ -3285,7 +3293,9 @@ var LayoutEditorPage = (function () {
 			}
 			showFields();
 			const kindSelect = select(
-				MAPPING_CHOICES.map((choice) => [choice, tl(`kind.${choice}`)]),
+				(CONTEXT_KINDS.includes(kind) ? [kind] : [])
+					.concat(MAPPING_CHOICES)
+					.map((choice) => [choice, tl(`kind.${choice}`)]),
 				kind,
 				(value) => {
 					kind = value;
@@ -3295,6 +3305,8 @@ var LayoutEditorPage = (function () {
 			);
 			function built() {
 				if (kind === 'none') return null;
+				// Kept as it is: the panel has no fields for a repeat or magic key.
+				if (CONTEXT_KINDS.includes(kind)) return JSON.parse(JSON.stringify(mapping));
 				if (kind === 'text') return { text: fields.text.value };
 				if (kind === 'dead_key') return { dead_key: fields.dead_key.value };
 				if (kind === 'action') return { action: fields.action.value };
