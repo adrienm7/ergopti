@@ -267,14 +267,14 @@ _KALImport(Host) {
 	if (Path == "")
 		return
 	Data := _KALData()
-	try File := JsonParse(FileRead(Path, "UTF-8"))
-	if !IsSet(File) || !(File is Map) || File.Get("format", "") != Data["export_format"]
-		|| File.Get("version", 0) != Data["export_version"] || !(File.Get("preset", 0) is Map)
-		|| !(File.Get("images", 0) is Map) {
+	try Imported := JsonParse(FileRead(Path, "UTF-8"))
+	if !IsSet(Imported) || !(Imported is Map) || Imported.Get("format", "") != Data["export_format"]
+		|| Imported.Get("version", 0) != Data["export_version"] || !(Imported.Get("preset", 0) is Map)
+		|| !(Imported.Get("images", 0) is Map) {
 		LoggerWarn("KeepAwakeLibrary", "The preset file is not an exported anti-sleep preset.")
 		return _KALPush(Host, "onImported", Map("ok", false, "reason", "presets_document_invalid"))
 	}
-	Preset := File["preset"]
+	Preset := Imported["preset"]
 	Invalid := KeepAwakePresetInvalid(Preset)
 	if (Invalid != "")
 		return _KALPush(Host, "onImported", Map("ok", false, "reason", Invalid))
@@ -282,7 +282,7 @@ _KALImport(Host) {
 	Preset["id"] := KeepAwakeLibraryFreshId(Preset["id"], (Id) => IsObject(KeepAwakePresetsGet(Doc, Id)))
 	AutoClickLibraryPaths(&Folder, &Images, &Index)
 	for Image in Preset["images"] {
-		Encoded := File["images"].Get(Image["file"], "")
+		Encoded := Imported["images"].Get(Image["file"], "")
 		Bytes := Encoded == "" ? 0 : CryptoBase64Decode(Encoded)
 		if !_KALIsPng(Bytes)
 			return _KALPush(Host, "onImported", Map("ok", false, "reason", "presets_document_invalid"))
