@@ -301,6 +301,11 @@ local function bind()
 	return { ffi = ffi, gtk = gtk, glib = glib, gobject = gobject }
 end
 
+--- The default GTK binding, public so that the live keyboard profile
+--- (tests/hardware/run_dialog_keyboard_walk.lua) drives the real dialogs
+--- through M.main's binder seam instead of a copy of the declarations.
+M.bind = bind
+
 --- The window title: the caller's, else the product name. A window with no
 --- title is announced nameless by a screen reader and is a blank row in the
 --- window list (Alt+Tab). A title the caller gives empty stays empty: that is

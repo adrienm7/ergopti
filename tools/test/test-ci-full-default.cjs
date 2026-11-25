@@ -958,8 +958,9 @@ check(
 		// wrap transforms in a real GTK field; 220: the multi-field expansions
 		// and character deletion in real GTK fields; 222: the model page's first
 		// Ollama install in real WebKit and its install step; 224: the pointer
-		// metrics of the live daemon and its install step.
-		assert.equal(Scoped.contract.slots.length, 224);
+		// metrics of the live daemon and its install step; 225: the keyboard walk
+		// of the owned dialogs.
+		assert.equal(Scoped.contract.slots.length, 225);
 		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
 		assert.ok(
 			retained.includes(
