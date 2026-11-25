@@ -75,6 +75,7 @@ local function expectations()
 	local TrayHints = require("menu.engine.tray_shortcut_hints")
 	local ShortcutHint = require("menu.ui.builder.shortcut_hint")
 	local ScriptChords = require("modules.shortcuts.script_chords")
+	local ConfigKeys = require("settings.engine.keys")
 	local top = Manifest.get_array("top_level")
 	local function script_row(id)
 		local base = caption(top, id, t)
@@ -84,7 +85,7 @@ local function expectations()
 	local configuration = Manifest.get_array("configuration_menu")
 	local reading_font = nil
 	for _, item in ipairs(configuration) do
-		if item.id == "reading_font" and for_linux(item) then reading_font = t(item.i18n) end
+		if item.id == ConfigKeys.COMMAND.READING_FONT and for_linux(item) then reading_font = t(item.i18n) end
 	end
 	local debug_rows = Manifest.get_array("debug_menu")
 	local logs_header = "menu.debug.header_logs"
