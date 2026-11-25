@@ -17,8 +17,9 @@
 ;    step_failed. The screen port is WorkflowScreen (screen.ahk) over the screen
 ;    vision service: the front window, embedded PNGs written as private
 ;    template files, OCR with the shared text match, the interactive region.
-; 2. A shell step runs `cmd.exe /d /s /c` with the run_command line
-;    (UserActionHiddenShellLine): the command reaches the inner cmd.exe by
+; 2. A shell step runs `cmd.exe /d /s /c` with the run_command line, through
+;    the run_command owner (UserActionHiddenShell), which alone launches a
+;    user's shell: the command reaches the inner cmd.exe by
 ;    delayed expansion of a private variable, and the workflow variables are
 ;    ERGOPTI_VAR_<name> environment variables, never command text.
 ; 3. Every OS call goes through an existing adapter (timers, files, windows,
@@ -291,9 +292,7 @@ _WorkflowShell(Command, Env, DeadlineMs, Done) {
 	for Name, Value in Env
 		Variables[Name] := Value
 	try {
-		Shell := A_WinDir . "\System32\cmd.exe"
-		State.Handle := ShellRunner_SpawnTreeOwnedCommand(Shell, UserActionHiddenShellLine(),
-			ShellRunner_BuildEnvironment(Variables), EnvGet("USERPROFILE"), _WorkflowShellDone.Bind(State), , , 0, false, true)
+		State.Handle := UserActionHiddenShell(ShellRunner_BuildEnvironment(Variables), _WorkflowShellDone.Bind(State))
 		Started := State.Handle.start()
 	} catch as Err {
 		LoggerError(WORKFLOW_LOG, "The command of a workflow shell step could not start ({1}).", Type(Err))

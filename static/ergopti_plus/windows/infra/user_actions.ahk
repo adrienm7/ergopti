@@ -247,12 +247,16 @@ _UserCommandShellLine() {
 		. USER_COMMAND_ERR_VARIABLE . '!" "' . Shell . '" /d /s /c "!' . USER_COMMAND_VARIABLE . '!""'
 }
 
-; The hidden run_command line, for another owner of a hidden command (a workflow
-; shell step): the command text, its stdout and stderr paths go in the private
-; USER_COMMAND_* variables of the child's environment.
-; @returns {String}
-UserActionHiddenShellLine() {
-	return _UserCommandShellLine()
+; Builds the hidden run_command child for another owner of a hidden command (a
+; workflow shell step), so this module stays the one that launches a user's
+; shell: the command text, its stdout and stderr paths go in the private
+; USER_COMMAND_* variables of Environment. The caller starts the handle.
+; @param {String} Environment The child's environment block (ShellRunner_BuildEnvironment).
+; @param {Func} OnDone Called with the exit code when the child ends.
+; @returns {Object} The tree-owned process handle, not yet started.
+UserActionHiddenShell(Environment, OnDone) {
+	return ShellRunner_SpawnTreeOwnedCommand(_UserActionComSpec(), _UserCommandShellLine(),
+		Environment, EnvGet("USERPROFILE"), OnDone, , , 0, false, true)
 }
 
 ; Runs a run_command binding.
