@@ -326,9 +326,10 @@
 	--theme-metrics-bg: var(--theme-page-background);
 	--theme-metrics-panel: #ffffff;
 	--theme-metrics-text: var(--theme-label);
-	/* 8.4:1 on the page, 7.3:1 on the table headers (WCAG 1.4.6); the system
-	   tertiary grey was 3.3:1 and 3.6:1. */
-	--theme-metrics-text-muted: var(--theme-hue-48484c);
+	/* 8.7:1 on the page, 7.3:1 on the red-tinted split boxes of the typing
+	   dashboard, where #48484c read 6.99:1 (WCAG 1.4.6); the system tertiary
+	   grey was 3.3:1 and 3.6:1. */
+	--theme-metrics-text-muted: var(--theme-hue-46464a);
 	--theme-metrics-strong: var(--theme-label);
 	--theme-metrics-border: #d2d2d7;
 	--theme-metrics-th-bg: var(--theme-gray5);

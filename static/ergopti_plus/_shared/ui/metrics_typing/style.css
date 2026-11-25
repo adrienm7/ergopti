@@ -24,7 +24,11 @@
 	--accent: var(--theme-accent);
 	--border: var(--theme-metrics-border);
 	--mono-bg: var(--theme-grey-eaeaea);
-	--mono-color: var(--theme-hue-005cc5);
+	/* 7:1 on the key chips' grey: #005cc5 read 5.2:1 (WCAG 1.4.6). */
+	--mono-color: var(--theme-hue-004a99);
+	/* Control keys' red ink on the chips, 7:1 in both appearances (the system
+	   red #ff3333 read 3.0:1 on the light chip and 5.2:1 on the dark one). */
+	--control-ink: var(--theme-hue-8a1a14);
 	--th-bg: var(--theme-metrics-th-bg);
 	--th-hover: var(--theme-metrics-th-hover);
 	--td-hover: var(--theme-metrics-td-hover);
@@ -43,11 +47,15 @@
 	--kpi-hs-color: rgb(138, 26, 20);
 	--kpi-llm-color: rgb(94, 36, 132);
 	/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
-	--kpi-wpm-color: rgb(160, 82, 0);
-	--kpi-wpm-rgb: 160, 82, 0;
+	--kpi-wpm-color: rgb(115, 58, 0);
+	--kpi-wpm-rgb: 115, 58, 0;
 	--chart-wpm-color: rgb(204, 163, 0);
 	--chart-wpm-rgb: 204, 163, 0;
-	--kpi-precision-color: var(--theme-hue-008000);
+	/* The speed chart's title in its line's hue, 7:1 on its card where the
+	   line's own yellow read 2.1:1 (WCAG 1.4.6). */
+	--chart-wpm-ink: rgb(92, 72, 0);
+	/* 7:1 on its tinted card: #008000 read 4.4:1, #a05200 above 4.8:1. */
+	--kpi-precision-color: rgb(0, 88, 0);
 	--kpi-delegation-color: rgb(0, 86, 179);
 	/* Teal — same-finger bigram indicator (was rep color); 7:1 on its tinted
 	   button, where rgb(0, 155, 150) was 3.3:1 on white (WCAG 1.4.6). */
@@ -55,8 +63,10 @@
 	/* The two heatmaps' captions, 7:1 on the page (their fixed hues were 3:1). */
 	--heatmap-keys-caption: rgb(11, 79, 156);
 	--heatmap-sfb-caption: rgb(20, 83, 45);
-	--kpi-dist-color: rgb(0, 113, 197);
-	--kpi-rep-color: rgb(0, 134, 174); /* Mid-blue-cyan — between dist blue and sfb teal */
+	/* 7:1 on their tinted cards, where rgb(0, 113, 197) read 4.3:1 and
+	   rgb(0, 134, 174) 3.6:1 (WCAG 1.4.6). */
+	--kpi-dist-color: rgb(0, 70, 145);
+	--kpi-rep-color: rgb(0, 80, 104); /* Mid-blue-cyan — between dist blue and sfb teal */
 
 	/* KPI Backgrounds Light Mode */
 	--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 95%);
@@ -86,15 +96,19 @@
 
 	/* Text colors */
 	--strong-color: var(--theme-metrics-strong);
-	/* Black mixed into the table's speed and accuracy gradient (table.js). */
-	--gradient-ink-shade: 50%;
+	/* Black mixed into a hue written as text (the table's speed and accuracy
+	   gradient in table.js, the modifier key chips): 65 % holds every hue at
+	   7:1 on the page, where 50 % left the green and the yellow at 6.6:1 and
+	   5:1 and the bare chips read 2.0:1 to 3.0:1 (WCAG 1.4.6). */
+	--hue-ink-base: black;
+	--hue-ink-shade: 65%;
 
 	/* Headings and values of the detail cards: each holds 4.5:1 on its tinted
 	   card. The light appearance used the dark one's pastels, 1.3:1 to 2.5:1
 	   (WCAG 1.4.3). */
 	--ekpi-ergo-bigram-ink: rgb(67, 56, 202);
 	--ekpi-ergo-trigram-ink: rgb(126, 34, 206);
-	--ekpi-errors-ink: rgb(185, 28, 28);
+	--ekpi-errors-ink: var(--theme-hue-8a1a14);
 	--ekpi-roi-ink: rgb(22, 101, 52);
 	--ekpi-lexical-ink: rgb(146, 64, 14);
 	--ekpi-rhythm-ink: rgb(3, 105, 161);
@@ -113,6 +127,7 @@
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
 		--mono-bg: var(--theme-grey-111);
 		--mono-color: var(--theme-hue-9cdcfe);
+		--control-ink: var(--theme-hue-ff9d9d);
 		--tooltip-bg: var(--theme-grey-555);
 		--modal-overlay: rgba(0, 0, 0, 0.6);
 
@@ -124,17 +139,21 @@
 		/* KPI Colors (Vibrant, readable colors for Dark Mode) */
 		/* Red and purple hold 7:1 on their cards (WCAG 1.4.6); the system red
 		   #ff453a was 4.4:1 there and read as orange, the purple #bf5af2 4.3:1. */
-		--kpi-hs-color: rgb(255, 163, 168);
+		--kpi-hs-color: rgb(255, 180, 184);
 		--kpi-llm-color: rgb(220, 170, 255);
 		/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
-		--kpi-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
-		--kpi-wpm-rgb: 255, 149, 0;
+		/* Orange, green, blue and teal hold 7:1 on their tinted cards (WCAG
+		   1.4.6): the system #ff9500, #30d158, #0a84ff and #00d4cc read 6.0:1,
+		   6.9:1, 4.1:1 and 6.0:1 there. */
+		--kpi-wpm-color: rgb(255, 180, 77);
+		--kpi-wpm-rgb: 255, 180, 77;
 		--chart-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
 		--chart-wpm-rgb: 255, 214, 10;
-		--kpi-precision-color: rgb(48, 209, 88); /* #30d158 (Vibrant Green) */
+		--chart-wpm-ink: var(--chart-wpm-color);
+		--kpi-precision-color: rgb(94, 224, 138);
 		--kpi-delegation-color: rgb(30, 150, 255); /* #0a84ff (Vibrant Blue) */
-		--kpi-sfb-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) — same-finger bigram indicator */
-		--kpi-dist-color: rgb(10, 132, 255); /* #0a84ff (Vibrant Blue) */
+		--kpi-sfb-color: rgb(120, 236, 230); /* Vibrant teal — same-finger bigram indicator */
+		--kpi-dist-color: rgb(140, 200, 255); /* Vibrant blue */
 		--kpi-rep-color: rgb(5, 172, 230); /* Mid-blue-cyan — between dist blue and sfb teal */
 
 		/* KPI Backgrounds Dark Mode */
@@ -163,12 +182,15 @@
 		--chart-bg: rgba(255, 255, 255, 0.05);
 		--chart-border: rgba(255, 255, 255, 0.4);
 
-		--gradient-ink-shade: 0%;
+		/* White mixed in on the dark appearance: 60 % holds the red and the
+		   purple at 7:1, where the bare hues read 3.7:1 to 6.2:1. */
+		--hue-ink-base: white;
+		--hue-ink-shade: 60%;
 
 		/* Detail card headings and values */
 		--ekpi-ergo-bigram-ink: rgb(129, 140, 248);
 		--ekpi-ergo-trigram-ink: rgb(192, 132, 252);
-		--ekpi-errors-ink: rgb(248, 113, 113);
+		--ekpi-errors-ink: var(--theme-hue-ff9d9d);
 		--ekpi-roi-ink: rgb(74, 222, 128);
 		--ekpi-lexical-ink: rgb(251, 191, 36);
 		--ekpi-rhythm-ink: rgb(56, 189, 248);
@@ -1100,7 +1122,7 @@ tr:hover td {
 	background: var(--mono-bg);
 	border: 1px solid rgba(255, 51, 51, 0.6);
 	border-radius: 3px;
-	color: var(--theme-hue-ff3333);
+	color: var(--control-ink);
 	font-size: 0.85em;
 	font-weight: bold;
 	padding: 1px 3px;
@@ -1112,7 +1134,7 @@ tr:hover td {
 	background: var(--mono-bg);
 	border: 1px solid rgba(255, 51, 51, 0.6);
 	border-radius: 3px;
-	color: var(--theme-hue-ff3333) !important;
+	color: var(--control-ink) !important;
 	font-weight: bold;
 	padding: 1px 3px;
 }
@@ -1125,34 +1147,54 @@ tr:hover td {
 .shortcut-mod-cmd {
 	background: rgba(48, 209, 88, 0.1);
 	border-color: rgba(48, 209, 88, 0.4) !important;
-	color: var(--theme-green-dark) !important;
+	color: color-mix(
+		in srgb,
+		var(--theme-green-dark),
+		var(--hue-ink-base) var(--hue-ink-shade)
+	) !important;
 }
 
 .shortcut-mod-ctrl {
 	background: rgba(255, 149, 0, 0.1);
 	border-color: rgba(255, 149, 0, 0.4) !important;
-	color: var(--theme-orange) !important;
+	color: color-mix(
+		in srgb,
+		var(--theme-orange),
+		var(--hue-ink-base) var(--hue-ink-shade)
+	) !important;
 }
 
 /* Brighter purple — aligns perceptual weight with cmd’s vibrant green */
 .shortcut-mod-alt {
 	background: rgba(204, 85, 255, 0.1);
 	border-color: rgba(204, 85, 255, 0.45) !important;
-	color: var(--theme-hue-cc55ff) !important;
+	color: color-mix(
+		in srgb,
+		var(--theme-hue-cc55ff),
+		var(--hue-ink-base) var(--hue-ink-shade)
+	) !important;
 }
 
 /* Bright sky-blue — same visual weight as cmd but in blue */
 .shortcut-mod-shift {
 	background: rgba(77, 182, 255, 0.1);
 	border-color: rgba(77, 182, 255, 0.5) !important;
-	color: var(--theme-hue-4db6ff) !important;
+	color: color-mix(
+		in srgb,
+		var(--theme-hue-4db6ff),
+		var(--hue-ink-base) var(--hue-ink-shade)
+	) !important;
 }
 
 /* Vivid gold/yellow — clearly distinct from ctrl's orange */
 .shortcut-mod-fn {
 	background: rgba(255, 204, 0, 0.1);
 	border-color: rgba(255, 204, 0, 0.5) !important;
-	color: var(--theme-yellow) !important;
+	color: color-mix(
+		in srgb,
+		var(--theme-yellow),
+		var(--hue-ink-base) var(--hue-ink-shade)
+	) !important;
 }
 
 /* Control/special keys (Backspace, Tab, Escape, arrows…) — same dark bg as regular
@@ -1160,7 +1202,7 @@ tr:hover td {
 .shortcut-key-control {
 	background: var(--mono-bg);
 	border-color: rgba(255, 51, 51, 0.6) !important;
-	color: var(--theme-hue-ff3333) !important;
+	color: var(--control-ink) !important;
 }
 
 /* =================================================== */
