@@ -395,10 +395,17 @@ const PROGRAMS = {
 	python3: inPrep('python3', 'the Python the fixtures spawn'),
 	luajit: inPrep('luajit', 'the production interpreter'),
 	// ImageMagick's convert: the screen-capture resize fixture proves a real
-	// write failure against it on the Ubuntu desktop-webview lane only.
-	convert: why('ImageMagick, for the screen-capture resize fixture; installed by CI', HOST, {
-		proof: { file: CI_LINUX, token: 'ubuntu_apt\\.py.* imagemagick\\b' }
-	}),
+	// write failure against it on the Ubuntu desktop-webview lane only. The
+	// screen vision import test probes ImageMagick 6 or 7 and skips without it.
+	convert: why(
+		'ImageMagick, for the screen-capture resize fixture (installed by CI) and the probed screen vision import test',
+		['test', 'host'],
+		{
+			proof: { file: CI_LINUX, token: 'ubuntu_apt\\.py.* imagemagick\\b', scopes: HOST },
+			probed: TEST
+		}
+	),
+	magick: optionalTool('ImageMagick 7, probed by the screen vision import test', TEST),
 	// Declared runtime dependencies (packages and install.sh).
 	xclip: declaredByDeb('xclip', 'clipboard on X11', DRIVER_HOST),
 	'notify-send': declaredByInstaller('notify-send', 'desktop notifications'),

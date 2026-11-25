@@ -74,6 +74,16 @@ local function fresh_service(env)
 	return Service
 end
 
+-- A 2x2 GIF of two frames, red then blue: the import must keep the first only.
+local TWO_FRAME_GIF = table.concat({
+	"\71\73\70\56\57\97\2\0\2\0\240\0\0\255\0\0\0\0\0\33\255\11\78\69\84\83\67\65\80",
+	"\69\50\46\48\3\1\0\0\0\33\249\4\0\0\0\0\0\33\255\11\73\109\97\103\101\77\97\103",
+	"\105\99\107\14\103\97\109\109\97\61\48\46\52\53\52\53\52\53\0\44\0\0\0\0\2\0\2\0",
+	"\0\2\2\132\81\0\33\249\4\0\0\0\0\0\33\255\11\73\109\97\103\101\77\97\103\105\99",
+	"\107\14\103\97\109\109\97\61\48\46\52\53\52\53\52\53\0\44\0\0\0\0\2\0\2\0\128\0",
+	"\0\255\0\0\0\2\2\132\81\0\59"
+})
+
 helpers.describe("screen vision service (Linux)", function()
 	helpers.it("screen vision: captures a window as the shared gray image with its screen frame", function()
 		local Service = fresh_service({ DISPLAY = ":0" })
@@ -188,13 +198,19 @@ helpers.describe("screen vision service (Linux)", function()
 	end)
 
 	helpers.it("screen vision: imports a GIF's first frame as a whole PNG", function()
-		if not os.execute("command -v convert >/dev/null 2>&1 || command -v magick >/dev/null 2>&1") then
+		-- LuaJIT's os.execute returns the raw status, a number that is true even
+		-- when the command failed: only true (Lua 5.2+) or 0 means found.
+		local found = os.execute("command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1")
+		if found ~= true and found ~= 0 then
 			return -- ImageMagick is optional: without it the next case pins the refusal
 		end
 		local Service = fresh_service({ DISPLAY = ":0" })
 		local dir = os.tmpname()
 		os.remove(dir)
-		os.execute("mkdir '" .. dir .. "' && convert -size 8x8 xc:red xc:blue '" .. dir .. "/in.gif' 2>/dev/null")
+		os.execute("mkdir '" .. dir .. "'")
+		local gif = assert(io.open(dir .. "/in.gif", "wb"))
+		gif:write(TWO_FRAME_GIF)
+		gif:close()
 		ShellRunner._set_async_runner(function(executable, args, _, callback)
 			local quoted = {}
 			for index = 3, #args do quoted[#quoted + 1] = "'" .. args[index]:gsub("'", "'\\''") .. "'" end
