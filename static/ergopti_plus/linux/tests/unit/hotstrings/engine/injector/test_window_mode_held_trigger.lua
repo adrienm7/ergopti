@@ -27,6 +27,8 @@ local KEY_E = 18
 local KEY_J = 36
 local KEY_BACKSPACE = 14
 local KEY_COMMA = 51
+local KEY_SPACE = 57
+local KEY_A = 30
 
 -- KDE Plasma's default autorepeat delay: a key held this long repeats.
 local DESKTOP_REPEAT_DELAY_MS = 600
@@ -100,6 +102,8 @@ local function load(clock, held_code)
 		["j"] = { keycode = KEY_J, level = 1, mods = {} },
 		["e"] = { keycode = KEY_E, level = 1, mods = {} },
 		[","] = { keycode = KEY_COMMA, level = 1, mods = {} },
+		[" "] = { keycode = KEY_SPACE, level = 1, mods = {} },
+		["a"] = { keycode = KEY_A, level = 1, mods = {} },
 	})
 	local channel = { emitted = {} }
 	channel.is_open = function() return true end
@@ -158,6 +162,31 @@ helpers.describe("injector: a window-mode expansion releases its trigger at once
 			clock.now, table.concat(waits, "+")))
 		helpers.assert_eq(table.concat(typed, ","), table.concat({ KEY_BACKSPACE, KEY_BACKSPACE, KEY_J, KEY_E }, ","),
 			"two erases, then j and e")
+	end)
+
+	-- The tester's double space between « fois » and « ya »: an end-char
+	-- expansion fires on the Space key-down the hook forwarded, and replays
+	-- the Space after the replacement. Held through the focus waits, the
+	-- forwarded Space autorepeated before its release.
+	helpers.it("types the space after an end-char expansion exactly once (window-held-space)", function()
+		local clock = { now = 0 }
+		local injector, channel, restore = load(clock, KEY_SPACE)
+		local owner = window_owner(clock)
+		local ok, result = pcall(injector.inject, 3, "ja", false, " ", owner)
+		restore()
+		helpers.assert_true(ok and type(result) == "table" and result.ok == true,
+			"the expansion commits: " .. tostring(ok and result and result.error or result))
+		helpers.assert_eq(channel.emitted[1].code, KEY_SPACE)
+		helpers.assert_eq(channel.emitted[1].value, 0, "the forwarded Space is released first")
+		helpers.assert_eq(channel.emitted[1].at, 0, "before any focus wait")
+		local spaces = 0
+		for _, event in ipairs(channel.emitted) do
+			if event.code == KEY_SPACE and event.value == 1 then spaces = spaces + 1 end
+			helpers.assert_true(event.value ~= 2, "no autorepeat event is injected")
+		end
+		helpers.assert_eq(spaces, 1, "the replayed Space is typed once")
+		helpers.assert_eq(channel.emitted[#channel.emitted].code, KEY_SPACE, "after the replacement")
+		helpers.assert_eq(clock.now, 0, "the expansion waited " .. clock.now .. " ms on focus queries")
 	end)
 
 	-- The tester's « it backspaces a huge amount of text by itself »: with
