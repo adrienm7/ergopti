@@ -22,9 +22,11 @@
 
 local M = {}
 
+local Timings = require("core.timing.engine.timings")
+
 -- A menu with every branch filled is a few hundred kilobytes of JSON
 -- (constants.toml [limits]).
-M.MAX_OUTPUT_BYTES = require("core.timing.engine.timings").count("limits", "field_check_output_bytes")
+M.MAX_OUTPUT_BYTES = Timings.count("limits", "field_check_output_bytes")
 
 --- Builds the request function.
 --- @param timeout_ms number The bound of one request.

@@ -47,7 +47,7 @@ M.DEFAULT_ITEM_PATH = "/StatusNotifierItem"
 -- A clicked row rebuilds the menu on a later turn: the check reads it again
 -- this many times, this far apart, before it gives up (constants.toml [adapters]).
 M.SETTLE_ATTEMPTS = Timings.count("adapters", "field_tray_settle_attempts")
-M.SETTLE_MS = Timings.ms("adapters", "field_tray_settle_ms")
+M.SETTLE_INTERVAL_MS = Timings.ms("adapters", "field_tray_settle_ms")
 
 -- The panel events a hover sends to a submenu row, in the order Plasma sends them.
 M.HOVER_EVENTS = { "hovered", "opened" }
@@ -222,7 +222,7 @@ local function new_bus(ports)
 			bus.layout(row.id, function(node, why)
 				if node == nil then return done(nil, why) end
 				if #M.visible_rows(node) > 0 or attempts >= M.SETTLE_ATTEMPTS then return done(node) end
-				ports.after(M.SETTLE_MS, read)
+				ports.after(M.SETTLE_INTERVAL_MS, read)
 			end)
 		end
 		bus.about_to_show(row.id, function(ok, why)
@@ -464,7 +464,7 @@ local function settle(bus, ports, holds, done)
 		bus.layout(0, function(root)
 			if root and holds(root) then return done(root) end
 			if attempts >= M.SETTLE_ATTEMPTS then return done(nil) end
-			ports.after(M.SETTLE_MS, read)
+			ports.after(M.SETTLE_INTERVAL_MS, read)
 		end)
 	end
 	read()
@@ -533,7 +533,7 @@ local function choose(bus, ports, expect, label, done)
 							local ticked = now and radio_state(now) or {}
 							if #ticked == 1 and ticked[1].label == label then return done(true) end
 							if attempts >= M.SETTLE_ATTEMPTS then return done(false) end
-							ports.after(M.SETTLE_MS, confirm)
+							ports.after(M.SETTLE_INTERVAL_MS, confirm)
 						end)
 					end)
 				end
