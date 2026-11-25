@@ -25,7 +25,7 @@ local function fake_config(gates_on, sections_on)
 	for _, id in ipairs({ "autocorrection", "rolls", LANGUAGE_CATEGORY }) do
 		categories[id] = {
 			id = id, count = 3, sections_order = { "first", "second" },
-			sections = { first = { count = 1 }, second = { count = 2 } },
+			sections = { first = { count = 1, description = "first" }, second = { count = 2, description = "second" } },
 		}
 	end
 	return {

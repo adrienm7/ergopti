@@ -38,6 +38,8 @@ helpers.describe("menu_builder: group toggles call hotstrings_config with the gr
 			-- Every group is on, so is the Hotstrings switch (category-off rule).
 			any_enabled = function() return true end,
 			get_groups = function() return { "code", "email" } end,
+			-- Every pack names itself in its file, as the bundled ones do.
+			get_category = function(id) return { id = id, description = { en = id, fr = id } } end,
 			is_group_enabled = function(gn) enabled_args[#enabled_args + 1] = gn; return true end,
 			toggle_group = function(gn) toggle_args[#toggle_args + 1] = gn end,
 			set_category_scope_enabled = function(names, enabled)

@@ -436,7 +436,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
 							description = { en = "Rolls", fr = "Roulements" },
 							extension = { id = "ergopti", name = "Ergopti" },
-							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1, description = "hc" }, sx = { count = 0, description = "sx" } } },
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}
@@ -611,7 +611,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
 							description = { en = "Rolls", fr = "Roulements" },
 							extension = { id = "ergopti", name = "Ergopti" },
-							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1, description = "hc" }, sx = { count = 0, description = "sx" } } },
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}

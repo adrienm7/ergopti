@@ -46,7 +46,7 @@ local function fake_config(opts)
 				path = "/home/u/.config/ergopti/hotstrings/rolls.toml",
 				description = { en = "Rolls", fr = "Roulements" },
 				sections_order = { "hc", "sx" },
-				sections = { hc = { count = 12 }, sx = { count = 3 } },
+				sections = { hc = { count = 12, description = "hc" }, sx = { count = 3, description = "sx" } },
 				count = 15,
 				-- Rolls come from the Ergopti layout extension, whose submenu lists them.
 				extension = { id = "ergopti", name = "Ergopti" },

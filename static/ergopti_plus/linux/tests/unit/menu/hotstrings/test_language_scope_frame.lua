@@ -30,8 +30,10 @@ local function fixture(body)
 		source.hotstring_language_parent_lua, source.hotstring_scope_checkbox
 	local categories = {
 		french_autocorrection = { id = "french_autocorrection", count = 3,
+			description = { en = "french_autocorrection", fr = "french_autocorrection" },
 			sections = { alpha = { count = 3 } }, sections_order = { "alpha" } },
 		french_magickey = { id = "french_magickey", count = 999,
+			description = { en = "french_magickey", fr = "french_magickey" },
 			sections = { beta = { count = 999 } }, sections_order = { "beta" } },
 	}
 	local writes, selected, desired, acknowledgement = 0, nil, nil, true

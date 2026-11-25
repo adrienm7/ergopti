@@ -411,11 +411,15 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M.stop_reading()
 
 		local slot_rows = 0
+		-- « È → raccourcis de Z » names an accented key's letter, not a slot's
+		-- action: its submenu is the alphabet.
+		local accented = "^" .. require("core.i18n.engine.i18n").get("shortcuts.accented_row")
+			:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("{[12]}", ".+") .. "$"
 		local function walk(rows)
 			for _, row in ipairs(rows or {}) do
 				if type(row) == "table" then
 					if type(row.title) == "string" and row.title:find(" → ", 1, true)
-						and type(row.menu) == "table" then
+						and not row.title:match(accented) and type(row.menu) == "table" then
 						slot_rows = slot_rows + 1
 						-- The picker rows, plus a swipe's mode and step groups
 						-- (each a submenu of its own), never the whole catalogue.

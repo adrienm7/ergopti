@@ -64,7 +64,7 @@ local function fake_config(opts)
 		get_category = function(id)
 			if id ~= "rolls" then return nil end
 			local sections = {}
-			for name, count in pairs(COUNTS) do sections[name] = { count = count } end
+			for name, count in pairs(COUNTS) do sections[name] = { count = count, description = name } end
 			return {
 				id = "rolls", path = "/tmp/rolls.toml", count = 17,
 				description = { en = "Rolls", fr = "Roulements" },
