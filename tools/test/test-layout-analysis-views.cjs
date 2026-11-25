@@ -238,6 +238,23 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	);
 	const dke = skip('dke');
 	check(dke.skipgrams === 1 && dke.skipgram.sfb === 100, 'movement: « dke » is an SFB skipgram');
+	// Row changes on QWERTY: « se » ring home then middle top (the longer
+	// finger above: concordant), « dw » middle home then ring top (discordant),
+	// « sd » one row, « dk » two hands, « de » one finger: none of them.
+	const pair = (text) =>
+		E.movementTable(qwerty, E.ngramsFromText(text), { keyboard: 'iso' }).bigram;
+	const se = pair('se');
+	check(
+		se.row_change === 100 && se.row_change_concordant === 100 && se.row_change_discordant === 0,
+		`movement: « se » is a concordant row change (${JSON.stringify(se)})`
+	);
+	const dw = pair('dw');
+	check(
+		dw.row_change === 100 && dw.row_change_discordant === 100,
+		'movement: « dw » is a discordant row change'
+	);
+	for (const text of ['sd', 'dk', 'de'])
+		check(pair(text).row_change === 0, `movement: « ${text} » is no row change`);
 	const dkf = skip('dkf');
 	check(
 		dkf.skipgrams === 1 && dkf.skipgram.sfb === 0 && dkf.skipgram.repeat === 0,
