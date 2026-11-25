@@ -923,7 +923,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 				"exact genuine current source repair restores actual native publication")
 		}
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
-		AssertEqual(23, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
+		AssertEqual(24, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
 		AssertEqual("changed-model", Document["llm"]["model"])
 		Stages := 0
 		Loop Files, Path . ".*.tmp"
