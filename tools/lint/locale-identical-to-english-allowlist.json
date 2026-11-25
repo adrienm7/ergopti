@@ -4384,6 +4384,32 @@
 		"field_check.value.other": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "nl"]
+		},
+		"layout_editor.magic.skipped_item": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"layout_editor.magic.actions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
 		}
 	}
 }

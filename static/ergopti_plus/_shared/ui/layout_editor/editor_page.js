@@ -55,8 +55,12 @@ var LayoutEditorPage = (function () {
 	const PREFIX = 'layout_editor.';
 	const MAPPING_CHOICES = ['none', 'text', 'dead_key', 'action', 'key', 'disabled'];
 	// A layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
-	// shown and kept as the source writes them; the key panel does not edit them yet.
+	// the key panel places them, and edits a magic key's table of rules.
 	const CONTEXT_KINDS = ['repeat', 'magic'];
+	// How far back a repeat key reaches (source_model.js CONTEXT_KEYS).
+	const REPEAT_DEPTHS = LayoutSource.CONTEXT_KEYS.repeat_depths;
+	// The table a first magic key creates when the layout has none to name.
+	const DEFAULT_MAGIC_TABLE = 'magic';
 	const BUILTIN_MODIFIERS = ['shift', 'control', 'alt', 'meta', 'caps_lock', 'kana'];
 	// Ranges of the Unicode palette; the block name is a locale key.
 	const PALETTE_BLOCKS = [
@@ -321,6 +325,11 @@ var LayoutEditorPage = (function () {
 		]);
 	}
 
+	/** A field on its own line with its visible label (WCAG 1.3.1, 3.3.2). */
+	function labelled(id, text, control) {
+		return el('p', { class: 'le-context-field' }, [el('label', { for: id, text }), control]);
+	}
+
 	// The shared legend formatter (_generated/key_legend.js, from the site's keyLegend.js).
 	const visible = KEY_LEGEND.visibleText;
 
@@ -455,6 +464,8 @@ var LayoutEditorPage = (function () {
 				? window.LAYOUT_ANALYSIS_FILES.savedFormat()
 				: LAYOUT_ANALYSIS.defaultKeyboardFormat(),
 			deadKey: null,
+			// The last Kawalyzer file read into a magic table: its rules left out.
+			magicImport: null,
 			paletteBlock: PALETTE_BLOCKS[0].id,
 			// Whether the palette is unfolded, so a render keeps it open.
 			paletteOpen: false,
@@ -579,6 +590,7 @@ var LayoutEditorPage = (function () {
 				state.dirty = true;
 				state.message = null;
 				state.historySaid = null;
+				state.magicImport = null;
 			} catch (error) {
 				state.message = { kind: 'error', text: problemText(error) };
 			}
@@ -3357,8 +3369,30 @@ var LayoutEditorPage = (function () {
 				}),
 				dead_key: select(deadOptions, mapping && mapping.dead_key, () => {}, { id: 'le-dead' }),
 				action: select(actionOptions, mapping && mapping.action, () => {}, { id: 'le-action' }),
-				key: select(keyOptions, mapping && mapping.key, () => {}, { id: 'le-send-key' })
+				key: select(keyOptions, mapping && mapping.key, () => {}, { id: 'le-send-key' }),
+				repeat: select(
+					REPEAT_DEPTHS.map((depth) => [String(depth), tl(`context.repeat_${depth}`)]),
+					String(mapping && mapping.repeat !== undefined ? mapping.repeat : REPEAT_DEPTHS[0]),
+					() => {},
+					{ id: 'le-repeat', class: 'le-context-target' }
+				)
 			};
+			// The magic key's table: one the layout has, or a new one named here.
+			const tables = (doc().magic || []).map((entry) => entry.id);
+			const magicTable = el('input', {
+				type: 'text',
+				id: 'le-magic-table',
+				class: 'le-context-target',
+				list: 'le-magic-tables',
+				autocomplete: 'off',
+				value:
+					mapping && mapping.magic !== undefined ? mapping.magic : tables[0] || DEFAULT_MAGIC_TABLE
+			});
+			const magicTables = el(
+				'datalist',
+				{ id: 'le-magic-tables' },
+				tables.map((id) => el('option', { value: id }))
+			);
 			const sendModifiers = modifierOptions().map((id) =>
 				el('label', { class: 'le-check' }, [
 					el('input', {
@@ -3380,12 +3414,23 @@ var LayoutEditorPage = (function () {
 					);
 				if (kind === 'action') area.append(fields.action);
 				if (kind === 'key') area.append(fields.key, el('p', { class: 'le-checks' }, sendModifiers));
+				if (kind === 'repeat')
+					area.append(labelled('le-repeat', tl('context.repeat_label'), fields.repeat));
+				if (kind === 'magic') {
+					area.append(
+						labelled('le-magic-table', tl('magic.table_label'), magicTable),
+						magicTables,
+						el('p', { class: 'le-note', text: tl('magic.note') })
+					);
+					// The rules of a table the layout already has; a new one gets
+					// its rules once Apply has placed the key that names it.
+					if (mapping && mapping.magic !== undefined && tables.includes(mapping.magic))
+						area.append(magicRules(mapping.magic));
+				}
 			}
 			showFields();
 			const kindSelect = select(
-				(CONTEXT_KINDS.includes(kind) ? [kind] : [])
-					.concat(MAPPING_CHOICES)
-					.map((choice) => [choice, tl(`kind.${choice}`)]),
+				MAPPING_CHOICES.concat(CONTEXT_KINDS).map((choice) => [choice, tl(`kind.${choice}`)]),
 				kind,
 				(value) => {
 					kind = value;
@@ -3395,8 +3440,9 @@ var LayoutEditorPage = (function () {
 			);
 			function built() {
 				if (kind === 'none') return null;
-				// Kept as it is: the panel has no fields for a repeat or magic key.
-				if (CONTEXT_KINDS.includes(kind)) return JSON.parse(JSON.stringify(mapping));
+				if (kind === 'repeat') return { repeat: Number(fields.repeat.value) };
+				// A new table name creates the table (LayoutEditorModel.setMapping).
+				if (kind === 'magic') return { magic: magicTable.value.trim() };
 				if (kind === 'text') return { text: fields.text.value };
 				if (kind === 'dead_key') return { dead_key: fields.dead_key.value };
 				if (kind === 'action') return { action: fields.action.value };
@@ -3472,6 +3518,166 @@ var LayoutEditorPage = (function () {
 				swapControl(code, keyOptions),
 				el('p', { class: 'le-note', text: tl('drag_hint') })
 			]);
+		}
+
+		/**
+		 * A magic key's table of rules (docs/design/magic-and-repeat-keys.md):
+		 * after the text a rule names, the key types its character; with no
+		 * rule matching, the default character. Each change is one step of the
+		 * history; a Kawalyzer « Clever Keys » file replaces the rules, the
+		 * ones a table cannot hold listed with their reason.
+		 * @param {string} id - A table the layout has.
+		 */
+		function magicRules(id) {
+			const table = (doc().magic || []).find((entry) => entry.id === id);
+			const named = step('edit_history.step.magic_key', { name: id });
+			const after = el('input', {
+				type: 'text',
+				id: 'le-magic-after',
+				class: 'le-context-target',
+				size: 4,
+				autocomplete: 'off'
+			});
+			const types = el('input', {
+				type: 'text',
+				id: 'le-magic-types',
+				class: 'le-context-target',
+				size: 4,
+				autocomplete: 'off'
+			});
+			const fallback = el('input', {
+				type: 'text',
+				id: 'le-magic-fallback',
+				class: 'le-context-target',
+				size: 4,
+				autocomplete: 'off',
+				value: table.fallback || ''
+			});
+			const file = el('input', {
+				type: 'file',
+				id: 'le-magic-file',
+				accept: '.json,application/json',
+				hidden: true,
+				onchange: (event) => readFile(event.target, (name, text) => importMagicRules(id, text))
+			});
+			const button = (attributes) =>
+				el('button', Object.assign({ type: 'button', class: 'le-context-target' }, attributes));
+			const rows = table.rules.map((rule) =>
+				el('tr', {}, [
+					el('td', { text: visible(rule.after) }),
+					el('td', { text: visible(rule.types) }),
+					el(
+						'td',
+						{},
+						button({
+							class: 'le-context-target danger',
+							'data-after': rule.after,
+							text: tl('btn.remove'),
+							'aria-label': tl('magic.remove_rule', { after: rule.after }),
+							onclick: () =>
+								apply((d) => LayoutEditorModel.setMagicRule(d, id, rule.after, null), named)
+						})
+					)
+				])
+			);
+			const skipped = state.magicImport && state.magicImport.id === id ? state.magicImport : null;
+			return el(
+				'section',
+				{ class: 'le-magic', id: 'le-magic', 'aria-labelledby': 'le-magic-title' },
+				[
+					el('h4', { id: 'le-magic-title', text: tl('magic.title', { id }) }),
+					el('table', { class: 'le-rules', id: 'le-magic-rules' }, [
+						el('thead', {}, [
+							el('tr', {}, [
+								el('th', { scope: 'col', text: tl('magic.after') }),
+								el('th', { scope: 'col', text: tl('magic.types') }),
+								el('th', { scope: 'col', text: tl('magic.actions') })
+							])
+						]),
+						el(
+							'tbody',
+							{},
+							rows.length
+								? rows
+								: [el('tr', {}, [el('td', { colspan: '3', text: tl('magic.empty') })])]
+						)
+					]),
+					labelled('le-magic-after', tl('magic.after'), after),
+					labelled('le-magic-types', tl('magic.types'), types),
+					button({
+						id: 'le-magic-add',
+						text: tl('magic.add_rule'),
+						onclick: () =>
+							apply((d) => LayoutEditorModel.setMagicRule(d, id, after.value, types.value), named)
+					}),
+					labelled('le-magic-fallback', tl('magic.fallback'), fallback),
+					button({
+						id: 'le-magic-fallback-apply',
+						text: tl('magic.fallback_apply'),
+						onclick: () =>
+							apply((d) => LayoutEditorModel.setMagicFallback(d, id, fallback.value), named)
+					}),
+					file,
+					button({
+						id: 'le-magic-import',
+						text: tl('magic.import'),
+						onclick: () => file.click()
+					}),
+					skipped
+						? el('section', { id: 'le-magic-imported', role: 'status' }, [
+								el('p', {
+									text: tl('magic.imported', {
+										count: skipped.count,
+										skipped: skipped.unmapped.length
+									})
+								}),
+								skipped.unmapped.length
+									? el(
+											'ul',
+											{ id: 'le-magic-skipped' },
+											skipped.unmapped.map((entry) =>
+												el('li', {
+													text: tl('magic.skipped_item', {
+														text: entry.text,
+														keys: entry.keys,
+														reason: tl(`magic.reason.${entry.reason}`)
+													})
+												})
+											)
+										)
+									: null
+							])
+						: null
+				]
+			);
+		}
+
+		/** Replaces a magic table's rules with a Kawalyzer « Clever Keys » file's. */
+		function importMagicRules(id, text) {
+			let read;
+			try {
+				read = LAYOUT_FORMATS.fromKawalyzerRules(text);
+			} catch (error) {
+				const refusal = LAYOUT_FORMATS.refusalMessage(error);
+				notify('error', t(refusal.key, refusal.values));
+				return;
+			}
+			apply(
+				(d) => {
+					const next = LayoutEditorModel.setMagicRules(d, id, read.rules);
+					return read.fallback === null
+						? next
+						: LayoutEditorModel.setMagicFallback(next, id, read.fallback);
+				},
+				step('edit_history.step.magic_key', { name: id })
+			);
+			if (!state.message)
+				state.magicImport = {
+					id,
+					count: read.rules.length + (read.fallback === null ? 0 : 1),
+					unmapped: read.unmapped
+				};
+			render();
 		}
 
 		/**

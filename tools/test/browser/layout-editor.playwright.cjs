@@ -40,6 +40,8 @@ const { catalogueShape, pageRawKeys } = require('../lib/raw-locale-keys.cjs');
 const studioControls = require('./studio-controls.cjs');
 // A layout's own levels (Neo 2's Mod3 and Mod4) on the Comparer's boards.
 const layoutLevels = require('./layout-levels.cjs');
+// A layout's own repeat and magic keys in the key panel (editor-context-keys).
+const contextKeys = require('./layout-editor-context-keys.cjs');
 const { TEXT_SPACING_CSS } = require('./site-reading.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -4441,6 +4443,8 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
 		await layoutLevels.exerciseComparerLevels(browser, origin);
+		await contextKeys.exerciseKeyPanel(browser, origin, { open, downloaded });
+		await contextKeys.exerciseKeyPanelLocales(browser, origin, { open });
 		await studioUx.exercisePanelFirstChange(browser, origin);
 		await studioUx.exerciseOneInfoPerRow(browser, origin);
 		await studioUx.exerciseHistoryShortcuts(browser, origin);
