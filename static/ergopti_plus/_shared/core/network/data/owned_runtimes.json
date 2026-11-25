@@ -408,9 +408,9 @@
 		},
 		{
 			"os": "macos",
-			"tool": "Shell (`sh`, `bash`)",
-			"programs": ["sh", "bash"],
-			"used_for": "`/bin/sh`, `/bin/bash`, `/usr/bin/env` for the bundled scripts",
+			"tool": "Shell (`sh`, `bash`, `env`)",
+			"programs": ["sh", "bash", "env"],
+			"used_for": "`/bin/sh`, `/bin/bash`, `/usr/bin/env` for the bundled scripts and a user workflow's shell steps (`macos/modules/shortcuts/workflows.lua`)",
 			"today": "System",
 			"current_class": "SYS",
 			"version_needed": "bash 3.2 compatible",
