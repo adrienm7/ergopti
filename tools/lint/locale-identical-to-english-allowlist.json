@@ -4518,6 +4518,14 @@
 		"workflows.value.file": {
 			"reason": "loanword-or-cognate",
 			"locales": ["it"]
+		},
+		"editor.hotstrings.action_legend": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"editor.hotstrings.tag_action": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
 		}
 	}
 }
