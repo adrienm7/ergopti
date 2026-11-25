@@ -1337,6 +1337,25 @@ for startup_receipt in "${PRESERVED_STARTUP_RECEIPTS[@]}"; do
 	printf '%s\n' "$startup_receipt" >> "${LIB_DIR}/.ergopti-owned-files"
 done
 
+# A git checkout carries no build stamp, so the installed daemon reported its
+# commit as unknown in every diagnostic. Its copy is stamped with the commit of
+# the checkout it was installed from, marked as a checkout copy so it stays a
+# local version (tools/build/write_build_stamp.sh write-checkout); the receipt
+# owns that file like the payload. A release bundle ships its own stamp.
+CHECKOUT_ROOT="$(cd -- "${DRIVERS_ROOT}/../.." && pwd -P)"
+CHECKOUT_STAMP_WRITER="${CHECKOUT_ROOT}/tools/build/write_build_stamp.sh"
+if [ -f "$CHECKOUT_STAMP_WRITER" ] \
+	&& [ "$(git -C "$CHECKOUT_ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$CHECKOUT_ROOT" ]; then
+	SOURCE_STAMP="$(bash "$CHECKOUT_STAMP_WRITER" path "$SRC_SHARED")" || exit 1
+	if [ ! -e "$SOURCE_STAMP" ] && [ ! -L "$SOURCE_STAMP" ]; then
+		CHECKOUT_STAMP="$(bash "$CHECKOUT_STAMP_WRITER" path "$DEST_SHARED")" || exit 1
+		ERGOPTI_BUILD_VERSION= bash "$CHECKOUT_STAMP_WRITER" write-checkout "$DEST_SHARED" >/dev/null || exit 1
+		CHECKOUT_STAMP_DIGEST="$(sha256sum < "$CHECKOUT_STAMP")" || exit 1
+		printf '%s\t%s/%s\n' "${CHECKOUT_STAMP_DIGEST%% *}" "$OWNERSHIP_SHARED_TREE" "${CHECKOUT_STAMP##*/}" \
+			>> "${LIB_DIR}/.ergopti-owned-files" || exit 1
+	fi
+fi
+
 if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# This generated checkout artifact is outside the input source tree, so its
 	# actual installed bytes need their own canonical ownership entry.

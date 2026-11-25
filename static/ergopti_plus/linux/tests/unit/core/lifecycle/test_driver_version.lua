@@ -167,6 +167,20 @@ describe("Driver version: infra/version.lua resolves the stamp", function()
 		assert_true(logged, "expected a WARNING; got:\n" .. table.concat(lines, "\n"))
 	end)
 
+	it("an install.sh copy of a checkout reports local without a warning", function()
+		local version, source
+		local lines = capture_logs(function()
+			version, source = Version.resolve({ shared_root = SHARED, fs = fixture_fs({
+				[STAMP] = "commit=" .. SHA .. "\n" .. Snapshot.BUILD_STAMP_SOURCE_KEY .. "="
+					.. Snapshot.BUILD_STAMP_SOURCE_CHECKOUT .. "\n" }) })
+		end)
+		assert_eq(Version.LOCAL, version, "a checkout copy is no release and claims none")
+		assert_eq(Version.SOURCE_LOCAL, source)
+		for _, line in ipairs(lines) do
+			assert_true(line:find("Driver version unknown", 1, true) == nil, line)
+		end
+	end)
+
 	it("the checkout resolves to local, never to a fixed release literal", function()
 		assert_eq(Version.LOCAL, Version.VERSION,
 			"the source tree ships no stamp, so a fixed version literal would be the only way to differ")

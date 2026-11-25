@@ -299,6 +299,18 @@ function verifyOwnership(run, contents, prefix = path.join(run.home, '.local'), 
 		'bin/ergopti-hotstrings',
 		'@wrapper'
 	];
+	// A checkout install stamps its copy with the checkout's commit, or the
+	// installed daemon logged « Build commit unknown » at every start (field
+	// report of 2026-11-25); the copy stays a local version (source=checkout).
+	const head = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
+	if (head.status === 0) {
+		requiredOwners.push('_shared/build_stamp.txt');
+		assert.equal(
+			fs.readFileSync(path.join(library, '_shared/build_stamp.txt'), 'utf8'),
+			`commit=${head.stdout.trim()}\nsource=checkout\n`,
+			'a checkout install stamps the commit it was installed from'
+		);
+	}
 	if (hasStartup) requiredOwners.push('@unit', '@autostart');
 	else
 		assert.ok(

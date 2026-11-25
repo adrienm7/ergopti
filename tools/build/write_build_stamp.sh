@@ -24,16 +24,25 @@
 # requires the same version when ERGOPTI_BUILD_VERSION is set, and a well-formed
 # one whenever it is present.
 #
+# The Linux install.sh copies a git checkout into the user's library: it stamps
+# that copy with write-checkout, the HEAD of this checkout and
+# BUILD_STAMP_SOURCE_KEY=checkout, which the readers keep a local version, so
+# its reports name the commit without claiming a release.
+#
 # Usage:
 #   bash tools/build/write_build_stamp.sh write  <shared tree directory>
+#   bash tools/build/write_build_stamp.sh write-checkout <shared tree directory>
 #   bash tools/build/write_build_stamp.sh verify <shared tree directory>
 #   bash tools/build/write_build_stamp.sh read-version <shared tree directory>
+#   bash tools/build/write_build_stamp.sh path <shared tree directory>
 
 set -euo pipefail
 
 BUILD_STAMP_FILE="build_stamp.txt"
 BUILD_STAMP_COMMIT_KEY="commit"
 BUILD_STAMP_VERSION_KEY="version"
+BUILD_STAMP_SOURCE_KEY="source"
+BUILD_STAMP_SOURCE_CHECKOUT="checkout"
 
 # The macOS build runs this under /bin/bash 3.2, whose cd has no -e: -P already
 # resolves the physical directory, and an empty PWD is refused below.
@@ -43,7 +52,7 @@ IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -P -- "${SCRIPT_DIR}/../.." && print
 
 fail() { printf '[build-stamp] ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ $# -eq 2 ] || fail "usage: write_build_stamp.sh write|verify|read-version <shared tree directory>"
+[ $# -eq 2 ] || fail "usage: write_build_stamp.sh write|write-checkout|verify|read-version|path <shared tree directory>"
 MODE="$1"
 SHARED_DIR="$2"
 [ -d "$SHARED_DIR" ] || fail "shared tree directory not found: $SHARED_DIR"
@@ -84,6 +93,19 @@ case "$MODE" in
 			echo "[build-stamp] no ${BUILD_STAMP_VERSION_KEY} entry: ERGOPTI_BUILD_VERSION is unset (not a release build)"
 		fi
 		;;
+	path)
+		# The stamp file's path, for an installer that records what it wrote.
+		printf '%s\n' "$STAMP_PATH"
+		;;
+	write-checkout)
+		# A checkout copy is never a release: a version here would claim one.
+		[ -z "${ERGOPTI_BUILD_VERSION:-}" ] || fail "a checkout copy takes no ERGOPTI_BUILD_VERSION"
+		commit="$(git -C "$REPO_ROOT" rev-parse HEAD)" || fail "$REPO_ROOT is not a git checkout"
+		require_full_commit "$commit" "git HEAD of $REPO_ROOT"
+		printf '%s=%s\n%s=%s\n' "$BUILD_STAMP_COMMIT_KEY" "$commit" \
+			"$BUILD_STAMP_SOURCE_KEY" "$BUILD_STAMP_SOURCE_CHECKOUT" > "$STAMP_PATH"
+		echo "[build-stamp] ${BUILD_STAMP_COMMIT_KEY}=${commit} (git HEAD of ${REPO_ROOT}, checkout copy) -> ${STAMP_PATH}"
+		;;
 	verify|read-version)
 		[ -f "$STAMP_PATH" ] || fail "no build stamp at $STAMP_PATH — the package would report an unknown commit"
 		line="$(grep -E "^${BUILD_STAMP_COMMIT_KEY}=" "$STAMP_PATH" || true)"
@@ -104,6 +126,6 @@ case "$MODE" in
 		fi
 		;;
 	*)
-		fail "unknown mode '$MODE' (expected write, verify or read-version)"
+		fail "unknown mode '$MODE' (expected write, write-checkout, verify, read-version or path)"
 		;;
 esac

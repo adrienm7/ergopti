@@ -217,6 +217,12 @@ M.BUILD_STAMP_COMMIT_KEY = "commit"
 -- in the workflow). Only release packages carry it; the Linux driver shows it
 -- as its version, because its sources hold no version a build could rewrite.
 M.BUILD_STAMP_VERSION_KEY = "version"
+-- Where an unreleased tree came from. The Linux install.sh stamps a copy of a
+-- git checkout with its commit and `source=checkout`: that tree is still a
+-- local version (no release version, no "version unknown" warning), and its
+-- commit is the checkout's, which a reader reports as a git commit.
+M.BUILD_STAMP_SOURCE_KEY = "source"
+M.BUILD_STAMP_SOURCE_CHECKOUT = "checkout"
 
 -- Where a resolved commit came from, reported next to it so a reader can tell
 -- a release build from a source run of the same commit.
@@ -245,17 +251,31 @@ function M.parse_build_stamp(text)
 	return nil, "the build stamp has no " .. M.BUILD_STAMP_COMMIT_KEY .. " entry"
 end
 
+--- Whether a build stamp marks a copy of a git checkout (BUILD_STAMP_SOURCE_KEY).
+--- @param text string Raw file content, one `key=value` per line.
+--- @return boolean
+function M.stamp_is_checkout(text)
+	if type(text) ~= "string" then return false end
+	for line in text:gmatch("[^\r\n]+") do
+		local key, value = line:match("^%s*([%w_]+)%s*=%s*(.-)%s*$")
+		if key == M.BUILD_STAMP_SOURCE_KEY then return value == M.BUILD_STAMP_SOURCE_CHECKOUT end
+	end
+	return false
+end
+
 --- Reads the commit a package build stamped into the shared tree.
 --- @param fs table { read = fun(path):string|nil }
 --- @param shared_root string|nil Absolute path of the shared tree.
 --- @return string|nil Abbreviated commit id, nil when there is no valid stamp.
 --- @return string|nil Why a present stamp was rejected; nil when it is absent.
+--- @return boolean Whether the stamp marks a copy of a git checkout.
 function M.build_commit(fs, shared_root)
-	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader" end
-	if type(shared_root) ~= "string" or shared_root == "" then return nil end
+	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader", false end
+	if type(shared_root) ~= "string" or shared_root == "" then return nil, nil, false end
 	local text = fs.read(NativePath.without_trailing_separators(shared_root) .. "/" .. M.BUILD_STAMP_FILE)
-	if text == nil then return nil end
-	return M.parse_build_stamp(text)
+	if text == nil then return nil, nil, false end
+	local commit, reason = M.parse_build_stamp(text)
+	return commit, reason, M.stamp_is_checkout(text)
 end
 
 --- Resolves the commit the running driver was built from. A package build is
@@ -268,8 +288,8 @@ end
 --- @return string One of the M.COMMIT_SOURCE_* values.
 --- @return string|nil Why the commit is unknown, when it is.
 function M.resolve_commit(fs, shared_root, source_dir)
-	local stamped, stamp_error = M.build_commit(fs, shared_root)
-	if stamped then return stamped, M.COMMIT_SOURCE_BUILD end
+	local stamped, stamp_error, checkout = M.build_commit(fs, shared_root)
+	if stamped then return stamped, checkout and M.COMMIT_SOURCE_GIT or M.COMMIT_SOURCE_BUILD end
 	-- A stamp that exists but cannot be read is a broken package, not a source
 	-- run: falling through to git would hide the defect behind a plausible id.
 	if stamp_error then return M.UNKNOWN, M.COMMIT_SOURCE_UNKNOWN, stamp_error end
@@ -315,6 +335,8 @@ function M.build_version(fs, shared_root)
 	if text == nil then return nil, nil, false end
 	local version, reason = M.parse_build_version(text)
 	if version then return version, nil, true end
+	-- A copy of a checkout carries no release version by design: it is local.
+	if reason == nil and M.stamp_is_checkout(text) then return nil, nil, false end
 	return nil, reason or ("the build stamp has no " .. M.BUILD_STAMP_VERSION_KEY
 		.. " entry: the package was not built by a release job"), true
 end

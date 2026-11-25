@@ -135,6 +135,18 @@ describe("Build commit: the shared stamp parser and resolver", function()
 		assert_eq(Snapshot.COMMIT_SOURCE_GIT, source)
 	end)
 
+	it("answers an install.sh copy of a checkout from its stamp, as a git commit", function()
+		-- The installed copy has no .git: without the stamp install.sh writes,
+		-- every start logged « Build commit unknown » (field report 2026-11-25).
+		local commit, source, detail = Snapshot.resolve_commit(fixture_fs({
+			["/home/u/.local/lib/ergopti/_shared/" .. Snapshot.BUILD_STAMP_FILE] = "commit=" .. SHA .. "\n"
+				.. Snapshot.BUILD_STAMP_SOURCE_KEY .. "=" .. Snapshot.BUILD_STAMP_SOURCE_CHECKOUT .. "\n",
+		}), "/home/u/.local/lib/ergopti/_shared", "/home/u/.local/lib/ergopti/linux")
+		assert_eq(SHORT, commit)
+		assert_eq(Snapshot.COMMIT_SOURCE_GIT, source, "the commit is the checkout's, not a release build's")
+		assert_eq(nil, detail)
+	end)
+
 	it("answers unknown with both places it looked when neither exists", function()
 		local commit, source, detail = Snapshot.resolve_commit(fixture_fs({}), "/opt/e/_shared", "/opt/e/linux")
 		assert_eq(Snapshot.UNKNOWN, commit)
