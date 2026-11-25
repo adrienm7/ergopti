@@ -943,6 +943,9 @@ function handleSecTitleClick(e, si) {
 
 function handleRowClick(e, si, ei) {
 	if (isDragOrSelection(e)) return;
+	// The checkbox's label is its 44 px target (theme.css): a click on it
+	// selects the row, the checkbox's own click following, and edits nothing.
+	if (e.target.closest('.entry-cb-wrap')) return;
 
 	let target = e.target;
 	let field = null;
@@ -1105,13 +1108,13 @@ function render() {
 					ei +
 					')">';
 				html +=
-					'<div class="entry-cb-wrap"><input type="checkbox" class="entry-cb" data-si="' +
+					'<label class="entry-cb-wrap"><input type="checkbox" class="entry-cb" data-si="' +
 					si +
 					'" data-ei="' +
 					ei +
 					'" aria-label="' +
 					escapeHtml(_t('editor.hotstrings.select_entry') + ' ' + e.trigger) +
-					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
+					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></label>';
 				html +=
 					'<div class="e-trig"><button type="button" class="trig-lbl" data-f="trig" title="' +
 					escapeHtml(_t('editor.hotstrings.click_to_edit')) +

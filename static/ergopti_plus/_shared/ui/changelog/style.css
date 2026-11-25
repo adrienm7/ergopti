@@ -540,6 +540,13 @@ body {
 	text-align: start;
 }
 
+/* A link alone in its cell (a download) is no link inside a sentence: it
+   takes the 44 px target of theme.css, its text centred in it. */
+#release-body td > a:only-child {
+	align-items: center;
+	display: inline-flex;
+}
+
 #release-body th {
 	background: var(--theme-hue-111113);
 	color: var(--theme-grey-ccc);

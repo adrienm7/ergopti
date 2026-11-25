@@ -12,7 +12,8 @@
  * audited unless a stated reason exempts it, and each fixture posts to the
  * bridge its page really uses, so the fake host answers the right messages.
  * The HTML_CodeSniffer baseline only names audited windows, states, both
- * schemes and HTML_CodeSniffer codes.
+ * schemes and HTML_CodeSniffer codes. The shared theme gives every control
+ * the 44 px minimum the scan measures (WCAG 2.5.5).
  * ==============================================================================
  */
 
@@ -24,6 +25,7 @@ const path = require('node:path');
 const scan = require('./browser/app-windows-accessibility.playwright.cjs');
 const { WINDOWS } = require('./browser/app-windows-fixtures.cjs');
 const htmlcs = require('./lib/htmlcs.cjs');
+const targetSize = require('./lib/target-size.cjs');
 
 const UI = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(UI, 'apps.manifest.json'), 'utf8'));
@@ -239,7 +241,24 @@ function checkReadingPreferences() {
 	}
 }
 
+/**
+ * Every app window links theme.css, so its one rule gives each control the
+ * scan measures its 44 px: a window drawn with the browser's 20 px buttons
+ * counted 391 kinds of small target before the rule.
+ */
+function checkTargetMinimum() {
+	const theme = fs.readFileSync(path.join(UI, 'theme.css'), 'utf8');
+	assert.deepEqual(targetSize.stylesheetTargetProblems(theme, '--theme-target-min'), []);
+	const bare = theme.replace(/--theme-target-min: 44px;/, '--theme-target-min: 24px;');
+	assert.notDeepEqual(
+		targetSize.stylesheetTargetProblems(bare, '--theme-target-min'),
+		[],
+		'A smaller minimum is refused'
+	);
+}
+
 checkComparison();
+checkTargetMinimum();
 checkReadingPreferences();
 checkBaseline();
 checkHtmlcsBaseline();

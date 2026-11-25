@@ -146,4 +146,81 @@ function targetSizeProblems(minimum) {
 	);
 }
 
-module.exports = { TARGET_SIZE_RULE, MINIMUM_PX, targetSizeProblems };
+/**
+ * The selectors of the controls targetSizeProblems measures, read from its
+ * own source: the page function cannot import them, and a second list here
+ * could drift from the one the gates run.
+ * @returns {string[]} Each selector with single quotes, as a stylesheet writes it.
+ */
+function controlSelectors() {
+	const source = targetSizeProblems.toString();
+	const list = source.slice(source.indexOf('const CONTROLS = ['), source.indexOf('].join('));
+	return Array.from(list.matchAll(/'([^']+)'/g), (match) => match[1].replace(/"/g, "'"));
+}
+
+/**
+ * Splits a selector list at its top-level commas.
+ * @param {string} list - The text between a :where( and its closing parenthesis.
+ * @returns {string[]}
+ */
+function splitSelectors(list) {
+	const parts = [];
+	let depth = 0;
+	let start = 0;
+	for (let index = 0; index < list.length; index++) {
+		if (list[index] === '(') depth++;
+		else if (list[index] === ')') depth--;
+		else if (list[index] === ',' && depth === 0) {
+			parts.push(list.slice(start, index).trim());
+			start = index + 1;
+		}
+	}
+	parts.push(list.slice(start).trim());
+	return parts.filter(Boolean);
+}
+
+/**
+ * What a stylesheet lacks to give every measured control the 44 px minimum:
+ * its token set to MINIMUM_PX, one zero-specificity rule over every control
+ * selector giving both minimum sides from that token (a text field may leave
+ * out the checkbox and the radio button), and the rule that gives those two
+ * their label's 44 px instead, as a native mark drawn at 44 px is a giant.
+ * @param {string} css - The stylesheet's text.
+ * @param {string} token - The custom property holding the minimum.
+ * @returns {string[]} The problems, empty when the stylesheet holds the minimum.
+ */
+function stylesheetTargetProblems(css, token) {
+	const problems = [];
+	const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+	const declared = code.match(new RegExp(`${token}:\\s*([^;]+);`));
+	if (!declared || declared[1].trim() !== `${MINIMUM_PX}px`)
+		problems.push(`${token} is not ${MINIMUM_PX}px`);
+	const sizes = (body) =>
+		body.includes(`min-block-size: var(${token})`) &&
+		body.includes(`min-inline-size: var(${token})`);
+	const rules = Array.from(code.matchAll(/:where\(([^{]*)\)\s*\{([^}]*)\}/g), (match) => ({
+		selectors: splitSelectors(match[1]),
+		body: match[2]
+	})).filter((rule) => sizes(rule.body));
+	const controls = rules.find((rule) => rule.selectors.includes('button'));
+	if (!controls) problems.push('no :where() rule gives the controls both minimum sides');
+	else
+		for (const selector of controlSelectors()) {
+			const field = selector.startsWith('input:not(');
+			const found = field
+				? controls.selectors.some((written) => written.startsWith(selector.slice(0, -1)))
+				: controls.selectors.includes(selector);
+			if (!found) problems.push(`the minimum misses ${selector}`);
+		}
+	if (!rules.some((rule) => rule.selectors.some((written) => /^label:has\(/.test(written))))
+		problems.push('no rule gives a checkbox or radio button its label as a 44 px target');
+	return problems;
+}
+
+module.exports = {
+	TARGET_SIZE_RULE,
+	MINIMUM_PX,
+	targetSizeProblems,
+	controlSelectors,
+	stylesheetTargetProblems
+};

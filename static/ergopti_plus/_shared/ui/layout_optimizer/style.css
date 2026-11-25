@@ -126,7 +126,7 @@ body:has(> main.layout-optimizer) {
 	color: inherit;
 	font: inherit;
 	max-width: 100%;
-	min-height: 34px;
+	min-height: var(--theme-target-min);
 	padding: 6px 10px;
 }
 
@@ -404,7 +404,7 @@ body:has(> main.layout-optimizer) {
 	border-radius: 7px;
 	flex: 1 1 auto;
 	font-weight: 600;
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 }
 
 .layout-optimizer .lo-tabs [role='tab'][aria-selected='true'] {
@@ -527,7 +527,7 @@ body:has(> main.layout-optimizer) {
 
 .lo-run-buttons .lo-primary {
 	flex: 1 1 auto;
-	min-height: 40px;
+	min-height: var(--theme-target-min);
 }
 
 #lo-progress {
@@ -742,6 +742,8 @@ body:has(> main.layout-optimizer) {
 .lo-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	position: absolute;
 	white-space: nowrap;

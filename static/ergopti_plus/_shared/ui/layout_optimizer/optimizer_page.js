@@ -127,7 +127,9 @@
 	// Workers at most, and the threads left to the page.
 	const MAX_WORKERS = 8;
 	// Size of one key unit of a drawn board, in pixels, at most and at least.
-	const KEY_UNIT_MAX = 44;
+	// A key is its unit less a 3 px gap: 47 px draws the 44 px target of
+	// WCAG 2.5.5 wherever the board has the room.
+	const KEY_UNIT_MAX = 47;
 	const KEY_UNIT_MIN = 20;
 	// The library layouts most alike to the optimized one the result lists.
 	const LIBRARY_CLOSEST = 5;

@@ -231,6 +231,8 @@ main {
 	padding: 2px 4px 2px 8px;
 }
 
+/* The fields give the 44 px reset button (theme.css) the width it gained, so
+   the row keeps its width and the section titles their column. */
 .ctrl input,
 .ctrl select {
 	background: transparent;
@@ -238,10 +240,10 @@ main {
 	color: var(--text);
 	font: inherit;
 	padding: 4px 0;
-	width: 90px;
+	width: 68px;
 }
 .ctrl select {
-	width: 130px;
+	width: 108px;
 }
 /* Priority is a small 0-100 integer — a narrow field keeps the four-control row
    (delay / priority / color / tooltip) from overflowing the 720 px panel. */

@@ -115,7 +115,7 @@ _HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 		g.BackColor := "0x1e1e1e"
 		g.MarginX := 0
 		g.MarginY := 0
-		Placeholder := g.Add("Text", "x0 y0 w960 h640", "")
+		Placeholder := g.Add("Text", "x0 y0 w960 h660", "")
 		g.OnEvent("Close", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnClose))
 		g.OnEvent("Size", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnResize))
 
@@ -131,7 +131,7 @@ _HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 		} finally Critical(PreviousCritical)
 		if !Published || !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
-		g.Show("w960 h640 Center")
+		g.Show("w960 h660 Center")
 		if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 			return true
 

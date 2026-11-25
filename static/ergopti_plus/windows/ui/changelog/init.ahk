@@ -186,9 +186,9 @@ _CLW_BuildWindow(Channel, Request) {
 	g.MarginY   := 0
 
 	; Full-window placeholder that WebView2.Fill() will cover.
-	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x580, SSoT);
+	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x620, SSoT);
 	; pinned by tools/test/test-webview-geometry-single-source.cjs.
-	Placeholder := g.Add("Text", "x0 y0 w860 h580", "")
+	Placeholder := g.Add("Text", "x0 y0 w860 h620", "")
 
 	g.OnEvent("Close",  _CLW_OnClose)
 	g.OnEvent("Escape", _CLW_OnClose)
@@ -209,7 +209,7 @@ _CLW_BuildWindow(Channel, Request) {
 		try g.Destroy()
 		return false
 	}
-	try g.Show("w860 h580")
+	try g.Show("w860 h620")
 	catch as Err {
 		; Native destruction during Show is an ordinary retired opening.
 		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
