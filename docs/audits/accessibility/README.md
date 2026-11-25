@@ -1250,6 +1250,19 @@ accessibility statement (1). Each was cut or lost its filler, without a
 rewrite, and two typos went with them; the diffs are the evidence. The
 layout use page renders its text in the browser and had none.
 
+### Plain language, the Studio's catalogue (2026-11-25, Paris time)
+
+The frames' words are now measured in the catalogue itself:
+`tools/test/test-studio-plain-language.cjs` cuts every string of the
+`layout_analysis`, `layout_editor`, `layout_optimizer` and `layout_try`
+namespaces into sentences by the reading gate's rule (widened to scripts
+without capitals) and counts those of 30 words or more. English had 28 and
+French 36; each was cut in two or three, without a rewrite, and the test
+refuses an English or French row. The other spaced locales keep 315 rows in
+`studio-plain-language-baseline.json`, which only shrinks; formulas are not
+prose, and Japanese and Chinese, which put no space between words, are left
+to the manual review.
+
 ### Help text of the typing dashboard (WCAG 3.3.5)
 
 Every card of the typing dashboard says what it counts behind its « i »,

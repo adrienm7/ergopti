@@ -858,7 +858,8 @@
 		"test:linux-flatpak-module-cache": "node ./tools/test/test-linux-flatpak-module-cache.cjs",
 		"test:update-asset-signature": "node ./tools/test/test-update-asset-signature.cjs",
 		"test:windows-stable-signing-retirement": "node ./tools/test/test-windows-stable-signing-retirement.cjs",
-		"test:error-messages-say-how-to-recover": "node ./tools/test/test-error-messages-say-how-to-recover.cjs"
+		"test:error-messages-say-how-to-recover": "node ./tools/test/test-error-messages-say-how-to-recover.cjs",
+		"test:studio-plain-language": "node ./tools/test/test-studio-plain-language.cjs"
 	},
 	"type": "module",
 	"imports": {

@@ -749,6 +749,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-analysis-views.cjs"],
 			"repro": "npm run test:layout-analysis-views"
+		},
+		{
+			"id": "studio-plain-language",
+			"ordinal": 735,
+			"name": "no Studio catalogue string gains a sentence of 30 words or more in any spaced locale, and the English and French sources have none (WCAG 3.1.5)",
+			"cmd": "node",
+			"args": ["tools/test/test-studio-plain-language.cjs"],
+			"repro": "npm run test:studio-plain-language"
 		}
 	]
 }
