@@ -52,6 +52,8 @@ const GROUPS = [
 	'macos_notifications',
 	'linux_stage',
 	'linux_desktop',
+	'linux_host_environment',
+	'linux_input',
 	'locales',
 	'windows_vendor'
 ];
@@ -63,8 +65,19 @@ const GROUPS = [
 // Compose state file the user installer writes, the Wayland protocols of the
 // COSMIC focus worker, the environment variables of the dialog host's test
 // guard) are the Linux daemon's: its Python installer and the extension pin the
-// same values in their tests.
-const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'linux_desktop', 'locales']);
+// same values in their tests. The launcher's record of the host environment is
+// read by the Linux daemon (core/process/adapters/host_environment.lua) and written by
+// tools/build/templates/linux-portable-runtime-env.sh, where they are the names of
+// shell variables it assigns and expands, not values it could read from a
+// variable: test-linux-appimage-portability.cjs pins the template's names to this file. The uinput device names are the Linux daemon's alone.
+const LUA_ONLY_GROUPS = new Set([
+	'bytecode_package',
+	'linux_stage',
+	'linux_desktop',
+	'linux_host_environment',
+	'linux_input',
+	'locales'
+]);
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).
 const MACOS_ONLY_GROUPS = new Set(['macos_notifications']);
@@ -91,13 +104,17 @@ const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
 // path (linux/core/lifecycle/engine/bytecode_package.lua, modules/updater/installer.lua).
 // The Linux desktop names add a D-Bus object path and a dot file name.
 const LINUX_DESKTOP_SHAPE = /^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._-]*)$/;
+// A uinput device name is free text the kernel reports (struct uinput_setup.name,
+// at most 79 bytes before its terminating NUL): words separated by single spaces.
+const LINUX_INPUT_SHAPE = /^(?=.{1,79}$)[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 // The product name the user reads (app.display_name) carries a plus sign.
 const APP_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 const GROUP_SHAPE = {
 	app: APP_SHAPE,
 	field_report: PATH_SHAPE,
 	bytecode_package: PATH_SHAPE,
-	linux_desktop: LINUX_DESKTOP_SHAPE
+	linux_desktop: LINUX_DESKTOP_SHAPE,
+	linux_input: LINUX_INPUT_SHAPE
 };
 
 /** Stops generation with one exact reason. */

@@ -75,6 +75,15 @@ return {
 		dialog_host_guard_env = "ERGOPTI_DIALOG_HOST_GUARD",
 		dialog_host_guard_case_env = "ERGOPTI_DIALOG_HOST_GUARD_CASE",
 	},
+	linux_host_environment = {
+		names_env = "ERGOPTI_HOST_ENV_NAMES",
+		value_prefix = "ERGOPTI_HOST_ENV_SET_",
+		driver_root_env = "ERGOPTI_HOST_ENV_DRIVER_ROOT",
+	},
+	linux_input = {
+		virtual_keyboard = "Ergopti Virtual Keyboard",
+		virtual_pointer = "Ergopti Virtual Pointer",
+	},
 	locales = {
 		system_fallback = "en",
 	},

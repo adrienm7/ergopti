@@ -29,11 +29,14 @@ local M = {}
 
 local LOG = "core.process.adapters.host_environment"
 
+-- The variables network-runtime-env.sh writes (identifiers.json linux_host_environment).
+local Record = require("core.text.engine.identifiers").linux_host_environment
+
 --- The launcher's record: the names it changed, and each one's host value.
-M.NAMES_ENV = "ERGOPTI_HOST_ENV_NAMES"
-M.VALUE_PREFIX = "ERGOPTI_HOST_ENV_SET_"
+M.NAMES_ENV = Record.names_env
+M.VALUE_PREFIX = Record.value_prefix
 --- The roots whose programs keep the bundle environment.
-M.OWNED_ROOT_ENVS = { "ERGOPTI_RUNTIME_PREFIX", "ERGOPTI_HOST_ENV_DRIVER_ROOT" }
+M.OWNED_ROOT_ENVS = { "ERGOPTI_RUNTIME_PREFIX", Record.driver_root_env }
 
 -- Whether install() already wrapped the spawn functions.
 local _installed = false

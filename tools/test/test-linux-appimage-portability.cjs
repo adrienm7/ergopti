@@ -627,6 +627,25 @@ passed++;
 assert.ok(!/LD_LIBRARY_PATH=/.test(environment), 'no library path reaches host programs');
 assert.ok(!/LD_LIBRARY_PATH/.test(appRunSourceOf(builder)), 'AppRun sets no library path');
 assert.ok(!/export PATH=/.test(environment), 'owned programs run by absolute path');
+// The record's variable names are declared once, in identifiers.json, and the
+// daemon reads them from there; the template spells them as shell variable
+// names, so they are pinned here (a rename on one side alone loses the record).
+const HostRecord = JSON.parse(
+	read('static/ergopti_plus/_shared/core/text/data/identifiers.json')
+).linux_host_environment;
+assert.ok(
+	environment.includes(`${HostRecord.names_env}="LUA_PATH `) &&
+		environment.includes(`export ${HostRecord.names_env}\n`),
+	'the template writes the name list the daemon reads'
+);
+assert.ok(
+	environment.includes(`export "${HostRecord.value_prefix}$ERGOPTI_PACKAGE_HOST_NAME=`),
+	'the template writes each host value under the prefix the daemon reads'
+);
+assert.ok(
+	environment.includes(`export ${HostRecord.driver_root_env}="$DRIVER_ROOT"`),
+	'the template exports the driver root the daemon keeps the bundle environment for'
+);
 if (process.platform === 'linux') {
 	const { spawnSync } = require('node:child_process');
 	const { bashExecutable } = require('../lib/git-bash.cjs');
@@ -688,29 +707,27 @@ if (process.platform === 'linux') {
 			'PATH'
 		])
 			assert.equal(variables[name], host[name], `${name} stays the host's`);
+		const recorded = (name) => variables[`${HostRecord.value_prefix}${name}`];
 		assert.equal(
-			variables.ERGOPTI_HOST_ENV_NAMES,
+			variables[HostRecord.names_env],
 			'LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH'
 		);
-		assert.equal(
-			variables.ERGOPTI_HOST_ENV_SET_GI_TYPELIB_PATH,
-			undefined,
-			'GI_TYPELIB_PATH was unset'
-		);
+		assert.equal(recorded('GI_TYPELIB_PATH'), undefined, 'GI_TYPELIB_PATH was unset');
 		assert.ok(variables.GI_TYPELIB_PATH.endsWith(path.join(prefix, 'lib/girepository-1.0')));
-		assert.equal(variables.ERGOPTI_HOST_ENV_SET_LUA_PATH, 'host;;');
-		assert.equal(variables.ERGOPTI_HOST_ENV_SET_CURL_CA_BUNDLE, trust);
-		assert.equal(variables.ERGOPTI_HOST_ENV_SET_LUA_CPATH, undefined, 'LUA_CPATH was unset');
-		assert.equal(variables.ERGOPTI_HOST_ENV_DRIVER_ROOT, path.join(prefix, 'lib/ergopti'));
+		assert.equal(recorded('LUA_PATH'), 'host;;');
+		assert.equal(recorded('CURL_CA_BUNDLE'), trust);
+		assert.equal(recorded('LUA_CPATH'), undefined, 'LUA_CPATH was unset');
+		assert.equal(variables[HostRecord.driver_root_env], path.join(prefix, 'lib/ergopti'));
 		assert.ok(variables.LUA_PATH.startsWith(path.join(prefix, 'lib/ergopti')));
 		// A nested launch from the bundle keeps the first record.
-		const nested = observe({
-			LUA_PATH: 'bundle;;',
-			ERGOPTI_HOST_ENV_NAMES: 'LUA_PATH LUA_CPATH CURL_CA_BUNDLE',
-			ERGOPTI_HOST_ENV_SET_LUA_PATH: 'host;;'
-		});
-		assert.equal(nested.status, 0, nested.stderr);
-		assert.match(nested.stdout, /^ERGOPTI_HOST_ENV_SET_LUA_PATH=host;;$/m);
+		const nested = parse(
+			observe({
+				LUA_PATH: 'bundle;;',
+				[HostRecord.names_env]: 'LUA_PATH LUA_CPATH CURL_CA_BUNDLE',
+				[`${HostRecord.value_prefix}LUA_PATH`]: 'host;;'
+			})
+		);
+		assert.equal(nested[`${HostRecord.value_prefix}LUA_PATH`], 'host;;');
 		// A prefix that builds its own GIO (the Flatpak's /app) still points GIO at it.
 		for (const name of [
 			'lib/gio/modules/libgiolibproxy.so',
@@ -722,9 +739,10 @@ if (process.platform === 'linux') {
 		const owned = observe({ CURL_CA_BUNDLE: trust });
 		assert.equal(owned.status, 0, owned.stderr);
 		assert.match(owned.stdout, /^GIO_MODULE_DIR=.*\/usr\/lib\/gio\/modules$/m);
-		assert.match(
-			owned.stdout,
-			/^ERGOPTI_HOST_ENV_NAMES=LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH GIO_MODULE_DIR /m
+		assert.ok(
+			parse(owned)[HostRecord.names_env].startsWith(
+				'LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH GIO_MODULE_DIR '
+			)
 		);
 	} finally {
 		fs.rmSync(sandbox, { recursive: true, force: true });
