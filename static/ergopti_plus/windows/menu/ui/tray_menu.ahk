@@ -113,5 +113,6 @@ global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 #Include builder/actions.ahk
 #Include ../../diagnostics/ui/log_openers.ahk
 #Include ../../diagnostics/engine/log_export.ahk
+#Include ../../diagnostics/adapters/log_export_files.ahk
 #Include ../../diagnostics/ui/log_export.ahk
 #Include builder/rebuild.ahk

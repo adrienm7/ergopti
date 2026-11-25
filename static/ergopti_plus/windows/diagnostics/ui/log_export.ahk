@@ -120,7 +120,7 @@ _LogExport_Notify(NotifyFn, TitleKey, MessageKey, Level, Path := "") {
 ; @returns {Boolean} True when the archive was exported, or an empty folder told.
 LogExport_Command(Seams := 0) {
 	Seams := (Seams is Map) ? Seams : Map()
-	RunWaitFn := Seams.Get("run_wait", (Command) => RunWait(Command, , "Hide"))
+	RunWaitFn := Seams.Get("run_wait", LogExportFiles_RunHidden)
 	RevealFn := Seams.Get("reveal", _LogExport_Reveal)
 	ClipboardFn := Seams.Get("clipboard", CB_Write)
 	NotifyFn := Seams.Get("notify", NotifierSend)
@@ -145,8 +145,7 @@ LogExport_Command(Seams := 0) {
 			return _LogExport_Notify(NotifyFn, "log_export.done_title", "log_export.empty", "info")
 		}
 		TempRoot := Seams.Has("temp_dir") ? Seams["temp_dir"] : A_Temp . "\"
-		Staging := TempRoot . "ergopti-log-export-" . DllCall("Kernel32\GetCurrentProcessId", "UInt")
-			. "-" . A_TickCount
+		Staging := LogExportFiles_StagingPath(TempRoot)
 		DirCreate(Staging)
 		Entries := []
 		for Entry in Selected {
@@ -155,7 +154,7 @@ LogExport_Command(Seams := 0) {
 			Target := Staging . "\" . StrReplace(Entry["archive"], "/", "\")
 			SplitPath(Target, , &TargetDir)
 			DirCreate(TargetDir)
-			FileAppend(LogExport_ScrubText(FileRead(Source, "UTF-8")), Target, "UTF-8-RAW")
+			LogExportFiles_StageScrubbed(Source, Target, LogExport_ScrubText)
 			Entries.Push(Entry["archive"])
 		}
 		Destination := _LogExport_Destination(DownloadsFn)
@@ -168,13 +167,13 @@ LogExport_Command(Seams := 0) {
 			throw Error("tar.exe exited with code " . ExitCode)
 		if !FileExist(Partial) || FileGetSize(Partial) == 0
 			throw Error("tar.exe wrote no archive")
-		FileMove(Partial, Final, 0)
+		LogExportFiles_Publish(Partial, Final)
 		Partial := ""
 	} catch as Err {
 		LoggerError("LogExport", "The logs could not be exported: {1}.", Err.Message)
 		if (Partial != "" && FileExist(Partial)) {
 			try {
-				FileDelete(Partial)
+				LogExportFiles_Remove(Partial)
 			} catch as CleanupErr {
 				LoggerWarn("LogExport", "The partial archive '{1}' could not be removed: {2}.", Partial, CleanupErr.Message)
 			}
@@ -203,7 +202,7 @@ LogExport_Command(Seams := 0) {
 ; @returns {Boolean} False when Explorer could not be started.
 _LogExport_Reveal(Path) {
 	try {
-		Run(ShellRunner_SystemProgramCommand("explorer.exe", '/select,"' . Path . '"'))
+		LogExportFiles_SelectInExplorer(Path)
 		return true
 	} catch as Err {
 		LoggerWarn("LogExport", "Explorer could not be started: {1}.", Err.Message)

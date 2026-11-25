@@ -516,6 +516,7 @@ InstallSendNoOps()
 #Include ../diagnostics/ui/log_openers.ahk
 ; « Export the logs (zip) »: the shared-vector port and its action, definitions only.
 #Include ../diagnostics/engine/log_export.ahk
+#Include ../diagnostics/adapters/log_export_files.ahk
 #Include ../diagnostics/ui/log_export.ahk
 #Include unit/diagnostics/ui/test_log_export.ahk
 #Include unit/core/logger/test_logs_dir_resolver.ahk
