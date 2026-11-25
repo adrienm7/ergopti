@@ -118,6 +118,10 @@ input[type='text'] {
 	flex-grow: 1;
 	font-family: 'SF Mono', 'Monaco', monospace;
 	font-size: 10.5px;
+	/* With its label above, the field is a 44 px target (WCAG 2.5.5) whatever
+	   the fonts: drawn from its text alone, the pair met 44 px here and fell
+	   short on the CI runner's fonts. */
+	min-height: 32px;
 	outline: none;
 	padding: 5px 8px;
 	transition:
