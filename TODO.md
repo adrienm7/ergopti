@@ -173,8 +173,11 @@ baseline as violations go.
       2026-11-24): macOS restyles the titles in faces the launcher registers for the session, Windows owner-draws
       the rows, Linux cannot (dbusmenu carries no font) and its row says so; proof `test_reading_font_titles.lua`,
       `MenuFontRegistrationTests`, `test_menu_font.ahk`, `test-menu-font-faces.cjs`. Left: a look at
-      the dyslexia font in a real window and tray menu on each OS (TODO-tests); the plain-language review of the Studio's own
-      strings (the 21 locales' catalogue, not measured).
+      the dyslexia font in a real window and tray menu on each OS (TODO-tests). The Studio's own strings are measured
+      now (`npm run test:studio-plain-language`, WCAG 3.1.5 on the 21 locales' catalogue): English and French have no
+      sentence of 30 words or more; left, the 315 rows the other 17 spaced locales still pin in
+      `tools/test/studio-plain-language-baseline.json`, and a review of Japanese and Chinese, which a word count
+      cannot measure.
 - [ ] **Blind and low-vision users.** The Optimiser's result boards have a table view of their own (each key's
       place, what it types on both layouts, whether it changed). Heading order and landmarks are a gate
       (`tools/test/lib/heading-landmarks.cjs`: one h1, no skipped level, one main, every other landmark named): the
