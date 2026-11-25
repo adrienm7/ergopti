@@ -250,6 +250,16 @@ function M.redaction_context(overrides)
 	return { home = identity.home, user = identity.user, config_dir = identity.config_dir, case_insensitive = true }
 end
 
+--- Reveals one file in Finder through the owned desktop opener, for the other
+--- Debug menu exports (« Export the logs (zip) »).
+--- @param path string Absolute file path.
+--- @param done function Receives { ok, code, error, cleanup_pending }.
+--- @param current function Exact action owner predicate.
+--- @return table request Cancellable native opener.
+function M.reveal_in_finder(path, done, current)
+	return DEFAULT_EFFECTS.reveal(path, done, current)
+end
+
 
 
 
