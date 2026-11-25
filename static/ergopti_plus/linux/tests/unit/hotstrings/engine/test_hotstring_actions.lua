@@ -31,4 +31,35 @@ helpers.describe("hotstring actions on Linux (hotstring-actions)", function()
 		for _, fn in ipairs(queued) do fn() end
 		helpers.assert_eq(table.concat(ran, ","), "wf:wf_a,select_all@hotstring")
 	end)
+
+	helpers.it("the commit follow-up runs an action entry and drops its context (hotstring-actions)", function()
+		local Followup = require("hotstrings.engine.commit_followup")
+		local calls = {}
+		local engine = {
+			reset = function(_, keep) calls[#calls + 1] = "reset:" .. tostring(keep) end,
+			apply_expansion = function() calls[#calls + 1] = "apply" end,
+		}
+		local ran = {}
+		local deps = { run_action = function(result) ran[#ran + 1] = result.action end }
+		helpers.assert_eq(Followup.apply(engine, { action = "select_all" }, deps), true,
+			"an action entry changes the context, so the undo must be dropped")
+		helpers.assert_eq(table.concat(ran, ","), "select_all")
+		helpers.assert_eq(table.concat(calls, ","), "reset:false", "an action entry never chains")
+		calls = {}
+		helpers.assert_eq(Followup.apply(engine, { output = "x" }, deps), false)
+		helpers.assert_eq(table.concat(calls, ","), "apply", "a plain entry keeps the text to chain on")
+		helpers.assert_eq(#ran, 1, "a plain entry runs no action")
+	end)
+
+	helpers.it("the daemon entry point routes the commit through the follow-up owner (hotstring-actions)", function()
+		-- main() sits at LuaJIT's 60-upvalue budget; the action wiring inlined there
+		-- once stopped the entry point compiling, so it stays behind one owner.
+		local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = handle:read("*a")
+		handle:close()
+		helpers.assert_true(source:find("CommitFollowup.apply(engine, result)", 1, true) ~= nil,
+			"the committed expansion must go through hotstrings.engine.commit_followup")
+		helpers.assert_true(source:find("action_runner", 1, true) == nil,
+			"the entry point must not wire the action runner itself")
+	end)
 end)

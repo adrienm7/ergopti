@@ -311,7 +311,6 @@ local hotstrings_config = require("hotstrings.engine.catalogue.config")
 local injector          = require("hotstrings.engine.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("hotstrings.engine.magic_key")
-local HotstringActions  = require("hotstrings.engine.action_runner")
 local RepeatKey         = require("hotstrings.engine.repeat_key")
 
 -- The user's own modifier chords. Hard require rather than optional: the module
@@ -1021,6 +1020,8 @@ local function main()
 	local PreviewSettings = require("hotstrings.engine.preview_settings")
 	local ExpansionDelay = require("hotstrings.engine.expansion_delay")
 	local InputCaptureGate = require("platform.input.capture_gate")
+	-- What a committed expansion leaves behind, action entries included.
+	local CommitFollowup = require("hotstrings.engine.commit_followup")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
@@ -1906,26 +1907,9 @@ local function main()
 			-- expanded text in the buffer, which is what Windows and macOS do —
 			-- resetting unconditionally is why Linux could never chain, and made
 			-- final_result unobservable here.
-			if expansion_committed then
-				if result.action then
-					-- An action entry: the edit has landed, the action runs next, out of
-					-- the key callback. It changes the context, so nothing chains and
-					-- no undo restores a trigger the action may have acted on.
-					_undoable = nil
-					engine:reset(false)
-					HotstringActions.run(result)
-				elseif result.has_key_tokens then
-					-- The caret is somewhere the engine never saw: neither the word
-					-- buffer nor the AI context can describe the text behind it.
-					engine:reset(false)
-				elseif result.final_result then
-					-- The field holds the replacement whether or not the matcher may chain
-					-- off it: the AI context mirrors it, then only the word buffer is dropped.
-					engine:apply_expansion(result)
-					engine:reset(nil, nil, "keep")
-				else
-					engine:apply_expansion(result)
-				end
+			-- An action entry also drops the undo: its action changes the context.
+			if expansion_committed and CommitFollowup.apply(engine, result) then
+				_undoable = nil
 			end
 		end
 
