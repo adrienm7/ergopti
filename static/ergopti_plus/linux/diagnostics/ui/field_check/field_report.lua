@@ -25,7 +25,7 @@
 ---    carries the evidence line, the clipboard the redacted report.
 --- 5. Without a window (no WebKitGTK, no display) the finished report opens
 ---    in the one-click checks' dialog (diagnostics/ui/field_check/window.lua),
----    and the log says so.
+---    its result folder is revealed, and the log says so.
 --- ==============================================================================
 
 local M = {}
@@ -161,8 +161,18 @@ local function finished(run, done, dir)
 	if run.windowed then
 		push(run, done_message(run))
 	elseif not run.closed then
-		logger().warn(LOG, "The field report window is not open; the report opens in a dialog.")
+		logger().warn(LOG, "The field report window is not open; the report opens in a dialog and its folder is revealed.")
 		require("diagnostics.ui.field_check.window").show_report(env, LOG, M.TITLE_KEY, text)
+		-- The folder holds the result files the window would have offered to open
+		if type(dir) == "string" and dir ~= "" then
+			local request = env.open_folder(dir, function(receipt)
+				if type(receipt) ~= "table" or receipt.ok ~= true then
+					logger().warn(LOG, "The field report folder could not be revealed (%s).",
+						tostring(type(receipt) == "table" and receipt.error))
+				end
+			end)
+			if request == nil then logger().warn(LOG, "The field report folder could not be revealed.") end
+		end
 		_run = nil
 	else
 		_run = nil
@@ -320,7 +330,7 @@ end
 
 --- Answers the webview manager's windowless delivery: run() goes on without
 --- the window, says so in a notice, and at the end shows the report in a
---- dialog, so the manager's notice would only repeat it.
+--- dialog and reveals its folder, so the manager's notice would only repeat it.
 --- @param _info table { app_name, component, locale, detail }
 --- @return boolean delivered
 function M.on_window_unavailable(_info)

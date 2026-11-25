@@ -198,6 +198,9 @@ helpers.describe("field report: the Linux window", function()
 			world.deferred[1]()
 			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_report]")
 			helpers.assert_contains(world.dialogs[1].text, "➖ driver_reload : [field_check.all.reason.needs_collector]")
+			-- Without the window's « Open the files » button the result folder is
+			-- revealed by itself (field-report-windowless)
+			helpers.assert_eq(world.opened, { "/run/fr/results/app-1" }, "the result folder is revealed")
 		end, { windowless = true })
 	end)
 
