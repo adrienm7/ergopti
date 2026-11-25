@@ -55,8 +55,9 @@ end
 ---   run_action(action, done), notify(text, done),
 ---   shell(command, env, deadline_ms, done(ok, stdout_or_reason)) -> cancel function|nil,
 ---   app_front(app, done(boolean)),
----   screen = table|nil the screen steps' adapter: { wait_for, capture, ocr,
----     click_target, visible } each (effect, done(result)) -> cancel|nil.
+---   screen = table|nil the screen steps' adapter (shortcuts.engine.workflows.screen):
+---     { wait_for, capture, ocr, click_target, visible } each
+---     (effect, done(result), workflow) -> cancel|nil.
 ---   Every done(true) means success; done(false, reason) a refusal. }
 --- @return table { perform(effect, done, workflow), cancel(effect) }
 function M.new(ports)
@@ -88,7 +89,7 @@ function M.new(ports)
 			if type(screen) ~= "table" or type(screen[name]) ~= "function" then
 				return finish({ ok = false, reason = RUN_REASON.screen_service_missing })
 			end
-			return keep(screen[name](effect, finish))
+			return keep(screen[name](effect, finish, workflow))
 		end
 		if op == "send_keys" then return ports.send_shortcut(effect.combo, plain(finish)) end
 		if op == "type_text" then return ports.type_text(effect.text, plain(finish)) end

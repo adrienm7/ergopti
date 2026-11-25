@@ -73,9 +73,16 @@ a closed `run_reasons` value and the dotted path of the step (`3.then.2`),
 which the driver's notice names. A workflow never runs twice at a time;
 Escape and the emergency stop abort every run at once.
 
-Steps marked `service` need the per-OS screen capture, OCR and template
-matching services (the auto-clicker and OCR capture work); until a driver has
-them, such a step stops with `screen_service_missing`.
+Steps marked `service` run on the per-OS screen vision service
+([design](../../../../../../docs/design/screen-vision.md)) through
+`_shared/shortcuts/engine/workflows/screen.lua`: a target is looked for in the
+front window, an image target is the workflow's embedded PNG, a text target is
+the shared fuzzy match of the OCR words, and `wait_for` polls every
+`wait_for_poll_ms`. A `capture` stores the path of its PNG file (in the
+driver's cache) in its variable, an `ocr` the text it read; the `region` mode
+lets the user draw the area. A refusal of the service maps through
+`screen_reasons` to one of four run reasons, so its notice says what to fix. A
+driver without the service stops such a step with `screen_service_missing`.
 
 ### Security notes
 
