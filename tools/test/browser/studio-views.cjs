@@ -29,6 +29,8 @@
  * 7. The editor's analysis panel: its worst n-grams open their corpus words too.
  * 8. The frame on every result tab: both layouts marked in the figures, the
  *    same pair in « One layout ».
+ * 9. Help: the « Help » tab names each task in a titled section, without the
+ *    filters or the layout frame.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -355,7 +357,25 @@ async function exerciseFrameEverywhere(browser, origin) {
 	await context.close();
 }
 
+async function exerciseHelp(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-help');
+	const titles = await page.$$eval('#la-panel-help h3', (hs) => hs.map((h) => h.textContent));
+	assert.deepEqual(
+		titles,
+		['compare', 'rank', 'pareto', 'trace', 'words', 'blend', 'share'].map(
+			(id) => EN[`layout_analysis.help.${id}_title`]
+		),
+		'help: one titled section per task'
+	);
+	assert.ok(await page.isHidden('#la-filters-box'), 'help: no filter applies to it');
+	assert.ok(await page.isHidden('#la-frame'), 'help: no layout frame');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseHelp,
 	exerciseFrameEverywhere,
 	exercisePanelWords,
 	exerciseBlend,

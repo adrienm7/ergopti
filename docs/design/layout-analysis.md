@@ -1422,6 +1422,14 @@ layout and the one it is compared with, the same two « One layout » shows;
 the Principal's rows of every figure are highlighted (`la-selected`) and the
 Comparison's edged (`la-versus`), the Pareto ring and the trace follow them.
 
+**Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
+pane). « Help », before « One layout » (which stays last), holds one titled
+section per common task: compare two layouts, rank on a metric, read the
+Pareto frontier, see where a cost comes from, find the words behind a bad
+pair, blend corpora, share a view. Static text through `layout_analysis.help.*`
+in every locale, its prose kept under 80 characters a line; no filter or
+layout frame applies to it.
+
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
 (`#lo-corpus`) through `LAYOUT_ANALYSIS_FILES.fillCorpusPicker`: the user's own

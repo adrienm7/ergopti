@@ -251,9 +251,13 @@
 		'pareto',
 		'trace',
 		'analysers',
+		'help',
 		'details'
 	];
 	const HOME_TAB = 'home';
+	// The task help (an idea seen in the Layouts Wiki playground's Docs pane):
+	// static text, no filter applies to it.
+	const HELP_TAB = 'help';
 	const DEFAULT_TAB = 'overview';
 	const DETAILS_TAB = 'details';
 	// The score settings' weight groups, each a titled sub-section; every
@@ -334,7 +338,8 @@
 		pareto: 'M3 3v18h18M6 8h3v4h4v3h4v3',
 		trace: 'M3 17h4l3-8 4 10 3-6h4',
 		analysers: 'M10 4a6 6 0 1 0 0.01 0M15 15l6 6',
-		details: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6'
+		details: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+		help: 'M12 3a9 9 0 1 0 0.01 0M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17v.5'
 	};
 	const TAB_SLOT = {
 		home: 1,
@@ -348,7 +353,8 @@
 		pareto: 5,
 		trace: 6,
 		analysers: 3,
-		details: 4
+		details: 4,
+		help: 5
 	};
 
 	// The metrics each themed tab charts, one bar chart each and one table;
@@ -961,6 +967,39 @@
 
 	<section id="la-panel-analysers" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-analysers" hidden>
 		<section id="la-analysers" class="la-card" hidden></section>
+	</section>
+
+	<section id="la-panel-help" class="la-tab-panel la-help" role="tabpanel" aria-labelledby="la-tab-help" hidden>
+		<p class="la-muted la-tab-intro" data-i18n="layout_analysis.help.intro"></p>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-compare">
+			<h3 id="la-help-compare" data-i18n="layout_analysis.help.compare_title"></h3>
+			<p data-i18n="layout_analysis.help.compare_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-rank">
+			<h3 id="la-help-rank" data-i18n="layout_analysis.help.rank_title"></h3>
+			<p data-i18n="layout_analysis.help.rank_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-pareto">
+			<h3 id="la-help-pareto" data-i18n="layout_analysis.help.pareto_title"></h3>
+			<p data-i18n="layout_analysis.help.pareto_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-trace">
+			<h3 id="la-help-trace" data-i18n="layout_analysis.help.trace_title"></h3>
+			<p data-i18n="layout_analysis.help.trace_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-words">
+			<h3 id="la-help-words" data-i18n="layout_analysis.help.words_title"></h3>
+			<p data-i18n="layout_analysis.help.words_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-blend">
+			<h3 id="la-help-blend" data-i18n="layout_analysis.help.blend_title"></h3>
+			<p data-i18n="layout_analysis.help.blend_text"></p>
+		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-share">
+			<h3 id="la-help-share" data-i18n="layout_analysis.help.share_title"></h3>
+			<p data-i18n="layout_analysis.help.share_text"></p>
+		</section>
+		<p class="la-muted" data-i18n="layout_analysis.help.credit"></p>
 	</section>
 
 	<section id="la-panel-details" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-details" hidden>
@@ -2055,7 +2094,8 @@
 			pareto: () => t('layout_analysis.tab.pareto'),
 			trace: () => t('layout_analysis.tab.trace'),
 			analysers: () => t('layout_analysis.tab.analysers'),
-			details: () => t('layout_analysis.tab.details')
+			details: () => t('layout_analysis.tab.details'),
+			help: () => t('layout_analysis.tab.help')
 		};
 		const DIRECTION_LABEL = {
 			lower: () => t('layout_analysis.analysers.better.lower'),
@@ -2182,7 +2222,9 @@
 				details: () => {
 					fillDetailsPick();
 					renderDetails();
-				}
+				},
+				// The help is static text, filled with the page's strings.
+				help: () => {}
 			};
 			// The ranking is cheap and always current, whichever tab is shown.
 			draw.overview();
@@ -2873,7 +2915,7 @@
 				$(`la-panel-${id}`).hidden = !chosen;
 			}
 			// The results' filters narrow the figures, not « Home »'s controls.
-			$('la-filters-box').hidden = state.tab === HOME_TAB;
+			$('la-filters-box').hidden = state.tab === HOME_TAB || state.tab === HELP_TAB;
 			$('la-frame').hidden = !FRAME_TABS.includes(state.tab);
 		}
 
