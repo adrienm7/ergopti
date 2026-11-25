@@ -6224,7 +6224,7 @@
 	"layout_analysis.help.share_title": "보기 공유하기",
 	"layout_analysis.help.share_text": "« 링크 복사 »는 말뭉치나 혼합, 배열, 기본·비교 쌍, 열린 탭과 그 설정을 담습니다. 내 배열은 서버를 거치지 않고 링크에 담깁니다.",
 	"layout_analysis.help.metrics_title": "나만의 지표 작성",
-	"layout_analysis.help.metrics_text": "« 배열 하나 »의 « 나의 지표 »는 내장 지표가 재지 않는 것을 잽니다: 이름, 창(인접 키 쌍, 스킵그램 또는 키 트라이그램), 쿼리를 주면 주 배열과 비교 배열에서 쿼리가 참인 창의 비율을 보여 주고, « 비교 중인 모든 배열 측정 »은 모두에 대해 나열합니다.",
+	"layout_analysis.help.metrics_text": "« 배열 하나 »의 « 나의 지표 »는 내장 지표가 재지 않는 것을 잽니다. 이름, 창(인접 키 쌍, 스킵그램 또는 키 트라이그램), 쿼리를 주면 주 배열과 비교 배열에서 쿼리가 참인 창의 비율을 보여 주고, « 비교 중인 모든 배열 측정 »은 모두에 대해 나열합니다.",
 	"layout_analysis.help.metrics_syntax": "쿼리는 값을 숫자와 비교하거나(finger1 = 4, row2 < 0, distance >= 30) 예/아니오 값을 단독으로 쓰고(same_finger, lsb), & (그리고)와 | (또는)로 잇고, ! (아님)로 부정하며 괄호로 묶습니다. 필터의 « 값 조건식 »도 같은 방식으로 읽힙니다. 쓸 수 있는 이름은 지표 아래에 나열됩니다.",
 	"layout_analysis.help.credit": "파레토와 추적 탭, 움직임, 이 도움말은 Layouts Wiki playground에서 본 아이디어를 따랐습니다.",
 	"layout_analysis.movement.rhythm_title": "3연타 리듬",
