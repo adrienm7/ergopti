@@ -289,7 +289,7 @@ says so with its own lang attribute inside the French header.
 		border: 1px solid rgba(255, 255, 255, 0.6);
 		border-radius: 6px;
 		color: white;
-		min-height: 32px;
+		min-height: var(--site-target-min);
 		padding: 0 0.5rem;
 	}
 
@@ -312,7 +312,7 @@ says so with its own lang attribute inside the French header.
 		color: white;
 		cursor: pointer;
 		font: inherit;
-		min-height: 40px;
+		min-height: var(--site-target-min);
 		padding: 0 1rem;
 	}
 

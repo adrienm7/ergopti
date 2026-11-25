@@ -119,12 +119,11 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
 - [ ] **[CODE] AAA findings down to zero (maintainer, 2026-11-23).** axe-core's AAA rules (`wcag2aaa`,
       `wcag21aaa`, `wcag22aaa`, one list in `tools/test/lib/wcag-tags.cjs`) run in the site, Studio and app-window
       gates: any new finding fails CI. `color-contrast-enhanced` is at zero in both baselines since 2026-11-24
-      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). The 44 px targets of 2.5.5, which axe's
-      `target-size` (24 px) does not check, are measured by both gates themselves (`tools/test/lib/target-size.cjs`,
-      rule `target-size-enhanced`, counted once per kind of target). Left: lower those rows to zero (220 kinds on the
-      site and in its frames, 391 in the app windows' states; the public statement `/accessibilite`, which names AAA
-      as the target, lists them among its known gaps until then). The tool survey and every AAA criterion no tool
-      measures, with its check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks
+      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)), the 44 px targets of 2.5.5
+      (`target-size-enhanced`, measured by both gates themselves in `tools/test/lib/target-size.cjs`) since
+      2026-11-25 (sixteenth pass, one 44 px rule in `theme.css` and the site's `accessibility.css`). The tool survey
+      and every AAA criterion no tool measures, with its check, are in
+      [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks
       belong to the manual audit below. HTML_CodeSniffer's AAA errors (its own ratchet, fifteenth pass of the audit)
       now measure what axe skipped: the contrast it read as « NaN:1 » is measured through the browser's colours, and
       the real failures it then found (one-letter key chips, the typing dashboard's errors, chips and badges, the
@@ -613,14 +612,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       never sees. Kept meanwhile: both, proved by the app windows gate's self-check. The other choice is to count
       them and add a fixture state per hidden screen and a pixel check for SVG labels.
 
-- [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
-      maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
-      nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
-      every control, which changes the look of every window and can overflow the windows of a fixed size
-      (`apps.manifest.json`) on each OS. Kept meanwhile: the sizes as they are, held by the ratchet. Choose:
-  1. **(recommended) A 44 px minimum in `theme.css` for every app window and in the site's stylesheet**, then the
-     fixed window sizes raised where a window overflows, with a look at each window on the three OS.
-  2. Raise the size one window at a time as each is next reworked.
 - [ ] **Bug link login-redirect budget (decided by the agent on 2026-11-24, to review by the maintainer).** Measured
       anonymously on github.com (`tools/dev/measure-issue-url-limits.cjs`): `/issues/new` answers 500 from about
       6,460 bytes and `/login` from about 6,500, so a 4,000-byte link dense in `%XX` failed after the signed-out
