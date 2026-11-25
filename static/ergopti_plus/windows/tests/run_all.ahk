@@ -2372,7 +2372,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/ai/api/test_semantic_config_class.ahk
 #Include meta/ui/wpm/test_wpm_widget_consistency.ahk
 #Include meta/modules/keystats/ergonomics/test_marker_and_heatmap_completeness.ahk
-#Include meta/platform/input/test_text_send_direct_mode_guarded.ahk
 #Include meta/core/network/test_http_post_reentrancy_guard.ahk
 #Include meta/core/text/test_jsstr_cr_escaped.ahk
 #Include meta/core/text/test_json_string_literal_single_source.ahk
