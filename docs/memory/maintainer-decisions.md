@@ -220,6 +220,28 @@ open until the maintainer confirms or changes it.
   maintainer: until the OCR and template-matching services land, the
   validator accepts those steps and the run stops at them with
   `workflows.error.screen_service_missing`, never a silent skip.
+- **Windows names an application by its process** — decided by the agent on
+  2026-11-25, to review by the maintainer. A « focus app » step or an « app in
+  front » condition reads `Code` as `Code.exe`; the condition also holds when
+  the active window's process name contains the text, as the Linux driver
+  matches an application id. A window title is never matched.
+- **Windows workflow coordinates are physical pixels** — decided by the agent
+  on 2026-11-25, to review by the maintainer: the pointer steps go through the
+  mouse adapter (`MCSetPos`, SetPhysicalCursorPos), so a coordinate does not
+  move with the display scaling, as the auto-clicker's clicks do not.
+- **A Windows key binding starts its workflow on the next timer turn** —
+  decided by the agent on 2026-11-25, to review by the maintainer: the first
+  step would otherwise run inside the hotkey callback, its keys typed under the
+  modifiers of the shortcut that fired it.
+- **A Windows « Ergopti action » step succeeds once the action returned** —
+  decided by the agent on 2026-11-25, to review by the maintainer: the
+  gesture executor's actions return no success flag on Windows, so only an
+  error stops the workflow there.
+- **A Windows shell step fails on a non-zero exit code** — decided by the
+  agent on 2026-11-25, to review by the maintainer: its stdout, read once the
+  child exits and bounded by `[limits] user_action_output_bytes` as a
+  `run_command` capture, fills the step's variable without its trailing line
+  breaks; stderr is not kept.
 
 ## The reading font draws the tray menus too (2026-11-24)
 

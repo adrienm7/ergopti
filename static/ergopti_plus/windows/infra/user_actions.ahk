@@ -247,6 +247,14 @@ _UserCommandShellLine() {
 		. USER_COMMAND_ERR_VARIABLE . '!" "' . Shell . '" /d /s /c "!' . USER_COMMAND_VARIABLE . '!""'
 }
 
+; The hidden run_command line, for another owner of a hidden command (a workflow
+; shell step): the command text, its stdout and stderr paths go in the private
+; USER_COMMAND_* variables of the child's environment.
+; @returns {String}
+UserActionHiddenShellLine() {
+	return _UserCommandShellLine()
+}
+
 ; Runs a run_command binding.
 ; @param {String} BindingId The binding whose parameter holds the command.
 ; @returns {Boolean} True when the command started.
@@ -471,6 +479,12 @@ _UserCommandRead(Path) {
 	if DllCall("msvcrt\memchr", "Ptr", Bytes, "Int", 0, "UPtr", Bytes.Size, "CDecl Ptr")
 		return false
 	return StrGet(Bytes, Bytes.Size, "UTF-8")
+}
+
+; A capture of a hidden command read as strict UTF-8, for another owner of one.
+; @returns {String|Boolean} As _UserCommandRead.
+UserActionReadCapture(Path) {
+	return _UserCommandRead(Path)
 }
 
 ; The first non-blank line of a process's error output, bounded, for a notice.
