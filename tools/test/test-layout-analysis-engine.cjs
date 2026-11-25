@@ -147,7 +147,7 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 806;
+const LIBRARY_COUNT = 811;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
 const CREDITED_SOURCES = [
@@ -156,7 +156,8 @@ const CREDITED_SOURCES = [
 	'erglace_cmoinard',
 	'erglace_lysquid',
 	'ergaie_macdamien',
-	'colemak_french_touch'
+	'colemak_french_touch',
+	'ergopti_kalamine'
 ];
 // The French layouts of tools/build/import-kalamine-layouts.cjs (Kazerty, an
 // AZERTY, is checked with AZERTY's punctuation elsewhere).
@@ -181,7 +182,10 @@ const KALAMINE_FRENCH = [
 	'ergol_0_1',
 	'optergol',
 	'ergopti_2_1_2_1dk',
-	'hypertexte_1dfh'
+	'hypertexte_1dfh',
+	'ergopti_2_0_0_1dk',
+	'ergopti_2_0_0',
+	'ergopti_1_1_3'
 ];
 // Analysing the library costs 23 to 39 reference walks of its table with every
 // core of a Windows PC busy (2026-11-19: alone and inside this test, eight
@@ -3256,6 +3260,18 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 		['optergol', 'KeyQ', 0, 'k'],
 		['ergopti_2_1_2_1dk', 'KeyQ', 0, 'z'],
 		['hypertexte_1dfh', 'KeyR', 0, 'w'],
+		// This repository's old/kalamine builds: Ergopti 2.0.0 « è y o w b f c
+		// h g x », 1.1.3 « … f d l p ' z », 2.0.0 (1DK) « z y o w b f c h »;
+		// x-keyboard's Belgian AZERTY (« & 1 | » left of é) and Swiss French
+		// QWERTZ (« è ü [ » right of p).
+		['ergopti_2_0_0', 'KeyU', 0, 'c'],
+		['ergopti_1_1_3', 'KeyU', 0, 'd'],
+		['ergopti_2_0_0_1dk', 'KeyU', 0, 'c'],
+		['ergopti_2_0_0_1dk', 'KeyQ', 0, 'z'],
+		['azerty_be', 'Digit1', 2, '|'],
+		['azerty_be', 'BracketLeft', 0, 'dead:circumflex'],
+		['qwertz_ch_fr', 'BracketLeft', 0, 'è'],
+		['qwertz_ch_fr', 'KeyY', 0, 'z'],
 		// Colemak French Touch 0.4 (its author's): AltGr dead caron on A.
 		['colemak_french_touch', 'KeyA', 3, 'dead:caron'],
 		// cyanophage.github.io (b02780b39d), its 3 × 11 strings: Gallium
@@ -3716,6 +3732,9 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 		['azerty_latin9', french],
 		['dvorak_fr', french],
 		['ergol_iso', 'Ça ? Où « Noel » : être, cœur.'],
+		// x-keyboard's national layouts have no Ç or œ on their four levels.
+		['azerty_be', 'ça ? Où « Noël » : être, naïf, coeur.'],
+		['qwertz_ch_fr', 'ça ? Où « Noël » : être, naïf, coeur.'],
 		// Béopy's file states no diaeresis (its only dead key is the comma below).
 		['beopy', 'Ça ? Où « Noel » : être, cœur.'],
 		...KALAMINE_FRENCH.filter((kalamine) => kalamine !== 'beopy').map((kalamine) => [

@@ -958,7 +958,15 @@ _Don Quichotte_, Erglace's unsupported share 0.013 % → 0, distinct characters
 488 → 555; Bépolar 0.013 % → 0). « AirGlass version NucleoSquid » is
 Erglace (Nuke): ergol.org's Erglace page names Nuclear-Squid as the author of
 this « variante AIE », whose TOML kept Lysquid's header, so its credit now
-names Nuclear-Squid. 806 layouts.
+names Nuclear-Squid. 806 layouts. The same day the Kalamine repository
+(`layouts/` and `docs/samples/` at every commit: QWERTY demos and
+Lafayette), x-keyboard's `layouts/` (the JSON the Kalamine site and ergol.org
+emulate) and this repository's own Kalamine builds of earlier Ergopti
+versions (`static/ergopti_plus/old/kalamine`) were inventoried too: 811
+layouts. « Ergopti v1 1DK » is `old/kalamine/1dk/1.1.3/ergo_1dk.json`, whose
+keymap and dead keys equal the Ergo-L repository's HyperTexte 1DFH 1.1.2 (only
+the name and version differ), and its 2.1.2 equals the Ergo-L repository's
+`ergo_1dk.json`.
 
 | Layout                    | Source (licence)                                                                     | Before                                    | After                                                         |
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------- |
@@ -983,7 +991,14 @@ names Nuclear-Squid. 806 layouts.
 | Kazerty 1.0               | ergol `keymaps/fr.contrib/kazerty.json` (WTFPL)                                      | held, 1DK twice missing                   | complete                                                      |
 | Optergol 0.2              | ergol e561e4b305 `keymaps/fr.contrib/optergol.json` (tags v1.0.1, v1.0.2; WTFPL)     | missing                                   | added                                                         |
 | Ergopti 2.1.2 (1DK)       | ergol e561e4b305 `keymaps/fr.contrib/ergo_1dk.json` (WTFPL)                          | missing                                   | added                                                         |
-| HyperTexte 1DFH 1.1.2     | ergol e078a83b74 `layouts/fr.contrib/hypertexte_1dk.json` (WTFPL)                    | missing                                   | added                                                         |
+| HyperTexte 1DFH 1.1.2     | ergol e078a83b74 `layouts/fr.contrib/hypertexte_1dk.json` (WTFPL)                    | missing                                   | added; = our Ergopti 1.1.3 (1DK), listed                      |
+| Ergopti 1.1.3, 2.0.0      | this repository's `old/kalamine/standard/1.1.3`, `2.0.0` (98b663bfa3)                | missing                                   | added; 2.1.0 and 2.1.2 have the registry Ergopti's letters    |
+| Ergopti 2.0.0 (1DK)       | this repository's `old/kalamine/1dk/2.0.0`                                           | missing                                   | added; 1DK 2.1.0–2.1.2 have Ergopti 2.1.2 (1DK)'s letters     |
+| Kalamine's layouts        | OneDeadKey/kalamine `layouts/` (ansi, intl, prog), `docs/samples/` (MIT)             | held as QWERTY                            | unchanged: QWERTY's letters and digits                        |
+| x-keyboard's layouts      | OneDeadKey/x-keyboard 554fa347b5 `layouts/` (29 files, MIT)                          | 17 held (AZERTY, bépo, Ergo-L, Dvorak…)   | unchanged                                                     |
+| AZERTY (Belgian)          | x-keyboard `layouts/be.json` (from xkeyboard-config, MIT)                            | missing                                   | added (no Ç or œ on its four levels)                          |
+| QWERTZ (Swiss French)     | x-keyboard `layouts/ch(fr).json` (MIT)                                               | missing                                   | added (no Ç or œ on its four levels)                          |
+| x-keyboard's others       | `bg`, `br`, `ch`, `gr`, `it`, `no`, `pt`, `ru`, `ru(legacy)`, `se`, `ua`             | missing                                   | not added: no Latin letters, or a language the Comparer lacks |
 | Bépo42, Colemak-Lafayette | ergol `dev` branch only (2024-03): `bepo42`, `colemak-lafayette(-kaze)`, `optimot42` | missing                                   | not added: never on `main` or a tag; Bépolar, Colemak FT next |
 | Ergo-L-42, Qourg42        | ergol history 2020–2023 (`ergol42.yaml`, `qourg.yaml`)                               | —                                         | not added: the letters of Ergo-L 0.1 to 0.4                   |
 | Ergoléo, Ergolak (i/m/o)  | ergol history 2023-02-12                                                             | missing                                   | not added: Kalamine 0.40 cannot read them; experiments        |

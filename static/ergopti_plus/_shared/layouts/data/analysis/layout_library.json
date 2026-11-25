@@ -109,6 +109,19 @@
 			"commit": "e3bfbd4385",
 			"date": "2024-06-02",
 			"licence": "MIT (repository, « Copyright (c) 2024 Cédric Rossi »); arrangement re-encoded"
+		},
+		"x_keyboard": {
+			"name": "x-keyboard (OneDeadKey)",
+			"url": "https://github.com/OneDeadKey/x-keyboard/tree/554fa347b5150aa8a1eff64517a76616db5cb25a/layouts",
+			"commit": "554fa347b5",
+			"date": "2019-06-05",
+			"licence": "MIT (repository, « Copyright (c) 2019 Fabien Cazenave »); its layouts/ JSON, generated from xkeyboard-config by its make_layouts.sh; arrangements re-encoded"
+		},
+		"ergopti_kalamine": {
+			"name": "Ergopti (Kalamine files)",
+			"commit": "98b663bfa3",
+			"date": "2026-11-25",
+			"licence": "the repository's own Kalamine builds of earlier Ergopti versions (static/ergopti_plus/old/kalamine); arrangements re-encoded"
 		}
 	},
 	"layouts": [
@@ -70643,7 +70656,7 @@
 		},
 		{
 			"id": "hypertexte_1dfh",
-			"name": "HyperTexte 1DFH",
+			"name": "HyperTexte 1DFH (Ergopti 1.1.3, 1DK)",
 			"language": "fr",
 			"source": "ergol_repo",
 			"source_path": "e078a83b74:layouts/fr.contrib/hypertexte_1dk.json",
@@ -70755,6 +70768,587 @@
 					"à": "ê",
 					"ê": "^",
 					"’": "?"
+				}
+			}
+		},
+		{
+			"id": "ergopti_2_0_0_1dk",
+			"name": "Ergopti 2.0.0 (1DK)",
+			"language": "fr",
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/1dk/2.0.0/ergo_1dk.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["=", "+", null, null],
+				"Digit1": ["1", "1", "₁", "¹"],
+				"Digit2": ["2", "2", "₂", "²"],
+				"Digit3": ["3", "3", "₃", "³"],
+				"Digit4": ["4", "4", "₄", "⁴"],
+				"Digit5": ["5", "5", "₅", "⁵"],
+				"Digit6": ["6", "6", "₆", "⁶"],
+				"Digit7": ["7", "7", "₇", "⁷"],
+				"Digit8": ["8", "8", "₈", "⁸"],
+				"Digit9": ["9", "9", "₉", "⁹"],
+				"Digit0": ["0", "º", "₀", "⁰"],
+				"Minus": ["€", "€", null, null],
+				"Equal": ["%", "%", null, null],
+				"KeyQ": ["z", "Z", "`", "„"],
+				"KeyW": ["y", "Y", "@", "„"],
+				"KeyE": ["o", "O", "%", null],
+				"KeyR": ["w", "W", "!", null],
+				"KeyT": ["b", "B", "«", "“"],
+				"KeyY": ["f", "F", "»", "”"],
+				"KeyU": ["c", "C", "^", "€"],
+				"KeyI": ["h", "H", "#", "£"],
+				"KeyO": ["g", "G", "~", "≈"],
+				"KeyP": ["x", "X", "*", "×"],
+				"BracketLeft": ["[", "{", null, null],
+				"BracketRight": ["]", "}", null, null],
+				"KeyA": ["a", "A", "<", "≤"],
+				"KeyS": ["i", "I", ">", "≥"],
+				"KeyD": ["e", "E", "{", null],
+				"KeyF": ["u", "U", "}", null],
+				"KeyG": ["k", "K", "\\", null],
+				"KeyH": ["v", "V", "|", "¦"],
+				"KeyJ": ["s", "S", "(", "—"],
+				"KeyK": ["n", "N", ")", "–"],
+				"KeyL": ["t", "T", "[", null],
+				"Semicolon": ["r", "R", "]", null],
+				"Quote": ["'", "\"", null, null],
+				"Backslash": ["\\", "|", null, null],
+				"IntlBackslash": ["ê", "Ê", null, null],
+				"KeyZ": [".", ":", ":", "…"],
+				"KeyX": ["j", "J", "/", null],
+				"KeyC": ["à", "À", "=", null],
+				"KeyV": [
+					{
+						"dead": "odk"
+					},
+					{
+						"dead": "diaeresis"
+					},
+					"\"",
+					null
+				],
+				"KeyB": [",", ";", ";", "·"],
+				"KeyN": ["m", "M", "&", "−"],
+				"KeyM": ["d", "D", "$", "§"],
+				"Comma": ["l", "L", "=", "≠"],
+				"Period": ["p", "P", "+", "±"],
+				"Slash": ["’", "?", "'", "¿"],
+				"Space": [" ", "-", "_", " "]
+			},
+			"version": "2.0.0",
+			"dead_rules": {
+				"diaeresis": {
+					" ": "\"",
+					"dead:diaeresis": "¨",
+					" ": "\""
+				},
+				"odk": {
+					"0": "°",
+					" ": " ",
+					"-": " ",
+					".": "ù",
+					":": "Ù",
+					"A": "È",
+					"C": "Ç",
+					"E": "Œ",
+					"H": "Û",
+					"I": "É",
+					"J": "Æ",
+					"L": "Î",
+					"M": "Ñ",
+					"N": "Ô",
+					"P": "Q",
+					"X": "Â",
+					"Y": "Í",
+					"Z": "Á",
+					"a": "è",
+					"c": "ç",
+					"dead:odk": {
+						"dead": "diaeresis"
+					},
+					"e": "œ",
+					"h": "û",
+					"i": "é",
+					"j": "æ",
+					"l": "î",
+					"m": "ñ",
+					"n": "ô",
+					"p": "q",
+					"x": "â",
+					"y": "í",
+					"z": "á",
+					" ": " ",
+					"À": "Ê",
+					"à": "ê",
+					"ê": "^",
+					"’": "?"
+				}
+			}
+		},
+		{
+			"id": "ergopti_2_0_0",
+			"name": "Ergopti 2.0.0",
+			"language": "fr",
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/standard/2.0.0/ergopti.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["1", null, null, null],
+				"Digit2": ["2", null, null, null],
+				"Digit3": ["3", null, null, null],
+				"Digit4": ["4", null, null, null],
+				"Digit5": ["5", null, null, null],
+				"Digit6": ["6", null, null, null],
+				"Digit7": ["7", null, null, null],
+				"Digit8": ["8", null, null, null],
+				"Digit9": ["9", null, null, null],
+				"Digit0": ["0", null, null, null],
+				"KeyQ": ["è", "È", "`", "æ"],
+				"KeyW": ["y", "Y", "@", "í"],
+				"KeyE": ["o", "O", "œ", "Œ"],
+				"KeyR": ["w", "W", "ù", "Ù"],
+				"KeyT": ["b", "B", "«", null],
+				"KeyY": ["f", "F", "»", null],
+				"KeyU": ["c", "C", "ç", "Ç"],
+				"KeyI": ["h", "H", "#", null],
+				"KeyO": ["g", "G", "~", "≈"],
+				"KeyP": ["x", "X", "*", "×"],
+				"BracketLeft": ["z", "Z", "%", "‰"],
+				"BracketRight": [
+					{
+						"dead": "diaeresis"
+					},
+					" ",
+					" ",
+					"£"
+				],
+				"KeyA": ["a", "A", "<", "≤"],
+				"KeyS": ["i", "I", ">", "≥"],
+				"KeyD": ["e", "E", "{", null],
+				"KeyF": ["u", "U", "}", null],
+				"KeyG": [".", ":", ":", "·"],
+				"KeyH": ["v", "V", "|", "¦"],
+				"KeyJ": ["s", "S", "(", null],
+				"KeyK": ["n", "N", ")", "ñ"],
+				"KeyL": ["t", "T", "[", null],
+				"Semicolon": ["r", "R", "]", null],
+				"Quote": ["q", "Q", "’", "€"],
+				"Backslash": [
+					{
+						"dead": "circumflex"
+					},
+					"!",
+					"!",
+					"¡"
+				],
+				"IntlBackslash": ["ê", "Ê", "^", null],
+				"KeyZ": ["é", "É", "/", null],
+				"KeyX": ["à", "À", "\\", "á"],
+				"KeyC": ["j", "J", "\"", null],
+				"KeyV": [",", ";", ";", "’"],
+				"KeyB": ["k", "K", "…", null],
+				"KeyN": ["m", "M", "&", null],
+				"KeyM": ["d", "D", "$", "§"],
+				"Comma": ["l", "L", "=", "≠"],
+				"Period": ["p", "P", "+", "±"],
+				"Slash": ["'", "?", "?", "¿"],
+				"Space": [" ", "-", "_", " "]
+			},
+			"version": "2.0.0",
+			"dead_rules": {
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"(": "⁽",
+					")": "⁾",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"dead:circumflex": "^",
+					" ": "^",
+					" ": "^"
+				},
+				"diaeresis": {
+					" ": "\"",
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					" ": "\""
+				}
+			}
+		},
+		{
+			"id": "ergopti_1_1_3",
+			"name": "Ergopti 1.1.3",
+			"language": "fr",
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/standard/1.1.3/ergopti.json",
+			"fingering": "standard",
+			"rows": {
+				"Digit1": ["1", null, null, null],
+				"Digit2": ["2", null, null, null],
+				"Digit3": ["3", null, null, null],
+				"Digit4": ["4", null, null, null],
+				"Digit5": ["5", null, null, null],
+				"Digit6": ["6", null, null, null],
+				"Digit7": ["7", null, null, null],
+				"Digit8": ["8", null, null, null],
+				"Digit9": ["9", null, null, null],
+				"Digit0": ["0", null, null, null],
+				"Minus": ["€", null, null, null],
+				"KeyQ": ["è", "È", "`", "æ"],
+				"KeyW": ["y", "Y", "@", "í"],
+				"KeyE": ["o", "O", "œ", "Œ"],
+				"KeyR": ["w", "W", "ù", "Ù"],
+				"KeyT": ["b", "B", "«", null],
+				"KeyY": ["f", "F", "»", null],
+				"KeyU": ["d", "D", "$", null],
+				"KeyI": ["l", "L", "=", null],
+				"KeyO": ["p", "P", "+", null],
+				"KeyP": ["'", "?", "?", null],
+				"BracketLeft": ["z", "Z", "!", null],
+				"BracketRight": [
+					{
+						"dead": "diaeresis"
+					},
+					null,
+					null,
+					null
+				],
+				"KeyA": ["a", "A", "<", "≤"],
+				"KeyS": ["i", "I", ">", "≥"],
+				"KeyD": ["e", "E", "{", null],
+				"KeyF": ["u", "U", "}", null],
+				"KeyG": [".", ":", ":", "·"],
+				"KeyH": ["v", "V", "|", "¦"],
+				"KeyJ": ["s", "S", "(", null],
+				"KeyK": ["n", "N", ")", "ñ"],
+				"KeyL": ["t", "T", "[", null],
+				"Semicolon": ["r", "R", "]", null],
+				"Quote": ["q", "Q", "%", null],
+				"Backslash": [
+					{
+						"dead": "circumflex"
+					},
+					null,
+					null,
+					null
+				],
+				"IntlBackslash": ["ê", "Ê", "^", null],
+				"KeyZ": ["é", "É", "/", null],
+				"KeyX": ["à", "À", "\\", "á"],
+				"KeyC": ["j", "J", "\"", null],
+				"KeyV": [",", ";", ";", "’"],
+				"KeyB": ["k", "K", "…", null],
+				"KeyN": ["m", "M", "&", null],
+				"KeyM": ["c", "C", "ç", "Ç"],
+				"Comma": ["h", "H", "#", null],
+				"Period": ["g", "G", "~", null],
+				"Slash": ["x", "X", "*", null],
+				"Space": [" ", "-", "_", " "]
+			},
+			"version": "1.1.3",
+			"dead_rules": {
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"(": "⁽",
+					")": "⁾",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"dead:circumflex": "^"
+				},
+				"diaeresis": {
+					" ": "\"",
+					"dead:diaeresis": "¨"
+				}
+			}
+		},
+		{
+			"id": "azerty_be",
+			"name": "AZERTY (Belgian)",
+			"language": "fr",
+			"source": "x_keyboard",
+			"source_path": "layouts/be.json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["²", "³", null, null],
+				"Digit1": ["&", "1", "|", "¦"],
+				"Digit2": ["é", "2", "@", null],
+				"Digit3": ["\"", "3", "#", null],
+				"Digit4": ["'", "4", null, null],
+				"Digit5": ["(", "5", null, null],
+				"Digit6": ["§", "6", "^", null],
+				"Digit7": ["è", "7", null, null],
+				"Digit8": ["!", "8", null, null],
+				"Digit9": ["ç", "9", "{", null],
+				"Digit0": ["à", "0", "}", null],
+				"Minus": [")", "°", null, null],
+				"Equal": ["-", "_", null, null],
+				"KeyQ": ["a", "A", null, null],
+				"KeyW": ["z", "Z", null, null],
+				"KeyE": ["e", "E", "€", null],
+				"KeyR": ["r", "R", null, null],
+				"KeyT": ["t", "T", null, null],
+				"KeyY": ["y", "Y", null, null],
+				"KeyU": ["u", "U", null, null],
+				"KeyI": ["i", "I", null, null],
+				"KeyO": ["o", "O", null, null],
+				"KeyP": ["p", "P", null, null],
+				"BracketLeft": [
+					{
+						"dead": "circumflex"
+					},
+					{
+						"dead": "diaeresis"
+					},
+					"[",
+					null
+				],
+				"BracketRight": ["$", "*", "]", null],
+				"KeyA": ["q", "Q", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["d", "D", null, null],
+				"KeyF": ["f", "F", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": ["h", "H", null, null],
+				"KeyJ": ["j", "J", null, null],
+				"KeyK": ["k", "K", null, null],
+				"KeyL": ["l", "L", null, null],
+				"Semicolon": ["m", "M", null, null],
+				"Quote": [
+					"ù",
+					"%",
+					{
+						"dead": "acute"
+					},
+					null
+				],
+				"Backslash": [
+					"µ",
+					"£",
+					{
+						"dead": "grave"
+					},
+					null
+				],
+				"IntlBackslash": ["<", ">", null, null],
+				"KeyZ": ["w", "W", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["c", "C", null, null],
+				"KeyV": ["v", "V", null, null],
+				"KeyB": ["b", "B", null, null],
+				"KeyN": ["n", "N", null, null],
+				"KeyM": [",", "?", null, null],
+				"Comma": [";", ".", null, null],
+				"Period": [":", "/", null, null],
+				"Slash": [
+					"=",
+					"+",
+					{
+						"dead": "tilde"
+					},
+					null
+				],
+				"Space": [" ", " ", " ", " "]
+			},
+			"version": "2019-06-05",
+			"dead_rules": {
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					" ": "'",
+					" ": "'"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"(": "⁽",
+					")": "⁾",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"dead:circumflex": "^",
+					" ": "^",
+					" ": "^"
+				},
+				"diaeresis": {
+					" ": "\"",
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					" ": "\""
+				},
+				"grave": {
+					"dead:grave": "`",
+					" ": "`",
+					" ": "`"
+				},
+				"tilde": {
+					"<": "≲",
+					"=": "≃",
+					">": "≳",
+					"dead:tilde": "~",
+					" ": "~",
+					" ": "~"
+				}
+			}
+		},
+		{
+			"id": "qwertz_ch_fr",
+			"name": "QWERTZ (Swiss French)",
+			"language": "fr",
+			"source": "x_keyboard",
+			"source_path": "layouts/ch(fr).json",
+			"fingering": "standard",
+			"rows": {
+				"Backquote": ["§", "°", null, null],
+				"Digit1": ["1", "+", "|", "¦"],
+				"Digit2": ["2", "\"", "@", null],
+				"Digit3": ["3", "*", "#", null],
+				"Digit4": ["4", "ç", null, null],
+				"Digit5": ["5", "%", null, null],
+				"Digit6": ["6", "&", "¬", null],
+				"Digit7": ["7", "/", "¦", null],
+				"Digit8": ["8", "(", "¢", null],
+				"Digit9": ["9", ")", null, null],
+				"Digit0": ["0", "=", null, null],
+				"Minus": [
+					"'",
+					"?",
+					{
+						"dead": "acute"
+					},
+					null
+				],
+				"Equal": [
+					{
+						"dead": "circumflex"
+					},
+					{
+						"dead": "grave"
+					},
+					{
+						"dead": "tilde"
+					},
+					null
+				],
+				"KeyQ": ["q", "Q", null, null],
+				"KeyW": ["w", "W", null, null],
+				"KeyE": ["e", "E", "€", null],
+				"KeyR": ["r", "R", null, null],
+				"KeyT": ["t", "T", null, null],
+				"KeyY": ["z", "Z", null, null],
+				"KeyU": ["u", "U", null, null],
+				"KeyI": ["i", "I", null, null],
+				"KeyO": ["o", "O", null, null],
+				"KeyP": ["p", "P", null, null],
+				"BracketLeft": ["è", "ü", "[", null],
+				"BracketRight": [
+					{
+						"dead": "diaeresis"
+					},
+					"!",
+					"]",
+					null
+				],
+				"KeyA": ["a", "A", null, null],
+				"KeyS": ["s", "S", null, null],
+				"KeyD": ["d", "D", null, null],
+				"KeyF": ["f", "F", null, null],
+				"KeyG": ["g", "G", null, null],
+				"KeyH": ["h", "H", null, null],
+				"KeyJ": ["j", "J", null, null],
+				"KeyK": ["k", "K", null, null],
+				"KeyL": ["l", "L", null, null],
+				"Semicolon": ["é", "ö", null, null],
+				"Quote": ["à", "ä", "{", null],
+				"Backslash": ["$", "£", "}", null],
+				"IntlBackslash": ["<", ">", "\\", null],
+				"KeyZ": ["y", "Y", null, null],
+				"KeyX": ["x", "X", null, null],
+				"KeyC": ["c", "C", null, null],
+				"KeyV": ["v", "V", null, null],
+				"KeyB": ["b", "B", null, null],
+				"KeyN": ["n", "N", null, null],
+				"KeyM": ["m", "M", null, null],
+				"Comma": [",", ";", null, null],
+				"Period": [".", ":", null, null],
+				"Slash": ["-", "_", null, null],
+				"Space": [" ", " ", " ", " "]
+			},
+			"version": "2019-06-05",
+			"dead_rules": {
+				"acute": {
+					" ": "'",
+					"dead:acute": "´",
+					" ": "'",
+					" ": "'"
+				},
+				"circumflex": {
+					"0": "⁰",
+					"1": "¹",
+					"2": "²",
+					"3": "³",
+					"4": "⁴",
+					"5": "⁵",
+					"6": "⁶",
+					"7": "⁷",
+					"8": "⁸",
+					"9": "⁹",
+					"(": "⁽",
+					")": "⁾",
+					"+": "⁺",
+					"-": "⁻",
+					"=": "⁼",
+					"dead:circumflex": "^",
+					" ": "^",
+					" ": "^"
+				},
+				"diaeresis": {
+					" ": "\"",
+					"dead:diaeresis": "¨",
+					" ": "\"",
+					" ": "\""
+				},
+				"grave": {
+					"dead:grave": "`",
+					" ": "`",
+					" ": "`"
+				},
+				"tilde": {
+					"<": "≲",
+					"=": "≃",
+					">": "≳",
+					"dead:tilde": "~",
+					" ": "~",
+					" ": "~"
 				}
 			}
 		}
@@ -72903,6 +73497,42 @@
 			"source_path": "keymaps/fr/colemak-french-touch.json",
 			"reason": "Colemak French Touch 0.3.1, the Ergo-L repository's copy: the same letters and digits as its author's 0.4",
 			"same_as": "colemak_french_touch"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/standard/2.1.0/ergopti.json",
+			"reason": "Ergopti 2.1.0, the same letters and digits as the registry Ergopti",
+			"same_as": "ergopti"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/standard/2.1.2/ergopti.json",
+			"reason": "Ergopti 2.1.2, the same letters and digits as the registry Ergopti",
+			"same_as": "ergopti"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/1dk/2.1.0/ergo_1dk.json",
+			"reason": "Ergopti 2.1.0 (1DK), the same letters and digits as the Ergo-L repository's Ergopti 2.1.2 (1DK)",
+			"same_as": "ergopti_2_1_2_1dk"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/1dk/2.1.1/ergo_1dk.json",
+			"reason": "Ergopti 2.1.1 (1DK), the same letters and digits as the Ergo-L repository's Ergopti 2.1.2 (1DK)",
+			"same_as": "ergopti_2_1_2_1dk"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/1dk/2.1.2/ergo_1dk.json",
+			"reason": "Ergopti 2.1.2 (1DK), the same letters and digits as the Ergo-L repository's Ergopti 2.1.2 (1DK)",
+			"same_as": "ergopti_2_1_2_1dk"
+		},
+		{
+			"source": "ergopti_kalamine",
+			"source_path": "static/ergopti_plus/old/kalamine/1dk/1.1.3/ergo_1dk.json",
+			"reason": "Ergopti 1.1.3 (1DK): the keymap and dead keys of the Ergo-L repository's HyperTexte 1DFH 1.1.2, which holds it",
+			"same_as": "hypertexte_1dfh"
 		}
 	]
 }
