@@ -149,8 +149,10 @@
 
 <header lang="fr" bind:this={headerElement}>
 	<div id="ergopti-header">
-		<a href={resolve('/')} aria-label="Ergopti, page d’accueil">
-			<img src={asset('img/logo/logo.svg')} class="logo" alt="" />
+		<!-- The logo's text alternative names the link: a link holding only an
+		     image is named by its alt (WCAG 1.1.1, 2.4.4, H30). -->
+		<a href={resolve('/')}>
+			<img src={asset('img/logo/logo.svg')} class="logo" alt="Ergopti, page d’accueil" />
 		</a>
 		<div id="ergopti-title">
 			<strong class="no-gradient text-white">

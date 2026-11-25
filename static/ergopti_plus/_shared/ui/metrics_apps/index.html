@@ -16,7 +16,8 @@
 	<body>
 		<header class="top-fixed-bar">
 			<h1 class="header" id="apps-title" data-i18n="ui_apps.title"></h1>
-			<form class="filters-bar" style="display: flex; gap: 15px; align-items: center">
+			<!-- Filter bars, not forms: nothing is submitted, each control applies at once. -->
+			<div class="filters-bar" style="display: flex; gap: 15px; align-items: center">
 				<p class="field">
 					<label for="period-select" data-i18n="ui_apps.label_period"></label>
 					<select id="period-select" data-i18n-option-prefix="ui_apps.opt_period">
@@ -57,9 +58,9 @@
 					data-i18n="ui_apps.btn_count_awake"
 					data-i18n-title="ui_apps.tip_count_awake_btn"
 				></button>
-			</form>
+			</div>
 			<!-- Filtres catégorie (#53) et jour de semaine (#54) — toggle pour exclure des apps ou des jours du calcul. -->
-			<form
+			<div
 				class="filters-bar"
 				style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 8px"
 			>
@@ -71,7 +72,7 @@
 					<legend class="filter-label" data-i18n="ui_apps.label_days"></legend>
 					<ul class="pill-list" id="weekday-filter-buttons"></ul>
 				</fieldset>
-			</form>
+			</div>
 		</header>
 
 		<main class="main-content">

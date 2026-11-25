@@ -58,7 +58,7 @@
 			<p id="param-hint"></p>
 			<input
 				id="param-input"
-				aria-labelledby="param-prompt"
+				aria-labelledby="param-title param-prompt"
 				type="text"
 				autocomplete="off"
 				autocorrect="off"
@@ -86,7 +86,9 @@
 				<label id="param-language-label" for="param-language-select"></label>
 				<select id="param-language-select"></select>
 			</p>
-			<fieldset id="param-program" hidden>
+			<!-- Groups named by ARIA rather than fieldsets: their names are the
+			     action's title and the provider's label, not a legend of their own. -->
+			<div id="param-program" role="group" aria-labelledby="param-title" hidden>
 				<section
 					id="param-program-automation"
 					aria-labelledby="param-program-automation-title"
@@ -96,18 +98,23 @@
 					<p id="param-program-automation-reason"></p>
 					<ul id="param-program-automation-list"></ul>
 				</section>
-				<fieldset id="param-program-provider" hidden>
+				<div
+					id="param-program-provider"
+					role="group"
+					aria-labelledby="param-program-provider-label"
+					hidden
+				>
 					<label id="param-program-provider-label" for="param-program-provider-select"></label>
 					<select id="param-program-provider-select"></select>
 					<p id="param-program-provider-hint"></p>
 					<p id="param-program-provider-status" role="status"></p>
-				</fieldset>
+				</div>
 				<label id="param-program-executable-label" for="param-program-executable"></label>
 				<input id="param-program-executable" type="text" autocomplete="off" spellcheck="false" />
 				<p id="param-program-arguments-label"></p>
 				<ol id="param-program-arguments"></ol>
 				<button id="param-program-add" type="button"></button>
-			</fieldset>
+			</div>
 			<p id="param-error" role="alert" hidden></p>
 			<footer class="param-buttons">
 				<button id="param-back" type="button"></button>

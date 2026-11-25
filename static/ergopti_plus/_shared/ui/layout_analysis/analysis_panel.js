@@ -273,9 +273,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		rankSelect.id = 'la-panel-rank';
 		const rankLabel = el('label');
 		rankLabel.htmlFor = rankSelect.id;
-		// The panel's settings: labelled selects and the hand-off buttons, never submitted.
-		const controls = el('form', 'la-panel-controls');
-		controls.addEventListener('submit', (event) => event.preventDefault());
+		// The panel's settings: labelled selects and the hand-off buttons. A block,
+		// not a form: nothing is submitted, each control applies at once.
+		const controls = el('div', 'la-panel-controls');
 		controls.append(
 			corpusLabel,
 			corpusSelect,
@@ -937,12 +937,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 * model on the next tick (an analysis that started since drops it).
 		 */
 		function drawAnalysers(layout, prepared, settings, mine) {
+			// The corner names nothing: a plain cell; the column headers say
+			// which cells they head (scope), as the row headers do (WCAG 1.3.1).
+			const officialHead = el('th', '', t('layout_analysis.analysers.official'));
+			const customHead = el('th', '', t('layout_analysis.analysers.custom'));
+			officialHead.scope = 'col';
+			customHead.scope = 'col';
 			const head = el('tr');
-			head.append(
-				el('th'),
-				el('th', '', t('layout_analysis.analysers.official')),
-				el('th', '', t('layout_analysis.analysers.custom'))
-			);
+			head.append(el('td'), officialHead, customHead);
 			const rows = SCORES.analysers().map((analyser) => {
 				const tr = el('tr');
 				const th = el('th', '', analyser.name);
