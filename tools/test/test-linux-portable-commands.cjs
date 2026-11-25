@@ -448,7 +448,7 @@ const PROGRAMS = {
 	}),
 	// Optional desktop and system tools: probed before use in every launching file.
 	xsel: optionalTool('clipboard fallback on X11', DRIVER_HOST),
-	gdbus: optionalTool('GNOME tooltip preview', DRIVER_HOST),
+	gdbus: optionalTool('GNOME tooltip preview and KDE layout watch', DRIVER_HOST),
 	systemctl: optionalTool('systemd user service', DRIVER_HOST),
 	pactl: why(
 		'PulseAudio volume metric; probed before use, and the audio lane of the Ubuntu runner installs it',

@@ -41,6 +41,11 @@ local MAX_PENDING_BYTES = Timings.count("limits", "kde_layout_monitor_line_bytes
 --- @return table|nil child { process, stdout }
 --- @return string|nil problem
 local function production_spawn(on_exit)
+	-- gdbus ships with GLib, which a minimal Arch, Fedora or openSUSE image
+	-- lacks: name the missing tool instead of a bare spawn ENOENT.
+	if not require("core.process.adapters.shell_runner").has_command("gdbus", true) then
+		return nil, "gdbus is not installed"
+	end
 	local uv = require("luv")
 	local stdout = uv.new_pipe(false)
 	local process, problem = uv.spawn("gdbus", { args = M.MONITOR_ARGS, stdio = { nil, stdout, nil } }, on_exit)

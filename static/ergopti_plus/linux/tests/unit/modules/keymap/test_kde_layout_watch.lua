@@ -65,4 +65,25 @@ helpers.describe("kde layout watch (kde-layout-watch)", function()
 		helpers.assert_eq(owner.start(function() end), false)
 		helpers.assert_eq(owner.status(), "stopped")
 	end)
+
+	helpers.it("probes gdbus before the production spawn (kde-layout-watch-probe)", function()
+		-- A minimal Arch, Fedora or openSUSE image has no GLib tools: the
+		-- watch names the missing gdbus instead of spawning it blind.
+		local ShellRunner = require("core.process.adapters.shell_runner")
+		local uv = require("luv")
+		local real_has, real_spawn = ShellRunner.has_command, uv.spawn
+		local probed, spawned = nil, false
+		ShellRunner.has_command = function(binary) probed = binary; return false end
+		uv.spawn = function() spawned = true; return nil, "unexpected" end
+		Watch._reset_for_test()
+		local ok, started = pcall(Watch.start, function() end)
+		local status = Watch.status()
+		Watch._reset_for_test()
+		ShellRunner.has_command, uv.spawn = real_has, real_spawn
+		helpers.assert_true(ok, tostring(started))
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(status, "stopped")
+		helpers.assert_eq(probed, "gdbus")
+		helpers.assert_true(not spawned, "gdbus was spawned without a probe")
+	end)
 end)
