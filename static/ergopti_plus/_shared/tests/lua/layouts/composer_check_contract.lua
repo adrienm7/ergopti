@@ -148,11 +148,37 @@ return function(helpers, Json, ports)
 		end)
 
 		helpers.it("fails when a recorded copy is gone (composer-check)", function()
+			-- The snapshot lists a layout only while its copy exists, as the layout
+			-- manager does: a vanished copy is a layout that is not installed.
 			local registry, deps, state = fresh()
 			save_fixture(registry, deps)
 			state.files[ports.installed_copy] = nil
 			local steps, result = run_check(registry, deps, state)
-			helpers.assert_true(steps:find("composer_mode=info:existing composer_install=skip:kept composer_copy=fail:unreadable", 1, true) ~= nil, steps)
+			helpers.assert_true(steps:find("composer_mode=info:existing composer_install=skip:kept composer_copy=fail:not_installed", 1, true) ~= nil, steps)
+			helpers.assert_true(not result.passed)
+		end)
+
+		helpers.it("fails when a listed copy cannot be read (composer-check)", function()
+			local registry, deps, state = fresh()
+			save_fixture(registry, deps)
+			local env_read = deps.read
+			deps.read = function(path)
+				if path == ports.installed_copy then return nil end
+				return env_read(path)
+			end
+			local steps, result = run_check(registry, deps, state)
+			helpers.assert_true(steps:find("composer_copy=fail:unreadable composer_ready=skip:no_copy", 1, true) ~= nil, steps)
+			helpers.assert_true(not result.passed)
+		end)
+
+		helpers.it("names a saved composition whose installation failed as not installed (composer-check)", function()
+			-- The field report of 2026-11-25: the user's composition was saved, its
+			-- installation failed, and the check called the missing record unreadable.
+			local registry, deps, state = fresh()
+			state.files[DECLARATION_PATH] = DECLARATION
+			local steps, result = run_check(registry, deps, state)
+			helpers.assert_eq(steps, "composer_fixture=pass composer_mode=info:existing composer_install=skip:kept "
+				.. "composer_copy=fail:not_installed composer_ready=skip:no_copy composer_cleanup=skip:kept")
 			helpers.assert_true(not result.passed)
 		end)
 	end)

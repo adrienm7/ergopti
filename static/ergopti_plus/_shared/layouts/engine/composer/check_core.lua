@@ -100,9 +100,18 @@ function M.run(env, report, finish)
 	verify = function(info)
 		local snapshot = env.snapshot()
 		local entry = (snapshot.installed or {})[env.composer_id]
+		-- A composition saved while its installation failed has no record: that is
+		-- the failed install to look at, not an unreadable file.
+		if entry == nil then
+			env.log("error", "The composition is saved but was never installed: no installed layout records it.")
+			step("composer_copy", FAIL, "not_installed")
+			step("composer_ready", SKIP, "no_copy")
+			cleanup()
+			return
+		end
 		local text = env.read_copy()
-		if entry == nil or type(text) ~= "string" then
-			env.log("error", "The installed composition is missing or unreadable.")
+		if type(text) ~= "string" then
+			env.log("error", "The installed composition is recorded but its file is missing or unreadable.")
 			step("composer_copy", FAIL, "unreadable")
 			step("composer_ready", SKIP, "no_copy")
 			cleanup()
