@@ -198,6 +198,15 @@ open until the maintainer confirms or changes it.
   value, so a parameterised action (other than `run_workflow`, whose value is
   the workflow) is not offered. An entry naming an action this OS does not
   offer keeps it through an edit, shown by its id, rather than losing it.
+- **The screen steps look in the front window and name a fixable cause** —
+  decided by the agent on 2026-11-25, to review by the maintainer. `wait_for`,
+  `click_target` and « visible » search the front window, as the
+  auto-clicker does (it is captured under XWayland too). A `capture` stores
+  the path of a PNG in the driver's cache, and the `region` mode uses the
+  system's own region selection (`screencapture -i`, the Linux screenshot
+  cascade). A screen vision refusal becomes one of four run reasons (screen
+  recording not allowed, capture refused, no text recognition, screen not
+  read), never « not found ».
 - **A workflow click is refused while a gesture holds a mouse button** —
   decided by the agent on 2026-11-25, to review by the maintainer: on macOS
   the click would release the button a « clic maintenu » gesture holds, so

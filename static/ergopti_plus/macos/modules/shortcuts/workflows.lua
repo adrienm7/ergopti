@@ -16,9 +16,11 @@
 ---    ports raises; stop() releases it with the driver.
 --- 2. Every OS call goes through an existing adapter or owner: this module
 ---    holds no `hs.` call (the purity ledger).
---- 3. A click at coordinates needs the exact mouse ownership the click
----    actions keep (actions_click.lua); until it is shared it is a named
----    refusal, as the screen steps are until the screen vision service lands.
+--- 3. A click at coordinates goes through the synthetic click owner
+---    (platform/input/synthetic_click.lua). The screen steps run on the screen
+---    vision service, started by its session (platform/vision/vision_session.lua):
+---    captures, embedded images written as private template files and the
+---    drawn region's file all live in its cache folder.
 --- 4. A shell step runs `/usr/bin/env ERGOPTI_VAR_x=… /bin/sh -l -c <command>`:
 ---    the variables are argv entries, never shell text.
 --- ==============================================================================
@@ -27,6 +29,7 @@ local Logger = require("core.logger.engine.logger")
 local Json = require("core.text.engine.json")
 local Owner = require("shortcuts.engine.workflows.owner")
 local Model = require("shortcuts.engine.workflows.model")
+local Screen = require("shortcuts.engine.workflows.screen")
 
 local LOG = "modules.shortcuts.workflows"
 
@@ -46,6 +49,8 @@ local function default_deps()
 		notifications = require("core.ui.engine.notifications"),
 		window_info = require("platform.focus.window_info"),
 		i18n = require("core.i18n.engine.i18n"),
+		vision_session = require("platform.vision.vision_session"),
+		screen_ports = function() return require("adapters.auto_click_ports").ports() end,
 	}
 end
 
@@ -114,6 +119,73 @@ local function effect_ports(deps)
 	}
 end
 
+--- The screen vision adapter of the shared screen steps.
+--- @param deps table
+--- @param ports table The effect ports (the click reuses mouse_click).
+--- @param matcher_options table auto_click_defaults.json.
+--- @return table
+local function screen_vision(deps, ports, matcher_options)
+	local templates, files = {}, 0
+	local function vision() return deps.vision_session.service() end
+	local function window_image(done)
+		local front = deps.screen_ports().foreground()
+		if not front then return done(nil, "no_foreground_window") end
+		vision().capture_window(front.window, done)
+	end
+	local function image_capture(done)
+		return function(image, reason)
+			if image then done({ image = image }) else done(nil, reason) end
+		end
+	end
+	local function private_file(prefix)
+		files = files + 1
+		return deps.vision_session.cache_dir() .. "/workflow_" .. prefix .. "_" .. files .. ".png"
+	end
+	return {
+		window_image = window_image,
+		capture = function(mode, done)
+			if mode == "window" then return window_image(image_capture(done)) end
+			if mode == "full" then
+				local bounds = deps.mouse.getMonitorBounds(1)
+				return vision().capture_region({ x = bounds.left, y = bounds.top,
+					width = bounds.right - bounds.left, height = bounds.bottom - bounds.top }, image_capture(done))
+			end
+			-- A drawn region: screencapture's interactive selection writes the file,
+			-- in the cache folder the started service created.
+			vision()
+			local path = private_file("region")
+			run(deps, "/usr/sbin/screencapture", { "-i", "-x", path }, function(ok)
+				if ok and deps.file_system.read_with_status(path) ~= nil then done({ path = path })
+				else done(nil, "capture_refused") end
+			end)
+		end,
+		template = function(bytes, _, done)
+			if templates[bytes] == nil then
+				vision() -- the started service owns the cache folder
+				local path = private_file("template")
+				if not deps.file_system.write(path, bytes) then return done(nil, "template_unreadable") end
+				templates[bytes] = path
+			end
+			done({ path = templates[bytes] })
+		end,
+		match = function(image, list, done) vision().match(image, list, matcher_options, done) end,
+		recognize = function(capture, done)
+			local options = { layout = capture.layout or "block", languages = deps.screen_ports().languages() }
+			if capture.image then return vision().recognize_text(capture.image, options, done) end
+			vision().recognize_file(capture.path, options, done)
+		end,
+		save = function(capture, done) done(capture.path or capture.image.source) end,
+		click = function(x, y, button, done) ports.mouse_click(x, y, button, 1, done) end,
+		click_point = require("shortcuts.engine.auto_click_matcher").click_point,
+		find_text = function(words, targets) return vision().find_text(words, targets) end,
+		after = function(ms, fn)
+			local handle = deps.timer.after(ms / 1000, fn)
+			return function() deps.timer.cancel(handle) end
+		end,
+		now_ms = function() return deps.screen_ports().now_ms() end,
+	}
+end
+
 return Owner.driver_module({
 	log = LOG,
 	default_services = default_deps,
@@ -134,7 +206,15 @@ return Owner.driver_module({
 				vocabulary = services.actions().send_vocabulary(),
 				wait_max_ms = timeouts.wait_max_ms,
 			}),
-			effects = effect_ports(services),
+			effects = (function()
+				local ports = effect_ports(services)
+				local matcher = shared_json("shortcuts/data/auto_click_defaults.json")
+				ports.screen = Screen.new(screen_vision(services, ports, matcher), {
+					catalogue = shared_json(Model.CATALOGUE_PATH), poll_ms = timeouts.wait_for_poll_ms,
+					text_max_distance = matcher.text_max_distance, threshold = matcher.threshold,
+				})
+				return ports
+			end)(),
 			after = function(ms, fn)
 				local handle = services.timer.after(ms / 1000, fn)
 				return function() services.timer.cancel(handle) end
