@@ -2455,8 +2455,8 @@ function render_errors_table() {
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
 				`<td style="text-align:end;">${format_number(d.count)}</td>` +
-				`<td style="text-align:end;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
-				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:end;color:var(--ekpi-errors-ink);">${format_number(d.errors)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--ekpi-errors-ink);"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');

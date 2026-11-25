@@ -346,14 +346,14 @@ function gradient_color(value, stops) {
 }
 
 /**
- * The gradient colour as table text: shaded by --gradient-ink-shade (style.css),
- * which darkens it on the light appearance, where the bright stops were 1.5:1
- * to 2.0:1 on the page (WCAG 1.4.3), and leaves it as is on the dark one.
+ * The gradient colour as table text: mixed with --hue-ink-base by
+ * --hue-ink-shade (style.css), black on the light appearance and white on
+ * the dark one, so every stop holds 7:1 on the table (WCAG 1.4.6).
  * @param {string} color - A CSS colour from gradient_color.
  * @returns {string} A CSS colour.
  */
 function gradient_ink(color) {
-	return `color-mix(in srgb, ${color}, black var(--gradient-ink-shade))`;
+	return `color-mix(in srgb, ${color}, var(--hue-ink-base) var(--hue-ink-shade))`;
 }
 
 // ===================================
@@ -2105,9 +2105,9 @@ function render_table() {
 				} else {
 					const rep_color =
 						item.rep_rate >= 20
-							? ThemeTokens.color('red')
+							? gradient_ink(ThemeTokens.color('red'))
 							: item.rep_rate >= 10
-								? ThemeTokens.color('yellow')
+								? gradient_ink(ThemeTokens.color('yellow'))
 								: 'inherit';
 					const rate_str = format_number(item.rep_rate.toFixed(1)) + ' %';
 					rep_html = `<span style="color:${rep_color}">${format_number(item.rep)} (${rate_str})</span>`;

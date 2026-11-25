@@ -23,14 +23,16 @@
 	--accent-text: var(--theme-dialog-accent-text);
 	--ok: var(--theme-dialog-ok);
 	--fail: var(--theme-dialog-fail);
-	--pending: var(--theme-hue-9a6700);
+	/* 10:1 on the white page: the former #9a6700 read 4.87:1, below the 7:1 of AAA. */
+	--pending: var(--theme-hue-5c3800);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
 		--label: var(--theme-grey-b0b0b0);
 		--code: var(--theme-grey-2d2d2d);
-		--pending: var(--theme-hue-d29922);
+		/* 9:1 on the dark page: the former #d29922 read 6.53:1. */
+		--pending: var(--theme-hue-f0c040);
 	}
 }
 

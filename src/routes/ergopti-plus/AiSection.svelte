@@ -513,7 +513,8 @@ FEATURES & RATIONALE:
 	.tt-shortcut {
 		background: rgba(255, 255, 255, 0.08);
 		border-radius: 5px;
-		color: rgba(255, 255, 255, 0.65);
+		/* 7:1 on the tooltip's wash, where 65 % white read 6.5:1 (WCAG 1.4.6). */
+		color: rgba(255, 255, 255, 0.8);
 		float: right;
 		font-size: 0.72rem;
 		margin-left: 10px;

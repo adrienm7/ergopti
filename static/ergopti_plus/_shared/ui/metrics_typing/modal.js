@@ -219,7 +219,8 @@ function render_app_list() {
 			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="" />`
-			: `<span class="app-icon-div" style="background-color:${get_app_color(app)}">${escape_html(appInitial(app))}</span>`;
+			: // Shaded so its white initial holds 7:1 on every palette hue (WCAG 1.4.6).
+				`<span class="app-icon-div" style="background-color:color-mix(in srgb, ${get_app_color(app)}, black 60%)">${escape_html(appInitial(app))}</span>`;
 
 		html +=
 			`<li><label class="app-item">` +
