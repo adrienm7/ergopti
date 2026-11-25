@@ -1,0 +1,300 @@
+{
+	"_comment": "Ticks of the anti-sleep auto-click session (_shared/shortcuts/engine/auto_click_session.lua and its Windows twin). A vector gives the plan's allowed apps and targets, then ticks: each tick sets the foreground (app_id, window or null), the state (locked, paused, secure_field), the clock, and the scan answer the service gives (result with image and hits, or a reason; null means the scan is not answered during this tick, and the next tick's answer goes to that scan). expect_clicks lists the screen points clicked, in order; expect_scans counts scan requests.",
+	"plan": {
+		"allowed_apps": ["com.microsoft.VSCode"],
+		"auto_click": true,
+		"has_targets": true
+	},
+	"cooldown_ms": 3000,
+	"vectors": [
+		{
+			"id": "click_once_then_cooldown",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				},
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1700,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				},
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 4000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				}
+			],
+			"expect_clicks": [
+				[840, 622],
+				[840, 622]
+			],
+			"expect_scans": 3
+		},
+		{
+			"id": "disallowed_app_is_not_scanned",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.apple.systempreferences",
+						"window": 2
+					},
+					"now_ms": 1000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				}
+			],
+			"expect_clicks": [],
+			"expect_scans": 0
+		},
+		{
+			"id": "locked_screen_is_not_scanned",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"state": {
+						"locked": true
+					},
+					"now_ms": 1000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				}
+			],
+			"expect_clicks": [],
+			"expect_scans": 0
+		},
+		{
+			"id": "focus_lost_during_scan_clicks_nothing",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"after_scan_foreground": {
+						"app_id": "com.apple.finder",
+						"window": 9
+					},
+					"now_ms": 1000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 1,
+							"frame": {
+								"x": 100,
+								"y": 50,
+								"width": 800,
+								"height": 600
+							}
+						},
+						"hits": [
+							{
+								"id": "allow",
+								"x": 700,
+								"y": 560,
+								"width": 80,
+								"height": 24
+							}
+						]
+					}
+				}
+			],
+			"expect_clicks": [],
+			"expect_scans": 1
+		},
+		{
+			"id": "one_scan_in_flight",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1000,
+					"answer": null
+				},
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1700,
+					"answer": null
+				}
+			],
+			"expect_clicks": [],
+			"expect_scans": 1
+		},
+		{
+			"id": "text_hit_after_image_hits",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1000,
+					"answer": {
+						"image": {
+							"width": 800,
+							"height": 600,
+							"scale": 2,
+							"frame": {
+								"x": 0,
+								"y": 0,
+								"width": 400,
+								"height": 300
+							}
+						},
+						"hits": [],
+						"text_hits": [
+							{
+								"id": "copilot",
+								"x": 100,
+								"y": 200,
+								"width": 40,
+								"height": 20
+							}
+						]
+					}
+				}
+			],
+			"expect_clicks": [[60, 105]],
+			"expect_scans": 1
+		},
+		{
+			"id": "scan_refusal_clicks_nothing",
+			"ticks": [
+				{
+					"foreground": {
+						"app_id": "com.microsoft.VSCode",
+						"window": 1
+					},
+					"now_ms": 1000,
+					"answer": {
+						"reason": "capture_permission_missing"
+					}
+				}
+			],
+			"expect_clicks": [],
+			"expect_scans": 1
+		}
+	]
+}

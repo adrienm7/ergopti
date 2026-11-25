@@ -23,6 +23,8 @@ local Json = require("core.text.engine.json")
 local Matcher = require("shortcuts.engine.auto_click_matcher")
 local Policy = require("shortcuts.engine.auto_click_policy")
 local TextTarget = require("shortcuts.engine.text_target")
+local Presets = require("shortcuts.engine.keep_awake_presets")
+local Session = require("shortcuts.engine.auto_click_session")
 
 local PARK_MILLER_MULTIPLIER = 16807
 local PARK_MILLER_MODULUS = 2147483647
@@ -117,6 +119,10 @@ function M.register(helpers, options)
 	local match_corpus = load(options.shared, "auto_click_match_vectors.json")
 	local policy_corpus = load(options.shared, "auto_click_policy_vectors.json")
 	local text_corpus = load(options.shared, "text_target_vectors.json")
+	local presets_corpus = load(options.shared, "keep_awake_presets_vectors.json")
+	local session_corpus = load(options.shared, "auto_click_session_vectors.json")
+	local starters = read_json(options.shared, "shortcuts/data/keep_awake_presets.json")
+	local defaults = read_json(options.shared, "shortcuts/data/auto_click_defaults.json")
 	TextTarget.set_fold(read_json(options.shared, "core/text/data/text_fold.json").fold)
 
 	helpers.describe("auto-click matcher vectors: " .. options.driver, function()
@@ -178,6 +184,95 @@ function M.register(helpers, options)
 						helpers.assert_eq(hit[key], vector.expect[key], vector.id .. " " .. key)
 					end
 				end
+			end)
+		end
+	end)
+
+
+	helpers.describe("anti-sleep presets vectors: " .. options.driver, function()
+		for _, vector in ipairs(presets_corpus.edits) do
+			helpers.it("presets " .. vector.id, function()
+				local doc = assert(Presets.load(starters, nil))
+				for index, step in ipairs(vector.steps) do
+					local ok, reason = Presets[step.op](doc, (table.unpack or unpack)(step.args))
+					helpers.assert_eq(ok, step.ok, vector.id .. " step " .. index)
+					if step.reason then helpers.assert_eq(reason, step.reason, vector.id .. " reason " .. index) end
+				end
+				helpers.assert_eq(doc.active, vector.expect_active, vector.id .. " active")
+				local ids = {}
+				for _, preset in ipairs(doc.presets) do ids[#ids + 1] = preset.id end
+				helpers.assert_eq(table.concat(ids, ","), table.concat(vector.expect_ids, ","), vector.id .. " ids")
+				if vector.expect_switch then
+					helpers.assert_eq(Presets.get(doc, vector.expect_switch.id).auto_click, vector.expect_switch.auto_click,
+						vector.id .. " switch")
+				end
+				if vector.expect_name then
+					helpers.assert_eq(Presets.get(doc, vector.expect_name.id).name, vector.expect_name.name, vector.id .. " name")
+				end
+				local reloaded = Presets.load(starters, doc)
+				helpers.assert_not_nil(reloaded, vector.id .. " the edited document reloads")
+			end)
+		end
+		for _, vector in ipairs(presets_corpus.plans) do
+			helpers.it("plan " .. vector.id, function()
+				local doc = assert(Presets.load(starters, nil))
+				local plan = Presets.plan(Presets.get(doc, vector.preset), vector.os, vector.images_dir, vector.separator,
+					defaults)
+				helpers.assert_eq(plan.keep_awake, vector.expect.keep_awake, "keep_awake")
+				helpers.assert_eq(plan.auto_click, vector.expect.auto_click, "auto_click")
+				helpers.assert_eq(table.concat(plan.allowed_apps, "|"), table.concat(vector.expect.allowed_apps, "|"), "apps")
+				helpers.assert_eq(#plan.templates, vector.expect.templates, "templates")
+				helpers.assert_eq(#plan.text_targets, vector.expect.text_targets, "text targets")
+			end)
+		end
+		helpers.it("presets refuse a broken saved document", function()
+			local doc, reason = Presets.load(starters, { version = starters.version, presets = {} })
+			helpers.assert_nil(doc, "no document")
+			helpers.assert_eq(reason, "presets_document_invalid", "reason")
+		end)
+	end)
+
+	helpers.describe("auto-click session vectors: " .. options.driver, function()
+		for _, vector in ipairs(session_corpus.vectors) do
+			helpers.it("session " .. vector.id, function()
+				local tick_index, clicks, scans, pending = 0, {}, 0, nil
+				local function current() return vector.ticks[tick_index] end
+				local foreground_now
+				local ports = {
+					foreground = function() return foreground_now end,
+					state = function()
+						local state = current().state
+						if state == nil or Json.is_null(state) then return {} end
+						return state
+					end,
+					scan = function(_, _, callback) scans = scans + 1; pending = callback end,
+					click = function(x, y) clicks[#clicks + 1] = x .. "," .. y; return true end,
+					now_ms = function() return current().now_ms end,
+					log = function() end,
+				}
+				local plan = { allowed_apps = session_corpus.plan.allowed_apps, auto_click = session_corpus.plan.auto_click,
+					templates = { { id = "t" } }, text_targets = { { id = "copilot" } } }
+				local session = Session.new(ports, plan, { cooldown_ms = session_corpus.cooldown_ms, options = {}, ocr = {} })
+				for index, tick in ipairs(vector.ticks) do
+					tick_index = index
+					foreground_now = tick.foreground
+					local before = pending
+					pending = nil
+					session.tick()
+					local callback = pending or before
+					if tick.after_scan_foreground then foreground_now = tick.after_scan_foreground end
+					if callback and not Json.is_null(tick.answer) then
+						pending = nil
+						if tick.answer.reason then callback(nil, tick.answer.reason) else callback(tick.answer) end
+					else
+						pending = callback
+					end
+				end
+				local expected = {}
+				for _, point in ipairs(vector.expect_clicks) do expected[#expected + 1] = point[1] .. "," .. point[2] end
+				helpers.assert_eq(table.concat(clicks, ";"), table.concat(expected, ";"), vector.id .. " clicks")
+				helpers.assert_eq(scans, vector.expect_scans, vector.id .. " scans")
+				helpers.assert_eq(session.count(), #expected, vector.id .. " count")
 			end)
 		end
 	end)
