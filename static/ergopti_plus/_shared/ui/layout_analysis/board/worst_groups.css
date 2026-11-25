@@ -67,7 +67,8 @@
 }
 
 /* « Corpus words » under a row: a small text button in the accent ink, its
-   words in a muted paragraph once opened. */
+   words in a muted paragraph once opened. Its box keeps the 44 px of WCAG
+   2.5.5 although its text is small. */
 .la-ngram-words {
 	background: transparent;
 	border: 0;
@@ -75,7 +76,8 @@
 	cursor: pointer;
 	font: inherit;
 	font-size: 0.85em;
-	min-height: 24px;
+	min-height: 44px;
+	min-width: 44px;
 	padding: 2px 4px;
 	text-decoration: underline;
 }
