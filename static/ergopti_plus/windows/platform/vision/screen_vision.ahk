@@ -15,7 +15,9 @@
 ;    start; ScreenVisionStop() asks it to leave and retires the child.
 ; 2. A folder queue (<id>.req.json in, <id>.res.json out, each renamed into
 ;    place), polled on a timer from the timings registry: ShellRunner gives no
-;    stdin stream to a running child, and a file protocol cannot tear.
+;    stdin stream to a running child, and a file protocol cannot tear. The
+;    timer runs only while the worker starts or a call waits for its answer:
+;    an idle worker between auto-click sessions costs the driver no poller.
 ; 3. Every call answers once through its callback, Callback(Answer, Reason):
 ;    an answer Map, or 0 with a reason of the closed vocabulary. A request
 ;    past its deadline answers "ocr_timeout"; a dead worker answers
@@ -36,6 +38,7 @@ class ScreenVisionOwner {
 	static ready := 0
 	static started := 0
 	static spawn_fn := 0
+	static polling := false
 }
 
 
@@ -141,7 +144,7 @@ ScreenVisionInit() {
 	ScreenVisionOwner.handle := Handle
 	ScreenVisionOwner.state := "starting"
 	ScreenVisionOwner.started := A_TickCount
-	SetTimer(_ScreenVisionPoll, TimingsGet("screen_vision", "worker_poll_ms"))
+	_ScreenVisionArmPoll(true)
 	LoggerSuccess("ScreenVision", "Screen vision worker started; waiting for its readiness.")
 	return true
 }
@@ -150,7 +153,7 @@ ScreenVisionInit() {
 ScreenVisionStop() {
 	if ScreenVisionOwner.state = "stopped"
 		return
-	SetTimer(_ScreenVisionPoll, 0)
+	_ScreenVisionArmPoll(false)
 	if ScreenVisionOwner.queue != ""
 		try FileAppend("", ScreenVisionOwner.queue . "\stop")
 	if IsObject(ScreenVisionOwner.handle)
@@ -186,7 +189,17 @@ _ScreenVisionAnswer(Callback, Answer, Reason) {
 		LoggerError("ScreenVision", "A screen vision callback raised: {1}.", Err.Message)
 }
 
+; Arms or disarms the queue poll; arming an armed poll keeps its period.
+_ScreenVisionArmPoll(On) {
+	if On && !ScreenVisionOwner.polling
+		SetTimer(_ScreenVisionPoll, TimingsGet("screen_vision", "worker_poll_ms"))
+	else if !On && ScreenVisionOwner.polling
+		SetTimer(_ScreenVisionPoll, 0)
+	ScreenVisionOwner.polling := On
+}
+
 ; Reads the readiness file and every finished answer, and expires late requests.
+; Disarms itself once the worker is past its start and no call waits.
 _ScreenVisionPoll() {
 	Queue := ScreenVisionOwner.queue
 	if ScreenVisionOwner.state = "starting" {
@@ -224,6 +237,8 @@ _ScreenVisionPoll() {
 			_ScreenVisionAnswer(Entry["callback"], 0, "ocr_timeout")
 		}
 	}
+	if ScreenVisionOwner.state != "starting" && ScreenVisionOwner.pending.Count == 0
+		_ScreenVisionArmPoll(false)
 }
 
 ; Sends one request to the worker; Callback(Answer, Reason) runs once.
@@ -248,6 +263,7 @@ _ScreenVisionRequest(Request, Callback) {
 	ScreenVisionOwner.pending[Id] := Map("callback", Callback, "op", Request["op"],
 		"deadline", A_TickCount + TimingsGet("screen_vision", "ocr_timeout_ms")
 			+ (ScreenVisionOwner.state = "starting" ? TimingsGet("screen_vision", "worker_start_timeout_ms") : 0))
+	_ScreenVisionArmPoll(true)
 }
 
 

@@ -134,6 +134,15 @@ const INVENTORY = {
 		'Armed only while keep-awake is active, to cancel it the instant the user moves the ' +
 		'mouse. 150 ms because a cancel the user has to wait for reads as the feature ignoring ' +
 		'them. Disarmed with the feature.',
+	'modules/shortcuts/auto_click.ahk:_AutoClickTick':
+		'Armed only while an anti-sleep auto-click session runs (AutoClickStart to ' +
+		'AutoClickStop). Each 700 ms tick asks screen vision for one look at the allowed ' +
+		'foreground window; a slower tick leaves a permission prompt or a "continue" button ' +
+		'unanswered for seconds, which is the whole point of the mode.',
+	'platform/vision/screen_vision.ahk:_ScreenVisionPoll':
+		'Armed only while the vision worker starts or a call waits for its answer file, and ' +
+		'disarmed by the poll itself once the queue is empty. 25 ms because an auto-click tick ' +
+		'waits on that answer, and the worker writes it without a wake signal to the driver.',
 	'ai/ui/menu/api_entries.ahk:_LLM_Menu_ApiTestProgressTick':
 		'Armed only while an API test probe shows its progress window, and stopped by ' +
 		'_LLM_Menu_ApiTestProgressHide when the probe answers, times out or is cancelled. ' +

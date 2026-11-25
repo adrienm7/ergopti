@@ -102,3 +102,31 @@ _TSV_SingleOwner() {
 	} finally _TSV_Finish()
 }
 Test("screen vision: one owner, and a stop answers pending calls (screen-vision-queue)", _TSV_SingleOwner)
+
+; A 25 ms poll left armed after the worker went idle would cost the driver CPU
+; for its whole life once one auto-click session had run.
+_TSV_PollRunsOnlyWhileACallWaits() {
+	ScreenVisionStop()
+	ScreenVisionOwner.spawn_fn := _TSV_Spawn
+	try {
+		AssertTrue(ScreenVisionInit(), "the worker starts")
+		AssertTrue(ScreenVisionOwner.polling, "the poll watches for readiness")
+		Queue := ScreenVisionOwner.queue
+		FileAppend('{"ok":true,"capture":{"ok":true},"ocr":{"ok":true}}', Queue . "\ready.json", "UTF-8-RAW")
+		_ScreenVisionPoll()
+		AssertFalse(ScreenVisionOwner.polling, "a ready worker with no call is not polled")
+		Answered := 0
+		ScreenVisionCaptureWindow(9, (Image, Reason) => (Answered += 1))
+		AssertTrue(ScreenVisionOwner.polling, "a queued call arms the poll")
+		_ScreenVisionPoll()
+		AssertTrue(ScreenVisionOwner.polling, "the poll stays armed while the answer is owed")
+		FileAppend('{"ok":false,"reason":"no_foreground_window"}', Queue . "\00000001.res.json", "UTF-8-RAW")
+		_ScreenVisionPoll()
+		AssertEqual(1, Answered, "the call is answered")
+		AssertFalse(ScreenVisionOwner.polling, "the last answer disarms the poll")
+		ScreenVisionStop()
+		AssertFalse(ScreenVisionOwner.polling, "a stop leaves no poll")
+	} finally _TSV_Finish()
+}
+Test("screen vision: the queue is polled only while a call waits (screen-vision-idle-poll)",
+	_TSV_PollRunsOnlyWhileACallWaits)
