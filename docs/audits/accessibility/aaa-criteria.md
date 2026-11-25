@@ -29,10 +29,13 @@ HTML_CodeSniffer's errors are counted the same way, per page (or window),
 scheme, frame (or state) and code, in a ratchet of their own
 (`site-htmlcs-baseline.json`, `app-windows-htmlcs-baseline.json`, each rule
 written `htmlcs:<code>`). HTML_CodeSniffer 2.5.1 reads only `rgb()` and hex
-colours, so a colour Chromium computes as `color(srgb …)` or `oklab(…)` (the
-`color-mix()` and `oklch()` tokens) gives a contrast « of NaN:1 »: that
-error is counted under its code suffixed `.Unmeasured`, still gated, so that
-a measured ratio below 7:1 keeps a row of its own.
+colours and no alpha below 1: the scan hands it the browser's conversion of
+`color(srgb …)` and `oklab(…)` and composites a translucent colour over what
+is behind it (fifteenth pass). A contrast it still cannot compute (a layer
+over an image or a gradient, SVG text over its shapes) is counted under its
+code suffixed `.Unmeasured`, still gated, so that a measured ratio below 7:1
+keeps a row of its own. An error on an element the page does not render is
+listed in the report only; the state that shows it is scanned.
 The target is an empty baseline. The last `color-contrast-enhanced` rows went
 on 2026-11-24 (thirteenth pass); the rows left are the 44 px targets of 2.5.5,
 which the gates measure themselves (`target-size-enhanced`, below).

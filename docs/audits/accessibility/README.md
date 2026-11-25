@@ -1401,6 +1401,55 @@ The maintainer added HTML_CodeSniffer to the AAA audit on 2026-11-24
   the app windows' `keyboard-fold` state whenever its steps fell inside it;
   the state now reproduces the race.
 
+## Fifteenth pass, HTML_CodeSniffer measures what it read as NaN (2026-11-25, Paris time)
+
+- **The tool, first.** HTML_CodeSniffer 2.5.1 parses only integer `rgb()` and
+  hex colours and gives up on any alpha below 1, so nearly all of its contrast
+  errors read « NaN:1 » (18,232 of the site's and 8,695 of the app windows'
+  errors). `tools/test/lib/htmlcs.cjs` now hands its parser the browser's own
+  conversion (a one-pixel canvas) and its style reader each translucent
+  background or text colour composited over what is behind it, down to the
+  page's `Canvas` colour, as axe does. A layer over a background image or
+  gradient, and SVG text (painted over sibling shapes the tool never sees),
+  stay `.Unmeasured`. An error on an element the page does not render (inside
+  a `hidden` screen or a closed dialog) goes to the report, not the count: the
+  state that shows it is scanned with it rendered (to review, TODO
+  « Maintainer decisions pending »). The app windows gate's `--self-check`
+  proves each case on a small page and fails on the previous scanner.
+- **What it then found, which axe passed or skipped.** axe-core 4.14 reported
+  a measured 2.11:1 as a pass in the typing dashboard and skips one-character
+  text as « too short »; both were real. Fixed at their source, 7:1 in both
+  appearances: the key chips' blue (5.2:1) and the control keys' red (3.0:1),
+  the modifier chips (2.0:1 to 5.3:1, now the table's ink rule:
+  `--hue-ink-base` and `--hue-ink-shade`), the speed and accuracy gradient
+  (shaded 65 % black, or 60 % white on dark), the error table's pink (2.3:1),
+  the cards' precision, distance, repetition and speed inks (3.6:1 to 6.9:1),
+  the speed chart's yellow title (2.1:1, `--chart-wpm-ink`), the app badges'
+  white initials (1.5:1 to 4.1:1, shaded 60 %), the diagnostics' « checking »
+  amber (4.9:1 light, 6.5:1 dark), the dashboards' muted grey on the red split
+  boxes (6.99:1) and the AI page's shortcut chips (6.5:1).
+- **Markup.** The action picker's search field and the typing dashboard's two
+  search fields are named (a placeholder vanishes as one types); the
+  onboarding's folder field is named by its description; groups that had no
+  legend are named ARIA groups (the onboarding's languages and checklist, the
+  action picker's program editor, the info editor's rows) or keep a fieldset
+  with a visually hidden legend (the Comparer's filters); filter bars and
+  editors that never submit are no longer forms (the apps dashboard, the paths
+  and info editors, the analysis panel's settings); the analysers table's
+  column headers carry `scope`; the release header's empty heading is hidden
+  until a release names it; the site logo's link is named by the logo's `alt`.
+- **Counts.** App windows: 344 rows and 10,694 errors to 16 rows and 1,240
+  (1,232 SVG key labels left unmeasured, 4 `G141` and 4 `H43`). Site: 218 rows
+  and 18,418 errors to 76 rows and 6,386, all contrast over a gradient or an
+  image left unmeasured.
+- **Left, each a limit of the tool.** `G141`: a release body's « ### » is read
+  at level 2 through `aria-level`, which the tool ignores (the tags keep their
+  look by design). `H43`: the model browser's backend and provider headers use
+  `scope="rowgroup"`; the tool expects every backend's header on every cell,
+  which would misname the rows for a screen reader, so the `headers` it asks
+  for were not added. The `.Unmeasured` rows need a pixel measure of the
+  backdrop.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of
