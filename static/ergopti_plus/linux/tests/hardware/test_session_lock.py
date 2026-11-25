@@ -294,8 +294,11 @@ class SessionLockTests(unittest.TestCase):
                         encoding="utf-8",
                     )
                     bootstrap = root / "bootstrap.lua"
+                    # The logger shim is the first module Main loads past the
+                    # lock; compat.utf8 now loads before it, through the host
+                    # environment's shared quoting.
                     bootstrap.write_text(
-                        "package.preload['core.lifecycle.engine.compat.utf8'] = function()\n"
+                        "package.preload['core.logger.engine.shim'] = function()\n"
                         "  assert(os.getenv('ERGOPTI_SESSION_LOCK_FD') == nil)\n"
                         "  local status = os.execute(os.getenv('TEST_CHILD_COMMAND'))\n"
                         "  assert(status == 0 or status == true)\n"
