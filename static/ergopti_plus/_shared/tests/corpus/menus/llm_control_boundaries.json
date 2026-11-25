@@ -63,7 +63,7 @@
 		"menu.llm.disable_password_fields",
 		"button.cancel"
 	],
-	"display_inline_english": "✍️ Inline auto-type (Copilot-style)",
+	"display_inline_english": "✍️ Type AI suggestions automatically (no key to accept them)",
 	"live_off_english": "Off",
 	"trigger_remaining_english": "Exclude from automatic AI generation…",
 	"retired_menu_sections": ["llm_live_controls", "llm_live_off_boundary"]

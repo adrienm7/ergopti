@@ -205,9 +205,12 @@ baseline as violations go.
       `npm run test:metrics-cards-explained`), and the Studio's 37 metrics all have their definition. The tray
       settings were reviewed on 2026-11-25: each of the 87 setting rows of menu.toml is classified in
       `docs/audits/accessibility/tray-settings-help-review.json` (`npm run test:menu-settings-help-review` refuses an unreviewed
-      row); 70 say their effect in their label, 17 need a help text, each with what it must add. Left: those 17
-      help texts, in 21 locales, once the maintainer has chosen where a tray row shows its help (« Maintainer
-      decisions pending »).
+      row); 70 say their effect in their label, 17 needed a help text. Since 2026-11-25 each of the 17 says its
+      effect in its own label in the 21 locales (« Words per minute (WPM) in menu bar », « Type AI suggestions
+      automatically (no key to accept them) »…), the same on the three trays, and the review records the old
+      label per locale: the test refuses a row whose label still reads as before in any locale. Left: the
+      maintainer's review of that choice (« Where a tray setting shows its help », « Maintainer decisions
+      pending »).
 
 ## Ergopti Studio
 
@@ -631,7 +634,8 @@ Each question names the default kept meanwhile; an answer moves into the item or
       review of `docs/audits/accessibility/tray-settings-help-review.json` found 17 setting rows whose label does not say their
       effect (« WPM », « CapsWord », « Copilot-style », « ROI », « Chained hotstrings (a → b → c) »…). A native menu
       row has no help line on Windows (Win32 menus have no item tooltips) nor Linux (dbusmenu carries none); macOS
-      can show a tooltip. Kept meanwhile: the labels as they are, the review held by its test. Choose:
+      can show a tooltip. Applied on 2026-11-25: option 1, the 17 labels reworded in the 21 locales
+      (`npm run test:menu-settings-help-review` holds each one). Choose:
   1. **(recommended) Reword each of the 17 labels** so that it says its effect (« Words per minute in the menu
      bar »), in the 21 locales: the same on the three OS, nothing to hover.
   2. A help tooltip per row on macOS and a « What do these settings do? » row opening the configuration page on the

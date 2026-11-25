@@ -1,5 +1,5 @@
 {
-	"_comment": "Review of every tray setting row (check, choice and toggle) for help text (WCAG 3.3.5). A tray row has no help line of its own: « self_explained » rows say their effect in their label, « needs_help » rows do not, and the reason says what a help text must add. tools/test/test-menu-settings-help-review.cjs requires one entry per setting row of _shared/menu/data/menu.toml. Reviewed by the agent on 2026-11-25.",
+	"_comment": "Review of every tray setting row (check, choice and toggle) for help text (WCAG 3.3.5). A tray row has no help line of its own: « self_explained » rows say their effect in their label, « needs_help » rows do not, and the reason says what a help text must add. tools/test/test-menu-settings-help-review.cjs requires one entry per setting row of _shared/menu/data/menu.toml. Reviewed by the agent on 2026-11-25. Each « needs_help » row now says its effect in its own label (« help »: the label key it draws and that key’s text in each locale before the rewrite, which no locale may keep).",
 	"rows": {
 		"about_menu.start_at_login": {
 			"verdict": "self_explained",
@@ -7,7 +7,33 @@
 		},
 		"about_update_channel_menu.update_channel": {
 			"verdict": "needs_help",
-			"why": "« channel » does not say that a prerelease channel installs untested versions"
+			"why": "« channel » does not say that a prerelease channel installs untested versions",
+			"help": {
+				"label_key": "menu.about.channel_menu",
+				"before": {
+					"ar": "قناة التحديث: {channel}",
+					"cs": "Kanál aktualizací: {channel}",
+					"da": "Opdateringskanal: {channel}",
+					"de": "Aktualisierungskanal: {channel}",
+					"en": "Update channel: {channel}",
+					"es": "Canal de actualizaciones: {channel}",
+					"fr": "Canal de mise à jour : {channel}",
+					"he": "ערוץ עדכונים: {channel}",
+					"hi": "अपडेट चैनल: {channel}",
+					"it": "Canale di aggiornamento: {channel}",
+					"ja": "アップデートチャンネル: {channel}",
+					"ko": "업데이트 채널: {channel}",
+					"nl": "Updatekanaal: {channel}",
+					"no": "Oppdateringskanal: {channel}",
+					"pl": "Kanał aktualizacji: {channel}",
+					"pt": "Canal de atualizações: {channel}",
+					"ru": "Канал обновлений: {channel}",
+					"sv": "Uppdateringskanal: {channel}",
+					"tr": "Güncelleme kanalı: {channel}",
+					"uk": "Канал оновлень: {channel}",
+					"zh": "更新通道：{channel}"
+				}
+			}
 		},
 		"about_update_frequency_menu.update_check_interval": {
 			"verdict": "self_explained",
@@ -51,11 +77,63 @@
 		},
 		"gesture_slot_mode_commands.gesture_mode_incremental": {
 			"verdict": "needs_help",
-			"why": "« Incremental send (distance) » does not say how the length of a swipe changes what is sent"
+			"why": "« Incremental send (distance) » does not say how the length of a swipe changes what is sent",
+			"help": {
+				"label_key": "menu.gestures.mode_incremental",
+				"before": {
+					"ar": "إرسال تدريجي (مسافة)",
+					"cs": "Inkrementální odeslání (vzdálenost)",
+					"da": "Inkrementel afsendelse (afstand)",
+					"de": "Inkrementell senden (Distanz)",
+					"en": "Incremental send (distance)",
+					"es": "Envío incremental (distancia)",
+					"fr": "Envoi incrémental (distance)",
+					"he": "שליחה מצטברת (מרחק)",
+					"hi": "वृद्धिशील भेजना (दूरी)",
+					"it": "Invio incrementale (distanza)",
+					"ja": "インクリメンタル送信（距離）",
+					"ko": "점진적 전송 (거리)",
+					"nl": "Incrementeel verzenden (afstand)",
+					"no": "Inkrementell sending (avstand)",
+					"pl": "Wysyłanie przyrostowe (odległość)",
+					"pt": "Envio incremental (distância)",
+					"ru": "Инкрементальная отправка (расстояние)",
+					"sv": "Inkrementell skickning (distans)",
+					"tr": "Artımlı gönderme (mesafe)",
+					"uk": "Інкрементальне надсилання (відстань)",
+					"zh": "增量发送（距离）"
+				}
+			}
 		},
 		"gesture_slot_mode_commands.gesture_mode_single": {
 			"verdict": "needs_help",
-			"why": "« x1 » does not say how the length of a swipe changes what is sent"
+			"why": "« x1 » does not say how the length of a swipe changes what is sent",
+			"help": {
+				"label_key": "menu.gestures.mode_single",
+				"before": {
+					"ar": "إجراء واحد (x1)",
+					"cs": "Jednoduchá akce (x1)",
+					"da": "Enkelt handling (x1)",
+					"de": "Einzelaktion (x1)",
+					"en": "Single action (x1)",
+					"es": "Acción única (x1)",
+					"fr": "Action unique (x1)",
+					"he": "פעולה יחידה (x1)",
+					"hi": "एकल क्रिया (x1)",
+					"it": "Azione singola (x1)",
+					"ja": "シングルアクション (x1)",
+					"ko": "단일 동작 (x1)",
+					"nl": "Enkele actie (x1)",
+					"no": "Enkel handling (x1)",
+					"pl": "Pojedyncza akcja (x1)",
+					"pt": "Ação única (x1)",
+					"ru": "Единственное действие (x1)",
+					"sv": "Enskild åtgärd (x1)",
+					"tr": "Tek eylem (x1)",
+					"uk": "Одинична дія (x1)",
+					"zh": "单次动作（x1）"
+				}
+			}
 		},
 		"gestures_menu.gestures_toggle": {
 			"verdict": "self_explained",
@@ -103,7 +181,33 @@
 		},
 		"hotstrings_params_group.cascade_max_arrows": {
 			"verdict": "needs_help",
-			"why": "an arrow diagram instead of words: one expansion can trigger the next, up to the chosen count"
+			"why": "an arrow diagram instead of words: one expansion can trigger the next, up to the chosen count",
+			"help": {
+				"label_key": "menu.hotstrings.cascade_max_arrows",
+				"before": {
+					"ar": "سلاسل نصية متسلسلة (a → b → c)",
+					"cs": "Zřetězené hotstringy (a → b → c)",
+					"da": "Kædede hotstrings (a → b → c)",
+					"de": "Verkettete Hotstrings (a → b → c)",
+					"en": "Chained hotstrings (a → b → c)",
+					"es": "Hotstrings en cadena (a → b → c)",
+					"fr": "Hotstrings en chaîne (a → b → c)",
+					"he": "Hotstrings משורשרים (a → b → c)",
+					"hi": "शृंखलाबद्ध Hotstring (a → b → c)",
+					"it": "Hotstring a catena (a → b → c)",
+					"ja": "ホットストリングの連鎖 (a → b → c)",
+					"ko": "핫스트링 연쇄 (a → b → c)",
+					"nl": "Hotstrings in een keten (a → b → c)",
+					"no": "Kjedede hotstrings (a → b → c)",
+					"pl": "Hotstringi w łańcuchu (a → b → c)",
+					"pt": "Hotstrings em cadeia (a → b → c)",
+					"ru": "Цепочка хотстрингов (a → b → c)",
+					"sv": "Kedjade hotstrings (a → b → c)",
+					"tr": "Zincirleme hotstring'ler (a → b → c)",
+					"uk": "Ланцюжок хотстрингів (a → b → c)",
+					"zh": "热字符串连锁 (a → b → c)"
+				}
+			}
 		},
 		"hotstrings_params_group.click_resets_word": {
 			"verdict": "self_explained",
@@ -143,7 +247,33 @@
 		},
 		"layout_menu.virtual_keyboard": {
 			"verdict": "needs_help",
-			"why": "does not say why a virtual keyboard is chosen (the shape of keyboard macOS believes is plugged in)"
+			"why": "does not say why a virtual keyboard is chosen (the shape of keyboard macOS believes is plugged in)",
+			"help": {
+				"label_key": "menu.layout.virtual_keyboard",
+				"before": {
+					"ar": "لوحة مفاتيح Karabiner الافتراضية",
+					"cs": "Virtuální klávesnice Karabiner",
+					"da": "Karabiners virtuelle tastatur",
+					"de": "Virtuelle Karabiner-Tastatur",
+					"en": "Karabiner virtual keyboard",
+					"es": "Teclado virtual de Karabiner",
+					"fr": "Clavier virtuel Karabiner",
+					"he": "מקלדת וירטואלית של Karabiner",
+					"hi": "Karabiner वर्चुअल कीबोर्ड",
+					"it": "Tastiera virtuale di Karabiner",
+					"ja": "Karabiner の仮想キーボード",
+					"ko": "Karabiner 가상 키보드",
+					"nl": "Virtueel Karabiner-toetsenbord",
+					"no": "Karabiners virtuelle tastatur",
+					"pl": "Klawiatura wirtualna Karabiner",
+					"pt": "Teclado virtual do Karabiner",
+					"ru": "Виртуальная клавиатура Karabiner",
+					"sv": "Karabiners virtuella tangentbord",
+					"tr": "Karabiner sanal klavyesi",
+					"uk": "Віртуальна клавіатура Karabiner",
+					"zh": "Karabiner 虚拟键盘"
+				}
+			}
 		},
 		"layout_native_record_choice.layout_native_select": {
 			"verdict": "self_explained",
@@ -167,11 +297,63 @@
 		},
 		"llm_display_inline_control.llm_display_inline": {
 			"verdict": "needs_help",
-			"why": "relies on knowing another product (Copilot) to say what the row does"
+			"why": "relies on knowing another product (Copilot) to say what the row does",
+			"help": {
+				"label_key": "menu.llm.inline_autotype",
+				"before": {
+					"ar": "✍️ كتابة تلقائية مضمنة (نمط Copilot)",
+					"cs": "✍️ Inline auto-psaní (styl Copilot)",
+					"da": "✍️ Inline auto-skrivning (Copilot-stil)",
+					"de": "✍️ Inline-Autotippen (Copilot-Stil)",
+					"en": "✍️ Inline auto-type (Copilot-style)",
+					"es": "✍️ Auto-escritura en línea (estilo Copilot)",
+					"fr": "✍️ Saisie automatique en ligne (style Copilot)",
+					"he": "✍️ הקלדה אוטומטית מובנית (סגנון Copilot)",
+					"hi": "✍️ इनलाइन ऑटो-टाइप (Copilot शैली)",
+					"it": "✍️ Auto-digitazione in linea (stile Copilot)",
+					"ja": "✍️ インライン自動入力（Copilot 風）",
+					"ko": "✍️ 인라인 자동 입력 (Copilot 스타일)",
+					"nl": "✍️ Inline auto-typen (Copilot-stijl)",
+					"no": "✍️ Inline auto-skriving (Copilot-stil)",
+					"pl": "✍️ Wpisywanie w miejscu (styl Copilot)",
+					"pt": "✍️ Digitação automática em linha (estilo Copilot)",
+					"ru": "✍️ Авто-ввод по месту (стиль Copilot)",
+					"sv": "✍️ Inline auto-skrivning (Copilot-stil)",
+					"tr": "✍️ Satır içi otomatik yazma (Copilot tarzı)",
+					"uk": "✍️ Авто-введення на місці (стиль Copilot)",
+					"zh": "✍️ 内联自动输入（Copilot 风格）"
+				}
+			}
 		},
 		"llm_display_menu.llm_indentation": {
 			"verdict": "needs_help",
-			"why": "does not say what is indented, nor when"
+			"why": "does not say what is indented, nor when",
+			"help": {
+				"label_key": "menu.llm.indent_label",
+				"before": {
+					"ar": "مسافة بادئة للاقتراح المحدد",
+					"cs": "Odsazení vybraného návrhu",
+					"da": "Indrykning af det valgte forslag",
+					"de": "Einrückung des ausgewählten Vorschlags",
+					"en": "Indentation of the selected suggestion",
+					"es": "Sangría de la sugerencia seleccionada",
+					"fr": "Indentation de la suggestion sélectionnée",
+					"he": "הזחה של ההצעה הנבחרת",
+					"hi": "चयनित सुझाव की इंडेंटेशन",
+					"it": "Rientro del suggerimento selezionato",
+					"ja": "選択した提案のインデント",
+					"ko": "선택된 제안의 들여쓰기",
+					"nl": "Inspringing van de geselecteerde suggestie",
+					"no": "Innrykk for det valgte forslaget",
+					"pl": "Wcięcie wybranej sugestii",
+					"pt": "Indentação da sugestão selecionada",
+					"ru": "Отступ выбранного предложения",
+					"sv": "Indrag av det valda förslaget",
+					"tr": "Seçilen önerinin girintisi",
+					"uk": "Відступ вибраної пропозиції",
+					"zh": "所选建议的缩进"
+				}
+			}
 		},
 		"llm_display_menu.llm_info_bar": {
 			"verdict": "self_explained",
@@ -187,7 +369,33 @@
 		},
 		"llm_generation_menu.llm_auto_raise_temperature": {
 			"verdict": "needs_help",
-			"why": "« temperature » is model jargon: the row makes later suggestions more varied"
+			"why": "« temperature » is model jargon: the row makes later suggestions more varied",
+			"help": {
+				"label_key": "menu.llm.auto_raise_temp",
+				"before": {
+					"ar": "  ↳ رفع درجة الحرارة تلقائيًا (+0.1 لكل اقتراح)",
+					"cs": "  ↳ Automaticky zvýšit teplotu (+0,1 na návrh)",
+					"da": "  ↳ Automatisk temperaturstigning (+0,1 pr. forslag)",
+					"de": "  ↳ Temperatur automatisch erhöhen (+0.1 pro Vorschlag)",
+					"en": "  ↳ Auto-raise temperature (+0.1 per suggestion)",
+					"es": "  ↳ Subir temp. automáticamente (+0,1 por sugerencia)",
+					"fr": "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
+					"he": "  ↳ העלה טמפרטורה אוטומטית (+0.1 לכל הצעה)",
+					"hi": "  ↳ स्वचालित रूप से तापमान बढ़ाएं (+0.1 प्रति सुझाव)",
+					"it": "  ↳ Aumenta automaticamente la temperatura (+0.1 per suggerimento)",
+					"ja": "  ↳ 温度を自動的に上げる（提案ごとに+0.1）",
+					"ko": "  ↳ 온도 자동 증가 (제안당 +0.1)",
+					"nl": "  ↳ Temperatuur automatisch verhogen (+0,1 per suggestie)",
+					"no": "  ↳ Øk temperatur automatisk (+0.1 per forslag)",
+					"pl": "  ↳ Automatycznie podnoś temperaturę (+0,1 na sugestię)",
+					"pt": "  ↳ Aumentar temperatura automaticamente (+0,1 por sugestão)",
+					"ru": "  ↳ Автоматически повышать температуру (+0.1 за предложение)",
+					"sv": "  ↳ Höj automatiskt temperaturen (+0,1 per förslag)",
+					"tr": "  ↳ Sıcaklığı otomatik artır (öneri başına +0,1)",
+					"uk": "  ↳ Автоматично підвищувати температуру (+0.1 за пропозицію)",
+					"zh": "  ↳ 自动提高温度（每条建议+0.1）"
+				}
+			}
 		},
 		"llm_generation_reset_navigation.llm_reset_on_nav": {
 			"verdict": "self_explained",
@@ -215,7 +423,33 @@
 		},
 		"llm_trigger_menu.llm_inline_autotype": {
 			"verdict": "needs_help",
-			"why": "relies on knowing another product (Copilot) to say what the row does"
+			"why": "relies on knowing another product (Copilot) to say what the row does",
+			"help": {
+				"label_key": "menu.llm.inline_autotype",
+				"before": {
+					"ar": "✍️ كتابة تلقائية مضمنة (نمط Copilot)",
+					"cs": "✍️ Inline auto-psaní (styl Copilot)",
+					"da": "✍️ Inline auto-skrivning (Copilot-stil)",
+					"de": "✍️ Inline-Autotippen (Copilot-Stil)",
+					"en": "✍️ Inline auto-type (Copilot-style)",
+					"es": "✍️ Auto-escritura en línea (estilo Copilot)",
+					"fr": "✍️ Saisie automatique en ligne (style Copilot)",
+					"he": "✍️ הקלדה אוטומטית מובנית (סגנון Copilot)",
+					"hi": "✍️ इनलाइन ऑटो-टाइप (Copilot शैली)",
+					"it": "✍️ Auto-digitazione in linea (stile Copilot)",
+					"ja": "✍️ インライン自動入力（Copilot 風）",
+					"ko": "✍️ 인라인 자동 입력 (Copilot 스타일)",
+					"nl": "✍️ Inline auto-typen (Copilot-stijl)",
+					"no": "✍️ Inline auto-skriving (Copilot-stil)",
+					"pl": "✍️ Wpisywanie w miejscu (styl Copilot)",
+					"pt": "✍️ Digitação automática em linha (estilo Copilot)",
+					"ru": "✍️ Авто-ввод по месту (стиль Copilot)",
+					"sv": "✍️ Inline auto-skrivning (Copilot-stil)",
+					"tr": "✍️ Satır içi otomatik yazma (Copilot tarzı)",
+					"uk": "✍️ Авто-введення на місці (стиль Copilot)",
+					"zh": "✍️ 内联自动输入（Copilot 风格）"
+				}
+			}
 		},
 		"llm_trigger_menu.llm_instant_on_word_end": {
 			"verdict": "self_explained",
@@ -235,7 +469,33 @@
 		},
 		"metrics_menu.encryption": {
 			"verdict": "needs_help",
-			"why": "« ROI » is jargon, and the row does not say that the typed text can no longer be read back"
+			"why": "« ROI » is jargon, and the row does not say that the typed text can no longer be read back",
+			"help": {
+				"label_key": "menu.metrics.encrypt_toggle",
+				"before": {
+					"ar": "تشفير النص المكتوب (ROI: المجاميع العددية فقط)",
+					"cs": "Šifrovat psaný text (ROI: pouze číselné součty)",
+					"da": "Kryptér indtastet tekst (ROI: kun numeriske summer)",
+					"de": "Eingabetext verschlüsseln (ROI: nur numerische Summen)",
+					"en": "Encrypt typing text (ROI: numeric totals only)",
+					"es": "Cifrar texto escrito (ROI: solo totales numéricos)",
+					"fr": "Chiffrer le texte saisi (ROI : totaux numériques uniquement)",
+					"he": "הצפנת טקסט מוקלד (ROI: סכומים מספריים בלבד)",
+					"hi": "टाइप किए गए पाठ को एन्क्रिप्ट करें (ROI: केवल संख्यात्मक कुल)",
+					"it": "Cifra il testo digitato (ROI: solo totali numerici)",
+					"ja": "入力テキストを暗号化（ROI：数値の合計のみ）",
+					"ko": "입력 텍스트 암호화 (ROI: 숫자 합계만)",
+					"nl": "Getypte tekst versleutelen (ROI: alleen numerieke totalen)",
+					"no": "Krypter skrevet tekst (ROI: kun numeriske summer)",
+					"pl": "Szyfruj wpisywany tekst (ROI: tylko sumy liczbowe)",
+					"pt": "Criptografar texto digitado (ROI: só totais numéricos)",
+					"ru": "Шифровать вводимый текст (ROI: только числовые итоги)",
+					"sv": "Kryptera skriven text (ROI: endast numeriska totalsummor)",
+					"tr": "Yazılan metni şifrele (ROI: yalnızca sayısal toplamlar)",
+					"uk": "Шифрувати введений текст (ROI: лише числові підсумки)",
+					"zh": "加密输入文本（ROI：仅数值合计）"
+				}
+			}
 		},
 		"metrics_menu.filter_private": {
 			"verdict": "self_explained",
@@ -271,19 +531,123 @@
 		},
 		"metrics_menu.wpm_menubar": {
 			"verdict": "needs_help",
-			"why": "« WPM » is an abbreviation (words per minute) the row never expands (WCAG 3.1.4)"
+			"why": "« WPM » is an abbreviation (words per minute) the row never expands (WCAG 3.1.4)",
+			"help": {
+				"label_key": "menu.metrics.show_wpm_menubar",
+				"before": {
+					"ar": "WPM في شريط القائمة",
+					"cs": "WPM v panelu nabídek",
+					"da": "WPM i menubar",
+					"de": "TPM in der Menüleiste",
+					"en": "WPM in menu bar",
+					"es": "PPM en la barra de menús",
+					"fr": "MPM dans la barre des menus",
+					"he": "WPM בשורת התפריט",
+					"hi": "मेनू बार में WPM",
+					"it": "WPM nella barra menu",
+					"ja": "メニューバーにWPMを表示",
+					"ko": "메뉴 바에 WPM 표시",
+					"nl": "WPM in menubalk",
+					"no": "WPM i menylinjen",
+					"pl": "WPM na pasku menu",
+					"pt": "WPM na barra de menu",
+					"ru": "WPM в строке меню",
+					"sv": "WPM i menyrad",
+					"tr": "Menü çubuğunda DKS",
+					"uk": "WPM у рядку меню",
+					"zh": "在菜单栏显示 WPM"
+				}
+			}
 		},
 		"metrics_menu.wpm_widget": {
 			"verdict": "needs_help",
-			"why": "« WPM » is an abbreviation (words per minute) the row never expands (WCAG 3.1.4)"
+			"why": "« WPM » is an abbreviation (words per minute) the row never expands (WCAG 3.1.4)",
+			"help": {
+				"label_key": "menu.metrics.show_wpm_widget",
+				"before": {
+					"ar": "أداة WPM العائمة",
+					"cs": "Plovoucí widget WPM",
+					"da": "Flydende WPM widget",
+					"de": "Schwebendes TPM-Widget",
+					"en": "Floating WPM widget",
+					"es": "Widget PPM flotante",
+					"fr": "Widget MPM flottant",
+					"he": "ווידג'ט WPM צף",
+					"hi": "फ्लोटिंग WPM विजेट",
+					"it": "Widget WPM fluttuante",
+					"ja": "フローティングWPMウィジェット",
+					"ko": "부동 WPM 위젯",
+					"nl": "Zwevende WPM-widget",
+					"no": "Flytende WPM-widget",
+					"pl": "Pływający widget WPM",
+					"pt": "Widget flutuante de WPM",
+					"ru": "Плавающий виджет WPM",
+					"sv": "Flytande WPM-widget",
+					"tr": "Kayan DKS widget'ı",
+					"uk": "Плаваючий віджет WPM",
+					"zh": "浮动 WPM 小组件"
+				}
+			}
 		},
 		"number_row_policy_rows.number_row_edges": {
 			"verdict": "needs_help",
-			"why": "does not say which three keys are the edge keys"
+			"why": "does not say which three keys are the edge keys",
+			"help": {
+				"label_key": "menu.layout.number_row_edges",
+				"before": {
+					"ar": "أعد ترتيب مفاتيح الحواف الثلاثة أيضًا",
+					"cs": "Přeuspořádat i tři krajní klávesy",
+					"da": "Omordn også de tre kanttaster",
+					"de": "Auch die drei Randtasten neu ordnen",
+					"en": "Also reorder the three edge keys",
+					"es": "Reordenar también las tres teclas de los bordes",
+					"fr": "Réordonner aussi les trois touches des bords",
+					"he": "לסדר מחדש גם את שלושת מקשי הקצוות",
+					"hi": "किनारे की तीन कुंजियों का क्रम भी बदलें",
+					"it": "Riordina anche i tre tasti ai bordi",
+					"ja": "両端の 3 キーも並べ替える",
+					"ko": "양 끝의 세 키도 재배열",
+					"nl": "Ook de drie randtoetsen herschikken",
+					"no": "Omordne også de tre kanttastene",
+					"pl": "Przestaw także trzy klawisze na brzegach",
+					"pt": "Reordenar também as três teclas das bordas",
+					"ru": "Также переставить три крайние клавиши",
+					"sv": "Ordna även om de tre kanttangenterna",
+					"tr": "Kenardaki üç tuşu da yeniden sırala",
+					"uk": "Також переставити три крайні клавіші",
+					"zh": "同时重新排列两端的三个键"
+				}
+			}
 		},
 		"number_row_policy_rows.number_row_mode": {
 			"verdict": "needs_help",
-			"why": "« Number row » names no effect: its values say what comes first, not that it is what a key types without Shift"
+			"why": "« Number row » names no effect: its values say what comes first, not that it is what a key types without Shift",
+			"help": {
+				"label_key": "menu.layout.number_row",
+				"before": {
+					"ar": "صف الأرقام",
+					"cs": "Číselná řada",
+					"da": "Talrække",
+					"de": "Ziffernreihe",
+					"en": "Number row",
+					"es": "Fila de números",
+					"fr": "Rangée des chiffres",
+					"he": "שורת הספרות",
+					"hi": "अंक पंक्ति",
+					"it": "Riga dei numeri",
+					"ja": "数字列",
+					"ko": "숫자 행",
+					"nl": "Cijferrij",
+					"no": "Tallrekke",
+					"pl": "Rząd cyfr",
+					"pt": "Fila de números",
+					"ru": "Цифровой ряд",
+					"sv": "Sifferrad",
+					"tr": "Sayı satırı",
+					"uk": "Цифровий ряд",
+					"zh": "数字行"
+				}
+			}
 		},
 		"personal_file_controls.personal_file_enabled": {
 			"verdict": "self_explained",
@@ -291,7 +655,33 @@
 		},
 		"personal_file_controls.personal_file_tooltip": {
 			"verdict": "needs_help",
-			"why": "does not say which tooltip: the preview shown before a personal hotstring expands"
+			"why": "does not say which tooltip: the preview shown before a personal hotstring expands",
+			"help": {
+				"label_key": "hs_config.label_tooltip",
+				"before": {
+					"ar": "إظهار تلميح الأداة",
+					"cs": "Zobrazit nápovědu",
+					"da": "Vis tooltip",
+					"de": "Tooltip anzeigen",
+					"en": "Show tooltip",
+					"es": "Mostrar tooltip",
+					"fr": "Afficher infobulle",
+					"he": "הצג טיפ",
+					"hi": "टूलटिप दिखाएं",
+					"it": "Mostra tooltip",
+					"ja": "ツールチップを表示",
+					"ko": "툴팁 표시",
+					"nl": "Toon tooltip",
+					"no": "Vis verktøytips",
+					"pl": "Pokaż dymek",
+					"pt": "Mostrar tooltip",
+					"ru": "Показывать подсказку",
+					"sv": "Visa tooltip",
+					"tr": "Araç ipucunu göster",
+					"uk": "Показувати підказку",
+					"zh": "显示提示"
+				}
+			}
 		},
 		"preview_announcements_control.preview_announcements": {
 			"verdict": "self_explained",
@@ -307,7 +697,33 @@
 		},
 		"preview_magic_control.preview_star_enabled": {
 			"verdict": "needs_help",
-			"why": "« ★ » alone names the magic key; the row does not say which preview it shows"
+			"why": "« ★ » alone names the magic key; the row does not say which preview it shows",
+			"help": {
+				"label_key": "menu.hotstrings.tooltip_magic",
+				"before": {
+					"ar": "★ معاينة",
+					"cs": "★ Náhled",
+					"da": "★ Forhåndsvisning",
+					"de": "★ Vorschau",
+					"en": "★ Preview",
+					"es": "Vista previa ★",
+					"fr": "Aperçu ★",
+					"he": "תצוגה מקדימה של ★",
+					"hi": "★ पूर्वावलोकन",
+					"it": "★ Anteprima",
+					"ja": "★ プレビュー",
+					"ko": "★ 미리보기",
+					"nl": "★ Voorbeeld",
+					"no": "★ Forhåndsvisning",
+					"pl": "★ Podgląd",
+					"pt": "★ Prévia",
+					"ru": "★ Предпросмотр",
+					"sv": "★ Förhandsvisning",
+					"tr": "★ Önizleme",
+					"uk": "★ Попередній перегляд",
+					"zh": "★ 预览"
+				}
+			}
 		},
 		"preview_presence_controls.preview_ai_enabled": {
 			"verdict": "self_explained",
@@ -323,7 +739,33 @@
 		},
 		"selection_caps_word_control.selection_caps_word": {
 			"verdict": "needs_help",
-			"why": "« CapsWord » is a keyboard-community term: capitals until the end of the word"
+			"why": "« CapsWord » is a keyboard-community term: capitals until the end of the word",
+			"help": {
+				"label_key": "sg_actions.caps_word",
+				"before": {
+					"ar": "⇪★ CapsWord",
+					"cs": "⇪★ CapsWord",
+					"da": "⇪★ CapsWord",
+					"de": "⇪★ CapsWord",
+					"en": "⇪★ CapsWord",
+					"es": "⇪★ CapsWord",
+					"fr": "⇪★ CapsWord",
+					"he": "⇪★ CapsWord",
+					"hi": "⇪★ CapsWord",
+					"it": "⇪★ CapsWord",
+					"ja": "⇪★ CapsWord",
+					"ko": "⇪★ CapsWord",
+					"nl": "⇪★ CapsWord",
+					"no": "⇪★ CapsWord",
+					"pl": "⇪★ CapsWord",
+					"pt": "⇪★ CapsWord",
+					"ru": "⇪★ CapsWord",
+					"sv": "⇪★ CapsWord",
+					"tr": "⇪★ CapsWord",
+					"uk": "⇪★ CapsWord",
+					"zh": "⇪★ CapsWord"
+				}
+			}
 		},
 		"shortcut_wrap_live_control.shortcut_wrap_on_type": {
 			"verdict": "self_explained",

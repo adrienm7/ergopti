@@ -177,7 +177,7 @@ function M.run(helpers, corpus_path)
 				helpers.assert_eq(rows[2].checked, false)
 				helpers.assert_eq(rows[2].action, nil, "no writer is acquired")
 				helpers.assert_eq(rows[2].disabled_reason_key, "platform_reason.number_row_override_unsupported")
-				helpers.assert_eq(rows[1].label, "Number row")
+				helpers.assert_eq(rows[1].label, "What the number row types without Shift")
 				local expected = { "Native order", "Digits first", "Symbols first" }
 				for index, item in ipairs(rows[1].items) do
 					helpers.assert_eq(item.label, expected[index])

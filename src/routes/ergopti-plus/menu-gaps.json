@@ -127,8 +127,8 @@
 		"path": "llm_trigger_menu.llm_inline_autotype",
 		"visibility": "hide",
 		"labels": {
-			"fr": "✍️ Saisie automatique en ligne (style Copilot)",
-			"en": "✍️ Inline auto-type (Copilot-style)"
+			"fr": "✍️ Taper les suggestions de l’IA automatiquement (sans touche pour les accepter)",
+			"en": "✍️ Type AI suggestions automatically (no key to accept them)"
 		},
 		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
@@ -451,7 +451,10 @@
 	{
 		"path": "selection_caps_word_control.selection_caps_word",
 		"visibility": "hide",
-		"labels": { "fr": "⇪★ CapsWord", "en": "⇪★ CapsWord" },
+		"labels": {
+			"fr": "⇪★ CapsWord (majuscules jusqu’à la fin du mot)",
+			"en": "⇪★ CapsWord (capitals to the end of the word)"
+		},
 		"platforms": { "windows": false, "macos": false, "linux": true },
 		"reasons": {
 			"windows": {
@@ -737,7 +740,10 @@
 	{
 		"path": "layout_menu.virtual_keyboard",
 		"visibility": "hide",
-		"labels": { "fr": "Clavier virtuel Karabiner", "en": "Karabiner virtual keyboard" },
+		"labels": {
+			"fr": "Forme du clavier vue par macOS (clavier virtuel Karabiner)",
+			"en": "Keyboard shape macOS sees (Karabiner virtual keyboard)"
+		},
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
@@ -2195,8 +2201,8 @@
 		"path": "llm_display_inline_control.llm_display_inline",
 		"visibility": "hide",
 		"labels": {
-			"fr": "✍️ Saisie automatique en ligne (style Copilot)",
-			"en": "✍️ Inline auto-type (Copilot-style)"
+			"fr": "✍️ Taper les suggestions de l’IA automatiquement (sans touche pour les accepter)",
+			"en": "✍️ Type AI suggestions automatically (no key to accept them)"
 		},
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {

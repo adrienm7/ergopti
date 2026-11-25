@@ -1620,7 +1620,10 @@
 	},
 	{
 		"path": "sg_actions.caps_word",
-		"labels": { "fr": "⇪★ CapsWord", "en": "⇪★ CapsWord" },
+		"labels": {
+			"fr": "⇪★ CapsWord (majuscules jusqu’à la fin du mot)",
+			"en": "⇪★ CapsWord (capitals to the end of the word)"
+		},
 		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
