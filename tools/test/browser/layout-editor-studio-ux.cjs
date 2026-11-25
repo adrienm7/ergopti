@@ -558,9 +558,18 @@ async function exerciseWorstNgrams(browser, origin) {
 	await comparer.locator('#la-ngrams-list .la-ngram-sfb .la-ngram').first().focus();
 	const onBoard = await outlined(comparer, '#la-ngrams-board');
 	assert.equal(onBoard.length, 2, `the overview's board outlines the pair: ${onBoard}`);
+	// Each row ends with its « Corpus words » button (dab055a9a67): Tab reaches
+	// it, then the next pair.
+	await comparer.keyboard.press('Tab');
+	assert.equal(
+		await comparer.evaluate(() => document.activeElement.className),
+		'la-ngram-words',
+		"Tab reaches the row's « Corpus words » first"
+	);
 	await comparer.keyboard.press('Tab');
 	const next = await outlined(comparer, '#la-ngrams-board');
-	assert.equal(next.length, 2, 'Tab moves to the next pair and outlines it');
+	assert.equal(next.length, 2, 'the next Tab moves to the next pair and outlines it');
+	assert.notDeepEqual(next, onBoard, 'the outlined pair is the next one');
 	assert.deepEqual(comparerErrors, []);
 	await comparer.close();
 }
