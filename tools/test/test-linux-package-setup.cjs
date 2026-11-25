@@ -1051,6 +1051,44 @@ else echo "users input uinput"; fi`
 		// install command; this seam changes only its filesystem mode operation.
 		stub('install', '[[ "$1 $2 $3" = "-d -m 700" ]] || exit 64\nmkdir -p -- "$4"');
 	}
+	// The unit sees the user manager's environment: a desktop launch publishes
+	// its own display and retires a Wayland socket an earlier login left there.
+	for (const [label, session, imported, unset] of [
+		['X11', { DISPLAY: ':1', XDG_SESSION_TYPE: 'x11' }, 'DISPLAY XDG_SESSION_TYPE', true],
+		[
+			'Wayland',
+			{ DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-1', XDG_CURRENT_DESKTOP: 'sway' },
+			'DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP',
+			false
+		]
+	]) {
+		fs.writeFileSync(callLog, '');
+		const launched = spawnSync(bashExecutable(), [bashPath(launcher), '--tray'], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: {
+				HOME: bashPath(sandbox),
+				TEST_PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+				CALL_LOG: bashPath(callLog),
+				TEST_CASE: 'desktop',
+				LAUNCH_ROOT: bashPath(path.dirname(path.dirname(launcher))),
+				...session
+			}
+		});
+		assert.equal(launched.status, 0, `${label}: ${launched.stderr}`);
+		const invoked = fs.readFileSync(callLog, 'utf8');
+		const importAt = invoked.indexOf(`systemctl --user import-environment ${imported}\n`);
+		const startAt = invoked.indexOf('systemctl --user start ergopti-hotstrings.service');
+		assert.ok(
+			importAt >= 0 && importAt < startAt,
+			`${label}: the display is published before the start: ${invoked}`
+		);
+		assert.equal(
+			invoked.includes('systemctl --user unset-environment WAYLAND_DISPLAY'),
+			unset,
+			`${label}: a stale Wayland socket is retired only outside Wayland`
+		);
+	}
 	const noSystemdStubs = path.join(sandbox, 'no-systemd-stubs');
 	fs.cpSync(stubs, noSystemdStubs, { recursive: true });
 	fs.rmSync(path.join(noSystemdStubs, 'systemctl'));
