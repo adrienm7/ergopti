@@ -154,6 +154,88 @@ helpers.describe("diagnostics without a native window (Linux)", function()
 		end)
 	end)
 
+	-- Settings, metrics, Studio and every other page answered a refused window
+	-- with the raw English error « show(): native window acquisition refused »
+	-- (field report, Arch KDE Plasma 6 Wayland): every registered page now
+	-- either delivers itself without a window or is explained in words.
+	local function registered_pages()
+		local pages = {}
+		for page in pairs(require("core.ui.ui.webkit_host").APP_BRIDGES) do pages[#pages + 1] = page end
+		table.sort(pages)
+		return pages
+	end
+
+	--- Whether a page's bridge delivers it without a window.
+	--- @param page string
+	--- @return boolean
+	local function delivers_without_window(page)
+		local manager = require("core.ui.ui.webview_manager")
+		local reason_without = manager.page_unavailable_reason(page)
+		require("core.ui.engine.gui_stack").record_windows_missing(LGI)
+		local reason_with = manager.page_unavailable_reason(page)
+		require("core.ui.engine.gui_stack")._reset_recorded_windows_missing_for_test()
+		helpers.assert_eq(reason_without, nil, "no reason while windows can open: " .. page)
+		return reason_with == nil
+	end
+
+	helpers.it("(window-unavailable-every-page) answers every registered page in words without lgi", function()
+		local pages = registered_pages()
+		helpers.assert_true(#pages >= 20, "the page registry is read: " .. #pages)
+		-- The error window is its caller's notice (below); the physical
+		-- shortcuts page opens only through its bridge's session, whose refusal
+		-- says physical_shortcuts.window_unavailable; the bridges that deliver
+		-- without a window have their own tests.
+		local own_answer = { error_dialog = true, physical_shortcuts = true }
+		for _, page in ipairs(pages) do
+			if not own_answer[page] and not delivers_without_window(page) then
+				without_window(LGI, function(manager, record)
+					local before = #helpers.recorded_notices()
+					manager.show(page)
+					local notices = helpers.recorded_notices()
+					local named = false
+					for index = before + 1, #notices do
+						if tostring(notices[index].message):find(LGI, 1, true) then named = true end
+					end
+					helpers.assert_true(named, "a notice names lgi for " .. page)
+					helpers.assert_eq(record.errors, {}, "no ERROR is logged for " .. page)
+					assert_no_raw_refusal(record)
+				end)
+			end
+		end
+	end)
+
+	helpers.it("(window-unavailable-every-page) explains a refusal in words with the toolkit present", function()
+		without_window(nil, function(manager, record)
+			helpers.assert_eq(manager.show("metrics_typing"), false)
+			local title = manager._app_title("metrics_typing")
+			local notice = notice_containing(title)
+			helpers.assert_true(notice ~= nil, "a notice names the window")
+			helpers.assert_true(notice.message ~= "notify.window_failed", "the notice is translated")
+			helpers.assert_eq(record.errors, {}, "the refusal is a warning, not the error window's ERROR")
+			assert_no_raw_refusal(record)
+		end)
+	end)
+
+	helpers.it("(window-unavailable-every-page) greys a page's tray row only when it cannot deliver it", function()
+		local manager = require("core.ui.ui.webview_manager")
+		local Host = require("core.ui.ui.webkit_host")
+		for command, page in pairs(manager.TRAY_COMMAND_PAGES) do
+			helpers.assert_true(Host.bridge_for_app(page) ~= nil, command .. " opens a registered page")
+		end
+		helpers.assert_eq(manager.command_unavailable_reason("show_typing"), nil)
+		require("core.ui.engine.gui_stack").record_windows_missing(LGI)
+		local ok, err = pcall(function()
+			helpers.assert_eq(manager.command_unavailable_reason("show_typing"), "platform_reason.windows_need_lgi")
+			helpers.assert_eq(manager.command_unavailable_reason("layout_manager"), nil,
+				"the layout manager offers its install in a native question")
+			helpers.assert_eq(manager.command_unavailable_reason("about_releases_page"), nil, "a browser page is not a window")
+			helpers.assert_true(not pcall(require("core.ui.engine.gui_stack").record_windows_missing, LGI), "the component is recorded once")
+		end)
+		require("core.ui.engine.gui_stack")._reset_recorded_windows_missing_for_test()
+		if not ok then error(err, 0) end
+		helpers.assert_true(not pcall(require("core.ui.engine.gui_stack").record_windows_missing, "lgi"), "an unknown component is refused")
+	end)
+
 	helpers.it("leaves the error window's own notice alone (window-missing-component)", function()
 		without_window(LGI, function(manager, record)
 			helpers.assert_eq(manager.show("error_dialog"), false)

@@ -41,6 +41,11 @@ M.WEBKIT_VERSION = "4.1"
 M.LGI_COMPONENT = "lgi (Lua GObject Introspection)"
 M.WEBKIT_COMPONENT = "WebKitGTK " .. M.WEBKIT_VERSION
 
+-- The window component the start check found missing, recorded through
+-- record_windows_missing (nil while windows can open). Set once: the windows
+-- need a restart to appear.
+local _recorded_windows_missing = nil
+
 M.TITLE_KEY = "startup.linux_gui_stack_title"
 M.TRAY_BODY_KEY = "startup.linux_gui_stack_tray_body"
 M.WINDOWS_BODY_KEY = "startup.linux_gui_stack_windows_body"
@@ -224,10 +229,34 @@ function M.windows_body(deps, component, what)
 	return body
 end
 
+--- Records the window component the start check found missing, so the tray
+--- greys the rows that open a window (webview_manager.command_unavailable_reason).
+--- @param component string M.LGI_COMPONENT or M.WEBKIT_COMPONENT.
+function M.record_windows_missing(component)
+	if component ~= M.LGI_COMPONENT and component ~= M.WEBKIT_COMPONENT then
+		error("record_windows_missing(): unknown component " .. tostring(component), 2)
+	end
+	if _recorded_windows_missing ~= nil then error("record_windows_missing(): already recorded", 2) end
+	_recorded_windows_missing = component
+end
+
+--- The recorded missing window component.
+--- @return string|nil
+function M.recorded_windows_missing()
+	return _recorded_windows_missing
+end
+
+--- Forgets the recorded component; tests only.
+function M._reset_recorded_windows_missing_for_test()
+	_recorded_windows_missing = nil
+end
+
 --- Runs the start check of a --tray launch.
 --- @param deps table { i18n, notifier, print, load_lgi, logger, indicator, status,
----   os_release, file_exists }; indicator is platform.tray.appindicator and status
----   core.ui.engine.component_status unless a test supplies a double.
+---   os_release, file_exists, on_windows_missing }; indicator is
+---   platform.tray.appindicator and status core.ui.engine.component_status unless
+---   a test supplies a double; on_windows_missing(component) receives the missing
+---   window component, so the tray greys the rows that open a window.
 --- @return integer|nil The exit status when the daemon must not start, nil to continue.
 function M.check_at_start(deps)
 	local Logger = deps.logger or require("core.logger.engine.shim")
@@ -253,6 +282,7 @@ function M.check_at_start(deps)
 		local status = deps.status or require("core.ui.engine.component_status")
 		-- The tray names it by its menu.toml row (linux_component_problems).
 		status.report({ code = "windows_" .. what, title = title, body = body }, { notifier = deps.notifier })
+		if deps.on_windows_missing then deps.on_windows_missing(windows) end
 		return nil
 	end
 	Logger.debug(LOG, "Desktop toolkit present: GTK 3, libayatana-appindicator3, lgi and %s.", M.WEBKIT_COMPONENT)

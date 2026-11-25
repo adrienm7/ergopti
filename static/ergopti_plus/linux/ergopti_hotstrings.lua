@@ -3045,7 +3045,9 @@ local function main()
 		-- GTK, libayatana-appindicator, lgi and WebKitGTK are the host's (owned
 		-- runtimes, SYS): a missing one is named here rather than leaving an
 		-- invisible daemon or windows that never open.
-		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
+		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier,
+			-- The tray then greys the rows whose window cannot open, naming why.
+			on_windows_missing = require("core.ui.engine.gui_stack").record_windows_missing })
 		if refusal then os.exit(refusal) end
 		if not tray_menu.start() then
 			Logger.error(LOG, "The tray icon could not be created.")

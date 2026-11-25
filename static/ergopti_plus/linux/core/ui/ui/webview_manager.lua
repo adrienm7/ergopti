@@ -24,7 +24,11 @@
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
 --- 5. A refused window is delivered or explained, never a raw error: its
 ---    bridge's on_window_unavailable() delivers the content another way, or a
----    notice names the missing component (lgi, WebKitGTK 4.1).
+---    notice names the missing component (lgi, WebKitGTK 4.1), or, with both
+---    present, a notice says the window could not open and where to look.
+--- 6. While the start check recorded a component missing (gui_stack), the
+---    tray rows that open a window without such a delivery are drawn greyed,
+---    naming it (command_unavailable_reason, read by the menu renderer).
 --- ==============================================================================
 
 local M = {}
@@ -459,6 +463,52 @@ function M._set_missing_component_probe_for_test(probe)
 	_missing_component_probe = probe or probe_missing_component
 end
 
+-- The tray's reason for each component a window can lack.
+local UNAVAILABLE_REASON_KEYS = {
+	[require("core.ui.engine.gui_stack").LGI_COMPONENT] = "platform_reason.windows_need_lgi",
+	[require("core.ui.engine.gui_stack").WEBKIT_COMPONENT] = "platform_reason.windows_need_webkit",
+}
+
+--- The page each tray command opens, by manifest command id. A row whose page
+--- cannot open is drawn greyed with the missing component's reason; the
+--- webview manager tests hold every page here to a registered one.
+M.TRAY_COMMAND_PAGES = {
+	about_changelog = "changelog",
+	config_folder = "paths_editor",
+	edit_nav_layer = "layout_editor_window",
+	ergopti_studio = "layout_editor_window",
+	hotstrings_config_window = "hotstrings_config_window",
+	layout_manager = "layout_manager",
+	llm_model_selector = "model_browser",
+	personal_hotstring_open_editor = "hotstring_editor",
+	physical_shortcuts_editor = "physical_shortcuts",
+	setup_wizard = "onboarding",
+	show_apps = "metrics_apps",
+	show_typing = "metrics_typing",
+}
+
+--- Why a page cannot open now: nil while windows can open, or when its bridge
+--- delivers it without one (on_window_unavailable: the diagnostics, the layout
+--- manager), else the locale key of the reason naming the missing component.
+--- @param app_name string The shared UI app directory name.
+--- @return string|nil reason_key
+function M.page_unavailable_reason(app_name)
+	local missing = require("core.ui.engine.gui_stack").recorded_windows_missing()
+	if missing == nil then return nil end
+	local handler = _load_handler(app_name)
+	if type(handler) == "table" and type(handler.on_window_unavailable) == "function" then return nil end
+	return UNAVAILABLE_REASON_KEYS[missing]
+end
+
+--- The reason a tray command cannot run now: its page's, when it opens one.
+--- @param command_id string A manifest command id.
+--- @return string|nil reason_key
+function M.command_unavailable_reason(command_id)
+	local page = M.TRAY_COMMAND_PAGES[command_id]
+	if page == nil then return nil end
+	return M.page_unavailable_reason(page)
+end
+
 --- Tells the user, in their language, that a window needs a missing component.
 --- @param app_name string The refused page.
 --- @param component string The missing component (a product name, untranslated).
@@ -474,6 +524,23 @@ local function notify_missing_component(app_name, component)
 	end)
 	if not loaded then
 		Logger.error(LOG, "show(): the missing-component notice for '%s' failed: %s", app_name, tostring(admitted))
+	end
+	return loaded and admitted == true
+end
+
+--- Tells the user, in their language, that a window could not open although
+--- its components are present, and where the cause is named.
+--- @param app_name string The refused page.
+--- @return boolean admitted Whether the notification was handed to the desktop.
+local function notify_window_failed(app_name)
+	local loaded, admitted = pcall(function()
+		local title = M._app_title(app_name)
+		local body = require("core.i18n.engine.i18n").get("notify.window_failed")
+			:gsub("{1}", function() return title end)
+		return require("platform.focus.application_notifier").send(body, { title = title, level = "warning" })
+	end)
+	if not loaded then
+		Logger.error(LOG, "show(): the window failure notice for '%s' failed: %s", app_name, tostring(admitted))
 	end
 	return loaded and admitted == true
 end
@@ -513,7 +580,13 @@ local function deliver_without_window(app_name, handler, active_locale, detail)
 		notify_missing_component(app_name, missing)
 		return true
 	end
-	return false
+	-- Both components load and the window still did not open (a display the
+	-- toolkit refused, a page that failed to build): a translated notice, as
+	-- every other refusal gets, and a WARN carrying the native detail. The
+	-- ERROR this logged opened the error window with an English line.
+	Logger.warn(LOG, "show(): the native window for '%s' could not open (%s).", app_name, detail)
+	notify_window_failed(app_name)
+	return true
 end
 
 --- Builds the HTML a window loads for a shared UI app, with the page's

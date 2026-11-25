@@ -170,6 +170,83 @@ helpers.describe("the real Linux tray reads as text", function()
 		helpers.assert_eq(problems, {})
 	end)
 
+	-- Without lgi or WebKitGTK 4.1 every window-opening row only raised a notice
+	-- once clicked; the red row above already says what is missing, so these
+	-- rows are greyed with that reason (window-rows-unavailable).
+	helpers.it("(window-rows-unavailable) greys every window row while the windows are missing", function()
+		local decode = require("core.text.engine.json").decode
+		local catalogue = check.catalogue(SHARED_ROOT, "en", decode)
+		local handle = assert(io.open(SHARED_ROOT .. "/menu/data/menu_manifest.json", "rb"))
+		local manifest = decode(handle:read("*a"))
+		handle:close()
+		local manager = require("core.ui.ui.webview_manager")
+		local GuiStack = require("core.ui.engine.gui_stack")
+		-- The label of each window command, as the manifest declares it.
+		local labels = {}
+		for _, rows in pairs(manifest) do
+			if type(rows) == "table" then
+				for _, item in ipairs(rows) do
+					if type(item) == "table" and manager.TRAY_COMMAND_PAGES[item.id] and type(item.i18n) == "string" then
+						local label = catalogue[item.i18n]
+						if type(label) == "string" and label ~= "" and not label:find("%", 1, true) then
+							labels[item.id] = label
+						end
+					end
+				end
+			end
+		end
+		local reason = catalogue["platform_reason.windows_need_lgi"]
+		local head = reason:match("^(.-):")
+		-- A row is its label, after any declared prefix, and before the reason.
+		local function rows_for(tree)
+			local found = {}
+			local function walk(rows)
+				for _, row in ipairs(rows or {}) do
+					local title = type(row.title) == "string" and row.title or ""
+					if title:sub(-#(" — " .. head)) == " — " .. head then title = title:sub(1, -#(" — " .. head) - 1) end
+					for command, label in pairs(labels) do
+						if title:sub(-#label) == label then
+							found[command] = found[command] or {}
+							table.insert(found[command], row)
+						end
+					end
+					walk(row.menu)
+				end
+			end
+			walk(tree)
+			return found
+		end
+		local present = rows_for(tray("en"))
+		require("core.ui.engine.gui_stack").record_windows_missing(GuiStack.LGI_COMPONENT)
+		local ok, missing = pcall(function() return rows_for(tray("en")) end)
+		require("core.ui.engine.gui_stack")._reset_recorded_windows_missing_for_test()
+		if not ok then error(missing, 0) end
+		local checked = 0
+		for command, rows in pairs(present) do
+			local greyed = missing[command] or {}
+			local page = manager.TRAY_COMMAND_PAGES[command]
+			for index, row in ipairs(rows) do
+				local without = greyed[index]
+				helpers.assert_true(without ~= nil, command .. " is still drawn without windows")
+				if row.fn ~= nil and row.disabled ~= true then
+					checked = checked + 1
+					require("core.ui.engine.gui_stack").record_windows_missing(GuiStack.LGI_COMPONENT)
+					local delivers = manager.page_unavailable_reason(page) == nil
+					require("core.ui.engine.gui_stack")._reset_recorded_windows_missing_for_test()
+					if delivers then
+						helpers.assert_true(without.fn ~= nil, command .. " delivers " .. page .. " without a window")
+					else
+						helpers.assert_eq(without.disabled, true, command .. " is greyed without windows")
+						helpers.assert_eq(without.fn, nil, command .. " runs nothing without windows")
+						helpers.assert_eq(without.title, row.title .. " — " .. head)
+						helpers.assert_eq(without.tooltip, reason, command .. " carries the whole reason")
+					end
+				end
+			end
+		end
+		helpers.assert_true(checked >= 8, "the walk reached the window rows: " .. checked)
+	end)
+
 	-- Physical delivery answers true since the maintainer's decision of
 	-- 2026-11-11 (LIN-004): the row no longer names an unqualified delivery
 	-- (physical-delivery-available).
