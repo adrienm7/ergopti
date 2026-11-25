@@ -41,6 +41,14 @@ _EDOS_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; The native box is the opener's answer to a window that cannot open. A window
+; the user closed while WebView2 was being created must not come back as one.
+Ui_MsgBox(Text := "", Title := "", Options := "") {
+	global _EDOS
+	_EDOS.Announcements += 1
+	return ""
+}
+
 _EDOS_Failure(Failure) {
 	global _EDOS
 	if !IsObject(_EDOS.Failure)
@@ -281,6 +289,8 @@ _EDOS_Check() {
 		return
 	}
 	_EDOS_Require(_EDOS.ActorDone && _EDOS.CloseAck == 1, "Cancellation must occur at the genuine constructor wait.")
+	_EDOS_Require(_EDOS.Announcements == 0,
+		"A window the user closed during the constructor wait must not reopen as a message box.")
 	if InStr(_EDOS.Mode, "reject")
 		_EDOS_Require(_EDOS.Pending.promise.status == "rejected" && _EDOS.Pending.promise.result is Error,
 			"The controlled failure must remain an actual rejected Promise.")
@@ -350,7 +360,7 @@ _EDOS_Main() {
 	Persistent(true)
 	_EDOS := {Mode: A_Args[1], Pages: [], Logs: [], Environment: _EDOS_Environment(), EnvironmentCalls: 0,
 		Failure: 0, Pending: 0, Actor: _EDOS_Actor, Timeout: _EDOS_Timeout, ActorDone: false,
-		CloseAck: 0, Successor: 0, Opened: 0, SourceErrors: 0}
+		CloseAck: 0, Successor: 0, Opened: 0, SourceErrors: 0, Announcements: 0}
 	Primary := 0, Observed := false, PreviousCritical := Critical("Off"), PreviousSuspend := A_IsSuspended
 	Thread("Interrupt", 0)
 	Suspend(false)

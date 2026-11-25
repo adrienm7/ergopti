@@ -435,6 +435,10 @@ _ErrorDialog_Open(Record) {
 		catch as Err {
 			Primary := Err
 			LoggerError("ErrorDialog", "WebView2 could not be created for the error window: {1}", Err.Message)
+			; A window the user closed during the wait was answered: a message box
+			; would bring back the error they dismissed.
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
 			; The empty host must not stand behind the message box.
 			try G.Hide()
 			_ErrorDialog_AnnounceWithoutWindow(Record, Fields, Err.Message)
