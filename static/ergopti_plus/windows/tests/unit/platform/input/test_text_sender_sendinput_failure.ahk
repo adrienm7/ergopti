@@ -102,3 +102,40 @@ _TSSIF_EmptySustainedKeyHasBooleanFailureContract() {
 }
 Test("TextSender AHK-03: rejected sustained keys preserve the boolean sender contract",
 	_TSSIF_EmptySustainedKeyHasBooleanFailureContract)
+
+; Direct-mode text goes through SendText, which a contested low-level hook can
+; make throw. TextSend must contain it, report the failure to its caller and
+; log it, never let it escape into the keyboard-facing caller.
+_TSSIF_DirectSendTextFailureIsContained() {
+	global _AHK_SendText, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT
+	Previous := _AHK_SendText
+	SavedSink := _LOGGER_TEST_SINK, SavedRepeat := _LOGGER_REPEAT_ENABLED
+	SavedKey := _LOGGER_DEDUP_KEY, SavedCount := _LOGGER_DEDUP_COUNT
+	Results := [], Logs := []
+	try {
+		_AHK_SendText := _TSSIF_AlwaysFail
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		_LOGGER_REPEAT_ENABLED := false
+		_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_COUNT := 0
+		Escaped := false
+		try TextSend("abc", Map("mode", "direct"), (Ok, Detail := "") => Results.Push([Ok, Detail]))
+		catch
+			Escaped := true
+		AssertFalse(Escaped, "a direct-mode SendText failure must not escape TextSend")
+	} finally {
+		_AHK_SendText := Previous
+		_LOGGER_TEST_SINK := SavedSink, _LOGGER_REPEAT_ENABLED := SavedRepeat
+		_LOGGER_DEDUP_KEY := SavedKey, _LOGGER_DEDUP_COUNT := SavedCount
+	}
+	AssertEqual(1, Results.Length, "the caller hears the outcome once")
+	AssertFalse(Results[1][1], "the caller is told the text was not sent")
+	AssertContains(Results[1][2], "injected SendInput failure", "the caller is told why")
+	Logged := 0
+	for Line in Logs {
+		if InStr(Line, "[ERROR] [TextSender]") && InStr(Line, "direct-mode SendText failed")
+			Logged += 1
+	}
+	AssertEqual(1, Logged, "the failure is logged as an error")
+}
+Test("TextSender: a direct-mode SendText failure is contained, reported and logged",
+	_TSSIF_DirectSendTextFailureIsContained)
