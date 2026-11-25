@@ -66,6 +66,21 @@ helpers.describe("component_status: a problem stays visible", function()
 		helpers.assert_true(Status.has("windows_lgi"))
 	end)
 
+	helpers.it("logs the diagnosis as a warning, so the error window does not open over it", function()
+		-- An ERROR reaches the error window's observer: every start without lgi
+		-- opened a WebKit window lgi cannot draw (startup scenarios, 2026-11-25).
+		local lines = {}
+		local function keep(level)
+			return function(_, fmt, ...) lines[#lines + 1] = { level = level, text = string.format(fmt, ...) } end
+		end
+		local logger = { error = keep("error"), warn = keep("warn"), info = keep("info"), debug = keep("debug") }
+		local Status = helpers.load_module_with_dependency("core.ui.engine.component_status", "core.logger.engine.shim", logger)
+		helpers.assert_true(Status.report(PROBLEM, {}))
+		helpers.assert_eq(#lines, 1)
+		helpers.assert_eq(lines[1].level, "warn")
+		helpers.assert_contains(lines[1].text, "[diagnosis] code=windows_lgi")
+	end)
+
 	helpers.it("leads the tray menu with a declared red row that shows the explanation", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
 		helpers.assert_eq(#problem_rows(Status), 0, "no row and no separator when nothing is wrong")

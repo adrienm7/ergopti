@@ -15,7 +15,11 @@
 ---    naming the problem whose click shows the full explanation, as macOS
 ---    shows a red dot on its Tap-Holds title.
 --- 2. One diagnosis line per problem in the log, with a stable code, so a
----    field log answers "why" without the screen the user saw.
+---    field log answers "why" without the screen the user saw. It is a
+---    warning: an ERROR opens the error window (diagnostics/ui/error_dialog),
+---    a WebKit window a missing lgi or WebKitGTK cannot draw, over a problem
+---    the notice and the tray row already explain. Every CI start without lgi
+---    failed the zero-error start scenarios on it (2026-11-25).
 --- 3. The tray rows are declared in the shared menu (menu.toml top_level
 ---    component_status, one linux_component_problems row per code) and drawn
 ---    by the shared renderer (menu/ui/builder/component_status_rows.lua): this
@@ -74,7 +78,7 @@ function M.report(problem, deps)
 	local entry = { code = problem.code, title = problem.title, body = problem.body, active = problem.active }
 	_problems[#_problems + 1] = entry
 	_by_code[entry.code] = entry
-	Logger.error(LOG, "[diagnosis] code=%s — %s", entry.code, entry.body)
+	Logger.warn(LOG, "[diagnosis] code=%s — %s", entry.code, entry.body)
 	local notifier = type(deps) == "table" and deps.notifier or nil
 	if notifier and type(notifier.send) == "function" then
 		local ok, err = pcall(notifier.send, entry.body, { title = entry.title, level = "error", persistent = true })
