@@ -78,7 +78,31 @@ local function fixture(overrides)
 		notifications = { notify = function(text) world.notices[#world.notices + 1] = text; return true end },
 		window_info = { frontmost_application = function() return { pid = 1, bundle_id = "com.apple.Safari" } end },
 		i18n = { get = function(key) return key end },
+		vision_session = {
+			cache_dir = function() return "/cache/vision" end,
+			service = function() return {
+				capture_window = function(window, done)
+					world.captured = window
+					done({ source = "/cache/vision/capture_1.png", scale = 2, frame = { x = 10, y = 20, width = 100, height = 50 } })
+				end,
+				capture_region = function(rect, done)
+					world.region = rect
+					done({ source = "/cache/vision/capture_2.png", scale = 2, frame = rect })
+				end,
+				match = function(_, templates, _, done)
+					world.template = templates[1]
+					done({ { id = templates[1].id, x = 40, y = 20, width = 8, height = 8, score = 1, scale = 1 } }, {})
+				end,
+				find_text = function() return {} end,
+			} end,
+		},
+		screen_ports = function() return {
+			foreground = function() return { window = 77 } end,
+			languages = function() return { "fr-FR" } end,
+			now_ms = function() return 0 end,
+		} end,
 	}
+	deps.mouse.getMonitorBounds = function() return { left = 0, top = 0, right = 1440, bottom = 900 } end
 	for key, value in pairs(overrides or {}) do deps[key] = value end
 	Workflows.init(deps)
 	return Workflows, world
@@ -127,6 +151,32 @@ helpers.describe("workflows on macOS (workflows-macos)", function()
 		helpers.assert_eq(world.clicked.button, "left", "the default button")
 		helpers.assert_eq(world.clicked.count, 1, "the default count")
 		helpers.assert_true(world.notices[1]:find("workflows.notice.failed", 1, true) ~= nil, tostring(world.notices[1]))
+		Workflows.stop()
+	end)
+
+	helpers.it("an embedded image is clicked where the front window shows it (workflows-macos)", function()
+		store({ { kind = "click_target", target = { type = "image", image = "send" } } })
+		local workflows = Json.decode(FILES["/cfg/workflows.json"])
+		workflows.workflows[1].images = { send = "iVBORw0KGgoAAAA=" }
+		FILES["/cfg/workflows.json"] = Json.encode(workflows)
+		local Workflows, world = fixture()
+		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.captured, 77)
+		helpers.assert_eq(world.template.path, "/cache/vision/workflow_template_1.png")
+		helpers.assert_true(FILES["/cache/vision/workflow_template_1.png"]:sub(1, 4) == "\137PNG", "the PNG is written")
+		helpers.assert_eq(world.clicked.x, 32)
+		helpers.assert_eq(world.clicked.y, 32)
+		helpers.assert_eq(world.clicked.count, 1)
+		helpers.assert_eq(#world.notices, 0, tostring(world.notices[1]))
+		Workflows.stop()
+	end)
+
+	helpers.it("a whole-screen capture stores its private file (workflows-macos)", function()
+		store({ { kind = "capture", mode = "full", into = "shot" }, { kind = "type_text", text = "{{shot}}" } })
+		local Workflows, world = fixture()
+		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.region.width, 1440)
+		helpers.assert_eq(world.typed[1], "/cache/vision/capture_2.png")
 		Workflows.stop()
 	end)
 
