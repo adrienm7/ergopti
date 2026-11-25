@@ -24,7 +24,8 @@
  * 5. Worst n-grams: each row of the overview's cards opens the corpus words
  *    typing its keys in a row.
  * 6. Blends: two built-in corpora mixed by weight become the compared
- *    corpus, named with their shares; an invalid weight is refused in words.
+ *    corpus, named with their shares; an invalid weight is refused in words;
+ *    the link carries the recipe and the next visit mixes it again.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -289,7 +290,25 @@ async function exerciseBlend(browser, origin) {
 		EN['layout_analysis.blend.weight_invalid'].replace('{n}', '1'),
 		'blend: an invalid weight is refused in words'
 	);
+	// The link names the blend, and opens on it for a fresh visitor.
+	await page.click('#la-share');
+	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const link = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+	assert.equal(
+		link.searchParams.get('blend'),
+		'fr_nemolivier:70,en_carroll_alice:30',
+		`blend: the link carries the recipe (${link.search})`
+	);
+	const fresh = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const reader = await fresh.newPage();
+	reader.on('pageerror', (error) => errors.push(error.message));
+	await reader.goto(`${origin}${link.pathname}${link.search}`);
+	await reader.waitForFunction(() => document.getElementById('la-corpus').value === 'blend');
+	// The same visitor finds it again on the next visit.
+	await page.reload();
+	await page.waitForFunction(() => document.getElementById('la-corpus').value === 'blend');
 	assert.deepEqual(errors, []);
+	await fresh.close();
 	await context.close();
 }
 

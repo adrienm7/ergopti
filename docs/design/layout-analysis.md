@@ -260,8 +260,9 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   corpus of counts). A part of weight 0 is skipped; no part, a negative
   weight or all weights 0 throw. The Comparer's « Home » offers it under the
   corpus picker (« Blend corpora »: up to three built-in corpora and their
-  weights); the blend is listed with the user's own texts and is not kept
-  across visits.
+  weights); the blend is listed with the user's own texts, its recipe kept
+  with the conveniences (mixed again on the next visit when it was the corpus
+  compared) and carried in the share link (`blend=<id>:<weight>,…`).
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the
@@ -1606,7 +1607,7 @@ source with the popover) describe it. The grids fall to one column under
 240 px, so the panel reflows at 320 px. The site embeds it like the editor
 (`?lang=<code>`); the app's Studio window loads the same page. A link may add
 `corpus=<built-in id>`, `keyboard=<id>`, `format=<id>`, `layouts=<id,id>`,
-`details=<id>`, `versus=<id>`, `tab=<tab id>`, `px=<value>` and `py=<value>`
+`details=<id>`, `versus=<id>`, `blend=<id>:<weight>,…`, `tab=<tab id>`, `px=<value>` and `py=<value>`
 (the Pareto tab's two values) and `text=<trace text>`: the page opens on them over the
 visitor's saved choice without saving them, and names an unknown value in the
 console, keeping the saved choice. The site's benchmark page

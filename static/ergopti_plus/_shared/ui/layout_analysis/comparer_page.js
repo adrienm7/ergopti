@@ -208,7 +208,8 @@
 		'tab',
 		'px',
 		'py',
-		'text'
+		'text',
+		'blend'
 	];
 	// The layout origins a link can name: the user's own layouts stay on their device.
 	const SHAREABLE_ORIGINS = ['registry', 'reference', 'library'];
@@ -1201,6 +1202,7 @@
 						tab: state.tabSaved,
 						heats: state.heats,
 						pareto: state.pareto,
+						blend: state.blendRecipe,
 						traceText: state.trace.text,
 						// The user's own score presets, each a score settings file and its name.
 						presets: state.presets,
@@ -1328,6 +1330,12 @@
 			tabSorts: {},
 			heats: validHeats(saved.heats),
 			pick: validFilters(saved.pick, ['origin', 'language']),
+			// The last blend's recipe ([{id, weight}]), rebuilt at start when it was
+			// the corpus compared or a link names it.
+			blendRecipe: linked.blend || validBlend(saved.blend, corpora),
+			restoreBlend:
+				Boolean(linked.blend) ||
+				(saved.corpus === BLEND_ID && Boolean(validBlend(saved.blend, corpora))),
 			// The Pareto tab's two values and whether it shows the frontier only.
 			pareto: validPareto(
 				linked.px || linked.py
@@ -1519,6 +1527,19 @@
 				if (paretoChoices().includes(id)) out[name] = id;
 				else console.warn(`layout comparer: the link names no Pareto value ${id} (${name})`);
 			}
+			// A blend's recipe: « id:weight » parts, each a built-in corpus.
+			const blend = query.get('blend');
+			if (blend !== null) {
+				const recipe = validBlend(
+					blend.split(',').map((part) => {
+						const [id, weight] = part.split(':');
+						return { id, weight: Number(weight) };
+					}),
+					known
+				);
+				if (recipe) out.blend = recipe;
+				else console.warn(`layout comparer: the link's blend ${blend} does not read`);
+			}
 			const text = query.get('text');
 			if (text !== null) {
 				if (Array.from(text).length <= E.TRACE_MAX_CHARS) out.text = text;
@@ -1583,6 +1604,23 @@
 			return [PARETO_MARK].concat(
 				Object.keys(E.METRICS).filter((id) => E.METRICS[id].better !== 'none')
 			);
+		}
+
+		/**
+		 * A blend's recipe as saved or linked: one to BLEND_PARTS parts, each a
+		 * built-in corpus and a weight ≥ 0, one at least above 0; null otherwise.
+		 */
+		function validBlend(recipe, known) {
+			if (!Array.isArray(recipe) || recipe.length === 0 || recipe.length > BLEND_PARTS) return null;
+			const ok = recipe.every(
+				(part) =>
+					part &&
+					known.some((c) => c.builtin && c.id === part.id) &&
+					Number.isFinite(part.weight) &&
+					part.weight >= 0
+			);
+			if (!ok || !recipe.some((part) => part.weight > 0)) return null;
+			return recipe.map((part) => ({ id: part.id, weight: part.weight }));
 		}
 
 		/** The saved Pareto choices; an unknown value takes the default. */
@@ -5457,6 +5495,8 @@
 			const query = new URLSearchParams();
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			if (corpus && corpus.builtin) query.set('corpus', state.corpus);
+			if (state.corpus === BLEND_ID && state.blendRecipe)
+				query.set('blend', state.blendRecipe.map((part) => `${part.id}:${part.weight}`).join(','));
 			query.set('keyboard', state.keyboard);
 			query.set('format', state.format);
 			query.set('layouts', shareable.map((l) => l.id).join(','));
@@ -5474,7 +5514,7 @@
 			return {
 				url: `${base}?${query.toString().replace(/%2C/g, ',')}`,
 				own: chosen.filter((l) => !SHAREABLE_ORIGINS.includes(l.origin)),
-				personal: !(corpus && corpus.builtin)
+				personal: !(corpus && corpus.builtin) && !(state.corpus === BLEND_ID && state.blendRecipe)
 			};
 		}
 
@@ -5617,9 +5657,21 @@
 					)
 					.join(', ')
 			});
+			state.blendRecipe = parts.map((part) => ({ id: part.corpus.id, weight: part.weight }));
 			state.corpus = BLEND_ID;
 			setCorpus({ id: BLEND_ID, title, tables, default: true });
 			status.textContent = t('layout_analysis.blend.done', { title });
+		}
+
+		/** Fills the blend's form from a recipe and compares on it again. */
+		function restoreBlend(recipe) {
+			fillBlend();
+			for (let i = 0; i < BLEND_PARTS; i++) {
+				const part = recipe[i];
+				if (part) $(`la-blend-corpus-${i}`).value = part.id;
+				$(`la-blend-weight-${i}`).value = String(part ? part.weight : 0);
+			}
+			return useBlend();
 		}
 
 		/**
@@ -7555,6 +7607,12 @@
 			history.start();
 			historyStarted = true;
 			analyse();
+			// The blend compared last time, or the one a link names, is mixed again.
+			if (state.restoreBlend)
+				restoreBlend(state.blendRecipe).catch((error) => {
+					$('la-blend-status').textContent = t('layout_analysis.blend.failed');
+					throw error;
+				});
 			if (opts.reportHeight) reportHeight();
 			// The host's personal layouts (app data folder, site IndexedDB).
 			if (HOST.store)
