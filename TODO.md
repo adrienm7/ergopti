@@ -119,13 +119,11 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
 - [ ] **[CODE] AAA findings down to zero (maintainer, 2026-11-23).** axe-core's AAA rules (`wcag2aaa`,
       `wcag21aaa`, `wcag22aaa`, one list in `tools/test/lib/wcag-tags.cjs`) run in the site, Studio and app-window
       gates: any new finding fails CI. `color-contrast-enhanced` is at zero in both baselines since 2026-11-24
-      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). The 44 px targets of 2.5.5, which axe's
-      `target-size` (24 px) does not check, are measured by both gates themselves (`tools/test/lib/target-size.cjs`,
-      rule `target-size-enhanced`, counted once per kind of target). Left: lower those rows to zero (220 kinds on the
-      site and in its frames, 391 in the app windows' states; the public statement `/accessibilite`, which names AAA
-      as the target, lists them among its known gaps until then). The tool survey and every AAA criterion no tool
-      measures, with its check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks
-      belong to the manual audit below.
+      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)), the 44 px targets of 2.5.5
+      (`target-size-enhanced`, measured by both gates themselves in `tools/test/lib/target-size.cjs`) since
+      2026-11-25 (fifteenth pass, one 44 px rule in `theme.css` and the site's `accessibility.css`). The tool survey
+      and every AAA criterion no tool measures, with its check, are in
+      [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual audit below.
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the
@@ -599,14 +597,6 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
-- [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
-      maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
-      nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
-      every control, which changes the look of every window and can overflow the windows of a fixed size
-      (`apps.manifest.json`) on each OS. Kept meanwhile: the sizes as they are, held by the ratchet. Choose:
-  1. **(recommended) A 44 px minimum in `theme.css` for every app window and in the site's stylesheet**, then the
-     fixed window sizes raised where a window overflows, with a look at each window on the three OS.
-  2. Raise the size one window at a time as each is next reworked.
 - [ ] **Recent log lines in the bug report (decided by the agent on 2026-11-24, to review by the maintainer).** The
       request of 2026-11-24 asked for the « recent log lines »; the closed sharing policy carries only recognised
       error codes and counts (`project-shared-export-schema-is-closed`), because a raw line can hold typed text, a

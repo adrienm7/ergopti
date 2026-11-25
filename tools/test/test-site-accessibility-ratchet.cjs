@@ -14,7 +14,8 @@
  * names only known rows, no source justifies text, and nothing outside the
  * header offsets by its minimum height instead of its measured one, and
  * HTML_CodeSniffer runs from its exactly pinned package on disk, with its
- * own well-formed ratchet.
+ * own well-formed ratchet. The site's stylesheet gives every control the
+ * 44 px minimum the scan measures (WCAG 2.5.5).
  * ==============================================================================
  */
 
@@ -27,6 +28,7 @@ const vm = require('node:vm');
 const scan = require('./browser/site-accessibility.playwright.cjs');
 const reading = require('./browser/site-reading.cjs');
 const htmlcs = require('./lib/htmlcs.cjs');
+const targetSize = require('./lib/target-size.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -542,7 +544,17 @@ function checkHeaderOffset() {
 	assert.match(header, /setProperty\('--header-offset'/, 'The header publishes its height');
 }
 
+/**
+ * The site's accessibility stylesheet gives each control the scan measures
+ * its 44 px, as theme.css does in the Studio frames it holds.
+ */
+function checkTargetMinimum() {
+	const css = fs.readFileSync(path.join(ROOT, 'src/lib/css/accessibility.css'), 'utf8');
+	assert.deepEqual(targetSize.stylesheetTargetProblems(css, '--site-target-min'), []);
+}
+
 checkComparison();
+checkTargetMinimum();
 checkBaseline();
 checkHtmlcs();
 checkStatementTarget();
@@ -554,5 +566,5 @@ checkReadingRatchet();
 checkNoJustifiedText();
 checkHeaderOffset();
 console.log(
-	'ok - site accessibility ratchet, baseline, HTML_CodeSniffer, statement target, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
+	'ok - site accessibility ratchet, 44 px targets, baseline, HTML_CodeSniffer, statement target, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
 );

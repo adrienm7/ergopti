@@ -161,7 +161,7 @@ FEATURES & RATIONALE:
 			</li>
 			<li>
 				{t(
-					'Certains boutons et certaines cases à cocher font moins de 44 pixels de côté, la taille que demande le niveau AAA.'
+					'Sur un écran plus étroit que le clavier dessiné, les touches de l’Optimiseur font moins de 44 pixels de côté, la taille que demande le niveau AAA.'
 				)}
 			</li>
 		</ul>

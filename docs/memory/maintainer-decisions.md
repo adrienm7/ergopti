@@ -2931,3 +2931,23 @@ Changed by the maintainer (each a `[CODE]` item in TODO.md until done):
 Deferred: 100 % line coverage and 100 % killed mutants as red CI gates are a
 far-future backlog (TODO.md, last section); the per-file coverage ratchets
 kept on 2026-11-24 only stop a file from dropping.
+
+## Maintainer answers of 2026-11-25
+
+- **44 px targets (WCAG 2.5.5) everywhere.** The maintainer chose a 44 by
+  44 px minimum for every control over raising each window as it is next
+  reworked. Mechanism: one zero-specificity rule in
+  `static/ergopti_plus/_shared/ui/theme.css` (token `--theme-target-min`) for
+  the app windows and the Studio frames, and its twin in
+  `src/lib/css/accessibility.css` (`--site-target-min`) for the site. A
+  `min-*-size` wins over a page's own height, so a page that wants a smaller
+  control must write its own minimum, which the `target-size-enhanced` rows of
+  the two accessibility ratchets refuse. A native checkbox or radio button
+  keeps its size and its label takes the 44 px (drawn at 44 px, the mark
+  itself grows into a giant square); an inline link inside a sentence keeps
+  its line height, as WCAG exempts it. The fixed window sizes of
+  `apps.manifest.json` were raised where the bigger controls added a
+  scrollbar (download window, changelog, hotstring editor), and the Windows
+  literals that mirror them followed. `test-app-windows-accessibility-ratchet`
+  and `test-site-accessibility-ratchet` refuse a stylesheet that drops the
+  rule or sets the token below `MINIMUM_PX` of `tools/test/lib/target-size.cjs`.
