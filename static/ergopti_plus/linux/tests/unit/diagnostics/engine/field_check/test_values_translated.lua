@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/tests/unit/diagnostics/engine/field_check/test_field_check_values_translated.lua
+--- static/ergopti_plus/linux/tests/unit/diagnostics/engine/field_check/test_values_translated.lua
 
 --- The field check reports show each step value in the user's language. The
 --- field report of 2026-11-25 read « Composition installée : kept » and
