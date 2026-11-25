@@ -180,7 +180,8 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		local ready = w.json("ready.json")
 		helpers.assert_eq(ready.driver, "linux")
 		helpers.assert_eq(ready.pid, 4242)
-		helpers.assert_eq(ready.steps, { "field_composer", "field_network", "field_setup", "driver_reload" })
+		helpers.assert_eq(ready.steps, { "field_composer", "field_network", "field_setup", "field_tray", "field_session",
+			"driver_reload" })
 	end)
 
 	helpers.it("runs every step headless, writes one result each, the guard and the done marker", function()
@@ -328,8 +329,9 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		local resume = w.json("resume.json")
 		assert_document("resume", resume)
 		helpers.assert_eq({ resume.index, resume.step, resume.steps, resume.order, resume.codes },
-			{ 4, "driver_reload", { "field_composer", "field_network", "field_setup", "driver_reload" },
-				{ "field_composer", "field_network", "field_setup" }, {} })
+			{ 6, "driver_reload", { "field_composer", "field_network", "field_setup", "field_tray", "field_session",
+				"driver_reload" },
+				{ "field_composer", "field_network", "field_setup", "field_tray", "field_session" }, {} })
 		helpers.assert_eq(w.json("results/rl/done.json"), nil, "the run waits for its restart")
 		helpers.assert_true(session:stop())
 		helpers.assert_eq(w.json("results/rl/done.json"), nil, "the stop suspends the run instead of closing it")
@@ -339,16 +341,17 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		local _, next_world = successor(w, { reload_ms = 850 })
 		helpers.assert_eq(next_world.checks, {}, "no check before the reload runs twice")
 		helpers.assert_eq(next_world.files[FOLDER .. "/resume.json"], nil, "the resume file is read once")
-		local reload = next_world.json("results/rl/04_driver_reload.json")
+		local reload = next_world.json("results/rl/06_driver_reload.json")
 		assert_document("result", reload)
 		helpers.assert_eq({ reload.kind, reload.verdict, reload.codes, reload.elapsed_ms, reload.report.reload_ms },
 			{ "reload", "pass", { "reloaded" }, 850, 850 })
-		helpers.assert_eq(next_world.json("results/rl/05_config_guard.json").verdict, "pass")
+		helpers.assert_eq(next_world.json("results/rl/07_config_guard.json").verdict, "pass")
 		local done = next_world.json("results/rl/done.json")
 		assert_document("done", done)
 		helpers.assert_eq({ done.interrupted, done.pid, done.order },
-			{ false, 5151, { "field_composer", "field_network", "field_setup", "driver_reload", "config_guard" } })
-		helpers.assert_eq(done.counts, { pass = 5 })
+			{ false, 5151, { "field_composer", "field_network", "field_setup", "field_tray", "field_session", "driver_reload",
+				"config_guard" } })
+		helpers.assert_eq(done.counts, { pass = 7 })
 		helpers.assert_eq(next_world.files[FOLDER .. "/running.json"], nil)
 		helpers.assert_eq(next_world.json("ready.json").pid, 5151, "the successor publishes its own readiness")
 	end)
@@ -357,9 +360,9 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		local session, w = reloaded_daemon()
 		helpers.assert_true(session:stop())
 		local _, unmeasured = successor(w, { config = "a = 2\n" })
-		local reload = unmeasured.json("results/rl/04_driver_reload.json")
+		local reload = unmeasured.json("results/rl/06_driver_reload.json")
 		helpers.assert_eq({ reload.verdict, reload.codes }, { "fail", { "reloaded", "reload_unmeasured" } })
-		helpers.assert_eq(unmeasured.json("results/rl/05_config_guard.json").verdict, "pass",
+		helpers.assert_eq(unmeasured.json("results/rl/07_config_guard.json").verdict, "pass",
 			"the guard compares with a snapshot taken after the restart")
 
 		local changed = world()
@@ -381,19 +384,20 @@ helpers.describe("Linux field run (linux-field-run)", function()
 
 	helpers.it("fails the reload step by name when the reload is refused or never starts", function()
 		local _, w = reloaded_daemon({ reload = function() return false, "postponed" end })
-		local refused = w.json("results/rl/04_driver_reload.json")
+		local refused = w.json("results/rl/06_driver_reload.json")
 		helpers.assert_eq({ refused.verdict, refused.codes }, { "fail", { "reload_refused", "reload_postponed" } })
 		helpers.assert_eq(w.files[FOLDER .. "/resume.json"], nil, "a refused reload leaves no resume file")
 		helpers.assert_eq(w.json("results/rl/done.json").order,
-			{ "field_composer", "field_network", "field_setup", "driver_reload", "config_guard" })
+			{ "field_composer", "field_network", "field_setup", "field_tray", "field_session", "driver_reload",
+				"config_guard" })
 
 		local _, raised = reloaded_daemon({ reload = function() error("no restart") end })
-		helpers.assert_eq(raised.json("results/rl/04_driver_reload.json").codes, { "reload_refused" })
+		helpers.assert_eq(raised.json("results/rl/06_driver_reload.json").codes, { "reload_refused" })
 
 		local _, silent = reloaded_daemon()
 		helpers.assert_eq(silent.json("results/rl/done.json"), nil)
 		silent.flush(60000)
-		local never = silent.json("results/rl/04_driver_reload.json")
+		local never = silent.json("results/rl/06_driver_reload.json")
 		helpers.assert_eq({ never.verdict, never.codes }, { "timeout", { "reload_not_started" } })
 		helpers.assert_eq(silent.files[FOLDER .. "/resume.json"], nil)
 		helpers.assert_eq(silent.json("results/rl/done.json").interrupted, false)
@@ -430,9 +434,9 @@ helpers.describe("Linux field run (linux-field-run)", function()
 
 	helpers.it("rejects a reload step that names a check, and a check step that names none", function()
 		for _, change in ipairs({
-			function(steps) steps.steps[4].check = "composer" end,
+			function(steps) steps.steps[#steps.steps].check = "composer" end,
 			function(steps) steps.steps[1].check = nil end,
-			function(steps) steps.steps[4].kind = "diagnostics" end,
+			function(steps) steps.steps[#steps.steps].kind = "diagnostics" end,
 		}) do
 			local steps = linux_steps()
 			change(steps)
@@ -468,13 +472,18 @@ helpers.describe("Linux field run in-app (field-report-in-app)", function()
 		helpers.assert_eq(w.files[FOLDER .. "/request.json"], nil, "no request file is written")
 		w.flush()
 		local dir = "results/" .. run.request_id .. "/"
-		helpers.assert_eq(w.json(dir .. "accepted.json").steps, { "field_composer", "field_network", "field_setup" })
+		helpers.assert_eq(w.json(dir .. "accepted.json").steps, { "field_composer", "field_network", "field_setup",
+			"field_tray", "field_session" })
 		helpers.assert_eq(w.json(dir .. "01_field_composer.json").verdict, "pass")
 		helpers.assert_eq(w.json(dir .. "02_field_network.json").verdict, "pass")
 		helpers.assert_eq(w.json(dir .. "03_field_setup.json").verdict, "pass")
+		helpers.assert_eq(w.json(dir .. "04_field_tray.json").verdict, "pass")
+		helpers.assert_eq(w.json(dir .. "05_field_session.json").verdict, "pass")
 		helpers.assert_eq(w.json(dir .. "done.json").interrupted, false)
 		helpers.assert_eq(events, { "start:1:field_composer", "record:field_composer:pass", "start:2:field_network",
-			"record:field_network:pass", "start:3:field_setup", "record:field_setup:pass", "record:config_guard:pass", "done:false:" .. FOLDER .. "/" .. dir:sub(1, -2) })
+			"record:field_network:pass", "start:3:field_setup", "record:field_setup:pass", "start:4:field_tray",
+			"record:field_tray:pass", "start:5:field_session", "record:field_session:pass", "record:config_guard:pass",
+			"done:false:" .. FOLDER .. "/" .. dir:sub(1, -2) })
 	end)
 
 	helpers.it("refuses a second in-app run, and one while a collector's run goes on", function()

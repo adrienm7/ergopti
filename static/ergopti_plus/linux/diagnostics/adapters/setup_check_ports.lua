@@ -14,17 +14,25 @@
 
 local M = {}
 
---- The bound of one command: half the deadline of the step running the check.
+--- The deadline of the field run step running a check, from its declaration;
+--- the tray and session check ports bound their commands by it too.
 --- @param check string The check's id in the field run declaration.
 --- @return number milliseconds
-local function command_timeout_ms(check)
+function M.step_deadline_ms(check)
 	local FieldRun = require("diagnostics.engine.field_run.field_run")
 	local Paths = require("core.fs.engine.paths")
 	local declaration = FieldRun.read_declaration(Paths.driver_root() .. "/diagnostics/data/field_run_steps.json")
 	for _, step in ipairs(declaration.steps) do
-		if step.check == check then return step.deadline_seconds * 1000 / 2 end
+		if step.check == check then return step.deadline_seconds * 1000 end
 	end
 	error("no field run step runs the " .. check .. " check")
+end
+
+--- The bound of one command: half the deadline of the step running the check.
+--- @param check string The check's id in the field run declaration.
+--- @return number milliseconds
+local function command_timeout_ms(check)
+	return M.step_deadline_ms(check) / 2
 end
 
 --- Builds the ports.

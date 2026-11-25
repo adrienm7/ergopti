@@ -1,6 +1,6 @@
 {
 	"_comment": "Linux field run steps: tools/dev/collect-linux-field-report.sh asks the running daemon to run these Debug field checks with no window, then copies the results. The protocol (file names, verdicts, refusal reasons, identifier rules, folders and the keys of each document) is _shared/diagnostics/data/field_run_protocol.json, read by diagnostics/engine/field_run/field_run.lua and the collector; this file holds only what is Linux's: the steps, the request deadline bounds and the name of the configuration guard step. Each step's proves line says what its pass shows.",
-	"deadline_seconds": { "default": 300, "min": 60, "max": 900 },
+	"deadline_seconds": { "default": 480, "min": 60, "max": 900 },
 	"guard_step": "config_guard",
 	"steps": [
 		{
@@ -23,6 +23,20 @@
 			"check": "setup",
 			"deadline_seconds": 30,
 			"proves": "The session gives the daemon what install.sh set up: /dev/uinput writable and one evdev node readable, the systemd user unit enabled, a polkit authentication agent running, and on GNOME, KDE or COSMIC Wayland the compositor focus reporter listening."
+		},
+		{
+			"id": "field_tray",
+			"kind": "field_check",
+			"check": "tray",
+			"deadline_seconds": 90,
+			"proves": "The tray menu a panel reads over D-Bus (dbusmenu) shows « Suspendre » right above « Recharger », the script chords beside them, the Configuration titles, the Débogage logs rows and the red problem rows; a panel's hover keeps the Hotstrings and Shortcuts ticks; « Layout to emulate » is one radio group whose click applies at once and is put back; « Suspendre » ticks and unticks."
+		},
+		{
+			"id": "field_session",
+			"kind": "field_check",
+			"check": "session",
+			"deadline_seconds": 60,
+			"proves": "The daemon's session holds: a restart launcher, the input groups and the uinput rule, a virtual keyboard udev and libinput read as a keyboard only, no touchpad grabbed, the compositor focus script, a named active layout with its KDE watch, lgi for this Lua, no hook restart, no emergency stop, no lost clipboard and a notification server that keeps a notice."
 		},
 		{
 			"id": "driver_reload",

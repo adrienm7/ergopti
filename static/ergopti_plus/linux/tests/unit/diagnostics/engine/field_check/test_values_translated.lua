@@ -4,7 +4,7 @@
 --- field report of 2026-11-25 read « Composition installée : kept » and
 --- « Réglages proxy : none »: the raw codes reached the window after French
 --- labels. Every value the composer and network checks (all three drivers) and
---- the Linux setup check can emit must have a field_check.value.* key in every
+--- the Linux setup, tray and session checks can emit must have a field_check.value.* key in every
 --- locale, and the renderer must use it.
 
 local helpers = require("tests.helpers")
@@ -36,13 +36,16 @@ local function catalogues()
 end
 
 -- The producers of step values: the shared composer and network checks, their
--- Linux, macOS and Windows ports, and the Linux setup check.
+-- Linux, macOS and Windows ports, and the Linux setup, tray and session checks.
 local PRODUCERS = {
 	"_shared/layouts/engine/composer/check_core.lua",
 	"_shared/core/network/engine/field_check_network.lua",
 	"linux/core/network/adapters/check_ports.lua",
 	"linux/modules/keymap/composer_check.lua",
 	"linux/diagnostics/engine/field_check/setup_check.lua",
+	"linux/diagnostics/engine/field_check/tray_check.lua",
+	"linux/diagnostics/engine/field_check/session_check.lua",
+	"linux/diagnostics/adapters/bus_query.lua",
 	"linux/diagnostics/ui/field_check/window.lua",
 	"macos/modules/keymap/composer_check.lua",
 	"windows/ui/layout_manager/composer_check.ahk",
