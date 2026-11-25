@@ -61,8 +61,16 @@ function M.run(options)
 		end,
 		isRunning = function() return observed.grabbed end,
 		isRecovering = function() return false end,
-		stop = function() record("hook.stop"); observed.grabbed = false; return true end,
-		emergency_stop = function() record("hook.emergency"); observed.grabbed = false; return true end,
+		stop = function()
+			record("hook.stop"); observed.grabbed = false
+			observed.hook_stop = { deliberate = true, reason = "stopped by its owner" }; return true
+		end,
+		emergency_stop = function(reason)
+			record("hook.emergency"); observed.grabbed = false
+			observed.hook_stop = { deliberate = false, reason = tostring(reason) }; return true
+		end,
+		-- The daemon's hook supervisor tells a quit from a failure by this.
+		last_stop = function() return observed.hook_stop end,
 		get_mode = function() return observed.grabbed and "intercept" or "observe" end,
 		pump = function()
 			record("hook.pump"); observed.pumps = observed.pumps + 1
@@ -202,7 +210,7 @@ function M.run(options)
 			end }
 		elseif name == "tray.adapters.status_notifier_host" then
 			return { probe = function() return nil, "controlled session" end }
-		elseif name == "core.timing.engine.timings" then
+		elseif name == "core.timing.engine.timings" or name == "platform.input.hook_supervisor" then
 			return require(name)
 		elseif name == "core.lifecycle.engine.driver_control" then
 			-- The local reload control starts once the daemon is ready.

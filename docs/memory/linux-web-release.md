@@ -10,6 +10,22 @@ Observe mode and `EVIOCGRAB` mode have different correctness contracts. A driver
 that does not grab cannot prevent a physical terminator from reaching the app;
 replay logic must reflect the active mode.
 
+### project-linux-a-stopped-hook-is-restarted-not-fatal
+
+The keyboard hook retires its capture without the shutdown coordinator in
+several places (`_retire_source_transaction`: a refused watchdog tick, a
+dialog restoration, a refused layout refresh; `emergency_stop`). Each now
+records `keyboard_hook.last_stop()` and logs its cause; the daemon's idle tick
+hands a non-deliberate stop to `platform/input/hook_supervisor.lua`, which
+reopens a retired uinput channel (`injector.reopen_fast_channel`, never the
+clipboard owner) and restarts the hook within `RESTART_BACKOFF_MS`. Only a
+spent budget keeps the LCY-001 exit 70. An AppImage launch has no systemd
+`Restart=`, so before this every silent retirement looked like a crash there
+and only there. Never reintroduce a direct `request_failure` on a stopped hook.
+The tray keeps pumping while a restart waits (Quit must answer); only the
+keyboard pump is skipped. A deliberate stop seen without a requested shutdown
+is an ownership fault and still exits.
+
 ### project-linux-update-restart-is-watched-until-the-daemon-reports
 
 After an update, `modules/updater/restarter.lua` starts the new daemon under a

@@ -484,6 +484,7 @@ return {
 	"tests.unit.platform.input.keyboard_hook.test_consumption_prior_role",
 	"tests.unit.platform.input.keyboard_hook.test_held_modifier_key",
 	"tests.unit.platform.input.keyboard_hook.test_modal_release",
+	"tests.unit.platform.input.test_hook_supervisor",
 	"tests.unit.platform.input.keyboard_hook.test_tap_hold",
 	"tests.unit.platform.input.keyboard_hook.test_action_one_shot",
 	"tests.unit.platform.input.keyboard_hook.test_nav_wheel",

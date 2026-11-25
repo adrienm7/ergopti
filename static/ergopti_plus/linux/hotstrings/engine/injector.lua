@@ -911,6 +911,33 @@ function M.close_fast_channel()
 	return true
 end
 
+--- Keeps a live output channel, or replaces a retired one, before the keyboard
+--- hook is started again.
+---
+--- A capture transaction the hook retires also retires the virtual keyboard it
+--- forwarded through, so a restarted hook would find a broker whose output is
+--- gone. Only that channel is replaced: the clipboard owner is left alone, since
+--- closing it would drop whatever the user had just copied.
+--- @return boolean live True when an open channel with its broker is ready.
+function M.reopen_fast_channel()
+	local Broker = require("platform.input.modifier_broker")
+	local channel = _uinput
+	if channel then
+		local broker = Broker.for_channel(channel)
+		local retired = broker and type(broker.output_retired) == "function" and broker.output_retired() == true
+		if channel.is_open() and broker and not retired then return true end
+		local closed = channel.close() == true
+			or (not channel.is_open() and not channel.has_output_debt())
+		if not closed or _uinput ~= channel then
+			Logger.error(LOG, "The retired output channel could not be released; the keyboard stays with the desktop.")
+			return false
+		end
+		Broker.detach(channel)
+		_uinput = nil
+	end
+	return M.open_fast_channel()
+end
+
 --- Test seam: injects (or clears) the uinput channel without touching /dev.
 --- @param mod table|nil A module exposing is_open() and emit(code, value).
 function M._set_uinput(mod)

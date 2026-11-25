@@ -540,6 +540,33 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "gesture pump failure must be diagnosed and stop its reader")
     end)
 
+    helpers.it("restarts a stopped keyboard hook before it ends the daemon", function()
+      -- Regression: the idle tick requested a run-time failure the moment the
+      -- hook was not running, so any retired capture ended the daemon (four
+      -- field exits on 2026-11-25, « Shutdown quiescence started (keyboard hook
+      -- stopped) »), and nothing restarted an AppImage launch.
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = assert(io.open(driver_root .. "/ergopti_hotstrings.lua", "r"))
+      local src = fh:read("*a"); fh:close()
+      local periodic_start = assert(src:find("local on_periodic = function()", 1, true))
+      local loop_start = assert(src:find("event_loop.run({", periodic_start, true))
+      local stopped_at = assert(src:find("not keyboard_hook.isRunning() and not keyboard_hook.isRecovering()", loop_start, true))
+      local branch = src:sub(stopped_at, assert(src:find("\n\t\t\tend\n", stopped_at, true)))
+      local poll_at = branch:find("privacy_owners.hook_supervisor.poll()", 1, true)
+      local gate_at = branch:find('if state == "exhausted" or state == "stopped" then', 1, true)
+      local failure_at = branch:find('shutdown.request_failure("keyboard hook stopped")', 1, true)
+      helpers.assert_true(poll_at ~= nil, "the stopped hook goes to its supervisor first")
+      helpers.assert_true(gate_at ~= nil and gate_at > poll_at and failure_at ~= nil and failure_at > gate_at,
+        "only a spent restart budget keeps the run-time failure exit")
+      local tray_at = assert(src:find("if tray_menu then", stopped_at, true))
+      local pump_at = assert(src:find("keyboard_hook.pump, stop_input_loop", stopped_at, true))
+      helpers.assert_true(src:find("if hook_down then return end", tray_at, true) < pump_at,
+        "the tray keeps pumping while a restart waits; only the keyboard pump is skipped")
+      helpers.assert_true(src:find('require("platform.input.hook_supervisor").new({', 1, true) ~= nil,
+        "the daemon constructs the supervisor with its restart port")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL

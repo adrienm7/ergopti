@@ -324,7 +324,7 @@ local function run_hold(transition, expected, options)
 		environment.InputEvent = require("platform.input.event")
 		environment.Monotonic = clock
 		environment._cached_app_id = "code"
-		local startup = assert(main:match("keyboard_hook.start%(%{(.-)\n\t%}%)"))
+		local startup = assert(main:match("local hook_start_options = %{(.-)\n\t%}\n\tkeyboard_hook%.start%(hook_start_options%)"))
 		local physical_binding = assert(startup:match("onPhysical%s*=%s*([%w_]+),"))
 		local hold_binding = assert(startup:match("onHold%s*=%s*([%w_]+),"))
 		local admission_binding = assert(startup:match("onHoldAdmission%s*=%s*([%w_]+),"))

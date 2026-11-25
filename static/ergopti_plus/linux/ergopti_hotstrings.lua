@@ -3783,7 +3783,8 @@ local function main()
 	BootProfiler.stage("input hooks")
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
-	keyboard_hook.start({
+	-- Kept: the hook supervisor starts the hook again with these same options.
+	local hook_start_options = {
 		onCaptureReacquired = publish_reacquired_capture,
 		device = device,
 		pinned = opts.device ~= nil,
@@ -3818,7 +3819,8 @@ local function main()
 		onEmitRelative = injector.emit_relative,
 		outputBroker = injector.output_broker(),
 		requireOutputBroker = opts.grab == true,
-	})
+	}
+	keyboard_hook.start(hook_start_options)
 	if not privacy_owners.startup_checkpoint() then return end
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
 		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
@@ -3829,6 +3831,28 @@ local function main()
 		print("Error: could not start the keyboard hook.")
 		error("Keyboard hook startup refused", 0)
 	end
+	-- A hook that stops on its own (a retired capture, an output failure) is
+	-- started again, with the output channel it forwards through, instead of
+	-- ending the daemon (platform/input/hook_supervisor.lua).
+	privacy_owners.hook_supervisor = require("platform.input.hook_supervisor").new({
+		hook = keyboard_hook, now_ms = Monotonic.now_ms,
+		restart = function()
+			if opts.grab and injector.reopen_fast_channel() ~= true then
+				return false, "the uinput output channel could not be reopened"
+			end
+			hook_start_options.outputBroker = injector.output_broker()
+			if keyboard_hook.start(hook_start_options) ~= true or not keyboard_hook.isRunning() then
+				return false, "start refused"
+			end
+			if publish_reacquired_capture() ~= true then
+				keyboard_hook.emergency_stop("capture publication refused after a restart")
+				return false, "capture publication refused"
+			end
+			-- Keys typed while the hook was down reached the desktop unseen.
+			hook_start_options.onDesync()
+			return true
+		end,
+	})
 	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
 	-- Publish the selected inverse on that exact state before any input is pumped.
 	do
@@ -3907,11 +3931,19 @@ local function main()
 	event_loop.run({
 		onIdle = function()
 			if shutdown.is_requested() then shutdown.poll(); return end
-			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
-				-- Only an emergency stops the hook before a shutdown was requested.
-				shutdown.request_failure("keyboard hook stopped")
-				return
+			local hook_down = not keyboard_hook.isRunning() and not keyboard_hook.isRecovering()
+			if hook_down then
+				-- A stop nobody asked for is restarted; only a spent restart budget
+				-- keeps the run-time failure exit a service manager can act on. A
+				-- deliberate stop belongs to the shutdown coordinator, so one seen
+				-- here without a requested shutdown is an ownership fault.
+				local state = privacy_owners.hook_supervisor.poll()
+				if state == "exhausted" or state == "stopped" then
+					shutdown.request_failure("keyboard hook stopped")
+					return
+				end
 			end
+			-- The tray keeps running while a restart waits, so Quit still answers.
 			if tray_menu then
 				local owner = tray_menu
 				RuntimeGuard.call("tray pump", owner.pump, function()
@@ -3926,6 +3958,7 @@ local function main()
 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
 			if secure_focus_guard.has_context_operation() then refresh_admitted_focus(false) end
+			if hook_down then return end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
