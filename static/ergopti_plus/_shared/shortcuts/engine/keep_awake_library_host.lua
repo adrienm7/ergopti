@@ -35,35 +35,16 @@ local LOG = "keep_awake.library_window"
 M.APP_ID = "keep_awake_library"
 M.BRIDGE = "hsKeepAwake"
 
---- The format tag and version of an exported preset file.
-M.EXPORT_FORMAT = "ergopti.keep_awake_preset"
-M.EXPORT_VERSION = 1
-
--- The store edits the page may ask for, with their argument count.
-M.EDITS = {
-	set_active = 1, set_switch = 3, duplicate = 3, rename = 2, remove = 1,
-	set_apps = 3, put_target = 3, remove_target = 2,
-}
-
--- The page's own strings (keepawake.library.<name>).
-M.PAGE_KEYS = {
-	"window_title", "heading", "subtitle", "presets_heading", "toolbar", "new", "duplicate", "rename",
-	"delete", "export", "import", "make_active", "active", "name", "switches_heading", "keep_awake",
-	"auto_click", "apps_heading", "apps_hint", "images_heading", "images_empty", "add_button",
-	"import_image", "threshold", "enabled", "remove", "texts_heading", "texts_empty", "add_text",
-	"variants", "variants_hint", "max_distance", "close", "new_name", "copy_name", "confirm_delete",
-	"saved", "refused", "image_added", "image_failed", "exported", "imported", "import_failed",
-	"image_alt",
-}
-
 local PNG_SIGNATURE = "\137PNG\r\n\26\n"
 
 --- Every locale key the page reads.
+--- @param data table keep_awake_library.json.
+--- @param starters table keep_awake_presets.json (the starters' translated names).
 --- @return table keys
-function M.string_keys()
+function M.string_keys(data, starters)
 	local keys = {}
-	for index, name in ipairs(M.PAGE_KEYS) do keys[index] = "keepawake.library." .. name end
-	for _, preset in ipairs({ "simple", "vscode", "teams" }) do keys[#keys + 1] = "keepawake.preset." .. preset end
+	for index, name in ipairs(data.page_keys) do keys[index] = "keepawake.library." .. name end
+	for _, preset in ipairs(starters.presets) do keys[#keys + 1] = preset.name_key end
 	table.sort(keys)
 	return keys
 end
@@ -102,6 +83,7 @@ function M.new(ports)
 	end
 	local host = {}
 	local library = ports.library
+	local data = library.read_shared("shortcuts/data/keep_awake_library.json")
 	local sep = ports.separator or "/"
 
 	local function images_dir()
@@ -135,7 +117,7 @@ function M.new(ports)
 
 	local function strings()
 		local out = {}
-		for _, key in ipairs(M.string_keys()) do out[key] = ports.translate(key) end
+		for _, key in ipairs(M.string_keys(data, library.read_shared("shortcuts/data/keep_awake_presets.json"))) do out[key] = ports.translate(key) end
 		return out
 	end
 
@@ -146,7 +128,7 @@ function M.new(ports)
 	end
 
 	local function edit(op, args)
-		local count = M.EDITS[op]
+		local count = data.edits[op]
 		if not count or type(args) ~= "table" or #args ~= count then
 			Logger.warn(LOG, "The library window asked for an edit it may not make: %s.", tostring(op))
 			return push_doc({ ok = false, reason = "invalid_request" })
@@ -204,7 +186,7 @@ function M.new(ports)
 		end
 		local path = ports.save_path(preset.id .. ".json")
 		if not path then return end
-		local text = Json.encode({ format = M.EXPORT_FORMAT, version = M.EXPORT_VERSION, preset = preset,
+		local text = Json.encode({ format = data.export_format, version = data.export_version, preset = preset,
 			images = images })
 		local ok = ports.write_file(path, text)
 		if not ok then Logger.error(LOG, "The preset export could not be written.") end
@@ -216,7 +198,7 @@ function M.new(ports)
 		local path = ports.open_path()
 		if not path then return end
 		local ok, file = pcall(Json.decode, ports.read_file(path) or "")
-		if not ok or type(file) ~= "table" or file.format ~= M.EXPORT_FORMAT or file.version ~= M.EXPORT_VERSION
+		if not ok or type(file) ~= "table" or file.format ~= data.export_format or file.version ~= data.export_version
 			or type(file.preset) ~= "table" or type(file.images) ~= "table" then
 			Logger.warn(LOG, "The preset file is not an exported anti-sleep preset.")
 			return ports.push("onImported", { ok = false, reason = "presets_document_invalid" })

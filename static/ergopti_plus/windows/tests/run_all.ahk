@@ -393,6 +393,7 @@ InstallHotstringHooks()
 #Include ../modules/shortcuts/auto_click_session.ahk
 #Include ../modules/shortcuts/ocr_capture.ahk
 #Include ../modules/shortcuts/ocr_capture_action.ahk
+#Include ../modules/shortcuts/keep_awake_library_window.ahk
 #Include ../modules/shortcuts/auto_click.ahk
 #Include ../platform/vision/screen_vision.ahk
 #Include ../platform/vision/region_select.ahk
@@ -739,6 +740,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_keep_awake_presets.ahk
 #Include unit/modules/shortcuts/test_auto_click_session.ahk
 #Include unit/modules/shortcuts/test_ocr_capture.ahk
+#Include unit/modules/shortcuts/test_keep_awake_library_window.ahk
 #Include unit/platform/vision/test_screen_vision.ahk
 #Include unit/gestures/adapters/test_touchpad_hid.ahk
 #Include unit/gestures/adapters/test_raw_touchpad_owner.ahk

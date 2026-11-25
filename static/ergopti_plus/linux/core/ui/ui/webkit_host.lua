@@ -64,6 +64,7 @@ M.APP_BRIDGES = {
 	prompt_editor            = "prompt_bridge",
 	update_check             = "update_check_bridge",
 	user_workflows           = "hsWorkflows",
+	keep_awake_library       = "hsKeepAwake",
 }
 
 --- The canonical bridge-name catalogue, derived from page ownership above.

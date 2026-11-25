@@ -172,6 +172,49 @@ helpers.describe("screen vision service (Linux)", function()
 		Service.stop()
 	end)
 
+	helpers.it("screen vision: imports a GIF's first frame as a whole PNG", function()
+		if not os.execute("command -v convert >/dev/null 2>&1 || command -v magick >/dev/null 2>&1") then
+			return -- ImageMagick is optional: without it the next case pins the refusal
+		end
+		local Service = fresh_service({ DISPLAY = ":0" })
+		local dir = os.tmpname()
+		os.remove(dir)
+		os.execute("mkdir '" .. dir .. "' && convert -size 8x8 xc:red xc:blue '" .. dir .. "/in.gif' 2>/dev/null")
+		ShellRunner._set_async_runner(function(executable, args, _, callback)
+			local quoted = {}
+			for index = 3, #args do quoted[#quoted + 1] = "'" .. args[index]:gsub("'", "'\\''") .. "'" end
+			local script = assert(io.open(dir .. "/import.sh", "w"))
+			script:write(args[2])
+			script:close()
+			local ok = os.execute(executable .. " '" .. dir .. "/import.sh' " .. table.concat(quoted, " ", 2))
+			callback({ ok = ok == true or ok == 0, code = (ok == true or ok == 0) and 0 or 1 })
+			return { cancel = function() end, on_settled = function() end }
+		end)
+		local out, reason
+		Service.import_image(dir .. "/in.gif", dir .. "/out.png", function(p, r) out, reason = p, r end)
+		ShellRunner._set_async_runner(nil)
+		helpers.assert_nil(reason, "no refusal")
+		local handle = assert(io.open(out, "rb"))
+		helpers.assert_eq(handle:read(8), "\137PNG\r\n\26\n", "the file is a PNG")
+		handle:close()
+		os.execute("rm -rf '" .. dir .. "'")
+		Service.stop()
+	end)
+
+	helpers.it("screen vision: names a missing ImageMagick at import", function()
+		local Service = fresh_service({ DISPLAY = ":0" })
+		ShellRunner._set_async_runner(function(_, _, _, callback)
+			callback({ ok = false, code = 3 })
+			return { cancel = function() end, on_settled = function() end }
+		end)
+		local out, reason
+		Service.import_image("/x.heic", "/y.png", function(p, r) out, reason = p, r end)
+		ShellRunner._set_async_runner(nil)
+		helpers.assert_nil(out, "nothing converted")
+		helpers.assert_eq(reason, "import_tool_missing", "the reason names the missing tool")
+		Service.stop()
+	end)
+
 	helpers.it("screen vision: greys text recognition when tesseract is missing", function()
 		local Service = fresh_service({ DISPLAY = ":0" })
 		ShellRunner._set_runner(function() return false end)

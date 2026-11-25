@@ -20,6 +20,12 @@ const ctx = require('./context.cjs');
 /** The workflow editor page and the step catalogue its key families come from. */
 const WORKFLOWS_PAGE = 'static/ergopti_plus/_shared/ui/user_workflows/script.js';
 const WORKFLOW_STEPS = 'static/ergopti_plus/_shared/shortcuts/data/workflows/steps.json';
+/** The Windows library window host, which builds its page strings by name (keep_awake_library.json). */
+const KEEP_AWAKE_LIBRARY_HOSTS = [
+	'static/ergopti_plus/windows/modules/shortcuts/keep_awake_library_window.ahk'
+];
+const KEEP_AWAKE_LIBRARY_DATA =
+	'static/ergopti_plus/_shared/shortcuts/data/keep_awake_library.json';
 
 const ROOT = 'static/ergopti_plus/';
 const SCHEMA = ROOT + '_shared/diagnostics/data/schema.json';
@@ -130,6 +136,12 @@ function constantBlock(rel, comment, line) {
 // ==========================================
 
 module.exports = [
+	{
+		prefix: 'keepawake.library.',
+		files: KEEP_AWAKE_LIBRARY_HOSTS,
+		source: 'the page_keys of the anti-sleep library window protocol (keep_awake_library.json)',
+		keys: () => ctx.keysOf('keepawake.library.', ctx.json(KEEP_AWAKE_LIBRARY_DATA).page_keys)
+	},
 	{
 		prefix: 'workflows.field.',
 		files: [WORKFLOWS_PAGE],

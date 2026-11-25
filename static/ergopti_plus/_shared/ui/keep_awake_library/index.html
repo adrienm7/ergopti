@@ -1,0 +1,118 @@
+<!-- _shared/ui/keep_awake_library/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="keepawake.library.window_title"></title>
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
+		<link rel="stylesheet" href="../theme.css" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<main>
+			<h1 data-i18n="keepawake.library.heading"></h1>
+			<p class="subtitle" data-i18n="keepawake.library.subtitle"></p>
+
+			<section class="layout">
+				<section class="list-pane" aria-labelledby="presets-heading">
+					<h2 id="presets-heading" data-i18n="keepawake.library.presets_heading"></h2>
+					<nav class="toolbar" data-i18n-aria-label="keepawake.library.toolbar">
+						<button type="button" id="btn-new" data-i18n="keepawake.library.new"></button>
+						<button
+							type="button"
+							id="btn-duplicate"
+							data-i18n="keepawake.library.duplicate"
+						></button>
+						<button type="button" id="btn-delete" data-i18n="keepawake.library.delete"></button>
+						<button type="button" id="btn-import" data-i18n="keepawake.library.import"></button>
+						<button type="button" id="btn-export" data-i18n="keepawake.library.export"></button>
+					</nav>
+					<ul id="preset-list" class="preset-list"></ul>
+				</section>
+
+				<section id="editor" class="editor-pane" aria-labelledby="editor-heading" hidden>
+					<h2 id="editor-heading"></h2>
+					<p class="field">
+						<label for="input-name" data-i18n="keepawake.library.name"></label>
+						<input type="text" id="input-name" autocomplete="off" />
+						<button type="button" id="btn-rename" data-i18n="keepawake.library.rename"></button>
+					</p>
+					<p>
+						<button
+							type="button"
+							id="btn-activate"
+							data-i18n="keepawake.library.make_active"
+						></button>
+					</p>
+
+					<fieldset class="group">
+						<legend data-i18n="keepawake.library.switches_heading"></legend>
+						<p class="check">
+							<input type="checkbox" id="switch-keep-awake" />
+							<label for="switch-keep-awake" data-i18n="keepawake.library.keep_awake"></label>
+						</p>
+						<p class="check">
+							<input type="checkbox" id="switch-auto-click" />
+							<label for="switch-auto-click" data-i18n="keepawake.library.auto_click"></label>
+						</p>
+					</fieldset>
+
+					<h3 id="apps-heading" data-i18n="keepawake.library.apps_heading"></h3>
+					<p class="hint" id="apps-hint" data-i18n="keepawake.library.apps_hint"></p>
+					<textarea
+						id="input-apps"
+						rows="3"
+						aria-labelledby="apps-heading"
+						aria-describedby="apps-hint"
+					></textarea>
+
+					<h3 data-i18n="keepawake.library.images_heading"></h3>
+					<p id="images-empty" class="hint" data-i18n="keepawake.library.images_empty" hidden></p>
+					<ul id="images" class="targets"></ul>
+					<p class="row">
+						<button
+							type="button"
+							id="btn-add-button"
+							data-i18n="keepawake.library.add_button"
+						></button>
+						<button
+							type="button"
+							id="btn-import-image"
+							data-i18n="keepawake.library.import_image"
+						></button>
+					</p>
+
+					<h3 data-i18n="keepawake.library.texts_heading"></h3>
+					<p id="texts-empty" class="hint" data-i18n="keepawake.library.texts_empty" hidden></p>
+					<ul id="texts" class="targets"></ul>
+					<p class="field">
+						<label for="input-variants" data-i18n="keepawake.library.variants"></label>
+						<input
+							type="text"
+							id="input-variants"
+							autocomplete="off"
+							aria-describedby="variants-hint"
+						/>
+						<button type="button" id="btn-add-text" data-i18n="keepawake.library.add_text"></button>
+					</p>
+					<p class="hint" id="variants-hint" data-i18n="keepawake.library.variants_hint"></p>
+				</section>
+			</section>
+
+			<p id="status" class="status" role="status" aria-live="polite"></p>
+
+			<footer class="btns">
+				<button
+					type="button"
+					id="btn-close"
+					class="cancel"
+					data-i18n="keepawake.library.close"
+				></button>
+			</footer>
+		</main>
+
+		<script src="script.js"></script>
+	</body>
+</html>

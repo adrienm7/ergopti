@@ -4526,6 +4526,10 @@
 		"editor.hotstrings.tag_action": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
+		},
+		"keepawake.library.name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
 		}
 	}
 }

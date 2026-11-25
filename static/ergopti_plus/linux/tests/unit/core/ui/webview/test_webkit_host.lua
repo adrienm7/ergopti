@@ -10,12 +10,12 @@ local EXPECTED_BRIDGES = {
   "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
   "healthcheck", "error_dialog", "config_cleanup_bridge", "layout_manager_bridge",
   "layout_editor_window_bridge", "update_check_bridge", "field_report", "emulation_picker_bridge",
-  "hsWorkflows",
+  "hsWorkflows", "hsKeepAwake",
 }
 
 -- This independently authored contract rejects missing, duplicate and foreign names.
 local function exact_bridge_registry(names)
-  if type(names) ~= "table" or #names ~= 23 then return false end
+  if type(names) ~= "table" or #names ~= 24 then return false end
   local expected, seen = {}, {}
   for _, name in ipairs(EXPECTED_BRIDGES) do expected[name] = true end
   for _, name in ipairs(names) do
@@ -68,8 +68,8 @@ helpers.describe("core.ui.ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 23 bridges including the physical editor and the workflows", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 23)
+    helpers.it("has exactly 24 bridges including the physical editor, the workflows and the anti-sleep library", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 24)
       helpers.assert_true(exact_bridge_registry(WH.get_bridge_names()))
     end)
   end)

@@ -41,8 +41,24 @@ function M.region_command(region_save)
 		.. [=[; } && [ -s "$f" ] && { printf '%s' "$f"; exit 0; }; rm -f "$f"; rmdir "$d"; exit 1]=]
 end
 
+--- Lets the user draw a region and captures it into a private PNG.
+--- @param region_save string The region cascade with %s for the target file.
+--- @param callback function (path|nil, reason): reason "cancelled" on Escape.
+function M.select_region(region_save, callback)
+	local ShellRunner = require("core.process.adapters.shell_runner")
+	local handle = ShellRunner.run_async("sh", { "-c", M.region_command(region_save) },
+		{ timeout_ms = Timings.ms("screen_vision", "region_select_timeout_ms") }, function(result)
+			local path = result.ok and (result.stdout or ""):gsub("%s+$", "") or ""
+			if path ~= "" then return callback(path) end
+			if result.timed_out then Logger.warn(LOG, "The region selection timed out.") end
+			callback(nil, "cancelled")
+		end)
+	if not handle then callback(nil, "capture_unavailable") end
+end
+
 --- Removes a capture file and its private folder.
-local function remove_capture(path)
+--- @param path string
+function M.remove_capture(path)
 	os.remove(path)
 	local folder = require("core.fs.engine.native_path").dirname(path)
 	if folder and folder:match("/ergopti%-ocr%.[^/]+$") then os.remove(folder) end
@@ -50,19 +66,9 @@ end
 
 --- The native ports of one run.
 local function default_ports(region_save)
-	local ShellRunner = require("core.process.adapters.shell_runner")
 	local i18n = require("core.i18n.engine.i18n")
 	return {
-		select = function(callback)
-			local handle = ShellRunner.run_async("sh", { "-c", M.region_command(region_save) },
-				{ timeout_ms = Timings.ms("screen_vision", "region_select_timeout_ms") }, function(result)
-					local path = result.ok and (result.stdout or ""):gsub("%s+$", "") or ""
-					if path ~= "" then return callback(path) end
-					if result.timed_out then Logger.warn(LOG, "The region selection timed out.") end
-					callback(nil, "cancelled")
-				end)
-			if not handle then callback(nil, "capture_unavailable") end
-		end,
+		select = function(callback) M.select_region(region_save, callback) end,
 		recognize = function(path, callback)
 			require("platform.vision.tesseract_ocr").recognize_file(path, { layout = "block",
 				locale = require("core.i18n.engine.locale").current_locale() }, callback)
@@ -73,7 +79,7 @@ local function default_ports(region_save)
 			if lines then body = body:gsub("{1}", tostring(lines)) end
 			require("platform.focus.application_notifier").send(body, { level = level })
 		end,
-		remove = remove_capture,
+		remove = M.remove_capture,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	}
 end

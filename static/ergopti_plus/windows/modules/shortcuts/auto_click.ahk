@@ -87,7 +87,7 @@ _AutoClickSave(Doc) {
 		DirCreate(Images)
 		if FileExist(Index . ".partial")
 			FileDelete(Index . ".partial")
-		FileAppend(_ScreenVisionJson(Doc), Index . ".partial", "UTF-8-RAW")
+		FileAppend(KeepAwakeLibraryJson(Doc), Index . ".partial", "UTF-8-RAW")
 		FileMove(Index . ".partial", Index, true)
 	} catch as Err {
 		LoggerError("AutoClick", "The presets document could not be written: {1}.", Err.Message)
@@ -194,7 +194,8 @@ _MI_BuildKeepAwakeMenu() {
 		"keep_awake_presets", (*) => AutoClickPresetRows(),
 		"keep_awake_status", (*) => AutoClickStatusRows()), Map(
 		"keep_awake_switch", _AutoClickToggleSwitch.Bind("keep_awake"),
-		"keep_awake_auto_click", _AutoClickToggleSwitch.Bind("auto_click")), Map(
+		"keep_awake_auto_click", _AutoClickToggleSwitch.Bind("auto_click"),
+		"keep_awake_library", KeepAwakeLibraryOpen), Map(
 		"keep_awake_switch_on", _AutoClickSwitchOn.Bind("keep_awake"),
 		"keep_awake_auto_click_on", _AutoClickSwitchOn.Bind("auto_click"),
 		"keep_awake_auto_click_available", (*) => true))

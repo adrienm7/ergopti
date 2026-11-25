@@ -21,6 +21,7 @@ local function _build_keep_awake()
 	local commands = {
 		keep_awake_switch = function() return AutoClick.toggle_switch("keep_awake") end,
 		keep_awake_auto_click = function() return AutoClick.toggle_switch("auto_click") end,
+		keep_awake_library = function() return require("ui.keep_awake_library_bridge").open() end,
 	}
 	local getters = {
 		keep_awake_switch_on = function() return AutoClick.switch_on("keep_awake") end,

@@ -586,6 +586,13 @@ SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_
 --- private file, read by tesseract and copied by modules/ocr_capture.lua.
 local OCR_REGION_SAVE = SCREENSHOT_COMMANDS["screenshot_region_save"]
 
+--- The region cascade with %s for the target file, for the other region
+--- captures (the anti-sleep library's « Ajouter un bouton… »).
+--- @return string command
+function M.region_save_command()
+	return OCR_REGION_SAVE
+end
+
 --- Where a saved screenshot lands, and under what name.
 ---
 --- $XDG_PICTURES_DIR when the user's desktop declares one, the conventional

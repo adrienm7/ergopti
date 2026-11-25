@@ -258,7 +258,8 @@ const MACOS_MODULES = {
 	permission_dialog: 'ui/permission_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua',
 	update_check: 'ui/update_check/init.lua',
-	user_workflows: 'ui/menu/menu_user_workflows.lua'
+	user_workflows: 'ui/menu/menu_user_workflows.lua',
+	keep_awake_library: 'ui/menu/menu_keep_awake_library.lua'
 };
 
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
@@ -408,6 +409,12 @@ const WINDOWS_APPS = {
 		file: 'ui/emulation_picker/init.ahk',
 		// The WebViewHost base sizes the window from the manifest entry.
 		checks: () => [/WebViewHost\.TryOpen\(\s*"emulation_picker"/, /^(?![\s\S]*_Geometry\(\)\s*\{)/]
+	},
+	keep_awake_library: {
+		file: 'modules/shortcuts/keep_awake_library_window.ahk',
+		// Opened through WebViewHost.TryOpen under its manifest id; the base
+		// _Geometry reads the manifest.
+		checks: () => [/WebViewHost\.TryOpen\(\s*"keep_awake_library"/]
 	},
 	layout_editor_window: {
 		file: 'ui/layout_manager/editor_window.ahk',
