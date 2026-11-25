@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Teams에서 절전 방지",
 	"keepawake.preset_empty": "이 프리셋은 절전을 막지도, 클릭하지도 않습니다. « 절전 방지 » 메뉴에서 옵션 중 하나를 켜세요.",
 	"keepawake.auto_click_refused": "자동 클릭을 시작할 수 없습니다. 이유는 « 절전 방지 » 메뉴에 표시됩니다.",
+	"keepawake.auto_click_unavailable": "이 세션에서는 사용할 수 없습니다: 아래 빨간 줄에 이유가 있습니다.",
 	"keepawake.reason.auto_click_wayland": "Wayland에서는 어떤 앱도 포인터를 움직일 수 없습니다. 자동 클릭에는 X11 세션을 사용하세요",
 	"keepawake.reason.auto_click_tool_missing": "xdotool이 설치되어 있지 않습니다. 자동 클릭을 하려면 설치하세요",
 	"keepawake.reason.capture_permission_missing": "Ergopti에 화면 기록이 허용되지 않았습니다. 시스템 설정 › 개인정보 보호 및 보안에서 허용하세요",

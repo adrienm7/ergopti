@@ -443,6 +443,8 @@ class MenuCommand {
 	static HOTSTRING_SCOPE_ALL_SECTIONS := "hotstring_scope_all_sections"
 	static IDLE_RESET := "idle_reset"
 	static INCLUDE_REALTIME := "include_realtime"
+	static KEEP_AWAKE_AUTO_CLICK := "keep_awake_auto_click"
+	static KEEP_AWAKE_SWITCH := "keep_awake_switch"
 	static KEYBOARD_CORE_STATUS := "keyboard_core_status"
 	static KEYBOARD_GROUP_ADD_CMD := "keyboard_group_add_cmd"
 	static KEYBOARD_GROUP_ADD_CMD_SHIFT := "keyboard_group_add_cmd_shift"

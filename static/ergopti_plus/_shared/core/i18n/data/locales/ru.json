@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Без сна в Teams",
 	"keepawake.preset_empty": "Эта предустановка не мешает сну и ничего не нажимает: включите один из её параметров в меню « Без сна ».",
 	"keepawake.auto_click_refused": "Не удалось запустить автоматические щелчки: причина указана в меню « Без сна ».",
+	"keepawake.auto_click_unavailable": "Недоступно в этом сеансе: причина указана в красной строке ниже.",
 	"keepawake.reason.auto_click_wayland": "Wayland не позволяет приложениям перемещать указатель; для автоматических щелчков используйте сеанс X11",
 	"keepawake.reason.auto_click_tool_missing": "xdotool не установлен; установите его для автоматических щелчков",
 	"keepawake.reason.capture_permission_missing": "Запись экрана для Ergopti не разрешена: разрешите её в Системных настройках › Конфиденциальность и безопасность",

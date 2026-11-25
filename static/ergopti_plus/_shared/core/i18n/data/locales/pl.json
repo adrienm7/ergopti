@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Zapobieganie uśpieniu w Teams",
 	"keepawake.preset_empty": "To ustawienie nie zapobiega uśpieniu ani niczego nie klika: włącz jedną z jego opcji w menu « Zapobieganie uśpieniu ».",
 	"keepawake.auto_click_refused": "Nie udało się uruchomić automatycznych kliknięć: menu « Zapobieganie uśpieniu » podaje przyczynę.",
+	"keepawake.auto_click_unavailable": "Niedostępne w tej sesji: czerwony wiersz poniżej podaje powód.",
 	"keepawake.reason.auto_click_wayland": "Wayland nie pozwala aplikacjom przesuwać wskaźnika; użyj sesji X11, aby klikać automatycznie",
 	"keepawake.reason.auto_click_tool_missing": "xdotool nie jest zainstalowany; zainstaluj go, aby klikać automatycznie",
 	"keepawake.reason.capture_permission_missing": "Nagrywanie ekranu nie jest dozwolone dla Ergopti: zezwól na nie w Ustawieniach systemowych › Prywatność i ochrona",

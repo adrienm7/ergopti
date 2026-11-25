@@ -17,13 +17,22 @@ function M.build()
 	-- create it before i18n is ready.
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local Mode = require("modules.shortcuts.actions.auto_click")
-	local admitted = ManifestMenu.template_rows("keep_awake_menu", {}, {}, {
+	local commands = {
+		keep_awake_switch = function() return Mode.toggle_switch("keep_awake") end,
+		keep_awake_auto_click = function() return Mode.toggle_switch("auto_click") end,
+	}
+	local getters = {
+		keep_awake_switch_on = function() return Mode.switch_on("keep_awake") end,
+		keep_awake_auto_click_on = function() return Mode.switch_on("auto_click") end,
+		keep_awake_auto_click_available = function() return Mode.auto_click_available() end,
+	}
+	local admitted = ManifestMenu.template_rows("keep_awake_menu", commands, getters, {
 		["keep_awake_presets"] = function() return Mode.preset_rows() end,
-		["keep_awake_options"] = function() return Mode.option_rows() end,
+		["keep_awake_status"] = function() return Mode.status_rows() end,
 	})
 	if not admitted then return nil end
 	local rendered = ManifestMenu.render_rows(admitted, "keep_awake_menu")
-	return ManifestMenu.group_row("top_level", "keep_awake", rendered, {})
+	return ManifestMenu.group_row("top_level", "keep_awake", rendered, getters)
 end
 
 return M

@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Anti-veille dans Teams",
 	"keepawake.preset_empty": "Ce préréglage n’empêche pas la mise en veille et ne clique rien : activez l’une de ses options dans le menu « Anti-veille ».",
 	"keepawake.auto_click_refused": "Les clics automatiques n’ont pas pu démarrer : le menu « Anti-veille » indique pourquoi.",
+	"keepawake.auto_click_unavailable": "Indisponible dans cette session : la ligne rouge ci-dessous indique pourquoi.",
 	"keepawake.reason.auto_click_wayland": "Wayland ne laisse aucune application déplacer le pointeur ; ouvrez une session X11 pour cliquer automatiquement",
 	"keepawake.reason.auto_click_tool_missing": "xdotool n’est pas installé ; installez-le pour cliquer automatiquement",
 	"keepawake.reason.capture_permission_missing": "L’enregistrement de l’écran n’est pas autorisé pour Ergopti : autorisez-le dans Réglages Système › Confidentialité et sécurité",

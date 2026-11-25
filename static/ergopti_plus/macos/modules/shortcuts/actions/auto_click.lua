@@ -125,8 +125,17 @@ function M.active_plan() return library().active_plan() end
 --- The rows of the menu's presets list.
 function M.preset_rows() return library().preset_rows() end
 
---- The rows of the menu's options list.
-function M.option_rows() return library().option_rows() end
+--- Whether one switch of the active preset is on.
+function M.switch_on(name) return library().switch_on(name) end
+
+--- Flips one switch of the active preset.
+function M.toggle_switch(name) return library().toggle_switch(name) end
+
+--- Whether the auto-click switch can run here.
+function M.auto_click_available() return library().auto_click_available() end
+
+--- The rows of the menu's status list.
+function M.status_rows() return library().status_rows() end
 
 
 

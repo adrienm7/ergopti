@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Wakker houden in Teams",
 	"keepawake.preset_empty": "Deze voorinstelling voorkomt de slaapstand niet en klikt nergens op: schakel een van de opties in via het menu « Wakker houden ».",
 	"keepawake.auto_click_refused": "Automatische klikken konden niet starten: het menu « Wakker houden » vermeldt waarom.",
+	"keepawake.auto_click_unavailable": "Niet beschikbaar in deze sessie: de rode regel hieronder zegt waarom.",
 	"keepawake.reason.auto_click_wayland": "Wayland laat geen toepassing de aanwijzer verplaatsen; gebruik een X11-sessie om automatisch te klikken",
 	"keepawake.reason.auto_click_tool_missing": "xdotool is niet geïnstalleerd; installeer het om automatisch te klikken",
 	"keepawake.reason.capture_permission_missing": "Schermopname is niet toegestaan voor Ergopti: sta het toe in Systeeminstellingen › Privacy en beveiliging",

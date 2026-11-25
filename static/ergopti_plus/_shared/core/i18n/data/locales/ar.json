@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "منع السكون في Teams",
 	"keepawake.preset_empty": "هذا الإعداد المسبق لا يمنع السكون ولا ينقر على شيء: فعّل أحد خياراته من قائمة « منع السكون ».",
 	"keepawake.auto_click_refused": "تعذّر بدء النقرات التلقائية: تجد السبب في قائمة « منع السكون ».",
+	"keepawake.auto_click_unavailable": "غير متاح في هذه الجلسة: يوضح السطر الأحمر أدناه السبب.",
 	"keepawake.reason.auto_click_wayland": "لا يسمح Wayland لأي تطبيق بتحريك المؤشر؛ استخدم جلسة X11 للنقر تلقائيًا",
 	"keepawake.reason.auto_click_tool_missing": "xdotool غير مثبت؛ ثبّته للنقر تلقائيًا",
 	"keepawake.reason.capture_permission_missing": "تسجيل الشاشة غير مسموح لـ Ergopti: اسمح به من إعدادات النظام › الخصوصية والأمن",

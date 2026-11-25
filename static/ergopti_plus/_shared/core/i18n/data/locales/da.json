@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Hold vågen i Teams",
 	"keepawake.preset_empty": "Denne forudindstilling forhindrer ikke dvale og klikker ikke: slå en af dens indstillinger til i menuen « Hold vågen ».",
 	"keepawake.auto_click_refused": "Automatiske klik kunne ikke starte: menuen « Hold vågen » viser hvorfor.",
+	"keepawake.auto_click_unavailable": "Ikke tilgængelig i denne session: den røde linje nedenfor siger hvorfor.",
 	"keepawake.reason.auto_click_wayland": "Wayland lader ingen programmer flytte markøren; brug en X11-session til automatiske klik",
 	"keepawake.reason.auto_click_tool_missing": "xdotool er ikke installeret; installer det til automatiske klik",
 	"keepawake.reason.capture_permission_missing": "Skærmoptagelse er ikke tilladt for Ergopti: tillad det i Systemindstillinger › Anonymitet og sikkerhed",

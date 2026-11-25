@@ -1190,8 +1190,28 @@
 			"i18n": "menu.keep_awake.header_options"
 		},
 		{
+			"type": "check",
+			"id": "keep_awake_switch",
+			"i18n": "menu.keep_awake.keep_awake",
+			"checked_when": [
+				"keep_awake_switch_on"
+			]
+		},
+		{
+			"type": "check",
+			"id": "keep_awake_auto_click",
+			"i18n": "menu.keep_awake.auto_click",
+			"checked_when": [
+				"keep_awake_auto_click_on"
+			],
+			"disabled_when": [
+				"keep_awake_auto_click_available"
+			],
+			"disabled_reason_key": "keepawake.auto_click_unavailable"
+		},
+		{
 			"type": "list",
-			"id": "keep_awake_options"
+			"id": "keep_awake_status"
 		}
 	],
 	"language_menu": [
