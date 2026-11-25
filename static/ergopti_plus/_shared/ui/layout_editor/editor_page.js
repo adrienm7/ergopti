@@ -111,7 +111,8 @@ var LayoutEditorPage = (function () {
 	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
 	const STICKER_MAX_MM = 30;
 	// The secondary tools under the board, in tab order; the first one opens by default.
-	// « Versions » (saved snapshots) is an idea seen in the Layouts Wiki playground.
+	// « Versions » (saved snapshots) and « Help » (the tasks, in words) are ideas
+	// seen in the Layouts Wiki playground; « Help » stays last.
 	const TOOLS = [
 		'details',
 		'versions',
@@ -122,8 +123,11 @@ var LayoutEditorPage = (function () {
 		'navigation',
 		'windows',
 		'export',
-		'stickers'
+		'stickers',
+		'help'
 	];
+	// The tasks « Help » explains, one titled section each (layout_editor.help.<id>_title, _text).
+	const HELP_TOPICS = ['start', 'keys', 'layers', 'undo', 'versions', 'analyse', 'save', 'export'];
 	// The drag data type of a character from the palette or the name search.
 	const CHAR_DRAG_TYPE = 'application/x-ergopti-character';
 	// The export « Format » drop-down (maintainer decision, 2026-11-15): the
@@ -2783,6 +2787,24 @@ var LayoutEditorPage = (function () {
 			]);
 		}
 
+		/**
+		 * « Help » (an idea seen in the Layouts Wiki playground's Docs pane): the
+		 * editor's common tasks in a few lines each, one titled section per task.
+		 */
+		function helpTool() {
+			return el('section', { class: 'le-panel le-help', id: 'le-help' }, [
+				el('h2', { text: tl('tools.help') }),
+				el('p', { class: 'le-note', text: tl('help.intro') }),
+				...HELP_TOPICS.map((id) =>
+					el('section', { class: 'le-help-topic', 'aria-labelledby': `le-help-${id}` }, [
+						el('h3', { id: `le-help-${id}`, text: tl(`help.${id}_title`) }),
+						el('p', { text: tl(`help.${id}_text`) })
+					])
+				),
+				el('p', { class: 'le-note', text: tl('help.credit') })
+			]);
+		}
+
 		/** Shows one secondary tool. */
 		function showTool(id) {
 			state.tool = id;
@@ -2804,7 +2826,8 @@ var LayoutEditorPage = (function () {
 				navigation: navigationTool,
 				windows: preserved ? null : windowsPanel,
 				export: exportPanel,
-				stickers: stickersTool
+				stickers: stickersTool,
+				help: helpTool
 			};
 			const shown = TOOLS.filter((id) => builders[id]);
 			const active = shown.includes(state.tool) ? state.tool : shown[0];

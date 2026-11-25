@@ -1428,7 +1428,13 @@ section per common task: compare two layouts, rank on a metric, read the
 Pareto frontier, see where a cost comes from, find the words behind a bad
 pair, blend corpora, share a view. Static text through `layout_analysis.help.*`
 in every locale, its prose kept under 80 characters a line; no filter or
-layout frame applies to it.
+layout frame applies to it. The editor and the Optimiser have theirs too: the
+editor's last tool, « Help » (`HELP_TOPICS` of `editor_page.js`, start, change
+a key, layers, undo, versions, the live score, save, use the layout), and a
+folded card under the Optimiser's header (`#lo-help`, its heading the
+disclosure's label: corpus and start, what may move, run, read the result, use
+it, compare with what exists). Their texts quote each locale's own button
+labels, so a renamed button and its help agree.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser

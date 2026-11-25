@@ -4449,6 +4449,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioViews.exercisePanelWords(browser, origin);
 		await studioViews.exerciseFrameEverywhere(browser, origin);
 		await studioViews.exerciseHelp(browser, origin);
+		await studioViews.exerciseEditorOptimizerHelp(browser, origin);
 		await studioUx.exerciseWorstNgrams(browser, origin);
 		await studioUx.exerciseBestSwaps(browser, origin);
 		await studioUx.exerciseBestCycles(browser, origin);

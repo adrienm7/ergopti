@@ -500,6 +500,31 @@ body:has(> main.layout-optimizer) {
 	font-weight: 600;
 }
 
+/* The task help: one folded card under the header, its heading the
+   disclosure's label, its prose kept under 80 characters a line. */
+.lo-help {
+	margin-bottom: var(--lo-space-4);
+}
+
+.lo-help > summary {
+	cursor: pointer;
+}
+
+.lo-help > summary > h2 {
+	display: inline;
+	font-size: 1.1em;
+	margin: 0;
+}
+
+.lo-help p {
+	max-width: 66ch;
+}
+
+.lo-help h3 {
+	font-size: 1em;
+	margin: var(--lo-space-3) 0 var(--lo-space-1);
+}
+
 .lo-run-buttons .lo-primary {
 	flex: 1 1 auto;
 	min-height: 40px;
