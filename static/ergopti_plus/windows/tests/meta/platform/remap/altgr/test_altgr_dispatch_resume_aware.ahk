@@ -27,11 +27,12 @@
 ;    quit), not just pass a native keystroke through.
 ;
 ; This test asserts:
-;   1. _ScriptAltGrChordDebounce uses a per-slot map keyed on Slot.
-;   2. The debounce check appears before the action call in _ScriptAltGrDispatch.
-;   3. A HotIf predicate combining A_IsSuspended and SC138 state is registered.
+;   1. A HotIf predicate combining A_IsSuspended and SC138 state is registered.
+;   2. _ScriptAltGrDispatch never reads A_IsSuspended.
 ;
-; SCOPE: source introspection of infra/script_altgr_hotkeys.ahk.
+; SCOPE: source introspection of infra/script_altgr_hotkeys.ahk. Invariant A
+; and the debounce-before-action order run against the real functions in
+; tests/unit/platform/remap/altgr/test_altgr_chord_debounce.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,57 +40,11 @@
 
 
 
-; ====================================================
-; ====================================================
-; ======= 1/ Source scan helpers =====================
-; ====================================================
-; ====================================================
-
-_ADRA_ReadSource() {
-	return _DriverDirsConcat("infra", "hotstrings/engine", "diagnostics/engine/reports", "diagnostics/engine/field_run", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
-}
-
-
 ; ===================================================
 ; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
-
-_ADRA_ChordDebouncePerSlotMap() {
-	Src := _ADRA_ReadSource()
-	Assert(Src != "", "infra/ source must be readable")
-
-	Body := _DriverFuncBody("_ScriptAltGrChordDebounce")
-	Assert(Body != "", "_ScriptAltGrChordDebounce must be defined in infra/script_altgr_hotkeys.ahk")
-
-	; Must use a static Map to track the last fire time per slot
-	Assert(InStr(Body, "static last := Map()") > 0,
-		"_ScriptAltGrChordDebounce must use a 'static last := Map()' keyed by Slot — a single shared timestamp would falsely debounce different chords that fire in quick succession on separate keys")
-}
-
-Test("script_altgr: _ScriptAltGrChordDebounce uses per-slot static Map (altgr-dispatch-resume-aware)",
-	_ADRA_ChordDebouncePerSlotMap)
-
-
-_ADRA_DebounceBeforeAction() {
-	Body := _DriverFuncBody("_ScriptAltGrDispatch")
-	Assert(Body != "", "_ScriptAltGrDispatch must be defined — prerequisite for this test")
-
-	DebouncePos := InStr(Body, "_ScriptAltGrChordDebounce(Slot)")
-	ActionPos   := InStr(Body, "RunScriptShortcutAction(Slot)")
-
-	Assert(DebouncePos > 0,
-		"_ScriptAltGrDispatch must call _ScriptAltGrChordDebounce(Slot) — the debounce guard prevents rapid re-fire across a suspend/resume boundary")
-	Assert(ActionPos > 0,
-		"_ScriptAltGrDispatch must call RunScriptShortcutAction(Slot)")
-	Assert(DebouncePos < ActionPos,
-		"_ScriptAltGrChordDebounce must run BEFORE RunScriptShortcutAction in _ScriptAltGrDispatch — the debounce check is what prevents a chord completed just before a suspend/resume toggle from replaying the action on the fresh thread spawned after resume")
-}
-
-Test("script_altgr: chord debounce check runs before the action call (altgr-dispatch-resume-aware)",
-	_ADRA_DebounceBeforeAction)
-
 
 _ADRA_SuspendedHotIfBlockRegistered() {
 	; The registrar registers the plan's rows; the paused twin's criterion is
