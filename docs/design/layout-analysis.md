@@ -249,6 +249,20 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   those without a thumb key (`trigrams`, `trigramsNoThumbs`); the « all »
   share of each scored class is `analyse()`'s metric. A second table under the
   movements shows them.
+- Movement percentiles (2026-11-25, an idea seen in the Layouts Wiki
+  playground, whose views give each value its percentile). « Place among the
+  library », in « One layout », measures `movementTable` for every complete
+  library layout of the comparison (the user's own left out, at least
+  `PERCENTILE_MIN_REFERENCES`), one layout per slice of the page's thread so
+  it keeps answering (20 to 60 ms a layout on a large corpus, a status line
+  counting them); then each movement and rhythm cell carries a percentile
+  chip. `rankAmong(better, references)` places a value (the core of
+  `percentiles`, which keeps it for the metrics), `movementBetter(id)` gives
+  each class its direction: the metric's, else `MOVEMENT_BETTER` (a
+  discordant row change and a same-finger end are costs; a row change as such
+  and a concordant one are neither, and their chip is neutral: « higher than »
+  instead of « better than », in the text colour). Shown, never scored; a new
+  comparison or new weights drop the chips until the next request.
 - `wordsWithKeys(layout, words, codes, {keyboard?, profile?, limit?})` →
   `{words, occurrences}`: the words of a word table whose key stream (each
   character its cheapest way, the ways compiled once) holds the given two or

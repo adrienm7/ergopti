@@ -31,6 +31,11 @@
  *    same pair in « One layout ».
  * 9. Help: the « Help » tab names each task in a titled section, without the
  *    filters or the layout frame.
+ * 11. Movement percentiles: « Place among the library » measures the
+ *    library's complete layouts on request, the status says how far it is,
+ *    and then every movement and rhythm cell carries its percentile chip,
+ *    neutral for a class with no better way; a comparison of too few layouts
+ *    says so in words.
  * 10. Help in the editor and the Optimiser: the editor's last tool, « Help »,
  *    and the Optimiser's folded help under its header name each task in a
  *    titled section, the Optimiser's opened from the keyboard.
@@ -425,7 +430,56 @@ async function exerciseEditorOptimizerHelp(browser, origin) {
 	await context.close();
 }
 
+async function exerciseMovementPercentiles(browser, origin) {
+	const few = await openComparer(browser, origin, `layouts=${LAYOUTS}&details=azerty`);
+	await few.page.click('#la-movement-name');
+	await few.page.click('#la-movement-rank');
+	assert.match(
+		await few.page.textContent('#la-movement-rank-status'),
+		/^This comparison holds only \d+\s+complete library layouts/,
+		'percentiles: too few references said in words'
+	);
+	assert.deepEqual(few.errors, []);
+	await few.context.close();
+	const { context, page, errors } = await openComparer(browser, origin, 'details=azerty');
+	await page.click('#la-movement-name');
+	assert.equal(
+		await page.locator('#la-movement .la-pct').count(),
+		0,
+		'percentiles: on request only'
+	);
+	await page.click('#la-movement-rank');
+	await page.waitForFunction(
+		() => /^Each cell carries/.test(document.getElementById('la-movement-rank-status').textContent),
+		null,
+		{ timeout: 120000 }
+	);
+	const rows = await page.$$eval('#la-movement tbody tr', (trs) =>
+		trs.map((tr) =>
+			[...tr.querySelectorAll('td')].map((td) => td.querySelector('.la-pct') !== null)
+		)
+	);
+	assert.ok(
+		rows.length > 0 && rows.every((cells) => cells.every(Boolean)),
+		'percentiles: every movement cell'
+	);
+	assert.ok(
+		(await page.locator('#la-rhythm tbody .la-pct').count()) === 8 * 2,
+		'percentiles: every rhythm cell'
+	);
+	const neutral = page.locator('#la-movement .la-pct-neutral').first();
+	assert.match(
+		await neutral.getAttribute('aria-label'),
+		/^P\d+, Percentile \d+\s+on .*: higher than/
+	);
+	const chip = page.locator('#la-movement .la-pct:not(.la-pct-neutral)').first();
+	assert.match(await chip.getAttribute('aria-label'), /^P\d+, Percentile \d+\s+on .*: better than/);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseMovementPercentiles,
 	exerciseEditorOptimizerHelp,
 	exerciseHelp,
 	exerciseFrameEverywhere,

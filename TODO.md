@@ -310,9 +310,8 @@ waits for the maintainer's review).
       (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
       »; (4) saved layout versions in the editor beside undo (done: the editor's « Versions » tool, named snapshots kept
       in the workspace, compared key by key and restored as one undoable step); (5) task help (done: the Comparer's « Help » tab, the
-      editor's « Help » tool and the Optimiser's folded help); (6) the movement cells' percentiles among the compared layouts (done: row changes
-      concordant and discordant, the trigram rhythm with same-finger ends, all and without thumbs; `movementTable` costs
-      20 to 60 ms a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (8)
+      editor's « Help » tool and the Optimiser's folded help); (6) the movement cells' percentiles (done: « Place among the library » in « One layout »
+      measures the library on request, one layout per slice, then every movement and rhythm cell carries its chip); (8)
       Kawalyzer's « Clever Keys » (context outputs) with item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)

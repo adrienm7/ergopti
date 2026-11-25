@@ -128,3 +128,9 @@ button.la-pct {
 	padding: 0 6px;
 	vertical-align: middle;
 }
+
+/* A class with no better direction (a row change): the value's rank only,
+   framed in the text colour, no verdict colour. */
+button.la-pct.la-pct-neutral {
+	--la-pct-colour: var(--theme-text);
+}
