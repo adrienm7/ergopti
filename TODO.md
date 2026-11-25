@@ -220,7 +220,7 @@ analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-an
 waits for the maintainer's review).
 
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 75 of the 91 files left out for its keys came in, the library holds 793 layouts
+      model »): 75 of the 91 files left out for its keys came in, the library holds 806 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
       board-only codes, the Shift keys and AltGr's key read as QMK's mod-tap (`docs/design/layout-analysis.md`,
       « ErgoDox keys »; the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Since
@@ -234,7 +234,16 @@ waits for the maintainer's review).
       (Klausler « Kaimakides »: deskthority's « Keyboard layouts » page names neither; CarpalxQ and QWERTY Wide Mod
       « Dave Ferree »: the CarpalxQ post, « jumpedthesynapse » 2007-07, names no author and credits Martin Krzywinski
       for « 75-85% of this layout »; Arensito, KLA's « Dave Ferree », at Håkon Hallingstad's pvv.ntnu.no page,
-      which answered 502 on 2026-11-24). Neo 2 is credited from neo-layout.org's history since 2026-11-24.
+      which answered 502 on 2026-11-24). Neo 2 is credited from neo-layout.org's history since 2026-11-24. The
+      Ergo-L family's credits were read again on 2026-11-25 (Erglace (Nuke) is Nuclear-Squid's, from ergol.org's
+      Erglace page); Kazerty stays « knowledge » (Fabien Cazenave): its file names no author, and only the commit
+      that added it (Nuclear-Squid/ergol #379) is his.
+- [ ] **[LATER] Ergo-L family, what is left (2026-11-25).** The family is re-encoded from its upstreams by
+      `tools/build/import-kalamine-layouts.cjs` (report section 13, inventory table). Left, each needing a source:
+      Wismill's Erglace with the 1DK under a thumb (ergol.org names it, no file found), Hypergol (a Kanata and QMK
+      configuration with combos and a magic key, no letter layout file), Adextre from its author (adextre.fr answered
+      403; the library holds KLAnext's ErgoDox copy), and a French Engram (none found). Rerun the import when
+      cmoinard/Erglace or the Ergo-L repository publishes a new version: bump the commit and SHA-256 in `LAYOUTS`.
 - [ ] **[LATER] More Leipzig languages.** Google Books' French, English, German, Spanish and Italian 1-grams ship
       (`static/corpus/frequency/google_books`, pinned in `static/corpus/count_table_sources.json`). Left: Portuguese
       and Dutch (Leipzig `por_wikipedia_2021_1M` and `nld_wikipedia_2021_1M`, Google Books has no Dutch export) need
@@ -610,6 +619,18 @@ Each question names the default kept meanwhile; an answer moves into the item or
       reproduced: its score is a fitted model over a per-context fingering search, documented by its configuration
       only and refitted twice in the week read (same document, « Not covered »); to revisit once a release
       documents its score.
+- [ ] **Which Ergo-L family versions the library keeps (decided by the agent on 2026-11-25, to review by the
+      maintainer).** Kept: each version an upstream releases, tags or archives itself (the Ergo-L repository's
+      `layouts/ergolv0*.json` and `0_7_0/` of its v0.7 release candidate, cmoinard's `Historique/`, Lysquid's tags,
+      the Ergo-L repository's earlier contrib files Optergol, Ergopti 2.1.2 (1DK) and HyperTexte 1DFH), when its
+      letters and digits differ from a later one; a version with the same letters is listed in `not_imported`. Left
+      out: files of the Ergo-L `dev` branch only (Bépo42, Colemak-Lafayette, OptimoL), drafts superseded before a
+      release (Ergaie 0.1.0) and the repositories' experiments (Ergoléo, Ergolak, Ergaie's `prototypes/`). The
+      newest version keeps the layout's id and name (« Erglace (JF) » is now 0.6.19; 0.6.17 became
+      `erglace_jf_0_6_17`). The Kalamine rules entering another dead key are kept (1DK twice → ë), which moved the
+      golden values of the eight Kalamine layouts held before. The other choice is to keep only the latest version
+      of each layout.
+
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
       are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script
