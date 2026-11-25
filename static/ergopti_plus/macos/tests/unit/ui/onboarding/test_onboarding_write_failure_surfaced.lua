@@ -18,6 +18,16 @@
 local helpers = require("tests.helpers")
 local with_finish = require("tests.support.onboarding_finish_fixture").with_finish
 
+-- The handwritten configuration images carry the registry's current version:
+-- stamped below it, the Finish handler would upgrade them first, and a new
+-- config step would silently change what each scenario publishes.
+local CURRENT_META
+do
+	local Migrate = require("settings.engine.migration.migrate")
+	local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
+	CURRENT_META = "[_meta]\nschema_version = " .. tostring(registry.current) .. "\n"
+end
+
 -- A valid finish payload whose rows reach the writer.
 local ANSWERS = {
 	locale = "en",
@@ -148,8 +158,8 @@ end)
 --- Drives the real Finish handler with generic exact-byte publication effects.
 --- The controlled prepare installs no native configuration admission journal.
 local function with_published_boundary(scenario)
-	local before = '[_meta]\nschema_version = 23\n[llm]\nenabled = false\n'
-	local candidate = '[_meta]\nschema_version = 23\n[llm]\nenabled = true\n'
+	local before = CURRENT_META .. '[llm]\nenabled = false\n'
+	local candidate = CURRENT_META .. '[llm]\nenabled = true\n'
 	local f = { bytes = before, writes = 0, cleanups = 0, inverses = 0,
 		inverse_cleanups = 0, settled = false }
 	local function inverse(path, content, expected, _, admission)
@@ -212,7 +222,7 @@ helpers.describe("macOS wizard generic publication compensation at actual Finish
 
 	helpers.it("keeps the original publication owner across reopen and an unrelated successor", function()
 		with_published_boundary(function(f)
-			local foreign = '[_meta]\nschema_version = 23\n[llm]\nenabled = false\n# external successor\n'
+			local foreign = CURRENT_META .. '[llm]\nenabled = false\n# external successor\n'
 			f.bytes, f.settled = foreign, true
 			helpers.assert_eq(f.onboarding.run("/virtual/another-destination.toml"), false)
 			f.state.finish(ANSWERS)
@@ -257,7 +267,7 @@ local function with_canonical_finish(scenario, fresh_writer_after_inverse)
 		local temporary = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
 		local path = temporary:gsub("[/\\]+$", "") .. "/ergopti_wizard_native_"
 			.. tostring(os.time()) .. "_" .. tostring({}):gsub("[^%w]", "") .. ".toml"
-		local before = '# native Finish original\n[_meta]\nschema_version = 23\n[llm]\nenabled = false\n[future]\nkeep = "owned by another feature"\n'
+		local before = '# native Finish original\n' .. CURRENT_META .. '[llm]\nenabled = false\n[future]\nkeep = "owned by another feature"\n'
 		local created = assert(io.open(path, "w")); assert(created:write(before)); assert(created:close())
 		local f = { path = path, before = before, unlocks = 0, close_refusals = 0, refuse_unlock = false }
 		local adapter = physical.make_adapter(nil, nil, nil, nil, nil, function()
