@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"command_owner_sha256": "5d51f401368392ae01c4274ae8236df7e7a66755822adee8cc9d758e74748ba9",
+	"command_owner_sha256": "d2df8d4ad2333d33432efc66c0f8d975bfbea20c7c3ef4d5c82e1ca929744e50",
 	"modern": {
 		"authority": "official_upstream_github_release_asset_digest",
 		"api_url": "https://api.github.com/repos/curl/curl/releases/tags/curl-8_14_1",
