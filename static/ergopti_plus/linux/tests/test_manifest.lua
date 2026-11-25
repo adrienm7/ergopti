@@ -72,6 +72,7 @@ return {
 	"tests.unit.settings.test_shared_timings",
 	"tests.unit.settings.test_byte_limits",
 	"tests.unit.settings.test_value_check_vectors",
+	"tests.unit.modules.shortcuts.test_workflow_model",
 	"tests.unit.settings.test_shared_manifest_reader",
 	"tests.unit.diagnostics.engine.control.test_driver_control",
 	"tests.unit.diagnostics.engine.control.test_field_run",

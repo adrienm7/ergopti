@@ -1,0 +1,1467 @@
+{
+	"$description": "Workflow runs every interpreter replays: the shared Lua state machine (_shared/tests/lua/workflows/workflow_interpreter_contract.lua, macOS and Linux) and the AutoHotkey port. A replay calls next(), checks the effect (its deadline is `deadline_ms`) against `effects` in order (only the keys a vector lists; null means the key is absent), answers it with `results` in order (default { ok = true }), or aborts when `abort_at` effects were seen, then checks the final outcome. `@digest` stands for the workflow's own shell digest. `limits` are merged over steps.json's; `timeouts` stand for the registry values.",
+	"timeouts": {
+		"step_timeout_ms": 1000,
+		"screen_step_timeout_ms": 2000,
+		"shell_timeout_ms": 3000
+	},
+	"vectors": [
+		{
+			"id": "linear_sequence",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "type_text",
+						"text": "Hi"
+					},
+					{
+						"kind": "send_keys",
+						"combo": "ctrl+a"
+					},
+					{
+						"kind": "wait",
+						"duration_ms": 500
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "type_text",
+					"path": "1",
+					"text": "Hi",
+					"deadline_ms": 1000
+				},
+				{
+					"op": "send_keys",
+					"path": "2",
+					"combo": "ctrl+a",
+					"deadline_ms": 1000
+				},
+				{
+					"op": "wait",
+					"path": "3",
+					"duration_ms": 500,
+					"deadline_ms": 1500
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "variable_from_step_output",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "clipboard_get",
+						"into": "c"
+					},
+					{
+						"kind": "type_text",
+						"text": "x{{c}}y"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": "abc"
+				}
+			],
+			"effects": [
+				{
+					"op": "clipboard_get",
+					"path": "1"
+				},
+				{
+					"op": "type_text",
+					"path": "2",
+					"text": "xabcy"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "set_variable_then_placeholder",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "n",
+						"value": "Ada"
+					},
+					{
+						"kind": "notify",
+						"text": "Hello {{n}}"
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2",
+					"text": "Hello Ada"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "unknown_variable_stops_before_the_effect",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "wait",
+						"duration_ms": 1
+					},
+					{
+						"kind": "type_text",
+						"text": "{{nope}}"
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "wait",
+					"path": "1"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "unknown_variable",
+				"path": "2",
+				"kind": "type_text"
+			}
+		},
+		{
+			"id": "failure_names_the_step",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "open",
+						"target_kind": "file",
+						"value": "/missing"
+					},
+					{
+						"kind": "notify",
+						"text": "never"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": false,
+					"reason": "timeout"
+				}
+			],
+			"effects": [
+				{
+					"op": "open",
+					"path": "1",
+					"target_kind": "file",
+					"value": "/missing"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "timeout",
+				"path": "1",
+				"kind": "open"
+			}
+		},
+		{
+			"id": "failure_without_reason_is_step_failed",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "focus_app",
+						"app": "Code"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": false
+				}
+			],
+			"effects": [
+				{
+					"op": "focus_app",
+					"path": "1"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "step_failed",
+				"path": "1",
+				"kind": "focus_app"
+			}
+		},
+		{
+			"id": "if_visible_takes_then",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "if",
+						"condition": {
+							"type": "visible",
+							"target": {
+								"type": "text",
+								"text": "OK"
+							}
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "yes"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "no"
+							}
+						]
+					},
+					{
+						"kind": "wait",
+						"duration_ms": 0
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": true
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "1",
+					"condition": {
+						"type": "visible",
+						"target": {
+							"type": "text",
+							"text": "OK"
+						}
+					},
+					"deadline_ms": 2000
+				},
+				{
+					"op": "notify",
+					"path": "1.then.1",
+					"text": "yes"
+				},
+				{
+					"op": "wait",
+					"path": "2"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_false_takes_else",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "if",
+						"condition": {
+							"type": "app_front",
+							"app": "Code"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "yes"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "no"
+							}
+						]
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": false
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "1",
+					"condition": {
+						"type": "app_front",
+						"app": "Code"
+					}
+				},
+				{
+					"op": "notify",
+					"path": "1.else.1",
+					"text": "no"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_false_without_else_continues",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "if",
+						"condition": {
+							"type": "app_front",
+							"app": "Code"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "yes"
+							}
+						]
+					},
+					{
+						"kind": "notify",
+						"text": "after"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": false
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "1"
+				},
+				{
+					"op": "notify",
+					"path": "2",
+					"text": "after"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_variable_is_answered_without_a_probe",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "hello world"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "contains",
+							"value": "o w"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "in"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "out"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.then.1",
+					"text": "in"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_variable_equals_then",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "abc"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "equals",
+							"value": "abc"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.then.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_variable_equals_else",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "abc"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "equals",
+							"value": "ab"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.else.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_variable_starts_with_then",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "abc"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "starts_with",
+							"value": "ab"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.then.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_variable_starts_with_else",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "abc"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "starts_with",
+							"value": "bc"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.else.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_unset_variable_is_empty",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "z",
+							"op": "empty"
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "1.then.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_contains_is_literal",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "a.c"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "contains",
+							"value": "."
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					},
+					{
+						"kind": "set_variable",
+						"name": "s",
+						"value": "abc"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "variable",
+							"variable": "s",
+							"op": "contains",
+							"value": "."
+						},
+						"then": [
+							{
+								"kind": "notify",
+								"text": "t"
+							}
+						],
+						"else": [
+							{
+								"kind": "notify",
+								"text": "e"
+							}
+						]
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "2.then.1"
+				},
+				{
+					"op": "notify",
+					"path": "4.else.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "if_clipboard_is_probed_with_expanded_value",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "w",
+						"value": "key"
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "matches",
+							"source": "clipboard",
+							"op": "equals",
+							"value": "{{w}}"
+						},
+						"then": []
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": true
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "2",
+					"condition": {
+						"type": "matches",
+						"source": "clipboard",
+						"op": "equals",
+						"value": "key"
+					}
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "repeat_runs_its_body_n_times",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "repeat",
+						"count": 3,
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 10
+							}
+						]
+					},
+					{
+						"kind": "notify",
+						"text": "end"
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "notify",
+					"path": "2"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "nested_repeat_and_if",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "repeat",
+						"count": 2,
+						"steps": [
+							{
+								"kind": "if",
+								"condition": {
+									"type": "app_front",
+									"app": "A"
+								},
+								"then": [
+									{
+										"kind": "repeat",
+										"count": 2,
+										"steps": [
+											{
+												"kind": "wait",
+												"duration_ms": 1
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": true
+				},
+				{
+					"ok": true
+				},
+				{
+					"ok": true
+				},
+				{
+					"ok": true,
+					"value": false
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1.then.1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1.then.1.1"
+				},
+				{
+					"op": "probe",
+					"path": "1.1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "empty_repeat_and_branches_are_skipped",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "repeat",
+						"count": 5,
+						"steps": []
+					},
+					{
+						"kind": "if",
+						"condition": {
+							"type": "app_front",
+							"app": "A"
+						},
+						"then": []
+					},
+					{
+						"kind": "notify",
+						"text": "n"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": true
+				}
+			],
+			"effects": [
+				{
+					"op": "probe",
+					"path": "2"
+				},
+				{
+					"op": "notify",
+					"path": "3"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "run_steps_max_bounds_a_long_run",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "repeat",
+						"count": 1000,
+						"steps": [
+							{
+								"kind": "wait",
+								"duration_ms": 0
+							}
+						]
+					}
+				]
+			},
+			"limits": {
+				"run_steps_max": 5
+			},
+			"effects": [
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1"
+				},
+				{
+					"op": "wait",
+					"path": "1.1"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "too_many_steps",
+				"path": "1.1",
+				"kind": "wait"
+			}
+		},
+		{
+			"id": "wait_for_deadline_adds_its_timeout",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "wait_for",
+						"target": {
+							"type": "text",
+							"text": "{{t}}"
+						},
+						"timeout_ms": 3000
+					}
+				]
+			},
+			"variables": {
+				"t": "Save"
+			},
+			"effects": [
+				{
+					"op": "wait_for",
+					"path": "1",
+					"target": {
+						"type": "text",
+						"text": "Save"
+					},
+					"deadline_ms": 5000,
+					"timeout_ms": 3000
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "click_target_image_keeps_its_reference",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "click_target",
+						"target": {
+							"type": "image",
+							"image": "b"
+						},
+						"button": "right"
+					}
+				],
+				"images": {
+					"b": "iVBORw0KGgoAAAA="
+				}
+			},
+			"effects": [
+				{
+					"op": "click_target",
+					"path": "1",
+					"target": {
+						"type": "image",
+						"image": "b"
+					},
+					"button": "right",
+					"deadline_ms": 2000
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "note_is_not_an_effect_field",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "wait",
+						"duration_ms": 1,
+						"note": "pause"
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "wait",
+					"path": "1",
+					"note": null
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "shell_asks_once_then_runs_with_variables",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"approved_now": true,
+			"results": [
+				{
+					"ok": true,
+					"value": true
+				},
+				{
+					"ok": true,
+					"value": "done"
+				},
+				{
+					"ok": true
+				}
+			],
+			"effects": [
+				{
+					"op": "confirm_shell",
+					"path": "2",
+					"digest": "@digest",
+					"commands": ["echo $ERGOPTI_X"]
+				},
+				{
+					"op": "shell",
+					"path": "2",
+					"command": "echo $ERGOPTI_X",
+					"environment": {
+						"v": "1"
+					},
+					"deadline_ms": 3000
+				},
+				{
+					"op": "type_text",
+					"path": "3",
+					"text": "done"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "shell_declined_stops",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"results": [
+				{
+					"ok": true,
+					"value": false
+				}
+			],
+			"effects": [
+				{
+					"op": "confirm_shell",
+					"path": "2"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "shell_declined",
+				"path": "2",
+				"kind": "shell"
+			}
+		},
+		{
+			"id": "shell_already_approved_runs_directly",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"approved_digest": "@digest",
+			"approved_now": false,
+			"results": [
+				{
+					"ok": true,
+					"value": "x"
+				},
+				{
+					"ok": true
+				}
+			],
+			"effects": [
+				{
+					"op": "shell",
+					"path": "2"
+				},
+				{
+					"op": "type_text",
+					"path": "3"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "shell_stale_approval_asks_again",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"approved_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+			"results": [
+				{
+					"ok": true,
+					"value": false
+				}
+			],
+			"effects": [
+				{
+					"op": "confirm_shell",
+					"path": "2"
+				}
+			],
+			"expected": {
+				"op": "failed",
+				"reason": "shell_declined",
+				"path": "2",
+				"kind": "shell"
+			}
+		},
+		{
+			"id": "imported_shell_without_approval_is_refused",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "import",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"effects": [],
+			"expected": {
+				"op": "failed",
+				"reason": "shell_not_approved",
+				"path": "2",
+				"kind": "shell"
+			}
+		},
+		{
+			"id": "imported_shell_approved_in_the_editor_runs",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "import",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "1"
+					},
+					{
+						"kind": "shell",
+						"command": "echo $ERGOPTI_X",
+						"into": "out"
+					},
+					{
+						"kind": "type_text",
+						"text": "{{out}}"
+					}
+				]
+			},
+			"approved_digest": "@digest",
+			"results": [
+				{
+					"ok": true,
+					"value": "x"
+				},
+				{
+					"ok": true
+				}
+			],
+			"effects": [
+				{
+					"op": "shell",
+					"path": "2"
+				},
+				{
+					"op": "type_text",
+					"path": "3"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "imported_without_shell_runs",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "import",
+				"steps": [
+					{
+						"kind": "notify",
+						"text": "n"
+					}
+				]
+			},
+			"effects": [
+				{
+					"op": "notify",
+					"path": "1"
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "shell_command_takes_no_placeholder",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "set_variable",
+						"name": "v",
+						"value": "; rm -rf ~"
+					},
+					{
+						"kind": "shell",
+						"command": "echo {{v}}"
+					}
+				]
+			},
+			"approved_digest": "@digest",
+			"effects": [
+				{
+					"op": "shell",
+					"path": "2",
+					"command": "echo {{v}}",
+					"environment": {
+						"v": "; rm -rf ~"
+					}
+				}
+			],
+			"expected": {
+				"op": "done"
+			}
+		},
+		{
+			"id": "abort_stops_at_the_pending_step",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": [
+					{
+						"kind": "wait",
+						"duration_ms": 1
+					},
+					{
+						"kind": "wait",
+						"duration_ms": 10000
+					},
+					{
+						"kind": "notify",
+						"text": "never"
+					}
+				]
+			},
+			"abort_at": 2,
+			"effects": [
+				{
+					"op": "wait",
+					"path": "1"
+				},
+				{
+					"op": "wait",
+					"path": "2"
+				}
+			],
+			"expected": {
+				"op": "aborted",
+				"reason": "aborted",
+				"path": "2",
+				"kind": "wait"
+			}
+		},
+		{
+			"id": "empty_workflow_is_done",
+			"workflow": {
+				"id": "wf_1",
+				"name": "Test",
+				"origin": "local",
+				"steps": []
+			},
+			"effects": [],
+			"expected": {
+				"op": "done"
+			}
+		}
+	]
+}
