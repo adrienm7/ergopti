@@ -326,7 +326,7 @@ class WorkflowRunner {
 		global WORKFLOW_LOG
 		Id := Workflow["id"]
 		if this.Running.Has(Id) {
-			LoggerInfo(WORKFLOW_LOG, "Workflow {1} is already running; the new trigger is ignored.", Id)
+			LoggerInfo(WORKFLOW_LOG, "Workflow {1} is already running; the new start is ignored.", Id)
 			return false
 		}
 		LoggerStart(WORKFLOW_LOG, "Running workflow {1}…", Id)
@@ -460,7 +460,7 @@ class WorkflowOwner {
 			return false
 		}
 		if this.Runner.IsRunning(Id) {
-			LoggerInfo(WORKFLOW_LOG, "Workflow {1} is already running; this trigger is ignored.", Id)
+			LoggerInfo(WORKFLOW_LOG, "Workflow {1} is already running; this start is ignored.", Id)
 			return false
 		}
 		return this.Begin(Workflow, Listener)
