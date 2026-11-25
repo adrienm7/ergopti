@@ -637,6 +637,14 @@ The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
+      maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
+      nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
+      every control, which changes the look of every window and can overflow the windows of a fixed size
+      (`apps.manifest.json`) on each OS. Kept meanwhile: the sizes as they are, held by the ratchet. Choose:
+  1. **(recommended) A 44 px minimum in `theme.css` for every app window and in the site's stylesheet**, then the
+     fixed window sizes raised where a window overflows, with a look at each window on the three OS.
+  2. Raise the size one window at a time as each is next reworked.
 - [ ] **Recent log lines in the bug report (decided by the agent on 2026-11-24, to review by the maintainer).** The
       request of 2026-11-24 asked for the « recent log lines »; the closed sharing policy carries only recognised
       error codes and counts (`project-shared-export-schema-is-closed`), because a raw line can hold typed text, a
