@@ -120,6 +120,16 @@ helpers.describe("pointer metrics: what one evdev report adds", function()
 		helpers.assert_eq(availability.reason, "platform_reason.pointer_distance_needs_cursor_position")
 	end)
 
+	helpers.it("pointer-distance-unbound: an unbound tracker names a localized reason", function()
+		-- The menu localizes the reason; the unbound fallback was raw English
+		-- text, shown verbatim in the Metrics submenu of a field tray.
+		local reason = PointerMetrics.new().availability().reason
+		helpers.assert_eq(reason, "platform_reason.pointer_distance_needs_cursor_position")
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
+		local locale = file:read("*a"); file:close()
+		helpers.assert_contains(locale, '"' .. reason .. '"')
+	end)
+
 	helpers.it("refuses a kind the hook does not report", function()
 		local tracker = PointerMetrics.new()
 		helpers.assert_eq(pcall(tracker.observe, "release", EvdevCodes.BTN_LEFT, 0), false)

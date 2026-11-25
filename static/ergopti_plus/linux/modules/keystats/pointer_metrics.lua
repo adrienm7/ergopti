@@ -223,7 +223,10 @@ function M.new()
 	--- @return table { measured = boolean, unit = "px"|nil, reason = string|nil }
 	function tracker.availability()
 		if position.read then return { measured = true, unit = "px" } end
-		return { measured = false, reason = position.reason or "no cursor position source" }
+		-- The menu localizes every reason, so an unbound tracker names an i18n
+		-- key too: raw text showed verbatim in the Metrics submenu.
+		return { measured = false,
+			reason = position.reason or "platform_reason.pointer_distance_needs_cursor_position" }
 	end
 
 	--- The screen distance since the previous cursor read, when one is due.
