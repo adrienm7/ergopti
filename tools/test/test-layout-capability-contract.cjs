@@ -418,7 +418,7 @@ const STUDIO_MESSAGES = [
 
 // layout_menu rows by capability; a row with platforms must carry a reason for the others.
 const MENU_ROWS = {
-	install: ['layout_manager', 'layout_bundle', 'layout_system_install'],
+	install: ['layout_manager', 'layout_user_install', 'layout_bundle', 'layout_system_install'],
 	switch: ['active_layouts', 'layout_switching'],
 	emulate: ['layout_emulation'],
 	tune: [

@@ -656,6 +656,22 @@
 		}
 	},
 	{
+		"path": "layout_menu.layout_user_install",
+		"visibility": "hide",
+		"labels": { "fr": "layout_user_install", "en": "layout_user_install" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			},
+			"macos": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			}
+		}
+	},
+	{
 		"path": "layout_menu.layout_bundle",
 		"visibility": "hide",
 		"labels": { "fr": "layout_bundle", "en": "layout_bundle" },
@@ -1258,6 +1274,57 @@
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Chaque pilote lit le pavé tactile par une pile différente — Windows par son API de pavé de précision, macOS par les événements de gestes de Hammerspoon, Linux par evdev — les emplacements que chacun peut offrir, et la configuration que chacun demande, lui sont donc propres."
+			}
+		}
+	},
+	{
+		"path": "layout_user_install_commands.user_layout_install",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Installer et activer la disposition Ergopti",
+			"en": "Install and activate the Ergopti layout"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			},
+			"macos": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			}
+		}
+	},
+	{
+		"path": "layout_user_installed_commands.user_layout_activate",
+		"visibility": "hide",
+		"labels": { "fr": "Activer la disposition Ergopti", "en": "Activate the Ergopti layout" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			},
+			"macos": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			}
+		}
+	},
+	{
+		"path": "layout_user_installed_commands.user_layout_uninstall",
+		"visibility": "hide",
+		"labels": { "fr": "Désinstaller la disposition Ergopti", "en": "Uninstall the Ergopti layout" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
+			},
+			"macos": {
+				"en": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+				"fr": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu."
 			}
 		}
 	},

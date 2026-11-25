@@ -198,6 +198,11 @@ local function _build_layouts(ctx)
 			switch = ctx.pause_layout,
 		})
 	end
+	-- Install and activate Ergopti, or activate or uninstall it, without the
+	-- layout manager window, whose toolkit a system can lack.
+	providers["layout_user_install"] = function()
+		return require("ui.layout_manager.tray_actions").rows()
+	end
 	-- How far GTK 3 applications compose the installed layouts' sequences.
 	providers["compose_input_method"] = function()
 		return require("menu.ui.compose_input_method_row").rows({ t = i18n_safe })

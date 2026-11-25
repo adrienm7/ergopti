@@ -186,6 +186,9 @@ local function carries_extension(snapshot, id)
 	return (type(entry) == "table" and entry.extension ~= nil)
 		or (type(installed) == "table" and installed.extension ~= nil)
 end
+-- The Linux tray's window-less Ergopti rows decide their reload the same way
+-- (linux/ui/layout_manager/tray_actions.lua).
+M.carries_extension = carries_extension
 
 --- Asks the host to reload the driver after a layout's extension changed: the
 --- extension catalogue is read once per boot, so only a reload loads or drops

@@ -931,6 +931,7 @@ return {
 	"tests.unit.diagnostics.ui.test_healthcheck_windowless",
 	"tests.unit.diagnostics.ui.test_runner",
 	"tests.unit.core.ui.editors.test_layout_manager_bridge",
+	"tests.unit.core.ui.editors.test_layout_manager_tray_actions",
 	"tests.unit.core.ui.editors.test_layout_editor_source_store",
 	"tests.unit.menu.llm.test_toggle_row",
 	"tests.unit.menu.llm.test_ai_config_parents",
