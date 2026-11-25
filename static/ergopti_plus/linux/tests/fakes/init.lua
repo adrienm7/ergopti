@@ -184,6 +184,14 @@ function M.evdev_reader(opts)
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
+	function fake.grabbed_paths()
+		local paths = {}
+		for slot in pairs(fake.grabbed) do
+			if fake.open_slots[slot] ~= nil then paths[#paths + 1] = fake.open_slots[slot] end
+		end
+		table.sort(paths)
+		return paths
+	end
 	function fake.pressed_keys(slot, max_code)
 		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
 		return opts.pressed_keys or {}
@@ -585,6 +593,8 @@ function M.clipboard(opts)
 		fake.contents = previous
 		return true
 	end
+	-- The fake always puts the previous contents back: no restore is ever lost.
+	function fake.restore_failures() return 0 end
 	-- The copy probe: the selection, the clipboard left as it was.
 	function fake.read_selection(emit_combo, sleep_ms)
 		if opts.available == false then return false, "", "clipboard unavailable" end

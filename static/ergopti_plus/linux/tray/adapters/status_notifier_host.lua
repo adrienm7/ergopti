@@ -72,6 +72,7 @@ local function bind()
 		void g_variant_unref(void *value);
 		void g_error_free(ErgoptiSniGError *error);
 		void g_object_unref(void *object);
+		const char *g_dbus_connection_get_unique_name(void *connection);
 		typedef struct _XDisplay ErgoptiSniDisplay;
 		ErgoptiSniDisplay *XOpenDisplay(const char *name);
 		int XDefaultScreen(ErgoptiSniDisplay *display);
@@ -184,6 +185,30 @@ end
 -- ======= 3/ Probe =============================
 -- ==============================================
 -- ==============================================
+
+--- The unique name this process holds on the session bus: the shared
+--- connection libayatana exports the tray item and its menu on, which the field
+--- run's tray check reads back from a child process (a call from this process
+--- would wait on the loop that has to answer it).
+--- @return string|nil name ":1.42", nil when the bus cannot be read.
+--- @return string|nil reason
+function M.own_bus_name()
+	local native, reason = bind()
+	if not native then return nil, reason end
+	local ffi, gio = native.ffi, native.gio
+	local slot = ffi.new("ErgoptiSniGError *[1]")
+	local connection = gio.g_bus_get_sync(G_BUS_TYPE_SESSION, nil, slot)
+	if slot[0] ~= nil or connection == nil then
+		local message = slot[0] ~= nil and ffi.string(slot[0].message) or "no connection"
+		if slot[0] ~= nil then gio.g_error_free(slot[0]) end
+		return nil, "session bus unavailable: " .. message
+	end
+	local unique = gio.g_dbus_connection_get_unique_name(connection)
+	local name = unique ~= nil and ffi.string(unique) or nil
+	gio.g_object_unref(connection)
+	if name == nil or name == "" then return nil, "the session bus connection has no unique name" end
+	return name, nil
+end
 
 --- Reads what shows tray icons in this session.
 --- @return table|nil facts { watcher = boolean, host = boolean|nil, xembed = boolean };

@@ -99,6 +99,21 @@ helpers.describe("hook supervisor: an unexpected stop is restarted, never a shut
 		end
 		helpers.assert_eq(restarts, #Supervisor.RESTART_BACKOFF_MS + 2, "stops far apart never exhaust the budget")
 	end)
+
+	helpers.it("hook-supervisor: counts every outage and restart for the field run's session check", function()
+		local supervisor, hook, clock, Supervisor = supervised(function(h) h.running = true; return true end)
+		Supervisor._reset_lifetime_for_test()
+		helpers.assert_eq(Supervisor.lifetime(), { outages = 0, restarts = 0, exhausted = 0 })
+		for _ = 1, 2 do
+			hook.running, hook.stop = false, { deliberate = false, reason = "emergency_stop", detail = "emergency" }
+			helpers.assert_eq(supervisor.poll(), "waiting")
+			clock.now = clock.now + Supervisor.RESTART_BACKOFF_MS[1]
+			helpers.assert_eq(supervisor.poll(), "restarted")
+			helpers.assert_eq(supervisor.poll(), "running", "a running hook is no new outage")
+			clock.now = clock.now + Supervisor.STABLE_RESET_MS
+		end
+		helpers.assert_eq(Supervisor.lifetime(), { outages = 2, restarts = 2, exhausted = 0 })
+	end)
 end)
 
 helpers.describe("hook supervisor: the real hook after a silent retirement", function()
@@ -135,6 +150,10 @@ helpers.describe("hook supervisor: the real hook after a silent retirement", fun
 				helpers.assert_true(s.hook.isRunning(), "capture runs again")
 				helpers.assert_eq(s.hook.last_stop(), nil)
 				helpers.assert_true(s.reader.is_grabbed("keyboard:" .. s.paths.b), "the keyboard is grabbed again")
+				-- The field run's session check lists the grabbed devices by path.
+				local listed = false
+				for _, path in ipairs(s.reader.grabbed_paths()) do listed = listed or path == s.paths.b end
+				helpers.assert_true(listed, "the grabbed keyboard is listed by its path")
 				s.successor = s.writer.capture_output()
 			end)
 			s.writer._set_path_for_test(nil)

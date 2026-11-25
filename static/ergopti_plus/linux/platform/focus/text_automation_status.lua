@@ -259,6 +259,18 @@ function M.summary()
 	return word, tostring(state.reason)
 end
 
+--- The guard's mode and reason as it holds them, for the field run's session
+--- check: "field" (a checked text field), "window" (the window mode) or
+--- "closed", and the reason token.
+--- @return string|nil mode nil when unbound.
+--- @return string|nil reason
+function M.mode()
+	if not _state_reader then return nil end
+	local state = _state_reader()
+	if type(state) ~= "table" or type(state.mode) ~= "string" then return nil end
+	return state.mode, tostring(state.reason)
+end
+
 --- The session's accessibility switch as the focus worker found it.
 --- @return string|nil
 function M.accessibility()

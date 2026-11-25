@@ -601,6 +601,18 @@ function M.is_grabbed(slot)
 	return state(slot).grabbed
 end
 
+--- The paths of every device this process holds under EVIOCGRAB, for the
+--- field run's session check: a touchpad must never be among them.
+--- @return table paths Sorted absolute paths; empty when nothing is grabbed.
+function M.grabbed_paths()
+	local paths = {}
+	for _, entry in pairs(_slots) do
+		if entry.grabbed and entry.fd ~= nil and type(entry.path) == "string" then paths[#paths + 1] = entry.path end
+	end
+	table.sort(paths)
+	return paths
+end
+
 --- @return string|nil The open device path.
 function M.device_path(slot)
 	return state(slot).path
