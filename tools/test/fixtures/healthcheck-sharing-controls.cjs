@@ -108,7 +108,7 @@ exports.run = function run(root) {
 		);
 		for (const canary of facts.canaries) assert.ok(!document.includes(canary), canary);
 		assert.ok(
-			document.includes('lease_watchdog_exit') && document.includes('log_observation_only')
+			document.includes(vector.expected.events[0].code) && document.includes('log_observation_only')
 		);
 		assert.ok(document.includes('excluded_entries'));
 		assert.equal(JSON.stringify(vector.snapshot), original);

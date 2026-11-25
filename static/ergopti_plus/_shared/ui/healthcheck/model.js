@@ -1133,7 +1133,14 @@
 						candidate = numberAt < 0 ? '' : candidate.slice(numberAt);
 					}
 				}
-				if (rule.literal && candidate === rule.literal)
+				if (rule.codes) {
+					// A stable diagnosis code (linux core/ui/engine/component_status):
+					// only a code of the closed list is shared, never the sentence after it.
+					var token = candidate
+						? (candidate.slice(rule.message_prefix.length).match(/^[a-z0-9_]+/) || [''])[0]
+						: '';
+					if (rule.codes.indexOf(token) >= 0) event = { entry_index: index + 1, code: token };
+				} else if (rule.literal && candidate === rule.literal)
 					event = { entry_index: index + 1, code: rule.code };
 				else if (rule.prefix && candidate.startsWith(rule.prefix)) {
 					var value = candidate.slice(rule.prefix.length);
@@ -1365,6 +1372,14 @@
 								shareFacts(event, keys)
 						);
 					});
+					// Why the other lines say nothing: no rule names their code, so
+					// their text, which may be private, stays on this computer
+					if (recent.observed && recent.excluded_entries > 0)
+						lines.push(
+							label('healthcheck.export.recent_errors_unrecognised') +
+								': ' +
+								shareNumber(recent.excluded_entries)
+						);
 				}
 				// The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
 				if (sections.developer && sections.developer.detailed_log === false)

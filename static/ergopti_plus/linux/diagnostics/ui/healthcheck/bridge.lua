@@ -37,12 +37,6 @@ local LoggerSink = require("core.logger.engine.sink")
 
 M.DRIVER = "linux"
 
--- When the daemon started, in seconds. Captured at load rather than read from
--- the process table: /proc/self/stat gives jiffies since boot, which needs the
--- clock tick and the boot time to become an age, and both can be wrong in a
--- container.
-local _started_at = os.time()
-
 -- The daemon parts the developer section checks. The required ones run in
 -- every daemon. The optional ones are loaded by every daemon too, through
 -- RuntimeGuard.optional_require, but the user can switch them off: switched
@@ -251,6 +245,13 @@ local function running_apps()
 	return list
 end
 
+--- Whole seconds the daemon has run, nil before its boot clock started.
+--- @return number|nil
+local function uptime_s()
+	local ms = require("core.logger.engine.boot_profiler").uptime_ms()
+	return ms and math.floor(ms / 1000) or nil
+end
+
 --- The system section and its load.
 --- @param facts table system_facts()
 --- @param state table Daemon state.
@@ -268,7 +269,10 @@ local function collect_system(facts, state, detailed)
 		keyboard_layout = type(layout) == "string" and layout or nil,
 		ram_free        = facts.ram_free,
 		process_memory  = process_memory(status),
-		uptime          = os.time() - _started_at,
+		-- The daemon's boot clock: this module loads when the page first opens,
+		-- so its own load time read "running for: 0 s" (field report, Arch
+		-- Linux, 2026-11-25).
+		uptime          = uptime_s(),
 		elevated        = elevated(status),
 		running_apps    = detailed == true and running_apps() or nil,
 	}
@@ -287,9 +291,22 @@ local function collect_input(state)
 	local caps_lock, caps_err = Hook.caps_lock_on()
 	if caps_lock == nil then Logger.warn(LOG, "Diagnostics could not read the CapsLock state: %s.", tostring(caps_err)) end
 	input.caps_lock = caps_lock
-	local ok_manager, Manager = pcall(require, "platform.remap.manager")
-	if ok_manager then input.kanata_running = Manager.owns_process() end
+	-- The engine is the keyboard hook itself (tap-holds and layout emulation
+	-- run in it): kanata, which the old platform.remap.manager row read, left
+	-- the driver, so the row always read "unknown" (field report, 2026-11-25).
+	if Hook.isRecovering() then
+		input.remap_phase = "recovering"
+	elseif not Hook.isRunning() then
+		input.remap_phase = "idle"
+	elseif input.paused == true then
+		input.remap_phase = "paused"
+	else
+		input.remap_phase = "active"
+	end
 	input.keymap_resolved = require("adapters.keyboard_layout").is_ready() == true
+	-- Whether hotstrings may act in the focused window, and why not: every
+	-- withholding used to be silent (field report, KDE Plasma Wayland, 2026-11-25).
+	input.text_automation, input.text_automation_reason = require("platform.focus.text_automation_status").summary()
 	return input
 end
 
@@ -329,8 +346,7 @@ local function collect_features(state)
 	add("hotstrings", hotstrings_enabled(state.config))
 	add("shortcuts", module_enabled(state.shortcuts))
 	add("gestures", module_enabled(state.gestures))
-	local ok_manager, Manager = pcall(require, "platform.remap.manager")
-	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
+	add("tapholds", require("platform.remap.tap_hold_manager").is_enabled())
 	add("llm", module_enabled(state.llm))
 	add("metrics", module_enabled(state.keystats))
 	return { items = items }
@@ -766,6 +782,15 @@ local function perform(session, action, state, context)
 	local Report = require("diagnostics.ui.healthcheck.report")
 	local documents = M.config()
 	if action.action == "export_snapshot" then
+		-- A report copied before the deferred configuration probe answered said
+		-- "configuration: pending" and "unknown" changed settings (field report,
+		-- Arch Linux, 2026-11-25). The files are local: read them now instead.
+		local configuration_probe = session.snapshot.probes and session.snapshot.probes.configuration
+		if type(configuration_probe) ~= "table" or configuration_probe.state == "pending" then
+			local err = require("diagnostics.engine.healthcheck.configuration").complete(session.snapshot,
+				M.configuration_context(documents.schema))
+			if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
+		end
 		if not require("diagnostics.engine.healthcheck.share").capture_page_checks(session.snapshot, action) then
 			return { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence }
 		end

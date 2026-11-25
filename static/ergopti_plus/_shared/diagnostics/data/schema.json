@@ -362,7 +362,7 @@
 				{
 					"id": "remap_phase",
 					"type": "text",
-					"platforms": ["macos"]
+					"platforms": ["macos", "linux"]
 				},
 				{
 					"id": "key_downs",
@@ -417,6 +417,16 @@
 				{
 					"id": "keymap_resolved",
 					"type": "bool",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "text_automation",
+					"type": "text",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "text_automation_reason",
+					"type": "text",
 					"platforms": ["linux"]
 				},
 				{
@@ -797,6 +807,30 @@
 								"keymap_resolved": {
 									"kind": "boolean"
 								},
+								"text_automation": {
+									"kind": "enum",
+									"values": ["open", "closed", "unknown"]
+								},
+								"text_automation_reason": {
+									"kind": "enum",
+									"values": [
+										"field_admitted",
+										"atspi_unavailable",
+										"no_accessible_window",
+										"no_focus_answer",
+										"context_pending",
+										"context_unavailable",
+										"field_unknown",
+										"password_field",
+										"protected_context",
+										"settling",
+										"stopped",
+										"starting",
+										"no_detector",
+										"window_policy_failed",
+										"unknown"
+									]
+								},
 								"remap_phase": {
 									"kind": "enum",
 									"values": [
@@ -913,7 +947,17 @@
 															"lease_pong_timeout",
 															"lease_ready_timeout",
 															"mlx_import_failed",
-															"mlx_server_unreachable"
+															"mlx_server_unreachable",
+															"layout_unresolved",
+															"windows_lgi",
+															"windows_webkit",
+															"kwin_focus_script",
+															"text_automation_atspi_unavailable",
+															"text_automation_no_accessible_window",
+															"text_automation_no_focus_answer",
+															"text_automation_context_unavailable",
+															"text_automation_no_detector",
+															"text_automation_window_policy_failed"
 														]
 													},
 													"exit_code": {
@@ -2588,6 +2632,21 @@
 				"code": "mlx_server_unreachable",
 				"message_prefix": "MLX server is missing or unreachable.",
 				"literal": "MLX server is missing or unreachable."
+			},
+			{
+				"message_prefix": "[diagnosis] code=",
+				"codes": [
+					"layout_unresolved",
+					"windows_lgi",
+					"windows_webkit",
+					"kwin_focus_script",
+					"text_automation_atspi_unavailable",
+					"text_automation_no_accessible_window",
+					"text_automation_no_focus_answer",
+					"text_automation_context_unavailable",
+					"text_automation_no_detector",
+					"text_automation_window_policy_failed"
+				]
 			}
 		]
 	}

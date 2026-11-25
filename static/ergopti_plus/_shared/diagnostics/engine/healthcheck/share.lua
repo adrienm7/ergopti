@@ -150,7 +150,14 @@ function M.error_facts(entries, source, schema)
 					candidate = number_at and candidate:sub(number_at) or ""
 				end
 			end
-			if rule.literal and candidate == rule.literal then
+			if rule.codes then
+				-- A stable diagnosis code (linux core/ui/engine/component_status):
+				-- only a code of the closed list is shared, never the sentence after it.
+				local token = candidate ~= "" and candidate:sub(#rule.message_prefix + 1):match("^([a-z0-9_]+)") or nil
+				for _, code in ipairs(rule.codes) do
+					if token == code then event = { entry_index = index, code = code }; break end
+				end
+			elseif rule.literal and candidate == rule.literal then
 				event = { entry_index = index, code = rule.code }
 			elseif rule.prefix and candidate:sub(1, #rule.prefix) == rule.prefix then
 				local value = candidate:sub(#rule.prefix + 1)
@@ -342,6 +349,12 @@ local function readable(safe, schema)
 					if key ~= "code" and key ~= "entry_index" then keys[#keys + 1] = key end
 				end
 				lines[#lines + 1] = label("healthcheck.export.recognised_error") .. ": " .. event.code .. facts(event, keys)
+			end
+			-- Why the other lines say nothing: no rule names their code, so their
+			-- text, which may be private, stays on this computer
+			if recent.observed and type(recent.excluded_entries) == "number" and recent.excluded_entries > 0 then
+				lines[#lines + 1] = label("healthcheck.export.recent_errors_unrecognised") .. ": "
+					.. number_text(recent.excluded_entries)
 			end
 		end
 		-- The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them

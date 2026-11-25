@@ -243,3 +243,53 @@ helpers.describe("healthcheck (linux): the features this driver lacks", function
 		end
 	end)
 end)
+
+helpers.describe("healthcheck (linux): the engine and text automation rows", function()
+	-- Field report, Arch Linux, KDE Plasma Wayland, 2026-11-25: "Remapping
+	-- engine: unknown" while the emulation ran, "running for: 0 s" after
+	-- minutes, and no row said why every hotstring was withheld.
+
+	--- Builds one snapshot with the keyboard hook and the text status doubled.
+	--- @param hook table { running, recovering }
+	--- @param paused boolean
+	--- @return table input, table system
+	local function rows(hook, paused)
+		local Hook = require("platform.input.keyboard_hook")
+		local saved_running, saved_recovering = Hook.isRunning, Hook.isRecovering
+		Hook.isRunning = function() return hook.running end
+		Hook.isRecovering = function() return hook.recovering == true end
+		local ok, result = pcall(function()
+			return helpers.load_module("diagnostics.ui.healthcheck.bridge").build_snapshot(
+				{ is_paused = function() return paused end }, false)
+		end)
+		Hook.isRunning, Hook.isRecovering = saved_running, saved_recovering
+		helpers.assert_true(ok, tostring(result))
+		return result.sections.input, result.sections.system
+	end
+
+	helpers.it("(text-automation-visible) names the keyboard engine's real state", function()
+		helpers.assert_eq(rows({ running = true }, false).remap_phase, "active")
+		helpers.assert_eq(rows({ running = true }, true).remap_phase, "paused")
+		helpers.assert_eq(rows({ running = false }, false).remap_phase, "idle")
+		helpers.assert_eq(rows({ running = false, recovering = true }, false).remap_phase, "recovering")
+	end)
+
+	helpers.it("(text-automation-visible) states whether hotstrings may act, and why", function()
+		local Status = require("platform.focus.text_automation_status")
+		Status._reset_for_test()
+		Status.bind(function() return { mode = "window", reason = "no_accessible_window" } end)
+		local input = rows({ running = true }, false)
+		Status._reset_for_test()
+		helpers.assert_eq(input.text_automation, "open")
+		helpers.assert_eq(input.text_automation_reason, "no_accessible_window")
+	end)
+
+	helpers.it("(text-automation-visible) counts the daemon's uptime from its boot clock", function()
+		local BootProfiler = require("core.logger.engine.boot_profiler")
+		local saved = BootProfiler.uptime_ms
+		BootProfiler.uptime_ms = function() return 125400 end
+		local _, system = rows({ running = true }, false)
+		BootProfiler.uptime_ms = saved
+		helpers.assert_eq(system.uptime, 125, "not the time since the page's module loaded")
+	end)
+end)

@@ -152,6 +152,14 @@ function M.elapsed_ms()
 	return Monotonic.now_ms() - _origin_ms
 end
 
+--- How long the daemon has run: the monotonic time since begin() plus the
+--- process age measured then. Nil before begin(), never a guessed zero.
+--- @return number|nil
+function M.uptime_ms()
+	if _origin_ms == nil then return nil end
+	return Monotonic.now_ms() - _origin_ms + (_load_ms or 0)
+end
+
 --- Opens a named boot stage.
 --- @param name string
 function M.stage(name)

@@ -205,6 +205,44 @@
 					}
 				]
 			}
+		},
+		{
+			"id": "linux-diagnosis-codes",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-11-25T09:00:00Z",
+				"sections": {
+					"issues": {
+						"warn_count": 0,
+						"err_count": 4,
+						"recent_source": "errors_file",
+						"recent": [
+							"2026-11-25 01:41:20:515 [ERROR] [core.ui.engine.component_status] [diagnosis] code=kwin_focus_script — Ergopti+ cannot learn PRIVATE_TOKEN /home/PRIVATE_ACCOUNT",
+							"2026-11-25 01:41:25:000 [ERROR] [core.ui.engine.component_status] [diagnosis] code=text_automation_no_accessible_window — PRIVATE_SECRET",
+							"2026-11-25 01:41:26:000 [ERROR] [core.ui.engine.component_status] [diagnosis] code=PRIVATE_TOKEN — https://PRIVATE_HOST.invalid",
+							"2026-11-25 01:41:56:486 [ERROR] [clipboard.adapters.owner] The clipboard owner did not take the selection back from PRIVATE_ORG."
+						]
+					}
+				}
+			},
+			"expected": {
+				"observed": true,
+				"source": "errors_file",
+				"qualification": "log_observation_only",
+				"examined_entries": 4,
+				"excluded_entries": 2,
+				"events": [
+					{
+						"entry_index": 1,
+						"code": "kwin_focus_script"
+					},
+					{
+						"entry_index": 2,
+						"code": "text_automation_no_accessible_window"
+					}
+				]
+			}
 		}
 	]
 }

@@ -639,7 +639,11 @@ helpers.describe("closed recent error facts", function()
 			for _, canary in ipairs(corpus.canaries) do
 				helpers.assert_true(not doc.text:find(canary, 1, true), canary)
 			end
-			helpers.assert_contains(doc.text, "lease_watchdog_exit")
+			helpers.assert_contains(doc.text, vector.expected.events[1].code)
+			-- Every excluded line is counted with why it says nothing (field
+			-- report, 2026-11-25: 50 examined, 50 excluded, no reason shown).
+			helpers.assert_contains(doc.text, config.schema.export_strings["healthcheck.export.recent_errors_unrecognised"]
+				.. ": " .. tostring(vector.expected.excluded_entries))
 			helpers.assert_contains(doc.text, "log_observation_only")
 			for _, action in ipairs({ "copy", "save", "report" }) do
 				local Report = helpers.load_module("diagnostics.ui.healthcheck.report")

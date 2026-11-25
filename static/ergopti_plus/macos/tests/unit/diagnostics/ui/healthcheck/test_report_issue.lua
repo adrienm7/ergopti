@@ -890,7 +890,7 @@ helpers.describe("closed recent error facts", function()
 			for _, canary in ipairs(corpus.canaries) do
 				helpers.assert_true(not doc.text:find(canary, 1, true), canary)
 			end
-			helpers.assert_contains(doc.text, "lease_watchdog_exit")
+			helpers.assert_contains(doc.text, vector.expected.events[1].code)
 			helpers.assert_contains(doc.text, "log_observation_only")
 			for _, action in ipairs({ "copy", "save", "report" }) do
 				local Report, calls, overrides = load_report()

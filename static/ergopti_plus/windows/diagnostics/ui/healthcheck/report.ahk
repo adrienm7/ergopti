@@ -165,7 +165,18 @@ HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
 						Candidate := NumberAt ? SubStr(Candidate, NumberAt) : ""
 					}
 				}
-				if Rule.Has("literal") && Candidate == Rule["literal"]
+				if Rule.Has("codes") {
+					; A stable diagnosis code (linux core/ui/engine/component_status):
+					; only a code of the closed list is shared, never the sentence after it.
+					Token := ""
+					if Candidate != "" && RegExMatch(SubStr(Candidate, StrLen(Rule["message_prefix"]) + 1), "^[a-z0-9_]+", &Found)
+						Token := Found[0]
+					for Code in Rule["codes"]
+						if Token == Code {
+							Event := Map("entry_index", Index, "code", Code)
+							break
+						}
+				} else if Rule.Has("literal") && Candidate == Rule["literal"]
 					Event := Map("entry_index", Index, "code", Rule["code"])
 				else if Rule.Has("prefix") && SubStr(Candidate, 1, StrLen(Rule["prefix"])) == Rule["prefix"] {
 					Value := SubStr(Candidate, StrLen(Rule["prefix"]) + 1)
@@ -384,6 +395,10 @@ _HCShare_Readable(Safe, Schema) {
 								Keys.Push(Key)
 						Lines.Push(L("healthcheck.export.recognised_error") . ": " . Event["code"] . _HCShare_Facts(Event, Keys))
 					}
+					; Why the other lines say nothing: no rule names their code, so
+					; their text, which may be private, stays on this computer
+					if Recent.Get("observed", false) && Recent.Get("excluded_entries", 0) > 0
+						Lines.Push(L("healthcheck.export.recent_errors_unrecognised") . ": " . _HCShare_Number(Recent["excluded_entries"]))
 				}
 				; The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
 				Developer := Sections.Get("developer", 0)

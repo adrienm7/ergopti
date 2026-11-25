@@ -222,6 +222,19 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 		end)
 	end)
 
+	helpers.it("(text-automation-visible) a report copied before the configuration probe reads the files", function()
+		-- Field report, Arch Linux, 2026-11-25: "configuration: pending" and
+		-- unknown changed settings in a report copied right after opening.
+		with_bridge(nil, function(bridge, context)
+			local ready = bridge.on_message("ready", {}, page(context))
+			ready.snapshot.probes.configuration = { state = "pending" }
+			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 4 }, {}, page(context))
+			helpers.assert_true(exported.snapshot.probes.configuration.state ~= "pending",
+				"the local files are read at export")
+			helpers.assert_true(not exported.share_text:find("configuration: pending", 1, true))
+		end)
+	end)
+
 	helpers.it("answers a refused clipboard as a failure", function()
 		with_bridge({ clipboard = false }, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))

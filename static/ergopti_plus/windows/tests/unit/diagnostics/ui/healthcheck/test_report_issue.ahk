@@ -571,7 +571,7 @@ _THPA_RecentErrorFacts() {
 		AssertEqual(_HC_ValueToJson(Vector["expected"]), _HC_ValueToJson(Doc["snapshot"]["sections"]["issues"]["recent_error_facts"]))
 		for Canary in Corpus["canaries"]
 			AssertFalse(InStr(Doc["text"], Canary), Canary)
-		AssertContains(Doc["text"], "lease_watchdog_exit")
+		AssertContains(Doc["text"], Vector["expected"]["events"][1]["code"])
 		AssertContains(Doc["text"], "log_observation_only")
 		for ActionName in ["copy", "save", "report"] {
 			Calls := []
