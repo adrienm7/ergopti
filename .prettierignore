@@ -31,6 +31,7 @@ static/ergopti_plus/_shared/tests/corpus/layouts/source/emulation.json
 static/ergopti_plus/_shared/tests/corpus/layouts/source/source_emulation.json
 static/ergopti_plus/_shared/tests/corpus/layouts/source/neo2_emulation.json
 static/ergopti_plus/_shared/tests/corpus/layouts/source/ergopti_emulation.json
+static/ergopti_plus/_shared/tests/corpus/layouts/source/context_emulation.json
 static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_bootstrap.json
 static/ergopti_plus/_shared/core/network/native/go/native_http/managed_ollama_environment.json
 static/ergopti_plus/_shared/core/network/native/go/native_http/proxy_policy.json
