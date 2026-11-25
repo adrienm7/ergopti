@@ -19,7 +19,8 @@ local Checks = require("diagnostics.engine.field_check.checks")
 --- Runs the check over canned facts.
 local function run(facts)
 	local report, finished = Report.new_report("engine_icon"), 0
-	local defaults = { embedded = true, readable = true, icon_file = "ErgoptiPlus", icns_present = true }
+	local defaults = { embedded = true, readable = true, icon_file = "ErgoptiPlus", app_icon_file = "ErgoptiPlus",
+		icns_present = true }
 	for key, value in pairs(facts or {}) do defaults[key] = value end
 	Check.engine_icon({ engine_icon_facts = function() return defaults end }, report,
 		function() finished = finished + 1 end)
@@ -60,6 +61,8 @@ helpers.describe("field_engine_icon: the icon the embedded engine declares", fun
 		helpers.assert_eq(steps.engine_icon_name.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.engine_icon_name.value, "AppIcon")
 		helpers.assert_eq(steps.engine_icns.value, "missing")
+		steps = run({ app_icon_file = nil, icon_file = "" })
+		helpers.assert_eq(steps.engine_icon_file.state, Report.STATE_FAIL, "no icon on either side is no proof")
 		steps = run({ readable = false })
 		helpers.assert_eq(steps.engine_icon_file.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.engine_icon_file.value, "info_plist_unreadable")

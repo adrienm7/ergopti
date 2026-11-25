@@ -1021,8 +1021,12 @@ function M.new()
 			local icon_file = info.CFBundleIconFile
 			local icns = type(icon_file) == "string" and icon_file ~= ""
 				and hs.fs.attributes(bundle .. "/Contents/Resources/" .. icon_file:gsub("%.icns$", "") .. ".icns", "mode")
-			return { embedded = true, readable = true, icon_file = icon_file, icon_name = info.CFBundleIconName,
-				icns_present = icns == "file" }
+			-- The reference is the icon ErgoptiPlus.app itself declares, so no name is typed twice
+			local app = bundle:gsub("/Contents/Frameworks/Hammerspoon%.app$", "")
+			local app_ok, app_info = pcall(hs.plist.read, app .. "/Contents/Info.plist")
+			local app_icon_file = app_ok and type(app_info) == "table" and app_info.CFBundleIconFile or nil
+			return { embedded = true, readable = true, icon_file = icon_file, app_icon_file = app_icon_file,
+				icon_name = info.CFBundleIconName, icns_present = icns == "file" }
 		end,
 		physical_shortcut_facts = function()
 			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")

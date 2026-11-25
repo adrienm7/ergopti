@@ -26,11 +26,9 @@ local M = {}
 
 local PASS, FAIL, INFO, SKIP = Report.STATE_PASS, Report.STATE_FAIL, Report.STATE_INFO, Report.STATE_SKIP
 
--- The icon name the build gives the embedded engine (tools/build/build_macos_app.sh, build_icon)
-M.ICON_FILE = "ErgoptiPlus"
-
 --- Runs the check.
---- ports.engine_icon_facts() → { embedded, readable, icon_file, icon_name, icns_present }.
+--- ports.engine_icon_facts() → { embedded, readable, icon_file, app_icon_file, icon_name, icns_present };
+--- app_icon_file is the icon ErgoptiPlus.app itself declares, which the engine must show.
 --- @param ports table
 --- @param report table field_check_report report.
 --- @param finish function
@@ -46,7 +44,8 @@ function M.engine_icon(ports, report, finish)
 		return finish()
 	end
 	local file = tostring(facts.icon_file or ""):gsub("%.icns$", "")
-	report.step("engine_icon_file", file == M.ICON_FILE and PASS or FAIL,
+	local expected = tostring(facts.app_icon_file or ""):gsub("%.icns$", "")
+	report.step("engine_icon_file", file ~= "" and file == expected and PASS or FAIL,
 		file ~= "" and file or "absent")
 	report.step("engine_icon_name", facts.icon_name == nil and PASS or FAIL,
 		facts.icon_name == nil and "absent" or tostring(facts.icon_name))
