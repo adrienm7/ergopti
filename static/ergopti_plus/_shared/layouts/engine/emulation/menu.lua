@@ -58,7 +58,9 @@ function M.choice_rows(opts)
 	local items, shown = {}, nil
 	local function add(value, label)
 		if value == current then shown = label end
-		items[#items + 1] = { label = label, checked = value == current, action = function() opts.choose(value) end }
+		-- One choice of several: drawn as a radio where the tray has one.
+		items[#items + 1] = { label = label, checked = value == current, radio = true,
+			action = function() opts.choose(value) end }
 	end
 	for _, choice in ipairs(M.BUILTIN) do add(choice.value, t(choice.label_key)) end
 	for _, entry in ipairs(registry_ids) do add(entry.id, entry.name) end

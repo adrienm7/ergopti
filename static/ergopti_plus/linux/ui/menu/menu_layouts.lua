@@ -74,6 +74,7 @@ local function _build_layouts(ctx)
 					-- puts one platform's convention inside a string, and the row was
 					-- not even a check item.
 					checked = current == name,
+					radio   = true,
 					action  = function()
 						if type(on_change) ~= "function" then
 							Logger.error(LOG, "ctx.on_layout_change is absent — '%s' cannot be selected.", chosen)

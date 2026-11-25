@@ -86,6 +86,8 @@ function M.rows(ctx)
 		rows[#rows + 1] = {
 			label = choice.label,
 			checked = choice.active == true,
+			-- The desktop has one active source: a choice of one, drawn as a radio.
+			radio = true,
 			disabled = choice.active == true,
 			action = function()
 				Logger.start(LOG, "Switching the keyboard layout to '%s' from the menu…", id)

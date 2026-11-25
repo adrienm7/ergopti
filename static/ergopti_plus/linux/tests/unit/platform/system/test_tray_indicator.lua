@@ -42,6 +42,21 @@ local function fake_binding()
 		return w
 	end
 
+	--- One "activate" emission: GTK's class handler toggles a check item once,
+	--- then every unblocked handler runs in connection order.
+	--- @param instance table
+	--- @return function
+	local function activation(instance)
+		return function()
+			if instance.kind == "check" then instance.active = instance.active == 1 and 0 or 1 end
+			local handlers = {}
+			for index, connected in ipairs(instance.handlers or {}) do handlers[index] = connected end
+			for _, connected in ipairs(handlers) do
+				if not connected.blocked then connected.handler(instance, connected.data) end
+			end
+		end
+	end
+
 	local gtk = {
 		gtk_menu_new = function() return widget("menu") end,
 		gtk_menu_item_new_with_label = function(label) return widget("item", label) end,
@@ -51,12 +66,29 @@ local function fake_binding()
 			-- GTK implements a changed programmatic check through activate too.
 			if w.active ~= active and w.activate then w.activate() else w.active = active end
 		end,
+		gtk_check_menu_item_set_draw_as_radio = function(w, radio) w.draw_as_radio = radio == 1 end,
 		gtk_menu_item_set_submenu = function(item, submenu)
 			log.submenus[#log.submenus + 1] = { item = item, submenu = submenu }
 			item.submenu = submenu
 		end,
 		gtk_menu_shell_append = function(shell, child)
 			log.appends[#log.appends + 1] = { shell = shell, child = child }
+			-- libdbusmenu-gtk exports a check item when it is added to a menu:
+			-- toggle-type from draw-as-radio, toggle-state from active, and an
+			-- activate handler connected after the row's own that publishes
+			-- toggle-state only when it changes (parser.c).
+			if child.kind == "check" then
+				local export = { toggle_type = child.draw_as_radio and "radio" or "checkmark",
+					toggle_state = child.active, updates = 0 }
+				child.export = export
+				child.handlers = child.handlers or {}
+				child.handlers[#child.handlers + 1] = { handler = function()
+					if export.toggle_state ~= child.active then
+						export.toggle_state, export.updates = child.active, export.updates + 1
+					end
+				end }
+				child.activate = activation(child)
+			end
 			shell.children = shell.children or {}
 			shell.children[#shell.children + 1] = child
 			child.parent = shell
@@ -124,10 +156,9 @@ local function fake_binding()
 				if not entry.blocked then return handler(instance, data) end
 			end
 			if signal == "activate" then
-				-- A parent row's activate opens its submenu; GTK runs every
-				-- handler of the signal, so the fake chains them too.
-				local previous = instance.activate
-				instance.activate = previous and function() previous(); entry.fire() end or entry.fire
+				instance.handlers = instance.handlers or {}
+				instance.handlers[#instance.handlers + 1] = entry
+				instance.activate = activation(instance)
 			else
 				instance[signal] = entry.fire
 			end
@@ -834,5 +865,98 @@ helpers.describe("tray indicator: authoritative checks", function()
 		helpers.assert_eq(calls, 100)
 		helpers.assert_eq(widget_named(log, "Refused").active, 0)
 		indicator.destroy()
+	end)
+end)
+
+helpers.describe("tray indicator: dbusmenu toggle export (tray-radio-export)", function()
+	helpers.it("(tray-hover-keeps-check) hovering a checked submenu row keeps its tick", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local runs = 0
+		indicator.set_menu({ { title = "Hotstrings", checked = true, menu = {
+			{ title = "Inside", fn = function() runs = runs + 1 end } } } })
+		local parent = widget_named(log, "Hotstrings")
+		-- Plasma sends AboutToShow on hover; libdbusmenu-gtk turns it into activate.
+		for _ = 1, 3 do open(log, "Hotstrings") end
+		helpers.assert_eq(parent.active, 1, "a hover is not a click: the feature must stay ticked")
+		helpers.assert_eq(parent.export.toggle_state, 1, "the panel is told the published tick")
+		helpers.assert_true(widget_named(log, "Inside") ~= nil, "the hover still opens the submenu")
+		helpers.assert_eq(runs, 0)
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-hover-keeps-check) an activated disabled or inert check row keeps its mark", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "Input source", checked = true, disabled = true, fn = function() end },
+			{ title = "Status", checked = false } })
+		widget_named(log, "Input source").activate()
+		widget_named(log, "Status").activate()
+		helpers.assert_eq(widget_named(log, "Input source").active, 1)
+		helpers.assert_eq(widget_named(log, "Status").active, 0)
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-check) a click that changes nothing republishes the row's mark", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "None", checked = true, radio = true, fn = function() return true end } })
+		local row = widget_named(log, "None")
+		local before = row.export.updates
+		row.activate()
+		helpers.assert_eq(row.active, 1)
+		helpers.assert_true(row.export.updates > before,
+			"a panel that unticked the row locally must receive its toggle-state again")
+		helpers.assert_eq(row.export.toggle_state, 1, "the last exported state is the published one")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-radio-export) a single-choice group is exported as radio items", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "A", checked = true, radio = true, fn = function() end },
+			{ title = "Switch", checked = true, fn = function() end } })
+		helpers.assert_eq(widget_named(log, "A").export.toggle_type, "radio")
+		helpers.assert_eq(widget_named(log, "Switch").export.toggle_type, "checkmark",
+			"an independent switch stays a checkmark")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-radio-export) exactly one row is ticked after any sequence of clicks", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local current = "none"
+		local function tree()
+			local rows = {}
+			for _, value in ipairs({ "none", "ergopti", "bepo" }) do
+				rows[#rows + 1] = { title = value, checked = current == value, radio = true,
+					fn = function() current = value end }
+			end
+			return { { title = "Layout to emulate: " .. current, menu = rows } }
+		end
+		-- The rows of the submenu the panel shows now (GTK destroys a replaced
+		-- submenu with its parent row).
+		local function choice(name)
+			for _, child in ipairs(rows_of(widget_named(log, "Layout to emulate: " .. current).submenu)) do
+				if child.label == name then return child end
+			end
+			error("no choice " .. name)
+		end
+		indicator.set_menu(tree())
+		for _, value in ipairs({ "bepo", "bepo", "none", "ergopti", "none", "none" }) do
+			open(log, "Layout to emulate: " .. current)
+			choice(value).activate()
+			indicator.set_menu(tree())
+			open(log, "Layout to emulate: " .. current)
+			local ticked = {}
+			for _, name in ipairs({ "none", "ergopti", "bepo" }) do
+				local widget = choice(name)
+				if widget.active == 1 then ticked[#ticked + 1] = name end
+				helpers.assert_eq(widget.export.toggle_state, widget.active, name .. " exported as drawn")
+				helpers.assert_eq(widget.export.toggle_type, "radio")
+			end
+			helpers.assert_eq(table.concat(ticked, ","), value, "after choosing " .. value)
+		end
+		indicator.destroy(); indicator._set_binding_for_test(nil)
 	end)
 end)

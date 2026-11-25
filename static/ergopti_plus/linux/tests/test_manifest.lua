@@ -530,6 +530,7 @@ return {
 	"tests.unit.menu.structure.test_input_source_selection",
 	"tests.unit.menu.structure.test_pause_layout_rows",
 	"tests.unit.menu.structure.test_active_layout_rows",
+	"tests.unit.menu.structure.test_layout_emulation_choice",
 	"tests.unit.menu.structure.test_compose_input_method_row",
 	"tests.unit.menu.structure.test_matches_manifest",
 	"tests.unit.menu.structure.test_prompt_cancel",

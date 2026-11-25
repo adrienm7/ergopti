@@ -652,6 +652,9 @@ function M.new(deps)
 				local greyed = row.disabled == true and type(row.disabled_reason_key) == "string"
 				if greyed then entry.title = row.label .. " — " .. reason_head(i18n.get(row.disabled_reason_key)) end
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
+				-- One choice of a single-choice group: a tray that has radio items
+				-- (Linux dbusmenu) draws it as one; the others draw the same check.
+				if row.radio == true and row.checked ~= nil then entry.radio = true end
 				-- An optional per-row image, the Lua twin of the AutoHotkey renderer's
 				-- `icon`. Without it a provider had to choose between reaching the
 				-- renderer and keeping its icons: the bundled-apps list went through an
@@ -728,7 +731,7 @@ function M.new(deps)
 				for field in next, child do
 					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
 						and field ~= "disabled" and field ~= "image" and field ~= "joins_reload"
-						and field ~= "bypasses_reload" then return nil end
+						and field ~= "bypasses_reload" and field ~= "radio" then return nil end
 				end
 				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
 				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
@@ -736,6 +739,8 @@ function M.new(deps)
 				if joins_reload ~= nil and joins_reload ~= true then return nil end
 				local bypasses_reload = rawget(child, "bypasses_reload")
 				if bypasses_reload ~= nil and bypasses_reload ~= true then return nil end
+				local radio = rawget(child, "radio")
+				if radio ~= nil and (radio ~= true or rawget(child, "checked") == nil) then return nil end
 				if type(title) ~= "string" or title == "" or (action ~= nil and type(action) ~= "function")
 					or (subtree ~= nil and type(subtree) ~= "table") or (action ~= nil and subtree ~= nil)
 					or (checked ~= nil and type(checked) ~= "boolean")
@@ -747,7 +752,7 @@ function M.new(deps)
 					row = { separator = true }
 				else
 					row = { label = title, action = action, checked = checked, disabled = disabled, image = image,
-						joins_reload = joins_reload, bypasses_reload = bypasses_reload }
+						joins_reload = joins_reload, bypasses_reload = bypasses_reload, radio = radio }
 					if subtree ~= nil then
 						row.items = convert(subtree, depth + 1)
 						if row.items == nil then return nil end
@@ -866,13 +871,14 @@ function M.new(deps)
 					for field in next, row do
 						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
 							and field ~= "checked" and field ~= "disabled" and field ~= "joins_reload"
-							and field ~= "bypasses_reload" and field ~= "tooltip" then return false end
+							and field ~= "bypasses_reload" and field ~= "tooltip" and field ~= "radio" then return false end
 					end
 					-- A row drawn as an image names itself through its tooltip,
 					-- the text VoiceOver reads for it (the macOS canvas badge).
 					if rawget(row, "tooltip") ~= nil and type(rawget(row, "tooltip")) ~= "string" then return false end
 					if rawget(row, "joins_reload") ~= nil and rawget(row, "joins_reload") ~= true then return false end
 					if rawget(row, "bypasses_reload") ~= nil and rawget(row, "bypasses_reload") ~= true then return false end
+					if rawget(row, "radio") ~= nil and (rawget(row, "radio") ~= true or rawget(row, "checked") == nil) then return false end
 					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
 					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
 					if type(title) ~= "string" or (title == "" and image == nil)
@@ -970,6 +976,7 @@ function M.new(deps)
 			sub[#sub + 1] = {
 				label   = label,
 				checked = current == value,
+				radio   = true,
 				action  = function() return fn(value) end,
 			}
 		end
@@ -989,6 +996,7 @@ function M.new(deps)
 			sub[#sub + 1] = {
 				label   = i18n.get(item.custom_i18n),
 				checked = custom_current,
+				radio   = true,
 				action  = function() return custom_fn() end,
 			}
 			if custom_current and type(current) == "number" then

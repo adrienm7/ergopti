@@ -186,6 +186,7 @@ local function bind()
 		GtkWidget*   gtk_check_menu_item_new_with_label(const char *label);
 		GtkWidget*   gtk_separator_menu_item_new(void);
 		void         gtk_check_menu_item_set_active(GtkWidget *item, gboolean is_active);
+		void         gtk_check_menu_item_set_draw_as_radio(GtkWidget *item, gboolean draw_as_radio);
 		void         gtk_menu_item_set_submenu(GtkWidget *item, GtkWidget *submenu);
 		void         gtk_menu_shell_append(GtkWidget *shell, GtkWidget *child);
 		void         gtk_widget_set_sensitive(GtkWidget *widget, gboolean sensitive);
@@ -319,12 +320,23 @@ local function connect(lib, widget, signal, fn, owned)
 end
 
 --- The widget kind a row needs; a row only changes in place within its kind.
+--- A row of a single-choice group (`radio = true`) is a check item drawn as a
+--- radio, which libdbusmenu-gtk publishes as toggle-type "radio" instead of
+--- "checkmark": a panel then draws one choice of several, and Qt's dbusmenu
+--- client does not untick a chosen radio locally when it is clicked again.
 --- @param item table
---- @return string "separator", "check" or "plain".
+--- @return string "separator", "radio", "check" or "plain".
 local function row_kind(item)
 	if item.separator or item.title == "-" then return "separator" end
-	if item.checked ~= nil then return "check" end
+	if item.checked ~= nil then return item.radio == true and "radio" or "check" end
 	return "plain"
+end
+
+--- Whether a row kind is drawn as a GtkCheckMenuItem.
+--- @param kind string
+--- @return boolean
+local function is_check(kind)
+	return kind == "check" or kind == "radio"
 end
 
 --- @param item table
@@ -344,34 +356,61 @@ local function row_action(row, item, disabled)
 end
 
 --- Sets a check row's mark without running its action: set_active emits
---- activate, so the row's own handler is blocked meanwhile.
+--- activate, so the row's own handlers are blocked meanwhile.
 --- @param lib table
 --- @param row table
 --- @param checked boolean
 local function set_check(lib, row, checked)
 	-- A check row with a submenu opens it on activate: blocked too, or a
 	-- changed check would build a submenu nobody opened.
-	local signal = row.signal or (row.sub and row.sub.parent_signal)
-	if signal then lib.gobject.g_signal_handler_block(row.widget, signal) end
+	local signals = { row.signal, row.sub and row.sub.parent_signal }
+	for index = 1, 2 do
+		if signals[index] then lib.gobject.g_signal_handler_block(row.widget, signals[index]) end
+	end
 	local restored, err = pcall(lib.gtk.gtk_check_menu_item_set_active, row.widget, checked and 1 or 0)
-	if signal then lib.gobject.g_signal_handler_unblock(row.widget, signal) end
+	for index = 1, 2 do
+		if signals[index] then lib.gobject.g_signal_handler_unblock(row.widget, signals[index]) end
+	end
 	if not restored then error(err, 0) end
 end
 
---- Connects a row's activate handler, once, the first time it has an action.
---- The handler reads the row's current action and check, so an in-place update
---- never needs a new callback.
+--- Puts back the published mark of a check row that GTK toggled on its own,
+--- then publishes that mark again.
+---
+--- GTK toggles a check item on EVERY activate, and activate is not only a
+--- click: libdbusmenu-gtk turns a panel's AboutToShow, sent when the pointer
+--- merely hovers a submenu row, into the parent's activate, and a D-Bus Event
+--- reaches an insensitive or inert row too. Plasma showed Hotstrings or
+--- Shortcuts unticked after a hover, and a disabled input source unticked
+--- after a click, while nothing had changed.
+---
+--- The restore alone is not enough either: libdbusmenu exports toggle-state
+--- only when it changes, and its activate handler runs after this one, so it
+--- never sees the transient toggle. A panel that ticks or unticks a check item
+--- locally on click (Qt's dbusmenu client does) then keeps that local mark
+--- until something else changes the row — a « None » ticked beside the chosen
+--- layout. The opposite mark and back, both silent for this module, leave the
+--- exporter a change whose final value is the published one.
+--- @param lib table
+--- @param row table
+local function reassert_check(lib, row)
+	set_check(lib, row, row.checked)
+	set_check(lib, row, not row.checked)
+	set_check(lib, row, row.checked)
+end
+
+--- Connects a row's activate handler, once: on every check row, and on any
+--- other row the first time it has an action. The handler reads the row's
+--- current action and check, so an in-place update never needs a new callback.
 --- @param lib table
 --- @param row table
 --- @param owned table
 local function arm_row(lib, row, owned)
-	if row.action_id or not row.fn then return end
+	if row.action_id or not (row.fn or is_check(row.kind)) then return end
 	row.action_id, row.signal = connect(lib, row.widget, "activate", function()
-		if row.kind == "check" then
-			-- GTK toggles before activate handlers run. Only the owning rebuild
-			-- may publish a changed setting; rejected writes must keep its check.
-			set_check(lib, row, row.checked)
-		end
+		-- GTK toggles before activate handlers run. Only the owning rebuild
+		-- may publish a changed setting; rejected writes must keep its check.
+		if is_check(row.kind) then reassert_check(lib, row) end
 		local fn = row.fn
 		if fn then return fn() end
 	end, owned)
@@ -429,8 +468,9 @@ local function add_row(lib, node, item, owned)
 		row.widget = lib.gtk.gtk_separator_menu_item_new()
 	else
 		row.label = tostring(item.title or "")
-		if row.kind == "check" then
+		if is_check(row.kind) then
 			row.widget = lib.gtk.gtk_check_menu_item_new_with_label(row.label)
+			if row.kind == "radio" then lib.gtk.gtk_check_menu_item_set_draw_as_radio(row.widget, 1) end
 			row.checked = item.checked == true
 			lib.gtk.gtk_check_menu_item_set_active(row.widget, row.checked and 1 or 0)
 		else
@@ -444,8 +484,9 @@ local function add_row(lib, node, item, owned)
 		-- dbusmenu Event can activate an insensitive GTK item directly.
 		-- Unavailable rows therefore never receive an action capability.
 		row.fn = row_action(row, item, disabled)
-		arm_row(lib, row, owned)
 	end
+	-- After the submenu's opener: a hover opens it, then the check is restored.
+	arm_row(lib, row, owned)
 	row.sensitive = not disabled
 	if disabled then lib.gtk.gtk_widget_set_sensitive(row.widget, 0) end
 	lib.gtk.gtk_menu_shell_append(node.menu, row.widget)
@@ -503,7 +544,7 @@ local patch_node
 --- @param owned table
 local function patch_row(lib, node, row, item, owned)
 	local disabled = node.disabled or item.disabled == true
-	if row.kind == "check" and row.checked ~= (item.checked == true) then
+	if is_check(row.kind) and row.checked ~= (item.checked == true) then
 		row.checked = item.checked == true
 		set_check(lib, row, row.checked)
 	end
