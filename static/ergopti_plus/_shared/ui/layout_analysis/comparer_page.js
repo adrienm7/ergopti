@@ -3189,7 +3189,16 @@
 			window.LAYOUT_ANALYSIS_WORST.draw(box, {
 				groups: detailOf(result).topGroups,
 				layout,
-				highlight: window.LAYOUT_ANALYSIS_WORST.highlighter(() => $('la-ngrams-board'))
+				highlight: window.LAYOUT_ANALYSIS_WORST.highlighter(() => $('la-ngrams-board')),
+				// The drill-down to the corpus's words, when the corpus has a word table.
+				words: state.words
+					? (codes) =>
+							E.wordsWithKeys(layout, state.words, codes, {
+								keyboard: state.keyboard,
+								profile: FINGERING.current(state.keyboard) || undefined,
+								limit: TRACE_WORDS_SHOWN
+							})
+					: undefined
 			});
 		}
 

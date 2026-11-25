@@ -321,8 +321,9 @@ waits for the maintainer's review).
       own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace »
       tabs, their links, the movement table and the trace's « Corpus words » (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in
-      order: (1) the same « Corpus words » drill-down (`E.wordsWithKeys`, done in the trace) on each row of the
-      worst n-grams (`board/worst_groups.js`, shared with the editor panel); (2) corpus blends: a weighted mix of
+      order: (1) the « Corpus words » drill-down in the editor's analysis panel too (done in the Comparer's trace and
+      worst n-grams: `E.wordsWithKeys`, the `words` option of `board/worst_groups.js`; the panel needs its corpus's
+      word table); (2) corpus blends: a weighted mix of
       built-in corpora, their n-gram counts summed with the chosen weights before `prepareNgrams`, offered in the corpus picker and kept
       with the conveniences; (3) magic and repeat keys: write a design first (`layout-source-format.md`, engine
       ways of typing as a context-dependent output, and the three drivers' emulation, `cross-driver-parity`);

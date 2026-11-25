@@ -23,6 +23,9 @@
  *    the rest the engine keeps (and folds them again), says how many it adds,
  *    moves the focus to the first row it adds, and stays unfolded across the
  *    next analyses of the same box.
+ * 6. « Corpus words » (an idea seen in the Layouts Wiki playground): with a
+ *    words lookup, each row gets a button that opens the words of the corpus's
+ *    word table typing its keys in a row, the most frequent first.
  * ==============================================================================
  */
 
@@ -97,8 +100,11 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 	 * Draws the cards into a box.
 	 * @param {HTMLElement} box - Emptied first.
 	 * @param {{groups: object, layout: object, highlight: function((string[]|null)): void,
-	 *   limit?: number}} options - groups: the engine's topGroups (event → [{keys,
-	 *   count, share}]); highlight: told the keys of the row hovered or focused.
+	 *   limit?: number, words?: function(string[]): {words: Array<{word: string}>,
+	 *   occurrences: number}}} options - groups: the engine's topGroups (event →
+	 *   [{keys, count, share}]); highlight: told the keys of the row hovered or
+	 *   focused; words: the corpus words typing the keys in a row (a « Corpus
+	 *   words » button per row when given).
 	 */
 	function draw(box, options) {
 		const t = window.LAYOUT_ANALYSIS_INFO.t;
@@ -159,6 +165,7 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 				});
 				const item = el('li');
 				item.append(button);
+				if (options.words) item.append(...wordsToggle(options.words, group.keys, keys));
 				list.append(item);
 			}
 			card.append(list);
@@ -166,6 +173,47 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 			box.append(card);
 		}
 	}
+
+	/**
+	 * A row's « Corpus words » button and the paragraph it opens, filled on
+	 * first opening from the lookup.
+	 * @param {function(string[]): {words: Array<{word: string}>, occurrences: number}} lookup
+	 * @param {string[]} codes - The row's key codes.
+	 * @param {string[]} labels - The keys as the row writes them.
+	 * @returns {HTMLElement[]}
+	 */
+	function wordsToggle(lookup, codes, labels) {
+		const t = window.LAYOUT_ANALYSIS_INFO.t;
+		const button = el('button', 'la-ngram-words', t('layout_analysis.trace.words'));
+		button.type = 'button';
+		button.setAttribute(
+			'aria-label',
+			t('layout_analysis.trace.words_for', { keys: labels.join(' ') })
+		);
+		const found = el('p', 'la-muted la-ngram-found');
+		found.id = `la-ngram-words-${++wordsSerial}`;
+		found.hidden = true;
+		button.setAttribute('aria-expanded', 'false');
+		button.setAttribute('aria-controls', found.id);
+		button.addEventListener('click', () => {
+			const open = button.getAttribute('aria-expanded') !== 'true';
+			button.setAttribute('aria-expanded', String(open));
+			found.hidden = !open;
+			if (!open || found.textContent !== '') return;
+			const hits = lookup(codes);
+			found.textContent =
+				hits.words.length === 0
+					? t('layout_analysis.trace.words_none')
+					: t('layout_analysis.trace.words_found', {
+							words: hits.words.map((w) => w.word).join(', '),
+							count: hits.occurrences
+						});
+		});
+		return [' ', button, found];
+	}
+
+	// A counter for the ids of the words paragraphs, unique in the page.
+	let wordsSerial = 0;
 
 	/**
 	 * The button under a card that unfolds its other rows, or folds them back.
