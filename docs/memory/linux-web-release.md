@@ -147,6 +147,17 @@ lifetime (the Reader's `same_open`), never its input generation: the layer's
 generation once stopped the hook at the next device watchdog tick after the
 first wheel or button binding (`_source_recovery.member_custody`).
 
+### project-linux-the-field-run-reads-the-tray-from-a-child
+
+The field run's tray check (`diagnostics/engine/field_check/tray_check.lua`) reads the daemon's own
+`com.canonical.dbusmenu` export with `busctl --user --json=short --` from a child process
+(`diagnostics/adapters/bus_query.lua`): a call from the daemon would wait on the GTK loop that has to answer it. The
+`--` is required because GetLayout's recursion depth `-1` is otherwise parsed as an option, and Event prints nothing,
+so an empty reply is a success. Submenus are lazy: AboutToShow fills them, which is also the activate that unticked
+Hotstrings on Plasma; `tests/hardware/run_field_tray_check.lua` (`dbus-run-session -- xvfb-run -a luajit …`) proves
+the check against real libdbusmenu-gtk and fails when `reassert_check` is removed. Action: a new tray assertion goes
+into that check and that proof, never into a synchronous bus call from the daemon.
+
 ### project-linux-container-proofs-model-the-kernel-at-libc
 
 A container kernel has no uinput: `tests/hardware/run_container_proofs.sh`
