@@ -2368,7 +2368,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/metrics/test_metrics_shortcut_transaction.ahk
 #Include meta/modules/keystats/metrics/test_metrics_app_time_accuracy.ahk
 #Include meta/settings/persistence/test_toggle_category_all_features_atomic.ahk
-#Include meta/core/crypto/test_djb2_fallback_logged.ahk
 #Include meta/platform/system/test_adapter_callback_swallow_logged.ahk
 #Include meta/platform/system/test_notifier_single_owner.ahk
 #Include meta/ai/prediction/test_callbacks_never_swallowed.ahk
