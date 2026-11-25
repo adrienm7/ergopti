@@ -395,7 +395,15 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
     the `ai` areas, then the remaining never-campaigned units of its table in rank order. Taken on 2026-11-25:
     `macos/core/text` and `linux/core/text` ([report](docs/audits/platform-parity/2026-11-25-core-text/report.md),
     TXT-01 fixed: every Linux TOML file parse is counted as `toml.parse`); left from it: compare the catalogue
-    override writes of macOS and Linux on one hand-edited `config.toml`.
+    override writes of macOS and Linux on one hand-edited `config.toml`. Also taken on 2026-11-25: the application
+    launch adapters ([report](docs/audits/platform-parity/2026-11-25-app-launchers/report.md), LCH-01 fixed: macOS
+    logs every launch by program name only, as Windows), the permission guidance
+    ([report](docs/audits/platform-parity/2026-11-25-permission-guidance/report.md), PRM-01 fixed: Enter answers
+    the macOS permission dialog once, with the focused button) and the menu engine bindings with the macOS reload
+    hold ([report](docs/audits/platform-parity/2026-11-25-menu-engine/report.md), no drift; the developer-run
+    reload under an open window is under « Maintainer decisions pending »). Next in rank order:
+    `macos/clipboard`, `linux/hotstrings/adapters` and `linux/ui/user_action_editor.lua` once today's hotstring and
+    action work has landed, then `linux/platform`.
 - [ ] **[RELEASE] Windows/Linux feed-only update fallback.** Built: the Versions window's feed-only list installs the
       channel's newest release through its required detached signature on both (`feed-only-install` tests, throwaway
       key in `feed_install_vectors.json`); without a key every feed row keeps the no-details refusal. Left, at release
@@ -640,6 +648,15 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Keep it as described**, no row for a removal Windows does not report.
   2. Add a 🔴 row from the idle-counter comparison, accepting false alarms under remote desktop or other injectors.
   3. Reinstall the hooks periodically (`InstallKeybdHook(true, true)`), at the cost of a reset of the hook's key state.
+- [ ] **No reload hold for an open window in developer runs (decided by the agent on 2026-11-25, to review by
+      the maintainer).** macOS holds a file-watcher reload while its metrics windows or the hotstring editor are
+      open (`macos/menu/engine/ui_restore.lua`), because `hs.reload` closes every window. In a developer run,
+      Windows (`core/lifecycle/engine/dev_source.ahk`) and Linux (a source edit restarts the daemon) reload as soon
+      as the tree settles, closing an open editor. Users never reach this path (their source does not change and
+      Linux re-reads TOML in place). Kept meanwhile: no hold on Windows and Linux
+      ([report](docs/audits/platform-parity/2026-11-25-menu-engine/report.md)). Choose:
+  1. **(recommended) Keep it as described**, a developer reload is wanted at once.
+  2. Hold the developer reload on Windows and Linux while a window with unsaved edits is open, as macOS does.
 - [ ] **Bug link login-redirect budget (decided by the agent on 2026-11-24, to review by the maintainer).** Measured
       anonymously on github.com (`tools/dev/measure-issue-url-limits.cjs`): `/issues/new` answers 500 from about
       6,460 bytes and `/login` from about 6,500, so a 4,000-byte link dense in `%XX` failed after the signed-out
