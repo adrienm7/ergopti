@@ -169,8 +169,9 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	; via the framework helper rather than a pinned per-module path.
 	; KL_CaptureHeld() is the shared capture gate: driver suspension OR the
 	; user's collection pause; _MFS_CaptureGateKeepsBothPauseCauses below calls
-	; it under a real Suspend. KL_Hook_Tick is called under a real Suspend in
-	; tests/unit/modules/keystats/test_keystats_hook_tick_pause.ahk. The ingest
+	; it under a real Suspend. KL_Hook_Tick and KL_Hook_LivePush run under a
+	; real Suspend in tests/unit/modules/keystats/test_keystats_hook_tick_pause.ahk.
+	; The ingest
 	; tick re-checks the pause inside its journal scope, so its admission guard
 	; cannot be observed apart from the second one and stays a source read.
 	Body := _DriverFuncBody("KL_IngestOnce")
@@ -185,11 +186,6 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	Publish := InStr(Sensor, "KL_LogSystemEvent(")
 	Assert(Gate > 0 && Filter > Gate && Native > Gate && Publish > Gate,
 		"the real collection pause gate must precede sensor filtering, native acquisition and publication")
-	; KL_Hook_LivePush is the live-push companion tick.
-	Body := _DriverFuncBody("KL_Hook_LivePush")
-	Assert(Body != "", "KL_Hook_LivePush() must exist")
-	Assert(InStr(Body, "A_IsSuspended") > 0,
-		"KL_Hook_LivePush must gate on A_IsSuspended (metrics-timers-bypass-pause)")
 }
 Test("metrics: the recurring keystats/metrics ticks gate on A_IsSuspended (metrics-timers-bypass-pause)", _ATG_MetricsTicksGatedOnSuspend)
 
