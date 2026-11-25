@@ -878,6 +878,8 @@ check(
 				'pareto',
 				'trace',
 				'analysers',
+				// The task help (2026-11-25), before « One layout », which stays last.
+				'help',
 				'details'
 			]),
 		`tabs: ${tabs}`

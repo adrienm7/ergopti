@@ -2358,3 +2358,9 @@ body:has(> main.layout-analysis) {
 	outline: 2px dashed var(--la-accent);
 	outline-offset: -2px;
 }
+
+/* The task help (an idea seen in the Layouts Wiki playground's Docs pane):
+   prose kept to a readable measure, under 80 characters a line. */
+.la-help p {
+	max-width: 66ch;
+}
