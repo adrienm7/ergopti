@@ -424,6 +424,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
+- **SendInput to 0 in the compiled script (maintainer choice, 2026-11-25: after the v1.0.10 release).** The exe
+  AV surface counts 73 `SendInput` occurrences (`tools/ci/windows-exe-av-surface.json`). Rewrite the `SendInput()`
+  calls as `Send()` where no other `SendMode` is active, rename the internal wrappers (`_AHK_SendInput`,
+  `_TextSenderSendInput`, `SendInputFn`, `_LLM_TerminalOutputSendInput*`) and lower the ceiling to 0, in a dedicated
+  pass with Windows field checks. Cosmetic for antivirus engines (the AutoHotkey runtime imports the API anyway).
 - **Tests.** Source assertions left to convert to behaviour (3,765 `_Driver*` source reads in 984 files; 68 meta
   files still name `A_IsSuspended`, 56 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
