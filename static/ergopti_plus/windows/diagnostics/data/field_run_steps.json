@@ -28,14 +28,14 @@
 			"kind": "field_check",
 			"check": "send_probe",
 			"deadline_seconds": 90,
-			"proves": "After a notice asking not to type, SendInput and SendEvent type every shape the driver sends into a window the check owns, each exactly."
+			"proves": "After a notice asking not to type, both send modes type every shape the driver sends into a window the check owns, each exactly."
 		},
 		{
 			"id": "field_hook_probe",
 			"kind": "field_check",
 			"check": "hook_probe",
 			"deadline_seconds": 60,
-			"proves": "After a notice asking not to type, the low-level keyboard hook order before and after a SendInput is recorded and AutoHotkey's hook runs first once it rehooks."
+			"proves": "After a notice asking not to type, the low-level keyboard hook order before and after an injected key is recorded and AutoHotkey's hook runs first once it rehooks."
 		},
 		{
 			"id": "driver_reload",
