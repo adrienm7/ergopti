@@ -2161,6 +2161,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/hotstrings/engine/engine/test_cascade.ahk
 #Include unit/hotstrings/engine/engine/test_final_result.ahk
 #Include unit/hotstrings/engine/engine/test_injection_plan.ahk
+#Include unit/hotstrings/engine/engine/test_action_entry.ahk
 #Include unit/hotstrings/engine/engine/test_output_tokens.ahk
 #Include meta/hotstrings/engine/catalogue/test_combo_auto_escaping.ahk
 #Include meta/modules/keystats/ergonomics/test_ergo_flow_gap_end.ahk
