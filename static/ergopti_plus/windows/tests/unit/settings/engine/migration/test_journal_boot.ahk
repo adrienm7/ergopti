@@ -899,10 +899,10 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Coordinator := _ConfigFullSaveCoordinator()
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Original := '[_meta]`nschema_version = 23`n[llm]`nmodel = "user-model"`n'
+	Original := '[_meta]`nschema_version = 24`n[llm]`nmodel = "user-model"`n'
 	Successor := Metadata . '`n[llm]`nmodel = "user-model"`n[future]`nkeep = [false, 1, "1"]`n'
 	try {
-		AssertEqual(23, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v23 registry contract")
+		AssertEqual(24, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v24 registry contract")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Original))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
@@ -936,7 +936,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	}
 }
 Test("config journal: post-boot direct current14 no-op and writer keep genuine admission",
-	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 23', false))
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 24', false))
 Test("config journal: post-boot direct future99 no-op and writer refuse without borrowing boot",
 	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 99', true))
 Test("config journal: post-boot direct nonversion no-op and writer refuse without borrowing boot",
