@@ -80,7 +80,7 @@
 				{
 					"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 					"symbol": "HSE_UndoExpansion(Undo",
-					"sha256": "24b592605b83b8f9da1df9801b6eafc680c38a6a143773add9b7214033b97490"
+					"sha256": "56e4314b8365c52e57685253b0ae1162cdfd811c42046e65a72b5b8002f203e7"
 				}
 			],
 			"macos": [
