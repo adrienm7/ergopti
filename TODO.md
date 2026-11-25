@@ -466,6 +466,17 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### All drivers
 
+- [ ] **User workflows, what is left (maintainer request, 2026-11-25; branch `feat/user-workflows`).** On macOS and
+      Linux the model, runner, `run_workflow` action and editor window are built
+      ([data README](static/ergopti_plus/_shared/shortcuts/data/workflows/README.md)). Left: 1. Windows: port the validator, interpreter and runner to AutoHotkey, replaying
+      `_shared/tests/corpus/workflows/`, then the effect ports, the `run_workflow` handler, the window host and the
+      Shortcuts row; drop `platform_reason.action_workflows_windows_pending` then. 2. Hotstring → action on the three drivers: an entry `{ output = "", action = "<id>" }` (or `action =
+     "run_workflow", workflow = "<id>"`), carried by the TOML reader, the loaders, the matcher record and the
+      editor's save validators; after the erase and the output the engine runs the action; a shared corpus pins it. 3. Screen steps (wait for, capture, OCR, click on an image or a text, « visible » conditions): wire the screen
+      vision service of `feat/keep-awake-autoclick` ([design](docs/design/screen-vision.md)) once it has macOS and
+      Windows, with a PNG-to-gray template loader; until then they stop with `screen_service_missing`. 4. macOS click at coordinates through the mouse ownership of `gestures/engine/actions_click.lua` (a named
+      refusal today).
+
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S01 to S26 are on dev.
       Left: S27 (install) to S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per
