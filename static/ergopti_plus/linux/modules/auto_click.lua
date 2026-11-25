@@ -227,7 +227,7 @@ function M.start(plan)
 	end
 	local ports = _ports or default_ports()
 	if not _ports and not _vision_started then
-		require("platform.vision.screen_vision").init()
+		require("platform.vision.vision_session").service()
 		_vision_started = true
 	end
 	local base_click = ports.on_click

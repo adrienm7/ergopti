@@ -225,7 +225,8 @@ local function ensure_connected()
 end
 
 --- Captures a window, or a rectangle of the root window.
---- @param target table { window = id } or { rect = { x, y, width, height } } in root coordinates.
+--- @param target table { window = id }, { root = true } (the whole screen) or
+---   { rect = { x, y, width, height } } in root coordinates.
 --- @param gray function (r, g, b) -> integer, the shared rounding.
 --- @return table|nil image The screen vision image; nil with a reason.
 --- @return string|nil reason
@@ -243,6 +244,12 @@ function M.capture(target, gray)
 		if not fx then return nil, "no_foreground_window" end
 		drawable, x, y, width, height = id, 0, 0, fw, fh
 		frame = { x = fx, y = fy, width = fw, height = fh }
+	elseif target.root then
+		local root = _transport.root()
+		local _, _, fw, fh = _transport.geometry(root)
+		if not fw then return nil, "capture_unavailable" end
+		drawable, x, y, width, height = root, 0, 0, fw, fh
+		frame = { x = 0, y = 0, width = fw, height = fh }
 	else
 		local r = target.rect
 		assert(type(r) == "table", "a capture needs a window or a rectangle")
