@@ -2993,8 +2993,15 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   hotstring again on an unread focus, and do not open the AI there.
 - **44 px targets:** a 44 px minimum for every control in the app windows' `theme.css` and the site's stylesheet,
   with fixed window sizes raised where a window overflows.
-- **Magic and repeat keys:** build them as designed in `docs/design/magic-and-repeat-keys.md`, the Studio analysis
-  first, then the emulation by the three drivers.
+- **Repeat and magic keys in the Studio's analysis: build it as designed, the
+  analysis first** (choice 1 of the pending item). A layout's own repeat,
+  skip-repeat and magic keys (output-context rules of at most two characters,
+  `docs/design/magic-and-repeat-keys.md`) are analysed as context-dependent
+  ways of typing, then emulated by the three drivers from one shared data
+  source; they stay apart from Ergopti+'s ★, a hotstring trigger. Action:
+  `contextOutput` and `_shared/tests/corpus/layouts/magic_vectors.json` define
+  what such a key types for the analysis and every driver; a driver change
+  replays those vectors, and no layout key takes ★ or ✦ as its label.
 - **Recent log lines in the bug report:** keep the closed policy; each new failure shape gets a recognised code,
   no raw log line in the report, the clipboard or the link.
 - **Pareto tab defaults:** keep them as shipped.
