@@ -721,12 +721,12 @@ _HS_CategoryRowsStandard() {
 		; full "what would reactivate" count.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		; Checkmark follows the category's own enable toggle, not whether every
-		; section is checked: the category stays checked with its button on even
-		; if some or all sections inside are off.
+		; Checked while its gate is open and one of its hotstrings is active:
+		; never « checked (0) » (maintainer, 2026-11-25); the gate itself is the
+		; submenu's own switch.
 		Rows.Push(Map(
 			"label",   Title,
-			"checked", IsCategoryGated(Category) ? true : false,
+			"checked", HS_FamilyChecked(IsCategoryGated(Category), Total),
 			"submenu", SubMenus[Category]))
 	}
 	return Rows
@@ -794,12 +794,12 @@ _HS_BoundCategoryRows(ExtensionId) {
 					|| !SubMenus.Has(Category)
 				continue
 			; Count + checkmark: same rule as the standard categories — enabled
-			; sections only, 0 when the master or this category's gate is off; the
-			; checkmark follows the category's own toggle, not its section states.
+			; sections only, 0 when the master or this category's gate is off, and
+			; never « checked (0) ».
 			Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 			Result.rows.Push(Map(
 				"label",   GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")",
-				"checked", IsCategoryGated(Category) ? true : false,
+				"checked", HS_FamilyChecked(IsCategoryGated(Category), Total),
 				"submenu", SubMenus[Category]))
 			Result.total += Total
 		}
@@ -1561,10 +1561,11 @@ _HS_ExtensionRows(Options := unset) {
 					Child := _HS_CategoryMenu(TF.category, TF.path, TFRows,
 						(Targets, Enabled) => HotstringExtensions_SetCategoryEnabled(Targets[1], Enabled, Options))
 					OwnedMenus.Push(Child)
+					PackCount := HotstringExtensions_Count(Features, [{ toml_files: [TF] }], MasterOn)
 					PackRows.Push(Map(
-						"label", TF.stem . " (" . FmtCount(HotstringExtensions_Count(Features,
-							[{ toml_files: [TF] }], MasterOn)) . ")",
-						"checked", ReadFeatureStateV2(GroupPath)["enabled"], "submenu", Child))
+						"label", TF.stem . " (" . FmtCount(PackCount) . ")",
+						"checked", HS_FamilyChecked(ReadFeatureStateV2(GroupPath)["enabled"], PackCount),
+						"submenu", Child))
 				}
 			}
 			if !(PackRows is Array)

@@ -68,7 +68,9 @@ local function fake_dyn(on, families_on)
 	local log = { set_enabled = {}, rules = {}, scoped = {} }
 	return {
 		is_enabled = function() return on end,
-		active_count = function() return 0 end,
+		-- Two active hotstrings while the gate is open: a family counting none
+		-- is drawn unchecked (family-check-not-zero).
+		active_count = function() return on and 2 or 0 end,
 		set_enabled = function(value) log.set_enabled[#log.set_enabled + 1] = value end,
 		set_scope_enabled = function(value, config)
 			log.scoped[#log.scoped + 1] = { on = value, config = config }

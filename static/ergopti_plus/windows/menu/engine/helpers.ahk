@@ -225,6 +225,14 @@ FmtCount(N) {
 		_FmtCountCache[N] := Result
 		return Result
 }
+; Whether a hotstring family's parent row (a category whose sections open in
+; its submenu) is drawn checked: its gate open and at least one hotstring
+; active. Never « checked (0) » (maintainer, 2026-11-25); the gate stays the
+; submenu's own switch. The Lua drivers hold the same rule in
+; _shared/menu/engine/labels.lua (family_checked).
+HS_FamilyChecked(GateOpen, ActiveCount) {
+	return (GateOpen && ActiveCount > 0) ? true : false
+}
 NoAction(*) {
 }
 ; Frames a translated title as a disabled menu section header. The frame is the

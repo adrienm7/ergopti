@@ -149,3 +149,13 @@ _MH_NativeCaseReceipt() {
 	} finally _CTC_ReleaseMenu(MenuOwner)
 }
 Test("menu_helpers: native case comparison is observed on an owned menu (menu-native-case-receipt)", _MH_NativeCaseReceipt)
+
+; Maintainer decision of 2026-11-25 (family-check-not-zero): an open hotstring
+; family that counts no active hotstring is never drawn « checked (0) ».
+TestMH_FamilyCheckedNeedsAnActiveHotstring() {
+	AssertEqual(false, HS_FamilyChecked(true, 0), "an open family with nothing active is unchecked")
+	AssertEqual(true, HS_FamilyChecked(true, 3), "an open family with active hotstrings is checked")
+	AssertEqual(false, HS_FamilyChecked(false, 3), "a closed family is unchecked")
+}
+Test("menu_helpers: a hotstring family is never checked with no active hotstring (family-check-not-zero)",
+	TestMH_FamilyCheckedNeedsAnActiveHotstring)

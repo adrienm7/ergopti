@@ -468,7 +468,9 @@ function M.build_groups(ctx, only, counts)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
 			label   = base_label .. " (" .. fmt_count(total) .. ")",
-			checked = enabled or nil,
+			-- A family with sections is never « checked (0) » (Labels.family_checked);
+			-- a leaf keeps the tick of the gate its click switches.
+			checked = (has_secs and Labels.family_checked(enabled == true, total) or not has_secs and enabled) or nil,
 			-- Clickable only as a leaf. A category with sections opens a submenu,
 			-- and a row that opens a submenu is never clicked: its gate is the
 			-- submenu's first row instead.

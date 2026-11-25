@@ -123,6 +123,20 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		end)
 	end
 
+	-- Maintainer decision of 2026-11-25 (family-check-not-zero): a family
+	-- whose gate is open but that counts no active hotstring reads
+	-- « Alpha (0) » unchecked, never « checked (0) ».
+	for _, case in ipairs({ { count = 0, checked = nil }, { count = 5, checked = true } }) do
+		helpers.it("an open family with " .. case.count .. " active hotstring(s) is drawn checked=" .. tostring(case.checked), function()
+			local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
+			local ctx = context(case.count > 0, true)
+			local rows = hotstrings.build_groups(ctx, nil, { group_counts = { alpha = case.count } })
+			helpers.assert_true(type(rows[1]) == "table" and type(rows[1].submenu) == "table", "the family row and its submenu")
+			helpers.assert_true(rows[1].label:find("(" .. case.count .. ")", 1, true) ~= nil, rows[1].label)
+			helpers.assert_eq(rows[1].checked, case.checked)
+		end)
+	end
+
 	helpers.it("one group with a section off leaves every « all » checkbox unticked", function()
 		local hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
 		local ctx = context(true, true, { "alpha.toml", "beta.toml" })

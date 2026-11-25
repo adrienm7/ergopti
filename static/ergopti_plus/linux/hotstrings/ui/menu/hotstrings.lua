@@ -13,6 +13,7 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local LabelValue = require("core.i18n.engine.label_value")
+local Labels = require("menu.engine.labels")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
@@ -463,7 +464,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- every entry it would have had.
 			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category))
 				.. (personal and not current_source() and (" — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")) or ""),
-			checked = on and true or false,
+			-- Never « checked (0) »: the gate stays the submenu's first row.
+			checked = Labels.family_checked(on == true, active_count(id, category)),
 			submenu = rendered,
 		}
 	end
@@ -1210,7 +1212,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- description key and has no translation of its own, so it would have
 				-- rendered as the raw string.
 				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
-				checked = on,
+				checked = Labels.family_checked(on == true, count),
 				submenu = rendered,
 			}
 			return rows
