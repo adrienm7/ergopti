@@ -206,7 +206,7 @@ async function versions(browser, origin) {
 	await page.waitForSelector('#le-versions-table');
 	assert.deepEqual(
 		await page.$$eval('#le-versions-table tbody th', (cells) =>
-			cells.map((cell) => cell.textContent)
+			cells.map((cell) => cell.childNodes[0].textContent)
 		),
 		['Before ¤'],
 		'the version is listed by its name'
@@ -240,9 +240,58 @@ async function versions(browser, origin) {
 	);
 	await page.click('#le-undo');
 	assert.equal(await legend('KeyQ'), '¤', 'Undo takes the restore back');
+	// The branch graph: two versions saved from « Before ¤ » (one after a
+	// restore of it) both sit under it, each naming it as its origin.
+	const save = async (versionName) => {
+		await page.fill('#le-version-name', versionName);
+		await page.click('#le-version-save');
+	};
+	await save('Branch A');
+	await page.click('#le-version-restore-0');
+	await save('Branch B');
+	const graph = async () =>
+		page.$$eval('#le-versions-table tbody tr', (trs) =>
+			trs.map((tr) => [
+				tr.children[0].childNodes[tr.children[0].querySelector('.le-version-branch') ? 1 : 0]
+					.textContent,
+				tr.children[1].textContent,
+				getComputedStyle(tr.children[0]).getPropertyValue('--le-version-depth').trim(),
+				Boolean(tr.querySelector('.le-version-current'))
+			])
+		);
+	assert.deepEqual(
+		await graph(),
+		[
+			['Before ¤', 'the start', '0', false],
+			['Branch A', 'Before ¤', '1', false],
+			['Branch B', 'Before ¤', '1', true]
+		],
+		'two branches from one version, the last saved the base'
+	);
+	// Deleting the root hangs its branches from its own parent (the start).
 	await page.click('#le-version-delete-0');
 	await page.waitForSelector('#le-confirm-no');
 	await page.click('#le-confirm-yes');
+	await page.waitForFunction(
+		() => document.querySelectorAll('#le-versions-table tbody tr').length === 2
+	);
+	assert.deepEqual(
+		(await graph()).map((row) => row.slice(0, 3)),
+		[
+			['Branch A', 'the start', '0'],
+			['Branch B', 'the start', '0']
+		],
+		'the branches of a deleted version hang from its parent'
+	);
+	for (let left = 2; left > 0; left--) {
+		await page.click('#le-version-delete-0');
+		await page.waitForSelector('#le-confirm-no');
+		await page.click('#le-confirm-yes');
+		await page.waitForFunction(
+			(count) => document.querySelectorAll('#le-versions-table tbody tr').length === count,
+			left - 1
+		);
+	}
 	await page.waitForSelector('#le-versions-empty');
 	assert.deepEqual(errors, [], 'versions page errors');
 	await context.close();

@@ -22,6 +22,13 @@
 			"reason": "The open panel's layout grid of its columns and its n-gram section; a pure layout box with no meaning of its own."
 		},
 		{
+			"file": "static/ergopti_plus/_shared/ui/layout_editor/editor_page.js",
+			"element": "span.le-version-branch",
+			"count": 1,
+			"kind": "decorative",
+			"reason": "The decorative branch mark before a version under another, aria-hidden: the « Made from » cell says the same in words."
+		},
+		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
 			"element": "span.la-panel-verdict",
 			"count": 1,
