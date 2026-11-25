@@ -39,6 +39,7 @@ Linux exports the group as dbusmenu radio items; the macOS menu bar
 style, so they draw the same single tick as a checkmark. Do not grow the
 submenu back into the whole catalogue; a new emulatable layout appears in the
 picker, and in the quick rows once chosen.
+
 ## The anti-sleep mode gains an optional auto-clicker (2026-11-25)
 
 Answers to the auto-click questionnaire. The auto-clicker is integrated into

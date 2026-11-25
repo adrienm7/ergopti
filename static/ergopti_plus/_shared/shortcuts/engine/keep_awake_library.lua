@@ -23,6 +23,55 @@ local M = {}
 local Presets = require("shortcuts.engine.keep_awake_presets")
 local Rows = require("shortcuts.engine.keep_awake_menu")
 
+--- Reads one shared JSON data file through a driver's ports.
+--- @param read function (path) -> string|nil
+--- @param shared function (relative) -> absolute path under _shared/
+--- @param decode function (string) -> table|nil
+--- @param relative string Path under _shared/.
+--- @return table decoded
+function M.read_shared_json(read, shared, decode, relative)
+	local raw = read(shared(relative))
+	local decoded = type(raw) == "string" and decode(raw) or nil
+	assert(type(decoded) == "table", relative .. " is unreadable")
+	return decoded
+end
+
+--- Owns one auto-click run: its session and the timer that ticks it.
+--- @param ports table { every(seconds, fn) -> handle, cancel(handle), log(level, message, ...) }
+--- @return table runner { start(session, seconds, before_tick), stop(), session() }
+function M.runner(ports)
+	local runner, current, timer = {}, nil, nil
+
+	--- Starts ticking a session; before_tick may return false to stop the run.
+	function runner.start(session, seconds, before_tick)
+		assert(current == nil, "an auto-click run is already active")
+		current = session
+		timer = ports.every(seconds, function()
+			if not current then return end
+			if before_tick and before_tick() == false then runner.stop(); return end
+			current.tick()
+		end)
+	end
+
+	--- Stops the run; a scan still running is ignored when it answers.
+	function runner.stop()
+		if not current then return true end
+		current.stop()
+		current = nil
+		if timer then ports.cancel(timer) end
+		timer = nil
+		ports.log("info", "Auto-click stopped.")
+		return true
+	end
+
+	--- The running session, or nil.
+	function runner.session()
+		return current
+	end
+
+	return runner
+end
+
 --- Creates the library of one driver.
 --- @param ports table {
 ---   os_name = "macos"|"linux", separator = "/",

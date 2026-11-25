@@ -25,11 +25,12 @@ local Logger = require("core.logger.engine.shim")
 local SyntheticInput = require("platform.input.synthetic_input")
 
 local LOG = "adapters.auto_click_ports"
-local SYNTHETIC_OWNER = "shortcuts.keep_awake"
 
 --- Posts one tagged mouse event at a point.
 local function post_mouse(event_type, point)
-	local prepared, detail = SyntheticInput.prepare_mouse_event(SYNTHETIC_OWNER, event_type, point)
+	local prepared, detail = SyntheticInput.prepare_mouse_event(
+		-- The keep-awake session's own provenance: its watcher ignores it.
+		"shortcuts.keep_awake", event_type, point)
 	if not prepared then
 		Logger.warn(LOG, "An automatic click could not be prepared: %s.", tostring(detail))
 		return false

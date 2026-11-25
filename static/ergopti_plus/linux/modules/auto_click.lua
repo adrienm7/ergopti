@@ -39,7 +39,10 @@ local Session = require("shortcuts.engine.auto_click_session")
 local LOG = "modules.auto_click"
 
 local _session = nil
-local _timer = nil
+local _runner = Library.runner({
+	every = TimerScheduler.every, cancel = TimerScheduler.cancel,
+	log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+})
 local _locked = true
 local _lock_probe = false
 local _clicks_total = 0
@@ -56,10 +59,7 @@ local _vision_started = false
 -- =========================================
 
 local function read_shared(relative)
-	local raw = FileSystem.read(Paths.shared(relative))
-	local decoded = type(raw) == "string" and Json.decode(raw) or nil
-	assert(type(decoded) == "table", relative .. " is unreadable")
-	return decoded
+	return Library.read_shared_json(FileSystem.read, Paths.shared, Json.decode, relative)
 end
 
 local _library = nil
@@ -233,22 +233,15 @@ function M.start(plan)
 		options = defaults, cooldown_ms = Timings.ms("keep_awake", "auto_click_cooldown_ms"),
 		ocr = { layout = "sparse", locale = locale },
 	})
-	_timer = TimerScheduler.every(Timings.sec("keep_awake", "auto_click_tick_ms"), function()
-		if _session then _session.tick() end
-	end)
+	_runner.start(_session, Timings.sec("keep_awake", "auto_click_tick_ms"))
 	Logger.info(LOG, "Auto-click started: %d image(s), %d text target(s).", #plan.templates, #plan.text_targets)
 	return true
 end
 
 --- Stops the auto-clicker; a scan still running is ignored when it answers.
 function M.stop()
-	if not _session then return true end
-	_session.stop()
 	_session = nil
-	if _timer then TimerScheduler.cancel(_timer) end
-	_timer = nil
-	Logger.info(LOG, "Auto-click stopped.")
-	return true
+	return _runner.stop()
 end
 
 return M
