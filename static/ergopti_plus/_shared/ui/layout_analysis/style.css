@@ -2248,6 +2248,18 @@ body:has(> main.layout-analysis) {
 	stroke-width: 1.5;
 }
 
+/* The smoothed distribution above the spread: a light fill of the frontier's
+   colour with its outline, so it reads in both themes without hiding a tick. */
+.la-pareto-density-fill {
+	fill: color-mix(in srgb, var(--la-cat-1) 22%, transparent);
+}
+
+.la-pareto-density {
+	fill: none;
+	stroke: var(--la-cat-1);
+	stroke-width: 1.5;
+}
+
 /* The spread's inner quantiles (P10 to P90): taller dashed marks in the
    text colour, each named under the strip and listed in the table below. */
 .la-pareto-quantile {

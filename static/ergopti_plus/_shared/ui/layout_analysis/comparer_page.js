@@ -449,6 +449,10 @@
 	// The quantiles the Pareto tab's spread marks and lists (the Layouts Wiki
 	// playground's Ranking view snaps its range to these), in percent.
 	const SPREAD_QUANTILES = [0, 10, 25, 50, 75, 90, 100];
+	// The smoothed distribution above the spread (an idea seen in the Layouts
+	// Wiki playground's Ranking view): its band's height and its samples.
+	const SPREAD_DENSITY_BAND = 44;
+	const SPREAD_DENSITY_POINTS = 160;
 	// Corpus blends (an idea seen in the Layouts Wiki playground): how many
 	// corpora a blend mixes, its id in the corpus list, and the first parts.
 	const BLEND_PARTS = 3;
@@ -2552,8 +2556,9 @@
 				count: rows.length - 1
 			});
 			const { width, margin } = PARETO_SIZE;
-			// Room under the strip for the quantiles' names, on two alternating lines.
-			const height = 68;
+			// Room under the strip for the quantiles' names, on two alternating
+			// lines, and above it for the smoothed distribution.
+			const height = 68 + SPREAD_DENSITY_BAND;
 			const sx = paretoScale(
 				rows.map((r) => paretoValue(r, x)),
 				better,
@@ -2566,7 +2571,12 @@
 				role: 'img',
 				'aria-labelledby': 'la-pareto-spread-label la-pareto-spread-text'
 			});
-			svg.append(
+			const values = rows.map((r) => paretoValue(r, x));
+			svg.append(spreadDensity(values, sx));
+			// The strip under the curve.
+			const strip = svgEl('g', { transform: `translate(0 ${SPREAD_DENSITY_BAND})` });
+			svg.append(strip);
+			strip.append(
 				svgEl('line', {
 					x1: margin,
 					y1: 28,
@@ -2576,7 +2586,7 @@
 				})
 			);
 			for (const result of rows)
-				svg.append(
+				strip.append(
 					svgEl('line', {
 						x1: sx(paretoValue(result, x)),
 						x2: sx(paretoValue(result, x)),
@@ -2585,11 +2595,11 @@
 						class: 'la-pareto-spread-tick'
 					})
 				);
-			const quantiles = spreadQuantiles(rows.map((r) => paretoValue(r, x)));
+			const quantiles = spreadQuantiles(values);
 			// The inner quantiles as taller dashed marks, named above (P0 and P100 are the ends).
 			const inner = quantiles.filter((q) => q.p !== 0 && q.p !== 100);
 			for (const [index, { p, value: at }] of inner.entries()) {
-				svg.append(
+				strip.append(
 					svgEl('line', {
 						x1: sx(at),
 						x2: sx(at),
@@ -2606,11 +2616,45 @@
 					class: 'la-pareto-tick'
 				});
 				label.textContent = t('layout_analysis.percentile.chip', { percent: p });
-				svg.append(label);
+				strip.append(label);
 			}
-			svg.append(svgEl('circle', { cx: sx(value), cy: 28, r: 8, class: 'la-pareto-ring' }));
+			strip.append(svgEl('circle', { cx: sx(value), cy: 28, r: 8, class: 'la-pareto-ring' }));
 			box.append(svg);
 			renderParetoQuantiles(x, quantiles, rows.length);
+		}
+
+		/**
+		 * The smoothed distribution of the spread's values (E.densityCurve, an
+		 * idea seen in the Layouts Wiki playground's Ranking view), drawn as a
+		 * filled curve over the values' range in the band above the strip, its
+		 * peak at the band's top. Decorative beside the strip and the quantiles'
+		 * table, which say the same in numbers.
+		 * @param {number[]} values - The values the strip shows.
+		 * @param {function(number): number} sx - The strip's scale.
+		 * @returns {SVGElement} The curve's group, its fill and its outline.
+		 */
+		function spreadDensity(values, sx) {
+			const low = Math.min(...values);
+			const high = Math.max(...values);
+			const { points } = E.densityCurve(values, { points: SPREAD_DENSITY_POINTS });
+			const inside = points.filter((p) => p.x >= low && p.x <= high);
+			const peak = Math.max(...inside.map((p) => p.density), 0);
+			const base = SPREAD_DENSITY_BAND - 2;
+			const y = (density) => (peak > 0 ? base - (density / peak) * (base - 4) : base);
+			const line = inside.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.x)} ${y(p.density)}`);
+			const group = svgEl('g', { 'aria-hidden': 'true' });
+			// The fill closes on the band's floor; the outline is the curve alone.
+			group.append(
+				svgEl('path', {
+					d: [`M ${sx(low)} ${base}`]
+						.concat(line.map((step) => `L${step.slice(1)}`))
+						.concat([`L ${sx(high)} ${base}`, 'Z'])
+						.join(' '),
+					class: 'la-pareto-density-fill'
+				}),
+				svgEl('path', { d: line.join(' '), class: 'la-pareto-density' })
+			);
+			return group;
 		}
 
 		/**

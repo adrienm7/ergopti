@@ -5428,6 +5428,73 @@ var LAYOUT_ANALYSIS = (function () {
 		}));
 	}
 
+	// How many points a density curve samples between its ends.
+	const DENSITY_POINTS = 64;
+	// Silverman's rule of thumb: bandwidth = 0.9 · min(σ, IQR / 1.34) · n^(-1/5).
+	const SILVERMAN = { factor: 0.9, iqr: 1.34, power: -0.2 };
+	// The curve runs this many bandwidths past the extreme values, so its tails close.
+	const DENSITY_TAIL = 3;
+	// Values with no spread are smoothed over this share of their range (or of their size).
+	const DENSITY_FLAT_SHARE = 0.05;
+
+	/**
+	 * A smoothed distribution of values (an idea seen in the Layouts Wiki
+	 * playground's Ranking view): a Gaussian kernel density estimate, its
+	 * bandwidth by Silverman's rule of thumb (the spread, or DENSITY_FLAT_SHARE
+	 * of the range when the values are nearly all equal), sampled from DENSITY_TAIL
+	 * bandwidths under the lowest value to as many above the highest. The
+	 * density integrates to 1 over the values' axis.
+	 * @param {number[]} values - At least one finite value.
+	 * @param {{points?: number, bandwidth?: number}} [options] - points: samples
+	 *   (2 at least, DENSITY_POINTS when absent); bandwidth: a fixed one (> 0).
+	 * @returns {{bandwidth: number, points: Array<{x: number, density: number}>}}
+	 *   points in increasing x.
+	 * @throws {Error} On no value, a value that is not finite, fewer than two
+	 *   points or a bandwidth that is not above 0.
+	 */
+	function densityCurve(values, options) {
+		const opts = options || {};
+		if (!Array.isArray(values) || values.length === 0 || !values.every(Number.isFinite))
+			throw new Error('layout_analysis: densityCurve needs finite values');
+		const count = opts.points === undefined ? DENSITY_POINTS : opts.points;
+		if (!Number.isInteger(count) || count < 2)
+			throw new Error('layout_analysis: densityCurve needs at least two points');
+		const sorted = values.slice().sort((a, b) => a - b);
+		const n = sorted.length;
+		const quantile = (p) => {
+			const at = p * (n - 1);
+			const low = Math.floor(at);
+			return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low);
+		};
+		let bandwidth = opts.bandwidth;
+		if (bandwidth === undefined) {
+			const mean = sorted.reduce((sum, v) => sum + v, 0) / n;
+			const sd = Math.sqrt(sorted.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n);
+			const iqr = (quantile(0.75) - quantile(0.25)) / SILVERMAN.iqr;
+			const spread = iqr > 0 ? Math.min(sd, iqr) : sd;
+			const range = sorted[n - 1] - sorted[0];
+			// Equal values have no spread: a width that still draws a bump.
+			const base =
+				spread > 0
+					? spread
+					: (range > 0 ? range : Math.abs(mean)) * DENSITY_FLAT_SHARE || DENSITY_FLAT_SHARE;
+			bandwidth = SILVERMAN.factor * base * n ** SILVERMAN.power;
+		}
+		if (!(bandwidth > 0) || !Number.isFinite(bandwidth))
+			throw new Error('layout_analysis: densityCurve needs a bandwidth above 0');
+		const from = sorted[0] - DENSITY_TAIL * bandwidth;
+		const to = sorted[n - 1] + DENSITY_TAIL * bandwidth;
+		const norm = 1 / (n * bandwidth * Math.sqrt(2 * Math.PI));
+		const points = [];
+		for (let i = 0; i < count; i++) {
+			const x = from + ((to - from) * i) / (count - 1);
+			let sum = 0;
+			for (const v of sorted) sum += Math.exp(-0.5 * ((x - v) / bandwidth) ** 2);
+			points.push({ x, density: sum * norm });
+		}
+		return { bandwidth, points };
+	}
+
 	/**
 	 * The keyboard formats (100 %, TKL, 75 %, 65 %, 60 %), each with the keys
 	 * it lacks: the one table the editor's « Format », the Comparer's and the
@@ -8493,6 +8560,7 @@ var LAYOUT_ANALYSIS = (function () {
 		blendNgrams,
 		BLEND_CHARS,
 		pareto,
+		densityCurve,
 		compileQuery,
 		QueryError,
 		defaultWeights,
