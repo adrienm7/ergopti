@@ -170,6 +170,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_path" })
 	Items.Push({ Kind: "action", Id: "run_program" })
 	Items.Push({ Kind: "action", Id: "run_command" })
+	Items.Push({ Kind: "action", Id: "run_workflow" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -377,6 +378,7 @@ GestureActionCatalogueData() {
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
 	Actions["run_command"] := { Family: "sg", LabelKey: "sg_actions.run_command", Parameter: "command", Confirm: false }
 	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
+	Actions["run_workflow"] := { Family: "sg", LabelKey: "sg_actions.run_workflow", Parameter: "workflow", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
 	Actions["screen_record"] := { Family: "sg", LabelKey: "sg_actions.screen_record", Parameter: "", Confirm: false }

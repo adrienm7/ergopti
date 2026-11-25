@@ -14,12 +14,13 @@ screen targets and the bounds. It is the one source of:
 | `_shared/shortcuts/engine/workflows/model.lua`       | the same check, placeholders, shell digest (Lua) |
 | `_shared/shortcuts/engine/workflows/interpreter.lua` | the run as a state machine of effects            |
 | `_shared/shortcuts/engine/workflows/runner.lua`      | deadlines, single run, abort (macOS and Linux)   |
+| `windows/modules/shortcuts/workflows/`               | the AutoHotkey port of the four above (Windows)  |
 
 The vectors are `_shared/tests/corpus/workflows/`: `validation_vectors.json`
 (the first refusal of a file, its closed reason and JSON Pointer) and
 `interpreter_vectors.json` (the effects of a run and its outcome).
 `tools/test/test-workflow-model-vectors.cjs` replays the first in JavaScript
-and checks that both Lua suites replay both.
+and checks that both Lua suites and the AutoHotkey suite replay both.
 
 ## The file
 

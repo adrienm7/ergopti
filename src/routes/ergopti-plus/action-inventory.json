@@ -882,14 +882,8 @@
 			"fr": "🧩 Lancer un workflow personnalisé [configurable]",
 			"en": "🧩 Run a custom workflow [configurable]"
 		},
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Not on Windows: the workflow runner is part of the macOS and Linux drivers only.",
-				"fr": "Pas sous Windows : l’exécution des workflows n’existe que dans les pilotes macOS et Linux.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.open_path",

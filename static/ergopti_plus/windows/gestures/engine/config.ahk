@@ -166,6 +166,13 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				ErrorText := t("dialog.gestures.param_err_path")
 				return false
 		}
+		; The id only: whether the workflow still exists is checked when it runs.
+		if (Spec == "workflow") {
+				if WorkflowParameterIsValid(Value)
+						return true
+				ErrorText := t("dialog.gestures.param_err_workflow")
+				return false
+		}
 		; Checked before the trim below: the spaces of a text to type are part of it,
 		; and the key and shortcut rules trim for themselves.
 		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
@@ -247,6 +254,8 @@ GestureActionParameterPrompt(ActionName) {
 						return t("dialog.gestures.param_command_windows")
 				case "path":
 						return t("dialog.gestures.param_path")
+				case "workflow":
+						return t("dialog.gestures.param_workflow")
 				case "search_url":
 						return t("dialog.gestures.param_search_url")
 				case "url":
@@ -338,6 +347,8 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				return _GesturePickCommand(BindingId, ActionName, Title, Prompt, Existing)
 		if (Spec == "path")
 				return _GesturePickPath(BindingId, ActionName, Title, Prompt)
+		if (Spec == "workflow")
+				return _GesturePickWorkflow(BindingId, ActionName, Title, Prompt, Existing)
 		loop {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt")
@@ -394,6 +405,25 @@ _GesturePickCommand(BindingId, ActionName, Title, Prompt, Existing) {
 								"value", Value)
 				Ui_MsgBox(ErrorText, t("dialog.gestures.param_error_title"), "Icon!")
 		}
+}
+
+; Asks for a run_workflow parameter: one of the user's workflows, picked by name.
+; None yet is told, never an empty list; an unreadable workflows.json is told
+; by the owner.
+; @returns {Map|false} The parameter candidate, false when cancelled or none exists.
+_GesturePickWorkflow(BindingId, ActionName, Title, Prompt, Existing) {
+		Choices := WorkflowsChoices()
+		if !(Choices is Array)
+				return false
+		if (Choices.Length == 0) {
+				LoggerInfo("gestures", "No workflow to assign: the user has none yet.")
+				Ui_MsgBox(t("workflows.none_defined"), t("dialog.gestures.param_error_title"), "Iconi")
+				return false
+		}
+		Picked := _GestureVisionPickBackend(Title, Prompt, Choices, (Existing is String) ? Existing : "")
+		if (Picked == "")
+				return false
+		return Map("has_value", true, "key", GestureActionParameterKey(BindingId, ActionName), "value", Picked)
 }
 
 ; Asks for an open_path parameter in the native file or folder picker.
@@ -639,8 +669,9 @@ GestureEnsureActionParameter(BindingId, ActionName, WriterFn := 0, NotifyFn := 0
 GestureActionDisplayLabel(ActionName, BindingId := "") {
 		Label := _GestureActionLabel(ActionName)
 		Spec := GestureActionParameterSpec(ActionName)
-		; A command's text may hold a secret, and a menu is on screen.
-		if (Spec == "program" || Spec == "command")
+		; A command's text may hold a secret, and a menu is on screen. A workflow id
+		; means nothing to a reader, and its name would cost a file read per row.
+		if (Spec == "program" || Spec == "command" || Spec == "workflow")
 				return Label
 		if (BindingId = "")
 				return Label

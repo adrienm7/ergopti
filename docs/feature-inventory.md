@@ -240,7 +240,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## windows — 45 actions not declared
+## windows — 44 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -252,7 +252,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.space_next_wrap`: Spaces on macOS and desktops on Windows and Linux are the same virtual desktops under two names: use the equivalent action. Equivalent actions: `desktop_next_wrap`.
 - [ ] `sg_actions.mission_control`: Each system has its own window overview: Mission Control and App Exposé on macOS, Task View on Windows. Linux desktops each bind their own, so bind your desktop's key as a keystroke there. Equivalent actions: `task_view`.
 - [ ] `sg_actions.app_expose`: Each system has its own window overview: Mission Control and App Exposé on macOS, Task View on Windows. Linux desktops each bind their own, so bind your desktop's key as a keystroke there. Equivalent actions: `task_view`.
-- [ ] `sg_actions.run_workflow`: Not on Windows: the workflow runner is part of the macOS and Linux drivers only.
 - [ ] `sg_actions.run_apple_shortcut`: macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead. Equivalent actions: `run_program`.
 - [ ] `sg_actions.clear_notifications`: This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. Equivalent actions: `notification_center`.
 - [ ] `sg_actions.remove_quarantine_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. Equivalent actions: `unblock_file_selection`.

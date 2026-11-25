@@ -987,10 +987,10 @@ parameter = "command"
 # workflows.json of the config folder), named by its id and run by the shared
 # interpreter (_shared/shortcuts/engine/workflows/): steps with registry
 # deadlines, one run at a time, Escape stops it, a failure is notified naming
-# its step. See _shared/shortcuts/data/workflows/README.md.
-platform = "hs,linux"
+# its step. See _shared/shortcuts/data/workflows/README.md. Windows runs the
+# AutoHotkey port of the same model (windows/modules/shortcuts/workflows/).
+platform = "all"
 parameter = "workflow"
-reason_ahk = "platform_reason.action_workflows_windows_pending"
 
 [sg_actions.open_path]
 # A file or folder opened with its default application (macOS `open`, Linux
