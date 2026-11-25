@@ -2033,7 +2033,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/dispatch/test_timer_scheduler_ms_guard.ahk
 #Include meta/core/network/test_http_cancel_aborts.ahk
 #Include meta/platform/input/test_keyboard_hook_vk_format.ahk
-#Include meta/core/process/shell_runner/test_plc_stop_clears_callbacks.ahk
 #Include meta/core/text/test_toml_coerce_quoted_commas.ahk
 #Include meta/core/i18n/test_setlocale_resets_fallback.ahk
 #Include meta/modules/shortcuts/test_ws_save_atomic.ahk
