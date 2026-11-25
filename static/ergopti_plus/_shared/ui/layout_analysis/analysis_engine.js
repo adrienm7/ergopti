@@ -4869,6 +4869,11 @@ var LAYOUT_ANALYSIS = (function () {
 	// skipgrams (the first and last keys of each key trigram): the pair events of
 	// the stream visitor (TRACE_PAIR_EVENTS).
 	const MOVEMENT_CLASSES = TRACE_PAIR_EVENTS;
+	// The movement table's own classes, shown only, no metric of the score: a
+	// row change (two fingers of one hand, thumbs aside, on different rows),
+	// concordant when the longer finger takes the upper row (the hand's natural
+	// shape) and discordant when it takes the lower one (the scissor's way).
+	const MOVEMENT_EXTRA = ['row_change', 'row_change_concordant', 'row_change_discordant'];
 
 	/**
 	 * The movement table of a layout on a corpus (an idea seen in the Layouts
@@ -4884,7 +4889,7 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
 	 *   - As analyse().
 	 * @returns {{bigram: object, skipgram: object, bigrams: number, skipgrams: number}}
-	 *   bigram and skipgram: class → share (%); bigrams and skipgrams: the pairs
+	 *   bigram and skipgram: class (MOVEMENT_CLASSES, then MOVEMENT_EXTRA) → share (%); bigrams and skipgrams: the pairs
 	 *   counted (a pair with the space is in none, a thumb SFB aside).
 	 */
 	function movementTable(layoutInput, ngrams, options) {
@@ -4909,7 +4914,24 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			return classes.get(at);
 		};
-		const zero = () => Object.fromEntries(MOVEMENT_CLASSES.map((name) => [name, 0]));
+		// A pair's row change: null when none, else concordant or discordant.
+		const rowChange = (k1, k2) => {
+			const f1 = board.finger[k1];
+			const f2 = board.finger[k2];
+			if (f1 === f2 || board.hand[k1] !== board.hand[k2] || !fingerRows(board, k1, k2)) return null;
+			if (board.row[k1] === board.row[k2]) return null;
+			const longer = FINGER_LENGTH[board.order[k1]] > FINGER_LENGTH[board.order[k2]] ? k1 : k2;
+			const shorter = longer === k1 ? k2 : k1;
+			return board.row[longer] < board.row[shorter]
+				? 'row_change_concordant'
+				: 'row_change_discordant';
+		};
+		const extraOf = (k1, k2) => {
+			const kind = rowChange(k1, k2);
+			return kind === null ? [] : ['row_change', kind];
+		};
+		const zero = () =>
+			Object.fromEntries(MOVEMENT_CLASSES.concat(MOVEMENT_EXTRA).map((name) => [name, 0]));
 		const bigram = zero();
 		const skipgram = zero();
 		let bigrams = 0;
@@ -4922,17 +4944,17 @@ var LAYOUT_ANALYSIS = (function () {
 				const found = classOf(k1, k2);
 				if (found === null) return;
 				bigrams += n;
-				for (const name of found) bigram[name] += n;
+				for (const name of found.concat(extraOf(k1, k2))) bigram[name] += n;
 			},
 			trigram(k1, k2, k3, n) {
 				const found = classOf(k1, k3);
 				if (found === null) return;
 				skipgrams += n;
-				for (const name of found) skipgram[name] += n;
+				for (const name of found.concat(extraOf(k1, k3))) skipgram[name] += n;
 			}
 		});
 		const share = (counts, whole) => {
-			for (const name of MOVEMENT_CLASSES)
+			for (const name of MOVEMENT_CLASSES.concat(MOVEMENT_EXTRA))
 				counts[name] = whole > 0 ? (100 * counts[name]) / whole : 0;
 			return counts;
 		};
@@ -8196,6 +8218,7 @@ var LAYOUT_ANALYSIS = (function () {
 		TRACE_TRIPLE_EVENTS,
 		TRACE_MAX_CHARS,
 		MOVEMENT_CLASSES,
+		MOVEMENT_EXTRA,
 		movementTable,
 		wordsWithKeys,
 		blendNgrams,

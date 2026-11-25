@@ -266,6 +266,12 @@ module.exports = [
 			)
 	},
 	{
+		prefix: 'layout_analysis.movement.',
+		files: [COMPARER],
+		source: 'LAYOUT_ANALYSIS.MOVEMENT_EXTRA (the movement table own classes)',
+		keys: () => ctx.keysOf('layout_analysis.movement.', engine().MOVEMENT_EXTRA)
+	},
+	{
 		prefix: 'layout_analysis.finger_short.',
 		files: [COMPARER],
 		source: 'LAYOUT_ANALYSIS_DATA.model.fingers (the trace tab prints each key finger short)',
