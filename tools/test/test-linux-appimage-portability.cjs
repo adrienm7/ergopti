@@ -703,6 +703,14 @@ if (process.platform === 'linux') {
 			0o644
 		);
 		write('usr/bin/luajit', '#!/bin/sh\necho "launched $*"\n');
+		// A tray launch goes through the packages' launcher, which sets up
+		// keyboard access; AppRun used to start the daemon directly, and the
+		// AppImage never reached the keyboard on Arch (2026-11-25).
+		write(
+			'usr/lib/ergopti/install/launch.sh',
+			'#!/bin/sh\necho "launcher portable=$ERGOPTI_PORTABLE_LAUNCH $*"\n',
+			0o644
+		);
 		// Only what AppRun needs before the preflight, and a getconf that answers
 		// as the system under test does: no bash, as on Alpine.
 		const bin = path.join(sandbox, 'bin');
@@ -752,10 +760,7 @@ if (process.platform === 'linux') {
 				env: { PATH: bin, FAKE_LIBC: 'glibc 2.35' }
 			});
 			assert.equal(wrapper.status, 0, wrapper.stderr);
-			assert.equal(
-				wrapper.stdout,
-				`launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`
-			);
+			assert.equal(wrapper.stdout, 'launcher portable=1 --tray\n');
 		} finally {
 			fs.unlinkSync(path.join(bin, 'bash'));
 		}
@@ -763,10 +768,22 @@ if (process.platform === 'linux') {
 			const admitted = launch(libc, 'en_US.UTF-8', true);
 			assert.equal(admitted.status, 0, `${libc}: ${admitted.stderr}`);
 			assert.equal(admitted.stderr, '');
+			assert.equal(admitted.stdout, 'launcher portable=1 --tray\n');
+		}
+		// Any other launch (a terminal --version, a smoke probe) stays direct.
+		fs.symlinkSync(bashExecutable(), path.join(bin, 'bash'));
+		try {
+			const direct = spawnSync(path.join(appDir, 'AppRun'), ['--version'], {
+				encoding: 'utf8',
+				env: { PATH: bin, FAKE_LIBC: 'glibc 2.35' }
+			});
+			assert.equal(direct.status, 0, direct.stderr);
 			assert.equal(
-				admitted.stdout,
-				`launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`
+				direct.stdout,
+				`launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --version\n`
 			);
+		} finally {
+			fs.unlinkSync(path.join(bin, 'bash'));
 		}
 	} finally {
 		fs.rmSync(sandbox, { recursive: true, force: true });

@@ -33,9 +33,40 @@ helpers.describe("input_access: telling the user", function()
 				return key == Access.BODY_KEY and "Repair: {1}" or "Title"
 			end },
 			script_dir = "/opt/Ergopti user's % directory",
+			getenv = function() return nil end,
 			print = function(line) lines[#lines + 1] = line end,
 		}, "denied")
 		helpers.assert_eq(lines[2], "Repair: bash '/opt/Ergopti user'\\''s % directory/install.sh' --setup-perms")
+	end)
+
+	helpers.it("names the AppImage itself, not its vanishing mount, as the repair (field report, Arch)", function()
+		-- The AppImage's driver root is a temporary mount: the install.sh it
+		-- named was gone once the image exited. Relaunching the image runs the
+		-- launcher, which asks once for the authorization.
+		local Access = helpers.load_module("platform.input.access")
+		local lines = {}
+		Access.report({
+			i18n = { init = function() end, get = function(key)
+				return key == Access.BODY_KEY and "Repair: {1}" or "Title"
+			end },
+			script_dir = "/tmp/.mount_ErgoptXYZ/usr/lib/ergopti",
+			getenv = function(name) return name == "APPIMAGE" and "/home/u/Apps/Ergopti Plus.AppImage" or nil end,
+			print = function(line) lines[#lines + 1] = line end,
+		}, "denied")
+		helpers.assert_eq(lines[2], "Repair: '/home/u/Apps/Ergopti Plus.AppImage'")
+	end)
+
+	helpers.it("the AppImage's tray launch goes through the permission launcher", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/../../../tools/build/build-linux-appimage.sh", "r"))
+		local builder = fh:read("*a")
+		fh:close()
+		local apprun = builder:match("cat > \"%$APPDIR/AppRun\" << 'APPRUN_EOF'\n(.-)\nAPPRUN_EOF")
+		helpers.assert_true(apprun ~= nil, "the AppRun heredoc")
+		local launcher = apprun:find('exec bash "$DRIVER_ROOT/install/launch.sh" "$@"', 1, true)
+		local direct = apprun:find('exec "$LUAJIT_BIN" "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"', 1, true)
+		helpers.assert_true(launcher ~= nil and direct ~= nil and launcher < direct,
+			"a --tray launch reaches launch.sh before the direct daemon start")
+		helpers.assert_true(apprun:find("export ERGOPTI_PORTABLE_LAUNCH=1", 1, true) ~= nil)
 	end)
 
 	helpers.it("notifies with the translated title and body", function()
