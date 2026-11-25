@@ -115,10 +115,10 @@ class OllamaRuntimeOwner {
 				A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe")
 			if !this._LocalPath(PowerShell)
 				throw ValueError("The native PowerShell executable must be local and absolute.")
-			Arguments := ["-NoLogo", "-NoProfile", "-NonInteractive",
-				"-ExecutionPolicy", "Bypass", "-File", this.Options["launcher"],
+			Arguments := ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"],
+				"-File", this.Options["launcher"],
 				"-ManagedHelperPath", this.Options["helper"],
-				"-ManagedHelperSha256", this.Options["helper_sha256"]]
+				"-ManagedHelperSha256", this.Options["helper_sha256"])
 			for Pair in [["ManagedRoot", "managed_root"], ["RootIdentity", "root_identity"],
 				["PublishedPath", "version_path"], ["StageIdentity", "version_identity"],
 				["TicketId", "ticket"], ["ManifestSha256", "manifest_sha256"],

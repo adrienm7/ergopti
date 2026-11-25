@@ -386,15 +386,47 @@ ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
 }
 
 /**
+ * The one spelling of every PowerShell stage's argv: Leading, then the
+ * execution policy its bundled scripts and modules need, then Args. The
+ * compiled script's antivirus surface counts every other copy of the policy
+ * pair, so no launch site spells it out.
+ * @param {Array} Leading The items before the policy: the stage's switches,
+ *   after the executable when the caller builds a whole command line.
+ * @param {String} Args The stage's own arguments (-File or -Command first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsArgv(Leading, Args*) {
+	if !(Leading is Array)
+		throw TypeError("Leading arguments must be an Array", -1, Type(Leading))
+	Out := Leading.Clone()
+	Out.Push("-ExecutionPolicy", "Bypass")
+	Out.Push(Args*)
+	return Out
+}
+
+/**
  * The arguments a PowerShell stage starts with: no profile, no prompt, and
- * the execution policy its scripts and modules need, followed by Args.
+ * the execution policy, followed by Args.
  * @param {String} Args The stage's own arguments (-File or -Command first).
  * @returns {Array}
  */
 ShellRunner_WinPsArgs(Args*) {
-	Out := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
-	Out.Push(Args*)
-	return Out
+	return ShellRunner_WinPsArgv(["-NoProfile", "-NonInteractive"], Args*)
+}
+
+/**
+ * The argv of a PowerShell stage whose console window is hidden: Leading,
+ * then the hidden window style, then the execution policy and Args.
+ * @param {Array} Leading The stage's switches before the window style.
+ * @param {String} Args The stage's own arguments (-File first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsHiddenArgs(Leading, Args*) {
+	if !(Leading is Array)
+		throw TypeError("Leading arguments must be an Array", -1, Type(Leading))
+	Hidden := Leading.Clone()
+	Hidden.Push("-WindowStyle", "Hidden")
+	return ShellRunner_WinPsArgv(Hidden, Args*)
 }
 
 /**

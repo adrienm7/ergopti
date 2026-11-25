@@ -226,8 +226,7 @@ _CrashReportWorkerSpawnOwned(Executable, Args, Done) {
 }
 
 _CrashReportWorkerPrimaryArgs(Owner) {
-	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", Owner["worker_path"], "-MappingName", Owner["mapping"]["name"]]
+	Args := ShellRunner_WinPsArgs("-File", Owner["worker_path"], "-MappingName", Owner["mapping"]["name"])
 	Options := Owner["options"]
 	DelayMs := Options.Get("delay_ms", 0)
 	if DelayMs
@@ -242,10 +241,9 @@ _CrashReportWorkerPrimaryArgs(Owner) {
 ; encoded command: antivirus engines score -EncodedCommand launches as malware.
 _CrashReportWorkerFallbackArgs(Owner) {
 	global _VendorDir, CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES
-	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", _VendorDir . "\ergopti_crash_fallback_worker.ps1",
+	Args := ShellRunner_WinPsArgs("-File", _VendorDir . "\ergopti_crash_fallback_worker.ps1",
 		"-MappingName", Owner["mapping"]["name"],
-		"-MaxPayloadBytes", String(CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES)]
+		"-MaxPayloadBytes", String(CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES))
 	if Owner.Get("deadline_expired", false)
 		Args.Push("-DeadlineExpired")
 	return Args

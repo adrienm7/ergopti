@@ -32,7 +32,8 @@ _GPSE_Source() {
 		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult",
 		"GestureRestartTouchpadDevice", "GestureRestartRunElevated", "_GestureRestartReserve", "_GestureRestartAbortReservation",
 		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript",
-		"TouchpadRegistrySkipsDeviceRestart", "TouchpadRegistryPrivatePath", "TouchpadRegistryLogTag", "ShellRunner_WinPsPath"] {
+		"TouchpadRegistrySkipsDeviceRestart", "TouchpadRegistryPrivatePath", "TouchpadRegistryLogTag", "ShellRunner_WinPsPath",
+		"ShellRunner_WinPsHiddenArgs", "ShellRunner_WinPsArgv"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "the child needs the entire actual function: " . Name)
 		if Name == "GestureRestartRunElevated"

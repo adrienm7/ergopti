@@ -2381,8 +2381,7 @@ _Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
-	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", WorkerPath, "-TransportPrefix", Prefix]
+	Args := ShellRunner_WinPsArgs("-File", WorkerPath, "-TransportPrefix", Prefix)
 	for Arg in Args {
 		if (InStr(Arg, "`n") or InStr(Arg, "`r"))
 			throw ValueError("Staging worker arguments unexpectedly contain a newline")
@@ -3311,12 +3310,12 @@ _Updater_CreateSuspendedSwapOwner(SwapScriptPath, NewExe, CurrentExe, Transactio
 		}
 
 		PowerShellPath := _Updater_PowerShellPath()
-		Args := [PowerShellPath, "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
-			"Bypass", "-File", SwapScriptPath, Owner["ReadyName"], Owner["CommitName"],
+		Args := ShellRunner_WinPsArgv([PowerShellPath, "-NoProfile", "-NonInteractive"],
+			"-File", SwapScriptPath, Owner["ReadyName"], Owner["CommitName"],
 			Owner["AckName"], Owner["FinalExitName"], LocalHandles["ParentHandle"], NewExe,
 			CurrentExe, UPDATER_SWAP_PROBATION_MS, UPDATER_SWAP_BOOT_READY_TIMEOUT_MS,
 			UPDATER_SWAP_RESTORE_ATTEMPTS,
-			UPDATER_SWAP_RESTORE_RETRY_MS, SwapScriptPath . ".log"]
+			UPDATER_SWAP_RESTORE_RETRY_MS, SwapScriptPath . ".log")
 		CommandLine := ""
 		for Arg in Args
 			CommandLine .= (CommandLine == "" ? "" : " ") . _Updater_QuoteCreateProcessArg(Arg)

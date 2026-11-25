@@ -1027,7 +1027,10 @@ _GestureRestartAbortReservation(Epoch) {
 ; @param ScriptPath {String} The worker script _GestureRestartBuildPsScript wrote.
 ; @param &Pid {Integer} Receives the worker's PID; a refused UAC prompt throws.
 GestureRestartRunElevated(ScriptPath, &Pid) {
-	Run('*RunAs "' . ShellRunner_WinPsPath() . '" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
+	Switches := ""
+	for Switch in ShellRunner_WinPsHiddenArgs(["-NoProfile"], "-File")
+		Switches .= Switch . " "
+	Run('*RunAs "' . ShellRunner_WinPsPath() . '" ' . Switches . '"' . ScriptPath . '"', , "Hide", &Pid)
 }
 
 GestureRestartTouchpadDevice(OnDone := 0) {

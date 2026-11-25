@@ -110,8 +110,8 @@ class OllamaInstallFilesPort {
 	/** @returns {Array} Closed typed argv; no task is constructed on refusal. */
 	_Arguments(Action, Request) {
 		if Action != "download" {
-			Arguments := ["-NoLogo", "-NoProfile", "-NonInteractive",
-				"-ExecutionPolicy", "Bypass", "-File", this.Options["helper"], "-Action", Action]
+			Arguments := ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"],
+				"-File", this.Options["helper"], "-Action", Action)
 			for Name, Value in Request {
 				if Name != "ManagedRoot" && Name != "CataloguePath" && Name != "CatalogueSha256"
 						&& Name != "AssetId" && Name != "ArchivePath" && Name != "TicketId"
@@ -168,8 +168,8 @@ class OllamaInstallFilesPort {
 					throw ValueError("Download source paths must be explicit and absolute.", -1, Name)
 			}
 		}
-		Arguments := ["-NoLogo", "-NoProfile", "-NonInteractive",
-			"-ExecutionPolicy", "Bypass", "-File", this.Options["download_helper"], "-Action", Action]
+		Arguments := ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"],
+			"-File", this.Options["download_helper"], "-Action", Action)
 		for Name, Value in Request
 			Arguments.Push("-" . Name, String(Value))
 		return Arguments

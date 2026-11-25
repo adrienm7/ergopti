@@ -1028,7 +1028,7 @@ class OllamaManagedBootstrap {
 		if !IsSet(Model)
 			Model := this.Model
 		Target := this.Target
-		Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+		Args := ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"], "-File",
 			this.Plan["directory"] . "\ollama-model-pull.ps1", "-ManagedHelperPath", this.Plan["helper"],
 			"-ManagedHelperSha256", this.Plan["helper_sha256"], "-ManagedRoot", Target["managed_root"],
 			"-RuntimeLauncherPath", this.Plan["directory"] . "\ollama-runtime-launch.ps1",
@@ -1038,7 +1038,7 @@ class OllamaManagedBootstrap {
 			"-RootIdentity", Target["root_identity"], "-PublishedPath", Target["version_path"],
 			"-StageIdentity", Target["version_identity"], "-TicketId", Target["ticket"],
 			"-ManifestSha256", Target["manifest_sha256"], "-RuntimeTicket", Target["runtime_ticket"],
-			"-Port", String(Target["port"]), "-Model", Model]
+			"-Port", String(Target["port"]), "-Model", Model)
 		Owner := Map("task", 0, "building", true, "accepted", false, "terminal", 0, "callback", OnDone)
 		this.PullTask := Owner
 		Accepted := false

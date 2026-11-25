@@ -125,10 +125,10 @@ ScreenVisionInit() {
 	ScreenVisionOwner.counter := 0
 	ScreenVisionOwner.pending := Map()
 	Spawn := IsObject(ScreenVisionOwner.spawn_fn) ? ScreenVisionOwner.spawn_fn : ShellRunner_SpawnTreeOwned
-	Args := ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
+	Args := ShellRunner_WinPsHiddenArgs(["-NoProfile", "-NonInteractive"], "-File",
 		Files[1], "-QueueDir", Queue,
 		"-ParentPid", String(DllCall("GetCurrentProcessId")),
-		"-PollMs", String(TimingsGet("screen_vision", "worker_poll_ms"))]
+		"-PollMs", String(TimingsGet("screen_vision", "worker_poll_ms")))
 	try {
 		Handle := Spawn.Call(ShellRunner_WinPsPath(), Args, _ScreenVisionWorkerExited)
 		Started := IsObject(Handle) && Handle.start() == true

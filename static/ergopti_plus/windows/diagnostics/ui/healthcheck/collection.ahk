@@ -95,8 +95,8 @@ class DiagnosticCollectionWindows {
 				Map("id", "collector", "path", this.Worker), Map("id", "contract", "path", this.ContractPath)]
 			this.Write("request.json", Identity)
 			this.Task := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
-				["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", this.Worker,
-				"-SessionDirectory", this.Directory], ObjBindMethod(this, "Completed"), , , this.Contract["max_output_bytes"], true, true)
+				ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"], "-File", this.Worker,
+				"-SessionDirectory", this.Directory), ObjBindMethod(this, "Completed"), , , this.Contract["max_output_bytes"], true, true)
 			if !this.Task.start()
 				throw Error("Diagnostic worker launch refused.")
 			PreviousCritical := Critical("On")
