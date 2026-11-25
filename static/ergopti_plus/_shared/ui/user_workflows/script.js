@@ -15,9 +15,9 @@
  *    saves a file a driver would refuse.
  * 2. Keyboard first: every step moves with its Up and Down buttons; drag and
  *    drop is an extra for the pointer, never the only way.
- * 3. A shell step of an imported workflow is refused at run time until the
- *    user approves it here; the approval goes to the host, which stores it
- *    outside the workflow file.
+ * 3. A shell step runs without a prompt in a workflow made here; in an
+ *    imported one it is refused at run time until the user approves it here
+ *    (the host stores the approval outside the workflow file) or edits it.
  * 4. Host protocol (bridge hsWorkflows): the page posts ready, save, test_run,
  *    stop, approve_shell, export, import, pick_image and close; the host calls
  *    initData, onSaved, onImported, onImagePicked, onRunStep and onRunEnd.
@@ -436,6 +436,13 @@ function fieldControl(owner, name, spec, path) {
 		if (raw === '' && !spec.required) delete owner[name];
 		else if (spec.type === 'integer') owner[name] = Number(raw);
 		else owner[name] = raw;
+		// Editing a shell step of an imported workflow is its approval: the user
+		// now owns the command (maintainer decision of 2026-11-25).
+		const workflow = current();
+		if (owner.kind === 'shell' && workflow && workflow.origin === 'import') {
+			workflow.origin = 'local';
+			document.getElementById('import-banner').hidden = true;
+		}
 	});
 	row.append(label, control);
 	if (spec.type === 'text' && spec.placeholders) {

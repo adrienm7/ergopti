@@ -1,5 +1,5 @@
 {
-	"$description": "The user workflow model: the file layout, every step kind with its closed field set, the conditions of an « if » and the bounds a workflow file must keep. One source for the canonical JS check of the editor (_shared/ui/workflow_model.js), the shared Lua validator and interpreter (_shared/shortcuts/engine/workflows/, macOS and Linux) and the AutoHotkey port (Windows). Vectors: _shared/tests/corpus/workflows/. A step's run deadline is the timing registry key its `timeout` names, in [workflows] of _shared/core/timing/data/constants.toml. A `service` step needs the per-OS screen services (capture, OCR, template matching) and stops with a named notice while they are absent. A `shell` step runs only once its commands' digest is approved (README.md).",
+	"$description": "The user workflow model: the file layout, every step kind with its closed field set, the conditions of an « if » and the bounds a workflow file must keep. One source for the canonical JS check of the editor (_shared/ui/workflow_model.js), the shared Lua validator and interpreter (_shared/shortcuts/engine/workflows/, macOS and Linux) and the AutoHotkey port (Windows). Vectors: _shared/tests/corpus/workflows/. A step's run deadline is the timing registry key its `timeout` names, in [workflows] of _shared/core/timing/data/constants.toml. A `service` step needs the per-OS screen services (capture, OCR, template matching) and stops with a named notice while they are absent. A `shell` step of an imported workflow runs only once its commands' digest is approved in the editor (README.md).",
 	"schema_version": 1,
 	"limits": {
 		"file_bytes": 16777216,
@@ -220,7 +220,6 @@
 		"already_running",
 		"unknown_variable",
 		"shell_not_approved",
-		"shell_declined",
 		"too_many_steps",
 		"step_failed",
 		"timeout",

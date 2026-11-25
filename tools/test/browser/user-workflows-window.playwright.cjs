@@ -13,7 +13,7 @@
  *    refuses (an empty name) is never posted: the refusal is told;
  * 4. a test run highlights the step the host names, then tells its end;
  * 5. an import is stamped « import » even when its file says local, and its
- *    shell steps show the approval banner;
+ *    shell steps show the approval banner, which an edit of the step lifts;
  * 6. Delete asks in its own button first, a second press deletes.
  *
  * ROOT CAUSE ENCODED:
@@ -186,11 +186,40 @@ async function main() {
 		assert.notEqual(approve.id, 'wf_a', 'an imported id that collides is renamed');
 		checks++;
 
+		// Editing the imported shell step is its approval: the workflow becomes local.
+		await page.evaluate(() =>
+			window.onImported({
+				ok: true,
+				workflows: [
+					{
+						id: 'wf_b',
+						name: 'Edited',
+						origin: 'local',
+						steps: [{ kind: 'shell', command: 'true' }]
+					}
+				]
+			})
+		);
+		assert.equal(await page.isVisible('#import-banner'), true);
+		await page.fill('#f-1-command', 'echo edited');
+		await page.dispatchEvent('#f-1-command', 'change');
+		assert.equal(
+			await page.isVisible('#import-banner'),
+			false,
+			'an edited shell step needs no approval'
+		);
+		await page.click('#btn-save');
+		const edited = await page.evaluate(() =>
+			window.messages.filter((m) => m.action === 'save').pop()
+		);
+		assert.equal(edited.doc.workflows.find((w) => w.id === 'wf_b').origin, 'local');
+		checks++;
+
 		// Delete asks in its button, a second press deletes.
 		await page.click('#btn-delete');
-		assert.equal(await page.locator('#workflow-list button').count(), 2);
+		assert.equal(await page.locator('#workflow-list button').count(), 3);
 		await page.click('#btn-delete');
-		assert.equal(await page.locator('#workflow-list button').count(), 1);
+		assert.equal(await page.locator('#workflow-list button').count(), 2);
 		checks++;
 	} finally {
 		await browser.close();

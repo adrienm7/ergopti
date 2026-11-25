@@ -52,9 +52,13 @@ Answers of the maintainer's QCM of 2026-11-25:
   image or a text on screen, open an app, URL or file, focus an app, screen
   capture, OCR to a variable, clipboard get and set, click on a found image or
   text, mouse at coordinates, any Ergopti action, a notification and a shell
-  command. A shell step asks for confirmation the first time per workflow
-  version, and a workflow imported from a file never runs a shell step
-  without the user's explicit approval in the editor.
+  command. Shell steps are as fluid as possible (maintainer change of
+  2026-11-25): in a workflow the user made or edited in the editor they run
+  with no prompt; a workflow that arrives by import with shell steps is
+  « shell steps not approved » until one « Approve » click in the editor
+  (recorded with a hash of its shell steps) or an edit of a shell step there,
+  and until then a run stops at its first shell step with a translated
+  notice. The starter workflows Ergopti ships hold no shell step.
 - Logic: a linear sequence plus « if » (image or text visible, app in front,
   clipboard or variable matches) with else, « repeat N times » and simple
   variables usable through placeholders in later steps. Escape or the
@@ -84,18 +88,20 @@ open until the maintainer confirms or changes it.
   data. A single `run_workflow` action whose parameter is the workflow id is
   assignable everywhere an action is, and the pickers list the workflows as its
   choices.
-- **Shell approval is bound to the commands' digest, kept outside the
-  workflow file** — decided by the agent on 2026-11-25, to review by the
-  maintainer. The « workflow version » a confirmation covers is the SHA-256 of
-  the workflow id and its shell commands in order; any edit of a command asks
-  again. Approvals live in their own file of the config folder, so an export
-  never carries one and an imported file cannot claim one.
+- **An import's approval is bound to its shell commands' digest, kept
+  outside the workflow file** — decided by the agent on 2026-11-25, to review
+  by the maintainer. The hash is the SHA-256 of the workflow id and its shell
+  commands in order; approvals live in their own file of the config folder,
+  so an export never carries one and an imported file cannot claim one.
+- **Editing any shell step of an imported workflow approves the workflow** —
+  decided by the agent on 2026-11-25, to review by the maintainer: the editor
+  then shows and owns the commands; editing another kind of step does not.
 - **An import is marked by the editor, not by the file** — decided by the
   agent on 2026-11-25, to review by the maintainer. The editor stamps every
   imported workflow `origin = "import"`; its shell steps are refused at run
   time (with a notice pointing to the editor) until the user approves them
   there. A file copied by hand into the config folder is as trusted as
-  `config.toml`, like a `run_command` binding, and still asks on first run.
+  `config.toml`, like a `run_command` binding.
 - **Text conditions compare literally** (equals, contains, starts with, is
   empty), never by regular expression — decided by the agent on 2026-11-25,
   to review by the maintainer: Lua patterns, PCRE (AHK) and JavaScript regular

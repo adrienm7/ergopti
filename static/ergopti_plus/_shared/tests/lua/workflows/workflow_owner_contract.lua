@@ -8,7 +8,7 @@
 --- stored workflow, each effect reaches its port, a missing workflow, an
 --- invalid file and a failing step each end in a translated notice, Escape
 --- stops a run, the variables reach a shell step as environment variables,
---- and an approval is written to its own file only.
+--- and an imported shell step waits for the editor's approval.
 ---
 --- ROOT CAUSE ENCODED:
 --- The run_workflow action had nothing to run: no store read the user's
@@ -61,10 +61,6 @@ local function harness(catalogue, vocabulary, files, overrides)
 		shell = function(command, env, deadline, done)
 			world.calls[#world.calls + 1] = { name = "shell", args = { command, env, deadline } }
 			done(true, "out")
-		end,
-		confirm_shell = function(workflow, commands, done)
-			world.calls[#world.calls + 1] = { name = "confirm_shell", args = { workflow.name, commands } }
-			done(world.confirm)
 		end,
 		app_front = function(app, done) done(app == "Front") end,
 	}
@@ -167,23 +163,17 @@ function M.register(helpers, shared_path)
 			helpers.assert_true(world.notices[1]:find("<workflows.notice.aborted>Mine", 1, true) ~= nil, world.notices[1])
 		end)
 
-		helpers.it("workflows: a shell step gets the variables in its environment and is approved once", function()
+		helpers.it("workflows: a shell step runs at once with the variables in its environment", function()
 			local steps = { { kind = "set_variable", name = "who", value = "; rm -rf ~" },
 				{ kind = "shell", command = "echo \"$ERGOPTI_VAR_who\"", into = "out" }, { kind = "type_text", text = "{{out}}" } }
 			local owner, world = harness(catalogue, vocabulary, { ["/cfg/workflows.json"] = file_of(steps) })
 			owner.run({ id = "wf_1" })
-			helpers.assert_eq(world.calls[1].name, "confirm_shell")
-			helpers.assert_eq(world.calls[1].args[1], "Mine")
-			helpers.assert_eq(world.calls[2].args[1], "echo \"$ERGOPTI_VAR_who\"")
-			helpers.assert_eq(world.calls[2].args[2].ERGOPTI_VAR_who, "; rm -rf ~")
-			helpers.assert_eq(world.calls[2].args[3], 30)
-			helpers.assert_eq(world.calls[3].args[1], "out")
-			local approvals = Json.decode(world.files["/cfg/workflow_approvals.json"])
-			helpers.assert_eq(approvals.approvals.wf_1, Model.shell_digest({ id = "wf_1", steps = steps }))
-			helpers.assert_true(not world.files["/cfg/workflows.json"]:find("approv", 1, true), "workflows.json carries no approval")
-			world.calls = {}
-			owner.run({ id = "wf_1" })
-			helpers.assert_eq(world.calls[1].name, "shell", "an approved version asks nothing")
+			helpers.assert_eq(world.calls[1].name, "shell", "a workflow the user made asks nothing")
+			helpers.assert_eq(world.calls[1].args[1], "echo \"$ERGOPTI_VAR_who\"")
+			helpers.assert_eq(world.calls[1].args[2].ERGOPTI_VAR_who, "; rm -rf ~")
+			helpers.assert_eq(world.calls[1].args[3], 30)
+			helpers.assert_eq(world.calls[2].args[1], "out")
+			helpers.assert_eq(world.files["/cfg/workflow_approvals.json"], nil, "running writes no approval")
 		end)
 
 		helpers.it("workflows: an imported shell step without approval asks nothing and runs nothing", function()

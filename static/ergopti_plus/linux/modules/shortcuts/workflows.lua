@@ -7,9 +7,9 @@
 --- (_shared/shortcuts/engine/workflows/owner.lua): workflows.json and the
 --- approvals in the config folder, keys and text through the daemon's uinput
 --- device, xdg-open and gtk-launch, the clipboard owner, xdotool for the
---- pointer, the gesture executor for Ergopti actions, the desktop notifier, a
---- login /bin/sh for a shell step and the tray's choice dialog for its
---- confirmation. The run_workflow action and Escape reach the owner here.
+--- pointer, the gesture executor for Ergopti actions, the desktop notifier and
+--- a login /bin/sh for a shell step. The run_workflow action and Escape reach
+--- the owner here.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One owner per daemon, built on first use (init is idempotent only for
@@ -53,7 +53,6 @@ local function default_deps()
 		clipboard = require("clipboard.adapters.clipboard"),
 		notifier = require("platform.focus.application_notifier"),
 		window_info = require("platform.focus.window_info"),
-		choice_prompt = require("core.ui.ui.choice_prompt"),
 		i18n = require("core.i18n.engine.i18n"),
 		session_type = function() return os.getenv("XDG_SESSION_TYPE") end,
 		rename = os.rename,
@@ -144,15 +143,6 @@ local function effect_ports(deps)
 			return run(deps, "env", args, deadline_ms, function(ok, stdout)
 				if ok then done(true, (tostring(stdout or ""):gsub("[\r\n]+$", ""))) else done(false, stdout) end
 			end)
-		end,
-		confirm_shell = function(workflow, commands, done)
-			local title = deps.i18n.get("workflows.confirm_shell.title")
-			local body = Owner.fill(deps.i18n.get("workflows.confirm_shell.body"),
-				{ workflow.name, table.concat(commands, "\n") })
-			local answer = deps.choice_prompt.pick(title, body, {
-				{ value = "allow", label = deps.i18n.get("workflows.confirm_shell.allow") },
-			}, nil)
-			done(answer == "allow")
 		end,
 		app_front = function(app, done)
 			local focused = deps.window_info.getFocused()

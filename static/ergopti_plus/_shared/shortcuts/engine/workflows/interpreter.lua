@@ -18,9 +18,10 @@
 --- 2. Errors are never silent: a failed effect, an unknown variable or a
 ---    refused shell step ends the run with a closed reason (steps.json
 ---    run_reasons) and the dotted path of the step, which the notice names.
---- 3. Shell steps: an approval covers the workflow's shell digest
----    (model.shell_digest). A workflow of origin "import" without one is
----    refused outright; any other asks once through a confirm_shell effect.
+--- 3. Shell steps: a workflow the user made or edited runs them; an imported
+---    one (origin "import") stops at its first shell step until the editor
+---    approved its shell digest (model.shell_digest), maintainer decision of
+---    2026-11-25.
 --- 4. A bounded run: every executed step counts toward limits.run_steps_max,
 ---    so nested repeats cannot spin for hours.
 --- ==============================================================================
@@ -74,7 +75,9 @@ function M.new(options)
 	for _, reason in ipairs(catalogue.run_reasons) do run_reasons[reason] = true end
 
 	local digest = Model.shell_digest(workflow)
-	local approved = digest ~= nil and options.approved_digest == digest
+	-- A workflow the user made or edited runs its shell steps; an imported one
+	-- only once its shell digest was approved in the editor.
+	local approved = workflow.origin ~= "import" or (digest ~= nil and options.approved_digest == digest)
 	local variables = {}
 	for name, value in pairs(options.variables or {}) do variables[name] = tostring(value) end
 	local frames = { { steps = workflow.steps, index = 1, prefix = "", remaining = 0 } }
@@ -180,11 +183,7 @@ function M.new(options)
 						return { op = "probe", condition = condition, path = path, kind = "if", deadline_ms = timeout_of("if") }
 					end
 				elseif step.kind == "shell" and not approved then
-					executed = executed - 1
-					if workflow.origin == "import" then return finish("failed", "shell_not_approved", path, step.kind) end
-					pending = { step = step, path = path, frame = frame, confirm = true }
-					return { op = "confirm_shell", digest = digest, commands = Model.shell_commands(workflow.steps),
-						path = path, kind = step.kind }
+					return finish("failed", "shell_not_approved", path, step.kind)
 				else
 					local effect = { op = step.kind, path = path, kind = step.kind, deadline_ms = timeout_of(step.kind) }
 					for name, value in pairs(step) do
@@ -225,14 +224,6 @@ function M.new(options)
 			finish("failed", result.reason or "step_failed", path, step.kind)
 			return
 		end
-		if current.confirm then
-			if result.value ~= true then
-				finish("failed", "shell_declined", path, step.kind)
-				return
-			end
-			approved = true
-			return
-		end
 		frame.index = frame.index + 1
 		if step.kind == "if" then
 			local answer = result.value == true
@@ -248,12 +239,6 @@ function M.new(options)
 		local path = pending and pending.path or nil
 		local kind = pending and pending.step.kind or nil
 		finish("aborted", "aborted", path, kind)
-	end
-
-	--- Whether the shell approval was given during this run.
-	--- @return boolean
-	function run.approved_now()
-		return approved and digest ~= nil and options.approved_digest ~= digest
 	end
 
 	return run
