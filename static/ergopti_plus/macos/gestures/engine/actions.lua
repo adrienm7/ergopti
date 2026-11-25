@@ -1242,12 +1242,18 @@ end
 --- @param action string send_text, send_key or send_shortcut.
 --- @param binding string The binding whose parameter holds the value.
 --- @return boolean True when the input was sent.
-local function send_input_action(action, binding)
+--- Sends one send_text, send_key or send_shortcut value, from a binding or a
+--- workflow step (modules/shortcuts/workflows).
+--- @param action string send_text, send_key or send_shortcut.
+--- @param value any The value, refused when it does not parse.
+--- @param binding string|nil What asked for it, for the log.
+--- @return boolean sent
+function M.send_input_value(action, value, binding)
 	local kind = M.get_action_parameter_spec(action)
 	local vocabulary = M.send_vocabulary()
-	local parsed = SendInput.parse(kind, M.get_action_parameter(binding, action), vocabulary)
+	local parsed = SendInput.parse(kind, value, vocabulary)
 	if not parsed then
-		Logger.warn(LOG, "%s ignored for binding '%s': no valid value is stored.", action, tostring(binding))
+		Logger.warn(LOG, "%s ignored for '%s': no valid value.", action, tostring(binding))
 		return false
 	end
 	if kind == "text" then return postKeyStrokes(parsed.text) end
@@ -1264,6 +1270,18 @@ local function send_input_action(action, binding)
 	end
 	if kind == "key" then return postKeyStrokes(parsed.char) end
 	return postKeyStroke(mods, parsed.char)
+end
+--- Types a workflow's text through the same synthetic keystrokes as send_text,
+--- without send_text's length bound (the workflow model bounds it).
+--- @param text string
+--- @return boolean typed
+function M.type_text(text)
+	if type(text) ~= "string" or text == "" then return false end
+	return postKeyStrokes(text)
+end
+
+local function send_input_action(action, binding)
+	return M.send_input_value(action, M.get_action_parameter(binding, action), binding)
 end
 -- The value is the binding's own parameter, as for wrap_selection.
 sg("send_text", function(binding) return send_input_action("send_text", binding) end)
@@ -1531,8 +1549,8 @@ sg("open_app", function(binding)
 	end
 	return System.open_app(value, current_action_parent())
 end)
--- The user's own command line, file or folder, and Apple shortcut: each value
--- is decoded by _shared/user_action_parameter and never logged.
+-- The user's own command line, file or folder, Apple shortcut and workflow:
+-- each value is decoded by _shared/user_action_parameter and never logged.
 local USER_ACTIONS = {
 	run_command = function(fields, parent)
 		return require("gestures.engine.user_actions").run_command(fields, parent,
@@ -1540,6 +1558,9 @@ local USER_ACTIONS = {
 	end,
 	open_path = function(fields, parent)
 		return require("gestures.engine.user_actions").open_path(fields, parent)
+	end,
+	run_workflow = function(fields)
+		return require("modules.shortcuts.workflows").run(fields)
 	end,
 	run_apple_shortcut = function(fields, parent)
 		return require("gestures.engine.apple_shortcut_action").run(fields, parent,

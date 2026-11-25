@@ -877,6 +877,21 @@
 		"reasons": {}
 	},
 	{
+		"path": "sg_actions.run_workflow",
+		"labels": {
+			"fr": "🧩 Lancer un workflow personnalisé [configurable]",
+			"en": "🧩 Run a custom workflow [configurable]"
+		},
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Not on Windows yet: the workflow runner is being ported to AutoHotkey.",
+				"fr": "Pas encore sous Windows : l’exécution des workflows est en cours de portage vers AutoHotkey.",
+				"equivalents": []
+			}
+		}
+	},
+	{
 		"path": "sg_actions.open_path",
 		"labels": {
 			"fr": "📂 Ouvrir un fichier ou un dossier [configurable]",

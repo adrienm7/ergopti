@@ -112,7 +112,8 @@ const PARAMETER_KINDS = new Set([
 	'program',
 	'command',
 	'path',
-	'apple_shortcut'
+	'apple_shortcut',
+	'workflow'
 ]);
 
 const SG_FIELDS = new Set([

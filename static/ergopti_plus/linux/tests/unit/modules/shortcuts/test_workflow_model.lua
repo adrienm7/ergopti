@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Replays the shared workflow model contract
 --- (_shared/tests/lua/workflows/workflow_model_contract.lua) and the
---- interpreter and runner contracts on the Linux runtime.
+--- interpreter, runner and owner contracts on the Linux runtime.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -14,3 +14,4 @@ local shared = require("core.fs.engine.paths").shared
 require("tests.lua.workflows.workflow_model_contract").register(helpers, shared)
 require("tests.lua.workflows.workflow_interpreter_contract").register(helpers, shared)
 require("tests.lua.workflows.workflow_runner_contract").register(helpers, shared)
+require("tests.lua.workflows.workflow_owner_contract").register(helpers, shared)
