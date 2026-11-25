@@ -1013,8 +1013,11 @@ Ollama runtime is `ollama\` inside it, with its own protected DACL;
 grants no write, delete or re-permission right to another principal, held open
 without DELETE sharing), Linux one `ergopti` folder per XDG base.
 A new data folder is a purpose folder under that root declared in the TOML,
-never a new spelling; `test-legacy-folder-names.cjs` rejects an old spelling
-outside the migration tables. The macOS owned Karabiner runtime keeps
+never a new spelling; `test-legacy-folder-names.cjs` reads every tracked text
+file and rejects an old spelling outside the migration tables, and a root
+followed by the name in another case or with "Plus" (a prefix list of scanned
+folders once let a stale old config path live in `static/ergopti/`). The macOS
+owned Karabiner runtime keeps
 `ErgoptiPlus` (`[owned_runtime.macos]`) until its rebuild. Each driver has one
 resolver consumers call at the moment of use: macOS `Logger.logs_dir()` /
 `today_log_path()` / `today_errors_path()` / `crash_reports_dir()`, Windows

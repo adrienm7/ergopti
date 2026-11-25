@@ -45,6 +45,15 @@ One deliberate exception, documented in the TOML:
 The log file prefixes `ErgoptiPlus_`, the app and script names and the bundle
 ids `com.ergoptiplus.*` are not folder names and are unchanged.
 
+`tools/test/test-legacy-folder-names.cjs` reads every tracked text file but the
+owners and `docs/audits/`: it fails on an old spelling from the `[migration]`
+tables and on a root followed by the name in another case or with "Plus"
+(`~/.local/state/Ergopti`, `~/Library/Logs/ergopti`, `%LOCALAPPDATA%\ErgoptiPlus`).
+The maintainer's note of 2026-11-25 (the dev logs are in
+`~/.local/state/ergopti/logs`, without "\_plus", where v1.0.9 used
+`~/.local/state/ergopti_plus/logs`) is this rule: the Linux migration moves the
+old folder at the first boot of a dev or later build.
+
 ## One-time migration
 
 The shared core is `_shared/settings/engine/migration/legacy_folder_migration_core.lua`, replayed from
@@ -66,22 +75,21 @@ contract (macOS, Linux) and by
   application-named subfolder, as the logs owner saves it) becomes the same
   parent's `Ergopti` (`ergopti` on Linux), and the logs written into its
   application-named subfolder move there; the user's own entries of the old
-  folder stay, and any other custom folder is kept (decided by the coordinator
-  on 2026-11-11 overnight, to review by the maintainer). macOS rewrites
-  LogsDirPath, Linux the `paths.logs_dir` setting; Windows has not taken the
-  rule yet.
+  folder stay, and any other custom folder is kept (validated by the
+  maintainer on 2026-11-13). macOS and Windows rewrite LogsDirPath, Linux the
+  `paths.logs_dir` setting.
 - Every outcome is logged through the central logger.
 
 Drivers:
 
-- **macOS** `adapters/legacy_folder_migration.lua`, from `init.lua` before
+- **macOS** `core/fs/adapters/legacy_folder_migration.lua`, from `init.lua` before
   `config_paths`: paths.toml and RemapRuntime of `ErgoptiPlus/`,
   `~/.config/ergopti_plus` to `Ergopti/config`, and every entry of
   `~/Library/Logs/ergopti_plus`, `~/Library/Caches/ergopti_plus` and
   `~/Library/Application Support/ergopti_plus`. The locks, LeaseGuardian and
   pty-sources of `ErgoptiPlus/` stay for a build that may still run until the
   next login, and `ErgoptiPlus/karabiner` is the owned runtime.
-- **Linux** `infra/legacy_folder_migration.lua`, from `ergopti_hotstrings.lua`
+- **Linux** `settings/engine/migration/legacy_folder_migration.lua`, from `ergopti_hotstrings.lua`
   before the logger sink: each XDG base's `ergopti_plus` merges into its
   `ergopti`; the backup is `<base>/ergopti/before-folder-migration/`.
 - **Windows** `settings/engine/migration/legacy_folder_migration.ahk`, from `boot.ahk` before the
