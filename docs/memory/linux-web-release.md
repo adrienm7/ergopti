@@ -271,9 +271,11 @@ deadline (`atspi_probe_timeout_ms`); input callbacks keep the default.
 
 Generic `lua-*` packages are Lua 5.4 builds on Fedora, Arch, openSUSE and
 Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
-(Alpine, Fedora). Fedora has no LuaJIT lgi, so its WebKit windows cannot open
-(declared in the `first-install-distros` matrix). GNOME shows no tray icon
-without an AppIndicator extension. Action: prove installer changes with
+(Alpine, Fedora). Fedora's Lua 5.1 lgi is `lua-lgi-compat`
+(`/usr/lib64/lua/5.1/lgi`, checked 2026-11-25); `compat-lua-*` and
+`lua5.1-posix` do not exist there. Every package carrying the private runtime
+bundles its own lgi (`build_owned_lgi`), so only a source install needs the
+host's. GNOME shows no tray icon without an AppIndicator extension. Action: prove installer changes with
 `tests/hardware/run_in_docker.sh <image>` and the first-install matrix.
 
 ### project-linux-tap-holds-run-in-the-daemon
@@ -1028,6 +1030,20 @@ script directory (inside the app bundle when packaged), never the configuration
 directory; report `config_paths.get_config_dir()` for the latter. Action: a new
 package format or diagnostic field goes through these owners, and
 `test-package-builds-stamp-commit.cjs` must stay green.
+
+### project-appimage-tray-launch-goes-through-launch-sh
+
+AppRun used to exec the daemon directly, so the AppImage never set up the
+`input`/`uinput` groups, the uinput udev rule or the module: on Arch the core
+could never reach the keyboard (field report, 2026-11-25). A `--tray` launch now
+execs `install/launch.sh` with `ERGOPTI_PORTABLE_LAUNCH=1`, which starts no
+systemd unit and hands pkexec a copy of the privileged payload in a private
+temporary folder, because root cannot read a user's FUSE mount. The repair
+command shown to the user is `$APPIMAGE` itself, never a path inside the mount.
+lgi's GTK override calls `gtk_init_check()`, so any probe that resolves the
+WebKit2 namespace needs a display (the distro check starts Xvfb). Action: a new
+privileged file the setup needs is copied there too and listed in the AppImage's
+`REQUIRED_PAYLOAD`.
 
 ### project-appimage-is-built-on-the-oldest-lts
 

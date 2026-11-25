@@ -506,6 +506,33 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Linux
 
+- [ ] **[FIELD] Arch Linux, KDE Plasma 6 Wayland: « rien ne marche à part le tray » (Discord report, 2026-11-25).**
+      User system: Arch, Plasma 6.8.3, Frameworks 6.32, Qt 6.12, kernel 7.3.5, ThinkPad X270 (HD 520), AppImage and
+      the GitHub install. Fixed on `fix/linux-arch-core-inactive`: the AppImage carries its own LuaJIT lgi (their
+      `lua-lgi` is a Lua 5.4 build); a tray launch of the AppImage now runs `install/launch.sh`, which asks once
+      (pkexec) to create the `input`/`uinput` groups, install the uinput udev rule and load the module (AppRun used to
+      skip it, so the keyboard core could never start on Arch); each missing part stays as a 🔴 row at the top of the
+      tray and as a notice that stays up (KDE dropped the timed one). Ask the user, on the next dev prerelease: 1. Download the new `ErgoptiPlus-x86_64.AppImage`, `chmod +x` it, quit any running Ergopti+, launch it from the
+      file manager. Expected: one administrator prompt (« Ergopti+ … accès au clavier »). Accept it. 2. Log out and back in (or reboot) if the tray then shows « Accès au clavier indisponible »: group membership
+      applies to new sessions only. Relaunch the AppImage. 3. Check: typing `adn ` in a text editor gives `ADN`; Réglages and Statistiques open; the tray
+      has no 🔴 row. If one remains, click it and copy its text. 4. Send: the day's log `~/.local/state/ergopti/logs/` (whole folder, as a zip; lines with `[diagnosis] code=` name
+      each problem), the output of `id; ls -l /dev/uinput; lsmod | grep uinput; ls /etc/udev/rules.d/`, and the
+      field report: tray « Débogage » › « Lancer le field report (tous les tests) », then « Copier » in its window
+      and paste it. The run's files are in `$XDG_RUNTIME_DIR/ergopti/field-run/` (`/run/user/<uid>/…`), which is
+      cleared at logout: copy them before logging out. 5. The GitHub install (`install.sh`) path on the same machine: `pacman -Q lua51-lgi webkit2gtk-4.1
+       libayatana-appindicator` must list all three after the install.
+      Unproved here: the pkexec prompt under KDE's polkit agent, `sg` acquiring the new groups in the same session,
+      and KWin Wayland's layout read (a failure shows « Disposition clavier non lue »).
+- [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25).** Windows: a runtime error without
+      WebView2 is only a TrayTip (`diagnostics/ui/error_dialog.ahk:362-375`) and a managed download failure only a
+      transient notice (`ui/download_window/init.ahk:78-82`): fall back to `Ui_MsgBox` naming the errors file;
+      `HealthCheck_FormatPlain` (`diagnostics/ui/healthcheck/core.ahk:527`) has no caller although comments call it the
+      WebView2-less fallback; no tray status row exists for a removed keyboard hook or a failed `ergopti_nav_owner.dll`
+      (`ai/adapters/nav_event_owner.ahk:4971`). macOS: a keymap event tap that keeps failing to restart only logs an
+      ERROR per second (`hotstrings/engine/expander/init.lua:2905-2945`) with no 🔴 title dot; a failed `hs.webview.new`
+      leaves a menu click without effect (`menu/ui/builder/builder.lua:843`). Linux now has `component_status` for
+      the same class.
+
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
       … v1.0.10-dev.175) admit it. Remove that step, its call, `test-linux-legacy-update-probes.cjs` and the frozen
