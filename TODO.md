@@ -306,7 +306,11 @@ waits for the maintainer's review).
       2026-11-24 (`verify-analyser-scores.cjs --genkey`, `--oxeylyzer`: Score within 0.005 % and 0.0003 on average,
       docs/design/analyser-scores.md); since 2026-11-25 genkey is `exact` on texts and both stay `close` for the
       word lists and the 12 count-table corpora (the trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
-      own run to be checked; shirolyzer's score is undocumented.
+      own run to be checked: it builds in a cloud session (rbscholtus/keycraft f8c6419, 2026-11-25, Go 1.27 fetched by
+      `GOTOOLCHAIN=auto`, `go build ./cmd/keycraft`). Its score is Σ weight × (metric − median) / IQR over the 150
+      layouts of its `data/layouts` scored on the same corpus (`internal/keycraft/scorer.go`, weights in
+      `data/config/weights.txt`, metrics in `analyser.go`), so a scorer needs that reference set shipped and scored per
+      corpus; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
       their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
       (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (2) corpus blends (done: up to three corpora by weight,
