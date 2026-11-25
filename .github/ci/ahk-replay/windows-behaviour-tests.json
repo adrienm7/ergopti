@@ -1,5 +1,5 @@
 {
-	"expected_count": 13,
+	"expected_count": 14,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -50,6 +50,10 @@
 		},
 		{
 			"contains": "reg_readbinary decodes a real reg_binary value",
+			"expected_count": 1
+		},
+		{
+			"contains": "a warning is batched and only an error forces the flush",
 			"expected_count": 1
 		}
 	]
