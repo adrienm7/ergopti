@@ -226,6 +226,18 @@
 			"dest": "vendor/ergopti_brightness_worker.ps1"
 		},
 		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision_worker.ps1",
+			"dest": "vendor/ergopti_screen_vision_worker.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision_matcher.cs",
+			"dest": "vendor/ergopti_screen_vision_matcher.cs"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision_capture.cs",
+			"dest": "vendor/ergopti_screen_vision_capture.cs"
+		},
+		{
 			"source": "static/layouts/registry/index.json",
 			"dest": "static/layouts/registry/index.json"
 		},
