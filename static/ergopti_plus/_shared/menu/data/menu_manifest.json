@@ -2807,6 +2807,22 @@
 			"type": "---"
 		},
 		{
+			"type": "list",
+			"id": "hotstrings_taps_down",
+			"status_rows": {
+				"taps_down": [
+					{
+						"type": "label",
+						"i18n": "menu.hotstrings.taps_down"
+					}
+				]
+			},
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "group",
 			"id": "hotstrings_params",
 			"i18n": "menu.hotstrings.params"

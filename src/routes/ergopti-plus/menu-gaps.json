@@ -811,6 +811,22 @@
 		}
 	},
 	{
+		"path": "hotstrings_menu.hotstrings_taps_down",
+		"visibility": "hide",
+		"labels": { "fr": "hotstrings_taps_down", "en": "hotstrings_taps_down" },
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"reasons": {
+			"windows": {
+				"en": "macOS only: macOS can switch off the event taps through which Ergopti reads the keyboard, for instance when its Accessibility or Input Monitoring permission is withdrawn, and this row then says why the hotstrings stopped. Windows and Linux read the keyboard through the driver’s own hook or daemon, which has no such switch for this row to report.",
+				"fr": "macOS uniquement : macOS peut couper les interceptions d’événements par lesquelles Ergopti lit le clavier, par exemple quand son autorisation Accessibilité ou Surveillance de l’entrée est retirée ; cette ligne dit alors pourquoi les hotstrings sont à l’arrêt. Windows et Linux lisent le clavier par le hook ou le démon du pilote lui-même, qui n’a pas d’interrupteur de ce genre à signaler."
+			},
+			"linux": {
+				"en": "macOS only: macOS can switch off the event taps through which Ergopti reads the keyboard, for instance when its Accessibility or Input Monitoring permission is withdrawn, and this row then says why the hotstrings stopped. Windows and Linux read the keyboard through the driver’s own hook or daemon, which has no such switch for this row to report.",
+				"fr": "macOS uniquement : macOS peut couper les interceptions d’événements par lesquelles Ergopti lit le clavier, par exemple quand son autorisation Accessibilité ou Surveillance de l’entrée est retirée ; cette ligne dit alors pourquoi les hotstrings sont à l’arrêt. Windows et Linux lisent le clavier par le hook ou le démon du pilote lui-même, qui n’a pas d’interrupteur de ce genre à signaler."
+			}
+		}
+	},
+	{
 		"path": "hotstrings_menu.hotstrings_reload",
 		"visibility": "hide",
 		"labels": { "fr": "🔄 Recharger", "en": "🔄 Reload" },

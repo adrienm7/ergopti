@@ -87,7 +87,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				},
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua",
@@ -142,7 +142,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				}
 			],
 			"linux": [
@@ -194,7 +194,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				}
 			],
 			"linux": [
@@ -249,7 +249,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				}
 			],
 			"linux": [
@@ -296,7 +296,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				}
 			],
 			"linux": [
@@ -348,7 +348,7 @@
 				{
 					"file": "static/ergopti_plus/macos/hotstrings/engine/expander/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "825f94f1485e4744695dccd7db030e8e79eef88b666b5ddb6370809edc751804"
+					"sha256": "f92c12590bea2dc834c4a67ce665f64caa7e5f8a2dbf3f6dccfa12960ef1595b"
 				}
 			],
 			"linux": [

@@ -94,6 +94,9 @@ end
 
 
 local HotCounter  = require("hotstrings.ui.menu.counter")
+local HotstringsStatus = require("hotstrings.ui.menu.hotstrings_status")
+local TitleStatus = require("menu.ui.title_status")
+local Timings     = require("core.timing.engine.timings")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local CanvasBadge = require("menu.ui.builder.canvas_badge")
 local ShortcutHint = require("menu.ui.builder.shortcut_hint")
@@ -107,6 +110,12 @@ local TomlCodec   = require("core.text.engine.toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
 local _top_level_cache = nil
+
+-- The Hotstrings title's red dot outlives the build that painted it: a typing
+-- event tap can stay disabled after any build, so the shared watch repaints
+-- it (menu/ui/title_status.lua), and keeps watching a title without a dot.
+local _hotstrings_status_watch = TitleStatus.new_watch("Hotstrings",
+	Timings.sec("hotstrings", "title_status_watch_ms"), { keep_without_dot = true })
 local _top_level_separator_receiver = nil
 local _language_packs_cache    = nil
 
@@ -519,7 +528,22 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = function() return master_on end
 
+	-- The title's red dot (maintainer, 2026-11-25), read again live by the
+	-- watch: a typing event tap the watchdog cannot re-enable leaves every
+	-- switch on while nothing expands, which only the log said.
+	local function read_status()
+		local paused = ctx.paused == true
+		if type(ctx.is_paused) == "function" then paused = ctx.is_paused() == true end
+		return HotstringsStatus.read(ctx.keymap, paused)
+	end
+	local status = read_status()
+
 	local providers = {
+		-- Greyed under the switch while a typing tap is down: what stopped and what to check
+		["hotstrings_taps_down"]          = function()
+			if status == nil then return {} end
+			return ManifestMenu.status_rows("hotstrings_menu", "hotstrings_taps_down", "taps_down") or {}
+		end,
 		["hotstring_categories_standard"] = function() return std_groups end,
 		["hotstring_languages"]           = function() return language_rows end,
 		-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
@@ -566,10 +590,13 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
 		return {}
 	end
+
 	-- The tick mirrors the switch; the switch itself is the submenu's first
 	-- row, since a row that opens a submenu is never clicked.
 	local parent = receive(hotstrings_menu, { hotstrings_enabled = function() return master_on or nil end,
 		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return grand_has_count end })
+	if parent then TitleStatus.decorate(parent, status) end
+	if type(ctx.updateMenu) == "function" then _hotstrings_status_watch.watch(status, read_status, ctx.updateMenu) end
 	return parent and { parent } or {}
 end
 

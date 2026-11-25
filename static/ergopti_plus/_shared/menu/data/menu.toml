@@ -2589,6 +2589,18 @@ i18n = "common.clear_to_system"
 [[menu.hotstrings_menu]]
 type = "---"
 
+# Why the macOS hotstrings expand nothing while their switch reads on: a typing
+# event tap of the keymap engine stays disabled after the watchdog's restart
+# (maintainer, 2026-11-25). Greyed under the switch's head while the title carries
+# the red dot; empty otherwise. Windows and Linux capture keys inside the
+# driver's own hook or daemon, which has no tap macOS can switch off.
+[[menu.hotstrings_menu]]
+type = "list"
+id = "hotstrings_taps_down"
+status_rows.taps_down = [{ type = "label", i18n = "menu.hotstrings.taps_down" }]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.hotstrings_menu]]
 type = "group"
 id = "hotstrings_params"
