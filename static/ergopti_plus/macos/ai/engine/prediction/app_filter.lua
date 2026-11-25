@@ -231,6 +231,13 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	then
 		return true
 	end
+	-- A window whose focused element macOS Accessibility does not read admits
+	-- plain hotstrings only (km_utils.window_mode_admits): the field could be a
+	-- password field that hides its role, so no AI text is asked there.
+	if km_utils.window_mode_admits() then
+		Logger.debug(LOG, "Focused field unread — LLM request skipped.")
+		return true
+	end
 
 	local front, focus_failed = get_focused_app()
 	if focus_failed then

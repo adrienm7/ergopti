@@ -2852,6 +2852,22 @@
 			"unavailable": "hide"
 		},
 		{
+			"type": "list",
+			"id": "hotstrings_focus_unchecked",
+			"status_rows": {
+				"focus_unchecked": [
+					{
+						"type": "label",
+						"i18n": "menu.hotstrings.focus_unchecked"
+					}
+				]
+			},
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "group",
 			"id": "hotstrings_params",
 			"i18n": "menu.hotstrings.params"

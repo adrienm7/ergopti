@@ -169,6 +169,7 @@ future = "keep every neighbor"
 		local native_utils = require("hotstrings.engine.expander.utils")
 		package.loaded["hotstrings.engine.expander.utils"] = setmetatable({
 			is_ignored_window = function() return false, 0 end,
+			window_mode_admits = function() return false end,
 			is_secure_field = function() return false end,
 			start_ignored_win_tracking = function() return 1 end,
 		}, { __index = native_utils })

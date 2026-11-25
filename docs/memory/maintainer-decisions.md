@@ -2974,8 +2974,23 @@ The maintainer answered the agent decisions pending on 2026-11-25.
 - **Linux hotstrings without an accessibility field verdict:** keep the « window » mode described in
   `linux/modules/keystats/focus_guard.lua` (INVARIANTS 6), including switching `org.a11y.Status IsEnabled` on and
   the red tray row for a lasting reason.
-- **macOS unreadable AX focus:** give macOS the same treatment as Linux (window-mode admission outside a known
-  secure field and password apps, red menu row for a lasting reason).
+- **macOS unreadable AX focus, as Linux.** Asked whether macOS should get the
+  Linux window mode when `AXFocusedUIElement` cannot be read, the maintainer
+  answered « Oui, comme Linux ». The probe
+  (`hotstrings/engine/expander/utils.lua`) then keeps the window classified
+  and concludes the mode `window` (reason `focus_unreadable`), unless the
+  application is a password manager (`_shared/data/secure_apps.json`), the
+  title marks a private window (`metrics/engine/view/private_window.lua`), an
+  ignored-window rule matches, or a password field was the last field read
+  (`password_field_latched`). `is_secure_field` still answers nil there, so
+  only plain hotstrings pass, through `window_mode_admits`; metrics, the AI
+  (keys, context, preview, dispatch through
+  `ai/engine/prediction/app_filter.lua`) and the receipt-bound actions keep
+  needing a field verdict. A window mode held for
+  `privacy.text_automation_notice_after_ms` paints the red dot on the
+  Hotstrings title and a greyed reason row (`hotstrings_menu` list
+  `hotstrings_focus_unchecked`), never a notification. Do not withhold every
+  hotstring again on an unread focus, and do not open the AI there.
 - **44 px targets:** a 44 px minimum for every control in the app windows' `theme.css` and the site's stylesheet,
   with fixed window sizes raised where a window overflows.
 - **Magic and repeat keys:** build them as designed in `docs/design/magic-and-repeat-keys.md`, the Studio analysis

@@ -28,6 +28,7 @@ require("platform.input.keycodes.key_names") -- pure, with its data: the gesture
 require("shortcuts.engine.actions.sticky_label") -- pure: the gesture actions name their sticky holds with it
 require("gestures.engine.incremental") -- pure: the gesture geometry steps an incremental swipe with it
 require("gestures.engine.contact_join") -- pure: the gesture geometry judges a third contact with it
+require("metrics.engine.view.private_window") -- pure: the hotstrings' window mode refuses a private window with it
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("core.logger.engine")

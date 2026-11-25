@@ -31,6 +31,7 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 	local function load_filter(ignored_state)
 		package.loaded["hotstrings.engine.expander.utils"] = {
 			is_ignored_window = function() return ignored_state end,
+			window_mode_admits = function() return false end,
 		}
 		return helpers.load_with_stubs("ai.engine.prediction.app_filter")
 	end

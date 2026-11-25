@@ -32,6 +32,7 @@ local SyntheticInput = require("platform.input.synthetic_input")
 local SecureFieldDetector = require("platform.focus.secure_field_detector")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local FieldRunSelftest = require("diagnostics.engine.field_run.selftest")
+local PrivateWindow = require("metrics.engine.view.private_window")
 
 local LOG = "layouts.engine.utils"
 
@@ -1161,6 +1162,20 @@ local _ignored_win_last_title_known = true
 local _ignored_win_activity = { probes = 0, retitle = 0, invalidations = {} }
 local _secure_field_cache_value = nil
 local _text_destination = nil
+-- The text automation mode the last probe concluded, as on Linux
+-- (modules/keystats/focus_guard.lua INVARIANTS 6): "field" when the focused
+-- field was classified ordinary, "window" (reason focus_unreadable) when
+-- AXFocusedUIElement could not be read in an ordinary window, "closed"
+-- otherwise (secure_field, password_app, password_field_latched,
+-- private_window, ignored_window, unclassified, stopped). Only plain hotstrings follow the window mode; metrics, AI and the
+-- receipt-bound actions keep needing a field verdict (maintainer, 2026-11-25:
+-- « Oui, comme Linux »).
+local _automation_mode, _automation_reason, _automation_since_ns = "closed", "stopped", nil
+-- A password field seen and not yet left for an ordinary field: it closes even
+-- the window mode, whatever unreadable focus follows it.
+local _password_field_latched = false
+-- Reasons already logged once this session when the window mode admitted text.
+local _automation_logged = {}
 local schedule_ignored_win_refresh
 local arm_ignored_win_ttl_refresh
 
@@ -1477,6 +1492,21 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 	return true
 end
 
+--- Records the text automation mode a probe concluded; a repeat keeps its age.
+--- @param mode string "field", "window" or "closed".
+--- @param reason string Why, from the closed list above.
+local function publish_automation_mode(mode, reason)
+	if mode == _automation_mode and reason == _automation_reason then return end
+	_automation_mode, _automation_reason = mode, reason
+	_automation_since_ns = TimerScheduler.now_ns()
+	if mode == "window" and not _automation_logged[reason] then
+		_automation_logged[reason] = true
+		Logger.warn(LOG, "Hotstrings expand without a password-field check: macOS Accessibility does not say "
+			.. "which field has focus (%s). Password managers and private windows still withhold them; "
+			.. "metrics and AI stay closed there.", reason)
+	end
+end
+
 --- Marks the cached classification unknown after an AX read failure.
 --- @return nil
 local function mark_ignored_win_unknown()
@@ -1487,6 +1517,7 @@ local function mark_ignored_win_unknown()
 	_ignored_win_last_identity = nil
 	_ignored_win_last_window_key = nil
 	_ignored_win_last_title_known = true
+	publish_automation_mode("closed", "unclassified")
 	return nil
 end
 
@@ -1617,6 +1648,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		observe_ignored_win_identity(win, app_name, "<hammerspoon>")
 		_ignored_win_cache_value = true
 		_secure_field_cache_value = false
+		publish_automation_mode("closed", "ignored_window")
 		return true
 	end
 
@@ -1631,12 +1663,30 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	local secure, detail, element
 	if SecureFieldDetector.isSecureApp(app_name) == true then
 		secure = true
+		publish_automation_mode("closed", "password_app")
 	else
 		secure, detail, element = SecureFieldDetector.inspectFocusedElementWithReceipt(app)
+		if secure == true then
+			_password_field_latched = true
+			publish_automation_mode("closed", "secure_field")
+		elseif secure == false then
+			_password_field_latched = false
+			publish_automation_mode("field", "field")
+		elseif _password_field_latched then
+			publish_automation_mode("closed", "password_field_latched")
+		elseif PrivateWindow.matches(title) then
+			publish_automation_mode("closed", "private_window")
+		else
+			-- An unreadable focused element leaves the window classified: the
+			-- title rules still judge it, and plain hotstrings follow the window
+			-- mode instead of being withheld in silence (TODO.md, 2026-11-25).
+			Logger.debug(LOG, "Focused element unreadable: %s.", tostring(detail))
+			publish_automation_mode("window", "focus_unreadable")
+		end
 	end
-	if type(secure) ~= "boolean" then return stage("secure_field", true) end
 	stage("secure_field")
-	_secure_field_cache_value = secure
+	-- Not « and secure or nil »: a false verdict must stay false.
+	if type(secure) == "boolean" then _secure_field_cache_value = secure else _secure_field_cache_value = nil end
 	-- Bind the receipt to the exact AX element whose privacy was classified.
 	-- A second focused-element read could select another field between calls.
 	if not secure and element then
@@ -1653,6 +1703,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	if type(ignored_titles) == "table" and ignored_titles[title] then
 		Logger.debug(LOG, "Window '%s' ignored (exact match).", title)
 		_ignored_win_cache_value = true
+		publish_automation_mode("closed", "ignored_window")
 		return true
 	end
 
@@ -1663,6 +1714,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 			if type(pat) == "string" and ok_match and matched then
 				Logger.debug(LOG, "Window '%s' ignored (pattern '%s').", title, pat)
 				_ignored_win_cache_value = true
+				publish_automation_mode("closed", "ignored_window")
 				return true
 			end
 			if type(pat) == "string" and not ok_match then
@@ -1814,6 +1866,14 @@ function M.selftest_window_context()
 end
 
 
+--- The caller's civil-clock read, or a fresh one when it passed none.
+--- @param now number|nil Current epoch timestamp (seconds) from the caller.
+--- @return number now
+local function epoch_seconds(now)
+	if now then return now end
+	return hs.timer.secondsSinceEpoch()
+end
+
 --- Returns the cached secure-field classification without performing AX work.
 --- The cache shares focus identity, TTL, invalidation, and refresh ownership with
 --- is_ignored_window(); nil means the current field is not yet classified.
@@ -1821,7 +1881,7 @@ end
 --- @return boolean|nil secure
 --- @return integer context_generation
 function M.is_secure_field(now)
-	if not now then now = hs.timer.secondsSinceEpoch() end
+	now = epoch_seconds(now)
 	if _ignored_win_stopped then return nil, _ignored_win_context_generation end
 	if _ignored_win_cache_dirty or _secure_field_cache_value == nil then
 		schedule_ignored_win_refresh()
@@ -1832,6 +1892,28 @@ function M.is_secure_field(now)
 		return nil, _ignored_win_context_generation
 	end
 	return _secure_field_cache_value, _ignored_win_context_generation
+end
+
+--- Whether plain hotstrings may expand without a field verdict (the window
+--- mode): the focused element could not be read in a window that is neither a
+--- password manager's nor private, and no password field was seen since the
+--- last ordinary one. Read after is_secure_field(), which arms the refresh.
+--- @param now number|nil Current epoch timestamp (seconds) from the caller.
+--- @return boolean admitted
+function M.window_mode_admits(now)
+	now = epoch_seconds(now)
+	if _ignored_win_stopped or _ignored_win_cache_dirty or _ignored_win_cache_value ~= false
+		or _secure_field_cache_value ~= nil or _automation_mode ~= "window" then return false end
+	return now >= _ignored_win_cache_time and (now - _ignored_win_cache_time) < IGNORED_WIN_TTL_SEC
+end
+
+--- The text automation mode the last probe concluded, for the Hotstrings
+--- title's status (hotstrings/ui/menu/status.lua). An in-memory read.
+--- @return string mode "field", "window" or "closed".
+--- @return string reason
+--- @return number|nil since_ns Monotonic nanoseconds since the mode began.
+function M.text_automation_state()
+	return _automation_mode, _automation_reason, _automation_since_ns
 end
 
 --- Captures a classified destination without native calls on the input thread.
@@ -1977,6 +2059,8 @@ function M.stop()
 	_ignored_win_last_identity = nil
 	_ignored_win_titles_ref = nil
 	_ignored_win_patterns_ref = nil
+	_password_field_latched = false
+	publish_automation_mode("closed", "stopped")
 	return settled
 end
 

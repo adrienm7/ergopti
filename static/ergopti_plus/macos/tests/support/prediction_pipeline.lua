@@ -119,6 +119,7 @@ local function load_fixture(options)
 	-- prewarm commits, which would make this fixture stop before backend dispatch.
 	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
+		window_mode_admits = function() return false end,
 	}
 
 	local tooltip = {
