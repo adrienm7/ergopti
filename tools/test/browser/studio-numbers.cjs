@@ -56,8 +56,10 @@ const RESULT_TABS = [
 ];
 const LANGS = ['fr', 'en'];
 // Where a text names the characters of keys: a lone digit there is a key's
-// character, not a number (a board's key, a key column, an n-gram, a pair).
-const KEY_CONTEXT = '.la-key, .la-keys, .la-ngram, .la-cell-count, .la-fingering-key';
+// character, not a number (a board's key, a key column, an n-gram, a pair,
+// the « Corpus words » button named after a worst n-gram row's keys).
+const KEY_CONTEXT =
+	'.la-key, .la-keys, .la-ngram, .la-ngram-words, .la-cell-count, .la-fingering-key';
 // The cells read whole, and the ranks among them, written without a unit.
 const CELLS = 'td, [role="cell"]';
 const RANKS = '.la-rank, .la-cell-rank, .la-cell-mark';
