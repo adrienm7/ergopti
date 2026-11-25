@@ -195,9 +195,6 @@ body {
 	cursor: pointer;
 	flex-shrink: 0;
 	font-size: 9px;
-	/* A 24 px target (WCAG 2.5.8) around the small glyph. */
-	min-height: 24px;
-	min-width: 24px;
 	transition: transform 0.18s;
 }
 

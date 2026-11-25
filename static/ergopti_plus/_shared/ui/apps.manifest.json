@@ -75,7 +75,7 @@
 		"changelog": {
 			"title_key": "changelog_window.window_title",
 			"width": 860,
-			"height": 580,
+			"height": 620,
 			"min_width": 860,
 			"min_height": 540,
 			"vhost": "ergopti.changelog"
@@ -83,9 +83,9 @@
 		"download_window": {
 			"title_key": "download_window.window_title",
 			"width": 460,
-			"height": 380,
+			"height": 420,
 			"min_width": 460,
-			"min_height": 380,
+			"min_height": 420,
 			"vhost": "ergopti.download"
 		},
 		"emulation_picker": {
@@ -139,7 +139,7 @@
 		"hotstring_editor": {
 			"title_key": "editor.hotstrings.window_title",
 			"width": 960,
-			"height": 640,
+			"height": 660,
 			"min_width": 720,
 			"min_height": 520,
 			"vhost": "ergopti.hotstrings"

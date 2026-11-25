@@ -150,6 +150,8 @@ body:has(> main.layout-analysis) {
 .la-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	position: absolute;
 	white-space: nowrap;
@@ -330,7 +332,7 @@ body:has(> main.layout-analysis) {
 	display: inline-flex;
 	font-weight: 600;
 	gap: 8px;
-	min-height: 40px;
+	min-height: var(--theme-target-min);
 	padding: 8px 16px;
 }
 
@@ -470,8 +472,8 @@ body:has(> main.layout-analysis) {
 	display: inline-flex;
 	font-weight: 600;
 	justify-content: center;
-	min-height: 28px;
-	min-width: 28px;
+	min-height: var(--theme-target-min);
+	min-width: var(--theme-target-min);
 	text-decoration: none;
 }
 
@@ -497,15 +499,15 @@ body:has(> main.layout-analysis) {
 	width: 100%;
 }
 
-/* Rows of at least 26 px keep each checkbox 24 px clear of the next one
-   (WCAG 2.5.8 target size); the whole row is the checkbox's label anyway. */
-/* A layout's « + » box (text mode « final, except + »): laid out as a layout. */
+/* The whole row is the checkbox's label, its 44 px target (WCAG 2.5.5,
+   theme.css). A layout's « + » box (text mode « final, except + ») is laid
+   out as a layout. */
 .la-layout,
 .la-plus {
 	align-items: center;
 	display: flex;
 	gap: 6px;
-	min-height: 26px;
+	min-height: var(--theme-target-min);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -583,8 +585,8 @@ body:has(> main.layout-analysis) {
 }
 
 /* A table row's layout name, a button for the keyboard drawn as the cell's
-   text (the row answers to the pointer too). Its box is at least 24 px each
-   way (WCAG 2.5.8): a one- or two-letter name (« Ø ») was a 15 by 20 px target
+   text (the row answers to the pointer too). Its box is at least 44 px each
+   way (WCAG 2.5.5, theme.css): a one- or two-letter name (« Ø ») was a 15 by 20 px target
    wedged between the rows above and below it. */
 .layout-analysis .la-row-name {
 	background: none;
@@ -592,8 +594,8 @@ body:has(> main.layout-analysis) {
 	border-radius: 2px;
 	color: inherit;
 	font: inherit;
-	min-block-size: 24px;
-	min-inline-size: 24px;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
 	padding: 0;
 	text-align: inherit;
 }
@@ -764,12 +766,13 @@ body:has(> main.layout-analysis) {
 .la-table thead th.la-th-metric {
 	hyphens: auto;
 	line-height: 1.25;
-	max-width: 12em;
+	max-width: 14em;
 	/* The table scrolls sideways rather than squeeze a header past two lines.
 	   The « i » and the cell's padding take their share of the column: at
 	   10em a wide sans-serif (Linux's) put « Roulements vers l’intérieur » and
-	   « Caractères non pris en charge » on three lines. */
-	min-width: 12em;
+	   « Caractères non pris en charge » on three lines, and at 12em once the
+	   « i » took its 44 px target (theme.css). */
+	min-width: 14em;
 	vertical-align: bottom;
 	white-space: normal;
 }
@@ -1456,7 +1459,7 @@ body:has(> main.layout-analysis) {
 	/* A name wider than a phone's row wraps instead of widening the page. */
 	hyphens: auto;
 	max-width: 100%;
-	min-height: 40px;
+	min-height: var(--theme-target-min);
 	min-width: 0;
 	overflow-wrap: anywhere;
 	padding: 6px 12px;
@@ -1918,7 +1921,7 @@ body:has(> main.layout-analysis) {
 	border-radius: 6px;
 	display: inline-flex;
 	gap: 4px;
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 	padding: 2px 8px;
 }
 
@@ -1945,7 +1948,7 @@ body:has(> main.layout-analysis) {
 }
 
 .la-rename-input {
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 	min-width: 14em;
 }
 
@@ -2134,7 +2137,7 @@ body:has(> main.layout-analysis) {
 }
 
 .la-preset-save input {
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 	min-width: 14em;
 }
 
@@ -2168,8 +2171,8 @@ body:has(> main.layout-analysis) {
 	display: inline-flex;
 	gap: 2px;
 	margin-right: 4px;
-	min-height: 24px;
-	min-width: 24px;
+	min-height: var(--theme-target-min);
+	min-width: var(--theme-target-min);
 	padding: 0 3px;
 	vertical-align: middle;
 }
@@ -2214,7 +2217,7 @@ body:has(> main.layout-analysis) {
 	display: inline-flex;
 	gap: 6px;
 	margin-left: auto;
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 }
 
 .la-csv-button .la-row-icon {

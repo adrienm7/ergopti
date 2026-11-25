@@ -83,7 +83,7 @@ body {
 	border-radius: 6px;
 	color: inherit;
 	font: inherit;
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 	padding: 4px 10px;
 }
 
@@ -195,9 +195,10 @@ body {
    filled, bold and carries an accent bar along its foot (not colour alone);
    its « Duplicate » and « Close » are small icon buttons inside it, spaced
    evenly and kept off its border, so hover and focus never cut its outline
-   (maintainer, 2026-11-19). */
+   (maintainer, 2026-11-19). The height holds the 44 px icon buttons of
+   theme.css 2 px inside the tab's 1 px border. */
 .le-layout-tab-list {
-	--le-tab-height: 38px;
+	--le-tab-height: calc(var(--theme-target-min) + 6px);
 	align-items: center;
 	display: flex;
 	flex: 1 1 auto;
@@ -248,7 +249,7 @@ body {
 .layout-editor .le-layout-tab-item button {
 	background: transparent;
 	border: 0;
-	min-height: 0;
+	min-height: var(--theme-target-min);
 }
 
 .layout-editor .le-layout-tab {
@@ -269,18 +270,19 @@ body {
 	outline-offset: -3px;
 }
 
-/* « Duplicate » (ux-study item 20) and « Close »: 28 px icon buttons, as far
-   from each other as the last one is from the tab's edge. */
+/* « Duplicate » (ux-study item 20) and « Close »: 44 px icon buttons (the
+   target of theme.css), as far from each other as the last one is from the
+   tab's edge. */
 .layout-editor .le-tab-icon-button {
 	align-items: center;
 	border-radius: 6px;
 	color: var(--le-sub);
 	display: inline-flex;
 	flex: none;
-	height: 28px;
+	height: var(--theme-target-min);
 	justify-content: center;
 	padding: 0;
-	width: 28px;
+	width: var(--theme-target-min);
 }
 
 .layout-editor .le-tab-icon-button:hover:not(:disabled) {
@@ -334,7 +336,7 @@ body {
 	border: 0;
 	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
 	font: inherit;
-	min-height: 0;
+	min-height: var(--theme-target-min);
 	padding: 0 10px;
 	width: 18ch;
 }
@@ -541,6 +543,8 @@ body {
 .le-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	position: absolute;
 	white-space: nowrap;
@@ -1512,7 +1516,7 @@ body {
 
 .le-paste-actions button {
 	border-radius: 8px;
-	min-height: 36px;
+	min-height: var(--theme-target-min);
 	padding: 6px 14px;
 }
 

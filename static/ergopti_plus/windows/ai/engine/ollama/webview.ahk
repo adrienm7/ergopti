@@ -37,7 +37,7 @@
 
 ; Window dimensions — matches the Hammerspoon download_window proportions
 global _OllamaWV_W      := 460
-global _OllamaWV_H      := 380
+global _OllamaWV_H      := 420
 global _OllamaWV_Margin := 10   ; gap from screen edge and taskbar (physical pixels, -DPIScale)
 
 ; Internal state

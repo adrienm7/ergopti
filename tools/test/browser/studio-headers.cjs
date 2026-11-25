@@ -31,8 +31,8 @@ const { shared } = require('../../lib/paths.cjs');
 
 const LANGS = ['fr', 'en'];
 const ACRONYMS = { sfb: 'SFB', sfs: 'SFS', lsb: 'LSB' };
-// A header of two lines, with room for the rounding of its line boxes.
-const TWO_LINES = 2.4;
+// A header of two lines at most, its line boxes counted (textLines).
+const TWO_LINES = 2;
 const TYPES = {
 	'.html': 'text/html',
 	'.js': 'text/javascript',
@@ -105,13 +105,32 @@ async function checkFingeringKeys(page, lang) {
 	await page.keyboard.press('Escape');
 }
 
+/**
+ * How many lines a button's text takes, in the page: its line boxes, told
+ * apart by their tops. The button's own height says nothing since it is at
+ * least the 44 px target of theme.css, two and a half lines of one.
+ * @param {Element} button - The header's sort button.
+ * @returns {number}
+ */
+function textLines(button) {
+	const range = document.createRange();
+	range.selectNodeContents(button);
+	const tops = [];
+	for (const rect of range.getClientRects())
+		if (rect.width > 0 && !tops.some((top) => Math.abs(top - rect.top) < rect.height / 2))
+			tops.push(rect.top);
+	return tops.length;
+}
+
 /** How many lines each metric header's text takes. */
 function headerLines(page) {
-	return page.$$eval('#la-table thead th.la-th-metric .la-sort', (buttons) =>
-		buttons.map((button) => ({
-			key: button.dataset.sort,
-			lines: button.getBoundingClientRect().height / parseFloat(getComputedStyle(button).lineHeight)
-		}))
+	return page.$$eval(
+		'#la-table thead th.la-th-metric .la-sort',
+		(buttons, source) => {
+			const lines = new Function(`return (${source})`)();
+			return buttons.map((button) => ({ key: button.dataset.sort, lines: lines(button) }));
+		},
+		textLines.toString()
 	);
 }
 
@@ -125,18 +144,22 @@ async function checkHeaders(browser, origin, lang) {
 	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=${lang}&corpus=fr_nemolivier`);
 	await page.waitForSelector('#la-table thead th.la-th-metric', { timeout: 120000 });
 	await page.click('#la-tab-overview');
-	const headers = await page.$$eval('#la-table thead th.la-th-metric', (cells) =>
-		cells.map((th) => {
-			const button = th.querySelector('.la-sort');
-			const style = getComputedStyle(button);
-			return {
-				key: button.dataset.sort,
-				text: button.textContent,
-				label: button.getAttribute('aria-label'),
-				infos: th.querySelectorAll('.la-info').length,
-				lines: button.getBoundingClientRect().height / parseFloat(style.lineHeight)
-			};
-		})
+	const headers = await page.$$eval(
+		'#la-table thead th.la-th-metric',
+		(cells, source) => {
+			const lines = new Function(`return (${source})`)();
+			return cells.map((th) => {
+				const button = th.querySelector('.la-sort');
+				return {
+					key: button.dataset.sort,
+					text: button.textContent,
+					label: button.getAttribute('aria-label'),
+					infos: th.querySelectorAll('.la-info').length,
+					lines: lines(button)
+				};
+			});
+		},
+		textLines.toString()
 	);
 	assert.ok(headers.length >= 10, `${lang}: the ranking shows its metric columns`);
 	for (const header of headers) {

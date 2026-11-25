@@ -603,11 +603,65 @@
 	overflow-wrap: break-word;
 }
 
+/* The smallest side of a pointer target, 44 px (WCAG 2.5.5). */
+:root {
+	--theme-target-min: 44px;
+}
+
+/* Every pointer target is at least 44 by 44 px (WCAG 2.5.5, the maintainer's
+   decision of 2026-11-25): the controls tools/test/lib/target-size.cjs
+   measures. A minimum size wins over a page's own height or width, so a
+   page sizes a control down only by writing its own minimum, as the
+   visually hidden classes do to keep their 1 px. An inline link
+   inside a sentence keeps the size of its line (the criterion's inline
+   exception): a minimum size does not apply to an inline box. Zero
+   specificity, border box: the minimum is the whole target, padding
+   included. */
+:where(
+	a[href],
+	button,
+	input:not([type='hidden'], [type='checkbox'], [type='radio']),
+	select,
+	textarea,
+	summary,
+	[role='button'],
+	[role='link'],
+	[role='checkbox'],
+	[role='radio'],
+	[role='switch'],
+	[role='tab'],
+	[role='menuitem'],
+	[role='option'],
+	[role='slider'],
+	[tabindex]:not([tabindex='-1'])
+) {
+	box-sizing: border-box;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
+}
+
+/* A native box or button drawn at 44 px is a giant mark: it keeps its size,
+   and its label, around it or right after it, which a click hands to it,
+   takes the 44 px instead (the criterion's « equivalent » target). */
+:where(
+	label:has(input[type='checkbox'], input[type='radio']),
+	input[type='checkbox'] + label,
+	input[type='radio'] + label
+) {
+	align-items: center;
+	box-sizing: border-box;
+	display: inline-flex;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
+}
+
 /* Text a screen reader reads and the eye does not see: the h1 of a window
    whose title is its title bar, so its outline starts at the top level. */
 .theme-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	position: absolute;
 	white-space: nowrap;
