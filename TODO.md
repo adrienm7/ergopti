@@ -427,7 +427,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- **Tests.** Source assertions left to convert to behaviour (3,772 `_Driver*` source reads in 991 files; 68 meta
+- **Tests.** Source assertions left to convert to behaviour (3,771 `_Driver*` source reads in 990 files; 68 meta
   files still name `A_IsSuspended`, 56 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
   `_DriverDirsConcat` and `_DriverFileSource`, and as `tests/meta` files containing `A_IsSuspended`. Guards that
