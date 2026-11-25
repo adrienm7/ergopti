@@ -58,6 +58,21 @@ if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && ! "$PORTABLE_LAU
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
 	systemctl --user daemon-reload
+	# The unit runs in the user manager's environment, not this session's.
+	# GNOME and Plasma publish their display there; i3, Openbox and sway
+	# without a session manager may not, which started a daemon with no
+	# display at all. A manager that outlived an earlier Wayland login also
+	# keeps its WAYLAND_DISPLAY, which the daemon's display probe would trust
+	# in this X11 session. Publish what this graphical session has and retire
+	# the Wayland socket it lacks; a launch with no display changes nothing.
+	if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+		session_variables=()
+		for variable in DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE; do
+			if [ -n "${!variable:-}" ]; then session_variables+=("$variable"); fi
+		done
+		systemctl --user import-environment "${session_variables[@]}"
+		if [ -z "${WAYLAND_DISPLAY:-}" ]; then systemctl --user unset-environment WAYLAND_DISPLAY; fi
+	fi
 	# A relaunch from the application menu restarts a running unit; systemd stops
 	# it with SIGTERM, the daemon's controlled exit (MLC-003).
 	if ! "$AUTOSTART" && systemctl --user is-active --quiet ergopti-hotstrings.service; then
