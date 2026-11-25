@@ -552,6 +552,8 @@
 			"helper-settlement-observer-refused",
 			"https_downgrade",
 			"identity_changed",
+			"import_failed",
+			"import_tool_missing",
 			"import_unsupported_format",
 			"import_write_failed",
 			"incomplete-scalar",

@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * Fake hosts of the editing windows: hotstrings, hotstring settings, paths,
  * personal information, prompts, numeric and token prompts, the model
- * browser, the physical shortcuts and the user workflows. See
- * app-windows-fixtures.cjs.
+ * browser, the physical shortcuts, the user workflows and the anti-sleep
+ * library. See app-windows-fixtures.cjs.
  * ==============================================================================
  */
 
@@ -521,5 +521,27 @@ module.exports = [
 			});
 		},
 		ready: '#steps .step'
+	},
+	{
+		id: 'keep_awake_library',
+		bridge: 'hsKeepAwake',
+		// The host sends the strings, the defaults and the presets document; the
+		// fake host reads the starters the page is served beside and adds one
+		// image and one text target so every row kind is drawn.
+		host: async function (message) {
+			if (!message || message.action !== 'ready') return;
+			const read = async (rel) => (await fetch('../../' + rel)).json();
+			const starters = await read('shortcuts/data/keep_awake_presets.json');
+			const presets = starters.presets;
+			presets[1].images = [{ id: 'button', file: 'button.png', enabled: true, threshold: 0.92 }];
+			window.initData({
+				strings: await read('core/i18n/data/locales/fr.json'),
+				os: 'linux',
+				defaults: await read('shortcuts/data/auto_click_defaults.json'),
+				doc: { version: starters.version, active: 'vscode', presets: presets },
+				thumbnails: {}
+			});
+		},
+		ready: '#images .target'
 	}
 ];

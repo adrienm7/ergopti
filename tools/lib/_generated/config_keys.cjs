@@ -453,6 +453,7 @@ module.exports = Object.freeze({
 		IDLE_RESET: "idle_reset",
 		INCLUDE_REALTIME: "include_realtime",
 		KEEP_AWAKE_AUTO_CLICK: "keep_awake_auto_click",
+		KEEP_AWAKE_LIBRARY: "keep_awake_library",
 		KEEP_AWAKE_SWITCH: "keep_awake_switch",
 		KEYBOARD_CORE_STATUS: "keyboard_core_status",
 		KEYBOARD_GROUP_ADD_CMD: "keyboard_group_add_cmd",

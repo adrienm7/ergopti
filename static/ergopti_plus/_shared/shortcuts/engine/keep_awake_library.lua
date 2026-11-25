@@ -97,6 +97,9 @@ function M.new(ports)
 		return folder, folder .. ports.separator .. "images", folder .. ports.separator .. defaults.library_index
 	end
 
+	--- Reads one shared JSON data file (the library window's protocol data).
+	library.read_shared = ports.read_shared
+
 	--- The auto-click defaults (threshold bounds, text distance).
 	function library.defaults()
 		return ports.read_shared("shortcuts/data/auto_click_defaults.json")

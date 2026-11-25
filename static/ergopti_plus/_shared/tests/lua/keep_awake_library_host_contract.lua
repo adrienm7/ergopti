@@ -17,6 +17,13 @@ local Json = require("core.text.engine.json")
 local Library = require("shortcuts.engine.keep_awake_library")
 local Host = require("shortcuts.engine.keep_awake_library_host")
 
+local function read_json(shared, relative)
+	local handle = assert(io.open(shared(relative), "rb"))
+	local text = handle:read("*a")
+	handle:close()
+	return assert(Json.decode(text))
+end
+
 local PNG = "\137PNG\r\n\26\n" .. "fake image body"
 
 --- A host over an in-memory configuration folder.
@@ -78,7 +85,8 @@ function M.register(helpers, shared)
 			w.host.on_message({ action = "ready" })
 			local init = w.last("initData")
 			helpers.assert_not_nil(init, "initData is pushed")
-			for _, key in ipairs(Host.string_keys()) do
+			for _, key in ipairs(Host.string_keys(read_json(shared, "shortcuts/data/keep_awake_library.json"),
+				read_json(shared, "shortcuts/data/keep_awake_presets.json"))) do
 				helpers.assert_eq(init.strings[key], "<" .. key .. ">", key .. " is translated")
 			end
 			helpers.assert_eq(init.doc.active, "simple", "the starters are the first document")

@@ -93,6 +93,20 @@ local function library()
 	return _library
 end
 
+--- The library store (the library window edits through it).
+M.library = library
+
+--- The screen vision service, started once by this owner (the library window uses it too).
+--- @return table service
+function M.vision()
+	local Vision = require("platform.vision.screen_vision")
+	if not _vision_started then
+		Vision.init()
+		_vision_started = true
+	end
+	return Vision
+end
+
 --- The presets document.
 function M.document() return library().document() end
 
@@ -226,10 +240,7 @@ function M.start(plan)
 		return false, reason
 	end
 	local ports = _ports or default_ports()
-	if not _ports and not _vision_started then
-		require("platform.vision.screen_vision").init()
-		_vision_started = true
-	end
+	if not _ports then M.vision() end
 	local base_click = ports.on_click
 	ports.on_click = function(count, target)
 		_clicks_total = _clicks_total + 1

@@ -1212,6 +1212,14 @@
 		{
 			"type": "list",
 			"id": "keep_awake_status"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "keep_awake_library",
+			"i18n": "menu.keep_awake.library"
 		}
 	],
 	"language_menu": [

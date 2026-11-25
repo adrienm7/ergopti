@@ -18,6 +18,7 @@ local TITLE_KEYS = {
 	["healthcheck"] = "menu.debug.healthcheck",
 	["hotstring_editor"] = "editor.hotstrings.window_title",
 	["hotstrings_config_window"] = "hs_config.window_title",
+	["keep_awake_library"] = "keepawake.library.window_title",
 	["layout_editor_window"] = "layout_editor.title",
 	["layout_manager"] = "layout_manager.window_title",
 	["metrics_apps"] = "metrics_apps.window_title",

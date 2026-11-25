@@ -35,7 +35,9 @@ const FRAMELESS_BY_DESIGN = {
 	windows: {
 		'core/ui/ui/tooltip/helpers.ahk': 'typing tooltip and its border overlay',
 		'core/ui/ui/tooltip/llm.ahk': 'LLM suggestion tooltip',
-		'ui/wpm/wpm_widget.ahk': 'floating WPM widget and graph'
+		'ui/wpm/wpm_widget.ahk': 'floating WPM widget and graph',
+		'platform/vision/region_select.ahk':
+			'full-screen region selection overlay and its frame (Ctrl+O, « Ajouter un bouton… »)'
 	},
 	linux: {
 		'core/ui/adapters/graphics_renderer.lua': 'preview tooltip',

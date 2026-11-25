@@ -28,32 +28,39 @@ local LOG = "modules.shortcuts.ocr_capture"
 local _running = false
 local _ports = nil
 
---- The native ports of one run.
-local function default_ports()
+--- Lets the user draw a region with screencapture and keeps it as a private PNG.
+--- @param callback function (path|nil, reason): reason "cancelled" on Escape.
+function M.select_region(callback)
 	local Vision = require("modules.shortcuts.actions.auto_click").vision()
 	local Native = require("adapters.screen_text_ports")
 	local CaptureFlow = require("modules.shortcuts.actions.screen_capture_flow")
 	local FileSystem = require("core.fs.adapters.file_system")
+	if not CaptureFlow.ensure_permission("Text capture") then
+		callback(nil, "capture_permission_missing")
+		return
+	end
+	local path = Vision.new_capture_path()
+	local mark = CaptureFlow.clipboard_mark()
+	local started = Native.select_region(path, function(exit_code, stderr)
+		local outcome, detail = CaptureFlow.settle({ path = path, mark = mark, exit_code = exit_code,
+			stderr = stderr, interactive = true, destination = "file" })
+		if outcome == CaptureFlow.OUTCOME_SAVED then return callback(path) end
+		FileSystem.remove_exact(path)
+		if outcome == CaptureFlow.OUTCOME_CANCELLED then return callback(nil, "cancelled") end
+		Logger.warn(LOG, "The region capture failed: %s.", tostring(detail))
+		callback(nil, "capture_refused")
+	end)
+	if not started then callback(nil, "capture_unavailable") end
+end
+
+--- The native ports of one run.
+local function default_ports()
+	local Vision = require("modules.shortcuts.actions.auto_click").vision()
+	local Native = require("adapters.screen_text_ports")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local i18n = require("core.i18n.engine.i18n")
 	return {
-		select = function(callback)
-			if not CaptureFlow.ensure_permission("Text capture") then
-				callback(nil, "capture_permission_missing")
-				return
-			end
-			local path = Vision.new_capture_path()
-			local mark = CaptureFlow.clipboard_mark()
-			local started = Native.select_region(path, function(exit_code, stderr)
-				local outcome, detail = CaptureFlow.settle({ path = path, mark = mark, exit_code = exit_code,
-					stderr = stderr, interactive = true, destination = "file" })
-				if outcome == CaptureFlow.OUTCOME_SAVED then return callback(path) end
-				FileSystem.remove_exact(path)
-				if outcome == CaptureFlow.OUTCOME_CANCELLED then return callback(nil, "cancelled") end
-				Logger.warn(LOG, "The region capture failed: %s.", tostring(detail))
-				callback(nil, "capture_refused")
-			end)
-			if not started then callback(nil, "capture_unavailable") end
-		end,
+		select = M.select_region,
 		recognize = function(path, callback)
 			Vision.recognize_file(path, { layout = "block", languages = require("adapters.auto_click_ports").languages() },
 				callback)

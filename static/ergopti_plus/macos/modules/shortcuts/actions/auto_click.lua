@@ -110,6 +110,9 @@ local function library()
 	return _library
 end
 
+--- The library store (the library window edits through it).
+M.library = library
+
 --- The presets document.
 function M.document() return library().document() end
 

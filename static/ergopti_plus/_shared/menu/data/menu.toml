@@ -1018,6 +1018,16 @@ disabled_reason_key = "keepawake.auto_click_unavailable"
 type = "list"
 id = "keep_awake_status"
 
+# « Bibliothèque… » opens the library window (_shared/ui/keep_awake_library):
+# the presets, their apps and their targets, « Ajouter un bouton… ».
+[[menu.keep_awake_menu]]
+type = "---"
+
+[[menu.keep_awake_menu]]
+type = "command"
+id = "keep_awake_library"
+i18n = "menu.keep_awake.library"
+
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing
 # described the menu they were listing them into.

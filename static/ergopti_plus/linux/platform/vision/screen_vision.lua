@@ -224,4 +224,34 @@ function M.find_text(words, targets)
 	return TextTarget.find_all(words, targets)
 end
 
+-- The shell that converts an image file of any format ImageMagick reads (the
+-- first frame of a GIF or a multi-page TIFF) into a PNG, and checks that the
+-- PNG is whole: ImageMagick 7 can exit 0 after a refused write.
+local IMPORT_SCRIPT = table.concat({
+	'src="$1"; out="$2"',
+	'has() { command -v "$1" >/dev/null 2>&1; }',
+	'whole_png() { [ "$(tail -c 8 -- "$1" | od -An -tx1 | tr -d \' \\n\')" = 49454e44ae426082 ]; }',
+	'if has magick; then magick "${src}[0]" -strip "PNG32:$out" || exit 1',
+	'elif has convert; then convert "${src}[0]" -strip "PNG32:$out" || exit 1',
+	'else exit 3; fi',
+	'whole_png "$out" || { rm -f -- "$out"; exit 1; }',
+}, "\n")
+
+--- Converts an image file of any common format into a library PNG.
+--- @param path string The file the user picked.
+--- @param out_path string The PNG to write.
+--- @param callback function (out_path|nil, reason): import_tool_missing without ImageMagick.
+function M.import_image(path, out_path, callback)
+	require_init()
+	local handle = require("core.process.adapters.shell_runner").run_async("sh",
+		{ "-c", IMPORT_SCRIPT, "ergopti-import", path, out_path },
+		{ timeout_ms = require("core.timing.engine.timings").ms("screen_vision", "ocr_timeout_ms") }, function(result)
+			if result.ok then return callback(out_path) end
+			if result.code == 3 then return callback(nil, "import_tool_missing") end
+			Logger.warn(LOG, "The image could not be converted to PNG: %s.", tostring(result.error or result.code))
+			callback(nil, "import_failed")
+		end)
+	if not handle then callback(nil, "import_failed") end
+end
+
 return M

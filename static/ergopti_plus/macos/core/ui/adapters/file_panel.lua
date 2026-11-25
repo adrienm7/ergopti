@@ -24,7 +24,8 @@ local M = {}
 local HOME_DIR = os.getenv("HOME") or "/"
 
 -- The file types an open panel admits, by kind of file.
-M.TYPES = { workflows = { "json" }, png = { "png" } }
+M.TYPES = { workflows = { "json" }, png = { "png" }, preset = { "json" },
+	images = { "png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff", "webp", "heic" } }
 
 --- Runs one panel script.
 --- @param script string

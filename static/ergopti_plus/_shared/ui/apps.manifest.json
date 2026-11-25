@@ -217,6 +217,14 @@
 			"min_height": 420,
 			"vhost": "ergopti.userworkflows"
 		},
+		"keep_awake_library": {
+			"title_key": "keepawake.library.window_title",
+			"width": 920,
+			"height": 700,
+			"min_width": 620,
+			"min_height": 420,
+			"vhost": "ergopti.keepawakelibrary"
+		},
 		"personal_info_editor": {
 			"title_key": "editor.personal_info.window_title",
 			"width": 560,

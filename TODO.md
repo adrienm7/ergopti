@@ -569,8 +569,11 @@ switches, the click counter, the reasons), Ctrl+M running the active preset on t
       the Ctrl+O action uses the screenshot tool cascade (grim and slurp, GNOME, KDE, maim).
 - [ ] **component_status rows:** the capture and OCR problems are red rows of the « Anti-veille » submenu; add them to
       each driver's component_status list too.
-- [ ] **« Ajouter un bouton… », image import and the library/preset window** (shared WebView, 21 locales, a11y gates,
-      44 px targets, export and import of a preset with its images).
+- [ ] **Library window field checks, one per OS** (done in code: « Anti-veille › Bibliothèque… » opens
+      `_shared/ui/keep_awake_library` on the three OS through one protocol, `keep_awake_library.json`): create, duplicate,
+      rename, delete and activate a preset; « Ajouter un bouton… » on a real Copilot prompt then Ctrl+M clicks it; an
+      imported JPEG, GIF (first frame) and HEIC become library PNGs (Linux needs ImageMagick, HEIC also its libheif);
+      a preset exported on Windows imports on macOS and Linux with its images, and the other way round.
 - [ ] **Ctrl+O « Capture → texte » field checks, one per OS** (done in code: the shared flow
       `_shared/shortcuts/engine/ocr_capture.lua` and its corpus, Ctrl+B wraps in parentheses on the three OS): draw a
       two-line region, the clipboard holds both lines; Escape and an empty drag change nothing; a blank region keeps the
