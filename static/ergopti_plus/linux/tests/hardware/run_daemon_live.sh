@@ -19,6 +19,14 @@ export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 # the AI phase sees its accepting digit typed instead.
 export LUA_PATH="${LUA_PATH};/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
 export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+# Run as root under sudo, the runner user's XDG_RUNTIME_DIR is inherited, and a
+# dconf client there creates its dconf folder owned by root: every later
+# gsettings of that user is then refused (desktop-webview, 2026-11-25). Root
+# keeps its session files in a runtime folder of its own.
+if [ "$(id -u)" = 0 ]; then
+	XDG_RUNTIME_DIR="$(mktemp -d)" || exit 2
+	export XDG_RUNTIME_DIR
+fi
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break
