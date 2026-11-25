@@ -17,9 +17,15 @@ local helpers = require("tests.helpers")
 local PROBLEM = { code = "windows_lgi", title = "Ergopti+ needs a component",
 	body = "Install lua51-lgi: sudo pacman -S --needed lua51-lgi" }
 
--- Every code a Linux part reports: each needs its own declared tray row.
-local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "ergopti_layout_install_failed",
-	"ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
+-- Every code a Linux part reports: each needs its own declared tray row. The
+-- KWin focus script's was missing (field report, Plasma 6.8 Wayland,
+-- 2026-11-25): its problem reached the log only, each tray build saying it
+-- had no row. Whole literal codes are also read from their reporters below.
+local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "kwin_focus_script",
+	"ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
+
+-- The reporters whose codes are whole literals, read for the codes above.
+local LITERAL_REPORTERS = { "platform.focus.text_automation_status", "ergopti_hotstrings" }
 
 --- The problem rows built over a status, with the status window recorded.
 --- @param Status table
@@ -64,7 +70,21 @@ helpers.describe("component_status: a problem stays visible", function()
 		helpers.assert_eq(shown[1][2], PROBLEM.body)
 	end)
 
-	helpers.it("draws a row for every code a Linux part reports", function()
+	helpers.it("(component-problem-rows) every whole literal code a reporter names is listed", function()
+		local listed = {}
+		for _, code in ipairs(REPORTED_CODES) do listed[code] = true end
+		local found = 0
+		for _, module_name in ipairs(LITERAL_REPORTERS) do
+			local source = assert(helpers.read_module_source(module_name), module_name)
+			for code in source:gmatch('\n%s*code = "([a-z0-9_]+)",') do
+				found = found + 1
+				helpers.assert_true(listed[code] == true, code .. " (" .. module_name .. ") has no listed tray row")
+			end
+		end
+		helpers.assert_true(found >= 2, "the reporters' literal codes were read")
+	end)
+
+	helpers.it("(component-problem-rows) draws a row for every code a Linux part reports", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
 		for _, code in ipairs(REPORTED_CODES) do
 			Status.report({ code = code, title = "t " .. code, body = "b " .. code }, {})

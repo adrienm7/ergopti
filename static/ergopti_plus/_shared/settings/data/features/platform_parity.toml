@@ -173,7 +173,7 @@ technical = "The rows run the Linux layout registry's user XKB install, activati
 
 [reasons."platform_reason.component_status_rows_are_linux"]
 kind = "os_concept"
-technical = "The Linux daemon lists the problems its parts report (core/ui/engine/component_status.lua: a missing lgi or WebKitGTK, an unread XKB layout, a failed user layout step) as red tray rows, because a freedesktop notification can vanish from a KDE Plasma 6 history; macOS and Windows report their own problems in their own menus."
+technical = "The Linux daemon lists the problems its parts report (core/ui/engine/component_status.lua: a missing lgi or WebKitGTK, an unread XKB layout, a failed user layout step, a KWin that does not run the focus script) as red tray rows, because a freedesktop notification can vanish from a KDE Plasma 6 history; macOS and Windows report their own problems in their own menus."
 
 [reasons."platform_reason.category_master_is_a_gate_on_windows"]
 kind = "driver_storage"

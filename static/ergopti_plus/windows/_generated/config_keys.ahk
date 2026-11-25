@@ -381,6 +381,7 @@ class MenuCommand {
 	static COMPONENT_PROBLEM_ERGOPTI_LAYOUT_ACTIVATE_FAILED := "component_problem_ergopti_layout_activate_failed"
 	static COMPONENT_PROBLEM_ERGOPTI_LAYOUT_INSTALL_FAILED := "component_problem_ergopti_layout_install_failed"
 	static COMPONENT_PROBLEM_ERGOPTI_LAYOUT_UNINSTALL_FAILED := "component_problem_ergopti_layout_uninstall_failed"
+	static COMPONENT_PROBLEM_KWIN_FOCUS_SCRIPT := "component_problem_kwin_focus_script"
 	static COMPONENT_PROBLEM_LAYOUT_UNRESOLVED := "component_problem_layout_unresolved"
 	static COMPONENT_PROBLEM_WINDOWS_LGI := "component_problem_windows_lgi"
 	static COMPONENT_PROBLEM_WINDOWS_WEBKIT := "component_problem_windows_webkit"

@@ -6799,6 +6799,18 @@
 		},
 		{
 			"type": "command",
+			"id": "component_problem_kwin_focus_script",
+			"i18n": "startup.linux_kwin_script_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
 			"id": "component_problem_ergopti_layout_install_failed",
 			"i18n": "layouts.linux_ergopti_install_failed_label",
 			"caption_getter": "linux_component_health_dot",
