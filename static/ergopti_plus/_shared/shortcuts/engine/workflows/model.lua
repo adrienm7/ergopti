@@ -24,6 +24,7 @@
 --- 5. Pure: no logger, no i18n, no I/O; callers report and localize.
 --- ==============================================================================
 
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 local Json = require("core.text.engine.json")
 local SendInput = require("platform.input.send_input")
 local Sha256 = require("core.crypto.engine.sha256")
@@ -38,8 +39,6 @@ local LAST_CONTROL_BYTE = 31
 local DELETE_BYTE = 127
 local MULTILINE_BYTES = { [9] = true, [10] = true, [13] = true }
 
-local ACTION_PATTERN_HEAD = "^[a-z][a-z0-9_]*$"
-local ACTION_MAX_BYTES = 64
 local BASE64_QUANTUM = 4
 
 
@@ -262,7 +261,7 @@ local function new_checker(catalogue, context)
 			if state.variable_count > limits.variables_max then refuse("too_many_variables", path) end
 		elseif kind == "action" then
 			if type(value) ~= "string" then refuse("bad_type", path) end
-			if #value > ACTION_MAX_BYTES or not value:match(ACTION_PATTERN_HEAD) then refuse("bad_identifier", path) end
+			if #value > ActionEntry.ACTION_MAX_BYTES or not value:match(ActionEntry.ACTION_PATTERN) then refuse("bad_identifier", path) end
 		elseif kind == "image" then
 			if type(value) ~= "string" then refuse("bad_type", path) end
 			if not is_identifier(value) then refuse("bad_identifier", path) end

@@ -43,7 +43,11 @@ M.REFUSALS = {
 	bad_erase_trigger = "bad_erase_trigger",
 }
 
-local ACTION_MAX_BYTES = 64
+--- The grammar of an action catalogue id, which a workflow's run_action step
+--- also checks (shortcuts.engine.workflows.model).
+M.ACTION_MAX_BYTES = 64
+M.ACTION_PATTERN = "^[a-z][a-z0-9_]*$"
+
 local WORKFLOW_MAX_BYTES = 64
 
 --- Checks the action fields of a parsed entry.
@@ -59,7 +63,7 @@ function M.fields(entry)
 		if erase ~= nil and type(erase) ~= "boolean" then return nil, M.REFUSALS.bad_erase_trigger end
 		return nil
 	end
-	if type(action) ~= "string" or #action > ACTION_MAX_BYTES or not action:match("^[a-z][a-z0-9_]*$") then
+	if type(action) ~= "string" or #action > M.ACTION_MAX_BYTES or not action:match(M.ACTION_PATTERN) then
 		return nil, M.REFUSALS.bad_action
 	end
 	if action == M.WORKFLOW_ACTION then
