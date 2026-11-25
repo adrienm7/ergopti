@@ -296,6 +296,20 @@ helpers.describe("input_access: the service does not loop on it", function()
 			"systemd would restart the daemon every 3 s and repeat the notification")
 	end)
 
+	helpers.it("bounds the restarts of a failure that repeats at every start", function()
+		-- The default burst (5 in 10 s) never trips with RestartSec=3s, so an exit
+		-- status other than 78 (no device, unopenable /dev/uinput, unreadable
+		-- keymap) restarted the daemon every three seconds for the whole session.
+		local unit = read("ergopti-hotstrings.service")
+		local unit_section = unit:match("\n%[Unit%]\n(.-)\n%[Service%]")
+		local interval = tonumber(unit_section:match("\nStartLimitIntervalSec=(%d+)"))
+		local burst = tonumber(unit_section:match("\nStartLimitBurst=(%d+)"))
+		local delay = tonumber(unit:match("\nRestartSec=(%d+)s"))
+		helpers.assert_true(interval ~= nil and burst ~= nil, "the [Unit] section declares the start limit")
+		helpers.assert_true((burst - 1) * delay < interval,
+			"the burst must be reachable at the restart delay, or the limit never trips")
+	end)
+
 	helpers.it("is what the daemon reports at every access check", function()
 		local src = read("ergopti_hotstrings.lua")
 		-- The whole module name, quoted, so a move that renames it renames it here.
