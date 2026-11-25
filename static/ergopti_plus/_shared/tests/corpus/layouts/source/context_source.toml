@@ -1,0 +1,86 @@
+# A layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
+# a repeat key on the ISO key left of Z (the skip-repeat key on its Shift
+# level), a magic key on the key right of L that breaks the E-D same-finger
+# pair, a circumflex dead key and a few letters. No native layout file holds
+# these keys: the emulation tables (context_emulation.json) perform them, and
+# the typing vectors (context_vectors.json) replayed by the web, Lua and
+# AutoHotkey engines give each press the text typed before it, as the drivers do.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "context_keys"
+name = "Repeat and magic keys"
+
+[physical]
+base = "iso"
+
+[[magic]]
+id = "sfb"
+fallback = ""
+
+[[magic.rules]]
+after = "e"
+types = "d"
+
+[[magic.rules]]
+after = "d"
+types = "e"
+
+[[magic.rules]]
+after = "ce"
+types = "s"
+
+[[dead_keys]]
+id = "circumflex"
+terminator = "^"
+
+[[dead_keys.rules]]
+input = "e"
+text = "ê"
+
+[[layers]]
+id = "base"
+required = []
+optional = []
+
+[layers.keys.KeyA]
+text = "a"
+
+[layers.keys.KeyC]
+text = "c"
+
+[layers.keys.KeyD]
+text = "d"
+
+[layers.keys.KeyE]
+text = "e"
+
+[layers.keys.KeyS]
+text = "s"
+
+[layers.keys.Space]
+text = " "
+
+[layers.keys.BracketLeft]
+dead_key = "circumflex"
+
+[layers.keys.IntlBackslash]
+repeat = 1
+
+[layers.keys.Quote]
+magic = "sfb"
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = []
+
+[layers.keys.KeyA]
+text = "A"
+
+[layers.keys.KeyE]
+text = "E"
+
+[layers.keys.IntlBackslash]
+repeat = 2

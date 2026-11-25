@@ -27,7 +27,8 @@ const EMULATED_REASONS = new Set([
 	'tap_hold_not_in_keylayout',
 	'system_or_modifier_key_remap',
 	'key_chord_not_in_keylayout',
-	'action_not_in_keylayout'
+	'action_not_in_keylayout',
+	'context_key_not_in_keylayout'
 ]);
 
 /**

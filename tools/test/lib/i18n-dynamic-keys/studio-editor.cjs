@@ -202,8 +202,12 @@ module.exports = [
 	{
 		prefix: 'layout_editor.kind.',
 		files: [PAGE],
-		source: 'MAPPING_CHOICES of editor_page.js',
-		keys: () => ctx.keysOf('layout_editor.kind.', ctx.literal(PAGE, 'MAPPING_CHOICES'))
+		source: 'MAPPING_CHOICES and CONTEXT_KINDS of editor_page.js',
+		keys: () =>
+			ctx.keysOf(
+				'layout_editor.kind.',
+				ctx.literal(PAGE, 'MAPPING_CHOICES').concat(ctx.literal(PAGE, 'CONTEXT_KINDS'))
+			)
 	},
 	{
 		prefix: 'layout_editor.lost.',

@@ -32,7 +32,7 @@ var LayoutEditorModel = (function () {
 	// ============================
 
 	const PLATFORMS = ['windows', 'macos', 'linux'];
-	const MAPPING_KINDS = ['text', 'dead_key', 'action', 'key', 'disabled'];
+	const MAPPING_KINDS = ['text', 'dead_key', 'action', 'key', 'disabled', 'repeat', 'magic'];
 	const CAPS_MODES = ['unaffected', 'shift', 'separate'];
 
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);

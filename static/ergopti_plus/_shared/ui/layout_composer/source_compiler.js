@@ -567,9 +567,13 @@ var LayoutSourceCompiler = (function () {
 				} else
 					omitted.push({
 						path,
+						// A repeat or magic key types after the text typed before it: no
+						// native layout file holds that, the drivers' emulation does.
 						reason: own(mapping, 'action')
 							? `action_not_in_${format}`
-							: `key_chord_not_in_${format}`
+							: own(mapping, 'repeat') || own(mapping, 'magic')
+								? `context_key_not_in_${format}`
+								: `key_chord_not_in_${format}`
 					});
 			}
 			for (const [mac, output] of defaults) if (!rows.has(mac)) rows.set(mac, ['output', output]);
@@ -807,6 +811,8 @@ var LayoutSourceCompiler = (function () {
 		}
 		if (own(mapping, 'disabled')) return { disabled: true };
 		if (own(mapping, 'dead_key')) return { dead_key: mapping.dead_key };
+		if (own(mapping, 'repeat')) return { repeat: mapping.repeat };
+		if (own(mapping, 'magic')) return { magic: mapping.magic };
 		return 'action_not_emulated';
 	}
 
@@ -935,8 +941,16 @@ var LayoutSourceCompiler = (function () {
 			for (const [name, mapping] of Object.entries(keys)) {
 				const path = `layers.${layer.id}.keys.${name}`;
 				// The compiled .keylayout already types a native layer's text, dead keys and
-				// disabled keys; the emulation adds what it leaves out.
-				if (native && !own(mapping, 'key') && !own(mapping, 'action')) continue;
+				// disabled keys; the emulation adds what it leaves out (chords, actions,
+				// repeat and magic keys).
+				if (
+					native &&
+					!own(mapping, 'key') &&
+					!own(mapping, 'action') &&
+					!own(mapping, 'repeat') &&
+					!own(mapping, 'magic')
+				)
+					continue;
 				if (!pressable(name, path)) continue;
 				const emulated = emulate(mapping);
 				if (typeof emulated === 'string') skip(path, emulated);
@@ -988,7 +1002,11 @@ var LayoutSourceCompiler = (function () {
 		for (const [index, entry] of (source.tap_holds || []).entries()) {
 			const path = `tap_holds[${index}]`;
 			if (!pressable(entry.key, path)) continue;
-			const tap = emulate(entry.tap);
+			// A tap's text is chosen at its release, with no text typed before it to read.
+			const tap =
+				own(entry.tap, 'repeat') || own(entry.tap, 'magic')
+					? 'context_key_tap_not_emulated'
+					: emulate(entry.tap);
 			if (typeof tap === 'string') {
 				skip(`${path}.tap`, tap);
 				continue;
@@ -1025,6 +1043,22 @@ var LayoutSourceCompiler = (function () {
 			remaps,
 			not_emulated: notEmulated
 		};
+		// The magic keys' tables, by id, when an emulated mapping types one; a
+		// table without a magic key is written exactly as before.
+		const magicIds = new Set();
+		for (const entry of layers)
+			for (const mapping of Object.values(entry.keys))
+				if (own(mapping, 'magic')) magicIds.add(mapping.magic);
+		for (const entry of tapHolds) if (own(entry.tap, 'magic')) magicIds.add(entry.tap.magic);
+		if (magicIds.size > 0) {
+			emulation.magic = {};
+			for (const table of source.magic || [])
+				if (magicIds.has(table.id))
+					emulation.magic[table.id] = {
+						rules: table.rules.map((rule) => ({ after: rule.after, types: rule.types })),
+						fallback: own(table, 'fallback') ? table.fallback : ''
+					};
+		}
 		// A dead key the emulation types composes with the next key, which may be
 		// on a native layer the .keylayout types: the table then says what each key
 		// of those layers answers a rule with, and the text mappings their compose
