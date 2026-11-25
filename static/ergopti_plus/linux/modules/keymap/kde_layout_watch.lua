@@ -34,7 +34,7 @@ M.SIGNALS = { "org.kde.KeyboardLayouts.layoutChanged", "org.kde.KeyboardLayouts.
 M.MONITOR_ARGS = { "monitor", "--session", "--dest", "org.kde.keyboard", "--object-path", "/Layouts" }
 -- A monitor line is one signal with its arguments; a longer partial line is
 -- no layout signal and is dropped up to its newline.
-local MAX_PENDING_BYTES = Timings.count("limits", "kde_layout_monitor_line_bytes")
+local MAX_MONITOR_LINE_BYTES = Timings.count("limits", "kde_layout_monitor_line_bytes")
 
 --- The production spawn: gdbus monitor with its stdout on a libuv pipe.
 --- @param on_exit function on_exit(code, signal)
@@ -120,7 +120,7 @@ function M.new(ports)
 			pending = pending:sub(newline + 1)
 			if dropping then dropping = false else consume(line) end
 		end
-		if #pending > MAX_PENDING_BYTES then pending, dropping = "", true end
+		if #pending > MAX_MONITOR_LINE_BYTES then pending, dropping = "", true end
 	end
 
 	--- Starts gdbus monitor and calls `handler` after each layout switch.
