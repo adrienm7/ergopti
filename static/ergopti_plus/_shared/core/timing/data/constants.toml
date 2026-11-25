@@ -602,6 +602,11 @@ worker_start_timeout_ms = 20000
 # LX: modules/ocr_capture.lua. AHK: platform/vision/region_select.ahk.
 region_select_timeout_ms = 120000
 
+# How often the Windows region overlay redraws its frame while the user drags:
+# about 60 frames a second, smooth without loading the message loop.
+# AHK: platform/vision/region_select.ahk.
+region_select_track_ms = 15
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keystats

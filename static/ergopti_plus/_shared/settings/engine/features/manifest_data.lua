@@ -579,9 +579,6 @@ M.features = {
 		path = "shortcuts.keyboard.primary_o", id = "primary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "ahk", "linux" }, recommended = "ocr_screenshot", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.primary_q", section = "shortcuts.keyboard", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.keyboard.meta_a", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{

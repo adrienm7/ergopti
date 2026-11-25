@@ -2453,30 +2453,6 @@
 			"reason": "keyboard-key-name",
 			"locales": "*"
 		},
-		"sg_actions.microsoft_bold": {
-			"reason": "keyboard-key-name",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"fr",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk"
-			]
-		},
 		"sg_actions.mission_control": {
 			"reason": "brand-or-feature-name",
 			"locales": [

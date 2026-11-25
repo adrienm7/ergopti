@@ -2667,24 +2667,6 @@
 		}
 	},
 	{
-		"path": "shortcuts.keyboard.primary_q",
-		"family": "feature",
-		"labels": {
-			"fr": "Gras dans les applications Microsoft (Ctrl+G)",
-			"en": "Bold in Microsoft apps (Ctrl+G)"
-		},
-		"platforms": {
-			"windows": true,
-			"macos": false,
-			"linux": false
-		},
-		"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
-		"reason": {
-			"fr": "Ce raccourci appartient au système qui le lie : chaque pilote propose ses actions sur les combinaisons que son système laisse libres (touche Windows sous Windows, Ctrl et Cmd sous macOS, emplacements du clavier sous Linux) et enregistre le choix sous son propre nom.",
-			"en": "This shortcut belongs to the system that binds it: each driver offers its actions on the chords its own system leaves free (Windows key combinations on Windows, Ctrl and Cmd on macOS, keyboard slots on Linux) and stores the choice under its own name."
-		}
-	},
-	{
 		"path": "shortcuts.keyboard.meta_a",
 		"family": "feature",
 		"labels": {

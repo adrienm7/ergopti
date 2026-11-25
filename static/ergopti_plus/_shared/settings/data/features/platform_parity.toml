@@ -219,10 +219,6 @@ technical = "Apple Shortcuts run through the macOS shortcuts command; Windows an
 kind = "os_api"
 technical = "Windows and the Linux notification daemons let no application dismiss another application's notifications; the equivalent action opens the notification centre."
 
-[reasons."platform_reason.action_office_bold_key_is_windows"]
-kind = "os_concept"
-technical = "French Microsoft Office on Windows uses Ctrl+G for bold, so the action picks the key per application; macOS (Cmd+B) and Linux (Ctrl+B) need one plain shortcut."
-
 [reasons."platform_reason.input_probe_is_autohotkey_specific"]
 kind = "os_concept"
 technical = "These checks measure AutoHotkey's synthetic key sending and its low-level keyboard hook, which only the Windows driver runs."

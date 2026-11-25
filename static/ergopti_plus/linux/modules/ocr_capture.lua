@@ -44,7 +44,7 @@ end
 --- Removes a capture file and its private folder.
 local function remove_capture(path)
 	os.remove(path)
-	local folder = path:match("^(.*)/[^/]+$")
+	local folder = require("core.fs.engine.native_path").dirname(path)
 	if folder and folder:match("/ergopti%-ocr%.[^/]+$") then os.remove(folder) end
 end
 

@@ -694,13 +694,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       reason. (6) An unknown lock state counts as locked. The other choices: keep the auto-clicker running through
       physical input, or add 1.25 / 1.5 scales at the cost of exact integer resizing.
 
-- [ ] **The Microsoft bold remap's letter on Windows (decided by the agent on 2026-11-25, to review by the
-      maintainer).** Ctrl+B now wraps the line in parentheses, so `microsoft_bold` (Ctrl+G in Microsoft apps, Ctrl+B
-      elsewhere) is recommended on Ctrl+Q (slot `primary_q`): in French Office Ctrl+Q only removes paragraph
-      formatting, and Chrome, Edge and VS Code leave it nearly unused, while the other free letters are Office's
-      own formatting keys (E, J, K, U, I) or common commands (D, H, L). Ctrl+G was ruled out: VS Code's « go to
-      line ». A configuration that binds `primary_b = "microsoft_bold"` explicitly keeps it. Choose: keep Ctrl+Q,
-      another letter, or no recommended letter for the remap.
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
       are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script

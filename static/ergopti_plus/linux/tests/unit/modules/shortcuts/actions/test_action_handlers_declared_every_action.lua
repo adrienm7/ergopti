@@ -68,11 +68,11 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 		local Logger = require("core.logger.engine.shim")
 		local real_warn, warned = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warned[#warned + 1] = string.format(fmt, ...) end
-		local ok, err = pcall(Gestures.execute_action, "microsoft_bold", "tap_hold")
+		local ok, err = pcall(Gestures.execute_action, "open_window_spy", "tap_hold")
 		Logger.warn = real_warn
 		if not ok then error(err, 0) end
 		helpers.assert_eq(#warned, 1, "one warning")
-		helpers.assert_contains(warned[1], "microsoft_bold")
+		helpers.assert_contains(warned[1], "open_window_spy")
 	end)
 
 end)

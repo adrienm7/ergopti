@@ -98,14 +98,20 @@ with its reason. No recognised text is ever logged.
 Maintainer's answer « Ctrl+B partout »: the wrap moves to Ctrl+B on Windows
 too (slot `primary_b`, also created on Linux, and `secondary_b` on macOS), and
 Ctrl+O becomes the capture on the three OS (`primary_o` created on Windows and
-Linux, `secondary_o` on macOS). The Microsoft bold remap that Windows
-recommended on Ctrl+B moves to another free Ctrl letter; the letter (Ctrl+Q)
-is the agent's choice, listed in TODO.md under « Maintainer decisions
-pending ». The slot ids are unchanged, so a configuration that binds
-`primary_b` or `secondary_o` explicitly keeps its binding with no migration
-step; only « Restaurer les recommandations » applies the new letters. On
+Linux, `secondary_o` on macOS). The slot ids are unchanged, so a
+configuration that binds `primary_b` or `secondary_o` explicitly keeps its
+binding; only « Restaurer les recommandations » applies the new letters. On
 Windows the capture no longer needs PowerToys: an overlay selects the region
 and Windows.Media.Ocr reads it.
+
+## microsoft_bold removed (maintainer, 2026-11-25)
+
+The Windows-only `microsoft_bold` action (Ctrl+G in Microsoft apps, Ctrl+B
+elsewhere, recommended on Ctrl+B) is removed rather than moved to another
+letter: Ctrl+B is the parentheses wrap on the three OS. The config step v23
+to v24 empties a shipped Windows keyboard slot bound to it (logged once with
+the upgrade); a binding elsewhere is reported by the configuration cleanup as
+any action the driver cannot run.
 
 ## User workflows are actions, also run by hotstring (2026-11-25)
 

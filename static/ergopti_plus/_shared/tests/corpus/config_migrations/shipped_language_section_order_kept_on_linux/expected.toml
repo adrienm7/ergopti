@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_language_section_order_kept_on_linux/expected.toml
 
 [_meta]
-schema_version = 23
+schema_version = 24
 
 [hotstrings.order_overrides]
 autocorrection = ["typographie", "majuscules"]

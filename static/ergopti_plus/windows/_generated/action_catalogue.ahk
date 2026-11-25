@@ -197,7 +197,6 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
 	Items.Push({ Kind: "action", Id: "toggle_capslock" })
-	Items.Push({ Kind: "action", Id: "microsoft_bold" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.tapholds" })
 	Items.Push({ Kind: "action", Id: "one_shot_shift" })
 	Items.Push({ Kind: "action", Id: "caps_word" })
@@ -327,7 +326,6 @@ GestureActionCatalogueData() {
 	Actions["lock_screen"] := { Family: "sg", LabelKey: "sg_actions.lock_screen", Parameter: "", Confirm: false }
 	Actions["maximize"] := { Family: "sg", LabelKey: "sg_actions.maximize", Parameter: "", Confirm: false }
 	Actions["mic_mute_toggle"] := { Family: "sg", LabelKey: "sg_actions.mic_mute_toggle", Parameter: "", Confirm: false }
-	Actions["microsoft_bold"] := { Family: "sg", LabelKey: "sg_actions.microsoft_bold", Parameter: "", Confirm: false }
 	Actions["minimize_all"] := { Family: "sg", LabelKey: "sg_actions.minimize_all", Parameter: "", Confirm: false }
 	Actions["mute"] := { Family: "sg", LabelKey: "sg_actions.mute", Parameter: "", Confirm: false }
 	Actions["nav_back"] := { Family: "sg", LabelKey: "sg_actions.nav_back", Parameter: "", Confirm: false }

@@ -124,7 +124,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_holds.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 51 paths not declared
+## macos — 50 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
@@ -149,7 +149,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.meta_star` (feature; declared: windows, linux; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
 - [ ] `shortcuts.keyboard.primary_b` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.primary_o` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.keyboard.primary_q` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_g` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -178,7 +177,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 61 paths not declared
+## linux — 60 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -191,7 +190,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.take_note_settings_are_windows`)
 - [ ] `shortcuts.keyboard.secondary_star` (feature; declared: macos; reason: `platform_reason.star_slot_is_ctrl_on_macos`)
-- [ ] `shortcuts.keyboard.primary_q` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_a` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_d` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_g` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -290,7 +288,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layers.actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
 - [ ] `layers.modifiers.fn`: macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.
 
-## macos — 31 actions not declared
+## macos — 30 actions not declared
 
 - [ ] `sg_actions.app_switcher`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `system_app_switcher`.
 - [ ] `sg_actions.app_window_previous`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `win_app_next`.
@@ -314,7 +312,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.clear_notifications`: This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. Equivalent actions: `notification_center`.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. Equivalent actions: `remove_quarantine_selection`.
 - [ ] `sg_actions.take_note`: macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file.
-- [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.one_shot_shift`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `sticky_shift`.
 - [ ] `sg_actions.caps_word`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `capsword`.
 - [ ] `sg_actions.ctrl_backspace`: Each system deletes a word with its own modifier (Option on macOS, Ctrl on Windows and Linux), so each lists its own action: use the equivalent action. Equivalent actions: `opt_backspace`.
@@ -324,7 +321,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 
-## linux — 55 actions not declared
+## linux — 54 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -346,7 +343,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.remove_quarantine_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
 - [ ] `sg_actions.display_mirror_toggle`: No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.
-- [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.layer_on`: macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.
 - [ ] `sg_actions.layer_off`: macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.
 - [ ] `sg_actions.capsword`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `caps_word`.

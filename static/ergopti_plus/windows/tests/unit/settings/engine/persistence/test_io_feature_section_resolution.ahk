@@ -44,7 +44,7 @@
 
 ; A Features fixture shaped like the real manifest output: the sub-trees that
 ; used to live in the AHK silo (layout, shortcuts.personal, gestures,
-; category_enabled) alongside the ones that never did (shortcuts.microsoft_bold,
+; category_enabled) alongside the ones that never did (shortcuts.plain_switch,
 ; shortcuts.a_grave) inside the SAME top-level "shortcuts" key — the collision that
 ; a naive per-top-level-key prefix heuristic got wrong.
 _CFP_Fixture() {
@@ -52,7 +52,7 @@ _CFP_Fixture() {
 		"layout", Map("ergopti_base", false),
 		"gestures", Map("enabled", false, "swipe_3_down", "tab_close"),
 		"shortcuts", Map(
-			"microsoft_bold", false,
+			"plain_switch", false,
 			"a_grave", Map("enabled", false, "letter", "x"),
 			"personal", Map("laptop_broken_key", false)
 		),
@@ -126,8 +126,8 @@ _CFP_CollectFeatureUpdates_SectionsMatchNesting() {
 		"gestures.swipe_3_down must be written to [gestures]")
 
 	; Leaves that never lived in a silo must be unaffected by its removal.
-	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts", "microsoft_bold", false),
-		"shortcuts.microsoft_bold must stay at [shortcuts]")
+	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts", "plain_switch", false),
+		"shortcuts.plain_switch must stay at [shortcuts]")
 	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.a_grave", "enabled", false),
 		"shortcuts.a_grave.enabled must stay at [shortcuts.a_grave]")
 	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.a_grave", "letter", "x"),
@@ -151,7 +151,7 @@ _CFP_CollectFeatureUpdates_EmitsExactlyTheseWrites() {
 		. "shortcuts.a_grave|enabled`n"
 		. "shortcuts.a_grave|letter`n"
 		. "shortcuts.personal|laptop_broken_key`n"
-		. "shortcuts|microsoft_bold"
+		. "shortcuts|plain_switch"
 	AssertEqual(Expected, _CFP_Emission(Updates),
 		"the 8 fixture leaves must produce exactly these 8 section|key writes")
 }

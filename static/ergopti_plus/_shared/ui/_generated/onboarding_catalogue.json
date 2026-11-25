@@ -1260,28 +1260,6 @@
 									]
 								},
 								{
-									"path": "shortcuts.keyboard.primary_q",
-									"value": "microsoft_bold",
-									"default": "none",
-									"recommended": true,
-									"label": [
-										{
-											"key": "key_name.ctrl"
-										},
-										{
-											"text": " + "
-										},
-										{
-											"text": "Q"
-										}
-									],
-									"value_label": [
-										{
-											"key": "sg_actions.microsoft_bold"
-										}
-									]
-								},
-								{
 									"path": "shortcuts.keyboard.meta_a",
 									"value": "select_line",
 									"default": "none",

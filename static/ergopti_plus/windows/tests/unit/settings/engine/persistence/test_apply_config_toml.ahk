@@ -468,7 +468,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. "auto_configure_on_next_start = true`r`n"
 			. "[shortcuts.keyboard]`r`n"
 			. 'meta_c = "ocr_screenshot"' . "`r`n"
-			. 'meta_b = "microsoft_bold"' . "`r`n"
+			. 'meta_b = "surround_parens"' . "`r`n"
 			. 'meta_cc = "ocr_screenshot"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
@@ -675,12 +675,12 @@ TestFMv2_LiteralStringsKeepManifestTypes() {
 	try {
 		Path := _FM_WriteFixture("literal_string_types",
 			"[script]`nlocale = 'en'`nlog_level = 'ERROR' # explicit threshold`n"
-			. "[shortcuts.keyboard]`nprimary_b = 'microsoft_bold'`n")
+			. "[shortcuts.keyboard]`nprimary_b = 'surround_parens'`n")
 		AssertEqual(3, ApplyConfigToml(Features, Path, &Rejected, , &Outdated),
 			"literal strings must apply to string, enum and action manifest leaves")
 		AssertEqual("en", Features["script"]["locale"])
 		AssertEqual("ERROR", Features["script"]["log_level"])
-		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["primary_b"])
+		AssertEqual("surround_parens", Features["shortcuts"]["keyboard"]["primary_b"])
 		AssertEqual(0, Rejected)
 		AssertEqual(0, Outdated.Count,
 			"valid literal strings must never be proposed for configuration cleanup")
@@ -701,7 +701,7 @@ _FM_QuotedStringBootAdmission(Style, Locale := "en", Comment := "") {
 	OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
 	Quote := Style == "single" ? Chr(39) : Style == "basic" ? Chr(34) : Style == "triple-basic" ? Chr(34) . Chr(34) . Chr(34) : Chr(39) . Chr(39) . Chr(39)
-	Source := "[script]`nlocale = " . Quote . Locale . Quote . Comment . "`nlog_level = " . Quote . "ERROR" . Quote . "`n[shortcuts.keyboard]`nprimary_b = " . Quote . "microsoft_bold" . Quote . "`n"
+	Source := "[script]`nlocale = " . Quote . Locale . Quote . Comment . "`nlog_level = " . Quote . "ERROR" . Quote . "`n[shortcuts.keyboard]`nprimary_b = " . Quote . "surround_parens" . Quote . "`n"
 	try {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
@@ -712,7 +712,7 @@ _FM_QuotedStringBootAdmission(Style, Locale := "en", Comment := "") {
 		AssertEqual(3, Applied, "three valid quoted overrides must apply at the real boot owner")
 		AssertEqual(Locale, Features["script"]["locale"])
 		AssertEqual("ERROR", Features["script"]["log_level"])
-		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["primary_b"])
+		AssertEqual("surround_parens", Features["shortcuts"]["keyboard"]["primary_b"])
 		AssertEqual(0, _ConfigBootOutdatedEntries.Count, "valid quoted values must not become cleanup candidates")
 	} finally {
 		if IsSet(Path) && FileExist(Path)

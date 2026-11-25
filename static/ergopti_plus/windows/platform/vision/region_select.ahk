@@ -83,7 +83,7 @@ _RegionSelectDown(wParam, lParam, Msg, Hwnd) {
 		return
 	MouseGetPos(&X, &Y)
 	RegionSelectOwner.start := [X, Y]
-	SetTimer(_RegionSelectTrack, 15)
+	SetTimer(_RegionSelectTrack, TimingsGet("screen_vision", "region_select_track_ms"))
 	return 0
 }
 

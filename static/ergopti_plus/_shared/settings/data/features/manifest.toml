@@ -2405,8 +2405,8 @@ description_key = "menu.shortcuts.keyboard.secondary_star"
 # ===== 4.8b ahk.shortcuts.keyboard ========
 # Ctrl+B wraps the line in parentheses on the three OS, and Ctrl+O is the
 # « Capture → texte » action (maintainer's decision of 2026-11-25). The
-# Microsoft bold remap moved from Ctrl+B to Ctrl+Q on Windows (agent's choice,
-# to review); a config that binds primary_b explicitly keeps its binding.
+# Microsoft bold remap Windows recommended on Ctrl+B was removed the same day;
+# the v23 to v24 config step drops a saved binding to it.
 [[features.shortcuts.keyboard]]
 id = "primary_b"
 platforms = ["ahk", "linux"]
@@ -2428,16 +2428,6 @@ recommended = "ocr_screenshot"
 family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_o"
-
-[[features.shortcuts.keyboard]]
-id = "primary_q"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = "none"
-recommended = "microsoft_bold"
-family = "feature"
-type = "action"
-description_key = "shortcuts.label_ctrl_q"
 
 [[features.shortcuts.keyboard]]
 id = "meta_a"

@@ -87,7 +87,7 @@ _FIL_Fixture() {
 		"layout",   Map("ergopti_base", false),
 		"gestures", Map("enabled", true),
 		"shortcuts", Map(
-			"microsoft_bold", false,
+			"plain_switch", false,
 			"gpt", Map("enabled", false, "link", "https://example")
 		),
 		"hotstrings", Map(
@@ -121,9 +121,9 @@ _FIL_GesturesMaster() {
 Test("feature_io: gestures master -> [gestures] enabled", _FIL_GesturesMaster)
 
 _FIL_PlainShortcut() {
-	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.microsoft_bold", "shortcuts", "microsoft_bold", 0)
+	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.plain_switch", "shortcuts", "plain_switch", 0)
 }
-Test("feature_io: un-prefixed plain bool -> [shortcuts] microsoft_bold", _FIL_PlainShortcut)
+Test("feature_io: un-prefixed plain bool -> [shortcuts] plain_switch", _FIL_PlainShortcut)
 
 _FIL_AlphaToggle() {
 	_FIL_AssertLoc(_FIL_Fixture(), "shortcuts.gpt", "shortcuts.gpt", "enabled", 1)

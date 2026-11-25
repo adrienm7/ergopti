@@ -267,9 +267,6 @@ global GESTURE_ACTIONS := Map(
 		"ocr_screenshot", {
 				Fn: (*) => OcrCaptureAction(),
 		},
-		"microsoft_bold", {
-				Fn: (*) => (MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")),
-		},
 		"paste_plain", {
 				Fn: (*) => GesturePastePlain(),
 		},

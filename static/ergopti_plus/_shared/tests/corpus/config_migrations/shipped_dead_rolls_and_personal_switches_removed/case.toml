@@ -5,4 +5,4 @@ description = "v23 removes the chevron_greater and chevron_less rolls and the fi
 drivers = ["ahk", "hs", "linux"]
 outcome = "migrated"
 from_version = 22
-to_version = 23
+to_version = 24
