@@ -86,10 +86,8 @@ local function daemon_source()
 	-- The daemon's resets include the commit follow-up's, which main() delegates
 	-- to its own owner to stay within LuaJIT's upvalue budget.
 	local source = {}
-	for _, relative in ipairs({ "/ergopti_hotstrings.lua", "/hotstrings/engine/commit_followup.lua" }) do
-		local file = assert(io.open(helpers.driver_root() .. relative, "r"))
-		source[#source + 1] = file:read("*a")
-		file:close()
+	for _, module_name in ipairs({ "ergopti_hotstrings", "hotstrings.engine.commit_followup" }) do
+		source[#source + 1] = assert(helpers.read_module_source(module_name), module_name)
 	end
 	return table.concat(source, "\n")
 end

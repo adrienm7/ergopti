@@ -105,9 +105,7 @@ helpers.describe("OCR capture module (Linux)", function()
 	helpers.it("ocr capture: the notice escapes the line count it substitutes", function()
 		-- A '%' in a gsub replacement is a capture reference: the count must be
 		-- escaped as macOS's gsub-replacement gate requires of the same notice.
-		local handle = assert(io.open(helpers.driver_root() .. "/modules/ocr_capture.lua", "r"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = assert(helpers.read_module_source("modules.ocr_capture"))
 		helpers.assert_true(source:find('body:gsub("{1}", text_utils.escape_gsub_replacement(tostring(lines)))', 1, true) ~= nil,
 			"the {1} count is routed through text_utils.escape_gsub_replacement")
 		helpers.assert_true(source:find('body:gsub("{1}", tostring(lines))', 1, true) == nil,

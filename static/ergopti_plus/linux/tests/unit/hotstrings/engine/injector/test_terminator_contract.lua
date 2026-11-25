@@ -199,9 +199,7 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 		local apply_guard_at = match_path:find("if expansion_committed and CommitFollowup.apply(engine, result) then",
 			(commit_guard_at or 0) + 1, true)
 		local apply_at = apply_guard_at and match_path:find("CommitFollowup.apply(engine, result)", apply_guard_at, true)
-		local followup = assert(io.open(helpers.driver_root() .. "/hotstrings/engine/commit_followup.lua", "r"))
-		local followup_source = followup:read("*a")
-		followup:close()
+		local followup_source = assert(helpers.read_module_source("hotstrings.engine.commit_followup"))
 		helpers.assert_true(followup_source:find("engine:apply_expansion(result)", 1, true) ~= nil,
 			"the commit follow-up must apply the expansion to the engine")
 
