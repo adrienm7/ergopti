@@ -787,8 +787,17 @@
 		<label class="la-filter-field la-filter-score" data-i18n-text="layout_analysis.table.score_max">
 			<input id="la-row-max" type="number" step="any" />
 		</label>
+		<label class="la-filter-field la-filter-query" data-i18n-text="layout_analysis.filter.query">
+			<input id="la-row-query" type="text" spellcheck="false" autocomplete="off" aria-describedby="la-row-query-hint la-row-query-status" />
+		</label>
 		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
 	</fieldset>
+	<p id="la-row-query-hint" class="la-muted la-query-hint" data-i18n="layout_analysis.filter.query_hint"></p>
+	<p id="la-row-query-status" class="la-query-status" role="status"></p>
+	<details class="la-query-names">
+		<summary id="la-query-names-title" data-i18n="layout_analysis.filter.query_names"></summary>
+		<ul id="la-query-names" aria-labelledby="la-query-names-title"></ul>
+	</details>
 	</details>
 
 	<section id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
@@ -1643,6 +1652,8 @@
 				complete: COMPLETE_CHOICES.includes(value.complete) ? value.complete : COMPLETE_CHOICES[0],
 				min: bound(value.min),
 				max: bound(value.max),
+				// The values query (« sfb < 1.2 & complete »), '' for none.
+				query: typeof value.query === 'string' ? value.query : '',
 				// The relative view: each value as its difference to the reference layout.
 				relative: value.relative === true,
 				// Families folded to their best member, and the layouts pinned to the top.
@@ -3090,6 +3101,74 @@
 			}
 		}
 
+		// The values a query may name: the mark, every metric, and two yes-or-no
+		// values (complete, the user's own layout).
+		const QUERY_FLAGS = ['complete', 'mine'];
+		const QUERY_MARK = 'mark';
+
+		/** A result's values as a query reads them. */
+		function queryValues(result) {
+			return Object.assign({}, result.metrics, {
+				[QUERY_MARK]: result.score.mark,
+				complete: !result.incomplete,
+				mine: isPersonal(result)
+			});
+		}
+
+		// The last query compiled: {text, test, error}; test null when it keeps
+		// every row (empty, or not readable: said in words, never applied).
+		let queryCache = null;
+
+		/** The table's values query, compiled once per text. */
+		function compiledQuery() {
+			const text = state.table.query;
+			if (queryCache && queryCache.text === text) return queryCache;
+			try {
+				const test = E.compileQuery(text, {
+					numbers: [QUERY_MARK].concat(Object.keys(E.METRICS)),
+					flags: QUERY_FLAGS
+				});
+				queryCache = { text, test: text.trim() === '' ? null : test, error: null };
+			} catch (error) {
+				if (!(error instanceof E.QueryError)) throw error;
+				queryCache = { text, test: null, error };
+			}
+			return queryCache;
+		}
+
+		/** Why the query does not read, in words, or '' when it does. */
+		function queryStatus() {
+			const { error } = compiledQuery();
+			if (!error) return '';
+			const values = { at: error.at + 1, token: error.token };
+			const words = {
+				query_unexpected: () => t('layout_analysis.filter.query_unexpected', values),
+				query_unknown_name: () => t('layout_analysis.filter.query_unknown_name', values),
+				query_number: () => t('layout_analysis.filter.query_number', values),
+				query_comparison: () => t('layout_analysis.filter.query_comparison', values),
+				query_flag: () => t('layout_analysis.filter.query_flag', values),
+				query_parenthesis: () => t('layout_analysis.filter.query_parenthesis', values),
+				query_end: () => t('layout_analysis.filter.query_end', values)
+			};
+			if (!words[error.code]) throw new Error(`layout comparer: no words for ${error.code}`);
+			return t('layout_analysis.filter.query_invalid', { reason: words[error.code]() });
+		}
+
+		/** The names a query may use, each with what it is. */
+		function fillQueryNames() {
+			const item = (id, text) => {
+				const li = el('li');
+				li.append(el('code', '', id), ` ${text}`);
+				return li;
+			};
+			$('la-query-names').replaceChildren(
+				item(QUERY_MARK, t('layout_analysis.filter.query_name_mark')),
+				item('complete', t('layout_analysis.filter.query_name_complete')),
+				item('mine', t('layout_analysis.filter.query_name_mine')),
+				...Object.keys(E.METRICS).map((id) => item(id, metricName(id)))
+			);
+		}
+
 		/** A compared layout's family ('' for none). */
 		function familyOf(result) {
 			const layout = layoutOf(result.layout.id);
@@ -3104,9 +3183,11 @@
 		function shownRows() {
 			const { name, family, origin, language, complete, min, max } = state.table;
 			const needle = name.trim().toLowerCase();
+			const query = compiledQuery();
 			return state.results.filter((r) => {
 				const layout = layoutOf(r.layout.id);
 				return (
+					(query.test === null || query.test(queryValues(r))) &&
 					(!needle || r.layout.name.toLowerCase().includes(needle)) &&
 					(!family || familyOf(r) === family) &&
 					(!origin || originOf(layout) === origin) &&
@@ -3177,6 +3258,9 @@
 			$('la-row-name').value = state.table.name;
 			$('la-row-min').value = state.table.min === null ? '' : String(state.table.min);
 			$('la-row-max').value = state.table.max === null ? '' : String(state.table.max);
+			$('la-row-query').value = state.table.query;
+			$('la-row-query-status').textContent = queryStatus();
+			fillQueryNames();
 		}
 
 		/**
@@ -7509,10 +7593,12 @@
 				state.table.complete = $('la-row-complete').value;
 				state.table.min = bound($('la-row-min'));
 				state.table.max = bound($('la-row-max'));
+				state.table.query = $('la-row-query').value;
+				$('la-row-query-status').textContent = queryStatus();
 				save();
 				render();
 			};
-			for (const id of ['la-row-name', 'la-row-min', 'la-row-max'])
+			for (const id of ['la-row-name', 'la-row-min', 'la-row-max', 'la-row-query'])
 				$(id).addEventListener('input', filtered);
 			for (const id of ['la-row-family', 'la-row-origin', 'la-row-language', 'la-row-complete'])
 				$(id).addEventListener('change', filtered);
@@ -7909,7 +7995,8 @@
 				Boolean(name || family || origin || language) ||
 				complete !== COMPLETE_CHOICES[0] ||
 				min !== null ||
-				max !== null;
+				max !== null ||
+				state.table.query.trim() !== '';
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			window.LAYOUT_ANALYSIS_FILES.onEditorLayouts(useEditorLayouts);
 			FINGERING.onChange(() => analyse());

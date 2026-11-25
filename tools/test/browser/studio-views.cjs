@@ -31,6 +31,10 @@
  *    same pair in « One layout ».
  * 9. Help: the « Help » tab names each task in a titled section, without the
  *    filters or the layout frame.
+ * 13. Values query: a query over the values (« sfb < … & complete ») keeps
+ *    only the layouts it holds for, in every figure's rows; one that does not
+ *    read filters nothing and says why and where in words; the names it may
+ *    use are listed.
  * 12. Blends of the user's own text: the pasted text is a part the blend's
  *    pickers offer, the blend mixes it, says it stays on this device, and
  *    the link carries no blend; the next visit mixes it again.
@@ -385,6 +389,46 @@ async function exerciseBlendOwnText(browser, origin) {
 	await context.close();
 }
 
+async function exerciseValuesQuery(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-overview');
+	const filters = page.locator('#la-filters-box > summary');
+	if (!(await page.$eval('#la-filters-box', (box) => box.open))) await filters.click();
+	const names = () =>
+		page.$$eval('#la-table tbody tr', (trs) => trs.map((tr) => tr.dataset.id || tr.textContent));
+	const all = (await names()).length;
+	assert.equal(all, 5, 'query: five layouts at first');
+	await page.fill('#la-row-query', 'mark > 100000');
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length === 0);
+	assert.equal(
+		await page.textContent('#la-row-query-status'),
+		'',
+		'query: a readable query says nothing'
+	);
+	await page.fill('#la-row-query', 'complete & !mine & mark >= 0');
+	await page.waitForFunction(
+		(n) => document.querySelectorAll('#la-table tbody tr').length === n,
+		all
+	);
+	await page.fill('#la-row-query', 'sfb <');
+	await page.waitForFunction(
+		() => document.getElementById('la-row-query-status').textContent !== ''
+	);
+	assert.ok(
+		(await page.textContent('#la-row-query-status')).startsWith(
+			EN['layout_analysis.filter.query_invalid'].split('{reason}')[0]
+		),
+		'query: one that does not read says so'
+	);
+	assert.equal((await names()).length, all, 'query: one that does not read filters nothing');
+	const listed = await page.$$eval('#la-query-names code', (codes) =>
+		codes.map((c) => c.textContent)
+	);
+	assert.ok(listed.includes('mark') && listed.includes('sfb'), 'query: the names are listed');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function exercisePanelWords(browser, origin) {
 	const { page, errors, context } = await studioUx.openOnErgopti(browser, origin);
 	const button = page.locator('.la-panel-ngrams .la-ngram-words').first();
@@ -534,6 +578,7 @@ async function exerciseMovementPercentiles(browser, origin) {
 }
 
 module.exports = {
+	exerciseValuesQuery,
 	exerciseBlendOwnText,
 	exerciseMovementPercentiles,
 	exerciseEditorOptimizerHelp,

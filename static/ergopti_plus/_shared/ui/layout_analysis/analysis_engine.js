@@ -5189,6 +5189,156 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
+	// ==========================================
+	// ======= Values query (library filter) ====
+	// ==========================================
+
+	/** A values query that does not read: a stable code and where, for the page's words. */
+	class QueryError extends Error {
+		constructor(code, at, token) {
+			super(`${code} at ${at}${token ? `: ${token}` : ''}`);
+			this.name = 'QueryError';
+			this.code = code;
+			this.at = at;
+			this.token = token || '';
+		}
+	}
+
+	// The comparisons a values query reads, each a test of a value against a number.
+	const QUERY_COMPARISONS = {
+		'<': (a, b) => a < b,
+		'<=': (a, b) => a <= b,
+		'>': (a, b) => a > b,
+		'>=': (a, b) => a >= b,
+		'=': (a, b) => a === b,
+		'!=': (a, b) => a !== b
+	};
+	// The words that join or negate, besides & | !.
+	const QUERY_WORDS = { and: '&', or: '|', not: '!' };
+
+	/** The tokens of a values query, each {kind, text, at}. */
+	function queryTokens(text) {
+		const tokens = [];
+		const pattern =
+			/\s*(?:(\d+(?:[.,]\d+)?|[.,]\d+)|([a-z_][a-z0-9_]*)|(<=|>=|!=|==|<|>|=|&&?|\|\|?|!|\(|\)))/iy;
+		let at = 0;
+		while (at < text.length) {
+			if (/^\s*$/.test(text.slice(at))) break;
+			pattern.lastIndex = at;
+			const found = pattern.exec(text);
+			if (!found) {
+				// Where the unread text starts, past the spaces before it.
+				const from = at + (text.slice(at).length - text.slice(at).trimStart().length);
+				throw new QueryError('query_unexpected', from, text.slice(from).split(/\s/)[0]);
+			}
+			const start = found.index + found[0].length - found[0].trimStart().length;
+			if (found[1] !== undefined)
+				tokens.push({ kind: 'number', text: found[1].replace(',', '.'), at: start });
+			else if (found[2] !== undefined) {
+				const word = found[2].toLowerCase();
+				if (QUERY_WORDS[word]) tokens.push({ kind: 'op', text: QUERY_WORDS[word], at: start });
+				else tokens.push({ kind: 'name', text: word, at: start });
+			} else {
+				// && and || read as & and |, == as =.
+				const op = { '&&': '&', '||': '|', '==': '=' }[found[3]] || found[3];
+				tokens.push({ kind: 'op', text: op, at: start });
+			}
+			at = pattern.lastIndex;
+		}
+		return tokens;
+	}
+
+	/**
+	 * Compiles a values query over a layout's values (an idea seen in the
+	 * Layouts Wiki playground's Boolean filter on its library): comparisons
+	 * of a value with a number (« sfb < 1.2 », « roll_in >= 30 »), a yes-or-no
+	 * value alone (« complete »), joined by & (and), | (or), negated by !
+	 * (not), grouped by parentheses; & binds before |. A decimal comma reads
+	 * as a point. An empty query keeps every layout.
+	 * @param {string} text - The query.
+	 * @param {{numbers: string[], flags: string[]}} names - The value names it may use.
+	 * @returns {function(object): boolean} A test over {name: value}: a number
+	 *   for each of numbers, a boolean for each of flags; a value that is not a
+	 *   finite number fails its comparison.
+	 * @throws {QueryError} query_unexpected, query_unknown_name, query_number,
+	 *   query_comparison, query_flag, query_parenthesis or query_end, with
+	 *   where it happens.
+	 */
+	function compileQuery(text, names) {
+		const numbers = new Set(names.numbers);
+		const flags = new Set(names.flags);
+		const tokens = queryTokens(text);
+		if (tokens.length === 0) return () => true;
+		let index = 0;
+		const peek = () => tokens[index];
+		const end = () => text.length;
+		const isOp = (token, op) => token && token.kind === 'op' && token.text === op;
+		const expression = () => {
+			let left = conjunction();
+			while (isOp(peek(), '|')) {
+				index += 1;
+				const right = conjunction();
+				const a = left;
+				left = (values) => a(values) || right(values);
+			}
+			return left;
+		};
+		const conjunction = () => {
+			let left = negation();
+			while (isOp(peek(), '&')) {
+				index += 1;
+				const right = negation();
+				const a = left;
+				left = (values) => a(values) && right(values);
+			}
+			return left;
+		};
+		const negation = () => {
+			if (isOp(peek(), '!')) {
+				index += 1;
+				const inner = negation();
+				return (values) => !inner(values);
+			}
+			return primary();
+		};
+		const primary = () => {
+			const token = peek();
+			if (!token) throw new QueryError('query_end', end());
+			if (isOp(token, '(')) {
+				index += 1;
+				const inner = expression();
+				if (!isOp(peek(), ')'))
+					throw new QueryError('query_parenthesis', peek() ? peek().at : end());
+				index += 1;
+				return inner;
+			}
+			if (token.kind !== 'name') throw new QueryError('query_unexpected', token.at, token.text);
+			index += 1;
+			if (flags.has(token.text)) {
+				if (peek() && peek().kind === 'op' && QUERY_COMPARISONS[peek().text])
+					throw new QueryError('query_flag', peek().at, token.text);
+				return (values) => values[token.text] === true;
+			}
+			if (!numbers.has(token.text))
+				throw new QueryError('query_unknown_name', token.at, token.text);
+			const op = peek();
+			if (!op || op.kind !== 'op' || !QUERY_COMPARISONS[op.text])
+				throw new QueryError('query_comparison', op ? op.at : end(), token.text);
+			index += 1;
+			const number = peek();
+			if (!number || number.kind !== 'number')
+				throw new QueryError('query_number', number ? number.at : end(), token.text);
+			index += 1;
+			const test = QUERY_COMPARISONS[op.text];
+			const bound = Number(number.text);
+			return (values) => Number.isFinite(values[token.text]) && test(values[token.text], bound);
+		};
+		const compiled = expression();
+		if (index < tokens.length)
+			throw new QueryError('query_unexpected', tokens[index].at, tokens[index].text);
+		return compiled;
+	}
+
 	const PARETO_DIRECTIONS = ['lower', 'higher'];
 
 	/**
@@ -8332,6 +8482,8 @@ var LAYOUT_ANALYSIS = (function () {
 		blendNgrams,
 		BLEND_CHARS,
 		pareto,
+		compileQuery,
+		QueryError,
 		defaultWeights,
 		defaultFloors,
 		scoreFloors,

@@ -312,7 +312,8 @@ waits for the maintainer's review).
       in the workspace, compared key by key and restored as one undoable step); (5) task help (done: the Comparer's « Help » tab, the
       editor's « Help » tool and the Optimiser's folded help); (6) the movement cells' percentiles (done: « Place among the library » in « One layout »
       measures the library on request, one layout per slice, then every movement and rhythm cell carries its chip); (8)
-      Kawalyzer's « Clever Keys » (context outputs) with item (3).
+      Kawalyzer's « Clever Keys » (context outputs) with item (3). Also done: the library grid's Boolean filter as the
+      Comparer's « Values query » (`E.compileQuery`).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
