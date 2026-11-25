@@ -106,6 +106,10 @@ M.FAILURE_RECORD = "record_failed"
 M.FAILURE_PYTHON = "python_missing"
 M.FAILURE_CONVERSION = "conversion_failed"
 M.FAILURE_INSTALLER = "installer_failed"
+-- The conversion data or the user XKB installer is missing from this installation
+-- (an install.sh run from a checkout before install/xkb_helpers.sh): reinstalling
+-- is the fix, not trying again.
+M.FAILURE_HELPERS_MISSING = "helpers_missing"
 M.FAILURE_FOREIGN_FILE = "foreign_file"
 M.FAILURE_XORG_SESSION = "xorg_session"
 M.FAILURE_SELECT = "select_failed"
@@ -629,7 +633,7 @@ end
 local function convert(deps, entry, layout_path, on_done, rows)
 	local data_dir = deps.converter_data
 	if not data_dir then
-		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the XKB conversion data is not shipped with this driver")
 		return
 	end
 	local canonical, level5
@@ -669,7 +673,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	local template = deps.read(data_dir .. "/xkb_symbols.txt")
 	local types = deps.read(data_dir .. "/xkb_types.txt")
 	if type(template) ~= "string" or type(types) ~= "string" then
-		on_done(false, M.FAILURE_CONVERSION, "the XKB template or key types are not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the XKB template or key types are not shipped with this driver")
 		return
 	end
 	local keycodes, keycodes_err = XkbConverter.keycodes(keycode_table, entry.keycode_convention)
@@ -719,7 +723,7 @@ end
 --- @param on_done function on_done(ok, report_or_code, detail)
 local function run_installer(deps, args, on_done)
 	if not deps.installer then
-		on_done(false, M.FAILURE_INSTALLER, "the user XKB installer is not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the user XKB installer is not shipped with this driver")
 		return
 	end
 	local argv = { deps.installer }

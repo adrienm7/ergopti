@@ -46,6 +46,11 @@ const FAILURE_KEYS = Object.freeze({
 	foreign_file: 'layout_manager.failure_foreign_file',
 	download_failed: 'layout_manager.failure_download',
 	python_missing: 'layouts.linux_needs_python',
+	// Linux: what keeps a converted layout from reaching the user XKB tree.
+	helpers_missing: 'layout_manager.failure_helpers_missing',
+	conversion_failed: 'layout_manager.failure_conversion',
+	installer_failed: 'layout_manager.failure_installer',
+	xorg_session: 'layouts.linux_xorg_session',
 	// Linux: a compositor that selects its layout only in its own file (Sway, niri...).
 	session_unsupported: 'layout_manager.failure_session_unsupported'
 });

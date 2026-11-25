@@ -48,7 +48,11 @@
 		"layout_manager.failure_provided_by_bundle",
 		"layout_manager.failure_foreign_file",
 		"layout_manager.failure_download",
+		"layout_manager.failure_helpers_missing",
+		"layout_manager.failure_conversion",
+		"layout_manager.failure_installer",
 		"layout_manager.failure_other",
+		"layouts.linux_xorg_session",
 		"layouts.linux_needs_python"
 	]
 }

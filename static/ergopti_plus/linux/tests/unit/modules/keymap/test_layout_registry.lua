@@ -1035,6 +1035,36 @@ helpers.describe("layout manager (Linux): what the package ships", function()
 		helpers.assert_nil(LayoutRegistry.installer_path("/nowhere", function() return false end))
 		helpers.assert_nil(LayoutRegistry.converter_data_path("/nowhere", function() return false end))
 	end)
+
+	helpers.it("finds the helpers a checkout install.sh puts below ~/.local/lib/ergopti/linux (layout-registry-convert)", function()
+		-- The field report of 2026-11-25: install.sh from a checkout copied only the
+		-- driver tree, so neither candidate existed and every layout failed.
+		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
+		local root = "/home/u/.local/lib/ergopti/linux"
+		local present = {
+			[root .. "/xkb_generation/data/key_sym.json"] = true,
+			[root .. "/xkb_installation/user_layout_installer.py"] = true,
+		}
+		local function exists(path) return present[path] == true end
+		helpers.assert_eq(LayoutRegistry.converter_data_path(root, exists), root .. "/xkb_generation/data")
+		helpers.assert_eq(LayoutRegistry.installer_path(root, exists), root .. "/xkb_installation/user_layout_installer.py")
+	end)
+
+	helpers.it("says the installation lacks its layout tools instead of a conversion failure (layout-registry-convert)", function()
+		for _, missing in ipairs({ "converter_data", "installer" }) do
+			local LayoutRegistry, deps = manager({
+				served = "offline",
+				files = shipped_files(),
+				runs = { OK_RUN, INSTALLED_RUN },
+			})
+			deps[missing] = nil
+			local result = run(function(done) LayoutRegistry.install("ergopti", done, deps) end)
+			helpers.assert_true(not result.ok, missing)
+			helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_HELPERS_MISSING,
+				missing .. ": a missing helper is its own failure, which the page explains as a reinstall")
+			helpers.assert_contains(result.extra, "not shipped with this driver")
+		end
+	end)
 end)
 
 require("tests.lua.layouts.installed_manager_contract")(helpers, Json, {
