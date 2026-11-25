@@ -57,6 +57,7 @@ local function started_emulation()
 		caps_locked = function() return false end,
 		is_active = function() return true end,
 		ergopti_family = function() return "ergopti" end,
+		typed_text = function() return "" end,
 	})
 	return Emulation
 end
