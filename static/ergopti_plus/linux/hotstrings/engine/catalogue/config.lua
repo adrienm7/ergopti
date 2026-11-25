@@ -212,12 +212,18 @@ local function sections_are_the_builds(category)
 end
 
 --- Whether one explicit choice names something the published catalogue can
---- prove retired. Nothing is retired before a catalogue was published.
+--- prove retired. Nothing is retired before a catalogue was published. A
+--- personal file or an extension pack is never judged, as on macOS: its
+--- absence may be temporary (a pack not installed in this build, a file moved
+--- away), so its choice is neither warned about nor offered for deletion.
 --- @param id string Category id.
 --- @param section string|nil Section name, for a section choice.
 --- @return boolean retired
 local function choice_is_retired(id, section)
 	return ChoiceCatalogue.is_retired(_published == true, function(category_id)
+		if PersonalFiles.components(category_id) or Extensions.parse_category_key(category_id) then
+			return { unjudged = true }
+		end
 		local category = _categories[category_id]
 		if category == nil then return nil end
 		return { sections = sections_are_the_builds(category) and (category.sections or {}) or nil }

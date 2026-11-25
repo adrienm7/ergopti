@@ -456,6 +456,21 @@ helpers.describe("hotstrings_config", function()
       helpers.assert_true(warnings[1]:find("'hotstrings.modules.probe.gone'", 1, true) ~= nil, warnings[1])
     end)
 
+    helpers.it("never judges an absent extension pack's choices (config-outdated-extension-unjudged)", function()
+      -- A field boot warned six "ext:ergopti-demo:*" choices as outdated on
+      -- every start: the pack was not loaded, so the Linux lookup called its
+      -- categories retired, and the cleanup cannot cut a quoted key, so the
+      -- warnings never went away. An extension pack's absence may be
+      -- temporary; as on macOS it is never judged, warned or offered.
+      local source = "[hotstrings.groups]\nprobe = true\n\"ext:ergopti-demo:demo-phrases\" = true\n\n"
+        .. "[hotstrings.modules.\"ext:ergopti-demo:demo-symbols\"]\narrows = false\n"
+      local offered, warnings = cleanup_offers({ config_dir = "virtual.toml", publish = true, categories = {
+        probe = { id = "probe", path = "/bundled/probe.toml", sections = {}, sections_order = {} },
+      } }, source)
+      helpers.assert_eq(offered, {})
+      helpers.assert_eq(warnings, {}, table.concat(warnings, " | "))
+    end)
+
     helpers.it("ignores an old-shape choice without guessing it or refusing the catalogue (config-outdated-hotstrings)", function()
       -- An old-shape choice is outdated configuration: never guessed ("yes" is
       -- not a switch), never a refusal that turns every hotstring off. The
