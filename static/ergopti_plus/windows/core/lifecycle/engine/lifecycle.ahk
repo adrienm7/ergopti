@@ -563,6 +563,9 @@ Ergopti_OnSuspendEnter() {
 	}
 	if IsSet(ProgramActions_Stop)
 		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	; A pause stops the running user workflows: none resumes half-way later.
+	if IsSet(WorkflowsAbortAll)
+		_LifecycleRunRequiredStep(Transition, "user-workflows", WorkflowsAbortAll)
 	if IsSet(UserHotstringsInvalidate)
 		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if IsSet(LLM_AuxInvalidate)
