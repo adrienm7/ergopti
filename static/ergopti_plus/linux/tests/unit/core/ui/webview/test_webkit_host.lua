@@ -15,7 +15,7 @@ local EXPECTED_BRIDGES = {
 
 -- This independently authored contract rejects missing, duplicate and foreign names.
 local function exact_bridge_registry(names)
-  if type(names) ~= "table" or #names ~= 24 then return false end
+  if type(names) ~= "table" or #names ~= #EXPECTED_BRIDGES then return false end
   local expected, seen = {}, {}
   for _, name in ipairs(EXPECTED_BRIDGES) do expected[name] = true end
   for _, name in ipairs(names) do
@@ -68,8 +68,8 @@ helpers.describe("core.ui.ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 24 bridges including the physical editor, the workflows and the anti-sleep library", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 24)
+    helpers.it("has exactly the expected bridges including the physical editor, the workflows and the anti-sleep library", function()
+      helpers.assert_eq(#WH.get_bridge_names(), #EXPECTED_BRIDGES)
       helpers.assert_true(exact_bridge_registry(WH.get_bridge_names()))
     end)
   end)
@@ -87,7 +87,7 @@ helpers.describe("core.ui.ui.webkit_host", function()
         duplicate[#duplicate + 1] = name == "physical_shortcuts_bridge" and "healthcheck" or name
       end
       helpers.assert_true(not exact_bridge_registry(missing))
-      helpers.assert_eq(#duplicate, 23)
+      helpers.assert_eq(#duplicate, #EXPECTED_BRIDGES)
       helpers.assert_true(not exact_bridge_registry(duplicate))
       duplicate[1] = "foreign_bridge"
       helpers.assert_true(not exact_bridge_registry(duplicate))
