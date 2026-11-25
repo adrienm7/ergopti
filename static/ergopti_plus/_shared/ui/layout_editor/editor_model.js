@@ -586,6 +586,54 @@ var LayoutEditorModel = (function () {
 	}
 
 	// =============================
+	// ======= 5b/ Differences =====
+	// =============================
+
+	/** A key table's entries, each OS's overrides kept under their scope. */
+	function keyEntries(layer) {
+		const entries = new Map();
+		for (const [code, mapping] of Object.entries(layer.keys || {}))
+			entries.set(`all|${code}`, mapping);
+		for (const platform of PLATFORMS) {
+			const overrides = (layer.platform_keys || {})[platform] || {};
+			for (const [code, mapping] of Object.entries(overrides))
+				entries.set(`${platform}|${code}`, mapping);
+		}
+		return entries;
+	}
+
+	/**
+	 * The keys two documents map differently (a saved version against the
+	 * current layout), layer by layer in the first document's order then the
+	 * second's new layers, keys in code order within a layer.
+	 * @param {object} before - The older document (a saved version).
+	 * @param {object} after - The newer one (the layout shown).
+	 * @returns {{layer: string, code: string, scope: string, before: object|null, after: object|null}[]}
+	 *   scope is 'all' or the OS of an override; a missing layer counts its
+	 *   keys as added or removed.
+	 */
+	function differences(before, after) {
+		const layersOf = (doc) => new Map((doc.layers || []).map((layer) => [layer.id, layer]));
+		const old = layersOf(before);
+		const next = layersOf(after);
+		const ids = [...old.keys()].concat([...next.keys()].filter((id) => !old.has(id)));
+		const found = [];
+		for (const id of ids) {
+			const a = old.has(id) ? keyEntries(old.get(id)) : new Map();
+			const b = next.has(id) ? keyEntries(next.get(id)) : new Map();
+			const keys = [...new Set([...a.keys(), ...b.keys()])].sort();
+			for (const key of keys) {
+				const first = a.has(key) ? a.get(key) : null;
+				const second = b.has(key) ? b.get(key) : null;
+				if (JSON.stringify(first) === JSON.stringify(second)) continue;
+				const [scope, code] = key.split('|');
+				found.push({ layer: id, code, scope, before: first, after: second });
+			}
+		}
+		return found;
+	}
+
+	// =============================
 	// ======= 6/ History ==========
 	// =============================
 
@@ -634,6 +682,7 @@ var LayoutEditorModel = (function () {
 		simulate,
 		previewTypist,
 		kindOf,
+		differences,
 		createHistory
 	};
 })();

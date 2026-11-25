@@ -10,6 +10,22 @@
 		"pending-translation": "Studio, layout editor or analyser label written in English and French first (maintainer rule, 2026-11-14): the other locales carry the English value until the labels settle, then the entry is translated and deleted. Never for French."
 	},
 	"entries": {
+		"layout_editor.versions.default_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "sv"]
+		},
+		"layout_editor.versions.col_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"layout_editor.tools.versions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"layout_editor.versions.col_actions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
 		"accessibility.tray_tip": {
 			"reason": "brand-or-feature-name",
 			"locales": [

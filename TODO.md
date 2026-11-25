@@ -308,7 +308,8 @@ waits for the maintainer's review).
       what is left: blend the user's own text or « Ma frappe » too (done: up to three built-in corpora by weight,
       `E.blendNgrams`, kept with the conveniences and carried in the share link); (3) magic and repeat keys: designed
       (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
-      »; (4) saved layout versions in the editor beside undo; (5) task help in the editor and the Optimiser too (done:
+      »; (4) saved layout versions in the editor beside undo (done: the editor's « Versions » tool, named snapshots kept
+      in the workspace, compared key by key and restored as one undoable step); (5) task help in the editor and the Optimiser too (done:
       the Comparer's « Help » tab); (6) the movement cells' percentiles among the compared layouts (done: row changes
       concordant and discordant, the trigram rhythm with same-finger ends, all and without thumbs; `movementTable` costs
       20 to 60 ms a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (8)

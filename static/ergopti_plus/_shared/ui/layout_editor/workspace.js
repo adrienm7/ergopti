@@ -24,6 +24,11 @@
  *    is refused.
  * 4. Pure classic script: the page and the Node tests run it unchanged; the
  *    IndexedDB store takes the window it runs in.
+ * 5. Saved versions (an idea seen in the Layouts Wiki playground's Versions
+ *    pane): each tab keeps up to MAX_VERSIONS named snapshots beside its undo
+ *    history, each its TOML source and the time it was taken, in the same
+ *    stored text, so the host's workspace bound (studio.max_workspace_bytes)
+ *    covers them too.
  * ==============================================================================
  */
 
@@ -40,6 +45,11 @@ var LayoutEditorWorkspace = (function () {
 	// How long the editor waits after the last change before it saves, so a burst
 	// of edits (typing a name, dragging characters) is one write.
 	const AUTOSAVE_DELAY_MS = 300;
+	// The saved versions a tab keeps; one more is refused, never dropped in
+	// silence, so the user chooses which to delete.
+	const MAX_VERSIONS = 20;
+	// The longest name of a saved version, in characters.
+	const MAX_VERSION_NAME = 80;
 	// The backup archive's name; its files are <layout id>.toml.
 	const BACKUP_FILENAME = 'ergopti-studio-layouts.zip';
 	// The IndexedDB database, object store and key of the website's workspace.
@@ -73,8 +83,38 @@ var LayoutEditorWorkspace = (function () {
 	// ====================================
 
 	/**
+	 * A saved version as stored, or the refusal naming its first bad field.
+	 * @param {*} version - {name, text, at} with at in milliseconds since 1970.
+	 * @param {string} path - Where it sits, for the refusal.
+	 * @returns {{name: string, text: string, at: number}}
+	 * @throws {WorkspaceError} workspace_invalid.
+	 */
+	function checkedVersion(version, path) {
+		if (
+			!version ||
+			typeof version.name !== 'string' ||
+			version.name.trim() === '' ||
+			[...version.name].length > MAX_VERSION_NAME ||
+			typeof version.text !== 'string' ||
+			version.text === '' ||
+			!Number.isSafeInteger(version.at) ||
+			version.at < 0
+		)
+			throw new WorkspaceError('workspace_invalid', path);
+		return { name: version.name, text: version.text, at: version.at };
+	}
+
+	/** A tab's saved versions as stored, at most MAX_VERSIONS. */
+	function checkedVersions(versions, path) {
+		if (!Array.isArray(versions) || versions.length > MAX_VERSIONS)
+			throw new WorkspaceError('workspace_invalid', path);
+		return versions.map((version, index) => checkedVersion(version, `${path}[${index}]`));
+	}
+
+	/**
 	 * The stored text of a workspace.
-	 * @param {{text: string, dirty: boolean}[]} tabs - Each tab's TOML source.
+	 * @param {{text: string, dirty: boolean, versions?: {name: string, text: string, at: number}[]}[]} tabs -
+	 *   Each tab's TOML source and its saved versions, oldest first.
 	 * @param {number} active - The index of the tab shown.
 	 * @returns {string}
 	 */
@@ -89,7 +129,11 @@ var LayoutEditorWorkspace = (function () {
 			tabs: tabs.map((tab, index) => {
 				if (typeof tab.text !== 'string' || tab.text === '')
 					throw new WorkspaceError('workspace_invalid', `tabs[${index}].text`);
-				return { text: tab.text, dirty: tab.dirty === true };
+				const stored = { text: tab.text, dirty: tab.dirty === true };
+				const versions = checkedVersions(tab.versions || [], `tabs[${index}].versions`);
+				// A tab without versions is stored as before they existed.
+				if (versions.length) stored.versions = versions;
+				return stored;
 			})
 		});
 	}
@@ -97,7 +141,8 @@ var LayoutEditorWorkspace = (function () {
 	/**
 	 * Reads a stored workspace.
 	 * @param {string} text
-	 * @returns {{active: number, tabs: {text: string, dirty: boolean}[]}}
+	 * @returns {{active: number, tabs: {text: string, dirty: boolean,
+	 *   versions: {name: string, text: string, at: number}[]}[]}}
 	 * @throws {WorkspaceError} workspace_invalid naming the first field that does not read.
 	 */
 	function parse(text) {
@@ -114,7 +159,9 @@ var LayoutEditorWorkspace = (function () {
 		const tabs = data.tabs.map((tab, index) => {
 			if (!tab || typeof tab.text !== 'string' || tab.text === '' || typeof tab.dirty !== 'boolean')
 				throw new WorkspaceError('workspace_invalid', `tabs[${index}]`);
-			return { text: tab.text, dirty: tab.dirty };
+			const versions =
+				tab.versions === undefined ? [] : checkedVersions(tab.versions, `tabs[${index}].versions`);
+			return { text: tab.text, dirty: tab.dirty, versions };
 		});
 		if (!Number.isInteger(data.active) || data.active < 0 || data.active >= tabs.length)
 			throw new WorkspaceError('workspace_invalid', 'active');
@@ -268,6 +315,8 @@ var LayoutEditorWorkspace = (function () {
 	return {
 		SCHEMA,
 		AUTOSAVE_DELAY_MS,
+		MAX_VERSIONS,
+		MAX_VERSION_NAME,
 		BACKUP_FILENAME,
 		IMPORTED,
 		WorkspaceError,
