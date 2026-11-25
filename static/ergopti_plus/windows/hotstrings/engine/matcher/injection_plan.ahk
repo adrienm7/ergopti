@@ -23,6 +23,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\action_entry.ahk
 
 global HSE_PLAN_PATH_AUTO := "auto"
 global HSE_PLAN_PATH_TERMINATOR := "terminator"
