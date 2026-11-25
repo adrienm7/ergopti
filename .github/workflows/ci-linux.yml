@@ -3337,6 +3337,33 @@ jobs:
           fi
         timeout-minutes: 10
 
+      # WCAG 2.1.1, 2.1.2 and 2.4.3 for the same owned dialogs: each kind is
+      # built by the real module, walked with real Tab and Shift+Tab sent
+      # through XTest, then closed with Escape; a window that swallows Tab must
+      # be refused. Its prerequisites are the dialog host's, installed above.
+      - name: The owned dialogs are walked with Tab, Shift+Tab and Escape on a real display
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          display_file="$RUNNER_TEMP/dialog-walk-display"
+          Xvfb -displayfd 3 -screen 0 1024x768x24 -nolisten tcp 3>"$display_file" &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for _ in $(seq 100); do [ -s "$display_file" ] && break; sleep 0.1; done
+          test -s "$display_file"
+          DISPLAY=":$(head -n 1 "$display_file")" GDK_BACKEND=x11 dbus-run-session -- \
+            luajit static/ergopti_plus/linux/tests/hardware/run_dialog_keyboard_walk.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 5
+
       # The user XKB installer runs on Ergopti's own Python, downloaded once on
       # consent. The live probe drives the production path (managed HTTP
       # download of the pinned python-build-standalone archive, size and SHA-256

@@ -1061,6 +1061,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "The owned dialogs are walked with Tab, Shift+Tab and Escape on a real display",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Ergopti's own Python downloads, verifies and runs",
 			"protocol": 10
 		},
