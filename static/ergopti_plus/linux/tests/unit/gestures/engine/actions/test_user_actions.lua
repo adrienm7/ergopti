@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/user_action_vectors.json"
-local ACTION_OF_KIND = { command = "run_command", path = "open_path" }
+local ACTION_OF_KIND = { command = "run_command", path = "open_path", workflow = "run_workflow" }
 local SECRET = "curl -H 'Authorization: Bearer s3cr3t-T0KEN' https://example.invalid"
 
 --- @return table The decoded corpus.
@@ -38,6 +38,7 @@ helpers.describe("user actions replay the shared parameter corpus (Linux)", func
 		helpers.assert_eq(Gestures.get_action_parameter_spec("run_command"), "command")
 		helpers.assert_eq(Gestures.get_action_parameter_spec("open_path"), "path")
 		helpers.assert_eq(Gestures.get_action_parameter_spec("run_apple_shortcut"), nil)
+		helpers.assert_eq(Gestures.get_action_parameter_spec("run_workflow"), "workflow")
 	end)
 
 	for _, vector in ipairs(corpus.vectors) do

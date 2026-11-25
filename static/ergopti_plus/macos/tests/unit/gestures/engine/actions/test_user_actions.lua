@@ -20,7 +20,8 @@ local helpers = require("tests.helpers")
 local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/user_action_vectors.json")
-local ACTION_OF_KIND = { command = "run_command", path = "open_path", apple_shortcut = "run_apple_shortcut" }
+local ACTION_OF_KIND = { command = "run_command", path = "open_path", apple_shortcut = "run_apple_shortcut",
+	workflow = "run_workflow" }
 local SECRET = "curl -H 'Authorization: Bearer s3cr3t-T0KEN' https://example.invalid"
 local SHORTCUT_ID = "1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516"
 local OTHER_ID = "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE"
@@ -44,7 +45,7 @@ local Actions = require("gestures.engine.actions")
 helpers.describe("user actions replay the shared parameter corpus (macOS)", function()
 	local corpus = read_corpus()
 
-	helpers.it("the three parameters are declared", function()
+	helpers.it("the four parameters are declared", function()
 		for kind, action in pairs(ACTION_OF_KIND) do
 			helpers.assert_eq(Actions.get_action_parameter_spec(action), kind, action)
 		end

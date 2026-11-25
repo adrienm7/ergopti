@@ -154,7 +154,8 @@ for (const driver of ['linux', 'macos']) {
 	for (const contract of [
 		'workflow_model_contract',
 		'workflow_interpreter_contract',
-		'workflow_runner_contract'
+		'workflow_runner_contract',
+		'workflow_owner_contract'
 	]) {
 		check(
 			text.includes(`tests.lua.workflows.${contract}`),

@@ -116,6 +116,9 @@ function referenceParse(kind, value) {
 			return null;
 		return { id: data.id, name: data.name, input: data.input, output: data.output };
 	}
+	if (kind === 'workflow') {
+		return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? { id: value } : null;
+	}
 	throw new Error(`unknown kind ${kind}`);
 }
 
@@ -143,7 +146,7 @@ for (const vector of corpus.vectors || []) {
 		check(vector.parsed === undefined, `${key}: an invalid vector has no parsed fields`);
 	}
 }
-for (const kind of ['command', 'path', 'apple_shortcut'])
+for (const kind of ['command', 'path', 'apple_shortcut', 'workflow'])
 	check(
 		(counts[`${kind}:true`] || 0) >= 4 && (counts[`${kind}:false`] || 0) >= 6,
 		`the corpus needs valid and invalid ${kind} vectors`
@@ -186,7 +189,8 @@ const catalogue = TOML.parse(fs.readFileSync(ACTIONS, 'utf8'));
 const EXPECTED_KIND = {
 	run_command: 'command',
 	open_path: 'path',
-	run_apple_shortcut: 'apple_shortcut'
+	run_apple_shortcut: 'apple_shortcut',
+	run_workflow: 'workflow'
 };
 for (const [action, kind] of Object.entries(EXPECTED_KIND)) {
 	const row = catalogue.sg_actions[action];

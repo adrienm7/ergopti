@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: User Action Parameters
 --- DESCRIPTION:
---- The per-binding values of the run_command, open_path and run_apple_shortcut
---- actions for the macOS and Linux drivers: which stored strings are valid, what
---- they hold once decoded, and the one canonical spelling each editor stores.
+--- The per-binding values of the run_command, open_path, run_apple_shortcut
+--- and run_workflow actions for the macOS and Linux drivers: which stored
+--- strings are valid, what they hold once decoded, and the one canonical
+--- spelling each editor stores.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule, pinned by
@@ -27,7 +28,7 @@ local TextUtils = require("core.text.engine.utils_core")
 local M = {}
 
 --- The parameter kinds this module owns, as actions.toml names them.
-M.KINDS = { command = true, path = true, apple_shortcut = true }
+M.KINDS = { command = true, path = true, apple_shortcut = true, workflow = true }
 
 --- The only schema version a stored value may carry.
 M.VERSION = 1
@@ -37,6 +38,9 @@ M.MAX_COMMAND_BYTES = 4096
 
 --- Longest path an open_path binding stores (bytes): macOS and Linux PATH_MAX.
 M.MAX_OPEN_PATH_BYTES = 4096
+
+--- Longest workflow id (workflow_id_pattern of workflows/steps.json).
+M.MAX_WORKFLOW_ID_BYTES = 64
 
 --- Longest shortcut name, as the Apple Shortcuts owner bounds it.
 M.MAX_SHORTCUT_NAME_BYTES = 4096
@@ -53,11 +57,13 @@ M.PROMPT_KEYS = {
 	command = "dialog.gestures.param_command",
 	path = "dialog.gestures.param_path",
 	apple_shortcut = "dialog.gestures.param_apple_shortcut",
+	workflow = "dialog.gestures.param_workflow",
 }
 M.ERROR_KEYS = {
 	command = "dialog.gestures.param_err_command",
 	path = "dialog.gestures.param_err_path",
 	apple_shortcut = "dialog.gestures.param_err_apple_shortcut",
+	workflow = "dialog.gestures.param_err_workflow",
 }
 
 --- What happens to a captured text output: nothing, typed, or copied.
@@ -170,7 +176,18 @@ local function parse_shortcut(value)
 	return { id = data.id, name = data.name, input = data.input, output = data.output }
 end
 
-local PARSERS = { command = parse_command, path = parse_path, apple_shortcut = parse_shortcut }
+--- Decodes a run_workflow value: the id of one of the user's workflows, as
+--- steps.json spells it. Whether it still exists is checked when it runs.
+--- @param value any
+--- @return table|nil workflow { id }
+local function parse_workflow(value)
+	if type(value) ~= "string" or #value > M.MAX_WORKFLOW_ID_BYTES or not value:match("^[A-Za-z0-9_%-]+$") then
+		return nil
+	end
+	return { id = value }
+end
+
+local PARSERS = { command = parse_command, path = parse_path, apple_shortcut = parse_shortcut, workflow = parse_workflow }
 
 --- Decodes one stored value of a kind this module owns.
 --- @param kind string command, path or apple_shortcut.
@@ -197,6 +214,7 @@ function M.spell(kind, fields)
 	if kind == "command" then return encode_object(COMMAND_KEYS, fields) end
 	if kind == "apple_shortcut" then return encode_object(SHORTCUT_KEYS, fields) end
 	if kind == "path" then return tostring(fields.path) end
+	if kind == "workflow" then return tostring(fields.id) end
 	error("user_action_parameter: unknown kind '" .. tostring(kind) .. "'", 2)
 end
 
@@ -218,7 +236,8 @@ end
 --- @return string|nil text Nil when the label keeps its configurable marker.
 function M.label_value(kind, value)
 	local fields = M.parse(kind, value)
-	if not fields or kind == "command" then return nil end
+	-- A workflow is named by the driver from its store: the id means nothing to a reader
+	if not fields or kind == "command" or kind == "workflow" then return nil end
 	if kind == "apple_shortcut" then return fields.name end
 	return fields.path:match("([^/]+)/*$") or "/"
 end

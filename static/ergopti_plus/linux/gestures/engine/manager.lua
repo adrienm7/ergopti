@@ -659,6 +659,16 @@ local BUILTIN_HANDLERS = {
 		-- through send_vocabulary(), which is declared below this table)
 		return UserActions.run_command(fields, require("modules.shortcuts.manager").send_vocabulary().text_max_code_points)
 	end,
+	-- One of the user's workflows, named by its id and run by the shared owner
+	-- (modules/shortcuts/workflows): a missing one is told, never skipped.
+	["run_workflow"] = function(binding)
+		local fields = UserActionParameter.parse("workflow", M.get_action_parameter(binding, "run_workflow"))
+		if not fields then
+			Logger.warn(LOG, "run_workflow ignored for binding '%s': no valid workflow is stored.", tostring(binding))
+			return false
+		end
+		return require("modules.shortcuts.workflows").run(fields)
+	end,
 	["open_path"] = function(binding)
 		local fields = UserActionParameter.parse("path", M.get_action_parameter(binding, "open_path"))
 		if not fields then
@@ -1728,6 +1738,9 @@ end
 function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
+	-- A pause stops the running user workflows: none resumes half-way later
+	local workflows = package.loaded["modules.shortcuts.workflows"]
+	if paused == true and workflows then workflows.abort_all() end
 	local inhibitor = package.loaded["modules.keep_awake"]
 	-- Keep-awake stops with the pause and comes back on resume when it ran.
 	if type(paused) == "boolean" and inhibitor and inhibitor.set_paused(paused) ~= true then
@@ -1739,6 +1752,8 @@ end
 
 function M.stop_programs()
 	local commands_settled = UserActions.stop()
+	local workflows = package.loaded["modules.shortcuts.workflows"]
+	if workflows then workflows.stop() end
 	local inhibitor = package.loaded["modules.keep_awake"]
 	if inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return commands_settled end
