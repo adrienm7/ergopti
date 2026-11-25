@@ -128,6 +128,12 @@
 			"not_testable": "The pill is drawn in the open menu-bar menu, which no run captures: open the menu in light and dark mode, paused and not; the geometry is unit-tested (test_canvas_badge_no_leak)."
 		},
 		{
+			"id": "hotstrings_taps_down_dot",
+			"title": "Hotstrings red dot while a typing event tap cannot restart",
+			"checks": [],
+			"not_testable": "A run cannot withdraw its own Accessibility or Input Monitoring permission: withdraw one while Ergopti runs and read the menu-bar menu, then allow it again and reload. The watchdog outage, the dot and the row are unit-tested (test_event_taps_recover_when_disabled, test_master_tick)."
+		},
+		{
 			"id": "hotstrings_unread_focus_window_mode",
 			"title": "Hotstrings expand where the focused field is unread, with the Hotstrings red dot",
 			"checks": [],

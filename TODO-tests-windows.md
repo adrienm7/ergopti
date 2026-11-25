@@ -300,6 +300,12 @@ eader.sqlite` held open by another program, press Reset: the status line says th
 
 ### Pause, startup, updates and network
 
+- [ ] **Silent component failures (fixed 2026-11-25, never run on Windows):** with WebView2 removed or blocked
+      (rename `%LOCALAPPDATA%\Microsoft\EdgeWebView`, or run without its runtime), raise an error (Débogage): a
+      message box names the error and the errors file instead of a vanishing notification; « Diagnostic » opens the
+      redacted report as an HTML page in the browser and a notice names its file. Rename `ergopti_nav_owner.dll`
+      next to the driver and reload: the tray's first row is the 🔴 keyboard core row, its click explains what is
+      degraded; restore the DLL and reload: the row and its separator are gone.
 - [ ] **Report a bug and Suggest a feature (2026-11-24):** the diagnostics window's « Report a bug » opens the bug
       form with Driver « Windows » chosen in its dropdown, above Operating system, and a Diagnostics field in readable
       English lines (Warnings and errors first, then the checks, the permissions and, last, the « Settings that differ
