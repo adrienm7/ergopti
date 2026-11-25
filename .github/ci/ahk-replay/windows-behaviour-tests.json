@@ -1,5 +1,5 @@
 {
-	"expected_count": 15,
+	"expected_count": 16,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -58,6 +58,10 @@
 		},
 		{
 			"contains": "a direct-mode sendtext failure is contained, reported and logged",
+			"expected_count": 1
+		},
+		{
+			"contains": "the hold options are read from the shared catalogue",
 			"expected_count": 1
 		}
 	]

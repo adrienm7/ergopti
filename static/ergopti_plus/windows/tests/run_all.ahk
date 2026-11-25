@@ -2181,7 +2181,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/keys/test_toggle_capslock_calls_disable_capsword.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_writer_inherit_defaults.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_persist_before_publish.ahk
-#Include meta/platform/remap/tap_hold/test_tap_hold_picker_catalog_path.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_global_transaction.ahk
 #Include meta/ai/navigation/test_nav_loop_ten.ahk
 #Include meta/ai/api/test_entries_persist_error_logged.ahk
