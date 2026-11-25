@@ -15,7 +15,7 @@ The ErgoptiPlus daemon runs this module to install what it converted, in Lua
 (``layouts/xkb_converter.lua``), from a registry ``.keylayout``:
 
     user_layout_installer.py install --layout-id ergol --display-name "Ergo-L" \
-        --source-dir ~/.config/ergopti_plus/layouts/ergol
+        --source-dir ~/.config/ergopti/layouts/ergol
     user_layout_installer.py uninstall --layout-id ergol
     user_layout_installer.py activate --layout-id ergol
 

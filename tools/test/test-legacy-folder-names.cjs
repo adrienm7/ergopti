@@ -5,24 +5,31 @@
  * MODULE: Legacy Folder Names Gate
  * DESCRIPTION:
  * Fails when anything but the one-time migration spells a data folder of the
- * builds before the single folder name (maintainer decision, 2026-11-03):
- * `Ergopti` on macOS and Windows, `ergopti` under XDG on Linux, every folder
- * named once in _shared/core/fs/data/paths/app_dirs.toml.
+ * builds before the single folder name (maintainer decision, 2026-11-03), or
+ * spells a root with another case or a "Plus" form of the name: `Ergopti` on
+ * macOS and Windows, `ergopti` under XDG on Linux, every folder named once in
+ * _shared/core/fs/data/paths/app_dirs.toml.
  *
  * FEATURES & RATIONALE:
  * 1. Old Spellings: the old names come from the app_dirs [migration] table, so
  *    the gate follows the migration rather than a list of its own.
  * 2. Owners Only: the TOML, its generated files, the migration modules, their
- *    tests and vectors, the handoff and the TODO item may name the old
- *    folders; history (docs/audits) is not rewritten.
+ *    tests and vectors, the handoff, the TODO item and the TODO-tests checks
+ *    may name the old folders; history (docs/audits) is not rewritten. Every
+ *    other tracked text file is read: a list of scanned folders once left
+ *    static/ergopti/ out, where a stale ~/.config/ergopti_plus stayed.
  * 3. Deferred Owned Runtime: the owned Karabiner runtime keeps its compiled
  *    folder (app_dirs [owned_runtime.macos]) until its next rebuild, so its
  *    system tree and per-user karabiner home are not old spellings.
  * 4. Hand Spellings Follow the Root: the shell, Python and Go helpers that
  *    cannot read the generated files spell the macOS support root by hand;
  *    each must spell the current one.
- * 5. Cannot Pass Vacuously: a planted line of each old spelling must be caught
- *    before the tree is judged.
+ * 5. One Spelling per OS: a root followed by the name in another case or with
+ *    "Plus" (~/.local/state/Ergopti, ~/Library/Logs/ergopti,
+ *    %LOCALAPPDATA%\ErgoptiPlus) is a divergent folder even when no build
+ *    used it, so a doc or a fixture cannot drift from the declared name.
+ * 6. Cannot Pass Vacuously: a planted line of each old and divergent spelling
+ *    must be caught before the tree is judged.
  * ==============================================================================
  */
 
@@ -35,15 +42,6 @@ const path = require('path');
 const { data } = require('./lib/app-dirs.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCANNED = [
-	'static/ergopti_plus/',
-	'tools/',
-	'.github/',
-	'.agents/',
-	'docs/',
-	'README.md',
-	'video/'
-];
 const OWNERS = new Set([
 	'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml',
 	'static/ergopti_plus/_shared/core/fs/engine/app_dirs.lua',
@@ -59,6 +57,10 @@ const OWNERS = new Set([
 	'static/ergopti_plus/windows/settings/engine/migration/legacy_folder_migration.ahk',
 	'static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_legacy_folder_migration.ahk',
 	'docs/tooling/one-folder-name-handoff.md',
+	'TODO.md',
+	'TODO-tests-linux.md',
+	'TODO-tests-macos.md',
+	'TODO-tests-windows.md',
 	'tools/test/test-legacy-folder-names.cjs'
 ]);
 const HISTORY = /^docs\/audits\//;
@@ -69,6 +71,9 @@ const HAND_SPELLED_SUPPORT =
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SEP = '[\\\\/]+';
+// The system tree and the per-user karabiner home of the owned runtime, which
+// keep their compiled folder (feature 3).
+const NOT_SYSTEM_TREE = '(?<!(^|[\\s`\'"(=:])/Library/)';
 
 /** The regular expressions of every old data-folder spelling. */
 function oldSpellings() {
@@ -89,7 +94,7 @@ function oldSpellings() {
 	// root-owned system tree and the per-user karabiner home.
 	add(
 		`Application Support/${macos.legacy_support_folder}`,
-		`(?<!(^|[\\s\`'"(=:])/Library/)Application Support${SEP}${escape(
+		`${NOT_SYSTEM_TREE}Application Support${SEP}${escape(
 			macos.legacy_support_folder
 		)}(?![\\w-])(?!${SEP}karabiner)`
 	);
@@ -118,23 +123,71 @@ function oldSpellings() {
 		`$XDG_*/${linux.legacy_folder}`,
 		`XDG_[A-Z]+_(HOME|DIR)\\}?(:-[^}]*\\})?${SEP}${escape(linux.legacy_folder)}(?![\\w-])`
 	);
-	return rows;
+	return rows.concat(divergentSpellings());
 }
 
-/** Every line of a text that spells an old folder. */
+/**
+ * The regular expressions of an OS root followed by the application name in
+ * another case or with "Plus" (feature 5). Each captures the folder name as
+ * `name`; `allowed` keeps the OS spelling and the owned runtime's folder.
+ */
+function divergentSpellings() {
+	const anyCase = (name) =>
+		[...name].map((char) => `[${char.toLowerCase()}${char.toUpperCase()}]`).join('');
+	const leaf = `(?<name>${anyCase(data.app.linux_folder_name)}(?:[_-]?${anyCase('plus')})?)(?![\\w-])`;
+	const owned = data.owned_runtime.macos.folder_name;
+	const linux = data.app.linux_folder_name;
+	const app = data.app.folder_name;
+	return [
+		{
+			label: `Linux root not named "${linux}"`,
+			pattern: new RegExp(
+				`(?:\\.local${SEP}(?:state|share)|\\.cache|\\.config|XDG_[A-Z]+_(?:HOME|DIR)\\}?(?::-[^}]*\\})?)${SEP}${leaf}`,
+				'g'
+			),
+			allowed: (groups) => groups.name === linux
+		},
+		{
+			label: `macOS root not named "${app}"`,
+			pattern: new RegExp(
+				`(?<system>(?:^|(?<=[\\s\`'"(=:]))/)?Library${SEP}(?<base>Logs|Caches|Application Support)${SEP}${leaf}(?<karabiner>${SEP}karabiner)?`,
+				'g'
+			),
+			// The owned runtime keeps its compiled support folder (feature 3).
+			allowed: (groups) =>
+				groups.name === app ||
+				(groups.name === owned &&
+					groups.base === 'Application Support' &&
+					Boolean(groups.system || groups.karabiner))
+		},
+		{
+			label: `Windows root not named "${app}"`,
+			pattern: new RegExp(
+				`(?:LOCALAPPDATA|LocalAppData|AppData${SEP}Local)%?["']?\\)?\\s*(?:\\.\\s*"|,\\s*['"]|${SEP})${SEP.replace('+', '*')}${leaf}`,
+				'g'
+			),
+			allowed: (groups) => groups.name === app
+		}
+	];
+}
+
+/** Every line of a text that spells an old or a divergent folder. */
 function findings(text, rows) {
 	const out = [];
 	text.split('\n').forEach((line, index) => {
-		for (const row of rows)
-			if (row.pattern.test(line))
-				out.push({ line: index + 1, label: row.label, text: line.trim() });
+		for (const row of rows) {
+			const hit = row.allowed
+				? [...line.matchAll(row.pattern)].some((match) => !row.allowed(match.groups))
+				: row.pattern.test(line);
+			if (hit) out.push({ line: index + 1, label: row.label, text: line.trim() });
+		}
 	});
 	return out;
 }
 
 const rows = oldSpellings();
 
-// 5. Cannot pass vacuously: every spelling is caught in a planted line, and
+// 6. Cannot pass vacuously: every spelling is caught in a planted line, and
 // the owned runtime and the new names are not.
 for (const planted of [
 	'~/.config/ergopti_plus/config.toml',
@@ -149,7 +202,14 @@ for (const planted of [
 	'path.join(process.env.LOCALAPPDATA, "ergopti_plus", "logs")',
 	'A_AppData . "\\Ergopti\\paths.toml"',
 	'~/.local/state/ergopti_plus/logs',
-	'${XDG_STATE_HOME}/ergopti_plus/logs'
+	'${XDG_STATE_HOME}/ergopti_plus/logs',
+	'~/.local/state/Ergopti/logs',
+	'${XDG_CONFIG_HOME:-$HOME/.config}/ErgoptiPlus/config.toml',
+	'~/Library/Logs/ergopti/launcher.log',
+	'/Users/u/Library/Caches/ergopti/dev/db.sqlite',
+	'~/Library/Application Support/ErgoptiPlus/paths.toml',
+	'%LOCALAPPDATA%\\ErgoptiPlus\\logs',
+	'EnvGet("LOCALAPPDATA") . "\\ergopti\\logs"'
 ])
 	assert(findings(planted, rows).length > 0, `the gate must catch: ${planted}`);
 for (const allowed of [
@@ -159,6 +219,8 @@ for (const allowed of [
 	'%LOCALAPPDATA%\\Ergopti\\logs',
 	'%LOCALAPPDATA%\\Ergopti\\ollama',
 	'~/.local/state/ergopti/logs',
+	'${XDG_RUNTIME_DIR}/ergopti-proof',
+	'~/.cache/ergopti_updater_etag_main.txt',
 	'static/ergopti_plus/_shared',
 	'layout = "ergopti_plus"'
 ])
@@ -167,7 +229,7 @@ for (const allowed of [
 const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, maxBuffer: 1 << 28 })
 	.toString()
 	.split('\0')
-	.filter((file) => file && SCANNED.some((prefix) => file === prefix || file.startsWith(prefix)))
+	.filter(Boolean)
 	.filter((file) => !OWNERS.has(file) && !HISTORY.test(file))
 	.filter(
 		(file) =>
