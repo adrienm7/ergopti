@@ -489,6 +489,25 @@ input hook takes the next key by design and says Escape cancels), the
 system MsgBox and InputBox, and the WebView2-only windows (walked in the
 browser, next section).
 
+### Keyboard walk of the native windows (Linux, 2026-11-25, Paris time)
+
+The Linux driver's native windows are its own GTK 3 dialogs
+(`core/ui/ui/dialog_host.lua`); the tray menu is the desktop's and the
+other windows are WebKitGTK pages, walked in the browser.
+`tests/hardware/run_dialog_keyboard_walk.lua` builds each kind through the
+module's own `main` (its binder seam wraps `Host.bind` and replaces only
+`gtk_dialog_run`), shows it on an X server, gives its window the keyboard
+and sends real Tab, Shift+Tab and Escape through XTest. The rules are the
+Windows walk's: every mapped, sensitive, focusable control is reached (a
+scrolled window that hands the focus to its list is not a stop), the round
+comes back to its first stop with no stop met twice, Shift+Tab retraces
+it, and Escape closes the dialog with no answer. The file and folder
+choosers are GTK's own widget, whose Shift+Tab takes one stop Tab skips
+(the path bar's scroll button): they are held to no trap either way and to
+reaching the file list and the answer buttons. A window that swallows Tab
+must be refused, and is. All seven kinds pass (52 checks); CI runs the
+profile beside the dialog title profile, in the desktop-webview row.
+
 ## Fifth pass, the app's WebView windows (2026-11-18, Paris time)
 
 `tools/test/browser/app-windows-accessibility.playwright.cjs`
