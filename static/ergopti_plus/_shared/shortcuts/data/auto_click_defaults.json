@@ -1,7 +1,5 @@
 {
-	"_comment": "Single source of the anti-sleep auto-clicker defaults (Ctrl+M, sg_actions.activity_simulation), read by the three drivers and the library window. threshold is the least normalised cross-correlation of a match (0 to 1), per image unless the library overrides it. scales are the power-of-two factors a library image is also tried at, for a button captured on a 1x screen and matched on a 2x one or the reverse. The coarse_* keys bound the coarse-to-fine search (_shared/shortcuts/engine/auto_click_matcher.lua). allowed_apps lists, per OS, the foreground apps the auto-clicker may click in: bundle ids on macOS, executable names on Windows, WM classes on Linux. The tick and the cooldown are durations: they live in the timings registry ([keep_awake] auto_click_tick_ms and auto_click_cooldown_ms).",
-	"keep_awake_enabled": true,
-	"auto_click_enabled": false,
+	"_comment": "Single source of the anti-sleep auto-clicker matching defaults (Ctrl+M, sg_actions.activity_simulation), read by the three drivers and the library window. threshold is the least normalised cross-correlation of an image match (0 to 1) when an image sets none, within threshold_min and threshold_max. scales are the power-of-two factors a library image is also tried at, for a button captured on a 1x screen and matched on a 2x one or the reverse. The coarse_* keys bound the coarse-to-fine search (_shared/shortcuts/engine/auto_click_matcher.lua). text_max_distance is the edit distance a new text target admits. library_folder is the folder of the library under the configuration folder, library_index its presets file. Allowed apps and the keep-awake and auto-click switches belong to each preset (keep_awake_presets.json). The tick and the cooldown are durations: they live in the timings registry ([keep_awake] auto_click_tick_ms and auto_click_cooldown_ms).",
 	"threshold": 0.92,
 	"threshold_min": 0.5,
 	"threshold_max": 1,
@@ -10,10 +8,6 @@
 	"coarse_margin": 0.15,
 	"coarse_candidates": 8,
 	"library_folder": "auto_click",
-	"library_index": "auto_click_library.json",
-	"allowed_apps": {
-		"macos": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
-		"windows": ["Code.exe", "Code - Insiders.exe"],
-		"linux": ["code", "code-insiders"]
-	}
+	"library_index": "presets.json",
+	"text_max_distance": 1
 }

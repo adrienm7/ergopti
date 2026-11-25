@@ -1,0 +1,240 @@
+{
+	"_comment": "Edits of the anti-sleep presets document (_shared/shortcuts/engine/keep_awake_presets.lua and its Windows twin), each vector starting from the starters of _shared/shortcuts/data/keep_awake_presets.json. steps call one edit (op and its args); ok and reason pin its answer; expect_active and expect_ids pin the document after the steps. plan vectors pin what one OS runs for a starter.",
+	"edits": [
+		{
+			"id": "starters_are_the_first_document",
+			"steps": [],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams"]
+		},
+		{
+			"id": "choose_a_preset",
+			"steps": [
+				{
+					"op": "set_active",
+					"args": ["vscode"],
+					"ok": true
+				}
+			],
+			"expect_active": "vscode",
+			"expect_ids": ["simple", "vscode", "teams"]
+		},
+		{
+			"id": "unknown_preset_refused",
+			"steps": [
+				{
+					"op": "set_active",
+					"args": ["nope"],
+					"ok": false,
+					"reason": "preset_unknown"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams"]
+		},
+		{
+			"id": "switch_auto_click",
+			"steps": [
+				{
+					"op": "set_switch",
+					"args": ["simple", "auto_click", true],
+					"ok": true
+				},
+				{
+					"op": "set_switch",
+					"args": ["simple", "dance", true],
+					"ok": false,
+					"reason": "preset_invalid_switch"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams"],
+			"expect_switch": {
+				"id": "simple",
+				"auto_click": true
+			}
+		},
+		{
+			"id": "duplicate_then_rename",
+			"steps": [
+				{
+					"op": "duplicate",
+					"args": ["vscode", "vscode_copy", "Mon VS Code"],
+					"ok": true
+				},
+				{
+					"op": "duplicate",
+					"args": ["vscode", "vscode_copy", "Again"],
+					"ok": false,
+					"reason": "preset_id_taken"
+				},
+				{
+					"op": "rename",
+					"args": ["vscode_copy", "VS Code perso"],
+					"ok": true
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams", "vscode_copy"],
+			"expect_name": {
+				"id": "vscode_copy",
+				"name": "VS Code perso"
+			}
+		},
+		{
+			"id": "delete_active_falls_back_to_first",
+			"steps": [
+				{
+					"op": "set_active",
+					"args": ["teams"],
+					"ok": true
+				},
+				{
+					"op": "remove",
+					"args": ["teams"],
+					"ok": true
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode"]
+		},
+		{
+			"id": "last_preset_stays",
+			"steps": [
+				{
+					"op": "remove",
+					"args": ["vscode"],
+					"ok": true
+				},
+				{
+					"op": "remove",
+					"args": ["teams"],
+					"ok": true
+				},
+				{
+					"op": "remove",
+					"args": ["simple"],
+					"ok": false,
+					"reason": "preset_last"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple"]
+		},
+		{
+			"id": "targets_are_validated",
+			"steps": [
+				{
+					"op": "put_target",
+					"args": [
+						"simple",
+						"images",
+						{
+							"id": "allow",
+							"file": "allow.png",
+							"threshold": 0.9,
+							"enabled": true
+						}
+					],
+					"ok": true
+				},
+				{
+					"op": "put_target",
+					"args": [
+						"simple",
+						"images",
+						{
+							"id": "bad",
+							"file": "../evil.png",
+							"enabled": true
+						}
+					],
+					"ok": false,
+					"reason": "preset_invalid_targets"
+				},
+				{
+					"op": "put_target",
+					"args": [
+						"simple",
+						"texts",
+						{
+							"id": "allow",
+							"variants": ["Allow"],
+							"max_distance": 0,
+							"enabled": true
+						}
+					],
+					"ok": false,
+					"reason": "preset_invalid_targets"
+				},
+				{
+					"op": "remove_target",
+					"args": ["simple", "allow"],
+					"ok": true
+				},
+				{
+					"op": "remove_target",
+					"args": ["simple", "allow"],
+					"ok": false,
+					"reason": "target_unknown"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams"]
+		},
+		{
+			"id": "apps_per_os",
+			"steps": [
+				{
+					"op": "set_apps",
+					"args": ["simple", "linux", ["code"]],
+					"ok": true
+				},
+				{
+					"op": "set_apps",
+					"args": ["simple", "beos", ["x"]],
+					"ok": false,
+					"reason": "preset_invalid_apps"
+				},
+				{
+					"op": "set_apps",
+					"args": ["simple", "linux", [""]],
+					"ok": false,
+					"reason": "preset_invalid_apps"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams"]
+		}
+	],
+	"plans": [
+		{
+			"id": "vscode_on_windows",
+			"preset": "vscode",
+			"os": "windows",
+			"images_dir": "C:\\lib",
+			"separator": "\\",
+			"expect": {
+				"keep_awake": true,
+				"auto_click": true,
+				"allowed_apps": ["Code.exe", "Code - Insiders.exe"],
+				"templates": 0,
+				"text_targets": 1
+			}
+		},
+		{
+			"id": "simple_on_linux",
+			"preset": "simple",
+			"os": "linux",
+			"images_dir": "/lib",
+			"separator": "/",
+			"expect": {
+				"keep_awake": true,
+				"auto_click": false,
+				"allowed_apps": [],
+				"templates": 0,
+				"text_targets": 0
+			}
+		}
+	]
+}
