@@ -77,7 +77,6 @@ _BBCA_Case(Mode) {
 	global _LLM_Remote_Async, _LLM_Remote_BackboardAssistants, _LLM_Remote_PostBodyFn, _LLM_Remote_BackboardExchanges
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	PreviousCritical := Critical("On")
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map()
 	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN",
@@ -91,7 +90,6 @@ _BBCA_Case(Mode) {
 	try {
 		AssertFalse(SavedLogger.FlushActive)
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		LoggerSetTestSink(_BBCA_Log.Bind(State))
 		_LLM_Remote_Async := Map(), _LLM_Remote_BackboardAssistants := Map(), _LLM_Remote_BackboardExchanges := Map()

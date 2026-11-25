@@ -132,7 +132,6 @@ _HGTP_Case(Mode) {
 	global _ReadPersonalTomlCache, _HS_GrandTotalCache, _PersonalTomlReadGeneration, _HSResolveGen
 	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HotstringGroupConfig, _HotstringExtensionPacks
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _HealthCheckLastError, _HealthCheckErrCount, _HealthCheckWarnCount, _ED_Policy, _ED_Busy, _ED_PendingRecord
 	global _TomlUnreadableFiles, _FLAT_HOTSTRING_V1_CATS, _V1CatToV2CatMap, _LegacyTopCategoryMap
 	static Sequence := 0
@@ -168,7 +167,6 @@ _HGTP_Case(Mode) {
 	PreviousCritical := A_IsCritical
 	try {
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := "", _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		_ED_Policy := 0
 		_TomlFileCache := Map(), _TomlFileSectionCounts := Map(), _TomlCountCache := Map(), HotstringGroupConfig := Map()

@@ -120,7 +120,6 @@ _PTRP_Case(Mode) {
 	global ScriptInformation, _ReadPersonalTomlCache, _HS_GrandTotalCache, _TomlUnreadableFiles
 	global _PersonalTomlReadGeneration, _HealthCheckWarnCount
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	static Sequence := 0
 	AssertFalse(A_IsSuspended)
 	AssertEqual(0, _LOGGER_TEST_SINK, "the fixture cannot replace a foreign observer")
@@ -141,7 +140,6 @@ _PTRP_Case(Mode) {
 		ScriptInformation["PersonalTomlPath"] := Path
 		_ReadPersonalTomlCache := false
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false
 		_LOGGER_PATH_DATE := ""
 		Critical("Off")

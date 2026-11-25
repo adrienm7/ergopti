@@ -108,7 +108,7 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 _WPMZ_Canon() {
 	global _SharedDir, _TimingsCache, _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
-	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING, LOGGER_SUB_FILES
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError
 	AssertFalse(_LOGGER_FLUSH_ACTIVE, "An active foreign logger flush cannot be parked")
 	LoggerState := _TLOG_CaptureLoggerState()
@@ -125,7 +125,6 @@ _WPMZ_Canon() {
 	try {
 		_ResetLogger()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
-		_LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map(), LOGGER_SUB_FILES := []
 		_ParseTomlCache := Map(), _TomlReadFailures := Map(), _TomlUnreadableFiles := Map()
 		TimingsLoadShared(_SharedDir)
 		WindowMs := TimingsGet("keystats", "wpm_window_ms")

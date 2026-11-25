@@ -32,7 +32,7 @@ class _OFEP_Fixture {
 	Setup() {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
 		global _LLM_ManagedBootstrap
-		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
 		global DRIVER_BASELINE_PRIORITY_CLASS
 		AssertFalse(IsObject(_LLM_ManagedBootstrap), "the fixture cannot cancel a foreign managed bootstrap")
 		AssertEqual(0, _LOGGER_TEST_SINK, "the fixture cannot replace another active logger observer")
@@ -52,7 +52,6 @@ class _OFEP_Fixture {
 		this.Prepared := true
 		DRIVER_BASELINE_PRIORITY_CLASS := this.Baseline
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false
 		_LLM_Deps_State := "pending"
 		_LLM_Deps_Checking := true

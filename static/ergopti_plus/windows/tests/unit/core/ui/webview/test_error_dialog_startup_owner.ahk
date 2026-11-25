@@ -52,7 +52,7 @@ _EDOT_Source(Root, LogOpeners := false) {
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included vendor " . Vendor) . ")`n"
 	}
-	for Symbol in ["AppDirsFolderName", "WindowTitle", "LoggerSubFilesData", "UpdateChannelRegistryData", "UpdateScheduleData"] {
+	for Symbol in ["AppDirsFolderName", "WindowTitle", "UpdateChannelRegistryData", "UpdateScheduleData"] {
 		Source .= "#Include " . _EDOT_Generated(Symbol) . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included generated " . Symbol) . ")`n"
 	}

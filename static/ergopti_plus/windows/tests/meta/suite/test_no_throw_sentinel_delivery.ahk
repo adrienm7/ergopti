@@ -60,7 +60,6 @@ _AMSG_MetaCallback(Callback) {
 
 _AMSG_Vectors := [
 	["text sender containment", _TSSIF_AdapterMethodsContainSendInputFailure, TextEraseChars],
-	["logger fanout", TestLogger_FanOutQueueSurvivesFlushSwap, _LoggerFanOut],
 	["remote trim", _RemoteTrimRegistry_DetachesBeforeReentrantCallback, _LLMRemote_TrimAsyncRegistry],
 	["Ollama trim", _OllamaTrimRegistry_DetachesBeforeReentrantCallback, _LLM_Ollama_TrimAsyncRegistry],
 	["LLM containment", _AMSG_MetaCallback.Bind(_LCS_ThrowingCallbackIsLoggedNotSwallowed), _LLM_InvokeCallback],

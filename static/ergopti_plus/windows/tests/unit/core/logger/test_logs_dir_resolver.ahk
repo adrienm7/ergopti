@@ -156,7 +156,6 @@ Test("logs folder: pre-boot lines go to the default logs folder, not beside path
 ; ================================
 
 _LDIR_OpenerScope(Callback) {
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
 	global _LOGGER_REPEAT_ENABLED, _LOGGER_TEST_SINK, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	AssertEqual(0, _LOGGER_APPEND_DEBTS.Count, "Foreign native append debt cannot be parked")
 	AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count, "A foreign native repair cannot be parked")
@@ -164,7 +163,6 @@ _LDIR_OpenerScope(Callback) {
 	Saved := _TLOG_CaptureLoggerState(), Repeat := _LOGGER_REPEAT_ENABLED, Sink := _LOGGER_TEST_SINK
 	try {
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_TEST_SINK := 0
 		Callback.Call()
 	} finally {

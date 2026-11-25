@@ -130,7 +130,6 @@ _MNV_Check(World, Result) {
 
 _MNV_Case(Mode) {
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
 	PreviousCritical := Critical("On")
 	try {
@@ -144,7 +143,6 @@ _MNV_Case(Mode) {
 		Primary := 0, Cleanup := 0
 		try {
 			_ResetLogger()
-			LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 			_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 			KLWV.windows := Map(), KLWV.warm_hosts := Map(), KLWV.retiring := Map(), KLWV.epoch := World.Epoch
 			KLWV.first_paint_timer_fn := _MNV_RecordTimer.Bind(World)

@@ -34,7 +34,7 @@ _HCPE_Case(Mode) {
 	global _DriverDir, _VendorDir, _SharedDir, _HC_ProbeRun
 	global HC_PROBE_USER_AGENT
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
-	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING, LOGGER_SUB_FILES
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _ED_Busy, _ED_PendingRecord, _ED_Policy
 	global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError
 	static RetirementDebt := 0
@@ -60,7 +60,6 @@ _HCPE_Case(Mode) {
 		_ResetLogger()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
-		_LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map(), LOGGER_SUB_FILES := []
 		_ED_Policy := 0
 		_HC_ProbeRun := Run
 		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",

@@ -866,7 +866,6 @@ _HSCI_EnsureWriteCallout(Mode) {
 	global _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources
 	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _HealthCheckWarnCount
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	AssertEqual(0, _LOGGER_TEST_SINK, "a foreign log observer cannot be detached")
 	LoggerState := _TLOG_CaptureLoggerState()
 	AssertFalse(LoggerState.FlushActive)
@@ -950,7 +949,6 @@ _HSCI_EnsureWriteCallout(Mode) {
 		OwnedWriter.DefineProp("Call", {Call: ObserveOwned})
 		InstalledOwned := true
 		_ResetLogger()
-		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
 		LoggerSetTestSink(OnLog)
 		_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()

@@ -48,7 +48,6 @@ _TestResultsBeginRun()
 #Include ../core/text/engine/json.ahk
 #Include ../core/text/engine/number.ahk
 #Include ../core/logger/engine/wall_clock.ahk
-#Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk

@@ -935,7 +935,7 @@ _LATRT_Case(Cancel, AliasMode := "") {
     global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_ThinkingRefused
     global STORAGE_REG_BASE, LLM_API_TEST_TIMEOUT_MS
     global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
-    global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_FLUSH_ACTIVE
+    global _LOGGER_FLUSH_ACTIVE
     global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError, _LATRT_Debt
     if !_LATRT_DrainDebt()
         throw Error("An earlier exact thinking-retry fixture still owns retirement debt.")
@@ -972,7 +972,6 @@ _LATRT_Case(Cancel, AliasMode := "") {
         LLM_API_TEST_TIMEOUT_MS := 20000
         _ResetLogger()
         _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
-        LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
         LoggerSetTestSink(_LATRT_Sink.Bind(State))
 
         PeerScript := _DriverDir . "\tests\fixtures\llm_thinking_retry_peer.ps1"

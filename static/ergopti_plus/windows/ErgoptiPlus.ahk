@@ -156,10 +156,10 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 		; been invisible to three audits: the one event that proves it happened
 		; was unwritable by construction.
 		;
-		; Calling LoggerInit() here instead would be worse. It runs
-		; _LoggerInitSubFiles, which DELETES any sub-file whose mtime is a
-		; previous day — so a yielding instance would destroy the LIVE owner's
-		; gestures/layout/tray sub-logs on its way out.
+		; Calling LoggerInit() here instead would be worse. It runs the
+		; retention purge, which DELETES files in the logs folder the LIVE
+		; owner is writing to — a yielding instance must leave that folder to
+		; its owner on its way out.
 		;
 		; LoggerAppendBootstrapLine writes to bootstrap.log in the default logs
 		; folder, which needs nothing but %LOCALAPPDATA%: it is reachable before
@@ -363,10 +363,6 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
-; Generated sub-file routing table, included before the logger that calls it.
-; It defines a FUNCTION rather than a global, so this ordering is a convenience
-; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
-#Include _generated/logger_sub_files.ahk
 ; Application folder, logs folder and log file names, generated from
 ; _shared/core/fs/data/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
@@ -1674,8 +1670,6 @@ if (_DriverStartupSmokeDir != "") {
 						. " append_repairs=" . _StartupSmokeLoggerRefusal["append_repairs"]
 						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
 						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
-						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
-						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"]
 						. " last_append_failure=" . _StartupSmokeLoggerRefusal["last_append_failure"] . "`n",
 						"*", "UTF-8-RAW")
 				throw Error("The startup smoke could not make its diagnostic logs durable.")

@@ -61,7 +61,7 @@ _UHLT_Source(Root) {
 	KeyOwner := _DriverDir . "\_generated\config_keys.ahk"
 	AssertTrue(FileExist(KeyOwner), "The logger must load its real generated configuration key classes.")
 	Source .= "#Include " . KeyOwner . "`n"
-	for Symbol in ["AppDirsFolderName", "LoggerSubFilesData"]
+	for Symbol in ["AppDirsFolderName"]
 		Source .= "#Include " . _UHLT_Generated(Symbol) . "`n"
 	; The worker poll reads its period from the staged copy of the real registry.
 	Source .= "TimingsLoadShared()`n"
