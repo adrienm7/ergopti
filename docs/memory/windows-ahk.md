@@ -307,7 +307,13 @@ unzip or other dropper-like stage in the compiled exe; do the work in process
 (GDI+, `DllCall`) or in a bundled `-File` worker. `tools/ci/windows-exe-av-surface.json`
 gates the built exe; lower a ceiling when a launcher goes, and never raise one
 without a reason in the commit. Reputation comes only from signing (SignPath).
-The bundle's `Add-Type` count is textual: a comment or an `-AssemblyName`
+The compiled script carries code and strings, not comments or `#Include`
+lines, so a comment mentioning `SendInput` costs nothing while an identifier
+does; `test-windows-exe-av-surface.cjs` replays every script ceiling on the
+sources stripped that way. Build every PowerShell argv with
+`ShellRunner_WinPsArgs`, `ShellRunner_WinPsArgv` or `ShellRunner_WinPsHiddenArgs`
+(`core/process/adapters/shell_runner.ahk`), the only spelling of the
+execution-policy and hidden-window pairs. The bundle's `Add-Type` count is textual: a comment or an `-AssemblyName`
 load counts like a compile. Load a framework assembly by strong name
 (`[Reflection.Assembly]::Load`), a prebuilt file with `LoadFrom`, and compile
 new worker C# at build time like `tools/build/build_windows_screen_vision.ps1`

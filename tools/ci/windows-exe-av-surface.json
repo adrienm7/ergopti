@@ -19,10 +19,10 @@
 			"download_api": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 15 },
-			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 2 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 1 },
 			"elevated_run": { "pattern": "\\*RunAs", "max": 3 },
-			"powershell_mentions": { "pattern": "powershell", "max": 46 },
+			"powershell_mentions": { "pattern": "powershell", "max": 44 },
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
 			"key_state_polling": {
 				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
@@ -32,7 +32,7 @@
 				"pattern": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
 				"max": 3
 			},
-			"send_input_api": { "pattern": "SendInput", "max": 123 },
+			"send_input_api": { "pattern": "SendInput", "max": 73 },
 			"script_host": { "pattern": "WScript|cscript|mshta", "max": 2 },
 			"elevation_wording": {
 				"pattern": "RunAs|requireAdministrator|highestAvailable|\\bUAC\\b",

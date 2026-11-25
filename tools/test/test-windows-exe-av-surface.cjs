@@ -428,34 +428,48 @@ assert.deepEqual(
 	'the tracked bundle selection stays under every bundle ceiling'
 );
 
-// 13. The shipped AutoHotkey sources hold the script surface that names a
-// Win32 API before any Windows build. Ahk2Exe embeds them without comments,
-// so with comments stripped an API name counts as in the compiled script: the
-// e14155d93f6 build failed when the owner-drawn tray menu added a BitBlt.
+// 13. The shipped AutoHotkey sources hold every script ceiling before any
+// Windows build. Ahk2Exe embeds them without comments and resolves #Include
+// lines, so with both stripped a string counts as in the compiled script: the
+// e14155d93f6 build failed when the owner-drawn tray menu added a BitBlt, and
+// the 2026-11-25 dev build when two hidden PowerShell workers and the workflow
+// shortcut parser raised the policy, window-style and SendInput counts. A
+// block comment may close at the end of its opening line (`/** ... */`).
 const stripAhkComments = (text) =>
 	text
-		.replace(/^\s*\/\*[\s\S]*?^\s*\*\//gm, '')
+		.replace(/^\s*\/\*[\s\S]*?(?:^\s*\*\/|\*\/[ \t]*$)/gm, '')
 		.split('\n')
-		.map((line) => line.replace(/(^|\s);.*$/, ''))
+		.map((line) => (/^\s*#Include\b/i.test(line) ? '' : line.replace(/(^|\s);.*$/, '')))
 		.join('\n');
+assert.equal(
+	stripAhkComments('/** doc */\nA := "-File"\n/*\nB := 1\n*/\n#Include x.ahk\nC := 2 ; note\n'),
+	'\nA := "-File"\n\n\nC := 2\n',
+	'one-line doc blocks end on their line, #Include lines and comments are dropped'
+);
 const shippedScript = readSourceFiles(path.join(root, 'static/ergopti_plus/windows'))
 	.map((file) => stripAhkComments(file.text))
 	.join('\n');
 assert.ok(shippedScript.length > 0, 'the shipped Windows sources are read');
-const apiSurface = {
-	forbidden: policy.script.forbidden,
-	ceilings: Object.fromEntries(
-		['keyboard_hook_api', 'clipboard_listener', 'screen_capture_api'].map((id) => {
-			assert.ok(policy.script.ceilings[id], `the script policy caps ${id}`);
-			return [id, policy.script.ceilings[id]];
-		})
-	)
-};
 assert.deepEqual(
-	checkSection('sources', shippedScript, apiSurface).errors,
+	checkSection('sources', shippedScript, {
+		forbidden: policy.script.forbidden,
+		ceilings: policy.script.ceilings
+	}).errors,
 	[],
-	'the shipped Windows sources stay under every script API ceiling'
+	'the shipped Windows sources stay under every script ceiling'
 );
+// Every PowerShell stage takes its policy and hidden-window switches from the
+// shell runner's argv builders, so each pair is spelled once.
+for (const id of ['powershell_policy_bypass', 'hidden_window_style']) {
+	const files = readSourceFiles(path.join(root, 'static/ergopti_plus/windows')).filter((file) =>
+		new RegExp(policy.script.ceilings[id].pattern, 'i').test(stripAhkComments(file.text))
+	);
+	assert.deepEqual(
+		files.map((file) => file.name),
+		['core/process/adapters/shell_runner.ahk'],
+		`${id} is spelled only by the shell runner's argv builders`
+	);
+}
 
 // 14. The screen vision worker compiles nothing at run time: it loads the
 // assembly tools/build/build_windows_screen_vision.ps1 compiles at build time,
