@@ -16,7 +16,9 @@
  * 4. buttons send action names only, never a path, a text or a URL;
  * 5. errors folded into the window are counted; action results reach the
  *    status line; the Linux bridge response reaches the same entry point;
- * 6. every label the page asks for exists in every locale.
+ * 6. every label the page asks for exists in every locale;
+ * 7. the Windows host without WebView2 keeps the error on screen in a modal
+ *    box naming the errors file, never in a transient notification.
  * ==============================================================================
  */
 
@@ -291,6 +293,40 @@ const ERROR = {
 	// The logical side, so a right-to-left window mirrors it (PCK-22).
 	if (!/#btn-close\s*\{[^}]*margin-inline-end:\s*auto/.test(css))
 		fail('Close must stand alone at the start (margin-inline-end: auto)');
+}
+
+{
+	// The Windows host without WebView2 (error-dialog-no-webview). A TrayTip
+	// was the only trace of the error: gone in seconds, never in the history.
+	// Both refusals now keep it on screen in a modal box naming the errors file.
+	const host = fs
+		.readFileSync(
+			path.join(SHARED, '..', 'windows', 'diagnostics', 'ui', 'error_dialog.ahk'),
+			'utf8'
+		)
+		.split('\n')
+		.filter((line) => !/^\s*;/.test(line))
+		.join('\n');
+	const body = (name) => {
+		const start = host.search(new RegExp(`^${name}\\(`, 'm'));
+		if (start < 0) return '';
+		const from = host.indexOf('\n', start) + 1;
+		const next = host.slice(from).search(/^[A-Za-z_][A-Za-z0-9_]*\([^\n]*\)\s*\{\s*$/m);
+		return next < 0 ? host.slice(start) : host.slice(start, from + next);
+	};
+	const open = body('_ErrorDialog_Open');
+	const announce = body('_ErrorDialog_AnnounceWithoutWindow');
+	if (!open) fail('the Windows error window opener is not readable');
+	if (/\bNotifierSend\s*\(/.test(open))
+		fail('a missing WebView2 must not leave the error to a transient notification');
+	if ((open.match(/_ErrorDialog_AnnounceWithoutWindow\(/g) || []).length !== 2)
+		fail('both WebView2 refusals must keep the error on screen');
+	if (
+		!/\bUi_MsgBox\(/.test(announce) ||
+		!announce.includes('"error_dialog.logged_in"') ||
+		!announce.includes('"log_path"')
+	)
+		fail('the error must stay in a modal box that names its errors file');
 }
 
 if (failures.length > 0) {

@@ -25,7 +25,8 @@
 ;    diagnostics window's own actions (HealthCheck_PerformAction), which redact
 ;    again before anything leaves the machine.
 ; 5. One window at a time, bound to an epoch: a late message of a closed window
-;    is inert. Without WebView2 the error is announced by a notification.
+;    is inert. Without WebView2 the error stays on screen in a message box
+;    that names the errors file: a notification vanishes and loses it.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -324,6 +325,22 @@ _ErrorDialog_Present(Record) {
 	; Opening owns its failure cleanup; this frame must never free a successor.
 	_ErrorDialog_Open(Record)
 }
+; Keeps an error on screen when its window cannot open: a notification
+; vanishes after a few seconds and the error would be lost. A modal box names
+; the error and the errors file that holds it, until the user closes it.
+; @param Record {Map} { kind, module, message, time }
+; @param Fields {Map} The report built for the window; its log_path is today's errors file.
+; @param Reason {String} Why the window cannot open, for the log.
+; @returns {String} The message box's answer.
+_ErrorDialog_AnnounceWithoutWindow(Record, Fields, Reason) {
+	Text := t("error_dialog.heading") . "`n`n" . Record["message"]
+	LogPath := (Fields is Map) ? Fields.Get("log_path", "") : ""
+	if (LogPath != "")
+		Text .= "`n`n" . StrReplace(t("error_dialog.logged_in"), "%s", LogPath)
+	LoggerWarn("ErrorDialog", "The error window cannot open ({1}); the error is shown in a message box.", Reason)
+	return Ui_MsgBox(Text, t("common.error_title"), "Iconx")
+}
+
 ; Keep native title construction independently testable without reporting a real error.
 _ErrorDialog_NewWindow() {
 	return Gui_Create("+Resize +MinSize440x320", t("common.error_title"))
@@ -360,18 +377,12 @@ _ErrorDialog_Open(Record) {
 		if !_ErrorDialog_IsCurrent(Epoch)
 			return false
 		; Free RAM never decides: only a missing or refused WebView2 does. The
-		; error then stays visible as a notification, not as a native window.
+		; error then stays on screen in a message box, not in a native window.
 		Unavailable := WebView_UnavailableReason()
 		if !_ErrorDialog_IsCurrent(Epoch)
 			return false
 		if (Unavailable != "") {
-			Heading := t("error_dialog.heading")
-			if !_ErrorDialog_IsCurrent(Epoch)
-				return false
-			NotifierSend(Heading . "`n`n" . Record["message"], Map("level", "error"))
-			if _ErrorDialog_IsCurrent(Epoch)
-				LoggerWarn("ErrorDialog", "WebView2 is unavailable ({1}); the error was announced by a notification.",
-					Unavailable)
+			_ErrorDialog_AnnounceWithoutWindow(Record, Fields, Unavailable)
 			return false
 		}
 		G := _ErrorDialog_NewWindow()
@@ -424,6 +435,9 @@ _ErrorDialog_Open(Record) {
 		catch as Err {
 			Primary := Err
 			LoggerError("ErrorDialog", "WebView2 could not be created for the error window: {1}", Err.Message)
+			; The empty host must not stand behind the message box.
+			try G.Hide()
+			_ErrorDialog_AnnounceWithoutWindow(Record, Fields, Err.Message)
 			return false
 		}
 		; Until publication, this stack alone owns the returned controller, even if stale.

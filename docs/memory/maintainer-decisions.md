@@ -1619,11 +1619,13 @@ Native UI that is the only UI by design stays: tray menus, native message and
 input boxes, file and folder pickers, the keyboard-slot ListBox, the bundled
 apps' windows, the tooltips and the WPM widget, the API-test progress window
 and the fatal pre-boot modal. The error window, which reports a crash, still
-announces the error through a notification when WebView2 cannot open: it is
-not a window and the error must not be lost. macOS (Hammerspoon `hs.webview`, always present)
-and Linux (WebKitGTK webview manager, which names the missing component in a
-notice, and writes the diagnostics report to an HTML file opened in the
-browser, when it is absent) have no native duplicate of a WebView page. Do not bring a native
+announces the error when WebView2 cannot open, in a native message box that
+names the errors file (`_ErrorDialog_AnnounceWithoutWindow`, 2026-11-25): it
+is not a window substitute, and a notification vanished with the error. macOS
+(Hammerspoon `hs.webview`, always present) and Linux (WebKitGTK webview
+manager, which names the missing component in a notice, and writes the
+diagnostics report to an HTML file opened in the browser, when it is absent)
+have no native duplicate of a WebView page. Do not bring a native
 substitute back for a WebView window.
 
 ## Metrics rows store UTC and their recorded offset (2026-11-11)
