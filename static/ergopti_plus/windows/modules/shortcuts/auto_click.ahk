@@ -193,9 +193,9 @@ _MI_BuildKeepAwakeMenu() {
 	return MenuRenderer_Build("keep_awake_menu", "Anti-veille", "", "", Map(
 		"keep_awake_presets", (*) => AutoClickPresetRows(),
 		"keep_awake_status", (*) => AutoClickStatusRows()), Map(
-		"keep_awake_switch", _AutoClickToggleSwitch.Bind("keep_awake"),
-		"keep_awake_auto_click", _AutoClickToggleSwitch.Bind("auto_click"),
-		"keep_awake_library", KeepAwakeLibraryOpen), Map(
+		MenuCommand.KEEP_AWAKE_SWITCH, _AutoClickToggleSwitch.Bind("keep_awake"),
+		MenuCommand.KEEP_AWAKE_AUTO_CLICK, _AutoClickToggleSwitch.Bind("auto_click"),
+		MenuCommand.KEEP_AWAKE_LIBRARY, KeepAwakeLibraryOpen), Map(
 		"keep_awake_switch_on", _AutoClickSwitchOn.Bind("keep_awake"),
 		"keep_awake_auto_click_on", _AutoClickSwitchOn.Bind("auto_click"),
 		"keep_awake_auto_click_available", (*) => true))

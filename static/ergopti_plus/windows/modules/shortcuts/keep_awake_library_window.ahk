@@ -80,6 +80,7 @@ _KALData() {
 
 ; Opens the window, or focuses the open one (the « Anti-veille » menu row).
 KeepAwakeLibraryOpen(*) {
+	; config-key-literal-ok: the window's app id in apps.manifest.json, named like the menu row
 	Host := WebViewHost.TryOpen("keep_awake_library", Map("RunsWhilePaused", true,
 		"OnMessage", (H, Message) => _KALMessage(H, Message)))
 	if !IsObject(Host) {

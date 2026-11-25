@@ -32,7 +32,7 @@ local M = {}
 local LOG = "keep_awake.library_window"
 
 --- The window's app id in apps.manifest.json and its bridge name.
-M.APP_ID = "keep_awake_library"
+M.APP_ID = "keep_awake_library" -- config-key-literal-ok: the app id, named like the menu row
 M.BRIDGE = "hsKeepAwake"
 
 local PNG_SIGNATURE = "\137PNG\r\n\26\n"
