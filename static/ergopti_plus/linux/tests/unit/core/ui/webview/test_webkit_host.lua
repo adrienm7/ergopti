@@ -87,7 +87,7 @@ helpers.describe("core.ui.ui.webkit_host", function()
         duplicate[#duplicate + 1] = name == "physical_shortcuts_bridge" and "healthcheck" or name
       end
       helpers.assert_true(not exact_bridge_registry(missing))
-      helpers.assert_eq(#duplicate, 22)
+      helpers.assert_eq(#duplicate, 23)
       helpers.assert_true(not exact_bridge_registry(duplicate))
       duplicate[1] = "foreign_bridge"
       helpers.assert_true(not exact_bridge_registry(duplicate))
