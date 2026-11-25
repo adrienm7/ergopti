@@ -158,6 +158,8 @@ local function scenario(options, body)
 			keyboard_hook = { held_modifiers = function() return {} end, held_modifier_role = function() return false end },
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
 			input_capture_gate = gate,
+			-- Main delegates the committed expansion's follow-up to its own owner.
+			CommitFollowup = require("hotstrings.engine.commit_followup"),
 			MagicKey = { get = function() return "★" end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
 			wrap_on_type = { on_key = function() return false end, end_selection_window = function() return true end },
