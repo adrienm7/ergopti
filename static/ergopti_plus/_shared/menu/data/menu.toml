@@ -5626,6 +5626,16 @@ reason_key = "platform_reason.component_status_rows_are_linux"
 
 [[menu.linux_component_problems]]
 type = "command"
+id = "component_problem_gnome_focus_extension"
+i18n = "startup.linux_gnome_extension_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
 id = "component_problem_ergopti_layout_install_failed"
 i18n = "layouts.linux_ergopti_install_failed_label"
 caption_getter = "linux_component_health_dot"

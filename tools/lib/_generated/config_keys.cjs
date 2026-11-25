@@ -390,6 +390,7 @@ module.exports = Object.freeze({
 		COMPONENT_PROBLEM_ERGOPTI_LAYOUT_ACTIVATE_FAILED: "component_problem_ergopti_layout_activate_failed",
 		COMPONENT_PROBLEM_ERGOPTI_LAYOUT_INSTALL_FAILED: "component_problem_ergopti_layout_install_failed",
 		COMPONENT_PROBLEM_ERGOPTI_LAYOUT_UNINSTALL_FAILED: "component_problem_ergopti_layout_uninstall_failed",
+		COMPONENT_PROBLEM_GNOME_FOCUS_EXTENSION: "component_problem_gnome_focus_extension",
 		COMPONENT_PROBLEM_KWIN_FOCUS_SCRIPT: "component_problem_kwin_focus_script",
 		COMPONENT_PROBLEM_LAYOUT_UNRESOLVED: "component_problem_layout_unresolved",
 		COMPONENT_PROBLEM_WINDOWS_LGI: "component_problem_windows_lgi",

@@ -37,6 +37,26 @@ M.MAX_CLASS_BYTES = 256
 M.MAX_TITLE_BYTES = 2048
 -- Bounds every synchronous bus call the worker makes.
 M.CALL_TIMEOUT_MS = 500
+-- The GNOME Shell extension's identity, as GNOME Shell's Extensions interface
+-- names it; pinned to the shipped metadata.json and the installer by
+-- tests/unit/platform/focus/compositor_focus/test_assets.lua.
+M.GNOME_EXTENSION_UUID = require("core.text.engine.identifiers").linux_desktop.gnome_extension_uuid
+-- What the GNOME worker can say of the extension (an "extension" record).
+M.EXTENSION_STATES = { active = true, inactive = true, error = true, out_of_date = true, absent = true,
+	unanswered = true, unknown = true }
+-- Why no focus report arrives from GNOME Shell, for the log; the tray's
+-- localized text is platform/focus/text_automation_status.lua's.
+M.EXTENSION_HINTS = {
+	absent = "GNOME Shell has not loaded the extension " .. M.GNOME_EXTENSION_UUID
+		.. ": log out and back in after an install, otherwise reinstall Ergopti+ outside Flatpak",
+	inactive = "the extension is installed but disabled: enable it in the Extensions app or with "
+		.. "'gnome-extensions enable " .. M.GNOME_EXTENSION_UUID .. "'",
+	out_of_date = "GNOME Shell refuses the extension for this Shell version: update Ergopti+, then log out and back in",
+	error = "GNOME Shell failed to load the extension: 'gnome-extensions info " .. M.GNOME_EXTENSION_UUID
+		.. "' and the gnome-shell journal name the error",
+	silent = "GNOME Shell sent no report although its name was taken: log out and back in so the Shell "
+		.. "loads the installed extension",
+}
 
 local LOG = "platform.focus.compositor_focus"
 local OWNER = "compositor-focus"
@@ -101,6 +121,12 @@ function M.parse_record(record)
 		if type(record.loaded) ~= "boolean" or type(record.answered) ~= "boolean" then return nil end
 		return "script", { loaded = record.loaded, answered = record.answered }
 	end
+	-- GNOME only: the extension's state as GNOME Shell answered, at start
+	-- (silent false) and once more after the silence bound (silent true).
+	if record.kind == "extension" then
+		if not M.EXTENSION_STATES[record.state] or type(record.silent) ~= "boolean" then return nil end
+		return "extension", { state = record.state, silent = record.silent }
+	end
 	if record.kind ~= "focus" then return nil end
 	if type(record.class) ~= "string" or type(record.title) ~= "string"
 		or type(record.id) ~= "string" or record.id == "" then return nil end
@@ -117,6 +143,20 @@ end
 -- ======= 3/ Source ===================
 -- =====================================
 -- =====================================
+
+--- Names why GNOME Shell sends no focus report, from what the worker learnt.
+--- @param state string|nil The extension's last reported state.
+--- @param silent boolean True once the silence bound passed with no report.
+--- @param reported boolean True once a report (focus or clear) arrived.
+--- @return string|nil "absent", "inactive", "out_of_date", "error", "silent",
+---   or nil when reports arrive or may still arrive.
+function M.extension_problem(state, silent, reported)
+	if reported or state == nil then return nil end
+	if state == "absent" or state == "inactive" or state == "out_of_date" or state == "error" then return state end
+	-- Active, unanswered or unknown: only the silence bound proves a problem.
+	if silent then return "silent" end
+	return nil
+end
 
 --- Creates the focus source for one desktop family.
 --- @param options table { family = "gnome"|"kde"|"cosmic", start_process?, command?, decode? }
@@ -138,8 +178,12 @@ function M.new(options)
 			return executable, { Paths.driver_root() .. "/platform/focus/cosmic_toplevel_worker.lua",
 				soname, tostring(uv.os_getpid()), shared_lua }, Paths.driver_root()
 		end
+		-- How long the worker waits for the extension's first report before it
+		-- asks GNOME Shell again for its state. Read here, not in the worker,
+		-- which loads this module without the daemon's logger.
+		local silence_ms = require("core.timing.engine.timings").ms("adapters", "desktop_focus_silence_ms")
 		return executable, { Paths.driver_root() .. "/platform/focus/compositor_focus_worker.lua",
-			M.SERVICES[family], tostring(uv.os_getpid()), shared_lua }, Paths.driver_root()
+			M.SERVICES[family], tostring(uv.os_getpid()), shared_lua, tostring(silence_ms) }, Paths.driver_root()
 	end
 
 	local source = {}
@@ -149,6 +193,9 @@ function M.new(options)
 	local current = nil
 	-- KWin only: "loaded", "not_loaded", "unanswered", nil before the worker says.
 	local script = nil
+	-- GNOME only: the extension's last reported state, whether the silence
+	-- bound passed, whether any report arrived, and the problem the log named.
+	local extension, silent, reported, diagnosed = nil, false, false, nil
 
 	local function fail(reason)
 		if status == "failed" or status == "stopped" then return end
@@ -182,6 +229,26 @@ function M.new(options)
 					.. "System Settings > Window Management > KWin Scripts.", script)
 			end
 			return
+		end
+		if kind == "extension" then
+			if family ~= "gnome" then fail("extension record off GNOME"); return end
+			extension, silent = window.state, silent or window.silent
+			local problem = M.extension_problem(extension, silent, reported)
+			if problem and problem ~= diagnosed then
+				diagnosed = problem
+				Logger.warn(LOG, "GNOME Shell's Ergopti focus extension sends no focus report (%s, state %s): %s. "
+					.. "Per-application rules, the password-app list and the layout switch stay inactive until it does.",
+					problem, extension, M.EXTENSION_HINTS[problem])
+			elseif not problem then
+				Logger.info(LOG, "GNOME Shell reports the Ergopti focus extension %s.", extension)
+			end
+			return
+		end
+		reported = true
+		if diagnosed then
+			-- Pairs the diagnosis line: the problem the tray names is gone.
+			Logger.info(LOG, "GNOME Shell's Ergopti focus extension reports focus again (after %s).", diagnosed)
+			diagnosed = nil
 		end
 		current = window
 	end
@@ -242,6 +309,15 @@ function M.new(options)
 	--- @return string|nil "loaded", "not_loaded", "unanswered"; nil when not
 	--- yet known or for another desktop.
 	function source.script_state() return script end
+
+	--- Why GNOME Shell sends no focus report, as the worker found it.
+	--- @return string|nil "absent", "inactive", "out_of_date", "error" or
+	---   "silent"; nil once reports arrive, while they may still arrive, or
+	---   for another desktop.
+	function source.extension_problem()
+		if status ~= "ready" then return nil end
+		return M.extension_problem(extension, silent, reported)
+	end
 
 	--- The desktop family this source serves.
 	--- @return string

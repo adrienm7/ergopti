@@ -3730,6 +3730,11 @@ local function main()
 				TextAutomationStatus.check_desktop_focus(window_info.compositor_script_state())
 			end)
 		end
+		if window_info and type(window_info.compositor_extension_problem) == "function" then
+			RuntimeGuard.call("desktop focus extension notice", function()
+				TextAutomationStatus.check_focus_extension(window_info.compositor_extension_problem)
+			end)
+		end
 		if file_watchers then
 			local owner = file_watchers
 			local function retire()

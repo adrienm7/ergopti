@@ -22,7 +22,7 @@ local PROBLEM = { code = "windows_lgi", title = "Ergopti+ needs a component",
 -- 2026-11-25): its problem reached the log only, each tray build saying it
 -- had no row. Whole literal codes are also read from their reporters below.
 local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "kwin_focus_script",
-	"ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
+	"gnome_focus_extension", "ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
 
 -- The reporters whose codes are whole literals, read for the codes above.
 local LITERAL_REPORTERS = { "platform.focus.text_automation_status", "ergopti_hotstrings" }

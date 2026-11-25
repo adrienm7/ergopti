@@ -49,6 +49,16 @@ M.NOTICES = {
 		body = "startup.linux_text_reason_window_policy_failed" },
 }
 
+-- What the tray says of each reason GNOME Shell sends no focus report
+-- (compositor_focus.extension_problem): what to do differs for each.
+M.EXTENSION_BODIES = {
+	absent = "startup.linux_gnome_extension_body_absent",
+	inactive = "startup.linux_gnome_extension_body_inactive",
+	out_of_date = "startup.linux_gnome_extension_body_out_of_date",
+	error = "startup.linux_gnome_extension_body_error",
+	silent = "startup.linux_gnome_extension_body_silent",
+}
+
 -- What the log says, once per reason and session, when the window mode first
 -- admits text for it. Developer text: the tray row carries the localized one.
 local LOG_HINTS = {
@@ -67,6 +77,9 @@ local _accessibility_reader = nil
 local _mode, _reason, _since_ms = nil, nil, nil
 local _logged = {}
 local _noticed = {}
+-- Whether the GNOME extension's row was shown at the last check, so a
+-- recovery (or a relapse) redraws the tray once.
+local _extension_visible = false
 local _listener = nil
 local _status = nil
 local _say = nil
@@ -191,6 +204,39 @@ function M.check_desktop_focus(script_state)
 	if _listener then _listener() end
 	return true
 end
+--- Names a GNOME Shell that sends no focus report because the Ergopti
+--- extension is missing, disabled, out of date, failed or stale: the focused
+--- application then stays unknown, and the layout switch has no one to ask.
+--- The red row holds while the reader names a problem and leaves the tray
+--- once reports arrive.
+--- @param reader function () -> window_info.compositor_extension_problem().
+--- @return boolean changed True when the tray must be rebuilt.
+function M.check_focus_extension(reader)
+	assert(type(reader) == "function", "the focus extension check needs a problem reader")
+	local problem = reader()
+	local visible = problem ~= nil
+	if not _noticed.gnome_focus_extension then
+		if not visible then return false end
+		local body = M.EXTENSION_BODIES[problem]
+		assert(body, "unknown focus extension problem " .. tostring(problem))
+		_noticed.gnome_focus_extension = true
+		local status = _status or require("core.ui.engine.component_status")
+		local label = say("startup.linux_gnome_extension_label")
+		status.report({
+			code = "gnome_focus_extension",
+			label = label,
+			title = label,
+			body = say(body),
+			active = function() return reader() ~= nil end,
+		})
+	elseif visible == _extension_visible then
+		return false
+	end
+	_extension_visible = visible
+	if _listener then _listener() end
+	return true
+end
+
 
 
 
@@ -223,6 +269,7 @@ end
 function M._reset_for_test()
 	_state_reader, _accessibility_reader, _listener = nil, nil, nil
 	_mode, _reason, _since_ms, _noticed = nil, nil, nil, {}
+	_extension_visible = false
 	_logged, _status, _say = {}, nil, nil
 end
 

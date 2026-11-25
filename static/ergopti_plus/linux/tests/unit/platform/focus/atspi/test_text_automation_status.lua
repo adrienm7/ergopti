@@ -100,6 +100,44 @@ helpers.describe("text automation status", function()
 		helpers.assert_eq(reports[1].body, "<startup.linux_kwin_script_body>")
 	end)
 
+	helpers.it("(gnome-focus-extension) a GNOME Shell without a reporting extension is a red row until it reports", function()
+		local Status, reports = fresh()
+		local redraws = 0
+		Status.set_notice_listener(function() redraws = redraws + 1 end)
+		local problem = nil
+		local reader = function() return problem end
+		helpers.assert_eq(Status.check_focus_extension(reader), false, "nothing to name yet")
+		problem = "inactive"
+		helpers.assert_true(Status.check_focus_extension(reader))
+		helpers.assert_eq(Status.check_focus_extension(reader), false, "named once")
+		helpers.assert_eq(#reports, 1)
+		helpers.assert_eq(reports[1].code, "gnome_focus_extension")
+		helpers.assert_eq(reports[1].title, "<startup.linux_gnome_extension_label>")
+		helpers.assert_eq(reports[1].body, "<startup.linux_gnome_extension_body_inactive>", "what to do for this state")
+		helpers.assert_true(reports[1].active(), "the row holds while the problem does")
+		problem = nil
+		helpers.assert_eq(reports[1].active(), false, "reports arrived: the row leaves the tray")
+		helpers.assert_true(Status.check_focus_extension(reader), "the recovery redraws the tray")
+		helpers.assert_eq(redraws, 2)
+		helpers.assert_eq(Status.check_focus_extension(reader), false)
+		helpers.assert_eq(#reports, 1)
+	end)
+
+	helpers.it("(gnome-focus-extension) every problem has its own localized advice", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		local Status = fresh()
+		local I18n = require("core.i18n.engine.i18n")
+		for problem in pairs(Focus.EXTENSION_HINTS) do
+			local key = Status.EXTENSION_BODIES[problem]
+			helpers.assert_true(type(key) == "string", problem .. " has a body")
+			helpers.assert_true(I18n.get(key) ~= key, key .. " is translated")
+		end
+		for problem in pairs(Status.EXTENSION_BODIES) do
+			helpers.assert_true(Focus.EXTENSION_HINTS[problem] ~= nil, problem .. " has a log hint")
+		end
+		helpers.assert_true(I18n.get("startup.linux_gnome_extension_label") ~= "startup.linux_gnome_extension_label")
+	end)
+
 	package.loaded["core.logger.engine.shim"] = previous_logger
 	package.loaded["platform.focus.text_automation_status"] = nil
 end)

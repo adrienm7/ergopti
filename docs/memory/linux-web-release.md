@@ -292,6 +292,17 @@ closed on ambiguity: every expansion blocked. Measured cost is ~1 ms per node
 against a 1 s probe deadline. Action: keep the search scoped to the active
 window and prove changes with `tests/hardware/run_atspi_focus.sh`.
 
+### project-linux-gnome-focus-extension-state-is-asked
+
+The Ergopti GNOME Shell extension reports the focused window as soon as
+`org.ergopti.Focus` appears, so a GNOME worker that hears nothing is a fact
+about the Shell, not a quiet desktop. `org.gnome.Shell.Extensions
+GetExtensionInfo` answers an empty dictionary for an extension the running Shell
+has not scanned (a first install before a new login), and `state` as a double
+in the ExtensionState numbers (1 active, 2 inactive, 3 error, 4 out of date).
+Action: name the problem from that answer (compositor_focus_worker
+`extension_record`) and clear it only on a report, never on a state reread.
+
 ### project-linux-focus-barrier-budget-is-per-caller
 
 `atspi_focus_watch.barrier()` waits 20 ms (`focus_barrier_timeout_ms`) for the

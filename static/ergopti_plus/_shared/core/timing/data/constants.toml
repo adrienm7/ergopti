@@ -1506,6 +1506,14 @@ unresponsive_ax_backoff_ms = 30000
 # LX: modules/keymap/layout_registry.lua (managed_python.lua).
 managed_python_download_timeout_ms = 600000
 
+# Linux: how long the GNOME focus worker waits, once it owns org.ergopti.Focus,
+# for the Shell extension's first report before it asks GNOME Shell again for the
+# extension's state. An enabled extension reports as soon as the name appears,
+# within one bus round trip; a silence this long means the Shell runs no copy
+# of it, or a stale one (an update needs a new login).
+# LX: platform/focus/compositor_focus.lua passes it to compositor_focus_worker.lua.
+desktop_focus_silence_ms = 10000
+
 # Linux: how long the window switch worker sleeps between two polls of its queue.
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10

@@ -69,6 +69,7 @@ return {
 		flatpak = "/app/bin/ergopti",
 	},
 	linux_desktop = {
+		gnome_extension_uuid = "focus@ergopti.fr",
 		gnome_switch_path = "/org/ergopti/InputSource",
 		gnome_switch_interface = "org.ergopti.InputSource1",
 		gnome_extension_missing = "gnome_extension_missing",

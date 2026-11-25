@@ -28,7 +28,14 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       COSMIC the log says « Listening for cosmic-comp focus reports on zcosmic_toplevel_info_v1 version 2 » on a
       current cosmic-comp (1 on an older one) and the focused application follows the window. GNOME layout switch:
       Layout > « Input sources » switches the layout through the Ergopti extension and the `sources` setting keeps
-      its order; with the extension turned off the menu names it.
+      its order; with the extension turned off the menu names it. GNOME extension state (2026-11-25): turn the
+      extension off (`gnome-extensions disable focus@ergopti.fr`) and restart the daemon: the tray leads at once with
+      the red row « L’extension GNOME Shell d’Ergopti ne signale pas le focus », whose click says to enable it, and the
+      log has one « sends no focus report (inactive, state inactive) » line; turn it back on: the row leaves at the
+      next menu open and the log says « reports focus again (after inactive) ». On a GNOME newer than the extension's
+      `shell-version` list the row says to update Ergopti+ (out_of_date); right after a first install, before a new
+      login, it says to log out and back in (absent). Note what a GNOME Shell that lists the extension active but
+      sends nothing does: the row should appear 10 s after start (silent).
 - [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland
       and X11; the wizard (7) on Wayland; the magic key grab, injection and hotplug (30); sway or Xorg reading the
       daemon's real virtual keyboard on real evdev nodes (93); touchpad hotplug: with gestures on, unplug a USB or

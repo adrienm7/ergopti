@@ -106,8 +106,10 @@ const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
 // The bytecode package's file names, wire markers and the compiler's root-relative
 // path (linux/core/lifecycle/engine/bytecode_package.lua, modules/updater/installer.lua).
-// The Linux desktop names add a D-Bus object path and a dot file name.
-const LINUX_DESKTOP_SHAPE = /^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._-]*)$/;
+// The Linux desktop names add a D-Bus object path, a dot file name and a GNOME
+// Shell extension UUID (<name>@<domain>, as its metadata.json spells it).
+const LINUX_DESKTOP_SHAPE =
+	/^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._-]*|[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*)$/;
 // A uinput device name is free text the kernel reports (struct uinput_setup.name,
 // at most 79 bytes before its terminating NUL): words separated by single spaces.
 const LINUX_INPUT_SHAPE = /^(?=.{1,79}$)[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;

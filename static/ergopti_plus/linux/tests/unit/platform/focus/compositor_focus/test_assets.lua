@@ -55,6 +55,8 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 		local kwin = json.decode(read("platform/desktop_focus/kwin/metadata.json"))
 		local installer = read("install/compositor_focus.sh")
 		helpers.assert_eq(installer:match('\nGNOME_FOCUS_UUID="([^"]+)"'), gnome.uuid)
+		helpers.assert_eq(helpers.load_module("platform.focus.compositor_focus").GNOME_EXTENSION_UUID, gnome.uuid,
+			"the worker asks GNOME Shell for the extension the installer ships")
 		helpers.assert_eq(installer:match('\nKWIN_FOCUS_ID="([^"]+)"'), kwin.KPlugin.Id)
 		helpers.assert_eq(helpers.load_module("platform.focus.compositor_focus_worker").KWIN_SCRIPT_ID, kwin.KPlugin.Id)
 		helpers.assert_eq(kwin["X-Plasma-MainScript"], "code/main.js")

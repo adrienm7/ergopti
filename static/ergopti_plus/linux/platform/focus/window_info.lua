@@ -521,6 +521,13 @@ function M.compositor_script_state()
 	return _compositor_focus and _compositor_focus.script_state() or nil
 end
 
+--- Why GNOME Shell sends no focus report, nil off GNOME, while reports may
+--- still come or once they do (compositor_focus source.extension_problem).
+--- @return string|nil "absent", "inactive", "out_of_date", "error" or "silent"
+function M.compositor_extension_problem()
+	return _compositor_focus and _compositor_focus.extension_problem() or nil
+end
+
 --- Stops the focus source started by start_compositor_focus().
 --- @return boolean settled
 function M.stop_compositor_focus()
