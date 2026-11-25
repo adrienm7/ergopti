@@ -1400,15 +1400,19 @@ value with that layout's place in words, and a table (values, Pareto layer,
 « beaten by ») that says every point. Incomplete layouts are left out (their
 low counts are no trade-off) and counted in the summary. No weight enters the
 frontier. « Trace » types a text (the locale's sample until the visitor
-writes one, kept with the conveniences) on a layout and an optional second
-one (`E.traceText`): the events of the text side by side with their
+writes one, kept with the conveniences) on the Principal layout and the
+optional Comparison one (`E.traceText`): the events of the text side by side with their
 difference, then for each layout a strip of characters over their keys (each
 key in its finger's hue with its finger printed under it, a key of a
 penalised pair or triple outlined; aria-hidden), the same keystroke by
 keystroke as a table, and the penalised pairs and triples in words.
 « Copy the link » on either tab carries it (`tab`), the Pareto values
-(`px`, `py`) or the trace's text and its two layouts (as `details` and
-`versus`), so a shared view opens as it was.
+(`px`, `py`) or the trace's text, with the frame's two layouts (`details`,
+`versus`), so a shared view opens as it was. Both tabs show the Principal
+and Comparison frame above their panel (`#la-frame`, an idea seen in the
+Layouts Wiki playground's Main and Comp pickers): it sets the detailed layout
+and the one it is compared with, the same two « One layout » shows, so the
+Pareto ring, the trace and « One layout » always speak of the same pair.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser

@@ -11,7 +11,8 @@
  * WHAT IS CHECKED:
  * 1. Pareto: the table lists every compared complete layout with its layer,
  *    the frontier rows match the engine's E.pareto on the same values, the
- *    chart is a named image with one point per layout, « Frontier only »
+ *    chart is a named image with one point per layout, the Principal and
+ *    Comparison frame chooses the ringed layout, « Frontier only »
  *    keeps the frontier, and a new value redraws the table's header.
  * 2. Trace: the events table counts the text typed for the chosen layout, a
  *    second layout adds its column and the difference, the strip is hidden
@@ -100,6 +101,13 @@ async function exercisePareto(browser, origin) {
 		) && kept.length >= front.length,
 		`pareto: « Frontier only » keeps the frontier (${kept.map((c) => c[0])})`
 	);
+	// The frame's Principal layout is the one ringed and selected in the table.
+	assert.ok(await page.isVisible('#la-frame'), 'pareto: the frame is shown');
+	await page.selectOption('#la-frame-main', 'bepo');
+	const selected = await page.$$eval('#la-pareto-table tr.la-selected th', (ths) =>
+		ths.map((th) => th.textContent)
+	);
+	assert.deepEqual(selected, ['bépo'], 'pareto: the frame chooses the ringed layout');
 	await page.uncheck('#la-pareto-front');
 	await page.selectOption('#la-pareto-y', 'redirect');
 	const header = await page.$$eval('#la-pareto-table thead th', (ths) =>
@@ -119,7 +127,7 @@ async function exerciseTrace(browser, origin) {
 	await page.click('#la-tab-trace');
 	await page.fill('#la-trace-text', 'Ça va ?');
 	await page.waitForSelector('#la-trace-events tbody tr');
-	assert.equal(await page.inputValue('#la-trace-layout'), 'azerty', 'trace: the detailed layout');
+	assert.equal(await page.inputValue('#la-frame-main'), 'azerty', 'trace: the detailed layout');
 	const header = await page.$$eval('#la-trace-events thead th', (ths) => ths.length);
 	assert.equal(header, 2, 'trace: one layout, one count column');
 	// AZERTY types no capital Ç: it is said in words.
@@ -130,7 +138,7 @@ async function exerciseTrace(browser, origin) {
 			.isVisible(),
 		'trace: the untyped character is counted in words'
 	);
-	await page.selectOption('#la-trace-versus', 'ergopti');
+	await page.selectOption('#la-frame-comp', 'ergopti');
 	const columns = await page.$$eval('#la-trace-events thead th', (ths) =>
 		ths.map((th) => th.textContent)
 	);
@@ -178,8 +186,8 @@ async function exerciseViewLinks(browser, origin) {
 	);
 	await page.click('#la-tab-trace');
 	await page.fill('#la-trace-text', 'Noël à Zoé');
-	await page.selectOption('#la-trace-layout', 'bepo');
-	await page.selectOption('#la-trace-versus', 'qwerty');
+	await page.selectOption('#la-frame-main', 'bepo');
+	await page.selectOption('#la-frame-comp', 'qwerty');
 	const trace = await copy();
 	assert.deepEqual(
 		['tab', 'text', 'details', 'versus'].map((name) => trace.searchParams.get(name)),
@@ -203,8 +211,8 @@ async function exerciseViewLinks(browser, origin) {
 	assert.deepEqual(
 		[
 			await reader.inputValue('#la-trace-text'),
-			await reader.inputValue('#la-trace-layout'),
-			await reader.inputValue('#la-trace-versus')
+			await reader.inputValue('#la-frame-main'),
+			await reader.inputValue('#la-frame-comp')
 		],
 		['Noël à Zoé', 'bepo', 'qwerty'],
 		'links: the trace link opens on its text and layouts'

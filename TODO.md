@@ -315,9 +315,10 @@ waits for the maintainer's review).
       read a Pareto »), routed through `i18n`; (6) more shown-only metrics, what is left (done: row changes concordant
       and discordant in the movement table): alternation whose ends are an SFS, weak redirects (no index), each with and
       without thumbs, and each movement cell's percentile among the compared layouts (`movementTable` costs 20 to 60 ms
-      a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (7) a Principal and
-      Comparison frame at the top of the Comparer that every tab follows (today « One layout » and the trace each choose
-      theirs); (8) Kawalyzer's « Clever Keys » (context outputs) with item (3).
+      a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (7) the Principal and
+      Comparison frame on the other result tabs too (done on Pareto and Trace, `FRAME_TABS`; the overview and the themed
+      tabs could mark both layouts in their charts and tables); (8) Kawalyzer's « Clever Keys » (context outputs) with
+      item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -646,7 +647,8 @@ Each question names the default kept meanwhile; an answer moves into the item or
       trace types a sample sentence in the page's language until the visitor writes one (French: « Où êtes-vous
       allés cet été ? Ça dépend : à Noël, chez Zoé et Gaëtan, près du lac. »), at most 2,000 characters, each
       character on its own (chords not traced), a line break or an untyped character cutting the stream as in
-      the corpus tables. Choose another sample, or a sample taken from the chosen corpus's words.
+      the corpus tables. Its layouts are the Principal and Comparison frame's, shared with « One layout » and the
+      Pareto ring. Choose another sample, or a sample taken from the chosen corpus's words.
 - [ ] **Analyser fidelity per corpus kind (decided by the agent on 2026-11-24, to review by the maintainer).**
       Rerun on 2026-11-24, genkey matches itself on the text corpora within its printed rounding and Oxeylyzer within
       0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
