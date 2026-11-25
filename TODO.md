@@ -554,11 +554,13 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 The decision is in [maintainer decisions](docs/memory/maintainer-decisions.md) (« The anti-sleep mode gains an
 optional auto-clicker »). Done: the shared matcher and policy with their corpora
-(`_shared/shortcuts/engine/auto_click_*.lua`, `_shared/tests/corpus/keep_awake/`), replayed on Lua 5.4 and LuaJIT.
+(`_shared/shortcuts/engine/auto_click_*.lua`, `_shared/tests/corpus/keep_awake/`), replayed on Lua 5.4 and LuaJIT, and
+their Windows twin (`windows/modules/shortcuts/auto_click_{matcher,policy}.ahk`), replayed by the AHK suite; its first
+hosted Windows run is still to read.
 
-- [ ] **Windows twin of the matcher and policy** (`modules/shortcuts/`), replaying the same two corpora, with GDI
-      capture of the foreground window rect; AHK `ImageSearch *n` only if its variation is mapped to the tolerance
-      and documented.
+- [ ] **Windows capture:** GDI capture (`PrintWindow` or `BitBlt` + `GetDIBits`) of the foreground window rect into
+      the port's gray image; the AHK loops of the port are slow, so measure a 1600 × 1000 window first and move the
+      scoring loop into the native DLL if a tick exceeds its budget.
 - [ ] **macOS native matcher.** The shared Lua matcher takes about 0.8 s per scale on Lua 5.4 for an 800 × 600
       window and a 96 × 48 button, too slow for the 700 ms tick in Hammerspoon; capture (`hs.window:snapshot`) and
       match on the Swift side, pinned by the same corpus, with Screen Recording permission shown as a red
