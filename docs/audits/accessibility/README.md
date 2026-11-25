@@ -1370,6 +1370,37 @@ surveyed and every AAA criterion, measured or checked by hand, are in
   the site's list, so none can come back through a reviewed entry: 460
   justified divs and spans, none made up.
 
+## Fourteenth pass, HTML_CodeSniffer beside axe (2026-11-25, Paris time)
+
+The maintainer added HTML_CodeSniffer to the AAA audit on 2026-11-24
+([aaa-criteria.md](aaa-criteria.md), « Tools surveyed »).
+
+- **Gates.** `html_codesniffer` 2.5.1 is an exactly pinned devDependency; its
+  `build/HTMLCS.js` is read from `node_modules` (no network) and run with the
+  `WCAG2AAA` standard in every page, frame, state and scheme the two axe gates
+  already open, right after axe (`tools/test/lib/htmlcs.cjs`). Its errors are
+  counted per page (or window), scheme, frame (or state) and code in
+  `site-htmlcs-baseline.json` and `app-windows-htmlcs-baseline.json`, under
+  the same ratchet as axe; its warnings and notices only go to the
+  `--report` file (`htmlcs.warningsAndNotices`). Both ratchet contracts check
+  the exact pin, the injected bundle's version, the standard and that each
+  gate runs the scan.
+- **First measure** on `origin/dev` of 2026-11-25: the site and its frames,
+  220 rows and 18,420 error nodes, of which 18,232 are contrasts it could not
+  compute (`.Unmeasured`: HTML_CodeSniffer 2.5.1 reads only `rgb()` and hex
+  colours, not the `color(srgb …)` and `oklab(…)` Chromium computes for
+  `color-mix()` and `oklch()`), 2 a measured 6.24:1 (`b.mark.on` in the model
+  browser shown on `/ergopti-plus/ia`) and 186 markup errors (mostly
+  `1_3_1_AAA.G141` heading levels, `1_1_1.H30.2` image links without text,
+  `4_1_2.H91` unnamed buttons and fields); the app windows, 346 rows and
+  10,698 nodes, of which 8,695 unmeasured, 1,605 measured contrasts below
+  7:1 that axe's `color-contrast-enhanced` does not report, and 398 markup
+  errors.
+- **Also fixed:** the action picker's second focus try on its search field
+  took the focus back from a control reached within its 60 ms, which failed
+  the app windows' `keyboard-fold` state whenever its steps fell inside it;
+  the state now reproduces the race.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

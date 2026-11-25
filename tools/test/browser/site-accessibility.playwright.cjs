@@ -22,7 +22,11 @@
  * check. Every page and frame is also measured, in the light scheme, for the
  * 44 px pointer targets of WCAG 2.5.5 (lib/target-size.cjs), which axe's
  * target-size rule (the 24 px of 2.5.8) does not check; they are counted in
- * the axe baseline under their own rule.
+ * the axe baseline under their own rule. Every page and frame is also
+ * scanned, in both schemes, by HTML_CodeSniffer's WCAG2AAA standard
+ * (lib/htmlcs.cjs), right after axe in the same document: its errors are
+ * counted per page, scheme, frame and code in a third ratchet
+ * (site-htmlcs-baseline.json); its warnings and notices only go to the report.
  * ==============================================================================
  */
 
@@ -39,6 +43,8 @@ const { SITE_ROUTES } = require('../../ci/site-artifact.cjs');
 const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
 // The 44 px targets of WCAG 2.5.5, which axe does not measure.
 const targetSize = require('../lib/target-size.cjs');
+// HTML_CodeSniffer's WCAG2AAA errors, the second automated AAA scanner.
+const htmlcs = require('../lib/htmlcs.cjs');
 
 // Pages audited: every real page of the site, plus the pages the artifact
 // smoke list does not carry (the Optimiser tab, the accessibility statement).
@@ -53,6 +59,9 @@ const BASELINE_PATH = path.join(__dirname, 'site-accessibility-baseline.json');
 // The reading checks' ratchet (site-reading.cjs): offending elements per page,
 // reading mode and check.
 const READING_BASELINE_PATH = path.join(__dirname, 'site-reading-baseline.json');
+// The HTML_CodeSniffer ratchet (lib/htmlcs.cjs): error messages per page,
+// scheme, frame and code, the rule written « htmlcs:<code> ».
+const HTMLCS_BASELINE_PATH = path.join(__dirname, 'site-htmlcs-baseline.json');
 // Where a11y_prefs.js keeps the visitor's settings (the « text » reading mode).
 const PREFERENCES_KEY = 'ergopti-a11y-preferences';
 // A frame that settles its scripts after load (the Studio pages build their
@@ -142,6 +151,21 @@ function readBaseline(file = BASELINE_PATH, parts = 4) {
 }
 
 /**
+ * Read the HTML_CodeSniffer baseline: rows keyed like the axe ones, each rule
+ * an HTML_CodeSniffer code (lib/htmlcs.cjs), so an axe row cannot hide there.
+ * @returns {Object<string, number>}
+ */
+function readHtmlcsBaseline() {
+	const baseline = readBaseline(HTMLCS_BASELINE_PATH, 4);
+	for (const key of Object.keys(baseline))
+		assert.ok(
+			key.split(' | ')[3].startsWith(htmlcs.HTMLCS_RULE_PREFIX),
+			'HTML_CodeSniffer baseline row without its prefix: ' + key
+		);
+	return baseline;
+}
+
+/**
  * Name of a frame in the findings: « page » for the top document, else the
  * framed file's path inside the site.
  */
@@ -174,8 +198,15 @@ async function scanFrame(frame, axeSource, selector = null) {
 	);
 }
 
-/** Load one route in one colour scheme and scan the page and its frames. */
-async function scanRoute(context, origin, basePath, route, scheme, inflight, axeSource) {
+/**
+ * Load one route in one colour scheme and scan the page and its frames with
+ * axe, then with HTML_CodeSniffer in the same documents.
+ * @param {{axe: string, htmlcs: string}} sources - The two scanners' bundles.
+ * @returns {Promise<{findings: object[], htmlcs: object[], htmlcsOthers: object[]}>}
+ *   The axe and target size rows, the HTML_CodeSniffer error rows, and its
+ *   warnings and notices (reported, not counted).
+ */
+async function scanRoute(context, origin, basePath, route, scheme, inflight, sources) {
 	const page = await context.newPage();
 	try {
 		await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
@@ -185,6 +216,8 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 		await smoke.settleFrames(page);
 		await smoke.settleNetwork(inflight, { quietMs: FRAME_QUIET_MS });
 		const findings = [];
+		const htmlcsFindings = [];
+		const htmlcsOthers = [];
 		for (const frame of page.frames()) {
 			if (frame !== page.mainFrame() && (frame.url() === '' || frame.url() === 'about:blank'))
 				continue;
@@ -195,8 +228,14 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 			await frame.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
 				timeout: BUSY_TIMEOUT_MS
 			});
-			for (const violation of await scanFrame(frame, axeSource))
+			for (const violation of await scanFrame(frame, sources.axe))
 				findings.push({ route, scheme, frame: name, ...violation });
+			// Contrast depends on the scheme: both schemes, like axe.
+			const sniffed = await htmlcs.scanHtmlcs(frame, sources.htmlcs);
+			for (const error of sniffed.errors)
+				htmlcsFindings.push({ route, scheme, frame: name, ...error });
+			for (const other of sniffed.others)
+				htmlcsOthers.push({ route, scheme, frame: name, ...other });
 			// The sizes do not depend on the colours: once per page and frame.
 			if (scheme !== 'light') continue;
 			const small = await frame.evaluate(targetSize.targetSizeProblems, targetSize.MINIMUM_PX);
@@ -212,7 +251,7 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 					targets: small
 				});
 		}
-		return findings;
+		return { findings, htmlcs: htmlcsFindings, htmlcsOthers };
 	} finally {
 		await page.close();
 	}
@@ -750,12 +789,13 @@ async function scanReading(browser, origin, basePath, routes, mode) {
 
 /**
  * Serve the built site on loopback and scan every audited page in Chromium:
- * axe in both colour schemes and the behaviour checks, unless readingOnly,
- * then the reading checks in every reading mode.
- * @returns {Promise<{findings: object[], reading: object[]}>}
+ * axe and HTML_CodeSniffer in both colour schemes and the behaviour checks,
+ * unless readingOnly, then the reading checks in every reading mode.
+ * @returns {Promise<{findings: object[], reading: object[], htmlcs: object[], htmlcsOthers: object[]}>}
  */
 async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES, readingOnly = false) {
 	const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+	const sources = { axe: axeSource, htmlcs: htmlcs.htmlcsSource() };
 	// Resource integrity is the artifact smoke and structure gates' job; this
 	// scan only answers. The loopback host also makes isDev.js probe absent
 	// version.json files (src/lib/js/isDev.js), which must not fail the scan.
@@ -770,13 +810,25 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES, readi
 		const origin = 'http://127.0.0.1:' + server.address().port;
 		return await smoke.withBrowser(chromium, async (browser) => {
 			const findings = [];
+			const htmlcsFindings = [];
+			const htmlcsOthers = [];
 			if (!readingOnly)
 				await withContext(browser, origin, {}, async (context, inflight) => {
 					for (const route of routes)
-						for (const scheme of COLOR_SCHEMES)
-							findings.push(
-								...(await scanRoute(context, origin, basePath, route, scheme, inflight, axeSource))
+						for (const scheme of COLOR_SCHEMES) {
+							const scanned = await scanRoute(
+								context,
+								origin,
+								basePath,
+								route,
+								scheme,
+								inflight,
+								sources
 							);
+							findings.push(...scanned.findings);
+							htmlcsFindings.push(...scanned.htmlcs);
+							htmlcsOthers.push(...scanned.htmlcsOthers);
+						}
 					await exerciseKeyboardAndSettings(context, origin, basePath, inflight, axeSource);
 					await exerciseStudio(context, origin, basePath, inflight, axeSource);
 					await exerciseHeroPause(context, origin, basePath, inflight);
@@ -785,7 +837,7 @@ async function scanSite(site, basePath, chromium, routes = AUDITED_ROUTES, readi
 			const readingFindings = [];
 			for (const mode of Object.keys(reading.READING_MODES))
 				readingFindings.push(...(await scanReading(browser, origin, basePath, routes, mode)));
-			return { findings, reading: readingFindings };
+			return { findings, reading: readingFindings, htmlcs: htmlcsFindings, htmlcsOthers };
 		});
 	} finally {
 		await new Promise((resolve, reject) =>
@@ -856,15 +908,25 @@ async function main(args = process.argv.slice(2)) {
 	if (report)
 		fs.writeFileSync(
 			report.slice('--report='.length),
-			JSON.stringify({ axe: findings, reading: scanned.reading }, null, '\t') + '\n'
+			JSON.stringify(
+				{
+					axe: findings,
+					reading: scanned.reading,
+					htmlcs: { errors: scanned.htmlcs, warningsAndNotices: scanned.htmlcsOthers }
+				},
+				null,
+				'\t'
+			) + '\n'
 		);
 	const current = countsOf(findings);
 	const total = Object.values(current).reduce((sum, nodes) => sum + nodes, 0);
 	const currentReading = readingCountsOf(scanned.reading);
 	const readingTotal = Object.values(currentReading).reduce((sum, count) => sum + count, 0);
+	const currentHtmlcs = countsOf(scanned.htmlcs);
+	const htmlcsTotal = Object.values(currentHtmlcs).reduce((sum, count) => sum + count, 0);
 	if (!readingOnly) printSummary(findings, routes);
 	if (only) {
-		for (const finding of findings)
+		for (const finding of [...findings, ...scanned.htmlcs])
 			console.log(
 				'  ' +
 					rowKey(finding) +
@@ -879,11 +941,16 @@ async function main(args = process.argv.slice(2)) {
 		return;
 	}
 	if (flags.includes('--update-baseline')) {
-		if (!readingOnly) fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, '\t') + '\n');
+		if (!readingOnly) {
+			fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, '\t') + '\n');
+			fs.writeFileSync(HTMLCS_BASELINE_PATH, JSON.stringify(currentHtmlcs, null, '\t') + '\n');
+		}
 		fs.writeFileSync(READING_BASELINE_PATH, JSON.stringify(currentReading, null, '\t') + '\n');
 		console.log(
 			'Site accessibility: baseline(s) written (' +
-				(readingOnly ? 'axe not scanned' : total + ' node(s)') +
+				(readingOnly
+					? 'axe and HTML_CodeSniffer not scanned'
+					: total + ' node(s), ' + htmlcsTotal + ' HTML_CodeSniffer error(s)') +
 				', ' +
 				readingTotal +
 				' reading element(s)).'
@@ -894,7 +961,10 @@ async function main(args = process.argv.slice(2)) {
 		? { regressions: [], improvements: [] }
 		: compareWithBaseline(current, readBaseline());
 	const read = compareWithBaseline(currentReading, readBaseline(READING_BASELINE_PATH, 4));
-	const improvements = [...axe.improvements, ...read.improvements];
+	const sniff = readingOnly
+		? { regressions: [], improvements: [] }
+		: compareWithBaseline(currentHtmlcs, readHtmlcsBaseline());
+	const improvements = [...axe.improvements, ...read.improvements, ...sniff.improvements];
 	if (improvements.length)
 		console.log(
 			'Site accessibility: fewer violations than the baseline; lower it with --update-baseline:\n  ' +
@@ -907,13 +977,18 @@ async function main(args = process.argv.slice(2)) {
 		'New accessibility violations (the ratchet only goes down)'
 	);
 	assert.deepEqual(
+		sniff.regressions,
+		[],
+		'New HTML_CodeSniffer WCAG2AAA errors (the ratchet only goes down)'
+	);
+	assert.deepEqual(
 		read.regressions,
 		[],
 		'New reading problems: clipped, overlapping, justified or too long text (the ratchet only goes down)'
 	);
 	console.log(
 		'Site accessibility: ' +
-			(readingOnly ? '' : total + ' node(s) and ') +
+			(readingOnly ? '' : total + ' node(s), ' + htmlcsTotal + ' HTML_CodeSniffer error(s) and ') +
 			readingTotal +
 			' reading element(s), within the baseline(s), PASS in Chromium.'
 	);
@@ -926,12 +1001,14 @@ module.exports = {
 	TARGET_SIZE_RULE: targetSize.TARGET_SIZE_RULE,
 	BASELINE_PATH,
 	READING_BASELINE_PATH,
+	HTMLCS_BASELINE_PATH,
 	rowKey,
 	countsOf,
 	readingKey,
 	readingCountsOf,
 	compareWithBaseline,
 	readBaseline,
+	readHtmlcsBaseline,
 	scanSite,
 	main
 };

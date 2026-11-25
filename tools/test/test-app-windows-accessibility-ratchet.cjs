@@ -11,6 +11,8 @@
  * committed baseline is well formed, every window page under _shared/ui/ is
  * audited unless a stated reason exempts it, and each fixture posts to the
  * bridge its page really uses, so the fake host answers the right messages.
+ * The HTML_CodeSniffer baseline only names audited windows, states, both
+ * schemes and HTML_CodeSniffer codes.
  * ==============================================================================
  */
 
@@ -21,6 +23,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const scan = require('./browser/app-windows-accessibility.playwright.cjs');
 const { WINDOWS } = require('./browser/app-windows-fixtures.cjs');
+const htmlcs = require('./lib/htmlcs.cjs');
 
 const UI = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(UI, 'apps.manifest.json'), 'utf8'));
@@ -123,6 +126,32 @@ function checkBaseline() {
 		assert.ok(scan.WCAG_TAGS.includes(tag), 'The app windows scan runs ' + tag);
 }
 
+/** The HTML_CodeSniffer baseline names audited windows, their states and both schemes. */
+function checkHtmlcsBaseline() {
+	const baseline = scan.readHtmlcsBaseline();
+	for (const key of Object.keys(baseline)) {
+		const [id, scheme, state, rule] = key.split(' | ');
+		const target = WINDOWS.find((each) => each.id === id);
+		const states = ['filled', ...(target.states || []).map((each) => each.name)];
+		assert.ok(states.includes(state), 'HTML_CodeSniffer baseline state: ' + key);
+		assert.ok(scan.COLOR_SCHEMES.includes(scheme), 'HTML_CodeSniffer baseline scheme: ' + key);
+		assert.ok(rule.startsWith(htmlcs.HTMLCS_RULE_PREFIX), 'HTML_CodeSniffer baseline rule: ' + key);
+	}
+	const row = scan.compareWithBaseline(
+		{ ['a | light | filled | ' + htmlcs.HTMLCS_RULE_PREFIX + 'WCAG2AAA.X']: 1 },
+		{}
+	);
+	assert.equal(row.regressions.length, 1, 'A new HTML_CodeSniffer error is a regression');
+	assert.match(
+		fs.readFileSync(
+			path.join(__dirname, 'browser', 'app-windows-accessibility.playwright.cjs'),
+			'utf8'
+		),
+		/htmlcs\.scanHtmlcs\(page, htmlcsSource\)/,
+		'The app windows scan runs HTML_CodeSniffer in each state'
+	);
+}
+
 /** Every window page is audited once, or named above with its reason. */
 function checkCoverage() {
 	const pages = fs
@@ -213,6 +242,7 @@ function checkReadingPreferences() {
 checkComparison();
 checkReadingPreferences();
 checkBaseline();
+checkHtmlcsBaseline();
 checkCoverage();
 checkFixtures();
 console.log('PASS app windows accessibility ratchet contract');

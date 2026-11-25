@@ -878,6 +878,7 @@
 		"@types/aos": "^3.0.7",
 		"axe-core": "4.14.0",
 		"fast-check": "^4.8.0",
+		"html_codesniffer": "2.5.1",
 		"husky": "^8.0.0",
 		"lint-staged": "^16.1.5",
 		"playwright": "1.58.2",

@@ -12,7 +12,9 @@
  * storage and refuse unknown values (static/ergopti_plus/_shared/ui/a11y_prefs.js),
  * the reading ratchet (site-reading.cjs) applies the WCAG 1.4.12 values and
  * names only known rows, no source justifies text, and nothing outside the
- * header offsets by its minimum height instead of its measured one.
+ * header offsets by its minimum height instead of its measured one, and
+ * HTML_CodeSniffer runs from its exactly pinned package on disk, with its
+ * own well-formed ratchet.
  * ==============================================================================
  */
 
@@ -24,6 +26,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const scan = require('./browser/site-accessibility.playwright.cjs');
 const reading = require('./browser/site-reading.cjs');
+const htmlcs = require('./lib/htmlcs.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -79,6 +82,48 @@ function checkBaseline() {
 	);
 	const row = scan.compareWithBaseline({ ['/ | light | page | ' + scan.TARGET_SIZE_RULE]: 1 }, {});
 	assert.equal(row.regressions.length, 1, 'A new small target is a regression');
+}
+
+/**
+ * HTML_CodeSniffer (maintainer, 2026-11-24): an exact pin whose bundle is the
+ * one injected, the WCAG2AAA standard, a contrast it could not compute kept
+ * apart from a measured one, and a baseline that only names audited pages,
+ * both schemes and HTML_CodeSniffer codes.
+ */
+function checkHtmlcs() {
+	const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+	const pin = manifest.devDependencies.html_codesniffer;
+	assert.match(pin, /^\d+\.\d+\.\d+$/, 'html_codesniffer is pinned to an exact version');
+	const source = htmlcs.htmlcsSource();
+	assert.ok(
+		source.includes('html_codesniffer - v' + pin + ' '),
+		'The injected bundle is the pinned one'
+	);
+	assert.match(
+		source,
+		/\}\)\.call\(window, undefined, undefined, undefined\);$/,
+		'The bundle ignores AMD'
+	);
+	assert.equal(htmlcs.HTMLCS_STANDARD, 'WCAG2AAA');
+	assert.ok(htmlcs.CONTRAST_CODE.test('WCAG2AAA.Principle1.Guideline1_4.1_4_6.G17.Fail'));
+	assert.ok(htmlcs.CONTRAST_CODE.test('WCAG2AAA.Principle1.Guideline1_4.1_4_6.G18.Fail'));
+	assert.ok(!htmlcs.CONTRAST_CODE.test('WCAG2AAA.Principle1.Guideline1_1.1_1_1.H37'));
+	const baseline = scan.readHtmlcsBaseline();
+	for (const key of Object.keys(baseline)) {
+		const [route, scheme] = key.split(' | ');
+		assert.ok(scan.AUDITED_ROUTES.includes(route), 'HTML_CodeSniffer baseline page: ' + key);
+		assert.ok(scan.COLOR_SCHEMES.includes(scheme), 'HTML_CodeSniffer baseline scheme: ' + key);
+	}
+	const row = scan.compareWithBaseline(
+		{ ['/ | dark | page | ' + htmlcs.HTMLCS_RULE_PREFIX + 'WCAG2AAA.X']: 1 },
+		{}
+	);
+	assert.equal(row.regressions.length, 1, 'A new HTML_CodeSniffer error is a regression');
+	assert.match(
+		fs.readFileSync(path.join(__dirname, 'browser', 'site-accessibility.playwright.cjs'), 'utf8'),
+		/htmlcs\.scanHtmlcs\(frame, sources\.htmlcs\)/,
+		'The site scan runs HTML_CodeSniffer in each frame'
+	);
 }
 
 /**
@@ -499,6 +544,7 @@ function checkHeaderOffset() {
 
 checkComparison();
 checkBaseline();
+checkHtmlcs();
 checkStatementTarget();
 checkRouteCoverage();
 checkPreferences();
@@ -508,5 +554,5 @@ checkReadingRatchet();
 checkNoJustifiedText();
 checkHeaderOffset();
 console.log(
-	'ok - site accessibility ratchet, baseline, statement target, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
+	'ok - site accessibility ratchet, baseline, HTML_CodeSniffer, statement target, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
 );

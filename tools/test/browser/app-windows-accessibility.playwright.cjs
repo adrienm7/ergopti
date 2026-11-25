@@ -28,7 +28,12 @@
  * 6. checked for text alternatives: every image, drawing and chart canvas
  *    named or hidden from assistive technology;
  * 7. measured for the 44 px pointer targets of WCAG 2.5.5 (lib/target-size.cjs),
- *    which axe's target-size rule (24 px, 2.5.8) does not check.
+ *    which axe's target-size rule (24 px, 2.5.8) does not check;
+ * 8. scanned by HTML_CodeSniffer's WCAG2AAA standard (lib/htmlcs.cjs) in
+ *    both schemes, right after axe in the same document: its errors are
+ *    counted per window, scheme, state and code in a ratchet of their own
+ *    (app-windows-htmlcs-baseline.json); its warnings and notices only go to
+ *    the report.
  * Every axe rule's node count and every window's walk problems are counted
  * and compared with the committed baseline beside this file: a new row or a
  * higher count fails, so the violations can only go down. The maintainer
@@ -60,6 +65,8 @@ const { serveStatic, installFakeHost } = require('../lib/app-window-host.cjs');
 const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
 // The 44 px targets of WCAG 2.5.5, which axe does not measure.
 const targetSize = require('../lib/target-size.cjs');
+// HTML_CodeSniffer's WCAG2AAA errors, the second automated AAA scanner.
+const htmlcs = require('../lib/htmlcs.cjs');
 
 // --root=dir serves another copy of static/ (an older commit's, to prove a fix
 // by scanning the code it replaced); the fixtures and the baseline stay these.
@@ -72,6 +79,9 @@ const MANIFEST = JSON.parse(
 	fs.readFileSync(path.join(STATIC_ROOT, 'ergopti_plus', '_shared', 'ui', 'apps.manifest.json'))
 );
 const BASELINE_PATH = path.join(__dirname, 'app-windows-accessibility-baseline.json');
+// The HTML_CodeSniffer ratchet: error messages per window, scheme, state and
+// code, the rule written « htmlcs:<code> ».
+const HTMLCS_BASELINE_PATH = path.join(__dirname, 'app-windows-htmlcs-baseline.json');
 // What a raw locale key looks like on screen (the catalogue's keys and namespaces).
 const RAW_KEY_SHAPE = catalogueShape();
 const COLOR_SCHEMES = Object.freeze(['light', 'dark']);
@@ -307,14 +317,20 @@ function statesOf(target) {
 
 /**
  * Scans and walks every window in every state and scheme.
- * @returns {Promise<Array<{window: string, scheme: string, state: string, rule: string, nodes: number}>>}
+ * @returns {Promise<{findings: object[], htmlcs: object[], htmlcsOthers: object[]}>}
+ *   Rows {window, scheme, state, rule, nodes}: the axe and own checks' rows,
+ *   the HTML_CodeSniffer error rows, and its warnings and notices (reported,
+ *   not counted).
  */
 async function auditWindows(chromium, windows, family, port) {
 	const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+	const htmlcsSource = htmlcs.htmlcsSource();
 	const server = await serveStatic(STATIC_ROOT, port);
 	const origin = `http://127.0.0.1:${server.address().port}`;
 	const browser = await chromium.launch();
 	const findings = [];
+	const htmlcsFindings = [];
+	const htmlcsOthers = [];
 	try {
 		for (const target of windows)
 			for (const state of statesOf(target))
@@ -330,6 +346,11 @@ async function auditWindows(chromium, windows, family, port) {
 						if (state.enter) await state.enter(page);
 						for (const violation of await scanPage(page, axeSource))
 							findings.push({ window: target.id, scheme, state: state.name, ...violation });
+						// Contrast depends on the scheme: both schemes, like axe.
+						const where = { window: target.id, scheme, state: state.name };
+						const sniffed = await htmlcs.scanHtmlcs(page, htmlcsSource);
+						for (const error of sniffed.errors) htmlcsFindings.push({ ...where, ...error });
+						for (const other of sniffed.others) htmlcsOthers.push({ ...where, ...other });
 						// The walk and the texts do not depend on the colours: once per state.
 						if (scheme === 'light') {
 							// An unresolved locale key read as a name is no name at all: a
@@ -437,7 +458,7 @@ async function auditWindows(chromium, windows, family, port) {
 		await browser.close();
 		await new Promise((resolve) => server.close(resolve));
 	}
-	return findings;
+	return { findings, htmlcs: htmlcsFindings, htmlcsOthers };
 }
 
 /**
@@ -645,12 +666,13 @@ function compareWithBaseline(current, baseline) {
 }
 
 /**
- * Read the committed baseline; a missing or malformed file is an error, not
+ * Read a committed baseline; a missing or malformed file is an error, not
  * an empty baseline, so the gate cannot pass by losing its reference.
+ * @param {string} [file] - The axe baseline by default, or the HTML_CodeSniffer one.
  * @returns {Object<string, number>}
  */
-function readBaseline() {
-	const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+function readBaseline(file = BASELINE_PATH) {
+	const baseline = JSON.parse(fs.readFileSync(file, 'utf8'));
 	assert.ok(baseline && typeof baseline === 'object' && !Array.isArray(baseline), 'Baseline shape');
 	const ids = new Set(WINDOWS.map((target) => target.id));
 	for (const [key, nodes] of Object.entries(baseline)) {
@@ -660,6 +682,21 @@ function readBaseline() {
 		assert.ok(COLOR_SCHEMES.includes(parts[1]), 'Baseline scheme: ' + key);
 		assert.ok(Number.isSafeInteger(nodes) && nodes > 0, 'Baseline count: ' + key);
 	}
+	return baseline;
+}
+
+/**
+ * Read the HTML_CodeSniffer baseline: rows keyed like the axe ones, each rule
+ * an HTML_CodeSniffer code (lib/htmlcs.cjs), so an axe row cannot hide there.
+ * @returns {Object<string, number>}
+ */
+function readHtmlcsBaseline() {
+	const baseline = readBaseline(HTMLCS_BASELINE_PATH);
+	for (const key of Object.keys(baseline))
+		assert.ok(
+			key.split(' | ')[3].startsWith(htmlcs.HTMLCS_RULE_PREFIX),
+			'HTML_CodeSniffer baseline row without its prefix: ' + key
+		);
 	return baseline;
 }
 
@@ -709,13 +746,27 @@ async function main(args = process.argv.slice(2)) {
 		);
 		return;
 	}
-	const findings = await auditWindows(require('playwright').chromium, windows, family, port);
+	const audited = await auditWindows(require('playwright').chromium, windows, family, port);
+	const findings = audited.findings;
 	const report = value('report');
-	if (report) fs.writeFileSync(report, JSON.stringify(findings, null, '\t') + '\n');
+	if (report)
+		fs.writeFileSync(
+			report,
+			JSON.stringify(
+				{
+					axe: findings,
+					htmlcs: { errors: audited.htmlcs, warningsAndNotices: audited.htmlcsOthers }
+				},
+				null,
+				'\t'
+			) + '\n'
+		);
 	const current = countsOf(findings);
 	const total = Object.values(current).reduce((sum, nodes) => sum + nodes, 0);
+	const currentHtmlcs = countsOf(audited.htmlcs);
+	const htmlcsTotal = Object.values(currentHtmlcs).reduce((sum, nodes) => sum + nodes, 0);
 	if (only) {
-		for (const finding of findings)
+		for (const finding of [...findings, ...audited.htmlcs])
 			console.log(
 				'  ' +
 					rowKey(finding) +
@@ -731,24 +782,44 @@ async function main(args = process.argv.slice(2)) {
 	}
 	if (args.includes('--update-baseline')) {
 		fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, '\t') + '\n');
-		console.log('App windows accessibility: baseline written (' + total + ' node(s)).');
+		fs.writeFileSync(HTMLCS_BASELINE_PATH, JSON.stringify(currentHtmlcs, null, '\t') + '\n');
+		console.log(
+			'App windows accessibility: baselines written (' +
+				total +
+				' node(s), ' +
+				htmlcsTotal +
+				' HTML_CodeSniffer error(s)).'
+		);
 		return;
 	}
-	const { regressions, improvements } = compareWithBaseline(current, readBaseline());
+	const axe = compareWithBaseline(current, readBaseline());
+	const sniff = compareWithBaseline(currentHtmlcs, readHtmlcsBaseline());
+	const improvements = [...axe.improvements, ...sniff.improvements];
 	if (improvements.length)
 		console.log(
 			'App windows accessibility: fewer violations than the baseline; lower it with --update-baseline:\n  ' +
 				improvements.join('\n  ')
 		);
-	assert.deepEqual(regressions, [], 'New accessibility violations (the ratchet only goes down)');
+	assert.deepEqual(
+		axe.regressions,
+		[],
+		'New accessibility violations (the ratchet only goes down)'
+	);
+	assert.deepEqual(
+		sniff.regressions,
+		[],
+		'New HTML_CodeSniffer WCAG2AAA errors (the ratchet only goes down)'
+	);
 	console.log(
-		`App windows accessibility: ${windows.length} windows, ${total} node(s), within the baseline, ` +
+		`App windows accessibility: ${windows.length} windows, ${total} node(s) and ` +
+			`${htmlcsTotal} HTML_CodeSniffer error(s), within the baselines, ` +
 			`PASS in Chromium over the ${family} bridge.`
 	);
 }
 
 module.exports = {
 	BASELINE_PATH,
+	HTMLCS_BASELINE_PATH,
 	COLOR_SCHEMES,
 	WCAG_TAGS,
 	WALK_RULE,
@@ -762,6 +833,7 @@ module.exports = {
 	countsOf,
 	compareWithBaseline,
 	readBaseline,
+	readHtmlcsBaseline,
 	main
 };
 if (require.main === module)

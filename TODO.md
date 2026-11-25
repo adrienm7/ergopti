@@ -599,15 +599,6 @@ Each closes on a named green hosted or native run, recorded here.
     `model-browser-native-json` (43347126427, not reproduced; all four `config-*` groups, the bound check and
     `run_llm_model_browser.ahk` passed three times in a row locally on 2026-11-18, so only hosted runs are left).
 
-## Decided on 2026-11-24, to implement
-
-The maintainer answered these on 2026-11-24 ([maintainer decisions](docs/memory/maintainer-decisions.md),
-« Agent decisions reviewed on 2026-11-24 »).
-
-- [ ] **[CODE] Add HTML_CodeSniffer to the AAA audit (maintainer, 2026-11-24).** Pinned npm package injected into the
-      same Playwright pages as axe-core, gating on its `WCAG2AAA` errors (its notices need a person and stay a list),
-      beside the repository's own checks for what both miss (2.5.5).
-
 ## Maintainer decisions pending
 
 Each question names the default kept meanwhile; an answer moves into the item or into
