@@ -47,9 +47,13 @@ _VDSB_SurfacesReadTheOwner() {
 	Snapshot := HealthCheck_Run()
 	AssertEqual(Updater_CurrentVersion(), Snapshot["sections"]["versions"]["ergopti_version"],
 		"the diagnostics version is the owner's")
-	; The shared report (the copied, saved and windowless file) names the same version.
+	; The shared report (the copied, saved and windowless file) names the same
+	; version. Its projection admits release versions only, so a source run's
+	; "local" is not shared: the case is a stamped build, as the owner shows it.
+	Released := Updater_DisplayVersion("3.1.0-dev.4+ci.77.f58d157", false)
+	Snapshot["sections"]["versions"]["ergopti_version"] := Released
 	Shared := HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])
-	Assert(InStr(Shared["summary"], "`nVersion: " . Updater_CurrentVersion() . "`n") > 0,
+	Assert(InStr(Shared["summary"], "`nVersion: " . Released . "`n") > 0,
 		"the shared diagnostics must show exactly the owner's version: " . Shared["summary"])
 
 	Identity := Updater_BuildIdentity()
