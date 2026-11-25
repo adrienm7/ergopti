@@ -209,12 +209,12 @@ analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-an
 waits for the maintainer's review).
 
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 73 of the 91 files left out for its keys came in, the library holds 791 layouts
+      model »): 75 of the 91 files left out for its keys came in, the library holds 793 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
-      board-only codes and the Shift keys read as QMK's mod-tap (`docs/design/layout-analysis.md`, « ErgoDox keys »;
-      the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Still in `not_imported`:
-      KLAnext's VCKB and VCKB2 type a letter (d, l) on the ErgoDox's right 2-unit outer thumb key, the board's AltGr (a mod-tap code there, as the Shift keys' tapped characters
-      have, would read it; each would still lack its « u », on the left thumb's second key).
+      board-only codes, the Shift keys and AltGr's key read as QMK's mod-tap (`docs/design/layout-analysis.md`,
+      « ErgoDox keys »; the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Since
+      2026-11-25 KLAnext's VCKB and VCKB2 are in, complete on the ErgoDox: their d and l on AltGr's key read as
+      its tapped character (`RightThumbOuter`, see « Maintainer decisions pending »).
 - [ ] **[LATER] Layout library credits, what is left.** The credits were read on their authors' pages on 2026-11-17
       (`checked` and `evidence` in `layout_credits.json`). Still « knowledge »: QWERTY (US patent 207,559 is Sholes's,
       but its text names no letter order: read its drawings or another primary source) and KOY (neo-layout.org names
@@ -627,6 +627,12 @@ Each question names the default kept meanwhile; an answer moves into the item or
       context-dependent ways of typing, emulated by the three drivers, kept apart from ★). Kept meanwhile: nothing
       built. Choose: (1) build it as designed, the analysis first; (2) analysis only, no driver emulation (the
       Studio then rates keys no Ergopti driver can type); (3) not now.
+- [ ] **AltGr's ErgoDox key read as a mod-tap (decided by the agent on 2026-11-25, to review by the
+      maintainer).** KLAnext's VCKB and VCKB2 type six right thumb letters, one (d, l) on the ErgoDox's right 2-unit
+      outer key, the board's AltGr, and stayed out. Kept: that letter reads as QMK's mod-tap (`RALT_T`), as the Shift
+      keys' letters do since 2026-11-19, on the board-only thumb key `RightThumbOuter` at AltGr's place, taken only
+      when the right thumb has no code left, so no other layout moved (`docs/design/layout-analysis.md`, « ErgoDox
+      keys »). Both came in complete on the ErgoDox. The other choice is to keep them out.
 - [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
       `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
       unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.

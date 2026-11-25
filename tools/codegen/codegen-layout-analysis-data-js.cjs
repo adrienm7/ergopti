@@ -1277,6 +1277,10 @@ function checkThumbKeys(model) {
 	for (const code of model.thumb_rest_keys)
 		if (!model.thumb_keys.includes(code))
 			throw new Error(`thumb_rest_keys: ${code} is no thumb key`);
+	if (!Array.isArray(model.mod_tap_thumb_keys)) throw new Error('mod_tap_thumb_keys: not a list');
+	for (const code of model.mod_tap_thumb_keys)
+		if (!model.thumb_keys.includes(code) || !boardOnly.has(code))
+			throw new Error(`mod_tap_thumb_keys: ${code} is no board-only thumb key`);
 	const fingered = [];
 	for (const spec of Object.values(model.keyboards))
 		fingered.push(spec.board ? boards[spec.board].fingers : spec.extra_fingers || {});

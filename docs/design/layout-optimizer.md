@@ -63,7 +63,9 @@ the move set and each unit-tested:
 maintainer). The analysis model's thumb keys
 ([layout-analysis.md](layout-analysis.md#model)) are places only when
 `thumbKeys` names a keyboard that has them (a split board, JIS); the empty
-ones join as holes, so a letter may move there. A keyboard without thumb keys
+ones join as holes, so a letter may move there, but for a mod-tap thumb key
+(`mod_tap_thumb_keys`: the ErgoDox's AltGr key, 2026-11-25), a place only
+when the start layout types there. A keyboard without thumb keys
 is refused (`thumb_keys_absent`). With `null`, the default, nothing moves onto
 a thumb key and a start layout's thumb characters stay where they are, as a
 pinned key's. A letter that moves onto a thumb key is scored like any other

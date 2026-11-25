@@ -330,8 +330,13 @@ var LAYOUT_OPTIMIZER = (function () {
 			// The left thumb types on one key (the start's space key, else the one
 			// it rests on): its other keys are no places.
 			const spare = new Set(engine.spareThumbKeys(layout, opts.thumbKeys));
+			// A mod-tap key (AltGr's on the ErgoDox) is a place only when the start
+			// types there: no layout is moved onto a modifier unasked.
+			const modTap = new Set(engine.modTapThumbKeys());
+			const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
 			for (const code of thumbCodes)
-				if (board.index.has(code) && !spare.has(code)) thumbPlaces.add(code);
+				if (board.index.has(code) && !spare.has(code) && (!modTap.has(code) || typed(code)))
+					thumbPlaces.add(code);
 			if (thumbPlaces.size === 0)
 				throw new OptimizerError(
 					'thumb_keys_absent',

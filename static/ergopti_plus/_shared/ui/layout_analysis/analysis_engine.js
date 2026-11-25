@@ -843,6 +843,16 @@ var LAYOUT_ANALYSIS = (function () {
 		return data().model.thumb_keys.slice();
 	}
 
+	/**
+	 * The thumb keys at a modifier's place, read as QMK's mod-tap (the
+	 * ErgoDox's AltGr key): the optimizer offers them only to a layout that
+	 * types there.
+	 * @returns {string[]} Board-only codes.
+	 */
+	function modTapThumbKeyCodes() {
+		return data().model.mod_tap_thumb_keys.slice();
+	}
+
 	/** The layouts of the shared library, in the library shape. */
 	function libraryLayouts() {
 		return data().layouts.map(layoutFromRows);
@@ -8436,6 +8446,7 @@ var LAYOUT_ANALYSIS = (function () {
 		layoutFromComposerSource,
 		typingCodes,
 		thumbKeys: thumbKeyCodes,
+		modTapThumbKeys: modTapThumbKeyCodes,
 		spareThumbKeys,
 		keyboardFormats,
 		defaultKeyboardFormat,

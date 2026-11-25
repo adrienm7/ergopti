@@ -676,7 +676,8 @@ until then, so every layout's ErgoDox values changed with this convention.
   letters, by the finger column each sits under), the thumb keys
   `LeftThumbUpperOuter`, `LeftThumbUpperInner`, `LeftThumbMiddle`,
   `LeftThumbLower`, `RightThumbUpperInner`, `RightThumbUpperOuter`,
-  `RightThumbMiddle`, and the Shift keys' tapped characters below.
+  `RightThumbMiddle`, `RightThumbOuter` (AltGr's tapped character, below),
+  and the Shift keys' tapped characters below.
 - They are analysis-only names: never in `physical_keys.json`, the drivers'
   registry, whose every record needs a scan code, an evdev code and a macOS
   keycode, nor on the row-staggered keyboards (the codegen's
@@ -694,7 +695,7 @@ until then, so every layout's ErgoDox values changed with this convention.
   its own hand's letter (a left-hand character takes ShiftRight), so the two
   uses never meet. The drawings skip the modifiers, so the place shows the
   character. The other boards keep their Shift keys as modifiers only.
-- The 3 right board-only thumb keys are also `thumb_keys` (pairs, reach
+- The 4 right board-only thumb keys are also `thumb_keys` (pairs, reach
   from the nearest rest key, the optimizer's `thumbKeys`), present on the
   ErgoDox only. Its 4 left ones (`LeftThumbUpperOuter`,
   `LeftThumbUpperInner`, `LeftThumbMiddle`, `LeftThumbLower`) are
@@ -717,8 +718,14 @@ until then, so every layout's ErgoDox values changed with this convention.
   (`leftThumbKeys`, `layoutBoard`), so KLAnext's Einbinder Orthogonal
   (« u ») and Yp Hina Fu (« e ») are complete on the ErgoDox; they are the
   only library layouts that type on both, and no other value moved. The right 2-unit outer key (75) holds
-  AltGr, a modifier: a letter there has no code and is named unread
-  (KLAnext's VCKB and VCKB2 stay out for it).
+  AltGr, a modifier. A letter there takes the code the right thumb leaves
+  free; when none is left it reads as QMK's mod-tap (`RALT_T`), as the
+  Shift keys' letters do (2026-11-25, decided by the agent, to review by the
+  maintainer): tapped the key types it, held it is AltGr, on
+  `RightThumbOuter`, at AltGr's place and the right thumb, written back at
+  75 (`KLA_THUMB_BOARDS.ergodox.modTap`). KLAnext's VCKB and VCKB2 (six right
+  thumb letters, d or l there) came in complete on the ErgoDox; no other
+  value moved.
 - The board names its own outer columns (`outer_keys` in
   `board_geometries.json`: both pinky columns and the two outer keys of the
   row below), which replace the model's `outer_keys` there.
