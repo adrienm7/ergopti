@@ -1,5 +1,5 @@
 {
-	"expected_count": 7,
+	"expected_count": 8,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -26,6 +26,10 @@
 		},
 		{
 			"contains": "(secure-field-probe-paused)",
+			"expected_count": 1
+		},
+		{
+			"contains": "a paused park tick accumulates no distance",
 			"expected_count": 1
 		}
 	]
