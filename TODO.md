@@ -506,22 +506,12 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `pacman -Q lua51-lgi webkit2gtk-4.1 libayatana-appindicator` must list all three packages. Unproved here: the
       pkexec prompt under KDE's polkit agent, `sg` acquiring the new groups in the same session, and KWin Wayland's
       layout read (a failure shows « Disposition clavier non lue »).
-- [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25), being fixed.** Windows on
-      `fix/windows-silent-component-failures`: an error without WebView2 now stays on screen in a message box naming
-      the errors file, the diagnostic is delivered as an HTML page in the browser, and a 🔴 tray row shows a failed
-      `ergopti_nav_owner.dll`; none of it has run on Windows yet. The managed download failure was already a modal
-      box. macOS on `fix/macos-silent-component-failures`: a red dot on the Hotstrings title while the keymap event
-      tap cannot restart (`hotstrings/engine/expander/init.lua:2905-2945`), and an alert plus the HTML fallback when
-      `hs.webview.new` fails (`menu/ui/builder/builder.lua:843`).
-- [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25).** Windows: a runtime error without
-      WebView2 is only a TrayTip (`diagnostics/ui/error_dialog.ahk:362-375`) and a managed download failure only a
-      transient notice (`ui/download_window/init.ahk:78-82`): fall back to `Ui_MsgBox` naming the errors file;
-      `HealthCheck_FormatPlain` (`diagnostics/ui/healthcheck/core.ahk:527`) has no caller although comments call it the
-      WebView2-less fallback; no tray status row exists for a removed keyboard hook or a failed `ergopti_nav_owner.dll`
-      (`ai/adapters/nav_event_owner.ahk:4971`). macOS: a keymap event tap that keeps failing to restart only logs an
-      ERROR per second (`hotstrings/engine/expander/init.lua:2905-2945`) with no 🔴 title dot; a failed `hs.webview.new`
-      leaves a menu click without effect (`menu/ui/builder/builder.lua:843`). Linux now has `component_status` for
-      the same class.
+- [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25), field checks.** The code is on
+      `dev`: the Windows error and diagnostics delivery without WebView2, its 🔴 keyboard core row for a failed
+      `ergopti_nav_owner.dll` (`HealthCheck_FormatPlain`, uncalled, was removed), the macOS red Hotstrings dot for a
+      keymap tap that cannot restart, the macOS windowless diagnostics and error delivery, and the macOS window mode
+      for an unread focused element. Left: the Windows run in TODO-tests-windows.md (« Silent component failures »)
+      and the macOS ones in TODO-tests-macos.md; the hook Windows removes in silence is a pending decision below.
 
 - [ ] **[LATER] Legacy Linux updater probes.** `tools/build/add-linux-legacy-update-probes.sh` adds
       `_shared/data/locales/en.json` and an empty `_shared/lua/` to the release tarball so pre-move updaters (v1.0.9
@@ -599,6 +589,18 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **No tray row for a keyboard hook Windows removes in silence (decided by the agent on 2026-11-25, to review
+      by the maintainer).** Windows 7 and later remove a low-level hook whose callback overruns
+      `LowLevelHooksTimeout` without telling the process, and Microsoft documents that the process cannot know. The
+      only signal is indirect: `GetLastInputInfo` (`A_TimeIdle`) moving while the hooks' own idle counters
+      (`A_TimeIdleKeyboard`, `A_TimeIdleMouse`) do not, which injected input (Ergopti's own sends, remote desktop,
+      other automation tools) also produces. Kept meanwhile: no detector and no row; the driver keeps its hook
+      callbacks short (`modules/keymap/layout.ahk`, `hotstrings/engine/matcher/engine.ahk`), and a hook refused at
+      start already shows the 🔴 keyboard core row. macOS shows its own tap outage (Hotstrings red dot), Linux has no
+      such timeout in its evdev daemon. Choose:
+  1. **(recommended) Keep it as described**, no row for a removal Windows does not report.
+  2. Add a 🔴 row from the idle-counter comparison, accepting false alarms under remote desktop or other injectors.
+  3. Reinstall the hooks periodically (`InstallKeybdHook(true, true)`), at the cost of a reset of the hook's key state.
 - [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
       maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
       nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
