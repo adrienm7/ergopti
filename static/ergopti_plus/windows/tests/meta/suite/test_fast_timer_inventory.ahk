@@ -68,7 +68,8 @@ _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
 		"_RegionSelectTrack",           "15",    ; only armed while the left button drags a Ctrl+O capture region; timings [screen_vision] region_select_track_ms, one pointer read
-		"_KeyCombinationChordTimerFn",  "5",     ; only armed while a key waits for its chord or a chord holds its keys; one key-state read per key
+		"_ScreenVisionPoll",            "25",    ; only armed while the vision worker starts or a call waits for its answer file, disarmed once the queue is empty; timings [screen_vision] worker_poll_ms
+		"_KeyCombinationChordTimerFn",  "5",    ; only armed while a key waits for its chord or a chord holds its keys; one key-state read per key
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
 		"_UserHotstringsPoll",          "25",    ; only while exact worker/Job/stage debt is owned; stale source/focus/input cancellation
 		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
