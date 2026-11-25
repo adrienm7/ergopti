@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Der Installationspfad enthält eine symbolische Verkn�
 uninstall.system_prefix=Systeminstallationspräfix abgelehnt.
 uninstall.unsafe_path=Unsicherer Eigentumspfad.
 uninstall.unsupported_argument=Nicht unterstütztes Deinstallationsargument: {1}
+xkb_helpers.not_found=Die Installationsdateien der Tastaturbelegungen wurden weder neben {1} noch unter {2} gefunden: ohne sie lässt sich keine Belegung installieren.

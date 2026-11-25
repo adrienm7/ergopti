@@ -183,19 +183,17 @@ echo "--- Copying the .keylayout converter ---"
 # xkb_converter.lua), from the keysym table, symbols template and key types that
 # ship in data/. The Python converter, the repository-only regeneration script and
 # the tests stay behind: the package does not run them.
-copy_tree "${REPO_ROOT}/static/ergopti/linux/xkb_generation/" "${BUILD_DIR}/linux/xkb_generation/" \
-	--exclude tests --exclude generate_xkb_files.py --exclude keylayout_to_xkb.py
-
-echo "--- Copying the user XKB installer and the layout registry ---"
-
 # The layout manager installs a converted layout in the user XKB tree without
-# sudo (user_layout_installer.py and the modules it imports), and installs the
-# Ergopti layouts offline from the registry folder shipped at its repository
-# path below the driver (modules/keymap/layout_registry.lua).
-mkdir -p "${BUILD_DIR}/linux/xkb_installation"
-cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/user_layout_installer.py" "${BUILD_DIR}/linux/xkb_installation/"
-cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/layout_package.py" "${BUILD_DIR}/linux/xkb_installation/"
-cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/desktop_activation.py" "${BUILD_DIR}/linux/xkb_installation/"
+# sudo (user_layout_installer.py and the modules it imports). The file list has
+# one owner, install/xkb_helpers.sh, which a checkout install.sh runs too.
+# shellcheck source=../../static/ergopti_plus/linux/install/xkb_helpers.sh
+source "${LINUX_SRC}/install/xkb_helpers.sh"
+stage_xkb_helpers "${REPO_ROOT}/static/ergopti/linux" "${BUILD_DIR}/linux"
+
+echo "--- Copying the layout registry ---"
+
+# The Ergopti layouts install offline from the registry folder shipped at its
+# repository path below the driver (modules/keymap/layout_registry.lua).
 copy_tree "${REPO_ROOT}/static/layouts/registry/" "${BUILD_DIR}/linux/static/layouts/registry/"
 
 # ============================================================================
@@ -311,6 +309,7 @@ REQUIRED_FILES=(
 	"linux/static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml"
 	"linux/static/layouts/registry/ergopti/hotstrings/suffixes_a.toml"
 	"linux/install/layout_registry.sh"
+	"linux/install/xkb_helpers.sh"
 	"linux/install/native_source_build.sh"
 	# The .rpm wrapper and the standalone launcher admit native_modules/ here.
 	"linux/install/native_modules_env.sh"

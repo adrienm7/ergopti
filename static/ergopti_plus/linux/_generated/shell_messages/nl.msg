@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Het installatiepad loopt via een symbolische koppeling
 uninstall.system_prefix=Systeeminstallatievoorvoegsel geweigerd.
 uninstall.unsafe_path=Onveilig eigendomspad.
 uninstall.unsupported_argument=Niet-ondersteund verwijderargument: {1}
+xkb_helpers.not_found=De installatiebestanden voor toetsenbordindelingen zijn niet gevonden naast {1} of in {2}: zonder deze kan geen indeling worden geïnstalleerd.

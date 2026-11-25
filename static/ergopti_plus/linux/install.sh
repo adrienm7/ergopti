@@ -1096,6 +1096,12 @@ _section install.section_files
 # shellcheck source=install/layout_registry.sh
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
+# The layout manager's XKB helpers (conversion data, user XKB installer) travel
+# below the installed driver too, resolved before the first copy for the same
+# reason: without them no keyboard layout can be installed.
+# shellcheck source=install/xkb_helpers.sh
+source "${SRC_DRIVER}/install/xkb_helpers.sh"
+SRC_XKB_HELPERS="$(xkb_helpers_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
 # Carry prior startup receipts when their files remain under the menu owner.
 # The menu compares the old desktop digest before renewing ownership.
@@ -1307,16 +1313,26 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 fi
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"
+# A registry or XKB helpers copied from the checkout are the installer's too, so
+# uninstall.sh removes them with the driver.
+EXTRA_OWNED_TREES=()
+if [ -n "${SRC_REGISTRY}" ]; then
+	EXTRA_OWNED_TREES+=("${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}")
+fi
+if [ -n "${SRC_XKB_HELPERS}" ]; then
+	# Staged first, so the receipt hashes exactly the files that were installed.
+	XKB_HELPERS_STAGE="$(mktemp -d)"
+	trap 'rm -rf -- "$XKB_HELPERS_STAGE"' EXIT
+	stage_xkb_helpers "${SRC_XKB_HELPERS}" "${XKB_HELPERS_STAGE}" || exit 1
+	cp -r "${XKB_HELPERS_STAGE}/." "${LIB_DIR}/linux/"
+	EXTRA_OWNED_TREES+=(
+		"${XKB_HELPERS_STAGE}/${XKB_HELPERS_DATA_FOLDER}" "linux/${XKB_HELPERS_DATA_FOLDER}"
+		"${XKB_HELPERS_STAGE}/${XKB_HELPERS_INSTALLER_FOLDER}" "linux/${XKB_HELPERS_INSTALLER_FOLDER}"
+	)
+fi
 install -d "${LIB_DIR}/bin"
 install -m 755 "${SRC_DRIVER}/install/standalone_launcher.sh" "${LIB_DIR}/bin/ergopti-hotstrings"
-# A registry copied from the checkout is the installer's too, so uninstall.sh
-# removes it with the driver.
-if [ -n "${SRC_REGISTRY}" ]; then
-	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}" \
-		"${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}"
-else
-	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
-fi
+bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}" "${EXTRA_OWNED_TREES[@]}"
 for startup_receipt in "${PRESERVED_STARTUP_RECEIPTS[@]}"; do
 	printf '%s\n' "$startup_receipt" >> "${LIB_DIR}/.ergopti-owned-files"
 done

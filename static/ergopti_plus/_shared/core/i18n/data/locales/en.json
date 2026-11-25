@@ -1811,6 +1811,7 @@
 	"linux_shell.launch.groups_unavailable": "The session could not acquire its configured input groups.",
 	"linux_shell.launch.session_lock_invalid": "The session lock root must be an absolute path.",
 	"linux_shell.layout_registry.not_found": "Layout registry not found beside {1} nor at {2}.",
+	"linux_shell.xkb_helpers.not_found": "The keyboard layout installation files were not found beside {1} nor at {2}: without them no keyboard layout can be installed.",
 	"linux_shell.permissions.identity_mismatch": "Account identity mismatch.",
 	"linux_shell.permissions.no_login_manager": "No login manager is running; user enrollment is deferred to the graphical launch.",
 	"linux_shell.permissions.non_desktop_account": "Refusing a non-desktop account.",

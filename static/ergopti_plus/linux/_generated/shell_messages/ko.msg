@@ -132,3 +132,4 @@ uninstall.symlink_in_path=설치 경로가 심볼릭 링크를 거칩니다.
 uninstall.system_prefix=시스템 설치 접두사를 거부했습니다.
 uninstall.unsafe_path=소유권 경로가 안전하지 않습니다.
 uninstall.unsupported_argument=지원되지 않는 제거 인수: {1}
+xkb_helpers.not_found=키보드 배열 설치 파일을 {1} 옆에서도 {2}에서도 찾을 수 없습니다. 이 파일이 없으면 배열을 설치할 수 없습니다.

@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Installation path crosses a symbolic link.
 uninstall.system_prefix=Refusing a system installation prefix.
 uninstall.unsafe_path=Unsafe ownership path.
 uninstall.unsupported_argument=Unsupported uninstall argument: {1}
+xkb_helpers.not_found=The keyboard layout installation files were not found beside {1} nor at {2}: without them no keyboard layout can be installed.

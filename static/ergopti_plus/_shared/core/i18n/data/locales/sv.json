@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Sessionen kunde inte få sina konfigurerade inmatningsgrupper.",
 	"linux_shell.launch.session_lock_invalid": "Mappen för sessionslåset måste vara en absolut sökväg.",
 	"linux_shell.layout_registry.not_found": "Layoutregistret hittades varken bredvid {1} eller i {2}.",
+	"linux_shell.xkb_helpers.not_found": "Installationsfilerna för tangentbordslayouter hittades varken bredvid {1} eller i {2}: utan dem kan ingen layout installeras.",
 	"linux_shell.permissions.identity_mismatch": "Kontots identitet stämmer inte.",
 	"linux_shell.permissions.no_login_manager": "Ingen inloggningshanterare körs; användarens registrering skjuts upp till den grafiska starten.",
 	"linux_shell.permissions.non_desktop_account": "Konto utan skrivbord avvisades.",

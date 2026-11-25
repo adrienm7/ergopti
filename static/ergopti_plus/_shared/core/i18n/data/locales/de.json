@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Die Sitzung konnte ihre konfigurierten Eingabegruppen nicht erhalten.",
 	"linux_shell.launch.session_lock_invalid": "Das Verzeichnis der Sitzungssperre muss ein absoluter Pfad sein.",
 	"linux_shell.layout_registry.not_found": "Layout-Register weder neben {1} noch unter {2} gefunden.",
+	"linux_shell.xkb_helpers.not_found": "Die Installationsdateien der Tastaturbelegungen wurden weder neben {1} noch unter {2} gefunden: ohne sie lässt sich keine Belegung installieren.",
 	"linux_shell.permissions.identity_mismatch": "Die Kontoidentität stimmt nicht überein.",
 	"linux_shell.permissions.no_login_manager": "Es läuft kein Anmeldemanager; die Aufnahme des Benutzers wird auf den grafischen Start verschoben.",
 	"linux_shell.permissions.non_desktop_account": "Konto ohne Desktop abgelehnt.",

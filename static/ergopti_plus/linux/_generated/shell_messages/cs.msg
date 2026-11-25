@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Instalační cesta prochází symbolickým odkazem.
 uninstall.system_prefix=Systémová instalační předpona byla odmítnuta.
 uninstall.unsafe_path=Nebezpečná cesta vlastnictví.
 uninstall.unsupported_argument=Nepodporovaný argument odinstalace: {1}
+xkb_helpers.not_found=Instalační soubory rozložení klávesnice nebyly nalezeny vedle {1} ani v {2}: bez nich nelze nainstalovat žádné rozložení.

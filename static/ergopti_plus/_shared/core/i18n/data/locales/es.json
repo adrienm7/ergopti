@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "La sesión no pudo obtener sus grupos de entrada configurados.",
 	"linux_shell.launch.session_lock_invalid": "La carpeta de bloqueo de la sesión debe ser una ruta absoluta.",
 	"linux_shell.layout_registry.not_found": "No se encuentra el registro de distribuciones junto a {1} ni en {2}.",
+	"linux_shell.xkb_helpers.not_found": "No se encontraron los archivos de instalación de distribuciones de teclado junto a {1} ni en {2}: sin ellos no se puede instalar ninguna distribución.",
 	"linux_shell.permissions.identity_mismatch": "La identidad de la cuenta no coincide.",
 	"linux_shell.permissions.no_login_manager": "No hay ningún gestor de inicio de sesión en ejecución; la inscripción del usuario se aplaza al inicio gráfico.",
 	"linux_shell.permissions.non_desktop_account": "Se rechaza una cuenta que no es de escritorio.",

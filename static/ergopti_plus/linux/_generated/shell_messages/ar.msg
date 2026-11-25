@@ -132,3 +132,4 @@ uninstall.symlink_in_path=يمر مسار التثبيت عبر رابط رمز�
 uninstall.system_prefix=رُفضت بادئة تثبيت للنظام.
 uninstall.unsafe_path=مسار ملكية غير آمن.
 uninstall.unsupported_argument=وسيطة إلغاء تثبيت غير مدعومة: {1}
+xkb_helpers.not_found=لم يُعثر على ملفات تثبيت تخطيطات لوحة المفاتيح بجوار {1} ولا في {2}: بدونها لا يمكن تثبيت أي تخطيط.

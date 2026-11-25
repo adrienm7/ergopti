@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "세션이 설정된 입력 그룹을 얻지 못했습니다.",
 	"linux_shell.launch.session_lock_invalid": "세션 잠금 폴더는 절대 경로여야 합니다.",
 	"linux_shell.layout_registry.not_found": "레이아웃 레지스트리를 {1} 옆에서도 {2}에서도 찾을 수 없습니다.",
+	"linux_shell.xkb_helpers.not_found": "키보드 배열 설치 파일을 {1} 옆에서도 {2}에서도 찾을 수 없습니다. 이 파일이 없으면 배열을 설치할 수 없습니다.",
 	"linux_shell.permissions.identity_mismatch": "계정 ID가 일치하지 않습니다.",
 	"linux_shell.permissions.no_login_manager": "로그인 관리자가 실행 중이 아닙니다. 사용자 등록은 그래픽 실행 시로 미룹니다.",
 	"linux_shell.permissions.non_desktop_account": "데스크톱 계정이 아니어서 거부했습니다.",

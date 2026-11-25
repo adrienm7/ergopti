@@ -132,3 +132,4 @@ uninstall.symlink_in_path=インストールパスがシンボリックリンク
 uninstall.system_prefix=システムのインストールプレフィックスを拒否しました。
 uninstall.unsafe_path=所有権のパスが安全ではありません。
 uninstall.unsupported_argument=サポートされていないアンインストール引数: {1}
+xkb_helpers.not_found=キーボード配列のインストール用ファイルが {1} の隣にも {2} にも見つかりません。これがないと配列をインストールできません。

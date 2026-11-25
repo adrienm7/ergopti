@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "La sessione non è riuscita a ottenere i gruppi di input configurati.",
 	"linux_shell.launch.session_lock_invalid": "La cartella del blocco della sessione deve essere un percorso assoluto.",
 	"linux_shell.layout_registry.not_found": "Registro dei layout non trovato accanto a {1} né in {2}.",
+	"linux_shell.xkb_helpers.not_found": "File di installazione dei layout di tastiera non trovati accanto a {1} né in {2}: senza di essi non si può installare alcun layout.",
 	"linux_shell.permissions.identity_mismatch": "L’identità dell’account non corrisponde.",
 	"linux_shell.permissions.no_login_manager": "Nessun gestore di accesso è in esecuzione; l’iscrizione dell’utente è rimandata all’avvio grafico.",
 	"linux_shell.permissions.non_desktop_account": "Account non desktop rifiutato.",

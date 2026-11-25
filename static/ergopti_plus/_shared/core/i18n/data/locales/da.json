@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Sessionen kunne ikke få sine konfigurerede inputgrupper.",
 	"linux_shell.launch.session_lock_invalid": "Sessionslåsens mappe skal være en absolut sti.",
 	"linux_shell.layout_registry.not_found": "Layoutregistret blev hverken fundet ved siden af {1} eller i {2}.",
+	"linux_shell.xkb_helpers.not_found": "Installationsfilerne til tastaturlayouts blev hverken fundet ved siden af {1} eller i {2}: uden dem kan intet layout installeres.",
 	"linux_shell.permissions.identity_mismatch": "Kontoens identitet stemmer ikke.",
 	"linux_shell.permissions.no_login_manager": "Ingen loginmanager kører; brugerens tilmelding udskydes til den grafiske start.",
 	"linux_shell.permissions.non_desktop_account": "Konto uden skrivebord afvist.",

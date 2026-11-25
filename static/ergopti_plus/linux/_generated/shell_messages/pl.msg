@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Ścieżka instalacji przechodzi przez dowiązanie symb
 uninstall.system_prefix=Odrzucono systemowy prefiks instalacji.
 uninstall.unsafe_path=Niebezpieczna ścieżka własności.
 uninstall.unsupported_argument=Nieobsługiwany argument dezinstalacji: {1}
+xkb_helpers.not_found=Nie znaleziono plików instalacyjnych układów klawiatury ani obok {1}, ani w {2}: bez nich nie można zainstalować żadnego układu.

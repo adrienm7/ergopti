@@ -132,3 +132,4 @@ uninstall.symlink_in_path=La ruta de instalación atraviesa un enlace simbólico
 uninstall.system_prefix=Se rechaza un prefijo de instalación del sistema.
 uninstall.unsafe_path=Ruta de propiedad no segura.
 uninstall.unsupported_argument=Argumento de desinstalación no admitido: {1}
+xkb_helpers.not_found=No se encontraron los archivos de instalación de distribuciones de teclado junto a {1} ni en {2}: sin ellos no se puede instalar ninguna distribución.

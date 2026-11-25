@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Сеанс не зміг отримати налаштовані групи введення.",
 	"linux_shell.launch.session_lock_invalid": "Папка блокування сеансу має бути абсолютним шляхом.",
 	"linux_shell.layout_registry.not_found": "Реєстр розкладок не знайдено ні поруч із {1}, ні в {2}.",
+	"linux_shell.xkb_helpers.not_found": "Файли встановлення розкладок клавіатури не знайдено ні поруч із {1}, ні в {2}: без них не можна встановити жодну розкладку.",
 	"linux_shell.permissions.identity_mismatch": "Ідентифікаційні дані облікового запису не збігаються.",
 	"linux_shell.permissions.no_login_manager": "Менеджер входу не запущено; реєстрацію користувача відкладено до графічного запуску.",
 	"linux_shell.permissions.non_desktop_account": "Обліковий запис без робочого столу відхилено.",

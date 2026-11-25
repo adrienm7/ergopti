@@ -132,3 +132,4 @@ uninstall.symlink_in_path=इंस्टॉलेशन पथ एक सिम
 uninstall.system_prefix=सिस्टम इंस्टॉलेशन प्रीफ़िक्स अस्वीकार किया गया।
 uninstall.unsafe_path=असुरक्षित स्वामित्व पथ।
 uninstall.unsupported_argument=असमर्थित अनइंस्टॉल तर्क: {1}
+xkb_helpers.not_found=कीबोर्ड लेआउट इंस्टॉल करने की फ़ाइलें न {1} के पास मिलीं, न {2} में: इनके बिना कोई लेआउट इंस्टॉल नहीं हो सकता।

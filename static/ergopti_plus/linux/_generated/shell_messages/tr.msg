@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Kurulum yolu sembolik bir bağlantıdan geçiyor.
 uninstall.system_prefix=Sistem kurulum öneki reddedildi.
 uninstall.unsafe_path=Güvenli olmayan sahiplik yolu.
 uninstall.unsupported_argument=Desteklenmeyen kaldırma bağımsız değişkeni: {1}
+xkb_helpers.not_found=Klavye düzeni kurulum dosyaları ne {1} yanında ne de {2} içinde bulundu: bunlar olmadan hiçbir düzen kurulamaz.

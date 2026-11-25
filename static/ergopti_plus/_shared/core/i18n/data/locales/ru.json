@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Сеанс не смог получить настроенные группы ввода.",
 	"linux_shell.launch.session_lock_invalid": "Папка блокировки сеанса должна задаваться абсолютным путём.",
 	"linux_shell.layout_registry.not_found": "Реестр раскладок не найден ни рядом с {1}, ни в {2}.",
+	"linux_shell.xkb_helpers.not_found": "Файлы установки раскладок клавиатуры не найдены ни рядом с {1}, ни в {2}: без них нельзя установить ни одну раскладку.",
 	"linux_shell.permissions.identity_mismatch": "Идентификационные данные учётной записи не совпадают.",
 	"linux_shell.permissions.no_login_manager": "Диспетчер входа не запущен; регистрация пользователя откладывается до графического запуска.",
 	"linux_shell.permissions.non_desktop_account": "Учётная запись без рабочего стола отклонена.",

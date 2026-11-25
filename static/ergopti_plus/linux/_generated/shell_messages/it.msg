@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Il percorso di installazione attraversa un collegament
 uninstall.system_prefix=Prefisso di installazione di sistema rifiutato.
 uninstall.unsafe_path=Percorso di proprietà non sicuro.
 uninstall.unsupported_argument=Argomento di disinstallazione non supportato: {1}
+xkb_helpers.not_found=File di installazione dei layout di tastiera non trovati accanto a {1} né in {2}: senza di essi non si può installare alcun layout.

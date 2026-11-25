@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Installasjonsstien går gjennom en symbolsk lenke.
 uninstall.system_prefix=Avviser et systeminstallasjonsprefiks.
 uninstall.unsafe_path=Usikker eierskapssti.
 uninstall.unsupported_argument=Avinstalleringsargument støttes ikke: {1}
+xkb_helpers.not_found=Fant ikke installasjonsfilene for tastaturoppsett verken ved siden av {1} eller i {2}: uten dem kan ingen oppsett installeres.

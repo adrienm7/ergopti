@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Installationsstien går gennem et symbolsk link.
 uninstall.system_prefix=Afviser et systeminstallationspræfiks.
 uninstall.unsafe_path=Usikker ejerskabssti.
 uninstall.unsupported_argument=Ikke-understøttet afinstallationsargument: {1}
+xkb_helpers.not_found=Installationsfilerne til tastaturlayouts blev hverken fundet ved siden af {1} eller i {2}: uden dem kan intet layout installeres.

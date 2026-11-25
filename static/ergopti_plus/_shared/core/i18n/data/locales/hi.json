@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "सत्र अपने कॉन्फ़िगर किए गए इनपुट समूह प्राप्त नहीं कर सका।",
 	"linux_shell.launch.session_lock_invalid": "सत्र लॉक का फ़ोल्डर एक निरपेक्ष पथ होना चाहिए।",
 	"linux_shell.layout_registry.not_found": "लेआउट रजिस्ट्री न तो {1} के पास मिली, न ही {2} में।",
+	"linux_shell.xkb_helpers.not_found": "कीबोर्ड लेआउट इंस्टॉल करने की फ़ाइलें न {1} के पास मिलीं, न {2} में: इनके बिना कोई लेआउट इंस्टॉल नहीं हो सकता।",
 	"linux_shell.permissions.identity_mismatch": "खाता पहचान मेल नहीं खाती।",
 	"linux_shell.permissions.no_login_manager": "कोई लॉगिन मैनेजर नहीं चल रहा; उपयोगकर्ता नामांकन ग्राफ़िकल लॉन्च तक टाला गया।",
 	"linux_shell.permissions.non_desktop_account": "गैर-डेस्कटॉप खाता अस्वीकार किया गया।",

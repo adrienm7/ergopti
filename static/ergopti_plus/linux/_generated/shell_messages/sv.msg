@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Installationssökvägen går via en symbolisk länk.
 uninstall.system_prefix=Vägrar ett systeminstallationsprefix.
 uninstall.unsafe_path=Osäker ägarskapssökväg.
 uninstall.unsupported_argument=Avinstallationsargument stöds inte: {1}
+xkb_helpers.not_found=Installationsfilerna för tangentbordslayouter hittades varken bredvid {1} eller i {2}: utan dem kan ingen layout installeras.

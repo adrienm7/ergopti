@@ -132,3 +132,4 @@ uninstall.symlink_in_path=נתיב ההתקנה עובר דרך קישור סמ�
 uninstall.system_prefix=קידומת התקנת מערכת נדחתה.
 uninstall.unsafe_path=נתיב בעלות לא בטוח.
 uninstall.unsupported_argument=ארגומנט הסרה לא נתמך: {1}
+xkb_helpers.not_found=קובצי ההתקנה של פריסות המקלדת לא נמצאו ליד {1} וגם לא ב-{2}: בלעדיהם אי אפשר להתקין אף פריסה.

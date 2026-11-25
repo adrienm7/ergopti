@@ -132,3 +132,4 @@ uninstall.symlink_in_path=安装路径经过了符号链接。
 uninstall.system_prefix=已拒绝系统安装前缀。
 uninstall.unsafe_path=所有权路径不安全。
 uninstall.unsupported_argument=不支持的卸载参数：{1}
+xkb_helpers.not_found=在 {1} 旁和 {2} 中均未找到键盘布局安装文件：没有它们就无法安装任何布局。

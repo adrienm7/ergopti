@@ -132,3 +132,4 @@ uninstall.symlink_in_path=Le chemin d’installation traverse un lien symbolique
 uninstall.system_prefix=Préfixe d’installation système refusé.
 uninstall.unsafe_path=Chemin de propriété dangereux.
 uninstall.unsupported_argument=Argument de désinstallation non pris en charge : {1}
+xkb_helpers.not_found=Fichiers d’installation des dispositions clavier introuvables à côté de {1} ni dans {2} : sans eux, aucune disposition ne peut être installée.

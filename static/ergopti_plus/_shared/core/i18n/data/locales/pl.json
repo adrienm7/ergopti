@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Sesja nie mogła uzyskać skonfigurowanych grup wejścia.",
 	"linux_shell.launch.session_lock_invalid": "Katalog blokady sesji musi być ścieżką bezwzględną.",
 	"linux_shell.layout_registry.not_found": "Nie znaleziono rejestru układów obok {1} ani w {2}.",
+	"linux_shell.xkb_helpers.not_found": "Nie znaleziono plików instalacyjnych układów klawiatury ani obok {1}, ani w {2}: bez nich nie można zainstalować żadnego układu.",
 	"linux_shell.permissions.identity_mismatch": "Tożsamość konta się nie zgadza.",
 	"linux_shell.permissions.no_login_manager": "Nie działa żaden menedżer logowania; rejestracja użytkownika zostaje odłożona do uruchomienia graficznego.",
 	"linux_shell.permissions.non_desktop_account": "Odrzucono konto bez pulpitu.",

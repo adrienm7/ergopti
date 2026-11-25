@@ -1811,6 +1811,7 @@
 	"linux_shell.launch.groups_unavailable": "La session n’a pas pu obtenir ses groupes d’accès au clavier configurés.",
 	"linux_shell.launch.session_lock_invalid": "Le dossier du verrou de session doit être un chemin absolu.",
 	"linux_shell.layout_registry.not_found": "Registre des dispositions introuvable à côté de {1} ni dans {2}.",
+	"linux_shell.xkb_helpers.not_found": "Fichiers d’installation des dispositions clavier introuvables à côté de {1} ni dans {2} : sans eux, aucune disposition ne peut être installée.",
 	"linux_shell.permissions.identity_mismatch": "L’identité du compte ne correspond pas.",
 	"linux_shell.permissions.no_login_manager": "Aucun gestionnaire de connexion n’est actif ; l’inscription de l’utilisateur est reportée au lancement graphique.",
 	"linux_shell.permissions.non_desktop_account": "Compte non graphique refusé.",

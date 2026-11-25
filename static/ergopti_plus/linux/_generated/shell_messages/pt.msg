@@ -132,3 +132,4 @@ uninstall.symlink_in_path=O caminho de instalação atravessa uma ligação simb
 uninstall.system_prefix=Prefixo de instalação do sistema recusado.
 uninstall.unsafe_path=Caminho de propriedade inseguro.
 uninstall.unsupported_argument=Argumento de desinstalação não suportado: {1}
+xkb_helpers.not_found=Os ficheiros de instalação dos esquemas de teclado não foram encontrados junto a {1} nem em {2}: sem eles não é possível instalar nenhum esquema.

@@ -1816,6 +1816,7 @@
 	"linux_shell.launch.groups_unavailable": "Oturum yapılandırılmış giriş gruplarını alamadı.",
 	"linux_shell.launch.session_lock_invalid": "Oturum kilidi klasörü mutlak bir yol olmalıdır.",
 	"linux_shell.layout_registry.not_found": "Düzen kaydı ne {1} yanında ne de {2} içinde bulundu.",
+	"linux_shell.xkb_helpers.not_found": "Klavye düzeni kurulum dosyaları ne {1} yanında ne de {2} içinde bulundu: bunlar olmadan hiçbir düzen kurulamaz.",
 	"linux_shell.permissions.identity_mismatch": "Hesap kimliği eşleşmiyor.",
 	"linux_shell.permissions.no_login_manager": "Çalışan bir oturum açma yöneticisi yok; kullanıcı kaydı grafik başlatmaya ertelendi.",
 	"linux_shell.permissions.non_desktop_account": "Masaüstü olmayan hesap reddedildi.",
