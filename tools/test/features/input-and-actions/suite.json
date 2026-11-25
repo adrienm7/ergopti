@@ -842,6 +842,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-hotstring-editor-action-entry.cjs"],
 			"repro": "npm run test:hs-editor-action-entry"
+		},
+		{
+			"id": "js-hotstring-editor-trigger-capture",
+			"ordinal": 743,
+			"name": "hotstring editor: only the trigger field records raw keys; every other Ergopti field keeps the emulation and the hotstrings",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-hotstring-editor-trigger-capture.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-trigger-capture.cjs"
 		}
 	]
 }

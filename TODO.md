@@ -556,6 +556,20 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       shared root by `build_stamp.txt` has been out for one full release cycle. The structure step that moves
       `linux/infra/version.lua` (also required by v1.0.9) must add that probe too.
 
+## Ergopti's own fields: emulation and hotstrings everywhere, recording fields raw (maintainer decision, 2026-11-25)
+
+The decision is in [maintainer decisions](docs/memory/maintainer-decisions.md) (« Ergopti's own fields type like any
+other »). Done on Linux: the hotstring editor page holds the capture gate only while its trigger field has the focus
+(`_shared/ui/hotstring_editor/script.js`, `tools/test/test-hotstring-editor-trigger-capture.cjs`). Open:
+
+- macOS: the editor's `window_focus` sets `_is_focused` and calls `_on_focus_change`, which nothing sets, so a
+  trigger typed in the trigger field can expand there; wire it to withhold the expander and the emulation while the
+  trigger field is focused.
+- Windows: `personal_toml_editor_webview.ahk` ignores `window_focus`; the same withholding is missing.
+- The tray's native prompts (the magic key's, `core/ui/ui/text_prompt.lua`) block the Linux daemon's loop, so
+  `core/ui/ui/modal.lua` hands the keyboard to the desktop and no emulation types in them; they need an
+  asynchronous dialog.
+
 ## Anti-sleep auto-clicker (maintainer request, 2026-11-25)
 
 The decisions are in [maintainer decisions](docs/memory/maintainer-decisions.md) (« The anti-sleep mode gains an

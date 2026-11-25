@@ -1800,18 +1800,36 @@ function setDefaultPrio(value) {
 // ====================================
 // ====================================
 
-window.addEventListener(
-	'focus',
-	function (e) {
-		if (e.target === window || e.target === document) toLua('window_focus', { focused: true });
-	},
-	true
-);
+// Only the field that records a trigger holds the daemon's capture gate
+// (maintainer decision of 2026-11-25): the layout emulation and the hotstrings
+// keep typing in every other Ergopti field, while the trigger is typed raw, so
+// writing an existing trigger there never expands it. The message keeps its
+// name; `focused` now means "the trigger field has the focus".
+const TRIGGER_FIELD_ID = 'e-trig';
+let triggerFieldFocused = false;
+
+/**
+ * Tells the daemon whether the trigger field records the keys, once per change.
+ * @param {boolean} focused - Whether the trigger field has the focus.
+ */
+function setTriggerFieldFocused(focused) {
+	if (focused === triggerFieldFocused) return;
+	triggerFieldFocused = focused;
+	toLua('window_focus', { focused: focused });
+}
+
+document.addEventListener('focusin', function (e) {
+	setTriggerFieldFocused(Boolean(e.target && e.target.id === TRIGGER_FIELD_ID));
+});
+
+document.addEventListener('focusout', function (e) {
+	if (e.target && e.target.id === TRIGGER_FIELD_ID) setTriggerFieldFocused(false);
+});
 
 window.addEventListener(
 	'blur',
 	function (e) {
-		if (e.target === window || e.target === document) toLua('window_focus', { focused: false });
+		if (e.target === window || e.target === document) setTriggerFieldFocused(false);
 	},
 	true
 );

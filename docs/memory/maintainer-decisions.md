@@ -5,6 +5,19 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Ergopti's own fields type like any other; only recording fields are raw (2026-11-25)
+
+Decided by the maintainer on 2026-11-25: the layout emulation and the
+hotstrings stay active in every Ergopti window and text field, so the user
+types Ergopti or Ergopti+ everywhere. The one exception is a field that records
+a trigger, a key or a shortcut (the hotstring editor's trigger field `e-trig`,
+key-capture and shortcut fields): it receives the raw keys, with neither the
+emulation nor the hotstrings. Mechanism: the trusted-UI capture gate is held
+per field, only by recording fields; while it is held every consumer, the
+emulation included, waits. Key-capture fields read the physical key through
+the hook's position capture, before any consumer. Action: a new Ergopti text
+field holds nothing; a new recording field holds the gate while focused.
+
 ## Layout to emulate: recent layouts, then « Others… » (2026-11-25)
 
 Decided by the maintainer on 2026-11-25: « Dispositions et émulation ›

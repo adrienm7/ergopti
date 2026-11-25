@@ -756,9 +756,10 @@ function M.on_message(payload, state, context)
 	end
 
 	if action == "window_focus" then
-		-- The editor asks the daemon to stop expanding while the user types INTO
-		-- it. Without this, writing a hotstring whose trigger already exists fires
-		-- that hotstring inside the editor's own text field.
+		-- The page sends this for its TRIGGER field only (maintainer decision of
+		-- 2026-11-25): a field that records a trigger receives the raw keys, so
+		-- writing an existing trigger never fires it there, while the layout
+		-- emulation and the hotstrings keep typing in every other Ergopti field.
 		if type(data.focused) ~= "boolean" then return { ok = false } end
 		local gate = type(state) == "table" and state.input_capture_gate or nil
 		if type(gate) ~= "table" or type(gate.acquire) ~= "function"
