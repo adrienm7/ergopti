@@ -62,6 +62,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const FILES = window.LAYOUT_ANALYSIS_FILES;
 	const SCORES = window.LAYOUT_ANALYSER_SCORES;
 	const t = INFO.t;
+	// How many corpus words the drill-down of a worst n-gram names.
+	const WORDS_SHOWN = 12;
 	// The metrics the panel lists; the Comparer shows them all.
 	const PANEL_METRICS = [
 		'sfb',
@@ -439,6 +441,17 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			return Object.values(FILES.TEXT_MODES).includes(mode) ? mode : FILES.TEXT_MODES.typed;
 		}
 
+		/**
+		 * The chosen corpus's word table, once its tables are loaded: a built-in
+		 * corpus's, a host's when it sends one; null for a corpus of counts only.
+		 */
+		function corpusWords() {
+			const corpus = corpora.find((c) => c.id === state.corpus);
+			if (corpus.host) return corpus.host.words || null;
+			const raw = (window.LAYOUT_ANALYSIS_CORPORA || {})[corpus.id];
+			return (raw && raw.words) || null;
+		}
+
 		async function tables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			if (corpus.host) return E.prepareNgrams(FILES.plainTables(corpus.host, textMode()));
@@ -665,10 +678,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			});
 			drawTyping(result, layout);
 			tellHighlight(null);
+			const words = corpusWords();
 			window.LAYOUT_ANALYSIS_WORST.draw(ngrams, {
 				groups: result.topGroups,
 				layout,
-				highlight: tellHighlight
+				highlight: tellHighlight,
+				// The drill-down to the corpus's words (an idea seen in the Layouts
+				// Wiki playground), when the corpus has a word table.
+				words: words
+					? (codes) =>
+							E.wordsWithKeys(layout, words, codes, {
+								keyboard: state.keyboard,
+								profile: settings.profile,
+								limit: WORDS_SHOWN
+							})
+					: undefined
 			});
 			drawFingers(result);
 			drawAnalysers(layout, prepared, settings, mine);

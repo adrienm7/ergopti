@@ -26,6 +26,7 @@
  * 6. Blends: two built-in corpora mixed by weight become the compared
  *    corpus, named with their shares; an invalid weight is refused in words;
  *    the link carries the recipe and the next visit mixes it again.
+ * 7. The editor's analysis panel: its worst n-grams open their corpus words too.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -36,6 +37,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { shared } = require('../../lib/paths.cjs');
+
+const studioUx = require('./layout-editor-studio-ux.cjs');
 
 const EN = JSON.parse(
 	fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
@@ -312,7 +315,21 @@ async function exerciseBlend(browser, origin) {
 	await context.close();
 }
 
+async function exercisePanelWords(browser, origin) {
+	const { page, errors, context } = await studioUx.openOnErgopti(browser, origin);
+	const button = page.locator('.la-panel-ngrams .la-ngram-words').first();
+	await button.waitFor({ state: 'attached' });
+	await button.scrollIntoViewIfNeeded();
+	await button.click();
+	assert.equal(await button.getAttribute('aria-expanded'), 'true', 'panel words: opened');
+	const found = page.locator(`#${await button.getAttribute('aria-controls')}`);
+	assert.notEqual((await found.textContent()).trim(), '', 'panel words: listed');
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exercisePanelWords,
 	exerciseBlend,
 	exercisePareto,
 	exerciseTrace,

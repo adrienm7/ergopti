@@ -303,21 +303,19 @@ waits for the maintainer's review).
       trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
       own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
-      their links, the movement table and the trace's « Corpus words »
-      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (1) the « Corpus
-      words » drill-down in the editor's analysis panel too (done in the Comparer's trace and worst n-grams:
-      `E.wordsWithKeys`, the `words` option of `board/worst_groups.js`; the panel needs its corpus's word table); (2)
-      corpus blends, what is left: blend the user's own text or « Ma frappe » too (done: up to three built-in corpora by
-      weight, `E.blendNgrams`, kept with the conveniences and carried in the share link); (3) magic and repeat keys:
-      designed (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer
-      decisions pending »; (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How
-      do I compare, rank, read a Pareto »), routed through `i18n`; (6) more shown-only metrics, what is left (done: row
-      changes concordant and discordant in the movement table): alternation whose ends are an SFS, weak redirects (no
-      index), each with and without thumbs, and each movement cell's percentile among the compared layouts
-      (`movementTable` costs 20 to 60 ms a layout on a large corpus: compute it on demand, or in a worker, for the whole
-      comparison); (7) the Principal and Comparison frame on the other result tabs too (done on Pareto and Trace,
-      `FRAME_TABS`; the overview and the themed tabs could mark both layouts in their charts and tables); (8)
-      Kawalyzer's « Clever Keys » (context outputs) with item (3).
+      their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
+      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (2) corpus blends,
+      what is left: blend the user's own text or « Ma frappe » too (done: up to three built-in corpora by weight,
+      `E.blendNgrams`, kept with the conveniences and carried in the share link); (3) magic and repeat keys: designed
+      (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
+      »; (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How do I compare, rank,
+      read a Pareto »), routed through `i18n`; (6) more shown-only metrics, what is left (done: row changes concordant
+      and discordant in the movement table): alternation whose ends are an SFS, weak redirects (no index), each with and
+      without thumbs, and each movement cell's percentile among the compared layouts (`movementTable` costs 20 to 60 ms
+      a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (7) the Principal and
+      Comparison frame on the other result tabs too (done on Pareto and Trace, `FRAME_TABS`; the overview and the themed
+      tabs could mark both layouts in their charts and tables); (8) Kawalyzer's « Clever Keys » (context outputs) with
+      item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
