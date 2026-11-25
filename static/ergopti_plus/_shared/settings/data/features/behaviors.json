@@ -22,7 +22,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/hotstrings/engine/matcher/dispatch.ahk",
 			"symbol": "HSE_UndoExpansion(Undo",
-			"sha256": "1e68ae5c8e00966edcb65ccbcffc46a2c4ea76d3d266f21e9d37a73ec3c14315"
+			"sha256": "24b592605b83b8f9da1df9801b6eafc680c38a6a143773add9b7214033b97490"
 		},
 		{
 			"id": "macos-repeat",

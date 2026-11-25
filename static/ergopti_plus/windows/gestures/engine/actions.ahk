@@ -1269,6 +1269,19 @@ GestureActionPickerItems() {
 		return Items
 }
 
+; The actions a hotstring entry may run, for the personal editor: every enabled
+; picker action that takes no value, as Linux get_hotstring_action_choices.
+; @returns {Array} of Map("value", id, "label", label)
+GestureHotstringActionChoices() {
+		Choices := []
+		for _, Item in GestureActionPickerItems() {
+				if (Item.Type == "action" and !(Item.HasOwnProp("Disabled") and Item.Disabled)
+						and GestureActionParameterSpec(Item.Id) == "")
+						Choices.Push(Map("value", Item.Id, "label", Item.Label))
+		}
+		return Choices
+}
+
 ; One picker row: an action whose catalogue requirement is proven absent stays
 ; visible and greyed, with the reason. Read at each open, so switching the AI on
 ; offers it again without a reload.

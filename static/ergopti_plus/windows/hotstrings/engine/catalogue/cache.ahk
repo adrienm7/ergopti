@@ -534,6 +534,10 @@ _HotstringsCacheBuildRows(CategoryPaths := 0) {
 				continue
 			if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match)
 				continue
+			; A cached row only types text: an action entry belongs to a user's
+			; file, never to a bundled one this cache serves.
+			if IsObject(HS_EntryLineAction(Line, &ActionRefusal)) || ActionRefusal != ""
+				throw ValueError("A bundled hotstring entry carries action fields: " . Line)
 
 			Trigger := UnescapeTomlString(Match[1])
 			Output := UnescapeTomlString(Match[2])

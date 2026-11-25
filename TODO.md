@@ -469,9 +469,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **User workflows, what is left (maintainer request, 2026-11-25; branch `feat/user-workflows`).** On macOS and
       Linux the model, runner, `run_workflow` action and editor window are built
       ([data README](static/ergopti_plus/_shared/shortcuts/data/workflows/README.md)). Left, in this order:
-  - Hotstring → action with the « effacer le déclencheur » option is built on macOS and Linux (engine and
-    editor); on Windows only the shared rules are ported (`hotstrings/engine/matcher/action_entry.ahk`): the
-    reader, the matcher's dispatch and the editor host still need the action fields.
+  - Hotstring → action with the « effacer le déclencheur » option is built on the three drivers (reader,
+    matcher, editor host and personal writer on Windows); left, a field check on a real Windows desktop of an
+    entry that runs a workflow and of one that keeps its trigger.
   - Windows: the model, runner, `run_workflow`, the window and its Shortcuts row are ported
     (`windows/modules/shortcuts/workflows/`, `tests/unit/modules/shortcuts/workflows/`) and run first on the
     Windows CI; left, a field check of every step kind, Escape and the window on a real Windows desktop.
