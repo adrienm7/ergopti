@@ -6,7 +6,7 @@
 --- Runs the Linux workflow owner against recording OS services: the
 --- run_workflow action of the gesture executor reaches the stored workflow,
 --- keys go through the uinput send_shortcut handler, a shell step runs under
---- env with its variables as argv, the pointer steps refuse under Wayland,
+--- env with its variables as argv and an imported one waits for approval, the pointer steps refuse under Wayland,
 --- Escape and the script pause stop a run, and the binding editor offers the
 --- workflows by name or says there are none.
 ---
@@ -26,7 +26,7 @@ local CONFIG = {}
 local function fixture(session)
 	package.loaded["modules.shortcuts.workflows"] = nil
 	local Workflows = require("modules.shortcuts.workflows")
-	local world = { runs = {}, sent = {}, typed = {}, notices = {}, timers = {}, files = CONFIG, picked = nil }
+	local world = { runs = {}, sent = {}, typed = {}, notices = {}, timers = {}, files = CONFIG }
 	Workflows.init({
 		shell = { run_async = function(program, args, options, callback)
 			world.runs[#world.runs + 1] = { program = program, args = args, options = options }
@@ -61,7 +61,6 @@ local function fixture(session)
 		clipboard = { read_checked = function() return true, "clip" end, write = function() return true end },
 		notifier = { send = function(text) world.notices[#world.notices + 1] = text; return true end },
 		window_info = { getFocused = function() return { appId = "org.mozilla.firefox" } end },
-		choice_prompt = { pick = function() return world.picked end },
 		i18n = { get = function(key) return key end },
 		session_type = function() return session or "x11" end,
 		rename = function(from, to) world.files[to] = world.files[from]; world.files[from] = nil; return true end,
@@ -82,20 +81,20 @@ helpers.describe("workflows on Linux (workflows-linux)", function()
 		store({ { kind = "send_keys", combo = "ctrl+a" }, { kind = "set_variable", name = "n", value = "x y" },
 			{ kind = "shell", command = "echo \"$ERGOPTI_VAR_n\"", into = "out" }, { kind = "type_text", text = "{{out}}!" } })
 		local Workflows, world = fixture()
-		world.picked = "allow"
 		helpers.assert_eq(Workflows.run({ id = "wf_1" }), true)
 		helpers.assert_eq(world.sent[1], "ctrl+a")
 		helpers.assert_eq(world.runs[1].program, "env")
 		helpers.assert_eq(table.concat(world.runs[1].args, "|"), "ERGOPTI_VAR_n=x y|/bin/sh|-l|-c|echo \"$ERGOPTI_VAR_n\"")
 		helpers.assert_eq(world.typed[1], "hello!")
-		helpers.assert_true(CONFIG["/tmp/ergopti-workflows-test/workflow_approvals.json"] ~= nil, "the approval is stored")
+		helpers.assert_eq(CONFIG["/tmp/ergopti-workflows-test/workflow_approvals.json"], nil, "no prompt, no approval")
 		Workflows.stop()
 	end)
 
-	helpers.it("a declined shell confirmation runs nothing (workflows-linux)", function()
+	helpers.it("an imported shell step runs nothing until approved (workflows-linux)", function()
 		store({ { kind = "shell", command = "true" } })
+		CONFIG["/tmp/ergopti-workflows-test/workflows.json"] = CONFIG["/tmp/ergopti-workflows-test/workflows.json"]
+			:gsub('"origin":"local"', '"origin":"import"')
 		local Workflows, world = fixture()
-		world.picked = nil
 		Workflows.run({ id = "wf_1" })
 		helpers.assert_eq(#world.runs, 0)
 		helpers.assert_true(world.notices[1]:find("workflows.notice.failed", 1, true) ~= nil, tostring(world.notices[1]))

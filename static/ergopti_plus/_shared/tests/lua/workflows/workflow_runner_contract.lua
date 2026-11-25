@@ -6,7 +6,7 @@
 --- Drives the shared runner with recording ports on the macOS and Linux
 --- runtimes: the registry deadlines, a step past its deadline, a workflow that
 --- is triggered twice, an abort that cancels the pending effect, an answer
---- that arrives too late, and the shell approval stored only after a yes.
+--- that arrives too late, and the shell steps of a local and an imported run.
 ---
 --- ROOT CAUSE ENCODED:
 --- Without one runner, a slow OS call could resume a stopped workflow, a
@@ -25,7 +25,7 @@ local M = {}
 --- @param overrides table|nil Port replacements.
 --- @return table runner, table world
 local function harness(catalogue, overrides)
-	local world = { timers = {}, effects = {}, pending = {}, cancelled = {}, ends = {}, approvals = {}, stored = {} }
+	local world = { timers = {}, effects = {}, pending = {}, cancelled = {}, ends = {}, approvals = {} }
 	local ports = {
 		catalogue = catalogue,
 		timeouts = { step_timeout_ms = 10, screen_step_timeout_ms = 20, shell_timeout_ms = 30,
@@ -42,7 +42,6 @@ local function harness(catalogue, overrides)
 		cancel = function(effect) world.cancelled[#world.cancelled + 1] = effect.path end,
 		approvals = {
 			get = function(id) return world.approvals[id] end,
-			set = function(id, digest) world.stored[#world.stored + 1] = { id = id, digest = digest } end,
 		},
 		on_end = function(workflow, outcome) world.ends[#world.ends + 1] = { id = workflow.id, outcome = outcome } end,
 	}
@@ -130,19 +129,16 @@ function M.register(helpers, shared_path)
 			helpers.assert_eq(runner.abort("wf_1"), false)
 		end)
 
-		helpers.it("workflows: a shell approval is stored only after a yes", function()
+		helpers.it("workflows: a local shell step runs at once, an approved import too", function()
 			local steps = { { kind = "shell", command = "true" } }
 			local runner, world = harness(catalogue)
 			runner.start(workflow(steps))
-			helpers.assert_eq(world.effects[1].op, "confirm_shell")
-			world.pending[1]({ ok = true, value = false })
-			helpers.assert_eq(#world.stored, 0)
-			helpers.assert_eq(world.ends[1].outcome.reason, "shell_declined")
-			runner.start(workflow(steps))
-			world.pending[2]({ ok = true, value = true })
-			helpers.assert_eq(world.effects[3].op, "shell")
-			world.pending[3]({ ok = true, value = "" })
-			helpers.assert_eq(world.stored[1].digest, Model.shell_digest(workflow(steps)))
+			helpers.assert_eq(world.effects[1].op, "shell")
+			world.pending[1]({ ok = true, value = "" })
+			helpers.assert_eq(world.ends[1].outcome.op, "done")
+			world.approvals.wf_1 = Model.shell_digest(workflow(steps))
+			runner.start(workflow(steps, "import"))
+			helpers.assert_eq(world.effects[2].op, "shell")
 		end)
 
 		helpers.it("workflows: an imported shell step without approval asks nothing", function()

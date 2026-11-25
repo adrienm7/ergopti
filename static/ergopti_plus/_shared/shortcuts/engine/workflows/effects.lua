@@ -6,7 +6,7 @@
 --- Turns each effect of the shared interpreter into one call of the driver's
 --- OS ports, for the macOS and Linux drivers: keys, text, waits, opening and
 --- focusing, the clipboard, the mouse, Ergopti actions, notifications, shell
---- commands, the shell confirmation and the screen steps. The runner hands
+--- commands and the screen steps. The runner hands
 --- its effects to perform(); cancel() stops the pending one.
 ---
 --- FEATURES & RATIONALE:
@@ -33,7 +33,7 @@ local SCREEN_OPS = { wait_for = true, capture = true, ocr = true, click_target =
 -- The ports every driver must supply.
 local REQUIRED_PORTS = {
 	"send_shortcut", "type_text", "after", "open", "focus_app", "clipboard_get", "clipboard_set",
-	"mouse_move", "mouse_click", "run_action", "notify", "shell", "confirm_shell", "app_front",
+	"mouse_move", "mouse_click", "run_action", "notify", "shell", "app_front",
 }
 
 --- The environment of a shell step: each variable under its prefixed name.
@@ -54,7 +54,6 @@ end
 ---   mouse_move(x, y, done), mouse_click(x, y, button, count, done),
 ---   run_action(action, done), notify(text, done),
 ---   shell(command, env, deadline_ms, done(ok, stdout_or_reason)) -> cancel function|nil,
----   confirm_shell(workflow, commands, done(approved)),
 ---   app_front(app, done(boolean)),
 ---   screen = table|nil the screen steps' adapter: { wait_for, capture, ocr,
 ---     click_target, visible } each (effect, done(result)) -> cancel|nil.
@@ -114,11 +113,6 @@ function M.new(ports)
 				function(ok, value)
 					if ok then finish({ ok = true, value = value }) else finish({ ok = false, reason = value or RUN_REASON.step_failed }) end
 				end))
-		end
-		if op == "confirm_shell" then
-			return ports.confirm_shell(workflow, effect.commands, function(approved)
-				finish({ ok = true, value = approved == true })
-			end)
 		end
 		if op == "probe" then
 			local condition = effect.condition

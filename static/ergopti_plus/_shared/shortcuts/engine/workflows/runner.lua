@@ -14,9 +14,9 @@
 ---    call can never resume a stopped workflow.
 --- 2. A trampoline: an adapter may answer synchronously (a clipboard read)
 ---    without growing the stack with the number of steps.
---- 3. The shell approval the interpreter obtained is stored through the
----    driver's approval port only after the user said yes, keyed by the
----    workflow id and bound to its shell digest.
+--- 3. The shell approval of an imported workflow is read through the
+---    driver's approval port, keyed by the workflow id and bound to its shell
+---    digest; only the editor writes one.
 --- 4. The driver owns every OS effect, the confirmation dialog, the notice
 ---    and the step highlight; this module owns none of them.
 --- ==============================================================================
@@ -48,7 +48,7 @@ end
 ---   after = function(ms, fn) -> cancel function: one timer,
 ---   perform = function(effect, done, workflow): run one effect; done({ ok, value, reason }) once,
 ---   cancel = function(effect): stop a pending effect (abort or deadline), optional,
----   approvals = { get = function(id) -> digest|nil, set = function(id, digest) },
+---   approvals = { get = function(id) -> digest|nil },
 ---   on_step = function(workflow, effect): a step starts (the editor's highlight), optional,
 ---   on_end = function(workflow, outcome): the run ended (notice on failure). }
 --- @return table runner { start, abort, abort_all, is_running }
@@ -58,8 +58,8 @@ function M.new(ports)
 		assert(type(ports[name]) == "function", "a workflow runner needs the port " .. name)
 	end
 	assert(type(ports.catalogue) == "table", "a workflow runner needs the step catalogue")
-	assert(type(ports.approvals) == "table" and type(ports.approvals.get) == "function"
-		and type(ports.approvals.set) == "function", "a workflow runner needs the approval store")
+	assert(type(ports.approvals) == "table" and type(ports.approvals.get) == "function",
+		"a workflow runner needs the approval store")
 	local timeouts = ports.timeouts or M.registry_timeouts()
 	local running = {}
 	local runner = {}
@@ -67,7 +67,6 @@ function M.new(ports)
 	local function finish(state, outcome)
 		if state.cancel_timer then state.cancel_timer(); state.cancel_timer = nil end
 		running[state.workflow.id] = nil
-		if state.run.approved_now() then ports.approvals.set(state.workflow.id, state.run.digest) end
 		if outcome.op == "done" then
 			Logger.success(LOG, "Workflow %s finished.", state.workflow.id)
 		elseif outcome.op == "aborted" then

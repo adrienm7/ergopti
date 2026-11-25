@@ -106,7 +106,7 @@ function M.new(ports)
 		after = ports.after,
 		perform = effects.perform,
 		cancel = effects.cancel,
-		approvals = { get = store.approval, set = store.approve },
+		approvals = { get = store.approval },
 		on_step = function(workflow, effect)
 			local listener = listeners[workflow.id]
 			if listener and listener.on_step then listener.on_step(effect) end

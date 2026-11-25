@@ -6,7 +6,7 @@
 --- Replays _shared/tests/corpus/workflows/interpreter_vectors.json against the
 --- shared interpreter: the effects a run asks for, in order, with their paths
 --- and deadlines, the branches an « if » takes, the repeat count, the
---- variables, the shell approval rules and the outcome of a failure or an
+--- variables, the shell rules (an import waits for its approval) and the outcome of a failure or an
 --- abort. Each corpus workflow is first held valid by the shared model, so a
 --- vector cannot pin the behaviour of a file the editor would refuse.
 ---
@@ -105,7 +105,6 @@ function M.register(helpers, shared_path)
 				for _, key in ipairs({ "op", "reason", "path", "kind" }) do
 					helpers.assert_eq(final[key], row.expected[key], row.id .. " outcome " .. key)
 				end
-				if row.approved_now ~= nil then helpers.assert_eq(run.approved_now(), row.approved_now, row.id) end
 			end)
 		end
 	end)

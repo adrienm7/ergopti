@@ -8,8 +8,8 @@
 --- approvals in the config folder (atomic FileSystem writes), keys and text
 --- through the gesture registry's synthetic input, `open` for an app, a URL
 --- or a file, the clipboard adapter, the pointer adapter, the gesture
---- registry for Ergopti actions, the notification owner, a login /bin/sh for
---- a shell step and the focus-aware alert for its confirmation.
+--- registry for Ergopti actions, the notification owner and a login /bin/sh
+--- for a shell step.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One owner per driver, built on first use; a second init with other
@@ -44,7 +44,6 @@ local function default_deps()
 		mouse = require("adapters.mouse_control"),
 		notifications = require("core.ui.engine.notifications"),
 		window_info = require("platform.focus.window_info"),
-		dialog = require("core.ui.engine.dialog_util"),
 		i18n = require("core.i18n.engine.i18n"),
 	}
 end
@@ -106,13 +105,6 @@ local function effect_ports(deps)
 			for _, name in ipairs(names) do args[#args + 1] = name .. "=" .. env[name] end
 			for _, part in ipairs({ "/bin/sh", "-l", "-c", command }) do args[#args + 1] = part end
 			return run(deps, "/usr/bin/env", args, function(ok, out) done(ok, ok and (out or "") or out) end)
-		end,
-		confirm_shell = function(workflow, commands, done)
-			local allow = deps.i18n.get("workflows.confirm_shell.allow")
-			local ok, clicked = pcall(deps.dialog.block_alert, deps.i18n.get("workflows.confirm_shell.title"),
-				Owner.fill(deps.i18n.get("workflows.confirm_shell.body"), { workflow.name, table.concat(commands, "\n") }),
-				deps.i18n.get("button.cancel"), allow, "warning")
-			done(ok and clicked == allow)
 		end,
 		app_front = function(app, done)
 			local front = deps.window_info.frontmost_application()

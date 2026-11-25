@@ -6,7 +6,7 @@
 --- Runs the macOS workflow owner against recording services: the stored
 --- workflow runs through the gesture registry's synthetic input, `open` and
 --- the clipboard adapter, a shell step runs under /usr/bin/env with its
---- variables as argv, its confirmation is the focus-aware alert, Escape stops
+--- variables as argv with no prompt, Escape stops
 --- a run, a click at coordinates is a named refusal, and the binding editor
 --- offers the workflows by name.
 ---
@@ -72,7 +72,6 @@ local function fixture(overrides)
 		mouse = { setPos = function() return true end },
 		notifications = { notify = function(text) world.notices[#world.notices + 1] = text; return true end },
 		window_info = { frontmost_application = function() return { pid = 1, bundle_id = "com.apple.Safari" } end },
-		dialog = { block_alert = function(_, _, _, other) world.clicked = other; return world.answer end },
 		i18n = { get = function(key) return key end },
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
@@ -93,14 +92,13 @@ helpers.describe("workflows on macOS (workflows-macos)", function()
 			{ kind = "set_variable", name = "n", value = "x" }, { kind = "shell", command = "echo $ERGOPTI_VAR_n", into = "o" },
 			{ kind = "type_text", text = "{{o}}" } })
 		local Workflows, world = fixture()
-		world.answer = "workflows.confirm_shell.allow"
 		helpers.assert_eq(Workflows.run({ id = "wf_1" }), true)
 		helpers.assert_eq(world.sent[1], "primary+a")
 		helpers.assert_eq(table.concat(world.runs[1].args, "|"), "-a|Safari")
 		helpers.assert_eq(world.runs[2].program, "/usr/bin/env")
 		helpers.assert_eq(table.concat(world.runs[2].args, "|"), "ERGOPTI_VAR_n=x|/bin/sh|-l|-c|echo $ERGOPTI_VAR_n")
 		helpers.assert_eq(world.typed[1], "hello")
-		helpers.assert_true(FILES["/cfg/workflow_approvals.json"] ~= nil, "the approval is stored")
+		helpers.assert_eq(FILES["/cfg/workflow_approvals.json"], nil, "no prompt, no approval")
 		Workflows.stop()
 	end)
 

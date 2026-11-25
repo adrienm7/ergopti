@@ -83,9 +83,12 @@ them, such a step stops with `screen_service_missing`.
   (Windows) with the user's rights, exactly like a `run_command` binding.
 - Its command never takes placeholders: OCR or clipboard text would otherwise
   become shell syntax. The variables reach it as environment variables.
-- An approval covers the SHA-256 of the workflow id and its shell commands in
-  order (`model.shell_digest`); any edit of a command asks again. Approvals
-  live in their own file of the config folder, never in `workflows.json`, so
-  an export carries none.
+- A shell step of a workflow made or edited in the editor runs with no prompt
+  (maintainer decision of 2026-11-25). An imported workflow stops at its
+  first shell step until the editor approves it: the approval covers the
+  SHA-256 of the workflow id and its shell commands in order
+  (`model.shell_digest`), and editing a shell step there approves it too.
+  Approvals live in their own file of the config folder, never in
+  `workflows.json`, so an export carries none.
 - The editor marks an imported workflow `origin = "import"`; its shell steps
   are refused at run time until the user approves them in the editor.
