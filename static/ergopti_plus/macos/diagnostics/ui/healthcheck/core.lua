@@ -1235,26 +1235,28 @@ function M.close_window()
 end
 
 --- Opens the diagnostics window. Replaces any existing window (singleton).
---- @param opts table|nil { state = menu state|nil }
+--- @param opts table { state = menu state|nil }
 --- @return boolean opened
-function M.show_window(opts)
+--- @return boolean settled True when nothing more is owed to the click: a
+---   newer request superseded this one, or a window is on screen.
+local function open_window(opts)
 	if NativeClose.retry_cleanup() ~= true then return false end
 	_open_revision = _open_revision + 1
 	local revision = _open_revision
-	opts = type(opts) == "table" and opts or {}
 	Logger.start(LOG, "Opening the diagnostics window…")
-	if revision ~= _open_revision or package.loaded["diagnostics.ui.healthcheck.core"] ~= M then return false end
+	if revision ~= _open_revision or package.loaded["diagnostics.ui.healthcheck.core"] ~= M then return false, true end
 	if type(opts.state) == "table" then _menu_state = opts.state end
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
-		if not close_owned_window(_window, "reopen") then return false end
+		-- The window already open stays on screen
+		if not close_owned_window(_window, "reopen") then return false, true end
 	elseif not stop_continuations() then
 		Logger.error(LOG, "Healthcheck startup refused: prior timer cleanup remains pending.")
 		return false
 	end
 
-	if revision ~= _open_revision or package.loaded["diagnostics.ui.healthcheck.core"] ~= M then return false end
+	if revision ~= _open_revision or package.loaded["diagnostics.ui.healthcheck.core"] ~= M then return false, true end
 	local ok_snap, snapshot = pcall(M.run)
 	if not ok_snap or type(snapshot) ~= "table" then
 		Logger.error(LOG, "The diagnostics could not be collected: %s.", tostring(snapshot))
@@ -1390,11 +1392,48 @@ function M.show_window(opts)
 	end, debug.traceback)
 	if not focus_ok or focused ~= true then
 		Logger.error(LOG, "Diagnostics window presentation was refused; the current report remains open.")
-		return false
+		return false, true
 	end
 
 	Logger.success(LOG, "Diagnostics window opened.")
 	return true
 end
 
+
+--- Delivers the diagnostics when their window did not open: the report as an
+--- HTML file opened in the browser, else an alert naming the log with
+--- « Report a bug » (maintainer, 2026-11-25). Before, the menu ignored the
+--- refusal and the click did nothing visible.
+--- @param opts table { state = menu state|nil }
+local function deliver_without_window(opts)
+	local ok_report, Report = pcall(require, "diagnostics.ui.healthcheck.report")
+	if not ok_report then
+		Logger.error(LOG, "The diagnostics report module is unavailable: %s.", tostring(Report))
+		return
+	end
+	local delivered_ok, delivered = xpcall(Report.deliver_without_window, debug.traceback, opts)
+	if delivered_ok and delivered == true then return end
+	if not delivered_ok then
+		Logger.error(LOG, "The diagnostics report could not be delivered without its window: %s", tostring(delivered))
+	end
+	local alerted, err = xpcall(function()
+		local i18n = require("core.i18n.engine.i18n")
+		local body = i18n.format("dialog.window_unavailable.body", i18n.get("menu.debug.healthcheck"),
+			Report.log_path_for_alert())
+		return Report.alert_window_unavailable("healthcheck", body, opts)
+	end, debug.traceback)
+	if not alerted then Logger.error(LOG, "The diagnostics window failure could not be shown: %s", tostring(err)) end
+end
+
+--- Opens the diagnostics window, or delivers its report without it.
+--- @param opts table|nil { state = menu state|nil }
+--- @return boolean opened Whether the window opened; false after a windowless delivery too.
+function M.show_window(opts)
+	opts = type(opts) == "table" and opts or {}
+	local ok, opened, settled = xpcall(open_window, debug.traceback, opts)
+	if ok and (opened == true or settled == true) then return opened == true end
+	if not ok then Logger.error(LOG, "The diagnostics window raised while opening: %s", tostring(opened)) end
+	deliver_without_window(opts)
+	return false
+end
 return M

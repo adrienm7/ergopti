@@ -489,6 +489,19 @@ local function open_window(record)
 	return true
 end
 
+--- Tells the user an error was logged when its window could not open: a native
+--- alert names today's errors file and offers « Report a bug », which needs
+--- no window. Logged at WARN: an ERROR here would ask for this same window.
+local function alert_without_window()
+	local ok, err = xpcall(function()
+		local Report = require("diagnostics.ui.healthcheck.report")
+		local path = Logger.today_errors_path() or Report.log_path_for_alert()
+		local body = require("core.i18n.engine.i18n").format("dialog.window_unavailable.error_body", path)
+		return Report.alert_window_unavailable("error_dialog", body, nil)
+	end, debug.traceback)
+	if not ok then Logger.warn(LOG, "The error window failure could not be shown: %s", tostring(err)) end
+end
+
 --- Opens the window for a decided error, off the logging call's stack.
 --- @param record table
 local function schedule(record)
@@ -511,6 +524,8 @@ local function schedule(record)
 		-- A window that could not open frees the policy for the next error
 		_busy = false
 		_folded = 0
+		-- The error must not be lost with its window (maintainer, 2026-11-25)
+		alert_without_window()
 	end)
 	if committed ~= true then
 		_scheduled = nil
