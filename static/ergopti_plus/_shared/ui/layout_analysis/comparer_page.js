@@ -807,6 +807,13 @@
 		<ul id="la-query-names" aria-labelledby="la-query-names-title"></ul>
 	</details>
 	</details>
+	<details id="la-frame-diff" class="la-frame-diff" open hidden>
+		<summary id="la-frame-diff-label"></summary>
+		<p id="la-frame-diff-none" class="la-muted" data-i18n="layout_analysis.frame.diff_none"></p>
+		<section id="la-frame-diff-wrap" class="la-table-wrap" tabindex="0" aria-labelledby="la-frame-diff-label">
+			<table id="la-frame-diff-table" class="la-table"></table>
+		</section>
+	</details>
 
 	<section id="la-panel-overview" class="la-tab-panel" role="tabpanel" aria-labelledby="la-tab-overview">
 		<div class="la-overview">
@@ -956,6 +963,7 @@
 				<li data-i18n-text="layout_analysis.pareto.legend_front"><span class="la-swatch la-swatch-cat-1" aria-hidden="true"></span></li>
 				<li data-i18n-text="layout_analysis.pareto.legend_other"><span class="la-swatch la-swatch-muted" aria-hidden="true"></span></li>
 				<li data-i18n-text="layout_analysis.pareto.legend_details"><span class="la-swatch la-swatch-ring" aria-hidden="true"></span></li>
+				<li data-i18n-text="layout_analysis.pareto.legend_versus"><span class="la-swatch la-swatch-versus" aria-hidden="true"></span></li>
 			</ul>
 			<div id="la-pareto-chart" class="la-pareto-chart"></div>
 		</section>
@@ -2285,6 +2293,7 @@
 			// The ranking is cheap and always current, whichever tab is shown.
 			draw.overview();
 			if (state.tab !== DEFAULT_TAB) draw[state.tab]();
+			renderFrameDiff();
 		}
 
 		// ===================================
@@ -2338,6 +2347,18 @@
 			return node;
 		}
 
+		/** The Comparison layout's mark on a Pareto figure: a square, beside the Principal's ring. */
+		function versusMark(cx, cy) {
+			const side = 14;
+			return svgEl('rect', {
+				x: cx - side / 2,
+				y: cy - side / 2,
+				width: side,
+				height: side,
+				class: 'la-pareto-versus'
+			});
+		}
+
 		/**
 		 * A linear scale from a value range to a pixel range, the better end of
 		 * the value on the right or at the top (the chart reads « up and right is
@@ -2384,6 +2405,7 @@
 			renderParetoChart(rows, layers, front);
 			renderParetoSpread(rows);
 			renderParetoTable(rows, layers);
+			renderFrameDiff();
 		}
 
 		/** The scatter plot: every layout, the frontier joined, the detailed one ringed. */
@@ -2520,6 +2542,8 @@
 						class: 'la-pareto-ring'
 					})
 				);
+			const versus = rows.find((r) => r.layout.id === state.versus);
+			if (versus) svg.append(versusMark(sx(paretoValue(versus, x)), sy(paretoValue(versus, y))));
 			box.append(svg);
 		}
 
@@ -2555,6 +2579,19 @@
 				beaten,
 				count: rows.length - 1
 			});
+			const compared = rows.find((r) => r.layout.id === state.versus && r !== detailed);
+			if (compared) {
+				const other = paretoValue(compared, x);
+				const gap = value - other;
+				text.append(
+					' ',
+					t('layout_analysis.pareto.spread_versus', {
+						layout: compared.layout.name,
+						value: paretoText(x, other),
+						delta: `${gap > 0 ? '+' : ''}${paretoText(x, gap)}`
+					})
+				);
+			}
 			const { width, margin } = PARETO_SIZE;
 			// Room under the strip for the quantiles' names, on two alternating
 			// lines, and above it for the smoothed distribution.
@@ -2618,6 +2655,8 @@
 				label.textContent = t('layout_analysis.percentile.chip', { percent: p });
 				strip.append(label);
 			}
+			const versus = rows.find((r) => r.layout.id === state.versus && r !== detailed);
+			if (versus) strip.append(versusMark(sx(paretoValue(versus, x)), 28));
 			strip.append(svgEl('circle', { cx: sx(value), cy: 28, r: 8, class: 'la-pareto-ring' }));
 			box.append(svg);
 			renderParetoQuantiles(x, quantiles, rows.length);
@@ -3085,6 +3124,131 @@
 			// The results' filters narrow the figures, not « Home »'s controls.
 			$('la-filters-box').hidden = state.tab === HOME_TAB || state.tab === HELP_TAB;
 			$('la-frame').hidden = !FRAME_TABS.includes(state.tab);
+			// The trace counts its own difference, per event of the text typed.
+			$('la-frame-diff').hidden = !FRAME_TABS.includes(state.tab) || state.tab === 'trace';
+		}
+
+		/**
+		 * The values of a frame tab that its difference table compares, each
+		 * {label, a, b, text, better} for the Principal (a) and the Comparison
+		 * (b): the overview's mark and leading metrics, a themed tab's metrics
+		 * (with each finger's load on « Fingers » and « Heat maps », better the
+		 * closer to the ideal), the Pareto tab's two values.
+		 * @param {string} tab - A FRAME_TABS id but the trace.
+		 * @param {object} a - The Principal's result.
+		 * @param {object} b - The Comparison's result.
+		 * @returns {Array<{label: string, info?: string, a: number, b: number,
+		 *   text: function(number, boolean): string, verdict: string}>}
+		 */
+		function frameDiffRows(tab, a, b) {
+			const verdict = (better, x, y) => {
+				if (better === 'none') return 'none';
+				if (x === y) return 'same';
+				return (better === 'higher') === x > y ? 'better' : 'worse';
+			};
+			const signed = (value, digits) => `${value > 0 ? '+' : ''}${format(value, digits)}`;
+			const metricRow = (id) => ({
+				label: metricName(id),
+				info: id,
+				a: a.metrics[id],
+				b: b.metrics[id],
+				text: (value, delta) =>
+					delta
+						? withUnit(signed(value, metricDigits(id)), unitText(id))
+						: measure(value, metricDigits(id), unitText(id)),
+				verdict: verdict(E.METRICS[id].better, a.metrics[id], b.metrics[id])
+			});
+			const markRow = () => ({
+				label: t('layout_analysis.table.score'),
+				a: a.score.mark,
+				b: b.score.mark,
+				text: (value, delta) =>
+					withUnit(delta ? signed(value, 1) : format(value, 1), t('layout_analysis.unit.points')),
+				verdict: verdict('higher', a.score.mark, b.score.mark)
+			});
+			// A finger's share of the presses: better the closer to the ideal load.
+			const fingerRows = () =>
+				Object.keys(a.idealLoad).map((id) => {
+					const ideal = a.idealLoad[id];
+					const [x, y] = [a.fingerShares[id], b.fingerShares[id]];
+					const gap = Math.abs(x - ideal) - Math.abs(y - ideal);
+					return {
+						label: t('layout_analysis.frame.diff_finger', {
+							finger: t(`layout_analysis.finger.${id}`)
+						}),
+						a: x,
+						b: y,
+						text: (value, delta) =>
+							delta ? withUnit(signed(value, 1), '%') : measure(value, 1, '%'),
+						verdict: gap === 0 ? 'same' : gap < 0 ? 'better' : 'worse'
+					};
+				});
+			if (tab === 'overview') return [markRow()].concat(LEADER_METRICS.map(metricRow));
+			if (tab === 'fingers') return fingerRows().concat(TAB_METRICS.fingers.map(metricRow));
+			if (tab === 'heatmaps') return fingerRows();
+			if (tab === 'pareto')
+				return [state.pareto.x, state.pareto.y].map((id) =>
+					id === PARETO_MARK ? markRow() : metricRow(id)
+				);
+			return TAB_METRICS[tab].map(metricRow);
+		}
+
+		/**
+		 * The difference of the Principal and the Comparison layouts on the tab
+		 * shown (an idea seen in the Layouts Wiki playground, whose views show
+		 * Main, Comp or their difference): a folding table above the tab's
+		 * figures, each value with both layouts, the difference (Principal −
+		 * Comparison) and which one it favours in words; without a Comparison,
+		 * a line saying how to choose one.
+		 */
+		function renderFrameDiff() {
+			const box = $('la-frame-diff');
+			if (!FRAME_TABS.includes(state.tab) || state.tab === 'trace') return;
+			const a = state.results.find((r) => r.layout.id === state.details) || null;
+			const b = state.results.find((r) => r.layout.id === state.versus) || null;
+			const table = $('la-frame-diff-table');
+			$('la-frame-diff-none').hidden = Boolean(a && b);
+			$('la-frame-diff-wrap').hidden = !(a && b);
+			if (!a || !b) {
+				setText($('la-frame-diff-label'), t('layout_analysis.frame.diff_title_none'));
+				table.replaceChildren();
+				return;
+			}
+			setText(
+				$('la-frame-diff-label'),
+				t('layout_analysis.frame.diff_title', { main: a.layout.name, comp: b.layout.name })
+			);
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.details.metric_column'),
+				a.layout.name,
+				b.layout.name,
+				t('layout_analysis.details.delta')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			for (const row of frameDiffRows(state.tab, a, b)) {
+				const tr = el('tr');
+				const th = el('th', '', row.label);
+				th.scope = 'row';
+				if (row.info && DATA.sources.items[row.info]) th.append(' ', infoButton(row.info));
+				const delta = el('td', 'la-delta');
+				delta.append(row.text(row.a - row.b, true), ' ', verdictCell(row.verdict));
+				tr.append(
+					th,
+					el('td', '', row.text(row.a, false)),
+					el('td', '', row.text(row.b, false)),
+					delta
+				);
+				tbody.append(tr);
+			}
+			table.replaceChildren(thead, tbody);
+			box.dataset.tab = state.tab;
 		}
 
 		/**
@@ -5611,6 +5775,25 @@
 				words: format(efforts.words.length, 0),
 				unsupported: format(efforts.unsupported.length, 0)
 			});
+			// The Comparison's mean beside it (an idea seen in the Layouts Wiki
+			// playground, whose views show Main, Comp or their difference).
+			const other = state.results.find(
+				(r) => r.layout.id === state.versus && r.layout.id !== result.layout.id
+			);
+			if (other) {
+				const theirs = cachedFigure(other, 'words', () =>
+					E.wordEfforts(layoutOf(other.layout.id), words, analysisOptions())
+				);
+				const gap = efforts.mean - theirs.mean;
+				$('la-words-mean').append(
+					' ',
+					t('layout_analysis.words.mean_versus', {
+						layout: other.layout.name,
+						mean: format(theirs.mean, 1),
+						delta: `${gap > 0 ? '+' : ''}${format(gap, 1)}`
+					})
+				);
+			}
 			const bins = E.effortDistribution(efforts.words, WORD_BINS);
 			loadBars(
 				$('la-words-bins'),
@@ -5730,6 +5913,30 @@
 		 * and the difference beside it, with which one the metric prefers in
 		 * words (the engine's diff).
 		 */
+		/**
+		 * A difference's verdict in words with a mark, never by colour alone:
+		 * better, worse or equal for the Principal layout, or not scored.
+		 * @param {'better'|'worse'|'same'|'none'} verdict
+		 * @returns {HTMLElement}
+		 */
+		function verdictCell(verdict) {
+			const verdicts = {
+				better: ['▲', t('layout_analysis.details.verdict_better')],
+				worse: ['▼', t('layout_analysis.details.verdict_worse')],
+				same: ['=', t('layout_analysis.details.verdict_same')],
+				none: ['', t('layout_analysis.details.verdict_none')]
+			};
+			const cell = el('small', `la-verdict la-verdict-${verdict}`);
+			const [mark, words] = verdicts[verdict];
+			if (mark) {
+				const drawn = el('span', 'la-verdict-mark', mark);
+				drawn.setAttribute('aria-hidden', 'true');
+				cell.append(drawn, ' ');
+			}
+			cell.append(words);
+			return cell;
+		}
+
 		function renderMetrics(result) {
 			const table = $('la-metrics');
 			table.replaceChildren();
@@ -5746,24 +5953,6 @@
 			const thead = el('thead');
 			thead.append(head);
 			const tbody = el('tbody');
-			// Each verdict in words with a mark, never by colour alone.
-			const verdicts = {
-				better: ['▲', t('layout_analysis.details.verdict_better')],
-				worse: ['▼', t('layout_analysis.details.verdict_worse')],
-				same: ['=', t('layout_analysis.details.verdict_same')],
-				none: ['', t('layout_analysis.details.verdict_none')]
-			};
-			const verdictCell = (verdict) => {
-				const cell = el('small', `la-verdict la-verdict-${verdict}`);
-				const [mark, words] = verdicts[verdict];
-				if (mark) {
-					const drawn = el('span', 'la-verdict-mark', mark);
-					drawn.setAttribute('aria-hidden', 'true');
-					cell.append(drawn, ' ');
-				}
-				cell.append(words);
-				return cell;
-			};
 			const addRow = (th, values, delta) => {
 				const tr = el('tr');
 				tr.append(th, ...values.map((text) => el('td', '', text)));

@@ -36,6 +36,11 @@
  * 15. Density: the spread draws the smoothed distribution of its values
  *    above the strip, hidden from assistive technology (the quantiles' table
  *    says it in numbers), within the strip's ends, its peak on its band's top.
+ * 16. Principal − Comparison everywhere: each frame tab but the trace shows
+ *    the difference of the two layouts on its values, equal to the engine's
+ *    values and their difference with its verdict in words; without a
+ *    Comparison it says how to choose one; the Pareto chart and spread mark
+ *    the Comparison with a square and the spread says its value and gap.
  * 13. Values query: a query over the values (« sfb < … & complete ») keeps
  *    only the layouts it holds for, in every figure's rows; one that does not
  *    read filters nothing and says why and where in words; the names it may
@@ -52,7 +57,8 @@
  *    and the Optimiser's folded help under its header name each task in a
  *    titled section, the Optimiser's opened from the keyboard.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
- *    skipgrams, with the compared layout's columns and their difference.
+ *    skipgrams, with the compared layout's columns and their difference; the
+ *    words' mean effort names the compared layout's and the gap.
  * ==============================================================================
  */
 
@@ -270,6 +276,10 @@ async function exerciseMovement(browser, origin) {
 	const rhythmHeader = await page.$$eval('#la-rhythm thead th', (ths) => ths.length);
 	assert.equal(rhythmHeader, 6, 'rhythm: class, all and no thumbs per layout, one difference');
 	assert.equal((await tableRows(page, '#la-rhythm')).length, 8, 'rhythm: eight classes');
+	// The words' mean effort names the Comparison's beside it, with the gap.
+	await page.waitForFunction(() => document.querySelector('#la-words-mean').textContent !== '');
+	const mean = await page.textContent('#la-words-mean');
+	assert.match(mean, /Ergopti: [\d.]+ points per word \(Principal − Comparison: [+−-]?[\d.]+\)/);
 	assert.deepEqual(errors, []);
 	await context.close();
 }
@@ -666,7 +676,75 @@ async function exerciseDensity(browser, origin) {
 	await context.close();
 }
 
+async function exerciseFrameDiff(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-bigrams');
+	await page.selectOption('#la-frame-main', 'ergopti');
+	await page.selectOption('#la-frame-comp', '');
+	assert.ok(await page.isVisible('#la-frame-diff-none'), 'frame diff: says how to choose one');
+	assert.ok(
+		await page.isHidden('#la-frame-diff-wrap'),
+		'frame diff: no table without a Comparison'
+	);
+	await page.selectOption('#la-frame-comp', 'bepo');
+	assert.equal(
+		await page.textContent('#la-frame-diff-label'),
+		'Difference: Ergopti − bépo',
+		'frame diff: named by both layouts'
+	);
+	const engine = await page.evaluate(() => {
+		let results = [];
+		window.LAYOUT_ANALYSIS_COMPARER.onResults((list) => {
+			results = list;
+		});
+		const [a, b] = ['ergopti', 'bepo'].map((id) => results.find((r) => r.layout.id === id));
+		return { a: a.metrics.sfb, b: b.metrics.sfb };
+	});
+	const number = (text) => Number(text.replace(/[^0-9.−+-]/g, '').replace('−', '-'));
+	const rows = await tableRows(page, '#la-frame-diff-table');
+	assert.equal(rows.length, 12, `frame diff: one row per bigram metric (${rows.length})`);
+	const sfb = rows.find((cells) => cells[0].startsWith(EN['layout_analysis.metric.sfb']));
+	assert.ok(sfb, 'frame diff: the SFB row');
+	assert.ok(
+		Math.abs(number(sfb[1]) - engine.a) < 0.006 && Math.abs(number(sfb[2]) - engine.b) < 0.006,
+		`frame diff: the engine's values (${sfb} against ${JSON.stringify(engine)})`
+	);
+	const delta = number(sfb[3].split(' ')[0]);
+	assert.ok(Math.abs(delta - (engine.a - engine.b)) < 0.006, `frame diff: a − b (${sfb[3]})`);
+	const verdict = EN[`layout_analysis.details.verdict_${engine.a < engine.b ? 'better' : 'worse'}`];
+	assert.ok(sfb[3].endsWith(verdict), `frame diff: the verdict in words (${sfb[3]})`);
+	// Every frame tab but the trace has it, each with its own values.
+	const counts = {};
+	for (const tab of ['overview', 'fingers', 'trigrams', 'rows', 'heatmaps', 'misc', 'pareto']) {
+		await page.click(`#la-tab-${tab}`);
+		assert.ok(await page.isVisible('#la-frame-diff-table'), `frame diff: shown on ${tab}`);
+		counts[tab] = (await tableRows(page, '#la-frame-diff-table')).length;
+	}
+	assert.equal(counts.pareto, 2, 'frame diff: the Pareto tab compares its two values');
+	assert.ok(counts.fingers > counts.heatmaps, 'frame diff: fingers adds its metrics to the loads');
+	await page.click('#la-tab-trace');
+	assert.ok(await page.isHidden('#la-frame-diff'), 'frame diff: the trace counts its own');
+	await page.click('#la-tab-pareto');
+	assert.equal(
+		await page.locator('#la-pareto-chart .la-pareto-versus').count(),
+		1,
+		'pareto: a square'
+	);
+	assert.equal(
+		await page.locator('#la-pareto-spread .la-pareto-versus').count(),
+		1,
+		'spread: a square'
+	);
+	assert.ok(
+		(await page.textContent('#la-pareto-spread-text')).includes('bépo:'),
+		'spread: the Comparison in words'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseFrameDiff,
 	exerciseDensity,
 	exerciseQuantiles,
 	exerciseValuesQuery,
