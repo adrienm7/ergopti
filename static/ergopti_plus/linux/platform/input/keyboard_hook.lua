@@ -216,11 +216,11 @@ local _remap_source_of = {}
 -- The last key or pointer event's time on the clock the events carry, and the
 -- daemon's monotonic time when it was read: the pump tells the engine what
 -- time it is on the events' clock from these, with nothing to read in between.
-local _clock_event_ms = nil
-local _clock_read_ms = nil
--- Test seam: the time the engine reads while _test_drive replays a stream
--- whose events carry `at_ms` and no kernel timestamp. nil in production.
-local _test_clock_ms = nil
+-- `test_ms` is a test seam: the time the engine reads while _test_drive
+-- replays a stream whose events carry `at_ms` and no kernel timestamp, nil in
+-- production. One table, not three locals: this chunk is at Lua 5.4's budget
+-- of 200 active locals, which a module-level for loop also draws on.
+local _clock = { event_ms = nil, read_ms = nil, test_ms = nil }
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
@@ -251,11 +251,8 @@ _locks.held_modifier_keys = {}
 -- therefore produce characters; ctrl, alt and meta start a shortcut and
 -- therefore produce none. Treating AltGr as Alt is how a French keyboard loses
 -- é, € and « — or how Alt+Tab ends up in the typing buffer.
-local _shift_held = false
-local _ctrl_held  = false
-local _alt_held   = false
-local _altgr_held = false
-local _meta_held  = false
+-- One table for the five roles, for the same local budget as _clock.
+local _held = { shift = false, ctrl = false, alt = false, altgr = false, meta = false }
 
 -- Physical modifier keys currently down, keyed by evdev code, and a count per
 -- role. A single boolean cannot represent Left+Right Shift: releasing either
@@ -381,7 +378,7 @@ local function _legacy_capture_for_test(code, value)
 	end
 	local ir = _get_input_reader()
 	if not ir or not ir.resolve_char then return nil, nil, "test input_reader unavailable" end
-	local char = ir.resolve_char(code, _layout, _shift_held)
+	local char = ir.resolve_char(code, _layout, _held.shift)
 	return char, char, nil
 end
 
@@ -607,11 +604,11 @@ local function _track_modifier(source, code, value, role)
 	else
 		return held_role ~= nil
 	end
-	_shift_held = _modifier_count.shift > 0
-	_ctrl_held  = _modifier_count.ctrl > 0
-	_alt_held   = _modifier_count.alt > 0
-	_altgr_held = _modifier_count.altgr > 0
-	_meta_held  = _modifier_count.meta > 0
+	_held.shift = _modifier_count.shift > 0
+	_held.ctrl  = _modifier_count.ctrl > 0
+	_held.alt   = _modifier_count.alt > 0
+	_held.altgr = _modifier_count.altgr > 0
+	_held.meta  = _modifier_count.meta > 0
 	return true
 end
 
@@ -620,8 +617,8 @@ local function _reset_modifier_state()
 	_modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
 	_modifier_order = {}
 	_last_down_role, _prior_down_role = nil, nil
-	_shift_held, _ctrl_held, _alt_held = false, false, false
-	_altgr_held, _meta_held = false, false
+	_held.shift, _held.ctrl, _held.alt = false, false, false
+	_held.altgr, _held.meta = false, false
 	_consumed_down = {}
 	_consumed_release = {}
 	_locks.held_modifier_keys = {}
@@ -634,7 +631,7 @@ end
 --- produce text.
 --- @return boolean
 local function _shortcut_modifier_held()
-	return _ctrl_held or _alt_held or _meta_held
+	return _held.ctrl or _held.alt or _held.meta
 end
 
 local _owned_row_receipt = nil
@@ -1256,9 +1253,9 @@ local function _event_time_ms(ev)
 	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then
 		at_ms = ev.timestamp_us / 1000
 	else
-		at_ms = _test_clock_ms or Monotonic.now_ms()
+		at_ms = _clock.test_ms or Monotonic.now_ms()
 	end
-	_clock_event_ms, _clock_read_ms = at_ms, Monotonic.now_ms()
+	_clock.event_ms, _clock.read_ms = at_ms, Monotonic.now_ms()
 	return at_ms
 end
 
@@ -1274,9 +1271,9 @@ end
 --- back would press every later hold at once.
 --- @return number|nil nil before any event.
 local function _event_clock_now_ms()
-	if not _clock_event_ms then return nil end
-	local since_read = Monotonic.now_ms() - _clock_read_ms - Monotonic.resolution_ms()
-	return _clock_event_ms + math.max(0, since_read)
+	if not _clock.event_ms then return nil end
+	local since_read = Monotonic.now_ms() - _clock.read_ms - Monotonic.resolution_ms()
+	return _clock.event_ms + math.max(0, since_read)
 end
 
 --- Arms the installed engine's one-shot Shift for an origin that owns no key
@@ -1739,8 +1736,8 @@ function _number_row.preview(ev, source)
 	if record.owners.has(key) and ev.value == InputEvent.VALUE_UP then return { record = record, key = key, release = true } end
 	if ev.code < 2 or ev.code > 11 or ev.value == InputEvent.VALUE_UP
 		or (ev.value == InputEvent.VALUE_REPEAT and not record.owners.has(key)) or _consumed_down[key]
-		or _shortcut_modifier_held() or _altgr_held or not _number_row.event_current(record, ev, source) then return nil end
-	local plan = record.rows.prepare({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, record.mode, ev.code - 1, _shift_held)
+		or _shortcut_modifier_held() or _held.altgr or not _number_row.event_current(record, ev, source) then return nil end
+	local plan = record.rows.prepare({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, record.mode, ev.code - 1, _held.shift)
 	if not plan then return nil end
 	local preview = record.rows.preview(plan)
 	if not preview or not _number_row.event_current(record, ev, source) then record.rows.retire(plan); return nil end
@@ -1756,7 +1753,7 @@ function _number_row.deliver(plan, ev, source)
 	if plan.suppressed then return true, nil, nil end
 	local record = plan.record
 	record.event, record.source = ev, source
-	local called, accepted, outcome = pcall(record.owners.event, plan.key, ev, record.mode, ev.code - 1, _shift_held, plan.plan)
+	local called, accepted, outcome = pcall(record.owners.event, plan.key, ev, record.mode, ev.code - 1, _held.shift, plan.plan)
 	record.event, record.source = nil, nil
 	if not called or accepted ~= true then
 		_number_row.abandon(plan, ev, false)
@@ -3284,8 +3281,8 @@ end
 --- @return table Array of "shift" / "altgr", in press order.
 function M.held_text_modifiers()
 	local held = {}
-	if _shift_held then held[#held + 1] = "shift" end
-	if _altgr_held then held[#held + 1] = "altgr" end
+	if _held.shift then held[#held + 1] = "shift" end
+	if _held.altgr then held[#held + 1] = "altgr" end
 	return held
 end
 
@@ -3396,11 +3393,11 @@ end
 --- @return table { shift?, ctrl?, alt?, altgr?, meta? } — true when held.
 function M.held_modifiers()
 	return {
-		shift = _shift_held or nil,
-		ctrl  = _ctrl_held or nil,
-		alt   = _alt_held or nil,
-		altgr = _altgr_held or nil,
-		meta  = _meta_held or nil,
+		shift = _held.shift or nil,
+		ctrl  = _held.ctrl or nil,
+		alt   = _held.alt or nil,
+		altgr = _held.altgr or nil,
+		meta  = _held.meta or nil,
 	}
 end
 
@@ -4728,7 +4725,7 @@ function M.stop()
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -4797,7 +4794,7 @@ function M.emergency_stop(reason)
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -5109,13 +5106,13 @@ function M._test_drive(events, callbacks, intercept)
 	while status == "bounded" do
 		local count
 		count, status = EvdevReader.drain(function(ev)
-			_test_clock_ms = times[at]
+			_clock.test_ms = times[at]
 			_dispatch_event(ev, test_path)
 		end, slot)
 		drained = drained + count
 	end
-	_test_clock_ms = nil
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.test_ms = nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_remap_source_of = {}
 	_running = false
 	_devices = {}
