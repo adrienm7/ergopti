@@ -1,5 +1,5 @@
 {
-	"expected_count": 14,
+	"expected_count": 15,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -54,6 +54,10 @@
 		},
 		{
 			"contains": "a warning is batched and only an error forces the flush",
+			"expected_count": 1
+		},
+		{
+			"contains": "a direct-mode sendtext failure is contained, reported and logged",
 			"expected_count": 1
 		}
 	]
