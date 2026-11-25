@@ -1485,7 +1485,12 @@ the desktop. Before this, each refusal path was a native fallback window that
 appeared during agents' runs. `test_no_native_webview_fallback.ahk` refuses a
 retired fallback symbol and a host that creates a controller without the
 shared admission. Action: a new WebView window follows the same two calls and
-gets a refusal test with WebView2 absent; never add a native substitute.
+gets a refusal test with WebView2 absent; never add a native substitute. Two
+surfaces must not lose their content to a refusal: the error window keeps the
+error in a modal box naming the errors file (`_ErrorDialog_AnnounceWithoutWindow`),
+and the diagnostics write their report to an HTML file opened in the browser
+(`HealthCheck_DeliverWithoutWindow`, through `_HC_WindowlessEffects` in tests,
+so the suite neither writes a file nor starts a browser).
 
 ### project-webview2-fill-reads-the-parent-control
 

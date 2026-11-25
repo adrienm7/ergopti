@@ -474,16 +474,23 @@ _TestHC_OwnWindows() {
 }
 
 ; The diagnostics TreeView that stood in for the page is gone (maintainer
-; decision 2026-11-21): the suite never loads WebView2, so the opening refuses
-; in words before any probe or host runs.
-_TestHC_WebViewOnly() {
-	global _HC_Gui, _HC_Opening, _LOGGER_TEST_SINK
+; decision 2026-11-21), and the refusal that replaced it left the user with no
+; report at all: the diagnostics depended on the very component they diagnose.
+; The suite never loads WebView2, so the opening writes the approved report to
+; an HTML file and opens it in the browser instead (maintainer decision
+; 2026-11-25), before any probe or host runs (healthcheck-webview-only).
+; @param Effects {Map} Recording side effects of the windowless delivery.
+; @returns {Map} { shown: Array, logs: Array, created: Integer, had_gui, has_gui }
+_TestHC_OpenWithoutWebView(Effects) {
+	global _HC_Gui, _HC_Opening, _LOGGER_TEST_SINK, _HC_WindowlessEffects
 	HadGui := IsSet(_HC_Gui)
 	Shown := [], Logs := [], Before := Map()
 	for Hwnd in _TestHC_OwnWindows()
 		Before[Hwnd] := true
 	PreviousSink := _LOGGER_TEST_SINK
+	PreviousEffects := _HC_WindowlessEffects
 	try {
+		_HC_WindowlessEffects := Effects
 		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Text), ""))
 		_LoggerFlushRepeats(true)
 		LoggerSetTestSink((Line) => Logs.Push(Line))
@@ -492,24 +499,94 @@ _TestHC_WebViewOnly() {
 	} finally {
 		LoggerSetTestSink(PreviousSink)
 		TestMsgBoxResponder("")
+		_HC_WindowlessEffects := PreviousEffects
 	}
-	AssertFalse(_HC_Opening, "the refused opening must release its in-progress flag")
+	AssertFalse(_HC_Opening, "the windowless opening must release its in-progress flag")
 	Created := 0
 	for Hwnd in _TestHC_OwnWindows()
 		if !Before.Has(Hwnd)
 			Created += 1
 	AssertEqual(0, Created, "no native diagnostics window may be built")
-	AssertEqual(HadGui, IsSet(_HC_Gui), "a refusal publishes no diagnostics host")
-	AssertEqual(1, Shown.Length, "the user is told exactly once")
-	AssertEqual(t("webview.required"), Shown[1], "the message is the shared WebView2-required text")
-	Errors := 0
-	for Line in Logs
-		if InStr(Line, "[ERROR]") && InStr(Line, "The diagnostics window cannot open: WebView2 is required")
-			Errors += 1
-	AssertEqual(1, Errors, "the refusal is logged once at ERROR")
+	AssertEqual(HadGui, IsSet(_HC_Gui), "no diagnostics host is published without WebView2")
+	return Map("shown", Shown, "logs", Logs)
 }
-Test("HealthCheck: an absent WebView2 refuses once and builds no native diagnostics window (healthcheck-webview-only)",
+
+; Counts the log lines of a level that contain a text.
+_TestHC_CountLines(Logs, Level, Text) {
+	Count := 0
+	for Line in Logs
+		if InStr(Line, "[" . Level . "]") && (Text == "" || InStr(Line, Text))
+			Count += 1
+	return Count
+}
+
+; Recording side effects of the windowless delivery.
+_TestHC_WindowlessEffects(Calls, Options := 0) {
+	Options := (Options is Map) ? Options : Map()
+	Save(Dir, Name, Text) {
+		if Options.Get("save_fails", false)
+			throw Error("synthetic refusal")
+		Calls.Push(Map("kind", "save", "dir", Dir, "name", Name, "text", Text))
+		return Dir . "\" . Name
+	}
+	return Map(
+		"save",   Save,
+		"open",   (Path) => (Calls.Push(Map("kind", "open", "path", Path)), Options.Get("opens", true)),
+		"notify", (Title, Body, Kind) => (Calls.Push(Map("kind", "notify", "title", Title, "body", Body)), true),
+		"alert",  (Title, Text) => (Calls.Push(Map("kind", "alert", "title", Title, "body", Text)), ""))
+}
+
+_TestHC_WebViewOnly() {
+	Calls := []
+	Seen := _TestHC_OpenWithoutWebView(_TestHC_WindowlessEffects(Calls))
+	AssertEqual(0, Seen["shown"].Length, "a delivered report needs no refusal box")
+	AssertEqual(3, Calls.Length, "the report is saved, opened, then named to the user")
+	for Index, Kind in ["save", "open", "notify"]
+		AssertEqual(Kind, Calls[Index]["kind"], "delivery order")
+	Saved := Calls[1]
+	AssertTrue(InStr(Saved["dir"], "\diagnostics"), "the file lands in the logs' diagnostics folder: " . Saved["dir"])
+	AssertEqual(".html", SubStr(Saved["name"], -5), "the report is an HTML file: " . Saved["name"])
+	AssertEqual(1, InStr(Saved["text"], "<!doctype html>"), "the file is a complete page")
+	AssertFalse(InStr(Saved["text"], "<script"), "the page runs no script")
+	AssertContains(Saved["text"], "# ErgoptiPlus diagnostics", "the page holds the approved report")
+	AssertContains(Saved["text"], _HCReport_EscapeHtml(t("webview.required")), "the page says how to get the window back")
+	Path := Saved["dir"] . "\" . Saved["name"]
+	AssertEqual(Path, Calls[2]["path"], "the browser opens the saved file")
+	AssertEqual(StrReplace(t("healthcheck.file_fallback.notice"), "{1}", Path), Calls[3]["body"],
+		"the user is told where the report is")
+	AssertEqual(1, _TestHC_CountLines(Seen["logs"], "WARNING", "The diagnostics window cannot open"),
+		"the missing window is logged once")
+	AssertEqual(1, _TestHC_CountLines(Seen["logs"], "SUCCESS", "Diagnostics report written to " . Path),
+		"the delivery's success names the file")
+	AssertEqual(0, _TestHC_CountLines(Seen["logs"], "ERROR", ""), "a delivered report is no error")
+}
+Test("HealthCheck: an absent WebView2 delivers the report as an HTML file in the browser (healthcheck-webview-only)",
 	_TestHC_WebViewOnly)
+
+_TestHC_WebViewOnlyBrowserRefused() {
+	Calls := []
+	Seen := _TestHC_OpenWithoutWebView(_TestHC_WindowlessEffects(Calls, Map("opens", false)))
+	AssertEqual(3, Calls.Length, "the report is saved, the browser tried, then the file named")
+	AssertEqual("alert", Calls[3]["kind"], "a browser that did not start leaves a box naming the file")
+	AssertEqual(StrReplace(t("healthcheck.file_fallback.unopened"), "{1}", Calls[2]["path"]), Calls[3]["body"])
+	AssertEqual(1, _TestHC_CountLines(Seen["logs"], "WARNING", "The browser did not open the diagnostics report"))
+}
+Test("HealthCheck: a browser that does not start leaves the report's path on screen (healthcheck-webview-only)",
+	_TestHC_WebViewOnlyBrowserRefused)
+
+_TestHC_WebViewOnlyUnwritable() {
+	Calls := []
+	Seen := _TestHC_OpenWithoutWebView(_TestHC_WindowlessEffects(Calls, Map("save_fails", true)))
+	AssertEqual(0, Calls.Length, "nothing is opened or announced without a file")
+	AssertEqual(1, Seen["shown"].Length, "the user is told exactly once")
+	AssertEqual(t("webview.required"), Seen["shown"][1], "the message is the shared WebView2-required text")
+	AssertEqual(1, _TestHC_CountLines(Seen["logs"], "ERROR", "The diagnostics report could not be written to a file"),
+		"the failed delivery is logged at ERROR")
+	AssertEqual(1, _TestHC_CountLines(Seen["logs"], "ERROR", "The diagnostics window cannot open: WebView2 is required"),
+		"the refusal is logged once at ERROR")
+}
+Test("HealthCheck: a report that cannot be written ends in the shared refusal (healthcheck-webview-only)",
+	_TestHC_WebViewOnlyUnwritable)
 
 /** Replay the actual poll with a deterministic tick and a recording request. */
 _TestHC_ProbeRollover(Started, Elapsed, Completed := false, Cancellation := "", AbortAllowed := true) {

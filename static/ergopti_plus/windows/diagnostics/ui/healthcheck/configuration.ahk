@@ -26,8 +26,8 @@
 ; 6. HealthCheck_ConfigurationProbe runs that collection as the local
 ;    `configuration` probe of the schema, against its deadline: phase A only
 ;    publishes empty sections and a pending probe. Flows without a page (the
-;    Debug menu's report, the native fallback window) call
-;    HealthCheck_CompleteConfiguration instead.
+;    Debug menu's report, the report written to a file without WebView2)
+;    call HealthCheck_CompleteConfiguration instead.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

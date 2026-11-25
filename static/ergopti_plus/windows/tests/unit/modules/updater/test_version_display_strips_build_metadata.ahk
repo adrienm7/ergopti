@@ -47,8 +47,10 @@ _VDSB_SurfacesReadTheOwner() {
 	Snapshot := HealthCheck_Run()
 	AssertEqual(Updater_CurrentVersion(), Snapshot["sections"]["versions"]["ergopti_version"],
 		"the diagnostics version is the owner's")
-	Assert(InStr(HealthCheck_FormatPlain(Snapshot), "`r`nversions.ergopti_version: " . Updater_CurrentVersion() . "`r`n") > 0,
-		"the plain-text diagnostics must show exactly the owner's version")
+	; The shared report (the copied, saved and windowless file) names the same version.
+	Shared := HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])
+	Assert(InStr(Shared["summary"], "`nVersion: " . Updater_CurrentVersion() . "`n") > 0,
+		"the shared diagnostics must show exactly the owner's version: " . Shared["summary"])
 
 	Identity := Updater_BuildIdentity()
 	Rows := _MI_AboutUpdateRows(true)

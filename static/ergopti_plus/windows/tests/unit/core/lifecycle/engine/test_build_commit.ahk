@@ -164,19 +164,24 @@ _TBC_SnapshotUsesStamp() {
 }
 Test("build commit: the boot snapshot reports the compiled build's stamp", _TBC_SnapshotUsesStamp)
 
-; The plain-text report (the window without WebView2) must carry the same two
-; rows the page shows. It once lacked both, so a pasted report named no commit
-; and no install folder: exactly the two facts a bug triage asks for first.
+; The diagnostics must carry the two facts a bug triage asks for first: the
+; commit and the install folder. A pasted report once named neither. The
+; shared report (copied, saved, and the file written without WebView2) names
+; the commit; the install folder is a path, which the page shows and the
+; sharing policy keeps out of every export.
 _TBC_CopyTextsCarryCommitAndAppDir() {
 	global _TBC_SHA, BUNDLE_COMMIT
 	Old := BUNDLE_COMMIT
 	BUNDLE_COMMIT := _TBC_SHA
 	try {
-		Plain := HealthCheck_FormatPlain(HealthCheck_Run())
-		Assert(InStr(Plain, "`r`nversions.commit: f58d15798 (build)`r`n") > 0, Plain)
-		Assert(InStr(Plain, "`r`npaths.app_dir: " . A_ScriptDir . "`r`n") > 0, Plain)
+		Snapshot := HealthCheck_Run()
+		AssertEqual("f58d15798 (build)", Snapshot["sections"]["versions"]["commit"])
+		AssertEqual(A_ScriptDir, Snapshot["sections"]["paths"]["app_dir"])
+		Shared := HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])
+		Assert(InStr(Shared["summary"], "`nCommit: f58d15798`n") > 0, Shared["summary"])
+		AssertFalse(InStr(Shared["text"], A_ScriptDir), "the shared report never carries the install path")
 	} finally {
 		BUNDLE_COMMIT := Old
 	}
 }
-Test("build commit: the plain-text diagnostics carry the commit and the app dir", _TBC_CopyTextsCarryCommitAndAppDir)
+Test("build commit: the diagnostics carry the commit and the app dir", _TBC_CopyTextsCarryCommitAndAppDir)

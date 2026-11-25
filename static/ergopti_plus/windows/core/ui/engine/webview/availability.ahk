@@ -82,12 +82,21 @@ WebView_RequireAvailable(Surface, VersionFn := 0) {
  * @returns {Boolean} Always false: nothing opened.
  */
 WebView_RefuseUnavailable(Surface, Reason, VersionFn := 0) {
-	global WEBVIEW_MIN_RUNTIME_VERSION
 	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
+	Ui_MsgBox(WebView_RecoveryText(VersionFn), t("common.error_title"), "Iconx")
+	return false
+}
+
+/**
+ * The localized sentence that says how to get WebView2 working: update a
+ * runtime that is too old, else install or repair it.
+ * @param {Func} VersionFn Test seam, WebView_RuntimeVersion by default.
+ * @returns {String}
+ */
+WebView_RecoveryText(VersionFn := 0) {
+	global WEBVIEW_MIN_RUNTIME_VERSION
 	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
-	Text := (Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0)
+	return (Version != "" && VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) < 0)
 		? StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
 		: t("webview.required")
-	Ui_MsgBox(Text, t("common.error_title"), "Iconx")
-	return false
 }
