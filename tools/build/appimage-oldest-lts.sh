@@ -104,7 +104,8 @@ build_owned_lgi() {
 container_build() {
 	# The programs and Lua modules of the private runtime every package carries
 	# are this release's packages (stage-linux-network-runtime.py), except
-	# luaposix, built from its pin (build_owned_luaposix).
+	# luaposix, built from its pin (build_owned_luaposix). glib-networking, dconf and the schemas are here only for
+	# the stager's admission: the image carries none of them.
 	apt_install bash ca-certificates curl binutils file gcc libc6-dev patchelf pkg-config python3 git \
 		luajit libluajit-5.1-dev lua-luv lua-filesystem sqlite3 openssl zstd \
 		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \

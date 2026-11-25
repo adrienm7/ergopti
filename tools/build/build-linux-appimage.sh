@@ -19,10 +19,12 @@
 #      on PATH. Without it the AppDir is left staged and the manual packaging
 #      command is printed. Actual native staging requires Linux x86_64.
 #
-# LuaJIT, luv, curl, lgi, native GIO modules, schemas and their linked ELF
-# closure are bundled from trusted build-host packages or pinned sources, with
-# libayatana-appindicator and its non-GTK libraries for the tray. The recipient supplies glibc, GLib, GTK,
-# the C++ runtime and certificate trust, so the build host must be the
+# LuaJIT, luv, curl, lgi and their linked ELF closure are bundled from trusted
+# build-host packages and pinned sources, with libayatana-appindicator and its
+# non-GTK libraries as a fallback tray (usr/lib/tray, used only when the
+# recipient has none). The recipient supplies glibc, GLib, GTK, its GIO modules
+# and schemas, the C++ runtime and certificate trust: nothing that loads into its GLib is bundled
+# (never_bundled in linux_appimage_recipient_libraries.json). The build host must be the
 # oldest supported Ubuntu LTS (ubuntu-22.04, glibc 2.35): built on a newer one,
 # the bundled luajit needed GLIBC_2.38 and the image died on Ubuntu 22.04 before
 # showing its tray. check-elf-glibc-ceiling.cjs refuses such a build below, and
@@ -173,6 +175,11 @@ python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
   --appdir "$APPDIR" \
   --catalogue "$PROJECT_ROOT/static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json" \
   --template "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh"
+
+# A core dump of the bundled luajit names only its GNU build-id: the stager
+# recorded it with its package, and the log keeps it beside the run.
+node -e 'const r=require(process.argv[1]); for (const f of r.files) if (f.path==="bin/luajit") console.log(`  luajit build-id ${f.build_id} (${f.package} ${f.version})`)' \
+  "$APPDIR/usr/share/ergopti/native-build-ids.json"
 
 # Every ELF file the image carries, the driver's own native backend included,
 # must load on the oldest supported LTS. A newer build host fails here rather

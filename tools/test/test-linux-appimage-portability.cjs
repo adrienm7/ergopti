@@ -247,6 +247,11 @@ passed++;
 // The packager refuses its own image, and CI builds and launches it in the
 // container of the ceiling's LTS.
 const builder = read('tools/build/build-linux-appimage.sh');
+/** The AppRun the packager writes. */
+function appRunSourceOf(text) {
+	const start = 'cat > "$APPDIR/AppRun" << \'APPRUN_EOF\'\n';
+	return text.slice(text.indexOf(start) + start.length, text.indexOf('\nAPPRUN_EOF\n') + 1);
+}
 assert.match(builder, /\nnode "\$SCRIPT_DIR\/check-elf-glibc-ceiling\.cjs" "\$APPDIR"\n/);
 assert.ok(
 	builder.indexOf('check-elf-glibc-ceiling.cjs" "$APPDIR"') <
@@ -277,10 +282,14 @@ assert.ok(
 	!/gtk-3|gdk-3|cairo|pango/.test(trayList.replace('dbusmenu-gtk3', '')),
 	"GTK stays the recipient's"
 );
+// They link the recipient's GTK 3, so they are only a fallback: outside the lib/
+// every staged file searches, behind the recipient's own libayatana.
 assert.match(
 	stager,
-	/for name, source in sorted\(tray_sources\(\)\.items\(\)\):\n\s+copy_unique\(source, prefix \/ "lib" \/ name, owners\)/
+	/for name, source in sorted\(tray_sources\(\)\.items\(\)\):\n\s+copy_unique\(source, prefix \/ TRAY_LIBRARY_DIRECTORY \/ name, owners\)/
 );
+assert.ok(stager.includes('TRAY_LIBRARY_DIRECTORY = "lib/tray"'));
+assert.ok(stager.includes('search = "$ORIGIN"'), 'the fallback tray libraries find each other');
 const container = read('tools/build/appimage-oldest-lts.sh');
 const containerBuildBody = container.slice(
 	container.indexOf('container_build() {'),
@@ -533,16 +542,248 @@ if (process.platform === 'linux') {
 }
 passed++;
 
+// Nothing that loads into, or must match, the recipient's GLib and GTK is
+// staged. The v1.0.9 image carried usr/lib/gio/modules (libdconfsettings.so,
+// libgiognomeproxy.so, libgiolibproxy.so, giomodule.cache), libproxy and the
+// compiled schemas, and pointed GIO_MODULE_DIR at them: on Arch (GLib 2.86) the
+// Ubuntu 22.04 libdconfsettings.so crashed luajit before any window opened.
+{
+	const Closure = require('../build/check-elf-needed-closure.cjs');
+	const data = JSON.parse(fs.readFileSync(Closure.RECIPIENT_LIBRARIES, 'utf8'));
+	const policy = Closure.neverBundled(data);
+	const recipient = Closure.recipientLibraries(data);
+	const image = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-never-bundled-'));
+	try {
+		const write = (name) => {
+			fs.mkdirSync(path.dirname(path.join(image, name)), { recursive: true });
+			fs.writeFileSync(path.join(image, name), 'fixture');
+		};
+		for (const name of [
+			'usr/bin/luajit',
+			'usr/lib/libcurl.so.4',
+			'usr/lib/libuv.so.1',
+			'usr/lib/tray/libdbusmenu-gtk3.so.4',
+			'usr/lib/lua/5.1/luv.so',
+			'usr/share/ergopti/native-build-ids.json'
+		])
+			write(name);
+		assert.deepEqual(
+			Closure.forbiddenEntries([image], policy, recipient),
+			[],
+			'a clean tree passes'
+		);
+		for (const name of [
+			'usr/lib/gio/modules/libdconfsettings.so',
+			'usr/lib/gio/modules/giomodule.cache',
+			'usr/share/glib-2.0/schemas/gschemas.compiled',
+			'usr/lib/libproxy.so.1',
+			'usr/lib/libgiolibproxy.so',
+			'usr/lib/libdconf.so.1',
+			'usr/lib/libglib-2.0.so.0',
+			'usr/lib/libgtk-3.so.0',
+			'usr/lib/libz.so.1'
+		])
+			write(name);
+		assert.deepEqual(
+			Closure.forbiddenEntries([image], policy, recipient).map((entry) =>
+				path.relative(image, entry).split(path.sep).join('/')
+			),
+			[
+				'usr/lib/gio',
+				'usr/lib/libdconf.so.1',
+				'usr/lib/libgiolibproxy.so',
+				'usr/lib/libglib-2.0.so.0',
+				'usr/lib/libgtk-3.so.0',
+				'usr/lib/libproxy.so.1',
+				'usr/lib/libz.so.1',
+				'usr/share/glib-2.0'
+			]
+		);
+	} finally {
+		fs.rmSync(image, { recursive: true, force: true });
+	}
+	assert.throws(() => Closure.neverBundled({}), /never_bundled/);
+	// The stager reads the same policy, stages no GIO module, schema or cache,
+	// and refuses a closure that reached one anyway.
+	assert.ok(!/giomoduledir|gio_querymodules|gschemas\.compiled|lib\/gio\/modules/.test(stager));
+	assert.ok(stager.includes('refuse_recipient_stack(prefix, owners)'));
+	assert.ok(
+		stager.includes('recipient = recipient_dependencies(seeds) | recipient_stack_policy()[1]'),
+		'no library the recipient list documents is staged'
+	);
+	const runtime = JSON.parse(
+		read('static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json')
+	);
+	assert.ok(!Object.hasOwn(runtime.network_runtime.portable, 'gio_modules'));
+	// The release workflow runs the closure check, which now refuses them too.
+	assert.ok(installJob.includes('node tools/build/check-elf-needed-closure.cjs squashfs-root pkg'));
+}
+passed++;
+
+// The launch environment reaches every process the daemon starts. A prefix
+// without its own GIO (every format but the Flatpak) sets no GIO, GSettings,
+// XDG, PATH or LD_LIBRARY_PATH variable, and records the host value of every
+// variable it does change for core/process/adapters/host_environment.lua.
+assert.ok(!/LD_LIBRARY_PATH=/.test(environment), 'no library path reaches host programs');
+assert.ok(!/LD_LIBRARY_PATH/.test(appRunSourceOf(builder)), 'AppRun sets no library path');
+assert.ok(!/export PATH=/.test(environment), 'owned programs run by absolute path');
+if (process.platform === 'linux') {
+	const { spawnSync } = require('node:child_process');
+	const { bashExecutable } = require('../lib/git-bash.cjs');
+	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-host-env-'));
+	try {
+		const prefix = path.join(sandbox, 'usr');
+		for (const name of [
+			'bin/luajit',
+			'bin/curl',
+			'bin/sqlite3',
+			'bin/openssl',
+			'bin/zstd',
+			'lib/lua/5.1/luv.so',
+			'lib/lua/5.1/lfs.so',
+			'lib/lua/5.1/posix/sys/stat.so',
+			'share/lua/5.1/posix/init.lua',
+			'lib/lua/5.1/lgi/corelgilua51.so',
+			'share/lua/5.1/lgi.lua',
+			'lib/girepository-1.0/GObject-2.0.typelib'
+		]) {
+			fs.mkdirSync(path.dirname(path.join(prefix, name)), { recursive: true });
+			fs.writeFileSync(path.join(prefix, name), 'existence fixture, never executed');
+		}
+		const script = path.join(sandbox, 'environment.sh');
+		fs.writeFileSync(script, environment);
+		const trust = path.join(sandbox, 'trust.pem');
+		fs.writeFileSync(trust, 'fixture');
+		const observe = (extra, sourced = true) =>
+			spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					`set -euo pipefail; ${sourced ? 'source "$1" "$2" "$3"; ' : ''}env | LC_ALL=C sort`,
+					'host-env',
+					script,
+					prefix,
+					path.join(prefix, 'lib/ergopti')
+				],
+				{ encoding: 'utf8', env: { PATH: '/usr/bin:/bin', ...extra } }
+			);
+		const parse = (observed) => {
+			assert.equal(observed.status, 0, observed.stderr);
+			return Object.fromEntries(
+				observed.stdout
+					.trim()
+					.split('\n')
+					.map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+			);
+		};
+		const hostEnvironment = { LUA_PATH: 'host;;', CURL_CA_BUNDLE: trust };
+		const host = parse(observe(hostEnvironment, false));
+		const variables = parse(observe(hostEnvironment));
+		for (const name of [
+			'GIO_MODULE_DIR',
+			'GIO_EXTRA_MODULES',
+			'GSETTINGS_SCHEMA_DIR',
+			'XDG_DATA_DIRS',
+			'LD_LIBRARY_PATH',
+			'PATH'
+		])
+			assert.equal(variables[name], host[name], `${name} stays the host's`);
+		assert.equal(
+			variables.ERGOPTI_HOST_ENV_NAMES,
+			'LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH'
+		);
+		assert.equal(
+			variables.ERGOPTI_HOST_ENV_SET_GI_TYPELIB_PATH,
+			undefined,
+			'GI_TYPELIB_PATH was unset'
+		);
+		assert.ok(variables.GI_TYPELIB_PATH.endsWith(path.join(prefix, 'lib/girepository-1.0')));
+		assert.equal(variables.ERGOPTI_HOST_ENV_SET_LUA_PATH, 'host;;');
+		assert.equal(variables.ERGOPTI_HOST_ENV_SET_CURL_CA_BUNDLE, trust);
+		assert.equal(variables.ERGOPTI_HOST_ENV_SET_LUA_CPATH, undefined, 'LUA_CPATH was unset');
+		assert.equal(variables.ERGOPTI_HOST_ENV_DRIVER_ROOT, path.join(prefix, 'lib/ergopti'));
+		assert.ok(variables.LUA_PATH.startsWith(path.join(prefix, 'lib/ergopti')));
+		// A nested launch from the bundle keeps the first record.
+		const nested = observe({
+			LUA_PATH: 'bundle;;',
+			ERGOPTI_HOST_ENV_NAMES: 'LUA_PATH LUA_CPATH CURL_CA_BUNDLE',
+			ERGOPTI_HOST_ENV_SET_LUA_PATH: 'host;;'
+		});
+		assert.equal(nested.status, 0, nested.stderr);
+		assert.match(nested.stdout, /^ERGOPTI_HOST_ENV_SET_LUA_PATH=host;;$/m);
+		// A prefix that builds its own GIO (the Flatpak's /app) still points GIO at it.
+		for (const name of [
+			'lib/gio/modules/libgiolibproxy.so',
+			'share/glib-2.0/schemas/gschemas.compiled'
+		]) {
+			fs.mkdirSync(path.dirname(path.join(prefix, name)), { recursive: true });
+			fs.writeFileSync(path.join(prefix, name), 'existence fixture, never executed');
+		}
+		const owned = observe({ CURL_CA_BUNDLE: trust });
+		assert.equal(owned.status, 0, owned.stderr);
+		assert.match(owned.stdout, /^GIO_MODULE_DIR=.*\/usr\/lib\/gio\/modules$/m);
+		assert.match(
+			owned.stdout,
+			/^ERGOPTI_HOST_ENV_NAMES=LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH GIO_MODULE_DIR /m
+		);
+	} finally {
+		fs.rmSync(sandbox, { recursive: true, force: true });
+	}
+}
+passed++;
+
+// A core of the bundled luajit names only its build-id and offsets: the stager
+// records every staged ELF file's GNU build-id and package in the prefix, refuses
+// a luajit without one, and the packager prints it into the build log.
+assert.ok(stager.includes('BUILD_IDENTITY_FILE = "share/ergopti/native-build-ids.json"'));
+assert.ok(stager.includes('raise RuntimeRefused("Bundled luajit carries no GNU build-id.")'));
+assert.ok(stager.includes('write_build_identities(prefix, owners)'));
+assert.ok(builder.includes('"$APPDIR/usr/share/ergopti/native-build-ids.json"'));
+if (process.platform === 'linux') {
+	// The real readelf on a real ELF file: one with its note is recorded, and the
+	// same file with the note removed refuses the stage.
+	const { spawnSync } = require('node:child_process');
+	const identity = spawnSync(
+		'python3',
+		[
+			'-I',
+			'-c',
+			`
+import importlib.util,json,pathlib,shutil,subprocess,sys,tempfile
+spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.run=lambda arguments,env=None,**options:subprocess.run(arguments,env=env,capture_output=True,text=True,check=True).stdout
+def copy(source,destination,owners):
+ destination.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,destination);owners[destination]={'source':pathlib.Path(source)}
+m.copy_unique=copy
+with tempfile.TemporaryDirectory() as scratch:
+ prefix=pathlib.Path(scratch)/'usr';owners={}
+ copy(shutil.which('true'),prefix/'bin/luajit',owners)
+ build_id=m.gnu_build_id(prefix/'bin/luajit');assert build_id and len(build_id)>=16,build_id
+ m.write_build_identities(prefix,owners)
+ record=json.loads((prefix/m.BUILD_IDENTITY_FILE).read_text())
+ assert [entry['path'] for entry in record['files']]==['bin/luajit'] and record['files'][0]['build_id']==build_id
+ subprocess.run(['objcopy','--remove-section=.note.gnu.build-id',str(prefix/'bin/luajit')],check=True)
+ assert m.gnu_build_id(prefix/'bin/luajit') is None
+ try:m.write_build_identities(prefix,{prefix/'bin/luajit':owners[prefix/'bin/luajit']})
+ except m.RuntimeRefused as refusal:assert str(refusal)=='Bundled luajit carries no GNU build-id.'
+ else:raise AssertionError('a luajit without a build-id was recorded')
+print('build identities ok')
+`,
+			path.join(ROOT, 'tools/build/stage-linux-network-runtime.py')
+		],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(identity.status, 0, identity.stderr);
+	assert.equal(identity.stdout, 'build identities ok\n');
+}
+passed++;
+
 // A system whose C library cannot load the image is refused in words, in the
 // user's language, before anything glibc-linked runs. On glibc 2.31 the bundled
 // luajit died with "version `GLIBC_2.34' not found"; on Alpine, AppRun itself
 // died with "No such file or directory": musl systems have no bash.
 const Preflight = require('../build/render-appimage-libc-preflight.cjs');
-const appRunSource = builder.slice(
-	builder.indexOf('cat > "$APPDIR/AppRun" << \'APPRUN_EOF\'\n') +
-		'cat > "$APPDIR/AppRun" << \'APPRUN_EOF\'\n'.length,
-	builder.indexOf('\nAPPRUN_EOF\n') + 1
-);
+const appRunSource = appRunSourceOf(builder);
 assert.ok(appRunSource.startsWith('#!/bin/sh\n'), 'AppRun starts without bash, which musl lacks');
 const sourcedAt = appRunSource.indexOf('\n. "$HERE/usr/lib/ergopti/libc-preflight.sh"\n');
 assert.ok(sourcedAt > 0, 'AppRun sources the preflight');

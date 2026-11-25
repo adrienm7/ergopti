@@ -80,6 +80,23 @@ local CANDIDATE_LIBS = {
 	gobject   = { "gobject-2.0.so.0", "gobject-2.0" },
 }
 
+-- The private runtime's own libayatana (tools/build/stage-linux-network-runtime.py
+-- TRAY_LIBRARY_DIRECTORY), relative to its prefix. It links the recipient's GTK 3,
+-- so the recipient's libayatana is always tried first and this copy only stands
+-- in on a system without one, such as the AppImage catalogue's Ubuntu 22.04.
+M.BUNDLED_INDICATOR = "lib/tray/libayatana-appindicator3.so.1"
+
+--- The libayatana candidates in load order: the recipient's sonames, then the
+--- private runtime's fallback copy when the driver runs from one.
+--- @param prefix string|nil The private runtime prefix (owned_programs.prefix()).
+--- @return table
+function M.indicator_candidates(prefix)
+	local names = {}
+	for index, name in ipairs(CANDIDATE_LIBS.indicator) do names[index] = name end
+	if prefix then names[#names + 1] = prefix .. "/" .. M.BUNDLED_INDICATOR end
+	return names
+end
+
 -- What to tell a user who has none of them, by package manager.
 local PACKAGE_HINTS = {
 	{ probe = "apt-get", hint = "sudo apt-get install libayatana-appindicator3-1" },
@@ -139,11 +156,11 @@ local _glib_wait = { native = nil, context = nil, fds = nil, capacity = 0, count
 --- Loads the first of a list of sonames that resolves.
 --- @param ffi table The FFI module.
 --- @param names table Candidate sonames.
---- @return userdata|nil
+--- @return userdata|nil, string|nil The library and the name that loaded.
 local function load_any(ffi, names)
 	for _, name in ipairs(names) do
 		local ok, lib = pcall(ffi.load, name)
-		if ok then return lib end
+		if ok then return lib, name end
 	end
 	return nil
 end
@@ -231,7 +248,8 @@ local function bind()
 
 	local gtk = load_any(ffi, CANDIDATE_LIBS.gtk)
 	local gobject = load_any(ffi, CANDIDATE_LIBS.gobject)
-	local indicator = load_any(ffi, CANDIDATE_LIBS.indicator)
+	local indicator, indicator_name = load_any(ffi,
+		M.indicator_candidates(require("settings.engine.preferences.owned_programs").prefix()))
 	if not gtk or not gobject or not indicator then
 		_missing = (not indicator) and M.INDICATOR_COMPONENT or M.GTK_COMPONENT
 		Logger.error(LOG, "Tray unavailable — %s is missing. Try: %s", _missing, package_hint())
@@ -247,7 +265,8 @@ local function bind()
 	end
 
 	_lib = { ffi = ffi, gtk = gtk, gobject = gobject, indicator = indicator }
-	Logger.success(LOG, "Tray backend bound (libayatana-appindicator).")
+	Logger.success(LOG, "Tray backend bound (libayatana-appindicator, %s).",
+		indicator_name:sub(1, 1) == "/" and "the bundled fallback" or "the system's")
 	return _lib
 end
 

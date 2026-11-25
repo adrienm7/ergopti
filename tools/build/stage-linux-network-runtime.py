@@ -23,6 +23,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -518,64 +519,6 @@ def owned_root(path):
         raise primary
 
 
-@contextmanager
-def held_directory(path):
-    descriptor = directory_fd(path, create=False)
-    primary = None
-    try:
-        yield descriptor
-        current_fd = directory_fd(path, create=False)
-        observation_error = None
-        try:
-            current = os.fstat(current_fd)
-            retained = os.fstat(descriptor)
-            if (current.st_dev, current.st_ino) != (retained.st_dev, retained.st_ino):
-                raise RuntimeRefused("Owned native writer directory changed.")
-        except BaseException as error:
-            observation_error = error
-        finally:
-            try:
-                os.close(current_fd)
-            except BaseException:
-                if observation_error is None:
-                    observation_error = RuntimeRefused(
-                        "Native writer observation retirement refused."
-                    )
-                sys.stderr.write(
-                    "Native writer observation retirement refused; owned inputs retained.\n"
-                )
-        if observation_error is not None:
-            raise observation_error
-    except BaseException as error:
-        primary = error
-    finally:
-        try:
-            os.close(descriptor)
-        except BaseException:
-            if primary is None:
-                primary = RuntimeRefused("Native writer directory retirement refused.")
-            sys.stderr.write("Native writer directory retirement refused; owned inputs retained.\n")
-    if primary is not None:
-        raise primary
-
-
-def gio_querymodules_executable():
-    candidate = Path(run(["pkg-config", "--variable=gio_querymodules", "gio-2.0"]).strip())
-    if not candidate.is_absolute():
-        raise RuntimeRefused("Native GIO cache writer location refused.")
-    executable = regular_source(candidate)
-    if not os.access(executable, os.X_OK):
-        raise RuntimeRefused("Native GIO cache writer executable refused.")
-    return str(executable)
-
-
-def query_modules(path, *, executable="gio-querymodules"):
-    # The actual cache writer inherits the retained module directory, rather
-    # than following a lexical path after a root/ancestor precheck.
-    with held_directory(path) as descriptor:
-        run([executable, f"/proc/self/fd/{descriptor}"], pass_fds=(descriptor,))
-
-
 def inspection_prefix():
     root_current()
     return Path(f"/proc/self/fd/{_DESTINATION_ROOT['fd']}") / "usr"
@@ -760,7 +703,12 @@ def recipient_base(name):
 # provides (stalonetray). GTK, GDK, cairo, pango and their dependencies stay the
 # recipient's: the webview windows load the recipient's GTK into the same
 # process. An exact list, so a build host that links another library fails here.
+# They link the recipient's GTK 3, so they are a fallback, not a replacement:
+# staged in lib/tray, outside the lib/ every other staged file searches, they
+# load only when the recipient has no libayatana of its own
+# (tray/adapters/appindicator.lua tries the recipient's soname first).
 TRAY_ROOT = "libayatana-appindicator3.so.1"
+TRAY_LIBRARY_DIRECTORY = "lib/tray"
 TRAY_LIBRARIES = frozenset(
     {
         TRAY_ROOT,
@@ -822,7 +770,9 @@ def recipient_dependencies(seeds):
 
 
 def copy_elf_closure(seeds, library_directory, owners):
-    recipient = recipient_dependencies(seeds)
+    # Every library the recipient list documents is the recipient's, whether
+    # or not a seed reached it through the recipient's GLib (libz from curl).
+    recipient = recipient_dependencies(seeds) | recipient_stack_policy()[1]
     pending = list(seeds)
     visited = set()
     while pending:
@@ -869,6 +819,9 @@ def set_private_runpaths(prefix, owners):
     )
     for destination in staged:
         search = private_runpath(destination, library_directory)
+        if destination.parent == prefix / TRAY_LIBRARY_DIRECTORY:
+            # The fallback tray libraries find each other only.
+            search = "$ORIGIN"
         if destination == prefix / "bin/sqlite3":
             search = "$ORIGIN/../" + SQLITE3_LIBRARY_DIRECTORY + ":" + search
         run(["patchelf", "--set-rpath", search, str(destination)])
@@ -1011,6 +964,139 @@ def stage_lgi(luajit, prefix, owners):
     return [core]
 
 
+RECIPIENT_LIBRARIES = (
+    ROOT / "static/ergopti_plus/_shared/updater/data/linux_appimage_recipient_libraries.json"
+)
+
+
+def recipient_stack_policy():
+    """The names the private runtime must leave to the recipient."""
+    data = json.loads(RECIPIENT_LIBRARIES.read_text())
+    policy = data["never_bundled"]
+    sonames = {name for group in data["groups"] for name in group.get("sonames", [])}
+    prefixes = tuple(prefix for group in data["groups"] for prefix in group.get("prefixes", []))
+    patterns = [re.compile(pattern) for pattern in policy["file_patterns"]]
+    return tuple(policy["directories"]), sonames, prefixes, patterns
+
+
+def forbidden_staged_path(relative, policy):
+    """Whether one staged path, relative to the prefix, is the recipient's."""
+    directories, sonames, prefixes, patterns = policy
+    text = relative.as_posix()
+    name = relative.name
+    return (
+        any(text == entry or text.startswith(entry + "/") for entry in directories)
+        or name in sonames
+        or name.startswith(prefixes)
+        or any(pattern.search(name) for pattern in patterns)
+    )
+
+
+def refuse_recipient_stack(prefix, owners):
+    """Refuse a staged file that loads into, or must match, the recipient's GLib.
+
+    GIO_MODULE_DIR once pointed the recipient's GLib at the build host's GIO
+    modules, and on Arch the Ubuntu 22.04 libdconfsettings.so crashed luajit.
+    """
+    policy = recipient_stack_policy()
+    for destination in owners:
+        if destination.is_relative_to(prefix) and forbidden_staged_path(
+            destination.relative_to(prefix), policy
+        ):
+            raise RuntimeRefused("Recipient GLib stack file staged into the private runtime.")
+
+
+def gnu_build_id(path):
+    """The GNU build-id note of one ELF file, or None."""
+    notes = run(["readelf", "--notes", "--", str(path)], env={**os.environ, "LC_ALL": "C"})
+    found = re.findall(r"Build ID: ([0-9a-f]{16,128})\b", notes)
+    if len(found) > 1:
+        raise RuntimeRefused("Native ELF build identity refused.")
+    return found[0] if found else None
+
+
+def dpkg_owners():
+    """Map each file a Debian package installed to that package and version."""
+    info = Path("/var/lib/dpkg/info")
+    status = Path("/var/lib/dpkg/status")
+    if not info.is_dir() or not status.is_file():
+        return {}
+    versions = {}
+    for stanza in status.read_text(errors="replace").split("\n\n"):
+        fields = dict(re.findall(r"^(Package|Version|Architecture): (.+)$", stanza, re.MULTILINE))
+        if "Package" in fields and "Version" in fields:
+            versions[fields["Package"]] = fields["Version"]
+            if "Architecture" in fields:
+                versions[fields["Package"] + ":" + fields["Architecture"]] = fields["Version"]
+    owners = {}
+    for listing in info.glob("*.list"):
+        package = listing.name[: -len(".list")]
+        for line in listing.read_text(errors="replace").splitlines():
+            owners[line] = (package, versions.get(package))
+    return owners
+
+
+def dpkg_spellings(source):
+    """The paths dpkg may have listed one file under, merged /usr or not."""
+    names = []
+    for name in (str(source), os.path.realpath(source)):
+        names.append(name)
+        if name.startswith("/usr/"):
+            names.append(name[len("/usr") :])
+        else:
+            names.append("/usr" + name)
+    return names
+
+
+# Where the build identities are recorded, inside the prefix every package
+# format copies (stage-linux-private-runtime.sh).
+BUILD_IDENTITY_FILE = "share/ergopti/native-build-ids.json"
+
+
+def write_build_identities(prefix, owners):
+    """Record the GNU build-id and origin of every staged ELF file.
+
+    A core dump of the bundled luajit names only its build-id and offsets:
+    with the package and version recorded here, the matching debug symbols
+    come from the distribution's debuginfod (debuginfod.ubuntu.com for the
+    oldest-LTS build) or from the pinned source. luajit must carry one.
+    """
+    packages = dpkg_owners()
+    files = []
+    for destination in sorted(owners):
+        source = owners[destination]["source"]
+        if not destination.is_relative_to(prefix) or not destination.is_file():
+            continue
+        with open(destination, "rb") as handle:
+            if handle.read(4) != b"\x7fELF":
+                continue
+        build_id = gnu_build_id(destination)
+        package, version = next(
+            (packages[name] for name in dpkg_spellings(source) if name in packages), (None, None)
+        )
+        files.append(
+            {
+                "path": destination.relative_to(prefix).as_posix(),
+                "build_id": build_id,
+                "package": package,
+                "version": version,
+            }
+        )
+    luajit = [entry for entry in files if entry["path"] == "bin/luajit"]
+    if len(luajit) != 1 or luajit[0]["build_id"] is None:
+        raise RuntimeRefused("Bundled luajit carries no GNU build-id.")
+    record = {
+        "version": 1,
+        "description": "GNU build-id and build-host package of every ELF file of the private runtime, to symbolise a core dump (debuginfod or the pinned source).",
+        "files": files,
+    }
+    # Copied in like every other staged file, so the receipt covers it.
+    with tempfile.TemporaryDirectory(prefix="ergopti-build-ids-") as scratch:
+        written = Path(scratch) / "native-build-ids.json"
+        written.write_text(json.dumps(record, indent=1) + "\n")
+        copy_unique(written, prefix / BUILD_IDENTITY_FILE, owners)
+
+
 def stage(appdir, catalogue, template):
     global _STAGE_DEADLINE
     _STAGE_DEADLINE = time.monotonic() + 180
@@ -1033,50 +1119,25 @@ def stage(appdir, catalogue, template):
             binaries.append(source)
         lua_modules = stage_lua_modules(binaries[0], prefix, owners)
         lua_modules += stage_lgi(binaries[0], prefix, owners)
-        # pkg-config reports the actual build host's GIO module location; no
-        # distribution-specific /usr/lib spelling is inferred.
-        module_directory = Path(run(["pkg-config", "--variable=giomoduledir", "gio-2.0"]).strip())
-        if not module_directory.is_absolute():
-            raise RuntimeRefused("Native GIO module location refused.")
-        modules = []
-        for name in policy["gio_modules"]:
-            source = regular_source(module_directory / name)
-            copy_unique(source, prefix / "lib/gio/modules" / name, owners)
-            modules.append(source)
-        schema_directory = Path(run(["pkg-config", "--variable=schemasdir", "gio-2.0"]).strip())
-        if not schema_directory.is_absolute():
-            raise RuntimeRefused("Native schema location refused.")
-        copy_unique(
-            schema_directory / "gschemas.compiled",
-            prefix / "share/glib-2.0/schemas/gschemas.compiled",
-            owners,
-        )
+        # No GIO module, GSettings backend or schema: each loads into the
+        # recipient's GLib inside the daemon, so they stay the recipient's.
         digest_sources = explicit_digest_sources(catalogue_data)
         for source in digest_sources:
             copy_unique(
                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
             )
-        copy_elf_closure(
-            [*binaries, *lua_modules, *modules, *digest_sources], prefix / "lib", owners
-        )
+        copy_elf_closure([*binaries, *lua_modules, *digest_sources], prefix / "lib", owners)
         # Not through the closure walk: it would stage GTK with them.
         for name, source in sorted(tray_sources().items()):
-            copy_unique(source, prefix / "lib" / name, owners)
+            copy_unique(source, prefix / TRAY_LIBRARY_DIRECTORY / name, owners)
         # inspect_installed() runs every owned program under the launch
         # environment, which names no library directory.
         set_private_runpaths(prefix, owners)
-        # The oldest supported LTS ships libproxy 0.4, whose optional plugins
-        # (GNOME settings, PAC runners) load from an absolute build-host path
-        # and so are absent from the image. Its built-in environment, sysconfig
-        # and KDE readers remain, and libgiognomeproxy reads the GNOME proxy
-        # settings itself; PAC stays unqualified. 0.5 links its backend, which
-        # the closure stages. The linked core is required either way.
-        if not any(destination.name == "libproxy.so.1" for destination in owners):
-            raise RuntimeRefused("Native libproxy core absent from the staged closure.")
+        refuse_recipient_stack(prefix, owners)
         copy_unique(template, driver / "network-runtime-env.sh", owners)
         # The shared environment template has a generated catalogue region.
         # It is copied unchanged, rather than generating policy in this stager.
-        query_modules(prefix / "lib/gio/modules", executable=gio_querymodules_executable())
+        write_build_identities(prefix, owners)
         admitted_prefix = inspection_prefix()
         inspect_installed(admitted_prefix, admitted_prefix / "lib/ergopti")
         root_current()
@@ -1090,7 +1151,8 @@ def inspect_installed(prefix, driver):
         [
             bash_executable(),
             "-c",
-            'set -euo pipefail; source "$1" "$2" "$3"; export XDG_DATA_DIRS="$2/share" XDG_DATA_HOME="$2/share"; exec "$2/bin/luajit" "$3/core/network/adapters/runtime_probe.lua" "$3/_shared"',
+            # The recipient's own GIO modules and schemas answer: none is bundled.
+            'set -euo pipefail; source "$1" "$2" "$3"; exec "$2/bin/luajit" "$3/core/network/adapters/runtime_probe.lua" "$3/_shared"',
             "ergopti-owned-runtime",
             str(driver / "network-runtime-env.sh"),
             str(prefix),

@@ -101,8 +101,6 @@ try {
 		else fs.writeFileSync(target, '');
 	}
 	for (const relative of [
-		'lib/gio/modules/libgiolibproxy.so',
-		'share/glib-2.0/schemas/gschemas.compiled',
 		'lib/lua/5.1/lgi/corelgilua51.so',
 		'share/lua/5.1/lgi.lua',
 		'lib/girepository-1.0/GObject-2.0.typelib'
@@ -561,7 +559,11 @@ try {
 			'glibc',
 			'libayatana-appindicator',
 			'lua51-lgi',
-			'webkit2gtk-4.1'
+			'webkit2gtk-4.1',
+			// The private runtime bundles no GIO module or schema: the host's
+			// proxy resolver and its schema answer inside the daemon.
+			'glib-networking',
+			'gsettings-desktop-schemas'
 		]) {
 			assert.ok(dependencies.includes(name), `missing runtime package: ${name}`);
 		}
@@ -574,7 +576,6 @@ try {
 			'openssl',
 			'sqlite',
 			'zstd',
-			'glib-networking',
 			// The XKB installer runs on Ergopti's own Python, downloaded on consent.
 			'python'
 		])

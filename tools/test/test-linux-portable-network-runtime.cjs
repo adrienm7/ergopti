@@ -91,11 +91,9 @@ function persistOwnedStageReceipt(fixture, identity, result) {
 let passed = 0;
 
 // Source inventory is hand maintained from the independent official contracts.
-assert.deepEqual(catalogue.network_runtime.portable.gio_modules, [
-	'libgiognomeproxy.so',
-	'libgiolibproxy.so',
-	'libdconfsettings.so'
-]);
+// The private runtime bundles no GIO module: one loads into the recipient's GLib
+// inside the daemon (a bundled libdconfsettings.so crashed luajit on Arch).
+assert.equal(Object.hasOwn(catalogue.network_runtime.portable, 'gio_modules'), false);
 assert.deepEqual(catalogue.network_runtime.portable.system_ca_files, [
 	'/etc/ssl/certs/ca-certificates.crt',
 	'/etc/pki/tls/certs/ca-bundle.crt',
@@ -173,7 +171,7 @@ try {
 			bashExecutable(),
 			[
 				'-c',
-				'set -euo pipefail; source "$1" "$2" "$3"; printf "%s\\n" "$GIO_MODULE_DIR"',
+				'set -euo pipefail; source "$1" "$2" "$3"; printf "%s\\n" "${GIO_MODULE_DIR-unset}"',
 				'owned-meson-layout',
 				bashPath(environmentPath),
 				bashPath(prefix),
@@ -193,7 +191,8 @@ try {
 	);
 	assert.equal(installed.stdout, bashPath(path.join(prefix, 'lib/gio/modules')) + '\n');
 	assert.equal(installed.stderr, '');
-	// The original lib64-only layout must still refuse; do not broaden discovery.
+	// A lib64-only layout is not a prefix that owns its GIO: it points GIO at
+	// nothing, and the Flatpak's runtime probe refuses the missing resolver.
 	fs.renameSync(path.join(prefix, 'lib/gio'), path.join(prefix, 'detached-gio'));
 	fs.mkdirSync(path.join(prefix, 'lib64/gio/modules'), { recursive: true });
 	fs.writeFileSync(
@@ -201,9 +200,8 @@ try {
 		'owned legacy path fixture'
 	);
 	const misplaced = observe();
-	assert.equal(misplaced.status, 1);
-	assert.equal(misplaced.stdout, '');
-	assert.equal(misplaced.stderr, 'Required installed native package component unavailable.\n');
+	assert.equal(misplaced.status, 0, misplaced.stderr);
+	assert.equal(misplaced.stdout, 'unset\n');
 } finally {
 	fs.rmSync(layoutFixture, { recursive: true, force: true });
 }
@@ -440,7 +438,7 @@ assert.deepEqual(modules[6]['config-opts'], [
 passed++;
 for (const mutate of [
 	(data) => {
-		data.network_runtime.portable.gio_modules.pop();
+		data.network_runtime.portable.gio_modules = ['libdconfsettings.so'];
 	},
 	(data) => {
 		data.network_runtime.portable.system_ca_files = [];
@@ -684,60 +682,8 @@ except m.RuntimeRefused:pass
 else:raise AssertionError('Replaced actual stage root must refuse')
 finally:m.directory_fd=real_directory;m.run=real_run;m.os.uname=real_uname;m._STAGE_DEADLINE=old_deadline
 assert root_injected==[True] and list(foreign_root.iterdir())==[] and m._DESTINATION_ROOT is None
-# The cache writer must receive the retained module directory FD capability.
-# Replace its lexical destination during the call; only the detached owned
-# directory receives the fixed model cache, and publication must refuse.
-writer_root=p/'writer-root';writer_root.mkdir();modules=writer_root/'usr/lib/gio/modules';modules.mkdir(parents=True);detached_modules=writer_root/'usr/lib/gio/detached-modules';foreign_modules=p/'foreign-modules';foreign_modules.mkdir();writer_calls=[];writer_fds=[]
-def cache_writer(arguments,*,pass_fds):
- assert arguments[0]=='gio-querymodules' and len(pass_fds)==1
- fd=pass_fds[0];writer_fds.append(fd);assert arguments[1]=='/proc/self/fd/'+str(fd)
- retained=m.os.fstat(fd);expected=modules.stat();assert (retained.st_dev,retained.st_ino)==(expected.st_dev,expected.st_ino)
- modules.rename(detached_modules);modules.symlink_to(foreign_modules,target_is_directory=True);writer_calls.append(True)
- output=m.os.open('giomodule.cache',m.os.O_WRONLY|m.os.O_CREAT|m.os.O_EXCL,0o600,dir_fd=fd)
- try:assert m.os.write(output,b'owned cache model')==len(b'owned cache model')
- finally:m.os.close(output)
- return ''
-m.run=cache_writer
-try:
- with m.owned_root(writer_root):
-  try:m.query_modules(modules)
-  except m.RuntimeRefused:pass
-  else:raise AssertionError('Replaced native writer destination must refuse publication')
-finally:m.run=real_run
-assert writer_calls==[True] and list(foreign_modules.iterdir())==[]
-assert (detached_modules/'giomodule.cache').read_bytes()==b'owned cache model' and m._DESTINATION_ROOT is None
-for fd in writer_fds:
- try:m.os.fstat(fd)
- except OSError:pass
- else:raise AssertionError('Owned writer directory descriptor was not retired')
-# Actual directory identity mismatch plus actual close-then-refusal must
-# preserve the earlier mismatch and never export private cleanup metadata.
-retirement_root=p/'writer-retirement-root';retirement_root.mkdir();target=retirement_root/'module-directory';target.mkdir();original_target=retirement_root/'original-module-directory';observations=[];retired=[];observation_diagnostic=io.StringIO();real_directory=m.directory_fd;real_close=m.os.close
-with m.owned_root(retirement_root):
- def observed_directory(path,*,create,use_root=True):
-  fd=real_directory(path,create=create,use_root=use_root)
-  if pathlib.Path(path)==target:observations.append(fd)
-  return fd
- def refused_observation_close(fd):
-  real_close(fd)
-  if len(observations)==2 and fd==observations[1]:
-   retired.append(fd);raise OSError('private path secret native close metadata')
- m.directory_fd=observed_directory;m.os.close=refused_observation_close
- try:
-  with contextlib.redirect_stderr(observation_diagnostic):
-   try:
-    with m.held_directory(target):target.rename(original_target);target.mkdir()
-   except m.RuntimeRefused as refusal:assert str(refusal)=='Owned native writer directory changed.'
-   else:raise AssertionError('Earlier native writer identity mismatch was lost')
- finally:m.directory_fd=real_directory;m.os.close=real_close
- assert len(observations)==2 and retired==[observations[1]]
- for fd in observations:
-  try:m.os.fstat(fd)
-  except OSError:pass
-  else:raise AssertionError('Acquired writer directory was not actually retired')
- assert observation_diagnostic.getvalue()=='Native writer observation retirement refused; owned inputs retained.\\n'
 assert m._DESTINATION_ROOT is None
-print('PASS independent portable component controls: 13 passed; 0 skipped.')
+print('PASS independent portable component controls: 11 passed; 0 skipped.')
 `,
 				helper,
 				scratch
@@ -747,7 +693,7 @@ print('PASS independent portable component controls: 13 passed; 0 skipped.')
 		assert.equal(controlled.status, 0);
 		assert.equal(
 			controlled.stdout,
-			'PASS independent portable component controls: 13 passed; 0 skipped.\n'
+			'PASS independent portable component controls: 11 passed; 0 skipped.\n'
 		);
 		passed++;
 	} finally {
@@ -758,9 +704,9 @@ console.log(
 	`Linux portable network packaging controls: ${passed} passed; ${process.platform === 'linux' ? 0 : 2} Linux-only filesystem groups skipped.`
 );
 
-// Independent command-contract witness: desktop runtime schemas need not ship
-// their development .pc file. Only the actual GIO-owned metadata is admitted;
-// this spy qualifies query selection and refusals, never native ABI or bytes.
+// Independent command-contract witness: the stager stages no GIO module, schema
+// or cache, so it asks GIO for none of their locations; the owned programs, Lua
+// modules and the explicit OpenSSL root are the closure's only seeds.
 if (process.platform === 'linux') {
 	const schemaMetadata = spawnSync(
 		'python3',
@@ -773,7 +719,7 @@ spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=import
 class BoundaryReached(Exception):pass
 with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
- for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
+ for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
  (sources/'posix-c').mkdir();(sources/'posix-c/ctype.so').write_bytes(b'independent query control only')
  (sources/'posix-lua').mkdir();(sources/'posix-lua/init.lua').write_bytes(b'independent query control only')
  (sources/'lgi-c').mkdir();(sources/'lgi-c/corelgilua51.so').write_bytes(b'independent query control only')
@@ -781,67 +727,34 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  typelibs=root/'typelibs';typelibs.mkdir()
  for name in m.FALLBACK_TYPELIBS:(typelibs/name).write_bytes(b'independent query control only')
  lua_modules={'luv':'luv.so','lfs':'lfs.so','posix.ctype':'posix-c/ctype.so','posix':'posix-lua/init.lua','lgi.corelgilua51':'lgi-c/corelgilua51.so','lgi':'lgi-lua/lgi.lua'}
- schema=root/'runtime schemas';schema.mkdir();(schema/'gschemas.compiled').write_bytes(b'independent schema acquisition control only')
- catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
+ catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
  real_uname=m.os.uname;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64')
  m.shutil.which=lambda name:str(sources/name)
  try:
-  for index,value in enumerate([str(schema),'','relative/untrusted-schemas']):
-   appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'core/network/adapters').mkdir(parents=True);(driver/'core/network/adapters/runtime_probe.lua').write_bytes(b'no execution in query witness')
-   queries=[];copies=[];closure=[];crypto_queries=[]
-   def controlled_run(arguments,**options):
-    if arguments[0]==str(sources/'luajit'):
-     # The Lua module locations the build host's LuaJIT answers; a require
-     # check answers nothing.
-     for module,file in lua_modules.items():
-      if 'searchpath("'+module+'"' in arguments[2]:return str(sources/file)
-     return ''
-    # Separate explicit crypto command-contract model; dummy bytes/SONAME output
-    # never qualify native OpenSSL ABI, ELF inspection, staging or digest behavior.
-    if arguments==['pkg-config','--variable=libdir','libcrypto']:
-     crypto_queries.append(arguments);return str(sources)
-    if arguments==['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]:
-     assert options['env']['LC_ALL']=='C','Explicit SONAME observation must use fixed locale'
-     crypto_queries.append(arguments)
-     return ' 0x000000000000000e (SONAME) Library soname: [libcrypto.so.3]\\n'
-    assert arguments[0]=='pkg-config' and len(arguments)==3,'Unexpected native command or schema factory'
-    queries.append(arguments)
-    if arguments==['pkg-config','--variable=giomoduledir','gio-2.0']:return str(sources)
-    if arguments==['pkg-config','--variable=typelibdir','gobject-introspection-1.0']:return str(typelibs)
-    assert arguments==['pkg-config','--variable=schemasdir','gio-2.0'],'Desktop development metadata must not be required'
-    return value
-   def boundary(*arguments):
-    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','posix-c/ctype.so','lgi-c/corelgilua51.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the owned program and Lua module seeds'
-    closure.append(True);raise BoundaryReached()
-   m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
-   try:m.stage(str(appdir),str(catalogue),'unused owned template')
-   except BoundaryReached:assert index==0
-   except m.RuntimeRefused as refusal:
-    assert index>0 and str(refusal)=='Native schema location refused.'
-   else:raise AssertionError('Query witness must terminate before native ELF or cache commands')
-   assert queries==[['pkg-config','--variable=typelibdir','gobject-introspection-1.0'],['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]
-   schema_copies=[source for source,destination in copies if destination.name=='gschemas.compiled']
-   assert schema_copies==([schema/'gschemas.compiled'] if index==0 else [])
-   # Invalid schema values refuse before the newly explicit crypto boundary.
-   assert crypto_queries==([['pkg-config','--variable=libdir','libcrypto'],['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]] if index==0 else [])
-   crypto_copies=[source for source,destination in copies if destination.name=='libcrypto.so.3']
-   assert crypto_copies==([sources/'libcrypto.so.3'] if index==0 else [])
-   assert closure==([True] if index==0 else []) and m._DESTINATION_ROOT is None
+  appdir=root/'package';driver=appdir/'usr/lib/ergopti';(driver/'core/network/adapters').mkdir(parents=True);(driver/'core/network/adapters/runtime_probe.lua').write_bytes(b'no execution in query witness')
+  queries=[];copies=[];closure=[]
+  def controlled_run(arguments,**options):
+   if arguments[0]==str(sources/'luajit'):
+    for module,file in lua_modules.items():
+     if 'searchpath("'+module+'"' in arguments[2]:return str(sources/file)
+    return ''
+   if arguments==['pkg-config','--variable=libdir','libcrypto']:return str(sources)
+   if arguments==['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]:
+    return ' 0x000000000000000e (SONAME) Library soname: [libcrypto.so.3]\\n'
+   queries.append(arguments)
+   if arguments==['pkg-config','--variable=typelibdir','gobject-introspection-1.0']:return str(typelibs)
+   raise AssertionError('Unexpected native command: no GIO location is queried')
+  def boundary(*arguments):
+   assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','posix-c/ctype.so','lgi-c/corelgilua51.so','libcrypto.so.3']],'Only the owned programs, Lua modules and OpenSSL root seed the closure'
+   closure.append(True);raise BoundaryReached()
+  m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
+  try:m.stage(str(appdir),str(catalogue),'unused owned template')
+  except BoundaryReached:pass
+  else:raise AssertionError('Query witness must terminate at the closure boundary')
+  assert queries==[['pkg-config','--variable=typelibdir','gobject-introspection-1.0']] and closure==[True] and m._DESTINATION_ROOT is None
+  assert not [destination for _,destination in copies if 'gio' in destination.parts or destination.name=='gschemas.compiled']
  finally:m.os.uname=real_uname
-with tempfile.TemporaryDirectory(prefix='ergopti-gio-cache-tool-') as temporary:
- root=pathlib.Path(temporary);tool=root/'actual owned executable';tool.write_bytes(b'not executed by metadata control');tool.chmod(0o700)
- nonexecutable=root/'ordinary owned file';nonexecutable.write_bytes(b'not executable')
- for index,value in enumerate([str(tool),'','relative/foreign-tool',str(root/'absent'),str(nonexecutable)]):
-  queries=[]
-  def tool_metadata(arguments,**options):
-   assert arguments==['pkg-config','--variable=gio_querymodules','gio-2.0'],'No writer, replacement native command or foreign metadata query admitted'
-   queries.append(arguments);return value
-  m.run=tool_metadata
-  try:observed=m.gio_querymodules_executable()
-  except (m.RuntimeRefused,OSError):assert index>0
-  else:assert index==0 and observed==str(tool)
-  assert queries==[['pkg-config','--variable=gio_querymodules','gio-2.0']]
-print('PASS GIO-owned metadata: 3 schema and 5 cache executable cases; native ABI unqualified.')
+print('PASS GIO-free staging: no GIO location queried, no module or schema staged.')
 `,
 			path.join(root, 'tools/build/stage-linux-network-runtime.py')
 		],
@@ -851,13 +764,13 @@ print('PASS GIO-owned metadata: 3 schema and 5 cache executable cases; native AB
 			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
 		}
 	);
-	assert.equal(schemaMetadata.status, 0, 'GIO-owned schema metadata selection refused');
+	assert.equal(schemaMetadata.status, 0, schemaMetadata.stderr);
 	assert.equal(schemaMetadata.stderr, '');
 	assert.equal(
 		schemaMetadata.stdout,
-		'PASS GIO-owned metadata: 3 schema and 5 cache executable cases; native ABI unqualified.\n'
+		'PASS GIO-free staging: no GIO location queried, no module or schema staged.\n'
 	);
-	console.log('GIO-owned schema metadata control: 1 passed; 0 skipped.');
+	console.log('GIO-free staging control: 1 passed; 0 skipped.');
 }
 
 // Command-contract witness of the closure walk: ldd lists a file's whole
@@ -928,9 +841,9 @@ def controlled_run(arguments,**options):
  assert arguments[:2]==['patchelf','--set-rpath'] and len(arguments)==4,'Only patchelf is observed'
  calls[arguments[3]]=arguments[2]
 m.run=controlled_run
-owners=[prefix/p for p in ['bin/curl','bin/sqlite3','lib/libssl.so.3','lib/sqlite3/libreadline.so.8','lib/lua/5.1/luv.so','lib/lua/5.1/posix/sys/stat.so','lib/gio/modules/libgiolibproxy.so','lib/gio/modules/giomodule.cache','lib/ergopti/network-runtime-env.sh','share/glib-2.0/schemas/gschemas.compiled','share/lua/5.1/posix/init.lua']]
+owners=[prefix/p for p in ['bin/curl','bin/sqlite3','lib/libssl.so.3','lib/sqlite3/libreadline.so.8','lib/lua/5.1/luv.so','lib/lua/5.1/posix/sys/stat.so','lib/tray/libdbusmenu-gtk3.so.4','lib/ergopti/network-runtime-env.sh','share/lua/5.1/posix/init.lua']]
 m.set_private_runpaths(prefix,dict.fromkeys(owners))
-assert calls=={'/prefix/bin/curl':'$ORIGIN/../lib','/prefix/bin/sqlite3':'$ORIGIN/../lib/sqlite3:$ORIGIN/../lib','/prefix/lib/libssl.so.3':'$ORIGIN','/prefix/lib/sqlite3/libreadline.so.8':'$ORIGIN/..','/prefix/lib/lua/5.1/luv.so':'$ORIGIN/../..','/prefix/lib/lua/5.1/posix/sys/stat.so':'$ORIGIN/../../../..','/prefix/lib/gio/modules/libgiolibproxy.so':'$ORIGIN/../..'},calls
+assert calls=={'/prefix/bin/curl':'$ORIGIN/../lib','/prefix/bin/sqlite3':'$ORIGIN/../lib/sqlite3:$ORIGIN/../lib','/prefix/lib/libssl.so.3':'$ORIGIN','/prefix/lib/sqlite3/libreadline.so.8':'$ORIGIN/..','/prefix/lib/lua/5.1/luv.so':'$ORIGIN/../..','/prefix/lib/lua/5.1/posix/sys/stat.so':'$ORIGIN/../../../..','/prefix/lib/tray/libdbusmenu-gtk3.so.4':'$ORIGIN'},calls
 print('PASS private runpaths: every staged ELF, at its depth.')
 `,
 			path.join(root, 'tools/build/stage-linux-network-runtime.py')
@@ -1341,11 +1254,7 @@ if (process.argv.includes('--native')) {
 			{ cwd: '/', encoding: 'utf8' }
 		);
 	assert.equal(nativeProbe().status, 0);
-	for (const component of [
-		'usr/lib/lua/5.1/luv.so',
-		'usr/lib/gio/modules/libgiolibproxy.so',
-		'usr/share/glib-2.0/schemas/gschemas.compiled'
-	]) {
+	for (const component of ['usr/lib/lua/5.1/luv.so']) {
 		const original = path.join(appdir, component);
 		fs.renameSync(original, original + '.owned-disabled');
 		const refused = nativeProbe();

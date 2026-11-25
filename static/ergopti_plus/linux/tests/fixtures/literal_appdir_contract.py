@@ -105,8 +105,6 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
         "lib/lua/5.1/lgi/corelgilua51.so",
         "share/lua/5.1/lgi.lua",
         "lib/girepository-1.0/GObject-2.0.typelib",
-        "lib/gio/modules/libgiolibproxy.so",
-        "share/glib-2.0/schemas/gschemas.compiled",
     ):
         path = usr / name
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -21,6 +21,11 @@
  *    supported glibc instead (the ceiling check) and a musl system is refused by
  *    AppRun in words. The baseline is recorded in the data file.
  * 3. A tree with no ELF file fails: an empty extraction must not pass.
+ * 4. The other direction: nothing that loads into, or must match, the
+ *    recipient's GLib and GTK is carried at all. A library of a recipient group
+ *    or a never_bundled entry (GIO modules and their cache, GSettings schemas,
+ *    dconf, libproxy) fails the tree: the Ubuntu 22.04
+ *    libdconfsettings.so the image once bundled crashed luajit on Arch.
  *
  * Usage:
  *   node tools/build/check-elf-needed-closure.cjs <file or directory>...
@@ -99,6 +104,62 @@ function recipientLibraries(data) {
 		return null;
 	};
 	return { has: (name) => groupOf(name) !== null, groupOf };
+}
+
+/**
+ * Validates the never-bundled policy of the recipient library list.
+ * @param {object} data Parsed linux_appimage_recipient_libraries.json.
+ * @returns {{directories: string[], patterns: RegExp[]}}
+ */
+function neverBundled(data) {
+	const policy = data && data.never_bundled;
+	if (
+		!policy ||
+		typeof policy.reason !== 'string' ||
+		policy.reason.length < 40 ||
+		!Array.isArray(policy.directories) ||
+		!Array.isArray(policy.file_patterns) ||
+		policy.directories.length === 0 ||
+		policy.file_patterns.length === 0 ||
+		[...policy.directories, ...policy.file_patterns].some(
+			(value) => typeof value !== 'string' || value.length === 0
+		)
+	)
+		throw new Error('recipient library list: a never_bundled policy with a reason is required');
+	return {
+		directories: policy.directories,
+		patterns: policy.file_patterns.map((pattern) => new RegExp(pattern))
+	};
+}
+
+/**
+ * Lists what a tree carries that must stay the recipient's.
+ * @param {string[]} roots Files or directories.
+ * @param {{directories: string[], patterns: RegExp[]}} policy From neverBundled().
+ * @param {{has: (name: string) => boolean}} recipient Documented recipient libraries.
+ * @returns {string[]} The offending paths, each with its root.
+ */
+function forbiddenEntries(roots, policy, recipient) {
+	const found = [];
+	for (const root of roots) {
+		const pending = [root];
+		while (pending.length > 0) {
+			const current = pending.pop();
+			const stat = fs.lstatSync(current);
+			const relative = path.relative(root, current).split(path.sep).join('/');
+			const name = path.basename(current);
+			if (stat.isDirectory()) {
+				if (
+					policy.directories.some((entry) => relative === entry || relative.endsWith(`/${entry}`))
+				)
+					found.push(current);
+				else for (const entry of fs.readdirSync(current)) pending.push(path.join(current, entry));
+			} else if (recipient.has(name) || policy.patterns.some((pattern) => pattern.test(name))) {
+				found.push(current);
+			}
+		}
+	}
+	return found.sort();
 }
 
 /** ELF shared objects have type ET_DYN; executables cannot satisfy DT_NEEDED. */
@@ -184,7 +245,14 @@ function main(roots) {
 		console.error('Usage: node tools/build/check-elf-needed-closure.cjs <file or directory>...');
 		return 2;
 	}
-	const recipient = recipientLibraries(JSON.parse(fs.readFileSync(RECIPIENT_LIBRARIES, 'utf8')));
+	const data = JSON.parse(fs.readFileSync(RECIPIENT_LIBRARIES, 'utf8'));
+	const recipient = recipientLibraries(data);
+	const forbidden = forbiddenEntries(roots, neverBundled(data), recipient);
+	for (const entry of forbidden)
+		console.error(
+			`[ERR] ${entry} loads into, or must match, the recipient's GLib and GTK: the image must not carry it.`
+		);
+	if (forbidden.length > 0) return 1;
 	const { checked, violations } = checkClosure(roots, readelfDynamic, recipient);
 	if (checked.length === 0) {
 		console.error(`[ERR] No ELF file under ${roots.join(', ')}: nothing was checked.`);
@@ -208,4 +276,11 @@ function main(roots) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { parseDynamic, recipientLibraries, checkClosure, RECIPIENT_LIBRARIES };
+module.exports = {
+	parseDynamic,
+	recipientLibraries,
+	neverBundled,
+	forbiddenEntries,
+	checkClosure,
+	RECIPIENT_LIBRARIES
+};

@@ -218,6 +218,8 @@ Requires:       shadow-utils
 Requires:       util-linux
 Requires:       xdg-utils
 Requires:       libsecret
+Requires:       glib-networking
+Requires:       gsettings-desktop-schemas
 Requires:       libxkbcommon-x11
 Requires:       libX11
 Requires:       libX11-xcb

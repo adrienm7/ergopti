@@ -27,9 +27,7 @@ const TEMPLATE = path.join(ROOT, 'tools/build/templates/linux-portable-runtime-e
 
 /** The template variables the admission loop names, relative to the prefix. */
 const VARIABLES = Object.freeze({
-	ERGOPTI_PACKAGE_PREFIX: '',
-	GIO_MODULE_DIR: 'lib/gio/modules',
-	GSETTINGS_SCHEMA_DIR: 'share/glib-2.0/schemas'
+	ERGOPTI_PACKAGE_PREFIX: ''
 });
 
 /**

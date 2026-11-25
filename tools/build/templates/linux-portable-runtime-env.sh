@@ -10,6 +10,36 @@ fi
 ERGOPTI_PACKAGE_PREFIX="$1"
 DRIVER_ROOT="$2"
 SHARED_LUA="$DRIVER_ROOT/_shared"
+# Only a prefix that builds its GIO modules and schemas against its own GLib
+# (the Flatpak's /app, on its runtime's GLib) points GIO at them. The private
+# runtime of the AppImage, the .deb, the .rpm and the tarball carries none: a
+# module loads into the recipient's GLib and GTK inside the daemon, and the
+# Ubuntu 22.04 libdconfsettings.so it once bundled crashed luajit on Arch.
+# GIO_MODULE_DIR also replaced the recipient's own module directory there.
+if [ -d "$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules" ]; then
+  ERGOPTI_PACKAGE_OWNS_GIO=true
+else
+  ERGOPTI_PACKAGE_OWNS_GIO=false
+fi
+# The host's value of every variable this file changes, recorded once before
+# any change so the daemon can start host programs (pkexec, setxkbmap,
+# xdg-open, notify-send...) with their own environment
+# (core/process/adapters/host_environment.lua). A nested launch from the bundle
+# keeps the first record: its environment is already the bundle's.
+if [ -z "${ERGOPTI_HOST_ENV_NAMES+x}" ]; then
+  ERGOPTI_HOST_ENV_NAMES="LUA_PATH LUA_CPATH CURL_CA_BUNDLE GI_TYPELIB_PATH"
+  if [ "$ERGOPTI_PACKAGE_OWNS_GIO" = true ]; then
+    ERGOPTI_HOST_ENV_NAMES="$ERGOPTI_HOST_ENV_NAMES GIO_MODULE_DIR GIO_EXTRA_MODULES GSETTINGS_SCHEMA_DIR XDG_DATA_DIRS"
+  fi
+  for ERGOPTI_PACKAGE_HOST_NAME in $ERGOPTI_HOST_ENV_NAMES; do
+    if [ -n "${!ERGOPTI_PACKAGE_HOST_NAME+x}" ]; then
+      export "ERGOPTI_HOST_ENV_SET_$ERGOPTI_PACKAGE_HOST_NAME=${!ERGOPTI_PACKAGE_HOST_NAME}"
+    fi
+  done
+  export ERGOPTI_HOST_ENV_NAMES
+fi
+# A command naming this root runs a driver script: it keeps the bundle's environment.
+export ERGOPTI_HOST_ENV_DRIVER_ROOT="$DRIVER_ROOT"
 unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON ERGOPTI_LITERAL_NATIVE_MODULES
 # The private prefix's Lua packages (luaposix) after the driver's own modules.
 case "$DRIVER_ROOT$ERGOPTI_PACKAGE_PREFIX" in
@@ -27,15 +57,19 @@ case "$DRIVER_ROOT$ERGOPTI_PACKAGE_PREFIX" in
     export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
     ;;
 esac
-# The driver runs its owned programs from this prefix only (settings/engine/preferences/owned_programs.lua).
+# The driver runs its owned programs from this prefix only, by absolute path
+# (settings/engine/preferences/owned_programs.lua), so PATH stays the host's:
+# a prefix bin/ in front of it reached every host program the daemon starts.
 export ERGOPTI_RUNTIME_PREFIX="$ERGOPTI_PACKAGE_PREFIX"
-export PATH="$ERGOPTI_PACKAGE_PREFIX/bin:$PATH"
-# No LD_LIBRARY_PATH: every staged file finds lib/ through its own RUNPATH, and
-# this environment reaches every host program the daemon starts.
-export GIO_MODULE_DIR="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
-export GIO_EXTRA_MODULES="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
-export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"
-export XDG_DATA_DIRS="$ERGOPTI_PACKAGE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+# No LD_LIBRARY_PATH either: every staged file finds lib/ through its own RUNPATH.
+ERGOPTI_PACKAGE_COMPONENTS=()
+if [ "$ERGOPTI_PACKAGE_OWNS_GIO" = true ]; then
+  export GIO_MODULE_DIR="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
+  export GIO_EXTRA_MODULES="$ERGOPTI_PACKAGE_PREFIX/lib/gio/modules"
+  export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"
+  export XDG_DATA_DIRS="$ERGOPTI_PACKAGE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  ERGOPTI_PACKAGE_COMPONENTS=("$GIO_MODULE_DIR/libgiolibproxy.so" "$GSETTINGS_SCHEMA_DIR/gschemas.compiled")
+fi
 # The prefix's lgi links the build host's libgirepository, whose built-in search
 # names only the Debian multiarch directory. The recipient's typelibs come
 # first (Fedora and openSUSE, Debian and Ubuntu, then Arch, whose lib64 is a
@@ -56,8 +90,7 @@ for ERGOPTI_PACKAGE_COMPONENT in \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lgi/corelgilua51.so" \
   "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/lgi.lua" \
   "$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0/GObject-2.0.typelib" \
-  "$GIO_MODULE_DIR/libgiolibproxy.so" \
-  "$GSETTINGS_SCHEMA_DIR/gschemas.compiled"; do
+  "${ERGOPTI_PACKAGE_COMPONENTS[@]}"; do
   if [ ! -f "$ERGOPTI_PACKAGE_COMPONENT" ]; then
     echo "Required installed native package component unavailable." >&2
     return 1

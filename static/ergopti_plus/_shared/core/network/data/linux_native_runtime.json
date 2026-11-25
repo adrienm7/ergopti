@@ -99,7 +99,9 @@
 			"shadow-utils",
 			"util-linux",
 			"xdg-utils",
-			"libsecret"
+			"libsecret",
+			"glib-networking",
+			"gsettings-desktop-schemas"
 		],
 		"arch": [
 			"xclip",
@@ -117,7 +119,9 @@
 			"libayatana-appindicator",
 			"lua51-lgi",
 			"webkit2gtk-4.1",
-			"libsecret"
+			"libsecret",
+			"glib-networking",
+			"gsettings-desktop-schemas"
 		],
 		"nix_library_path": [
 			"libayatana-appindicator",
@@ -178,7 +182,6 @@
 			"apk": null
 		},
 		"portable": {
-			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
 			"system_ca_files": [
 				"/etc/ssl/certs/ca-certificates.crt",
 				"/etc/pki/tls/certs/ca-bundle.crt",
@@ -241,7 +244,7 @@
 					"commit": "ea9eb7edb5eac4a9d175d74523db34fac0fa5180"
 				}
 			},
-			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc, certificate trust and GIO stack: no GIO module, GSettings backend or schema is bundled, because one loads into the recipient GLib and GTK of the daemon (a bundled Ubuntu 22.04 libdconfsettings.so crashed luajit on Arch). Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
 		}
 	},
 	"managed_python": {

@@ -125,12 +125,11 @@ function validate(data) {
 				throw new TypeError('Invalid native network provider package.');
 	}
 	const portable = network.portable;
-	if (
-		!portable ||
-		!Array.isArray(portable.gio_modules) ||
-		portable.gio_modules.join(',') !== 'libgiognomeproxy.so,libgiolibproxy.so,libdconfsettings.so'
-	)
-		throw new TypeError('Missing explicit portable GIO modules.');
+	// The private runtime loads the recipient's GIO modules: one bundled module
+	// loads into the recipient GLib and GTK of the daemon (a bundled
+	// libdconfsettings.so crashed luajit on Arch), so the catalogue names none.
+	if (!portable || Object.hasOwn(portable, 'gio_modules'))
+		throw new TypeError('The portable runtime bundles no GIO module.');
 	if (
 		!Array.isArray(portable.system_ca_files) ||
 		!portable.system_ca_files.length ||

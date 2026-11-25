@@ -7,8 +7,9 @@
 # curl, sqlite3, openssl and zstd instead of the host's (owned runtimes, PIN;
 # docs/design/owned-runtimes.md section 6.4).
 #
-# The prefix holds bin/, lib/ (the ELF closure, Lua C modules and GIO modules)
-# and share/ (Lua packages and the GSettings schemas). The driver tree under
+# The prefix holds bin/, lib/ (the ELF closure, Lua C modules and the fallback
+# tray in lib/tray) and share/ (Lua packages and the build identities). It
+# carries no GIO module or schema: those are the recipient's. The driver tree under
 # usr/lib/ergopti is not part of it: each packager installs that itself.
 # network-runtime-env.sh is the one owner of how the prefix reaches the
 # daemon; the copy is admitted by sourcing it, which refuses a missing part.

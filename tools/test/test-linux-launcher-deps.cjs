@@ -639,7 +639,9 @@ const privateRuntimePackages = {
 	deb: ['luajit (>= 2.1)', 'curl', 'lua-luv', 'openssl', 'sqlite3', 'libssl3t64 | libssl3'],
 	rpm: ['luajit >= 2.1', 'curl', 'openssl', 'sqlite'],
 	// The Arch recipe repacks the release tarball, which carries the same prefix.
-	arch: ['luajit', 'lua51-luv', 'curl', 'openssl', 'sqlite', 'glib-networking']
+	// glib-networking is the host's: the prefix carries no GIO module, since one
+	// loads into the host GLib inside the daemon.
+	arch: ['luajit', 'lua51-luv', 'curl', 'openssl', 'sqlite']
 };
 try {
 	const data = JSON.parse(fs.readFileSync(path.join(ROOT, nativeRuntimeGenerator.SOURCE), 'utf8'));
