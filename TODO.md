@@ -520,7 +520,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       field report: tray « Débogage » › « Lancer le field report (tous les tests) », then « Copier » in its window
       and paste it. The run's files are in `$XDG_RUNTIME_DIR/ergopti/field-run/` (`/run/user/<uid>/…`), which is
       cleared at logout: copy them before logging out. 5. The GitHub install (`install.sh`) path on the same machine: `pacman -Q lua51-lgi webkit2gtk-4.1
-   libayatana-appindicator` must list all three after the install.
+libayatana-appindicator` must list all three after the install.
       Unproved here: the pkexec prompt under KDE's polkit agent, `sg` acquiring the new groups in the same session,
       and KWin Wayland's layout read (a failure shows « Disposition clavier non lue »).
 - [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25).** Windows: a runtime error without
