@@ -2560,6 +2560,34 @@
 		},
 		{
 			"type": "list",
+			"id": "layout_user_install",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.layout_user_install_is_linux",
+			"status_rows": {
+				"busy": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.user_layout_busy"
+					}
+				],
+				"installed": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.user_layout_installed"
+					}
+				],
+				"unreadable": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.user_layout_unreadable"
+					}
+				]
+			}
+		},
+		{
+			"type": "list",
 			"id": "layout_bundle",
 			"status_rows": {
 				"no_bundle": [
@@ -4139,6 +4167,37 @@
 			"type": "command",
 			"id": "layout_open_preferences",
 			"i18n": "menu.layout.open_prefs"
+		}
+	],
+	"layout_user_install_commands": [
+		{
+			"type": "command",
+			"id": "user_layout_install",
+			"i18n": "menu.layout.user_layout_install",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.layout_user_install_is_linux"
+		}
+	],
+	"layout_user_installed_commands": [
+		{
+			"type": "command",
+			"id": "user_layout_activate",
+			"i18n": "menu.layout.user_layout_activate",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.layout_user_install_is_linux"
+		},
+		{
+			"type": "command",
+			"id": "user_layout_uninstall",
+			"i18n": "menu.layout.user_layout_uninstall",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.layout_user_install_is_linux"
 		}
 	],
 	"layout_system_install_commands": [

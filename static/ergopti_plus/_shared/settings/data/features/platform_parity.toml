@@ -167,6 +167,10 @@ technical = "These rows list the models and generation settings inline in the Li
 kind = "os_concept"
 technical = "The row downloads the unsigned MSKLC-built keyboard layout installer for Windows, which needs administrator rights; macOS installs its .bundle and Linux its XKB layout from their own rows."
 
+[reasons."platform_reason.layout_user_install_is_linux"]
+kind = "os_concept"
+technical = "The rows run the Linux layout registry's user XKB install, activation and removal without the WebKitGTK layout manager window, whose lgi and WebKitGTK a system can lack; macOS installs its .bundle and Windows its system layout from their own rows."
+
 [reasons."platform_reason.category_master_is_a_gate_on_windows"]
 kind = "driver_storage"
 technical = "Windows keeps this master switch as the category gate in category_enabled; macOS and Linux keep it as enabled in the category's own section."

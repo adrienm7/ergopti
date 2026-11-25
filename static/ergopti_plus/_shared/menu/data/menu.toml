@@ -2336,6 +2336,21 @@ type = "command"
 id = "layout_manager"
 i18n = "menu.layout.manage"
 
+# The layout manager is core, but its window needs lgi and WebKitGTK, which a
+# system can lack: Linux installs and activates Ergopti, and removes it, from the
+# tray itself as well (maintainer decision, 2026-11-25). The rows run the layout
+# manager's own registry operations (ui/layout_manager/tray_actions.lua) and say
+# each step's result in a notice; a failure also leaves a red tray row. macOS
+# and Windows install Ergopti from their own rows below.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_user_install"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+status_rows.busy = [{ type = "label", i18n = "menu.layout.user_layout_busy" }]
+status_rows.installed = [{ type = "label", i18n = "menu.layout.user_layout_installed" }]
+status_rows.unreadable = [{ type = "label", i18n = "menu.layout.user_layout_unreadable" }]
+
 # The block macOS alone has. It installs a .bundle keyboard layout through TIS
 # — the OS's own input-source mechanism, with a user scope and a system scope.
 # Windows installs Ergopti from its own row below and Linux for the user from
@@ -3657,6 +3672,29 @@ type = "---"
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
+
+# The commands of Layout's Ergopti rows (Linux): install and activate it when it
+# is not installed, activate or uninstall it once it is.
+[[menu.layout_user_install_commands]]
+type = "command"
+id = "user_layout_install"
+i18n = "menu.layout.user_layout_install"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+
+[[menu.layout_user_installed_commands]]
+type = "command"
+id = "user_layout_activate"
+i18n = "menu.layout.user_layout_activate"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+
+[[menu.layout_user_installed_commands]]
+type = "command"
+id = "user_layout_uninstall"
+i18n = "menu.layout.user_layout_uninstall"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
 
 # The commands of Layout > « Download the Ergopti system layout installer »
 # (Windows): the download when the layout is not installed, and the update shown

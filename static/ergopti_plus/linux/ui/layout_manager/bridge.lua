@@ -10,6 +10,8 @@
 --- The layout editor has its own window (_shared/ui/layout_editor_window, bridge
 --- "layout_editor_window_bridge"): M.editor is its handler, built by the same
 --- factory, and the manager page's open_editor shows it.
+--- When the manager window cannot open, on_window_unavailable offers its
+--- essential Ergopti actions without it (ui/layout_manager/tray_actions.lua).
 --- ==============================================================================
 
 local Json          = require("core.text.engine.json")
@@ -362,6 +364,17 @@ end
 
 M = new_handler(MANAGER_SPEC)
 M.editor = new_handler(EDITOR_SPEC)
+
+--- Answers the webview manager when the layout manager window cannot open
+--- (lgi or WebKitGTK 4.1 missing, or the window refused): the layout manager is
+--- core, so its essential actions are offered without it (install and activate
+--- Ergopti, or activate it), through the same registry operations as the page
+--- (ui/layout_manager/tray_actions.lua).
+--- @param info table { app_name, component, locale, detail } from the webview manager.
+--- @return boolean delivered
+function M.on_window_unavailable(info)
+	return require("ui.layout_manager.tray_actions").offer_without_window(info)
+end
 
 --- Opens the layout editor in its own window (the menu's « Create or edit a
 --- layout… »), or brings the open one to the front: its controller answers the
