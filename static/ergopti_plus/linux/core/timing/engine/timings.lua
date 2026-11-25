@@ -26,9 +26,9 @@ local Logger = require("core.logger.engine.shim")
 local Paths = require("core.fs.engine.paths")
 
 -- A missing parser is a broken install: say so instead of a raw stack trace.
-local ok_reader, Reader = pcall(require, "core.text.engine.toml_codec.reader")
+local ok_reader, Reader = pcall(require, "core.text.engine.toml.reader")
 if not ok_reader then
-	error("[timings] core.text.engine.toml_codec.reader not available — is _shared/ in package.path?")
+	error("[timings] core.text.engine.toml.reader not available — is _shared/ in package.path?")
 end
 
 return require("core.timing.engine.timings_core").new({
