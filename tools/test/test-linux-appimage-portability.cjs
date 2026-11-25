@@ -347,6 +347,69 @@ assert.match(
 );
 assert.match(ownedLuaposix, /test -f "\$prefix\/lib\/lua\/5\.1\/posix\/sys\/stat\.so"/);
 assert.match(ownedLuaposix, /export LUA_CPATH="\$prefix\/lib\/lua\/5\.1\/\?\.so;;"/);
+// The AppImage left lgi to the recipient, and Arch's generic lua-lgi is a Lua 5.4
+// build: the windows stayed closed (field report, 2026-11-25). The image carries
+// an lgi built for LuaJIT from the shared pin, and the GLib and freedesktop
+// typelibs GTK's typelib names, behind the recipient's typelib directories.
+assert.ok(containerBuildBody.includes('\tbuild_owned_lgi\n'), 'the build compiles the pinned lgi');
+const ownedLgi = container.slice(
+	container.indexOf('build_owned_lgi() {'),
+	container.indexOf('container_build() {')
+);
+assert.match(ownedLgi, /read-native-source-pin\.py lgi revision/, 'the lgi pin is the shared one');
+assert.match(ownedLgi, /rev-parse HEAD\)" = "\$commit"/, 'the checked-out lgi is the pinned one');
+assert.match(
+	ownedLgi,
+	/LUA_CFLAGS=-I\/usr\/include\/luajit-2\.1/,
+	'lgi is built for the LuaJIT ABI'
+);
+assert.ok(
+	!/apt_install[^\n]*(\\\n[^\n]*)*\blua-lgi\b/.test(containerBuildBody),
+	"the release's lua-lgi 0.9.2, older than GLib 2.80, is never staged"
+);
+assert.match(
+	JSON.parse(read('tools/build/native-source-pins.json')).lgi.revision,
+	/^[0-9a-f]{40}$/
+);
+assert.match(
+	stager,
+	/lua_modules \+= stage_lgi\(binaries\[0\], prefix, owners\)/,
+	'the stager stages lgi'
+);
+for (const typelib of [
+	'GLib-2.0',
+	'GObject-2.0',
+	'Gio-2.0',
+	'cairo-1.0',
+	'xlib-2.0',
+	'freetype2-2.0'
+])
+	assert.ok(stager.includes(`"${typelib}.typelib"`), `the image carries the ${typelib} typelib`);
+assert.ok(
+	stager.includes('GI_TYPELIB_PATH="$2/lib/girepository-1.0" "$2/bin/luajit"'),
+	'the build admits lgi with the bundled typelibs alone'
+);
+{
+	const template = read('tools/build/templates/linux-portable-runtime-env.sh');
+	const line = template.split('\n').find((entry) => entry.startsWith('export GI_TYPELIB_PATH='));
+	assert.ok(line, 'the launch environment names the typelib search');
+	const order = [
+		'/usr/lib64/girepository-1.0',
+		'/usr/lib/girepository-1.0',
+		'$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0'
+	];
+	const positions = order.map((entry) => line.indexOf(entry));
+	assert.ok(
+		positions.every((at) => at > 0),
+		'every typelib directory is searched'
+	);
+	assert.ok(
+		positions[0] < positions[1] && positions[1] < positions[2],
+		"the recipient's typelibs come before the image's fallback"
+	);
+	assert.ok(template.includes('"$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lgi/corelgilua51.so"'));
+}
+passed++;
 assert.ok(
 	container.includes(
 		'env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a bash "$SELF" xembed-in-display "$appimage"'
@@ -430,6 +493,9 @@ if (process.platform === 'linux') {
 			'lib/lua/5.1/lfs.so',
 			'lib/lua/5.1/posix/sys/stat.so',
 			'share/lua/5.1/posix/init.lua',
+			'lib/lua/5.1/lgi/corelgilua51.so',
+			'share/lua/5.1/lgi.lua',
+			'lib/girepository-1.0/GObject-2.0.typelib',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {

@@ -955,6 +955,62 @@ def stage_lua_modules(luajit, prefix, owners):
     return sources
 
 
+# The typelibs GLib, GObject Introspection and the freedesktop set install, which
+# lgi and the GTK 3 typelib name. The image carries them as a fallback only: the
+# launch environment (templates/linux-portable-runtime-env.sh) puts the
+# recipient's typelib directories first, so a recipient's GLib 2.80+ typelibs,
+# which GLib now generates itself, always win. A recipient without them (Arch
+# ships cairo's and xlib's in gobject-introspection-runtime, which a desktop
+# need not have) still loads GTK's. An exact list, so a build host that drops
+# one fails here.
+FALLBACK_TYPELIBS = (
+    "GLib-2.0.typelib",
+    "GObject-2.0.typelib",
+    "GModule-2.0.typelib",
+    "Gio-2.0.typelib",
+    "GIRepository-2.0.typelib",
+    "cairo-1.0.typelib",
+    "fontconfig-2.0.typelib",
+    "freetype2-2.0.typelib",
+    "xfixes-4.0.typelib",
+    "xft-2.0.typelib",
+    "xlib-2.0.typelib",
+    "xrandr-1.3.typelib",
+)
+
+
+def stage_lgi(luajit, prefix, owners):
+    """Stage lgi as the build host's LuaJIT loads it, with fallback typelibs.
+
+    lgi is a Lua package (share/lua/5.1/lgi.lua and lgi/) over one C module
+    (lib/lua/5.1/lgi/corelgilua51.so) that links libgirepository-1.0, which the
+    closure walk stages: the recipient's GLib and libffi stay the recipient's.
+    """
+    run([luajit, "-e", 'local l=require("lgi"); assert(type(l.require)=="function")'])
+    core = regular_source(lua_search(luajit, "lgi.corelgilua51", "cpath"))
+    copy_unique(core, prefix / "lib/lua/5.1/lgi/corelgilua51.so", owners)
+    entry = lua_search(luajit, "lgi", "path")
+    copy_unique(entry, prefix / "share/lua/5.1/lgi.lua", owners)
+    package = entry.parent / "lgi"
+    found = sorted(package.rglob("*.lua"))
+    if not found:
+        raise RuntimeRefused("Native lgi tree absent from the build host.")
+    for source in found:
+        copy_unique(
+            regular_source(source),
+            prefix / "share/lua/5.1/lgi" / source.relative_to(package),
+            owners,
+        )
+    typelibs = Path(
+        run(["pkg-config", "--variable=typelibdir", "gobject-introspection-1.0"]).strip()
+    )
+    if not typelibs.is_absolute():
+        raise RuntimeRefused("Native typelib location refused.")
+    for name in FALLBACK_TYPELIBS:
+        copy_unique(regular_source(typelibs / name), prefix / "lib/girepository-1.0" / name, owners)
+    return [core]
+
+
 def stage(appdir, catalogue, template):
     global _STAGE_DEADLINE
     _STAGE_DEADLINE = time.monotonic() + 180
@@ -976,6 +1032,7 @@ def stage(appdir, catalogue, template):
             copy_unique(source, prefix / "bin" / name, owners)
             binaries.append(source)
         lua_modules = stage_lua_modules(binaries[0], prefix, owners)
+        lua_modules += stage_lgi(binaries[0], prefix, owners)
         # pkg-config reports the actual build host's GIO module location; no
         # distribution-specific /usr/lib spelling is inferred.
         module_directory = Path(run(["pkg-config", "--variable=giomoduledir", "gio-2.0"]).strip())
@@ -1055,6 +1112,10 @@ def inspect_installed(prefix, driver):
             "-c",
             'set -euo pipefail; source "$1" "$2" "$3"; '
             '"$2/bin/luajit" -e \'require("lfs"); require("posix"); require("posix.sys.stat"); require("luv")\'; '
+            # The bundled typelibs alone: a binding that loads only beside the
+            # build host's own typelib directory would fail on a recipient.
+            'GI_TYPELIB_PATH="$2/lib/girepository-1.0" "$2/bin/luajit" -e '
+            "'local lgi=require(\"lgi\"); assert(lgi.GLib.MAJOR_VERSION == 2); assert(lgi.GObject.Object)'; "
             '"$2/bin/sqlite3" -version; "$2/bin/openssl" version; "$2/bin/zstd" --version',
             "ergopti-owned-programs",
             str(driver / "network-runtime-env.sh"),
