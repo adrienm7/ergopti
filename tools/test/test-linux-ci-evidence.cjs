@@ -2011,6 +2011,24 @@ assert.ok(
 	firstInstallFixture.indexOf('cp "${SRC}/tools/build/build-linux-native-output.sh"') <
 		firstInstallFixture.indexOf('section "Installer"')
 );
+// A checkout install stages the XKB helpers from the checkout folder named by
+// install/xkb_helpers.sh and fails without them; the first-install harness
+// copies only part of the checkout, so it must copy each folder that script
+// reads (a missing copy failed every distribution's first installation).
+const xkbHelpers = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/linux/install/xkb_helpers.sh'),
+	'utf8'
+);
+const xkbCheckout = /^XKB_HELPERS_CHECKOUT_FOLDER="\.\.\/([^"]+)"$/m.exec(xkbHelpers);
+assert.ok(xkbCheckout, 'xkb_helpers.sh names no checkout folder');
+for (const folder of new Set(
+	[...xkbHelpers.matchAll(/\$\{checkout\}\/([a-z_]+)\//g)].map((m) => m[1])
+)) {
+	assert.ok(
+		firstInstallFixture.includes(`"\${SRC}/static/${xkbCheckout[1]}/${folder}"`),
+		`the first-install harness does not copy static/${xkbCheckout[1]}/${folder}, which install.sh requires`
+	);
+}
 assert.strictEqual(
 	pipeline.stepField(prepare, 'shell'),
 	'sh',
