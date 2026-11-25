@@ -798,6 +798,23 @@ re-enables the tap before Lua callbacks run. Lua handlers or disable counters ar
 unreachable false fixes. Keep the keymap, keystats, and script-control watchdogs
 that poll native enabled state and restart persistent taps.
 
+A restart can keep failing (a revoked Accessibility or Input Monitoring
+permission): the keymap watchdog then records the tap in `_restart_failed`,
+logs its outage once and its recovery once, and retries quietly
+(`start_eventtap(name, tap, true)`). `taps_down()` feeds the Hotstrings
+title's red dot and greyed reason row (`hotstrings_status.lua`,
+`tap-outage-reported`, `hotstrings-taps-down-dot`). A new watchdog must keep
+that state instead of logging an ERROR per tick with nothing in the menu.
+
+### project-hs-webview-refusal-owes-a-visible-answer
+
+`hs.webview.new` can return nil. A window opened from a click must answer
+that refusal visibly: the diagnostics write the redacted report as an HTML
+file opened in the browser, else, like the error window, show an alert that
+names the log and offers « Report a bug »
+(`diagnostics-without-window`, `error-window-unavailable`). Log the alert at
+WARN from the error window: an ERROR there asks for the window that failed.
+
 ### project-hs-sentinel-key-misfire
 
 F13/F14/F15 can be physical macOS keys. Karabiner sentinels must also require the
