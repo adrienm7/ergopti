@@ -302,21 +302,11 @@ waits for the maintainer's review).
       docs/design/analyser-scores.md); both stay `close` for the word lists and the 12 count-table corpora (the
       trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
       own run to be checked; shirolyzer's score is undocumented.
-- [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
-      their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
-      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (2) corpus blends (done: up to three corpora by weight,
-      built-in or the user's own texts and « Ma frappe », `E.blendNgrams`, kept with the conveniences, carried in the
-      share link when every part is built-in); (3) magic and repeat keys: designed
-      (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
-      »; (4) saved layout versions in the editor beside undo (done: the editor's « Versions » tool, named snapshots kept
-      in the workspace, compared key by key and restored as one undoable step); (5) task help (done: the Comparer's « Help » tab, the
-      editor's « Help » tool and the Optimiser's folded help); (6) the movement cells' percentiles (done: « Place among the library » in « One layout »
-      measures the library on request, one layout per slice, then every movement and rhythm cell carries its chip); (8)
-      Kawalyzer's « Clever Keys » (context outputs) with item (3). Also done: the library grid's Boolean filter as the
-      Comparer's « Values query » (`E.compileQuery`), the Pareto spread's smoothed distribution
-      (`E.densityCurve`), the Principal − Comparison difference on every frame tab and « Your metrics », user
-      queries over key windows (`E.windowMetrics`), and tap-holds analysed as holds (`withTapHolds`,
-      `E.tapHoldReport`), and the « Versions » branch graph (each version under the one it came from).
+- [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Every idea of
+      `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where) but two: magic
+      and repeat keys with Kawalyzer's « Clever Keys » (designed in `docs/design/magic-and-repeat-keys.md`, waiting
+      for the maintainer's choice under « Maintainer decisions pending »), and dockable panes (not built, see the
+      decision of 2026-11-25 there).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -633,6 +623,11 @@ Each question names the default kept meanwhile; an answer moves into the item or
       shown without a direction), leaves incomplete layouts out of the frontier (their low counts are no
       trade-off) and names at most 12 frontier layouts on the chart (the table names all). Choose other default
       values or let incomplete layouts in.
+- [ ] **Studio views stay tabs, no dockable panes (decided by the agent on 2026-11-25, to review by the maintainer).**
+      The Layouts Wiki playground docks its views as panes side by side; the Studio keeps its keyboard-simple tabs,
+      whose Principal and Comparison frame and the Principal − Comparison table on every tab give the side-by-side
+      reading. Dockable panes would need a drag-free, keyboard and screen-reader layout manager. Choose: keep the
+      tabs, or ask for panes.
 - [ ] **Magic and repeat keys in the Studio's analysis (asked by the agent on 2026-11-25, to review by the
       maintainer).** The maintainer wants every idea of the Layouts Wiki playground and Kawalyzer, which analyse
       repeat, skip-repeat and magic (« Clever Keys ») keys; the decision of 2026-11-21 says « Studio shows layouts,
