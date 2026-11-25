@@ -1,5 +1,5 @@
 {
-	"expected_count": 9,
+	"expected_count": 10,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -34,6 +34,10 @@
 		},
 		{
 			"contains": "cs_unescape decodes toml escapes left to right",
+			"expected_count": 1
+		},
+		{
+			"contains": "provider failure is logged as an error",
 			"expected_count": 1
 		}
 	]

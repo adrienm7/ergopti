@@ -69,6 +69,40 @@ _SHA_FailureReturnsTheContractSentinel() {
 Test("crypto: provider failure never returns a weaker digest (sha256-failure-sentinel)",
 	_SHA_FailureReturnsTheContractSentinel)
 
+; The failure must be visible: a silent "" would look like an empty input to
+; whoever reads the log, and was how a weaker fallback once went unnoticed.
+_SHA_FailureIsLogged() {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED, _LOGGER_REPEAT_ENABLED
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL, _LastErrTime
+	Saved := [_LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED, _LOGGER_REPEAT_ENABLED,
+		_LOGGER_DEDUP_KEY, _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL, _LastErrTime]
+	Logs := []
+	try {
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		_LOGGER_ERROR_ENABLED := true
+		_LOGGER_REPEAT_ENABLED := false
+		; The sentinel test above logged the same line; a fresh key keeps the
+		; repeat collapser from swallowing this one.
+		_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_COUNT := 0
+		AssertEqual("", _CryptoSha256WithProvider("private-network", _SHA_ThrowingProvider))
+	} finally {
+		_LOGGER_TEST_SINK := Saved[1]
+		_LOGGER_ERROR_ENABLED := Saved[2]
+		_LOGGER_REPEAT_ENABLED := Saved[3]
+		_LOGGER_DEDUP_KEY := Saved[4]
+		_LOGGER_DEDUP_COUNT := Saved[5]
+		_LOGGER_DEDUP_LEVEL := Saved[6]
+		_LastErrTime := Saved[7]
+	}
+	Logged := 0
+	for Line in Logs {
+		if InStr(Line, "[ERROR] [Crypto]") && InStr(Line, "injected CNG failure")
+			Logged += 1
+	}
+	AssertEqual(1, Logged, "a provider failure must log one error naming its cause")
+}
+Test("crypto: provider failure is logged as an error (sha256-failure-sentinel)", _SHA_FailureIsLogged)
+
 ; Root-cause guard: neither COM dependency may come back.
 _SHA_NoUnreachableComPath() {
 	PublicBody := _DriverFuncBody("CryptoSha256")
