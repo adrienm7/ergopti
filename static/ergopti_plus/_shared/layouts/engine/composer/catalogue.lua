@@ -252,22 +252,31 @@ function M.refresh(settings, deps, on_done)
 		end
 	end
 	local url = Registry.raw_url(settings, settings.index_file)
-	local headers = M.request_headers(cached and cached.etag or nil)
 	local finished = false
-	deps.transport.get(url, headers, settings.timeout_ms, function(status, body, err, response_headers)
-		if finished then return end
-		finished = true
-		local outcome = M.resolve_index({ status = status, body = body, err = err, headers = response_headers },
-			cached, deps.bundled_index, deps.decode_json, settings.max_file_bytes)
-		outcome.cache_warning = cache_warning
-		if outcome.store then
-			local stored, store_err = deps.write_cache(outcome.text, outcome.etag)
-			if not stored then
-				outcome.cache_error = "cannot store the registry index: " .. tostring(store_err)
+	local function request(headers, retried)
+		deps.transport.get(url, headers, settings.timeout_ms, function(status, body, err, response_headers)
+			if finished then return end
+			-- A 304 with no index to reuse (a cache between here and the registry
+			-- that answered for another client) is asked once more without any
+			-- validator, so the catalogue shows the published index, not the shipped one.
+			if tonumber(status) == HTTP_NOT_MODIFIED and cached == nil and not retried then
+				request(M.request_headers(nil), true)
+				return
 			end
-		end
-		on_done(outcome)
-	end)
+			finished = true
+			local outcome = M.resolve_index({ status = status, body = body, err = err, headers = response_headers },
+				cached, deps.bundled_index, deps.decode_json, settings.max_file_bytes)
+			outcome.cache_warning = cache_warning
+			if outcome.store then
+				local stored, store_err = deps.write_cache(outcome.text, outcome.etag)
+				if not stored then
+					outcome.cache_error = "cannot store the registry index: " .. tostring(store_err)
+				end
+			end
+			on_done(outcome)
+		end)
+	end
+	request(M.request_headers(cached and cached.etag or nil), false)
 end
 
 
