@@ -216,7 +216,7 @@ local function run()
 	local LayoutEmulation = require("modules.keymap.layout_emulation")
 	local typed = {}
 	local deps = LayoutEmulation.production_deps({ injector = {}, is_paused = function() return false end,
-		dispatch_char = function() end, dry_run = false })
+		dispatch_char = function() end, dry_run = false, typed_text = function() return "" end })
 	deps.type_text = function(text) typed[#typed + 1] = text return true end
 	deps.caps_locked = function() return false end
 	LayoutEmulation.init(deps)
