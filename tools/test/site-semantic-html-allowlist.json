@@ -16,7 +16,7 @@
 		},
 		{
 			"file": "src/lib/components/Ergopti.svelte",
-			"element": "name-ergopti (none)",
+			"element": "span.name-ergopti",
 			"count": 1,
 			"kind": "styling-hook",
 			"reason": "Keeps the Ergopti brand name on one line in running text (ergopti_name.css); no phrasing element means a name."
@@ -30,7 +30,7 @@
 		},
 		{
 			"file": "src/lib/components/ErgoptiPlus.svelte",
-			"element": "name-ergopti-plus (none)",
+			"element": "span.name-ergopti-plus",
 			"count": 1,
 			"kind": "styling-hook",
 			"reason": "Keeps the Ergopti+ brand name on one line in running text (ergopti_name.css); no phrasing element means a name."
@@ -240,21 +240,21 @@
 		},
 		{
 			"file": "src/lib/keyboard/KeyboardBasis.svelte",
-			"element": "keyboard (none)",
+			"element": "div.keyboard-drawing",
 			"count": 1,
 			"kind": "aria-widget",
 			"reason": "The keyboard drawing carries role=\"table\" and its name; Keyboard.css lays it out as rows of key caps."
 		},
 		{
 			"file": "src/lib/keyboard/KeyboardBasis.svelte",
-			"element": "keyboard-row (none)",
+			"element": "div.keyboard-row",
 			"count": 1,
 			"kind": "aria-widget",
 			"reason": "One row of the keyboard drawing, role=\"row\" of its table."
 		},
 		{
 			"file": "src/lib/keyboard/KeyboardBasis.svelte",
-			"element": "keyboard-key (none)",
+			"element": "div.keyboard-key",
 			"count": 1,
 			"kind": "aria-widget",
 			"reason": "One key of the keyboard drawing, role=\"cell\" of its table."
@@ -268,21 +268,21 @@
 		},
 		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonColor.svelte",
-			"element": "keyboard-control-color (none)",
+			"element": "div.keyboard-control-color",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
 		},
 		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonLayer.svelte",
-			"element": "keyboard-control-layer (none)",
+			"element": "div.keyboard-control-layer",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
 		},
 		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonPlus.svelte",
-			"element": "keyboard-control-plus (none)",
+			"element": "div.keyboard-control-plus",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the button inside is the named control."
@@ -296,14 +296,14 @@
 		},
 		{
 			"file": "src/lib/keyboard/controls/KeyboardControlButtonType.svelte",
-			"element": "keyboard-control-type (none)",
+			"element": "div.keyboard-control-type",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Wraps one control of a keyboard drawing for its place in the control row; the select inside is the named control."
 		},
 		{
 			"file": "src/lib/keyboard/controls/KeyboardControls.svelte",
-			"element": "keyboard-controls (none)",
+			"element": "div.keyboard-controls",
 			"count": 1,
 			"kind": "layout",
 			"reason": "The row of the controls under a keyboard drawing (KeyboardControls.css); the buttons and selects inside are named."
@@ -1843,7 +1843,7 @@
 		},
 		{
 			"file": "src/routes/ergopti/installation/installation_macos.svelte",
-			"element": "nbsp (none)",
+			"element": "span.nbsp",
 			"count": 1,
 			"kind": "styling-hook",
 			"reason": "Draws the narrow no-break space before a colon as a visible block inside the key (Keyboard.css), so the reader sees where it goes."
@@ -1871,31 +1871,24 @@
 		},
 		{
 			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
-			"element": "keyboard (none)",
+			"element": "div.keyboard-drawing",
 			"count": 2,
 			"kind": "layout",
 			"reason": "A small drawing of the home row in the key-cap style of Keyboard.css; its letters read in order and its legend names it."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
-			"element": "keyboard-row.center",
+			"element": "div.keyboard-row",
 			"count": 2,
 			"kind": "layout",
 			"reason": "The one row of the home-row drawing, centred by Keyboard.css; its keys read in order."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
-			"element": "keyboard-key (none)",
+			"element": "div.keyboard-key",
 			"count": 16,
 			"kind": "layout",
 			"reason": "One key cap of the home-row drawing, coloured by finger (data-finger); its letter is its text."
-		},
-		{
-			"file": "src/routes/ergopti/presentation/distance_doigts_touches.svelte",
-			"element": "keyboard-legend (none)",
-			"count": 2,
-			"kind": "layout",
-			"reason": "The caption line under the home-row drawing in the drawing style of Keyboard.css; a figcaption would need the drawing to be a figure that Keyboard.css does not style."
 		},
 		{
 			"file": "src/routes/ergopti/presentation/ergopti_plus.svelte",
@@ -1997,7 +1990,7 @@
 		},
 		{
 			"file": "src/routes/ergopti/presentation/optimisation_roulements.svelte",
-			"element": "keyboard-control-rolls (none)",
+			"element": "div.keyboard-control-rolls",
 			"count": 1,
 			"kind": "layout",
 			"reason": "Centres the roll picker under the keyboard drawing; the select inside is the named control."

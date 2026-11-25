@@ -176,23 +176,6 @@ baseline as violations go.
       ratchet, which they all pass since the apps dashboard's tabs became tab panels with their own headings
       ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
       Left: screen-reader runs.
-- [ ] **Semantic markup and mouse-only controls.** The site's div and span are held by
-      `npm run test:site-semantic-html` (576 → 451, each justified in `tools/test/site-semantic-html-allowlist.json`)
-      and its images by `npm run test:site-image-alternatives`; every site page is checked for controls only a
-      mouse can use by `tools/test/browser/keyboard-operability.playwright.cjs` in CI
-      ([ninth pass](docs/audits/accessibility/README.md#ninth-pass-semantic-markup-keyboard-operability-and-reading-choices-2026-11-19-paris-time)).
-      The app windows' div and span are held by `npm run test:app-windows-semantic-markup` (1162 → 276, each
-      justified in `tools/test/app-windows-semantic-markup/`) and their mouse-only controls by the app windows scan
-      ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
-      The Studio pages' div and span are held by `npm run test:studio-semantic-html` (143, each justified in
-      `tools/test/studio-semantic-html-allowlist.json`, none interactive). Since 2026-11-22 the site gate also
-      counts made-up elements (a custom element name or one HTML does not define, as generic as a div): the 92
-      `<kbd-output>` became `<samp class="kbd-output">` and the 4 `<image-block>` a `<figure>`; on 2026-11-24
-      the 42 empty spacers became margins of their neighbours (`.space-before-tiny`…), the page blocks
-      `section`s (`bloc-introduction`, `bloc-fin`) or layout divs (`#page`, `.bloc-main`) and the reference
-      keyboard an `aside`, and the 34 left are justified in the same list. Left: those 34 — the keyboard
-      drawings' `keyboard`, `keyboard-row`, `keyboard-key` and `keyboard-legend` (their CSS and scripts select
-      them by name), the controls' wrappers, the brand names and the drawn `nbsp`.
 - [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
       editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
       (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked

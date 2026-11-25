@@ -9,9 +9,9 @@
 	export let id;
 </script>
 
-<keyboard-controls id={`controls_${id}`}>
+<div class="keyboard-controls" id={`controls_${id}`}>
 	<KeyboardControlButtonPlus {id} />
 	<KeyboardControlButtonType {id} />
 	<KeyboardControlButtonColor {id} />
 	<KeyboardControlButtonLayer {id} />
-</keyboard-controls>
+</div>

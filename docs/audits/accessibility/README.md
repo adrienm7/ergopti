@@ -1350,6 +1350,26 @@ surveyed and every AAA criterion, measured or checked by hand, are in
   text and description, and lists the small targets among its known gaps;
   `test-site-accessibility-ratchet.cjs` holds it to the level the gates run.
 
+## Fourteenth pass, no made-up element on the site (2026-11-25, Paris time)
+
+- **The last 34 made-up elements** of the site's markup (WCAG 4.1.1 and
+  1.3.1: a custom element name means no more than a div) are standard
+  elements: the keyboard drawings' `<keyboard>`, `<keyboard-row>` and
+  `<keyboard-key>` became `div.keyboard-drawing`, `div.keyboard-row` and
+  `div.keyboard-key` (their `role="table"`, `row` and `cell` kept), the
+  home-row drawings' legend a `p.keyboard-legend`, the controls' wrappers
+  `div.keyboard-controls` and `div.keyboard-control-*`, the brand names
+  `span.name-ergopti` and `span.name-ergopti-plus`, and the drawn narrow
+  no-break space of the macOS installation page a `span.nbsp` (the layouts'
+  generated key contents keep their `<nbsp>`, drawn by the same rule). The
+  drawing is `.keyboard-drawing` because `.keyboard` already names sections
+  of the Ergopti+ page. Keyboard.css, the controls' stylesheet, the shared
+  site stylesheets, `Keyboard.js` (which kept the key's class when it clears
+  a key) and the site structure test select them by class.
+- **Gate.** `npm run test:site-semantic-html` refuses any made-up element in
+  the site's list, so none can come back through a reviewed entry: 460
+  justified divs and spans, none made up.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of

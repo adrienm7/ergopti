@@ -1,11 +1,11 @@
-name-ergopti {
+.name-ergopti {
 	/* font-style: italic; */
 	display: inline-block;
 	letter-spacing: -1px;
 	white-space: nowrap;
 }
 
-name-ergopti-plus {
+.name-ergopti-plus {
 	white-space: nowrap;
 }
 

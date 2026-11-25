@@ -4,7 +4,7 @@
 =============================================
 */
 
-keyboard {
+.keyboard-drawing {
 	--keyboard-percentage: 0.9;
 	--keyboard-width: calc(var(--main-width) * var(--keyboard-percentage));
 	--keyboard-padding: clamp(7px, calc(var(--keyboard-width) / 50), 50px);
@@ -19,7 +19,7 @@ keyboard {
 	width: max-content;
 }
 
-keyboard-row {
+.keyboard-row {
 	display: flex;
 }
 
@@ -30,7 +30,7 @@ keyboard-row {
 	justify-content: center;
 }
 
-keyboard-legend {
+.keyboard-legend {
 	display: block;
 	margin: 0;
 	margin-top: 7px;
@@ -44,12 +44,12 @@ keyboard-legend {
 */
 
 /* Separate the keyboard in 2 parts */
-keyboard[data-type='ergodox'] keyboard-key[data-column='6'] {
+.keyboard-drawing[data-type='ergodox'] .keyboard-key[data-column='6'] {
 	margin-right: 50px;
 }
 
 /* Separate the thumb cluster from the rest of the keyboard */
-keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
+.keyboard-drawing[data-type='ergodox'] .keyboard-row[data-row='6'] {
 	margin-top: 30px;
 }
 
@@ -62,7 +62,7 @@ keyboard[data-type='ergodox'] keyboard-row[data-row='6'] {
 kbd,
 samp.kbd-output,
 kbd-non,
-keyboard-key {
+.keyboard-key {
 	align-content: center;
 	align-items: center;
 	cursor: pointer;
@@ -80,7 +80,7 @@ p samp.kbd-output {
 	line-height: 1.2em;
 }
 
-keyboard-key {
+.keyboard-key {
 	--key-size: calc(var(--keyboard-width) / 16);
 	--key-margin: calc(0.05 * var(--key-size));
 
@@ -128,15 +128,15 @@ keyboard-key {
 }
 
 @media (max-width: 500px) {
-	keyboard-key {
+	.keyboard-key {
 		--key-depth: 1px;
 		--key-pressed-depth: 0.5px;
 		--key-border-radius: calc(var(--keyboard-border-radius) / 8);
 	}
 }
 
-keyboard-key:active,
-keyboard-key:hover,
+.keyboard-key:active,
+.keyboard-key:hover,
 .pressed-key {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 	box-shadow:
@@ -152,12 +152,12 @@ keyboard-key:hover,
 }
 
 /* Keys we want to completely disappear */
-keyboard-key[data-key=''] {
+.keyboard-key[data-key=''] {
 	display: none;
 }
 
 /* Keys we want to be invisible, but still occupy the space */
-keyboard-key[data-key='none'] {
+.keyboard-key[data-key='none'] {
 	background-color: transparent !important;
 	border-color: transparent;
 	box-shadow: none;
@@ -172,7 +172,7 @@ keyboard-key[data-key='none'] {
 
 /* Key colors by finger and hand */
 /* They are not split at an exact 45-degree angle, as this provides a better visual rendering */
-keyboard {
+.keyboard-drawing {
 	--color-left-index-finger: 0deg;
 	--color-left-middle-finger: 35deg; /* 45deg in theory to divide regularly */
 	--color-left-ring-finger: 60deg; /* 90deg in theory to divide regularly */
@@ -183,74 +183,74 @@ keyboard {
 	--color-right-index-finger: 315deg;
 }
 
-keyboard-key[data-hand='left'][data-finger='index'] {
+.keyboard-key[data-hand='left'][data-finger='index'] {
 	--key-color-hue: var(--color-left-index-finger);
 }
 
-keyboard-key[data-hand='left'][data-finger='majeur'] {
+.keyboard-key[data-hand='left'][data-finger='majeur'] {
 	--key-color-hue: var(--color-left-middle-finger);
 }
 
-keyboard-key[data-hand='left'][data-finger='annulaire'] {
+.keyboard-key[data-hand='left'][data-finger='annulaire'] {
 	--key-color-hue: var(--color-left-ring-finger);
 }
 
-keyboard-key[data-hand='left'][data-finger='auriculaire'] {
+.keyboard-key[data-hand='left'][data-finger='auriculaire'] {
 	--key-color-hue: var(--color-left-little-finger);
 }
 
-keyboard-key[data-hand='right'][data-finger='index'] {
+.keyboard-key[data-hand='right'][data-finger='index'] {
 	--key-color-hue: var(--color-right-index-finger);
 }
 
-keyboard-key[data-hand='right'][data-finger='majeur'] {
+.keyboard-key[data-hand='right'][data-finger='majeur'] {
 	--key-color-hue: var(--color-right-middle-finger);
 }
 
-keyboard-key[data-hand='right'][data-finger='annulaire'] {
+.keyboard-key[data-hand='right'][data-finger='annulaire'] {
 	--key-color-hue: var(--color-right-ring-finger);
 }
 
-keyboard-key[data-hand='right'][data-finger='auriculaire'] {
+.keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 	--key-color-hue: var(--color-right-little-finger);
 }
 
 /* === Color configurations === */
 
-keyboard-key {
+.keyboard-key {
 	--key-color-luminosity: 70%;
 	--key-color-saturation: 100%;
 	--key-opacity: 35%;
 }
 
-keyboard[data-color='no'] keyboard-key {
+.keyboard-drawing[data-color='no'] .keyboard-key {
 	--key-color-hue: 190 !important;
 	--key-color-luminosity: 70%;
 	--key-opacity: 35%;
 }
 
-keyboard[data-color='azerty'] keyboard-key {
+.keyboard-drawing[data-color='azerty'] .keyboard-key {
 	--key-color-hue: 200 !important;
 }
-keyboard[data-color='azerty'] keyboard-legend {
+.keyboard-drawing[data-color='azerty'] .keyboard-legend {
 	color: hsl(200, 100%, 80%);
 }
 
-keyboard[data-color='ergopti'] keyboard-key {
+.keyboard-drawing[data-color='ergopti'] .keyboard-key {
 	--key-color-hue: 300 !important;
 }
-keyboard[data-color='ergopti'] keyboard-legend {
+.keyboard-drawing[data-color='ergopti'] .keyboard-legend {
 	color: hsl(300, 100%, 85%);
 }
 
-keyboard[data-color='freq'] keyboard-key {
+.keyboard-drawing[data-color='freq'] .keyboard-key {
 	--key-color-luminosity: 100%;
 	--key-color-saturation: 0%;
 }
 
-keyboard[data-color='freq'] keyboard-key[data-type='letter'],
-keyboard[data-color='freq'] keyboard-key[data-type='french'],
-keyboard[data-color='freq'] keyboard-key[data-type='ponctuation'] {
+.keyboard-drawing[data-color='freq'] .keyboard-key[data-type='letter'],
+.keyboard-drawing[data-color='freq'] .keyboard-key[data-type='french'],
+.keyboard-drawing[data-color='freq'] .keyboard-key[data-type='ponctuation'] {
 	--key-color-hue: calc(180deg * (1 - var(--frequency_normalized)));
 	--key-color-saturation: 90%;
 	--key-color-luminosity: 70%;
@@ -265,9 +265,9 @@ keyboard[data-color='freq'] keyboard-key[data-type='ponctuation'] {
 
 /* === Specific keys color === */
 
-keyboard-key[data-key='Space'],
-keyboard-key[data-type='special'],
-keyboard-key[data-key='Enter'] {
+.keyboard-key[data-key='Space'],
+.keyboard-key[data-type='special'],
+.keyboard-key[data-key='Enter'] {
 	background-color: rgb(10, 10, 10);
 	color: white;
 	/* Borders of special keys in white to enhance their emphasis */
@@ -278,12 +278,12 @@ keyboard-key[data-key='Enter'] {
 }
 
 /* Specific color of the Space bar */
-/* keyboard[data-type='iso'] keyboard-key[data-type='space'] {
+/* .keyboard-drawing[data-type='iso'] .keyboard-key[data-type='space'] {
 	background-color: rgb(0, 10, 30);
 } */
 
 /* Specific color of the Ergodox thumb keys */
-keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
+.keyboard-drawing[data-type='ergodox'] .keyboard-key[data-finger='thumb'] {
 	background-color: rgba(140, 160, 170, 0.25);
 }
 
@@ -294,16 +294,18 @@ keyboard[data-type='ergodox'] keyboard-key[data-finger='thumb'] {
 */
 
 /* Style of all keys changing with Ergopti+ */
-keyboard[data-plus='yes'] keyboard-key[data-plus='yes']:not([data-key='Space']),
-keyboard[data-plus='yes'][data-type='ergodox'][data-layer='Visuel'] keyboard-key[data-key='Space'],
-keyboard[data-plus='yes'][data-type='ergodox'][data-layer='Primary']
-	keyboard-key[data-key='Space'] {
+.keyboard-drawing[data-plus='yes'] .keyboard-key[data-plus='yes']:not([data-key='Space']),
+.keyboard-drawing[data-plus='yes'][data-type='ergodox'][data-layer='Visuel']
+	.keyboard-key[data-key='Space'],
+.keyboard-drawing[data-plus='yes'][data-type='ergodox'][data-layer='Primary']
+	.keyboard-key[data-key='Space'] {
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 100%;
 	background: linear-gradient(to bottom, rgba(0, 234, 255, 0.15), rgba(102, 0, 255, 0.15));
 }
 
-keyboard[data-plus='yes'][data-type='iso'][data-layer='Visuel'] keyboard-key[data-key='Space'] {
+.keyboard-drawing[data-plus='yes'][data-type='iso'][data-layer='Visuel']
+	.keyboard-key[data-key='Space'] {
 	/* margin-top: -3px; Small fix because adding the "+" puts the text a bit below its position */
 }
 
@@ -325,28 +327,28 @@ output-tap {
 	color: rgb(0, 128, 226);
 }
 
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='Tab'] tap-hold,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='RAlt'] tap-hold {
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='Tab'] tap-hold,
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='RAlt'] tap-hold {
 	line-height: 1.1;
 }
 
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='CapsLock'] tap-hold {
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='CapsLock'] tap-hold {
 	font-size: calc(var(--key-text-size) * 0.65);
 	line-height: 1.25;
 }
 
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LCtrl'] tap-hold,
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='LAlt'] tap-hold {
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='LCtrl'] tap-hold,
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='LAlt'] tap-hold {
 	line-height: 1.35;
 }
 
-keyboard[data-plus='yes'][data-type='iso'] keyboard-key[data-key='RCtrl'] tap-hold {
+.keyboard-drawing[data-plus='yes'][data-type='iso'] .keyboard-key[data-key='RCtrl'] tap-hold {
 	font-size: 0.7em;
 	line-height: 1.5;
 }
 
 /* Shift symbol in bold and bigger */
-keyboard-key[data-key='LShift'] tap-hold output-hold {
+.keyboard-key[data-key='LShift'] tap-hold output-hold {
 	font-size: 1.3em;
 	font-weight: bold;
 	margin-bottom: -0.1em;
@@ -359,20 +361,20 @@ keyboard-key[data-key='LShift'] tap-hold output-hold {
 =============================
 */
 
-keyboard[data-layer='Visuel'] keyboard-key[data-type='letter'],
-keyboard[data-layer='Visuel'] keyboard-key[data-type='french'] {
+.keyboard-drawing[data-layer='Visuel'] .keyboard-key[data-type='letter'],
+.keyboard-drawing[data-layer='Visuel'] .keyboard-key[data-type='french'] {
 	text-transform: uppercase;
 }
 
-keyboard[data-layer='Visuel'] keyboard-key[data-type='ponctuation'] {
+.keyboard-drawing[data-layer='Visuel'] .keyboard-key[data-type='ponctuation'] {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: 500;
 	line-height: 1;
 }
 
 /* Special case of the key Q that gives Qu */
-keyboard[data-layer='Visuel'][data-plus='yes'] keyboard-key[data-key='q'],
-keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] {
+.keyboard-drawing[data-layer='Visuel'][data-plus='yes'] .keyboard-key[data-key='q'],
+.keyboard-drawing[data-layer='Shift'][data-plus='yes'] .keyboard-key[data-key='q'] {
 	text-transform: capitalize;
 }
 
@@ -383,7 +385,7 @@ keyboard[data-layer='Shift'][data-plus='yes'] keyboard-key[data-key='q'] {
 */
 
 /* Uppercase all keys, except the modifier names */
-keyboard[data-layer='Ctrl'] keyboard-key:not([data-type='special']) {
+.keyboard-drawing[data-layer='Ctrl'] .keyboard-key:not([data-type='special']) {
 	text-transform: uppercase;
 }
 
@@ -393,21 +395,21 @@ keyboard[data-layer='Ctrl'] keyboard-key:not([data-type='special']) {
 =========================
 */
 
-keyboard[data-type='iso'] keyboard-key[data-type='enter'] {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter'] {
 	border-right: none;
 	position: relative;
 	top: 0;
 	z-index: 1;
 }
 
-keyboard[data-type='iso'] keyboard-key[data-type='enter'] div {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter'] div {
 	font-weight: normal;
 	position: relative;
 	z-index: 3;
 }
 
 /* Hide the junction between the key and the bottom of the key created by ::after, using a rectangle on top */
-keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']::before {
 	border-radius: 0 calc(var(--key-border-radius) - 1px) 0 0;
 	border-right: var(--key-border-size) solid var(--key-border-color);
 	content: '';
@@ -420,7 +422,7 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::before {
 }
 
 /* Create the bottom part of the Enter key */
-keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']::after {
 	border: var(--key-border-size) solid var(--key-border-color);
 	border-radius: 0 0 var(--key-border-radius) var(--key-border-radius);
 	border-top: none;
@@ -439,19 +441,19 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']::after {
 
 /* === What happens when the Enter key is pressed === */
 
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:active,
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:active,
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:hover {
 	position: relative;
 	top: var(--key-pressed-depth-change);
 }
 
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::before,
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::before {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:active::before,
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:hover::before {
 	height: var(--key-size);
 }
 
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:active::after,
-keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::after {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:active::after,
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-type='enter']:hover::after {
 	box-shadow:
 		0 var(--key-pressed-depth) 0 var(--effect-3d),
 		0 var(--key-pressed-depth) 0 var(--effect-3d);
@@ -459,18 +461,18 @@ keyboard[data-type='iso'] keyboard-key[data-type='enter']:hover::after {
 
 /* === Enter key color === */
 
-keyboard-key[data-type='enter']::before,
-keyboard-key[data-type='enter']::after {
+.keyboard-key[data-type='enter']::before,
+.keyboard-key[data-type='enter']::after {
 	background-color: rgb(10, 10, 10) !important;
 	color: white !important;
 }
 
-keyboard-key[data-type='enter']:hover,
-keyboard-key[data-type='enter']:hover::before,
-keyboard-key[data-type='enter']:hover::after,
-keyboard-key[data-type='enter'].pressed-key,
-keyboard-key[data-type='enter'].pressed-key::before,
-keyboard-key[data-type='enter'].pressed-key::after {
+.keyboard-key[data-type='enter']:hover,
+.keyboard-key[data-type='enter']:hover::before,
+.keyboard-key[data-type='enter']:hover::after,
+.keyboard-key[data-type='enter'].pressed-key,
+.keyboard-key[data-type='enter'].pressed-key::before,
+.keyboard-key[data-type='enter'].pressed-key::after {
 	background-color: rgb(210, 210, 210) !important;
 	box-shadow: none;
 	color: #333;
@@ -483,123 +485,125 @@ keyboard-key[data-type='enter'].pressed-key::after {
 */
 
 /* Different style for dead keys and keys with a different Ctrl layer */
-keyboard-key[data-style='deadkey'],
-keyboard-key[data-style='different'] {
+.keyboard-key[data-style='deadkey'],
+.keyboard-key[data-style='different'] {
 	--key-color-saturation: 0% !important;
 	--key-color-luminosity: 100% !important;
 	--key-opacity: 5% !important;
 	font-weight: 400;
 }
-keyboard-key[data-content='◌̈'],
-keyboard-key[data-content='◌̂'] {
+.keyboard-key[data-content='◌̈'],
+.keyboard-key[data-content='◌̂'] {
 	font-family: 'Open Sans'; /* Prevent some glyphs on dead keys to be incorrectly displayed */
 }
 
 /* J key seems lower than the others otherwise */
-keyboard-key[data-key='j'][data-content='j'] div,
-keyboard-key[data-key='j'][data-content='J'] div {
+.keyboard-key[data-key='j'][data-content='j'] div,
+.keyboard-key[data-key='j'][data-content='J'] div {
 	position: relative;
 	right: -0.05em;
 	top: -0.1em;
 }
 /* ★ key seems lower than the others otherwise */
-keyboard-key[data-content='★'] div {
+.keyboard-key[data-content='★'] div {
 	position: relative;
 	top: -0.05em;
 }
 
 /* Special keys with more than one character on them */
-keyboard-key[data-key='Escape'],
-keyboard-key[data-key='LCtrl'],
-keyboard-key[data-key='Win'],
-keyboard-key[data-key='LAlt'],
-keyboard-key[data-key='RCtrl'] {
+.keyboard-key[data-key='Escape'],
+.keyboard-key[data-key='LCtrl'],
+.keyboard-key[data-key='Win'],
+.keyboard-key[data-key='LAlt'],
+.keyboard-key[data-key='RCtrl'] {
 	font-size: calc(var(--key-text-size) * 0.75);
 	font-weight: normal;
 }
-keyboard[data-type='iso'] keyboard-key[data-key='Space'],
-keyboard[data-type='iso'] keyboard-key[data-key='RAlt'],
-keyboard[data-type='iso'] keyboard-key[data-key='Option'] {
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-key='Space'],
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-key='RAlt'],
+.keyboard-drawing[data-type='iso'] .keyboard-key[data-key='Option'] {
 	font-size: calc(var(--key-text-size) * 0.7);
 	font-weight: normal;
 }
 
-keyboard[data-type='ergodox'] keyboard-key[data-key='RAlt'] {
+.keyboard-drawing[data-type='ergodox'] .keyboard-key[data-key='RAlt'] {
 	font-size: calc(var(--key-text-size) * 0.65);
 	font-weight: normal;
 }
 
-keyboard-key[data-key='BackSpace'],
-keyboard-key[data-key='Delete'] {
+.keyboard-key[data-key='BackSpace'],
+.keyboard-key[data-key='Delete'] {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
-keyboard-key[data-key='RShift'],
-keyboard-key[data-key='LShift'] {
+.keyboard-key[data-key='RShift'],
+.keyboard-key[data-key='LShift'] {
 	font-weight: bold; /* Symbol is too thin otherwise */
 }
 
 /* Key appearing on the Ergodox layout */
-keyboard-key[data-key='AltTab'] {
+.keyboard-key[data-key='AltTab'] {
 	font-size: calc(var(--key-text-size) * 0.7);
 	line-height: 1.15;
 }
 
 /* Smaller font for keys [qu] and [où] */
-keyboard[data-plus='yes'][data-layer='Primary'] keyboard-key[data-key='q'],
-keyboard[data-plus='yes'][data-layer='AltGr'] keyboard-key[data-key='w'] {
+.keyboard-drawing[data-plus='yes'][data-layer='Primary'] .keyboard-key[data-key='q'],
+.keyboard-drawing[data-plus='yes'][data-layer='AltGr'] .keyboard-key[data-key='w'] {
 	font-size: calc(var(--key-text-size) * 0.9);
 }
-keyboard[data-plus='yes'][data-layer='Visuel'] keyboard-key[data-key='q'],
-keyboard[data-plus='yes'][data-layer='Shift'] keyboard-key[data-key='q'],
-keyboard[data-plus='yes'][data-layer='ShiftAltGr'] keyboard-key[data-key='w'] {
+.keyboard-drawing[data-plus='yes'][data-layer='Visuel'] .keyboard-key[data-key='q'],
+.keyboard-drawing[data-plus='yes'][data-layer='Shift'] .keyboard-key[data-key='q'],
+.keyboard-drawing[data-plus='yes'][data-layer='ShiftAltGr'] .keyboard-key[data-key='w'] {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
 /* Smaller font for Win + V */
-keyboard[data-layer='Layer'] keyboard-key[data-key='Coller'] {
+.keyboard-drawing[data-layer='Layer'] .keyboard-key[data-key='Coller'] {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
 
 /* Smaller font in , layer to prevent keys with 2 symbols to overflow */
-keyboard[data-layer=','] keyboard-key:not([data-type='special']):not([data-type='enter']) {
+.keyboard-drawing[data-layer=',']
+	.keyboard-key:not([data-type='special']):not([data-type='enter']) {
 	font-size: calc(var(--key-text-size) * 0.9);
 }
 
 /* Smaller font in À layer to prevent keys with 4 symbols to overflow */
-keyboard[data-layer='À'] keyboard-key:not([data-type='special']):not([data-type='enter']) {
+.keyboard-drawing[data-layer='À']
+	.keyboard-key:not([data-type='special']):not([data-type='enter']) {
 	font-size: calc(var(--key-text-size) * 0.7);
 }
 
 /* Smaller font in navigation layer to prevent keys with 3 symbols to overflow */
-keyboard[data-layer='Layer']
-	keyboard-key:not([data-finger='thumb']):not([data-type='special']):not([data-type='enter']) {
+.keyboard-drawing[data-layer='Layer']
+	.keyboard-key:not([data-finger='thumb']):not([data-type='special']):not([data-type='enter']) {
 	font-size: calc(var(--key-text-size) * 0.8);
 }
 
 /* Label "Layer" overflows otherwise */
-keyboard[data-layer='Layer'][data-type='ergodox'] keyboard-key[data-key='Space'] {
+.keyboard-drawing[data-layer='Layer'][data-type='ergodox'] .keyboard-key[data-key='Space'] {
 	font-size: calc(var(--key-text-size) * 0.65);
 }
 
 /* Smaller CapsLock symbol */
-keyboard-key[data-key='CapsLock'] tap-hold,
-keyboard-key[data-key='CapsLock'][data-content='⌫'],
-keyboard-key[data-key='CapsLock'][data-content='⌦'] {
+.keyboard-key[data-key='CapsLock'] tap-hold,
+.keyboard-key[data-key='CapsLock'][data-content='⌫'],
+.keyboard-key[data-key='CapsLock'][data-content='⌦'] {
 	font-size: calc(var(--key-text-size) * 0.85);
 }
-keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌫'],
-keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌦'] {
+.keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌫'],
+.keyboard-key[data-key='CapsLock'][data-content='Ctrl + ⌦'] {
 	font-size: calc(var(--key-text-size) * 0.7);
 }
 
-keyboard-key[data-content='CapsWord'] {
+.keyboard-key[data-content='CapsWord'] {
 	font-size: calc(var(--key-text-size) * 0.6);
 }
 
 /* Change font to avoid an ugly % glyph */
-keyboard-key[data-content='%'],
-keyboard-key[data-content='<nbsp></nbsp>%'] {
+.keyboard-key[data-content='%'],
+.keyboard-key[data-content='<nbsp></nbsp>%'] {
 	font-family:
 		system-ui,
 		-apple-system,
@@ -638,26 +642,26 @@ keyboard-key[data-content='<nbsp></nbsp>%'] {
 
 /* === keyboard_controle and keyboard_raccourcis_ergodox === */
 
-#keyboard_controle keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
-#keyboard_controle keyboard-key[data-column='0'],
-#keyboard_raccourcis_ergodox keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
+#keyboard_controle .keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17),
+#keyboard_controle .keyboard-key[data-column='0'],
+#keyboard_raccourcis_ergodox .keyboard-key[data-column]:nth-child(n + 8):nth-child(-n + 17) {
 	display: none;
 }
 
-#keyboard_controle keyboard-key[data-column='6'],
-#keyboard_raccourcis_ergodox keyboard-key[data-column='6'] {
+#keyboard_controle .keyboard-key[data-column='6'],
+#keyboard_raccourcis_ergodox .keyboard-key[data-column='6'] {
 	margin-right: 0;
 }
 
 /* === keyboard_symboles_plus === */
 
-#keyboard_symboles_plus keyboard-row:nth-child(n + 5) {
+#keyboard_symboles_plus .keyboard-row:nth-child(n + 5) {
 	display: none;
 }
 
 /* === keyboard_magique === */
 
-#keyboard_magique keyboard-key[data-plus='yes']:not([data-key='magique']) {
+#keyboard_magique .keyboard-key[data-plus='yes']:not([data-key='magique']) {
 	background: unset !important;
 	--key-color-saturation: 100% !important;
 	--key-color-luminosity: 70% !important;
@@ -669,15 +673,15 @@ keyboard-key[data-content='<nbsp></nbsp>%'] {
 	) !important;
 }
 
-#keyboard_magique keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
+#keyboard_magique .keyboard-key[data-plus='yes']:not([data-key='magique']):hover {
 	background-color: rgba(255, 255, 255, 0.85) !important;
 }
 
-#keyboard_magique keyboard-key[data-plus='yes'][data-type='special'] {
+#keyboard_magique .keyboard-key[data-plus='yes'][data-type='special'] {
 	background-color: rgb(10, 10, 10) !important;
 }
 
-#keyboard_magique keyboard-key[data-key='magique'] {
+#keyboard_magique .keyboard-key[data-key='magique'] {
 	background: linear-gradient(to bottom, rgba(255, 0, 0, 0.15), rgba(255, 0, 0, 0.15));
 }
 
@@ -687,7 +691,11 @@ keyboard-key[data-content='<nbsp></nbsp>%'] {
 ==========================================
 */
 
-nbsp {
+/* The layouts' generated key contents spell the narrow no-break space as an
+   <nbsp> element (static/layouts/visualisation/); the site's own pages use a
+   span of the same class. */
+nbsp,
+.nbsp {
 	background-color: white;
 	border-radius: 1px;
 	display: inline-block;

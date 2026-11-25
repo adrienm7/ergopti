@@ -206,7 +206,7 @@
 		summary,
 		legend,
 		label
-	):not(keyboard *, table *, button *, .banner *) {
+	):not(.keyboard-drawing *, table *, button *, .banner *) {
 	text-align: start !important;
 }
 
@@ -268,72 +268,72 @@
    whose lightness carries the value. The finger and the frequency are also
    in each key's name, so the colour is never the only way to read them. */
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='left'][data-finger='auriculaire'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='left'][data-finger='auriculaire'] {
 	--key-color-hue: 41deg;
 	--key-color-saturation: 100%;
 	--key-color-luminosity: 45%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='left'][data-finger='annulaire'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='left'][data-finger='annulaire'] {
 	--key-color-hue: 202deg;
 	--key-color-saturation: 77%;
 	--key-color-luminosity: 63%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='left'][data-finger='majeur'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='left'][data-finger='majeur'] {
 	--key-color-hue: 164deg;
 	--key-color-saturation: 100%;
 	--key-color-luminosity: 31%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='left'][data-finger='index'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='left'][data-finger='index'] {
 	--key-color-hue: 56deg;
 	--key-color-saturation: 85%;
 	--key-color-luminosity: 60%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='right'][data-finger='index'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='right'][data-finger='index'] {
 	--key-color-hue: 202deg;
 	--key-color-saturation: 100%;
 	--key-color-luminosity: 35%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='right'][data-finger='majeur'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='right'][data-finger='majeur'] {
 	--key-color-hue: 26deg;
 	--key-color-saturation: 100%;
 	--key-color-luminosity: 42%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='right'][data-finger='annulaire'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='right'][data-finger='annulaire'] {
 	--key-color-hue: 327deg;
 	--key-color-saturation: 45%;
 	--key-color-luminosity: 64%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='yes']
-	keyboard-key[data-hand='right'][data-finger='auriculaire'] {
+	.keyboard-drawing[data-color='yes']
+	.keyboard-key[data-hand='right'][data-finger='auriculaire'] {
 	--key-color-hue: 0deg;
 	--key-color-saturation: 0%;
 	--key-color-luminosity: 60%;
 }
 
 :root[data-a11y-colors='cvd']
-	keyboard[data-color='freq']
-	keyboard-key:is([data-type='letter'], [data-type='french'], [data-type='ponctuation']) {
+	.keyboard-drawing[data-color='freq']
+	.keyboard-key:is([data-type='letter'], [data-type='french'], [data-type='ponctuation']) {
 	--key-color-hue: 215deg;
 	--key-color-saturation: 90%;
 	--key-color-luminosity: calc(85% - 50% * var(--frequency_normalized));

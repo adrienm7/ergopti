@@ -10,7 +10,8 @@
  * meaning, and each one is justified in a reviewed list. A made-up element
  * (`<bloc-main>`, `<keyboard>`) counts as one: it means no more than a div
  * (since 2026-11-22, when the 92 `<kbd-output>` became `<samp>` and the
- * `<image-block>` became `<figure>`).
+ * `<image-block>` became `<figure>`); since 2026-11-25 the site has none and
+ * its list may justify none.
  *
  * WHAT IS CHECKED, in every Svelte file under src/:
  * 1. Every div, span and made-up element matches an entry of site-semantic-html-allowlist.json:
@@ -181,6 +182,22 @@ function checkTheChecker() {
 	);
 }
 
+/**
+ * The site's list justifies divs and spans only: since 2026-11-25 no made-up
+ * element is left in its markup (the keyboard drawings, their controls and the
+ * brand names became divs and spans with the same class), so none may come
+ * back through a reviewed entry either.
+ * @returns {string[]}
+ */
+function madeUpEntries(allowlist) {
+	return allowlist.elements
+		.filter((entry) => !/^(div|span)[.#( ]/.test(entry.element ?? ''))
+		.map(
+			(entry) =>
+				`${entry.file} <${entry.element}>: the site justifies no made-up element; use a div or a span with its class`
+		);
+}
+
 function main(args = process.argv.slice(2)) {
 	const site = measureSite();
 	if (args.includes('--inventory')) {
@@ -191,9 +208,19 @@ function main(args = process.argv.slice(2)) {
 		return;
 	}
 	checkTheChecker();
+	assert.match(
+		madeUpEntries({ elements: [{ file: 'a.svelte', element: 'keyboard (none)' }] })[0],
+		/no made-up element/,
+		'A made-up element is refused even with a reviewed entry'
+	);
+	assert.deepEqual(
+		madeUpEntries({ elements: [{ file: 'a.svelte', element: 'div.keyboard-drawing' }] }),
+		[]
+	);
 	const allowlist = JSON.parse(fs.readFileSync(ALLOWLIST_PATH, 'utf8'));
 	const problems = [
 		...allowlistProblems(allowlist),
+		...madeUpEntries(allowlist),
 		...site.interactive,
 		...site.warnings,
 		...[...site.ignores].flatMap(([file, ignores]) => ignoreProblems(file, ignores, allowlist)),
@@ -205,7 +232,7 @@ function main(args = process.argv.slice(2)) {
 	}
 	const total = allowlist.elements.reduce((sum, entry) => sum + entry.count, 0);
 	console.log(
-		`Site semantic HTML: ${site.measured.size} files, ${total} justified div, span or made-up element, no interactive one, no Svelte a11y warning`
+		`Site semantic HTML: ${site.measured.size} files, ${total} justified div or span, no made-up element, no interactive one, no Svelte a11y warning`
 	);
 }
 

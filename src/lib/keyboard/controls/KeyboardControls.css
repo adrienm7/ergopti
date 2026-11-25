@@ -1,10 +1,10 @@
-keyboard-controls button,
-keyboard-controls keyboard-control-layer::before {
+.keyboard-controls button,
+.keyboard-controls .keyboard-control-layer::before {
 	background-color: rgba(0, 14, 26, 0.7);
 	height: 100%;
 }
 
-keyboard-controls {
+.keyboard-controls {
 	--button-radius: 7px;
 	display: flex;
 	font-size: 0.75rem;
@@ -12,13 +12,13 @@ keyboard-controls {
 	width: fit-content; /* To center the controls */
 }
 
-keyboard-controls button:hover {
+.keyboard-controls button:hover {
 	background-color: white;
 	color: black;
 }
 
-keyboard-controls button,
-keyboard-controls select {
+.keyboard-controls button,
+.keyboard-controls select {
 	background-color: rgb(0, 0, 0, 0.5);
 	border: 2px solid white;
 	border-radius: 0;
@@ -30,7 +30,7 @@ keyboard-controls select {
 	padding: 10px;
 }
 
-keyboard-control-plus button {
+.keyboard-control-plus button {
 	border-left: 2px solid rgba(255, 255, 255, 0.8);
 	border-radius: var(--button-radius) 0 0 var(--button-radius);
 }
@@ -51,7 +51,7 @@ keyboard-control-plus button {
 	font-weight: bold;
 }
 
-keyboard-control-layer select {
+.keyboard-control-layer select {
 	background: linear-gradient(to top, #b661eb 25%, #ff53f4 50%);
 	font-weight: bold;
 	max-width: 30vw;
@@ -59,7 +59,7 @@ keyboard-control-layer select {
 
 .ergodox-text-gradient,
 .color-text-gradient,
-keyboard-control-layer select {
+.keyboard-control-layer select {
 	background-clip: text;
 	-webkit-background-clip: text;
 	color: transparent;
@@ -71,12 +71,12 @@ keyboard-control-layer select {
 ======================
 */
 
-keyboard-control-layer {
+.keyboard-control-layer {
 	min-height: 3em;
 	position: relative;
 }
 
-keyboard-control-layer select {
+.keyboard-control-layer select {
 	border: 2px solid white;
 	border-radius: 0 var(--button-radius) var(--button-radius) 0;
 	height: 100%;
@@ -84,12 +84,12 @@ keyboard-control-layer select {
 	position: relative;
 }
 
-keyboard-control-layer select option {
+.keyboard-control-layer select option {
 	background-color: black;
 	color: white;
 }
 
-keyboard-control-layer::before {
+.keyboard-control-layer::before {
 	border-radius: 0 var(--button-radius) var(--button-radius) 0;
 	content: '';
 	height: 100%;
@@ -99,7 +99,7 @@ keyboard-control-layer::before {
 	width: 100%;
 }
 
-keyboard-control-layer::after {
+.keyboard-control-layer::after {
 	color: white;
 	content: '▼';
 	position: absolute;
@@ -107,11 +107,11 @@ keyboard-control-layer::after {
 	top: 35%;
 }
 
-keyboard-control-layer:hover::before {
+.keyboard-control-layer:hover::before {
 	background-color: white;
 }
 
-keyboard-control-layer:hover::after {
+.keyboard-control-layer:hover::after {
 	color: black; /* Color of the selection triangle */
 }
 
@@ -123,31 +123,31 @@ keyboard-control-layer:hover::after {
 
 /* When the background is white */
 
-/* section keyboard-controls button,
-section keyboard-controls select {
+/* section .keyboard-controls button,
+section .keyboard-controls select {
 	border: 2px solid rgba(0, 0, 0, 0.8);
 	color: #333;
 }
 
-section keyboard-controls > :first-child {
+section .keyboard-controls > :first-child {
 	border-left: 2px solid rgba(0, 0, 0, 0.8);
 }
 
-section keyboard-controls select option {
+section .keyboard-controls select option {
 	background-color: rgb(0, 0, 0);
 	color: rgb(255, 255, 255);
 }
 
-section keyboard-controls > :last-child {
+section .keyboard-controls > :last-child {
 	border-right: 2px solid rgba(0, 0, 0, 0.8);
 }
 
-section keyboard-controls button:hover {
+section .keyboard-controls button:hover {
 	background-color: rgb(0, 0, 0);
 	color: rgba(255, 255, 255, 0.8);
 } */
 
 /* The controls drawn right under their keyboard keep it at a distance. */
-keyboard + keyboard-controls {
+.keyboard-drawing + .keyboard-controls {
 	margin-top: 5vh;
 }

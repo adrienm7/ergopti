@@ -34,7 +34,7 @@
 	}
 </script>
 
-<keyboard-control-plus>
+<div class="keyboard-control-plus">
 	<button onclick={togglePlus}>
 		{#if plusValue === 'yes'}
 			<strong>Plus</strong>&nbsp;➜ Standard
@@ -42,4 +42,4 @@
 			Standard ➜&nbsp;<strong style="padding:0; margin:0">Plus</strong>
 		{/if}
 	</button>
-</keyboard-control-plus>
+</div>

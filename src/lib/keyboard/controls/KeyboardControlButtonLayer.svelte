@@ -44,7 +44,7 @@
 	}
 </script>
 
-<keyboard-control-layer>
+<div class="keyboard-control-layer">
 	<select
 		id={'keyboard-layer-' + id}
 		bind:value={layerValue}
@@ -55,4 +55,4 @@
 			<option {value}>{label}</option>
 		{/each}
 	</select>
-</keyboard-control-layer>
+</div>

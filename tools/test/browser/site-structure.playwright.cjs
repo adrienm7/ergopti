@@ -487,7 +487,7 @@ async function exercisePhone(page, origin, basePath) {
  */
 async function exerciseDeadKeyLegends(page, origin, basePath) {
 	await visit(page, origin, basePath, '/ergopti');
-	const dead = page.locator("keyboard-key[data-style='deadkey']");
+	const dead = page.locator(".keyboard-key[data-style='deadkey']");
 	await dead.first().waitFor({ state: 'attached' });
 	const keys = await dead.evaluateAll((nodes) =>
 		nodes.map((node) => ({
@@ -587,13 +587,13 @@ async function exerciseGeneratedKeyboard(page, origin, basePath) {
 	const cell = (key) => data.keys.find((candidate) => candidate.key === key);
 	await visit(page, origin, basePath, '/ergopti');
 	const board = page.locator('#keyboard_presentation');
-	await board.locator("keyboard-key[data-key='a']").waitFor({ state: 'attached' });
+	await board.locator(".keyboard-key[data-key='a']").waitFor({ state: 'attached' });
 	const read = () =>
 		board.evaluate((node) => ({
 			role: node.getAttribute('role'),
 			label: node.getAttribute('aria-label'),
-			rows: [...node.querySelectorAll('keyboard-row')].map((row) => row.getAttribute('role')),
-			keys: [...node.querySelectorAll('keyboard-key')]
+			rows: [...node.querySelectorAll('.keyboard-row')].map((row) => row.getAttribute('role')),
+			keys: [...node.querySelectorAll('.keyboard-key')]
 				.filter((key) => key.dataset.key)
 				.map((key) => ({
 					key: key.dataset.key,
@@ -603,7 +603,7 @@ async function exerciseGeneratedKeyboard(page, origin, basePath) {
 					text: (key.querySelector('div') ?? key).textContent
 				}))
 		}));
-	const press = (key) => board.locator(`keyboard-key[data-key='${key}']`).dispatchEvent('click');
+	const press = (key) => board.locator(`.keyboard-key[data-key='${key}']`).dispatchEvent('click');
 	let drawn = await read();
 	assert.equal(drawn.role, 'table', 'The keyboard drawing is a table');
 	assert.ok(drawn.label, 'The keyboard table is named');
@@ -670,13 +670,13 @@ async function exerciseOtherLayoutKeyboard(page, origin, basePath) {
 			'The Ergopti version select is off while bépo is drawn'
 		);
 		const board = page.locator('#keyboard_presentation');
-		const key = (name) => board.locator(`keyboard-key[data-key='${name}']`);
+		const key = (name) => board.locator(`.keyboard-key[data-key='${name}']`);
 		const text = async (name) =>
 			key(name).evaluate((node) => (node.querySelector('div') ?? node).textContent);
 		await key('a').waitFor({ state: 'attached' });
 		await page.waitForFunction(
 			(expected) =>
-				document.querySelector("#keyboard_presentation keyboard-key[data-key='i'] div")
+				document.querySelector("#keyboard_presentation .keyboard-key[data-key='i'] div")
 					?.textContent === expected,
 			cell('i').Primary
 		);
