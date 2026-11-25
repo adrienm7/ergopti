@@ -221,12 +221,7 @@ end
 --- @return table hits { id, variant, text, x, y, width, height, distance }
 function M.find_text(words, targets)
 	require_init()
-	local hits = {}
-	for _, target in ipairs(targets) do
-		local hit = TextTarget.find(words, target)
-		if hit then hits[#hits + 1] = hit end
-	end
-	return hits
+	return TextTarget.find_all(words, targets)
 end
 
 return M
