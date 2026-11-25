@@ -31,6 +31,8 @@
  *    same pair in « One layout ».
  * 9. Help: the « Help » tab names each task in a titled section, without the
  *    filters or the layout frame.
+ * 14. Quantiles: the Pareto tab's spread marks P10 to P90 and lists P0 to
+ *    P100 in a table, in order, P0 and P100 the lowest and highest values.
  * 13. Values query: a query over the values (« sfb < … & complete ») keeps
  *    only the layouts it holds for, in every figure's rows; one that does not
  *    read filters nothing and says why and where in words; the names it may
@@ -577,7 +579,45 @@ async function exerciseMovementPercentiles(browser, origin) {
 	await context.close();
 }
 
+async function exerciseQuantiles(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-pareto');
+	await page.waitForSelector('#la-pareto-quantiles tbody tr');
+	const rows = await tableRows(page, '#la-pareto-quantiles');
+	assert.deepEqual(
+		rows.map((cells) => cells[0]),
+		['P0', 'P10', 'P25', 'P50', 'P75', 'P90', 'P100'],
+		'quantiles: seven rows, in order'
+	);
+	const number = (text) =>
+		Number(
+			text
+				.replace(/[^0-9.,−-]/g, '')
+				.replace(',', '.')
+				.replace('−', '-')
+		);
+	const values = rows.map((cells) => number(cells[1]));
+	assert.ok(
+		values.every((v, i) => i === 0 || v >= values[i - 1]),
+		`quantiles: never decreasing (${values})`
+	);
+	const pareto = (await tableRows(page, '#la-pareto-table')).map((cells) => number(cells[1]));
+	assert.ok(
+		Math.abs(values[0] - Math.min(...pareto)) < 0.011 &&
+			Math.abs(values[6] - Math.max(...pareto)) < 0.011,
+		`quantiles: P0 and P100 are the extremes (${values} against ${pareto})`
+	);
+	assert.equal(
+		await page.locator('#la-pareto-spread .la-pareto-quantile').count(),
+		5,
+		'quantiles: five marks'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseQuantiles,
 	exerciseValuesQuery,
 	exerciseBlendOwnText,
 	exerciseMovementPercentiles,

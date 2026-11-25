@@ -1452,6 +1452,13 @@ layout and the one it is compared with, the same two « One layout » shows;
 the Principal's rows of every figure are highlighted (`la-selected`) and the
 Comparison's edged (`la-versus`), the Pareto ring and the trace follow them.
 
+**Quantiles of the spread** (2026-11-25, an idea seen in the Layouts Wiki
+playground's Ranking view, which snaps its range to P0, P10, P25, P75, P90
+and P100). Under the Pareto tab's spread of the horizontal value, dashed
+marks place P10, P25, P50, P75 and P90 of the layouts shown (named under the
+strip on two alternating lines), and a table lists P0 to P100 with their
+values (linear between the two nearest ranks, `SPREAD_QUANTILES`).
+
 **Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
 pane). « Help », before « One layout » (which stays last), holds one titled
 section per common task: compare two layouts, rank on a metric, read the
