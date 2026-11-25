@@ -52,6 +52,30 @@ local MAX_SAFE_INTEGER = 9007199254740991
 -- Only genuine preflight capabilities can reuse admitted private header bytes.
 local prepared_headers = setmetatable({}, { __mode = "k" })
 
+-- The HTTP status of a conditional request whose cached copy is still current.
+local HTTP_NOT_MODIFIED = 304
+
+--- Whether caller headers carry a cache validator (If-None-Match, If-Modified-Since).
+--- @param headers table
+--- @return boolean
+local function has_validator_header(headers)
+	for name in pairs(headers) do
+		local lower = tostring(name):lower()
+		if lower == "if-none-match" or lower == "if-modified-since" then return true end
+	end
+	return false
+end
+
+--- Whether a result is the 304 a conditional request asked for. The result
+--- stays not ok (no body came back), but it is the answer, not a failure: it
+--- is logged as such instead of an ERROR the user sees in the error window.
+--- @param result table Port result envelope.
+--- @param conditional boolean Whether the request carried a validator.
+--- @return boolean
+function M.is_not_modified_answer(result, conditional)
+	return conditional == true and type(result) == "table" and tonumber(result.status) == HTTP_NOT_MODIFIED
+end
+
 --- Exposes the existing native default to the private managed wrapper.
 --- @return number
 function M.default_timeout_ms() return DEFAULT_TIMEOUT_MS end
@@ -429,6 +453,8 @@ local function finish(request, result, suppress_callback, transport_failure)
 	end
 	if result.ok then
 		Logger.debug(LOG, "HTTP request completed (status=%d).", result.status or 0)
+	elseif M.is_not_modified_answer(result, request.caller_validator == true or request.sent_validator ~= nil) then
+		Logger.debug(LOG, "HTTP request answered 304 Not Modified: the caller's cached copy is current.")
 	elseif result.error ~= "cancelled" then
 		if transport_failure == true and request.failure_log_level == "warn" and optional_service_failure(request, result) then
 			Logger.warn(LOG, "HTTP request failed: %s.", tostring(result.error))
@@ -1180,6 +1206,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			stderr_eof = false,
 			exited = false,
 			terminal = false,
+			-- A 304 answers a request that carried a validator: the caller reuses
+			-- its cached copy (layouts catalogue.resolve_index), so it is no error.
+			caller_validator = type(headers) == "table" and has_validator_header(headers),
 		}
 	end
 	if authorized then

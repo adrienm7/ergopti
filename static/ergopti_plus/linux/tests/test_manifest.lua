@@ -139,6 +139,7 @@ return {
 	"tests.unit.core.network.adapters.test_managed_http_public",
 	"tests.unit.core.network.adapters.test_http_failure_log_level",
 	"tests.unit.core.network.adapters.test_http_get_operation",
+	"tests.unit.core.network.adapters.test_http_not_modified_answer",
 	"tests.unit.core.network.adapters.test_managed_get_redirect_boundaries",
 	"tests.unit.core.network.adapters.test_managed_get_redirect_policy",
 	"tests.unit.core.network.adapters.test_managed_get_redirect_receipts",
