@@ -2988,6 +2988,50 @@ local function main()
 	end
 
 
+	-- The focus poll runs four times a second: on X11 it asks the server inside
+	-- this process (libxcb) instead of forking xdotool twice per poll.
+	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
+	-- Pointer distance and virtual-desktop changes are read from the X server:
+	-- the cursor's screen position (the pixels Windows and macOS store) and the
+	-- EWMH current desktop. Wayland grants no cursor position to a client; its
+	-- current workspace comes from sway, Hyprland or KWin when one runs. What
+	-- no source answers is said instead of a zero that looks measured. Bound
+	-- before the tray is built: its Metrics submenu names each source this
+	-- session lacks, and a tray drawn first showed the unbound tracker's raw
+	-- placeholder until something rebuilt the menu.
+	do
+		local sources = window_info and window_info.metrics_sources() or {}
+		keystats.bind_pointer_position(sources.pointer, sources.pointer and Monotonic.now_ms or nil,
+			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
+		local desktop, desktop_reason = sources.desktop, nil
+		if not desktop then
+			desktop, desktop_reason = require("gestures.adapters.workspace_switcher")
+				.current_workspace_source(Monotonic.now_ms)
+		end
+		if system_metrics then
+			system_metrics.bind_desktop_source(desktop,
+				not desktop and "platform_reason.desktop_changes_need_workspace_interface" or nil)
+		end
+		-- The diagnostics trail of the menu's « not measured » rows.
+		if not sources.pointer then
+			Logger.warn(LOG, "Metrics: pointer distance is not measured in this session "
+				.. "(no X11 cursor position; Wayland exposes none to a client).")
+		end
+		if not desktop then
+			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
+				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
+		end
+		require("modules.keystats.system.topology_metrics").bind_topology_source(sources.topology,
+			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
+		if not sources.topology then
+			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
+				.. "(no X11 window geometry; Wayland exposes none to a client).")
+		end
+		-- A touchpad tap-to-click never reaches evdev as a button: the metrics
+		-- count the touches libinput turns into one, under the desktop's setting.
+		require("modules.keystats.tap_click_sources").bind(keystats, Monotonic.now_ms)
+	end
+
 	BootProfiler.stage_done("callbacks")
 	-- 8.9) Start the tray menu if requested.
 	BootProfiler.stage("tray")
@@ -3596,49 +3640,9 @@ local function main()
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 
-	-- The focus poll runs four times a second: on X11 it asks the server inside
-	-- this process (libxcb) instead of forking xdotool twice per poll.
-	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
 	-- On GNOME and KDE Wayland the Shell extension and KWin script push focus
 	-- changes to a resident worker; the poll then reads them from memory.
 	if window_info and type(window_info.start_compositor_focus) == "function" then window_info.start_compositor_focus() end
-	-- Pointer distance and virtual-desktop changes are read from the X server:
-	-- the cursor's screen position (the pixels Windows and macOS store) and the
-	-- EWMH current desktop. Wayland grants no cursor position to a client; its
-	-- current workspace comes from sway, Hyprland or KWin when one runs. What
-	-- no source answers is said instead of a zero that looks measured.
-	do
-		local sources = window_info and window_info.metrics_sources() or {}
-		keystats.bind_pointer_position(sources.pointer, sources.pointer and Monotonic.now_ms or nil,
-			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
-		local desktop, desktop_reason = sources.desktop, nil
-		if not desktop then
-			desktop, desktop_reason = require("gestures.adapters.workspace_switcher")
-				.current_workspace_source(Monotonic.now_ms)
-		end
-		if system_metrics then
-			system_metrics.bind_desktop_source(desktop,
-				not desktop and "platform_reason.desktop_changes_need_workspace_interface" or nil)
-		end
-		-- The diagnostics trail of the menu's « not measured » rows.
-		if not sources.pointer then
-			Logger.warn(LOG, "Metrics: pointer distance is not measured in this session "
-				.. "(no X11 cursor position; Wayland exposes none to a client).")
-		end
-		if not desktop then
-			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
-				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
-		end
-		require("modules.keystats.system.topology_metrics").bind_topology_source(sources.topology,
-			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
-		if not sources.topology then
-			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
-				.. "(no X11 window geometry; Wayland exposes none to a client).")
-		end
-		-- A touchpad tap-to-click never reaches evdev as a button: the metrics
-		-- count the touches libinput turns into one, under the desktop's setting.
-		require("modules.keystats.tap_click_sources").bind(keystats, Monotonic.now_ms)
-	end
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)

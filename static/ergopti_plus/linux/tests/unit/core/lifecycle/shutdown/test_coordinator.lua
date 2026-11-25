@@ -68,6 +68,13 @@ helpers.describe("actual Main startup capture admission", function()
 		-- The collector's field run session starts with the daemon's own pid.
 		helpers.assert_eq(state.field_run and state.field_run.pid, 4242)
 	end)
+	helpers.it("(metrics-sources-before-tray) the tray is built after the pointer source is bound", function()
+		-- The tray used to be built before the cursor position source was bound,
+		-- so its Metrics submenu drew the unbound tracker's raw reason.
+		local state = MainStartup.run()
+		helpers.assert_true(state.ok, tostring(state.error))
+		helpers.assert_true(position(state.events, "metrics.pointer_bound") < position(state.events, "tray"))
+	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a
 		-- scenario. Adding SIGUSR1 to Main without updating that count killed

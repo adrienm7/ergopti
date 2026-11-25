@@ -163,7 +163,8 @@ function M.run(options)
 	-- The typing path's settings and catalogues are read before the hook starts.
 	env.RepeatKey = { is_enabled = function() record("typing.repeat_key"); return false end }
 	env.tap_keys = { keys = function() record("typing.tap_keys"); return {} end }
-	env.keystats = { hold_accounting_token = noop, pump_flush = noop, bind_pointer_position = noop,
+	env.keystats = { hold_accounting_token = noop, pump_flush = noop,
+		bind_pointer_position = function() record("metrics.pointer_bound") end,
 		load_media_policy = function() record("typing.media_policy") end,
 		get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
