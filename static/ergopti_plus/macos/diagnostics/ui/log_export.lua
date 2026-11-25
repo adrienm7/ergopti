@@ -46,15 +46,6 @@ local DEFAULT_EFFECTS = {
 	end,
 }
 
---- Merges test overrides over the production effects.
---- @param overrides table|nil
---- @return table
-local function effects_with(overrides)
-	local effects = {}
-	for name, fn in pairs(DEFAULT_EFFECTS) do effects[name] = fn end
-	for name, fn in pairs(overrides or {}) do effects[name] = fn end
-	return effects
-end
 
 --- Folder path with exactly one trailing slash.
 local function folder(path) return (tostring(path):gsub("/+$", "")) .. "/" end
@@ -92,7 +83,9 @@ end
 --- @param overrides table|nil Replacement side effects (tests only).
 --- @return string|nil path The archive, or nil when nothing was exported.
 function M.export(overrides)
-	local effects = effects_with(overrides)
+	-- Test overrides replace production effects one by one.
+	local effects = require("core.text.engine.table_util").shallow_copy(DEFAULT_EFFECTS)
+	for name, fn in pairs(overrides or {}) do effects[name] = fn end
 	local i18n = require("core.i18n.engine.i18n")
 	Logger.start(LOG, "Exporting the logs as one archive…")
 	local function fail(detail)
