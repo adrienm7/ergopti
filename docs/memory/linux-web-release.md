@@ -325,6 +325,15 @@ sent, so that budget failed expansions at random as
 destination (`capture_text_owner`'s `current()`) passes the native query
 deadline (`atspi_probe_timeout_ms`); input callbacks keep the default.
 
+That long budget is for the field mode only. The window mode exists because
+the worker gives no field answer (KDE Wayland), so the barrier only timed out:
+three seconds per expansion, the first while the trigger's forwarded key-down
+was still held on the virtual keyboard, which KDE autorepeated (`,e` gave
+`,eeeeeeeeeje`, 2026-11-25). Action: the window-mode owner checks with the
+input budget, which polls once the worker left a barrier unanswered; never put
+a wait of the desktop's autorepeat delay (about 600 ms) between a forwarded
+key-down and the transaction's held-key release.
+
 ### project-linux-first-install-needs-luajit-module-builds
 
 Generic `lua-*` packages are Lua 5.4 builds on Fedora, Arch, openSUSE and
