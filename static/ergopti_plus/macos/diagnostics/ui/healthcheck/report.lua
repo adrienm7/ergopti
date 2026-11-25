@@ -27,6 +27,12 @@
 --- 4. Side effects are one table so a test can observe each of them; the
 ---    browser opens last, after the clipboard holds what it asks for, and
 ---    nothing follows it that could take the focus back.
+--- 5. Without a window (hs.webview refused it) the same approved report is
+---    written as a self-contained HTML file and opened in the browser, as on
+---    Linux; when even that fails, or a window that has no file to fall back
+---    on cannot open, a native alert names the log and offers « Report a bug »
+---    (maintainer, 2026-11-25): a click that opens nothing reads as a dead
+---    driver.
 --- ==============================================================================
 
 local M = {}
@@ -37,6 +43,7 @@ local IssueLink   = require("diagnostics.engine.reports.issue_link")
 local Redact      = require("diagnostics.engine.reports.redact")
 local Share       = require("diagnostics.engine.healthcheck.share")
 local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ReportPage  = require("diagnostics.engine.healthcheck.report_page")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "diagnostics.engine.healthcheck.report"
@@ -206,6 +213,10 @@ local DEFAULT_EFFECTS = {
 	notify = function(title, body, kind)
 		return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 	end,
+	-- The default button first: hs.dialog.blockAlert answers with the label clicked
+	alert = function(title, body, default_button, other_button)
+		return require("core.ui.engine.dialog_util").block_alert(title, body, default_button, other_button, "warning")
+	end,
 	identity = function()
 		local ConfigPaths = require("settings.engine.paths")
 		return {
@@ -344,6 +355,97 @@ function M.suggest_feature(overrides, complete)
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
 	end)
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 4/ Without A Window =======
+-- ===================================
+-- ===================================
+
+--- Delivers the diagnostics report when no window can show it: the approved
+--- report of a fresh snapshot is written as a self-contained HTML file in the
+--- logs' diagnostics folder, opened in the default browser, and a notice names
+--- the file. The diagnostics must never depend on the window they may be
+--- diagnosing (the Linux fallback, maintainer 2026-11-25).
+--- @param opts table|nil { state = menu state|nil }, for the features section.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @return boolean delivered Whether the file was written and its opening asked.
+function M.deliver_without_window(opts, overrides)
+	local effects = effects_with(overrides)
+	local i18n = require("core.i18n.engine.i18n")
+	local state = type(opts) == "table" and opts.state or nil
+	local title = i18n.get("menu.debug.healthcheck")
+	Logger.start(LOG, "Writing the diagnostics report to a file: no window can show it…")
+	local ok, path = xpcall(function()
+		local bridge = require("diagnostics.ui.healthcheck.core")
+		local documents = bridge.config()
+		local snapshot = bridge.run({ state = state, complete_local = true })
+		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
+			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
+		local dir = snapshot.sections.paths.diagnostics_dir
+		if type(dir) ~= "string" or dir == "" then error("the diagnostics folder is unknown") end
+		local document = Share.document(snapshot, documents.schema, i18n.get(documents.schema.share_policy.notice_key))
+		local suffix = documents.schema.report.name_suffix
+		assert(document.name:sub(-#suffix) == suffix, "the report name does not end with the schema's suffix")
+		local html = ReportPage.render_html(title, i18n.get("healthcheck.file_fallback.lead"), document.text,
+			i18n.get_locale())
+		local written, detail = effects.save(dir, document.name:sub(1, -#suffix - 1) .. ".html", html)
+		if not written then error("the report could not be saved: " .. tostring(detail)) end
+		return written
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "The diagnostics report could not be written to a file: %s", tostring(path))
+		return false
+	end
+	Logger.success(LOG, "Diagnostics report written to %s.", path)
+	local asked, request = pcall(effects.open, path, function(receipt)
+		if type(receipt) ~= "table" or receipt.ok ~= true then
+			Logger.warn(LOG, "The browser did not open the diagnostics report (status=%s, reason=%s).",
+				tostring(type(receipt) == "table" and receipt.code), tostring(type(receipt) == "table" and receipt.error))
+		end
+	end, function() return true end)
+	if not asked or type(request) ~= "table" then
+		Logger.warn(LOG, "The browser could not be asked to open the diagnostics report: %s.", tostring(request))
+	end
+	local sent, delivered = pcall(effects.notify, title, i18n.format("healthcheck.file_fallback.notice", path), "info")
+	if not sent or delivered ~= true then
+		Logger.warn(LOG, "The diagnostics file notice was not delivered: %s.", tostring(delivered))
+	end
+	return true
+end
+
+--- Says in a native alert that a window could not open, where its failure is
+--- logged, and offers « Report a bug », which needs no window: it copies and
+--- saves the report, then opens the bug form in the browser.
+--- @param window_id string The window's apps.manifest id, for the log lines.
+--- @param body string The localized explanation, naming the log file.
+--- @param opts table|nil { state = menu state|nil }, for the bug report.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @return boolean reported Whether the user asked to report the bug.
+function M.alert_window_unavailable(window_id, body, opts, overrides)
+	local effects = effects_with(overrides)
+	local i18n = require("core.i18n.engine.i18n")
+	local close_label, report_label = i18n.get("common.close"), i18n.get("menu.debug.report_bug")
+	Logger.warn(LOG, "The %s window could not open: telling the user where it is logged.", tostring(window_id))
+	local clicked = effects.alert(i18n.get("dialog.window_unavailable.title"), body, close_label, report_label)
+	if clicked ~= report_label then return false end
+	Logger.info(LOG, "Reporting the %s window failure as a bug, as the user asked.", tostring(window_id))
+	M.report_bug(opts, overrides)
+	return true
+end
+
+--- The log file to name in a window-unavailable alert: today's log, else the
+--- logs folder.
+--- @return string path
+function M.log_path_for_alert()
+	local path = Logger.today_log_path() or Logger.logs_dir()
+	if type(path) ~= "string" or path == "" then error("no log file or folder is known") end
+	return path
 end
 
 return M

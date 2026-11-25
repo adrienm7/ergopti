@@ -15,7 +15,9 @@
 --- 5. copy, report and open go through the diagnostics actions with the
 ---    report the page showed; an unknown action is refused;
 --- 6. closing frees the policy, so the next new error opens a window again;
---- 7. the setting persists through Storage and defaults to the manifest.
+--- 7. the setting persists through Storage and defaults to the manifest;
+--- 8. a window that cannot open still tells the user, naming the errors file
+---    and offering « Report a bug » (error-window-unavailable).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -49,7 +51,7 @@ local function load_dialog(controls)
 
 	local context = {
 		timers = {}, scripts = {}, deleted = 0, released = 0, focused = 0, performed = {}, stored = {},
-		errors = {}, warnings = {}, rewritten = {},
+		errors = {}, warnings = {}, rewritten = {}, alerts = {},
 	}
 	-- config.toml owns the row (script_config_authority): a change writes it
 	-- before the store, held or not. The file itself is the authority's test.
@@ -62,8 +64,10 @@ local function load_dialog(controls)
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
+	logger.today_errors_path = function() return ERRORS_FILE end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end,
+		format = function(key, ...) return table.concat({ key, ... }, "|") end }
 	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		terminal_in_progress = function() return context.terminal == true end,
 	}
@@ -124,6 +128,11 @@ local function load_dialog(controls)
 		end,
 	}
 	package.loaded["diagnostics.ui.healthcheck.report"] = {
+		alert_window_unavailable = function(window_id, body)
+			context.alerts[#context.alerts + 1] = { id = window_id, body = body }
+			return false
+		end,
+		log_path_for_alert = function() return "unused: the errors file is known" end,
 		redaction_context = function() return { home = HOME, user = "jdoe", case_insensitive = true } end,
 		perform = function(action, paths, _, _, _, _, owner)
 			context.performed[#context.performed + 1] = { action = action, paths = paths }
@@ -259,6 +268,23 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 			helpers.assert_eq(page_messages(context)[1].module, "new")
 		end)
 	end
+
+	helpers.it("a refused web view still tells the user where the error is logged (error-window-unavailable)", function()
+		local dialog, context = load_dialog()
+		local native_new = hs.webview.new
+		-- hs.webview.new answers nil when WebKit refuses the window
+		hs.webview.new = function() return nil end
+		helpers.assert_true(dialog.init())
+		dialog.on_error("keystats", "Flush failed: %s", "Flush failed: disk full")
+		fire_timers(context)
+		hs.webview.new = native_new
+		helpers.assert_eq(#context.alerts, 1, "the error is not lost with its window")
+		helpers.assert_eq(context.alerts[1].id, "error_dialog")
+		helpers.assert_eq(context.alerts[1].body, "dialog.window_unavailable.error_body|" .. ERRORS_FILE,
+			"the alert names today's errors file")
+		dialog.on_error("other", "Other failure", "Other failure")
+		helpers.assert_eq(#context.timers, 1, "the refused window freed the policy for the next error")
+	end)
 
 	helpers.it("disabling invalidates queued windows across reactivation (error-dialog-cancel)", function()
 		local dialog, context = load_dialog()
