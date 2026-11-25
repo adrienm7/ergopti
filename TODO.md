@@ -309,15 +309,15 @@ waits for the maintainer's review).
       `E.wordsWithKeys`, the `words` option of `board/worst_groups.js`; the panel needs its corpus's word table); (2)
       corpus blends, what is left: keep the last blend with the conveniences (its recipe, rebuilt on the next visit),
       carry it in the share link, and blend the user's own text or « Ma frappe » too (done: up to three built-in corpora
-      by weight, `E.blendNgrams`, under the corpus picker); (3) magic and repeat keys: write a design first
-      (`layout-source-format.md`, engine ways of typing as a context-dependent output, and the three drivers' emulation,
-      `cross-driver-parity`); (4) saved layout versions in the editor beside undo; (5) task help inside the Studio («
-      How do I compare, rank, read a Pareto »), routed through `i18n`; (6) more shown-only metrics, what is left (done:
-      row changes concordant and discordant in the movement table): alternation whose ends are an SFS, weak redirects
-      (no index), each with and without thumbs, and each movement cell's percentile among the compared layouts
-      (`movementTable` costs 20 to 60 ms a layout on a large corpus: compute it on demand, or in a worker, for the whole
-      comparison); (7) a Principal and Comparison frame at the top of the Comparer that every tab follows (today « One
-      layout » and the trace each choose theirs); (8) Kawalyzer's « Clever Keys » (context outputs) with item (3).
+      by weight, `E.blendNgrams`, under the corpus picker); (3) magic and repeat keys: designed
+      (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
+      »; (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How do I compare, rank,
+      read a Pareto »), routed through `i18n`; (6) more shown-only metrics, what is left (done: row changes concordant
+      and discordant in the movement table): alternation whose ends are an SFS, weak redirects (no index), each with and
+      without thumbs, and each movement cell's percentile among the compared layouts (`movementTable` costs 20 to 60 ms
+      a layout on a large corpus: compute it on demand, or in a worker, for the whole comparison); (7) a Principal and
+      Comparison frame at the top of the Comparer that every tab follows (today « One layout » and the trace each choose
+      theirs); (8) Kawalyzer's « Clever Keys » (context outputs) with item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -634,6 +634,14 @@ Each question names the default kept meanwhile; an answer moves into the item or
       shown without a direction), leaves incomplete layouts out of the frontier (their low counts are no
       trade-off) and names at most 12 frontier layouts on the chart (the table names all). Choose other default
       values or let incomplete layouts in.
+- [ ] **Magic and repeat keys in the Studio's analysis (asked by the agent on 2026-11-25, to review by the
+      maintainer).** The maintainer wants every idea of the Layouts Wiki playground and Kawalyzer, which analyse
+      repeat, skip-repeat and magic (« Clever Keys ») keys; the decision of 2026-11-21 says « Studio shows layouts,
+      not the magic key » (the ★ of Ergopti+). The design is written (`docs/design/magic-and-repeat-keys.md`: a
+      layout's own repeat and magic keys, output-context rules of at most two characters, analysed as
+      context-dependent ways of typing, emulated by the three drivers, kept apart from ★). Kept meanwhile: nothing
+      built. Choose: (1) build it as designed, the analysis first; (2) analysis only, no driver emulation (the
+      Studio then rates keys no Ergopti driver can type); (3) not now.
 - [ ] **Trace sample text and stream rules (decided by the agent on 2026-11-25, to review by the maintainer).** The
       trace types a sample sentence in the page's language until the visitor writes one (French: « Où êtes-vous
       allés cet été ? Ça dépend : à Noël, chez Zoé et Gaëtan, près du lac. »), at most 2,000 characters, each
