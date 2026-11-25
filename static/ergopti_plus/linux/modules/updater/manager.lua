@@ -1494,10 +1494,12 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		Logger.debug(LOG, "Local source — background checks disabled.")
 		return true
 	end
-	-- A system package owns its own update path: install_archive() refuses to
-	-- replace it, so a background check would only offer what cannot be installed.
-	if M.installation_kind() == "package" then
-		Logger.info(LOG, "Package installation: no automatic update check, the package manager updates it.")
+	-- A system package, an AppImage or a Flatpak owns its own update path:
+	-- install_archive() refuses to replace it, so a background check would only
+	-- offer what cannot be installed.
+	local kind = M.installation_kind()
+	if require("modules.updater.install_origin").update_blocked_key(kind) then
+		Logger.info(LOG, "No automatic update check for this %s installation: its own updater replaces it.", kind)
 		return true
 	end
 
@@ -2040,7 +2042,7 @@ end
 
 --- Whether this installation can replace itself (a standalone install), and
 --- why not otherwise.
---- @return string kind "standalone", "package" or "unmanaged"
+--- @return string kind "standalone", "package", "appimage", "flatpak" or "unmanaged"
 --- @return string|nil reason
 function M.installation_kind()
 	local ok, context = pcall(M._resolve_installation)

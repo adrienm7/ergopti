@@ -635,6 +635,7 @@ return {
 	"tests.unit.modules.updater.check.test_updater_release_json_admission",
 	"tests.unit.modules.updater.check.test_updater_channel_and_recheck",
 	"tests.unit.modules.updater.install.test_updater_restart",
+	"tests.unit.modules.updater.install.test_install_origin",
 	"tests.unit.modules.updater.install.test_updater_successor_watch",
 	"tests.unit.modules.updater.vectors.test_updater_version_shared",
 	"tests.unit.modules.updater.install.test_release_install_contract",

@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub heeft niet op tijd geantwoord.\nJe netwerk blokkeert GitHub mogelijk: open de releasepagina in je browser of probeer het opnieuw.",
 	"changelog_window.install_backing_up": "Uw configuratie wordt geback-upt voordat {tag} wordt geïnstalleerd…",
 	"changelog_window.install_backup_kept": "Uw configuratie is geback-upt in {path}.",
+	"changelog_window.install_blocked_appimage": "Deze ErgoptiPlus-AppImage wordt bijgewerkt met AppImageUpdate of uw AppImage-beheerder, of door de nieuwe AppImage te downloaden.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus is met Flatpak geïnstalleerd: werk het bij met « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus is geïnstalleerd via een systeempakket: wissel van versie met uw pakketbeheerder.",
 	"changelog_window.install_blocked_source": "Lokale versie (vanaf de broncode): een gepubliceerde versie kan alleen vanuit een geïnstalleerde ErgoptiPlus worden geïnstalleerd.",
 	"changelog_window.install_downloading": "{tag} wordt gedownload en gecontroleerd…",

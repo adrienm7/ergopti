@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub svarte ikke i tide.\nNettverket ditt blokkerer kanskje GitHub: åpne utgivelsessiden i nettleseren eller prøv igjen.",
 	"changelog_window.install_backing_up": "Sikkerhetskopierer konfigurasjonen din før {tag} installeres…",
 	"changelog_window.install_backup_kept": "Konfigurasjonen din ble sikkerhetskopiert til {path}.",
+	"changelog_window.install_blocked_appimage": "Denne ErgoptiPlus-AppImagen oppdateres med AppImageUpdate eller AppImage-behandleren din, eller ved å laste ned den nye AppImagen.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus ble installert med Flatpak: oppdater det med « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus ble installert med en systempakke: bytt versjon med pakkebehandleren din.",
 	"changelog_window.install_blocked_source": "Lokal versjon (kjørt fra kildekoden): en publisert versjon kan bare installeres fra et installert ErgoptiPlus.",
 	"changelog_window.install_downloading": "Laster ned og kontrollerer {tag}…",

@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub nie odpowiedział na czas.\nTwoja sieć może blokować GitHub: otwórz stronę wydań w przeglądarce lub spróbuj ponownie.",
 	"changelog_window.install_backing_up": "Tworzenie kopii zapasowej konfiguracji przed instalacją {tag}…",
 	"changelog_window.install_backup_kept": "Kopia konfiguracji jest w {path}.",
+	"changelog_window.install_blocked_appimage": "Ten AppImage ErgoptiPlus aktualizuje się za pomocą AppImageUpdate lub menedżera AppImage albo przez pobranie nowego AppImage.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus zainstalowano przez Flatpak: zaktualizuj go poleceniem « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus zainstalowano z pakietu systemowego: zmień wersję za pomocą menedżera pakietów.",
 	"changelog_window.install_blocked_source": "Wersja lokalna (uruchomiona ze źródeł): opublikowaną wersję można zainstalować tylko z zainstalowanego ErgoptiPlus.",
 	"changelog_window.install_downloading": "Pobieranie i weryfikacja {tag}…",

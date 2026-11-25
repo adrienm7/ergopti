@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub 未能及时响应。\n您的网络可能屏蔽了 GitHub：请在浏览器中打开发布页面或重试。",
 	"changelog_window.install_backing_up": "正在安装 {tag} 前备份你的配置…",
 	"changelog_window.install_backup_kept": "你的配置已备份到 {path}。",
+	"changelog_window.install_blocked_appimage": "此 ErgoptiPlus AppImage 通过 AppImageUpdate 或您的 AppImage 管理器更新，或下载新的 AppImage。",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus 通过 Flatpak 安装：请使用 « flatpak update » 更新。",
 	"changelog_window.install_blocked_package": "ErgoptiPlus 是通过系统软件包安装的：请用包管理器更换版本。",
 	"changelog_window.install_blocked_source": "本地版本（从源码运行）：只有已安装的 ErgoptiPlus 才能安装已发布的版本。",
 	"changelog_window.install_downloading": "正在下载并验证 {tag}…",

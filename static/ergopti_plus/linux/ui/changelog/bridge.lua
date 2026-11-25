@@ -381,8 +381,8 @@ end
 --- @return string|nil key Locale key the page shows.
 local function install_blocked(manager)
 	if Installation.is_source_run() then return "changelog_window.install_blocked_source" end
-	if manager and type(manager.installation_kind) == "function" and manager.installation_kind() == "package" then
-		return "changelog_window.install_blocked_package"
+	if manager and type(manager.installation_kind) == "function" then
+		return require("modules.updater.install_origin").update_blocked_key(manager.installation_kind())
 	end
 	return nil
 end

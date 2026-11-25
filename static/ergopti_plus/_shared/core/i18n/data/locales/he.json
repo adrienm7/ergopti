@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub לא הגיב בזמן.\nייתכן שהרשת שלך חוסמת את GitHub: פתח את דף הגרסאות בדפדפן או נסה שוב.",
 	"changelog_window.install_backing_up": "מגבים את התצורה שלכם לפני התקנת {tag}…",
 	"changelog_window.install_backup_kept": "התצורה שלכם גובתה אל {path}.",
+	"changelog_window.install_blocked_appimage": "קובץ ה-AppImage הזה של ErgoptiPlus מתעדכן באמצעות AppImageUpdate או מנהל ה-AppImage שלכם, או בהורדת ה-AppImage החדש.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus הותקן באמצעות Flatpak: עדכנו אותו עם « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus הותקן בחבילת מערכת: החליפו גרסה באמצעות מנהל החבילות.",
 	"changelog_window.install_blocked_source": "גרסה מקומית (מקוד המקור): התקנת גרסה שפורסמה אפשרית רק מ-ErgoptiPlus מותקן.",
 	"changelog_window.install_downloading": "מורידים ומאמתים את {tag}…",

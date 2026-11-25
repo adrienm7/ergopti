@@ -126,11 +126,12 @@ local function _about_update_rows(ctx)
 	-- could tell whether the automatic update exists. The manifest's
 	-- `disabled_when = ["installed_build"]` greys the two choices.
 	local source_run = Installation.is_source_run()
-	-- A system package never self-updates either, so it gets the same greyed rows
-	-- with its own reason (the key the Versions window already shows).
+	-- A system package, an AppImage or a Flatpak never self-updates either, so it
+	-- gets the same greyed rows with its own origin's reason (the key the Versions
+	-- window already shows).
 	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil
-	if not source_run and type(up.installation_kind) == "function" and up.installation_kind() == "package" then
-		update_blocked_reason = "changelog_window.install_blocked_package"
+	if not source_run and type(up.installation_kind) == "function" then
+		update_blocked_reason = require("modules.updater.install_origin").update_blocked_key(up.installation_kind())
 	end
 	local frequency_row = _frequency_picker(ctx, up)
 

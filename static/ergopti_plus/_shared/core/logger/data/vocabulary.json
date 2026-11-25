@@ -330,6 +330,8 @@
 		"unsupported",
 		"unsupported_json_root",
 		"unsupported_shape",
+		"updater_appimage_owned",
+		"updater_flatpak_owned",
 		"updater_install_root_unsafe",
 		"updater_layout_not_standalone",
 		"updater_package_owned",
@@ -733,6 +735,14 @@
 		"touchpad_not_pointing_device": {
 			"kind": "reason",
 			"description": "The device is not a pointing device."
+		},
+		"updater_appimage_owned": {
+			"kind": "reason",
+			"description": "An AppImage owns the running tree; its own AppImage updater replaces the file."
+		},
+		"updater_flatpak_owned": {
+			"kind": "reason",
+			"description": "Flatpak owns the running tree; flatpak update replaces it."
 		},
 		"updater_install_root_unsafe": {
 			"kind": "reason",

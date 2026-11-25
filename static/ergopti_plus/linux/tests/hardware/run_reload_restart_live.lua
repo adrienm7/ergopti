@@ -80,7 +80,7 @@ local function run_daemon(scratch)
 			local how, detail = DaemonRestart.restart({
 				reason = reason,
 				args = {},
-				installation = function() return { kind = "standalone", wrapper = scratch .. "/launcher" } end,
+				installation = function() return { kind = "standalone", wrapper = scratch .. "/launcher", launcher = scratch .. "/launcher" } end,
 			})
 			if how ~= "relay" then return false, detail end
 			exiting = true

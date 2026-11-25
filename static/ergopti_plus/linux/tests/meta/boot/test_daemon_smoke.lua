@@ -218,7 +218,8 @@ local function with_paths_restart(mode, body)
           options.installation = function()
             state.resolved = state.resolved + 1
             if state.mode == "unavailable" then return { kind = "package", reason = "owned package" } end
-            return { kind = "standalone", wrapper = state.launcher or "/private/owned-launcher" }
+            local launcher = state.launcher or "/private/owned-launcher"
+            return { kind = "standalone", wrapper = launcher, launcher = launcher }
           end
           options.run = state.run or function(command)
             state.commands[#state.commands + 1] = command

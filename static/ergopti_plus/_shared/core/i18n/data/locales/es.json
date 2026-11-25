@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub no respondió a tiempo.\nEs posible que tu red bloquee GitHub: abre la página de versiones en tu navegador o vuelve a intentarlo.",
 	"changelog_window.install_backing_up": "Haciendo una copia de seguridad de su configuración antes de instalar {tag}…",
 	"changelog_window.install_backup_kept": "Su configuración se guardó en {path}.",
+	"changelog_window.install_blocked_appimage": "Esta AppImage de ErgoptiPlus se actualiza con AppImageUpdate o su gestor de AppImage, o descargando la nueva AppImage.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus se instaló con Flatpak: actualícelo con « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus se instaló con un paquete del sistema: cambie de versión con su gestor de paquetes.",
 	"changelog_window.install_blocked_source": "Versión local (desde el código fuente): solo se puede instalar una versión publicada desde un ErgoptiPlus instalado.",
 	"changelog_window.install_downloading": "Descargando y verificando {tag}…",

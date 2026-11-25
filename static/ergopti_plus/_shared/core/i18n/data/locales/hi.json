@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub ने समय पर जवाब नहीं दिया।\nआपका नेटवर्क GitHub को ब्लॉक कर सकता है: ब्राउज़र में रिलीज़ पेज खोलें या फिर से प्रयास करें।",
 	"changelog_window.install_backing_up": "{tag} इंस्टॉल करने से पहले आपके कॉन्फ़िगरेशन का बैकअप लिया जा रहा है…",
 	"changelog_window.install_backup_kept": "आपके कॉन्फ़िगरेशन का बैकअप {path} में है।",
+	"changelog_window.install_blocked_appimage": "ErgoptiPlus का यह AppImage, AppImageUpdate या आपके AppImage मैनेजर से, या नया AppImage डाउनलोड करके अपडेट होता है।",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus Flatpak से इंस्टॉल हुआ है: इसे « flatpak update » से अपडेट करें।",
 	"changelog_window.install_blocked_package": "ErgoptiPlus एक सिस्टम पैकेज से इंस्टॉल हुआ है: संस्करण अपने पैकेज मैनेजर से बदलें।",
 	"changelog_window.install_blocked_source": "स्थानीय संस्करण (स्रोत कोड से चल रहा है): प्रकाशित संस्करण केवल इंस्टॉल किए गए ErgoptiPlus से ही इंस्टॉल किया जा सकता है।",
 	"changelog_window.install_downloading": "{tag} डाउनलोड और सत्यापित किया जा रहा है…",

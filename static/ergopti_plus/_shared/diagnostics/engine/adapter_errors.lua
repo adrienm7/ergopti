@@ -85,6 +85,10 @@ local ids = {
 	TOUCHPAD_NO_MULTITOUCH_SLOT = "touchpad_no_multitouch_slot",
 	-- reason: The device is not a pointing device.
 	TOUCHPAD_NOT_POINTING_DEVICE = "touchpad_not_pointing_device",
+	-- reason: An AppImage owns the running tree; its own AppImage updater replaces the file.
+	UPDATER_APPIMAGE_OWNED = "updater_appimage_owned",
+	-- reason: Flatpak owns the running tree; flatpak update replaces it.
+	UPDATER_FLATPAK_OWNED = "updater_flatpak_owned",
 	-- reason: The standalone install root is unsafe.
 	UPDATER_INSTALL_ROOT_UNSAFE = "updater_install_root_unsafe",
 	-- reason: The driver is not in the standalone linux/ sibling layout.

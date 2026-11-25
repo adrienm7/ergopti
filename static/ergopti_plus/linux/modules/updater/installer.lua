@@ -116,17 +116,86 @@ local function default_probe(path, kind)
 	return run_command("test " .. flag .. " " .. shell_quote(path))
 end
 
---- Resolves the installation that owns the running updater module.
+-- Where each origin that owns its own update path keeps the launcher a restart
+-- runs: the system packages' wrapper and the Flatpak's command.
+local Launchers = require("core.text.engine.identifiers").linux_launchers
+M.PACKAGE_LAUNCHER = Launchers.package
+M.FLATPAK_LAUNCHER = Launchers.flatpak
+
+--- Whether a normalised path lies strictly inside a normalised folder.
+--- @param path string Absolute normalised path.
+--- @param folder string Absolute normalised folder.
+--- @return boolean
+local function is_inside(path, folder)
+	if folder == "/" then return path ~= "/" end
+	return path:sub(1, #folder + 1) == folder .. "/"
+end
+
+--- The AppImage context, when the running source is inside the mounted AppDir.
+--- The AppImage runtime exports APPDIR and APPIMAGE to every descendant, so a
+--- terminal or a daemon started from an AppImage process inherits them: the
+--- variables only name this daemon's origin when its own source is under
+--- $APPDIR. The restart runs $APPIMAGE, the file the user owns: the AppDir is a
+--- /tmp/.mount_* squashfs that disappears with the process that mounted it.
+--- @param source string Normalised source path.
+--- @param getenv function Environment reader.
+--- @param probe function File probe.
+--- @return table|nil context
+local function appimage_context(source, getenv, probe)
+	local appdir = normalise_path(getenv("APPDIR"))
+	if not appdir or appdir == "/" or not is_inside(source, appdir) then return nil end
+	local context = { kind = "appimage", reason = Errors.UPDATER_APPIMAGE_OWNED, appdir = appdir }
+	local raw_image = getenv("APPIMAGE")
+	local image = type(raw_image) == "string" and raw_image:sub(1, 1) == "/" and normalise_path(raw_image) or nil
+	if not image then
+		context.launcher_refusal = "the AppImage runtime named no absolute APPIMAGE file"
+	elseif is_inside(image, appdir) or image == appdir then
+		context.launcher_refusal = "APPIMAGE names a path inside the mounted AppDir"
+	elseif not probe(image, "file") then
+		context.launcher_refusal = "the AppImage file " .. image .. " is absent"
+	else
+		context.launcher, context.appimage = image, image
+	end
+	return context
+end
+
+--- Resolves the installation that owns the running updater module: its kind,
+--- why it cannot replace itself, and the launcher a restart runs. Only the
+--- self-update depends on the kind; every kind with a launcher can restart.
 --- @param source_path string debug source path for manager.lua.
 --- @param probe function|nil Test hook receiving path and "file"/"dir".
---- @return table context Installation kind and owned paths.
-function M.resolve(source_path, probe)
+--- @param getenv function|nil Test hook for os.getenv.
+--- @return table context { kind, reason?, launcher?, launcher_refusal?, install_root?, parent?, wrapper?, sandbox? }.
+function M.resolve(source_path, probe, getenv)
 	probe = probe or default_probe
+	getenv = getenv or os.getenv
 	local source = normalise_path((source_path or ""):gsub("^@", ""))
 	if not source then return { kind = "unmanaged", reason = Errors.UPDATER_SOURCE_PATH_RELATIVE } end
-	if os.getenv("APPIMAGE") or os.getenv("APPDIR") or os.getenv("FLATPAK_ID")
-		or source:match("^/usr/") or source:match("^/app/") or source:match("^/nix/store/") then
-		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED }
+	local appimage = appimage_context(source, getenv, probe)
+	if appimage then return appimage end
+	if source:match("^/app/") then
+		-- A Flatpak instance runs a sandbox that dies with its main process, so
+		-- its restart starts a new instance through the Flatpak portal.
+		if getenv("FLATPAK_ID") or probe("/.flatpak-info", "file") then
+			local context = { kind = "flatpak", reason = Errors.UPDATER_FLATPAK_OWNED, sandbox = "flatpak" }
+			if probe(M.FLATPAK_LAUNCHER, "file") then context.launcher = M.FLATPAK_LAUNCHER
+			else context.launcher_refusal = M.FLATPAK_LAUNCHER .. " is absent" end
+			return context
+		end
+		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED,
+			launcher_refusal = "no launcher is known for an /app tree outside Flatpak" }
+	end
+	if source:match("^/usr/") then
+		-- pacman, dpkg or rpm owns the tree and its update; the package's own
+		-- wrapper still restarts the daemon.
+		local context = { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED }
+		if probe(M.PACKAGE_LAUNCHER, "file") then context.launcher = M.PACKAGE_LAUNCHER
+		else context.launcher_refusal = M.PACKAGE_LAUNCHER .. " is absent" end
+		return context
+	end
+	if source:match("^/nix/store/") then
+		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED,
+			launcher_refusal = "a Nix store tree names no launcher this daemon can find" }
 	end
 
 	local script_dir = dirname(source)
@@ -155,6 +224,7 @@ function M.resolve(source_path, probe)
 		install_root = install_root,
 		parent = dirname(install_root),
 		wrapper = wrapper,
+		launcher = wrapper,
 	}
 end
 

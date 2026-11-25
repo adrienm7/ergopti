@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub zamanında yanıt vermedi.\nAğınız GitHub'ı engelliyor olabilir: sürümler sayfasını tarayıcınızda açın veya yeniden deneyin.",
 	"changelog_window.install_backing_up": "{tag} yüklenmeden önce yapılandırmanız yedekleniyor…",
 	"changelog_window.install_backup_kept": "Yapılandırmanız {path} konumuna yedeklendi.",
+	"changelog_window.install_blocked_appimage": "Bu ErgoptiPlus AppImage'ı AppImageUpdate veya AppImage yöneticinizle ya da yeni AppImage'ı indirerek güncellenir.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus Flatpak ile kuruldu: « flatpak update » ile güncelleyin.",
 	"changelog_window.install_blocked_package": "ErgoptiPlus bir sistem paketiyle yüklendi: sürümü paket yöneticinizle değiştirin.",
 	"changelog_window.install_blocked_source": "Yerel sürüm (kaynak koddan çalışıyor): yayımlanmış bir sürüm yalnızca yüklü bir ErgoptiPlus'tan yüklenebilir.",
 	"changelog_window.install_downloading": "{tag} indiriliyor ve doğrulanıyor…",

@@ -774,6 +774,8 @@
 			"unsupported",
 			"unsupported_json_root",
 			"unsupported_shape",
+			"updater_appimage_owned",
+			"updater_flatpak_owned",
 			"updater_install_root_unsafe",
 			"updater_layout_not_standalone",
 			"updater_package_owned",

@@ -42,6 +42,10 @@ M.UNIT = "ergopti-hotstrings.service"
 -- the client inherits, lets it report; it exits right after, as before.
 M.OWN_UNIT_JOB_PREFIX = "trap '' TERM; "
 
+-- How many 0.1 s ticks a Flatpak restart waits for the portal to report the
+-- new instance before it refuses the restart.
+M.FLATPAK_SPAWN_TICKS = 100
+
 local function read_file(path)
 	local fh = io.open(path, "r")
 	if not fh then return nil end
@@ -262,6 +266,37 @@ function M.relay_command(pid, wrapper, args, cancel_path, start_tick, successor)
 		.. " </dev/null >/dev/null 2>&1"
 end
 
+--- The relay of a Flatpak instance. Its sandbox dies with this process, every
+--- process inside it included, so the relay runs in a new instance of the same
+--- application that the Flatpak portal starts (flatpak-spawn without --host,
+--- which is no sandbox escape) and that outlives this one. That instance has
+--- its own PID namespace and cannot watch this process: it waits on the
+--- restart gate this process holds until it exits (session_lock.hold_restart_gate).
+--- @param gate string The gate file, in the application's shared data.
+--- @param wrapper string The Flatpak's launcher.
+--- @param args table The daemon's own arguments.
+--- @param cancel_path string A Quit's cancellation marker, honoured as relay_command does.
+--- @return string
+function M.flatpak_relay_command(gate, wrapper, args, cancel_path)
+	assert(type(gate) == "string" and gate:sub(1, 1) == "/", "a Flatpak relay needs an absolute gate")
+	local argv = { ShellRunner.quote(wrapper) }
+	for _, value in ipairs(args or {}) do argv[#argv + 1] = ShellRunner.quote(tostring(value)) end
+	local marker = ShellRunner.quote(cancel_path)
+	local spawned = ShellRunner.quote(gate .. ".spawned")
+	local script = string.format(": > %s; flock -x %s true || exit 70; if [ -e %s ]; then rm -f %s; exit 0; fi; exec %s",
+		spawned, ShellRunner.quote(gate), marker, marker, table.concat(argv, " "))
+	-- flatpak-spawn stays in this sandbox and dies with it, so dispatch only
+	-- succeeds once the new instance has reported that it runs; otherwise this
+	-- process could exit before the portal started it, leaving no daemon. A
+	-- dispatch that gives up cancels the instance, which would otherwise start
+	-- whenever this daemon later quits.
+	-- --latest-version starts the version a `flatpak update` installed meanwhile.
+	local dispatch = string.format("rm -f %s; (flatpak-spawn --latest-version /bin/sh -c %s) </dev/null >/dev/null 2>&1 & "
+		.. "ticks=0; while [ ! -e %s ]; do ticks=$((ticks + 1)); [ \"$ticks\" -gt %d ] && { : > %s; exit 1; }; sleep 0.1; done; rm -f %s",
+		spawned, ShellRunner.quote(script), spawned, M.FLATPAK_SPAWN_TICKS, marker, spawned)
+	return "setsid sh -c " .. ShellRunner.quote(dispatch) .. " </dev/null >/dev/null 2>&1"
+end
+
 --- The marker a Quit creates to stop the relay of this process from starting the launcher.
 --- It sits beside the bootstrap storage file, the per-user private location the driver
 --- already owns for its restart handoffs (core/lifecycle/engine/reload/restart_pause.lua), so it never depends on
@@ -329,7 +364,8 @@ end
 
 --- Starts the installed version in place of this process.
 --- @param opts table { wrapper, args, paused?, run?, cgroup?, pid?, start_tick?, boot_id?,
----   successor? }: successor { root } watches the updated daemon's start (see the header).
+---   successor?, sandbox?, hold_gate? }: successor { root } watches the updated daemon's
+---   start (see the header); sandbox "flatpak" relays through a new Flatpak instance.
 --- @return string|nil "systemd" (systemd stops and restarts this process) or
 ---   "relay" (the caller must now exit), nil when nothing could be started.
 function M.restart(opts)
@@ -420,6 +456,24 @@ function M.restart(opts)
 		if not marker then
 			Logger.error(LOG, "Own boot identity unreadable — the update applies at the next start.")
 			return nil
+		end
+		if opts.sandbox == "flatpak" then
+			-- An updated tree is the standalone installer's: a Flatpak has no watcher.
+			unwatched()
+			local gate = require("core.fs.adapters.storage").path() .. ".restart-gate"
+			local hold = opts.hold_gate or require("core.lifecycle.engine.shutdown.session_lock").hold_restart_gate
+			local held, why = hold(gate)
+			if not held then
+				Logger.error(LOG, "The Flatpak restart gate could not be held (%s) — the daemon keeps running.", tostring(why))
+				return nil
+			end
+			if not run(M.flatpak_relay_command(gate, opts.wrapper, opts.args, marker)) then
+				Logger.error(LOG, "The Flatpak portal did not start the new instance — the daemon keeps running.")
+				return nil
+			end
+			relay_marker, relay_pid = marker, pid
+			Logger.info(LOG, "Flatpak restart armed: a new instance starts %s once process %d exits.", opts.wrapper, pid)
+			return "relay"
 		end
 		if not run(M.relay_command(pid, opts.wrapper, opts.args, marker, start_tick, successor)) then
 			Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")

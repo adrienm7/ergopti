@@ -147,4 +147,32 @@ function M.release()
 	_held_fd = nil
 end
 
+-- The restart gate this process holds until it exits, once taken.
+local _gate_fd, _gate_path = nil, nil
+
+--- Holds an exclusive lock on `path` until this process exits, for a successor
+--- that cannot see this process: a Flatpak restart starts a new sandbox with
+--- its own PID namespace, whose relay waits on `flock <path>` instead. The
+--- kernel releases the lock with the last descriptor, so a crash frees it too.
+--- @param path string Absolute gate file, in a folder both instances share.
+--- @return boolean held
+--- @return string|nil error_message
+function M.hold_restart_gate(path)
+	assert(type(path) == "string" and path:sub(1, 1) == "/", "the restart gate needs an absolute path")
+	if _gate_fd then
+		if _gate_path == path then return true end
+		return false, "A restart gate is already held at " .. _gate_path .. "."
+	end
+	local ffi = ffi_c()
+	local bit = require("bit")
+	local fd = ffi.C.open(path, bit.bor(O_RDWR, O_CREAT, O_CLOEXEC), ffi.new("int", FILE_MODE))
+	if fd < 0 then return false, "The restart gate could not be opened: " .. path end
+	if ffi.C.flock(fd, bit.bor(LOCK_EX, LOCK_NB)) ~= 0 then
+		ffi.C.close(fd)
+		return false, "The restart gate is held by another process: " .. path
+	end
+	_gate_fd, _gate_path = fd, path
+	return true
+end
+
 return M

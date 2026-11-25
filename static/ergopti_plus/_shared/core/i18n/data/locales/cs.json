@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "GitHub neodpověděl včas.\nVaše síť možná blokuje GitHub: otevřete stránku verzí v prohlížeči nebo to zkuste znovu.",
 	"changelog_window.install_backing_up": "Zálohování konfigurace před instalací {tag}…",
 	"changelog_window.install_backup_kept": "Vaše konfigurace byla zálohována do {path}.",
+	"changelog_window.install_blocked_appimage": "Tato AppImage ErgoptiPlus se aktualizuje nástrojem AppImageUpdate nebo vaším správcem AppImage, případně stažením nové AppImage.",
+	"changelog_window.install_blocked_flatpak": "ErgoptiPlus byl nainstalován přes Flatpak: aktualizujte jej příkazem « flatpak update ».",
 	"changelog_window.install_blocked_package": "ErgoptiPlus byl nainstalován systémovým balíčkem: verzi změňte správcem balíčků.",
 	"changelog_window.install_blocked_source": "Místní verze (spuštěná ze zdrojového kódu): zveřejněnou verzi lze nainstalovat jen z nainstalovaného ErgoptiPlus.",
 	"changelog_window.install_downloading": "Stahování a ověřování {tag}…",

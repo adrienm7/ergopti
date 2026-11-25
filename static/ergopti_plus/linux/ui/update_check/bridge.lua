@@ -93,10 +93,12 @@ function M.download_offered(updater, release, ctx)
 		Logger.info(LOG, "Update refused: the release was found through the public feed, which names no installable asset.")
 		return false
 	end
-	-- A system package is updated by its package manager: downloading a release
-	-- the updater will then refuse to install only ends in an ERROR.
-	if type(updater.installation_kind) == "function" and updater.installation_kind() == "package" then
-		Logger.info(LOG, "Update refused: a system package is updated by its package manager.")
+	-- A system package, an AppImage or a Flatpak is updated by its own updater:
+	-- downloading a release the updater will then refuse to install only ends in
+	-- an ERROR.
+	local kind = type(updater.installation_kind) == "function" and updater.installation_kind() or nil
+	if require("modules.updater.install_origin").update_blocked_key(kind) then
+		Logger.info(LOG, "Update refused: this %s installation is updated by its own updater.", tostring(kind))
 		return false
 	end
 	local state = updater.get_state()

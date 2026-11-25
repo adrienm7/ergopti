@@ -26,6 +26,21 @@ The tray keeps pumping while a restart waits (Quit must answer); only the
 keyboard pump is skipped. A deliberate stop seen without a requested shutdown
 is an ownership fault and still exits.
 
+### project-linux-install-origin-gates-the-update-never-the-restart
+
+`modules/updater/installer.resolve()` names the origin (standalone, package,
+appimage, flatpak, unmanaged) from the running source path; `APPDIR`,
+`APPIMAGE` and `FLATPAK_ID` only confirm it, because every process an AppImage
+or Flatpak starts inherits them (an install.sh daemon started from one read as
+package-owned). The kind only selects the self-update refusal
+(`modules/updater/install_origin.lua`); every kind with a `launcher` restarts:
+the standalone or `/usr/bin/ergopti` wrapper, `$APPIMAGE` (never a path under
+the `/tmp/.mount_*` AppDir, gone with the parent), or a Flatpak instance the
+portal starts (`flatpak-spawn --latest-version`, gated on
+`session_lock.hold_restart_gate`, since the old sandbox and its relay die
+together). Action: a Reload or restart path asks for `context.launcher`, never
+for `kind == "standalone"`; v1.0.9 refused every AppImage Reload that way.
+
 ### project-linux-update-restart-is-watched-until-the-daemon-reports
 
 After an update, `modules/updater/restarter.lua` starts the new daemon under a

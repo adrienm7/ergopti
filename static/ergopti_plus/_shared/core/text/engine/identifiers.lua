@@ -64,6 +64,10 @@ return {
 	linux_stage = {
 		infix = "ergopti",
 	},
+	linux_launchers = {
+		package = "/usr/bin/ergopti",
+		flatpak = "/app/bin/ergopti",
+	},
 	linux_desktop = {
 		gnome_switch_path = "/org/ergopti/InputSource",
 		gnome_switch_interface = "org.ergopti.InputSource1",

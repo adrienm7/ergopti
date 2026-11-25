@@ -180,6 +180,8 @@
 	"changelog_window.error_timeout": "لم يستجب GitHub في الوقت المحدد.\nقد تحظر شبكتك GitHub: افتح صفحة الإصدارات في المتصفح أو أعد المحاولة.",
 	"changelog_window.install_backing_up": "جارٍ نسخ إعداداتك احتياطيًا قبل تثبيت {tag}…",
 	"changelog_window.install_backup_kept": "نُسخت إعداداتك احتياطيًا في {path}.",
+	"changelog_window.install_blocked_appimage": "تُحدَّث صورة AppImage هذه من ErgoptiPlus عبر AppImageUpdate أو مدير AppImage لديك، أو بتنزيل صورة AppImage الجديدة.",
+	"changelog_window.install_blocked_flatpak": "ثُبّت ErgoptiPlus عبر Flatpak: حدّثه باستخدام « flatpak update ».",
 	"changelog_window.install_blocked_package": "ثُبّت ErgoptiPlus بحزمة نظام: غيّر الإصدار باستخدام مدير الحزم.",
 	"changelog_window.install_blocked_source": "إصدار محلي (يعمل من الشيفرة المصدرية): لا يمكن تثبيت إصدار منشور إلا من ErgoptiPlus مثبّت.",
 	"changelog_window.install_downloading": "جارٍ تنزيل {tag} والتحقق منه…",

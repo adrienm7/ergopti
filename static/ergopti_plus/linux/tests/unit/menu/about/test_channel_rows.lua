@@ -368,6 +368,32 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(calls.checks, 0, "no check ran")
 	end)
 
+	-- An AppImage or a Flatpak is no system package: its greyed rows name its own
+	-- updater, and a standalone install greys nothing (install-origin-*).
+	helpers.it("an AppImage or a Flatpak greys the frequency row with its own origin's reason", function()
+		local i18n = require("core.i18n.engine.i18n")
+		local frequency = i18n.get("menu.about.frequency_menu")
+		for kind, key in pairs({ appimage = "changelog_window.install_blocked_appimage",
+			flatpak = "changelog_window.install_blocked_flatpak", standalone = false }) do
+			local up = fake_updater("dev")
+			up.installation_kind = function() return kind end
+			local found
+			for _, row in ipairs(submenu_of(build(up), "menu.about.title")) do
+				if type(row.title) == "string" and row.title:find(frequency, 1, true) == 1 then found = row end
+			end
+			helpers.assert_type(found, "table", kind .. " draws the frequency row")
+			local package_head = i18n.get("changelog_window.install_blocked_package"):match("^(.-)%s*[:：]")
+			helpers.assert_nil(found.title:find(package_head, 1, true), kind .. " is no system package: " .. found.title)
+			if key then
+				helpers.assert_eq(found.disabled, true, kind .. " greys the frequency row")
+				local head = i18n.get(key):match("^(.-)%s*[,:：]") or i18n.get(key)
+				helpers.assert_true(found.title:find(head, 1, true) ~= nil, kind .. " names its reason: " .. found.title)
+			else
+				helpers.assert_true(found.disabled ~= true, "a standalone install keeps its update frequency")
+			end
+		end
+	end)
+
 	-- A release found through the public feed (the API was blocked) names no asset
 	-- and no digest: its Update row is greyed with the check-only reason and the
 	-- bridge starts no download for it.

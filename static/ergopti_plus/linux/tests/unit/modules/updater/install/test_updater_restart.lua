@@ -324,7 +324,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			helpers.assert_eq(calls, 0, "unreadable cgroup must not dispatch a guessed relay")
 			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {},
-				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				installation = function() return { kind = "standalone", wrapper = "/x", launcher = "/x" } end,
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(outer)
 			helpers.assert_eq(calls, 0, "the daemon must also refuse an unknown cgroup")
@@ -342,7 +342,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			helpers.assert_nil(how)
 			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {}, cgroup = cgroup,
-				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				installation = function() return { kind = "standalone", wrapper = "/x", launcher = "/x" } end,
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(outer)
 			helpers.assert_eq(calls, 0)

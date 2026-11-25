@@ -51,6 +51,7 @@ const GROUPS = [
 	'bytecode_package',
 	'macos_notifications',
 	'linux_stage',
+	'linux_launchers',
 	'linux_desktop',
 	'linux_host_environment',
 	'linux_input',
@@ -69,10 +70,13 @@ const GROUPS = [
 // read by the Linux daemon (core/process/adapters/host_environment.lua) and written by
 // tools/build/templates/linux-portable-runtime-env.sh, where they are the names of
 // shell variables it assigns and expands, not values it could read from a
-// variable: test-linux-appimage-portability.cjs pins the template's names to this file. The uinput device names are the Linux daemon's alone.
+// variable: test-linux-appimage-portability.cjs pins the template's names to this file. The uinput device names are the Linux daemon's alone. The launchers the Linux packages and the Flatpak
+// install are the daemon's restart targets; tests/unit/modules/updater/install/
+// test_install_origin.lua holds the packagers to the same paths.
 const LUA_ONLY_GROUPS = new Set([
 	'bytecode_package',
 	'linux_stage',
+	'linux_launchers',
 	'linux_desktop',
 	'linux_host_environment',
 	'linux_input',
@@ -109,12 +113,15 @@ const LINUX_DESKTOP_SHAPE = /^(?:(?:\/[A-Za-z0-9_]+)+|\.?[A-Za-z0-9][A-Za-z0-9._
 const LINUX_INPUT_SHAPE = /^(?=.{1,79}$)[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/;
 // The product name the user reads (app.display_name) carries a plus sign.
 const APP_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
+// The Linux launchers are absolute paths of plain segments.
+const ABSOLUTE_PATH_SHAPE = /^(?:\/[A-Za-z0-9._-]+)+$/;
 const GROUP_SHAPE = {
 	app: APP_SHAPE,
 	field_report: PATH_SHAPE,
 	bytecode_package: PATH_SHAPE,
 	linux_desktop: LINUX_DESKTOP_SHAPE,
-	linux_input: LINUX_INPUT_SHAPE
+	linux_input: LINUX_INPUT_SHAPE,
+	linux_launchers: ABSOLUTE_PATH_SHAPE
 };
 
 /** Stops generation with one exact reason. */
