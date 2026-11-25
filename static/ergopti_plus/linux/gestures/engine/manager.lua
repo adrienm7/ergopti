@@ -609,6 +609,14 @@ local function screenshot_path(kind)
 	return string.format("%s/ergopti_%s_%s", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
+--- The command that lets the user draw a region and saves it as a PNG at
+--- path, the cascade of screenshot_region_save (a workflow's region capture).
+--- @param path string The destination file, shell-quoted by the caller.
+--- @return string
+function M.region_screenshot_command(path)
+	return (SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", function() return path end))
+end
+
 --- The tag each save action stamps into its filename.
 local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",

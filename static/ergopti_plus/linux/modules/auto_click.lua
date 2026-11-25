@@ -47,7 +47,6 @@ local _locked = true
 local _lock_probe = false
 local _clicks_total = 0
 local _ports = nil
-local _vision_started = false
 
 
 
@@ -99,12 +98,8 @@ M.library = library
 --- The screen vision service, started once by this owner (the library window uses it too).
 --- @return table service
 function M.vision()
-	local Vision = require("platform.vision.screen_vision")
-	if not _vision_started then
-		Vision.init()
-		_vision_started = true
-	end
-	return Vision
+	-- One session starts the service for the auto-clicker and the workflows.
+	return require("platform.vision.vision_session").service()
 end
 
 --- The presets document.
