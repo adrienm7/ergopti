@@ -1022,7 +1022,7 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ss`, `setsid`, `tr`, `od`, `lsblk`",
+			"tool": "`cat`, `grep`, `head`, `tail`, `sed`, `wc`, `date`, `sleep`, `readlink`, `find`, `ss`, `setsid`, `tr`, `od`, `lsblk`, `id`",
 			"programs": [
 				"cat",
 				"grep",
@@ -1038,9 +1038,10 @@
 				"setsid",
 				"tr",
 				"od",
-				"lsblk"
+				"lsblk",
+				"id"
 			],
-			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach, the screenshot resize's whole-PNG check (`linux/platform/system/screen_capture.lua`, `linux/modules/keystats/system/system_metrics.lua`, `linux/core/fs/engine/file_watchers.lua`, `linux/ai/engine/local_servers/ports.lua`, `linux/modules/updater/restarter.lua`, `linux/menu/ui/transactions/uninstall.lua`, `linux/gestures/engine/system_actions.lua`, `linux/gestures/engine/manager.lua`)",
+			"used_for": "Small queries and filters: system facts, file watching, the local AI servers' listening ports, the updater relay, the uninstall detach, the screenshot resize's whole-PNG check, the account a Flatpak's keyboard-access repair names (`linux/platform/system/screen_capture.lua`, `linux/platform/input/access.lua`, `linux/modules/keystats/system/system_metrics.lua`, `linux/core/fs/engine/file_watchers.lua`, `linux/ai/engine/local_servers/ports.lua`, `linux/modules/updater/restarter.lua`, `linux/menu/ui/transactions/uninstall.lua`, `linux/gestures/engine/system_actions.lua`, `linux/gestures/engine/manager.lua`)",
 			"today": "System (coreutils, iproute2, util-linux)",
 			"current_class": "SYS",
 			"version_needed": "POSIX",
