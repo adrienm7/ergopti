@@ -1208,6 +1208,16 @@ type = "command"
 id = "open_error_log"
 i18n = "menu.debug.open_error_log"
 
+# « Export the logs (zip) » (maintainer decision, 2026-11-25): the one archive
+# a tester sends, the daily logs of the last days scrubbed of typed text
+# (_shared/core/logger/data/log_export.toml).
+[[menu.debug_menu]]
+type = "command"
+id = "export_logs"
+i18n = "menu.debug.export_logs"
+platforms = ["linux"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
 [[menu.debug_menu]]
 type = "---"
 id = "---"

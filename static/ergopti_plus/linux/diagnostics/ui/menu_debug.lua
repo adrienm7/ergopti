@@ -90,6 +90,8 @@ local function _build_debug(ctx)
 		[require("settings.engine.keys").COMMAND.OPEN_LOGS]      = call_ctx("on_open_logs"),
 		[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = call_ctx("on_open_today_log"),
 		[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = call_ctx("on_open_error_log"),
+		-- Self-contained: the export lists, scrubs and archives the logs itself
+		[COMMAND.EXPORT_LOGS] = function() require("diagnostics.ui.log_export").run() end,
 		["healthcheck"]    = call_ctx("on_healthcheck"),
 		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
 		-- Self-contained: the in-app field report hands the daemon's field run session its steps

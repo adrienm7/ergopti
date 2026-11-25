@@ -380,6 +380,7 @@ return {
 	"tests.unit.core.lifecycle.test_xkb_rmlvo",
 	"tests.unit.core.logger.test_contract",
 	"tests.unit.core.logger.test_log_export_vectors",
+	"tests.unit.diagnostics.ui.test_log_export",
 	"tests.unit.core.logger.test_volume",
 	"tests.unit.core.text.test_case",
 	"tests.unit.core.text.test_native_path",

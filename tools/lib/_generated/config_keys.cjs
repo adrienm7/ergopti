@@ -414,6 +414,7 @@ module.exports = Object.freeze({
 		EDIT_SHORTCUTS: "edit_shortcuts",
 		ENCRYPTION: "encryption",
 		ERGOPTI_STUDIO: "ergopti_studio",
+		EXPORT_LOGS: "export_logs",
 		EXTENSION_ALL_SECTIONS: "extension_all_sections",
 		EXTENSION_DISABLE_ALL: "extension_disable_all",
 		EXTENSION_ENABLE_ALL: "extension_enable_all",
