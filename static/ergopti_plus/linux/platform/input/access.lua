@@ -81,12 +81,30 @@ end
 --- existed. Relaunching the image runs its launcher, which asks once for the
 --- authorization (install/launch.sh). The AppImage runtime names the image in
 --- APPIMAGE.
---- @param deps table { script_dir?, getenv? }
+--- A Flatpak's driver root is /app, which exists only inside the sandbox, and
+--- no command run there can add a host group: the host runs the app's own
+--- setup_permissions.sh from the deployment Flatpak names in /.flatpak-info.
+--- @param deps table { script_dir?, getenv?, read_file? }
 --- @return string
 function M.setup_command(deps)
 	local quote = require("core.process.adapters.shell_runner").quote
-	local image = (deps.getenv or os.getenv)("APPIMAGE")
+	local getenv = deps.getenv or os.getenv
+	local image = getenv("APPIMAGE")
 	if type(image) == "string" and image:sub(1, 1) == "/" then return quote(image) end
+	local flatpak = getenv("FLATPAK_ID")
+	if type(flatpak) == "string" and flatpak ~= "" then
+		local info = (deps.read_file or function(path)
+			local handle = io.open(path, "r")
+			if not handle then return nil end
+			local content = handle:read("*a")
+			handle:close()
+			return content
+		end)("/.flatpak-info")
+		local app_path = type(info) == "string" and info:match("\n%[Instance%]\n[^%[]-\napp%-path=([^\n]+)") or nil
+		assert(type(app_path) == "string" and app_path:sub(1, 1) == "/",
+			"a Flatpak without its host deployment path in /.flatpak-info")
+		return "sudo bash " .. quote(app_path .. "/lib/ergopti/install/setup_permissions.sh") .. ' --user "$(id -u)"'
+	end
 	local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
 	return "bash " .. quote(root .. "/install.sh") .. " --setup-perms"
 end
