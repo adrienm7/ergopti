@@ -59,6 +59,11 @@ AppDirsLogBootstrapName() {
 	return "bootstrap.log"
 }
 
+; Exact names the retention sweep deletes: the retired topical sub-files.
+AppDirsRetiredTopicalLogs() {
+	return ["ErgoptiPlus_gestures.log", "ErgoptiPlus_ollama.log", "ErgoptiPlus_llm.log", "ErgoptiPlus_hotstrings.log", "ErgoptiPlus_keystats.log", "ErgoptiPlus_menu.log", "ErgoptiPlus_notify.log", "ErgoptiPlus_boot.log", "ErgoptiPlus_layout.log", "ErgoptiPlus_dispatch.log", "ErgoptiPlus_tray.log", "ErgoptiPlus_mlx.log", "ErgoptiPlus_karabiner.log"]
+}
+
 ; Environment variable holding the default logs root.
 AppDirsWindowsLogsBaseEnv() {
 	return "LOCALAPPDATA"
