@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "تسجيل ترتيب خطافات لوحة المفاتيح",
 	"menu.debug.composer_check": "اختبار التخطيط المركّب",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS فقط: اختصارات Apple موجودة على macOS فقط. في الأنظمة الأخرى، شغّل أمرًا أو برنامجًا بدلًا من ذلك.",
-	"platform_reason.action_workflows_windows_pending": "غير متاح على Windows: مشغّل سير العمل جزء من برنامجي تشغيل macOS وLinux فقط.",
 	"platform_reason.input_probe_is_autohotkey_specific": "تقيس هذه الفحوص SendInput في AutoHotkey وخطاف لوحة المفاتيح الخاص به، وهما موجودان في برنامج تشغيل Windows فقط.",
 	"input_probe.title": "فحص الإدخال",
 	"input_probe.field_label": "النص الذي يكتبه الفحص (لا تكتب هنا):",

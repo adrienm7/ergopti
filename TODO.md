@@ -470,10 +470,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       Linux the model, runner, `run_workflow` action and editor window are built
       ([data README](static/ergopti_plus/_shared/shortcuts/data/workflows/README.md)). Left, in this order:
   - Hotstring → action with the « effacer le déclencheur » option is built on macOS and Linux (engine and
-    editor); Windows reads, plans and dispatches it with the AutoHotkey port.
-  - Windows: the AutoHotkey port of the validator, interpreter, runner, store, `run_workflow` and the window and
-    Shortcuts row, replaying `_shared/tests/corpus/workflows/`; then drop
-    `platform_reason.action_workflows_windows_pending`.
+    editor); on Windows only the shared rules are ported (`hotstrings/engine/matcher/action_entry.ahk`): the
+    reader, the matcher's dispatch and the editor host still need the action fields.
+  - Windows: the model, runner, `run_workflow`, the window and its Shortcuts row are ported
+    (`windows/modules/shortcuts/workflows/`, `tests/unit/modules/shortcuts/workflows/`) and run first on the
+    Windows CI; left, a field check of every step kind, Escape and the window on a real Windows desktop.
   - Screen steps on Windows: wire the AutoHotkey runner to `ScreenVision*` as
     `_shared/shortcuts/engine/workflows/screen.lua` does on macOS and Linux; until then they stop with
     `screen_service_missing`.

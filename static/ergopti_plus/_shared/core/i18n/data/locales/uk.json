@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Записати порядок клавіатурних хуків",
 	"menu.debug.composer_check": "Перевірити складену розкладку",
 	"platform_reason.action_apple_shortcuts_are_macos": "Лише macOS: Швидкі команди Apple існують лише в macOS. В інших системах натомість запустіть команду або програму.",
-	"platform_reason.action_workflows_windows_pending": "Немає у Windows: виконавець сценаріїв є лише в драйверах для macOS і Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Ці перевірки вимірюють SendInput з AutoHotkey і його клавіатурний хук, які є лише в драйвері Windows.",
 	"input_probe.title": "Перевірка введення",
 	"input_probe.field_label": "Текст, який вводить перевірка (не друкуйте тут):",

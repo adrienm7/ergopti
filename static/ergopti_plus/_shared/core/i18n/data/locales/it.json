@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Registra l'ordine degli hook della tastiera",
 	"menu.debug.composer_check": "Prova il layout composto",
 	"platform_reason.action_apple_shortcuts_are_macos": "Solo macOS: i Comandi rapidi di Apple esistono solo su macOS. Altrove, esegui invece un comando o un programma.",
-	"platform_reason.action_workflows_windows_pending": "Non su Windows: l’esecutore dei flussi di lavoro fa parte solo dei driver macOS e Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Questi controlli misurano SendInput di AutoHotkey e il suo hook della tastiera, che ha solo il driver Windows.",
 	"input_probe.title": "Controllo dell'input",
 	"input_probe.field_label": "Testo digitato dalla verifica (non scrivere qui):",
