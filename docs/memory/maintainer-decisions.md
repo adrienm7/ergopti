@@ -2931,3 +2931,22 @@ Changed by the maintainer (each a `[CODE]` item in TODO.md until done):
 Deferred: 100 % line coverage and 100 % killed mutants as red CI gates are a
 far-future backlog (TODO.md, last section); the per-file coverage ratchets
 kept on 2026-11-24 only stop a file from dropping.
+
+## Maintainer answers of 2026-11-25
+
+The maintainer answered the agent decisions pending on 2026-11-25.
+
+- **Linux hotstrings without an accessibility field verdict:** keep the « window » mode described in
+  `linux/modules/keystats/focus_guard.lua` (INVARIANTS 6), including switching `org.a11y.Status IsEnabled` on and
+  the red tray row for a lasting reason.
+- **macOS unreadable AX focus:** give macOS the same treatment as Linux (window-mode admission outside a known
+  secure field and password apps, red menu row for a lasting reason).
+- **44 px targets:** a 44 px minimum for every control in the app windows' `theme.css` and the site's stylesheet,
+  with fixed window sizes raised where a window overflows.
+- **Magic and repeat keys:** build them as designed in `docs/design/magic-and-repeat-keys.md`, the Studio analysis
+  first, then the emulation by the three drivers.
+- **Recent log lines in the bug report:** keep the closed policy; each new failure shape gets a recognised code,
+  no raw log line in the report, the clipboard or the link.
+- **Pareto tab defaults:** keep them as shipped.
+- **Trace sample text:** keep the fixed sample sentence in the page's language.
+- **Analyser fidelity:** one `fidelity` per corpus kind, genkey `exact` on texts.

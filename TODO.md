@@ -607,16 +607,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) A 44 px minimum in `theme.css` for every app window and in the site's stylesheet**, then the
      fixed window sizes raised where a window overflows, with a look at each window on the three OS.
   2. Raise the size one window at a time as each is next reworked.
-- [ ] **Recent log lines in the bug report (decided by the agent on 2026-11-24, to review by the maintainer).** The
-      request of 2026-11-24 asked for the « recent log lines »; the closed sharing policy carries only recognised
-      error codes and counts (`project-shared-export-schema-is-closed`), because a raw line can hold typed text, a
-      path or a name no redaction rule knows, and the field report never pushes to GitHub by default. Kept
-      meanwhile: no raw log line in the report, the clipboard or the link; the opt-in redacted day log stays the way
-      to share lines. Choose:
-  1. **(recommended) Keep the closed policy** and give each new failure shape a recognised code
-     (`recent_error_facts.rules` of `_shared/diagnostics/data/schema.json`).
-  2. Add the last ERROR lines, redacted, to the saved file only (never the link or the clipboard), behind the
-     same opt-in as the day log.
 - [ ] **Bug link login-redirect budget (decided by the agent on 2026-11-24, to review by the maintainer).** Measured
       anonymously on github.com (`tools/dev/measure-issue-url-limits.cjs`): `/issues/new` answers 500 from about
       6,460 bytes and `/login` from about 6,500, so a 4,000-byte link dense in `%XX` failed after the signed-out
@@ -625,11 +615,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       headers and cookies; a typical report's prefill is now cut a little earlier. Choose another redirect budget
       after a measurement from a signed-in and a signed-out browser, or raise `max_url_bytes` (letter-dense links
       reached 6,440 bytes) if a signed-in browser serves it.
-- [ ] **Pareto tab defaults (decided by the agent on 2026-11-25, to review by the maintainer).** The tab opens on
-      SFB against lateral stretches, offers the mark and every metric the score weighs one way (not the metrics
-      shown without a direction), leaves incomplete layouts out of the frontier (their low counts are no
-      trade-off) and names at most 12 frontier layouts on the chart (the table names all). Choose other default
-      values or let incomplete layouts in.
 - [ ] **Magic and repeat keys in the Studio's analysis (asked by the agent on 2026-11-25, to review by the
       maintainer).** The maintainer wants every idea of the Layouts Wiki playground and Kawalyzer, which analyse
       repeat, skip-repeat and magic (« Clever Keys ») keys; the decision of 2026-11-21 says « Studio shows layouts,
@@ -638,33 +623,11 @@ Each question names the default kept meanwhile; an answer moves into the item or
       context-dependent ways of typing, emulated by the three drivers, kept apart from ★). Kept meanwhile: nothing
       built. Choose: (1) build it as designed, the analysis first; (2) analysis only, no driver emulation (the
       Studio then rates keys no Ergopti driver can type); (3) not now.
-- [ ] **Trace sample text and stream rules (decided by the agent on 2026-11-25, to review by the maintainer).** The
-      trace types a sample sentence in the page's language until the visitor writes one (French: « Où êtes-vous
-      allés cet été ? Ça dépend : à Noël, chez Zoé et Gaëtan, près du lac. »), at most 2,000 characters, each
-      character on its own (chords not traced), a line break or an untyped character cutting the stream as in
-      the corpus tables. Its layouts are the Principal and Comparison frame's, shared with « One layout » and the
-      Pareto ring. Choose another sample, or a sample taken from the chosen corpus's words.
 - [ ] **Analyser fidelity per corpus kind (decided by the agent on 2026-11-24, to review by the maintainer).**
       Rerun on 2026-11-24, genkey matches itself on the text corpora within its printed rounding and Oxeylyzer within
       0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
       both stay `close` (the word lists and count tables keep the trigrams' chain), the text-corpus result stated in
       docs/design/analyser-scores.md. The other choice is a `fidelity` per corpus kind, with genkey `exact` on texts.
-- [ ] **Linux hotstrings without an accessibility field verdict (decided by the agent on 2026-11-25, to review by
-      the maintainer).** Field report (Arch, KDE Plasma 6.8 Wayland): no hotstring ever fired, silently, because the
-      focus guard admitted text only after an AT-SPI field verdict joined its window context, and a window that is
-      not on the accessibility bus (or a worker that does not answer) never gives one. Kept meanwhile
-      (`modules/keystats/focus_guard.lua` INVARIANTS 6): hotstrings expand in a « window » mode when the reason is
-      the desktop's (`atspi_unavailable`, `no_accessible_window`, `no_focus_answer`, `context_pending`,
-      `context_unavailable`, `field_unknown`), unless a password field was the last field seen, the compositor names
-      a password manager or a private window, or the settle delay runs; metrics, AI, wrap-on-type and selection
-      actions stay closed outside a field verdict; a window the compositor does not name (no KWin script) admits
-      hotstrings. The focus worker also switches the session's `org.a11y.Status IsEnabled` on when it is off, so Qt,
-      Chromium and Firefox put their windows on the bus. A lasting reason is a red tray row (component_status), never
-      a notification. Choose:
-  1. **(recommended) Keep the window mode as described.**
-  2. Close the window mode whenever the compositor names no application (KDE without the KWin script, GNOME
-     without the extension): no hotstring there until the integration runs.
-  3. Leave `org.a11y.Status` as the user set it and only say in the tray row that turning it on would help.
 - [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
       `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
       unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.
