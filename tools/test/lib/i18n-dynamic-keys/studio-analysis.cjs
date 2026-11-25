@@ -268,8 +268,13 @@ module.exports = [
 	{
 		prefix: 'layout_analysis.movement.',
 		files: [COMPARER],
-		source: 'LAYOUT_ANALYSIS.MOVEMENT_EXTRA (the movement table own classes)',
-		keys: () => ctx.keysOf('layout_analysis.movement.', engine().MOVEMENT_EXTRA)
+		source:
+			'LAYOUT_ANALYSIS.MOVEMENT_EXTRA and the _sfs RHYTHM_CLASSES (the movement table own classes)',
+		keys: () =>
+			ctx.keysOf(
+				'layout_analysis.movement.',
+				engine().MOVEMENT_EXTRA.concat(engine().RHYTHM_CLASSES.filter((id) => id.endsWith('_sfs')))
+			)
 	},
 	{
 		prefix: 'layout_analysis.finger_short.',

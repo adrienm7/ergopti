@@ -4874,6 +4874,19 @@ var LAYOUT_ANALYSIS = (function () {
 	// concordant when the longer finger takes the upper row (the hand's natural
 	// shape) and discordant when it takes the lower one (the scissor's way).
 	const MOVEMENT_EXTRA = ['row_change', 'row_change_concordant', 'row_change_discordant'];
+	// The trigram rhythm of the movement table (an idea seen in the Layouts Wiki
+	// playground's « Trigram rhythm » view), shown only: the trigram classes of
+	// the stream visitor, and those whose two ends are the same finger (an SFS).
+	const RHYTHM_CLASSES = [
+		'alternation',
+		'alternation_sfs',
+		'roll3_in',
+		'roll3_out',
+		'redirect',
+		'redirect_sfs',
+		'redirect_bad',
+		'redirect_bad_sfs'
+	];
 
 	/**
 	 * The movement table of a layout on a corpus (an idea seen in the Layouts
@@ -4932,6 +4945,29 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		const zero = () =>
 			Object.fromEntries(MOVEMENT_CLASSES.concat(MOVEMENT_EXTRA).map((name) => [name, 0]));
+		// A key triple's rhythm classes, probed once; null when no metric counts it.
+		const rhythms = new Map();
+		const rhythmOf = (k1, k2, k3) => {
+			const at = (k1 * K + k2) * K + k3;
+			if (!rhythms.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).trigram(k1, k2, k3, 1);
+				const sfs = c.sfs !== 0;
+				const found = [];
+				for (const name of ['alternation', 'roll3_in', 'roll3_out', 'redirect', 'redirect_bad'])
+					if (c[name] !== 0) {
+						found.push(name);
+						if (sfs && name !== 'roll3_in' && name !== 'roll3_out') found.push(`${name}_sfs`);
+					}
+				rhythms.set(at, c.trigrams === 0 ? null : found);
+			}
+			return rhythms.get(at);
+		};
+		const thumb = (k) => isThumbFinger(board.finger[k]);
+		const rhythmZero = () => Object.fromEntries(RHYTHM_CLASSES.map((name) => [name, 0]));
+		const rhythm = { all: rhythmZero(), noThumbs: rhythmZero() };
+		let trigramsAll = 0;
+		let trigramsNoThumbs = 0;
 		const bigram = zero();
 		const skipgram = zero();
 		let bigrams = 0;
@@ -4947,6 +4983,15 @@ var LAYOUT_ANALYSIS = (function () {
 				for (const name of found.concat(extraOf(k1, k2))) bigram[name] += n;
 			},
 			trigram(k1, k2, k3, n) {
+				const kinds = rhythmOf(k1, k2, k3);
+				if (kinds !== null) {
+					trigramsAll += n;
+					for (const name of kinds) rhythm.all[name] += n;
+					if (!thumb(k1) && !thumb(k2) && !thumb(k3)) {
+						trigramsNoThumbs += n;
+						for (const name of kinds) rhythm.noThumbs[name] += n;
+					}
+				}
 				const found = classOf(k1, k3);
 				if (found === null) return;
 				skipgrams += n;
@@ -4958,11 +5003,21 @@ var LAYOUT_ANALYSIS = (function () {
 				counts[name] = whole > 0 ? (100 * counts[name]) / whole : 0;
 			return counts;
 		};
+		const rhythmShare = (counts, whole) =>
+			Object.fromEntries(
+				RHYTHM_CLASSES.map((name) => [name, whole > 0 ? (100 * counts[name]) / whole : 0])
+			);
 		return {
 			bigram: share(bigram, bigrams),
 			skipgram: share(skipgram, skipgrams),
 			bigrams,
-			skipgrams
+			skipgrams,
+			rhythm: {
+				all: rhythmShare(rhythm.all, trigramsAll),
+				noThumbs: rhythmShare(rhythm.noThumbs, trigramsNoThumbs)
+			},
+			trigrams: trigramsAll,
+			trigramsNoThumbs
 		};
 	}
 
@@ -8219,6 +8274,7 @@ var LAYOUT_ANALYSIS = (function () {
 		TRACE_MAX_CHARS,
 		MOVEMENT_CLASSES,
 		MOVEMENT_EXTRA,
+		RHYTHM_CLASSES,
 		movementTable,
 		wordsWithKeys,
 		blendNgrams,

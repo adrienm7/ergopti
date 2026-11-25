@@ -1013,6 +1013,11 @@
 			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-movement-name">
 				<table id="la-movement" class="la-table"></table>
 			</section>
+			<h4 id="la-rhythm-name" data-i18n="layout_analysis.movement.rhythm_title"></h4>
+			<p class="la-muted" data-i18n="layout_analysis.movement.rhythm_caption"></p>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-rhythm-name">
+				<table id="la-rhythm" class="la-table"></table>
+			</section>
 		</details>
 		<details class="la-section">
 			<summary id="la-worst-name" data-i18n="layout_analysis.worst.title"></summary>
@@ -4925,6 +4930,53 @@
 						el('td', 'la-num', signed(b.bigram[id] - a.bigram[id])),
 						el('td', 'la-num', signed(b.skipgram[id] - a.skipgram[id]))
 					);
+				}
+				body.append(row);
+			}
+			table.append(thead, body);
+			renderRhythm(shown);
+		}
+
+		/**
+		 * The trigram rhythm under the movement table: each trigram class (and
+		 * those whose ends are the same finger) over all trigrams and over those
+		 * without a thumb, for the detailed layout and its comparison.
+		 */
+		function renderRhythm(shown) {
+			const table = $('la-rhythm');
+			table.replaceChildren();
+			const head = el('tr');
+			const columns = [t('layout_analysis.movement.class')];
+			for (const { r } of shown)
+				columns.push(
+					t('layout_analysis.movement.all', { layout: r.layout.name }),
+					t('layout_analysis.movement.no_thumbs', { layout: r.layout.name })
+				);
+			if (shown.length === 2) columns.push(t('layout_analysis.movement.delta_all'));
+			for (const label of columns) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			const pct = (v) => measure(v, 2, '%');
+			const name = (id) =>
+				id.endsWith('_sfs') ? t(`layout_analysis.movement.${id}`) : metricName(id);
+			for (const id of E.RHYTHM_CLASSES) {
+				const row = el('tr');
+				const header = el('th', '', name(id));
+				header.scope = 'row';
+				row.append(header);
+				for (const { m } of shown)
+					row.append(
+						el('td', 'la-num', pct(m.rhythm.all[id])),
+						el('td', 'la-num', pct(m.rhythm.noThumbs[id]))
+					);
+				if (shown.length === 2) {
+					const delta = shown[1].m.rhythm.all[id] - shown[0].m.rhythm.all[id];
+					row.append(el('td', 'la-num', `${delta > 0 ? '+' : ''}${format(delta, 2)}`));
 				}
 				body.append(row);
 			}
