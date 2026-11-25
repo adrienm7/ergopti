@@ -53,7 +53,10 @@ helpers.describe("linux: daemon fails fast on a missing terminator catalogue", f
 		end)
 
 		helpers.it("does not declare a hardcoded minimal terminator fallback", function()
-			helpers.assert_true(src:find("_fallback") == nil,
+			-- A name of the daemon's own ending in _fallback; a field read such
+			-- as app_dirs.linux.config_fallback (the XDG default folder) is not one.
+			local own_names = (src:gsub("%.[%w_]*_fallback", ""))
+			helpers.assert_true(own_names:find("_fallback") == nil,
 				"the minimal {space . , newline} fallback must be gone (fail fast instead)")
 		end)
 
