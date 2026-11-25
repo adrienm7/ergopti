@@ -3636,6 +3636,8 @@
 	"startup.linux_gui_stack_windows_package_body": "The Ergopti+ windows (settings, metrics, editors) need {1}, which this system does not provide, so they stay closed. Hotstrings and the tray work. To open the windows, install the {2} package: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "The lgi on this system is built for Lua {1}; Ergopti+ runs on LuaJIT, which needs the Lua 5.1 build ({2}).",
 	"startup.linux_gui_stack_windows_label": "Windows unavailable",
+	"startup.linux_layout_unresolved_label": "Keyboard layout not read",
+	"startup.linux_layout_unresolved_body": "Ergopti+ could not read this session’s keyboard layout, so hotstring replacements are not typed. Switching the layout once may fix it; otherwise use « {1} »: the report carries the log that says why.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ has no tray icon on this desktop",
 	"startup.linux_tray_host_missing_body": "No panel on this desktop shows tray icons, so the Ergopti+ icon and its menu are not visible. Hotstrings keep working. On GNOME, install {1}, enable the AppIndicator extension, then log out and back in. On another desktop, add a panel or a widget that shows StatusNotifierItem icons.",
 	"startup.linux_input_access_body": "Ergopti+ cannot read the keyboard or write to /dev/uinput yet. Log out and back in (or restart) so the “input” and “uinput” groups added by the installer take effect. If it persists, run: {1}",

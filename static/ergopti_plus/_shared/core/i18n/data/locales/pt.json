@@ -3636,6 +3636,8 @@
 	"startup.linux_gui_stack_windows_package_body": "As janelas do Ergopti+ (definições, estatísticas, editores) precisam de {1}, que não existe neste sistema, por isso ficam fechadas. Os hotstrings e o ícone da bandeja funcionam. Para abrir as janelas, instale o pacote {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "O lgi deste sistema foi compilado para Lua {1}; o Ergopti+ funciona com LuaJIT, que precisa da versão para Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Janelas indisponíveis",
+	"startup.linux_layout_unresolved_label": "Esquema de teclado não lido",
+	"startup.linux_layout_unresolved_body": "O Ergopti+ não conseguiu ler o esquema de teclado desta sessão, por isso as substituições dos hotstrings não são digitadas. Mudar de esquema uma vez pode bastar; caso contrário, use «{1}»: o relatório inclui o registo que indica a causa.",
 	"startup.linux_tray_host_missing_title": "O Ergopti+ não tem ícone na bandeja deste ambiente de trabalho",
 	"startup.linux_tray_host_missing_body": "Nenhum painel deste ambiente de trabalho mostra ícones da bandeja, por isso o ícone do Ergopti+ e o seu menu não estão visíveis. Os hotstrings continuam a funcionar. No GNOME, instale {1}, ative a extensão AppIndicator e termine a sessão e volte a iniciá-la. Noutro ambiente de trabalho, adicione um painel ou um widget que mostre ícones StatusNotifierItem.",
 	"startup.linux_input_access_body": "O Ergopti+ ainda não consegue ler o teclado nem escrever em /dev/uinput. Termine a sessão e entre novamente (ou reinicie) para que os grupos «input» e «uinput» adicionados pelo instalador tenham efeito. Se persistir, execute: {1}",

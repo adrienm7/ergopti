@@ -45,10 +45,42 @@ helpers.describe("component_status: a problem stays visible", function()
 		helpers.assert_eq(shown[2], PROBLEM.body)
 	end)
 
+	helpers.it("leaves the tray once a recoverable problem recovers", function()
+		local Status = helpers.load_module("core.ui.engine.component_status")
+		local unresolved = true
+		Status.report({ code = "layout_unresolved", label = "Layout", title = "t", body = "b",
+			active = function() return unresolved end }, {})
+		helpers.assert_eq(#Status.tray_rows(function() end), 2)
+		unresolved = false
+		helpers.assert_eq(#Status.tray_rows(function() end), 0, "the layout was read later")
+	end)
+
 	helpers.it("refuses a problem without its explanation", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
 		local ok = pcall(Status.report, { code = "x", label = "l", title = "t" })
 		helpers.assert_true(not ok)
+	end)
+
+	helpers.it("an unread layout before the grab becomes a recoverable tray problem", function()
+		-- Without a layout the daemon types no replacement: the core looked
+		-- inactive with nothing but a warning in the log.
+		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = fh:read("*a")
+		fh:close()
+		local guard = source:find("resolve again before grabbing", 1, true)
+		local report = source:find('code = "layout_unresolved"', guard or 1, true)
+		helpers.assert_true(guard ~= nil and report ~= nil, "the last check before the grab reports it")
+		helpers.assert_true(source:find("active = function() return not keyboard_layout.is_ready() end", report, true) ~= nil,
+			"the row leaves once a layout is read")
+		local Json = require("core.text.engine.json")
+		for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no",
+			"pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+			local handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "r"))
+			local catalogue = Json.decode(handle:read("*a"))
+			handle:close()
+			helpers.assert_eq(type(catalogue["startup.linux_layout_unresolved_label"]), "string", code)
+			helpers.assert_true((catalogue["startup.linux_layout_unresolved_body"] or ""):find("{1}", 1, true) ~= nil, code)
+		end
 	end)
 
 	helpers.it("the tray adapter publishes the rows before the menu", function()

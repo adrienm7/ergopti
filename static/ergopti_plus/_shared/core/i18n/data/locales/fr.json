@@ -3636,6 +3636,8 @@
 	"startup.linux_gui_stack_windows_package_body": "Les fenêtres d’Ergopti+ (réglages, statistiques, éditeurs) ont besoin de {1}, absent de ce système : elles restent fermées. Les hotstrings et l’icône de barre d’état fonctionnent. Pour ouvrir les fenêtres, installez le paquet {2} : {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "Le lgi présent sur ce système est construit pour Lua {1} ; Ergopti+ tourne sous LuaJIT, qui a besoin de la version pour Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Fenêtres indisponibles",
+	"startup.linux_layout_unresolved_label": "Disposition clavier non lue",
+	"startup.linux_layout_unresolved_body": "Ergopti+ n’a pas pu lire la disposition clavier de cette session : les remplacements des hotstrings ne sont pas tapés. Changer une fois de disposition peut suffire ; sinon, utilisez « {1} » : le rapport contient le journal qui en donne la cause.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ n’a pas d’icône de barre d’état sur ce bureau",
 	"startup.linux_tray_host_missing_body": "Aucun panneau de ce bureau n’affiche d’icônes de barre d’état : l’icône d’Ergopti+ et son menu restent invisibles. Les hotstrings fonctionnent toujours. Sous GNOME, installez {1}, activez l’extension AppIndicator, puis fermez la session et rouvrez-la. Sur un autre bureau, ajoutez un panneau ou un widget qui affiche les icônes StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ ne peut pas encore lire le clavier ni écrire dans /dev/uinput. Déconnectez-vous puis reconnectez-vous (ou redémarrez) pour que les groupes « input » et « uinput » ajoutés par l’installateur prennent effet. Si le problème persiste, lancez : {1}",
