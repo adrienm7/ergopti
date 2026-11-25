@@ -289,8 +289,8 @@ waits for the maintainer's review).
 
 - [ ] **Other analysers, what is left (2026-11-24).** genkey and Oxeylyzer were rerun on their text corpora on
       2026-11-24 (`verify-analyser-scores.cjs --genkey`, `--oxeylyzer`: Score within 0.005 % and 0.0003 on average,
-      docs/design/analyser-scores.md); both stay `close` for the word lists and the 12 count-table corpora (the
-      trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
+      docs/design/analyser-scores.md); since 2026-11-25 genkey is `exact` on texts and both stay `close` for the
+      word lists and the 12 count-table corpora (the trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
       own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
       their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
@@ -622,11 +622,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       context-dependent ways of typing, emulated by the three drivers, kept apart from ★). Kept meanwhile: nothing
       built. Choose: (1) build it as designed, the analysis first; (2) analysis only, no driver emulation (the
       Studio then rates keys no Ergopti driver can type); (3) not now.
-- [ ] **Analyser fidelity per corpus kind (decided by the agent on 2026-11-24, to review by the maintainer).**
-      Rerun on 2026-11-24, genkey matches itself on the text corpora within its printed rounding and Oxeylyzer within
-      0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
-      both stay `close` (the word lists and count tables keep the trigrams' chain), the text-corpus result stated in
-      docs/design/analyser-scores.md. The other choice is a `fidelity` per corpus kind, with genkey `exact` on texts.
 - [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
       `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
       unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.

@@ -2984,4 +2984,13 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   no raw log line in the report, the clipboard or the link.
 - **Pareto tab defaults:** keep them as shipped.
 - **Trace sample text:** keep the fixed sample sentence in the page's language.
-- **Analyser fidelity:** one `fidelity` per corpus kind, genkey `exact` on texts.
+- **Analyser fidelity per corpus kind.** `fidelity` in
+  `_shared/layouts/data/analysis/analyser_models.json` is one value per corpus
+  a scorer reads: `text` (a text corpus, which ships its own counts through
+  `textTables`) and `tables` (n-gram tables alone: word lists, count tables,
+  blends, « Ma frappe »). genkey is `exact` on texts and `close` on tables;
+  Oxeylyzer stays `close` on both (its trigrams still come from the chain).
+  A score names the fidelity of the tables it read
+  (`LAYOUT_ANALYSER_SCORES.fidelity`), and « Autres analyseurs » shows it
+  under each analyser's name; the codegen refuses a single value. A new
+  scorer or rerun states both values in `docs/design/analyser-scores.md`.

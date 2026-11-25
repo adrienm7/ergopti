@@ -42,6 +42,14 @@ Ergo-L's lower-cased tables) are cached per prepared table.
 **Fidelity** is `exact` when the scorer gives the analyser's own number on the
 same input (checked against its output), `close` when one known approximation
 remains (stated), `approximate` when the formula itself is reconstructed.
+It is stated per corpus a scorer reads (maintainer, 2026-11-25): `text`, a
+text corpus with its own counts (`textTables`), and `tables`, n-gram tables
+alone (word lists, count tables, blends, « Ma frappe »), where the trigrams'
+chain stands for what only a text gives. genkey is `exact` on texts and
+`close` on tables; every other analyser has the same value on both. Each
+score names the fidelity of the tables it read, and the « Autres analyseurs »
+view writes it under each analyser's name for the Comparer's corpus (a
+layout scored on another kind of corpus says its own in its cell's tooltip).
 
 ## API
 
@@ -49,11 +57,14 @@ On `LAYOUT_ANALYSER_SCORES`; every invalid input throws.
 
 - `ORDER`: the analyser ids, in display order.
 - `analysers()` → `[{id, name, author, url, repository, revision, licence,
-fidelity, better, unit, digits, headline}]`; `better` is `higher`, `lower` or
+fidelity: {text, tables}, better, unit, digits, headline}]`; `better` is `higher`, `lower` or
   `none` (an analyser without a score; `headline` names the parts to show
   instead).
 - `score(id, layout, ngrams, {keyboard})` → `{id, value, better, fidelity,
-unit, parts}`; `value` is `null` for an analyser without a score.
+unit, parts}`; `value` is `null` for an analyser without a score, `fidelity`
+  the one of the tables read.
+- `fidelity(id, ngrams)` → `exact`, `close` or `approximate`: the analyser's
+  fidelity on these tables, without scoring.
 - `score(…, {keyboard, profile, fingering})`: `fingering` is `official` (the
   default) or `custom` (see « Two fingerings »).
 - `scoreAll(layout, ngrams, {keyboard, profile})` → `{id: {official, custom}}`,
@@ -328,7 +339,7 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
   trigram(abc) / bigram(ab), computed once per corpus. The bigram also counts
   the runs that end after b, so a run's end stops the chain as genkey's reset
   does; the chain is exact when each pair of characters has one continuation.
-- **Fidelity: close.** Measured against genkey itself (built from f1f4173, its
+- **Fidelity: exact on texts, close on tables.** Measured against genkey itself (built from f1f4173, its
   default config, `load` then `rank`), on its 28 layout files whose finger
   matrix is its column fingering, over _Alice_, _Sherlock Holmes_, English
   Wikipedia, Python code and _Germinal_ (140 points): 1.3 % on average, 8.3 %
@@ -343,8 +354,8 @@ quiz, jumping!` on ten and twelve lines (across spaces and punctuation), ten
   layouts and texts, 140 points), the Score is within 0.005 % on average,
   0.017 % at most, and every statistic within genkey's printed rounding
   (score and finger speeds within 0.005, index use within 0.05, SFB within
-  0.0005, LSB within 0.005). The fidelity stays `close`: it is one value per
-  analyser, and the word lists and count tables keep the chain. Before
+  0.0005, LSB within 0.005). So genkey is `exact` on texts; the word lists
+  and count tables keep the chain, `close`. Before
   2026-11-19, a key whose character genkey's corpus filter substitutes (the
   `"` of Engram, read as `'`) took the place of the key the corpus reaches,
   though genkey's layout reader only lower-cases: 1.4 % on average, 9.9 % at
@@ -414,7 +425,7 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   most; SFB 0.0005 (0.003 at most), finger speed 0.0008 (0.004), stretches
   0.001 (0.012), rolls 0.005 (0.012), alternates 0.007 (0.018), redirects
   0.001 (0.004), bad redirects 0.0004 (0.002). The trigrams' chain is the gap
-  left, so the fidelity stays `close`. Gate (every
+  left, so the fidelity stays `close` on texts as on tables. Gate (every
   vector read with its text's counts, as a text corpus ships them, and
   `textTables` hand-counted on two short texts): hand-computed from the
   source (`the` 0.1333, `decided` −6.3314 on
