@@ -119,8 +119,12 @@ end
 --- Displays a system notification.
 ---
 --- @param message string Body text.
---- @param opts table|nil { title?, level?, onClick? }
+--- @param opts table|nil { title?, level?, persistent?, onClick? }
 ---        level is one of "info", "success", "warning", "error" (default "info").
+---        persistent = true keeps the notice up until the user closes it (an
+---        expiry of 0), for a problem that stays until fixed: on KDE Plasma 6
+---        a timed notice vanished without reaching the history. The urgency is
+---        still the level's, never "critical".
 ---        onClick is accepted and ignored: `notify-send` returns as soon as the
 ---        notification is posted and cannot report a click without holding the
 ---        process open, which this daemon will not do on a keystroke path.
@@ -176,8 +180,9 @@ local function send(message, opts, caption, native_admit)
 	-- instead of counted as shown (NUI-003). Ownership stays with the process
 	-- operation as before: a notice never delays shutdown, and its deadline stops
 	-- the child's group, so an exit leaves at most one bounded notify-send behind.
+	local expire_ms = options.persistent == true and 0 or TIMEOUT_MS
 	local argv = { "--app-name=" .. DEFAULT_TITLE, "--urgency=" .. urgency,
-		"--expire-time=" .. string.format("%d", TIMEOUT_MS), "--", title, message }
+		"--expire-time=" .. string.format("%d", expire_ms), "--", title, message }
 	local handle, refusal = Shell.run_async("notify-send", argv, { timeout_ms = SEND_TIMEOUT_MS }, function(result)
 		if result.ok == true then return end
 		local detail = tostring(result.error or ("exit code " .. tostring(result.code)))

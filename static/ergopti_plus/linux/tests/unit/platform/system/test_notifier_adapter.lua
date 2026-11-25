@@ -131,6 +131,16 @@ helpers.describe("notifier: sending", function()
 		helpers.assert_true(source:find("TIMEOUT_MS = 5000", 1, true) == nil, "no typed copy of the duration")
 	end)
 
+	helpers.it("keeps a persistent notice up until the user closes it", function()
+		-- A problem that stays until fixed was posted with the ordinary expiry
+		-- and vanished on KDE Plasma 6 without reaching its history.
+		with_shell(nil, function(notifier, commands)
+			notifier.send("lgi missing", { level = "error", persistent = true })
+			helpers.assert_true(commands[1]:find("--expire-time=0 ", 1, true) ~= nil, commands[1])
+			helpers.assert_true(commands[1]:find("--urgency=normal", 1, true) ~= nil, "never critical")
+		end)
+	end)
+
 	helpers.it("does not block the caller", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("bonjour")
