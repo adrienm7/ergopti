@@ -233,6 +233,14 @@
 			"verdict": "self_explained",
 			"why": "its parenthesis says what symmetric means"
 		},
+		"keep_awake_menu.keep_awake_auto_click": {
+			"verdict": "self_explained",
+			"why": "says what it does; greyed with its reason where clicks cannot be sent"
+		},
+		"keep_awake_menu.keep_awake_switch": {
+			"verdict": "self_explained",
+			"why": "says what it prevents"
+		},
 		"key_combinations_group.key_combinations_toggle": {
 			"verdict": "self_explained",
 			"why": "the group’s master switch"
