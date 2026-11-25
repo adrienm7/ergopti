@@ -44,12 +44,6 @@ M.WEBKIT_COMPONENT = "WebKitGTK " .. M.WEBKIT_VERSION
 M.TITLE_KEY = "startup.linux_gui_stack_title"
 M.TRAY_BODY_KEY = "startup.linux_gui_stack_tray_body"
 M.WINDOWS_BODY_KEY = "startup.linux_gui_stack_windows_body"
---- The windows body when the distribution is known: {2} the package, {3} the command.
-M.WINDOWS_PACKAGE_BODY_KEY = "startup.linux_gui_stack_windows_package_body"
---- Appended when lgi is installed for another Lua: {1} its version, {2} the package.
-M.OTHER_LUA_KEY = "startup.linux_gui_stack_lgi_other_lua"
---- The tray row that stays while the windows are unavailable.
-M.WINDOWS_LABEL_KEY = "startup.linux_gui_stack_windows_label"
 
 --- The host package that provides each component for LuaJIT, per distribution
 --- family. The generic lua-lgi is a Lua 5.4 build on Arch, Fedora and openSUSE:
@@ -203,14 +197,16 @@ function M.windows_body(deps, component, what)
 	local package = family and M.HOST_PACKAGES[what][family]
 	local body
 	if package then
-		body = text(deps.i18n, M.WINDOWS_PACKAGE_BODY_KEY, component, package, INSTALL_COMMANDS[family]:format(package))
+		-- The windows body when the distribution is known: {2} the package, {3} the command
+		body = text(deps.i18n, "startup.linux_gui_stack_windows_package_body", component, package, INSTALL_COMMANDS[family]:format(package))
 	else
 		body = text(deps.i18n, M.WINDOWS_BODY_KEY, component)
 	end
 	if what == "lgi" then
 		local version = M.foreign_lgi(deps.file_exists)
 		if version then
-			body = body .. " " .. text(deps.i18n, M.OTHER_LUA_KEY, version, package or M.HOST_PACKAGES.lgi.debian)
+			-- lgi installed for another Lua: {1} its version, {2} the package
+			body = body .. " " .. text(deps.i18n, "startup.linux_gui_stack_lgi_other_lua", version, package or M.HOST_PACKAGES.lgi.debian)
 		end
 	end
 	return body
@@ -243,7 +239,7 @@ function M.check_at_start(deps)
 		out(title)
 		out(body)
 		local status = deps.status or require("core.ui.engine.component_status")
-		status.report({ code = "windows_" .. what, label = text(deps.i18n, M.WINDOWS_LABEL_KEY),
+		status.report({ code = "windows_" .. what, label = text(deps.i18n, "startup.linux_gui_stack_windows_label"),
 			title = title, body = body }, { notifier = deps.notifier })
 		return nil
 	end
