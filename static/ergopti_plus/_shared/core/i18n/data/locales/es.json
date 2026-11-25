@@ -3443,6 +3443,8 @@
 	"startup.linux_gui_stack_windows_package_body": "Las ventanas de Ergopti+ (ajustes, estadísticas, editores) necesitan {1}, que no está en este sistema, así que permanecen cerradas. Los hotstrings y el icono de la bandeja funcionan. Para abrir las ventanas, instale el paquete {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "El lgi de este sistema está compilado para Lua {1}; Ergopti+ funciona con LuaJIT, que necesita la versión para Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Ventanas no disponibles",
+	"startup.linux_layout_unresolved_label": "Distribución de teclado no leída",
+	"startup.linux_layout_unresolved_body": "Ergopti+ no pudo leer la distribución de teclado de esta sesión, así que no se escriben los reemplazos de los hotstrings. Cambiar una vez de distribución puede bastar; si no, use «{1}»: el informe incluye el registro que explica la causa.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ no tiene icono en la bandeja de este escritorio",
 	"startup.linux_tray_host_missing_body": "Ningún panel de este escritorio muestra iconos de la bandeja, así que el icono de Ergopti+ y su menú no se ven. Los hotstrings siguen funcionando. En GNOME, instale {1}, active la extensión AppIndicator y cierre la sesión y vuelva a iniciarla. En otro escritorio, añada un panel o un widget que muestre iconos StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ aún no puede leer el teclado ni escribir en /dev/uinput. Cierre la sesión y vuelva a iniciarla (o reinicie) para que se apliquen los grupos «input» y «uinput» añadidos por el instalador. Si el problema persiste, ejecute: {1}",

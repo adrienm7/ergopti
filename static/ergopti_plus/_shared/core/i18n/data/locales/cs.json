@@ -3443,6 +3443,8 @@
 	"startup.linux_gui_stack_windows_package_body": "Okna Ergopti+ (nastavení, statistiky, editory) potřebují {1}, které v tomto systému chybí, proto zůstávají zavřená. Hotstringy a ikona v oznamovací oblasti fungují. Chcete-li okna otevřít, nainstalujte balíček {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "lgi v tomto systému je sestaveno pro Lua {1}; Ergopti+ běží na LuaJIT, který potřebuje verzi pro Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Okna nedostupná",
+	"startup.linux_layout_unresolved_label": "Rozložení klávesnice nenačteno",
+	"startup.linux_layout_unresolved_body": "Ergopti+ nemohl načíst rozložení klávesnice této relace, proto se náhrady hotstringů nepíší. Jednorázová změna rozložení může pomoci; jinak použijte „{1}“: hlášení obsahuje protokol s příčinou.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ nemá v tomto prostředí ikonu v oznamovací oblasti",
 	"startup.linux_tray_host_missing_body": "Žádný panel tohoto pracovního prostředí nezobrazuje ikony oznamovací oblasti, takže ikona Ergopti+ a její nabídka nejsou vidět. Hotstringy dál fungují. V GNOME nainstalujte {1}, zapněte rozšíření AppIndicator a pak se odhlaste a znovu přihlaste. V jiném prostředí přidejte panel nebo widget, který zobrazuje ikony StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: {1}",

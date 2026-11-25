@@ -3443,6 +3443,8 @@
 	"startup.linux_gui_stack_windows_package_body": "החלונות של Ergopti+ (הגדרות, סטטיסטיקות, עורכים) זקוקים ל־{1}, שאינו קיים במערכת זו, ולכן הם נשארים סגורים. ה־hotstrings וסמל המגש פועלים. כדי לפתוח את החלונות, התקינו את החבילה {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "ה־lgi במערכת זו בנוי עבור Lua {1}; Ergopti+ פועל על LuaJIT, שזקוק לגרסה עבור Lua 5.1 ‏({2}).",
 	"startup.linux_gui_stack_windows_label": "החלונות אינם זמינים",
+	"startup.linux_layout_unresolved_label": "פריסת המקלדת לא נקראה",
+	"startup.linux_layout_unresolved_body": "Ergopti+ לא הצליח לקרוא את פריסת המקלדת של הפעלה זו, ולכן ההחלפות של ה־hotstrings אינן מוקלדות. החלפת פריסה פעם אחת עשויה להספיק; אחרת השתמשו ב־„{1}”: הדוח כולל את היומן שמסביר את הסיבה.",
 	"startup.linux_tray_host_missing_title": "ל־Ergopti+ אין סמל במגש בשולחן העבודה הזה",
 	"startup.linux_tray_host_missing_body": "אף לוח בשולחן העבודה הזה אינו מציג סמלי מגש, ולכן הסמל של Ergopti+ והתפריט שלו אינם גלויים. ה־hotstrings ממשיכים לפעול. ב־GNOME, התקינו את {1}, הפעילו את ההרחבה AppIndicator, ואז התנתקו והתחברו מחדש. בשולחן עבודה אחר, הוסיפו לוח או וידג׳ט שמציג סמלי StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ עדיין לא יכול לקרוא את המקלדת או לכתוב אל ‎/dev/uinput. התנתקו והתחברו מחדש (או הפעילו מחדש) כדי שהקבוצות „input” ו־„uinput” שהמתקין הוסיף ייכנסו לתוקף. אם הבעיה נמשכת, הריצו: {1}",

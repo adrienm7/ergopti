@@ -54,9 +54,11 @@ local _by_code = {}
 -- =====================================
 
 --- Records a problem, logs its diagnosis line and posts a persistent notice.
---- @param problem table { code, label, title, body }: code is a stable token
----   ([a-z0-9_]+); label the short tray row text; title and body the translated
----   explanation.
+--- @param problem table { code, label, title, body, active? }: code is a stable
+---   token ([a-z0-9_]+); label the short tray row text; title and body the
+---   translated explanation; active, when given, answers whether the problem
+---   still holds, so a state that recovers on its own (a layout read later)
+---   leaves the tray once it does.
 --- @param deps table|nil { notifier }: the notifier, optional (no session bus).
 --- @return boolean recorded false when the code was already reported.
 function M.report(problem, deps)
@@ -66,11 +68,13 @@ function M.report(problem, deps)
 			"component_status.report: " .. field .. " is required")
 	end
 	assert(problem.code:match("^[a-z0-9_]+$"), "component_status.report: invalid code " .. problem.code)
+	assert(problem.active == nil or type(problem.active) == "function", "component_status.report: active must be a function")
 	if _by_code[problem.code] then
 		Logger.debug(LOG, "Problem %s already reported; kept as it is.", problem.code)
 		return false
 	end
-	local entry = { code = problem.code, label = problem.label, title = problem.title, body = problem.body }
+	local entry = { code = problem.code, label = problem.label, title = problem.title, body = problem.body,
+		active = problem.active }
 	_problems[#_problems + 1] = entry
 	_by_code[entry.code] = entry
 	Logger.error(LOG, "[diagnosis] code=%s — %s", entry.code, entry.body)
@@ -116,10 +120,17 @@ function M.tray_rows(show)
 	assert(type(show) == "function", "component_status.tray_rows: a show function is required")
 	local rows = {}
 	for _, entry in ipairs(_problems) do
-		rows[#rows + 1] = {
+		local holds = true
+		if entry.active then
+			local ok, value = pcall(entry.active)
+			-- A predicate that fails keeps the row: hiding a problem needs proof.
+			holds = not ok or value ~= false
+			if not ok then Logger.error(LOG, "Problem %s could not be re-checked (%s).", entry.code, tostring(value)) end
+		end
+		if holds then rows[#rows + 1] = {
 			title = M.DOT .. " " .. entry.label,
 			fn = function() show(entry.title, entry.body) end,
-		}
+		} end
 	end
 	if #rows > 0 then rows[#rows + 1] = { separator = true } end
 	return rows

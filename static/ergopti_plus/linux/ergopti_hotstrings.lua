@@ -3748,6 +3748,20 @@ local function main()
 	-- unless the desktop source proves the published layout still current.
 	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
+		-- The core then expands nothing a user can see: say so in the tray
+		-- until a later layout change is read (component_status).
+		local layout_i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n")
+		if layout_i18n then
+			local function say(key) local ok, value = pcall(layout_i18n.get, key) return ok and value or key end
+			local report_label = (say("menu.debug.report_bug"):gsub("^[^%w]*%s+", ""))
+			require("core.ui.engine.component_status").report({
+				code = "layout_unresolved",
+				label = say("startup.linux_layout_unresolved_label"),
+				title = say("startup.linux_layout_unresolved_label"),
+				body = (say("startup.linux_layout_unresolved_body"):gsub("{1}", function() return report_label end)),
+				active = function() return not keyboard_layout.is_ready() end,
+			}, { notifier = require("platform.system.notifier") })
+		end
 	end
 	BootProfiler.stage_done("watchers")
 	if not privacy_owners.startup_checkpoint() then return end
