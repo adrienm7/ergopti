@@ -45,6 +45,12 @@ local instance, err = Renderer.new({
 	json_decode   = json.decode,
 	i18n          = i18n,
 	logger        = Logger,
+	-- A row opening a window the start check found the system cannot draw is
+	-- greyed, naming the missing component (core/ui/ui/webview_manager.lua).
+	command_unavailable = function(command_id)
+		if require("core.ui.engine.gui_stack").recorded_windows_missing() == nil then return nil end
+		return require("core.ui.ui.webview_manager").command_unavailable_reason(command_id)
+	end,
 })
 
 if not instance then

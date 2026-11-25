@@ -307,6 +307,11 @@ local HOTSTRING_SUBS_FALLBACK = {
 ---                          stubs the driver logger can observe them, which is
 ---                          how every one of this renderer's four unit files is
 ---                          written.
+---   command_unavailable function|nil  Optional: command id → the locale key of
+---                          why that declared command cannot run now, or nil.
+---                          Its row is drawn greyed with that reason (the Linux
+---                          tray greys the rows opening a window the system
+---                          cannot draw).
 --- @return table|nil renderer, string|nil error
 function M.new(deps)
 	if type(deps) ~= "table" then
@@ -334,7 +339,13 @@ function M.new(deps)
 		return nil, "deps.logger missing"
 	end
 
+	if deps.command_unavailable ~= nil and type(deps.command_unavailable) ~= "function" then
+		BootLogger.error(LOG, "new(): deps.command_unavailable must be a function — renderer not created.")
+		return nil, "deps.command_unavailable invalid"
+	end
+
 	local platform      = deps.platform
+	local command_unavailable = deps.command_unavailable
 	local manifest_path = deps.manifest_path
 	local json_decode   = deps.json_decode
 	local i18n          = deps.i18n
@@ -1156,6 +1167,23 @@ function M.new(deps)
 				stand_in.title = prefix .. stand_in.title
 			end
 			return stand_in
+		end
+		-- A command the driver says cannot run now (a window the system cannot
+		-- draw) is greyed with its reason, like a row greyed by `disabled_when`.
+		if command_unavailable ~= nil then
+			local asked, blocked = pcall(command_unavailable, cmd_id)
+			if not asked or (blocked ~= nil and (type(blocked) ~= "string" or blocked == "")) then
+				Logger.error(LOG, "The availability of command '%s' (%s.%s) could not be read (%s) — row refused.",
+					tostring(cmd_id), manifest_key, row_id, tostring(blocked))
+				return nil
+			end
+			if blocked ~= nil then
+				local reason = i18n.get(blocked)
+				local greyed = { title = (title or i18n.get(i18n_key)) .. " — " .. reason_head(reason),
+					disabled = true, tooltip = reason }
+				if rawget(item, "label_prefix") ~= nil then greyed.title = prefix .. greyed.title end
+				return greyed
+			end
 		end
 		local built = {
 			title    = title or i18n.get(i18n_key),

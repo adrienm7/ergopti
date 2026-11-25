@@ -100,6 +100,17 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 		helpers.assert_true(sent[1].opts.persistent, "the notice stays until closed")
 	end)
 
+	helpers.it("(window-rows-unavailable) hands the missing window component to the tray", function()
+		local told = {}
+		run({ indicator = indicator(true), on_windows_missing = function(component) told[#told + 1] = component end,
+			load_lgi = function() return false, "module 'lgi' not found" end })
+		helpers.assert_eq(told, { "lgi (Lua GObject Introspection)" })
+		told = {}
+		run({ indicator = indicator(true), on_windows_missing = function(component) told[#told + 1] = component end,
+			load_lgi = lgi_with({ WebKit2 = "4.1" }) })
+		helpers.assert_eq(told, {}, "nothing is missing")
+	end)
+
 	helpers.it("names Arch's LuaJIT lgi package and command when lgi is absent", function()
 		local status, lines, _, reported = run({ indicator = indicator(true), os_release = ARCH_OS_RELEASE,
 			load_lgi = function() return false, "module 'lgi' not found" end })
