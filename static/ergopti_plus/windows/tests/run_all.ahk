@@ -303,6 +303,9 @@ global _DefaultLogsDir := _LogsDir
 ; functions instead of scanning their source.
 #Include ../infra/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
+; Script AltGr chord dispatch: function definitions and two globals, no
+; top-level hotkeys, so the chord debounce runs here instead of being scanned.
+#Include ../infra/script_altgr_hotkeys.ahk
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../_shared/settings/data/features/number_row_policy.ahk
@@ -2139,7 +2142,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/input/dispatch/test_timer_scheduler_suspend.ahk
 #Include meta/hotstrings/engine/magic_key/test_probe_deadkey_safe.ahk
 #Include meta/menu/test_script_shortcut_labels_locale.ahk
-#Include meta/platform/remap/altgr/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/modules/keystats/ergonomics/test_roi_halflife_threshold_reachable.ahk
 #Include meta/hotstrings/engine/engine/test_notepad_hotstring_atomic_burst.ahk
 #Include unit/ai/prediction/test_parser_dedup_stats.ahk
@@ -2198,6 +2200,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/altgr/test_altgr_detect_hkl_fallback.ahk
 #Include unit/platform/remap/altgr/test_altgr_detection.ahk
 #Include unit/platform/remap/altgr/test_altgr_family_follows_layout.ahk
+#Include unit/platform/remap/altgr/test_altgr_chord_debounce.ahk
 #Include unit/platform/remap/altgr/test_altgr_probe_real_layouts.ahk
 #Include unit/modules/keymap/test_layout_digit_row_probe.ahk
 #Include unit/modules/keymap/test_number_row_symbols.ahk
