@@ -2991,8 +2991,6 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   Hotstrings title and a greyed reason row (`hotstrings_menu` list
   `hotstrings_focus_unchecked`), never a notification. Do not withhold every
   hotstring again on an unread focus, and do not open the AI there.
-- **44 px targets:** a 44 px minimum for every control in the app windows' `theme.css` and the site's stylesheet,
-  with fixed window sizes raised where a window overflows.
 - **Repeat and magic keys in the Studio's analysis: build it as designed, the
   analysis first** (choice 1 of the pending item). A layout's own repeat,
   skip-repeat and magic keys (output-context rules of at most two characters,
@@ -3002,6 +3000,25 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   `contextOutput` and `_shared/tests/corpus/layouts/magic_vectors.json` define
   what such a key types for the analysis and every driver; a driver change
   replays those vectors, and no layout key takes ★ or ✦ as its label.
+- **44 px targets (WCAG 2.5.5) everywhere.** The maintainer chose a 44 by
+  44 px minimum for every control over raising each window as it is next
+  reworked. Mechanism: one zero-specificity rule in
+  `static/ergopti_plus/_shared/ui/theme.css` (token `--theme-target-min`) for
+  the app windows and the Studio frames, and its twin in
+  `src/lib/css/accessibility.css` (`--site-target-min`) for the site. A
+  `min-*-size` wins over a page's own height, so a page that wants a smaller
+  control must write its own minimum, which the `target-size-enhanced` rows of
+  the two accessibility ratchets refuse. A native checkbox or radio button
+  keeps its size and its label takes the 44 px (drawn at 44 px, the mark
+  itself grows into a giant square); an inline link inside a sentence keeps
+  its line height, as WCAG exempts it. The fixed window sizes of
+  `apps.manifest.json` were raised where the bigger controls added a
+  scrollbar (download window, changelog, hotstring editor), and the Windows
+  literals that mirror them followed. `test-app-windows-accessibility-ratchet`
+  and `test-site-accessibility-ratchet` refuse a stylesheet that drops the
+  rule or sets the token below `MINIMUM_PX` of `tools/test/lib/target-size.cjs`.
+- **Magic and repeat keys:** build them as designed in `docs/design/magic-and-repeat-keys.md`, the Studio analysis
+  first, then the emulation by the three drivers.
 - **Recent log lines in the bug report:** keep the closed policy; each new failure shape gets a recognised code,
   no raw log line in the report, the clipboard or the link.
 - **Pareto tab defaults:** keep them as shipped.

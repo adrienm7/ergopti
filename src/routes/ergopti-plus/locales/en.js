@@ -685,8 +685,8 @@ export default {
 		'(menus, settings, tooltips) have not been checked yet with the screen readers of Windows, macOS and Linux.',
 	'Les vidéos de démonstration n’ont pas encore de sous-titres ni de transcription.':
 		'The demo videos have no captions or transcript yet.',
-	'Certains boutons et certaines cases à cocher font moins de 44 pixels de côté, la taille que demande le niveau AAA.':
-		'Some buttons and checkboxes are smaller than 44 pixels across, the size level AAA asks for.',
+	'Sur un écran plus étroit que le clavier dessiné, les touches de l’Optimiseur font moins de 44 pixels de côté, la taille que demande le niveau AAA.':
+		'On a screen narrower than the drawn keyboard, the Optimiser’s keys are smaller than 44 pixels across, the size level AAA asks for.',
 	'Signaler un problème': 'Report a problem',
 	'Si une partie du site, d’Ergopti Studio ou d’':
 		'If a part of the website, of Ergopti Studio or of ',

@@ -849,8 +849,12 @@ under another configuration path.
 		text-align: center;
 	}
 
+	/* Alone on its line, the link is no link inside a sentence: it takes the
+	   44 px target of accessibility.css, its text centred in it. */
 	.cta-link {
+		align-items: center;
 		color: var(--accent-blue);
+		display: inline-flex;
 		text-decoration: none;
 	}
 

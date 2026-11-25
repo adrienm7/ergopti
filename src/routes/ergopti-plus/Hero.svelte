@@ -421,6 +421,10 @@ FEATURES & RATIONALE:
 		font-weight: 600;
 		gap: 7px;
 		justify-content: center;
+		/* Never narrower than its name: the 44 px minimum of accessibility.css
+		   replaces a flex item's own minimum, and at 200 % text « Windows »
+		   ran over « macOS ». */
+		min-inline-size: min-content;
 		padding: 7px 12px;
 		position: relative;
 		transition: color 0.25s var(--ease);
@@ -644,7 +648,7 @@ FEATURES & RATIONALE:
 		font-size: 0.82rem;
 		gap: 8px;
 		margin: 18px auto 0;
-		min-height: 32px;
+		min-height: var(--site-target-min);
 		padding: 6px 14px;
 		width: fit-content;
 	}

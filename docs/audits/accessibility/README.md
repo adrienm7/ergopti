@@ -1525,6 +1525,49 @@ The maintainer added HTML_CodeSniffer to the AAA audit on 2026-11-24
   for were not added. The `.Unmeasured` rows need a pixel measure of the
   backdrop.
 
+## Sixteenth pass, 44 px targets to zero (2026-11-25, Paris time)
+
+- **The maintainer's answer** (option 1 of the pending decision): a 44 by
+  44 px minimum for every control. One zero-specificity rule in `theme.css`
+  (`--theme-target-min`) for the app windows and the Studio frames, its twin
+  in `src/lib/css/accessibility.css` (`--site-target-min`) for the site. A
+  minimum size beats a page's own height; a native checkbox or radio button
+  keeps its size and its label, around it or right after it, takes the
+  44 px; a link inside a sentence keeps its line (the inline exception).
+- **Rows lowered to zero:** `target-size-enhanced`, 391 kinds in the app
+  windows' states and 219 on the site and in its frames. Both baselines are
+  now empty.
+- **Pages that wrote a smaller minimum** of their own (24 to 40 px, from the
+  AA work of 2.5.8) now read the token: the Studio's buttons, fields, tabs,
+  percentile pills, row buttons and layout checkboxes, the editor's tab
+  icons, the site's table of contents, settings dialog and hero toggle.
+  The hotstring editor's row checkbox gained a label (a click on it selects
+  the row and opens nothing), the typing heatmap's keys are 44 px tall on a
+  48 px row pitch, the Optimiser's key boards draw 44 px keys where they have
+  the room (a 47 px unit; a board narrower than 14 units still shrinks them,
+  as reflow comes first), and a lone link in a table cell or a paragraph
+  (the changelog's downloads, the hero's installation link) is no link
+  inside a sentence.
+- **Window sizes** (`apps.manifest.json`, read by the three hosts, and the
+  Windows literals that mirror it): the download window 380 to 420 px tall
+  (its minimum too), the changelog 580 to 620, the hotstring editor 640 to
+  660, so the fixture states scroll no more than before. The hotstrings
+  delay window kept its size: its fields gave the 44 px reset buttons the
+  width they gained.
+- **Visually hidden controls** (the `*-sr-only` classes, `.visually-hidden`,
+  the Comparer's file inputs inside their button labels) write a zero minimum
+  of their own to keep their 1 px; a file picker's label carries the 44 px.
+- **The Studio's own checks followed:** the editor's tab strip is 50 px tall
+  (the 44 px icon buttons 2 px inside the tab's border), the ranking's metric
+  columns are 14em wide so a header stays on two lines beside its 44 px
+  « i », and `studio-headers.cjs` counts a header's line boxes instead of
+  dividing a 44 px button by its line height.
+- **Side effect watched:** a `min-inline-size` replaces a flex item's own
+  content minimum, so a control in a squeezed flex row could shrink under its
+  text. The reading gates found one (the hero's OS toggle at 200 % text,
+  given back `min-inline-size: min-content`); the app windows' reading gate
+  passes.
+
 ## What remains
 
 The open items live in TODO.md, section « Full accessibility ». The rows of
