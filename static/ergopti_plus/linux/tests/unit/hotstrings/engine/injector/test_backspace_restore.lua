@@ -245,6 +245,23 @@ helpers.describe("Linux Main: Backspace restore (backspace-restore)", function()
 		end)
 	end
 
+	-- The Arch tester's text erased « by itself » (2026-11-25): a held
+	-- Backspace reaches Main again for each autorepeat. Only the first undoes;
+	-- each repeat is one plain Backspace, and the undo erases no more than the
+	-- expansion typed.
+	helpers.it("undoes once for a held Backspace and erases no more than it typed (backspace-restore-held)", function()
+		after_backspace({ trigger = ",e", output = "je" }, function(field, observations)
+			helpers.assert_eq(field.screen(), ",e", "the first Backspace gives the trigger back")
+			helpers.assert_eq(#observations.injected, 2, "the expansion, then one undo")
+			helpers.assert_true(observations.injected[2].backspaces <= utf8.len("je") - 1,
+				"the undo erases what is left of the replacement, never more")
+			field.backspace(); field.backspace()
+			helpers.assert_eq(#observations.injected, 2, "a repeat of the Backspace never undoes again")
+			helpers.assert_eq(field.screen(), "", "each repeat removed one character, as the application does")
+			helpers.assert_eq(observations.backspaced, 2, "and edited the buffer by one character each")
+		end)
+	end)
+
 	helpers.it("does not type back a consumed terminator (backspace-restore-consumed)", function()
 		after_backspace({ trigger = "btw", output = "by the way", terminator = STAR, terminator_consumed = true },
 			function(field) helpers.assert_eq(field.screen(), "btw") end)

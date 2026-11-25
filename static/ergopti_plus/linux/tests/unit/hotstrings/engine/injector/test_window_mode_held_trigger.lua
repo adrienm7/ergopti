@@ -26,6 +26,7 @@ local helpers = require("tests.helpers")
 local KEY_E = 18
 local KEY_J = 36
 local KEY_BACKSPACE = 14
+local KEY_COMMA = 51
 
 -- KDE Plasma's default autorepeat delay: a key held this long repeats.
 local DESKTOP_REPEAT_DELAY_MS = 600
@@ -81,11 +82,14 @@ local function window_owner(clock)
 	return owner, waits
 end
 
---- Loads the injector over a hook holding the « e » it forwarded and a
+--- Loads the injector over a hook holding the key it forwarded and a
 --- recording uinput channel stamped by the clock.
-local function load(clock)
+--- @param clock table { now = ms }
+--- @param held_code integer|nil The forwarded key still down (KEY_E by default).
+local function load(clock, held_code)
 	local real_hook = package.loaded["platform.input.keyboard_hook"]
-	local held = { KEY_E }
+	held_code = held_code or KEY_E
+	local held = { held_code }
 	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 		held_shortcut_modifier_codes = function() return {} end,
@@ -95,12 +99,13 @@ local function load(clock)
 	layout._set_table_for_test({
 		["j"] = { keycode = KEY_J, level = 1, mods = {} },
 		["e"] = { keycode = KEY_E, level = 1, mods = {} },
+		[","] = { keycode = KEY_COMMA, level = 1, mods = {} },
 	})
 	local channel = { emitted = {} }
 	channel.is_open = function() return true end
 	channel.emit = function(code, value)
 		channel.emitted[#channel.emitted + 1] = { code = code, value = value, at = clock.now }
-		if code == KEY_E and value == 0 then held = {} end
+		if code == held_code and value == 0 then held = {} end
 		return true
 	end
 	channel.sync = function() return true end
@@ -153,5 +158,36 @@ helpers.describe("injector: a window-mode expansion releases its trigger at once
 			clock.now, table.concat(waits, "+")))
 		helpers.assert_eq(table.concat(typed, ","), table.concat({ KEY_BACKSPACE, KEY_BACKSPACE, KEY_J, KEY_E }, ","),
 			"two erases, then j and e")
+	end)
+
+	-- The tester's « it backspaces a huge amount of text by itself »: with
+	-- « Backspace undoes the last expansion » on, the physical Backspace is
+	-- forwarded first, then the undo's injection waited the same one-second
+	-- barrier while that Backspace was still down, and KDE autorepeated it.
+	helpers.it("undoes je back to ,e without holding the physical Backspace (window-held-backspace)", function()
+		local clock = { now = 0 }
+		local injector, channel, restore = load(clock, KEY_BACKSPACE)
+		local owner = window_owner(clock)
+		-- « je » on screen, the forwarded Backspace removed « e »: one more
+		-- erase, then the trigger back.
+		local ok, result = pcall(injector.inject, 1, ",e", false, nil, owner)
+		restore()
+		helpers.assert_true(ok and type(result) == "table" and result.ok == true,
+			"the undo commits: " .. tostring(ok and result and result.error or result))
+		helpers.assert_eq(channel.emitted[1].code, KEY_BACKSPACE)
+		helpers.assert_eq(channel.emitted[1].value, 0, "the held physical Backspace is released first")
+		helpers.assert_eq(channel.emitted[1].at, 0, "before any focus wait")
+		local downs = 0
+		for index, event in ipairs(channel.emitted) do
+			if event.code == KEY_BACKSPACE and event.value == 1 then
+				downs = downs + 1
+				local up = channel.emitted[index + 1]
+				helpers.assert_true(up ~= nil and up.code == KEY_BACKSPACE and up.value == 0,
+					"every injected Backspace is released by the next event")
+			end
+			helpers.assert_true(event.value ~= 2, "no autorepeat event is injected")
+		end
+		helpers.assert_eq(downs, 1, "the erase never exceeds what the undo asked for")
+		helpers.assert_eq(clock.now, 0, "the undo waited " .. clock.now .. " ms on focus queries")
 	end)
 end)
