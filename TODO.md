@@ -179,25 +179,14 @@ baseline as violations go.
       ratchet, which they all pass since the apps dashboard's tabs became tab panels with their own headings
       ([tenth pass](docs/audits/accessibility/README.md#tenth-pass-semantic-markup-and-keyboard-operability-of-the-app-windows-2026-11-19-paris-time)).
       Left: screen-reader runs.
-- [ ] **Keyboard and motor.** The Studio keyboard walk is a CI gate (`npm run test:browser:studio-keyboard`, the
-      editor's « Try » field trap fixed) and the Studio has no time limit. The Windows driver's native windows
-      (14 of them: settings prompts, pickers, editors, the hotstring settings, paths and update fallbacks) are walked
-      with Tab and Shift+Tab in the AHK suite (`test_native_keyboard_walk.ahk`); none traps the keyboard. The app's
-      21 WebView windows are walked the same way, each stop with a visible focus indicator, in the same gate as
-      their scan (fifth pass), and since the tenth pass that scan also blocks an element a mouse can click or hover
-      that the keyboard cannot reach, arrow keys that do nothing in a tab list, list box or menu, and a modal that
-      Escape leaves open; the hotstring editor's sections move with the arrow keys and the metrics tooltips open on
-      focus. Since 2026-11-22 the Studio keyboard walk refuses hover-only content too (an element with a hover
-      listener that the keyboard cannot reach or that does not follow the focus, a drawing's values in hover
-      titles only; the app windows' check, proved first on a small page): every Studio page and tab passes.
-      Since 2026-11-24 the typing heatmaps' keys take the focus (one Tab stop per drawing, the arrow keys
-      between keys, the popup beside the focused key, Escape hides it) and the scan reads hover handlers written
-      in markup too, and the apps table's column explanations are listed under it (« What the columns mean »),
-      each header described by its entry. The Linux driver's native windows, the owned GTK dialogs (question,
-      message, entry, entry with offered values, list, file and folder choosers), are built by the real
-      `dialog_host.lua` on Xvfb and walked with real Tab, Shift+Tab and Escape through XTest
-      (`tests/hardware/run_dialog_keyboard_walk.lua`, its own step of the Linux E2E desktop-webview row); none
-      traps the keyboard. Left: the macOS native windows.
+- [ ] **Keyboard and motor.** The Studio, the 21 app WebView windows, the Windows driver's 14 native windows and,
+      since 2026-11-25, the Linux driver's owned GTK dialogs (`tests/hardware/run_dialog_keyboard_walk.lua`, real
+      Tab, Shift+Tab and Escape on Xvfb) are walked in CI; none traps the keyboard
+      ([audit](docs/audits/accessibility/README.md#keyboard-walk-of-the-native-windows-linux-2026-11-25-paris-time)).
+      Left: macOS, whose one native window of its own is the Swift update panel (the others are AppKit's and
+      Hammerspoon's system dialogs). Escape is not bound by its code (no cancel key equivalent, no
+      `cancelOperation(_:)`): make it close the panel as its close button does, with an XCTest run on a Mac, and the
+      walk with Full Keyboard Access (TODO-tests-macos.md `accessibility_voiceover`).
 - [ ] **Cognitive.** Consistent navigation; every metric and setting has its help text. Error messages: the
       about 60 shown on Windows or in the shared pages without a next step now say one, 63 of them pinned by
       `tools/test/test-error-messages-say-how-to-recover.cjs`
