@@ -97,6 +97,11 @@ function M.new(ports)
 		return folder, folder .. ports.separator .. "images", folder .. ports.separator .. defaults.library_index
 	end
 
+	--- The auto-click defaults (threshold bounds, text distance).
+	function library.defaults()
+		return ports.read_shared("shortcuts/data/auto_click_defaults.json")
+	end
+
 	--- The presets document, read once.
 	function library.document()
 		if doc then return doc end

@@ -205,6 +205,75 @@
 			],
 			"expect_active": "simple",
 			"expect_ids": ["simple", "vscode", "teams"]
+		},
+		{
+			"id": "add_an_imported_preset",
+			"steps": [
+				{
+					"op": "add",
+					"args": [
+						{
+							"id": "imported",
+							"name": "Importé",
+							"keep_awake": true,
+							"auto_click": true,
+							"allowed_apps": {
+								"macos": ["com.example.app"],
+								"windows": ["app.exe"],
+								"linux": ["app"]
+							},
+							"images": [
+								{
+									"id": "ok_button",
+									"file": "ok_button.png",
+									"enabled": true
+								}
+							],
+							"texts": []
+						}
+					],
+					"ok": true
+				},
+				{
+					"op": "add",
+					"args": [
+						{
+							"id": "imported",
+							"name": "Importé",
+							"keep_awake": true,
+							"auto_click": true,
+							"allowed_apps": {
+								"macos": ["com.example.app"],
+								"windows": ["app.exe"],
+								"linux": ["app"]
+							},
+							"images": [
+								{
+									"id": "ok_button",
+									"file": "ok_button.png",
+									"enabled": true
+								}
+							],
+							"texts": []
+						}
+					],
+					"ok": false,
+					"reason": "preset_id_taken"
+				},
+				{
+					"op": "add",
+					"args": [
+						{
+							"id": "broken",
+							"name": "x"
+						}
+					],
+					"ok": false,
+					"reason": "preset_invalid_switch"
+				}
+			],
+			"expect_active": "simple",
+			"expect_ids": ["simple", "vscode", "teams", "imported"]
 		}
 	],
 	"plans": [
