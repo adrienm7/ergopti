@@ -4,9 +4,51 @@
 
 The Linux checks only a real desktop can answer; code work stays in [TODO.md](TODO.md).
 
+## Checklist manuelle pour un testeur (Arch/KDE)
+
+À envoyer au testeur (Arch Linux, KDE Plasma 6 Wayland, AZERTY + Ergopti installés, `install.sh` depuis `dev`). Le
+field report automatique lit déjà le menu de la barre système par D-Bus, l’état de la session et des périphériques
+virtuels ; il ne reste ici que ce qu’une personne doit faire ou voir. Pour chaque étape, répondre « OK » ou « KO » avec
+ce qui a été vu.
+
+1. **Field report automatique (en premier).** Débogage › « Lancer le field report (tous les tests) ». Pendant environ
+   deux minutes, ne pas toucher au clavier ni à la souris : le test clique lui-même « Suspendre » deux fois et change un
+   instant la disposition à émuler avant de la remettre. Attendu : la fenêtre affiche chaque étape puis le résumé. À
+   envoyer : le texte du bouton « Copier » et le dossier ouvert par « Ouvrir le dossier », copié avant toute
+   déconnexion (il est effacé à la fermeture de session) :
+   `cp -r "$XDG_RUNTIME_DIR/ergopti/field-run/results" ~/ergopti-field-report`.
+2. **Frappe de base.** Dans Kate ou KWrite, taper une phrase avec é, è, à, ç, ù, « », des chiffres et ★ (touche
+   magique). Attendu : aucune lettre doublée, perdue ou permutée (a/q, m/virgule), ★ tapé une fois. À envoyer : la
+   phrase obtenue, copiée-collée.
+3. **Hotstrings et presse-papiers.** Copier un mot (Ctrl+C), taper un hotstring habituel puis un hotstring qui produit
+   un emoji ou un symbole hors du clavier, puis coller (Ctrl+V). Attendu : chaque hotstring s’étend une fois et le
+   collage rend le mot copié au départ. À envoyer : le texte obtenu.
+4. **Suspendre.** Cliquer « ⏸︎ Suspendre » dans la barre système, taper un hotstring : il ne s’étend pas ; recliquer
+   « Suspendre » : il s’étend de nouveau. À envoyer : OK/KO.
+5. **Pavé tactile.** Pendant qu’Ergopti tourne : déplacer le pointeur, toucher pour cliquer et défiler à deux doigts.
+   Attendu : le pavé tactile reste actif, KDE n’annonce pas une souris branchée. Si l’étape `libinput_keyboard` du
+   rapport est « ignorée », envoyer aussi `sudo libinput list-devices > ~/libinput.txt`.
+6. **Changement de disposition KDE.** Avec deux dispositions dans Configuration du système › Clavier, passer de l’une à
+   l’autre (Meta+Espace) et taper « aqzm, » dans l’éditeur après chaque changement. Attendu : les lettres suivent la
+   disposition active sans redémarrer Ergopti. À envoyer : le texte tapé et la sortie de
+   `gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts.getLayout`.
+7. **Journal détaillé.** Cocher Débogage › « Journal détaillé » : `grep log_level ~/.config/ergopti/config.toml` affiche
+   `DEBUG` ; le décocher : la ligne affiche `INFO` ou disparaît. À envoyer : les deux sorties.
+8. **Raccourcis de la barre système.** Raccourcis › « Raccourcis de gestion du script » : mettre « AltGr + ⌫ » à
+   « Aucun ». Attendu : « 🔄 Recharger » perd « (AltGr + ⌫) ». Remettre ensuite le réglage d’origine. À envoyer : OK/KO.
+9. **Police des fenêtres.** Configuration › Accessibilité › « Police des fenêtres » : OpenDyslexic. Attendu : les
+   fenêtres ouvertes (tableau de bord des métriques) changent de police aussitôt, le menu de la barre système garde
+   celle du bureau. Remettre « Par défaut ». À envoyer : OK/KO.
+10. **Fenêtre du field report.** Relancer le field report et cliquer « Arrêter » : la fenêtre dit « interrompu ». Au
+    troisième lancement, attendre la fin puis « Créer une issue GitHub » : le formulaire s’ouvre dans le navigateur
+    (ne pas l’envoyer). À envoyer : OK/KO.
+11. **Journaux.** À joindre à la fin : `journalctl --user -u ergopti-hotstrings -b > ~/ergopti-journal.txt` et le
+    dossier `~/.local/state/ergopti/logs` (par exemple `tar czf ~/ergopti-logs.tgz -C ~/.local/state/ergopti logs`).
+
 ## To confirm on Linux
 
-Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh --push` run answers each
+Every open line carries a `field-point` id; one `bash tools/dev/collect-linux-field-report.sh` run (or Débogage ›
+« Lancer le field report (tous les tests) », which runs the daemon's steps without the collector) answers each
 of them in `docs/field-reports/linux-<stamp>/todo_summary.md` (probe steps read the session, guided steps prompt the
 gestures in the terminal): coverage table, verdicts and what no run can test in
 [docs/tooling/linux-field-report-coverage.md](docs/tooling/linux-field-report-coverage.md). No machine is available
@@ -310,3 +352,16 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       installs pkexec, secret-tool, libxkbcommon-tools and typelib-1_0-WebKit2-4_1. The windows open, and a remote AI
       key is saved through secret-tool. GNOME there packages no AppIndicator extension: the tray message points to
       extensions.gnome.org/extension/615, and once that extension is installed and enabled the icon shows.
+- [ ] <!-- field-point: tray_kde_hover_radio --> Tray ticks on KDE Plasma 6 (fixed 2026-11-25): hovering Hotstrings
+      or Shortcuts keeps their tick, « Layout to emulate » draws radios with exactly one ticked, and a click on another
+      choice changes the running emulation at once (« None » stops it).
+- [ ] <!-- field-point: tray_problem_rows --> Problem rows (2026-11-25): each problem a Linux part reports (lgi or
+      WebKitGTK missing, an unresolved layout, the KWin focus script, the text automation causes, a failed layout
+      install) shows one red row at the top of the tray, and none once it is fixed.
+- [ ] <!-- field-point: virtual_devices_touchpad --> Touchpad kept (fixed 2026-11-25): while the daemon runs, udev and
+      libinput read « Ergopti Virtual Keyboard » as a keyboard only (no ID_INPUT_MOUSE), the « Ergopti Virtual Pointer »
+      appears only while a wheel binding is held, no touchpad is grabbed, and KDE keeps the touchpad enabled.
+- [ ] <!-- field-point: session_health --> Session health (2026-11-25): Reload has a restart launcher for the
+      installation's origin, the keyboard hook neither restarts nor stops in an emergency while typing accented text
+      and ★ through the emulation, no clipboard restore is lost, lgi matches the daemon's Lua, the text automation mode
+      and reason are named, a dispatch latency sample is logged and the notification server keeps a persistent notice.
