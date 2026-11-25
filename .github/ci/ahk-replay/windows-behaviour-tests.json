@@ -1,5 +1,5 @@
 {
-	"expected_count": 8,
+	"expected_count": 9,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -30,6 +30,10 @@
 		},
 		{
 			"contains": "a paused park tick accumulates no distance",
+			"expected_count": 1
+		},
+		{
+			"contains": "cs_unescape decodes toml escapes left to right",
 			"expected_count": 1
 		}
 	]

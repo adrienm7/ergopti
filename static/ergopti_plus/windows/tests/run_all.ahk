@@ -564,6 +564,7 @@ InstallSendNoOps()
 #Include unit/hotstrings/engine/personal/test_info_combo_resolver.ahk
 #Include unit/hotstrings/engine/personal/test_tag_case.ahk
 #Include unit/settings/engine/persistence/test_master_gates.ahk
+#Include unit/settings/engine/persistence/test_shortcuts_unescape.ahk
 #Include unit/hotstrings/engine/engine/test_domain_registry.ahk
 #Include unit/hotstrings/engine/engine/test_domain_expander.ahk
 #Include unit/core/text/toml/test_loader.ahk
@@ -2049,7 +2050,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/test_keyboard_hook_dispatch_error_logged.ahk
 #Include meta/menu/test_tray_menu_cleared_before_onboarding.ahk
 #Include meta/menu/test_tray_bootstrap_publication_transaction.ahk
-#Include meta/settings/persistence/test_shortcuts_unescape_ordering.ahk
 #Include meta/gestures/test_selfactivated_bounded.ahk
 #Include meta/ai/api/test_no_entry_logged.ahk
 #Include meta/ai/prediction/test_cancel_not_under_critical.ahk
