@@ -279,6 +279,10 @@ global _TH_OwnedPresses := Map()
 global _TH_OwnedModifiers := Map()
 global _TH_RetractedOwners := Map()
 global _TH_AltGrLCtrlOwners := Map()
+; Whether LCtrl was already logically down when the synthetic ledger pressed
+; the layout's AltGr on a layout whose AltGr adds a fake LCtrl: that LCtrl then
+; belongs to someone else, and _TH_ReleaseStrayAltGrLCtrl leaves it alone.
+global _TH_AltGrFoundLCtrlDown := false
 ; Tap-hold key id -> true once its current press was found to be AltGr's fake
 ; LCtrl (TapHoldAltGrTakesItsLCtrl); read once with _TH_TakeAltGrPress.
 global _TH_AltGrPresses := Map()
@@ -956,7 +960,7 @@ TapHoldReleasePhysicalKey(Key) {
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
-	global _TH_ModifierOwners, _TH_OwnedModifiers, _TapHoldKeyIsDown
+	global _TH_ModifierOwners, _TH_OwnedModifiers, _TapHoldKeyIsDown, _TH_AltGrFoundLCtrlDown
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -1007,11 +1011,16 @@ TapHoldSyntheticKeyDown(Key, Owner := 0) {
 			; Snapshot, before this owner presses them, the keys the user already
 			; holds down and delivered: the last owner leaves those to the user.
 			UserHeld := [], PhysicalBefore := Map()
+			PressesAltGr := false, LCtrlBefore := false
 			if Ok {
 				for _, Name in KeysToPress {
 					PhysicalBefore[Name] := !!_TapHoldKeyIsDown.Call(Name, "P")
 					if _TH_UserHoldsDeliveredKey(Name)
 						UserHeld.Push(Name)
+					if (Name == KS_AltGrKeyName() && KS_AltGrAddsFakeLCtrl()) {
+						PressesAltGr := true
+						LCtrlBefore := !!_TapHoldKeyIsDown.Call("LCtrl", "")
+					}
 				}
 			}
 			; The sender retains proven and uncertain Down attempts. This owner
@@ -1070,6 +1079,8 @@ TapHoldSyntheticKeyDown(Key, Owner := 0) {
 					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
 				for _, Name in UserHeld
 					_TH_SyntheticUserHeldKeys[Name] := true
+				if PressesAltGr
+					_TH_AltGrFoundLCtrlDown := LCtrlBefore
 				if IsObject(Owner) {
 					Owner.Held := true
 					; A DEBUG callout below may deliver AltGr's handback. Publish
@@ -1192,7 +1203,71 @@ TapHoldSyntheticKeyUp(Key, Owner := 0) {
 			_TH_SyntheticKeyLabel(ReleasedKeys))
 	if (FailedKeys.Length > 0)
 		try LoggerError("TapHoldDispatch", "Synthetic release remains pending for '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
+	; The tap that follows this release must not run under AltGr's leftover LCtrl.
+	if _TH_KeysIncludeAltGr(ReleasedKeys) && !_TH_ReleaseStrayAltGrLCtrl() {
+		Ok := false
+		if IsObject(Owner)
+			Owner.ReleaseOk := false
+	}
 	return Ok
+}
+
+; Whether a list of key names holds the layout's AltGr key.
+; @param Keys {Array} Key names.
+; @return {Boolean}
+_TH_KeysIncludeAltGr(Keys) {
+	if (Keys.Length == 0)
+		return false
+	AltGr := KS_AltGrKeyName()
+	for _, Name in Keys {
+		if (Name == AltGr)
+			return true
+	}
+	return false
+}
+
+; Release the LCtrl a synthetic AltGr left down once that AltGr is up (issue
+; #109). On a layout whose AltGr adds a fake LCtrl, Windows answers the
+; driver's own RAlt with that LCtrl, and AutoHotkey tags it as the script's
+; only for a keybd_event Send: a SendInput puts its events in an array, so
+; keyboard_mouse.cpp leaves g_AltGrExtraInfo unset ("hookable_altgr = ... &&
+; !put_event_into_array") and the LCtrl reaches every hook as a foreign key
+; press. No ledger owns it, so when its paired Up does not follow the RAlt Up,
+; nothing ever released it: LAlt tapped as Backspace and held as AltGr then
+; typed Ctrl+Backspace ({Blind} keeps a logically held LCtrl), and Ctrl stayed
+; down until the driver restarted. An LCtrl that was already down before the
+; AltGr was pressed, that a synthetic owner holds, or that the user holds
+; (physically, or through a physical AltGr whose own fake LCtrl it is) is left
+; alone. The Up also drops LCtrl from the modifiers AutoHotkey restores after
+; each Send.
+; @return {Boolean} False only when a needed release could not be sent.
+_TH_ReleaseStrayAltGrLCtrl() {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_AltGrLCtrlOwners
+	global _TH_AltGrFoundLCtrlDown, _TapHoldKeyIsDown
+	if !KS_AltGrAddsFakeLCtrl()
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		AltGr := KS_AltGrKeyName()
+		FoundDown := _TH_AltGrFoundLCtrlDown
+		if _TH_SyntheticHeldKeys.Has(AltGr) || _TH_SyntheticReleasePendingKeys.Has(AltGr)
+			return true
+		_TH_AltGrFoundLCtrlDown := false
+		if FoundDown || _TH_SyntheticHeldKeys.Has("LCtrl") || _TH_SyntheticReleasePendingKeys.Has("LCtrl")
+				|| _TH_AltGrLCtrlOwners.Count > 0
+			return true
+		if !_TapHoldKeyIsDown.Call("LCtrl", "")
+			return true
+		if _TapHoldKeyIsDown.Call("SC01D", "P") || _TapHoldKeyIsDown.Call(AltGr, "P")
+			return true
+		Released := TextPressKey("LCtrl", "Up", false)
+	} finally Critical(PreviousCritical)
+	if Released {
+		try LoggerWarn("TapHoldDispatch", "Released the LCtrl the synthetic AltGr left down; nothing owned it.")
+	} else {
+		try LoggerError("TapHoldDispatch", "The LCtrl the synthetic AltGr left down could not be released.")
+	}
+	return Released
 }
 
 TapHoldReleaseSyntheticKeys() {
@@ -1259,6 +1334,9 @@ TapHoldReleaseSyntheticKeys() {
 
 	if !MaskSent
 		try LoggerError("TapHoldDispatch", "Lifecycle cleanup could not mask the release of '{1}'; a menu may open.", _TH_SyntheticKeyLabel(Keys))
+	; Suspend, reload and exit end an AltGr hold too: its leftover LCtrl goes with it.
+	if _TH_KeysIncludeAltGr(Keys) && !_TH_ReleaseStrayAltGrLCtrl()
+		FailedKeys.Push("LCtrl")
 	if (FailedKeys.Length > 0) {
 		try LoggerError("TapHoldDispatch", "Lifecycle cleanup retained release-pending synthetic key(s) '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
 		return false

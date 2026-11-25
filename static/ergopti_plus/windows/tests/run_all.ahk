@@ -2217,6 +2217,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/remap/keys/test_user_lctrl_held.ahk
 #Include unit/platform/remap/altgr/test_altgr_takes_its_lctrl.ahk
 #Include unit/platform/remap/altgr/test_altgr_lctrl_not_typed.ahk
+#Include unit/platform/remap/altgr/test_altgr_hold_leaves_no_lctrl.ahk
 #Include meta/platform/remap/keys/test_prior_key_guards_use_helper.ahk
 #Include meta/platform/remap/keys/test_modifier_hotkeys_single_identity.ahk
 #Include meta/platform/remap/key_combinations/test_scan_code_shadows_key_name.ahk

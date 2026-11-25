@@ -1255,6 +1255,14 @@ is a plain Alt (`!KS_LayoutHasAltGr()`), a physical RAlt held as itself is the
 Alt the application receives (`KL_Watchers_DetectShortcut`). AHK keeps a modifier the driver pressed with
 `{X Down}` around later non-blind Sends, so a tap-hold's synthetic AltGr is
 lifted around output on every layout (`TapHoldSendWithOwnedKeyUp`).
+The fake LCtrl of the driver's own synthetic RAlt is not the script's: AHK
+tags it only for a keybd_event Send (keyboard_mouse.cpp `hookable_altgr`
+requires `!put_event_into_array`), so after a SendInput it reaches every hook
+as a foreign, injected LCtrl that no ledger owns. Issue #109 (LAlt tapped as
+Backspace, held as AltGr) typed Ctrl+Backspace and left Ctrl down until a
+restart. Action: every release of a synthetic AltGr, owner or lifecycle,
+ends with `_TH_ReleaseStrayAltGrLCtrl`, which lifts an LCtrl nobody owns
+(`test_altgr_hold_leaves_no_lctrl.ahk`).
 
 ### project-ahk-an-undecided-key-is-decided-by-the-thread-that-interrupts-it
 
