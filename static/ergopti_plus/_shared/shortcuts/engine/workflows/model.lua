@@ -116,15 +116,7 @@ local function pointer_segment(segment)
 	return (tostring(segment):gsub("~", "~0"):gsub("/", "~1"))
 end
 
---- The sorted string keys of an object.
---- @param value table
---- @return table
-local function sorted_keys(value)
-	local keys = {}
-	for key in pairs(value) do keys[#keys + 1] = key end
-	table.sort(keys)
-	return keys
-end
+local sorted_keys = require("core.text.engine.table_util").sorted_keys
 
 --- A set of the given lists' strings.
 --- @return table

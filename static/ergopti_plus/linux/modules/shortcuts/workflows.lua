@@ -135,10 +135,7 @@ local function effect_ports(deps)
 		end,
 		shell = function(command, env, deadline_ms, done)
 			local args = {}
-			local names = {}
-			for name in pairs(env) do names[#names + 1] = name end
-			table.sort(names)
-			for _, name in ipairs(names) do args[#args + 1] = name .. "=" .. env[name] end
+			for _, name in ipairs(require("core.text.engine.table_util").sorted_keys(env)) do args[#args + 1] = name .. "=" .. env[name] end
 			for _, part in ipairs({ "/bin/sh", "-l", "-c", command }) do args[#args + 1] = part end
 			return run(deps, "env", args, deadline_ms, function(ok, stdout)
 				if ok then done(true, (tostring(stdout or ""):gsub("[\r\n]+$", ""))) else done(false, stdout) end

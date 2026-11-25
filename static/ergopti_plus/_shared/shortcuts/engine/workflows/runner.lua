@@ -153,9 +153,7 @@ function M.new(ports)
 	--- Stops every running workflow (Escape, the emergency stop).
 	--- @return integer How many runs were stopped.
 	function runner.abort_all()
-		local ids = {}
-		for id in pairs(running) do ids[#ids + 1] = id end
-		table.sort(ids)
+		local ids = require("core.text.engine.table_util").sorted_keys(running)
 		for _, id in ipairs(ids) do runner.abort(id) end
 		return #ids
 	end

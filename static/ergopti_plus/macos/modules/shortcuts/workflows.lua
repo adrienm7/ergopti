@@ -99,10 +99,8 @@ local function effect_ports(deps)
 		end,
 		notify = function(text, done) done(deps.notifications.notify(text) == true) end,
 		shell = function(command, env, _, done)
-			local args, names = {}, {}
-			for name in pairs(env) do names[#names + 1] = name end
-			table.sort(names)
-			for _, name in ipairs(names) do args[#args + 1] = name .. "=" .. env[name] end
+			local args = {}
+			for _, name in ipairs(require("core.text.engine.table_util").sorted_keys(env)) do args[#args + 1] = name .. "=" .. env[name] end
 			for _, part in ipairs({ "/bin/sh", "-l", "-c", command }) do args[#args + 1] = part end
 			return run(deps, "/usr/bin/env", args, function(ok, out) done(ok, ok and (out or "") or out) end)
 		end,

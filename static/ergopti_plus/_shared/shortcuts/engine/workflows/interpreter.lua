@@ -44,15 +44,8 @@ local function placeholder_fields(catalogue, kind)
 	return fields
 end
 
---- Deep-copies a decoded JSON value into plain tables.
---- @param value any
---- @return any
-local function copy(value)
-	if type(value) ~= "table" then return value end
-	local out = {}
-	for key, item in pairs(value) do out[key] = copy(item) end
-	return out
-end
+-- Deep-copies a decoded JSON value into plain tables.
+local copy = require("core.text.engine.table_util").deep_copy
 
 --- Builds one run.
 --- @param options table {
