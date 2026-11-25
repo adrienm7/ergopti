@@ -207,10 +207,6 @@ technical = "The desktop count belongs to each desktop's settings (GNOME dynamic
 kind = "os_equivalent"
 technical = "macOS and the GNOME or KDE screenshot tools start screen recording from their own capture UI, which the equivalent action opens; no stable API starts a recording directly."
 
-[reasons."platform_reason.action_workflows_windows_pending"]
-kind = "not_yet"
-technical = "The shared workflow model, interpreter and runner are Lua (`_shared/shortcuts/engine/workflows/`), driven by `macos/modules/shortcuts/workflows.lua` and `linux/modules/shortcuts/workflows.lua`; the AutoHotkey port of the validator, interpreter and runner replaying `_shared/tests/corpus/workflows/` is not written yet."
-
 [reasons."platform_reason.action_apple_shortcuts_are_macos"]
 kind = "os_concept"
 technical = "Apple Shortcuts run through the macOS shortcuts command; Windows and Linux have no Shortcuts application."

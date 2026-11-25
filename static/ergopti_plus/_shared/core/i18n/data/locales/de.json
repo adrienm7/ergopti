@@ -2403,7 +2403,6 @@
 	"menu.debug.hook_probe": "Reihenfolge der Tastatur-Hooks aufzeichnen",
 	"menu.debug.composer_check": "Zusammengestellte Belegung testen",
 	"platform_reason.action_apple_shortcuts_are_macos": "Nur macOS: Apple-Kurzbefehle gibt es nur unter macOS. Führen Sie anderswo stattdessen einen Befehl oder ein Programm aus.",
-	"platform_reason.action_workflows_windows_pending": "Nicht unter Windows: Der Workflow-Ausführer gehört nur zu den Treibern für macOS und Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Diese Prüfungen messen SendInput von AutoHotkey und seinen Tastatur-Hook, die nur der Windows-Treiber hat.",
 	"input_probe.title": "Eingabeprüfung",
 	"input_probe.field_label": "Vom Test getippter Text (hier nicht tippen):",

@@ -421,18 +421,6 @@
 		}
 	},
 	{
-		"path": "shortcuts_menu.user_workflows_editor",
-		"visibility": "hide",
-		"labels": { "fr": "🧩 Workflows personnalisés…", "en": "🧩 Custom workflows…" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Not on Windows: the workflow runner is part of the macOS and Linux drivers only.",
-				"fr": "Pas sous Windows : l’exécution des workflows n’existe que dans les pilotes macOS et Linux."
-			}
-		}
-	},
-	{
 		"path": "shortcuts_menu.personal_shortcuts",
 		"visibility": "hide",
 		"labels": { "fr": "personal_shortcuts", "en": "personal_shortcuts" },

@@ -400,6 +400,7 @@ InstallHotstringHooks()
 #Include ../modules/shortcuts/workflows/interpreter.ahk
 #Include ../modules/shortcuts/workflows/runner.ahk
 #Include ../modules/shortcuts/workflows/effects.ahk
+#Include ../modules/shortcuts/workflows/editor_host.ahk
 #Include ../clipboard/adapters/clipboard.ahk
 #Include ../diagnostics/engine/field_run/input_probe.ahk
 #Include ../core/fs/adapters/storage.ahk
@@ -747,6 +748,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/workflows/test_workflow_model.ahk
 #Include unit/modules/shortcuts/workflows/test_workflow_interpreter.ahk
 #Include unit/modules/shortcuts/workflows/test_workflow_runner.ahk
+#Include unit/modules/shortcuts/workflows/test_workflow_editor_host.ahk
 #Include unit/gestures/adapters/test_touchpad_hid.ahk
 #Include unit/gestures/adapters/test_raw_touchpad_owner.ahk
 #Include unit/gestures/engine/test_swipe_slot_menu.ahk

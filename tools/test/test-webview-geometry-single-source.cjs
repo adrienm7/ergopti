@@ -409,6 +409,11 @@ const WINDOWS_APPS = {
 		// The WebViewHost base sizes the window from the manifest entry.
 		checks: () => [/WebViewHost\.TryOpen\(\s*"emulation_picker"/, /^(?![\s\S]*_Geometry\(\)\s*\{)/]
 	},
+	user_workflows: {
+		file: 'modules/shortcuts/workflows/editor_host.ahk',
+		// The WebViewHost base sizes the window from the manifest entry.
+		checks: () => [/WebViewHost\.TryOpen\(\s*"user_workflows"/, /^(?![\s\S]*_Geometry\(\)\s*\{)/]
+	},
 	layout_editor_window: {
 		file: 'ui/layout_manager/editor_window.ahk',
 		// The layout editor's own window, opened through WebViewHost.TryOpen under
@@ -431,9 +436,6 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
-	user_workflows:
-		'no Windows host yet — the AutoHotkey port of the shared workflow runner is pending ' +
-		'(platform_reason.action_workflows_windows_pending), so the Shortcuts row is macOS and Linux only',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',

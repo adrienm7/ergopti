@@ -517,6 +517,7 @@ _SC_ScopeCommands(Options := unset) {
 		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
 		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
 		MenuCommand.PHYSICAL_SHORTCUTS_EDITOR, ObjBindMethod(PhysicalShortcutsMenuPort(), "Open"),
+		MenuCommand.USER_WORKFLOWS_EDITOR, WorkflowsEditorOpen,
 		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }

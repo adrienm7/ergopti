@@ -278,6 +278,9 @@ class WebViewHost {
 		;   SkipI18nSeed         — default false; when true the I18nSeed script is
 		;                          NOT injected via AddScriptToExecuteOnDocumentCreated
 		;   CustomHtmlPath       — override the convention "ui/<AppId>/index.html"
+		;   LosslessJson         — default false; true decodes the page's messages
+		;                          with JsonParseLossless (true and false stay
+		;                          JSON_TRUE and JSON_FALSE, never 1 and 0)
 		;   RunsWhilePaused      — default false; true for a configuration window
 		;                          (EDD-1: a pause stops typing, not configuration),
 		;                          whose messages, ready and scripts the pause does
@@ -629,8 +632,10 @@ class WebViewHost {
 						return
 				}
 
-				; Parse JSON and dispatch to the module's OnMessage callback
-				try Payload := JsonParse(Msg)
+				; Parse JSON and dispatch to the module's OnMessage callback; a page
+				; whose closed schema refuses a boolean where a number is due reads
+				; its messages lossless (JsonParseLossless).
+				try Payload := this.Opts.Get("LosslessJson", false) ? JsonParseLossless(Msg) : JsonParse(Msg)
 				if (!IsSet(Payload) || !(Payload is Map))
 						return
 				if this.Opts.Has("OnMessage") {
