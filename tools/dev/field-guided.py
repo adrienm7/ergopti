@@ -261,6 +261,10 @@ def run_guided_step(step, sources, poll, bound):
             if key is not None:
                 log("     Answer y, n or s.")
         else:
+            if key is not None:
+                # Only s is read here: a silent y let a person believe the
+                # step had recorded their gesture.
+                log("     Nothing to type here: this step sees the gesture by itself; s skips it.")
             # An unreadable source may appear with the gesture (the first
             # Metrics row creates the database): it counts from 0 and is
             # named only if it never became readable.

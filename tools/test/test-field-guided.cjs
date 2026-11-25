@@ -325,6 +325,55 @@ const network = (id, kind) => ({
 		assert.equal(valid.status, 0, String(valid.stderr));
 	});
 
+	await check('an observe step answers a typed y instead of ignoring it in silence', async () => {
+		const paths = scratch([
+			{
+				id: 'observed',
+				mode: 'observe',
+				proves: 'A row appears.',
+				gesture: 'Do it.',
+				gesture_seconds: 10,
+				probes: [network('network_vpn_connected', 'vpn_connected')]
+			}
+		]);
+		sql(
+			paths,
+			'CREATE TABLE events_network (device_id TEXT, id INTEGER, ts TEXT, date TEXT, kind TEXT, app TEXT, meta_json TEXT);'
+		);
+		// A real terminal: the tool reads answers only from a tty.
+		const driver = [
+			'import os,pty,sys,time',
+			'pid,fd=pty.fork()',
+			'if pid==0: os.execvpe(sys.argv[1],sys.argv[1:],os.environ)',
+			'time.sleep(1.5); os.write(fd,b"y\\n")',
+			'out=b""',
+			'while True:',
+			'  try: chunk=os.read(fd,4096)',
+			'  except OSError: break',
+			'  if not chunk: break',
+			'  out+=chunk',
+			'os.waitpid(pid,0); sys.stdout.write(out.decode())'
+		].join('\n');
+		const done = spawnSync(
+			'python3',
+			[
+				'-c',
+				driver,
+				'python3',
+				TOOL,
+				'--steps',
+				paths.declaration,
+				'--out',
+				paths.folder,
+				'--metrics',
+				paths.metrics
+			],
+			{ env: { ...process.env, FIELD_GUIDED_SECONDS_OVERRIDE: '3' }, encoding: 'utf8' }
+		);
+		assert.match(done.stdout, /Nothing to type here/);
+		assert.equal(result(paths, 1, 'observed').verdict, 'needs_person');
+	});
+
 	console.log(`[OK] field guided steps (${checks} checks).`);
 })().catch((error) => {
 	console.error(error);
