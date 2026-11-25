@@ -1744,6 +1744,7 @@
 	"linux_shell.install.gnome_extension_failed": "Die AppIndicator-Erweiterung konnte nicht aktiviert werden — ohne sie zeigt GNOME das Symbol nicht an.",
 	"linux_shell.install.gnome_extension_missing": "GNOME-AppIndicator-Erweiterung fehlt — {1} wird installiert…",
 	"linux_shell.install.gnome_extension_next_login": "GNOME-AppIndicator-Erweiterung aktiviert (wirksam ab der nächsten Anmeldung)",
+	"linux_shell.install.gnome_extension_not_installed": "Kein Paket dieser Distribution enthält die GNOME-AppIndicator-Erweiterung: Installieren Sie AppIndicator and KStatusNotifierItem Support von {1}, melden Sie sich dann ab und wieder an — ohne sie zeigt GNOME das Symbol nicht an.",
 	"linux_shell.install.gnome_without_extensions": "GNOME ohne gnome-extensions — aktivieren Sie eine AppIndicator-Erweiterung, um das Symbol zu sehen.",
 	"linux_shell.install.help_help": "Diese Hilfe anzeigen",
 	"linux_shell.install.help_no_deps": "Keine Abhängigkeiten installieren (Sie stellen sie bereit)",

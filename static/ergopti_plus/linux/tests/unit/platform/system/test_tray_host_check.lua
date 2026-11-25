@@ -27,6 +27,7 @@ local function deps_for(facts)
 			return facts
 		end,
 		i18n = { get = function(key) return "<" .. key .. ":{1}>" end },
+		os_release = 'ID=fedora\nVERSION_ID=43\n',
 		logger = logger,
 		print = function(line) told.printed[#told.printed + 1] = line end,
 		notifier = { send = function(body, opts) told.notices[#told.notices + 1] = { body = body, opts = opts } end },
@@ -90,6 +91,41 @@ helpers.describe("tray host check: the user is told, in their language (tray-03)
 		helpers.assert_eq(told.printed[2], body)
 		helpers.assert_eq(#told.errors, 1, "the log carries the facts")
 		helpers.assert_contains(told.errors[1], "watcher false")
+	end)
+
+	helpers.it("a distribution that packages no extension is sent to its page, never to a missing package", function()
+		-- openSUSE Tumbleweed and Leap, Alpine and Void carry no AppIndicator
+		-- extension: « install gnome-shell-extension-appindicator » found nothing.
+		for _, os_release in ipairs({
+			'ID="opensuse-tumbleweed"\nID_LIKE="opensuse suse"\n',
+			'ID="opensuse-leap"\nID_LIKE="suse opensuse"\n',
+			"ID=alpine\n",
+			'ID="void"\n',
+			"ID=nixos\n",
+		}) do
+			local deps, told = deps_for({ watcher = false, host = nil, xembed = false })
+			deps.os_release = os_release
+			helpers.assert_eq(HostCheck.check(deps), false)
+			helpers.assert_eq(told.windows[1].body, "<startup.linux_tray_host_missing_body:" .. HostCheck.EXTENSION_PAGE .. ">",
+				os_release)
+		end
+		for os_release, family in pairs({
+			['ID=ubuntu\nID_LIKE=debian\n'] = "debian", ["ID=arch\n"] = "arch", ["ID=fedora\n"] = "fedora",
+		}) do
+			helpers.assert_eq(HostCheck.extension_source(os_release), "gnome-shell-extension-appindicator", family)
+		end
+	end)
+
+	helpers.it("names the same packages as install.sh's gnome-tray, and none where it has none", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/install.sh", "r"))
+		local source = fh:read("*a")
+		fh:close()
+		local managers = require("core.ui.engine.gui_stack").FAMILY_MANAGERS
+		for family, manager in pairs(managers) do
+			local mapped = source:match("\n%s*" .. manager .. ":gnome%-tray%) echo \"([^\"]+)\"")
+			helpers.assert_eq(mapped, HostCheck.EXTENSION_PACKAGES[family], family)
+		end
+		helpers.assert_contains(source, 'GNOME_TRAY_EXTENSION_PAGE="' .. HostCheck.EXTENSION_PAGE .. '"')
 	end)
 
 	helpers.it("a session with a host says nothing to the user", function()

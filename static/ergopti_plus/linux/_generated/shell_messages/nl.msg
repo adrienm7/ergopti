@@ -19,6 +19,7 @@ install.gnome_extension_enabled=GNOME AppIndicator-extensie ingeschakeld
 install.gnome_extension_failed=Kan de AppIndicator-extensie niet inschakelen — zonder haar toont GNOME het pictogram niet.
 install.gnome_extension_missing=GNOME AppIndicator-extensie ontbreekt — {1} wordt geïnstalleerd…
 install.gnome_extension_next_login=GNOME AppIndicator-extensie ingeschakeld (actief bij de volgende aanmelding)
+install.gnome_extension_not_installed=Geen pakket van deze distributie bevat de GNOME AppIndicator-extensie: installeer AppIndicator and KStatusNotifierItem Support via {1} en meld je daarna af en weer aan — zonder deze extensie toont GNOME het pictogram niet.
 install.gnome_without_extensions=GNOME zonder gnome-extensions — schakel een AppIndicator-extensie in om het pictogram te zien.
 install.help_help=Toont dit helpbericht
 install.help_no_deps=Installeert geen afhankelijkheden (die regelt u zelf)

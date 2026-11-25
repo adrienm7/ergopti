@@ -19,6 +19,7 @@ install.gnome_extension_enabled=rozšíření GNOME AppIndicator zapnuto
 install.gnome_extension_failed=Rozšíření AppIndicator nelze zapnout — bez něj GNOME ikonu nezobrazí.
 install.gnome_extension_missing=chybí rozšíření GNOME AppIndicator — instaluje se {1}…
 install.gnome_extension_next_login=rozšíření GNOME AppIndicator zapnuto (platí od příštího přihlášení)
+install.gnome_extension_not_installed=Žádný balíček této distribuce neobsahuje rozšíření GNOME AppIndicator: nainstalujte AppIndicator and KStatusNotifierItem Support z {1}, pak se odhlaste a znovu přihlaste — bez něj GNOME ikonu nezobrazí.
 install.gnome_without_extensions=GNOME bez gnome-extensions — zapněte rozšíření AppIndicator, abyste ikonu viděli.
 install.help_help=Zobrazí tuto nápovědu
 install.help_no_deps=Neinstaluje žádné závislosti (zajistíte je sami)

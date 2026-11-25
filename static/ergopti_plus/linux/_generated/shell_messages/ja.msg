@@ -19,6 +19,7 @@ install.gnome_extension_enabled=GNOME AppIndicator 拡張機能を有効にし�
 install.gnome_extension_failed=AppIndicator 拡張機能を有効にできませんでした。これがないと GNOME はアイコンを表示しません。
 install.gnome_extension_missing=GNOME AppIndicator 拡張機能がありません — {1} をインストールしています…
 install.gnome_extension_next_login=GNOME AppIndicator 拡張機能を有効にしました (次回ログイン時から有効)
+install.gnome_extension_not_installed=このディストリビューションには GNOME AppIndicator 拡張機能のパッケージがありません。{1} から AppIndicator and KStatusNotifierItem Support をインストールし、ログアウトして再度ログインしてください。これがないと GNOME はアイコンを表示しません。
 install.gnome_without_extensions=gnome-extensions のない GNOME — アイコンを表示するには AppIndicator 拡張機能を有効にしてください。
 install.help_help=このヘルプを表示します
 install.help_no_deps=依存関係をインストールしません (ご自身で用意してください)

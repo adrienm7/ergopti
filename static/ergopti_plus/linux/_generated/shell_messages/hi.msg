@@ -19,6 +19,7 @@ install.gnome_extension_enabled=GNOME AppIndicator एक्सटेंशन �
 install.gnome_extension_failed=AppIndicator एक्सटेंशन सक्षम नहीं हो सका — इसके बिना GNOME आइकन नहीं दिखाता।
 install.gnome_extension_missing=GNOME AppIndicator एक्सटेंशन अनुपलब्ध — {1} इंस्टॉल किया जा रहा है…
 install.gnome_extension_next_login=GNOME AppIndicator एक्सटेंशन सक्षम किया गया (अगले लॉगिन से प्रभावी)
+install.gnome_extension_not_installed=इस डिस्ट्रीब्यूशन का कोई भी पैकेज GNOME AppIndicator एक्सटेंशन नहीं देता: {1} से AppIndicator and KStatusNotifierItem Support इंस्टॉल करें, फिर लॉग आउट करके दोबारा लॉग इन करें — इसके बिना GNOME आइकन नहीं दिखाता।
 install.gnome_without_extensions=gnome-extensions के बिना GNOME — आइकन देखने के लिए कोई AppIndicator एक्सटेंशन सक्षम करें।
 install.help_help=यह सहायता संदेश दिखाता है
 install.help_no_deps=कोई निर्भरता इंस्टॉल नहीं करता (आपकी ज़िम्मेदारी)

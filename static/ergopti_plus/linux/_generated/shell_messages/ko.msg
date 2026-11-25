@@ -19,6 +19,7 @@ install.gnome_extension_enabled=GNOME AppIndicator 확장을 켰습니다
 install.gnome_extension_failed=AppIndicator 확장을 켤 수 없습니다. 이 확장이 없으면 GNOME에 아이콘이 표시되지 않습니다.
 install.gnome_extension_missing=GNOME AppIndicator 확장 없음 — {1} 설치 중…
 install.gnome_extension_next_login=GNOME AppIndicator 확장을 켰습니다(다음 로그인부터 적용)
+install.gnome_extension_not_installed=이 배포판에는 GNOME AppIndicator 확장을 제공하는 패키지가 없습니다. {1}에서 AppIndicator and KStatusNotifierItem Support를 설치한 뒤 로그아웃했다가 다시 로그인하세요 — 이 확장이 없으면 GNOME은 아이콘을 표시하지 않습니다.
 install.gnome_without_extensions=gnome-extensions가 없는 GNOME — 아이콘을 보려면 AppIndicator 확장을 켜세요.
 install.help_help=이 도움말을 표시합니다
 install.help_no_deps=종속성을 설치하지 않습니다(직접 준비하세요)

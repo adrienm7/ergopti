@@ -1744,6 +1744,7 @@
 	"linux_shell.install.gnome_extension_failed": "Не вдалося ввімкнути розширення AppIndicator — без нього GNOME не показує значок.",
 	"linux_shell.install.gnome_extension_missing": "немає розширення GNOME AppIndicator — встановлення {1}…",
 	"linux_shell.install.gnome_extension_next_login": "розширення GNOME AppIndicator увімкнено (діє з наступного входу)",
+	"linux_shell.install.gnome_extension_not_installed": "Жоден пакет цього дистрибутива не містить розширення GNOME AppIndicator: установіть AppIndicator and KStatusNotifierItem Support з {1}, потім вийдіть із сеансу й увійдіть знову — без нього GNOME не показує значок.",
 	"linux_shell.install.gnome_without_extensions": "GNOME без gnome-extensions — увімкніть розширення AppIndicator, щоб бачити значок.",
 	"linux_shell.install.help_help": "Показати цю довідку",
 	"linux_shell.install.help_no_deps": "Не встановлювати залежності (ви встановлюєте їх самі)",

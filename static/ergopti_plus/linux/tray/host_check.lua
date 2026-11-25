@@ -53,20 +53,53 @@ end
 -- =====================================
 -- =====================================
 
---- A translated text with {1} filled by the GNOME Shell extension that hosts
---- StatusNotifierItems, named as Debian, Ubuntu, Fedora, Arch and openSUSE all
---- package it; the product name stays the same in every language.
+--- The package that carries the GNOME Shell extension hosting
+--- StatusNotifierItems, per distribution family (install.sh's gnome-tray).
+--- openSUSE, Alpine and Void package none (their indexes, 2026-11-25): naming
+--- a package there sent the user to a `zypper install` that finds nothing.
+M.EXTENSION_PACKAGES = {
+	arch = "gnome-shell-extension-appindicator",
+	debian = "gnome-shell-extension-appindicator",
+	fedora = "gnome-shell-extension-appindicator",
+}
+
+--- Where the extension is installed from on a family that packages none; the
+--- same page install.sh names.
+M.EXTENSION_PAGE = "https://extensions.gnome.org/extension/615/appindicator-support/"
+
+--- What {1} names on this distribution: its package, or the extension's page.
+--- @param os_release string|nil /etc/os-release's content.
+--- @return string
+function M.extension_source(os_release)
+	local family = require("core.ui.engine.gui_stack").distro_family(os_release)
+	return M.EXTENSION_PACKAGES[family] or M.EXTENSION_PAGE
+end
+
+--- Reads /etc/os-release, nil when neither copy can be read.
+--- @return string|nil
+local function read_os_release()
+	local handle = io.open("/etc/os-release", "r") or io.open("/usr/lib/os-release", "r")
+	if not handle then return nil end
+	local content = handle:read("*a")
+	handle:close()
+	return content
+end
+
+--- A translated text with {1} filled by where the extension comes from; the
+--- product name stays the same in every language.
 --- @param i18n table
 --- @param key string
+--- @param source string M.extension_source's answer.
 --- @return string
-local function text(i18n, key)
+local function text(i18n, key, source)
 	local value = i18n.get(key)
-	return (value:gsub("{1}", function() return "gnome-shell-extension-appindicator" end))
+	return (value:gsub("{1}", function() return source end))
 end
 
 --- Runs the check and tells the user when no host shows the icon.
---- @param deps table { probe, i18n, logger, tray?, notifier?, print? }: probe is
----   status_notifier_host.probe; tray the TrayMenu adapter (its status window).
+--- @param deps table { probe, i18n, logger, tray?, notifier?, print?, os_release? }:
+---   probe is status_notifier_host.probe; tray the TrayMenu adapter (its status
+---   window); os_release the file's content, read from disk when absent.
 --- @return boolean|nil true with a host, false when the user was told there is
 ---   none, nil when the session could not be read.
 function M.check(deps)
@@ -84,8 +117,9 @@ function M.check(deps)
 		return true
 	end
 	Logger.error(LOG, "No tray host (%s): the icon and its menu are not visible; telling the user.", summary)
-	local title = text(deps.i18n, "startup.linux_tray_host_missing_title")
-	local body = text(deps.i18n, "startup.linux_tray_host_missing_body")
+	local source = M.extension_source(deps.os_release or read_os_release())
+	local title = text(deps.i18n, "startup.linux_tray_host_missing_title", source)
+	local body = text(deps.i18n, "startup.linux_tray_host_missing_body", source)
 	local out = deps.print or print
 	out(title)
 	out(body)

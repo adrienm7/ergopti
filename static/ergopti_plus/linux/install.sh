@@ -622,13 +622,13 @@ _required_dependency_package() {
 		xbps:webkit) echo "libwebkit2gtk41" ;;
 		apk:webkit) echo "webkit2gtk-4.1" ;;
 		# GNOME Shell hosts no tray icon on its own: an SNI host extension must be
-		# enabled. Ubuntu ships and enables its own; the others do not.
+		# enabled. Ubuntu ships and enables its own; the others do not. openSUSE
+		# (Tumbleweed and Leap), Alpine and Void package no such extension
+		# (checked against their indexes on 2026-11-25): there the user installs
+		# it from extensions.gnome.org, so no name is guessed for them.
 		apt:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		dnf:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		zypper:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		pacman:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		xbps:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		apk:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		*) return 1 ;;
 	esac
 }
@@ -891,6 +891,24 @@ _ensure_desktop_backend() {
 # i.e. every GNOME that is not Ubuntu's. Enabling takes effect at the next
 # login, which the input groups already require.
 GNOME_TRAY_EXTENSION="appindicatorsupport@rgcjonas.gmail.com"
+GNOME_TRAY_EXTENSION_PAGE="https://extensions.gnome.org/extension/615/appindicator-support/"
+
+# Whether the extension's files are on disk, for the user or system-wide. A
+# package installed during this session is not yet in `gnome-extensions list`,
+# but its metadata.json is already where the next shell will look for it.
+_gnome_tray_extension_installed() {
+	local data_dirs="${XDG_DATA_HOME:-${HOME}/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+	local data_dir
+	local IFS=":"
+	for data_dir in ${data_dirs}; do
+		[ -n "${data_dir}" ] || continue
+		if [ -f "${data_dir}/gnome-shell/extensions/${GNOME_TRAY_EXTENSION}/metadata.json" ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 _ensure_gnome_tray_host() {
 	case "${XDG_CURRENT_DESKTOP:-}" in
 		*GNOME*|*gnome*) ;;
@@ -914,6 +932,13 @@ _ensure_gnome_tray_host() {
 	fi
 	if gnome-extensions enable "${GNOME_TRAY_EXTENSION}" 2>/dev/null; then
 		ergopti_msg_with "  ✔  " install.gnome_extension_enabled
+		return 0
+	fi
+	# Writing the setting for an extension that is not on disk would report
+	# « enabled at the next login » while the next login shows no icon: the
+	# package does not exist (openSUSE) or its install failed.
+	if ! _gnome_tray_extension_installed; then
+		ergopti_msg_with "  ⚠  " install.gnome_extension_not_installed "${GNOME_TRAY_EXTENSION_PAGE}" >&2
 		return 0
 	fi
 	# A package installed during this session is unknown to the running shell,

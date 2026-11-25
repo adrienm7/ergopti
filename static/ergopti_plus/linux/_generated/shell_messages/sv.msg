@@ -19,6 +19,7 @@ install.gnome_extension_enabled=GNOME AppIndicator-tillägg aktiverat
 install.gnome_extension_failed=Det gick inte att aktivera AppIndicator-tillägget — utan det visar GNOME inte ikonen.
 install.gnome_extension_missing=GNOME AppIndicator-tillägg saknas — installerar {1}…
 install.gnome_extension_next_login=GNOME AppIndicator-tillägg aktiverat (gäller från nästa inloggning)
+install.gnome_extension_not_installed=Inget paket i den här distributionen innehåller GNOME-tillägget AppIndicator: installera AppIndicator and KStatusNotifierItem Support från {1} och logga sedan ut och in igen — utan det visar GNOME inte ikonen.
 install.gnome_without_extensions=GNOME utan gnome-extensions — aktivera ett AppIndicator-tillägg för att se ikonen.
 install.help_help=Visar det här hjälpmeddelandet
 install.help_no_deps=Installerar inga beroenden (dem ordnar du själv)
