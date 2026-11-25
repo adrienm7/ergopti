@@ -2274,6 +2274,38 @@ body:has(> main.layout-analysis) {
 	width: 12px;
 }
 
+/* The Comparison layout: a dashed square, told from the Principal's ring by
+   its shape as well as its line. */
+.la-pareto-versus {
+	fill: none;
+	stroke: var(--theme-text);
+	stroke-dasharray: 3 2;
+	stroke-width: 2;
+}
+
+.la-swatch-versus {
+	border: 2px dashed var(--theme-text);
+	height: 12px;
+	width: 12px;
+}
+
+/* The Principal − Comparison table above a frame tab's figures, framed as
+   the filters are; its summary a 44 px target. */
+.la-frame-diff {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 12px;
+	padding: 6px 14px;
+}
+
+.la-frame-diff > summary {
+	cursor: pointer;
+	font-weight: 600;
+	line-height: 1.4;
+	padding: 11px 0;
+}
+
 .la-table tr.la-pareto-row-front th {
 	box-shadow: inset 4px 0 0 var(--la-cat-1);
 }

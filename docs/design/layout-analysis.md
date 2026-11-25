@@ -1466,6 +1466,19 @@ kernel density of the values shown, its bandwidth by Silverman's rule of
 thumb, over the strip's range and scaled so its peak fills the band. The curve
 is decorative (`aria-hidden`): the quantiles' table says the same in numbers.
 
+**Principal − Comparison on every tab** (2026-11-25, an idea seen in the
+Layouts Wiki playground, whose views show Main, Comp or their difference).
+Under the filters, every frame tab but the trace (which counts its own
+difference per event) opens a folding table of the Principal and Comparison
+layouts on its values, with their difference (Principal − Comparison) and
+which one it favours in words (▲ better, ▼ worse, = equal, not scored): the
+mark and the overview's leading metrics, a themed tab's metrics, each
+finger's share of the presses on « Fingers » and « Heat maps » (better the
+closer to the ideal load), the Pareto tab's two values. Without a Comparison
+it says how to choose one. The Pareto chart and spread mark the Comparison
+with a dashed square beside the Principal's ring, and « One layout »'s
+words name the Comparison's mean effort and the gap.
+
 **Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
 pane). « Help », before « One layout » (which stays last), holds one titled
 section per common task: compare two layouts, rank on a metric, read the
