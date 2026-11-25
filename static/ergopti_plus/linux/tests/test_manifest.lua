@@ -306,6 +306,7 @@ return {
 	"tests.unit.core.lifecycle.test_display_server",
 	"tests.unit.core.lifecycle.test_driver_version",
 	"tests.unit.core.lifecycle.test_gui_stack",
+	"tests.unit.core.lifecycle.test_component_status",
 	"tests.unit.core.lifecycle.test_input_access",
 	"tests.unit.core.lifecycle.test_webkit_gc_signal",
 	"tests.unit.core.lifecycle.test_owned_programs",

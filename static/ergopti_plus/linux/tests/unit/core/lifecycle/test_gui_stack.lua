@@ -13,8 +13,18 @@
 
 local helpers = require("tests.helpers")
 
---- An i18n double answering "<key>" with a {1} slot.
-local I18N = { get = function(key) return "<" .. key .. ":{1}>" end }
+--- An i18n double answering "<key>" with a {1} slot, and {2}/{3} for the
+--- package wording.
+local I18N = { get = function(key)
+	if key == "startup.linux_gui_stack_windows_package_body" or key == "startup.linux_gui_stack_lgi_other_lua" then
+		return "<" .. key .. ":{1}|{2}|{3}>"
+	end
+	return "<" .. key .. ":{1}>"
+end }
+
+--- The /etc/os-release of the field report's machine.
+local ARCH_OS_RELEASE = 'NAME="Arch Linux"\nPRETTY_NAME="Arch Linux"\nID=arch\nBUILD_ID=rolling\n'
+
 
 --- A tray double.
 --- @param available boolean
@@ -39,15 +49,22 @@ end
 
 --- Runs the start check and records what the user is told.
 --- @param deps table
---- @return integer|nil status, table lines, table sent
+--- @return integer|nil status, table lines, table sent, table reported
 local function run(deps)
 	local Stack = helpers.load_module("core.ui.engine.gui_stack")
-	local lines, sent = {}, {}
+	local lines, sent, reported = {}, {}, {}
 	deps.i18n = I18N
+	if deps.os_release == nil then deps.os_release = "" end
+	deps.file_exists = deps.file_exists or function() return false end
+	deps.status = { report = function(problem, options)
+		reported[#reported + 1] = problem
+		if options.notifier then options.notifier.send(problem.body, { title = problem.title, level = "error", persistent = true }) end
+		return true
+	end }
 	deps.print = function(line) lines[#lines + 1] = line end
 	deps.notifier = { send = function(body, opts) sent[#sent + 1] = { body = body, opts = opts } end }
 	deps.logger = { error = function() end, warn = function() end, debug = function() end }
-	return Stack.check_at_start(deps), lines, sent
+	return Stack.check_at_start(deps), lines, sent, reported
 end
 
 helpers.describe("gui_stack: the desktop toolkit is checked at start", function()
@@ -80,7 +97,54 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 		helpers.assert_nil(status, "hotstrings and the tray still work")
 		helpers.assert_eq(lines[2], "<startup.linux_gui_stack_windows_body:lgi (Lua GObject Introspection)>")
 		helpers.assert_eq(#sent, 1)
-		helpers.assert_eq(sent[1].opts.level, "warning")
+		helpers.assert_true(sent[1].opts.persistent, "the notice stays until closed")
+	end)
+
+	helpers.it("names Arch's LuaJIT lgi package and command when lgi is absent", function()
+		local status, lines, _, reported = run({ indicator = indicator(true), os_release = ARCH_OS_RELEASE,
+			load_lgi = function() return false, "module 'lgi' not found" end })
+		helpers.assert_nil(status)
+		helpers.assert_eq(lines[2], "<startup.linux_gui_stack_windows_package_body:lgi (Lua GObject Introspection)"
+			.. "|lua51-lgi|sudo pacman -S --needed lua51-lgi>")
+		helpers.assert_eq(#reported, 1, "the problem stays in the tray")
+		helpers.assert_eq(reported[1].code, "windows_lgi")
+		helpers.assert_eq(reported[1].label, "<startup.linux_gui_stack_windows_label:{1}>")
+	end)
+
+	helpers.it("says that an lgi built for Lua 5.4 does not serve LuaJIT (field report, Arch's lua-lgi)", function()
+		local _, lines = run({ indicator = indicator(true), os_release = ARCH_OS_RELEASE,
+			file_exists = function(path) return path == "/usr/lib/lua/5.4/lgi/corelgilua51.so" end,
+			load_lgi = function() return false, "module 'lgi' not found" end })
+		helpers.assert_true(lines[2]:find("<startup.linux_gui_stack_lgi_other_lua:5.4|lua51-lgi|{3}>", 1, true) ~= nil,
+			lines[2])
+	end)
+
+	helpers.it("names the WebKitGTK typelib package of Debian and Ubuntu", function()
+		local _, lines = run({ indicator = indicator(true), load_lgi = lgi_with({ WebKit2 = "4.0" }),
+			os_release = 'NAME="Ubuntu"\nID=ubuntu\nID_LIKE=debian\n' })
+		helpers.assert_eq(lines[2], "<startup.linux_gui_stack_windows_package_body:WebKitGTK 4.1"
+			.. "|gir1.2-webkit2-4.1|sudo apt install gir1.2-webkit2-4.1>")
+	end)
+
+	helpers.it("maps derivatives through ID_LIKE", function()
+		local Stack = helpers.load_module("core.ui.engine.gui_stack")
+		helpers.assert_eq(Stack.distro_family('ID=endeavouros\nID_LIKE=arch\n'), "arch")
+		helpers.assert_eq(Stack.distro_family('ID="opensuse-tumbleweed"\nID_LIKE="opensuse suse"\n'), "suse")
+		helpers.assert_eq(Stack.distro_family('ID=linuxmint\nID_LIKE="ubuntu debian"\n'), "debian")
+		helpers.assert_nil(Stack.distro_family('ID=nixos\n'))
+	end)
+
+	helpers.it("names the same first package as install.sh for every manager", function()
+		local Stack = helpers.load_module("core.ui.engine.gui_stack")
+		local fh = assert(io.open(helpers.driver_root() .. "/install.sh", "r"))
+		local installer = fh:read("*a")
+		fh:close()
+		for family, manager in pairs(Stack.FAMILY_MANAGERS) do
+			for what, packages in pairs(Stack.HOST_PACKAGES) do
+				local first = installer:match("\n%s*" .. manager .. ":" .. what .. "%)%s*echo \"([^\" ]+)")
+				helpers.assert_eq(packages[family], first, manager .. ":" .. what)
+			end
+		end
 	end)
 
 	helpers.it("requires WebKitGTK 4.1 by version, not any WebKit2 (owned-runtimes-gui-stack)", function()
@@ -124,6 +188,15 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 				helpers.assert_true(type(catalogue[key]) == "string" and catalogue[key]:find("{1}", 1, true) ~= nil,
 					code .. " " .. key)
 			end
+			for _, key in ipairs({ "startup.linux_gui_stack_windows_package_body", "startup.linux_gui_stack_lgi_other_lua" }) do
+				for _, slot in ipairs({ "{1}", "{2}" }) do
+					helpers.assert_true(type(catalogue[key]) == "string" and catalogue[key]:find(slot, 1, true) ~= nil,
+						code .. " " .. key .. " " .. slot)
+				end
+			end
+			helpers.assert_true(catalogue["startup.linux_gui_stack_windows_package_body"]:find("{3}", 1, true) ~= nil,
+				code .. " names the command")
+			helpers.assert_eq(type(catalogue["startup.linux_gui_stack_windows_label"]), "string", code)
 		end
 	end)
 end)

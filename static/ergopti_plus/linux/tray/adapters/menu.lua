@@ -207,9 +207,18 @@ local function replace_menu(items)
 		Logger.debug(LOG, "setMenu() before an icon exists — kept for when one does.")
 		return false
 	end
-	if Indicator.set_menu(_items) ~= true then return false end
+	-- A reported problem (core/ui/engine/component_status.lua) leads the menu
+	-- as a red row until the daemon exits: a notification alone vanished on
+	-- KDE Plasma 6 without reaching its history.
+	local rows = require("core.ui.engine.component_status").tray_rows(function(title, body)
+		if not M.showStatusWindow(title, body) then
+			Logger.error(LOG, "Status window for '%s' could not open; the explanation is in the log.", title)
+		end
+	end)
+	for _, item in ipairs(_items) do rows[#rows + 1] = item end
+	if Indicator.set_menu(rows) ~= true then return false end
 	if describe(_paused) ~= _description then send_icon(nil) end
-	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
+	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #rows)
 	return true
 end
 
