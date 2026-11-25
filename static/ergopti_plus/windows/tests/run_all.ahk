@@ -910,6 +910,7 @@ _LLM_Deps_State := "ready"
 #Include ../core/network/proxy_override.ahk
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
+#Include unit/modules/keymap/test_emulation_quick_picker.ahk
 #Include unit/modules/keymap/test_layout_composer_host.ahk
 #Include unit/modules/keymap/test_layout_composer_stage_ownership.ahk
 #Include unit/modules/keymap/test_layout_composer_check.ahk

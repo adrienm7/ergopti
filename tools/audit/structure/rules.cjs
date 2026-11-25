@@ -352,7 +352,7 @@ const UI_FEATURES = [
 		'hotstrings',
 		/^(hotstring_editor|hotstrings_config_window|personal_info_editor|personal_toml_editor(_webview)?)$/
 	],
-	['layouts', /^(layer_editor|layout_manager|layout_composer|layout_editor)$/],
+	['layouts', /^(layer_editor|layout_manager|layout_composer|layout_editor|emulation_picker)$/],
 	['shortcuts', /^(physical_shortcuts|action_picker(_webview)?|user_action_editor)$/],
 	[
 		'ai',

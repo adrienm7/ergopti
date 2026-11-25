@@ -83,12 +83,13 @@ function M.set_switch(state, save_prefs, path, value)
 end
 
 --- Chooses the emulated layout: "none", a built-in Ergopti variant or a registry id.
+--- The layout chosen leads the recent layouts, saved with it.
 --- @param state table
 --- @param save_prefs function
 --- @param choice string
 --- @return boolean committed
 function M.choose(state, save_prefs, choice)
-	local values = Settings.choice_values(choice)
+	local values = Settings.choice_values(choice, M.settings(state).recents)
 	if values == nil then
 		Logger.error(LOG, "Refused emulated layout choice %s.", tostring(choice))
 		return false

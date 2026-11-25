@@ -5,6 +5,41 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Layout to emulate: recent layouts, then « Others… » (2026-11-25)
+
+Decided by the maintainer on 2026-11-25: « Dispositions et émulation ›
+Disposition à émuler » stays one single-choice group with exactly one checked
+row, applied live: « None » (the system layout types), then the layouts chosen
+last, the one in force first even when another owner (the onboarding, a hand
+edit) chose it, then a separator and « Autres… » (`menu.layout.emulation_others`),
+which opens the emulation picker window (`_shared/ui/emulation_picker`, the
+shared WebView of the small windows): every layout but « None », a search field
+that ignores case and accents, arrows and Enter or a click to choose, Escape to
+clear then cancel; its choice runs the same write as a row of the group.
+Mechanisms, one source each:
+
+- The recents are `layout.emulated_layout_recents` (absent by default, an
+  outdated shape reads as none), most recent first, written in the same write
+  as the selection (`layouts/engine/emulation/settings.lua` `choice_values` on
+  macOS and Linux, `_LayMgrWeb_SelectionOperations` on Windows, so the menu,
+  the picker and the layout manager all record it); « None » is never recorded. Their length is `emulation.recent_count` of
+  `_shared/layouts/data/defaults.json` (3).
+- The rows: `_shared/layouts/engine/emulation/recents.lua` and `menu.lua`
+  (macOS, Linux), `windows/modules/keymap/keylayout/emulation_recents.ahk` and
+  `ui/menu/menu_layout.ahk`, held together by
+  `_shared/tests/corpus/layouts/emulation_recents_vectors.json`; the separator
+  and « Others… » are the manifest's `layout_emulation_others_commands`.
+- The picker's page contract is `_shared/layouts/engine/emulation/picker_session.lua`
+  (macOS `ui/emulation_picker/init.lua`, Linux `ui/emulation_picker/bridge.lua`)
+  and its Windows twin `EmulationPickerSession` (`ui/emulation_picker/init.ahk`):
+  only a choice it offered, for its own session token, is written.
+
+Linux exports the group as dbusmenu radio items; the macOS menu bar
+(`hs.menubar`) and the Windows tray (AutoHotkey `Menu`) have no radio item
+style, so they draw the same single tick as a checkmark. Do not grow the
+submenu back into the whole catalogue; a new emulatable layout appears in the
+picker, and in the quick rows once chosen.
+
 ## The reading font draws the tray menus too (2026-11-24)
 
 The reading font chosen in Configuration › Accessibilité

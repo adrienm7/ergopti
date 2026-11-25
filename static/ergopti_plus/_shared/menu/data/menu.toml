@@ -2416,9 +2416,13 @@ type = "---"
 type = "section_header"
 i18n = "menu.layout.header_emulation"
 
-# The layout the emulation types over the system layout, as a submenu of
-# choices: none, the built-in Ergopti variants and the registry layouts the app
-# ships or the layout manager installed. It writes what the onboarding choice
+# The layout the emulation types over the system layout, as a submenu: one
+# single-choice group of « None » and the layouts chosen last
+# (layout.emulated_layout_recents, emulation.recent_count of
+# _shared/layouts/data/defaults.json), then layout_emulation_others_commands,
+# whose « Others… » opens the picker of every layout: the built-in Ergopti
+# variants and the registry layouts the app ships or the layout manager
+# installed (maintainer decision of 2026-11-25). It writes what the onboarding choice
 # writes, and its title names the emulated layout (and says when it cannot be
 # emulated), on the three drivers (Windows from its registry catalogue, through
 # the layout manager's acknowledged handoff).
@@ -3707,6 +3711,19 @@ type = "---"
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
+
+# The end of « Layout to emulate », below its single-choice group of « None »
+# and the layouts chosen last (maintainer decision of 2026-11-25): « Others… »
+# opens the picker window of every layout (_shared/ui/emulation_picker), whose
+# choice applies as a row of the group does. The three drivers append these
+# rows to the layout_emulation provider's choices.
+[[menu.layout_emulation_others_commands]]
+type = "---"
+
+[[menu.layout_emulation_others_commands]]
+type = "command"
+id = "layout_emulation_others"
+i18n = "menu.layout.emulation_others"
 
 # The commands of Layout's Ergopti rows (Linux): install and activate it when it
 # is not installed, activate or uninstall it once it is.

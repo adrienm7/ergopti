@@ -5550,6 +5550,21 @@
 		"reason": null
 	},
 	{
+		"path": "layout.emulated_layout_recents",
+		"family": "setting",
+		"labels": {
+			"fr": "Dispositions émulées récemment",
+			"en": "Layouts emulated recently"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "category_enabled.hotstrings",
 		"family": "feature",
 		"labels": {

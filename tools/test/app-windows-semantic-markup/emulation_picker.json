@@ -1,0 +1,18 @@
+{
+	"files": {
+		"script.js": [
+			{
+				"tag": "span",
+				"where": "var name = document.createElement('span');",
+				"count": 1,
+				"reason": "The layout's name inside its option row, laid out apart from the in-use mark; the option role already carries the row, and no phrasing element means a name."
+			},
+			{
+				"tag": "span",
+				"where": "var mark = document.createElement('span');",
+				"count": 1,
+				"reason": "The « in use » mark beside the name of the layout in force, part of the option's accessible name; no phrasing element means a status note inside a row."
+			}
+		]
+	}
+}

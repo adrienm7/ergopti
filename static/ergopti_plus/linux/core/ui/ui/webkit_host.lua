@@ -46,6 +46,7 @@ M.APP_BRIDGES = {
 	physical_shortcuts       = "physical_shortcuts_bridge",
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",
+	emulation_picker         = "emulation_picker_bridge",
 	error_dialog             = "error_dialog",
 	field_report             = "field_report", -- config-key-literal-ok: a bridge name
 	healthcheck              = "healthcheck",

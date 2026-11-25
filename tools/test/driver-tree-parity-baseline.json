@@ -172,6 +172,7 @@
 	"tree:ui/action_picker": "linux+macos+windows",
 	"tree:ui/changelog": "linux+macos+windows",
 	"tree:ui/download_window": "linux+macos+windows",
+	"tree:ui/emulation_picker": "linux+macos+windows",
 	"tree:ui/layout_manager": "linux+macos+windows",
 	"tree:ui/menu": "linux+macos+windows",
 	"tree:ui/metrics_apps": "linux+macos",

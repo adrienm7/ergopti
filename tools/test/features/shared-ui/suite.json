@@ -749,6 +749,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-analysis-views.cjs"],
 			"repro": "npm run test:layout-analysis-views"
+		},
+		{
+			"id": "js-emulation-picker-page",
+			"ordinal": 735,
+			"name": "emulation picker page (search, keyboard, choice, refusal, 21 locales)",
+			"cmd": "node",
+			"args": ["tools/test/test-emulation-picker-page.cjs"],
+			"repro": "npm run test:emulation-picker-page"
 		}
 	]
 }

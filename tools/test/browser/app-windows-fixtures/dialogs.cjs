@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Fake hosts of the small windows: the error window, the diagnostics, the
  * download and update windows, the release notes, the changelog, the action
- * picker and the configuration clean-up. See app-windows-fixtures.cjs.
+ * picker, the configuration clean-up and the emulation picker. See app-windows-fixtures.cjs.
  * ==============================================================================
  */
 
@@ -349,6 +349,34 @@ module.exports = [
 							keys: []
 						})
 					)
+			}
+		]
+	},
+	{
+		id: 'emulation_picker',
+		bridge: 'emulation_picker_bridge',
+		host: function (message) {
+			if (message !== 'ready') return;
+			window.receiveEmulationPicker({
+				session: 'emulation-picker-1',
+				choices: [
+					{ id: 'ergopti', label: 'Ergopti', current: false },
+					{ id: 'ergopti_plus', label: 'Ergopti+', current: true },
+					{ id: 'bepo', label: 'BÉPO', current: false },
+					{ id: 'ergol', label: 'Ergo‑L', current: false },
+					{ id: 'qwerty_lafayette', label: 'QWERTY-Lafayette', current: false }
+				]
+			});
+		},
+		ready: '#choices li[aria-selected="true"]',
+		states: [
+			{
+				name: 'searched',
+				enter: (page) => page.fill('#search', 'bepo')
+			},
+			{
+				name: 'no-match',
+				enter: (page) => page.fill('#search', 'dvorak')
 			}
 		]
 	},

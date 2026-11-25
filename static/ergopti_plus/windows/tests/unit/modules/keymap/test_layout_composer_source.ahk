@@ -286,8 +286,11 @@ _LCS_EmulateOperationsCase() {
 	Snapshot := Map("valid", true, "path", "C:\c.toml", "presence", true, "content", "", "values", Map())
 	Snap := (*) => Snapshot
 	Operations := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
-	AssertEqual(1, Operations.Length, "a registry selection writes only its identifier")
+	AssertEqual(2, Operations.Length, "a registry selection writes its identifier and the recent layouts")
 	AssertEqual(ConfigLeaf.EMULATED_LAYOUT, Operations[1].Key, "the identifier is the selection")
+	; The layout selected leads the recent layouts (maintainer decision of 2026-11-25).
+	AssertEqual(ConfigLeaf.EMULATED_LAYOUT_RECENTS, Operations[2].Key, "the selection leads the recent layouts")
+	AssertEqual("composed", Operations[2].Value[1])
 }
 
 Test("layout editor host: a source re-saved under another DLL name uninstalls the previous DLL first (kbd-dll-replaced)",

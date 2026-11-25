@@ -212,8 +212,14 @@ helpers.describe("input source tray selection acknowledgement", function()
 				"the emulation submenu is drawn")
 			local listed = {}
 			for _, item in ipairs(emulation.menu) do listed[item.title] = item end
-			helpers.assert_true(listed[world.names.ergol] ~= nil, "the installed registry layout can be emulated")
-			helpers.assert_eq(listed[world.names.ergol].checked, false, "no emulation is chosen by the fixture")
+			-- Never chosen yet, the installed registry layout is one of « Others… »,
+			-- the picker of every layout (maintainer decision of 2026-11-25).
+			local i18n = require("core.i18n.engine.i18n")
+			helpers.assert_true(listed[i18n.get("menu.layout.emulation_others")] ~= nil,
+				"the installed registry layout can be emulated from « Others… »")
+			helpers.assert_nil(listed[world.names.ergol], "a layout never chosen is no quick choice")
+			helpers.assert_true(listed[i18n.get("onboarding.layout.emulated_none")].checked,
+				"no emulation is chosen by the fixture")
 			helpers.assert_eq(#world.calls, 0, "drawing the menu switches nothing")
 		end)
 	end)

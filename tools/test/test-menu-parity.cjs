@@ -135,6 +135,17 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
 	},
+	// « Layout to emulate » ends on its shared « Others… » rows on the three OS.
+	layout_emulation: {
+		menu: 'layout_emulation_others_commands',
+		platforms: ['ahk', 'hs', 'linux'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/menu/menu_layout.ahk',
+			hs: 'macos/ui/menu/menu_keyboard_layout.lua',
+			linux: 'linux/ui/menu/menu_layouts.lua'
+		}
+	},
 	apps_installed: {
 		menu: 'apps_empty_rows',
 		platforms: ['hs'],

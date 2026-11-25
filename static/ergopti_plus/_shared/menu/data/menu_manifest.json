@@ -4202,6 +4202,16 @@
 			"i18n": "menu.layout.open_prefs"
 		}
 	],
+	"layout_emulation_others_commands": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "layout_emulation_others",
+			"i18n": "menu.layout.emulation_others"
+		}
+	],
 	"layout_user_install_commands": [
 		{
 			"type": "command",

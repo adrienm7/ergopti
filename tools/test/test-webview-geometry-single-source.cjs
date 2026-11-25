@@ -239,6 +239,7 @@ for (const [name, source] of [
 // id → module file (relative to static/ergopti_plus/macos).
 const MACOS_MODULES = {
 	config_cleanup: 'settings/ui/cleanup.lua',
+	emulation_picker: 'ui/emulation_picker/init.lua',
 	action_picker: 'ui/action_picker/init.lua',
 	hotstrings_config_window: 'hotstrings/ui/hotstrings_config_window/init.lua',
 	prompt_editor: 'ai/ui/prompt_editor/init.lua',
@@ -401,6 +402,11 @@ const WINDOWS_APPS = {
 			new RegExp(`ACTPICK_WIDTH\\s*:=\\s*${m.width}\\b`),
 			new RegExp(`ACTPICK_HEIGHT\\s*:=\\s*${m.height}\\b`)
 		]
+	},
+	emulation_picker: {
+		file: 'ui/emulation_picker/init.ahk',
+		// The WebViewHost base sizes the window from the manifest entry.
+		checks: () => [/WebViewHost\.TryOpen\(\s*"emulation_picker"/, /^(?![\s\S]*_Geometry\(\)\s*\{)/]
 	},
 	layout_editor_window: {
 		file: 'ui/layout_manager/editor_window.ahk',
