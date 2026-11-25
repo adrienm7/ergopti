@@ -232,8 +232,8 @@ FieldRun_Runners() {
 			|| Done.Call("fail", ["busy"]),
 		"composer", (Spec, Done) => ComposerCheck_Run(_FieldRun_ReportOutcome.Bind(Spec, , Done))
 			|| Done.Call("fail", ["busy"]),
-		"send_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunSendComparison, _FieldRun_SendProbeCodes),
-		"hook_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunHookOrder, _FieldRun_HookProbeCodes))
+		"send_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunSendComparison, _FieldRun_SendProbeCodes), ; config-key-literal-ok: a step check name
+		"hook_probe", _FieldRun_RunInputProbe.Bind(InputProbe_RunHookOrder, _FieldRun_HookProbeCodes)) ; config-key-literal-ok: a step check name
 }
 
 /**

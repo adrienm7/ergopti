@@ -60,7 +60,7 @@ global FIELD_REPORT_VERDICTS := ["pass", "fail", "timeout", "skip", "needs_perso
 ; asking not to type.
 FieldReport_RowChecks() {
 	return Map(MenuCommand.FIELD_CHECK_NETWORK, "network", MenuCommand.COMPOSER_CHECK, "composer",
-		MenuCommand.SEND_PROBE, "send_probe", MenuCommand.HOOK_PROBE, "hook_probe")
+		MenuCommand.SEND_PROBE, "send_probe", MenuCommand.HOOK_PROBE, "hook_probe") ; config-key-literal-ok: check names
 }
 
 
