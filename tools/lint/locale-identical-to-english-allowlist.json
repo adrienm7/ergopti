@@ -1404,6 +1404,35 @@
 			"reason": "unit-or-abbreviation",
 			"locales": ["de", "nl"]
 		},
+		"layout_analysis.blend.corpus": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "nl", "pt"]
+		},
+		"layout_analysis.blend.entry_part": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_analysis.table.layout": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "de", "it", "pt", "sv"]

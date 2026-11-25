@@ -247,6 +247,18 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   three codes in a row, the most frequent first. The trace's « Corpus words »
   button opens them under each penalised pair or triple (the drill-down of the
   Layouts Wiki playground's Keystrokes and Words views).
+- `blendNgrams(parts)` → `{chars, bigrams, trigrams, breaks, words}`: a
+  weighted blend of corpora `{ngrams, weight}` (an idea seen in the Layouts
+  Wiki playground's corpus blends). Each part is scaled so its characters
+  make its weight's share of `BLEND_CHARS` (1,000,000), whatever its size, then
+  summed, `breaks` too; the word tables are mixed the same way on their own
+  totals and cut to the 1,000 most frequent. The other analysers' text counts
+  cannot be mixed and are left out (their scorers read the tables, as for a
+  corpus of counts). A part of weight 0 is skipped; no part, a negative
+  weight or all weights 0 throw. The Comparer's « Home » offers it under the
+  corpus picker (« Blend corpora »: up to three built-in corpora and their
+  weights); the blend is listed with the user's own texts and is not kept
+  across visits.
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the

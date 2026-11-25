@@ -4997,6 +4997,71 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	// How many characters a corpus blend counts: each part scaled to its share of it.
+	const BLEND_CHARS = 1000000;
+	// The tables a blend mixes, each part scaled by the same factor (also those
+	// of `breaks`, the n-grams across a line break, itself such a set).
+	const BLEND_TABLES = ['chars', 'bigrams', 'trigrams'];
+
+	/**
+	 * A weighted blend of corpora (an idea seen in the Layouts Wiki playground's
+	 * corpus blends): each part's tables scaled so its characters make its
+	 * weight's share of BLEND_CHARS, then summed; the word tables mixed the
+	 * same way on their own totals and cut to the WORD_TABLE_SIZE most frequent.
+	 * The other analysers' text counts cannot be mixed and are left out (their
+	 * scorers then read the tables, as for a corpus of counts).
+	 * @param {Array<{ngrams: object, weight: number}>} parts - Raw tables
+	 *   ({chars, bigrams, trigrams, breaks?, words?}) and weights ≥ 0, one at least
+	 *   above 0; a part of weight 0 is skipped.
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: object,
+	 *   words: object|null}} words: null when no weighted part has a word table.
+	 * @throws {Error} On no part, a weight that is negative or not finite, all
+	 *   weights 0, or a weighted part without characters.
+	 */
+	function blendNgrams(parts) {
+		if (!Array.isArray(parts) || parts.length === 0)
+			throw new Error('layout_analysis: blendNgrams needs at least one part');
+		for (const part of parts)
+			if (!part || !Number.isFinite(part.weight) || part.weight < 0)
+				throw new Error('layout_analysis: a blend weight must be a number ≥ 0');
+		const used = parts.filter((part) => part.weight > 0);
+		if (used.length === 0) throw new Error('layout_analysis: a blend needs a weight above 0');
+		const all = used.reduce((sum, part) => sum + part.weight, 0);
+		const out = {
+			chars: {},
+			bigrams: {},
+			trigrams: {},
+			breaks: { chars: {}, bigrams: {}, trigrams: {} }
+		};
+		const add = (into, table, factor) => {
+			for (const [token, n] of Object.entries(table || {}))
+				if (n > 0) into[token] = (into[token] || 0) + n * factor;
+		};
+		const words = {};
+		let anyWords = false;
+		for (const part of used) {
+			const total = Object.values(part.ngrams.chars || {}).reduce(
+				(sum, n) => sum + (n > 0 ? n : 0),
+				0
+			);
+			if (!(total > 0)) throw new Error('layout_analysis: a blended corpus has no characters');
+			const factor = (BLEND_CHARS * part.weight) / all / total;
+			for (const name of BLEND_TABLES) {
+				add(out[name], part.ngrams[name], factor);
+				add(out.breaks[name], (part.ngrams.breaks || {})[name], factor);
+			}
+			if (part.ngrams.words) {
+				const count = Object.values(part.ngrams.words).reduce((sum, n) => sum + n, 0);
+				if (count > 0) {
+					anyWords = true;
+					add(words, part.ngrams.words, (BLEND_CHARS * part.weight) / all / count);
+				}
+			}
+		}
+		out.words = anyWords ? wordTable(words) : null;
+		return out;
+	}
+
 	const PARETO_DIRECTIONS = ['lower', 'higher'];
 
 	/**
@@ -8133,6 +8198,8 @@ var LAYOUT_ANALYSIS = (function () {
 		MOVEMENT_CLASSES,
 		movementTable,
 		wordsWithKeys,
+		blendNgrams,
+		BLEND_CHARS,
 		pareto,
 		defaultWeights,
 		defaultFloors,

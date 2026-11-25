@@ -319,21 +319,22 @@ waits for the maintainer's review).
       docs/design/analyser-scores.md); both stay `close` for the word lists and the 12 count-table corpora (the
       trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
       own run to be checked; shirolyzer's score is undocumented.
-- [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace »
-      tabs, their links, the movement table and the trace's « Corpus words » (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in
-      order: (1) the « Corpus words » drill-down in the editor's analysis panel too (done in the Comparer's trace and
-      worst n-grams: `E.wordsWithKeys`, the `words` option of `board/worst_groups.js`; the panel needs its corpus's
-      word table); (2) corpus blends: a weighted mix of
-      built-in corpora, their n-gram counts summed with the chosen weights before `prepareNgrams`, offered in the corpus picker and kept
-      with the conveniences; (3) magic and repeat keys: write a design first (`layout-source-format.md`, engine
-      ways of typing as a context-dependent output, and the three drivers' emulation, `cross-driver-parity`);
-      (4) saved layout versions in the editor beside undo; (5) task help inside the Studio (« How do I compare,
-      rank, read a Pareto »), routed through `i18n`; (6) more shown-only metrics of the playground's views, as
-      extra rows of the movement table: row changes split concordant and discordant (the longer finger reaching
-      up or not), alternation whose ends are an SFS, weak redirects (no index), each with and without thumbs, and
-      each cell's percentile against the library (`E.percentiles`); (7) a Principal and Comparison frame at the top
-      of the Comparer that every tab follows (today « One layout » and the trace each choose theirs); (8) Kawalyzer's
-      « Clever Keys » (context outputs) with item (3).
+- [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
+      their links, the movement table and the trace's « Corpus words »
+      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (1) the « Corpus
+      words » drill-down in the editor's analysis panel too (done in the Comparer's trace and worst n-grams:
+      `E.wordsWithKeys`, the `words` option of `board/worst_groups.js`; the panel needs its corpus's word table); (2)
+      corpus blends, what is left: keep the last blend with the conveniences (its recipe, rebuilt on the next visit),
+      carry it in the share link, and blend the user's own text or « Ma frappe » too (done: up to three built-in corpora
+      by weight, `E.blendNgrams`, under the corpus picker); (3) magic and repeat keys: write a design first
+      (`layout-source-format.md`, engine ways of typing as a context-dependent output, and the three drivers' emulation,
+      `cross-driver-parity`); (4) saved layout versions in the editor beside undo; (5) task help inside the Studio («
+      How do I compare, rank, read a Pareto »), routed through `i18n`; (6) more shown-only metrics of the playground's
+      views, as extra rows of the movement table: row changes split concordant and discordant (the longer finger
+      reaching up or not), alternation whose ends are an SFS, weak redirects (no index), each with and without thumbs,
+      and each cell's percentile against the library (`E.percentiles`); (7) a Principal and Comparison frame at the top
+      of the Comparer that every tab follows (today « One layout » and the trace each choose theirs); (8) Kawalyzer's «
+      Clever Keys » (context outputs) with item (3).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

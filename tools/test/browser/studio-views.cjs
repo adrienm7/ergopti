@@ -22,6 +22,8 @@
  *    the trace's text and layouts, and the link opens on them.
  * 5. Worst n-grams: each row of the overview's cards opens the corpus words
  *    typing its keys in a row.
+ * 6. Blends: two built-in corpora mixed by weight become the compared
+ *    corpus, named with their shares; an invalid weight is refused in words.
  * 4. Movements: « One layout » lists each pair class over adjacent pairs and
  *    skipgrams, with the compared layout's columns and their difference.
  * ==============================================================================
@@ -253,7 +255,38 @@ async function exerciseWorstWords(browser, origin) {
 	await context.close();
 }
 
+async function exerciseBlend(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-home');
+	await page.locator('#la-blend > summary').click();
+	await page.selectOption('#la-blend-corpus-0', 'fr_nemolivier');
+	await page.selectOption('#la-blend-corpus-1', 'en_carroll_alice');
+	await page.fill('#la-blend-weight-0', '70');
+	await page.fill('#la-blend-weight-1', '30');
+	await page.fill('#la-blend-weight-2', '0');
+	await page.click('#la-blend-use');
+	await page.waitForFunction(() => document.getElementById('la-corpus').value === 'blend');
+	const title = await page.$eval('#la-corpus', (select) => select.selectedOptions[0].textContent);
+	assert.ok(
+		title.startsWith(EN['layout_analysis.blend.entry'].split('{parts}')[0]) &&
+			title.includes('70') &&
+			title.includes('30'),
+		`blend: the corpus list names the blend (${title})`
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.fill('#la-blend-weight-0', '-5');
+	await page.click('#la-blend-use');
+	assert.equal(
+		await page.textContent('#la-blend-status'),
+		EN['layout_analysis.blend.weight_invalid'].replace('{n}', '1'),
+		'blend: an invalid weight is refused in words'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseBlend,
 	exercisePareto,
 	exerciseTrace,
 	exerciseViewLinks,
