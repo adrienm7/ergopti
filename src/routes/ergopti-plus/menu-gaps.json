@@ -271,12 +271,8 @@
 		"path": "debug_menu.export_logs",
 		"visibility": "hide",
 		"labels": { "fr": "Exporter les logs (zip)", "en": "Export the logs (zip)" },
-		"platforms": { "windows": false, "macos": false, "linux": true },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
-			"windows": {
-				"en": "Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.",
-				"fr": "Chaque pilote se débogue par son propre moteur d'exécution : AutoHotkey fournit Window Spy, une liste de variables et un historique des touches, Hammerspoon fournit une console Lua. Les autres moteurs n'ont aucun équivalent à ouvrir."
-			},
 			"macos": {
 				"en": "Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.",
 				"fr": "Chaque pilote se débogue par son propre moteur d'exécution : AutoHotkey fournit Window Spy, une liste de variables et un historique des touches, Hammerspoon fournit une console Lua. Les autres moteurs n'ont aucun équivalent à ouvrir."

@@ -182,6 +182,7 @@ OnError(_FatalErrorHandler)
 #Include ../core/ui/engine/native_dialogs.ahk
 #Include ../core/ui/engine/style.ahk
 #Include ../_generated/app_dirs.ahk
+#Include ../_generated/log_export_data.ahk
 #Include ../apps/engine/folders.ahk
 #Include ../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../core/logger/engine/logger.ahk
@@ -493,6 +494,10 @@ InstallSendNoOps()
 ; The logs-folder resolver and the Debug menu log openers built on it
 ; (logs-dir-resolver). log_openers.ahk is definitions only.
 #Include ../diagnostics/ui/log_openers.ahk
+; « Export the logs (zip) »: the shared-vector port and its action, definitions only.
+#Include ../diagnostics/engine/log_export.ahk
+#Include ../diagnostics/ui/log_export.ahk
+#Include unit/diagnostics/ui/test_log_export.ahk
 #Include unit/core/logger/test_logs_dir_resolver.ahk
 #Include meta/core/logger/test_logs_dir_single_resolver.ahk
 ; The folders editor host: definitions only until a window is opened; its
