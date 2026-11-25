@@ -110,12 +110,10 @@
 	--theme-grey-f3f3f3: #f3f3f3;
 	--theme-grey-f5f5f5: #f5f5f5;
 	--theme-grey-f9f9f9: #f9f9f9;
-	--theme-hue-005cc5: #005cc5;
 	/* The accessible accent: 8.6:1 under white text, 7.7:1 as text on the light
 	   grey background, where the Apple blue gives 4.0:1 and 3.6:1 (WCAG 1.4.6
 	   enhanced contrast, AAA). */
 	--theme-hue-004a99: #004a99;
-	--theme-hue-008000: #008000;
 	--theme-hue-094771: #094771;
 	--theme-hue-0a3a6e: #0a3a6e;
 	--theme-hue-0f172a: #0f172a;
@@ -170,7 +168,6 @@
 	--theme-hue-77dd77: #77dd77;
 	--theme-hue-8a1a14: #8a1a14;
 	--theme-hue-9973f2: #9973f2;
-	--theme-hue-9a6700: #9a6700;
 	--theme-hue-9ae6ac: #9ae6ac;
 	--theme-hue-9ccaff: #9ccaff;
 	--theme-hue-9cdcfe: #9cdcfe;
@@ -187,7 +184,6 @@
 	--theme-hue-cfe0ff: #cfe0ff;
 	--theme-hue-cfe3f5: #cfe3f5;
 	--theme-hue-d0d0d4: #d0d0d4;
-	--theme-hue-d29922: #d29922;
 	--theme-hue-d4d4d6: #d4d4d6;
 	--theme-hue-d9b3f7: #d9b3f7;
 	--theme-hue-d70015: #d70015;
@@ -209,7 +205,6 @@
 	--theme-hue-f5f8ff: #f5f8ff;
 	--theme-hue-fbeceb: #fbeceb;
 	--theme-hue-ff2d55: #ff2d55;
-	--theme-hue-ff3333: #ff3333;
 	--theme-hue-ff6961: #ff6961;
 	--theme-hue-ff6b00: #ff6b00;
 	--theme-hue-ff6b5f: #ff6b5f;
