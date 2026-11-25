@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Ord ur korpusen med {keys}",
 	"layout_analysis.trace.words_none": "Inget ord i korpusens ordlista skriver dessa tangenter i följd.",
 	"layout_analysis.trace.words_found": "{words} ({count} förekomster i ordlistan)",
-	"layout_analysis.movement.title": "Rörelser: grannpar och skipgram",
+	"layout_analysis.movement.title": "Rörelser — grannpar och skipgram",
 	"layout_analysis.movement.caption": "Varje slags tangentpar som andel av grannparen och som andel av skipgrammen: första och sista tangenten i varje tangenttrippel, lästa som om de följde varandra. Visas bara, räknas aldrig i poängen; parkolumnen är analysens eget mått.",
 	"layout_analysis.movement.class": "Slags par",
 	"layout_analysis.movement.bigrams": "{layout}: par",

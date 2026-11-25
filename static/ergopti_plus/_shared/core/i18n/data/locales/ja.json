@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "{keys} を含むコーパスの単語",
 	"layout_analysis.trace.words_none": "コーパスの単語リストに、これらのキーを続けて打つ単語はありません。",
 	"layout_analysis.trace.words_found": "{words}（単語リストで {count} 回）",
-	"layout_analysis.movement.title": "動き：隣接ペアとスキップグラム",
+	"layout_analysis.movement.title": "動き（隣接ペアとスキップグラム）",
 	"layout_analysis.movement.caption": "キーペアの種類ごとに、隣接するキーペアに占める割合と、スキップグラム（各3連打の最初と最後のキーを連続とみなしたもの）に占める割合を示します。表示のみでスコアには入りません。ペアの列は分析自体の指標です。",
 	"layout_analysis.movement.class": "ペアの種類",
 	"layout_analysis.movement.bigrams": "{layout}：ペア",

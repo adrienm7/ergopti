@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Wörter des Korpus mit {keys}",
 	"layout_analysis.trace.words_none": "Kein Wort der Wortliste des Korpus tippt diese Tasten nacheinander.",
 	"layout_analysis.trace.words_found": "{words} ({count} Vorkommen in der Wortliste)",
-	"layout_analysis.movement.title": "Bewegungen: benachbarte Paare und Skipgramme",
+	"layout_analysis.movement.title": "Bewegungen — benachbarte Paare und Skipgramme",
 	"layout_analysis.movement.caption": "Jede Art von Tastenpaar als Anteil der benachbarten Tastenpaare und als Anteil der Skipgramme: erste und letzte Taste jedes Tastentripels, gelesen, als folgten sie aufeinander. Nur angezeigt, nie bewertet; die Paarspalte ist der Messwert der Analyse selbst.",
 	"layout_analysis.movement.class": "Art des Paares",
 	"layout_analysis.movement.bigrams": "{layout}: Paare",

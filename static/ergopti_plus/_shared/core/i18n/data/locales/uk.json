@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Слова корпусу з {keys}",
 	"layout_analysis.trace.words_none": "Жодне слово зі списку слів корпусу не набирає ці клавіші поспіль.",
 	"layout_analysis.trace.words_found": "{words} ({count} входжень у списку слів)",
-	"layout_analysis.movement.title": "Рухи: сусідні пари й скіпграми",
+	"layout_analysis.movement.title": "Рухи — сусідні пари й скіпграми",
 	"layout_analysis.movement.caption": "Кожен вид пари клавіш як частка сусідніх пар і як частка скіпграм: перша й остання клавіші кожної трійки, прочитані так, ніби йдуть поспіль. Лише показується, до балу не входить; стовпець пар — це власна метрика аналізу.",
 	"layout_analysis.movement.class": "Вид пари",
 	"layout_analysis.movement.bigrams": "{layout}: пари",

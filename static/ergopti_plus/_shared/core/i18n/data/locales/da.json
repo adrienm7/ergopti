@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Ord fra korpus med {keys}",
 	"layout_analysis.trace.words_none": "Intet ord i korpussets ordliste skriver disse taster efter hinanden.",
 	"layout_analysis.trace.words_found": "{words} ({count} forekomster i ordlisten)",
-	"layout_analysis.movement.title": "Bevægelser: nabopar og skipgrammer",
+	"layout_analysis.movement.title": "Bevægelser — nabopar og skipgrammer",
 	"layout_analysis.movement.caption": "Hver slags tastpar som andel af naboparrene og som andel af skipgrammerne: første og sidste tast i hver tasttripel, læst som om de fulgte efter hinanden. Kun vist, aldrig talt med i scoren; parkolonnen er analysens egen måling.",
 	"layout_analysis.movement.class": "Slags par",
 	"layout_analysis.movement.bigrams": "{layout}: par",

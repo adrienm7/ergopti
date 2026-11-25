@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Woorden uit het corpus met {keys}",
 	"layout_analysis.trace.words_none": "Geen woord uit de woordenlijst van het corpus typt deze toetsen na elkaar.",
 	"layout_analysis.trace.words_found": "{words} ({count} keer in de woordenlijst)",
-	"layout_analysis.movement.title": "Bewegingen: aangrenzende paren en skipgrammen",
+	"layout_analysis.movement.title": "Bewegingen — aangrenzende paren en skipgrammen",
 	"layout_analysis.movement.caption": "Elk soort toetspaar als aandeel van de aangrenzende toetsparen, en als aandeel van de skipgrammen: de eerste en laatste toets van elk toetsdrietal, gelezen alsof ze op elkaar volgden. Alleen getoond, nooit gescoord; de parenkolom is de meting van de analyse zelf.",
 	"layout_analysis.movement.class": "Soort paar",
 	"layout_analysis.movement.bigrams": "{layout}: paren",

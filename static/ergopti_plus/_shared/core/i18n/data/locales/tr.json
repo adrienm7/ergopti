@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "{keys} içeren derlem sözcükleri",
 	"layout_analysis.trace.words_none": "Derlemin sözcük listesindeki hiçbir sözcük bu tuşları art arda yazmıyor.",
 	"layout_analysis.trace.words_found": "{words} (sözcük listesinde {count} kez)",
-	"layout_analysis.movement.title": "Hareketler: komşu ikililer ve atlamalı ikililer",
+	"layout_analysis.movement.title": "Hareketler — komşu ikililer ve atlamalı ikililer",
 	"layout_analysis.movement.caption": "Her tuş ikilisi türü, komşu tuş ikililerinin payı olarak ve atlamalı ikililerin payı olarak: her tuş üçlüsünün ilk ve son tuşu, art arda geliyormuş gibi okunur. Yalnızca gösterilir, puana hiç girmez; ikili sütunu analizin kendi ölçümüdür.",
 	"layout_analysis.movement.class": "İkili türü",
 	"layout_analysis.movement.bigrams": "{layout}: ikililer",

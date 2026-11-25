@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "מילים מהקורפוס עם {keys}",
 	"layout_analysis.trace.words_none": "אף מילה ברשימת המילים של הקורפוס אינה מקלידה מקשים אלה ברצף.",
 	"layout_analysis.trace.words_found": "{words} ({count} מופעים ברשימת המילים)",
-	"layout_analysis.movement.title": "תנועות: זוגות סמוכים וסקיפגרמות",
+	"layout_analysis.movement.title": "תנועות — זוגות סמוכים וסקיפגרמות",
 	"layout_analysis.movement.caption": "כל סוג של זוג מקשים כחלק מהזוגות הסמוכים, וכחלק מהסקיפגרמות: המקש הראשון והאחרון של כל שלשה, כאילו באו זה אחר זה. מוצג בלבד, לעולם לא נספר בציון; עמודת הזוגות היא המדד של הניתוח עצמו.",
 	"layout_analysis.movement.class": "סוג הזוג",
 	"layout_analysis.movement.bigrams": "{layout}: זוגות",

@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Corpus words with {keys}",
 	"layout_analysis.trace.words_none": "No word of the corpus's word table holds these keys in a row.",
 	"layout_analysis.trace.words_found": "{words} ({count} occurrences in the word table)",
-	"layout_analysis.movement.title": "Movements: adjacent pairs and skipgrams",
+	"layout_analysis.movement.title": "Movements — adjacent pairs and skipgrams",
 	"layout_analysis.movement.caption": "Each kind of key pair as a share of the adjacent key pairs, and as a share of the skipgrams: the first and last keys of every key trigram, read as if they followed each other. Shown only, never scored; the bigram column is the analysis's own metric.",
 	"layout_analysis.movement.class": "Kind of pair",
 	"layout_analysis.movement.bigrams": "{layout}: pairs",

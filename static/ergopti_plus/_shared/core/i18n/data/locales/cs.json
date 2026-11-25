@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Slova korpusu s {keys}",
 	"layout_analysis.trace.words_none": "Žádné slovo ze seznamu slov korpusu nepíše tyto klávesy po sobě.",
 	"layout_analysis.trace.words_found": "{words} ({count} výskytů v seznamu slov)",
-	"layout_analysis.movement.title": "Pohyby: sousední dvojice a skipgramy",
+	"layout_analysis.movement.title": "Pohyby — sousední dvojice a skipgramy",
 	"layout_analysis.movement.caption": "Každý druh dvojice kláves jako podíl sousedních dvojic a jako podíl skipgramů: první a poslední klávesa každé trojice, čtené, jako by šly po sobě. Jen zobrazeno, nikdy nehodnoceno; sloupec dvojic je měření samotné analýzy.",
 	"layout_analysis.movement.class": "Druh dvojice",
 	"layout_analysis.movement.bigrams": "{layout}: dvojice",

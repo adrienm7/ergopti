@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Palavras do corpus com {keys}",
 	"layout_analysis.trace.words_none": "Nenhuma palavra da lista do corpus digita estas teclas seguidas.",
 	"layout_analysis.trace.words_found": "{words} ({count} ocorrências na lista de palavras)",
-	"layout_analysis.movement.title": "Movimentos: pares vizinhos e skipgramas",
+	"layout_analysis.movement.title": "Movimentos — pares vizinhos e skipgramas",
 	"layout_analysis.movement.caption": "Cada tipo de par de teclas como parte dos pares vizinhos, e como parte dos skipgramas: a primeira e a última tecla de cada trio, lidas como se se seguissem. Apenas mostrado, nunca pontuado; a coluna dos pares é a própria métrica da análise.",
 	"layout_analysis.movement.class": "Tipo de par",
 	"layout_analysis.movement.bigrams": "{layout}: pares",

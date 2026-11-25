@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "Mots du corpus avec {keys}",
 	"layout_analysis.trace.words_none": "Aucun mot de la liste de mots du corpus ne tape ces touches à la suite.",
 	"layout_analysis.trace.words_found": "{words} ({count} occurrences dans la liste de mots)",
-	"layout_analysis.movement.title": "Mouvements : paires voisines et skipgrammes",
+	"layout_analysis.movement.title": "Mouvements — paires voisines et skipgrammes",
 	"layout_analysis.movement.caption": "Chaque type de paire de touches en part des paires voisines, et en part des skipgrammes : la première et la dernière touche de chaque triplet, lues comme si elles se suivaient. Affiché seulement, jamais compté dans le score ; la colonne des paires est la mesure de l'analyse elle-même.",
 	"layout_analysis.movement.class": "Type de paire",
 	"layout_analysis.movement.bigrams": "{layout} : paires",

@@ -6098,7 +6098,7 @@
 	"layout_analysis.trace.words_for": "{keys}가 들어간 말뭉치 단어",
 	"layout_analysis.trace.words_none": "말뭉치 단어 목록에 이 키를 연달아 치는 단어가 없습니다.",
 	"layout_analysis.trace.words_found": "{words}(단어 목록에서 {count}회)",
-	"layout_analysis.movement.title": "움직임: 인접 쌍과 스킵그램",
+	"layout_analysis.movement.title": "움직임 — 인접 쌍과 스킵그램",
 	"layout_analysis.movement.caption": "키 쌍의 종류별로 인접 키 쌍 중 비율과, 스킵그램(각 3연타의 첫 키와 마지막 키를 연속으로 본 것) 중 비율을 보여 줍니다. 표시만 하며 점수에는 넣지 않습니다. 쌍 열은 분석 자체의 지표입니다.",
 	"layout_analysis.movement.class": "쌍의 종류",
 	"layout_analysis.movement.bigrams": "{layout}: 쌍",
