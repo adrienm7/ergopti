@@ -919,7 +919,9 @@ local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
 		prepared({
 			boot_ms          = boot_ms,
 			locale           = i18n_mod and i18n_mod.get_locale() or nil,
-			keyboard_layout  = opts.layout,
+			-- The layout the session loaded, as macOS reports its input source;
+			-- opts.layout is only the physical family (qwerty or azerty).
+			keyboard_layout  = keyboard_layout.layout_name(),
 			log_level        = ScriptSettings.current(),
 			features_enabled = enabled,
 			features_total   = total,
@@ -1040,7 +1042,7 @@ local function main()
 		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
-	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
+	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s input_family=%s keymap=%s config=%s.",
 		tostring(opts.grab), tostring(opts.tray), tostring(opts.dry_run), tostring(opts.verbose),
 		opts.device and "pinned" or "auto", tostring(opts.layout),
 		opts.keymap and "override" or "server", opts.config and "custom" or "default")
@@ -3942,8 +3944,8 @@ local function main()
 		Logger.debug(LOG, "Typed input withheld from the engines: %s%s.", reason,
 			error_type and (" (prediction error type " .. error_type .. ")") or "")
 	end)
-	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
-		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
+	Logger.success(LOG, "Daemon ready (device=%s input_family=%s layout=\"%s\" mappings=%d dry_run=%s tray=%s).",
+		device, opts.layout, keyboard_layout.layout_name() or "unresolved", mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
 	-- An update watcher that started this daemon keeps it only once it reports ready.

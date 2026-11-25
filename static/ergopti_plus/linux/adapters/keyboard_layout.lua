@@ -89,6 +89,14 @@ local GNOME_MRU     = "gsettings get org.gnome.desktop.input-sources mru-sources
 local GNOME_SOURCES = "gsettings get org.gnome.desktop.input-sources sources 2>/dev/null"
 local GNOME_OPTIONS = "gsettings get org.gnome.desktop.input-sources xkb-options 2>/dev/null"
 local LOCALECTL     = "localectl status 2>/dev/null"
+-- The active layout of a KDE Plasma session (the keyboard daemon, Plasma 5.21
+-- and later), as a 0-based index into the layouts KWin compiled into the one
+-- keymap it sends. KWin switches the group itself, so the dumped keymap says
+-- nothing about which layout is active. GNOME needs no such question: Mutter
+-- compiles the current input source alone (plus a Latin fallback after it for
+-- a non-Latin source), so its first group is the active one.
+local KDE_ACTIVE_LAYOUT = "gdbus call --session --dest org.kde.keyboard --object-path /Layouts"
+	.. " --method org.kde.KeyboardLayouts.getLayout 2>/dev/null"
 local KEYBOARD_DEFAULTS = { "/etc/default/keyboard", "/etc/vconsole.conf" }
 
 -- A parsed keymap with fewer entries than this is a parse that went wrong, not a
@@ -108,6 +116,10 @@ local _source = nil
 
 -- evdev keycode → its level-1 keysym, from the same dump. nil until built.
 local _base = nil
+
+-- The name the loaded keymap gives its active group ("French (Ergopti)"),
+-- for diagnostics; nil until built or when the dump names no group.
+local _layout_name = nil
 
 -- The spacing symbol of each dead keysym a layout puts on a key, for a label:
 -- a dead key types nothing on its own, so Keysym.to_char has no character for
@@ -276,6 +288,22 @@ local function session_layout_names()
 	return nil
 end
 
+--- The 0-based layout the desktop reports as active, for a session whose
+--- compositor switches the keymap's group itself (KDE Plasma on Wayland).
+--- @param source string What produced the keymap.
+--- @return integer|nil group nil when the desktop is not asked.
+--- @return string|nil problem Why the desktop could not answer.
+local function desktop_active_group(source)
+	if source == "override" or not DisplayServer.is_wayland() or not DisplayServer.desktop_is("kde") then
+		return nil, nil
+	end
+	if not Shell.has_command("gdbus") then return nil, "gdbus is not installed" end
+	local ok, out = Shell.exec_checked(KDE_ACTIVE_LAYOUT)
+	local index = ok and require("adapters.input_source_switch").parse_kde_index(out) or nil
+	if index == nil then return nil, "the KDE keyboard daemon did not report its active layout" end
+	return index, nil
+end
+
 --- Runs the dump command appropriate to this session.
 --- @return string|nil The keymap text, or nil when nothing could produce one.
 --- @return string|nil The command that produced it, for the log.
@@ -431,7 +459,7 @@ function M.refresh(override_path)
 	_selection_override = override_path
 	_refresh_epoch = _refresh_epoch + 1
 	local epoch = _refresh_epoch
-	_table, _base, _cohort = nil, nil, nil
+	_table, _base, _cohort, _layout_name = nil, nil, nil, nil
 	Logger.start(LOG, "Resolving the active keyboard layout…")
 
 	local text, source = read_override(override_path), "override"
@@ -464,6 +492,22 @@ function M.refresh(override_path)
 		Logger.error(LOG, "Active keymap cannot initialise XKB capture via %s — %s.",
 			tostring(source), tostring(capture_err))
 		return false
+	end
+
+	-- The dumped keymap's fresh state sits in group 1; KWin may have another
+	-- layout active, and capture and injection must both read that one.
+	local desktop_group, group_problem = desktop_active_group(source)
+	if group_problem then
+		Logger.warn(LOG, "The active layout is unknown (%s); the keymap's first layout is used.", group_problem)
+	elseif desktop_group ~= nil then
+		local selected, select_err = XkbCapture.select_group(desktop_group)
+		if _refresh_epoch ~= epoch then return false end
+		if not selected then
+			_table, _base, _cohort = nil, nil, nil
+			Logger.error(LOG, "The desktop's active layout %d cannot be followed via %s — %s.",
+				desktop_group + 1, tostring(source), tostring(select_err))
+			return false
+		end
 	end
 
 	-- Asked of libxkbcommon on the keymap capture just validated, not parsed
@@ -500,14 +544,17 @@ function M.refresh(override_path)
 		return false
 	end
 	local base = M.build_base(text, group)
+	local names = XkbKeymap.group_names(text)
 	local check = inverse_current
 	local ok, current = pcall(check, receipt)
 	if _refresh_epoch ~= epoch or XkbCapture.inverse_current ~= check or not ok or current ~= true then return false end
 	publish(built, receipt)
 	_source = source
 	_base = base
+	_layout_name = names[group]
 	_reported_absent = false
-	Logger.success(LOG, "Layout resolved: %d typable character(s) via %s.", count, tostring(source))
+	Logger.success(LOG, "Layout resolved: \"%s\" (group %d of %d), %d typable character(s) via %s.",
+		_layout_name or "unnamed", group, math.max(TableUtil.count(names), group), count, tostring(source))
 	return true
 end
 
@@ -525,6 +572,13 @@ function M.refresh_unless_current(override_path)
 		return true
 	end
 	return M.refresh(override_path)
+end
+
+--- The name the loaded keymap gives its active group, or nil when none is
+--- loaded or the dump names no group (diagnostics only).
+--- @return string|nil
+function M.layout_name()
+	return current_cohort() and _layout_name or nil
 end
 
 --- What produced the loaded keymap, or nil when none is loaded.

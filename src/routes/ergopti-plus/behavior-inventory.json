@@ -201,7 +201,7 @@
 				{
 					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "4c6783faa2c73309221d8416786c3e00593518660cf286c892c0faf7c425864f"
 				},
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
@@ -256,7 +256,7 @@
 				{
 					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "4c6783faa2c73309221d8416786c3e00593518660cf286c892c0faf7c425864f"
 				}
 			]
 		}
@@ -303,7 +303,7 @@
 				{
 					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
 					"symbol": "local function resolve_press(keycode)",
-					"sha256": "d46e319cdf2f3cda536af2e2c247361f0c54a64d4f36c0bdcefb6300f4b7dcbd"
+					"sha256": "4c6783faa2c73309221d8416786c3e00593518660cf286c892c0faf7c425864f"
 				},
 				{
 					"file": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua",

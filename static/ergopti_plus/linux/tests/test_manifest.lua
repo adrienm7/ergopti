@@ -251,6 +251,7 @@ return {
 	"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
 	"tests.unit.menu.shortcuts.test_caps_word_auto_off_menu",
 	"tests.unit.adapters.layout.test_keyboard_layout_sources",
+	"tests.unit.adapters.layout.test_keyboard_layout_active_group",
 	"tests.unit.adapters.layout.test_input_source_switch",
 	"tests.unit.adapters.layout.test_layout_cohort_fixture",
 	"tests.unit.core.process.test_program_providers",

@@ -4623,7 +4623,7 @@ function M.start(opts)
 		-- Acquisition proved the device before it was running. Publish admission
 		-- at the completed lifecycle boundary so the first press can own repeats.
 		M.physical_source_receipt()
-		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
+		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d input_family=%s intercept=%s).",
 			#_devices, #_pointer_devices, type(options.layout) == "string" and options.layout or _layout, tostring(_intercept))
 		return _publish_source_transaction(tx)
 	end)

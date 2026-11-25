@@ -132,6 +132,8 @@ function M.run(options)
 		-- The pre-grab resolve: the same boundary, proven or dumped again.
 		refresh_unless_current = layout_refresh,
 		is_ready = function() return true end,
+		-- The Daemon ready line names the layout the session loaded.
+		layout_name = function() return "Controlled (US)" end,
 		publish_current_capture = function()
 			observed.preparing = true
 			record("layout.publish"); native_callback("layout.publish")

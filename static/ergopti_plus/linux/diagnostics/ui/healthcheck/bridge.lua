@@ -258,7 +258,9 @@ end
 --- @param detailed boolean Whether the user ticked "Include details".
 --- @return table
 local function collect_system(facts, state, detailed)
-	local layout = state.layout
+	-- The layout the session loaded; state.layout is only the physical family
+	-- (qwerty or azerty) the key mapping assumes.
+	local layout = require("adapters.keyboard_layout").layout_name()
 	local status = read_file("/proc/self/status")
 	return {
 		os              = facts.os_name,
