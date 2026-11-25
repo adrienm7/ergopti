@@ -102,8 +102,8 @@ _DPFG_CheckSfdUnknownFailsClosed() {
 	Assert(InStr(WorkerBody, "UIA.GetFocusedElement()") > 0
 		and InStr(WorkerBody, "UIA.Property.IsPassword") > 0,
 		"the disposable worker must inspect the focused element IsPassword property")
-	Assert(InStr(UiaBody, "if A_IsSuspended") > 0,
-		"deferred secure-field UIA work must be inert while the driver is suspended")
+	; The paused probe runs under a real Suspend in
+	; tests/unit/platform/focus/uia/test_secure_field_worker_context.ahk.
 }
 
 _DPFG_CallerFailureFailsClosed() {

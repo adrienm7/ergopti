@@ -422,8 +422,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 
 ### Windows
 
-- **Tests.** Source assertions left to convert to behaviour (3,776 `_Driver*` source reads in 995 files; 69 meta
-  files still name `A_IsSuspended`, 57 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
+- **Tests.** Source assertions left to convert to behaviour (3,776 `_Driver*` source reads in 995 files; 68 meta
+  files still name `A_IsSuspended`, 56 of them outside comments). Counted over `windows/tests/**/*.ahk` as calls to
   `_DriverFuncBody`, `_DriverFuncBodyOrEmpty`, `_DriverSourceConcat`, `_DriverSourceNoComments`, `_DriverDirConcat`,
   `_DriverDirsConcat` and `_DriverFileSource`, and as `tests/meta` files containing `A_IsSuspended`. Guards that
   would send keys, paste or move the cursor when broken (text sender, inline auto-type, tap-hold, dead keys,
