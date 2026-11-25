@@ -469,11 +469,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
 - [ ] **User workflows, what is left (maintainer request, 2026-11-25; branch `feat/user-workflows`).** On macOS and
       Linux the model, runner, `run_workflow` action and editor window are built
       ([data README](static/ergopti_plus/_shared/shortcuts/data/workflows/README.md)). Left, in this order:
-  - Hotstring → action on the three drivers, with the « effacer le déclencheur » option (on by default).
+  - Hotstring → action with the « effacer le déclencheur » option is built on macOS and Linux (engine and
+    editor); Windows reads, plans and dispatches it with the AutoHotkey port.
   - Windows: the AutoHotkey port of the validator, interpreter, runner, store, `run_workflow` and the window and
     Shortcuts row, replaying `_shared/tests/corpus/workflows/`; then drop
     `platform_reason.action_workflows_windows_pending`.
-  - macOS click at coordinates through the mouse ownership of `gestures/engine/actions_click.lua`.
   - Screen steps against the screen vision service ([design](docs/design/screen-vision.md)); until it is on
     `dev` they stop with `screen_service_missing`.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point

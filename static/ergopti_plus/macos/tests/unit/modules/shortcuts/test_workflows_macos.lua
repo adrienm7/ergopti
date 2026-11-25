@@ -7,8 +7,9 @@
 --- workflow runs through the gesture registry's synthetic input, `open` and
 --- the clipboard adapter, a shell step runs under /usr/bin/env with its
 --- variables as argv with no prompt, Escape stops
---- a run, a click at coordinates is a named refusal, and the binding editor
---- offers the workflows by name.
+--- a run, a click at coordinates reaches the synthetic click owner (and its
+--- refusal stops the run with a notice), and the binding editor offers the
+--- workflows by name.
 ---
 --- ROOT CAUSE ENCODED:
 --- The run_workflow action had no macOS owner: nothing read workflows.json,
@@ -70,6 +71,10 @@ local function fixture(overrides)
 		} end,
 		clipboard = { read = function() return "clip" end, write = function() return true end },
 		mouse = { setPos = function() return true end },
+		click = { click = function(x, y, button, count)
+			world.clicked = { x = x, y = y, button = button, count = count }
+			return world.click_refused ~= true
+		end },
 		notifications = { notify = function(text) world.notices[#world.notices + 1] = text; return true end },
 		window_info = { frontmost_application = function() return { pid = 1, bundle_id = "com.apple.Safari" } end },
 		i18n = { get = function(key) return key end },
@@ -102,10 +107,25 @@ helpers.describe("workflows on macOS (workflows-macos)", function()
 		Workflows.stop()
 	end)
 
-	helpers.it("a click at coordinates is refused with a notice (workflows-macos)", function()
-		store({ { kind = "mouse_click", x = 1, y = 1 } })
+	helpers.it("a click at coordinates reaches the click owner (workflows-macos)", function()
+		store({ { kind = "mouse_click", x = 12, y = 34, button = "right", count = 2 }, { kind = "notify", text = "done" } })
 		local Workflows, world = fixture()
 		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.clicked.x, 12)
+		helpers.assert_eq(world.clicked.y, 34)
+		helpers.assert_eq(world.clicked.button, "right")
+		helpers.assert_eq(world.clicked.count, 2)
+		helpers.assert_eq(world.notices[1], "done", "the run goes on after the click")
+		Workflows.stop()
+	end)
+
+	helpers.it("a refused click stops the run with a notice (workflows-macos)", function()
+		store({ { kind = "mouse_click", x = 1, y = 1 } })
+		local Workflows, world = fixture()
+		world.click_refused = true
+		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.clicked.button, "left", "the default button")
+		helpers.assert_eq(world.clicked.count, 1, "the default count")
 		helpers.assert_true(world.notices[1]:find("workflows.notice.failed", 1, true) ~= nil, tostring(world.notices[1]))
 		Workflows.stop()
 	end)

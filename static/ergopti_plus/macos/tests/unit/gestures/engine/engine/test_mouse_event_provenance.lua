@@ -206,6 +206,21 @@ helpers.describe("gestures.actions_click: every mouse phase has exact provenance
 		end)
 	end
 
+	helpers.it("sets the click state and button number a click sequence asks for (workflow-click)", function()
+		local fixture = load_click_fixture()
+		local properties = fixture.eventtap.event.properties
+		local prepared, detail = fixture.synthetic.prepare_mouse_event("workflow_click",
+			fixture.event_types.leftMouseDown, { x = 1, y = 2 }, { phase = "down", click_state = 2, button_number = 2 })
+		helpers.assert_true(prepared ~= nil, tostring(detail))
+		local event = fixture.constructed[#fixture.constructed]
+		helpers.assert_eq(event:getProperty(properties.mouseEventClickState), 2)
+		helpers.assert_eq(event:getProperty(properties.mouseEventButtonNumber), 2)
+		helpers.assert_eq(fixture.synthetic.discard_mouse_event(prepared), true)
+		local refused = fixture.synthetic.prepare_mouse_event("workflow_click",
+			fixture.event_types.leftMouseDown, { x = 1, y = 2 }, { phase = "down", click_state = 0 })
+		helpers.assert_eq(refused, nil, "a click state below 1 is refused")
+	end)
+
 	helpers.it("counts and discards one pre-handoff lifecycle owner", function()
 		local discarded_fixture = load_click_fixture()
 		local records_before = discarded_fixture.synthetic.stats().records
