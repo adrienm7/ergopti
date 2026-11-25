@@ -103,7 +103,8 @@ function M.setup_command(deps)
 		local app_path = type(info) == "string" and info:match("\n%[Instance%]\n[^%[]-\napp%-path=([^\n]+)") or nil
 		assert(type(app_path) == "string" and app_path:sub(1, 1) == "/",
 			"a Flatpak without its host deployment path in /.flatpak-info")
-		return "sudo bash " .. quote(app_path .. "/lib/ergopti/install/setup_permissions.sh") .. ' --user "$(id -u)"'
+		local driver = require("core.lifecycle.engine.installation").packaged_root(app_path)
+		return "sudo bash " .. quote(driver .. "/install/setup_permissions.sh") .. ' --user "$(id -u)"'
 	end
 	local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
 	return "bash " .. quote(root .. "/install.sh") .. " --setup-perms"
