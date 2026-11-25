@@ -189,6 +189,24 @@ helpers.describe("compositor_focus: source", function()
 		helpers.assert_eq(source.snapshot(), nil, "a cleared focus is unknown, not the last window")
 	end)
 
+	helpers.it("(text-automation-visible) records whether KWin runs the focus script", function()
+		-- Field report, Plasma 6.8 Wayland, 2026-11-25: the worker listened,
+		-- KWin never loaded the script, and nothing said so.
+		local source, process = new_source("kde")
+		helpers.assert_true(source.start())
+		process.say('{"kind":"ready"}\n')
+		helpers.assert_eq(source.script_state(), nil, "unknown until the worker asked KWin")
+		process.say('{"kind":"script","loaded":false,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "not_loaded")
+		helpers.assert_eq(source.status(), "ready", "a script KWin does not run is a fact, not a worker failure")
+		process.say('{"kind":"script","loaded":false,"answered":false}\n')
+		helpers.assert_eq(source.script_state(), "unanswered")
+		process.say('{"kind":"script","loaded":true,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "loaded")
+		process.say('{"kind":"script","loaded":"yes","answered":true}\n')
+		helpers.assert_eq(source.status(), "failed", "a malformed script record fails closed")
+	end)
+
 	for _, case in ipairs({
 		{ "a report before readiness", FOCUS },
 		{ "a malformed line", '{"kind":"ready"}\nnot json\n' },

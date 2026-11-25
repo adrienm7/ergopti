@@ -514,6 +514,13 @@ function M.compositor_focus_status()
 	return _compositor_focus and _compositor_focus.status() or nil
 end
 
+--- Whether KWin runs the Ergopti focus script, nil off KDE or before the
+--- worker says (compositor_focus source.script_state).
+--- @return string|nil "loaded", "not_loaded" or "unanswered"
+function M.compositor_script_state()
+	return _compositor_focus and _compositor_focus.script_state() or nil
+end
+
 --- Stops the focus source started by start_compositor_focus().
 --- @return boolean settled
 function M.stop_compositor_focus()

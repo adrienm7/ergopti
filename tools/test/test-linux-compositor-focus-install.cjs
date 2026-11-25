@@ -67,7 +67,20 @@ function sandbox({
 		`${record}\nif [ "$1" = get ]; then cat ${JSON.stringify(setting)}; exit 0; fi\n` +
 			`if [ "$1" = set ]; then printf '%s' "$4" > ${JSON.stringify(setting)}; fi\nexit 0`
 	);
-	stub(stubs, 'kwriteconfig6', `${record}\nexit 0`);
+	// kwinrc's ergopti-focusEnabled value, as kwriteconfig6 writes and
+	// kreadconfig6 reads it; no file means the key was never written.
+	const kwinValue = path.join(top, 'kwinrc-enabled');
+	stub(
+		stubs,
+		'kwriteconfig6',
+		`${record}\nfor last in "$@"; do :; done\n` +
+			`[ "$last" = --delete ] && rm -f ${JSON.stringify(kwinValue)} || printf '%s' "$last" > ${JSON.stringify(kwinValue)}\nexit 0`
+	);
+	stub(
+		stubs,
+		'kreadconfig6',
+		`[ -f ${JSON.stringify(kwinValue)} ] && cat ${JSON.stringify(kwinValue)}\nexit 0`
+	);
 	stub(stubs, 'gdbus', `${record}\nexit 0`);
 	const run = (args, desktop) => {
 		const result = spawnSync(bashExecutable(), [HELPER, ...args], {
@@ -88,6 +101,8 @@ function sandbox({
 		run,
 		calls,
 		setting: () => fs.readFileSync(setting, 'utf8'),
+		setKwinValue: (value) =>
+			value === null ? fs.rmSync(kwinValue, { force: true }) : fs.writeFileSync(kwinValue, value),
 		gnome: path.join(home, '.local/share/gnome-shell/extensions', UUID),
 		kwin: path.join(home, '.local/share/kwin/scripts/ergopti-focus'),
 		cleanup: () => fs.rmSync(top, { recursive: true, force: true })
@@ -158,6 +173,51 @@ check('KDE: a first install copies, enables in kwinrc and asks KWin to load it',
 			calls,
 			/gdbus call --session --dest org\.kde\.KWin --object-path \/Scripting --method org\.kde\.kwin\.Scripting\.start/
 		);
+	} finally {
+		box.cleanup();
+	}
+});
+
+check('KDE: the first install makes KWin reparse kwinrc before loading the script', () => {
+	// Field report, Plasma 6.8 Wayland, 2026-11-25: Scripting.start read the
+	// kwinrc KWin parsed at login, so the script just enabled stayed unloaded.
+	const box = sandbox();
+	try {
+		box.run(['install', DRIVER], 'KDE');
+		const calls = box.calls();
+		const reconfigure = calls.indexOf('--object-path /KWin --method org.kde.KWin.reconfigure');
+		const start = calls.indexOf('--method org.kde.kwin.Scripting.start');
+		assert.ok(reconfigure >= 0, 'KWin is asked to reparse its configuration');
+		assert.ok(reconfigure < start, 'before the scripts are loaded');
+	} finally {
+		box.cleanup();
+	}
+});
+
+check('KDE: files copied without the Enabled key are enabled at the next start', () => {
+	const box = sandbox();
+	try {
+		box.run(['install', DRIVER], 'KDE');
+		box.setKwinValue(null);
+		const before = box.calls().length;
+		box.run(['install', DRIVER], 'KDE');
+		assert.match(
+			box.calls().slice(before),
+			/kwriteconfig6 --file kwinrc --group Plugins --key ergopti-focusEnabled true/
+		);
+	} finally {
+		box.cleanup();
+	}
+});
+
+check('KDE: a script the user switched off stays off', () => {
+	const box = sandbox();
+	try {
+		box.run(['install', DRIVER], 'KDE');
+		box.setKwinValue('false');
+		const before = box.calls();
+		assert.equal(box.run(['install', DRIVER], 'KDE'), '', 'an unchanged copy says nothing');
+		assert.equal(box.calls(), before, 'no enable over the user choice');
 	} finally {
 		box.cleanup();
 	}

@@ -95,6 +95,12 @@ function M.parse_record(record)
 		return "ready", { protocol = protocol }
 	end
 	if record.kind == "clear" then return record.kind end
+	-- KWin only: whether the Ergopti script runs, as KWin answered after the
+	-- worker asked it to load enabled scripts.
+	if record.kind == "script" then
+		if type(record.loaded) ~= "boolean" or type(record.answered) ~= "boolean" then return nil end
+		return "script", { loaded = record.loaded, answered = record.answered }
+	end
 	if record.kind ~= "focus" then return nil end
 	if type(record.class) ~= "string" or type(record.title) ~= "string"
 		or type(record.id) ~= "string" or record.id == "" then return nil end
@@ -141,6 +147,8 @@ function M.new(options)
 	local operation = nil
 	local pending = ""
 	local current = nil
+	-- KWin only: "loaded", "not_loaded", "unanswered", nil before the worker says.
+	local script = nil
 
 	local function fail(reason)
 		if status == "failed" or status == "stopped" then return end
@@ -164,6 +172,17 @@ function M.new(options)
 			return
 		end
 		if status ~= "ready" then fail("focus report before readiness"); return end
+		if kind == "script" then
+			script = window.loaded and "loaded" or (window.answered and "not_loaded" or "unanswered")
+			if script == "loaded" then
+				Logger.info(LOG, "KWin runs the Ergopti focus script.")
+			else
+				Logger.warn(LOG, "KWin does not run the Ergopti focus script (%s): the focused application stays unknown, "
+					.. "so per-application rules and the password-app list cannot apply. Enable 'Ergopti focus' in "
+					.. "System Settings > Window Management > KWin Scripts.", script)
+			end
+			return
+		end
 		current = window
 	end
 
@@ -218,6 +237,11 @@ function M.new(options)
 	--- The source's state, for the field run's setup check.
 	--- @return string "idle", "starting", "ready", "failed" or "stopped"
 	function source.status() return status end
+
+	--- Whether KWin runs the Ergopti focus script, as the worker found it.
+	--- @return string|nil "loaded", "not_loaded", "unanswered"; nil when not
+	--- yet known or for another desktop.
+	function source.script_state() return script end
 
 	--- The desktop family this source serves.
 	--- @return string

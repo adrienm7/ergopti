@@ -178,9 +178,23 @@ _remove_gnome() {
 # ===================================
 # ===================================
 
+# Whether kwinrc holds the script's Enabled key at all, true or false: a
+# user's own choice either way. Absent means it was never written; without
+# kreadconfig nothing can tell, and the user's choice is presumed.
+_kwin_choice_recorded() {
+	local reader value
+	reader="$(_first_command kreadconfig6 kreadconfig5)" || return 0
+	value="$("$reader" --file kwinrc --group Plugins --key "${KWIN_FOCUS_ID}Enabled" 2>/dev/null)" || return 0
+	[ -n "$value" ]
+}
+
 _install_kwin() {
 	local source="$1/platform/desktop_focus/kwin" first=false writer label="KWin"
 	[ -d "$KWIN_TARGET" ] || first=true
+	# A first install whose enabling failed left the files without the key:
+	# every later start then saw "unchanged" and never enabled the script
+	# (field report, Plasma 6.8 Wayland, 2026-11-25). Enable it then too.
+	if ! "$first" && ! _kwin_choice_recorded; then first=true; fi
 	if ! "$first" && _same_tree "$source" "$KWIN_TARGET"; then return 0; fi
 	if ! _publish_tree "$source" "$KWIN_TARGET"; then
 		ergopti_msg_with "  ⚠  " install.focus_integration_failed "$label" >&2
@@ -195,7 +209,14 @@ _install_kwin() {
 		ergopti_msg_with "  ⚠  " install.focus_integration_failed "$label" >&2
 		return 0
 	fi
-	# Scripting.start loads every enabled script not yet loaded: this one.
+	# KWin read kwinrc at login: reconfigure makes it reparse the [Plugins]
+	# group just written, then Scripting.start loads every enabled script not
+	# yet loaded: this one. Without reconfigure it stayed unloaded until the
+	# next login. Harmless without KWin.
+	if command -v gdbus >/dev/null 2>&1; then
+		gdbus call --session --dest org.kde.KWin --object-path /KWin \
+			--method org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+	fi
 	_kwin_scripting start
 	ergopti_msg_with "  ✔  " install.focus_integration_enabled "$label"
 }

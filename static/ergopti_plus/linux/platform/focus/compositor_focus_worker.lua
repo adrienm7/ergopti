@@ -137,6 +137,7 @@ function M.run(service, parent_pid)
 		void *g_variant_get_child_value(void *value, size_t index);
 		const char *g_variant_get_string(void *value, size_t *length);
 		uint32_t g_variant_get_uint32(void *value);
+		int g_variant_get_boolean(void *value);
 		void g_variant_unref(void *value);
 		void g_error_free(ErgoptiGError *error);
 		void g_object_unref(void *object);
@@ -266,11 +267,35 @@ function M.run(service, parent_pid)
 		-- A KWin script runs once when loaded and reports the active window
 		-- then; reloading it now tells a daemon started after KWin which window
 		-- is active. A refusal only means "unknown until the next activation".
-		local unloaded = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "unloadScript",
-			{ gio.g_variant_new_string(KWIN_SCRIPT_ID) })
-		if unloaded ~= nil then gio.g_variant_unref(unloaded) end
-		local started = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "start", nil)
-		if started ~= nil then gio.g_variant_unref(started) end
+		local function scripting(method, children)
+			local reply = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", method, children)
+			if reply == nil then return nil end
+			local answer = true
+			if ffi.string(gio.g_variant_get_type_string(reply)) == "(b)" then
+				local value = gio.g_variant_get_child_value(reply, 0)
+				answer = gio.g_variant_get_boolean(value) ~= 0
+				gio.g_variant_unref(value)
+			end
+			gio.g_variant_unref(reply)
+			return answer
+		end
+		local function loaded() return scripting("isScriptLoaded", { gio.g_variant_new_string(KWIN_SCRIPT_ID) }) end
+		scripting("unloadScript", { gio.g_variant_new_string(KWIN_SCRIPT_ID) })
+		scripting("start", nil)
+		local state = loaded()
+		if state == false then
+			-- KWin reads kwinrc's [Plugins] once per session: a script enabled
+			-- by the installer during the session stays unloaded until KWin
+			-- reparses its configuration, which reconfigure does (field
+			-- report, Plasma 6.8 Wayland, 2026-11-25: no focus report ever).
+			local reconfigured = call("org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure", nil)
+			if reconfigured ~= nil then gio.g_variant_unref(reconfigured) end
+			scripting("start", nil)
+			state = loaded()
+		end
+		-- The daemon names a script KWin does not run: otherwise every window
+		-- stays unknown in silence.
+		emit({ kind = "script", loaded = state == true and true or false, answered = state ~= nil })
 	end
 	if not failed then glib.g_main_loop_run(loop) end
 
