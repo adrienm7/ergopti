@@ -28,18 +28,16 @@ function M.list_regular_files(dir)
 	local inspected, attributes = pcall(hs.fs.symlinkAttributes, folder:sub(1, -2))
 	if not inspected or type(attributes) ~= "table" then return {} end
 	if attributes.mode ~= "directory" then return nil, "not a folder: " .. folder end
-	local listed, iterator, state = pcall(hs.fs.dir, folder)
-	if not listed or type(iterator) ~= "function" then return nil, "cannot list " .. folder .. ": " .. tostring(iterator) end
+	-- The owner walks the folder in a generic-for, so its state is closed on every exit.
+	local entries, listed, list_error = require("core.fs.engine.dir").try_entries_quiet(folder)
+	if not listed then return nil, "cannot list " .. folder .. ": " .. tostring(list_error) end
 	local names = {}
-	local walked, walk_error = pcall(function()
-		for name in iterator, state do
-			if name ~= "." and name ~= ".." then
-				local ok, entry = pcall(hs.fs.symlinkAttributes, folder .. name)
-				if ok and type(entry) == "table" and entry.mode == "file" then names[#names + 1] = name end
-			end
+	for _, name in ipairs(entries) do
+		if name ~= "." and name ~= ".." then
+			local ok, entry = pcall(hs.fs.symlinkAttributes, folder .. name)
+			if ok and type(entry) == "table" and entry.mode == "file" then names[#names + 1] = name end
 		end
-	end)
-	if not walked then return nil, "cannot list " .. folder .. ": " .. tostring(walk_error) end
+	end
 	table.sort(names)
 	return names
 end
