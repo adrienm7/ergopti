@@ -275,3 +275,31 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       Ctrl+V into Full report pastes the complete report. Run it again and click « Stop the run », and once more and
       close the window with its close box during the run: the log says « cancelled by the person » and the report
       is interrupted. The window follows the Configuration menu's reading font and light or dark appearance.
+- [ ] <!-- field-point: gnome_50_focus_extension --> GNOME 50 and 51 focus extension (fixed 2026-11-25): on Fedora 44
+      or Ubuntu 26.04 (GNOME 50) under Wayland, install, log out and in: `gnome-extensions info focus@ergopti.fr` says
+      ACTIVE, never OUT OF DATE. Focus a terminal, then a browser: the log names each window's WM class (per-app
+      rules apply), and switching to the Ergopti layout from the tray changes GNOME's input source at once. Proved
+      only in headless Fedora 44 (50.6) and rawhide (51.1) shells, where no window took focus.
+- [ ] <!-- field-point: gnome_wayland_clipboard --> Clipboard on GNOME Wayland (2026-11-25): GNOME offers no
+      data-control protocol, so wl-copy and wl-paste need a surface of their own; in a headless GNOME 50 session
+      both timed out. On a real GNOME 50 Wayland desktop, focus a text field and expand a hotstring that pastes
+      (one with an emoji or a character the layout cannot type): the text arrives, the clipboard holds what it held
+      before, no window flashes, and the log shows no « clipboard » error or emergency stop. Repeat with the focus on
+      the desktop (no window) and on a fullscreen video.
+- [ ] <!-- field-point: wm_session_startup --> Startup without graphical-session.target (fixed 2026-11-25): on Xfce,
+      Cinnamon, Openbox and i3 (X11) and on sway without uwsm, run `install.sh` from the session: it prints that the
+      session never starts graphical-session.target, leaves `~/.config/autostart/ergopti-hotstrings.desktop` and no
+      enabled unit (`systemctl --user is-enabled ergopti-hotstrings` says disabled). Log out and in: the tray icon
+      appears on Xfce, Cinnamon and Openbox; on i3 and sway it appears once `exec ~/.local/bin/ergopti-hotstrings`
+      is in their configuration. `systemctl --user show-environment` lists the session's DISPLAY (and
+      WAYLAND_DISPLAY on sway only), and a later GNOME login on the same account starts one daemon, not two.
+- [ ] <!-- field-point: unit_start_limit --> Bounded restarts (fixed 2026-11-25): with the .deb installed, unload
+      uinput and block it (`sudo modprobe -r uinput`, then a `blacklist uinput` file) and log in: the notification
+      naming /dev/uinput appears at most five times in two minutes, then `systemctl --user status
+      ergopti-hotstrings` shows the unit failed with « start request repeated too quickly ». Clicking Quit in a
+      healthy session brings no icon back.
+- [ ] <!-- field-point: opensuse_rpm --> The .rpm on openSUSE (fixed 2026-11-25): on Tumbleweed and on Leap 15.6
+      (GNOME), `sudo zypper install ./ErgoptiPlus-linux-x86_64.rpm` resolves without a missing-package problem and
+      installs pkexec, secret-tool, libxkbcommon-tools and typelib-1_0-WebKit2-4_1. The windows open, and a remote AI
+      key is saved through secret-tool. GNOME there packages no AppIndicator extension: the tray message points to
+      extensions.gnome.org/extension/615, and once that extension is installed and enabled the icon shows.
