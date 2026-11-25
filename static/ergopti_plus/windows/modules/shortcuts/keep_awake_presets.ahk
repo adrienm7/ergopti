@@ -204,6 +204,17 @@ KeepAwakePresetsDuplicate(Doc, Id, NewId, Name, &Reason := "") {
 	return true
 }
 
+; Adds a preset (an imported one), validated first.
+KeepAwakePresetsAdd(Doc, Preset, &Reason := "") {
+	Reason := KeepAwakePresetInvalid(Preset)
+	if Reason != ""
+		return false
+	if _KeepAwakeIndexOf(Doc, Preset["id"])
+		return (Reason := "preset_id_taken") && false
+	Doc["presets"].Push(KeepAwakePresetsCopy(Preset))
+	return true
+}
+
 KeepAwakePresetsRename(Doc, Id, Name, &Reason := "") {
 	Preset := KeepAwakePresetsGet(Doc, Id)
 	if !IsObject(Preset)

@@ -176,6 +176,17 @@ function M.duplicate(doc, id, new_id, name)
 	return true
 end
 
+--- Adds a preset (an imported one), validated first.
+--- @param preset table The whole preset, its targets included.
+--- @return boolean ok, string|nil reason
+function M.add(doc, preset)
+	local reason = M.invalid(preset)
+	if reason then return false, reason end
+	if index_of(doc, preset.id) then return false, "preset_id_taken" end
+	doc.presets[#doc.presets + 1] = copy(preset)
+	return true
+end
+
 --- Renames a preset; a starter's translated name gives way to the user's.
 --- @return boolean ok, string|nil reason
 function M.rename(doc, id, name)

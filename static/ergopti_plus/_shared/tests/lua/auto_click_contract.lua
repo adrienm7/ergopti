@@ -320,6 +320,7 @@ function M.register(helpers, options)
 			end)
 		end
 	end)
+	require("tests.lua.keep_awake_library_host_contract").register(helpers, options.shared)
 end
 
 return M

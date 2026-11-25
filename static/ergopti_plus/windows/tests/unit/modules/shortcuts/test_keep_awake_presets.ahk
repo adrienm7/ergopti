@@ -27,6 +27,7 @@ _TKP_Step(Doc, Step, &Reason) {
 		case "set_active": return KeepAwakePresetsSetActive(Doc, Args[1], &Reason)
 		case "set_switch": return KeepAwakePresetsSetSwitch(Doc, Args[1], Args[2], Args[3], &Reason)
 		case "duplicate": return KeepAwakePresetsDuplicate(Doc, Args[1], Args[2], Args[3], &Reason)
+		case "add": return KeepAwakePresetsAdd(Doc, Args[1], &Reason)
 		case "rename": return KeepAwakePresetsRename(Doc, Args[1], Args[2], &Reason)
 		case "remove": return KeepAwakePresetsRemove(Doc, Args[1], &Reason)
 		case "set_apps": return KeepAwakePresetsSetApps(Doc, Args[1], Args[2], Args[3], &Reason)
