@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "Ta opp rekkefølgen på tastaturhooks",
 	"menu.debug.composer_check": "Test det sammensatte oppsettet",
 	"platform_reason.action_apple_shortcuts_are_macos": "Bare macOS: Apple Snarveier finnes bare på macOS. Kjør i stedet en kommando eller et program andre steder.",
-	"platform_reason.action_workflows_windows_pending": "Ikke på Windows ennå: arbeidsflytkjøreren porteres til AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "Ikke på Windows: arbeidsflytkjøreren finnes bare i driverne for macOS og Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Disse kontrollene måler AutoHotkeys SendInput og tastaturhooken, som bare Windows-driveren har.",
 	"input_probe.title": "Inndatakontroll",
 	"input_probe.field_label": "Tekst som kontrollen skriver (ikke skriv her):",

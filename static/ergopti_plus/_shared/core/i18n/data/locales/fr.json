@@ -2390,7 +2390,7 @@
 	"menu.debug.hook_probe": "Enregistrer l'ordre des hooks clavier",
 	"menu.debug.composer_check": "Tester la disposition composée",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS uniquement : les Raccourcis Apple n’existent que sous macOS. Ailleurs, lancez plutôt une commande ou un programme.",
-	"platform_reason.action_workflows_windows_pending": "Pas encore sous Windows : l’exécution des workflows est en cours de portage vers AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "Pas sous Windows : l’exécution des workflows n’existe que dans les pilotes macOS et Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Ces vérifications mesurent SendInput d'AutoHotkey et son hook clavier, que seul le pilote Windows possède.",
 	"input_probe.title": "Vérification de la saisie",
 	"input_probe.field_label": "Texte tapé par le test (ne tapez pas ici) :",

@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "Zaznamenat pořadí klávesnicových hooků",
 	"menu.debug.composer_check": "Vyzkoušet složené rozložení",
 	"platform_reason.action_apple_shortcuts_are_macos": "Pouze macOS: Zkratky Apple existují jen v macOS. Jinde místo toho spusťte příkaz nebo program.",
-	"platform_reason.action_workflows_windows_pending": "Zatím ne ve Windows: spouštění pracovních postupů se teprve převádí do AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "Není ve Windows: spouštění pracovních postupů je jen součástí ovladačů pro macOS a Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Tyto kontroly měří SendInput z AutoHotkey a jeho klávesnicový hook, které má jen ovladač pro Windows.",
 	"input_probe.title": "Kontrola vstupu",
 	"input_probe.field_label": "Text, který píše kontrola (sem nepište):",

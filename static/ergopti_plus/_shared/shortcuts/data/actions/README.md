@@ -415,7 +415,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R12 | `platform_reason.action_desktop_count_belongs_to_the_desktop` | Not on Linux: the number of desktops belongs to each desktop's own settings (GNOME adds and removes them by itself, KDE and Xfce keep a set count), and Wayland gives no application a request to change it. |
 | R13 | `platform_reason.action_recording_starts_from_the_capture_tool` | This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. |
 | R14 | `platform_reason.layer_spotlight_is_macos` | macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead. |
-| R15 | `platform_reason.action_workflows_windows_pending` | Not on Windows yet: the workflow runner is being ported to AutoHotkey. |
+| R15 | `platform_reason.action_workflows_windows_pending` | Not on Windows: the workflow runner is part of the macOS and Linux drivers only. |
 | R16 | `platform_reason.action_apple_shortcuts_are_macos` | macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead. |
 | R17 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
 | R18 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |

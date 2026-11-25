@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "תיעוד סדר הוקים של המקלדת",
 	"menu.debug.composer_check": "בדיקת הפריסה המורכבת",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOS בלבד: קיצורי Apple קיימים רק ב־macOS. במערכות אחרות, הריצו במקום זאת פקודה או תוכנה.",
-	"platform_reason.action_workflows_windows_pending": "עדיין לא ב־Windows: מריץ תהליכי העבודה מועבר ל־AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "לא ב־Windows: מריץ תהליכי העבודה קיים רק במנהלי ההתקן של macOS ו־Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "בדיקות אלה מודדות את SendInput של AutoHotkey ואת הוק המקלדת שלו, שיש רק במנהל ההתקן של Windows.",
 	"input_probe.title": "בדיקת קלט",
 	"input_probe.field_label": "הטקסט שהבדיקה מקלידה (אל תקלידו כאן):",

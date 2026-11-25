@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "Zapisz kolejność hooków klawiatury",
 	"menu.debug.composer_check": "Przetestuj złożony układ",
 	"platform_reason.action_apple_shortcuts_are_macos": "Tylko macOS: Skróty Apple istnieją wyłącznie w macOS. W innych systemach uruchom zamiast tego polecenie lub program.",
-	"platform_reason.action_workflows_windows_pending": "Jeszcze nie w Windows: wykonawca przepływów pracy jest przenoszony do AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "Niedostępne w Windows: wykonawca przepływów pracy jest tylko w sterownikach macOS i Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Te testy mierzą SendInput z AutoHotkey i jego hook klawiatury, które ma tylko sterownik Windows.",
 	"input_probe.title": "Test wprowadzania",
 	"input_probe.field_label": "Tekst wpisywany przez test (nie pisz tutaj):",

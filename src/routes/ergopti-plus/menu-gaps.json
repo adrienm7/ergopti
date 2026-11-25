@@ -427,8 +427,8 @@
 		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Not on Windows yet: the workflow runner is being ported to AutoHotkey.",
-				"fr": "Pas encore sous Windows : l’exécution des workflows est en cours de portage vers AutoHotkey."
+				"en": "Not on Windows: the workflow runner is part of the macOS and Linux drivers only.",
+				"fr": "Pas sous Windows : l’exécution des workflows n’existe que dans les pilotes macOS et Linux."
 			}
 		}
 	},

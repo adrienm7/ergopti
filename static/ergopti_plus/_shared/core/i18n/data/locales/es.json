@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "Registrar el orden de los hooks de teclado",
 	"menu.debug.composer_check": "Probar la distribución compuesta",
 	"platform_reason.action_apple_shortcuts_are_macos": "Solo macOS: los Atajos de Apple solo existen en macOS. En otros sistemas, ejecuta un comando o un programa.",
-	"platform_reason.action_workflows_windows_pending": "Aún no en Windows: el ejecutor de flujos de trabajo se está portando a AutoHotkey.",
+	"platform_reason.action_workflows_windows_pending": "No en Windows: el ejecutor de flujos de trabajo solo forma parte de los controladores de macOS y Linux.",
 	"platform_reason.input_probe_is_autohotkey_specific": "Estas comprobaciones miden SendInput de AutoHotkey y su hook de teclado, que solo tiene el controlador de Windows.",
 	"input_probe.title": "Comprobación de entrada",
 	"input_probe.field_label": "Texto que escribe la prueba (no escriba aquí):",

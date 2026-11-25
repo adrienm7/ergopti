@@ -2395,7 +2395,7 @@
 	"menu.debug.hook_probe": "キーボードフックの順序を記録",
 	"menu.debug.composer_check": "合成したレイアウトをテスト",
 	"platform_reason.action_apple_shortcuts_are_macos": "macOSのみ：Appleのショートカットは macOS にしかありません。ほかのシステムでは、代わりにコマンドかプログラムを実行してください。",
-	"platform_reason.action_workflows_windows_pending": "Windows ではまだ使えません。ワークフローの実行部を AutoHotkey へ移植中です。",
+	"platform_reason.action_workflows_windows_pending": "Windows では使えません。ワークフローの実行部は macOS と Linux のドライバーにのみあります。",
 	"platform_reason.input_probe_is_autohotkey_specific": "これらのチェックは AutoHotkey の SendInput とそのキーボードフックを計測します。どちらも Windows ドライバーにしかありません。",
 	"input_probe.title": "入力チェック",
 	"input_probe.field_label": "チェックが入力するテキスト（ここには入力しないでください）:",
