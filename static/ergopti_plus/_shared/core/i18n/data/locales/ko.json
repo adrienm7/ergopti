@@ -1910,6 +1910,7 @@
 	"linux_shell.install.security_warning_body": "'input' 그룹에 속하면 어떤 애플리케이션에서 입력한 암호를 포함해 세션의 모든 키 입력을 읽을 수 있습니다. 핫스트링 엔진에는 바로 이것이 필요하며, keyd와 xremap도 마찬가지입니다.",
 	"linux_shell.install.security_warning_title": "보안 경고",
 	"linux_shell.install.service_started": "ergopti-hotstrings 서비스를 켜고 시작했습니다",
+	"linux_shell.install.session_without_graphical_target": "이 세션은 systemd의 graphical-session.target을 시작하지 않습니다 (i3, Openbox, Xfce, 세션 관리자 없는 sway). 따라서 사용자 유닛은 실행되지 않으므로 Ergopti+는 다음 로그인 때 XDG 자동 시작 항목으로 시작됩니다. XDG 자동 시작을 무시하는 창 관리자(i3, sway)는 설정에 exec {1} 줄이 필요합니다.",
 	"linux_shell.install.source_toolchain_unavailable": "설치된 컴파일러로는 네이티브 아카이브 백엔드를 빌드할 수 없습니다.",
 	"linux_shell.install.startup_choice_unreadable": "시작 선택을 읽을 수 없습니다.",
 	"linux_shell.install.summary_config": "설정: {1}",

@@ -70,6 +70,7 @@ install.section_tray=Ikona w zasobniku systemowym i okna
 install.security_warning_body=Przynależność do grupy „input” pozwala odczytać KAŻDE naciśnięcie klawisza w sesji, w tym hasła wpisywane w dowolnej aplikacji. Właśnie tego wymaga silnik hotstringów i tak samo działają keyd i xremap.
 install.security_warning_title=OSTRZEŻENIE O BEZPIECZEŃSTWIE
 install.service_started=usługa ergopti-hotstrings włączona i uruchomiona
+install.session_without_graphical_target=Ta sesja nigdy nie uruchamia graphical-session.target systemd (i3, Openbox, Xfce, sway bez menedżera sesji), więc jednostka użytkownika nigdy by się nie uruchomiła: Ergopti+ uruchomi się zamiast tego z wpisu autostartu XDG przy następnym logowaniu. Menedżer okien, który ignoruje autostart XDG (i3, sway), potrzebuje w konfiguracji wiersza exec {1}.
 install.source_toolchain_unavailable=zainstalowany kompilator nie może zbudować natywnego zaplecza archiwów.
 install.startup_choice_unreadable=Nie można odczytać wyboru uruchamiania.
 install.summary_config=Konfiguracja: {1}

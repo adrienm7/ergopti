@@ -1910,6 +1910,7 @@
 	"linux_shell.install.security_warning_body": "Pertencer ao grupo «input» permite ler TODAS as teclas premidas na sessão, incluindo as palavras-passe digitadas em qualquer aplicação. É disso que um motor de hotstrings precisa, e é o que fazem o keyd e o xremap.",
 	"linux_shell.install.security_warning_title": "AVISO DE SEGURANÇA",
 	"linux_shell.install.service_started": "serviço ergopti-hotstrings ativado e iniciado",
+	"linux_shell.install.session_without_graphical_target": "Esta sessão nunca inicia o graphical-session.target do systemd (i3, Openbox, Xfce, sway sem gestor de sessão), por isso a unidade de utilizador nunca seria executada: o Ergopti+ arranca antes pela entrada de arranque automático XDG no próximo início de sessão. Um gestor de janelas que ignora o arranque automático XDG (i3, sway) precisa da linha exec {1} na sua configuração.",
 	"linux_shell.install.source_toolchain_unavailable": "o compilador instalado não consegue compilar o motor de arquivos nativo.",
 	"linux_shell.install.startup_choice_unreadable": "Não foi possível ler a escolha de início.",
 	"linux_shell.install.summary_config": "Configuração: {1}",

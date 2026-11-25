@@ -121,7 +121,15 @@ function runInstaller(scenario) {
 	stub(
 		stubs,
 		'systemctl',
-		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { ${scenario.refuseShow ? 'exit 1;' : `printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0;`} }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { ${scenario.refuseShow ? 'exit 1;' : `printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0;`} }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\n` +
+			// scenario.userBus: a reachable user bus; scenario.graphicalTarget: a
+			// session that starts graphical-session.target (GNOME, Plasma).
+			(scenario.userBus
+				? '[ "$2" = show-environment ] && exit 0\n' +
+					`[ "$2" = is-active ] && [ "$4" = graphical-session.target ] && exit ${scenario.graphicalTarget ? 0 : 3}\n` +
+					'case "$2" in daemon-reload|enable|disable|restart) exit 0 ;; esac\n'
+				: '') +
+			'exit 1'
 	);
 	if (
 		scenario.refuseUnitPublish ||
@@ -900,6 +908,51 @@ for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
 		} finally {
 			fs.rmSync(fixture, { recursive: true, force: true });
 		}
+	}
+}
+
+// ── Startup owner: the unit only where graphical-session.target runs ──────
+// The unit is WantedBy graphical-session.target. i3, Openbox, Xfce and sway
+// without a session manager never start it, and enabling the unit there while
+// retiring the XDG entry left nothing to start the daemon at the next login.
+for (const graphicalTarget of [true, false]) {
+	const run = runInstaller({
+		desktopProvided: true,
+		userBus: true,
+		graphicalTarget,
+		systemdEnabled: true
+	});
+	const label = graphicalTarget
+		? 'a session with graphical-session.target'
+		: 'a session without it';
+	try {
+		if (run.status !== 0) {
+			errors.push(`install.sh exited ${run.status} in ${label}: ${run.output.slice(-1500)}`);
+			continue;
+		}
+		const enabled = run.calls.some((call) =>
+			/systemctl --user enable +ergopti-hotstrings/.test(call)
+		);
+		const disabled = run.calls.some((call) =>
+			/systemctl --user disable ergopti-hotstrings/.test(call)
+		);
+		const autostart = fs.existsSync(
+			path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop')
+		);
+		if (enabled !== graphicalTarget)
+			errors.push(`${label}: the unit was ${enabled ? '' : 'not '}enabled`);
+		if (autostart === graphicalTarget)
+			errors.push(`${label}: the XDG autostart entry was ${autostart ? '' : 'not '}written`);
+		if (!graphicalTarget) {
+			if (!disabled)
+				errors.push(`${label}: an earlier enabled unit was left enabled beside the XDG entry`);
+			if (!/graphical-session\.target[\s\S]*exec \S*\/bin\/ergopti-hotstrings/.test(run.output))
+				errors.push(
+					`${label}: the user was not told how the daemon starts: ${run.output.slice(-800)}`
+				);
+		}
+	} finally {
+		run.cleanup();
 	}
 }
 

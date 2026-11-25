@@ -70,6 +70,7 @@ install.section_tray=Ikona v oznamovací oblasti a okna
 install.security_warning_body=Členství ve skupině „input“ umožňuje číst KAŽDÝ stisk klávesy v relaci, včetně hesel zadaných v libovolné aplikaci. Přesně to potřebuje modul hotstringů a stejně fungují i keyd a xremap.
 install.security_warning_title=BEZPEČNOSTNÍ UPOZORNĚNÍ
 install.service_started=služba ergopti-hotstrings zapnuta a spuštěna
+install.session_without_graphical_target=Tato relace nikdy nespouští graphical-session.target systemd (i3, Openbox, Xfce, sway bez správce relace), takže by se uživatelská jednotka nikdy nespustila: Ergopti+ se místo toho spustí z položky automatického spuštění XDG při příštím přihlášení. Správce oken, který automatické spuštění XDG ignoruje (i3, sway), potřebuje ve své konfiguraci řádek exec {1}.
 install.source_toolchain_unavailable=nainstalovaný kompilátor nedokáže sestavit nativní archivační modul.
 install.startup_choice_unreadable=Volbu spouštění nelze přečíst.
 install.summary_config=Konfigurace: {1}

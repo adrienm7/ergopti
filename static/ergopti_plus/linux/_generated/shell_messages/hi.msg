@@ -70,6 +70,7 @@ install.section_tray=सिस्टम ट्रे आइकन और वि�
 install.security_warning_body='input' समूह का सदस्य होने से सत्र की हर कुंजी-दबाव पढ़ी जा सकती है, किसी भी ऐप्लिकेशन में टाइप किए गए पासवर्ड सहित। hotstring इंजन को ठीक यही चाहिए, और keyd तथा xremap भी यही करते हैं।
 install.security_warning_title=सुरक्षा चेतावनी
 install.service_started=ergopti-hotstrings सेवा सक्षम और प्रारंभ की गई
+install.session_without_graphical_target=यह सत्र systemd का graphical-session.target कभी शुरू नहीं करता (i3, Openbox, Xfce, सत्र प्रबंधक के बिना sway), इसलिए उपयोगकर्ता यूनिट कभी नहीं चलेगी: Ergopti+ इसके बजाय अगले लॉगिन पर XDG ऑटोस्टार्ट प्रविष्टि से शुरू होता है। जो विंडो मैनेजर XDG ऑटोस्टार्ट को अनदेखा करता है (i3, sway), उसके कॉन्फ़िगरेशन में exec {1} पंक्ति चाहिए।
 install.source_toolchain_unavailable=इंस्टॉल किया गया कंपाइलर नेटिव आर्काइव बैकएंड नहीं बना सकता।
 install.startup_choice_unreadable=स्टार्टअप विकल्प पढ़ा नहीं जा सका।
 install.summary_config=कॉन्फ़िगरेशन: {1}

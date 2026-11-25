@@ -1910,6 +1910,7 @@
 	"linux_shell.install.security_warning_body": "الانتماء إلى مجموعة 'input' يتيح قراءة كل ضغطة مفتاح في الجلسة، بما في ذلك كلمات المرور المكتوبة في أي تطبيق. هذا ما يحتاجه محرك السلاسل النصية، وهو ما يفعله keyd وxremap أيضًا.",
 	"linux_shell.install.security_warning_title": "تحذير أمني",
 	"linux_shell.install.service_started": "تم تفعيل خدمة ergopti-hotstrings وتشغيلها",
+	"linux_shell.install.session_without_graphical_target": "هذه الجلسة لا تشغّل أبدًا graphical-session.target الخاص بـ systemd (i3 وOpenbox وXfce وsway بدون مدير جلسات)، لذلك لن تعمل وحدة المستخدم أبدًا: يبدأ Ergopti+ بدلًا من ذلك من مدخل التشغيل التلقائي XDG عند تسجيل الدخول التالي. يحتاج مدير النوافذ الذي يتجاهل التشغيل التلقائي XDG (i3 وsway) إلى السطر exec {1} في إعداداته.",
 	"linux_shell.install.source_toolchain_unavailable": "لا يستطيع المترجم المثبّت بناء محرك الأرشيف الأصلي.",
 	"linux_shell.install.startup_choice_unreadable": "تعذّرت قراءة خيار بدء التشغيل.",
 	"linux_shell.install.summary_config": "الإعدادات: {1}",

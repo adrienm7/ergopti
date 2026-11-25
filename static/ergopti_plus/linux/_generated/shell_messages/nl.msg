@@ -70,6 +70,7 @@ install.section_tray=Pictogram in het systeemvak en vensters
 install.security_warning_body=Lid zijn van de groep 'input' maakt het mogelijk ELKE toetsaanslag van de sessie te lezen, ook wachtwoorden die in een willekeurige toepassing worden getypt. Precies dat heeft een hotstring-engine nodig, en zo werken ook keyd en xremap.
 install.security_warning_title=BEVEILIGINGSWAARSCHUWING
 install.service_started=service ergopti-hotstrings ingeschakeld en gestart
+install.session_without_graphical_target=Deze sessie start systemd's graphical-session.target nooit (i3, Openbox, Xfce, sway zonder sessiebeheerder), dus de gebruikersunit zou nooit draaien: Ergopti+ start in plaats daarvan bij de volgende aanmelding via het XDG-autostartitem. Een vensterbeheerder die XDG-autostart negeert (i3, sway) heeft de regel exec {1} in zijn configuratie nodig.
 install.source_toolchain_unavailable=de geïnstalleerde compiler kan de native archiefbackend niet bouwen.
 install.startup_choice_unreadable=De opstartkeuze kon niet worden gelezen.
 install.summary_config=Configuratie: {1}

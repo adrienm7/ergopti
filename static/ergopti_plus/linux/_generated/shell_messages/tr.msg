@@ -70,6 +70,7 @@ install.section_tray=Sistem tepsisi simgesi ve pencereler
 install.security_warning_body='input' grubunda olmak, oturumdaki TÜM tuş vuruşlarını, herhangi bir uygulamada yazılan parolalar dahil, okumayı sağlar. Bir hotstring motorunun ihtiyacı tam olarak budur; keyd ve xremap de böyle çalışır.
 install.security_warning_title=GÜVENLİK UYARISI
 install.service_started=ergopti-hotstrings hizmeti etkinleştirildi ve başlatıldı
+install.session_without_graphical_target=Bu oturum systemd'nin graphical-session.target hedefini hiç başlatmıyor (i3, Openbox, Xfce, oturum yöneticisi olmadan sway), bu yüzden kullanıcı birimi hiç çalışmazdı: Ergopti+ bunun yerine bir sonraki oturum açışta XDG otomatik başlatma girdisinden başlar. XDG otomatik başlatmayı yok sayan bir pencere yöneticisinin (i3, sway) yapılandırmasında exec {1} satırı gerekir.
 install.source_toolchain_unavailable=yüklü derleyici yerel arşiv arka ucunu derleyemiyor.
 install.startup_choice_unreadable=Başlangıç seçimi okunamadı.
 install.summary_config=Yapılandırma: {1}
