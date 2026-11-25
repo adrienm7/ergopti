@@ -303,3 +303,72 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 		end)
 	end)
 end)
+
+--- Runs the genuine menu and helper as an AppImage daemon: the driver inside a
+--- mounted AppDir, the .AppImage file outside it.
+--- @param body function Receives the menu, the .AppImage file and the entry path.
+local function with_appimage_startup(body)
+	local uv, Paths = require("luv"), require("core.fs.engine.paths")
+	local loaded = { "core.process.adapters.shell_runner", "ui.menu.start_at_login", "modules.updater.installer" }
+	local previous = {}
+	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
+	local Shell
+	local source_root, original_root = Paths.driver_root(), Paths.driver_root
+	local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-appimage-login-XXXXXX"))
+	local mount = root .. "/.mount_ErgoptX"
+	local driver = mount .. "/usr/lib/ergopti"
+	local image = root .. "/Applications d'été/ErgoptiPlus-x86_64.AppImage"
+	local environment = { PATH = root .. "/commands:" .. assert(os.getenv("PATH")), XDG_CONFIG_HOME = root .. "/config",
+		APPDIR = mount, APPIMAGE = image }
+	local saved = {}
+	for key in pairs(environment) do saved[key] = os.getenv(key) end
+	local function write(path, text)
+		local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
+	end
+	local okay, detail = xpcall(function()
+		Shell = helpers.load_module("core.process.adapters.shell_runner")
+		helpers.load_module("modules.updater.installer")
+		local menu = helpers.load_module("ui.menu.start_at_login")
+		assert(Shell.run("mkdir -p -- " .. Shell.quote(driver .. "/install") .. " " .. Shell.quote(driver .. "/bin")
+			.. " " .. Shell.quote(image:match("^(.*)/[^/]+$")) .. " " .. Shell.quote(root .. "/commands")))
+		for _, name in ipairs({ "start_at_login.sh", "desktop_entry.sh", "config_home.sh" }) do
+			local file = assert(io.open(source_root .. "/install/" .. name, "rb"))
+			local text = assert(file:read("*a")); assert(file:close())
+			write(driver .. "/install/" .. name, text)
+		end
+		require("tests.support.shell_messages_fixture").provide(driver .. "/install")
+		-- The AppDir carries the checkout's bin/ like the real AppImage does.
+		write(driver .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\n")
+		write(image, "AppImage stand-in\n")
+		write(root .. "/commands/systemctl", "#!/bin/bash\nif [ \"$2\" = is-enabled ]; then exit 1; fi\nexit 0\n")
+		assert(uv.fs_chmod(root .. "/commands/systemctl", 493))
+		for key, value in pairs(environment) do assert(uv.os_setenv(key, value)) end
+		Paths.driver_root = function() return driver end
+		body(menu, image, root .. "/config/autostart/ergopti-appimage.desktop")
+	end, debug.traceback)
+	Paths.driver_root = original_root
+	for key in pairs(environment) do
+		if saved[key] == nil then assert(uv.os_unsetenv(key)) else assert(uv.os_setenv(key, saved[key])) end
+	end
+	for _, name in ipairs(loaded) do package.loaded[name] = previous[name] end
+	if Shell then assert(Shell.run("rm -rf -- " .. Shell.quote(root))) end
+	if not okay then error(detail, 0) end
+end
+
+helpers.describe("login startup of an AppImage", function()
+	helpers.it("(login-appimage) starts the .AppImage file itself, never the mounted AppDir", function()
+		with_appimage_startup(function(menu, image, desktop)
+			helpers.assert_eq(menu.command_available(), true, "an AppImage can own its login startup")
+			helpers.assert_eq(menu.enabled(), false)
+			helpers.assert_eq(menu.toggle(), true)
+			helpers.assert_eq(menu.enabled(), true)
+			local bytes = read_file(desktop)
+			helpers.assert_true(bytes:find('Exec="' .. image .. '" --session-start --tray\n', 1, true) ~= nil, bytes)
+			helpers.assert_nil(bytes:find(".mount_", 1, true), "the mount disappears with this process")
+			helpers.assert_nil(bytes:find("/bin/bash", 1, true), "an AppImage is no Bash script")
+			helpers.assert_eq(menu.toggle(), true)
+			helpers.assert_eq(menu.enabled(), false)
+			helpers.assert_true(read_file(desktop):find("Hidden=true", 1, true) ~= nil)
+		end)
+	end)
+end)

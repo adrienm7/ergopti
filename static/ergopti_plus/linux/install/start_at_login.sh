@@ -16,7 +16,23 @@ case "$ACTION" in status|enable|disable) ;; *) exit 64 ;; esac
 
 # The arguments the entry passes its launcher; empty is the installed form.
 LAUNCH_ARGUMENTS=
-if [ "$DRIVER_ROOT" = /usr/lib/ergopti ]; then
+if [ -n "${ERGOPTI_APPIMAGE_FILE:-}" ]; then
+	# An AppImage runs from a /tmp/.mount_* squashfs that disappears with the
+	# process that mounted it: its entry starts the .AppImage file the user
+	# keeps, which the daemon names (modules/updater/installer.resolve) only
+	# when it runs from inside that AppImage's AppDir.
+	case "$ERGOPTI_APPIMAGE_FILE" in /*) ;; *) ergopti_msg startup.requires_installed >&2; exit 78 ;; esac
+	if [ ! -f "$ERGOPTI_APPIMAGE_FILE" ] || [ -z "${ERGOPTI_APPIMAGE_DIR:-}" ] \
+		|| [[ "$DRIVER_ROOT" != "$ERGOPTI_APPIMAGE_DIR"/* ]] \
+		|| [[ "$ERGOPTI_APPIMAGE_FILE" = "$ERGOPTI_APPIMAGE_DIR"/* ]]; then
+		ergopti_msg startup.requires_installed >&2
+		exit 78
+	fi
+	DESKTOP_NAME=ergopti-appimage.desktop
+	LAUNCHER="$ERGOPTI_APPIMAGE_FILE"
+	ERGOPTI_DESKTOP_DIRECT_EXEC=true
+	receipt_allowed=false
+elif [ "$DRIVER_ROOT" = /usr/lib/ergopti ]; then
 	DESKTOP_NAME=ergopti.desktop
 	LAUNCHER=/usr/bin/ergopti
 	receipt_allowed=false

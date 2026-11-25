@@ -14,12 +14,29 @@ local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.start_at_login"
 
+--- The helper's environment for an AppImage: the .AppImage file its entry
+--- starts and the AppDir it was mounted at, as the updater's installation
+--- resolution names them. Every other origin passes nothing.
+--- @return string prefix Shell assignments ending in a space, or "".
+local function appimage_environment()
+	local context = require("modules.updater.installer").resolve(
+		Paths.driver_root() .. "/modules/updater/manager.lua")
+	if type(context) ~= "table" or context.kind ~= "appimage" then return "" end
+	if type(context.appimage) ~= "string" then
+		Logger.warn(LOG, "This AppImage names no file a login entry could start: %s.",
+			tostring(context.launcher_refusal))
+		return ""
+	end
+	return "ERGOPTI_APPIMAGE_FILE=" .. ShellRunner.quote(context.appimage)
+		.. " ERGOPTI_APPIMAGE_DIR=" .. ShellRunner.quote(context.appdir) .. " "
+end
+
 --- Calls the installed startup helper, retaining external failure as a failure.
 --- @param action string
 --- @param run function|nil
 --- @return boolean, string
 local function invoke(action, run)
-	return (run or ShellRunner.exec_checked)("/bin/bash "
+	return (run or ShellRunner.exec_checked)(appimage_environment() .. "/bin/bash "
 		.. ShellRunner.quote(Paths.driver_root() .. "/install/start_at_login.sh") .. " " .. action)
 end
 

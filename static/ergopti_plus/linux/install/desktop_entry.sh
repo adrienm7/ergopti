@@ -6,11 +6,22 @@
 
 # The arguments default to the installed launchers' login form; a source run's
 # own launcher (bin/ergopti-hotstrings) takes the daemon's --tray alone.
+# ERGOPTI_DESKTOP_DIRECT_EXEC=true names an executable that is no Bash script
+# (an .AppImage file), which the entry then runs itself.
 ergopti_desktop_exec() {
 	local escaped="$1" arguments="${2:---session-start --tray}"
 	case "$escaped" in
 		*$'\n'*|*$'\r'*|*$'\t'*) echo 'Unsupported desktop executable path.' >&2; return 64 ;;
 	esac
+	if [ "${ERGOPTI_DESKTOP_DIRECT_EXEC:-false}" = true ]; then
+		# Desktop implementations inspect the executable before expanding %
+		# escapes, so a direct executable admits no character any layer rewrites.
+		case "$escaped" in
+			*[\"\\\$\`%]*) echo 'Unsupported desktop executable path.' >&2; return 64 ;;
+		esac
+		printf 'Exec="%s" %s\n' "$escaped" "$arguments"
+		return 0
+	fi
 	escaped="${escaped//\\/\\\\}"
 	escaped="${escaped//\"/\\\"}"
 	escaped="${escaped//\$/\\\$}"
@@ -133,8 +144,8 @@ ergopti_desktop_entry_launcher() {
 					commands=$((commands + 1))
 					value="${trimmed#*=}"
 					value="${value#"${value%%[![:space:]]*}"}"
-					if [[ "$value" =~ ^/bin/bash\ \"(/[^\"\\%$\`]+)\"\ (--session-start\ )?--tray[[:space:]]*$ ]]; then
-						found="${BASH_REMATCH[1]}"
+					if [[ "$value" =~ ^(/bin/bash\ )?\"(/[^\"\\%$\`]+)\"\ (--session-start\ )?--tray[[:space:]]*$ ]]; then
+						found="${BASH_REMATCH[2]}"
 					fi
 				fi ;;
 		esac
