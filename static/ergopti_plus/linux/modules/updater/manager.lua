@@ -1494,13 +1494,19 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		Logger.debug(LOG, "Local source — background checks disabled.")
 		return true
 	end
-	-- A system package, an AppImage or a Flatpak owns its own update path:
-	-- install_archive() refuses to replace it, so a background check would only
-	-- offer what cannot be installed.
+	-- A system package or a Flatpak owns its own update path, which also
+	-- announces a new release: install_archive() refuses to replace it, so a
+	-- background check would only offer what cannot be installed. An AppImage
+	-- has no such announcer: its checks run and only announce (install_origin).
 	local kind = M.installation_kind()
-	if require("modules.updater.install_origin").update_blocked_key(kind) then
+	local InstallOrigin = require("modules.updater.install_origin")
+	if not InstallOrigin.checks_for_releases(kind) then
 		Logger.info(LOG, "No automatic update check for this %s installation: its own updater replaces it.", kind)
 		return true
+	end
+	if InstallOrigin.update_blocked_key(kind) then
+		Logger.info(LOG, "This %s installation never replaces itself; its background checks only announce "
+			.. "a new release.", kind)
 	end
 
 	_schedule_active = true

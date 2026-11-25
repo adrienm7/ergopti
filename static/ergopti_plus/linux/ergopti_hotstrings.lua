@@ -3577,7 +3577,10 @@ local function main()
 			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local body = require("updater.engine.check_notice").release_body(release, i18n_mod.get)
+				-- An AppImage cannot replace itself: the notice names the page to
+				-- download the new one from.
+				local body = require("modules.updater.install_origin").release_notice(release,
+					updater.installation_kind(), i18n_mod.get, updater.releases_page_url())
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",

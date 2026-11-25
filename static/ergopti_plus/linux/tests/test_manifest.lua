@@ -620,6 +620,7 @@ return {
 	"tests.unit.modules.updater.vectors.test_update_check_session_vectors",
 	"tests.unit.modules.updater.vectors.test_update_schedule_vectors",
 	"tests.unit.modules.updater.check.test_updater_check_schedule",
+	"tests.unit.modules.updater.check.test_appimage_release_notice",
 	"tests.meta.architecture.test_updater_constants_single_source",
 	"tests.meta.architecture.test_caps_word_auto_off_single_source",
 	"tests.unit.modules.updater.check.test_updater_manager_module_loads_without",

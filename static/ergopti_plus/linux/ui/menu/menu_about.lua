@@ -223,8 +223,10 @@ local function _about_update_rows(ctx)
 	end
 
 
-	-- A system package is an installed build, so only its own reason is applied here.
-	if update_blocked_reason and not source_run then
+	-- A system package is an installed build, so only its own reason is applied
+	-- here. An AppImage keeps its frequency: its checks still announce releases.
+	if update_blocked_reason and not source_run
+		and not require("modules.updater.install_origin").checks_for_releases(up.installation_kind()) then
 		frequency_row.items = nil
 		frequency_row.disabled = true
 		frequency_row.disabled_reason_key = update_blocked_reason

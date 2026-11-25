@@ -676,6 +676,18 @@ Each question names the default kept meanwhile; an answer moves into the item or
       keys' letters do since 2026-11-19, on the board-only thumb key `RightThumbOuter` at AltGr's place, taken only
       when the right thumb has no code left, so no other layout moved (`docs/design/layout-analysis.md`, « ErgoDox
       keys »). Both came in complete on the ErgoDox. The other choice is to keep them out.
+- [ ] **Linux AppImage and local installs told of new releases (decided by the agent on 2026-11-25, to review by
+      the maintainer).** Field report: a dev-channel AppImage never checked for updates (« its own updater replaces
+      it »), so its user was never told of a new version. Kept meanwhile (`modules/updater/install_origin.lua`): an
+      AppImage runs its background checks and announces a new release in a notification naming its own way to
+      update and the release page (`…/releases/tag/<tag>`); its « Update now » row stays greyed and installing stays
+      refused, so nothing replaces a file the user owns. A package or a Flatpak still checks nothing (its manager
+      announces). A local version (install.sh from a checkout, version `local`) still checks nothing: it has no
+      version to compare. Choose:
+  1. **(recommended) Keep the announcement only.**
+  2. Let the AppImage replace its own file from the release's AppImage asset (needs a verified digest of that
+     asset and a write to a file outside the daemon's folders).
+  3. Announce nothing, as before.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 
