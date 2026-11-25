@@ -388,7 +388,8 @@
 			'shortcut_left',
 			'modifier_usage',
 			'altgr_usage',
-			'dead_key_usage'
+			'dead_key_usage',
+			'context_key_usage'
 		]
 	};
 	// The parts of the stacked figures, each drawn in its categorical slot of
@@ -4924,6 +4925,9 @@
 		 */
 		function levelText(layout, code, level) {
 			if (code === 'Space' && level === 0) return '␣';
+			// The layout's own repeat or magic key shows its label (E.contextLabel).
+			const own = level < 0 ? '' : E.contextLabel(layout, code, level);
+			if (own !== '') return own;
 			const cell = level < 0 ? null : (layout.rows[code] || [])[level];
 			if (cell && typeof cell === 'object')
 				return (

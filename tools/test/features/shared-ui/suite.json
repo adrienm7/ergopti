@@ -765,6 +765,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-studio-plain-language.cjs"],
 			"repro": "npm run test:studio-plain-language"
+		},
+		{
+			"id": "layout-context-keys",
+			"ordinal": 738,
+			"name": "a layout's own repeat and magic keys type what the shared vectors say, are refused when malformed, and are analysed as context-dependent ways that keep every count and never cost more than the fixed typing",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-context-keys.cjs"],
+			"repro": "npm run test:layout-context-keys"
 		}
 	]
 }

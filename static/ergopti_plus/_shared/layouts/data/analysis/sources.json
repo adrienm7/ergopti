@@ -18,6 +18,10 @@
 			"path": "docs/design/layout-analysis.md",
 			"anchor": "ways-of-typing"
 		},
+		"engine_doc_context": {
+			"title": "Ergopti — magic and repeat keys in the layout model",
+			"path": "docs/design/magic-and-repeat-keys.md"
+		},
 		"study": {
 			"title": "Ergopti — study of the layout analysers",
 			"path": "docs/audits/layout-analysers/report.md"
@@ -248,6 +252,7 @@
 		"modifier_usage": ["engine_doc", "engine_doc_ways", "dariogoetz", "kla"],
 		"altgr_usage": ["engine_doc", "engine_doc_ways", "dariogoetz"],
 		"dead_key_usage": ["engine_doc", "engine_doc_ways", "ergol_stats", "kalamine"],
+		"context_key_usage": ["engine_doc_context", "engine_doc_ways"],
 		"outer_column": ["engine_doc", "study"],
 		"unsupported": ["engine_doc", "ergol_stats"],
 		"compact_fit": ["engine_doc", "study"],
