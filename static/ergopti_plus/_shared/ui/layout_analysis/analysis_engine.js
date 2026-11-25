@@ -617,11 +617,15 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		// The rows change with every copy that shares its levels (the
 		// optimizer's trials): they are checked each time.
+		// A tap-hold key (tap_keys) types when tapped and holds when held.
 		const typesOnModifier = () => {
 			for (const [name, modifier] of Object.entries(modifiers))
 				for (const side of ['for_left_hand', 'for_right_hand'])
 					for (const code of modifier[side])
-						if ((layout.rows[code] || []).some((cell) => cell !== null))
+						if (
+							!(modifier.tap_keys || []).includes(code) &&
+							(layout.rows[code] || []).some((cell) => cell !== null)
+						)
 							fail(`types on ${code}, which holds its modifier ${name}`);
 		};
 		if (checkedLevels.has(levels) && checkedLevels.get(levels) === modifiers) {
@@ -643,6 +647,14 @@ var LAYOUT_ANALYSIS = (function () {
 				if (!Array.isArray(codes) || codes.length === 0 || codes.some((c) => typeof c !== 'string'))
 					fail(`modifier ${name} needs its ${side} keys`);
 			}
+			if (
+				modifier.tap_keys !== undefined &&
+				(!Array.isArray(modifier.tap_keys) ||
+					modifier.tap_keys.some(
+						(c) => !modifier.for_left_hand.includes(c) && !modifier.for_right_hand.includes(c)
+					))
+			)
+				fail(`modifier ${name}: its tap_keys must be among its keys`);
 		}
 		typesOnModifier();
 		const ids = new Set();
@@ -688,7 +700,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   {dead: state}} (typed is a character, or « dead:<state> » for the dead
 	 *   key entering <state>), command?: code → letter, fingering?: 'standard'
 	 *   | 'angle', levels? and modifiers? (checkLevels): [{id, shift?, hold?:
-	 *   modifier names}] and name → {label, for_left_hand, for_right_hand}}.
+	 *   modifier names}] and name → {label, for_left_hand, for_right_hand,
+	 *   tap_keys?: those of its keys that also type when tapped (tap-holds)}}.
 	 *   A cell is a string, null, or {dead: state}.
 	 * @returns {object} The same layout, with empty dead/command maps filled in.
 	 * @throws {Error} On a malformed layout.
@@ -1067,9 +1080,10 @@ var LAYOUT_ANALYSIS = (function () {
 			for (let layer = 0; layer < row.length; layer++) {
 				const cell = row[layer];
 				if (cell === null) continue;
-				// A level whose modifier the board has no key for types nothing.
+				// A level whose modifier the board has no key for types nothing, nor
+				// one a tap-hold key would hold for itself.
 				const held = levels.held[layer][side];
-				if (held === null) continue;
+				if (held === null || held.includes(k)) continue;
 				let map;
 				let key = cell;
 				let width = 1;
@@ -5082,6 +5096,103 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	// ==========================================
+	// ======= Tap-hold keys ====================
+	// ==========================================
+
+	/**
+	 * A layout's tap-hold keys: those of its modifiers' keys that also type
+	 * when tapped (tap_keys), each with the modifiers it holds.
+	 * @param {object} layout - Library shape.
+	 * @returns {Map<string, string[]>} code → modifier names, in the modifiers' order.
+	 */
+	function tapHoldKeys(layout) {
+		const out = new Map();
+		for (const [name, modifier] of Object.entries(layout.modifiers || {}))
+			for (const code of modifier.tap_keys || []) {
+				if (!out.has(code)) out.set(code, []);
+				out.get(code).push(name);
+			}
+		return out;
+	}
+
+	/**
+	 * How a layout's tap-hold keys are used on a corpus (an idea seen in the
+	 * Layouts Wiki playground, which models tap and hold keys): each key's taps
+	 * (it types its own character) and holds (it holds a level for another
+	 * key), and the two patterns that make a tap-hold misfire or tire: a tap
+	 * rolled into another key of the same hand (a fast roll reads as a hold),
+	 * and a hold whose key typed is on the hold's own hand (one hand holds and
+	 * types). The stream is the one analyse() measures.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keys: Array<{code: string, holds: string[], taps: number,
+	 *   held: number, holdShare: number, rollAfterTap: number, sameHandHold: number}>,
+	 *   presses: number, holdShare: number}} keys in the board's order (those
+	 *   the board has): taps and held counted, holdShare the held share of the
+	 *   key's uses (%), rollAfterTap the share of its taps followed by another
+	 *   key of the same hand (%), sameHandHold the share of its holds typing a
+	 *   key of the same hand (%); presses the stream's key presses and
+	 *   holdShare the tap-holds' holds among them (%).
+	 */
+	function tapHoldReport(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const byCode = tapHoldKeys(layout);
+		const tapKeys = new Map();
+		for (const [code, holds] of byCode)
+			if (board.index.has(code)) tapKeys.set(board.index.get(code), holds);
+		const zero = () => new Float64Array(board.codes.length);
+		const [taps, held, rolled, sameHand] = [zero(), zero(), zero(), zero()];
+		let presses = 0;
+		let holds = 0;
+		if (tapKeys.size > 0) {
+			const plan = planTyping(
+				compileWays(layout, board, null),
+				board,
+				prepareNgrams(ngrams),
+				planMode(opts)
+			);
+			walkTyped(board, plan, {
+				char(char, seq, n) {
+					for (const k of seq.keys) if (tapKeys.has(k)) taps[k] += n;
+					// A run of one held key is one hold.
+					for (let i = 0; i < seq.held.length; i++) {
+						const k = seq.held[i];
+						if (!tapKeys.has(k) || (i > 0 && seq.held[i - 1] === k)) continue;
+						held[k] += n;
+						holds += n;
+						if (seq.keys.some((typed) => board.hand[typed] === board.hand[k])) sameHand[k] += n;
+					}
+				},
+				unsupported() {},
+				press(k, n) {
+					presses += n;
+				},
+				bigram(k1, k2, n) {
+					if (tapKeys.has(k1) && k1 !== k2 && board.hand[k1] === board.hand[k2]) rolled[k1] += n;
+				},
+				trigram() {}
+			});
+		}
+		const share = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const keys = Array.from(tapKeys.keys())
+			.sort((a, b) => a - b)
+			.map((k) => ({
+				code: board.codes[k],
+				holds: tapKeys.get(k).slice(),
+				taps: taps[k],
+				held: held[k],
+				holdShare: share(held[k], taps[k] + held[k]),
+				rollAfterTap: share(rolled[k], taps[k]),
+				sameHandHold: share(sameHand[k], held[k])
+			}));
+		return { keys, presses, holdShare: share(holds, presses) };
+	}
+
+	// ==========================================
 	// ======= User metrics over key windows =====
 	// ==========================================
 
@@ -8742,6 +8853,8 @@ var LAYOUT_ANALYSIS = (function () {
 		WINDOW_MAX_METRICS,
 		windowNames,
 		windowMetrics,
+		tapHoldKeys,
+		tapHoldReport,
 		rankAmong,
 		wordsWithKeys,
 		blendNgrams,

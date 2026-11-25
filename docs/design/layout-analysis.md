@@ -1504,6 +1504,25 @@ browser with three examples on a first visit, named in the page's language
 until renamed. The Help tab's « Write your own metric » documents the
 language.
 
+**Tap-holds analysed as holds** (2026-11-25, an idea seen in the Layouts Wiki
+playground, which models tap and hold keys). An editor document's tap-holds
+reach the analysis through `LAYOUT_FORMATS.withTapHolds`, on top of either
+reader (the compiled .keylayout or `fromSource`): each layer a tap-hold holds
+that types becomes a level of its own (`hold_<layer>`), held by that
+tap-hold's keys (the other hand's first, as Shift); a tap-hold holding one of
+the layout's own modifiers (or Right Alt, as AltGr, on a layout with levels)
+adds its key to that modifier's. Such a key is in its modifier's `tap_keys`:
+it types its tap when tapped (its tap text, else the base character of the key
+it taps), and the engine accepts that a modifier key types only for those. A
+key never holds its own level to type (`offerCells`). Not analysed: a
+tap-hold holding Shift, Control or a modifier with no level, or Right Alt on a
+layout of four levels with no held layer. `E.tapHoldReport` gives each
+tap-hold key's taps, holds, the share of its taps rolled into a key of its
+hand (a fast roll reads as a hold: the misfire risk of home-row mods) and the
+share of its holds typed by its own hand; the editor's panel and « One
+layout » show it, never scored. The other analysers read a layout of its own
+levels on its first four (`analyser_scores.js` `fourLevels`).
+
 **Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
 pane). « Help », before « One layout » (which stays last), holds one titled
 section per common task: compare two layouts, rank on a metric, read the
