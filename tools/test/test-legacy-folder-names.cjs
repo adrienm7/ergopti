@@ -206,7 +206,7 @@ for (const planted of [
 	'~/.local/state/Ergopti/logs',
 	'${XDG_CONFIG_HOME:-$HOME/.config}/ErgoptiPlus/config.toml',
 	'~/Library/Logs/ergopti/launcher.log',
-	'/Users/u/Library/Caches/ergopti/dev/db.sqlite',
+	'$HOME/Library/Caches/ergopti/dev/db.sqlite',
 	'~/Library/Application Support/ErgoptiPlus/paths.toml',
 	'%LOCALAPPDATA%\\ErgoptiPlus\\logs',
 	'EnvGet("LOCALAPPDATA") . "\\ergopti\\logs"'
