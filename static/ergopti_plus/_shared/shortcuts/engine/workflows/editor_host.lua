@@ -24,6 +24,7 @@ local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local Model = require("shortcuts.engine.workflows.model")
 local Base64 = require("core.lifecycle.engine.compat.base64")
+local NativePath = require("core.fs.engine.native_path")
 
 local M = {}
 
@@ -269,7 +270,7 @@ function M.new(ports)
 		if #encoded > owner.catalogue().limits.image_base64_bytes then
 			return ports.push("onImagePicked", { ok = false, reason = REASON.too_long })
 		end
-		local name = (path:match("([^/\\]+)$") or "image"):gsub("%.[Pp][Nn][Gg]$", "")
+		local name = (NativePath.basename(path) or "image"):gsub("%.[Pp][Nn][Gg]$", "")
 		ports.push("onImagePicked", { ok = true, name = name, data = encoded })
 	end
 
