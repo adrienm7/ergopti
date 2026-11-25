@@ -513,11 +513,25 @@ check(
 const THUMBS = E.thumbKeys();
 const onThumbs = (layout) =>
 	THUMBS.filter((code) => (layout.rows[code] || []).some((cell) => cell !== null));
-// Three on every thumb board, then the ErgoDox's three right board-only ones:
-// its other left thumb keys type nothing (maintainer, 2026-11-21).
+// Three on every thumb board, then the ErgoDox's four right board-only ones
+// (AltGr's mod-tap key the last): its other left thumb keys type nothing
+// (maintainer, 2026-11-21).
 check(
-	THUMBS.length === 6 && THUMBS.slice(0, 3).join() === 'NonConvert,Convert,KanaMode',
-	`the model has the three thumb keys and the ErgoDox's three, not ${THUMBS.join(' ')}`
+	THUMBS.length === 7 &&
+		THUMBS.slice(0, 3).join() === 'NonConvert,Convert,KanaMode' &&
+		E.modTapThumbKeys().join() === 'RightThumbOuter',
+	`the model has the three thumb keys and the ErgoDox's four, not ${THUMBS.join(' ')}`
+);
+// (ergodox-altgr-mod-tap-2026-11-25) AltGr's ErgoDox key, read as a mod-tap
+// for VCKB's letter, is a place only for a start that types there: AZERTY is
+// never moved onto a modifier, VCKB keeps its d's key as a place.
+const slotCodes = (start) =>
+	O.problem(E, start, { thumbKeys: 'ergodox' }).slots.map((slot) => slot.code);
+check(
+	!slotCodes(azerty).includes('RightThumbOuter') &&
+		slotCodes(azerty).includes('RightThumbMiddle') &&
+		slotCodes(library.get('vckb')).includes('RightThumbOuter'),
+	'thumbKeys: ergodox offers AltGr’s key to a start that does not type there'
 );
 const noThumbs = search(azerty, {}, { start: 'random' });
 check(

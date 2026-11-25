@@ -1074,6 +1074,12 @@
 					"y": 7,
 					"w": 1,
 					"row": 5
+				},
+				"RightThumbOuter": {
+					"x": 11.5,
+					"y": 7,
+					"w": 1,
+					"row": 5
 				}
 			},
 			"fingers": {
@@ -1154,6 +1160,7 @@
 				"RightThumbMiddle": "rt",
 				"KanaMode": "rt",
 				"Convert": "rt",
+				"RightThumbOuter": "rt",
 				"AltRight": "rt"
 			},
 			"home_keys": {
