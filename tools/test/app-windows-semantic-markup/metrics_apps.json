@@ -30,6 +30,18 @@
 				"where": "class=\"app-modal-section app-modal-grid-2\"",
 				"count": 2,
 				"reason": "A two-column grid that lays out a pair of headed sections of the drill-down side by side; the sections carry the meaning."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"filters-bar\" style=\"display: flex; gap: 15px",
+				"count": 1,
+				"reason": "A bar of filter controls, not a form: nothing is submitted, each control applies at once; each control carries its own label."
+			},
+			{
+				"tag": "div",
+				"where": "class=\"filters-bar\"\n",
+				"count": 1,
+				"reason": "A bar of filter controls, not a form: nothing is submitted, each control applies at once; its fieldsets carry their own legends."
 			}
 		]
 	}

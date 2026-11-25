@@ -1,3 +1,18 @@
 {
-	"files": {}
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"where": "id=\"param-program\" role=\"group\"",
+				"count": 1,
+				"reason": "A group named by ARIA after the action's title, which is not a legend of its own; a fieldset would need a duplicate legend."
+			},
+			{
+				"tag": "div",
+				"where": "param-program-provider",
+				"count": 1,
+				"reason": "A group named by ARIA after the provider's label, which is not a legend of its own; a fieldset would need a duplicate legend."
+			}
+		]
+	}
 }

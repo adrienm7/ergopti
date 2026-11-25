@@ -30,6 +30,12 @@
 				"where": "id=\"page-checklist-body\"",
 				"count": 1,
 				"reason": "The box the script redraws with the checklist fieldsets under the disclosure's summary and its inactive hint"
+			},
+			{
+				"tag": "div",
+				"where": "id=\"lang-list\" role=\"group\"",
+				"count": 1,
+				"reason": "A group of toggle buttons named by ARIA after the section heading, which is not a legend of its own."
 			}
 		],
 		"script.js": [
@@ -50,6 +56,12 @@
 				"where": "document.createElement('span');",
 				"count": 3,
 				"reason": "The text of a radio or checkbox label beside its input inside the same label, styled by the input's checked or disabled state"
+			},
+			{
+				"tag": "div",
+				"where": "var node = document.createElement('div');",
+				"count": 1,
+				"reason": "A checklist group named by ARIA after its header, which is itself a checkbox and so cannot be a legend; a group without a label stays a plain block."
 			}
 		]
 	}

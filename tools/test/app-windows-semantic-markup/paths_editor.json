@@ -1,3 +1,12 @@
 {
-	"files": {}
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"where": "id=\"paths-form\"",
+				"count": 1,
+				"reason": "The editor's rows, not a form: the footer's buttons save or cancel and Enter submits nothing."
+			}
+		]
+	}
 }

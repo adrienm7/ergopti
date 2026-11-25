@@ -1,3 +1,18 @@
 {
-	"files": {}
+	"files": {
+		"index.html": [
+			{
+				"tag": "div",
+				"where": "id=\"info-form\"",
+				"count": 1,
+				"reason": "The editor's rows, not a form: Save and Cancel act on a click, never on Enter."
+			},
+			{
+				"tag": "div",
+				"where": "id=\"rows\" role=\"group\"",
+				"count": 1,
+				"reason": "The rows group, named by ARIA after the window's heading, which is not a legend of its own."
+			}
+		]
+	}
 }
