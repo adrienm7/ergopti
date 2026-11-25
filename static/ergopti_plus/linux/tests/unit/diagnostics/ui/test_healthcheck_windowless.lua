@@ -121,6 +121,30 @@ helpers.describe("diagnostics without a native window (Linux)", function()
 		end)
 	end)
 
+	helpers.it("renders and delivers through the shared report page, as macOS does (healthcheck-windowless)", function()
+		-- A second renderer here drifted from the shared one macOS uses
+		helpers.assert_eq(require("diagnostics.ui.healthcheck.report").render_html, nil,
+			"the Linux report module keeps no HTML renderer of its own")
+		local ReportPage = require("diagnostics.engine.healthcheck.report_page")
+		local ok, err = pcall(ReportPage.deliver, { logger = {}, log = "test" })
+		helpers.assert_true(not ok and tostring(err):find("port", 1, true) ~= nil,
+			"a delivery without its ports fails fast: " .. tostring(err))
+		without_window(LGI, function(_, record)
+			require("diagnostics.ui.healthcheck.bridge").open()
+			local html = read(record.opened[1])
+			helpers.assert_true(html ~= nil, "the report file exists")
+			local title = html:match("<title>(.-)</title>")
+			local lead = html:match("<p>(.-)</p>")
+			local text = html:match("<pre>(.-)</pre>")
+			local locale = html:match('<html lang="(.-)">')
+			local unescape = function(s)
+				return (s:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '"'):gsub("&#39;", "'"):gsub("&amp;", "&"))
+			end
+			helpers.assert_eq(html, ReportPage.render_html(unescape(title), unescape(lead), unescape(text), unescape(locale)),
+				"the file is exactly the shared renderer's page")
+		end)
+	end)
+
 	helpers.it("explains a window without a fallback by the missing component (window-missing-component)", function()
 		without_window(LGI, function(manager, record)
 			helpers.assert_eq(manager.show("metrics_typing"), false)

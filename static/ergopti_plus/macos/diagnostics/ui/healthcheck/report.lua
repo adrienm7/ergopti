@@ -380,43 +380,15 @@ function M.deliver_without_window(opts, overrides)
 	local i18n = require("core.i18n.engine.i18n")
 	local state = type(opts) == "table" and opts.state or nil
 	local title = i18n.get("menu.debug.healthcheck")
-	Logger.start(LOG, "Writing the diagnostics report to a file: no window can show it…")
-	local ok, path = xpcall(function()
-		local bridge = require("diagnostics.ui.healthcheck.core")
-		local documents = bridge.config()
-		local snapshot = bridge.run({ state = state, complete_local = true })
-		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
-			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
-		local dir = snapshot.sections.paths.diagnostics_dir
-		if type(dir) ~= "string" or dir == "" then error("the diagnostics folder is unknown") end
-		local document = Share.document(snapshot, documents.schema, i18n.get(documents.schema.share_policy.notice_key))
-		local suffix = documents.schema.report.name_suffix
-		assert(document.name:sub(-#suffix) == suffix, "the report name does not end with the schema's suffix")
-		local html = ReportPage.render_html(title, i18n.get("healthcheck.file_fallback.lead"), document.text,
-			i18n.get_locale())
-		local written, detail = effects.save(dir, document.name:sub(1, -#suffix - 1) .. ".html", html)
-		if not written then error("the report could not be saved: " .. tostring(detail)) end
-		return written
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "The diagnostics report could not be written to a file: %s", tostring(path))
-		return false
-	end
-	Logger.success(LOG, "Diagnostics report written to %s.", path)
-	local asked, request = pcall(effects.open, path, function(receipt)
-		if type(receipt) ~= "table" or receipt.ok ~= true then
-			Logger.warn(LOG, "The browser did not open the diagnostics report (status=%s, reason=%s).",
-				tostring(type(receipt) == "table" and receipt.code), tostring(type(receipt) == "table" and receipt.error))
-		end
-	end, function() return true end)
-	if not asked or type(request) ~= "table" then
-		Logger.warn(LOG, "The browser could not be asked to open the diagnostics report: %s.", tostring(request))
-	end
-	local sent, delivered = pcall(effects.notify, title, i18n.format("healthcheck.file_fallback.notice", path), "info")
-	if not sent or delivered ~= true then
-		Logger.warn(LOG, "The diagnostics file notice was not delivered: %s.", tostring(delivered))
-	end
-	return true
+	return ReportPage.deliver({
+		logger = Logger, log = LOG, title = title, lead = i18n.get("healthcheck.file_fallback.lead"),
+		locale = i18n.get_locale(), translate = i18n.get, save = effects.save, open = effects.open,
+		collect = function()
+			local bridge = require("diagnostics.ui.healthcheck.core")
+			return bridge.run({ state = state, complete_local = true }), bridge.config()
+		end,
+		notify = function(path) return effects.notify(title, i18n.format("healthcheck.file_fallback.notice", path), "info") end,
+	})
 end
 
 --- Says in a native alert that a window could not open, where its failure is

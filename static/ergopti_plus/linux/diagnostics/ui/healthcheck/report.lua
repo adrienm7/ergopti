@@ -39,6 +39,7 @@ local IssueLink   = require("diagnostics.engine.reports.issue_link")
 local Redact      = require("diagnostics.engine.reports.redact")
 local Share       = require("diagnostics.engine.healthcheck.share")
 local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ReportPage  = require("diagnostics.engine.healthcheck.report_page")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "diagnostics.engine.healthcheck.report"
@@ -218,43 +219,11 @@ function M.report_field_run(line, text, overrides, complete)
 	end, overrides, complete)
 end
 
---- Escapes text for an HTML element or attribute.
---- @param text string
---- @return string
-local function escape_html(text)
-	return (text:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&#39;" }))
-end
-
---- The report as one self-contained page: no script, no asset, no network, so
---- any browser shows it whatever the desktop lacks.
---- @param title string The page title (the diagnostics window's name).
---- @param lead string The sentence that says why this is a file.
---- @param text string The approved report.
---- @param locale string The page language.
---- @return string html
-function M.render_html(title, lead, text, locale)
-	return table.concat({
-		"<!doctype html>",
-		'<html lang="' .. escape_html(locale) .. '">',
-		'<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
-		"<title>" .. escape_html(title) .. "</title>",
-		-- No colour of its own: the browser's light and dark defaults apply
-		"<style>:root{color-scheme:light dark}"
-			.. "body{font:15px/1.5 system-ui,sans-serif;margin:2em auto;max-width:60em;padding:0 1em}"
-			.. "pre{white-space:pre-wrap;word-break:break-word;border:1px solid;padding:1em;border-radius:6px}</style>",
-		"</head><body>",
-		"<h1>" .. escape_html(title) .. "</h1>",
-		"<p>" .. escape_html(lead) .. "</p>",
-		"<pre>" .. escape_html(text) .. "</pre>",
-		"</body></html>",
-		"",
-	}, "\n")
-end
-
 --- Delivers the diagnostics report when no window can show it: the approved
 --- report of a fresh snapshot is written as a self-contained HTML file in the
 --- logs' diagnostics folder, opened in the default browser, and a notice names
---- the file. The diagnostics must never depend on the component they diagnose.
+--- the file and the missing component. The diagnostics must never depend on the
+--- component they diagnose.
 --- @param info table { component = string|nil, locale = string } from the webview manager.
 --- @param overrides table|nil Replacement side effects (tests only).
 --- @return boolean delivered Whether the file was written and its opening started.
@@ -262,41 +231,20 @@ function M.deliver_without_window(info, overrides)
 	local effects = effects_with(overrides)
 	local I18n = require("core.i18n.engine.i18n")
 	local component = type(info) == "table" and info.component or nil
-	local locale = type(info) == "table" and type(info.locale) == "string" and info.locale or I18n.get_locale()
 	-- The diagnostics window's own name titles the page and the notice
 	local title = I18n.get(require("core.ui.engine.window_titles").key_for_app("healthcheck"))
-	Logger.start(LOG, "Writing the diagnostics report to a file: no window can show it…")
-	local ok, path = xpcall(function()
-		local snapshot, documents = menu_snapshot(true)
-		local dir = snapshot.sections.paths.diagnostics_dir
-		if type(dir) ~= "string" or dir == "" then error("the diagnostics folder is unknown") end
-		local document = Share.document(snapshot, documents.schema, I18n.get(documents.schema.share_policy.notice_key))
-		local suffix = documents.schema.report.name_suffix
-		assert(document.name:sub(-#suffix) == suffix, "the report name does not end with the schema's suffix")
-		local html = M.render_html(title, I18n.get("healthcheck.file_fallback.lead"), document.text, locale)
-		local written, detail = effects.save(dir, document.name:sub(1, -#suffix - 1) .. ".html", html)
-		if not written then error("the report could not be saved: " .. tostring(detail)) end
-		return written
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "The diagnostics report could not be written to a file: %s", tostring(path))
-		return false
-	end
-	Logger.success(LOG, "Diagnostics report written to %s.", path)
-	local request, refusal = effects.open(path, function(receipt)
-		if type(receipt) ~= "table" or receipt.ok ~= true then
-			Logger.warn(LOG, "The browser did not open the diagnostics report (status=%s, reason=%s).",
-				tostring(type(receipt) == "table" and receipt.code), tostring(type(receipt) == "table" and receipt.error))
-		end
-	end, function() return true end)
-	if request == nil then
-		Logger.warn(LOG, "The browser could not be asked to open the diagnostics report: %s.", tostring(refusal))
-	end
-	local body = I18n.get(component and "healthcheck.file_fallback.notice_missing" or "healthcheck.file_fallback.notice")
-		:gsub("{1}", function() return path end)
-		:gsub("{2}", function() return component or "" end)
-	effects.notify(title, body, "info")
-	return true
+	return ReportPage.deliver({
+		logger = Logger, log = LOG, title = title, lead = I18n.get("healthcheck.file_fallback.lead"),
+		locale = type(info) == "table" and type(info.locale) == "string" and info.locale or I18n.get_locale(),
+		translate = I18n.get, save = effects.save, open = effects.open,
+		collect = function() return menu_snapshot(true) end,
+		notify = function(path)
+			local body = I18n.get(component and "healthcheck.file_fallback.notice_missing" or "healthcheck.file_fallback.notice")
+				:gsub("{1}", function() return path end)
+				:gsub("{2}", function() return component or "" end)
+			return effects.notify(title, body, "info")
+		end,
+	})
 end
 
 --- Opens the GitHub feature form with the version and the system prefilled.
