@@ -160,7 +160,11 @@ function M.run(options)
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
 	env.TapHold = { is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
+	-- The typing path's settings and catalogues are read before the hook starts.
+	env.RepeatKey = { is_enabled = function() record("typing.repeat_key"); return false end }
+	env.tap_keys = { keys = function() record("typing.tap_keys"); return {} end }
 	env.keystats = { hold_accounting_token = noop, pump_flush = noop, bind_pointer_position = noop,
+		load_media_policy = function() record("typing.media_policy") end,
 		get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
 	env.capture_owned_scancodes = {}
@@ -276,6 +280,10 @@ function M.run(options)
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
 		elseif name == "settings.engine.paths" then
 			return { config = function() return "/controlled/config.toml" end }
+		elseif name == "hotstrings.engine.word_reset" then
+			-- The typing path's settings are read once before the hook starts,
+			-- not on the first key (its own case: tests/e2e first-key reads).
+			return { current = function() record("typing.settings"); return {} end }
 		elseif name == "ui.onboarding.startup" then
 			return { run = function(opts)
 				opts.open = function() return nil, "controlled missing config", 2 end

@@ -36,6 +36,10 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "hook.start") < position(state.events, "layout.publish"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "hook.pump"))
 		helpers.assert_true(position(state.events, "diagnostics.prepare") < position(state.events, "hook.start"))
+		-- The typing path's settings and catalogues are read before the first key can arrive.
+		for _, read in ipairs({ "typing.settings", "typing.repeat_key", "typing.media_policy", "typing.tap_keys" }) do
+			helpers.assert_true(position(state.events, read) < position(state.events, "hook.start"), read)
+		end
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
