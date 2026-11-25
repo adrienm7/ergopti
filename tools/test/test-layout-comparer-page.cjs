@@ -30,6 +30,8 @@
  * 7. Incomplete layouts: the chart and the table flag a layout that cannot
  *    type the space or a letter in either case, in the engine's ranking
  *    order, and the editor panel ranks the edited layout by E.rankOrder.
+ * 8. Other analysers: each analyser's header names its fidelity on the
+ *    Comparer's corpus (a text, or n-gram tables alone).
  * ==============================================================================
  */
 
@@ -1444,6 +1446,105 @@ check(
 			`table scroll: ${source} sizes a table box inline`
 		);
 	}
+}
+
+// (analyser-fidelity-per-corpus) « Autres analyseurs » names each analyser's
+// fidelity on the Comparer's corpus under its name: genkey is exact on a
+// text's own counts, close on n-gram tables alone.
+{
+	/** The few DOM calls analyser_tab.js makes, on plain objects. */
+	class FakeNode {
+		constructor(tag) {
+			this.tagName = tag.toUpperCase();
+			this.children = [];
+			this.text = '';
+			this.className = '';
+			this.dataset = {};
+			this.attributes = {};
+			this.style = { setProperty() {} };
+			this.classList = { add: (name) => (this.className += ` ${name}`) };
+		}
+		set textContent(value) {
+			this.children = [];
+			this.text = String(value);
+		}
+		get textContent() {
+			// append() takes strings too, as the header's analyser names.
+			return (
+				this.text + this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join('')
+			);
+		}
+		append(...nodes) {
+			for (const node of nodes) this.children.push(node);
+		}
+		replaceChildren(...nodes) {
+			this.children = [];
+			this.text = '';
+			this.append(...nodes);
+		}
+		replaceWith() {}
+		setAttribute(name, value) {
+			this.attributes[name] = value;
+		}
+		addEventListener() {}
+		get tHead() {
+			return this.children.find((c) => c.tagName === 'THEAD') || null;
+		}
+		get tBodies() {
+			return this.children.filter((c) => c.tagName === 'TBODY');
+		}
+		all(predicate) {
+			const own = predicate(this) ? [this] : [];
+			return own.concat(
+				...this.children.filter((c) => c instanceof FakeNode).map((c) => c.all(predicate))
+			);
+		}
+	}
+	const english = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'en.json'), 'utf8'));
+	const tab = { _i18n_strings: english, setTimeout: () => 0, performance: { now: () => 0 } };
+	tab.window = tab;
+	vm.createContext(tab);
+	for (const file of [
+		'_generated/analysis_data.js',
+		'analysis_engine.js',
+		'analyser_scores.js',
+		'info_popover.js'
+	])
+		vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, file), 'utf8'), tab);
+	// The page has its document once the scripts that start on one are loaded.
+	tab.document = {
+		createElement: (tag) => new FakeNode(tag),
+		createTextNode: (text) => ({ textContent: text })
+	};
+	vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, 'analyser_tab.js'), 'utf8'), tab);
+	tab.LAYOUT_ANALYSIS_FINGERING = { current: () => null, onChange() {} };
+	const engine = vm.runInContext('LAYOUT_ANALYSIS', tab);
+	const scorers = vm.runInContext('LAYOUT_ANALYSER_SCORES', tab);
+	const sample = 'the quick brown fox jumps over the lazy dog\n'.repeat(4);
+	const fidelityShown = (tables) => {
+		let follow = null;
+		const container = new FakeNode('div');
+		vm.runInContext('LAYOUT_ANALYSER_TAB', tab).attach(container, {
+			comparer: { onResults: (callback) => (follow = callback) }
+		});
+		follow([], tables, { keyboard: 'iso', layouts: new Map(), tablesOf: () => tables });
+		const heads = container.all((n) => n.tagName === 'TH' && /\bla-analyser\b/.test(n.className));
+		const genkey = heads.find((n) => n.textContent.startsWith('genkey'));
+		const line = genkey && genkey.all((n) => /\bla-fidelity\b/.test(n.className))[0];
+		return line ? line.textContent : null;
+	};
+	const text = Object.assign(engine.ngramsFromText(sample), {
+		analysers: scorers.textTables(sample)
+	});
+	check(
+		fidelityShown(text) === english['layout_analysis.analysers.fidelity.exact'],
+		`analyser tab: genkey on a text shows « ${fidelityShown(text)} »`
+	);
+	check(
+		fidelityShown(engine.ngramsFromText(sample)) ===
+			english['layout_analysis.analysers.fidelity.close'],
+		`analyser tab: genkey on n-gram tables shows « ${fidelityShown(engine.ngramsFromText(sample))} »`
+	);
 }
 
 if (errors.length > 0) {

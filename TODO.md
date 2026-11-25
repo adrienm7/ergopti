@@ -299,8 +299,8 @@ waits for the maintainer's review).
 
 - [ ] **Other analysers, what is left (2026-11-24).** genkey and Oxeylyzer were rerun on their text corpora on
       2026-11-24 (`verify-analyser-scores.cjs --genkey`, `--oxeylyzer`: Score within 0.005 % and 0.0003 on average,
-      docs/design/analyser-scores.md); both stay `close` for the word lists and the 12 count-table corpora (the
-      trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
+      docs/design/analyser-scores.md); since 2026-11-25 genkey is `exact` on texts and both stay `close` for the
+      word lists and the 12 count-table corpora (the trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
       own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
       their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
@@ -644,11 +644,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
       character on its own (chords not traced), a line break or an untyped character cutting the stream as in
       the corpus tables. Its layouts are the Principal and Comparison frame's, shared with « One layout » and the
       Pareto ring. Choose another sample, or a sample taken from the chosen corpus's words.
-- [ ] **Analyser fidelity per corpus kind (decided by the agent on 2026-11-24, to review by the maintainer).**
-      Rerun on 2026-11-24, genkey matches itself on the text corpora within its printed rounding and Oxeylyzer within
-      0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
-      both stay `close` (the word lists and count tables keep the trigrams' chain), the text-corpus result stated in
-      docs/design/analyser-scores.md. The other choice is a `fidelity` per corpus kind, with genkey `exact` on texts.
 - [ ] **Linux hotstrings without an accessibility field verdict (decided by the agent on 2026-11-25, to review by
       the maintainer).** Field report (Arch, KDE Plasma 6.8 Wayland): no hotstring ever fired, silently, because the
       focus guard admitted text only after an AT-SPI field verdict joined its window context, and a window that is

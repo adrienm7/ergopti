@@ -23,6 +23,9 @@
  * 4. Scores or ranks: each analyser's rank of the layouts beside the
  *    Comparer's, the cell shaded on one blue ramp (rank 1 darkest), the rank
  *    always written; every column sorts from a header button (aria-sort).
+ * 5. Each analyser's header says how faithful its score is on the Comparer's
+ *    corpus (a text or n-gram tables alone); a cell scored on another kind
+ *    of corpus says its own in its tooltip.
  * ==============================================================================
  */
 
@@ -54,6 +57,13 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		higher: () => t('layout_analysis.analysers.better.higher'),
 		lower: () => t('layout_analysis.analysers.better.lower'),
 		none: () => t('layout_analysis.analysers.better.none')
+	};
+
+	// How faithful each score is on the corpus it read (analyser_models.json, per corpus).
+	const FIDELITY_LABEL = {
+		exact: () => t('layout_analysis.analysers.fidelity.exact'),
+		close: () => t('layout_analysis.analysers.fidelity.close'),
+		approximate: () => t('layout_analysis.analysers.fidelity.approximate')
 	};
 
 	/** Translates a locale key (info_popover.js t(): numbers as every number shown). */
@@ -134,6 +144,18 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		});
 		const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
 
+		/** An analyser's fidelity on the Comparer's corpus. */
+		const fidelityOf = (a) => S.fidelity(a.id, state.tables);
+
+		/**
+		 * A cell's tooltip words for its fidelity, when its layout's own corpus
+		 * (a « + » layout types another text) differs from the header's.
+		 */
+		function otherFidelity(a, r) {
+			if (!r || !state.tables || r.fidelity === fidelityOf(a)) return '';
+			return FIDELITY_LABEL[r.fidelity]();
+		}
+
 		/** The text of one score: its value, or the headline statistics of a score-less analyser. */
 		function cellText(a, r) {
 			if (!r) return '…';
@@ -161,6 +183,9 @@ var LAYOUT_ANALYSER_TAB = (function () {
 				th.colSpan = FINGERINGS.length;
 				th.append(a.name, INFO.button(`analyser.${a.id}`));
 				th.append(el('small', 'la-muted', DIRECTION_LABEL[a.better]()));
+				// The Comparer's corpus decides it: genkey is exact on a text only.
+				if (state.tables)
+					th.append(el('small', 'la-muted la-fidelity', FIDELITY_LABEL[fidelityOf(a)]()));
 				top.append(th);
 				for (const fingering of FINGERINGS) {
 					const cell = el('th', 'la-sortable');
@@ -269,8 +294,12 @@ var LAYOUT_ANALYSER_TAB = (function () {
 				for (const a of analysers)
 					for (const fingering of FINGERINGS) {
 						const rank = byRank && byRank.get(`${result.layout.id}|${a.id}|${fingering}`);
+						const own = s && s[a.id][fingering];
+						const other = otherFidelity(a, own);
 						if (!rank) {
-							tr.append(el('td', 'la-num', cellText(a, s && s[a.id][fingering])));
+							const cell = el('td', 'la-num', cellText(a, own));
+							if (other) cell.title = other;
+							tr.append(cell);
 							continue;
 						}
 						// One blue ramp, the first rank darkest; the rank is written in the cell.
@@ -278,7 +307,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 						const cell = el('td', 'la-num la-cell la-cell-rank', format(rank, 0));
 						cell.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
 						if (share >= STRONG_SHARE) cell.classList.add('la-cell-strong');
-						cell.title = `${a.name} (${FINGERING_LABEL[fingering]()}): ${cellText(a, s[a.id][fingering])}`;
+						cell.title = `${a.name} (${FINGERING_LABEL[fingering]()}): ${cellText(a, own)}${other ? ` · ${other}` : ''}`;
 						tr.append(cell);
 					}
 				tbody.append(tr);

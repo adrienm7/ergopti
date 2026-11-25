@@ -2931,3 +2931,16 @@ Changed by the maintainer (each a `[CODE]` item in TODO.md until done):
 Deferred: 100 % line coverage and 100 % killed mutants as red CI gates are a
 far-future backlog (TODO.md, last section); the per-file coverage ratchets
 kept on 2026-11-24 only stop a file from dropping.
+
+## Maintainer answers of 2026-11-25
+
+- **Analyser fidelity per corpus kind.** `fidelity` in
+  `_shared/layouts/data/analysis/analyser_models.json` is one value per corpus
+  a scorer reads: `text` (a text corpus, which ships its own counts through
+  `textTables`) and `tables` (n-gram tables alone: word lists, count tables,
+  blends, « Ma frappe »). genkey is `exact` on texts and `close` on tables;
+  Oxeylyzer stays `close` on both (its trigrams still come from the chain).
+  A score names the fidelity of the tables it read
+  (`LAYOUT_ANALYSER_SCORES.fidelity`), and « Autres analyseurs » shows it
+  under each analyser's name; the codegen refuses a single value. A new
+  scorer or rerun states both values in `docs/design/analyser-scores.md`.

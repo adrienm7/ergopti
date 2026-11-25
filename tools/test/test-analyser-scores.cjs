@@ -15,7 +15,8 @@
  * 1. Vectors: each scorer gives its reference value and parts within the
  *    vector's tolerance, and every analyser has at least one vector.
  * 2. Description: every analyser names its source, revision, licence,
- *    fidelity and direction; an unknown analyser throws.
+ *    fidelity on a text and on n-gram tables alone, and direction; each score
+ *    names the fidelity of the tables it read; an unknown analyser throws.
  * 3. Whole library: every library layout gets a finite value (or, for an
  *    analyser without a score, finite parts) from every analyser on a
  *    built-in corpus, at a cost of at most SCORES_WALKS_BOUND reference walks
@@ -171,7 +172,12 @@ for (const a of analysers) {
 	check(covered.has(a.id), `${a.id}: no reference vector`);
 	for (const field of ['name', 'url', 'revision', 'licence'])
 		check(typeof a[field] === 'string' && a[field] !== '', `${a.id}: no ${field}`);
-	check(['exact', 'close', 'approximate'].includes(a.fidelity), `${a.id}: fidelity ${a.fidelity}`);
+	// (analyser-fidelity-per-corpus) One fidelity per corpus a scorer reads.
+	for (const corpus of ['text', 'tables'])
+		check(
+			['exact', 'close', 'approximate'].includes(a.fidelity[corpus]),
+			`${a.id}: fidelity on ${corpus} ${a.fidelity && a.fidelity[corpus]}`
+		);
 	check(['higher', 'lower', 'none'].includes(a.better), `${a.id}: direction ${a.better}`);
 	if (a.better === 'none')
 		check(a.headline.length > 0, `${a.id}: a score-less analyser needs headline parts`);
@@ -276,6 +282,47 @@ for (const self of ['dead:1dk', '**']) {
 				S.score(id, qwerty, E.ngramsFromText(split), { keyboard: 'ansi' }).value,
 			`${id}: the text's own skipgrams are not used`
 		);
+	// (analyser-fidelity-per-corpus) Each score names the fidelity of the
+	// tables it read: genkey is exact on a text's own counts, close on n-gram
+	// tables alone (a word list, a count table), where the chain stands in.
+	const fidelities = {
+		genkey: { text: 'exact', tables: 'close' },
+		oxeylyzer: { text: 'close', tables: 'close' },
+		kla: { text: 'exact', tables: 'exact' }
+	};
+	for (const [id, expected] of Object.entries(fidelities)) {
+		const onText = S.score(id, qwerty, withText, { keyboard: 'ansi' }).fidelity;
+		const onTables = S.scoreAll(qwerty, E.ngramsFromText(split), { keyboard: 'ansi' })[id].official
+			.fidelity;
+		check(
+			onText === expected.text && S.fidelity(id, withText) === expected.text,
+			`${id}: fidelity on a text ${onText}, expected ${expected.text}`
+		);
+		check(
+			onTables === expected.tables && S.fidelity(id, E.ngramsFromText(split)) === expected.tables,
+			`${id}: fidelity on tables ${onTables}, expected ${expected.tables}`
+		);
+	}
+	// The codegen refuses a fidelity that is one value for every corpus.
+	const { checkAnalysers } = require('../codegen/codegen-layout-analysis-data-js.cjs');
+	const models = JSON.parse(
+		fs.readFileSync(shared('layouts', 'data', 'analysis', 'analyser_models.json'), 'utf8')
+	).analysers;
+	const refusedFidelity = (fidelity) => {
+		try {
+			checkAnalysers({ genkey: Object.assign({}, models.genkey, { fidelity }) });
+		} catch {
+			return true;
+		}
+		return false;
+	};
+	check(!refusedFidelity(models.genkey.fidelity), 'codegen: refuses the shipped genkey fidelity');
+	check(refusedFidelity('close'), 'codegen: accepts one fidelity for every corpus');
+	check(refusedFidelity({ text: 'exact' }), 'codegen: accepts a fidelity without tables');
+	check(
+		refusedFidelity({ text: 'exact', tables: 'faithful' }),
+		'codegen: accepts an unknown fidelity'
+	);
 }
 // Two fingerings side by side: on a text without spaces or digits, where
 // carpalx, keygen, genkey and Oxeylyzer finger QWERTY as the default model
