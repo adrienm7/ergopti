@@ -565,6 +565,7 @@ InstallSendNoOps()
 #Include unit/hotstrings/engine/personal/test_tag_case.ahk
 #Include unit/settings/engine/persistence/test_master_gates.ahk
 #Include unit/settings/engine/persistence/test_shortcuts_unescape.ahk
+#Include unit/settings/engine/persistence/test_registry_binary.ahk
 #Include unit/hotstrings/engine/engine/test_domain_registry.ahk
 #Include unit/hotstrings/engine/engine/test_domain_expander.ahk
 #Include unit/core/text/toml/test_loader.ahk
@@ -2017,7 +2018,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/input/test_clipboard_saveall_sentinel.ahk
 #Include meta/platform/input/test_textsend_callback_wired.ahk
 #Include meta/settings/persistence/test_is_category_all_enabled_loop.ahk
-#Include meta/platform/system/test_regread_no_type_arg.ahk
 #Include meta/platform/system/test_accessibility_sources.ahk
 #Include meta/core/logger/test_dedup_tick.ahk
 #Include meta/hotstrings/engine/prefix/test_watcher_magic_suffix.ahk
