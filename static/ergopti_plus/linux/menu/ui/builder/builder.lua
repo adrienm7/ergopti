@@ -413,10 +413,9 @@ function M.build(ctx)
 	end
 
 	if quit_row then
-		-- The existing declared boundary before Quit follows its Linux-only last placement.
-		local boundary = receive_separator("linux_quit_last")
-		if not boundary then return {} end
-		rows[#rows + 1] = boundary
+		-- Quit follows Debug directly, with no boundary of its own (maintainer,
+		-- 2026-11-25): the declared boundary above Suspend already opens the
+		-- Suspend, Reload, Debug, Quit block it closes.
 		rows[#rows + 1] = quit_row
 	else
 		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")

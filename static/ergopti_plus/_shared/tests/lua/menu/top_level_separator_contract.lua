@@ -67,13 +67,12 @@ function M.register(helpers, driver)
 				helpers.assert_eq(#renderer.render_rows({boundaries[1], boundaries[2]}, "top_level"), 0)
 			end)
 		end)
-		helpers.it("projects Linux's Quit-last boundary from its original declaration only (declared-top-level-separator)", function()
+		helpers.it("projects Linux's Quit-last row with no boundary of its own (declared-top-level-separator)", function()
 			scenario(platform, function(renderer)
-				local receive, rows = renderer.top_level_separator_receiver(); assert(receive)
-				if platform == "linux" then
-					plain_boundary(helpers, receive("linux_quit_last"))
-					plain_boundary(helpers, receive(rows[oracle.linux_quit_boundary_position]))
-				else helpers.assert_nil(receive("linux_quit_last")) end
+				local receive = renderer.top_level_separator_receiver(); assert(receive)
+				-- Quit moved last on Linux closes the Suspend, Reload, Debug block:
+				-- the receiver has no boundary to re-emit above it, on any platform.
+				helpers.assert_nil(receive("linux_quit_last"))
 			end)
 		end)
 		local withdrawals = {

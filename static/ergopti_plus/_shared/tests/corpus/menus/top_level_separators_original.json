@@ -6,7 +6,6 @@
 		"hs": [6, 12, 15, 17, 21],
 		"linux": [6, 12, 15, 17, 21]
 	},
-	"linux_quit_boundary_position": 21,
 	"normalization_titles": ["First", "-", "Second", "-", "Third"],
-	"policy": "Original declared top_level boundaries; existing normalize_separators removes leading/trailing/adjacent separators, callbacks unchanged; Linux moves Quit last and projects its actual preceding boundary. Positions follow the « Anti-veille » group declared after Metrics on 2026-11-25."
+	"policy": "Original declared top_level boundaries; existing normalize_separators removes leading/trailing/adjacent separators, callbacks unchanged; Linux moves Quit last, right after Debug, with no boundary of its own (maintainer, 2026-11-25). Positions follow the « Anti-veille » group declared after Metrics on 2026-11-25."
 }

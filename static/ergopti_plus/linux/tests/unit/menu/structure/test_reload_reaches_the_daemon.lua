@@ -242,6 +242,11 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 			helpers.assert_true(reload ~= nil and quit ~= nil, "both commands consume their shared labels")
 			helpers.assert_true(reload.disabled ~= true and quit.disabled ~= true)
 			helpers.assert_true(items[#items] == quit, "the existing desktop Quit-last policy is retained")
+			-- Quit closes the Suspend, Reload, Debug block: no line of its own above it.
+			local above = items[#items - 1]
+			helpers.assert_true(above ~= nil and above.title ~= "-", "no separator sits right above Quit")
+			helpers.assert_eq(above.title, require("core.i18n.engine.i18n").get("menu.debug.title"),
+				"Debug directly precedes Quit")
 			reload.fn(); quit.fn()
 			helpers.assert_eq(table.concat(calls, ","), "reload,quit")
 		end)

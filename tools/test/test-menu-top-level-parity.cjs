@@ -270,6 +270,41 @@ if (declaredOrder !== builtOrder && !KNOWN_ORDER_DIVERGENCES.linux) {
 	);
 }
 
+// No line sits right above Quit on any driver (maintainer, 2026-11-25: that
+// line is useless). Windows and macOS draw the declared order, so the row
+// declared before their Quit must not be a boundary. Linux moves Quit after
+// Debug, so its last declared row must not be one either, and the block that
+// appends Quit must not emit a boundary of its own.
+for (const driver of ['ahk', 'hs', 'linux']) {
+	const sequence = (topLevel || [])
+		.filter((row) => !row.platforms || row.platforms.includes(driver))
+		.map((row) => row.id);
+	const placed =
+		driver === 'linux' && HOLDS_QUIT_LAST
+			? [...sequence.filter((id) => id !== 'quit'), 'quit']
+			: sequence;
+	const at = placed.indexOf('quit');
+	if (at < 1) {
+		errors.push(`the manifest projects no Quit row after another row for ${driver}`);
+	} else if (placed[at - 1] === SEPARATOR) {
+		errors.push(
+			`${driver} draws a separator right above Quit; the row before it must be a real entry`
+		);
+	}
+}
+const quitAppend = (buildBody ? buildBody[1] : '').match(
+	/\n\tif quit_row then\n([\s\S]*?)\n\telse\n/
+);
+if (!quitAppend) {
+	errors.push(
+		'could not find the block where the Linux M.build appends Quit — the check above is blind'
+	);
+} else if (/receive_separator|separator\s*=/.test(quitAppend[1].replace(/--[^\n]*/g, ''))) {
+	errors.push(
+		'the Linux M.build emits a boundary right above Quit again; Quit follows Debug directly'
+	);
+}
+
 // ==================================================
 // ==================================================
 // ======= 4/ And so must the other two =============

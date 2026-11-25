@@ -3859,9 +3859,9 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 				'finished native root discarded'
 			],
 			[
-				'receive_separator("linux_quit_last")',
-				'receive_separator("foreign_boundary")',
-				'Quit-last declared boundary disconnected'
+				'rows[#rows + 1] = quit_row',
+				'rows[#rows + 1] = { separator = true }\n\t\trows[#rows + 1] = quit_row',
+				'separator reinstated right above Quit'
 			],
 			[
 				'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil',

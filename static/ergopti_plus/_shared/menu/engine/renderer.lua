@@ -2240,7 +2240,7 @@ function M.new(deps)
 		-- Admit every nested source before platform iteration can observe it.
 		local source = reasoned_group_snapshot(declared)
 		if not source then return nil end
-		local quit, tail_boundary, record_owners = nil, nil, {}
+		local record_owners = {}
 		for index = 1, #declared do
 			local row = rawget(declared, index)
 			if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "id")) ~= "string" then return nil end
@@ -2264,10 +2264,6 @@ function M.new(deps)
 					end
 					if count ~= #allowed then return nil end
 				end
-				if is_for_platform(row) then tail_boundary = index end
-			elseif row.id == "quit" and is_for_platform(row) then
-				if quit ~= nil or row.type ~= "command" or type(row.i18n) ~= "string" or row.i18n == "" then return nil end
-				quit = { row = row, boundary = tail_boundary }
 			end
 		end
 		local owner = rawget(R, "top_level_separator_receiver")
@@ -2282,10 +2278,6 @@ function M.new(deps)
 		return function(row)
 			if not current() then return nil end
 			if row == "current" then return true end
-			if row == "linux_quit_last" then
-				if platform ~= "linux" or not quit or quit.boundary == nil then return nil end
-				row = rawget(declared, quit.boundary)
-			end
 			if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
 			local matches = 0
 			for _, entry in ipairs(declared) do if rawequal(row, entry) then matches = matches + 1 end end

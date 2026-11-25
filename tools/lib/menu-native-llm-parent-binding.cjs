@@ -2032,9 +2032,6 @@ function declaredLinuxNativeTray(unit, builder) {
 	end
 
 	if quit_row then
-		local boundary = receive_separator("linux_quit_last")
-		if not boundary then return {} end
-		rows[#rows + 1] = boundary
 		rows[#rows + 1] = quit_row
 	else
 		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
