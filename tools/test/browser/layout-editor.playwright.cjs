@@ -611,6 +611,14 @@ async function exerciseCompareEdited(browser, origin) {
 		0,
 		'the edited layout is not stored with the personal layouts'
 	);
+	// Its tap-hold (Space taps a space, holds « command ») in « One layout ».
+	await page.locator('#la-table tbody tr', { hasText: 'Source Fixture' }).first().click();
+	await page.waitForSelector('#la-tap-holds tbody tr[data-code="Space"]', { state: 'attached' });
+	assert.equal(
+		await page.$eval('#la-tap-holds-box', (box) => box.hidden),
+		false,
+		"« One layout » shows the edited layout's tap-holds"
+	);
 	assert.deepEqual(errors, []);
 	await page.close();
 }
@@ -4452,6 +4460,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioViews.exerciseDensity(browser, origin);
 		await studioViews.exerciseFrameDiff(browser, origin);
 		await studioViews.exerciseUserMetrics(browser, origin);
+		await studioViews.exerciseTapHolds(browser, origin);
 		await studioViews.exercisePanelWords(browser, origin);
 		await studioViews.exerciseFrameEverywhere(browser, origin);
 		await studioViews.exerciseHelp(browser, origin);

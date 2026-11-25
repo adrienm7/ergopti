@@ -192,6 +192,56 @@ const fourRead = PANEL.layoutFromEditorDoc(IO.parse(IO.serialize(four)).doc);
 assert.equal(fourRead.levels, undefined, 'a layout of four levels reads as four');
 assert.equal(fourRead.rows.KeyQ[0], 'q', 'through its .keylayout');
 
+// ============================================
+// ======= 3b/ Tap-holds analysed as holds ====
+// ============================================
+
+// The source fixture's Space taps a space and holds the « command » layer;
+// F is made to hold the « kana » layer (あ on A), which nothing else reaches.
+{
+	const parsed = IO.parse(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'source.toml'), 'utf8')
+	);
+	assert(parsed.ok, 'the source fixture reads');
+	const doc = plain(parsed.doc);
+	const plainRead = PANEL.layoutFromEditorDoc(plain(parsed.doc));
+	assert.deepEqual(
+		plain(plainRead.levels.map((level) => level.id)),
+		['base', 'shift', 'altgr', 'shift_altgr', 'hold_command'],
+		'the layer a tap-hold holds is a level of its own, after the four'
+	);
+	assert.deepEqual(
+		plain(plainRead.modifiers.hold_command),
+		{ label: 'command', for_left_hand: ['Space'], for_right_hand: ['Space'], tap_keys: ['Space'] },
+		'held by its tap-hold key, which also types'
+	);
+	assert.equal(plainRead.rows.Space[0], ' ', 'Space types its tap');
+	assert.equal(plainRead.rows.KeyA[4], 'a', 'the held layer types its keys');
+	doc.tap_holds.push({ key: 'KeyF', tap: { text: 'f' }, hold_layer: 'kana', threshold_ms: 200 });
+	const read = PANEL.layoutFromEditorDoc(doc);
+	assert.equal(read.rows.KeyF[0], 'f', 'a tap text is what the key types');
+	assert.equal(
+		E.analyse(plainRead, E.ngramsFromText('あ'), { keyboard: 'iso' }).metrics.unsupported,
+		100,
+		'without the tap-hold, nothing types あ'
+	);
+	assert.equal(
+		E.analyse(read, E.ngramsFromText('あ'), { keyboard: 'iso' }).metrics.unsupported,
+		0,
+		'holding F types あ on A'
+	);
+	const report = E.tapHoldReport(read, E.ngramsFromText('fa あ'), { keyboard: 'iso' });
+	const f = report.keys.find((key) => key.code === 'KeyF');
+	assert(f && f.taps === 1 && f.held === 1, 'F is tapped once and held once');
+	assert.equal(f.sameHandHold, 100, 'F holds for A, a key of its own hand');
+	assert.equal(f.rollAfterTap, 100, '« fa » rolls from F to A on one hand');
+	assert.equal(
+		F.withTapHolds(fourRead, four, DATA.model.fingerings.standard),
+		fourRead,
+		'a source without tap-holds is read as it is'
+	);
+}
+
 // ============================
 // ======= 4/ The exports =====
 // ============================

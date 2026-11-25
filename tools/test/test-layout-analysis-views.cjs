@@ -23,6 +23,9 @@
  *    same event (bigrams, skipgrams, trigrams), a value and its negation make
  *    100 %, the fields mean what they say (finger 4 the pinky, row −1 above
  *    the home row), and a query naming a key the window lacks is refused.
+ * 5. tapHoldReport: a tap-hold key's taps and holds, its taps rolled into a
+ *    key of its hand and its holds typed by its own hand, on a fixture; a key
+ *    never holds its own level, and a typing modifier key must be a tap key.
  * 3. densityCurve: the smoothed distribution integrates to 1, peaks on the
  *    densest cluster, draws the normal bell for one value, and refuses
  *    invalid input.
@@ -597,6 +600,90 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 				}))
 			),
 		'window metrics: too many metrics throw'
+	);
+}
+
+// ===========================================
+// ======= Tap-hold keys =====================
+// ===========================================
+
+// A tap-hold key (an idea seen in the Layouts Wiki playground's tap and hold
+// keys): F types « f » when tapped and holds the « nav » level when held.
+{
+	const qwerty = byId.get('qwerty');
+	const rows = {};
+	for (const [code, row] of Object.entries(qwerty.rows)) rows[code] = row.concat([null]);
+	rows.KeyU[4] = '→';
+	rows.KeyS[4] = '↓';
+	rows.KeyF[4] = '⊗';
+	const modifier = { label: 'Nav', for_left_hand: ['KeyF'], for_right_hand: ['KeyF'] };
+	const layout = {
+		id: 'tap_hold_fixture',
+		rows,
+		levels: [
+			{ id: 'base' },
+			{ id: 'shift', shift: true },
+			{ id: 'altgr', hold: ['altgr'] },
+			{ id: 'shift_altgr', shift: true, hold: ['altgr'] },
+			{ id: 'nav', hold: ['nav'] }
+		],
+		modifiers: {
+			altgr: { label: 'AltGr', for_left_hand: ['AltRight'], for_right_hand: ['AltRight'] },
+			nav: Object.assign({ tap_keys: ['KeyF'] }, modifier)
+		}
+	};
+	const text = 'fd fj → ↓';
+	const report = E.tapHoldReport(layout, E.ngramsFromText(text), { keyboard: 'iso' });
+	check(report.keys.length === 1 && report.keys[0].code === 'KeyF', 'tap-hold: one key, F');
+	const f = report.keys[0];
+	check(f.taps === 2 && f.held === 2, `tap-hold: two taps, two holds (${f.taps}, ${f.held})`);
+	check(f.holdShare === 50, `tap-hold: half its uses are holds (${f.holdShare})`);
+	check(
+		f.rollAfterTap === 50,
+		`tap-hold: « fd » rolls on its hand, « fj » does not (${f.rollAfterTap})`
+	);
+	check(
+		f.sameHandHold === 50,
+		`tap-hold: « ↓ » is held and typed by the left hand (${f.sameHandHold})`
+	);
+	check(f.holds.join() === 'nav', 'tap-hold: it holds nav');
+	check(report.presses > 0 && report.holdShare > 0, 'tap-hold: the holds among the presses');
+	check(
+		E.analyse(layout, E.ngramsFromText('a⊗b'), { keyboard: 'iso' }).coverage.unsupportedChars[
+			'⊗'
+		] === 1,
+		'tap-hold: a key cannot hold its own level to type'
+	);
+	check(
+		E.analyse(layout, E.ngramsFromText('→'), { keyboard: 'iso' }).metrics.unsupported === 0,
+		'tap-hold: its level types on the other keys'
+	);
+	throws(
+		() =>
+			E.analyse(
+				Object.assign({}, layout, { modifiers: { altgr: layout.modifiers.altgr, nav: modifier } }),
+				E.ngramsFromText('f'),
+				{ keyboard: 'iso' }
+			),
+		'tap-hold: a modifier key that types without being a tap key still throws'
+	);
+	throws(
+		() =>
+			E.analyse(
+				Object.assign({}, layout, {
+					modifiers: {
+						altgr: layout.modifiers.altgr,
+						nav: Object.assign({ tap_keys: ['KeyG'] }, modifier)
+					}
+				}),
+				E.ngramsFromText('f'),
+				{ keyboard: 'iso' }
+			),
+		'tap-hold: a tap key must be one of its modifier keys'
+	);
+	check(
+		E.tapHoldReport(qwerty, E.ngramsFromText(text), { keyboard: 'iso' }).keys.length === 0,
+		'tap-hold: a layout without tap-hold keys reports none'
 	);
 }
 
