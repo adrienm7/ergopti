@@ -48,6 +48,7 @@ return {
 	"tests.unit.hotstrings.engine.injector.test_repeat_main_commit",
 	"tests.unit.hotstrings.engine.engine.test_action_arrow_effects",
 	"tests.unit.core.process.test_desktop_opener",
+	"tests.unit.core.process.test_host_environment",
 	"tests.unit.diagnostics.ui.test_desktop_report_shutdown",
 	"tests.unit.menu.structure.test_rebuild_owner",
 	"tests.unit.ai.engine.features.test_selected_write_partial",

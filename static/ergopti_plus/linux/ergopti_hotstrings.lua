@@ -195,6 +195,11 @@ do
 	if not reserved then error(reserve_error, 0) end
 end
 
+-- Before anything can start a process or keep a reference to io.popen,
+-- os.execute or luv.spawn: host programs get the session's environment back,
+-- not the private runtime's search paths (core/process/adapters/host_environment.lua).
+require("core.process.adapters.host_environment").install()
+
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
 ---
 --- This runs before the session lock, the logger and i18n.init() — which cannot move
