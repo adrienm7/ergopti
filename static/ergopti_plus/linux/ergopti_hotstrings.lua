@@ -347,6 +347,10 @@ local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("diagnostics.engine.reports.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
+-- The exit status a refused start reports once its owners have unwound: a
+-- refusal only a new session or boot can lift (input_access.EXIT_ACCESS) must
+-- not become the generic 1 the unit restarts every three seconds.
+local startup_refusal_status = nil
 local BootProfiler      = require("core.logger.engine.boot_profiler")
 local DiagnosticSnapshot = require("diagnostics.engine.reports.snapshot")
 
@@ -2833,7 +2837,10 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		require("platform.input.access").report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
+		-- The status the access report returns, as at every other access check:
+		-- the uinput group or module only arrives with a new session or boot.
+		startup_refusal_status = require("platform.input.access").report({
+			i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)")
 		error("Fast output unavailable; refusing input capture", 0)
@@ -4138,7 +4145,8 @@ if not ok_main then
 	if privacy_owners.startup then privacy_owners.finish_startup("startup runtime failure") end
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
-	os.exit(1)
+	-- A refused start keeps the status its refusal chose (RestartPreventExitStatus).
+	os.exit(startup_refusal_status or 1)
 end
 -- Input that stopped at run time is a failure for the supervisor too (LCY-001);
 -- the teardown above already ran, so only the status remains to report.
