@@ -66,6 +66,7 @@
 	"package_requirements": {
 		"deb": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify-bin",
 			"libxkbcommon0",
 			"libxkbcommon-tools",
@@ -86,6 +87,7 @@
 		],
 		"rpm": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify",
 			"libxkbcommon",
 			"libxkbcommon-utils",
@@ -101,6 +103,7 @@
 		],
 		"arch": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify",
 			"libxkbcommon",
 			"at-spi2-core",

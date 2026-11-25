@@ -605,6 +605,21 @@ _required_dependency_package() {
 		pacman:secret-tool) echo "libsecret" ;;
 		xbps:secret-tool) echo "libsecret" ;;
 		apk:secret-tool) echo "libsecret" ;;
+		# The clipboard, on both display servers: a GNOME login offers Wayland
+		# and X11 sessions, and the injector pastes what the keymap cannot
+		# type through whichever one runs (clipboard/adapters/clipboard.lua).
+		apt:xclip) echo "xclip" ;;
+		dnf:xclip) echo "xclip" ;;
+		zypper:xclip) echo "xclip" ;;
+		pacman:xclip) echo "xclip" ;;
+		xbps:xclip) echo "xclip" ;;
+		apk:xclip) echo "xclip" ;;
+		apt:wl-copy) echo "wl-clipboard" ;;
+		dnf:wl-copy) echo "wl-clipboard" ;;
+		zypper:wl-copy) echo "wl-clipboard" ;;
+		pacman:wl-copy) echo "wl-clipboard" ;;
+		xbps:wl-copy) echo "wl-clipboard" ;;
+		apk:wl-copy) echo "wl-clipboard" ;;
 		# The tray icon. tray/adapters/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
@@ -843,6 +858,10 @@ _check_or_install xdg-open
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
 _check_or_install xkbcli
+# The packages require both clipboard tools; a source install without them had
+# no clipboard at all, so every character the keymap cannot type was lost.
+_check_or_install xclip
+_check_or_install wl-copy
 # Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
 # optional desktop convenience makes the privacy filter fail closed forever.
 _check_or_install_library libatspi.so.0

@@ -205,6 +205,7 @@ BuildArch:      $ARCH
 
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
 Requires:       xclip
+Requires:       wl-clipboard
 Requires:       libnotify
 Requires:       libxkbcommon
 Requires:       libxkbcommon-utils
