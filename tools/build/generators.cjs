@@ -421,6 +421,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-log-export.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/core/logger/engine/log_export_data.lua',
+			'static/ergopti_plus/windows/_generated/log_export_data.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-logger-sub-files.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
