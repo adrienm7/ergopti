@@ -1724,7 +1724,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				HostTitle := OutputHost["Title"]
 				; An action entry's edit goes out as one atomic burst, its action after
 				; it: the Notepad and terminal owners commit a text the action replaces.
-				IsNotepadApp := !IsObject(EntryAction) && OutputHostTakesTextByPaste(OutputHost)
+				IsNotepadApp := OutputHostTakesTextByPaste(OutputHost) && !IsObject(EntryAction)
 				IsTerminalApp := !IsObject(EntryAction) && _HSE_IsTerminalInputHost(exe, HostTitle)
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
@@ -1909,9 +1909,11 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					try {
 							BufferBeforeFire := HSE_Buffer
 							BoundaryBeforeFire := HSE_StartIsWordBoundary
-							ExpansionEffect := IsObject(EntryAction) ? _HSE_ApplyActionEntryEffect(Spec, Plan)
-									: HSE_ApplyExpansion(
-									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
+							if IsObject(EntryAction)
+									ExpansionEffect := _HSE_ApplyActionEntryEffect(Spec, Plan)
+							else
+									ExpansionEffect := HSE_ApplyExpansion(
+											Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
 							_HSE_RememberUndo(Spec, BufferBeforeFire, BoundaryBeforeFire, ExpansionEffect,
