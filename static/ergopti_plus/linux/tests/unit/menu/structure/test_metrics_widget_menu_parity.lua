@@ -337,7 +337,8 @@ helpers.describe("shared checked and section-header templates", function()
 				}, "applicable grey-policy header retains its ordinary decoration")
 				header.platforms = { "other_platform" }
 				local rows = assert(renderer.template_rows("metrics_menu"))
-				helpers.assert_eq(rows, { { label = "menu.metrics.privacy_header — Not available", disabled = true } },
+				helpers.assert_eq(rows, { { label = "menu.metrics.privacy_header — Not available", disabled = true,
+					tooltip = "Not available： detail" } },
 					"excluded platform uses the original reason-head stand-in")
 				helpers.assert_eq(renderer.render_rows(rows, "grey_header_test"), renderer.build("metrics_menu", "", {}, {}, {}))
 			end)

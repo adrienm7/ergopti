@@ -91,6 +91,44 @@ helpers.describe("tray_menu: with a backend", function()
 				.. "would be a second menu vocabulary to keep in sync")
 	end)
 
+	helpers.it("(greyed-reason-rows) draws a greyed row's reason below it, at every depth", function()
+		local tray, log = with_indicator(true)
+		local reason = "Unavailable: Only an X11 session, or GNOME, KDE or Hyprland on Wayland, applies this live."
+		local tree = {
+			{ title = "Layout", menu = {
+				{ title = "Also reorder the three edge keys — Unavailable", disabled = true, tooltip = reason },
+				{ title = "Next", fn = function() end },
+			} },
+		}
+		tray.setMenu(tree)
+		local drawn = log.menus[#log.menus][1].menu
+		local said = {}
+		for index = 2, #drawn - 1 do
+			helpers.assert_eq(drawn[index].disabled, true, "a reason row runs nothing")
+			helpers.assert_eq(drawn[index].fn, nil)
+			helpers.assert_true(#drawn[index].title <= 4 + 60 + 8, "a reason line stays narrow: " .. drawn[index].title)
+			said[#said + 1] = drawn[index].title:gsub("^%s+", "")
+		end
+		helpers.assert_true(#said >= 2, "a long reason wraps over several rows")
+		helpers.assert_eq(table.concat(said, " "),
+			"Only an X11 session, or GNOME, KDE or Hyprland on Wayland, applies this live.")
+		helpers.assert_eq(drawn[#drawn].title, "Next")
+		helpers.assert_eq(tray.getMenu(), tree, "the menu model itself is kept as the builder made it")
+		helpers.assert_eq(#tree[1].menu, 2)
+	end)
+
+	helpers.it("(greyed-reason-rows) says a reason whole when the label lacks its head, and wraps CJK text", function()
+		local tray = require("menu.engine.renderer")
+		local drawn = tray.with_reason_rows({ { title = "Row", disabled = true, tooltip = "Not here: never" } })
+		helpers.assert_eq(drawn[2].title, "    Not here: never")
+		local cjk = string.rep("\228\184\173", 50)
+		drawn = tray.with_reason_rows({ { title = "Row — X", disabled = true, tooltip = "X\239\188\154" .. cjk } })
+		helpers.assert_eq(#drawn, 3, "fifty wide characters take two lines of sixty columns")
+		helpers.assert_eq(drawn[2].title, "    " .. string.rep("\228\184\173", 30))
+		local plain = { { title = "Row — Off", disabled = true, tooltip = "Off" }, { title = "Live", disabled = true } }
+		helpers.assert_true(tray.with_reason_rows(plain) == plain, "nothing to add keeps the same table")
+	end)
+
 	helpers.it("builds both fallback menus with one builder (appimage-catalogue-tray-screenshot)", function()
 		local tray, log = with_indicator(true)
 		local quit, details, logs = function() end, function() end, function() end

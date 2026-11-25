@@ -122,6 +122,54 @@ helpers.describe("the real Linux tray reads as text", function()
 		return found, head
 	end
 
+	-- dbusmenu has no item tooltips: a greyed row showed only the head of its
+	-- reason, « Also reorder the three edge keys — Unavailable », so the Linux
+	-- tray draws the rest of it in inert rows below (greyed-reason-rows).
+	helpers.it("(greyed-reason-rows) every greyed row naming a reason says all of it", function()
+		local catalogue = check.catalogue(SHARED_ROOT, "en", require("core.text.engine.json").decode)
+		local function trim(text) return (text:gsub("^%s+", ""):gsub("%s+$", "")) end
+		-- The head of every catalogue text that opens with « Head: », as a
+		-- greyed label shows it after its dash.
+		local heads = {}
+		for _, text in pairs(catalogue) do
+			local head = type(text) == "string" and text:match("^([^:\n]+):%s*%S") or nil
+			if head and #head <= 40 then heads[trim(head)] = true end
+		end
+		local Renderer = require("menu.engine.renderer")
+		local greyed, problems = 0, {}
+		local function walk(rows)
+			local drawn = Renderer.with_reason_rows(rows)
+			local at = 0
+			for _, row in ipairs(rows) do
+				at = at + 1
+				while drawn[at] ~= nil and drawn[at].title ~= row.title do at = at + 1 end
+				local head = row.disabled == true and type(row.title) == "string" and row.title:match(" — ([^—]+)$") or nil
+				if head and heads[trim(head)] then
+					greyed = greyed + 1
+					if type(row.tooltip) ~= "string" then
+						problems[#problems + 1] = row.title .. " carries no reason"
+					else
+						local rest = trim(row.tooltip):match("^[^:]*:%s*(.-)%s*$")
+						local said = {}
+						local index = at + 1
+						while drawn[index] and drawn[index].disabled == true and drawn[index].fn == nil
+							and drawn[index].title:match("^    %S") do
+							said[#said + 1] = trim(drawn[index].title)
+							index = index + 1
+						end
+						if rest ~= nil and rest ~= "" and table.concat(said, " ") ~= rest:gsub("%s+", " ") then
+							problems[#problems + 1] = row.title .. " is drawn without « " .. rest .. " »"
+						end
+					end
+				end
+				if type(row.menu) == "table" then walk(row.menu) end
+			end
+		end
+		walk(tray("en"))
+		helpers.assert_true(greyed > 0, "the tray draws at least one greyed row naming a reason")
+		helpers.assert_eq(problems, {})
+	end)
+
 	-- Physical delivery answers true since the maintainer's decision of
 	-- 2026-11-11 (LIN-004): the row no longer names an unqualified delivery
 	-- (physical-delivery-available).

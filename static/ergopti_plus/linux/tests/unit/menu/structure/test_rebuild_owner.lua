@@ -424,6 +424,8 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "core.i18n.engine.i18n" then return { has = function() return false end } end
 			-- Counters only: the tray counts and times each menu replacement.
 			if name == "core.logger.engine.perf_counters" then return require(name) end
+			-- Pure: draws a greyed row's reason in rows below it for the panel.
+			if name == "menu.engine.renderer" then return require(name) end
 			-- The red problem rows that lead every menu; none reported here.
 			if name == "core.ui.engine.component_status" then
 				return { tray_rows = function(show)

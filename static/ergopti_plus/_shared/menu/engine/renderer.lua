@@ -449,6 +449,13 @@ function M.new(deps)
 		return TextUtils.trim(head)
 	end
 
+	-- A greyed row's label carries only the head of its reason (« label —
+	-- Unavailable »). Its `tooltip` carries the whole translated reason: a
+	-- tray with item tooltips (macOS) shows it on hover, and the Linux tray,
+	-- whose dbusmenu has none, draws it in inert rows below the row
+	-- (tray/adapters/menu.lua). Without it a field screenshot read « Also
+	-- reorder the three edge keys — Unavailable » and nothing else.
+
 	--- The reason a greyed row names: the first `disabled_reasons` entry whose
 	--- state getter answers true (a configuration saved by a newer version),
 	--- otherwise its `disabled_reason_key`. A malformed entry or a missing getter
@@ -492,7 +499,8 @@ function M.new(deps)
 				tostring(item.id or item.i18n), manifest_key)
 			return nil
 		end
-		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
+		local reason = i18n.get(item.reason_key)
+		return { title = i18n.get(item.i18n) .. " — " .. reason_head(reason), disabled = true, tooltip = reason }
 	end
 
 	--- Whether a menu's enable row reads off. An unanswered state is not "off":
@@ -530,12 +538,14 @@ function M.new(deps)
 	--- @param roles table Finished row -> off_rule_role.
 	--- @param reason_key string Locale key of the shared reason.
 	local function apply_category_off(rows, roles, reason_key)
-		local suffix = " — " .. reason_head(i18n.get(reason_key))
+		local reason = i18n.get(reason_key)
+		local suffix = " — " .. reason_head(reason)
 		for _, row in ipairs(rows) do
 			local role = roles[row]
 			if row.title ~= "-" and role ~= "live" then
 				if (not row.disabled or role == "unreasoned") and type(row.title) == "string" then
 					row.title = row.title .. suffix
+					if row.tooltip == nil then row.tooltip = reason end
 				end
 				row.disabled = true
 				row.fn = nil
@@ -650,7 +660,14 @@ function M.new(deps)
 				-- greyed row with a reason, « label — head of the reason », and has
 				-- nothing to run.
 				local greyed = row.disabled == true and type(row.disabled_reason_key) == "string"
-				if greyed then entry.title = row.label .. " — " .. reason_head(i18n.get(row.disabled_reason_key)) end
+				if greyed then
+					local reason = i18n.get(row.disabled_reason_key)
+					entry.title, entry.tooltip = row.label .. " — " .. reason_head(reason), reason
+				elseif row.disabled == true and type(row.tooltip) == "string" then
+					-- A declared row handed over as data (command_row) whose label
+					-- already carries the head of its reason.
+					entry.tooltip = row.tooltip
+				end
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
 				-- One choice of a single-choice group: a tray that has radio items
 				-- (Linux dbusmenu) draws it as one; the others draw the same check.
@@ -731,8 +748,11 @@ function M.new(deps)
 				for field in next, child do
 					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
 						and field ~= "disabled" and field ~= "image" and field ~= "joins_reload"
-						and field ~= "bypasses_reload" and field ~= "radio" then return nil end
+						and field ~= "bypasses_reload" and field ~= "radio" and field ~= "tooltip" then return nil end
 				end
+				-- A greyed row's full reason (see reason_head).
+				local tooltip = rawget(child, "tooltip")
+				if tooltip ~= nil and type(tooltip) ~= "string" then return nil end
 				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
 				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
 				local joins_reload = rawget(child, "joins_reload")
@@ -752,7 +772,7 @@ function M.new(deps)
 					row = { separator = true }
 				else
 					row = { label = title, action = action, checked = checked, disabled = disabled, image = image,
-						joins_reload = joins_reload, bypasses_reload = bypasses_reload, radio = radio }
+						joins_reload = joins_reload, bypasses_reload = bypasses_reload, radio = radio, tooltip = tooltip }
 					if subtree ~= nil then
 						row.items = convert(subtree, depth + 1)
 						if row.items == nil then return nil end
@@ -1169,6 +1189,7 @@ function M.new(deps)
 			local action = built.fn
 			return {
 				label = built.title, disabled = built.disabled,
+				tooltip = built.disabled and built.tooltip or nil,
 				action = type(action) == "function" and function(...)
 					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
 					return action(...)
@@ -1482,7 +1503,7 @@ function M.new(deps)
 						else
 							local stand_in = greyed_stand_in(key, item)
 							if not stand_in then return nil end
-							row = { label = stand_in.title, disabled = true }
+							row = { label = stand_in.title, disabled = true, tooltip = stand_in.tooltip }
 						end
 					elseif item.type == "command" then
 						row = R.command_row(key, item.id, commands, getters)
@@ -1624,6 +1645,7 @@ function M.new(deps)
 			local action = built.fn
 			return {
 				label = built.title, checked = built.checked, disabled = built.disabled,
+				tooltip = built.disabled and built.tooltip or nil,
 				action = type(action) == "function" and function(...)
 					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
 					return action(...)
@@ -1761,7 +1783,8 @@ function M.new(deps)
 					if disabled and reason ~= nil then
 						reason = disabled_reason(manifest_key, item, getters)
 						if reason == nil then goto continue end
-						title = title .. " — " .. reason_head(i18n.get(reason))
+						reason = i18n.get(reason)
+						title = title .. " — " .. reason_head(reason)
 						fn = nil
 					end
 					flush_sep()
@@ -1770,6 +1793,7 @@ function M.new(deps)
 						fn       = fn,
 						checked  = R.resolve_checked_when(manifest_key, toggle_id, getters),
 						disabled = disabled or nil,
+						tooltip  = disabled and reason or nil,
 					})
 					item_count = item_count + 1
 				end
@@ -2391,5 +2415,124 @@ function M.new(deps)
 
 	return R
 end
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 2/ Reason Rows ===========================
+-- ==================================================
+-- ==================================================
+
+-- The widest reason line, in columns (a CJK character counts two), and the
+-- indent that sets a reason line apart from a row of its own.
+local REASON_LINE_COLUMNS = 60
+local REASON_INDENT = "    "
+
+--- The columns a UTF-8 word takes: two for a wide (CJK) character.
+--- @param word string
+--- @return number
+local function columns(word)
+	local count = 0
+	for character in word:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		count = count + ((#character >= 3 and character >= "\226\186\128") and 2 or 1)
+	end
+	return count
+end
+
+--- Splits a reason into lines of at most REASON_LINE_COLUMNS columns, at
+--- spaces, and inside a word only when the word alone is wider (CJK text
+--- has no spaces).
+--- @param text string
+--- @return table lines
+local function wrap_reason(text)
+	local lines, line, width = {}, "", 0
+	local function push(word, word_width)
+		if line ~= "" and width + 1 + word_width > REASON_LINE_COLUMNS then
+			lines[#lines + 1] = line
+			line, width = "", 0
+		end
+		line = line == "" and word or (line .. " " .. word)
+		width = width == 0 and word_width or (width + 1 + word_width)
+	end
+	for word in text:gmatch("%S+") do
+		local word_width = columns(word)
+		if word_width <= REASON_LINE_COLUMNS then
+			push(word, word_width)
+		else
+			local piece, piece_width = "", 0
+			for character in word:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+				local character_width = columns(character)
+				if piece_width + character_width > REASON_LINE_COLUMNS then
+					push(piece, piece_width)
+					piece, piece_width = "", 0
+				end
+				piece, piece_width = piece .. character, piece_width + character_width
+			end
+			if piece ~= "" then push(piece, piece_width) end
+		end
+	end
+	if line ~= "" then lines[#lines + 1] = line end
+	return lines
+end
+
+--- The part of a greyed row's reason its label does not already show: the
+--- label ends with « — head of the reason », so the rows below carry what
+--- follows the head's colon; a label without the head gets the whole reason.
+--- @param title string The row's label.
+--- @param reason string The row's full translated reason.
+--- @return string|nil rest Nil when the label already shows all of it.
+local function reason_rest(title, reason)
+	local trimmed = reason:match("^%s*(.-)%s*$")
+	if trimmed == "" then return nil end
+	local cut, mark_length = nil, 0
+	for _, mark in ipairs({ ":", "\239\188\154" }) do
+		local at = trimmed:find(mark, 1, true)
+		if at and (cut == nil or at < cut) then cut, mark_length = at, #mark end
+	end
+	local head = (cut and trimmed:sub(1, cut - 1) or trimmed):match("^%s*(.-)%s*$")
+	local suffix = " — " .. head
+	if #title < #suffix or title:sub(-#suffix) ~= suffix then return trimmed end
+	if not cut then return nil end
+	local rest = trimmed:sub(cut + mark_length):match("^%s*(.-)%s*$")
+	return rest ~= "" and rest or nil
+end
+
+--- The tree a tray without item tooltips draws (Linux dbusmenu): every greyed row that carries its reason
+--- (`tooltip`, set by the shared renderer) is followed by inert rows saying
+--- it, so the reason is not reduced to the head the label carries,
+--- « — Unavailable ». Module-level: it needs no manifest, decoder or i18n. A list with
+--- nothing to add is returned as it is, so an unchanged menu stays the same
+--- table for the in-place patch.
+--- @param items table Array of rows.
+--- @return table items
+function M.with_reason_rows(items)
+	if type(items) ~= "table" then return items end
+	local out, changed = {}, false
+	for _, item in ipairs(items) do
+		local row = item
+		if type(item) == "table" and type(item.menu) == "table" then
+			local menu = M.with_reason_rows(item.menu)
+			if menu ~= item.menu then
+				row = {}
+				for key, value in pairs(item) do row[key] = value end
+				row.menu, changed = menu, true
+			end
+		end
+		out[#out + 1] = row
+		if type(item) == "table" and item.disabled == true and type(item.tooltip) == "string"
+			and type(item.title) == "string" and item.title ~= "-" then
+			local rest = reason_rest(item.title, item.tooltip)
+			if rest then
+				for _, line in ipairs(wrap_reason(rest)) do
+					out[#out + 1] = { title = REASON_INDENT .. line, disabled = true }
+				end
+				changed = true
+			end
+		end
+	end
+	return changed and out or items
+end
+
 
 return M

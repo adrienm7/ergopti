@@ -45,6 +45,7 @@ local I18n = require("core.i18n.engine.i18n")
 local Indicator = require("tray.adapters.appindicator")
 local Protocol = require("tray.protocol")
 local Perf = require("core.logger.engine.perf_counters")
+local Renderer = require("menu.engine.renderer")
 
 local LOG = "tray.adapters.menu"
 
@@ -209,7 +210,8 @@ local function replace_menu(items)
 		Logger.debug(LOG, "setMenu() before an icon exists — kept for when one does.")
 		return false
 	end
-	if Indicator.set_menu(_items) ~= true then return false end
+	-- dbusmenu has no item tooltips: a greyed row's reason is drawn below it.
+	if Indicator.set_menu(Renderer.with_reason_rows(_items)) ~= true then return false end
 	if describe(_paused) ~= _description then send_icon(nil) end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 	return true
