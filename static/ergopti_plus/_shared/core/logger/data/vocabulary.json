@@ -321,6 +321,7 @@
 		"startup_ollama_upgrade_required",
 		"startup_runtime_not_installed",
 		"state_failed",
+		"step_failed",
 		"stopped",
 		"string",
 		"suspended",

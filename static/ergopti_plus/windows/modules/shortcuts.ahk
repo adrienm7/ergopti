@@ -33,5 +33,7 @@
 #Include shortcuts/ocr_capture.ahk
 #Include shortcuts/ocr_capture_action.ahk
 #Include shortcuts/auto_click.ahk
+#Include shortcuts/workflows/model.ahk
+#Include shortcuts/workflows/interpreter.ahk
 #Include shortcuts/capsword_auto_off.ahk
 #Include shortcuts/capsword.ahk

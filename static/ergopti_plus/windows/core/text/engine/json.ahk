@@ -41,6 +41,10 @@
 ; so callers compare against this object identity (``v == JSON_NULL``) to
 ; detect a JSON null field.
 global JSON_NULL := Object()
+; Sentinels JsonParseLossless decodes true and false to: AutoHotkey's true is
+; the integer 1, so a plain decode cannot tell a boolean from a number.
+global JSON_TRUE := Object()
+global JSON_FALSE := Object()
 global JSON_MAX_NESTING_DEPTH := 128
 
 
@@ -100,6 +104,26 @@ JsonParse(text) {
 	pos := 1
 	val := _JsonParseValue(&text, &pos, 0, , _JsonDecodePatterns(
 		NativeTextIsWellFormedUtf16(StrPtr(text), StrLen(text))))
+	_JsonSkipWs(&text, &pos)
+	if (pos <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
+	return val
+}
+
+/**
+ * Parses a JSON document keeping every JSON type apart, as the Lua drivers'
+ * Json.decode_lossless does: true and false decode to JSON_TRUE and
+ * JSON_FALSE, null to JSON_NULL, an empty object to an empty Map and an empty
+ * array to an empty Array. A document whose closed schema refuses a boolean
+ * where a number is due (a user workflow file) needs this decode.
+ * @param {String} text The raw JSON text.
+ * @returns The root value.
+ */
+JsonParseLossless(text) {
+	_JsonCountDocumentPass(&text)
+	pos := 1
+	; The fast scalar patterns decode literals to AutoHotkey booleans: the exact walk only.
+	val := _JsonParseValue(&text, &pos, 0, , 0, true)
 	_JsonSkipWs(&text, &pos)
 	if (pos <= StrLen(text))
 		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
@@ -669,9 +693,10 @@ _JsonSkipWs(&text, &pos) {
 }
 
 ; Fast, when given, is the anchored pattern set of _JsonDecodePatterns that the
-; containers below decode their plain members and elements with.
-_JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0) {
-	global JSON_MAX_NESTING_DEPTH
+; containers below decode their plain members and elements with. Lossless
+; (JsonParseLossless) decodes true and false to their sentinels, at every depth.
+_JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0, Lossless := false) {
+	global JSON_MAX_NESTING_DEPTH, JSON_TRUE, JSON_FALSE
 	if (depth > JSON_MAX_NESTING_DEPTH)
 		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
 	_JsonSkipWs(&text, &pos)
@@ -684,11 +709,11 @@ _JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0) {
 	; erase it. Ordinary JsonParse callers keep their existing decoded values.
 	if (c == "{") {
 		kind := "object"
-		return _JsonParseObject(&text, &pos, depth, 0, false, Fast)
+		return _JsonParseObject(&text, &pos, depth, 0, false, Fast, Lossless)
 	}
 	if (c == "[") {
 		kind := "array"
-		return _JsonParseArray(&text, &pos, depth, Fast)
+		return _JsonParseArray(&text, &pos, depth, Fast, Lossless)
 	}
 	if (c == '"') {
 		kind := "string"
@@ -696,7 +721,9 @@ _JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0) {
 	}
 	if (c == "t" or c == "f") {
 		kind := "boolean"
-		return _JsonParseBool(&text, &pos)
+		if !Lossless
+			return _JsonParseBool(&text, &pos)
+		return _JsonParseBool(&text, &pos) ? JSON_TRUE : JSON_FALSE
 	}
 	if (c == "n") {
 		kind := "null"
@@ -714,7 +741,7 @@ _JsonParseValue(&text, &pos, depth, &kind := "", Fast := 0) {
 ; has no escape is read by one anchored match: with its separator when its value
 ; is a plain scalar, up to its value otherwise. Anything else, or a match the
 ; engine gives up on, is left to the exact walk below from the same position.
-_JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast := 0) {
+_JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast := 0, Lossless := false) {
 	global JSON_MAX_NESTING_DEPTH
 	static Tally := _JsonDecodeCounters()
 	pos++  ; consume {
@@ -755,7 +782,7 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast :
 			if found {
 				Tally.StringUnits += match.Len[1]
 				pos += match.Len
-				obj[match[1]] := _JsonParseValue(&text, &pos, depth + 1, , Fast)
+				obj[match[1]] := _JsonParseValue(&text, &pos, depth + 1, , Fast, Lossless)
 				_JsonSkipWs(&text, &pos)
 				c := SubStr(text, pos, 1)
 				if (c == ",") {
@@ -791,7 +818,7 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast :
 			throw Error("JSON: expected ':' at position " . pos . ".", -1)
 		pos++  ; consume :
 		if (!selective || wanted.Has(key))
-			obj[key] := _JsonParseValue(&text, &pos, depth + 1, , Fast)
+			obj[key] := _JsonParseValue(&text, &pos, depth + 1, , Fast, Lossless)
 		else
 			_JsonSkipValue(&text, &pos, depth + 1, WellFormed)
 		_JsonSkipWs(&text, &pos)
@@ -808,7 +835,7 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false, Fast :
 	}
 }
 
-_JsonParseArray(&text, &pos, depth, Fast := 0) {
+_JsonParseArray(&text, &pos, depth, Fast := 0, Lossless := false) {
 	static Tally := _JsonDecodeCounters()
 	pos++  ; consume [
 	arr := []
@@ -833,7 +860,7 @@ _JsonParseArray(&text, &pos, depth, Fast := 0) {
 				continue
 			}
 		}
-		val := _JsonParseValue(&text, &pos, depth + 1, , Fast)
+		val := _JsonParseValue(&text, &pos, depth + 1, , Fast, Lossless)
 		arr.Push(val)
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
