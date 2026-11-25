@@ -45,7 +45,10 @@ local function model(world)
 		check("🎯 Shortcuts", true, { children = { { label = "Child" } }, lazy = true }),
 		{ label = "Layout", lazy = true, children = {
 			{ label = "Layout to emulate : " .. st.emulated, lazy = true,
-				children = { radio("None"), radio("Ergopti"), radio("Bépo") } },
+				-- The submenu the menu draws (decision of 2026-11-25): « None », the
+				-- quick choices, then the « Others… » command after a separator.
+				children = o.no_recents and { radio("None"), { separator = true }, { label = "Others…" } }
+					or { radio("None"), radio("Ergopti"), radio("Bépo"), { separator = true }, { label = "Others…" } } },
 		} },
 		{ label = "Configuration", lazy = true, children = {
 			{ label = "— Reset —", enabled = o.title_enabled == true },
@@ -180,7 +183,7 @@ local function ports(options)
 				suspend = script("suspend", "Suspend", "AltGr + Enter"), reload = script("reload", "Reload", "AltGr + ⌫"),
 				quit = script("quit", "Quit", "AltGr + Esc"),
 				checkable_groups = { "Hotstrings", "Shortcuts" },
-				layout_group = "Layout", emulated = "Layout to emulate",
+				layout_group = "Layout", emulated = "Layout to emulate", emulation_commands = { "Others…" },
 				configuration = "Configuration", configuration_titles = { "— Reset —", "— Files —" },
 				reading_font = "Window font",
 				debug = "Debug", console = "Console", logs_title = "— Logs —", logs_switches = { "Detailed log", "Error window" },
@@ -231,6 +234,16 @@ helpers.describe("field run tray check (linux)", function()
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.hover_keeps_checks.state, Report.STATE_FAIL)
 		helpers.assert_eq(steps.hover_keeps_checks.value, "changed:1")
+	end)
+
+	-- The Arch tester's menu: no layout emulated yet, so the group is « None »
+	-- and « Others… »; the command row counted as a choice failed as not_radio.
+	helpers.it("passes a group of None and Others… and skips the live change (tray-emulation-commands)", function()
+		local steps = run({ no_recents = true })
+		helpers.assert_eq(steps.emulation_radio.state, Report.STATE_PASS, tostring(steps.emulation_radio.value))
+		helpers.assert_eq(steps.emulation_radio.value, "1")
+		helpers.assert_eq(steps.emulation_live.state, Report.STATE_SKIP)
+		helpers.assert_eq(steps.emulation_live.value, "one_choice")
 	end)
 
 	helpers.it("fails each drawing defect by name (tray-check)", function()

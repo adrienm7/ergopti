@@ -499,11 +499,23 @@ local function find_emulation(bus, root, expect, done)
 	step()
 end
 
---- The ticked rows of a choice group, and whether every row is a radio.
-local function radio_state(choices)
+--- Whether a row is one of the commands drawn after the choices (« Others… »).
+local function is_emulation_command(row, expect)
+	for _, label in ipairs(expect.emulation_commands or {}) do
+		if row.label == M.plain_label(label) then return true end
+	end
+	return false
+end
+
+--- The ticked rows of a choice group, and whether every choice is a radio.
+--- The commands after the choices (expect.emulation_commands) are no choice:
+--- since the menu decision of 2026-11-25 the group is « None », the quick
+--- choices and « Others… », and counting that command row as a choice failed
+--- every run as not_radio (Arch Linux field report, 2026-11-25).
+local function radio_state(choices, expect)
 	local ticked, all_radio, rows = {}, true, {}
 	for _, row in ipairs(M.visible_rows(choices)) do
-		if row.kind ~= "separator" then
+		if row.kind ~= "separator" and not is_emulation_command(row, expect) then
 			rows[#rows + 1] = row
 			if row.toggle_type ~= "radio" then all_radio = false end
 			if row.toggle_state == 1 then ticked[#ticked + 1] = row end
@@ -530,7 +542,7 @@ local function choose(bus, ports, expect, label, done)
 					bus.layout(0, function(fresh)
 						if not fresh then return done(false) end
 						find_emulation(bus, fresh, expect, function(_, now)
-							local ticked = now and radio_state(now) or {}
+							local ticked = now and radio_state(now, expect) or {}
 							if #ticked == 1 and ticked[1].label == label then return done(true) end
 							if attempts >= M.SETTLE_ATTEMPTS then return done(false) end
 							ports.after(M.SETTLE_INTERVAL_MS, confirm)
@@ -551,7 +563,7 @@ local function emulation_steps(bus, ports, root, expect, report, done)
 			report.step("emulation_live", Report.STATE_SKIP, code)
 			return done()
 		end
-		local ticked, all_radio, rows = radio_state(choices)
+		local ticked, all_radio, rows = radio_state(choices, expect)
 		local radio_ok = all_radio and #ticked == 1
 		report.step("emulation_radio", radio_ok and Report.STATE_PASS or Report.STATE_FAIL,
 			not all_radio and "not_radio" or (#ticked ~= 1 and ("ticked:" .. #ticked)) or tostring(#rows))

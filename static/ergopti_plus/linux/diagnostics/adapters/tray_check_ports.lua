@@ -66,6 +66,18 @@ local function section_switches(rows, header_key, t)
 	return switches
 end
 
+--- The command rows the menu draws after the « Layout to emulate » choices
+--- (_shared/menu/data/menu.toml, layout_emulation_others_commands): « Others… »
+--- opens the picker; it is no choice of the radio group.
+local function emulation_commands(rows, t)
+	local labels = {}
+	for _, item in ipairs(rows) do
+		if for_linux(item) and item.type == "command" and type(item.i18n) == "string" then labels[#labels + 1] = t(item.i18n) end
+	end
+	if #labels == 0 then error("tray check: the menu declares no Layout to emulate command") end
+	return labels
+end
+
 --- The labels, captions and states the live menu must show.
 --- @return table expect
 local function expectations()
@@ -102,6 +114,7 @@ local function expectations()
 		checkable_groups = { caption(top, "hotstrings", t), caption(top, "shortcuts", t) },
 		layout_group = caption(top, "keyboard_layout", t),
 		emulated = t("menu.layout.emulated_layout"),
+		emulation_commands = emulation_commands(Manifest.get_array("layout_emulation_others_commands"), t),
 		configuration = caption(top, "configuration", t),
 		configuration_titles = section_titles(configuration, I18n),
 		reading_font = reading_font or error("tray check: the menu declares no Linux reading font row"),
