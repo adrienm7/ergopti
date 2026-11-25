@@ -1058,6 +1058,138 @@
 			"text": "He said No!\n\nYes, I said.\nThe Dog ran:\nBut",
 			"value": 0.206,
 			"tolerance": 0.0005
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "The quick brown fox jumps over the lazy dog; she sells sea shells.",
+			"value": -50.8830946894,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 9.75609756098,
+				"LSB": 0,
+				"HSB": 0,
+				"SFS": 14.2857142857,
+				"RED-NML": 0,
+				"FLW": 53.5714285714,
+				"HLD": 11.1111111111,
+				"FLD": 32.2592592593,
+				"RLD": 61.1111111111,
+				"POH": 8.33333333333
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "colemak_dh_angle",
+			"keyboard": "iso",
+			"text": "Hello, World! Typing tests: in-roll, out-roll; redirect.",
+			"value": 2.24434742946,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 0,
+				"LSB": 0,
+				"HSB": 6.97674418605,
+				"SFS": 11.1111111111,
+				"RED-NML": 5.55555555556,
+				"FLW": 44.4444444444,
+				"HLD": 21.7391304348,
+				"FLD": 27.5217391304,
+				"RLD": 32.6086956522,
+				"POH": 3.26086956522
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ortho",
+			"text": "minimum: \"on-off\" aloud, decided",
+			"value": -31.9804006329,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 28,
+				"LSB": 8,
+				"HSB": 0,
+				"SFS": 19.0476190476,
+				"RED-NML": 4.7619047619,
+				"FLW": 9.52380952381,
+				"HLD": 20,
+				"FLD": 48,
+				"RLD": 86,
+				"POH": 0
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"text": "Où est la clé ? Ça dépend : déjà vu.\tÀ bientôt !\nNouvelle ligne",
+			"value": -31.6842510823,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 0,
+				"LSB": 2.94117647059,
+				"HSB": 2.94117647059,
+				"SFS": 8.69565217391,
+				"RED-NML": 4.34782608696,
+				"FLW": 43.4782608696,
+				"HLD": 0,
+				"FLD": 39,
+				"RLD": 90,
+				"POH": 17.5
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "bepo",
+			"keyboard": "iso",
+			"text": "Le cœur a ses raisons que la raison ne connaît point. « Œuvre », dit-il.",
+			"value": 16.6374135058,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 0,
+				"LSB": 0,
+				"HSB": 4.6511627907,
+				"SFS": 3.33333333333,
+				"RED-NML": 0,
+				"FLW": 63.3333333333,
+				"HLD": 0,
+				"FLD": 33.3846153846,
+				"RLD": -8.881784197e-16,
+				"POH": 0
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "keycraft",
+			"basis": "tool",
+			"layout": "dvorak",
+			"keyboard": "ansi",
+			"text": "Pack my box with five dozen liquor jugs.",
+			"value": 6.19601967386,
+			"tolerance": 1e-9,
+			"parts": {
+				"SFB": 0,
+				"LSB": 4,
+				"HSB": 12,
+				"SFS": 17.6470588235,
+				"RED-NML": 0,
+				"FLW": 82.3529411765,
+				"HLD": 9.09090909091,
+				"FLD": 27.3636363636,
+				"RLD": 53.0303030303,
+				"POH": 9.09090909091
+			},
+			"parts_tolerance": 1e-9
 		}
 	]
 }

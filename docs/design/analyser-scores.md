@@ -15,12 +15,13 @@ the engine itself is [layout-analysis.md](layout-analysis.md).
 
 ## Files
 
-| File                                                                             | Role                                                                  |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `static/ergopti_plus/_shared/ui/layout_analysis/analyser_scores.js`              | The scorers: classic script, global `LAYOUT_ANALYSER_SCORES`, no DOM. |
-| `static/ergopti_plus/_shared/layouts/data/analysis/analyser_models.json`         | Every constant, per analyser, with its source, revision and licence.  |
-| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/analyser_vectors.json` | Reference vectors; `npm run test:analyser-scores`.                    |
-| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/analysers/`            | Fixtures: KLA's Alice preset, Ergo-L's corpus tables and two keymaps. |
+| File                                                                             | Role                                                                      |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `static/ergopti_plus/_shared/ui/layout_analysis/analyser_scores.js`              | The scorers: classic script, global `LAYOUT_ANALYSER_SCORES`, no DOM.     |
+| `static/ergopti_plus/_shared/layouts/data/analysis/analyser_models.json`         | Every constant, per analyser, with its source, revision and licence.      |
+| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/analyser_vectors.json` | Reference vectors; `npm run test:analyser-scores`.                        |
+| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/analysers/`            | Fixtures: KLA's Alice preset, Ergo-L's corpus tables and two keymaps.     |
+| `static/ergopti_plus/_shared/layouts/data/analysis/keycraft_reference.json`      | keycraft's reference layouts (`tools/build/import-keycraft-layouts.cjs`). |
 
 The codegen (`npm run codegen:layout-analysis-data:js`) copies
 `analyser_models.json` into `LAYOUT_ANALYSIS_DATA.analysers`, checking that
@@ -78,6 +79,12 @@ bigrams, skipgrams}}`: the counts only a text gives, genkey's skipgrams of
   per corpus, 1.43 MB in all, against 5.93 MB for character pairs of gaps 2
   to 9), and the Comparer counts them from the user's own text; word lists and
   count tables have no text to count them from and keep the chain.
+- `referenceTables(ngrams)` → `{keycraft: {medians, iqrs}}`: keycraft's
+  median and interquartile range of each weighted metric over its reference
+  layouts on these tables. Set as `references` on the tables (the codegen
+  ships them in every built-in corpus), the keycraft scorer reads them; a
+  table without them (a blend, the user's text, « Ma frappe ») has them
+  computed once, about 0.15 to 0.3 s in a `vm` context.
 
 `layout` is the engine's library shape; `keyboard` is the engine's (`iso`,
 `iso_angle`, `ansi`, `ortho`), mapped to each analyser's own boards below. In
@@ -563,6 +570,71 @@ r·skip1 + r²·skip2 + r³·skip3)` (r = 1/7) times the distance and 5.5 / fing
   repeated sentence above and below its trigram threshold) on QWERTY,
   Colemak-DH, Dvorak and Ergopti, to 1e-9.
 
+### keycraft
+
+- **Source.** https://github.com/rbscholtus/keycraft (Barend Scholtus),
+  revision f8c6419 (2026-11-25), `internal/keycraft/analyser.go`,
+  `layout.go`, `keys.go`, `scorer.go`, `ranking.go` and `corpus.go`; weights
+  `data/config/weights.txt`, load targets `data/config/load_targets.txt`.
+  Licence: BSD-3-Clause (`LICENSE`, its notice in
+  `keycraft_reference.json`).
+- **Formula.** The score of `keycraft rank`, higher is better: Σ weight ×
+  (metric − median) / IQR over its 20 weighted metrics (SFB −8, LSB −4, FSB
+  −2.666, HSB −1.333, SFS −3, LSS −1, FSS −0.666, HSS −0.333, RED-WEAK
+  −2.666, RED-NML −1.333, FLW 8, HLD −0.5, FLD −1.5, RLD −1, POH −2, and RED,
+  RED-SFS, ALT-SFS, 2RL-SFB, 3RL-SFB at −0.001), a metric whose IQR is 0
+  left out. The median and the interquartile range (Q1 the median of the
+  lower half, Q3 of the upper) of each metric are taken over its 150
+  reference layouts (`data/layouts`, every geometry) scored on the same
+  corpus. Its metrics, in percent: same-finger, lateral-stretch, full- and
+  half-scissor bigrams and skipgrams (the pairs of keys its `layout.go`
+  lists, with its row stagger of 0, 0.25 and 0.75 keys), the trigram classes
+  (alternations, 2- and 3-rolls, redirections and their weak and
+  same-finger forms; flow the in- and outrolls and plain alternations), the
+  hand, finger and row loads against its targets (50/50; 7, 10, 16, 17 % per
+  hand; 17.5, 75, 7.5 %) and the pinky off its home key (2, 1.5, 1 per key).
+  Corpus: lower case (one code point per character, as Go's
+  `unicode.ToLower`), every white space a reset, the skipgram the ends of
+  each trigram; its totals count every n-gram, typed or not. A corpus with no
+  pair or triple outside white space (one short word) counts their shares as
+  0, where keycraft divides by zero (NaN).
+- **Grid.** Its 42 keys: three rows of twelve (the Tab or Caps Lock column,
+  the letter columns, the bracket or quote column) and six thumb keys, of
+  which the space bar is the fourth. A layout is read on the base layer of
+  those keys (lower-cased, a character on two keys kept on the first), as a
+  `.klf` file writes it: row-staggered (`rowstag`), its angle fingering
+  (`anglemod`) when the layout or the keyboard is angle-modded, `ortho` on
+  the ortholinear board. Its reader takes one byte per key, so a `.klf` file
+  cannot hold a non-ASCII character; its analyser reads any, and so does the
+  scorer: bépo's « é » is typed where the layout puts it. The space bar
+  never counts, as no n-gram holds a space.
+- **Reference statistics.** `tools/build/import-keycraft-layouts.cjs`
+  re-encodes the 150 layouts into `keycraft_reference.json`; the codegen
+  ships each built-in corpus's medians and IQRs as `references.keycraft`
+  (`referenceTables`), and a corpus without them (a blend, the user's text,
+  « Ma frappe ») has them computed once from the reference layouts.
+- **Custom fingering.** Each key the user's model knows takes its finger and
+  that finger's hand; the reference statistics stay those of keycraft's own
+  fingering.
+- **Fidelity: exact** on texts and tables. Measured against keycraft itself
+  (built from f8c6419, its default weights and load targets, `rank -o csv -m
+all`, 2 decimals) on every built-in corpus, 2026-11-25: its 102 layouts
+  that our boards hold (the 48 others are column-staggered or put a letter
+  on a thumb key) and ten library layouts written as its files, 6,608 points:
+  the Score and each of the 20 weighted metrics within its printed rounding
+  (0.005), on the 30 texts (keycraft reading the text the codegen counts) as
+  on the 29 word lists and count tables (keycraft reading its corpus file of
+  the same tables, the only way it reads counts). A local build printing its
+  `ComputeRankings` to full precision gives every metric, median and IQR
+  bit for bit on its own corpus and on _Germinal_, and the Score within 3e-14
+  (its sum runs over a Go map, in no fixed order). Gate: keycraft's own
+  analyser (`NewAnalyser` on its `SplitLayout`, the median and IQR of its
+  `ComputeRankings`), printed to 12 digits, on six short texts: QWERTY on
+  the staggered and ortholinear boards, Colemak-DH with its angle mod,
+  Dvorak on ANSI, AZERTY on French with no-break spaces, a tab and a line
+  break, and bépo with « œ » and guillemets (non-ASCII keys, which its
+  analyser reads though a `.klf` file cannot hold them).
+
 ## Checking against the real tools
 
 `node tools/dev/verify-analyser-scores.cjs [--verbose]` (maintainer tool, needs
@@ -582,7 +654,8 @@ Optimizer (KLO in the table); with `--cyanophage=<folder with its optimiser.js,
 worker.js and words-english.json>`, the Cyanophage optimiser's own code. Each
 tool that prints sub-scores is also compared metric by metric (the figures
 quoted in each section above). Measured on 2026-11-18, on 2026-11-19 for
-Cyanophage and on 2026-11-24 for Oxeylyzer and genkey:
+Cyanophage, on 2026-11-24 for Oxeylyzer and genkey and on 2026-11-25 for
+keycraft:
 
 | Analyser   | Points | Mean gap                                | Largest      |
 | ---------- | ------ | --------------------------------------- | ------------ |
@@ -593,6 +666,7 @@ Cyanophage and on 2026-11-24 for Oxeylyzer and genkey:
 | carpalx    | 50     | 0.31 % (1.2 % before)                   | 1.2 %        |
 | KLO        | 40     | < 1e-6 % (5.5 % before)                 | < 1e-6 %     |
 | Cyanophage | 60     | 0.79 %; 1e-9 without its slip           | 3.7 %        |
+| keycraft   | 6608   | 0.0025, its 2-decimal rounding          | 0.005        |
 
 cmini and a200 (Python, `--python=<exe>` with `--cmini-data=<its folder>` or
 `--a200-data=<its app folder>`) needed no change: every statistic within
@@ -642,8 +716,17 @@ Listed by the search for this work, not reproduced (no score, or a score made
 of the user's own timings): Keysolve 2 (percentiles against a bundled table),
 trialyzer (the user's typing times), keymui / keymeow (metrics, no score),
 mw8/white_keyboard_layout, engram, kuehlmak, Oxeylyzer 2 and the newer
-analysers with a few stars (mana, keycraft, chogalyzer, stronglytyped). KLA's
+analysers with a few stars (mana, chogalyzer, stronglytyped). KLA's
 `ergodox` and `matrix` boards are not modelled.
+
+**shirolyzer** (akai-hana/shirolyzer, MIT since 2026-11, read at 0a0e30e,
+2026-11-21) is not reproduced: its README documents its configuration
+(priority tiers, redirect, roll and scissor tiers, conditions), not its
+score, which is the output of a fitted model (`config/model/calibrated.json`,
+refitted by its `fitting/` tools, cost curves inside) over a fingering its
+trigram search chooses per context; the model and its stored scores changed
+twice in the week read (2026-11-19, 2026-11-21). A port would follow a moving
+fit, not a formula; it waits for a released, documented score.
 
 ## In the Studio
 

@@ -1513,6 +1513,12 @@ async function exerciseComparerTabs(page) {
 			new RegExp(`Shows the 40\\sbest of the ranking's ${results}\\slayouts`),
 			'and say so'
 		);
+	// keycraft has its column, scored against its reference layouts: a number in each row.
+	assert.match(
+		await page.textContent('.la-analysers-table thead'),
+		/keycraft/,
+		'keycraft has its column'
+	);
 	await page.selectOption('#la-analysers-view', 'ranks');
 	assert.ok(
 		await page.$$eval(

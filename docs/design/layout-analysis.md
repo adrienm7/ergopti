@@ -1157,7 +1157,8 @@ shows the credit and the link in each layout's details.
 `_shared/ui/layout_analysis/analyser_scores.js` (global `LAYOUT_ANALYSER_SCORES`,
 loaded after the engine) gives each layout's score as KLA, its SteveP fork,
 KLAnext, a200, carpalx, keygen, genkey, Oxeylyzer, Keyboard Layout Optimizer,
-cmini and the Ergo-L analyser compute it, on the same cached tables; its
+the Cyanophage optimiser, keycraft, cmini and the Ergo-L analyser compute it,
+on the same cached tables; its
 formulas, sources, licences and fidelity are in
 [analyser-scores.md](analyser-scores.md). The engine's `keyNgrams(layout,
 ngrams, {keyboard})` exposes the expanded key stream `analyse` measures
