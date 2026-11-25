@@ -10,6 +10,7 @@
 		"text_bytes": 4096,
 		"images_max": 32,
 		"image_base64_bytes": 1398104,
+		"template_pixels_max": 4194304,
 		"variables_max": 64,
 		"repeat_max": 1000,
 		"coordinate_max": 100000,
@@ -225,6 +226,27 @@
 		"timeout",
 		"screen_service_missing",
 		"text_not_found",
-		"image_not_found"
-	]
+		"image_not_found",
+		"screen_permission_missing",
+		"screen_capture_refused",
+		"ocr_unavailable",
+		"screen_read_failed"
+	],
+	"screen_reasons": {
+		"capture_permission_missing": "screen_permission_missing",
+		"capture_unavailable": "screen_capture_refused",
+		"capture_no_x_display": "screen_capture_refused",
+		"capture_wayland_region": "screen_capture_refused",
+		"capture_unsupported_visual": "screen_capture_refused",
+		"capture_refused": "screen_capture_refused",
+		"capture_empty": "screen_capture_refused",
+		"no_foreground_window": "screen_capture_refused",
+		"ocr_engine_missing": "ocr_unavailable",
+		"ocr_language_missing": "ocr_unavailable",
+		"ocr_timeout": "screen_read_failed",
+		"ocr_failed": "screen_read_failed",
+		"template_uniform": "screen_read_failed",
+		"template_unreadable": "screen_read_failed"
+	},
+	"screen_reason_other": "screen_read_failed"
 }

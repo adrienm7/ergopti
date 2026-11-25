@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Replays the shared workflow model contract
 --- (_shared/tests/lua/workflows/workflow_model_contract.lua) and the
---- interpreter, runner, owner and editor host contracts on the Linux runtime.
+--- interpreter, runner, owner, editor host and screen step contracts on the
+--- Linux runtime.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -16,3 +17,4 @@ require("tests.lua.workflows.workflow_interpreter_contract").register(helpers, s
 require("tests.lua.workflows.workflow_runner_contract").register(helpers, shared)
 require("tests.lua.workflows.workflow_owner_contract").register(helpers, shared)
 require("tests.lua.workflows.workflow_editor_host_contract").register(helpers, shared)
+require("tests.lua.workflows.workflow_screen_contract").register(helpers, shared)
