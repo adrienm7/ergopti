@@ -167,7 +167,8 @@ helpers.describe("layout manager without its window (Linux)", function()
 
 	helpers.it("fills the failure reason with the registry code's own explanation (layout-actions-windowless)", function()
 		for code, key in pairs({ python_missing = "layouts.linux_needs_python",
-			xorg_session = "layouts.linux_xorg_session", installer_failed = "layout_manager.failure_other" }) do
+			xorg_session = "layouts.linux_xorg_session", installer_failed = "layout_manager.failure_installer",
+			no_source = "layout_manager.failure_other" }) do
 			local Actions, record, deps = actions({ install = { false, code, "technical detail" } })
 			deps.i18n = { get = function(wanted)
 				if wanted == "layouts.linux_ergopti_install_failed" then return "failed: {1}" end
