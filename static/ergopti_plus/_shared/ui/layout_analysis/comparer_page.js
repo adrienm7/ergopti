@@ -449,6 +449,21 @@
 	// The quantiles the Pareto tab's spread marks and lists (the Layouts Wiki
 	// playground's Ranking view snaps its range to these), in percent.
 	const SPREAD_QUANTILES = [0, 10, 25, 50, 75, 90, 100];
+	// The user metrics a first visit starts with (an idea seen in the Layouts
+	// Wiki playground's metric queries), each named by its locale key.
+	const USER_METRIC_EXAMPLES = [
+		{ key: 'pinky_sfb', window: 'bigram', query: 'same_finger & !same_key & finger1 = 4' },
+		{
+			key: 'pinky_redirect',
+			window: 'trigram',
+			query: 'redirect & (finger1 = 4 | finger2 = 4 | finger3 = 4)'
+		},
+		{
+			key: 'top_row_sfs',
+			window: 'skipgram',
+			query: 'same_finger & !same_key & (row1 = -1 | row2 = -1)'
+		}
+	];
 	// The smoothed distribution above the spread (an idea seen in the Layouts
 	// Wiki playground's Ranking view): its band's height and its samples.
 	const SPREAD_DENSITY_BAND = 44;
@@ -1028,6 +1043,11 @@
 			<h3 id="la-help-share" data-i18n="layout_analysis.help.share_title"></h3>
 			<p data-i18n="layout_analysis.help.share_text"></p>
 		</section>
+		<section class="la-figure la-figure-wide" aria-labelledby="la-help-metrics">
+			<h3 id="la-help-metrics" data-i18n="layout_analysis.help.metrics_title"></h3>
+			<p data-i18n="layout_analysis.help.metrics_text"></p>
+			<p data-i18n="layout_analysis.help.metrics_syntax"></p>
+		</section>
 		<p class="la-muted" data-i18n="layout_analysis.help.credit"></p>
 	</section>
 
@@ -1100,6 +1120,30 @@
 			<p class="la-muted" data-i18n="layout_analysis.movement.rhythm_caption"></p>
 			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-rhythm-name">
 				<table id="la-rhythm" class="la-table"></table>
+			</section>
+		</details>
+		<details id="la-user-metrics-box" class="la-section">
+			<summary id="la-user-metrics-name" data-i18n="layout_analysis.user_metrics.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.user_metrics.caption"></p>
+			<ol id="la-user-metrics-list" class="la-user-metrics-list"></ol>
+			<p class="la-user-metrics-actions">
+				<button type="button" id="la-user-metrics-add" data-i18n="layout_analysis.user_metrics.add"></button>
+				<output id="la-user-metrics-full" class="la-muted"></output>
+			</p>
+			<details class="la-query-names">
+				<summary id="la-user-metrics-names-title" data-i18n="layout_analysis.user_metrics.names"></summary>
+				<ul id="la-user-metrics-names" aria-labelledby="la-user-metrics-names-title"></ul>
+			</details>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-user-metrics-name">
+				<table id="la-user-metrics" class="la-table"></table>
+			</section>
+			<p class="la-user-metrics-actions">
+				<button type="button" id="la-user-metrics-all" data-i18n="layout_analysis.user_metrics.measure_all"></button>
+			</p>
+			<p id="la-user-metrics-status" class="la-muted" role="status"></p>
+			<h4 id="la-user-metrics-all-name" data-i18n="layout_analysis.user_metrics.all_title" hidden></h4>
+			<section id="la-user-metrics-all-wrap" class="la-table-wrap" tabindex="0" aria-labelledby="la-user-metrics-all-name" hidden>
+				<table id="la-user-metrics-ranking" class="la-table"></table>
 			</section>
 		</details>
 		<details class="la-section">
@@ -1292,6 +1336,7 @@
 						pareto: state.pareto,
 						blend: state.blendRecipe,
 						traceText: state.trace.text,
+						userMetrics: state.userMetrics,
 						// The user's own score presets, each a score settings file and its name.
 						presets: state.presets,
 						pick: state.pick
@@ -1356,6 +1401,41 @@
 			own: true,
 			custom: Boolean(saved.custom && saved.custom.tables)
 		};
+		/**
+		 * The stored user metrics, each {id, name, window, query} with a window
+		 * the engine knows, at most E.WINDOW_MAX_METRICS; the examples when none
+		 * was stored (an empty list stored stays empty).
+		 */
+		function savedUserMetrics(stored) {
+			// An example keeps no name of its own: it is named in the page's language.
+			if (!Array.isArray(stored))
+				return USER_METRIC_EXAMPLES.map((example, index) => ({
+					id: `m${index + 1}`,
+					name: '',
+					example: example.key,
+					window: example.window,
+					query: example.query
+				}));
+			const ids = new Set();
+			return stored
+				.filter(
+					(m) =>
+						m &&
+						typeof m.id === 'string' &&
+						!ids.has(m.id) &&
+						ids.add(m.id) &&
+						typeof m.name === 'string' &&
+						typeof m.query === 'string' &&
+						E.WINDOW_KINDS.includes(m.window)
+				)
+				.slice(0, E.WINDOW_MAX_METRICS)
+				.map(({ id, name, example, window, query }) =>
+					USER_METRIC_EXAMPLES.some((e) => e.key === example)
+						? { id, name, example, window, query }
+						: { id, name, window, query }
+				);
+		}
+
 		const state = {
 			corpus:
 				linked.corpus ||
@@ -1449,7 +1529,9 @@
 						: typeof saved.traceText === 'string'
 							? saved.traceText
 							: null
-			}
+			},
+			// The visitor's own metrics over key windows, kept on this device.
+			userMetrics: savedUserMetrics(saved.userMetrics)
 		};
 		// A link's layouts are shown, not saved: the visitor's own choice stays.
 		state.linkedSelection = Boolean(linked.layouts);
@@ -3427,7 +3509,13 @@
 		/** Why the query does not read, in words, or '' when it does. */
 		function queryStatus() {
 			const { error } = compiledQuery();
-			if (!error) return '';
+			return error
+				? t('layout_analysis.filter.query_invalid', { reason: queryErrorText(error) })
+				: '';
+		}
+
+		/** A values query's refusal (an E.QueryError) in words, with where it happens. */
+		function queryErrorText(error) {
 			const values = { at: error.at + 1, token: error.token };
 			const words = {
 				query_unexpected: () => t('layout_analysis.filter.query_unexpected', values),
@@ -3439,7 +3527,7 @@
 				query_end: () => t('layout_analysis.filter.query_end', values)
 			};
 			if (!words[error.code]) throw new Error(`layout comparer: no words for ${error.code}`);
-			return t('layout_analysis.filter.query_invalid', { reason: words[error.code]() });
+			return words[error.code]();
 		}
 
 		/** The names a query may use, each with what it is. */
@@ -5337,6 +5425,298 @@
 		 * screen; every pair is also in a sortable table, and each cell names
 		 * its pair, share, count, kind and points to assistive technology.
 		 */
+		// ===================================
+		// ======= User metrics ==============
+		// ===================================
+
+		/** A user metric's name: its own, an example's in the page's language, or its number. */
+		function userMetricName(metric, index) {
+			if (metric.name) return metric.name;
+			if (metric.example) return t(`layout_analysis.user_metrics.example_${metric.example}`);
+			return t('layout_analysis.user_metrics.unnamed', { n: index + 1 });
+		}
+
+		/**
+		 * The user metrics' tests, each compiled once per text: {metric, error};
+		 * error an E.QueryError when its query does not read (not measured).
+		 */
+		function userMetricChecks() {
+			return state.userMetrics.map((metric) => {
+				try {
+					E.compileQuery(metric.query, E.windowNames(metric.window));
+					return { metric, error: null };
+				} catch (error) {
+					if (!(error instanceof E.QueryError)) throw error;
+					return { metric, error };
+				}
+			});
+		}
+
+		/** The user metrics that read, as windowMetrics takes them, and their cache key. */
+		function readableUserMetrics() {
+			const metrics = userMetricChecks()
+				.filter((check) => check.error === null)
+				.map(({ metric }) => ({ id: metric.id, window: metric.window, query: metric.query }));
+			return { metrics, key: JSON.stringify(metrics) };
+		}
+
+		/** A result's user metrics (E.windowMetrics), kept with its figures while they stay the same. */
+		function userMetricsOf(r) {
+			const { metrics, key } = readableUserMetrics();
+			const entry = cachedFigure(r, 'userMetrics', () => new Map());
+			if (!entry.has(key))
+				entry.set(
+					key,
+					E.windowMetrics(layoutOf(r.layout.id), tablesOf(r), metrics, analysisOptions())
+				);
+			return entry.get(key);
+		}
+
+		/** Saves the user metrics and redraws them, the editor list included when asked. */
+		function userMetricsChanged(redrawList) {
+			userMetricsRun = null;
+			save();
+			const shown = state.results.find((r) => r.layout.id === state.details);
+			if (shown) renderUserMetrics(shown, redrawList);
+		}
+
+		/** The editor of one user metric: its name, window and query, and the button removing it. */
+		function userMetricItem(metric, check, index) {
+			const li = el('li', 'la-user-metric');
+			const group = el('fieldset', 'la-user-metric-fields');
+			const shownName = userMetricName(metric, index);
+			const legend = el('legend', 'la-sr-only', shownName);
+			const field = (labelKey, control) => {
+				const label = el('label', 'la-filter-field', t(labelKey));
+				label.append(control);
+				return label;
+			};
+			const name = el('input');
+			name.type = 'text';
+			name.value = shownName;
+			name.className = 'la-user-metric-name';
+			name.addEventListener('change', () => {
+				metric.name = name.value.trim();
+				// A renamed example is the visitor's own.
+				delete metric.example;
+				userMetricsChanged(true);
+			});
+			const window = el('select', 'la-user-metric-window');
+			for (const kind of E.WINDOW_KINDS) {
+				const option = el('option', '', t(`layout_analysis.user_metrics.window_${kind}`));
+				option.value = kind;
+				window.append(option);
+			}
+			window.value = metric.window;
+			window.addEventListener('change', () => {
+				metric.window = window.value;
+				userMetricsChanged(true);
+			});
+			const query = el('input');
+			query.type = 'text';
+			query.value = metric.query;
+			query.spellcheck = false;
+			query.autocomplete = 'off';
+			query.className = 'la-user-metric-query';
+			const status = el('p', 'la-query-status');
+			status.id = `la-user-metric-status-${metric.id}`;
+			status.setAttribute('role', 'status');
+			query.setAttribute('aria-describedby', status.id);
+			if (check.error)
+				status.textContent = t('layout_analysis.user_metrics.invalid', {
+					reason: queryErrorText(check.error)
+				});
+			query.addEventListener('change', () => {
+				metric.query = query.value;
+				userMetricsChanged(true);
+			});
+			const remove = el('button', '', t('layout_analysis.user_metrics.remove'));
+			remove.type = 'button';
+			remove.className = 'la-user-metric-remove';
+			remove.setAttribute(
+				'aria-label',
+				t('layout_analysis.user_metrics.remove_named', { name: shownName })
+			);
+			remove.addEventListener('click', () => {
+				state.userMetrics = state.userMetrics.filter((m) => m !== metric);
+				userMetricsChanged(true);
+				$('la-user-metrics-add').focus();
+			});
+			group.append(
+				legend,
+				field('layout_analysis.user_metrics.name', name),
+				field('layout_analysis.user_metrics.window', window),
+				field('layout_analysis.user_metrics.query', query),
+				remove
+			);
+			li.append(group, status);
+			return li;
+		}
+
+		/** The names a user metric's query may use, each with what it is. */
+		function fillUserMetricNames() {
+			const item = (names, text) => {
+				const li = el('li');
+				names.forEach((name, i) => {
+					if (i > 0) li.append(', ');
+					li.append(el('code', '', name));
+				});
+				li.append(` ${text}`);
+				return li;
+			};
+			const places = (name) => [1, 2, 3].map((place) => `${name}${place}`);
+			const words = (id) => t(`layout_analysis.user_metrics.name_${id}`);
+			const events = E.TRACE_PAIR_EVENTS.concat(E.TRACE_TRIPLE_EVENTS);
+			$('la-user-metrics-names').replaceChildren(
+				...['finger', 'hand', 'row', 'reach', 'thumb', 'home'].map((id) =>
+					item(places(id), words(id))
+				),
+				...['rows_apart', 'columns_apart', 'distance', 'same_finger', 'same_hand', 'same_key'].map(
+					(id) => item([id], words(id))
+				),
+				...events.map((id) =>
+					item([id], t('layout_analysis.user_metrics.name_event', { metric: metricName(id) }))
+				)
+			);
+		}
+
+		// The user metrics of every compared layout, measured on request one
+		// layout per slice: {results, key, rows, done}; null before a request.
+		let userMetricsRun = null;
+
+		/**
+		 * The user metrics (an idea seen in the Layouts Wiki playground's metric
+		 * queries): each one's editor, then its share on the Principal and the
+		 * Comparison layouts with their difference; once measured on every
+		 * compared layout, the table of them all.
+		 */
+		function renderUserMetrics(result, redrawList) {
+			const checks = userMetricChecks();
+			const list = $('la-user-metrics-list');
+			// The list is redrawn only when it or the page's words change, so a
+			// field keeps its focus while the figures redraw.
+			const signature = JSON.stringify([state.userMetrics, t('layout_analysis.user_metrics.name')]);
+			if (redrawList || list.dataset.signature !== signature) {
+				list.replaceChildren(...checks.map((check, i) => userMetricItem(check.metric, check, i)));
+				list.dataset.signature = signature;
+			}
+			const full = state.userMetrics.length >= E.WINDOW_MAX_METRICS;
+			$('la-user-metrics-add').disabled = full;
+			$('la-user-metrics-full').textContent = full
+				? t('layout_analysis.user_metrics.full', { count: E.WINDOW_MAX_METRICS })
+				: '';
+			if ($('la-user-metrics-names').children.length === 0) fillUserMetricNames();
+			const versus = state.results.find(
+				(r) => r.layout.id === state.versus && r.layout.id !== result.layout.id
+			);
+			const shown = [result].concat(versus ? [versus] : []);
+			const measured = shown.map((r) => userMetricsOf(r));
+			const table = $('la-user-metrics');
+			const head = el('tr');
+			const columns = [
+				t('layout_analysis.details.metric_column'),
+				t('layout_analysis.user_metrics.window')
+			]
+				.concat(shown.map((r) => r.layout.name))
+				.concat(versus ? [t('layout_analysis.details.delta')] : []);
+			for (const label of columns) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			const pct = (v) => measure(v, 2, '%');
+			for (const [index, { metric, error }] of checks.entries()) {
+				if (error) continue;
+				const row = el('tr');
+				const name = el('th', '', userMetricName(metric, index));
+				name.scope = 'row';
+				row.append(name, el('td', '', t(`layout_analysis.user_metrics.window_${metric.window}`)));
+				for (const m of measured) row.append(el('td', 'la-num', pct(m.values[metric.id])));
+				if (versus) {
+					const gap = measured[0].values[metric.id] - measured[1].values[metric.id];
+					row.append(
+						el('td', 'la-num la-delta', withUnit(`${gap > 0 ? '+' : ''}${format(gap, 2)}`, '%'))
+					);
+				}
+				body.append(row);
+			}
+			table.replaceChildren(thead, body);
+			renderUserMetricsRanking();
+		}
+
+		/** The user metrics of every compared layout, once measured and still current. */
+		function renderUserMetricsRanking() {
+			const run = userMetricsRun;
+			const current =
+				run && run.done && run.results === state.results && run.key === readableUserMetrics().key;
+			$('la-user-metrics-all-name').hidden = !current;
+			$('la-user-metrics-all-wrap').hidden = !current;
+			const table = $('la-user-metrics-ranking');
+			if (!current) {
+				table.replaceChildren();
+				return;
+			}
+			const metrics = state.userMetrics.filter((m) => run.ids.includes(m.id));
+			const head = el('tr');
+			for (const label of [t('layout_analysis.table.layout')].concat(
+				metrics.map((m) => userMetricName(m, state.userMetrics.indexOf(m)))
+			)) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			for (const { result, values } of run.rows) {
+				const row = el('tr');
+				if (state.details === result.layout.id) row.classList.add('la-selected');
+				if (state.versus === result.layout.id) row.classList.add('la-versus');
+				const name = el('th', '', result.layout.name);
+				name.scope = 'row';
+				row.append(name, ...metrics.map((m) => el('td', 'la-num', measure(values[m.id], 2, '%'))));
+				body.append(row);
+			}
+			table.replaceChildren(thead, body);
+		}
+
+		/**
+		 * « Measure every compared layout »: the user metrics of each layout the
+		 * filters show, one per slice so the page keeps answering; a change of
+		 * the comparison or of the metrics while it runs ends it unfinished.
+		 */
+		async function measureUserMetrics() {
+			const results = state.results;
+			const { key, metrics } = readableUserMetrics();
+			const rows = shownRows();
+			const run = { results, key, ids: metrics.map((m) => m.id), rows: [], done: false };
+			userMetricsRun = run;
+			const status = $('la-user-metrics-status');
+			const button = $('la-user-metrics-all');
+			button.disabled = true;
+			try {
+				for (const [index, result] of rows.entries()) {
+					if (userMetricsRun !== run || state.results !== results) return;
+					run.rows.push({ result, values: userMetricsOf(result).values });
+					status.textContent = t('layout_analysis.user_metrics.all_progress', {
+						done: index + 1,
+						count: rows.length
+					});
+					// Lets the page answer between two layouts.
+					await new Promise((resolve) => setTimeout(resolve, 0));
+				}
+				if (userMetricsRun !== run || state.results !== results) return;
+				run.done = true;
+				status.textContent = t('layout_analysis.user_metrics.all_done', { count: rows.length });
+				renderUserMetricsRanking();
+			} finally {
+				button.disabled = false;
+			}
+		}
+
 		/** A result's movement table, kept with its other figures. */
 		function movementOf(r) {
 			return cachedFigure(r, 'movement', () =>
@@ -6081,6 +6461,7 @@
 			renderWorst(result);
 			renderMatrix(result);
 			renderMovement(result);
+			renderUserMetrics(result);
 			renderWords(result);
 			renderFigures(result);
 			const contributions = Object.entries(result.score.contributions)
@@ -7974,6 +8355,24 @@
 				renderDetails();
 			});
 			$('la-share').addEventListener('click', share);
+			$('la-user-metrics-add').addEventListener('click', () => {
+				if (state.userMetrics.length >= E.WINDOW_MAX_METRICS) return;
+				const taken = new Set(state.userMetrics.map((m) => m.id));
+				let n = state.userMetrics.length + 1;
+				while (taken.has(`m${n}`)) n++;
+				state.userMetrics.push({ id: `m${n}`, name: '', window: E.WINDOW_KINDS[0], query: '' });
+				userMetricsChanged(true);
+				const names = root.querySelectorAll('#la-user-metrics-list .la-user-metric-query');
+				if (names.length > 0) names[names.length - 1].focus();
+			});
+			$('la-user-metrics-all').addEventListener('click', () =>
+				measureUserMetrics().catch((error) => {
+					$('la-user-metrics-status').textContent = t('layout_analysis.movement.rank_failed', {
+						reason: error && error.message ? error.message : String(error)
+					});
+					throw error;
+				})
+			);
 			// A failed measure is said in words, then raised to the page's error report.
 			$('la-movement-rank').addEventListener('click', () =>
 				placeMovementAmongLibrary().catch((error) => {

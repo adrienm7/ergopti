@@ -19,6 +19,10 @@
  *    and on real sentences every event count of the trace, as a share of
  *    its pairs or triples, equals analyse()'s metric on the same text, for
  *    several library layouts with dead keys and AltGr levels.
+ * 4. windowMetrics: a user metric's share equals the movement table's on the
+ *    same event (bigrams, skipgrams, trigrams), a value and its negation make
+ *    100 %, the fields mean what they say (finger 4 the pinky, row −1 above
+ *    the home row), and a query naming a key the window lacks is refused.
  * 3. densityCurve: the smoothed distribution integrates to 1, peaks on the
  *    densest cluster, draws the normal bell for one value, and refuses
  *    invalid input.
@@ -416,6 +420,10 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	check(holds('sfb > 2 | roll_in = 30 & complete'), 'query: & binds before |');
 	check(!holds('(sfb > 2 | roll_in = 30) & mine'), 'query: parentheses group first');
 	check(!E.compileQuery('sfb < 5', names)({ sfb: Number.NaN }), 'query: a missing value fails');
+	check(
+		E.compileQuery('mark > -1 & mark >= −2,5', names)({ mark: -0.5 }),
+		'query: a negative number, with a minus sign or a hyphen'
+	);
 	const refusal = (text, code, at) => {
 		try {
 			E.compileQuery(text, names);
@@ -475,6 +483,121 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	throws(() => E.densityCurve([1, Number.NaN]), 'density: a value that is not finite throws');
 	throws(() => E.densityCurve([1, 2], { points: 1 }), 'density: one point throws');
 	throws(() => E.densityCurve([1, 2], { bandwidth: 0 }), 'density: a bandwidth of 0 throws');
+}
+
+// ===========================================
+// ======= User metrics over key windows =====
+// ===========================================
+
+// A user metric (an idea seen in the Layouts Wiki playground's metric
+// queries): the share of its windows a values query holds for.
+{
+	const text = 'Le cœur a ses raisons que la raison ne connaît point. Où êtes-vous allés, Zoé ?';
+	const ngrams = E.ngramsFromText(text);
+	for (const id of ['azerty', 'ergopti', 'bepo']) {
+		const layout = byId.get(id);
+		const table = E.movementTable(layout, ngrams, { keyboard: 'iso' });
+		const { values, windows } = E.windowMetrics(
+			layout,
+			ngrams,
+			[
+				{ id: 'sfb', window: 'bigram', query: 'sfb' },
+				{ id: 'sfs', window: 'skipgram', query: 'sfb' },
+				{ id: 'alt', window: 'trigram', query: 'alternation' },
+				{ id: 'left', window: 'bigram', query: 'hand1 = 0' },
+				{ id: 'right', window: 'bigram', query: 'hand1 = 1' },
+				{ id: 'one_hand', window: 'trigram', query: 'same_hand' },
+				{ id: 'two_hands', window: 'trigram', query: '!same_hand' },
+				{ id: 'pinky_sfb', window: 'bigram', query: 'sfb & finger1 = 4' },
+				{ id: 'everything', window: 'skipgram', query: '' }
+			],
+			{ keyboard: 'iso' }
+		);
+		check(
+			Math.abs(values.sfb - table.bigram.sfb) <= TOLERANCE,
+			`window metrics: ${id} bigram sfb ${values.sfb} is the movement table's ${table.bigram.sfb}`
+		);
+		check(
+			Math.abs(values.sfs - table.skipgram.sfb) <= TOLERANCE,
+			`window metrics: ${id} skipgram sfb ${values.sfs} is the movement table's ${table.skipgram.sfb}`
+		);
+		check(
+			Math.abs(values.alt - table.rhythm.all.alternation) <= TOLERANCE,
+			`window metrics: ${id} alternation ${values.alt} is the rhythm's ${table.rhythm.all.alternation}`
+		);
+		check(
+			windows.bigram === table.bigrams && windows.skipgram === table.skipgrams,
+			`window metrics: ${id} counts the movement table's windows`
+		);
+		check(
+			Math.abs(values.left + values.right - 100) <= TOLERANCE &&
+				Math.abs(values.one_hand + values.two_hands - 100) <= TOLERANCE,
+			`window metrics: ${id} a value and its negation make 100 %`
+		);
+		check(
+			values.pinky_sfb >= 0 && values.pinky_sfb <= values.sfb,
+			`window metrics: ${id} the pinkies' SFB is part of the SFB`
+		);
+		check(values.everything === 100, `window metrics: ${id} an empty query keeps every window`);
+	}
+	// The pinkies' SFB on QWERTY: « aq » and « qa » are its left pinky's only pairs here.
+	const qwerty = byId.get('qwerty');
+	const pinky = E.windowMetrics(
+		qwerty,
+		E.ngramsFromText('aqa ok'),
+		[
+			{ id: 'pinky', window: 'bigram', query: 'same_finger & finger1 = 4 & !same_key' },
+			{ id: 'top', window: 'bigram', query: 'row2 = -1 & home1' }
+		],
+		{ keyboard: 'iso' }
+	);
+	check(pinky.values.pinky > 0, 'window metrics: finger 4 is the pinky');
+	check(pinky.values.top > 0, 'window metrics: row −1 is the row above the home row');
+	const names = E.windowNames('bigram');
+	check(
+		names.numbers.includes('finger2') &&
+			names.flags.includes('same_finger') &&
+			names.flags.includes('lsb'),
+		'window metrics: a pair names its keys, its own values and its events'
+	);
+	check(
+		E.windowNames('trigram').flags.includes('redirect'),
+		'window metrics: a trigram its events'
+	);
+	throws(() => E.windowNames('word'), 'window metrics: an unknown window throws');
+	let refused = null;
+	try {
+		E.windowMetrics(qwerty, E.ngramsFromText('ab'), [
+			{ id: 'x', window: 'bigram', query: 'finger3 < 2' }
+		]);
+	} catch (error) {
+		refused = error;
+	}
+	check(
+		refused && refused.code === 'query_unknown_name' && refused.token === 'finger3',
+		'window metrics: a pair has no third key'
+	);
+	throws(
+		() =>
+			E.windowMetrics(qwerty, E.ngramsFromText('ab'), [
+				{ id: 'x', window: 'bigram', query: '' },
+				{ id: 'x', window: 'bigram', query: '' }
+			]),
+		'window metrics: a duplicate id throws'
+	);
+	throws(
+		() =>
+			E.windowMetrics(
+				qwerty,
+				E.ngramsFromText('ab'),
+				Array.from({ length: E.WINDOW_MAX_METRICS + 1 }, (_, i) => ({
+					id: `m${i}`,
+					window: 'bigram',
+					query: ''
+				}))
+			),
+		'window metrics: too many metrics throw'
+	);
 }
 
 if (errors.length > 0) {
