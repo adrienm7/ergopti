@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "محرك إعادة تعيين المفاتيح",
 	"menu.debug.header_tests_system": "النظام وأدوات الجهات الخارجية",
 	"menu.debug.title": "⚠ تشخيص",
+	"menu.keyboard_core.degraded": "نواة لوحة المفاتيح متدهورة",
+	"menu.keyboard_core.degraded_body": "تعذّر على Ergopti+ تشغيل مكوّن لوحة المفاتيح الأصلي (ergopti_nav_owner.dll)، فصار لا يقرأ إلا ما يراه AutoHotkey: قد تُعالَج المفاتيح المتتابعة بسرعة بترتيب خاطئ، وقد يُتعرَّف على AltGr بدقة أقل، وقد لا تستجيب بعض اختصارات الذكاء الاصطناعي. من الأسباب الشائعة برنامج مكافحة فيروسات يحظر هذا الملف. أعد تحميل Ergopti+ من شريط المهام؛ وإذا بقي هذا السطر، فاستخدم « {1} »: يتضمن التقرير السجل الذي يبيّن السبب.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "قياس SendEvent مقابل SendInput",
 	"menu.debug.hook_probe": "تسجيل ترتيب خطافات لوحة المفاتيح",

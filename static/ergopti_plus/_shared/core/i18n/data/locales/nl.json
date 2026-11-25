@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "Hertoewijzingsengine",
 	"menu.debug.header_tests_system": "Systeem en tools van derden",
 	"menu.debug.title": "⚠ Foutopsporing",
+	"menu.keyboard_core.degraded": "Toetsenbordkern beperkt",
+	"menu.keyboard_core.degraded_body": "Ergopti+ kon zijn eigen toetsenbordonderdeel (ergopti_nav_owner.dll) niet starten en leest daardoor alleen wat AutoHotkey ziet: snel achter elkaar gedrukte toetsen kunnen in de verkeerde volgorde worden verwerkt, AltGr wordt mogelijk minder betrouwbaar herkend en sommige AI-sneltoetsen reageren mogelijk niet. Een antivirusprogramma dat dit bestand blokkeert is een veelvoorkomende oorzaak. Laad Ergopti+ opnieuw via het systeemvak; blijft deze regel staan, gebruik dan « {1} »: het rapport bevat het logboek dat de oorzaak noemt.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent en SendInput meten",
 	"menu.debug.hook_probe": "Volgorde van toetsenbord-hooks vastleggen",

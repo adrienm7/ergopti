@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "रीमैपिंग इंजन",
 	"menu.debug.header_tests_system": "सिस्टम और तृतीय-पक्ष टूल",
 	"menu.debug.title": "⚠ डिबग",
+	"menu.keyboard_core.degraded": "कीबोर्ड कोर सीमित",
+	"menu.keyboard_core.degraded_body": "Ergopti+ अपना नेटिव कीबोर्ड घटक (ergopti_nav_owner.dll) शुरू नहीं कर सका, इसलिए वह केवल वही पढ़ता है जो AutoHotkey देखता है: तेज़ी से दबाई गई कुंजियाँ ग़लत क्रम में संभाली जा सकती हैं, AltGr कम भरोसे से पहचाना जा सकता है और कुछ AI शॉर्टकट जवाब नहीं दे सकते। इस फ़ाइल को रोकने वाला एंटीवायरस एक आम कारण है। ट्रे से Ergopti+ को फिर से लोड करें; अगर यह पंक्ति बनी रहे, तो « {1} » का उपयोग करें: रिपोर्ट में वह लॉग है जो कारण बताता है।",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent बनाम SendInput मापें",
 	"menu.debug.hook_probe": "कीबोर्ड हुक का क्रम दर्ज करें",

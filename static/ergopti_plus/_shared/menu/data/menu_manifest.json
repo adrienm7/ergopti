@@ -241,6 +241,22 @@
 	},
 	"top_level": [
 		{
+			"type": "command",
+			"id": "keyboard_core_status",
+			"i18n": "menu.keyboard_core.degraded",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide",
+			"boot_deferred": true
+		},
+		{
+			"id": "---",
+			"platforms": [
+				"ahk"
+			]
+		},
+		{
 			"type": "group",
 			"id": "tap_holds",
 			"i18n": "menu.tapholds.title",

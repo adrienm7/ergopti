@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "מנוע מיפוי המקשים",
 	"menu.debug.header_tests_system": "מערכת וכלי צד שלישי",
 	"menu.debug.title": "⚠ ניפוי שגיאות",
+	"menu.keyboard_core.degraded": "ליבת המקלדת פגועה",
+	"menu.keyboard_core.degraded_body": "Ergopti+ לא הצליח להפעיל את רכיב המקלדת המקורי שלו (ergopti_nav_owner.dll), ולכן הוא קורא רק את מה ש־AutoHotkey רואה: מקשים שמוקשים ברצף מהיר עלולים להיות מטופלים בסדר שגוי, AltGr עלול להיות מזוהה בצורה פחות אמינה וחלק מקיצורי הבינה המלאכותית עלולים לא להגיב. אנטי־וירוס שחוסם את הקובץ הוא סיבה נפוצה. טענו מחדש את Ergopti+ ממגש המערכת; אם השורה הזו נשארת, השתמשו ב־« {1} »: הדוח כולל את היומן שמסביר את הסיבה.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "מדידת SendEvent מול SendInput",
 	"menu.debug.hook_probe": "תיעוד סדר הוקים של המקלדת",

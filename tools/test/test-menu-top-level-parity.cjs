@@ -405,7 +405,14 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // The drivers that ship the bundled apps (App Cloner, Encryptor).
 const APPS_DRIVERS = ['ahk', 'hs', 'linux'];
 
+// The Windows keyboard core status row opens the tray (maintainer,
+// 2026-11-25), drawn only while the press ledger's native owner could not
+// start; macOS shows that state as a dot on a title, Linux in its tray adapter.
+const STATUS_DRIVERS = { keyboard_core_status: ['ahk'] };
+
 const APPROVED_TOP_LEVEL = [
+	'keyboard_core_status',
+	SEPARATOR,
 	'tap_holds',
 	'shortcuts',
 	'gestures',
@@ -450,6 +457,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 		(id) =>
 			id !== SEPARATOR &&
 			(id !== 'apps' || APPS_DRIVERS.includes(driver)) &&
+			(!STATUS_DRIVERS[id] || STATUS_DRIVERS[id].includes(driver)) &&
 			(id !== 'suspend' || ['ahk', 'hs', 'linux'].includes(driver))
 	);
 	if (ids.join(',') !== approved.join(',')) {

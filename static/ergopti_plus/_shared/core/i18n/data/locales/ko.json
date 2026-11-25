@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "키 재매핑 엔진",
 	"menu.debug.header_tests_system": "시스템 및 타사 도구",
 	"menu.debug.title": "⚠ 디버그",
+	"menu.keyboard_core.degraded": "키보드 코어 저하됨",
+	"menu.keyboard_core.degraded_body": "Ergopti+가 기본 키보드 구성 요소(ergopti_nav_owner.dll)를 시작하지 못해 AutoHotkey가 보는 것만 읽습니다. 빠르게 이어 누른 키가 잘못된 순서로 처리되거나, AltGr 인식이 덜 정확하거나, 일부 AI 단축키가 응답하지 않을 수 있습니다. 이 파일을 차단하는 백신 프로그램이 흔한 원인입니다. 트레이에서 Ergopti+를 다시 불러오세요. 이 줄이 계속 남아 있으면 « {1} »을(를) 사용하세요. 보고서에 원인을 알려 주는 로그가 들어 있습니다.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent와 SendInput 측정",
 	"menu.debug.hook_probe": "키보드 후크 순서 기록",

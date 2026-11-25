@@ -53,9 +53,11 @@ _NPL_OwnerRunsForEveryoneAndFailsSoft() {
 	; which ignores Suspend (3d65b7da79). No user setting stands before it.
 	Assert(RegExMatch(_DriverSourceNoComments(), "m)^if !_DriverSmokeInputQuarantined\R\s*KeyboardArbiterEnsureForLedger\(\)$"),
 		"the boot starts it at top level, under the smoke quarantine alone")
-	AssertTrue(KeyboardArbiterEnsureForLedger(() => true))
-	AssertFalse(KeyboardArbiterEnsureForLedger(() => false), "a refused start is reported, not raised")
-	AssertFalse(KeyboardArbiterEnsureForLedger(_NPL_Raises), "a raising start is reported, not raised")
+	try {
+		AssertTrue(KeyboardArbiterEnsureForLedger(() => true))
+		AssertFalse(KeyboardArbiterEnsureForLedger(() => false, () => ""), "a refused start is reported, not raised")
+		AssertFalse(KeyboardArbiterEnsureForLedger(_NPL_Raises), "a raising start is reported, not raised")
+	} finally KS_LedgerFailure("")
 	Previous := KS_NativeKeyPressPort()
 	KS_NativeKeyPressPort(_NPL_Raises)
 	try {
@@ -66,6 +68,56 @@ _NPL_OwnerRunsForEveryoneAndFailsSoft() {
 	AssertEqual("caps_lock", _NPL_FirstOf(["caps_lock", "tab"], Map("caps_lock", 0, "tab", 0)),
 		"no numbers: the catalogue decides")
 }
+; A core that cannot start was a log warning only: the user typed on a degraded
+; keyboard with nothing on screen. The tray now opens with a red row naming the
+; problem until a start succeeds, and a click explains it (keyboard-core-status).
+_NPL_FailedCoreShowsInTheTray() {
+	global _TrayMenuStage
+	SavedStage := _TrayMenuStage
+	Shown := []
+	try {
+		KS_LedgerFailure("")
+		AssertFalse(KeyboardArbiterEnsureForLedger(() => false, () => ""),
+			"a start a pause or a concurrent stop invalidated is refused")
+		AssertEqual("", KS_LedgerFailure(), "an invalidated start is no failure: the tray stays quiet")
+		AssertFalse(KeyboardArbiterEnsureForLedger(() => false, () => "Navigation owner DLL could not be loaded"))
+		AssertEqual("Navigation owner DLL could not be loaded", KS_LedgerFailure(), "a refused owner is kept for the tray")
+		Glyph := MenuManifest_HealthDot("unreachable")
+		AssertEqual("🔴", Glyph, "the dot is the manifest's health_dot unreachable glyph")
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Map(MenuCommand.KEYBOARD_CORE_STATUS, _MI_StageKeyboardCoreStatus,
+			ConfigLeaf.TAP_HOLDS, () => TrayMenuStage_Add("tap_holds", 0)), (Entry) => Entry["id"] == MenuCommand.KEYBOARD_CORE_STATUS
+			|| Entry["id"] == "---" || Entry["id"] == ConfigLeaf.TAP_HOLDS)
+		Stage := _TrayMenuStage
+		AssertTrue(Stage.Length >= 3, "the status row, its separator and the next row are staged")
+		AssertEqual(Glyph . " " . t("menu.keyboard_core.degraded"), Stage[1]["label"], "the row names the problem after the red dot")
+		AssertEqual("action", Stage[1]["kind"], "the row is clickable")
+		AssertEqual("", Stage[2]["label"], "a separator closes the status row")
+		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Map("text", Text, "title", Title)), ""))
+		Stage[1]["target"].Call("", 1, A_TrayMenu)
+		AssertEqual(1, Shown.Length, "a click explains the problem once")
+		AssertEqual(t("menu.keyboard_core.degraded"), Shown[1]["title"])
+		AssertContains(Shown[1]["text"], "ergopti_nav_owner.dll", "the explanation names the component")
+		AssertContains(Shown[1]["text"], t("menu.debug.report_bug"), "and where to report it")
+		AssertTrue(KeyboardArbiterEnsureForLedger(() => true), "a later start succeeds")
+		AssertEqual("", KS_LedgerFailure(), "a running core leaves the tray")
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Map(MenuCommand.KEYBOARD_CORE_STATUS, _MI_StageKeyboardCoreStatus,
+			ConfigLeaf.TAP_HOLDS, () => TrayMenuStage_Add("tap_holds", 0)), (Entry) => Entry["id"] == MenuCommand.KEYBOARD_CORE_STATUS
+			|| Entry["id"] == "---" || Entry["id"] == ConfigLeaf.TAP_HOLDS)
+		AssertTrue(_TrayMenuStage.Length >= 1)
+		AssertEqual("tap_holds", _TrayMenuStage[1]["label"], "without a problem no row and no separator open the tray")
+	} finally {
+		TestMsgBoxResponder("")
+		KS_LedgerFailure("")
+		_TrayMenuStage := SavedStage
+	}
+}
+Test("press ledger: a core that cannot start is a red tray row whose click explains it (keyboard-core-status)",
+	_NPL_FailedCoreShowsInTheTray)
+
 _NPL_Raises(*) {
 	throw Error("no hook")
 }

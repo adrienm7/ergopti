@@ -233,6 +233,26 @@ french_magickey = "FrenchMagicKey"
 # pause (EDD-1, maintainer decision 2026-11-12): the rows that wait for the
 # resume are greyed inside their submenu, with why. It was named
 # `greyed_when_paused` until 2026-11-15.
+# The keyboard core's status row (maintainer, 2026-11-25), Windows only: drawn
+# first, with the health_dot "unreachable" glyph of the llm entry before its
+# label, only while the native owner of the press ledger (ergopti_nav_owner.dll)
+# could not start; a click explains what is degraded and what to do. A log
+# warning was the only trace before. Its builder stages nothing while the core
+# runs, and then the separator below is not drawn either. macOS shows the same
+# glyph on its Tap-Holds title (ui/menu/tap_holds_status.lua), and Linux draws
+# its problem rows in its tray adapter (core/ui/engine/component_status.lua).
+[[menu.top_level]]
+type = "command"
+id = "keyboard_core_status"
+i18n = "menu.keyboard_core.degraded"
+platforms = ["ahk"]
+unavailable = "hide"
+boot_deferred = true
+
+[[menu.top_level]]
+id = "---"
+platforms = ["ahk"]
+
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
 # On macOS the title carries the llm entry's health_dot glyphs for the state of

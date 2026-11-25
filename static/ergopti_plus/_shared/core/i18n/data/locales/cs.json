@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "Modul přemapování",
 	"menu.debug.header_tests_system": "Systém a nástroje třetích stran",
 	"menu.debug.title": "⚠ Ladění",
+	"menu.keyboard_core.degraded": "Jádro klávesnice omezeno",
+	"menu.keyboard_core.degraded_body": "Ergopti+ nemohl spustit svou nativní součást klávesnice (ergopti_nav_owner.dll), takže čte jen to, co vidí AutoHotkey: rychle za sebou stisknuté klávesy mohou být zpracovány v nesprávném pořadí, AltGr může být rozpoznán méně spolehlivě a některé zkratky AI nemusí reagovat. Častou příčinou je antivirus, který tento soubor blokuje. Znovu načtěte Ergopti+ z oznamovací oblasti; pokud tento řádek zůstane, použijte « {1} »: zpráva obsahuje protokol s příčinou.",
 	"menu.debug.window_spy": "Sledování okna",
 	"menu.debug.send_probe": "Změřit SendEvent a SendInput",
 	"menu.debug.hook_probe": "Zaznamenat pořadí klávesnicových hooků",

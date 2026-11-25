@@ -185,6 +185,7 @@ _DG_ReorderedManifestReordersTheRoot() {
 ; in the right slots and pass them. An id missing here fails the case below, so
 ; a new builder has to say which row it stages.
 global _DG_BUILDER_TITLES := Map(
+	"keyboard_core_status", 'MenuRenderer_CommandRow("top_level", "keyboard_core_status"',
 	"keyboard_layout", 'MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
 	"ergopti_studio",  'MenuRenderer_CommandRow("top_level", "ergopti_studio"',
 	"hotstrings",      'MenuRenderer_GroupReceiver("top_level", "hotstrings")',

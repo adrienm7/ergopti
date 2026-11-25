@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "Yeniden eşleme motoru",
 	"menu.debug.header_tests_system": "Sistem ve üçüncü taraf araçlar",
 	"menu.debug.title": "⚠ Hata ayıklama",
+	"menu.keyboard_core.degraded": "Klavye çekirdeği kısıtlı",
+	"menu.keyboard_core.degraded_body": "Ergopti+ yerel klavye bileşenini (ergopti_nav_owner.dll) başlatamadı, bu yüzden yalnızca AutoHotkey’in gördüğünü okuyor: hızlıca art arda basılan tuşlar yanlış sırayla işlenebilir, AltGr daha az güvenilir tanınabilir ve bazı yapay zekâ kısayolları yanıt vermeyebilir. Bu dosyayı engelleyen bir virüsten koruma programı sık görülen bir nedendir. Ergopti+’yı sistem tepsisinden yeniden yükleyin; bu satır kalırsa « {1} » öğesini kullanın: rapor, nedeni söyleyen günlüğü içerir.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "SendEvent ve SendInput'u ölç",
 	"menu.debug.hook_probe": "Klavye hook sırasını kaydet",

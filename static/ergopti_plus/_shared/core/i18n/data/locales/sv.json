@@ -2041,6 +2041,8 @@
 	"menu.debug.header_tests_remap_runtime": "Ommappningsmotor",
 	"menu.debug.header_tests_system": "System och verktyg från tredje part",
 	"menu.debug.title": "⚠ Felsökning",
+	"menu.keyboard_core.degraded": "Tangentbordskärnan är begränsad",
+	"menu.keyboard_core.degraded_body": "Ergopti+ kunde inte starta sin inbyggda tangentbordskomponent (ergopti_nav_owner.dll), så den läser bara det AutoHotkey ser: tangenter som trycks snabbt efter varandra kan hanteras i fel ordning, AltGr kan kännas igen mindre tillförlitligt och vissa AI-genvägar kanske inte svarar. Ett antivirusprogram som blockerar filen är en vanlig orsak. Läs in Ergopti+ igen från meddelandefältet; om raden finns kvar, använd « {1} »: rapporten innehåller loggen som anger orsaken.",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.debug.send_probe": "Mät SendEvent mot SendInput",
 	"menu.debug.hook_probe": "Spela in ordningen på tangentbordshookar",

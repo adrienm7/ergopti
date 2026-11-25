@@ -303,6 +303,23 @@ _MM_DebugFallback() {
 ; the array at the "global_actions" id and fell back to a hardcoded tail when
 ; the id or the file was missing, so a renamed anchor rendered an old menu
 ; without a word. An unreadable manifest is reported and stages an empty root.
+; The glyph a status shows, from the health_dot table of the manifest's top
+; level: the llm entry declares it for every driver, and the AI title
+; (LLM_Menu_TrayTitle) reads the same table. The keyboard core status row reads
+; it here, so no driver spells a dot.
+; @param Status {String} "ready", "warming" or "unreachable".
+; @returns {String} "" when the manifest declares no glyph for it.
+MenuManifest_HealthDot(Status) {
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if !(Entry is Map)
+			continue
+		Dots := Entry.Get("health_dot", 0)
+		if (Dots is Map)
+			return Dots.Get(Status, "")
+	}
+	return ""
+}
+
 MenuManifest_LoadTopLevel() {
 	Root := _MM_GetManifestRoot()
 	if !(Root is Map) {
