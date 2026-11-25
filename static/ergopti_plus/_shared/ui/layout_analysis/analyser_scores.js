@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * A layout's score as each major public layout analyser computes it (KLA and
  * its SteveP fork, KLAnext, a200, carpalx, keygen, genkey, cmini, Oxeylyzer,
- * the Ergo-L analyser and Keyboard Layout Optimizer), beside Ergopti's own
+ * the Ergo-L analyser, Keyboard Layout Optimizer, the Cyanophage optimiser and
+ * keycraft), beside Ergopti's own
  * global score. Each scorer is reimplemented from the analyser's published
  * source or results (formulas only, no code copied); the formula, constants,
  * revision read, licence and fidelity of each are in
@@ -76,6 +77,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		'oxeylyzer',
 		'dariogoetz',
 		'cyanophage',
+		'keycraft',
 		'cmini',
 		'ergol'
 	];
@@ -2626,8 +2628,445 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return { value, parts };
 	}
 
+	// =========================
+	// ======= 12/ keycraft ====
+	// =========================
+
+	// keycraft's grid: three rows of twelve keys, then six thumb keys.
+	const KC_KEYS = 42;
+	const KC_COLUMNS = 12;
+	const KC_THUMB_ROW = 3;
+	const KC_FIRST_THUMB = 36;
+	const KC_MAIN_ROWS = 3;
+	const KC_HOME_ROW = 1;
+	const KC_TYPES = ['rowstag', 'anglemod', 'ortho', 'colstag'];
+
+	/** keycraft's lower case of one code point (Go's unicode.ToLower: one code point). */
+	function kcLower(char) {
+		// The full mapping gives « i̇ » for « İ », Go's simple mapping « i ».
+		return Array.from(char.toLowerCase())[0];
+	}
+
+	/**
+	 * keycraft's corpus as its reader counts a text, from the prepared tables:
+	 * lower case, every white space a reset (no n-gram holds one, and none is
+	 * counted), the skipgram the first and last characters of each trigram.
+	 * Its totals count every n-gram, typed by the layout or not. The tables'
+	 * n-grams that hold a line break or a tab (`breaks`) hold white space, so
+	 * the main tables give every n-gram keycraft counts.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {object} Character ids, counts by id and totals.
+	 */
+	function keycraftTables(table) {
+		const model = entry('keycraft').model;
+		const space = new Set(model.whitespace.map((cp) => String.fromCodePoint(cp)));
+		const ids = new Map();
+		const id = (char) => {
+			if (space.has(char)) return -1;
+			const lower = kcLower(char);
+			if (!ids.has(lower)) ids.set(lower, ids.size);
+			return ids.get(lower);
+		};
+		const uniById = new Map();
+		const bi = new Map();
+		const tri = new Map();
+		const skip = new Map();
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		let uniTotal = 0;
+		let biTotal = 0;
+		let triTotal = 0;
+		for (const [c, n] of table.uni) {
+			const x = id(c);
+			if (x < 0) continue;
+			add(uniById, x, n);
+			uniTotal += n;
+		}
+		const pairs = [];
+		for (const [a, b, n] of table.bi) {
+			const x = id(a);
+			const y = id(b);
+			if (x < 0 || y < 0) continue;
+			pairs.push([x, y, n]);
+			biTotal += n;
+		}
+		const triples = [];
+		for (const [a, m, b, n] of table.tri) {
+			const x = id(a);
+			const y = id(m);
+			const z = id(b);
+			if (x < 0 || y < 0 || z < 0) continue;
+			triples.push([x, y, z, n]);
+			triTotal += n;
+		}
+		// Pair keys need every id: a pair is x · K + y.
+		const K = ids.size;
+		for (const [x, y, n] of pairs) add(bi, x * K + y, n);
+		for (const [x, y, z, n] of triples) {
+			add(tri, (x * K + y) * K + z, n);
+			add(skip, x * K + z, n);
+		}
+		const uni = new Float64Array(K);
+		for (const [x, n] of uniById) uni[x] = n;
+		const T = tri.size;
+		const tA = new Int32Array(T);
+		const tB = new Int32Array(T);
+		const tC = new Int32Array(T);
+		const tN = new Float64Array(T);
+		let i = 0;
+		for (const [key, n] of tri) {
+			tC[i] = key % K;
+			tB[i] = Math.floor(key / K) % K;
+			tA[i] = Math.floor(key / K / K);
+			tN[i] = n;
+			i++;
+		}
+		return { ids, K, uni, bi, skip, tA, tB, tC, tN, uniTotal, biTotal, triTotal };
+	}
+
+	/** Row and column of a grid key (a thumb key: row 3, its column 0 to 5). */
+	function kcRowCol(k) {
+		return k >= KC_FIRST_THUMB
+			? [KC_THUMB_ROW, k - KC_FIRST_THUMB]
+			: [Math.floor(k / KC_COLUMNS), k % KC_COLUMNS];
+	}
+
+	/**
+	 * Column and row distances of two grid keys on keycraft's geometry: a
+	 * row stagger (rowstag, anglemod), a column stagger (colstag) or none.
+	 */
+	function kcDistance(model, type, k1, k2) {
+		const [r1, c1] = kcRowCol(k1);
+		const [r2, c2] = kcRowCol(k2);
+		const rowStag = type === 'rowstag' || type === 'anglemod';
+		const col = rowStag
+			? Math.abs(c1 + model.row_stagger[r1] - (c2 + model.row_stagger[r2]))
+			: Math.abs(c1 - c2);
+		const row =
+			type === 'colstag'
+				? Math.abs(r1 + model.column_stagger[c1] - (r2 + model.column_stagger[c2]))
+				: Math.abs(r1 - r2);
+		return { col, row };
+	}
+
+	/**
+	 * One layout on keycraft's grid: each key's character (its corpus id, −1
+	 * for none or a character the corpus never holds), finger and hand.
+	 * @param {object} model - keycraft's model.
+	 * @param {string} type - rowstag, anglemod, ortho or colstag.
+	 * @param {Array<string|null>} chars - The 42 keys' characters.
+	 * @param {Array<number|null>} [fingers] - A finger per key overriding keycraft's.
+	 * @returns {object} The keys.
+	 */
+	function kcKeys(model, type, chars, fingers) {
+		const official = model.key_finger[type === 'anglemod' ? 'anglemod' : 'standard'];
+		const keys = [];
+		const placed = new Set();
+		for (let k = 0; k < KC_KEYS; k++) {
+			const [row, col] = kcRowCol(k);
+			let char = chars[k];
+			// keycraft refuses a character on two keys: the first one keeps it.
+			if (char !== null && placed.has(char)) char = null;
+			if (char !== null) placed.add(char);
+			const custom = fingers ? fingers[k] : null;
+			const finger = custom === null || custom === undefined ? official[k] : custom;
+			// Its hand is the key's side, a thumb's by its three keys; a key the user
+			// fingers otherwise takes the finger's hand.
+			const side = row === KC_THUMB_ROW ? (col < 3 ? 0 : 1) : col < 6 ? 0 : 1;
+			const hand = custom === null || custom === undefined ? side : handOf(finger);
+			keys.push({ k, row, col, char, finger, hand });
+		}
+		return keys;
+	}
+
+	/**
+	 * keycraft's metrics of one layout (internal/keycraft/analyser.go): loads
+	 * and their deviations, same-finger, lateral-stretch and scissor bigrams and
+	 * skipgrams, and the trigram classes, each in percent.
+	 * @param {object} t - keycraftTables() output.
+	 * @param {string} type - The grid's geometry.
+	 * @param {object[]} keys - kcKeys() output.
+	 * @returns {object} Metric name → value.
+	 */
+	function kcMetrics(t, type, keys) {
+		const model = entry('keycraft').model;
+		const K = t.K;
+		// Corpus id of each key's character, −1 when the corpus has none.
+		const cid = new Int32Array(KC_KEYS).fill(-1);
+		const keyOf = new Int32Array(K).fill(-1);
+		for (const key of keys) {
+			if (key.char === null || !t.ids.has(key.char)) continue;
+			cid[key.k] = t.ids.get(key.char);
+			keyOf[cid[key.k]] = key.k;
+		}
+		const M = {};
+		// Loads (analyseHand).
+		let mainTotal = 0;
+		let pinkyOff = 0;
+		const handCount = [0, 0];
+		const fingerCount = new Float64Array(10);
+		const columnCount = new Float64Array(KC_COLUMNS);
+		const rowCount = new Float64Array(KC_THUMB_ROW + 1);
+		const penalty = new Map(model.pinky_penalties.map(([r, c, p]) => [`${r}/${c}`, p]));
+		for (let x = 0; x < K; x++) {
+			const n = t.uni[x];
+			const k = keyOf[x];
+			if (k < 0 || n === 0) continue;
+			const key = keys[k];
+			if (key.row < KC_MAIN_ROWS) {
+				mainTotal += n;
+				handCount[key.hand] += n;
+				fingerCount[key.finger] += n;
+				columnCount[key.col] += n;
+				if (key.finger === 0 || key.finger === 9) {
+					const p = penalty.get(`${key.row}/${key.col}`);
+					if (p !== undefined) pinkyOff += p * n;
+				}
+			}
+			rowCount[key.row] += n;
+		}
+		const totFactor = mainTotal > 0 ? 100 / mainTotal : 0;
+		M.POH = pinkyOff * totFactor;
+		M.H0 = handCount[0] * totFactor;
+		M.H1 = handCount[1] * totFactor;
+		M.HLD = Math.abs(M.H0 - model.target_hand_load[0]) + Math.abs(M.H1 - model.target_hand_load[1]);
+		let fld = 0;
+		for (let f = 0; f < 10; f++) {
+			const v = fingerCount[f] * totFactor;
+			M[`F${f}`] = v;
+			const diff = v - model.target_finger_load[f];
+			// A pinky counts only above its target.
+			if (f === 0 || f === 9) {
+				if (diff > 0) fld += diff;
+			} else fld += Math.abs(diff);
+		}
+		M.FLD = fld;
+		for (let c = 0; c < KC_COLUMNS; c++) M[`C${c}`] = columnCount[c] * totFactor;
+		let rld = 0;
+		for (let r = 0; r <= KC_THUMB_ROW; r++) {
+			const v = rowCount[r] * totFactor;
+			M[`R${r}`] = v;
+			if (r < KC_MAIN_ROWS) {
+				const diff = v - model.target_row_load[r];
+				// The home row counts below its target, the others above.
+				rld = r === KC_HOME_ROW ? rld - diff : rld + diff;
+			}
+		}
+		M.RLD = rld;
+		// Key pairs (layout.go): same finger, lateral stretches, scissors.
+		const used = (k) => keys[k].char !== null;
+		const sfb = [];
+		for (let k1 = 0; k1 < KC_KEYS - 1; k1++) {
+			if (!used(k1)) continue;
+			for (let k2 = k1 + 1; k2 < KC_KEYS; k2++)
+				if (used(k2) && keys[k1].finger === keys[k2].finger) sfb.push([k1, k2], [k2, k1]);
+		}
+		const lsbMin = new Map(model.lsb_finger_pairs.map(([a, b, d]) => [`${a}/${b}`, d]));
+		const lsb = [];
+		for (let k1 = 0; k1 < KC_KEYS; k1++) {
+			if (!used(k1)) continue;
+			for (let k2 = 0; k2 < KC_KEYS; k2++) {
+				if (k1 === k2 || !used(k2)) continue;
+				const min = lsbMin.get(`${keys[k1].finger}/${keys[k2].finger}`);
+				if (min !== undefined && kcDistance(model, type, k1, k2).col >= min) lsb.push([k1, k2]);
+			}
+		}
+		// Its fixed stretches of the row-staggered bottom row, whatever the keys hold.
+		for (const pair of model.lsb_extra[type]) lsb.push(pair);
+		const scissors = (configs) => {
+			const out = [];
+			for (const { first, second, fingers } of configs) {
+				const set = new Set(fingers.map(([a, b]) => `${a}/${b}`));
+				for (let i1 = first[0]; i1 <= first[1]; i1++) {
+					if (!used(i1)) continue;
+					for (let i2 = second[0]; i2 <= second[1]; i2++)
+						if (used(i2) && set.has(`${keys[i1].finger}/${keys[i2].finger}`))
+							out.push([i1, i2], [i2, i1]);
+				}
+			}
+			return out;
+		};
+		const fsb = scissors(model.full_scissors);
+		const hsb = scissors(model.half_scissors);
+		const count = (list, map) => {
+			let n = 0;
+			for (const [k1, k2] of list) {
+				const x = cid[k1];
+				const y = cid[k2];
+				if (x >= 0 && y >= 0) n += map.get(x * K + y) || 0;
+			}
+			return n;
+		};
+		// A corpus without a pair or a triple outside white space (one short word)
+		// counts their shares as 0, as keycraft guards its loads; its own
+		// division by zero would give NaN.
+		const biFactor = t.biTotal > 0 ? 100 / t.biTotal : 0;
+		M.SFB = count(sfb, t.bi) * biFactor;
+		M.LSB = count(lsb, t.bi) * biFactor;
+		M.FSB = count(fsb, t.bi) * biFactor;
+		M.HSB = count(hsb, t.bi) * biFactor;
+		const skipFactor = t.triTotal > 0 ? 100 / t.triTotal : 0;
+		M.SFS = count(sfb, t.skip) * skipFactor;
+		M.LSS = count(lsb, t.skip) * skipFactor;
+		M.FSS = count(fsb, t.skip) * skipFactor;
+		M.HSS = count(hsb, t.skip) * skipFactor;
+		// Trigrams (analyseTrigrams).
+		let rl2SFB = 0;
+		let rl2In = 0;
+		let rl2Out = 0;
+		let altSFS = 0;
+		let altNml = 0;
+		let rl3SFB = 0;
+		let rl3In = 0;
+		let rl3Out = 0;
+		let redWeak = 0;
+		let redSFS = 0;
+		let redNml = 0;
+		const LI = 3;
+		const RI = 6;
+		const weak = (f) => f < LI || f > RI;
+		for (let i = 0; i < t.tN.length; i++) {
+			const a = keyOf[t.tA[i]];
+			const b = keyOf[t.tB[i]];
+			const c = keyOf[t.tC[i]];
+			if (a < 0 || b < 0 || c < 0) continue;
+			const n = t.tN[i];
+			const k0 = keys[a];
+			const k1 = keys[b];
+			const k2 = keys[c];
+			const f0 = k0.finger;
+			const f1 = k1.finger;
+			const f2 = k2.finger;
+			if (k0.hand === k2.hand) {
+				if (k0.hand !== k1.hand) {
+					if (f0 === f2 && a !== c) altSFS += n;
+					else altNml += n;
+				} else if (f0 === f1 || f1 === f2) rl3SFB += n;
+				else if (f0 < f1 === f1 < f2) {
+					if (f0 < f1 === (k0.hand === 0)) rl3In += n;
+					else rl3Out += n;
+				} else if (weak(f0) && weak(f1) && weak(f2)) redWeak += n;
+				else if (f0 === f2 && a !== c) redSFS += n;
+				else redNml += n;
+			} else if (k0.hand === k1.hand) {
+				if (f0 === f1) rl2SFB += n;
+				else if (f0 < f1 === (k1.hand === 0)) rl2In += n;
+				else rl2Out += n;
+			} else if (f1 === f2) rl2SFB += n;
+			else if (f1 < f2 === (k2.hand === 0)) rl2In += n;
+			else rl2Out += n;
+		}
+		const triFactor = t.triTotal > 0 ? 100 / t.triTotal : 0;
+		M['RED-WEAK'] = redWeak * triFactor;
+		M['RED-SFS'] = redSFS * triFactor;
+		M['RED-NML'] = redNml * triFactor;
+		M.RED = M['RED-NML'] + M['RED-SFS'] + M['RED-WEAK'];
+		M['ALT-SFS'] = altSFS * triFactor;
+		M['ALT-NML'] = altNml * triFactor;
+		M.ALT = M['ALT-NML'] + M['ALT-SFS'];
+		M['2RL-SFB'] = rl2SFB * triFactor;
+		M['2RL-IN'] = rl2In * triFactor;
+		M['2RL-OUT'] = rl2Out * triFactor;
+		M['2RL'] = M['2RL-SFB'] + M['2RL-IN'] + M['2RL-OUT'];
+		M['3RL-SFB'] = rl3SFB * triFactor;
+		M['3RL-IN'] = rl3In * triFactor;
+		M['3RL-OUT'] = rl3Out * triFactor;
+		M['3RL'] = M['3RL-SFB'] + M['3RL-IN'] + M['3RL-OUT'];
+		M.FLW = M['2RL-IN'] + M['2RL-OUT'] + M['3RL-IN'] + M['3RL-OUT'] + M['ALT-NML'];
+		M['IN:OUT'] = (M['2RL-IN'] + M['3RL-IN']) / (M['2RL-OUT'] + M['3RL-OUT']);
+		return M;
+	}
+
+	/** A reference layout's 42 characters: a space is an empty key. */
+	function kcReferenceChars(keys) {
+		const chars = Array.from(keys);
+		if (chars.length !== KC_KEYS)
+			throw new Error(`analyser_scores: a keycraft reference layout has ${chars.length} keys`);
+		return chars.map((c) => (c === ' ' ? null : c));
+	}
+
+	/** The median of sorted values (scorer.go Median). */
+	function kcMedian(sorted) {
+		const mid = Math.floor(sorted.length / 2);
+		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+	}
+
+	/**
+	 * The median and interquartile range of each weighted metric over
+	 * keycraft's reference layouts on one corpus (scorer.go
+	 * computeMediansAndIQR: Q1 the median of the lower half, Q3 of the upper).
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{medians: object, iqrs: object}} Metric → value.
+	 */
+	function keycraftReference(table) {
+		const model = entry('keycraft').model;
+		const t = perCorpus(table, 'keycraft:tables', keycraftTables);
+		const values = {};
+		for (const metric of Object.keys(model.weights)) values[metric] = [];
+		for (const layout of model.reference_layouts) {
+			if (!KC_TYPES.includes(layout.type))
+				throw new Error(`analyser_scores: keycraft layout ${layout.name} type ${layout.type}`);
+			const M = kcMetrics(
+				t,
+				layout.type,
+				kcKeys(model, layout.type, kcReferenceChars(layout.keys))
+			);
+			for (const metric of Object.keys(model.weights)) values[metric].push(M[metric]);
+		}
+		const medians = {};
+		const iqrs = {};
+		for (const [metric, list] of Object.entries(values)) {
+			const sorted = list.slice().sort((a, b) => a - b);
+			const n = sorted.length;
+			medians[metric] = kcMedian(sorted);
+			iqrs[metric] =
+				kcMedian(sorted.slice(Math.floor((n + 1) / 2))) -
+				kcMedian(sorted.slice(0, Math.floor(n / 2)));
+		}
+		return { medians, iqrs };
+	}
+
+	/**
+	 * keycraft's score (`keycraft rank`, ranking.go computeScores): the sum of
+	 * weight × (metric − median) / IQR over its weighted metrics, median and
+	 * IQR taken over its reference layouts on the same corpus; higher is
+	 * better. A shipped corpus carries them (`references`, from
+	 * referenceTables), any other is scored against its own once.
+	 */
+	function scoreKeycraft(ctx) {
+		const model = entry('keycraft').model;
+		const t = perCorpus(ctx.table, 'keycraft:tables', keycraftTables);
+		const shipped = ctx.table.references && ctx.table.references.keycraft;
+		const ref = shipped || perCorpus(ctx.table, 'keycraft:reference', keycraftReference);
+		const angle = ctx.layout.fingering === 'angle' || ctx.keyboard === 'iso_angle';
+		const type = ctx.keyboard === 'ortho' ? 'ortho' : angle ? 'anglemod' : 'rowstag';
+		const positions = model.positions[ctx.keyboard === 'ansi' ? 'ansi' : 'iso'];
+		const custom = customModel(ctx);
+		const chars = [];
+		const fingers = [];
+		for (const code of positions) {
+			const row = code === null ? null : ctx.layout.rows[code];
+			const cell = row ? row[0] : null;
+			chars.push(single(cell) ? kcLower(cell) : null);
+			fingers.push(
+				custom && code !== null && custom.finger.has(code) ? custom.finger.get(code) : null
+			);
+		}
+		const M = kcMetrics(t, type, kcKeys(model, type, chars, custom ? fingers : null));
+		let value = 0;
+		const parts = {};
+		for (const [metric, weight] of Object.entries(model.weights)) {
+			parts[metric] = M[metric];
+			const iqr = ref.iqrs[metric];
+			if (typeof iqr !== 'number' || typeof ref.medians[metric] !== 'number')
+				throw new Error(`analyser_scores: keycraft has no reference for ${metric}`);
+			if (iqr === 0) continue;
+			value += (weight * (M[metric] - ref.medians[metric])) / iqr;
+		}
+		return { value, parts };
+	}
+
 	// ==========================
-	// ======= 12/ Public API ====
+	// ======= 13/ Public API ====
 	// ==========================
 
 	const SCORERS = {
@@ -2642,7 +3081,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		oxeylyzer: scoreOxeylyzer,
 		ergol: scoreErgol,
 		dariogoetz: scoreDariogoetz,
-		cyanophage: scoreCyanophage
+		cyanophage: scoreCyanophage,
+		keycraft: scoreKeycraft
 	};
 
 	const FINGERINGS = ['official', 'custom'];
@@ -2794,7 +3234,21 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		};
 	}
 
-	return { ORDER, analysers, fidelity, score, scoreAll, textTables };
+	/**
+	 * The statistics some analysers take over their own reference layouts on
+	 * one corpus: keycraft's median and interquartile range of each weighted
+	 * metric over the layouts of its `data/layouts`. Set as `references` on
+	 * the corpus's tables (the codegen ships them in every built-in corpus),
+	 * the scorer reads them instead of scoring the reference layouts itself.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {{keycraft: {medians: object, iqrs: object}}} The statistics.
+	 * @throws {Error} On malformed tables.
+	 */
+	function referenceTables(ngrams) {
+		return { keycraft: keycraftReference(engine().prepareNgrams(ngrams)) };
+	}
+
+	return { ORDER, analysers, fidelity, score, scoreAll, textTables, referenceTables };
 })();
 
 // Node (tests) reads the module through a vm context or require().

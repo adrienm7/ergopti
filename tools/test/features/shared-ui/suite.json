@@ -481,7 +481,7 @@
 		{
 			"id": "analyser-scores",
 			"ordinal": 673,
-			"name": "the Studio scores a layout as KLA, KLAnext, a200, carpalx, keygen, genkey, Oxeylyzer, Keyboard Layout Optimizer, cmini and the Ergo-L analyser compute it, reproducing their own, published or hand-computed values",
+			"name": "the Studio scores a layout as KLA, KLAnext, a200, carpalx, keygen, genkey, Oxeylyzer, Keyboard Layout Optimizer, the Cyanophage optimiser, keycraft, cmini and the Ergo-L analyser compute it, reproducing their own, published or hand-computed values",
 			"cmd": "node",
 			"args": ["tools/test/test-analyser-scores.cjs"],
 			"repro": "npm run test:analyser-scores"

@@ -2026,6 +2026,263 @@
 				"same_key_mod_factor": 0.03125,
 				"cost_tie": 0.01
 			}
+		},
+		"keycraft": {
+			"name": "keycraft",
+			"author": "Barend Scholtus (rbscholtus)",
+			"url": "https://github.com/rbscholtus/keycraft",
+			"repository": "https://github.com/rbscholtus/keycraft",
+			"revision": "f8c6419 (2026-11-25)",
+			"licence": "BSD-3-Clause (LICENSE, Copyright 2025, 2026 Barend Scholtus)",
+			"fidelity": { "text": "exact", "tables": "exact" },
+			"better": "higher",
+			"unit": "points",
+			"digits": 2,
+			"model": {
+				"whitespace": [
+					9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199,
+					8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288
+				],
+				"positions": {
+					"iso": [
+						"Tab",
+						"KeyQ",
+						"KeyW",
+						"KeyE",
+						"KeyR",
+						"KeyT",
+						"KeyY",
+						"KeyU",
+						"KeyI",
+						"KeyO",
+						"KeyP",
+						"BracketLeft",
+						"CapsLock",
+						"KeyA",
+						"KeyS",
+						"KeyD",
+						"KeyF",
+						"KeyG",
+						"KeyH",
+						"KeyJ",
+						"KeyK",
+						"KeyL",
+						"Semicolon",
+						"Quote",
+						"IntlBackslash",
+						"KeyZ",
+						"KeyX",
+						"KeyC",
+						"KeyV",
+						"KeyB",
+						"KeyN",
+						"KeyM",
+						"Comma",
+						"Period",
+						"Slash",
+						null,
+						null,
+						null,
+						null,
+						"Space",
+						null,
+						null
+					],
+					"ansi": [
+						"Tab",
+						"KeyQ",
+						"KeyW",
+						"KeyE",
+						"KeyR",
+						"KeyT",
+						"KeyY",
+						"KeyU",
+						"KeyI",
+						"KeyO",
+						"KeyP",
+						"BracketLeft",
+						"CapsLock",
+						"KeyA",
+						"KeyS",
+						"KeyD",
+						"KeyF",
+						"KeyG",
+						"KeyH",
+						"KeyJ",
+						"KeyK",
+						"KeyL",
+						"Semicolon",
+						"Quote",
+						null,
+						"KeyZ",
+						"KeyX",
+						"KeyC",
+						"KeyV",
+						"KeyB",
+						"KeyN",
+						"KeyM",
+						"Comma",
+						"Period",
+						"Slash",
+						null,
+						null,
+						null,
+						null,
+						"Space",
+						null,
+						null
+					]
+				},
+				"key_finger": {
+					"standard": [
+						0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3,
+						3, 6, 6, 7, 8, 9, 9, 4, 4, 4, 5, 5, 5
+					],
+					"anglemod": [
+						0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 1, 2, 3, 3,
+						3, 6, 6, 7, 8, 9, 9, 4, 4, 4, 5, 5, 5
+					]
+				},
+				"row_stagger": [0, 0.25, 0.75, 0],
+				"column_stagger": [0.35, 0.35, 0.1, 0, 0.1, 0.2, 0.2, 0.1, 0, 0.1, 0.35, 0.35],
+				"lsb_finger_pairs": [
+					[2, 3, 2],
+					[3, 2, 2],
+					[1, 3, 3.5],
+					[3, 1, 3.5],
+					[0, 1, 2],
+					[1, 0, 2],
+					[7, 6, 2],
+					[6, 7, 2],
+					[8, 6, 3.5],
+					[6, 8, 3.5],
+					[9, 8, 2],
+					[8, 9, 2]
+				],
+				"lsb_extra": {
+					"rowstag": [
+						[1, 26],
+						[2, 27],
+						[3, 28]
+					],
+					"anglemod": [[3, 28]],
+					"ortho": [],
+					"colstag": []
+				},
+				"full_scissors": [
+					{
+						"first": [24, 29],
+						"second": [0, 5],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3],
+							[0, 1],
+							[1, 2]
+						]
+					},
+					{
+						"first": [30, 35],
+						"second": [6, 11],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6],
+							[9, 8],
+							[8, 7]
+						]
+					}
+				],
+				"half_scissors": [
+					{
+						"first": [12, 17],
+						"second": [0, 5],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3]
+						]
+					},
+					{
+						"first": [24, 29],
+						"second": [12, 17],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3]
+						]
+					},
+					{
+						"first": [18, 23],
+						"second": [6, 11],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6]
+						]
+					},
+					{
+						"first": [30, 35],
+						"second": [18, 23],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6]
+						]
+					}
+				],
+				"target_hand_load": [50, 50],
+				"target_finger_load": [7, 10, 16, 17, 0, 0, 17, 16, 10, 7],
+				"target_row_load": [17.5, 75, 7.5],
+				"pinky_penalties": [
+					[0, 0, 2],
+					[0, 1, 1.5],
+					[1, 0, 1],
+					[1, 1, 0],
+					[2, 0, 2],
+					[2, 1, 1.5],
+					[0, 11, 2],
+					[0, 10, 1.5],
+					[1, 11, 1],
+					[1, 10, 0],
+					[2, 11, 2],
+					[2, 10, 1.5]
+				],
+				"weights": {
+					"SFB": -8,
+					"LSB": -4,
+					"FSB": -2.666,
+					"HSB": -1.333,
+					"SFS": -3,
+					"LSS": -1,
+					"FSS": -0.666,
+					"HSS": -0.333,
+					"RED": -0.001,
+					"RED-WEAK": -2.666,
+					"RED-SFS": -0.001,
+					"RED-NML": -1.333,
+					"ALT-SFS": -0.001,
+					"2RL-SFB": -0.001,
+					"3RL-SFB": -0.001,
+					"FLW": 8,
+					"HLD": -0.5,
+					"FLD": -1.5,
+					"RLD": -1,
+					"POH": -2
+				}
+			}
 		}
 	}
 }
