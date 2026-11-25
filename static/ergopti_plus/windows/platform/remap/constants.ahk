@@ -2203,6 +2203,19 @@ BackSpaceLogic(ExpectedEpoch := unset, IsDownFn := 0, UserLCtrlFn := 0, PressFn 
 	return False
 }
 
+; LAlt's Backspace tap (lalt.ahk 4.6 and 4.10): the modifier-aware deletion, else
+; a plain Backspace under the held modifiers. It lives beside BackSpaceLogic so
+; the unit suite, which cannot load lalt.ahk's hotkeys, runs the real tap.
+_LAltBackspaceTap() {
+	Epoch := _TH_SyntheticEpoch
+	BackSpaceActionWithModifiers := BackSpaceLogic(Epoch)
+	if not BackSpaceActionWithModifiers {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
+		TapHoldEmitKeyTap("BackSpace")
+	}
+}
+
 ; Hand back the synthetic hold the owner of KeyId took for this press, now.
 ; Its owner then releases nothing more and dispatches no tap.
 ; @param KeyId {String} Tap-hold key id.

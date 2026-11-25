@@ -363,17 +363,9 @@ _LAltDispatch() {
 
 ; Backspace has modifier-aware special handling, but is still a tap output and
 ; therefore runs inside TapHoldDispatchTap whenever LAlt has a hold behaviour.
-; BackSpaceLogic lives in constants.ahk, which the unit suite loads to replay
-; the shared thumb Backspace vectors.
-_LAltBackspaceTap() {
-	Epoch := _TH_SyntheticEpoch
-	BackSpaceActionWithModifiers := BackSpaceLogic(Epoch)
-	if not BackSpaceActionWithModifiers {
-		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
-			return
-		TapHoldEmitKeyTap("BackSpace")
-	}
-}
+; The tap itself (_LAltBackspaceTap) and BackSpaceLogic live in constants.ahk,
+; which the unit suite loads to replay the shared thumb Backspace vectors and
+; the issue-109 AltGr hold.
 
 
 

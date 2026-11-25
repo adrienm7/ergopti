@@ -27,8 +27,10 @@ class _AHNL_World {
 	OnSend(Keys) {
 		this.Sent.Push(Keys)
 		Position := 1
+		Edges := 0
 		while RegExMatch(Keys, "i)\{(\w+) (Down|Up)\}", &Edge, Position) {
 			Position := Edge.Pos + Edge.Len
+			Edges += 1
 			Name := Edge[1]
 			if (Edge[2] = "Down") {
 				this.Logical[Name] := true
@@ -42,6 +44,10 @@ class _AHNL_World {
 			if (Name == "RAlt" && !this.LoseFakeUp && this.Logical.Has("LCtrl"))
 				this.Logical.Delete("LCtrl")
 		}
+		; Every edge the driver sent must reach the model, or a key it cannot
+		; parse would stay out of the logical state and the case would pass.
+		StrReplace(Keys, " Down}", , false, &Downs), StrReplace(Keys, " Up}", , false, &Ups)
+		AssertEqual(Downs + Ups, Edges, "the world models every key edge of " . Keys)
 		return Keys
 	}
 
