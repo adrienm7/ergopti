@@ -321,7 +321,7 @@ waits for the maintainer's review).
       Comparer's « Values query » (`E.compileQuery`), the Pareto spread's smoothed distribution
       (`E.densityCurve`), the Principal − Comparison difference on every frame tab and « Your metrics », user
       queries over key windows (`E.windowMetrics`), and tap-holds analysed as holds (`withTapHolds`,
-      `E.tapHoldReport`).
+      `E.tapHoldReport`), and the « Versions » branch graph (each version under the one it came from).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

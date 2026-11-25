@@ -84,9 +84,12 @@ var LayoutEditorWorkspace = (function () {
 
 	/**
 	 * A saved version as stored, or the refusal naming its first bad field.
-	 * @param {*} version - {name, text, at} with at in milliseconds since 1970.
+	 * @param {*} version - {name, text, at, from?, base?}: at in milliseconds
+	 *   since 1970, also the version's id; from the at of the version the
+	 *   layout came from when it was saved (its branch); base true on the one
+	 *   the layout shown comes from (the last saved or restored).
 	 * @param {string} path - Where it sits, for the refusal.
-	 * @returns {{name: string, text: string, at: number}}
+	 * @returns {{name: string, text: string, at: number, from?: number, base?: true}}
 	 * @throws {WorkspaceError} workspace_invalid.
 	 */
 	function checkedVersion(version, path) {
@@ -98,17 +101,28 @@ var LayoutEditorWorkspace = (function () {
 			typeof version.text !== 'string' ||
 			version.text === '' ||
 			!Number.isSafeInteger(version.at) ||
-			version.at < 0
+			version.at < 0 ||
+			(version.from !== undefined && (!Number.isSafeInteger(version.from) || version.from < 0)) ||
+			(version.base !== undefined && version.base !== true)
 		)
 			throw new WorkspaceError('workspace_invalid', path);
-		return { name: version.name, text: version.text, at: version.at };
+		const out = { name: version.name, text: version.text, at: version.at };
+		if (version.from !== undefined) out.from = version.from;
+		if (version.base) out.base = true;
+		return out;
 	}
 
 	/** A tab's saved versions as stored, at most MAX_VERSIONS. */
 	function checkedVersions(versions, path) {
 		if (!Array.isArray(versions) || versions.length > MAX_VERSIONS)
 			throw new WorkspaceError('workspace_invalid', path);
-		return versions.map((version, index) => checkedVersion(version, `${path}[${index}]`));
+		const out = versions.map((version, index) => checkedVersion(version, `${path}[${index}]`));
+		// The ids are distinct, and one version at most is the layout's base.
+		if (new Set(out.map((version) => version.at)).size !== out.length)
+			throw new WorkspaceError('workspace_invalid', path);
+		if (out.filter((version) => version.base).length > 1)
+			throw new WorkspaceError('workspace_invalid', path);
+		return out;
 	}
 
 	/**

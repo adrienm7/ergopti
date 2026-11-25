@@ -342,6 +342,11 @@ bar's place and the backup format were decided by the agent on 2026-11-15, to re
   (`LayoutEditorModel.differences`, per layer and OS override) in a table; « Restore » makes the version the layout
   as one step Undo takes back (« restore {name} »); « Delete » asks first. A 21st version or a name over 80
   characters is refused with the reason, never dropped in silence.
+  The branch graph (2026-11-25, the playground draws one): each version keeps `from`, the `at` (its id, kept
+  distinct) of the version the layout came from when it was saved, and the one the layout now comes from (the last
+  saved or restored) has `base: true`. The list shows each version under its origin, indented with a branch mark,
+  its « Made from » cell naming the origin in words and the base saying so; deleting a version hangs its branches
+  from its own origin and hands it the base.
 
 ## Limits stated to the user
 
