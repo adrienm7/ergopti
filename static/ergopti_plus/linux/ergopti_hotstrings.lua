@@ -3859,6 +3859,17 @@ local function main()
 
 	BootProfiler.stage("input hooks")
 	if not privacy_owners.startup_checkpoint() then return end
+	-- The typing path reads these sources once, on first use. Read here, they
+	-- keep two config.toml decodes and two JSON catalogues out of the first
+	-- keystroke, which an X270 logged as an 89 ms input.dispatch. Each owner
+	-- logs its own refusal; an unread tap-key list is read again by its key.
+	require("hotstrings.engine.word_reset").current()
+	RepeatKey.is_enabled()
+	keystats.load_media_policy()
+	local tap_keys_read, tap_keys_error = pcall(tap_keys.keys)
+	if not tap_keys_read then
+		Logger.error(LOG, "The tap-key list could not be read before the first key: %s.", tostring(tap_keys_error))
+	end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
 	-- Kept: the hook supervisor starts the hook again with these same options.
 	local hook_start_options = {

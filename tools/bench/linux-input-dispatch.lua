@@ -184,9 +184,11 @@ package.preload["core.events.loop"] = function()
 			samples[#samples + 1] = now_ms() - started
 		end
 		counting = false
+		-- The session's first key apart: work read lazily on first use lands there.
+		local first = samples[1]
 		table.sort(samples)
-		print(string.format("focus=%s keys=%d per key (down+up, ms): p50=%.3f p95=%.3f max=%.3f; worker requests per key=%.2f",
-			FOCUS, KEYS, percentile(samples, 0.5), percentile(samples, 0.95), samples[#samples], requests / KEYS))
+		print(string.format("focus=%s keys=%d per key (down+up, ms): first=%.3f p50=%.3f p95=%.3f max=%.3f; worker requests per key=%.2f",
+			FOCUS, KEYS, first, percentile(samples, 0.5), percentile(samples, 0.95), samples[#samples], requests / KEYS))
 		local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 		if not signals.is_settled() then
 			luv.kill(luv.os_getpid(), "sigterm")

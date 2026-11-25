@@ -1135,6 +1135,13 @@ local function media_policy()
 	return _media_policy or nil
 end
 
+--- Reads the media catalogue before the first key instead of on its press.
+--- A refused catalogue is logged by media_policy() and stays refused.
+--- @return boolean loaded
+function M.load_media_policy()
+	return media_policy() ~= nil
+end
+
 --- The semantic media identity of an evdev key, nil for every other key.
 --- @param scancode any Linux evdev key code.
 --- @return string|nil media_id

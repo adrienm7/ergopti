@@ -209,6 +209,28 @@ package.preload["platform.input.uinput_writer"] = function()
 	return scripted_writer
 end
 
+-- ERGOPTI_E2E_FIRST_KEY_READS=1: name every source file read while the first
+-- scripted character is handled (its consumption check, then the character).
+-- The typing path's settings and catalogues are read before the first key;
+-- one read there is a decode inside the first keystroke of a slow machine.
+local FIRST_KEY_READS = os.getenv("ERGOPTI_E2E_FIRST_KEY_READS") == "1"
+local first_key_reads = nil
+--- Handles the first character with both file readers observed, then restores
+--- them; installed after start-up, whose config owners verify the readers.
+--- @param handle function The first character's callbacks.
+local function observe_first_key(handle)
+	local Writer = require("core.text.engine.toml_codec.writer")
+	local Files = require("core.fs.adapters.file_system")
+	local read_classified, read_with_status = Writer.read_classified, Files.read_with_status
+	first_key_reads = {}
+	local function note(path) first_key_reads[tostring(path):match("[^/]+$")] = true end
+	Writer.read_classified = function(path, ...) note(path); return read_classified(path, ...) end
+	Files.read_with_status = function(path, ...) note(path); return read_with_status(path, ...) end
+	local ok, failure = pcall(handle)
+	Writer.read_classified, Files.read_with_status = read_classified, read_with_status
+	assert(ok, failure)
+end
+
 local hook = require("platform.input.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
@@ -524,8 +546,21 @@ package.preload["core.events.loop"] = function()
 				local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)
 				i = i + #c
 				screen[#screen + 1] = c
-				callbacks.onChar(c, 30)
+				if FIRST_KEY_READS and first_key_reads == nil then
+					observe_first_key(function()
+						callbacks.onConsume({ code = 30, char = c, mods = {} })
+						callbacks.onChar(c, 30)
+					end)
+				else
+					callbacks.onChar(c, 30)
+				end
 			end
+		end
+		if FIRST_KEY_READS then
+			local names = {}
+			for name in pairs(first_key_reads or {}) do names[#names + 1] = name end
+			table.sort(names)
+			print(string.format("FIRST_KEY_READS %d %s", #names, #names > 0 and table.concat(names, ",") or "none"))
 		end
 		if TAP_WRAP ~= "none" then
 			print(string.format("TAP_WRAP attempts=%d queued=%d executed=%d reads=%d action=%s binding=%s",

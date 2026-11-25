@@ -590,6 +590,14 @@ local TAP_WRAP_SCENARIOS = {
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
 }
 
+-- The first key of a session reads no source file: the typing path's settings
+-- and catalogues are read at start-up. Read lazily, two config.toml decodes and
+-- the tap-key catalogue put an 89 ms input.dispatch into an X270's first key.
+local FIRST_KEY_SCENARIOS = {
+	{ name = "the first key of a session reads no configuration or catalogue", keys = "a ",
+		screen = "a ", first_key_reads = "0 none" },
+}
+
 -- Built-in dynamic hotstrings fire only at a word start (item 129): with the
 -- date rules on, "td★" after a space expands, which proves they are live, and
 -- the same suffix ending a longer word stays as typed. The date is read
@@ -719,6 +727,7 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_AUTOCORRECT", scenario.autocorrect or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
 			env[#env + 1] = { "ERGOPTI_E2E_CASCADE", scenario.cascade or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_FIRST_KEY_READS", scenario.first_key_reads and "1" or "0" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
@@ -728,6 +737,11 @@ do
 				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
 				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
 				else fail(prefix .. scenario.name .. " (AI input order)", scenario.queue_ai, receipt or "absent") end
+			end
+			if scenario.first_key_reads then
+				local receipt = output:match("FIRST_KEY_READS ([^\r\n]+)")
+				if receipt == scenario.first_key_reads then pass(prefix .. scenario.name .. " (file reads)")
+				else fail(prefix .. scenario.name .. " (file reads)", scenario.first_key_reads, receipt or "absent") end
 			end
 			if scenario.receipt then
 				local receipt = output:match("TAP_WRAP ([^\r\n]+)")
@@ -751,6 +765,7 @@ do
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
 	run_key_scenarios(home_env, "", AUTOCORRECT_SCENARIOS)
+	run_key_scenarios(home_env, "", FIRST_KEY_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
