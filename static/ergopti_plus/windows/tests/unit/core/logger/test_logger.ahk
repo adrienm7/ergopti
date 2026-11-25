@@ -1023,6 +1023,32 @@ TestLogger_ErrorsPathIsSeparate() {
 Test("Errors sink: WARNING and ERROR are written to the dedicated errors file; INFO/DEBUG are not",
 	TestLogger_ErrorsPathIsSeparate)
 
+; A WARNING is batched: forcing a synchronous flush on it wrote the errors file
+; twice when the buffered flush ran in the same tick, and the errors file was
+; once written inline (logger-sync-double-write-on-warning). Only an ERROR
+; forces the flush, and it carries the batched warning with it.
+TestLogger_WarningIsBatchedUntilAnError() {
+	global LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
+	_ResetLogger()
+	ErrorsTmp := A_Temp . "\ergopti_test_errors_batched_" . A_Now . "_" . A_TickCount . ".log"
+	LOGGER_ERRORS_LOG_PATH := ErrorsTmp
+	try FileDelete(ErrorsTmp)
+	try {
+		LoggerWarn("SyncWarn", "batched-warning-line")
+		AssertFalse(FileExist(ErrorsTmp),
+			"a WARNING must neither force a flush nor write the errors file inline (logger-sync-double-write-on-warning)")
+		AssertEqual(1, _LOGGER_PENDING_ERRORS.Length, "the warning waits in the errors batch")
+		LoggerError("SyncWarn", "forcing-error-line")
+		Content := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
+		AssertContains(Content, "batched-warning-line", "the forced flush of an ERROR carries the batched warning")
+		AssertContains(Content, "forcing-error-line", "an ERROR forces a synchronous flush of the errors file")
+	} finally {
+		try FileDelete(ErrorsTmp)
+	}
+}
+Test("Errors sink: a WARNING is batched and only an ERROR forces the flush (logger-sync-double-write-on-warning)",
+	TestLogger_WarningIsBatchedUntilAnError)
+
 TestLogger_ErrorsPathEmptyWhenNotSet() {
 	; If LOGGER_ERRORS_LOG_PATH remains "", the errors fan-out must be a no-op
 	; (guarded in _LoggerEmit) and must not throw.

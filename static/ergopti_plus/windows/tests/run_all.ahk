@@ -1608,7 +1608,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/ergonomics/test_agg_app_day_llm_suggested.ahk
 #Include meta/modules/keystats/reader/test_reader_preserves_walker_aggregates.ahk
 #Include meta/hotstrings/engine/catalogue/test_check_constraint_widened.ahk
-#Include meta/core/logger/test_sync_warning.ahk
 #Include meta/modules/keystats/test_keystats_deferred_write.ahk
 #Include meta/platform/remap/layers/test_deadkey_timeout.ahk
 #Include meta/modules/shortcuts/test_sendinstant_deferred_clipboard.ahk
