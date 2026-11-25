@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "lgi i det här systemet är byggt för Lua {1}; Ergopti+ körs med LuaJIT, som behöver versionen för Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Fönster otillgängliga",
 	"startup.linux_layout_unresolved_label": "Tangentbordslayouten lästes inte",
-	"startup.linux_layout_unresolved_body": "Ergopti+ kunde inte läsa den här sessionens tangentbordslayout, så hotstrings ersättningar skrivs inte. Att byta layout en gång kan räcka; använd annars ”{1}”: rapporten innehåller loggen som anger orsaken.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ kunde inte läsa sessionens tangentbordslayout och stoppades: utan den kan det inte veta vilka tecken som skrivs. Det startar om av sig självt några gånger; om meddelandet kommer tillbaka, använd ”{1}”: rapporten innehåller loggen som förklarar varför.",
 	"startup.linux_text_unchecked_label": "Hotstrings utan kontroll av lösenordsfält",
 	"startup.linux_text_closed_label": "Hotstrings undanhållna",
 	"startup.linux_text_reason_atspi_unavailable": "Tillgänglighetstjänsten (AT-SPI) körs inte, så Ergopti+ kan inte avgöra om det aktiva fältet är ett lösenordsfält. Hotstrings expanderas fortfarande, utom i program som listas som lösenordshanterare; statistik och AI förblir avstängda. Installera at-spi2-core och logga in igen.",

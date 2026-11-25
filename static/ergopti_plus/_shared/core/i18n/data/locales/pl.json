@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "lgi w tym systemie jest zbudowane dla Lua {1}; Ergopti+ działa na LuaJIT, który potrzebuje wersji dla Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Okna niedostępne",
 	"startup.linux_layout_unresolved_label": "Nie odczytano układu klawiatury",
-	"startup.linux_layout_unresolved_body": "Ergopti+ nie mógł odczytać układu klawiatury tej sesji, więc zamiany hotstringów nie są wpisywane. Jednorazowa zmiana układu może pomóc; w przeciwnym razie użyj „{1}”: raport zawiera dziennik z przyczyną.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ nie mógł odczytać układu klawiatury tej sesji i się zatrzymał: bez niego nie wie, jakie znaki są pisane. Uruchomi się ponownie sam kilka razy; jeśli ten komunikat wróci, użyj „{1}”: raport zawiera dziennik z przyczyną.",
 	"startup.linux_text_unchecked_label": "Hotstringi bez sprawdzania pól hasła",
 	"startup.linux_text_closed_label": "Hotstringi wstrzymane",
 	"startup.linux_text_reason_atspi_unavailable": "Usługa dostępności (AT-SPI) nie działa, więc Ergopti+ nie wie, czy aktywne pole jest polem hasła. Hotstringi nadal się rozwijają, z wyjątkiem aplikacji wymienionych jako menedżery haseł; statystyki i AI pozostają wyłączone. Zainstaluj at-spi2-core i zaloguj się ponownie.",

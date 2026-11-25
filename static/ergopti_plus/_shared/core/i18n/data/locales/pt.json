@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "O lgi deste sistema foi compilado para Lua {1}; o Ergopti+ funciona com LuaJIT, que precisa da versão para Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Janelas indisponíveis",
 	"startup.linux_layout_unresolved_label": "Esquema de teclado não lido",
-	"startup.linux_layout_unresolved_body": "O Ergopti+ não conseguiu ler o esquema de teclado desta sessão, por isso as substituições dos hotstrings não são digitadas. Mudar de esquema uma vez pode bastar; caso contrário, use «{1}»: o relatório inclui o registo que indica a causa.",
+	"startup.linux_layout_unresolved_body": "O Ergopti+ não conseguiu ler o esquema de teclado desta sessão e parou: sem ele, não consegue saber que caracteres são escritos. Reinicia sozinho algumas vezes; se esta mensagem voltar, use «{1}»: o relatório inclui o registo que indica a causa.",
 	"startup.linux_text_unchecked_label": "Hotstrings sem verificação de campos de senha",
 	"startup.linux_text_closed_label": "Hotstrings retidas",
 	"startup.linux_text_reason_atspi_unavailable": "O serviço de acessibilidade (AT-SPI) não está em execução, por isso o Ergopti+ não sabe se o campo ativo é um campo de senha. As hotstrings continuam a expandir, exceto nas aplicações listadas como gestores de senhas; as estatísticas e a IA ficam desligadas. Instale o at-spi2-core e inicie sessão de novo.",

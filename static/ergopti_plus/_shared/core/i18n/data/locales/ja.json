@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "このシステムの lgi は Lua {1} 用にビルドされています。Ergopti+ は LuaJIT で動作し、Lua 5.1 用のビルド（{2}）が必要です。",
 	"startup.linux_gui_stack_windows_label": "ウィンドウを利用できません",
 	"startup.linux_layout_unresolved_label": "キーボード配列を読み取れません",
-	"startup.linux_layout_unresolved_body": "Ergopti+ はこのセッションのキーボード配列を読み取れなかったため、ホットストリングの置換は入力されません。配列を一度切り替えると直ることがあります。直らない場合は「{1}」を使ってください。レポートには原因を示すログが含まれます。",
+	"startup.linux_layout_unresolved_body": "Ergopti+ はこのセッションのキーボード配列を読み取れなかったため停止しました。配列がないと、どの文字が入力されたか判断できません。自動で数回再起動します。このメッセージが再び表示される場合は「{1}」を使ってください。レポートには原因を示すログが含まれます。",
 	"startup.linux_text_unchecked_label": "パスワード欄チェックなしのホットストリング",
 	"startup.linux_text_closed_label": "ホットストリングを保留中",
 	"startup.linux_text_reason_atspi_unavailable": "アクセシビリティサービス（AT-SPI）が動いていないため、Ergopti+ はアクティブな欄がパスワード欄かどうか判断できません。パスワードマネージャーとして登録されたアプリを除き、ホットストリングは引き続き展開されます。統計と AI はオフのままです。at-spi2-core をインストールし、ログインし直してください。",

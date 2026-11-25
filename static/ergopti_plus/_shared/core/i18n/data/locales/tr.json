@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "Bu sistemdeki lgi Lua {1} için derlenmiş; Ergopti+ LuaJIT ile çalışır ve Lua 5.1 sürümüne ihtiyaç duyar ({2}).",
 	"startup.linux_gui_stack_windows_label": "Pencereler kullanılamıyor",
 	"startup.linux_layout_unresolved_label": "Klavye düzeni okunamadı",
-	"startup.linux_layout_unresolved_body": "Ergopti+ bu oturumun klavye düzenini okuyamadı, bu yüzden hotstring değiştirmeleri yazılmıyor. Düzeni bir kez değiştirmek yetebilir; aksi halde “{1}” seçeneğini kullanın: rapor, nedeni gösteren günlüğü içerir.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ bu oturumun klavye düzenini okuyamadı ve durdu: düzen olmadan hangi karakterlerin yazıldığını bilemez. Birkaç kez kendiliğinden yeniden başlar; bu ileti geri gelirse “{1}” seçeneğini kullanın: rapor nedenini anlatan günlüğü içerir.",
 	"startup.linux_text_unchecked_label": "Parola alanı denetimi olmadan hotstring'ler",
 	"startup.linux_text_closed_label": "Hotstring'ler durduruldu",
 	"startup.linux_text_reason_atspi_unavailable": "Erişilebilirlik hizmeti (AT-SPI) çalışmıyor, bu yüzden Ergopti+ etkin alanın parola alanı olup olmadığını anlayamıyor. Hotstring'ler parola yöneticisi olarak listelenen uygulamalar dışında genişlemeye devam eder; istatistikler ve yapay zekâ kapalı kalır. at-spi2-core'u kurun ve yeniden oturum açın.",

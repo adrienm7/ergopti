@@ -2855,7 +2855,7 @@ local function main()
 	-- magic key's default already read the keymap at boot: a layout still
 	-- current on the desktop source is not dumped a second time.
 	if not keyboard_layout.refresh_unless_current(opts.keymap) then
-		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
+		Logger.warn(LOG, "Layout unresolved — read again before the keyboard is grabbed.")
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
@@ -3831,9 +3831,10 @@ local function main()
 	-- UI preparation can outlive an XKB change; resolve again before grabbing,
 	-- unless the desktop source proves the published layout still current.
 	if not keyboard_layout.refresh_unless_current(opts.keymap) then
-		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
-		-- The core then expands nothing a user can see: say so in the tray
-		-- until a later layout change is read (component_status).
+		Logger.error(LOG, "Layout unresolved before the grab — XKB capture cannot start, so the daemon stops.")
+		-- keyboard_hook.start refuses without XKB capture, so this start ends
+		-- below; the notice says so instead of promising a degraded mode, and
+		-- the unit's start limit bounds the retries (component_status).
 		local layout_i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n")
 		if layout_i18n then
 			local function say(key) local ok, value = pcall(layout_i18n.get, key) return ok and value or key end

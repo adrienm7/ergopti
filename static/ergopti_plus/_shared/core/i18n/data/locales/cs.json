@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "lgi v tomto systému je sestaveno pro Lua {1}; Ergopti+ běží na LuaJIT, který potřebuje verzi pro Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Okna nedostupná",
 	"startup.linux_layout_unresolved_label": "Rozložení klávesnice nenačteno",
-	"startup.linux_layout_unresolved_body": "Ergopti+ nemohl načíst rozložení klávesnice této relace, proto se náhrady hotstringů nepíší. Jednorázová změna rozložení může pomoci; jinak použijte „{1}“: hlášení obsahuje protokol s příčinou.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ nemohl přečíst rozložení klávesnice této relace a zastavil se: bez něj nepozná, jaké znaky se píší. Několikrát se sám znovu spustí; pokud se tato zpráva vrátí, použijte „{1}“: hlášení obsahuje protokol s příčinou.",
 	"startup.linux_text_unchecked_label": "Hotstringy bez kontroly polí s heslem",
 	"startup.linux_text_closed_label": "Hotstringy pozastaveny",
 	"startup.linux_text_reason_atspi_unavailable": "Služba přístupnosti (AT-SPI) neběží, takže Ergopti+ nepozná, zda je aktivní pole polem pro heslo. Hotstringy se dál rozbalují, kromě aplikací uvedených jako správci hesel; statistiky a AI zůstávají vypnuté. Nainstalujte at-spi2-core a znovu se přihlaste.",

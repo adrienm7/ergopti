@@ -3770,7 +3770,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "lgi på dette system er bygget til Lua {1}; Ergopti+ kører med LuaJIT, som kræver versionen til Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Vinduer utilgængelige",
 	"startup.linux_layout_unresolved_label": "Tastaturlayout ikke læst",
-	"startup.linux_layout_unresolved_body": "Ergopti+ kunne ikke læse denne sessions tastaturlayout, så hotstrings’ erstatninger bliver ikke skrevet. Et enkelt skift af layout kan hjælpe; brug ellers “{1}”: rapporten indeholder loggen med årsagen.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ kunne ikke læse denne sessions tastaturlayout og stoppede: uden det kan det ikke vide, hvilke tegn der skrives. Det starter selv igen nogle gange; hvis denne besked kommer igen, så brug “{1}”: rapporten indeholder loggen, der forklarer hvorfor.",
 	"startup.linux_text_unchecked_label": "Hotstrings uden kontrol af adgangskodefelter",
 	"startup.linux_text_closed_label": "Hotstrings tilbageholdt",
 	"startup.linux_text_reason_atspi_unavailable": "Tilgængelighedstjenesten (AT-SPI) kører ikke, så Ergopti+ kan ikke se, om det aktive felt er et adgangskodefelt. Hotstrings udvides stadig, undtagen i programmer opført som adgangskodeadministratorer; statistik og AI forbliver slået fra. Installér at-spi2-core, og log ind igen.",
