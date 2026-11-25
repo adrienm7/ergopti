@@ -4410,6 +4410,138 @@
 		"layout_editor.magic.actions": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr"]
+		},
+		"workflows.field.text": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "de", "sv"]
+		},
+		"workflows.field.x": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"workflows.field.y": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"workflows.value.text": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "de", "sv"]
+		},
+		"workflows.editor.stop": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da"]
+		},
+		"workflows.editor.new_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "nl"]
+		},
+		"workflows.field.type": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no"]
+		},
+		"workflows.value.url": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["da", "de", "es", "fr", "hi", "it", "ja", "ko", "nl", "no", "pt", "sv", "tr"]
+		},
+		"workflows.editor.name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"workflows.editor.optional": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"workflows.field.variable": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "es", "fr"]
+		},
+		"workflows.value.variable": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "es", "fr"]
+		},
+		"workflows.editor.images_heading": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.editor.image_alt": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.action": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.condition": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.image": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.source": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.value.app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.value.image": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"workflows.field.mode": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"workflows.value.file": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
 		}
 	}
 }
