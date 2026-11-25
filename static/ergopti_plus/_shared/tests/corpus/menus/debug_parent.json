@@ -19,6 +19,7 @@
 			"Open logs folder",
 			"Open today's log file",
 			"Open today's errors file",
+			"Export the logs (zip)",
 			"-",
 			"Run the field report (every test)",
 			"Tests"
@@ -84,6 +85,7 @@
 			"Ouvrir le dossier de logs",
 			"Ouvrir le fichier de log du jour",
 			"Ouvrir le fichier des erreurs du jour",
+			"Exporter les logs (zip)",
 			"-",
 			"Lancer le field report (tous les tests)",
 			"Tests"

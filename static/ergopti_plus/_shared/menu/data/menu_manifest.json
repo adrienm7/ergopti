@@ -1409,12 +1409,7 @@
 		{
 			"type": "command",
 			"id": "export_logs",
-			"i18n": "menu.debug.export_logs",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+			"i18n": "menu.debug.export_logs"
 		},
 		{
 			"type": "---",
