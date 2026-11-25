@@ -210,4 +210,19 @@ function M.find(words, target)
 	return best
 end
 
+--- Finds the best hit of each target, in target order; a target with no hit
+--- is left out.
+--- @param words table As M.find.
+--- @param targets table { target… }
+--- @return table hits
+function M.find_all(words, targets)
+	assert(type(targets) == "table", "the text targets are a list")
+	local hits = {}
+	for _, target in ipairs(targets) do
+		local hit = M.find(words, target)
+		if hit then hits[#hits + 1] = hit end
+	end
+	return hits
+end
+
 return M
