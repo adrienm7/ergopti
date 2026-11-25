@@ -58,6 +58,19 @@ function validate(data) {
 			)
 				throw new TypeError(`Invalid preserved ${name} requirement.`);
 	}
+	const suse = data.package_requirements.rpm_suse_alternatives;
+	if (!suse || typeof suse.description !== 'string')
+		throw new TypeError('Missing reviewed openSUSE alternatives for the RPM requirements.');
+	for (const [fedora, opensuse] of Object.entries(suse)) {
+		if (fedora === 'description') continue;
+		if (!data.package_requirements.rpm.includes(fedora))
+			throw new TypeError(`openSUSE alternative for an unrequired RPM package ${fedora}.`);
+		if (
+			typeof opensuse !== 'string' ||
+			!/^(?:[A-Za-z0-9][A-Za-z0-9+_.-]*|\/usr\/s?bin\/[A-Za-z0-9][A-Za-z0-9+_.-]*)$/.test(opensuse)
+		)
+			throw new TypeError(`Invalid openSUSE alternative for ${fedora}.`);
+	}
 	const digest = data.archive_digest_runtime;
 	if (!digest || digest.soname !== 'libcrypto.so.3' || digest.nix_package !== 'openssl')
 		throw new TypeError('Missing or invalid OpenSSL3 digest runtime identity.');
@@ -187,6 +200,29 @@ function requirements(data, format) {
 				? [data.archive_digest_runtime.nix_package]
 				: [];
 	return [...new Set([...data.package_requirements[format], ...native, ...network, ...digest])];
+}
+
+/**
+ * The .rpm's Requires: one spec serves Fedora and openSUSE, so a requirement
+ * openSUSE names differently becomes the rich dependency (openSUSE or Fedora).
+ * The openSUSE name comes first because the Fedora one can resolve there to
+ * the wrong package (libsecret is the library without secret-tool).
+ */
+function rpmRequirements(data) {
+	validate(data);
+	const alternatives = { ...data.package_requirements.rpm_suse_alternatives };
+	delete alternatives.description;
+	for (const key of KEYS) {
+		const { dnf, zypper } = data.libraries[key].packages;
+		if (dnf !== zypper) alternatives[dnf] = zypper;
+	}
+	// A command's path is required alone: either family resolves it to the one
+	// package that ships the command, where an or could be met by a sibling.
+	return requirements(data, 'rpm').map((pkg) => {
+		const alternative = alternatives[pkg];
+		if (!alternative) return pkg;
+		return alternative.startsWith('/') ? alternative : `(${alternative} or ${pkg})`;
+	});
 }
 
 /** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
@@ -530,7 +566,7 @@ function render(data, read) {
 		['tools/build/PKGBUILD', 'arch'],
 		['tools/build/nix/flake.nix', 'nix_library_path']
 	]) {
-		const packages = requirements(data, format);
+		const packages = format === 'rpm' ? rpmRequirements(data) : requirements(data, format);
 		const body =
 			format === 'deb'
 				? 'Depends: ' + packages.join(', ')
@@ -563,6 +599,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+	rpmRequirements,
 	LUV_CMAKE_OPTIONS,
 	SOURCE,
 	LUA_OUTPUT,

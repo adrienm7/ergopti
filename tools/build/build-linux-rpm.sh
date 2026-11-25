@@ -207,20 +207,21 @@ BuildArch:      $ARCH
 Requires:       xclip
 Requires:       wl-clipboard
 Requires:       libnotify
-Requires:       libxkbcommon
-Requires:       libxkbcommon-utils
+Requires:       (libxkbcommon0 or libxkbcommon)
+Requires:       (libxkbcommon-tools or libxkbcommon-utils)
 Requires:       at-spi2-core
-Requires:       polkit
+Requires:       /usr/bin/pkexec
 Requires:       kmod
-Requires:       systemd-udev
-Requires:       libayatana-appindicator-gtk3
-Requires:       shadow-utils
+Requires:       (udev or systemd-udev)
+Requires:       (libayatana-appindicator3-1 or libayatana-appindicator-gtk3)
+Requires:       (shadow or shadow-utils)
 Requires:       util-linux
 Requires:       xdg-utils
-Requires:       libsecret
-Requires:       libxkbcommon-x11
-Requires:       libX11
-Requires:       libX11-xcb
+Requires:       /usr/bin/secret-tool
+Requires:       (typelib-1_0-WebKit2-4_1 or webkit2gtk4.1)
+Requires:       (libxkbcommon-x11-0 or libxkbcommon-x11)
+Requires:       (libX11-6 or libX11)
+Requires:       (libX11-xcb1 or libX11-xcb)
 # END GENERATED LINUX NATIVE REQUIREMENTS
 Recommends:     yad
 Recommends:     xdotool

@@ -561,7 +561,34 @@ if (!/(?:^|,\s*)at-spi2-core(?:\s|,|$)/.test(debDepends)) {
 	errors.push('the Debian Depends line must require at-spi2-core for secure-field detection');
 }
 
-const rpmRequires = new Set([...rpmSrc.matchAll(/^Requires:\s*([^\s]+)/gm)].map((m) => m[1]));
+// A rich dependency (openSUSE or Fedora) names both packages; either one counts.
+const rpmRequires = new Set(
+	[...rpmSrc.matchAll(/^Requires:\s*(.+?)\s*$/gm)].flatMap((m) =>
+		m[1].replace(/^\((.*)\)$/, '$1').split(/\s+or\s+/)
+	)
+);
+// One .rpm installs on Fedora and openSUSE: a Fedora-only name in Requires made
+// zypper refuse the package (Tumbleweed and Leap 15.6 carry none of
+// libxkbcommon-utils, systemd-udev, libayatana-appindicator-gtk3, libX11...).
+for (const requirement of [
+	'(libxkbcommon0 or libxkbcommon)',
+	'(libxkbcommon-tools or libxkbcommon-utils)',
+	'(udev or systemd-udev)',
+	'(libayatana-appindicator3-1 or libayatana-appindicator-gtk3)',
+	'(typelib-1_0-WebKit2-4_1 or webkit2gtk4.1)',
+	'(libX11-6 or libX11)',
+	// The command itself: an or would be met on openSUSE by libsecret-1-0 or
+	// polkit, which other packages pull in, and never install the command.
+	'/usr/bin/secret-tool',
+	'/usr/bin/pkexec'
+]) {
+	if (!new RegExp(`^Requires:\\s+${requirement.replace(/[()./]/g, '\\$&')}$`, 'm').test(rpmSrc))
+		errors.push(`the RPM spec does not require ${requirement} (Fedora and openSUSE)`);
+}
+for (const fedoraOnly of ['libsecret', 'polkit', 'libxkbcommon-utils', 'systemd-udev']) {
+	if (new RegExp(`^Requires:\\s+${fedoraOnly}$`, 'm').test(rpmSrc))
+		errors.push(`the RPM spec requires the Fedora-only name ${fedoraOnly} alone`);
+}
 if (!rpmRequires.has('libxkbcommon')) {
 	errors.push('the RPM spec must Require libxkbcommon for LuaJIT FFI capture');
 }
