@@ -1110,6 +1110,44 @@ libmount made the host libgio fail (`MOUNT_2_40`) and the tray with it.
 Action: never bundle what the host GLib loads itself. curl's brotli and zstd
 are still bundled and are the first suspects if a host library misses a symbol.
 
+Nor anything that loads INTO the host GLib: up to v1.0.9 the image carried
+`usr/lib/gio/modules` (libdconfsettings, libgiognomeproxy, libgiolibproxy,
+giomodule.cache), libproxy and compiled schemas, and the launch environment set
+`GIO_MODULE_DIR`, which replaces the host's module directory. On Arch (GLib
+2.86) the field core put luajit's `SEGV_MAPERR` in the Ubuntu 22.04
+libdconfsettings.so. Measured 2026-11-25 with the dev.178 image's own luajit:
+under its launch environment the GIO TLS backend was `GDummyTlsBackend`
+(`supports_tls` 0) on Ubuntu 24.04, because the bundle had no libgiognutls and
+`GIO_MODULE_DIR` hid the host's, so every in-process GIO, libsoup or WebKit
+HTTPS request failed; with the host's modules it was `GTlsBackendGnutls`, and
+both resolved a proxied URI through `GLibproxyResolver` alike. A container probe
+on Arch did not reproduce the SEGV (it needs the user's session).
+
+The host's glib-networking, dconf and gsettings-desktop-schemas now answer
+(declared requirements of the .deb, the .rpm and the Arch recipe; WebKitGTK's
+libsoup already depends on glib-networking). `native_proxy_runtime.lua` admits
+the host's resolver and `org.gnome.system.proxy` schema, and a recipient
+without them gets `proxy-backend-unavailable`, not a crash. PAC never relied on
+GIO: `system_proxy.lua` evaluates it itself
+(project-linux-gio-hides-pac-failures). `never_bundled` in
+`linux_appimage_recipient_libraries.json` is read by both the stager and
+`check-elf-needed-closure.cjs`, which refuse such a tree. Only the Flatpak,
+whose /app builds its own GIO modules on its runtime's GLib, still points GIO
+at them.
+
+The launch environment sets no PATH, GIO, XDG or LD_LIBRARY_PATH variable and
+records the host value of what it does change (LUA_PATH, LUA_CPATH,
+CURL_CA_BUNDLE and lgi's GI_TYPELIB_PATH) in `ERGOPTI_HOST_ENV_NAMES` and its
+companions. `core/process/adapters/host_environment.lua` wraps io.popen,
+os.execute and luv.spawn at daemon start so host programs get them back; a
+command naming the prefix or the driver root keeps the bundle's.
+`share/ergopti/native-build-ids.json` records every staged ELF file's GNU
+build-id and Ubuntu package, for debuginfod (luajit is Ubuntu 22.04's package,
+so debuginfod.ubuntu.com has its symbols). `appimage-distro-check.sh` runs the
+desktop launch on Arch too, with its dconf and glib-networking and without
+libayatana, so the image's fallback tray meets Arch's GTK.
+Action: a module GLib or GTK loads is the host's, never staged.
+
 glibc itself is not bundled: the daemon loads the host GTK, which needs the
 host's own glibc, so a bundled loader would have to be newer than every host
 library. Below the ceiling and on musl, AppRun (plain `/bin/sh`, since Alpine
@@ -1135,7 +1173,9 @@ The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
 no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its
 "keyboard access unavailable" tray correctly but exited because the tray
 library was missing. The image therefore bundles libayatana-appindicator3 and
-its non-GTK libraries (`TRAY_LIBRARIES` in `stage-linux-network-runtime.py`);
+its non-GTK libraries (`TRAY_LIBRARIES` in `stage-linux-network-runtime.py`) in
+`usr/lib/tray`, a fallback the tray adapter loads only after the host's own
+libayatana soname fails;
 without a watcher the library falls back to an XEmbed GtkStatusIcon. The smoke
 replays that check on a host without libayatana. Its tray pass left-clicks the
 icon (libayatana's GtkStatusIcon fallback pops the menu on both buttons), then
