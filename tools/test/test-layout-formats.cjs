@@ -1981,6 +1981,67 @@ async function checkLinks() {
 	}
 }
 
+// =====================================================
+// ======= 16/ Kalamine import: chained dead keys ======
+// =====================================================
+
+// (kalamine-chain-2026-11-25) tools/build/import-kalamine-layouts.cjs keeps a
+// rule entering another state with that state's whole table (the 1DK typed
+// twice, then e → ë), leaves a cell's compositions to the codegen, and drops
+// a rule entering a state without rules (the Greek of a file that states no
+// table for it). The import kept only the cells' own tables before, so the
+// Ergo-L family typed no ë.
+{
+	const { entryFrom } = require('../build/import-kalamine-layouts.cjs');
+	const json = {
+		name: 'chain',
+		keymap: {
+			KeyQ: ['**', '**'],
+			KeyW: ['e', 'E'],
+			KeyE: ['*^', '¨'],
+			KeyR: ['g', 'G']
+		},
+		deadkeys: {
+			'**': { '**': '*¨', e: 'é', g: '*µ', ' ': '’' },
+			'*¨': { e: 'ë', E: 'Ë', ' ': '¨' },
+			'*^': { e: 'ê', g: 'ĝ', '*^': '^', 1: '¹' }
+		}
+	};
+	const spec = {
+		id: 'chain',
+		name: 'Chain',
+		version: '1',
+		language: 'fr',
+		source: 'ergol_repo',
+		source_path: 'chain.json'
+	};
+	const entry = entryFrom(json, spec, F, E.typingCodes());
+	const rules = entry.dead_rules || {};
+	check(
+		JSON.stringify((rules.odk || {})['dead:odk']) === JSON.stringify({ dead: 'diaeresis' }) &&
+			(rules.odk || {}).e === 'é' &&
+			!('g' in (rules.odk || {})),
+		`Kalamine import: the 1DK table is ${JSON.stringify(rules.odk)}`
+	);
+	check(
+		(rules.diaeresis || {}).e === 'ë' && (rules.diaeresis || {}).E === 'Ë',
+		`Kalamine import: the diaeresis the 1DK enters lost its table: ${JSON.stringify(rules.diaeresis)}`
+	);
+	check(
+		!('e' in (rules.circumflex || {})) &&
+			(rules.circumflex || {})[1] === '¹' &&
+			(rules.circumflex || {})['dead:circumflex'] === '^',
+		`Kalamine import: the circumflex cell keeps ${JSON.stringify(rules.circumflex)}`
+	);
+	check(
+		JSON.stringify(entry.rows.KeyQ) ===
+			JSON.stringify([{ dead: 'odk' }, { dead: 'odk' }, null, null]) &&
+			entry.version === '1' &&
+			entry.fingering === 'standard',
+		`Kalamine import: the entry is ${JSON.stringify(entry).slice(0, 300)}`
+	);
+}
+
 checkLinks().then(report, (error) => {
 	console.error(error);
 	process.exit(1);
