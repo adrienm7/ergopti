@@ -122,31 +122,26 @@ end
 
 --- Captures one window.
 --- @param window string|number The X window id the focus query returned.
---- @return table|nil image, string|nil reason
-function M.capture_window(window)
+--- @param callback function (image|nil, reason), called before this returns on Linux.
+function M.capture_window(window, callback)
 	require_init()
-	if _capture_reason then return nil, _capture_reason end
-	return Capture.capture({ window = window }, Matcher.gray)
+	if _capture_reason then callback(nil, _capture_reason); return end
+	callback(Capture.capture({ window = window }, Matcher.gray))
 end
 
 --- Captures a rectangle of the screen, in root coordinates.
 --- @param rect table { x, y, width, height }
---- @return table|nil image, string|nil reason
-function M.capture_region(rect)
+--- @param callback function (image|nil, reason)
+function M.capture_region(rect, callback)
 	require_init()
 	local state = M.availability().region
-	if not state.ok then return nil, state.reason end
-	return Capture.capture({ rect = rect }, Matcher.gray)
+	if not state.ok then callback(nil, state.reason); return end
+	callback(Capture.capture({ rect = rect }, Matcher.gray))
 end
 
---- Finds library images in a captured image.
---- @param image table
---- @param templates table { { id, image, threshold } }
---- @param options table The matcher options (auto_click_defaults.json), threshold per template.
---- @return table hits { id, x, y, width, height, score, scale }, best first per template order.
---- @return table refused { [id] = reason } for templates that cannot match.
-function M.match(image, templates, options)
-	require_init()
+--- Finds library images in a captured image, synchronously.
+--- @return table hits, table refused
+local function match_now(image, templates, options)
 	local hits, refused = {}, {}
 	for _, template in ipairs(templates) do
 		local per = {}
@@ -161,6 +156,17 @@ function M.match(image, templates, options)
 		end
 	end
 	return hits, refused
+end
+
+--- Finds library images in a captured image.
+--- @param image table
+--- @param templates table { { id, image, threshold } }
+--- @param options table The matcher options (auto_click_defaults.json), threshold per template.
+--- @param callback function (hits, refused): hits { id, x, y, width, height, score, scale }
+---   in template order, refused { [id] = reason } for templates that cannot match.
+function M.match(image, templates, options, callback)
+	require_init()
+	callback(match_now(image, templates, options))
 end
 
 --- Recognises the text of a captured image.
@@ -183,6 +189,30 @@ function M.recognize_file(path, options, callback)
 	local ok, reason = Ocr.available()
 	if not ok then callback(nil, reason); return end
 	Ocr.recognize_file(path, options, callback)
+end
+
+--- Captures a window and looks for library images and text targets in it,
+--- the auto-clicker's tick in one call (on macOS, one launcher worker run).
+--- @param window string|number The X window id.
+--- @param request table { templates, options, text_targets, ocr = { layout, locale } }
+---   text_targets may be empty; OCR runs only when it is not.
+--- @param callback function (result|nil, reason): result { image, hits, text_hits, refused }
+---   with hits and text_hits in image pixels; text_reason names why text was not read.
+function M.scan_window(window, request, callback)
+	require_init()
+	M.capture_window(window, function(image, reason)
+		if not image then callback(nil, reason); return end
+		local hits, refused = match_now(image, request.templates or {}, request.options)
+		local targets = request.text_targets or {}
+		if #targets == 0 then
+			callback({ image = image, hits = hits, text_hits = {}, refused = refused })
+			return
+		end
+		M.recognize_text(image, request.ocr, function(words, ocr_reason)
+			callback({ image = image, hits = hits, refused = refused,
+				text_hits = words and M.find_text(words, targets) or {}, text_reason = ocr_reason })
+		end)
+	end)
 end
 
 --- Finds text targets among recognised words.
