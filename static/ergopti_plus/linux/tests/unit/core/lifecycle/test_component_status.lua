@@ -22,7 +22,8 @@ local PROBLEM = { code = "windows_lgi", title = "Ergopti+ needs a component",
 -- 2026-11-25): its problem reached the log only, each tray build saying it
 -- had no row. Whole literal codes are also read from their reporters below.
 local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "kwin_focus_script",
-	"gnome_focus_extension", "ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
+	"gnome_focus_extension", "ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed",
+	"screen_vision_capture", "screen_vision_ocr" }
 
 -- The text automation codes are built from the reasons of the status
 -- module's notice table ("text_automation_" .. reason): they had no rows,
@@ -36,7 +37,8 @@ do
 end
 
 -- The reporters whose codes are whole literals, read for the codes above.
-local LITERAL_REPORTERS = { "platform.focus.text_automation_status", "ergopti_hotstrings" }
+local LITERAL_REPORTERS = { "platform.focus.text_automation_status", "ergopti_hotstrings",
+	"platform.system.vision.screen_vision" }
 
 --- The problem rows built over a status, with the status window recorded.
 --- @param Status table
@@ -102,12 +104,13 @@ helpers.describe("component_status: a problem stays visible", function()
 		local found = 0
 		for _, module_name in ipairs(LITERAL_REPORTERS) do
 			local source = assert(helpers.read_module_source(module_name), module_name)
-			for code in source:gmatch('\n%s*code = "([a-z0-9_]+)",') do
+			-- A code opens its line or its table ({ code = "...", label = ... }).
+			for code in source:gmatch('[\n{]%s*code = "([a-z0-9_]+)",') do
 				found = found + 1
 				helpers.assert_true(listed[code] == true, code .. " (" .. module_name .. ") has no listed tray row")
 			end
 		end
-		helpers.assert_true(found >= 2, "the reporters' literal codes were read")
+		helpers.assert_true(found >= 4, "the reporters' literal codes were read")
 		-- A code built by concatenation must come from the enumerated table.
 		local status = assert(helpers.read_module_source("platform.focus.text_automation_status"))
 		local built = 0
