@@ -87,6 +87,11 @@ local function fixture()
 		create_transport = function() return transport end,
 		start_process = function() state.started = state.started + 1; state.settled = false; return operation end,
 		pause = function() state.now = state.now + 1; if state.on_pause then state.on_pause() end end,
+		restore_accessibility = function()
+			state.restored = (state.restored or 0) + 1
+			if state.restore_refused then return false, "injected refusal" end
+			return true
+		end,
 	})
 	function state.ready()
 		helpers.assert_true(state.watch.start())
@@ -636,5 +641,40 @@ helpers.describe("AT-SPI focus watcher: the authority it holds", function()
 		state.message("ready", { accessibility = "maybe" })
 		state.watch.pump()
 		helpers.assert_eq(state.watch.authority(), "unavailable")
+	end)
+end)
+
+helpers.describe("AT-SPI focus watcher: the session's accessibility switch at stop", function()
+	helpers.it("(a11y-switch-restore) turns the switch back off when its worker turned it on", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, 1, "the switch Ergopti turned on is turned off at stop")
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, 1, "a second stop restores nothing more")
+	end)
+
+	helpers.it("(a11y-switch-restore) leaves a switch it found on untouched", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, nil, "a screen reader's or the user's switch is not Ergopti's to turn off")
+	end)
+
+	helpers.it("(a11y-switch-restore) does not hold the shutdown on a refused restore", function()
+		local state = fixture()
+		state.restore_refused = true
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop(), "the process and pipes settled; the switch is only logged")
+		helpers.assert_eq(state.restored, 1)
 	end)
 end)
