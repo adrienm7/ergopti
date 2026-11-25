@@ -201,6 +201,14 @@
 			"min_height": 200,
 			"vhost": "ergopti.paths"
 		},
+		"user_workflows": {
+			"title_key": "workflows.editor.window_title",
+			"width": 980,
+			"height": 720,
+			"min_width": 640,
+			"min_height": 420,
+			"vhost": "ergopti.userworkflows"
+		},
 		"personal_info_editor": {
 			"title_key": "editor.personal_info.window_title",
 			"width": 560,

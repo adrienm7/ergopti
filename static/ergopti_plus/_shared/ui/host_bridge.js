@@ -24,6 +24,7 @@
 //   hsOnboarding              — _shared/ui/onboarding
 //   layout_editor_window_bridge — _shared/ui/layout_editor_window
 //   hsPaths                   — _shared/ui/paths_editor
+//   hsWorkflows               — _shared/ui/user_workflows
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   layout_manager_bridge     — _shared/ui/layout_manager
 //   metrics_apps_bridge       — _shared/ui/metrics_apps

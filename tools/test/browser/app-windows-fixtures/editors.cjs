@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * Fake hosts of the editing windows: hotstrings, hotstring settings, paths,
  * personal information, prompts, numeric and token prompts, the model
- * browser and the physical shortcuts. See app-windows-fixtures.cjs.
+ * browser, the physical shortcuts and the user workflows. See
+ * app-windows-fixtures.cjs.
  * ==============================================================================
  */
 
@@ -467,5 +468,47 @@ module.exports = [
 				}
 			}
 		]
+	},
+	{
+		id: 'user_workflows',
+		bridge: 'hsWorkflows',
+		// The host sends the strings, the step catalogue and the workflows with
+		// the data; the fake host reads the files the page is served beside.
+		host: async function (message) {
+			if (!message || message.action !== 'ready') return;
+			const read = async (rel) => (await fetch('../../' + rel)).json();
+			window.initData({
+				strings: await read('core/i18n/data/locales/fr.json'),
+				catalogue: await read('shortcuts/data/workflows/steps.json'),
+				vocabulary: await read('shortcuts/data/actions/send_keys.json'),
+				timings: { wait_max_ms: 600000 },
+				actions: [{ id: 'select_all', label: 'Tout sélectionner' }],
+				approved: {},
+				doc: {
+					schema_version: 1,
+					workflows: [
+						{
+							id: 'wf_form',
+							name: 'Remplir le formulaire',
+							origin: 'import',
+							steps: [
+								{ kind: 'focus_app', app: 'Firefox' },
+								{ kind: 'clipboard_get', into: 'copied' },
+								{
+									kind: 'if',
+									condition: { type: 'app_front', app: 'Firefox' },
+									then: [{ kind: 'type_text', text: 'Réf : {{copied}}' }],
+									else: [{ kind: 'notify', text: 'Firefox est fermé' }]
+								},
+								{ kind: 'repeat', count: 2, steps: [{ kind: 'send_keys', combo: 'ctrl+tab' }] },
+								{ kind: 'shell', command: 'echo "$ERGOPTI_VAR_copied"' }
+							]
+						},
+						{ id: 'wf_empty', name: 'Vide', origin: 'local', steps: [] }
+					]
+				}
+			});
+		},
+		ready: '#steps .step'
 	}
 ];
