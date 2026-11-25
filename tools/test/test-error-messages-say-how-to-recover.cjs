@@ -245,6 +245,18 @@ const CLASSIFIED = {
 		kind: 'rule',
 		reason: 'a reference to a layer the layout does not define; the field is in parentheses'
 	},
+	magic_unknown: {
+		kind: 'rule',
+		reason: 'a key names a magic key table the layout does not define; the table is in parentheses'
+	},
+	source_magic_context: {
+		kind: 'rule',
+		reason: 'states the limit a rule breaks; the rule’s field is in parentheses'
+	},
+	source_magic_unused: {
+		kind: 'rule',
+		reason: 'a rule table no key uses; the table is in parentheses'
+	},
 	layer_base_required: { kind: 'rule', reason: 'the base layer is the one layer a layout needs' },
 	nav_action_unknown: {
 		kind: 'rule',
