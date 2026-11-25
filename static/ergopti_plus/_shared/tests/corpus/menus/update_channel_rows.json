@@ -25,13 +25,19 @@
 	"reordered_values": ["dev", "main"],
 	"locales": {
 		"en": {
-			"parent_template": "Update channel: {channel}",
-			"captions": ["Update channel: Stable", "Update channel: Dev"],
+			"parent_template": "Update channel (pre-releases are less tested): {channel}",
+			"captions": [
+				"Update channel (pre-releases are less tested): Stable",
+				"Update channel (pre-releases are less tested): Dev"
+			],
 			"leaf_labels": ["Stable channel", "Dev channel (pre-releases)"]
 		},
 		"fr": {
-			"parent_template": "Canal de mise à jour : {channel}",
-			"captions": ["Canal de mise à jour : Stable", "Canal de mise à jour : Dev"],
+			"parent_template": "Canal de mise à jour (préversions moins testées) : {channel}",
+			"captions": [
+				"Canal de mise à jour (préversions moins testées) : Stable",
+				"Canal de mise à jour (préversions moins testées) : Dev"
+			],
 			"leaf_labels": ["Canal stable", "Canal dev (préversions)"]
 		}
 	},

@@ -264,8 +264,8 @@
 		"path": "hotstrings.cascade_max_arrows",
 		"family": "setting",
 		"labels": {
-			"fr": "Hotstrings en chaîne (a → b → c)",
-			"en": "Chained hotstrings (a → b → c)"
+			"fr": "Hotstrings en chaîne (une expansion peut déclencher la suivante)",
+			"en": "Chained hotstrings (an expansion can trigger the next one)"
 		},
 		"platforms": {
 			"windows": true,
@@ -2031,8 +2031,8 @@
 		"path": "metrics.encrypt",
 		"family": "setting",
 		"labels": {
-			"fr": "Chiffrer le texte saisi (ROI : totaux numériques uniquement)",
-			"en": "Encrypt typing text (ROI: numeric totals only)"
+			"fr": "Chiffrer le texte saisi (il ne peut plus être relu ; seuls les totaux restent)",
+			"en": "Encrypt typed text (it can no longer be read back; only totals stay)"
 		},
 		"platforms": {
 			"windows": true,
@@ -2106,8 +2106,8 @@
 		"path": "metrics.wpm_menubar_visible",
 		"family": "setting",
 		"labels": {
-			"fr": "MPM dans la barre des menus",
-			"en": "WPM in menu bar"
+			"fr": "Mots par minute (MPM) dans la barre des menus",
+			"en": "Words per minute (WPM) in menu bar"
 		},
 		"platforms": {
 			"windows": true,
@@ -5400,8 +5400,8 @@
 		"path": "layout.direct_access_digits",
 		"family": "feature",
 		"labels": {
-			"fr": "Rangée des chiffres",
-			"en": "Number row"
+			"fr": "Ce que tape la rangée des chiffres sans Maj",
+			"en": "What the number row types without Shift"
 		},
 		"platforms": {
 			"windows": true,
@@ -5415,8 +5415,8 @@
 		"path": "layout.virtual_keyboard",
 		"family": "setting",
 		"labels": {
-			"fr": "Clavier virtuel Karabiner",
-			"en": "Karabiner virtual keyboard"
+			"fr": "Forme du clavier vue par macOS (clavier virtuel Karabiner)",
+			"en": "Keyboard shape macOS sees (Karabiner virtual keyboard)"
 		},
 		"platforms": {
 			"windows": false,
@@ -5433,8 +5433,8 @@
 		"path": "layout.number_row_reorder_edges",
 		"family": "feature",
 		"labels": {
-			"fr": "Réordonner aussi les trois touches des bords",
-			"en": "Also reorder the three edge keys"
+			"fr": "Réordonner aussi les trois touches des bords (à gauche du 1, à droite du 0)",
+			"en": "Also reorder the three edge keys (left of 1, right of 0)"
 		},
 		"platforms": {
 			"windows": true,
