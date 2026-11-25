@@ -10,12 +10,12 @@
 --- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
 --- _shared/core/logger/engine owns the canonical line format, the eight variants, the
 --- 200-entry ring, the five-second dedup window and repeat collapsing — items 4,
---- 5 and 8 below. This file owns the production in-memory handoff, topical
---- routing policy, deferred console/notification delivery, the synchronous
+--- 5 and 8 below. This file owns the production in-memory handoff,
+--- deferred console/notification delivery, the synchronous
 --- early-boot/test fallback, and the periodic tick that flushes due repeat
 --- summaries once boot arms collapsing.
 --- The native launcher worker owns production file persistence, daily rotation,
---- retention purge and errors/topical fan-out. The split is not cosmetic: the
+--- retention purge and the errors mirror. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
 --- held to ONE implementation of those rules, and this half is pinned as
 --- behaviour by tests/unit/core/logger/engine/test_file_sinks.lua.
@@ -41,8 +41,9 @@
 ---    module is the one resolver of that folder and of today's file names.
 ---    Files older than max_age_days are purged automatically on init and after
 ---    the first successful write of each new calendar day.
---- 7. Topical sub-files: lines are fan-out to per-subsystem logs (llm, karabiner…)
----    based on module tag matching, giving focused tail targets per feature area.
+--- 7. One log: every line goes to the daily file only (maintainer decision,
+---    2026-11-25: testers had to send dozens of topical sub-files). The purge
+---    deletes the retired sub-files left by an older version, by exact name.
 --- 8. Timestamp format: HHhMMminSSsNNNms — matches the AHK driver exactly so both
 ---    log files look identical when tailed side by side.
 --- 9. Errors-only sink: the native worker also writes WARNING and ERROR lines to
@@ -146,13 +147,16 @@ local LOG_FILES = AppDirs.files
 M.FALLBACK_LOG_DIR = LogFolders.default_logs_dir(os.getenv(AppDirs.macos.base_env))
 	or LogFolders.homeless_logs_dir()
 
--- The fallback boot log users are directed to when startup fails. The [init]
--- topical fan-out writes the same file name, so every boot-stage line of an
--- early run is already there.
-M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. LOG_FILES.topical_prefix .. "boot" .. LOG_FILES.extension
+-- The fallback boot log users are directed to when startup fails: the
+-- synchronous boot journal (core/logger/adapters/boot_journal.lua) and the fatal
+-- report append each boot stage here, closed before the stage continues, because
+-- os.exit() discards the logger's queued lines, so its lines are not all in the
+-- daily log. It used to share ErgoptiPlus_boot.log with the retired [init]
+-- topical sub-file, a name the purge now deletes, so it has its own name.
+M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. AppDirs.macos.boot_journal
 
--- Log directory resolved after M.init_log_path(); used by sub-file fan-out and
--- by every public resolver below.
+-- Log directory resolved after M.init_log_path(); used by every public
+-- resolver below.
 local _log_dir = M.FALLBACK_LOG_DIR
 
 -- Today's unified and errors-only files as last opened by the synchronous
@@ -192,35 +196,6 @@ local UNIFIED_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.unified_prefix) 
 local ERRORS_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.errors_prefix) .. DATE_CAPTURE
 	.. _literal_pattern(LOG_FILES.extension) .. "$"
 
--- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
--- fan-out here in addition to the main unified file. Sub-files are ephemeral
--- (today only) — they are a filtered view of the main log, not an archive.
--- Sub-file routing table, generated from _shared/core/logger/data/sub_files.toml.
---
--- This used to be a 120-line hand-rolled [[array_of_tables]] parser plus a
--- hardcoded fallback list. Both were liabilities. The parser was one of TWO
--- copies of the same grammar (the AHK driver had its own), so the same bug had
--- to be found and fixed twice — a "]" inside a quoted pattern closed the array
--- early, silently dropping every pattern after it, and the file's own guidance
--- is to prefer bracketed tag patterns like "[gestures". The fallback was a
--- second copy of the data, and it had already drifted: it routed gestures on
--- one pattern where the canonical file has two, so a stripped build quietly
--- stopped collecting every bare "gesture" line.
---
--- The generated file is committed and loaded like any other module, so there is
--- no grammar to get wrong and no "file unavailable" branch to diverge in.
-local SUB_LOG_NAMES = require("_generated.logger_sub_files")
-
--- LogTransport routes a hostile oversized record in bounded 8 KiB windows.
--- Retaining exactly the longest-pattern-minus-one suffix makes a literal that
--- crosses a window boundary observable without ever rescanning the full line.
-local ROUTE_OVERLAP_BYTES = 0
-for _, sub in ipairs(SUB_LOG_NAMES) do
-	for _, pattern in ipairs(sub.patterns) do
-		ROUTE_OVERLAP_BYTES = math.max(ROUTE_OVERLAP_BYTES, #pattern - 1)
-	end
-end
-
 -- The platform-neutral core, shared with the Linux daemon and mirrored by the
 -- AutoHotkey driver. It owns the four algorithms this file used to carry its own
 -- copy of: the canonical line format, the eight variants, the 200-entry ring, and
@@ -230,7 +205,7 @@ end
 -- only hold ONE implementation to those rules.
 --
 -- Everything the core deliberately has no opinion about stays here: the unified
--- daily file, the errors-only mirror, the topical fan-out, the level-aware flush
+-- daily file, the errors-only mirror, the level-aware flush
 -- policy, and the print() tee. That half is pinned by
 -- tests/unit/core/logger/engine/test_file_sinks.lua as BEHAVIOUR rather than as source
 -- text, which is what made this migration provable instead of merely plausible.
@@ -364,28 +339,14 @@ local _log_retention_days = nil
 local _pending_purge_timers = {}
 local _next_purge_timer_token = 0
 
--- Per-sub-file calendar date, playing for the topical fan-out the role
--- _last_log_date plays for the main handle: it records the date this process last
--- wrote to each sub-file, so the first write of a new day truncates it instead of
--- appending. Deciding this at write time is the only correct moment — the purge
--- pass runs LOG_PURGE_DELAY_SEC after boot, by which point the fan-out has already
--- stamped every active sub-file with today's mtime, so its "mtime is not today"
--- test can never fire for the files that actually need resetting.
-local _sub_file_date  = {}
-
--- Open append handles for the topical sub-files, keyed by path. Declared here
--- with the other sink state and ABOVE every closure that touches it.
-local _sub_handles    = {}
-
 -- Forward declarations — implementations are in Section 3.2. Declared here for
--- the same reason as the handles above: init_log_path(), _purge_old_logs() and
+-- the same reason as the sink state above: init_log_path(), _purge_old_logs() and
 -- M.set_sink() are defined before them and must reach the real functions, not a
 -- nil global. A `local` declared textually BELOW a closure that names it is not
 -- captured by that closure at all; it silently binds the global instead, and the
 -- surrounding pcall then swallows the "attempt to call a nil value" that follows.
 local _log
 local _driver_sink
-local _route_line
 
 -- Production switches to the native ACKed transport before any input owner is
 -- activated. Early boot and headless unit tests deliberately retain the local
@@ -636,16 +597,6 @@ function M.init_log_path(log_dir, max_age_days)
 	_log_dir = log_dir
 	_log_retention_days = max_age_days
 
-	-- Close every sub-file handle open on the OLD directory. They are keyed by
-	-- absolute path, so a re-point would otherwise keep writing the topical logs
-	-- into the previous config directory for the rest of the session — and the
-	-- per-day truncation decision, cached alongside them, would be stale too.
-	for path, entry in pairs(_sub_handles) do
-		pcall(function() entry.fh:close() end)
-		_sub_handles[path]   = nil
-		_sub_file_date[path] = nil
-	end
-
 	-- Close any handle open on the old path so the next write re-opens cleanly
 	if _file_handle then
 		pcall(function() _file_handle:close() end)
@@ -723,21 +674,15 @@ function M._dated_log_expired(date, now, days)
 	return date < os.date("%Y-%m-%d", os.time(cutoff))
 end
 
---- Whether a topical view is stale: last modified on another calendar day.
---- @param modified number Modification epoch seconds.
---- @param now number Current epoch seconds.
---- @return boolean stale
-function M._topical_log_stale(modified, now)
-	return os.date("%Y-%m-%d", modified) ~= os.date("%Y-%m-%d", now)
-end
-
 --- Deletes stale log files under `log_dir`. Split out of init_log_path() so it can
 --- be deferred off the boot critical path and exercised directly in tests. Two passes:
 ---   1. Main daily logs — BOTH ErgoptiPlus_YYYY-MM-DD.log and the errors-only
 ---      ErgoptiPlus_errors_YYYY-MM-DD.log — aged by the date carried in the
 ---      FILENAME (not mtime) so moved or copied files still age correctly.
----   2. Topical sub-files, which are ephemeral (today only) — any whose last
----      modification is not today is removed (a filtered view, not an archive).
+---   2. The retired topical sub-files (app_dirs files.retired_topical_logs), by
+---      exact name and only as regular files: nothing writes them any more and
+---      every line they held is in the daily log, so the first purge after the
+---      update removes them whatever their age.
 ---
 --- Spawns zero subprocesses. The previous implementation shelled out through the
 --- fully synchronous ShellRunner: one `find | while read` pipeline forking
@@ -780,9 +725,9 @@ function M._purge_old_logs(log_dir, max_age_days)
 		_log("WARNING", "logger", "Log directory walk aborted for \"%s\": %s", log_dir, tostring(walk_err))
 	end
 
-	-- Exact-name set so the ephemeral sub-file pass is a single hash lookup.
-	local is_sub_file = {}
-	for _, sub in ipairs(SUB_LOG_NAMES) do is_sub_file[sub.name] = true end
+	-- Exact-name set so the retired sub-file pass is a single hash lookup.
+	local is_retired = {}
+	for _, name in ipairs(LOG_FILES.retired_topical_logs) do is_retired[name] = true end
 
 	local now     = os.time()
 	local removed = 0
@@ -801,10 +746,10 @@ function M._purge_old_logs(log_dir, max_age_days)
 			if M._dated_log_expired(year .. "-" .. month .. "-" .. day, now, max_age_days) then
 				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
-		elseif is_sub_file[name] then
-			local ok_attr, attrs = pcall(fs_ref.attributes, log_dir .. name)
-			if ok_attr and type(attrs) == "table" and attrs.modification
-				and M._topical_log_stale(attrs.modification, now) then
+		elseif is_retired[name] and type(fs_ref.symlinkAttributes) == "function" then
+			-- lstat: a link named like a retired file is never followed or removed.
+			local ok_attr, attrs = pcall(fs_ref.symlinkAttributes, log_dir .. name)
+			if ok_attr and type(attrs) == "table" and attrs.mode == "file" then
 				if _remove_stale_log(log_dir .. name) then removed = removed + 1 end
 			end
 		end
@@ -978,7 +923,7 @@ local _refused_channels = {}
 
 --- Reports one refused synchronous log channel on the console. Never through
 --- the logger: the line would go back to the very file that refused it.
---- @param channel string Channel name ("unified", "topical", "errors-only").
+--- @param channel string Channel name ("unified", "errors-only").
 --- @param detail any Native refusal message.
 local function _report_sink_refusal(channel, detail)
 	if _refused_channels[channel] then return end
@@ -1018,25 +963,6 @@ end
 -- ==================================
 -- ===== 3.1) File Sink Helpers =====
 -- ==================================
-
-local function _matches_any(line, patterns)
-	for _, p in ipairs(patterns) do
-		if line:find(p, 1, true) then return true end
-	end
-	return false
-end
-
---- Derives the native worker's topical fan-out outside the HID callback.
---- LogTransport calls this only from its TimerScheduler-owned pump.
---- @param line string Canonical formatted log line.
---- @return table names Validated topical filenames selected for this line.
-_route_line = function(line)
-	local names = {}
-	for _, sub in ipairs(SUB_LOG_NAMES) do
-		if _matches_any(line, sub.patterns) then names[#names + 1] = sub.name end
-	end
-	return names
-end
 
 --- Builds the HHhMMminSSsNNNms timestamp string matching the AHK driver format.
 local function _timestamp()
@@ -1093,36 +1019,6 @@ local function _ensure_log_file()
 	return _file_handle
 end
 
---- Returns the io.open mode for a topical sub-file: "a" when it already carries
---- today's lines, "w" when it must be reset for a new day. Decided once per
---- sub-file per calendar date, then cached in _sub_file_date.
----
---- Applies the same mtime-is-today predicate as the purge pass, but evaluates it
---- BEFORE the logger appends anything. Once the fan-out has written, mtime answers
---- "did this process just log?" rather than "does this file hold only today?" —
---- which is why the purge could never reset an active sub-file.
---- @param path string Absolute sub-file path.
---- @param today string Current date as YYYY-MM-DD.
---- @return string Either "a" or "w".
-local function _sub_file_mode(path, today)
-	if _sub_file_date[path] == today then return "a" end
-	_sub_file_date[path] = today
-
-	local hs_ref = rawget(_G, "hs")
-	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
-	if type(fs_ref) ~= "table" or type(fs_ref.attributes) ~= "function" then
-		-- Without a filesystem port the age is undecidable. Append rather than
-		-- truncate: keeping a stale line is recoverable, deleting today's is not.
-		return "a"
-	end
-
-	local ok_attr, attrs = pcall(fs_ref.attributes, path)
-	if not ok_attr or type(attrs) ~= "table" or not attrs.modification then
-		return "a"  -- File absent (nothing to reset) or unreadable — "a" creates it
-	end
-	return (os.date("%Y-%m-%d", attrs.modification) == today) and "a" or "w"
-end
-
 -- DEBUG lines written since the last flush.
 local _unflushed_debug = 0
 
@@ -1173,55 +1069,7 @@ local function _write_to_file(line, immediate)
 			_sink_accepted("unified")
 		end
 	end
-	-- Fan-out to topical sub-files.
-	--
-	-- Handles are kept OPEN, exactly like the main one. Opening and closing per
-	-- line looked cheap next to "the operations logged" — true of the operations,
-	-- and false of a keystroke: the default level is DEBUG and DEBUG lines are
-	-- emitted from the keystroke path, so every matching line paid an
-	-- open+write+close inside the eventtap callback. That is the same blocking
-	-- I/O the main handle's level-aware flush policy exists to avoid, arriving
-	-- through the back door.
-	--
-	-- Lines are still flushed on the same terms as the main handle, so a crash
-	-- loses at most the buffered DEBUG tail rather than leaving a stale handle
-	-- holding everything.
-	local today = os.date("%Y-%m-%d")
-	for _, sub in ipairs(SUB_LOG_NAMES) do
-		if _matches_any(line, sub.patterns) then
-			local path = _log_dir .. sub.name
-			local refusal = _sink_refusal(function()
-				local mode = _sub_file_mode(path, today)
-				local entry = _sub_handles[path]
-				-- Re-open when the mode changes: "w" means a new calendar day has
-				-- to truncate the file, which an already-open append handle cannot do.
-				if entry and entry.mode ~= mode then
-					pcall(function() entry.fh:close() end)
-					entry = nil
-				end
-				if not entry then
-					local fh, open_err = io.open(path, mode)
-					if not fh then return _refused(fh, open_err) end
-					entry = { fh = fh, mode = "a" }
-					_sub_handles[path] = entry
-				end
-				local wrote, write_err = entry.fh:write(full)
-				if wrote == nil then return _refused(wrote, write_err) end
-				if immediate ~= false then return _refused(entry.fh:flush()) end
-				return nil
-			end)
-			if refusal then
-				local entry = _sub_handles[path]
-				_sub_handles[path] = nil
-				if entry then pcall(function() entry.fh:close() end) end
-				_report_sink_refusal("topical", refusal)
-			else
-				_sink_accepted("topical")
-			end
-		end
-	end
 end
-
 
 
 
@@ -1358,16 +1206,6 @@ function M.start_async_sink(scheduler, transport_overrides)
 		_last_log_date = nil
 		_last_log_path = nil
 	end
-	for path, entry in pairs(_sub_handles) do
-		local ok, closed, close_err = pcall(function() return entry.fh:close() end)
-		if not ok or closed ~= true then
-			-- The refusing topical handle remains published for an exact retry.
-			return false, "topical boot log handle refused close: " .. tostring(path)
-				.. " — " .. tostring(ok and close_err or closed)
-		end
-		_sub_handles[path] = nil
-		_sub_file_date[path] = nil
-	end
 	_unflushed_debug = 0
 
 	_async_sink_generation = _async_sink_generation + 1
@@ -1377,8 +1215,6 @@ function M.start_async_sink(scheduler, transport_overrides)
 		log_dir = _log_dir,
 		retention_days = _log_retention_days or DEFAULT_LOG_RETENTION_DAYS,
 		prepare_line = private_line,
-		route_line = _route_line,
-		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
 		on_delivered = _deliver_async_record,
 		on_rejected = _deliver_async_record,
 		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,

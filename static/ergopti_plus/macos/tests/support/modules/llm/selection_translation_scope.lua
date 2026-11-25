@@ -12,7 +12,6 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"_generated.action_catalogue",
 	"_generated.gesture_emit_actions",
-	"_generated.logger_sub_files",
 	"_generated.registry_limits",
 	"shortcuts.engine.actions.assignable",
 	"core.fs.engine.app_dirs",

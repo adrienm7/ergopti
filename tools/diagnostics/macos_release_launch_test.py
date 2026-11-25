@@ -56,15 +56,15 @@ class FailureEvidenceTests(unittest.TestCase):
     def test_names_the_failure_and_the_error_lines(self):
         with tempfile.TemporaryDirectory() as folder:
             logs = Path(folder)
-            (logs / "ErgoptiPlus_boot.log").write_text(
+            (logs / "boot_journal.log").write_text(
                 "[INFO] booting\n[ERROR] [llm] Profile catalogue failed.\n", encoding="utf-8"
             )
             (logs / "launcher.log").write_text("FATAL: child exited\n", encoding="utf-8")
             lines = observer.failure_evidence({"error": "RuntimeError: boom"}, logs)
         self.assertEqual(lines[0], "release launch failed: RuntimeError: boom")
-        self.assertIn("ErgoptiPlus_boot.log: [ERROR] [llm] Profile catalogue failed.", lines)
+        self.assertIn("boot_journal.log: [ERROR] [llm] Profile catalogue failed.", lines)
         self.assertIn("launcher.log: FATAL: child exited", lines)
-        self.assertNotIn("ErgoptiPlus_boot.log: [INFO] booting", lines)
+        self.assertNotIn("boot_journal.log: [INFO] booting", lines)
 
     def test_caps_a_noisy_failure(self):
         with tempfile.TemporaryDirectory() as folder:

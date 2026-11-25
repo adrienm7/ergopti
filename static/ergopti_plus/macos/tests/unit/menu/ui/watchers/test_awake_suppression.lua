@@ -12,7 +12,6 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"_generated.logger_sub_files",
 	"platform.focus.application_notifier",
 	"core.logger.adapters.boot_journal",
 	"core.fs.adapters.file_system",

@@ -35,16 +35,9 @@ module.exports = function run({
 			'testShortWriteRollbackLeavesOneRecordInEverySink',
 			'testFailedShortWriteRollbackRetainsDebtBeforeRetry',
 			'testFailedRollbackSynchronizationRetainsDebtBeforeRetry',
-			'testReloadSessionAppendsToTodaysTopicalViewInsteadOfTruncatingIt',
-			'testFreshLauncherPreservesAnExistingSameDayTopicalView',
-			'testFirstRecordAfterMidnightReplacesThePriorDayTopicalView',
-			'testObservedCalendarTransitionRotatesTopicalEvenWhenOldRecordHasNewDayMtime',
-			'testSameDirectoryReconfigureRetainsObservedTopicalCalendarTransition',
-			'testReplacedDirectoryAtSamePathDoesNotReuseTopicalInitializationState',
-			'testTopicalRotationUsesMetadataObservedAfterWaitingForTheWriteLock',
 			'testDrainReceiveLoopBoundsZeroLengthDatagrams',
 			'testBoundLoopbackWorkerAcknowledgesPersistedRecord',
-			'testConfigurePurgesExpiredDailyAndStaleTopicalFiles',
+			'testConfigurePurgesExpiredDailyAndRetiredTopicalFiles',
 			'testFirstRecordOnNewWallClockDayRearmsRetentionWithoutReconfigure',
 			'testSinkReusesADescriptorAcrossAppendsAndReopensAfterUnlink',
 			'testSlowDatagramIsReportedWithItsCostBreakdown',
@@ -92,9 +85,9 @@ module.exports = function run({
 	}
 	rows.push(
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at fixed",
-		summary(42),
+		summary(35),
 		"Test Suite 'Selected tests' passed at fixed",
-		summary(42)
+		summary(35)
 	);
 	const valid = rows.join('\n') + '\n';
 	// Constructed foreign SDK49 summary: exclusion witness only, never SDK credit.
@@ -122,11 +115,11 @@ module.exports = function run({
 		["Test Suite 'Selected tests'", "Test Suite 'All tests'"],
 		['LoggerDatagramWorkerTests', 'OwnedSuspendedImageTests'],
 		['OwnedLogDirectoryTests', 'SuspendedImageLogCaptureTests'],
-		['Executed 29 tests', 'Executed 49 tests'],
+		['Executed 22 tests', 'Executed 49 tests'],
 		['Executed 13 tests', 'Executed 7 tests'],
-		['Executed 42 tests', 'Executed 49 tests'],
-		['Executed 42 tests', 'Executed 7 tests'],
-		['Executed 42 tests', 'Executed 0 tests'],
+		['Executed 35 tests', 'Executed 49 tests'],
+		['Executed 35 tests', 'Executed 7 tests'],
+		['Executed 35 tests', 'Executed 0 tests'],
 		['testAcceptedRecordFansOutOnceAndDuplicateOnlyAcknowledges', 'testForeignLoggerCase'],
 		['passed (0.001 seconds).', 'skipped (0.001 seconds).'],
 		['passed (0.001 seconds).', 'failed (0.001 seconds).'],
@@ -155,7 +148,7 @@ module.exports = function run({
 		valid + foreign49,
 		foreign49 + valid,
 		'',
-		valid.replace(summary(29) + '\n', ''),
+		valid.replace(summary(22) + '\n', ''),
 		valid.replace(
 			"Test Suite 'OwnedLogDirectoryTests' started at fixed",
 			"Test Suite 'ForeignTests' started at fixed"

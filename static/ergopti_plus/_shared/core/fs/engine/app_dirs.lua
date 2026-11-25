@@ -34,6 +34,7 @@ return {
 		support_relative = "Library/Application Support/Ergopti",
 		cache_relative = "Library/Caches/Ergopti",
 		launcher_log = "launcher.log",
+		boot_journal = "boot_journal.log",
 		fatal_report = "hammerspoon-fatal.txt",
 		reload_breadcrumb = "reload_breadcrumb.txt",
 	},

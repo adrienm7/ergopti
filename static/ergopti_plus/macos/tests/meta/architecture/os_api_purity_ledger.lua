@@ -118,7 +118,7 @@ return {
 			["ai/engine/ollama/install_error_messages.lua"] = 1,
 			["core/i18n/engine/locale.lua"] = 1,
 			["core/lifecycle/engine/driver_control.lua"] = 1,
-			["core/logger/engine/logger.lua"] = 3,
+			["core/logger/engine/logger.lua"] = 2,
 			["core/network/engine/vscode_bridge.lua"] = 3,
 			["hotstrings/engine/catalogue/personal_hotstrings.lua"] = 1,
 			["hotstrings/engine/catalogue/personal_info_fields.lua"] = 1,

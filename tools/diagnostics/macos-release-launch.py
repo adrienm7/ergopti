@@ -275,7 +275,7 @@ def main():
             report["screenshot_exit"] = screenshot.returncode
         except subprocess.TimeoutExpired:
             report["screenshot_error"] = "Screenshot timed out"
-        for path in (launcher_log, logs / "ErgoptiPlus_boot.log"):
+        for path in (launcher_log, logs / app_dirs.BOOT_JOURNAL_NAME):
             if path.is_file():
                 shutil.copyfile(path, output / path.name)
         if logs.is_dir():

@@ -19,7 +19,7 @@ local function with_windows(scenario)
 		"ui.permission_dialog", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "core.events.timer_scheduler", "core.timing.engine.deferred_work",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
-		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "core.ui.engine.webview.i18n_seed",
 		"tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, script_refs = {}, deferred = {}, closed = 0 }

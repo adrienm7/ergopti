@@ -116,7 +116,7 @@ FATAL_WORD = re.compile(r"(?<![A-Za-z0-9_])FATAL(?![A-Za-z0-9_])")
 # LogsDirPath override, the driver's own logs (_shared/core/fs/data/paths/app_dirs.toml).
 LOGS_RELATIVE = app_dirs.LOGS_RELATIVE
 LAUNCHER_LOG_NAME = app_dirs.LAUNCHER_LOG_NAME
-FALLBACK_BOOT_LOG_NAME = "ErgoptiPlus_boot.log"
+FALLBACK_BOOT_LOG_NAME = app_dirs.BOOT_JOURNAL_NAME
 CONFIG_TEMPLATE = (
     Path(__file__).resolve().parents[2]
     / "static/ergopti_plus/macos/_generated/config_template.toml"
@@ -246,6 +246,7 @@ def write_source_run_logs(logs, today):
         encoding="utf-8",
     )
     (logs / f"ErgoptiPlus_errors_{today}.log").write_text("", encoding="utf-8")
+    # A topical sub-file an older release wrote; the retention sweep retires it.
     (logs / "ErgoptiPlus_gestures.log").write_text("source topical line\n", encoding="utf-8")
     (logs / "ErgoptiPlus_2020-01-01.log").write_text("stale dated archive\n", encoding="utf-8")
     for entry in logs.iterdir():

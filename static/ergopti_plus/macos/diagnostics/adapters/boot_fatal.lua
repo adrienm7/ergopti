@@ -33,7 +33,7 @@ local BootJournal = require("core.logger.adapters.boot_journal")
 -- One flushed-and-closed writer for every durable boot channel.
 local write_now = BootJournal.write_now
 
--- Tagged like the boot sequence so the [init] topical fan-out selects the line.
+-- Tagged like the boot sequence, so the fatal line reads as one of its stages.
 local LOG = "init"
 
 --- Environment variable naming the per-launch report file read by the launcher.

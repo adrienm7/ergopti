@@ -6,8 +6,8 @@
 --- The shared core (_shared/core/logger/engine) owns the line format, the severity
 --- filter, the ring and the dedup window, and all of that is pinned by a
 --- cross-driver corpus. What the core does NOT own is everything this driver
---- adds around it: the unified daily file, the errors-only mirror, the topical
---- fan-out, the level-aware flush policy, and the print() tee.
+--- adds around it: the unified daily file, the errors-only mirror, the
+--- level-aware flush policy, and the print() tee.
 ---
 --- That half was guarded almost entirely by SOURCE SCANNING. A test asserting
 --- that `_flush_dedup_summary` contains the substring "M.today_errors_path()" is not
@@ -25,8 +25,8 @@
 --- 1. The unified file receives the canonical "TIMESTAMP [LEVEL] [module] body".
 --- 2. WARNING and ERROR are mirrored to the errors-only file; INFO and DEBUG are
 ---    not — that file is small on purpose, and it is the first place to look.
---- 3. A line whose tag matches a topical pattern is fanned out to that sub-file;
----    an unrouted line goes only to the unified log.
+--- 3. One daily log: a line tagged like a retired topical sub-file
+---    ([karabiner]) goes to the unified log and opens no other file.
 --- 4. INFO and above flush immediately; DEBUG lines do not flush per line. The
 ---    default level is DEBUG and DEBUG lines come off the keystroke path, so a
 ---    per-line fsync would land inside the event tap.
@@ -40,13 +40,8 @@ local helpers = require("tests.helpers")
 
 local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
--- Tag that matches a topical pattern in the generated routing table
--- (_generated/logger_sub_files.lua routes "[karabiner" to its own sub-file).
-local ROUTED_TAG = "karabiner"
-
--- Tag deliberately absent from every routing pattern, so a line carrying it must
--- reach the unified log and nothing else.
-local UNROUTED_TAG = "zzz_unrouted"
+-- Tag the retired topical routing sent to ErgoptiPlus_karabiner.log.
+local RETIRED_TOPIC_TAG = "karabiner"
 
 -- Buffered DEBUG lines the driver allows before flushing anyway. Mirrors
 -- FLUSH_EVERY_N_DEBUG in core/logger/engine/logger.lua; the assertions below stay strictly
@@ -73,10 +68,7 @@ local SUPPRESSED_COUNT = 2
 --- logger wrote, keyed by path, plus a flush tally per path.
 ---
 --- Nothing touches the disk: the assertions are about which sink received which
---- bytes, and a real file would only add a temp directory to clean up. hs.fs
---- reports every file as modified today so the topical fan-out appends rather
---- than truncating — the daily-reset decision has its own dedicated test and is
---- deliberately not re-asserted here.
+--- bytes, and a real file would only add a temp directory to clean up.
 --- @param dir string Log directory to point the logger at for this capture.
 --- @param body function Callback run with the recorder installed, receiving the
 ---   live (writes, flushes) tables so a test can read a tally MID-capture — the
@@ -85,8 +77,6 @@ local SUPPRESSED_COUNT = 2
 --- @return table writes Map of path → array of written strings.
 --- @return table flushes Map of path → number of flush() calls.
 local function capture(dir, body)
-	local hs          = _G.hs
-	local saved_attrs = hs.fs and hs.fs.attributes or nil
 	local saved_open  = io.open
 	local saved_level = Logger.current_level
 	local writes      = {}
@@ -96,10 +86,6 @@ local function capture(dir, body)
 	-- before it ever reached a sink and leave these assertions measuring nothing.
 	Logger.set_level("DEBUG")
 	Logger.reset_dedup()
-
-	if hs.fs then
-		hs.fs.attributes = function(_path) return { modification = os.time() } end
-	end
 
 	io.open = function(path, _mode)
 		local key = tostring(path)
@@ -123,7 +109,6 @@ local function capture(dir, body)
 	local ok, err = pcall(body, writes, flushes)
 
 	io.open = saved_open
-	if hs.fs then hs.fs.attributes = saved_attrs end
 	Logger.set_level(saved_level)
 	Logger.reset_dedup()
 
@@ -159,15 +144,11 @@ local function summary_line(blob)
 	return nil
 end
 
---- Path of the topical sub-file the routed tag is expected to reach.
----
---- Derived from the unified log rather than from the directory handed to
---- init_log_path(): the logger normalizes that argument, so the folder the
---- unified log actually lands in is the one the fan-out uses too.
+--- Path of the retired topical sub-file the [karabiner] tag used to reach.
 --- @return string
-local function routed_sub_file()
+local function retired_sub_file()
 	local log_dir = Logger.today_log_path():match("^(.*/)") or ""
-	return log_dir .. "ErgoptiPlus_" .. ROUTED_TAG .. ".log"
+	return log_dir .. "ErgoptiPlus_" .. RETIRED_TOPIC_TAG .. ".log"
 end
 
 
@@ -315,47 +296,26 @@ end)
 
 
 
--- ======================================
--- ======================================
--- ======= 3/ The Topical Fan-Out =======
--- ======================================
--- ======================================
+-- =====================================
+-- =====================================
+-- ======= 3/ One Daily Log Only =======
+-- =====================================
+-- =====================================
 
-helpers.describe("logger file sinks — topical fan-out", function()
-	helpers.it("routes a matching line to its sub-file as well as the unified log", function()
-		local dir = "/tmp/ergopti_sinks_routed/"
+helpers.describe("logger file sinks — one daily log", function()
+	helpers.it("writes a [karabiner] line to the daily log and creates no topical file", function()
+		local dir = "/tmp/ergopti_sinks_retired_topic/"
 		local writes = capture(dir, function()
-			Logger.info(ROUTED_TAG, "routed body")
+			Logger.info(RETIRED_TOPIC_TAG, "daily-only body")
 		end)
 
-		local unified = text_of(writes, Logger.today_log_path())
-		local sub     = text_of(writes, routed_sub_file())
-
-		helpers.assert_true(has(unified, "routed body"),
-			"a routed line must ALSO be written to the unified log — the sub-files are a "
-			.. "filtered view, not a redirection")
-		helpers.assert_true(has(sub, "routed body"), string.format(
-			"the line tagged [%s] must reach %s. The topical logs exist so triage is one small "
-			.. "file rather than a grep over the day's whole volume; a fan-out that stops "
-			.. "matching leaves them empty and nothing reports it.", ROUTED_TAG, routed_sub_file()))
-	end)
-
-	helpers.it("leaves an unrouted line out of every sub-file", function()
-		local dir = "/tmp/ergopti_sinks_unrouted/"
-		local writes = capture(dir, function()
-			Logger.info(UNROUTED_TAG, "unrouted body")
-		end)
-
-		helpers.assert_true(has(text_of(writes, Logger.today_log_path()), "unrouted body"),
-			"the unrouted line must still reach the unified log")
-
+		helpers.assert_true(has(text_of(writes, Logger.today_log_path()), "daily-only body"),
+			"the line must reach the daily log")
+		helpers.assert_true(writes[retired_sub_file()] == nil,
+			"no line may open the retired " .. retired_sub_file() .. ": testers send one daily log")
 		for path, _ in pairs(writes) do
-			if path ~= Logger.today_log_path() and path ~= Logger.today_errors_path() then
-				helpers.assert_true(not has(text_of(writes, path), "unrouted body"), string.format(
-					"a line matching no routing pattern reached the sub-file %s. A fan-out that "
-					.. "over-matches makes every topical log a copy of the main one, which costs "
-					.. "the disk and destroys the reason to open them.", path))
-			end
+			helpers.assert_true(path == Logger.today_log_path(), string.format(
+				"an INFO line opened %s besides the daily log", path))
 		end
 	end)
 end)
@@ -574,12 +534,12 @@ end)
 
 
 helpers.describe("logger file sinks — canonical privacy", function()
-	helpers.it("mac-logger-privacy: daily errors and topical records redact multiline bodies before fanout", function()
+	helpers.it("mac-logger-privacy: daily and errors records redact multiline bodies before persistence", function()
 		local writes = capture("/tmp/ergopti_privacy_sinks/", function()
 			Logger.claim_core_hooks()
-			Logger.error(ROUTED_TAG, "PrivateUser failed\n/Users/PrivateUser/cache; PrivateUser2; password=secret12345")
+			Logger.error(RETIRED_TOPIC_TAG, "PrivateUser failed\n/Users/PrivateUser/cache; PrivateUser2; password=secret12345")
 		end)
-		for _, path in ipairs({ Logger.today_log_path(), Logger.today_errors_path(), routed_sub_file() }) do
+		for _, path in ipairs({ Logger.today_log_path(), Logger.today_errors_path() }) do
 			local text = text_of(writes, path)
 			helpers.assert_contains(text, "[ERROR] [karabiner] <user> failed\n~/cache; PrivateUser2; password=<secret>")
 			helpers.assert_true(not has(text, "/Users/PrivateUser"))

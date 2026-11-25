@@ -31,8 +31,8 @@ M.WITHHELD = Data.withheld
 
 --- Pre-logger files each platform writes in its DEFAULT logs folder.
 local PRE_LOGGER = {
-	hs = { AppDirs.files.bootstrap_log, AppDirs.macos.launcher_log, AppDirs.macos.fatal_report,
-		AppDirs.macos.reload_breadcrumb },
+	hs = { AppDirs.files.bootstrap_log, AppDirs.macos.boot_journal, AppDirs.macos.launcher_log,
+		AppDirs.macos.fatal_report, AppDirs.macos.reload_breadcrumb },
 	linux = { AppDirs.files.bootstrap_log },
 	ahk = { AppDirs.files.bootstrap_log },
 }

@@ -22,7 +22,7 @@ local function fixture(callback, cleanup_failures)
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"core.process.adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
-			"_generated.locale_table", "_generated.logger_sub_files", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
+			"_generated.locale_table", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
 			"diagnostics.engine.reports.redact", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders", "core.logger.engine", "menu.engine.labels",
 		}, function()
 			local state = { creates = 0, bridges = 0, views = {}, contents = {}, payloads = {}, confirmations = 0 }

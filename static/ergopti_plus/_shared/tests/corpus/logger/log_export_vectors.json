@@ -75,6 +75,7 @@
 				"ErgoptiPlus_karabiner.log"
 			],
 			"default": [
+				"boot_journal.log",
 				"launcher.log",
 				"hammerspoon-fatal.txt",
 				"reload_breadcrumb.txt",
@@ -91,6 +92,11 @@
 					"folder": "logs",
 					"name": "ErgoptiPlus_2026-03-01.log",
 					"archive": "ErgoptiPlus_2026-03-01.log"
+				},
+				{
+					"folder": "default",
+					"name": "boot_journal.log",
+					"archive": "boot_journal.log"
 				},
 				{
 					"folder": "default",

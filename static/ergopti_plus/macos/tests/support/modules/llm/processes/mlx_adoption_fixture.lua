@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local OWNED = {
 	"core.logger.engine.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
-	"core.logger.engine.log_folders", "_generated.logger_sub_files", "core.logger.adapters.log_transport",
+	"core.logger.engine.log_folders", "core.logger.adapters.log_transport",
 	"core.lifecycle.engine.launcher_environment", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 	"settings.engine.paths", "core.text.engine.utils", "ai.engine.api.common",
 	"core.process.adapters.task_lifecycle", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
