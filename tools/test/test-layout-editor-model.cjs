@@ -7,7 +7,10 @@
  * Runs the editor's pure scripts in a vm context, in the order the page loads
  * them (the vendored TOML codec included), and checks the source I/O module
  * and the editing model: round trips, refusals, .keylayout preservation and
- * projection, the navigation layer conversion, dead-key typing and history.
+ * projection, the navigation layer conversion, dead-key typing and history,
+ * and a layout's own repeat and magic keys: placed by the key panel, their
+ * tables created with the first key and removed with the last, kept through
+ * a swap, and a Kawalyzer « Clever Keys » table saved and read back.
  * ==============================================================================
  */
 
@@ -190,6 +193,85 @@ test('modifiers, layers and dead keys still in use cannot be removed', () => {
 	doc = M.setMapping(doc, 'base', 'BracketLeft', { dead_key: 'circ' }, null);
 	refuses(() => M.removeDeadKey(doc, 'circ'), 'dead_key_in_use');
 	refuses(() => M.setModifier(doc, 'shift', 'held', ['Fn']), 'source_duplicate');
+});
+
+test('a repeat or magic key is placed, its table follows its keys and saves', () => {
+	let doc = IO.create('a', 'A');
+	doc = M.setMapping(doc, 'base', 'IntlBackslash', { repeat: 2 }, null);
+	refuses(() => M.setMapping(doc, 'base', 'KeyQ', { repeat: 3 }, null), 'source_invalid');
+	// The first magic key creates its table empty, with the empty fallback.
+	doc = M.setMapping(doc, 'base', 'KeyL', { magic: 'sfb' }, null);
+	assert.deepEqual(plain(doc.magic), [{ id: 'sfb', fallback: '', rules: [] }]);
+	doc = M.setMagicRule(doc, 'sfb', 'e', 'd');
+	doc = M.setMagicRule(doc, 'sfb', 'ce', 's');
+	doc = M.setMagicFallback(doc, 'sfb', 'x');
+	refuses(() => M.setMagicRule(doc, 'sfb', 'abc', 'd'), 'source_magic_context');
+	refuses(() => M.setMagicRule(doc, 'sfb', 'e', 'de'), 'source_invalid');
+	refuses(() => M.setMagicRule(doc, 'other', 'e', 'd'), 'magic_unknown');
+	// A second key on the same table, then a swap with a key of another table:
+	// both tables keep their rules.
+	doc = M.setMapping(doc, 'base', 'KeyK', { magic: 'sfb' }, null);
+	doc = M.setMapping(doc, 'base', 'KeyJ', { magic: 'second' }, null);
+	doc = M.setMagicRule(doc, 'second', 'a', 'b');
+	doc = M.transferMapping(doc, 'base', 'KeyK', 'KeyJ', null, false);
+	assert.deepEqual(
+		plain(doc.magic).map((entry) => [entry.id, entry.rules.length]),
+		[
+			['sfb', 2],
+			['second', 1]
+		]
+	);
+	doc = M.transferMapping(doc, 'base', 'KeyL', 'KeyK', null, false);
+	assert.equal(doc.magic.find((entry) => entry.id === 'sfb').rules.length, 2);
+	// Saved and read back through the source format, as the page saves it.
+	const text = IO.serialize(doc);
+	assert.deepEqual(plain(IO.parse(text).doc), plain(doc));
+	// The swaps left KeyL on « second », KeyK and KeyJ on « sfb ». The last
+	// key of a table changed: the table goes; an earlier snapshot (undo) keeps it.
+	const before = doc;
+	doc = M.setMapping(doc, 'base', 'KeyK', null, null);
+	doc = M.setMapping(doc, 'base', 'KeyL', { text: 'l' }, null);
+	assert.deepEqual(
+		plain(doc.magic).map((entry) => entry.id),
+		['sfb'],
+		'the table no key names is removed'
+	);
+	doc = M.setMapping(doc, 'base', 'KeyJ', null, null);
+	assert.equal(doc.magic, undefined);
+	assert.equal(plain(before.magic).length, 2, 'the earlier snapshot keeps both tables');
+});
+
+test('a Kawalyzer « Clever Keys » file fills a magic table that saves and reads back', () => {
+	// The Studio's reader of other formats (layout_formats.js), pure, in its own context.
+	const formats = vm.createContext({});
+	vm.runInContext(
+		fs.readFileSync(path.join(UI, 'layout_analysis', 'layout_formats.js'), 'utf8'),
+		formats
+	);
+	const F = vm.runInContext('LAYOUT_FORMATS', formats);
+	const read = F.fromKawalyzerRules(
+		fs.readFileSync(
+			path.join(ROOT, 'tools', 'test', 'fixtures', 'layout-formats', 'kawalyzer-clever-keys.json'),
+			'utf8'
+		)
+	);
+	let doc = M.setMapping(IO.create('a', 'A'), 'base', 'Quote', { magic: 'clever' }, null);
+	doc = M.setMagicRules(doc, 'clever', read.rules);
+	doc = M.setMagicFallback(doc, 'clever', read.fallback);
+	const back = IO.parse(IO.serialize(doc));
+	assert.equal(back.ok, true);
+	assert.deepEqual(plain(back.doc.magic), [
+		{
+			id: 'clever',
+			fallback: 'à',
+			rules: [
+				{ after: 'é', types: 'e' },
+				{ after: 's', types: 'c' },
+				{ after: 'ea', types: 'u' }
+			]
+		}
+	]);
+	assert.deepEqual(plain(back.doc.layers[0].keys.Quote), { magic: 'clever' });
 });
 
 test('the most specific layer the held modifiers reach is chosen', () => {

@@ -200,6 +200,26 @@ module.exports = [
 			])
 	},
 	{
+		prefix: 'layout_editor.context.repeat_',
+		files: [PAGE],
+		source: 'the repeat depths of source_model.js CONTEXT_KEYS (REPEAT_DEPTHS of editor_page.js)',
+		keys: () =>
+			ctx.keysOf(
+				'layout_editor.context.repeat_',
+				model('LayoutSource.CONTEXT_KEYS.repeat_depths').map(String)
+			)
+	},
+	{
+		prefix: 'layout_editor.magic.reason.',
+		files: [PAGE],
+		source: 'KAWALYZER_REASONS of layout_analysis/layout_formats.js',
+		keys: () =>
+			ctx.keysOf(
+				'layout_editor.magic.reason.',
+				ctx.literal(UI + 'layout_analysis/layout_formats.js', 'KAWALYZER_REASONS')
+			)
+	},
+	{
 		prefix: 'layout_editor.kind.',
 		files: [PAGE],
 		source: 'MAPPING_CHOICES and CONTEXT_KINDS of editor_page.js',

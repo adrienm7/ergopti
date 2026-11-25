@@ -86,6 +86,22 @@ var LAYOUT_FORMATS = (function () {
 		// Oxeylyzer's legacy layout files: three rows of keys, as plain text.
 		'kb'
 	];
+	// Kawalyzer's replacement files (fromKawalyzerRules): the two lists of
+	// rules, the characters its key strings write for its special keys, and the
+	// longest context a magic table holds (source_model.js CONTEXT_KEYS, held
+	// equal by tools/test/test-layout-formats.cjs).
+	const KAWALYZER_LISTS = ['essentialCorrections', 'optionalCorrections'];
+	const KAWALYZER_KEYS = Object.freeze({ magic: '#', repeat: '$', dead: '*' });
+	const KAWALYZER_CONTEXT_MAX = 2;
+	// Why a Kawalyzer rule stays out of a magic table, each worded in every
+	// locale (layout_editor.magic.reason.<reason>).
+	const KAWALYZER_REASONS = [
+		'kawalyzer_not_magic',
+		'kawalyzer_long_output',
+		'kawalyzer_long_context',
+		'kawalyzer_condition',
+		'kawalyzer_duplicate'
+	];
 	// The refusals and losses a page words in the user's language
 	// (layout_analysis.formats.refused.* and .loss.* in every locale).
 	const REFUSALS = [
@@ -2064,6 +2080,80 @@ var LAYOUT_FORMATS = (function () {
 	}
 
 	/**
+	 * A Kawalyzer « Clever Keys » file (the JSON of its replacements: lists
+	 * essentialCorrections and optionalCorrections of {text, keys}, where the
+	 * keys write the magic key « # », the repeat key « $ » and the dead key
+	 * « * »; nbodinripert/kawalyzer, GPL-3.0, its format read on 2026-11-25
+	 * without copying its code) as the rules of one magic key's table
+	 * (docs/design/magic-and-repeat-keys.md). A rule maps when its keys are
+	 * characters typed as themselves then the magic key, and its text is those
+	 * characters then the one character the magic key types; the magic key
+	 * alone typing one character is the table's fallback. Every other rule is
+	 * returned in `unmapped` with the reason the table cannot hold it.
+	 * @param {string|object} input - The file's text, or its parsed JSON.
+	 * @returns {{format: string, rules: Array<{after: string, types: string}>,
+	 *   fallback: string|null, unmapped: Array<{text: string, keys: string, reason: string}>}}
+	 * @throws {Error} format_syntax for a JSON error, format_invalid for a
+	 *   document that is not a Kawalyzer replacements file.
+	 */
+	function fromKawalyzerRules(input) {
+		const json = typeof input === 'string' ? parseJson(input) : input;
+		const isObject = json !== null && typeof json === 'object' && !Array.isArray(json);
+		const lists = isObject
+			? KAWALYZER_LISTS.filter((name) => Object.prototype.hasOwnProperty.call(json, name))
+			: [];
+		if (lists.length === 0)
+			fail('format_invalid', 'kawalyzer: no essentialCorrections nor optionalCorrections');
+		const result = { format: 'kawalyzer_rules', rules: [], fallback: null, unmapped: [] };
+		const unmapped = [];
+		for (const name of lists) {
+			if (!Array.isArray(json[name])) fail('format_invalid', `kawalyzer ${name} is not a list`);
+			json[name].forEach((rule, index) => {
+				const valid =
+					rule &&
+					typeof rule === 'object' &&
+					typeof rule.text === 'string' &&
+					rule.text !== '' &&
+					typeof rule.keys === 'string';
+				if (!valid) fail('format_invalid', `kawalyzer ${name}[${index}]`);
+				const reason = kawalyzerReason(rule, result);
+				const after = Array.from(rule.keys).slice(0, -1).join('');
+				const types = Array.from(rule.text).slice(-1)[0];
+				if (reason) result.unmapped.push({ text: rule.text, keys: rule.keys, reason });
+				else if (after === '') result.fallback = types;
+				else result.rules.push({ after, types });
+			});
+		}
+		return result;
+	}
+
+	/** Why a Kawalyzer rule is no rule of a magic table, or null when it is one. */
+	function kawalyzerReason(rule, result) {
+		const keys = Array.from(rule.keys);
+		const text = Array.from(rule.text);
+		const before = keys.slice(0, -1);
+		const literal =
+			keys[keys.length - 1] === KAWALYZER_KEYS.magic &&
+			before.every((key) => !Object.values(KAWALYZER_KEYS).includes(key)) &&
+			before.join('') === text.slice(0, before.length).join('');
+		if (!literal) return 'kawalyzer_not_magic';
+		if (text.length - before.length !== 1) return 'kawalyzer_long_output';
+		if (before.length > KAWALYZER_CONTEXT_MAX) return 'kawalyzer_long_context';
+		const conditioned =
+			rule.noLetterBefore === true ||
+			rule.noLetterAfter === true ||
+			(rule.allowedBefore || []).length > 0 ||
+			(rule.allowedAfter || []).length > 0;
+		if (conditioned) return 'kawalyzer_condition';
+		const kept =
+			before.length === 0
+				? result.fallback !== null
+				: result.rules.some((rule) => rule.after === before.join(''));
+		if (kept) return 'kawalyzer_duplicate';
+		return null;
+	}
+
+	/**
 	 * The format a pasted text is in, from its content alone (no file name):
 	 * the reader readText would use, or null when none matches.
 	 * @param {string} text - The pasted text.
@@ -3231,6 +3321,9 @@ var LAYOUT_FORMATS = (function () {
 		fromKeylayout,
 		fromKbe,
 		fromCyanophage,
+		fromKawalyzerRules,
+		KAWALYZER_REASONS,
+		KAWALYZER_CONTEXT_MAX,
 		FORMAT_NAMES,
 		formatNameKey,
 		detect,
