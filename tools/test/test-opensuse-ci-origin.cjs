@@ -316,6 +316,15 @@ try {
 		'package.json',
 		helperRelative
 	];
+	// install.sh stages the XKB helpers from the checkout's static/ergopti/linux
+	// (install/xkb_helpers.sh), which the first-install copy carries along.
+	for (const folder of ['xkb_generation', 'xkb_installation']) {
+		const base = `static/ergopti/linux/${folder}`;
+		for (const entry of fs.readdirSync(path.join(ROOT, base), { recursive: true })) {
+			const relative = `${base}/${entry}`;
+			if (fs.statSync(path.join(ROOT, relative)).isFile()) inputs.push(relative);
+		}
+	}
 	// Installer libraries belong to the same genuine driver subtree. Source the
 	// guard's declared library below without acquiring dependencies or compiling.
 	const installLibraries = 'static/ergopti_plus/linux/install';
