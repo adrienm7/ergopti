@@ -6471,5 +6471,22 @@
 	"ollama.uninstall.keep_models_button": "保留模型",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★：打开热字符串编辑器",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★：打开热字符串编辑器",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Windows 上为 Win+★，Linux 上为 Super+★，macOS 上为 Ctrl+★：Mac 键盘没有 Windows 键，而 Ctrl 是 Cmd 旁边空闲的修饰键。"
+	"platform_reason.star_slot_is_ctrl_on_macos": "Windows 上为 Win+★，Linux 上为 Super+★，macOS 上为 Ctrl+★：Mac 键盘没有 Windows 键，而 Ctrl 是 Cmd 旁边空闲的修饰键。",
+	"menu.keep_awake.title": "防止休眠",
+	"menu.keep_awake.header_presets": "预设",
+	"menu.keep_awake.header_options": "当前预设",
+	"menu.keep_awake.keep_awake": "阻止休眠",
+	"menu.keep_awake.auto_click": "自动点击",
+	"menu.keep_awake.click_count": "已执行的自动点击：{1}",
+	"keepawake.preset.simple": "简单防休眠",
+	"keepawake.preset.vscode": "在 VS Code 中防休眠",
+	"keepawake.preset.teams": "在 Teams 中防休眠",
+	"keepawake.preset_empty": "此预设既不阻止休眠也不点击任何内容：请在 « 防止休眠 » 菜单中开启其中一个选项。",
+	"keepawake.auto_click_refused": "无法启动自动点击：原因见 « 防止休眠 » 菜单。",
+	"keepawake.reason.auto_click_wayland": "Wayland 不允许任何应用移动指针；请使用 X11 会话进行自动点击",
+	"keepawake.reason.auto_click_tool_missing": "未安装 xdotool；请安装后再使用自动点击",
+	"keepawake.reason.capture_permission_missing": "未允许 Ergopti 录制屏幕：请在系统设置 › 隐私与安全性中允许",
+	"keepawake.reason.capture_unavailable": "此处无法读取屏幕",
+	"keepawake.reason.ocr_engine_missing": "无法使用文字识别（Linux 上请安装 tesseract）；图像目标仍可使用",
+	"keepawake.reason.ocr_language_missing": "未安装适用于您语言的文字识别语言"
 }

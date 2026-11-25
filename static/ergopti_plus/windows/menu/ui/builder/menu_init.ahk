@@ -146,6 +146,7 @@ _MI_TopLevelBuilders() {
 		"llm",             _MI_StageLlm,
 		"agent",           _MI_StageAgent,
 		"metrics",         _MI_StageMetrics,
+		"keep_awake",      _MI_StageKeepAwake,
 		"shortcuts",       _MI_StageShortcuts,
 		ConfigLeaf.TAP_HOLDS,       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,

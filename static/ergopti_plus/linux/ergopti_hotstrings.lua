@@ -3297,6 +3297,8 @@ local function main()
 			})
 		end)(menu_builder, tray_menu, _build_menu_ctx)
 		rebuild_tray_menu = privacy_owners.menu_rebuild.request
+		-- A preset edit or an automatic click changes the « Anti-veille » rows.
+		require("modules.auto_click").on_change(function() rebuild_tray_menu() end)
 		rebuild_tray_menu()
 		privacy_owners.menu_rebuild.pump()
 

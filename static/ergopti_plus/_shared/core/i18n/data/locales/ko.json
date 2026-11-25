@@ -6471,5 +6471,22 @@
 	"ollama.uninstall.keep_models_button": "모델 유지",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: 핫스트링 편집기 열기",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: 핫스트링 편집기 열기",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Windows에서는 Win+★, Linux에서는 Super+★, macOS에서는 Ctrl+★: Mac 키보드에는 Windows 키가 없고, Ctrl은 Cmd 옆의 비어 있는 수정 키입니다."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Windows에서는 Win+★, Linux에서는 Super+★, macOS에서는 Ctrl+★: Mac 키보드에는 Windows 키가 없고, Ctrl은 Cmd 옆의 비어 있는 수정 키입니다.",
+	"menu.keep_awake.title": "절전 방지",
+	"menu.keep_awake.header_presets": "프리셋",
+	"menu.keep_awake.header_options": "활성 프리셋",
+	"menu.keep_awake.keep_awake": "절전 모드 방지",
+	"menu.keep_awake.auto_click": "자동 클릭",
+	"menu.keep_awake.click_count": "수행한 자동 클릭: {1}",
+	"keepawake.preset.simple": "기본 절전 방지",
+	"keepawake.preset.vscode": "VS Code에서 절전 방지",
+	"keepawake.preset.teams": "Teams에서 절전 방지",
+	"keepawake.preset_empty": "이 프리셋은 절전을 막지도, 클릭하지도 않습니다. « 절전 방지 » 메뉴에서 옵션 중 하나를 켜세요.",
+	"keepawake.auto_click_refused": "자동 클릭을 시작할 수 없습니다. 이유는 « 절전 방지 » 메뉴에 표시됩니다.",
+	"keepawake.reason.auto_click_wayland": "Wayland에서는 어떤 앱도 포인터를 움직일 수 없습니다. 자동 클릭에는 X11 세션을 사용하세요",
+	"keepawake.reason.auto_click_tool_missing": "xdotool이 설치되어 있지 않습니다. 자동 클릭을 하려면 설치하세요",
+	"keepawake.reason.capture_permission_missing": "Ergopti에 화면 기록이 허용되지 않았습니다. 시스템 설정 › 개인정보 보호 및 보안에서 허용하세요",
+	"keepawake.reason.capture_unavailable": "여기에서는 화면을 읽을 수 없습니다",
+	"keepawake.reason.ocr_engine_missing": "텍스트 인식을 사용할 수 없습니다(Linux에서는 tesseract 설치). 이미지 대상은 계속 작동합니다",
+	"keepawake.reason.ocr_language_missing": "사용하는 언어에 맞는 텍스트 인식 언어가 설치되어 있지 않습니다"
 }

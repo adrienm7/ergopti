@@ -6471,5 +6471,22 @@
 	"ollama.uninstall.keep_models_button": "Зберегти моделі",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Відкрити редактор хотстрінгів",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Відкрити редактор хотстрінгів",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ у Windows, Super+★ у Linux, Ctrl+★ у macOS: на клавіатурі Mac немає клавіші Windows, а Ctrl там вільний модифікатор поруч із Cmd."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Win+★ у Windows, Super+★ у Linux, Ctrl+★ у macOS: на клавіатурі Mac немає клавіші Windows, а Ctrl там вільний модифікатор поруч із Cmd.",
+	"menu.keep_awake.title": "Без сну",
+	"menu.keep_awake.header_presets": "Передустановки",
+	"menu.keep_awake.header_options": "Активна передустановка",
+	"menu.keep_awake.keep_awake": "Не давати заснути",
+	"menu.keep_awake.auto_click": "Автоматичні клацання",
+	"menu.keep_awake.click_count": "Виконано автоматичних клацань: {1}",
+	"keepawake.preset.simple": "Простий режим без сну",
+	"keepawake.preset.vscode": "Без сну у VS Code",
+	"keepawake.preset.teams": "Без сну в Teams",
+	"keepawake.preset_empty": "Ця передустановка не заважає сну й нічого не натискає: увімкніть один із її параметрів у меню « Без сну ».",
+	"keepawake.auto_click_refused": "Не вдалося запустити автоматичні клацання: причину вказано в меню « Без сну ».",
+	"keepawake.reason.auto_click_wayland": "Wayland не дозволяє застосункам переміщати вказівник; для автоматичних клацань використовуйте сеанс X11",
+	"keepawake.reason.auto_click_tool_missing": "xdotool не встановлено; встановіть його для автоматичних клацань",
+	"keepawake.reason.capture_permission_missing": "Запис екрана для Ergopti не дозволено: дозвольте його в Системних параметрах › Приватність і безпека",
+	"keepawake.reason.capture_unavailable": "Тут неможливо прочитати екран",
+	"keepawake.reason.ocr_engine_missing": "Розпізнавання тексту недоступне (у Linux встановіть tesseract); цілі-зображення й далі працюють",
+	"keepawake.reason.ocr_language_missing": "Для ваших мов не встановлено мову розпізнавання тексту"
 }

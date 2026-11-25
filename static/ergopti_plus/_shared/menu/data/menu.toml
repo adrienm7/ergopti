@@ -325,6 +325,18 @@ rows = []
 checked_when = ["keystats_enabled"]
 boot_deferred = true
 
+# The anti-sleep mode's presets and options (maintainer, 2026-11-25). Ctrl+M
+# toggles the mode with the active preset; this submenu picks the preset and
+# switches its parts. Its rows are runtime data (the user's presets), so both
+# lists are filled by each driver from the shared presets store
+# (_shared/shortcuts/engine/keep_awake_presets.lua) and drawn by the renderer.
+[[menu.top_level]]
+type = "group"
+id = "keep_awake"
+i18n = "menu.keep_awake.title"
+rows = []
+boot_deferred = true
+
 [[menu.top_level]]
 id = "---"
 
@@ -968,6 +980,26 @@ disabled_when = ["agent_system_model_ready"]
 type = "list"
 id = "apps_installed"
 platforms = ["ahk", "hs", "linux"]
+
+# The « Anti-veille » submenu: the presets as one single-choice group, then the
+# active preset's switches, its click counter and the reason anything cannot
+# run (row data from _shared/shortcuts/engine/keep_awake_menu.lua and its
+# Windows twin).
+[[menu.keep_awake_menu]]
+type = "section_header"
+i18n = "menu.keep_awake.header_presets"
+
+[[menu.keep_awake_menu]]
+type = "list"
+id = "keep_awake_presets"
+
+[[menu.keep_awake_menu]]
+type = "section_header"
+i18n = "menu.keep_awake.header_options"
+
+[[menu.keep_awake_menu]]
+type = "list"
+id = "keep_awake_options"
 
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing

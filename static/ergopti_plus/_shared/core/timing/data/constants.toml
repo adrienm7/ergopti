@@ -568,6 +568,15 @@ mouse_check_poll_ms = 150
 inhibitor_poll_ms = 1000
 inhibitor_ready_timeout_ms = 5000
 
+# The anti-sleep auto-clicker: how often it looks at the allowed foreground
+# window, and how long one library target waits before it may be clicked
+# again, so a button still drawn for a frame after its click is not pressed
+# twice (maintainer decision of 2026-11-25).
+# LX: modules/auto_click.lua. HS: modules/shortcuts/actions/auto_click.lua.
+# AHK: modules/shortcuts/auto_click.ahk.
+auto_click_tick_ms = 700
+auto_click_cooldown_ms = 3000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Screen vision (capture, image matching, text recognition)

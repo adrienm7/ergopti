@@ -6471,5 +6471,22 @@
 	"ollama.uninstall.keep_models_button": "Modelleri sakla",
 	"menu.shortcuts.keyboard.meta_star": "Win / Super + ★: Hotstring düzenleyicisini aç",
 	"menu.shortcuts.keyboard.secondary_star": "Ctrl + ★: Hotstring düzenleyicisini aç",
-	"platform_reason.star_slot_is_ctrl_on_macos": "Windows’ta Win+★, Linux’ta Super+★, macOS’ta Ctrl+★: Mac klavyesinde Windows tuşu yoktur ve Ctrl orada Cmd’nin yanındaki boş değiştirici tuştur."
+	"platform_reason.star_slot_is_ctrl_on_macos": "Windows’ta Win+★, Linux’ta Super+★, macOS’ta Ctrl+★: Mac klavyesinde Windows tuşu yoktur ve Ctrl orada Cmd’nin yanındaki boş değiştirici tuştur.",
+	"menu.keep_awake.title": "Uyku engelleme",
+	"menu.keep_awake.header_presets": "Ön ayarlar",
+	"menu.keep_awake.header_options": "Etkin ön ayar",
+	"menu.keep_awake.keep_awake": "Uykuyu engelle",
+	"menu.keep_awake.auto_click": "Otomatik tıklamalar",
+	"menu.keep_awake.click_count": "Yapılan otomatik tıklamalar: {1}",
+	"keepawake.preset.simple": "Basit uyku engelleme",
+	"keepawake.preset.vscode": "VS Code'da uyku engelleme",
+	"keepawake.preset.teams": "Teams'te uyku engelleme",
+	"keepawake.preset_empty": "Bu ön ayar uykuyu engellemiyor ve hiçbir şeye tıklamıyor: « Uyku engelleme » menüsünden seçeneklerinden birini açın.",
+	"keepawake.auto_click_refused": "Otomatik tıklamalar başlatılamadı: nedeni « Uyku engelleme » menüsünde yazıyor.",
+	"keepawake.reason.auto_click_wayland": "Wayland hiçbir uygulamanın işaretçiyi taşımasına izin vermez; otomatik tıklama için bir X11 oturumu kullanın",
+	"keepawake.reason.auto_click_tool_missing": "xdotool yüklü değil; otomatik tıklama için yükleyin",
+	"keepawake.reason.capture_permission_missing": "Ergopti için ekran kaydına izin verilmiyor: Sistem Ayarları › Gizlilik ve Güvenlik bölümünden izin verin",
+	"keepawake.reason.capture_unavailable": "Ekran burada okunamıyor",
+	"keepawake.reason.ocr_engine_missing": "Metin tanıma kullanılamıyor (Linux'ta tesseract yükleyin); görüntü hedefleri yine çalışır",
+	"keepawake.reason.ocr_language_missing": "Dilleriniz için metin tanıma dili yüklü değil"
 }

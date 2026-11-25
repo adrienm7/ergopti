@@ -263,6 +263,12 @@ end
 local ADAPTER_SPECS = {
 	-- Reachable interfaces only; native execution and consent are checked separately.
 	{
+		id       = "adapters.auto_click_ports",
+		contract = { "ports" },
+		-- The anti-sleep auto-clicker builds its session ports when Ctrl+M starts it.
+		wired    = true,
+	},
+	{
 		id       = "adapters.apple_shortcuts",
 		contract = { "valid_identifier", "validate_reply", "new" },
 		wired    = true,
