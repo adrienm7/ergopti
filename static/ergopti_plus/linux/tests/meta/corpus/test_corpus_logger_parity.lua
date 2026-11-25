@@ -69,5 +69,4 @@ dofile(shared_root .. "/tests/corpus/logger/parity_replay.lua")({
 	end,
 	emit_body = emit_body,
 	dated_expired = Sink.dated_log_expired,
-	topical_stale = Sink.topical_log_stale,
 })

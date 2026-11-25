@@ -251,12 +251,13 @@ check(
 		);
 	}
 	// The purge lists the folder natively, ages each rolled file against the
-	// retention window and each topical view against today (the dated_retention
-	// and topical_retention cases of parity_vectors.json), and removes the expired ones.
+	// retention window (the dated_retention cases of parity_vectors.json),
+	// deletes the retired topical sub-files by exact name, and removes the
+	// expired ones.
 	const agePurge =
 		/NativeDirectory\.entries\(?[^\n]*|NativeDirectory\.entries/.test(sink) &&
 		/M\.dated_log_expired\(date, now, days\)/.test(sink) &&
-		/M\.topical_log_stale\(stat\.modified, now\)/.test(sink) &&
+		/AppDirs\.files\.retired_topical_logs/.test(sink) &&
 		/pcall\(os\.remove, path\)/.test(sink);
 	if (!agePurge) {
 		errors.push(
