@@ -273,6 +273,8 @@
 .la-panel .la-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	position: absolute;
 	white-space: nowrap;

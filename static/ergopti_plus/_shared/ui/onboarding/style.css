@@ -486,12 +486,12 @@ legend {
 
 /* Each box is 16 px and the rows 26 px apart at least: the boxes were 13 px,
    23.5 px apart, under the 24 px a pointer target needs (WCAG 2.5.8). */
+/* The row is its checkbox's 44 px target (theme.css), the box centred in it. */
 .check-row {
-	align-items: flex-start;
+	align-items: center;
 	cursor: pointer;
 	display: flex;
 	gap: 8px;
-	min-height: 26px;
 	padding: 4px 0;
 }
 

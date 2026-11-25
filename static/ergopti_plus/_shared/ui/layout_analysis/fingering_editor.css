@@ -35,12 +35,14 @@
    Here, not in the Comparer's stylesheet, because the editor's analysis panel
    draws one too (« Import a fingering »): there the native control showed
    beside the button and, at 200 % text on a phone, made the page scroll
-   sideways. */
+   sideways. The hidden control keeps its 1 px, so the label carries the
+   44 px target (theme.css). */
 .la-file {
 	align-items: center;
 	display: inline-flex;
 	gap: 8px;
 	max-width: 100%;
+	min-height: var(--theme-target-min);
 	position: relative;
 }
 
@@ -49,6 +51,8 @@
 	clip-path: inset(50%);
 	height: 1px;
 	margin: -1px;
+	min-block-size: 0;
+	min-inline-size: 0;
 	overflow: hidden;
 	padding: 0;
 	position: absolute;

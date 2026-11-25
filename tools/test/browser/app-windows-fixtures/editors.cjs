@@ -12,6 +12,8 @@
 
 'use strict';
 
+const assert = require('node:assert/strict');
+
 /** Waits until the page's locale strings have landed, as a host's late calls do. */
 function stringsLoaded(page) {
 	return page.waitForFunction(
@@ -191,10 +193,19 @@ module.exports = [
 				}
 			},
 			{
+				// The row's checkbox answers on its whole 44 px label (WCAG 2.5.5),
+				// not only on its 14 px box: a click on the label's edge selects
+				// the row and opens no entry.
 				name: 'selection',
 				enter: async (page) => {
-					await page.check('.entry-cb >> nth=0');
-					await page.locator('#bulk-bar').waitFor();
+					await page.locator('.entry-cb-wrap >> nth=0').click({ position: { x: 2, y: 2 } });
+					await page.locator('#bulk-bar').waitFor({ timeout: 5000 });
+					assert.ok(await page.isChecked('.entry-cb >> nth=0'), 'The label selects its row');
+					assert.equal(
+						await page.locator('#entry-modal.on').count(),
+						0,
+						'A click on the checkbox label opens no entry'
+					);
 				}
 			},
 			{

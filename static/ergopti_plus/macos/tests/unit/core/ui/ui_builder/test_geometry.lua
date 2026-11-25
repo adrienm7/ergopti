@@ -36,7 +36,7 @@ helpers.describe("ui_builder.get_app_geometry: single-sources window size from t
 		helpers.assert_true(type(geo) == "table", "geometry must be a table for a known id")
 		-- Canonical hotstring_editor size in _shared/ui/apps.manifest.json.
 		helpers.assert_eq(geo.width, 960, "hotstring_editor width must come from the manifest")
-		helpers.assert_eq(geo.height, 640, "hotstring_editor height must come from the manifest")
+		helpers.assert_eq(geo.height, 660, "hotstring_editor height must come from the manifest")
 	end)
 
 	helpers.it("returns nil (fail-loud) for an unknown app id", function()

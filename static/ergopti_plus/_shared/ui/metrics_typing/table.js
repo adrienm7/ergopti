@@ -894,7 +894,10 @@ function render_kc_heatmap(kc_data_arr) {
 	const GAP = 4;
 	const R = 5;
 	const KW = U - GAP;
-	const KH = Math.round(U * 0.88 - GAP);
+	// A key is 44 px tall, a pointer target of WCAG 2.5.5, and the rows stand
+	// 48 px apart (ROWS_PX over the Y span), GAP px between them.
+	const KH = Math.round(U * 0.96 - GAP);
+	const ROWS_PX = 6 * U;
 	const PAD = 8; // padding around the full keyboard in px
 
 	// Key y-coordinates span Y_BOT (thumb row) to Y_TOP (fn row)
@@ -997,7 +1000,7 @@ function render_kc_heatmap(kc_data_arr) {
 	key_entries.forEach(([kc_str, pos]) => {
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos);
-		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2);
+		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2);
 		const top_ext = kc_str === '36' ? ROW_PX : 0; // Return: wing extends one row up
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
@@ -1109,7 +1112,7 @@ function render_kc_heatmap(kc_data_arr) {
 		const fill = heat_color(count);
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos) + off_x;
-		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 
 		// Half-height keys: up and down arrows share the same grid cell, stacked vertically
 		const half_slot = HALF_HEIGHT_KEYS[kc_str];
@@ -1274,7 +1277,7 @@ function render_kc_heatmap(kc_data_arr) {
 			const rx_ret = stem_lx + stem_w;
 
 			const sy_qwerty =
-				Math.round(((Y_TOP - 0.84) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+				Math.round(((Y_TOP - 0.84) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 			const sy_home = sy; // Return pos.y = 0 (home row), so sy is already the home-row sy
 			const top_y = sy_qwerty; // top of wing (QWERTY row)
 			const wing_bot = sy_qwerty + KH; // bottom of wing rect
@@ -1482,7 +1485,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	const GAP = 4;
 	const R = 5;
 	const KW = U - GAP;
-	const KH = Math.round(U * 0.88 - GAP);
+	// A key is 44 px tall, a pointer target of WCAG 2.5.5, and the rows stand
+	// 48 px apart (ROWS_PX over the Y span), GAP px between them.
+	const KH = Math.round(U * 0.96 - GAP);
+	const ROWS_PX = 6 * U;
 	const PAD = 8;
 
 	const Y_TOP = 2.7;
@@ -1556,7 +1562,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	key_entries.forEach(([kc_str, pos]) => {
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos);
-		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2);
+		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2);
 		const top_ext = kc_str === '36' ? ROW_PX : 0;
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
@@ -1657,7 +1663,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		const fill = heat_color(count);
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos) + off_x;
-		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 		const half_slot = HALF_HEIGHT_KEYS[kc_str];
 		const key_h = half_slot ? Math.round(KH / 2) - Math.round(GAP / 2) : KH;
 		const sy =
@@ -1790,7 +1796,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			const stem_w = 34; // ≈ 0.76u — Apple ISO Return stem is narrower than 1u
 			const rx_ret = stem_lx + stem_w;
 			const sy_qwerty =
-				Math.round(((Y_TOP - 0.84) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+				Math.round(((Y_TOP - 0.84) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 			const sy_home = sy;
 			const top_y = sy_qwerty;
 			const wing_bot = sy_qwerty + KH;
