@@ -16,6 +16,11 @@
 --- configuration showed Hotstrings unticked while ★ expanded. Clicking the
 --- unticked switch then turned every category on, and switching it off left
 --- the engine running for the personal groups.
+---
+--- WHY THE TITLE DOT (hotstrings-taps-down-dot): a typing event tap macOS kept
+--- disabling left the engine started and the row ticked while nothing
+--- expanded; only an ERROR a second in the log said so. The title now carries
+--- the red dot and the submenu leads with why, repainted by the shared watch.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -201,9 +206,10 @@ local function hotstrings_row(world)
 		save_prefs     = function()
 			return world.Preferences.save(world.path, world.state, world.hotfiles, { keymap = world.engine })
 		end,
-		updateMenu     = function() end,
+		updateMenu     = function() world.repaints = (world.repaints or 0) + 1 end,
 		notify_feature = function() end,
 		applyTriggerChar = function(text) return text end,
+		paused         = world.paused == true,
 	}
 	local actions = setmetatable({}, { __index = function() return function() end end })
 	local ok, tray = pcall(Builder.generate, ctx, mods, actions)
@@ -223,6 +229,7 @@ local function with_wizard(answer, scenario)
 		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"menu.ui.builder.state", "menu.ui.builder.builder", "hotstrings.ui.menu.hotstrings", "menu.ui.keyboard.keymap_lifecycle",
 		"core.ui.engine.notifications", "core.i18n.engine.i18n", "menu.engine.manifest_menu",
+		"core.events.timer_scheduler",
 	}, function()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
@@ -349,6 +356,81 @@ helpers.describe("the Hotstrings tick follows the typing engine (hotstrings-mast
 				helpers.assert_eq(world.engine.is_group_enabled(name), false, name .. " stays off")
 			end
 			helpers.assert_true(hotstrings_row(world).checked ~= true, "the Hotstrings row is unticked")
+		end)
+	end)
+
+end)
+
+
+--- The red glyph the manifest declares on its top-level ``llm`` entry.
+--- @return string glyph
+local function red_dot()
+	for _, entry in ipairs(require("menu.engine.manifest_menu").get_root().top_level) do
+		if entry.id == "llm" then return entry.health_dot.unreachable end
+	end
+	error("the manifest declares no llm entry")
+end
+
+--- Installs a scheduler double whose repeating tick the case drives: the
+--- title watch resolves the scheduler at use (menu/ui/title_status.lua).
+--- @return table timers { tick = function|nil, cancelled = integer }
+local function drive_watch_ticks()
+	local timers = { cancelled = 0 }
+	package.loaded["core.events.timer_scheduler"] = {
+		every = function(_, tick) timers.tick = tick; return {}, true end,
+		cancel = function() timers.cancelled = timers.cancelled + 1; timers.tick = nil; return true end,
+		after = function() return {}, true end,
+	}
+	return timers
+end
+
+helpers.describe("the Hotstrings title says when its typing taps are down (hotstrings-taps-down-dot)", function()
+
+	helpers.it("(hotstrings-taps-down-dot) a tap the watchdog cannot re-enable paints the red dot and leads with why", function()
+		with_wizard(true, function(world)
+			boot(world)
+			local timers = drive_watch_ticks()
+			local down = { "keyDown" }
+			world.engine.taps_down = function() return down end
+			local parent = hotstrings_row(world)
+			local glyph = red_dot()
+			helpers.assert_eq(parent.title:sub(-#glyph), glyph, "the Hotstrings title ends with the red dot")
+			switch_of(parent)
+			local wanted = require("core.i18n.engine.i18n").get("menu.hotstrings.taps_down")
+			local reason, at = nil, nil
+			for index, row in ipairs(parent.menu) do
+				if row.title == wanted then reason, at = row, index end
+			end
+			helpers.assert_not_nil(reason, "the submenu says what stopped and what to check")
+			helpers.assert_true(at <= 6, "right under the switch's head, not below the categories")
+			helpers.assert_eq(reason.disabled, true, "the reason row is greyed")
+
+			-- The tap recovers after the build: the watch repaints once
+			helpers.assert_type(timers.tick, "function", "the title watch must be armed")
+			local before = world.repaints or 0
+			down = nil
+			timers.tick()
+			helpers.assert_eq(world.repaints, before + 1, "the recovery repaints the title")
+			timers.tick()
+			helpers.assert_eq(world.repaints, before + 1, "an unchanged status repaints nothing")
+			local healed = hotstrings_row(world)
+			helpers.assert_true(healed.title:find(glyph, 1, true) == nil, "a working engine draws no dot")
+			switch_of(healed)
+			for _, row in ipairs(healed.menu) do
+				helpers.assert_true(row.title ~= wanted, "nor its reason")
+			end
+		end)
+	end)
+
+	helpers.it("(hotstrings-taps-down-dot) a pause draws no dot, like the AI and Tap-Holds titles", function()
+		with_wizard(true, function(world)
+			boot(world)
+			drive_watch_ticks()
+			world.engine.taps_down = function() return { "flagsChanged" } end
+			world.paused = true
+			local parent = hotstrings_row(world)
+			helpers.assert_true(parent.title:find(red_dot(), 1, true) == nil, "no dot while Ergopti is paused")
+			switch_of(parent)
 		end)
 	end)
 

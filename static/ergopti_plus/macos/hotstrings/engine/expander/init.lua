@@ -2746,27 +2746,56 @@ local _watchdog_generation = 0
 local _watchdog_committed = false
 local tap_watchdog
 
-eventtap_is_enabled = function(name, event_tap)
+-- The taps the watchdog could not re-enable, by name. A tap macOS keeps
+-- disabling (a revoked Accessibility or Input Monitoring permission) failed its
+-- restart every second with an ERROR each time and nothing in the menu: the
+-- hotstrings were dead while every switch read on. The first failed restart is
+-- logged once and paired with the line of its recovery; the retries between
+-- them are silent, and the Hotstrings title reads the typing taps among them
+-- (M.taps_down, hotstrings/ui/menu/hotstrings_status.lua).
+local _restart_failed = {}
+
+-- The taps every keystroke goes through: while one of them stays disabled, no
+-- hotstring expands. The passive mouse tap only resets predictive state.
+local TYPING_TAPS = { "keyDown", "loopbackKeyUp", "flagsChanged" }
+
+--- Reads the native enablement of one keymap event tap.
+--- @param name string Tap name for the log lines.
+--- @param event_tap table|nil Native event tap.
+--- @param quiet boolean|nil True while the tap is already known down: its
+---   failed probes were logged when it went down.
+--- @return boolean enabled
+--- @return boolean state_ok False when the native state could not be read.
+eventtap_is_enabled = function(name, event_tap, quiet)
 	if not event_tap or type(event_tap.isEnabled) ~= "function" then
-		Logger.error(LOG, "Keymap %s eventtap has no verifiable native state.", name)
+		if not quiet then Logger.error(LOG, "Keymap %s eventtap has no verifiable native state.", name) end
 		return false, false
 	end
 	local ok, enabled = pcall(event_tap.isEnabled, event_tap)
 	if not ok then
-		Logger.error(LOG, "Keymap %s eventtap state probe failed: %s.", name, tostring(enabled))
+		if not quiet then
+			Logger.error(LOG, "Keymap %s eventtap state probe failed: %s.", name, tostring(enabled))
+		end
 		return false, false
 	end
 	return enabled == true, true
 end
 
 
-start_eventtap = function(name, event_tap)
+--- Starts one keymap event tap and verifies its native enablement.
+--- @param name string Tap name for the log lines.
+--- @param event_tap table|nil Native event tap.
+--- @param quiet boolean|nil True when the caller logs the failure itself: the
+---   watchdog names it once in its outage line, then retries silently.
+--- @return boolean started
+--- @return string|nil detail Why the start failed.
+start_eventtap = function(name, event_tap, quiet)
 	if not event_tap or type(event_tap.start) ~= "function" then
-		Logger.error(LOG, "Keymap %s eventtap cannot be started.", name)
-		return false
+		if not quiet then Logger.error(LOG, "Keymap %s eventtap cannot be started.", name) end
+		return false, "the tap cannot be started"
 	end
 	local ok, result = pcall(event_tap.start, event_tap)
-	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
+	local enabled, state_ok = eventtap_is_enabled(name, event_tap, quiet)
 	if state_ok and enabled then
 		if not ok then
 			Logger.warn(LOG,
@@ -2775,12 +2804,66 @@ start_eventtap = function(name, event_tap)
 		end
 		return true
 	end
+	local detail = not ok and ("its start failed: " .. tostring(result))
+		or (state_ok and "its start did not commit" or "its native state is unreadable")
+	if quiet then return false, detail end
 	if not ok then
 		Logger.error(LOG, "Keymap %s eventtap start failed: %s.", name, tostring(result))
 	elseif state_ok then
 		Logger.error(LOG, "Keymap %s eventtap start did not commit.", name)
 	end
+	return false, detail
+end
+
+
+--- Whether a tap is one every keystroke goes through.
+--- @param name string Tap name.
+--- @return boolean
+local function is_typing_tap(name)
+	for _, typing in ipairs(TYPING_TAPS) do
+		if typing == name then return true end
+	end
 	return false
+end
+
+
+--- Records that the watchdog could not re-enable a tap, logged once per outage.
+--- @param name string Tap name.
+--- @param detail string|nil Why its restart failed.
+local function note_tap_down(name, detail)
+	_restart_failed[name] = true
+	if is_typing_tap(name) then
+		Logger.error(LOG,
+			"Keymap %s event tap stays disabled (%s): no hotstring expands until it recovers; "
+				.. "the watchdog retries it every %s s without logging each attempt.",
+			name, tostring(detail), tostring(TAP_WATCHDOG_SEC))
+	else
+		Logger.warn(LOG,
+			"Keymap %s event tap stays disabled (%s): clicks no longer reset the predictions; "
+				.. "the watchdog retries it every %s s without logging each attempt.",
+			name, tostring(detail), tostring(TAP_WATCHDOG_SEC))
+	end
+end
+
+
+--- Records that a tap reported down runs again, the pair of its down line.
+--- @param name string Tap name.
+local function note_tap_recovered(name)
+	_restart_failed[name] = nil
+	Logger.info(LOG, "Keymap %s event tap re-enabled after its outage.", name)
+end
+
+
+--- Forgets every outage when the engine stops or starts afresh, closing each
+--- down line with its pair: the restart owns the taps from here.
+--- @param reason string What ends the watch, for the log line.
+local function forget_taps_down(reason)
+	for _, name in ipairs({ "keyDown", "loopbackKeyUp", "flagsChanged", "mouse" }) do
+		if _restart_failed[name] then
+			_restart_failed[name] = nil
+			Logger.info(LOG, "Keymap %s event tap outage no longer watched: %s.", name, reason)
+		end
+	end
 end
 
 
@@ -2901,6 +2984,20 @@ function M.tap_states()
 	return { started = _started == true, watchdog = _watchdog_committed == true, taps = taps }
 end
 
+--- The typing taps the watchdog could not re-enable, for the Hotstrings title
+--- (hotstrings/ui/menu/hotstrings_status.lua). An in-memory read: the menu
+--- watch calls it every second.
+--- @return table|nil names Tap names in a fixed order; nil while none is down
+---   or the engine is stopped.
+function M.taps_down()
+	if _started ~= true then return nil end
+	local names = {}
+	for _, name in ipairs(TYPING_TAPS) do
+		if _restart_failed[name] then names[#names + 1] = name end
+	end
+	return #names > 0 and names or nil
+end
+
 tap_watchdog = function(timer, generation)
 	if _started ~= true
 		or _watchdog_committed ~= true
@@ -2916,14 +3013,27 @@ tap_watchdog = function(timer, generation)
 		reconcile_observed_context_async()
 	end
 	local function revive(name, t)
-		if t and not eventtap_is_enabled(name, t) then
-			if name == "flagsChanged" then reset_shift_side() end
+		if not t then return false end
+		local was_down = _restart_failed[name] == true
+		if eventtap_is_enabled(name, t, was_down) then
+			-- Re-armed elsewhere (the keyDown error handler): it invalidated
+			if was_down then note_tap_recovered(name) end
+			return false
+		end
+		if name == "flagsChanged" then reset_shift_side() end
+		if not was_down then
 			-- The passive mouse tap only resets predictive state and its recovery never
 			-- interrupts typing, so reserve WARNING for the typing-critical taps
 			local recovery_logger = name == "mouse" and Logger.debug or Logger.warn
 			recovery_logger(LOG, "macOS disabled the %s event tap — re-enabling.", name)
-			return start_eventtap(name, t)
 		end
+		-- Always quiet: a first failure is named once below, the retries are silent
+		local started, detail = start_eventtap(name, t, true)
+		if started then
+			if was_down then note_tap_recovered(name) end
+			return true
+		end
+		if not was_down then note_tap_down(name, detail) end
 		return false
 	end
 	local keydown_revived = revive("keyDown", tap)
@@ -3126,6 +3236,7 @@ function M.start()
 	end
 
 	_callbacks_retired = false
+	forget_taps_down("the keymap engine restarted its taps")
 	_started = true
 	Logger.success(LOG, "Keymap engine started.")
 	return true
@@ -3150,6 +3261,7 @@ function M.stop(teardown)
 	end
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
+	forget_taps_down("the keymap engine stopped")
 	_callbacks_retired = true
 	reset_shift_side()
 	if _one_shot_shift then _one_shot_shift.reset() end

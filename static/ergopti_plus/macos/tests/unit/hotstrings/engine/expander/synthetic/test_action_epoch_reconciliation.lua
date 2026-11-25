@@ -205,12 +205,17 @@ local function load_fixture()
 		stop = function() mailbox_running = false; return true end,
 		is_running = function() return mailbox_running end,
 	}
+	local infos = {}
 	package.loaded["core.logger.engine.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
 		error = function(_, fmt, ...)
 			local ok, message = pcall(string.format, tostring(fmt), ...)
 			callback_errors[#callback_errors + 1] = ok and message or tostring(fmt)
+		end,
+		info = function(_, fmt, ...)
+			local ok, message = pcall(string.format, tostring(fmt), ...)
+			infos[#infos + 1] = ok and message or tostring(fmt)
 		end,
 	})
 	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
@@ -271,6 +276,8 @@ local function load_fixture()
 		taps = taps,
 		state = state,
 		calls = calls,
+		errors = function() return callback_errors end,
+		infos = function() return infos end,
 		advance = function() epoch = {} end,
 		dispatch = function()
 			helpers.assert_type(listener, "function")
@@ -636,6 +643,70 @@ helpers.describe("keymap action epochs", function()
 		helpers.assert_true(not fixture.state.buffer:find("ae", 1, true),
 			"the post-resume key must not join text from before the pause boundary")
 		fixture.keymap.stop()
+	end)
+
+	helpers.it("reports a tap macOS keeps disabling once, then its recovery once (tap-outage-reported)", function()
+		local fixture = load_fixture()
+		package.loaded["core.logger.engine.logger"].pcall = function(_, fn, ...) return pcall(fn, ...) end
+		local function tick()
+			local fired = false
+			for _, timer in ipairs(_G.hs.timer.__timers) do
+				if timer.running and timer.delay == 1 then timer:fire(); fired = true end
+			end
+			helpers.assert_true(fired, "the keymap watchdog must be exercised")
+		end
+		local function count(lines, needle)
+			local found = 0
+			for _, line in ipairs(lines) do
+				if line:find(needle, 1, true) then found = found + 1 end
+			end
+			return found
+		end
+		local keydown = fixture.taps[1]
+		local native_start = keydown.start
+		-- macOS refuses the restart: the tap stays disabled
+		keydown.start = function(self) return self end
+		keydown:stop()
+		local errors_before = #fixture.errors()
+		for _ = 1, 3 do tick() end
+		helpers.assert_eq(#fixture.errors() - errors_before, 1,
+			"three failed restarts log one ERROR, not one a second")
+		helpers.assert_eq(count(fixture.errors(), "stays disabled"), 1, "the outage is named once")
+		helpers.assert_type(fixture.keymap.taps_down, "function", "the engine must expose its tap outage")
+		local down = fixture.keymap.taps_down()
+		helpers.assert_eq(type(down) == "table" and table.concat(down, ",") or tostring(down), "keyDown",
+			"the menu must learn which typing tap stays disabled")
+
+		keydown.start = native_start
+		tick()
+		helpers.assert_nil(fixture.keymap.taps_down(), "a restart that commits clears the outage")
+		helpers.assert_eq(count(fixture.infos(), "keyDown event tap re-enabled after its outage"), 1,
+			"the recovery is the pair of the outage line")
+		tick()
+		helpers.assert_eq(count(fixture.infos(), "re-enabled after its outage"), 1, "and is logged once")
+		helpers.assert_eq(#fixture.errors() - errors_before, 1, "a recovered tap logs no further ERROR")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("a passive mouse tap outage never reads as the hotstrings being down (tap-outage-reported)", function()
+		local fixture = load_fixture()
+		package.loaded["core.logger.engine.logger"].pcall = function(_, fn, ...) return pcall(fn, ...) end
+		local mouse = fixture.taps[4]
+		mouse.start = function(self) return self end
+		mouse:stop()
+		for _, timer in ipairs(_G.hs.timer.__timers) do
+			if timer.running and timer.delay == 1 then timer:fire() end
+		end
+		helpers.assert_nil(fixture.keymap.taps_down(), "clicks only reset predictions; typing still expands")
+		-- A stop forgets the outage: the next start owns the taps afresh
+		fixture.taps[1].start = function(self) return self end
+		fixture.taps[1]:stop()
+		for _, timer in ipairs(_G.hs.timer.__timers) do
+			if timer.running and timer.delay == 1 then timer:fire() end
+		end
+		helpers.assert_eq(#(fixture.keymap.taps_down() or {}), 1)
+		fixture.keymap.stop()
+		helpers.assert_nil(fixture.keymap.taps_down(), "a stopped engine reports no outage")
 	end)
 
 	helpers.it("tap_states reads each tap's native state without changing it", function()

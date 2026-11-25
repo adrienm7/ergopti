@@ -67,6 +67,10 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- Windows renderer used to insert this separator itself, beside the switch it
 	-- also inserted by hand, and the Lua drivers drew none.
 	"---",
+	-- Why nothing expands while a typing event tap stays disabled, right under
+	-- the switch's head (maintainer, 2026-11-25); macOS only, empty while the
+	-- taps run.
+	"list:hotstrings_taps_down",
 	"group:hotstrings_params",
 	-- No whole-tree « all sections » row since 2026-10-17: it switched on the
 	-- packs of every language at once. Each submenu owns its bulk rows.

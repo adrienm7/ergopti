@@ -15,6 +15,7 @@
 	"gestures_menu": "platform_reason.touchpad_stack_is_per_driver",
 	"gesture_change_action": "platform_reason.touchpad_stack_is_per_driver",
 	"tap_holds_menu": "platform_reason.remap_engine_is_per_driver",
+	"hotstrings_menu.hotstrings_taps_down": "platform_reason.event_tap_outage_is_macos",
 	"llm_api_add_provider_group": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"llm_api_active_commands": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"selection_case_commands": "platform_reason.selection_operations_are_a_block_on_linux",
