@@ -329,7 +329,7 @@ boot_deferred = true
 # toggles the mode with the active preset; this submenu picks the preset and
 # switches its parts. Its rows are runtime data (the user's presets), so both
 # lists are filled by each driver from the shared presets store
-# (_shared/shortcuts/engine/keep_awake_presets.lua) and drawn by the renderer.
+# (_shared/shortcuts/engine/keep_awake/presets.lua) and drawn by the renderer.
 [[menu.top_level]]
 type = "group"
 id = "keep_awake"
@@ -983,7 +983,7 @@ platforms = ["ahk", "hs", "linux"]
 
 # The « Anti-veille » submenu: the presets as one single-choice group, then the
 # active preset's switches, its click counter and the reason anything cannot
-# run (row data from _shared/shortcuts/engine/keep_awake_menu.lua and its
+# run (row data from _shared/shortcuts/engine/keep_awake/menu.lua and its
 # Windows twin).
 [[menu.keep_awake_menu]]
 type = "section_header"

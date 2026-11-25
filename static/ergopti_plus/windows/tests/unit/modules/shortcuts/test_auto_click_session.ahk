@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/keep_awake/auto_click_session_vectors.json,
 ; which the macOS and Linux suites replay through
-; _shared/shortcuts/engine/auto_click_session.lua, through
+; _shared/shortcuts/engine/keep_awake/auto_click_session.lua, through
 ; modules/shortcuts/auto_click_session.ahk.
 ;
 ; ROOT CAUSE ENCODED:

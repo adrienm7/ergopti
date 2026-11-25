@@ -4,7 +4,7 @@
 ; MODULE: Text Targets (Windows port)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/keep_awake/text_target_vectors.json, which the
-; macOS and Linux suites replay through _shared/shortcuts/engine/text_target.lua,
+; macOS and Linux suites replay through _shared/shortcuts/engine/keep_awake/text_target.lua,
 ; through modules/shortcuts/text_target.ahk.
 ;
 ; ROOT CAUSE ENCODED:

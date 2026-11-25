@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/auto_click_policy.lua
+--- _shared/shortcuts/engine/keep_awake/auto_click_policy.lua
 
 --- ==============================================================================
 --- MODULE: Auto-Click Policy — Shared Lua Implementation

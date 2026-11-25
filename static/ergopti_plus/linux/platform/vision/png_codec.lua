@@ -21,7 +21,7 @@
 
 local M = {}
 
-local Matcher = require("shortcuts.engine.auto_click_matcher")
+local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
 
 local SIGNATURE = "\137PNG\r\n\26\n"
 -- The screen vision reasons this codec answers.

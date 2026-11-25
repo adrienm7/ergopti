@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Auto-Click Template Matcher (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/shortcuts/engine/auto_click_matcher.lua, the matcher the
+; Port of _shared/shortcuts/engine/keep_awake/auto_click_matcher.lua, the matcher the
 ; macOS and Linux drivers share for the anti-sleep auto-clicker (Ctrl+M,
 ; sg_actions.activity_simulation): a library button image is searched for in a
 ; grayscale capture of the foreground window.

@@ -3,7 +3,7 @@
 // ==============================================================================
 // MODULE: Screen Vision Matcher
 // DESCRIPTION:
-// Swift port of _shared/shortcuts/engine/auto_click_matcher.lua, the matcher
+// Swift port of _shared/shortcuts/engine/keep_awake/auto_click_matcher.lua, the matcher
 // the Linux driver runs in LuaJIT and the Windows driver in its own twin. The
 // macOS driver runs it here, in the signed launcher, because Hammerspoon's
 // Lua 5.4 took about 0.8 s per scale for an 800 x 600 window.

@@ -55,10 +55,10 @@ single defaults source (`_shared/shortcuts/data/auto_click_defaults.json`).
 - Scope: allowed apps only, VS Code and VS Code Insiders by default (bundle id
   on macOS, executable on Windows, WM class on Linux), inside that window's
   bounds; never when the screen is locked, Ergopti is paused or a secure field
-  has the focus (`_shared/shortcuts/engine/auto_click_policy.lua`).
+  has the focus (`_shared/shortcuts/engine/keep_awake/auto_click_policy.lua`).
 - Matching: deterministic normalised cross-correlation on grayscale with a
   tolerance per image (default 0.92), tried at half, single and double size
-  for 1x/2x screens (`_shared/shortcuts/engine/auto_click_matcher.lua`), the
+  for 1x/2x screens (`_shared/shortcuts/engine/keep_awake/auto_click_matcher.lua`), the
   same corpus replayed by every driver
   (`_shared/tests/corpus/keep_awake/`). Do not replace it by a learned or
   OCR-based detector: the maintainer chose a predictable tolerance.
@@ -67,7 +67,7 @@ single defaults source (`_shared/shortcuts/data/auto_click_defaults.json`).
   OS's own OCR on the allowed window (Vision on macOS, Windows.Media.Ocr,
   tesseract on Linux as an optional dependency), compared without case,
   accents or spacing with an edit distance per target
-  (`_shared/shortcuts/engine/text_target.lua`), so a red theme still matches.
+  (`_shared/shortcuts/engine/keep_awake/text_target.lua`), so a red theme still matches.
 - Import: every common image format the OS decodes (PNG, JPEG, WebP, GIF's
   first frame, BMP, TIFF, HEIC where available) is converted to the library's
   PNG; anything else is refused with a translated message.

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Anti-Sleep Presets (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/shortcuts/engine/keep_awake_presets.lua: the presets of the
+; Port of _shared/shortcuts/engine/keep_awake/presets.lua: the presets of the
 ; anti-sleep mode (Ctrl+M), their edits and what Windows runs for the active
 ; one. modules/shortcuts/auto_click.ahk keeps the user's document through it.
 ;

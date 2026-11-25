@@ -4,7 +4,7 @@
 --- MODULE: Auto-Click Ports (macOS)
 --- DESCRIPTION:
 --- The Hammerspoon side of the anti-sleep auto-clicker's session ports
---- (_shared/shortcuts/engine/auto_click_session.lua): the frontmost window and
+--- (_shared/shortcuts/engine/keep_awake/auto_click_session.lua): the frontmost window and
 --- its bundle id, the lock, pause and secure-field state, the scan through the
 --- screen vision service, the click, the clock and the user's languages.
 --- modules/shortcuts/actions/auto_click.lua owns the session and calls only

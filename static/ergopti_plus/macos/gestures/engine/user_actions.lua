@@ -7,7 +7,7 @@
 --- command line the user typed, run hidden or in a new Terminal window, and a
 --- file or folder opened with its default application.
 --- gestures/engine/actions.lua registers both and decodes their parameter
---- through _shared/shortcuts/engine/user_action_parameter.lua.
+--- through _shared/shortcuts/engine/actions/user_action_parameter.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Never blocks the runloop that feeds the keyboard tap: every process is an
@@ -36,7 +36,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local Clipboard = require("clipboard.adapters.clipboard")
 local SyntheticInput = require("platform.input.synthetic_input")
 local Unicode = require("core.lifecycle.engine.compat.utf8")
-local Parameter = require("shortcuts.engine.user_action_parameter")
+local Parameter = require("shortcuts.engine.actions.user_action_parameter")
 
 local LOG = "gestures.user_actions"
 

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/keep_awake/auto_click_match_vectors.json and
 ; auto_click_policy_vectors.json, which the macOS and Linux suites replay
-; through _shared/shortcuts/engine/auto_click_*.lua, through the AutoHotkey
+; through _shared/shortcuts/engine/keep_awake/auto_click_*.lua, through the AutoHotkey
 ; ports modules/shortcuts/auto_click_matcher.ahk and auto_click_policy.ahk.
 ;
 ; ROOT CAUSE ENCODED:

@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/keep_awake_library.lua
+--- _shared/shortcuts/engine/keep_awake/library.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Library — Shared Lua Implementation
@@ -20,8 +20,8 @@
 
 local M = {}
 
-local Presets = require("shortcuts.engine.keep_awake_presets")
-local Rows = require("shortcuts.engine.keep_awake_menu")
+local Presets = require("shortcuts.engine.keep_awake.presets")
+local Rows = require("shortcuts.engine.keep_awake.menu")
 
 --- Reads one shared JSON data file through a driver's ports.
 --- @param read function (path) -> string|nil

@@ -4,7 +4,7 @@
 --- MODULE: Auto-Click Contract
 --- DESCRIPTION:
 --- Replays the anti-sleep auto-clicker corpora through the shared matcher,
---- text targets and policy (_shared/shortcuts/engine/auto_click_*.lua and
+--- text targets and policy (_shared/shortcuts/engine/keep_awake/auto_click_*.lua and
 --- text_target.lua). The macOS suite runs it
 --- on Lua 5.4 and the Linux suite on LuaJIT, so an integer division, a float
 --- key or a wrapped product that only one runtime tolerates fails here; the
@@ -20,11 +20,11 @@
 local M = {}
 
 local Json = require("core.text.engine.json")
-local Matcher = require("shortcuts.engine.auto_click_matcher")
-local Policy = require("shortcuts.engine.auto_click_policy")
-local TextTarget = require("shortcuts.engine.text_target")
-local Presets = require("shortcuts.engine.keep_awake_presets")
-local Session = require("shortcuts.engine.auto_click_session")
+local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
+local Policy = require("shortcuts.engine.keep_awake.auto_click_policy")
+local TextTarget = require("shortcuts.engine.keep_awake.text_target")
+local Presets = require("shortcuts.engine.keep_awake.presets")
+local Session = require("shortcuts.engine.keep_awake.auto_click_session")
 local OcrCapture = require("shortcuts.engine.ocr_capture")
 
 local PARK_MILLER_MULTIPLIER = 16807

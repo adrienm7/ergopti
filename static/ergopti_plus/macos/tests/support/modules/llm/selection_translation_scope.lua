@@ -74,7 +74,7 @@ local OWNED = {
 	"menu.engine.manifest_reader_core",
 	"core.logger.engine.perf_budget",
 	"platform.remap.lease_helper",
-	"settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
+	"settings.engine.program_parameter", "shortcuts.engine.actions.user_action_parameter",
 	"keyboard.engine.layers.script_chords",
 	"platform.input.send_input",
 	"tap_hold.engine.key_combinations",

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Hosts _shared/ui/keep_awake_library (bridge "hsKeepAwake") on WebKitGTK:
 --- the messages go to the shared library host
---- (_shared/shortcuts/engine/keep_awake_library_host.lua) with the Linux
+--- (_shared/shortcuts/engine/keep_awake/library_host.lua) with the Linux
 --- ports: the page push through the webview manager, the screenshot region
 --- cascade for « Ajouter un bouton… », ImageMagick for an image file, and the
 --- native file dialogs for a preset's export and import.
@@ -24,7 +24,7 @@ local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 
 local LOG = "bridge.hsKeepAwake"
-local APP_NAME = require("shortcuts.engine.keep_awake_library_host").APP_ID
+local APP_NAME = require("shortcuts.engine.keep_awake.library_host").APP_ID
 
 local _host = nil
 
@@ -73,7 +73,7 @@ local function host_for(state)
 	local FileSystem = dependency(state, "file_system", "core.fs.adapters.file_system")
 	local AutoClick = dependency(state, "auto_click", "modules.auto_click")
 	local Capture = require("modules.ocr_capture")
-	_host = require("shortcuts.engine.keep_awake_library_host").new({
+	_host = require("shortcuts.engine.keep_awake.library_host").new({
 		library = AutoClick.library(),
 		os_name = "linux", separator = "/",
 		push = function(function_name, payload)

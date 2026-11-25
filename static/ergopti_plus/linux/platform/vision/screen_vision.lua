@@ -30,8 +30,8 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
-local Matcher = require("shortcuts.engine.auto_click_matcher")
-local TextTarget = require("shortcuts.engine.text_target")
+local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
+local TextTarget = require("shortcuts.engine.keep_awake.text_target")
 local Capture = require("platform.vision.x11_capture")
 local Ocr = require("platform.vision.tesseract_ocr")
 

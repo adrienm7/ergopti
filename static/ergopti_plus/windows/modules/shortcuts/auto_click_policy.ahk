@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Auto-Click Policy (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/shortcuts/engine/auto_click_policy.lua: whether one tick of
+; Port of _shared/shortcuts/engine/keep_awake/auto_click_policy.lua: whether one tick of
 ; the anti-sleep auto-clicker may capture the foreground window, and whether a
 ; match found there may be clicked. Every refusal lives here, so no Windows
 ; path can click outside the scope the maintainer set on 2026-11-25.

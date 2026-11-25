@@ -1,5 +1,5 @@
 {
-	"_comment": "Decisions of the anti-sleep auto-clicker policy (_shared/shortcuts/engine/auto_click_policy.lua and its Windows twin). base is a state that may click; each vector overrides some of its fields (null removes one) and pins the decision and its reason, a word of the policy's closed vocabulary. Times are monotonic milliseconds.",
+	"_comment": "Decisions of the anti-sleep auto-clicker policy (_shared/shortcuts/engine/keep_awake/auto_click_policy.lua and its Windows twin). base is a state that may click; each vector overrides some of its fields (null removes one) and pins the decision and its reason, a word of the policy's closed vocabulary. Times are monotonic milliseconds.",
 	"base": {
 		"app_id": "com.microsoft.VSCode",
 		"allowed_apps": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],

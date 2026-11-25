@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/keep_awake_menu.lua
+--- _shared/shortcuts/engine/keep_awake/menu.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Menu Rows — Shared Lua Implementation

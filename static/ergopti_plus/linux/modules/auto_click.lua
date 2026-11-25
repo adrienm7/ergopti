@@ -6,7 +6,7 @@
 --- The Linux half of the anti-sleep mode's presets and auto-clicker: it keeps
 --- the user's presets document (auto_click/presets.json in the configuration
 --- folder), and while Ctrl+M has the mode on with an auto-click preset it runs
---- the shared session (_shared/shortcuts/engine/auto_click_session.lua) on the
+--- the shared session (_shared/shortcuts/engine/keep_awake/auto_click_session.lua) on the
 --- timings registry's tick, with Linux ports: the X11 focus query, logind's
 --- lock state, the secure field detector, the screen vision service and an
 --- xdotool click.
@@ -33,8 +33,8 @@ local FileSystem = require("core.fs.adapters.file_system")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
-local Library = require("shortcuts.engine.keep_awake_library")
-local Session = require("shortcuts.engine.auto_click_session")
+local Library = require("shortcuts.engine.keep_awake.library")
+local Session = require("shortcuts.engine.keep_awake.auto_click_session")
 
 local LOG = "modules.auto_click"
 

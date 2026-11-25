@@ -145,7 +145,7 @@ _AutoClickSelect(Id) {
 	return (*) => AutoClickEdit(KeepAwakePresetsSetActive, Id)
 }
 
-; The rows of the presets list, as _shared/shortcuts/engine/keep_awake_menu.lua builds them.
+; The rows of the presets list, as _shared/shortcuts/engine/keep_awake/menu.lua builds them.
 AutoClickPresetRows() {
 	Doc := AutoClickDocument()
 	Rows := []

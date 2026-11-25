@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/auto_click_session.lua
+--- _shared/shortcuts/engine/keep_awake/auto_click_session.lua
 
 --- ==============================================================================
 --- MODULE: Auto-Click Session — Shared Lua Implementation
@@ -27,8 +27,8 @@
 
 local M = {}
 
-local Policy = require("shortcuts.engine.auto_click_policy")
-local Matcher = require("shortcuts.engine.auto_click_matcher")
+local Policy = require("shortcuts.engine.keep_awake.auto_click_policy")
+local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
 
 --- Creates a session.
 --- @param ports table {

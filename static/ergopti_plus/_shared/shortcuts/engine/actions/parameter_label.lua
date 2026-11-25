@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/action_parameter_label.lua
+--- _shared/shortcuts/engine/actions/parameter_label.lua
 
 --- Replaces the localized configurable marker with a binding's literal value.
 local M = {}
@@ -15,7 +15,7 @@ function M.format(label, value)
 end
 
 --- Formats a value of a known parameter kind: a user action's value shows only
---- its safe summary (_shared/shortcuts/engine/user_action_parameter.lua label_value), a
+--- its safe summary (_shared/shortcuts/engine/actions/user_action_parameter.lua label_value), a
 --- program none, every other kind its literal value.
 --- @param label string Translated action label.
 --- @param spec string|nil The action's parameter kind.
@@ -23,7 +23,7 @@ end
 --- @return string
 function M.for_spec(label, spec, value)
 	if spec == "program" then return label end
-	local UserActionParameter = require("shortcuts.engine.user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.actions.user_action_parameter")
 	if UserActionParameter.KINDS[spec] then return M.format(label, UserActionParameter.label_value(spec, value)) end
 	return M.format(label, value)
 end

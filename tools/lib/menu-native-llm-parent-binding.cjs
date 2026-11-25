@@ -617,7 +617,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 	const imports = {
 		WindowTitles: 'core.ui.engine.window_titles',
 		NumberRowPolicy: 'layouts.engine.layout.number_row_policy',
-		ParameterLabel: 'shortcuts.engine.action_parameter_label',
+		ParameterLabel: 'shortcuts.engine.actions.parameter_label',
 		RowDialect: 'menu.engine.row_dialect',
 		Logger: 'core.logger.engine.shim',
 		Extensions: 'hotstrings.engine.extensions',

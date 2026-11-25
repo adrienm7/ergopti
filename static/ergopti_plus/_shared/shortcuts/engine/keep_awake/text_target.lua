@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/text_target.lua
+--- _shared/shortcuts/engine/keep_awake/text_target.lua
 
 --- ==============================================================================
 --- MODULE: Text Targets — Shared Lua Implementation

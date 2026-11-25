@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Text Targets (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/shortcuts/engine/text_target.lua: finds a caption such as
+; Port of _shared/shortcuts/engine/keep_awake/text_target.lua: finds a caption such as
 ; « Autoriser une fois » among the words a text recognition returned, so the
 ; auto-clicker and the user workflows click a button by its text whatever its
 ; theme. The macOS and Linux drivers run the shared module.

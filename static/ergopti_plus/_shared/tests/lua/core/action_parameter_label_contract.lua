@@ -2,7 +2,7 @@
 
 --- Replays literal binding labels across all shipped action translations.
 return function(helpers, json, shared_root)
-	local Labels = require("shortcuts.engine.action_parameter_label")
+	local Labels = require("shortcuts.engine.actions.parameter_label")
 	local function read_json(relative)
 		local file = assert(io.open(shared_root .. "/" .. relative, "rb"))
 		local text = file:read("*a")

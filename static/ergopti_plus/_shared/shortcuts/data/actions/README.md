@@ -75,7 +75,7 @@ replays the corpus against the page.
 
 `run_command`, `open_path` and `run_apple_shortcut` carry the `command`,
 `path` and `apple_shortcut` kinds, decoded by
-`_shared/shortcuts/engine/user_action_parameter.lua` and pinned by
+`_shared/shortcuts/engine/actions/user_action_parameter.lua` and pinned by
 `_shared/tests/corpus/action_parameters/user_action_vectors.json`. They run in
 `gestures/engine/user_actions.lua` on macOS and Linux and in
 `gestures/engine/apple_shortcut_action.lua` on macOS. On Windows the first two

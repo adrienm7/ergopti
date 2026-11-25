@@ -11,7 +11,7 @@
 local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 local RowDialect = require("menu.engine.row_dialect")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")

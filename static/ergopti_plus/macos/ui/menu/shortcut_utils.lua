@@ -378,7 +378,7 @@ local OUTPUT_OPTIONS = {
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_command_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("shortcuts.engine.user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.actions.user_action_parameter")
 	local stored = UserActionParameter.parse("command", prior) or {}
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt, title, gestures.parameter_prompt(action),
@@ -406,7 +406,7 @@ end
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled or nothing can be listed.
 function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("shortcuts.engine.user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.actions.user_action_parameter")
 	local stored = UserActionParameter.parse("apple_shortcut", prior) or {}
 	local rows, reason = require("adapters.apple_shortcuts_cli").list_blocking()
 	if not rows or #rows == 0 then

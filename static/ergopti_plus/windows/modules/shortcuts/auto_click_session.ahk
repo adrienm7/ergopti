@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Auto-Click Session (AutoHotkey port)
 ; DESCRIPTION:
-; Port of _shared/shortcuts/engine/auto_click_session.lua: one run of the
+; Port of _shared/shortcuts/engine/keep_awake/auto_click_session.lua: one run of the
 ; anti-sleep auto-clicker. Every tick asks the policy whether the foreground
 ; window may be looked at, scans it through the screen vision service, and
 ; clicks at most one target the policy admits.

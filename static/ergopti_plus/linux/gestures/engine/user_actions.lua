@@ -7,7 +7,7 @@
 --- command line the user typed, run hidden or in a new terminal window, and a
 --- file or folder opened with its default application.
 --- gestures/engine/manager.lua dispatches both and decodes their parameter
---- through _shared/shortcuts/engine/user_action_parameter.lua.
+--- through _shared/shortcuts/engine/actions/user_action_parameter.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Never blocks the daemon's event loop: a hidden command is a libuv child
@@ -33,7 +33,7 @@ local Timings = require("core.timing.engine.timings")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local FileSystem = require("core.fs.adapters.file_system")
 local Unicode = require("core.lifecycle.engine.compat.utf8")
-local Parameter = require("shortcuts.engine.user_action_parameter")
+local Parameter = require("shortcuts.engine.actions.user_action_parameter")
 
 local LOG = "gestures.engine.user_actions"
 

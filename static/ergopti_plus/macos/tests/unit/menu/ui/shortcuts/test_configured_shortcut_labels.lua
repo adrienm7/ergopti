@@ -117,7 +117,7 @@ helpers.describe("real script-action catalogue projection", function()
 	for _, language in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("preserves every genuine script action and heading in " .. language, catalogue_scope(function()
 			-- Establish the existing controlled native environment before publishing translation.
-			helpers.load_with_stubs("shortcuts.engine.action_parameter_label")
+			helpers.load_with_stubs("shortcuts.engine.actions.parameter_label")
 			local Json = require("core.fs.adapters.json_codec")
 			local function read(relative)
 				local file = assert(io.open(helpers.shared(relative), "rb"))

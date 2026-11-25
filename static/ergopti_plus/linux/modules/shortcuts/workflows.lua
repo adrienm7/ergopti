@@ -228,7 +228,7 @@ local function screen_vision(deps, ports, catalogue, matcher_options, timeouts)
 			end)
 		end,
 		click = function(x, y, button, done) ports.mouse_click(x, y, button, 1, done) end,
-		click_point = require("shortcuts.engine.auto_click_matcher").click_point,
+		click_point = require("shortcuts.engine.keep_awake.auto_click_matcher").click_point,
 		find_text = function(words, targets) return deps.vision().find_text(words, targets) end,
 		after = function(ms, fn)
 			local handle = deps.timer.after(ms / 1000, fn)

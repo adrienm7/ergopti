@@ -25,7 +25,7 @@ local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("core.logger.engine.logger")
 local DeferredWork   = require("core.timing.engine.deferred_work")
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil

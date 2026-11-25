@@ -96,7 +96,7 @@ helpers.describe("screen vision service (Linux)", function()
 			rows[#rows + 1] = {}
 			for col = 20, 31 do rows[#rows][#rows[#rows] + 1] = block_value(col, row) end
 		end
-		local Matcher = require("shortcuts.engine.auto_click_matcher")
+		local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
 		local flat = Matcher.from_rows({ { 9, 9 }, { 9, 9 } })
 		local hits, refused = now(Service.match, image, {
 			{ id = "button", image = Matcher.from_rows(rows), threshold = 0.95 },

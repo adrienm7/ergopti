@@ -1,5 +1,5 @@
 {
-	"_comment": "Edits of the anti-sleep presets document (_shared/shortcuts/engine/keep_awake_presets.lua and its Windows twin), each vector starting from the starters of _shared/shortcuts/data/keep_awake_presets.json. steps call one edit (op and its args); ok and reason pin its answer; expect_active and expect_ids pin the document after the steps. plan vectors pin what one OS runs for a starter.",
+	"_comment": "Edits of the anti-sleep presets document (_shared/shortcuts/engine/keep_awake/presets.lua and its Windows twin), each vector starting from the starters of _shared/shortcuts/data/keep_awake_presets.json. steps call one edit (op and its args); ok and reason pin its answer; expect_active and expect_ids pin the document after the steps. plan vectors pin what one OS runs for a starter.",
 	"edits": [
 		{
 			"id": "starters_are_the_first_document",

@@ -4,7 +4,7 @@
 ; MODULE: Anti-Sleep Library Window (Windows)
 ; DESCRIPTION:
 ; Hosts _shared/ui/keep_awake_library (bridge hsKeepAwake) on WebView2: the
-; Windows twin of _shared/shortcuts/engine/keep_awake_library_host.lua. The
+; Windows twin of _shared/shortcuts/engine/keep_awake/library_host.lua. The
 ; page's first data, every edit of the presets document through the store
 ; (AutoClickEdit), « Ajouter un bouton… » through the region overlay and the
 ; screen vision worker, an image file converted by the worker, and the export

@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/auto_click_matcher.lua
+--- _shared/shortcuts/engine/keep_awake/auto_click_matcher.lua
 
 --- ==============================================================================
 --- MODULE: Auto-Click Template Matcher — Shared Lua Implementation

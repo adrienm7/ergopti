@@ -1,5 +1,5 @@
 {
-	"_comment": "The anti-sleep library window's protocol data (_shared/ui/keep_awake_library), read by the shared host (_shared/shortcuts/engine/keep_awake_library_host.lua) and its Windows twin: the page's own strings (keepawake.library.<name>), the store edits the page may ask for with their argument count, and the format tag and version of an exported preset file.",
+	"_comment": "The anti-sleep library window's protocol data (_shared/ui/keep_awake_library), read by the shared host (_shared/shortcuts/engine/keep_awake/library_host.lua) and its Windows twin: the page's own strings (keepawake.library.<name>), the store edits the page may ask for with their argument count, and the format tag and version of an exported preset file.",
 	"page_keys": [
 		"window_title",
 		"heading",

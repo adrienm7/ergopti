@@ -14,7 +14,7 @@
 
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 local hs = hs
 local Logger        = require("core.logger.engine.logger")
 local PhaseStats    = require("infra.phase_stats")

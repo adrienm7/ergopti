@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/keep_awake/keep_awake_presets_vectors.json,
 ; which the macOS and Linux suites replay through
-; _shared/shortcuts/engine/keep_awake_presets.lua, through
+; _shared/shortcuts/engine/keep_awake/presets.lua, through
 ; modules/shortcuts/keep_awake_presets.ahk.
 ;
 ; ROOT CAUSE ENCODED:

@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/keep_awake_presets.lua
+--- _shared/shortcuts/engine/keep_awake/presets.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Presets — Shared Lua Implementation

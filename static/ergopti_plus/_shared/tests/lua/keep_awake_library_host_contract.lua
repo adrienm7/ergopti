@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Anti-Sleep Library Window Host Contract
 --- DESCRIPTION:
---- Drives _shared/shortcuts/engine/keep_awake_library_host.lua with the real
+--- Drives _shared/shortcuts/engine/keep_awake/library_host.lua with the real
 --- library store over an in-memory file system: the first data names every
 --- page string, an edit the store refuses or the page may not ask for changes
 --- nothing, « Ajouter un bouton… » keeps a PNG under a fresh id, and a preset
@@ -14,8 +14,8 @@
 local M = {}
 
 local Json = require("core.text.engine.json")
-local Library = require("shortcuts.engine.keep_awake_library")
-local Host = require("shortcuts.engine.keep_awake_library_host")
+local Library = require("shortcuts.engine.keep_awake.library")
+local Host = require("shortcuts.engine.keep_awake.library_host")
 
 local function read_json(shared, relative)
 	local handle = assert(io.open(shared(relative), "rb"))

@@ -12,7 +12,7 @@
  *
  * WHY:
  * The rule is implemented once for both Lua drivers
- * (_shared/shortcuts/engine/user_action_parameter.lua); Windows is pending
+ * (_shared/shortcuts/engine/actions/user_action_parameter.lua); Windows is pending
  * (docs/tooling/windows-pc-agent-handoff.md). A corpus that disagrees with its
  * own rule, or that a suite stops replaying, pins nothing, and a platform
  * claimed before its replay exists is a binding the picker offers untested.

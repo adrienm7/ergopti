@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Opens _shared/ui/keep_awake_library (bridge "hsKeepAwake") from the
 --- « Anti-veille » menu row and hands its messages to the shared library host
---- (_shared/shortcuts/engine/keep_awake_library_host.lua) with the macOS
+--- (_shared/shortcuts/engine/keep_awake/library_host.lua) with the macOS
 --- ports: the page push through the WebView, screencapture's selection for
 --- « Ajouter un bouton… », the launcher's vision worker to convert an image
 --- file, and the native open and save panels.
@@ -26,7 +26,7 @@ local M = {}
 
 local LOG = "ui.menu.keep_awake_library"
 
-local LibraryHost = require("shortcuts.engine.keep_awake_library_host")
+local LibraryHost = require("shortcuts.engine.keep_awake.library_host")
 local APP_ID = LibraryHost.APP_ID
 local BRIDGE = LibraryHost.BRIDGE
 local ASSETS_DIR = (Paths.shared("ui/" .. APP_ID) or "") .. "/"

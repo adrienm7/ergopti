@@ -1,5 +1,5 @@
 {
-	"_comment": "Ticks of the anti-sleep auto-click session (_shared/shortcuts/engine/auto_click_session.lua and its Windows twin). A vector gives the plan's allowed apps and targets, then ticks: each tick sets the foreground (app_id, window or null), the state (locked, paused, secure_field), the clock, and the scan answer the service gives (result with image and hits, or a reason; null means the scan is not answered during this tick, and the next tick's answer goes to that scan). expect_clicks lists the screen points clicked, in order; expect_scans counts scan requests.",
+	"_comment": "Ticks of the anti-sleep auto-click session (_shared/shortcuts/engine/keep_awake/auto_click_session.lua and its Windows twin). A vector gives the plan's allowed apps and targets, then ticks: each tick sets the foreground (app_id, window or null), the state (locked, paused, secure_field), the clock, and the scan answer the service gives (result with image and hits, or a reason; null means the scan is not answered during this tick, and the next tick's answer goes to that scan). expect_clicks lists the screen points clicked, in order; expect_scans counts scan requests.",
 	"plan": {
 		"allowed_apps": ["com.microsoft.VSCode"],
 		"auto_click": true,

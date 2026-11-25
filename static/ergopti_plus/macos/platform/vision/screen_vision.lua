@@ -33,7 +33,7 @@ local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local LauncherHelper = require("platform.remap.lease_helper")
-local TextTarget = require("shortcuts.engine.text_target")
+local TextTarget = require("shortcuts.engine.keep_awake.text_target")
 local Paths = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 

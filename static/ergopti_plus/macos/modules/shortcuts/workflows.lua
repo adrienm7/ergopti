@@ -176,7 +176,7 @@ local function screen_vision(deps, ports, matcher_options)
 		end,
 		save = function(capture, done) done(capture.path or capture.image.source) end,
 		click = function(x, y, button, done) ports.mouse_click(x, y, button, 1, done) end,
-		click_point = require("shortcuts.engine.auto_click_matcher").click_point,
+		click_point = require("shortcuts.engine.keep_awake.auto_click_matcher").click_point,
 		find_text = function(words, targets) return vision().find_text(words, targets) end,
 		after = function(ms, fn)
 			local handle = deps.timer.after(ms / 1000, fn)

@@ -7,7 +7,7 @@
 --- (sg_actions.activity_simulation) calls toggle_mode(): the active preset's
 --- keep-awake part is the existing activity simulation
 --- (modules/shortcuts/actions/system.lua), its auto-click part the shared
---- session (_shared/shortcuts/engine/auto_click_session.lua) with macOS ports.
+--- session (_shared/shortcuts/engine/keep_awake/auto_click_session.lua) with macOS ports.
 --- The presets document is the shared library store's.
 ---
 --- FEATURES & RATIONALE:
@@ -33,8 +33,8 @@ local ConfigPaths = require("settings.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
-local Library = require("shortcuts.engine.keep_awake_library")
-local Session = require("shortcuts.engine.auto_click_session")
+local Library = require("shortcuts.engine.keep_awake.library")
+local Session = require("shortcuts.engine.keep_awake.auto_click_session")
 
 local LOG = "modules.shortcuts.auto_click"
 

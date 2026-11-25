@@ -1,5 +1,5 @@
 {
-	"_comment": "Text targets of the auto-clicker and the user workflows (_shared/shortcuts/engine/text_target.lua and its Windows twin). normalize pins the comparison form: lower case, accents removed through _shared/core/text/data/text_fold.json, punctuation and every space read as one space. find vectors give recognised words (boxes in image pixels, a line id grouping one line's words) and a target; expect is the hit's box and distance, or null.",
+	"_comment": "Text targets of the auto-clicker and the user workflows (_shared/shortcuts/engine/keep_awake/text_target.lua and its Windows twin). normalize pins the comparison form: lower case, accents removed through _shared/core/text/data/text_fold.json, punctuation and every space read as one space. find vectors give recognised words (boxes in image pixels, a line id grouping one line's words) and a target; expect is the hit's box and distance, or null.",
 	"normalize": [
 		{
 			"id": "case_and_accents",

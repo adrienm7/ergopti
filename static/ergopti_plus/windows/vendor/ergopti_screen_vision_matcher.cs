@@ -3,7 +3,7 @@
 // ==============================================================================
 // MODULE: Screen Vision Matcher (C# port)
 // DESCRIPTION:
-// C# port of _shared/shortcuts/engine/auto_click_matcher.lua for the Windows
+// C# port of _shared/shortcuts/engine/keep_awake/auto_click_matcher.lua for the Windows
 // screen vision worker (vendor/ergopti_screen_vision_worker.ps1), which
 // compiles it once with Add-Type when it starts. The AutoHotkey twin
 // (modules/shortcuts/auto_click_matcher.ahk) is the reference the AHK suite

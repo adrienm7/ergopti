@@ -313,7 +313,7 @@ helpers.describe("the user action editors store one canonical value (Linux)", fu
 			pick = function() asked = asked + 1; return "terminal" end,
 		})
 		helpers.assert_eq(asked, 1)
-		helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("command", value), nil)
+		helpers.assert_eq(require("shortcuts.engine.actions.user_action_parameter").parse("command", value), nil)
 	end)
 
 	helpers.it("a file or folder is picked with the owned dialog (user-actions)", function()

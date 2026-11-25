@@ -97,9 +97,9 @@ Windows, whose rectangle `ScreenVisionCaptureRegion` captures. Pinned by
 
 ## Shared code and corpora
 
-- `_shared/shortcuts/engine/auto_click_matcher.lua`, pinned by
+- `_shared/shortcuts/engine/keep_awake/auto_click_matcher.lua`, pinned by
   `_shared/tests/corpus/keep_awake/auto_click_match_vectors.json`.
-- `_shared/shortcuts/engine/text_target.lua` and
+- `_shared/shortcuts/engine/keep_awake/text_target.lua` and
   `_shared/core/text/data/text_fold.json`, pinned by
   `_shared/tests/corpus/keep_awake/text_target_vectors.json`.
 - `_shared/shortcuts/data/ocr_languages.json`: the OCR language of each

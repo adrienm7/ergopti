@@ -1,4 +1,4 @@
---- _shared/shortcuts/engine/keep_awake_library_host.lua
+--- _shared/shortcuts/engine/keep_awake/library_host.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Library Window Host (Shared)
@@ -24,7 +24,7 @@
 
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
-local Presets = require("shortcuts.engine.keep_awake_presets")
+local Presets = require("shortcuts.engine.keep_awake.presets")
 local Base64 = require("core.lifecycle.engine.compat.base64")
 
 local M = {}
