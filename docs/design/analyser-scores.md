@@ -651,7 +651,10 @@ keygen; with `--perl=<exe> --carpalx-data=<its source folder>` (and
 `--carpalx-perl5lib` for the Perl modules it needs), carpalx itself; with
 `--klo=<evaluate exe> --klo-data=<its source folder>`, Keyboard Layout
 Optimizer (KLO in the table); with `--cyanophage=<folder with its optimiser.js,
-worker.js and words-english.json>`, the Cyanophage optimiser's own code. Each
+worker.js and words-english.json>`, the Cyanophage optimiser's own code; with
+`--keycraft=<exe> --keycraft-data=<its source folder>`, `keycraft rank` on
+every built-in corpus (a text as the text the codegen counts, a word list or a
+count table as keycraft's corpus file of the same tables). Each
 tool that prints sub-scores is also compared metric by metric (the figures
 quoted in each section above). Measured on 2026-11-18, on 2026-11-19 for
 Cyanophage, on 2026-11-24 for Oxeylyzer and genkey and on 2026-11-25 for
