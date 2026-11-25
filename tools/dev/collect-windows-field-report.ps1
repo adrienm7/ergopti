@@ -802,14 +802,9 @@ function Complete-Report {
 			$DayLog = Join-Path $script:Out "$MainPrefix$Day$Extension"
 			if (Test-Path -LiteralPath $DayLog -PathType Leaf) { $DayLogs += $DayLog }
 		}
-		# The topical sub-logs keep the download, server, boot, menu, layout,
-		# dispatch, tray and gesture lines of earlier days; the hotstring and
-		# keystats ones can carry typed text and stay.
-		$Topical = @('llm', 'ollama', 'boot', 'menu', 'layout', 'dispatch', 'tray', 'gestures') | ForEach-Object { "$MainPrefix$_$Extension" }
-		foreach ($Name in @($Topical) + @($BootstrapLog)) {
-			$Source = Join-Path $Folder $Name
-			if (Test-Path -LiteralPath $Source -PathType Leaf) { $null = Copy-ScrubbedLog $Source }
-		}
+		# Written before the logger starts, so its lines are in no day log.
+		$Source = Join-Path $Folder $BootstrapLog
+		if (Test-Path -LiteralPath $Source -PathType Leaf) { $null = Copy-ScrubbedLog $Source }
 		# Crash reports are named, not copied: a dump is read on request.
 		$Crashes = Join-Path $Folder $CrashReports
 		Invoke-Step 'crash_reports' {

@@ -67,8 +67,8 @@
 # - No diagnostics export. The health check is a tray window, with no
 #   command-line form; the boot diagnostic snapshot (the one [Diagnostics]
 #   line) is in the day log and digest_snapshot.
-# - The topical sub-logs (ErgoptiPlus_hotstrings.log, ...) are not copied:
-#   every line they hold is also in the day log.
+# - The day log is the only log: the topical sub-logs were retired on
+#   2026-11-25 (every line they held was also in the day log).
 #
 # USAGE (base.txt in the report names the branch and the commit it ran on):
 #   bash tools/dev/collect-linux-field-report.sh         collect and save the
@@ -274,13 +274,8 @@ finalize() {
 				[ -f "${f}" ] && scrub_log "${f}"
 			done
 		done
-		# The topical sub-logs keep the download, server, boot, menu and gesture
-		# lines of earlier days; the hotstring and keystats ones can carry typed
-		# text and stay.
-		for f in "${log_dir}/${main}llm${ext}" "${log_dir}/${main}ollama${ext}" "${log_dir}/${main}boot${ext}" \
-			"${log_dir}/${main}menu${ext}" "${log_dir}/${main}gestures${ext}" "${log_dir}/${bootstrap}"; do
-			[ -f "${f}" ] && scrub_log "${f}"
-		done
+		# Written before the logger starts, so its lines are in no day log.
+		[ -f "${log_dir}/${bootstrap}" ] && scrub_log "${log_dir}/${bootstrap}"
 		# Crash reports are named, not copied: a dump is read on request.
 		step crash_reports sh -c 'ls -la "$1" 2>/dev/null || echo "no crash report"' sh "${log_dir}/${crashes}"
 		for d in "${days[@]}"; do

@@ -5,12 +5,11 @@
 The field report collector reads the logs and the personal hotstrings where
 the driver writes them; spelling those paths in the collector would drift the
 day a folder moves. Every name comes from its one declaration instead:
-_shared/core/fs/data/paths/app_dirs.toml for the folders and the log file names,
-_shared/core/logger/data/sub_files.toml for the topical log files. The
-paths.toml the launcher keeps wins over both defaults, as it does in the
-driver (settings/engine/paths.lua): its configuration and logs folder keys move
-the personal hotstrings and the logs. Only the topical logs the caller names
-are listed: the hotstring and keystroke logs can carry typed text.
+_shared/core/fs/data/paths/app_dirs.toml for the folders and the log file
+names. The paths.toml the launcher keeps wins over both defaults, as it does in
+the driver (settings/engine/paths.lua): its configuration and logs folder keys
+move the personal hotstrings and the logs. The daily log is the only log: the
+topical sub-files were retired on 2026-11-25.
 """
 
 import argparse
@@ -78,10 +77,8 @@ def main():
     """Prints the assignments and returns the process exit status."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("shared", type=pathlib.Path, help="the _shared folder of the clone")
-    parser.add_argument("topical", nargs="*", help="the topical log names to copy")
     arguments = parser.parse_args()
     dirs = load(arguments.shared / "core/fs/data/paths/app_dirs.toml")
-    routes = load(arguments.shared / "core/logger/data/sub_files.toml")
     app = dirs["app"]["folder_name"]
     logs = dirs["logs"]
     files = logs["files"]
@@ -99,11 +96,6 @@ def main():
     if log_dir is not None and os.path.basename(log_dir) != app:
         log_dir = os.path.join(log_dir, app)
     log_dir = log_dir or default_log_dir
-    declared = {entry["name"] for entry in routes["sub_files"] if "hs" in entry["platforms"]}
-    unknown = sorted(set(arguments.topical) - declared)
-    if unknown:
-        sys.exit(f"no macOS topical log named {', '.join(unknown)} in sub_files.toml.")
-    topical = [files["topical_prefix"] + name + files["extension"] for name in arguments.topical]
     values = {
         "LOG_DIR": log_dir,
         "LOG_UNIFIED_PREFIX": files["unified_prefix"],
@@ -114,7 +106,6 @@ def main():
         "LOG_DEFAULT_DIR": default_log_dir,
         "LOG_LAUNCHER": logs["macos"]["launcher_log"],
         "LOG_FATAL_REPORT": logs["macos"]["fatal_report"],
-        "LOG_TOPICAL": " ".join(topical),
         # Always in the default folder, whatever LogsDirPath says, like launcher.log.
         "RELOAD_BREADCRUMB": os.path.join(default_log_dir, logs["macos"]["reload_breadcrumb"]),
         "PERSONAL_HOTSTRINGS": os.path.join(
