@@ -188,6 +188,12 @@ const ALLOWLIST = [
 		reason: 'mouse spotlight: creates its locator overlay through the overlay adapter'
 	},
 	{
+		file: 'windows/platform/system/vision/region_select.ahk',
+		kinds: { 'win.alwaysOnTop': 2 },
+		reason:
+			'screen region selection: the dimmed full-screen overlay and its frame, closed on release, Escape or timeout'
+	},
+	{
 		file: 'linux/core/ui/adapters/graphics_renderer.lua',
 		kinds: { 'linux.keepAbove': 1, 'linux.popup': 3, 'overlay.adapter': 1 },
 		reason: 'hotstring preview tooltip: an undecorated click-through popup'
