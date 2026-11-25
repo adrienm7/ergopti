@@ -1,4 +1,4 @@
---- hotstrings/ui/menu/hotstrings_status.lua
+--- hotstrings/ui/menu/status.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Title Status
@@ -21,7 +21,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.logger")
 
-local LOG = "hotstrings.ui.menu.hotstrings_status"
+local LOG = "hotstrings.ui.menu.status"
 
 -- A key of the manifest's health_dot (menu.toml), as the AI and Tap-Holds
 -- titles return it; the title test checks it draws the red glyph.

@@ -802,7 +802,7 @@ A restart can keep failing (a revoked Accessibility or Input Monitoring
 permission): the keymap watchdog then records the tap in `_restart_failed`,
 logs its outage once and its recovery once, and retries quietly
 (`start_eventtap(name, tap, true)`). `taps_down()` feeds the Hotstrings
-title's red dot and greyed reason row (`hotstrings_status.lua`,
+title's red dot and greyed reason row (`hotstrings/ui/menu/status.lua`,
 `tap-outage-reported`, `hotstrings-taps-down-dot`). A new watchdog must keep
 that state instead of logging an ERROR per tick with nothing in the menu.
 

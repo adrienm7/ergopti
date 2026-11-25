@@ -2752,7 +2752,7 @@ local tap_watchdog
 -- hotstrings were dead while every switch read on. The first failed restart is
 -- logged once and paired with the line of its recovery; the retries between
 -- them are silent, and the Hotstrings title reads the typing taps among them
--- (M.taps_down, hotstrings/ui/menu/hotstrings_status.lua).
+-- (M.taps_down, hotstrings/ui/menu/status.lua).
 local _restart_failed = {}
 
 -- The taps every keystroke goes through: while one of them stays disabled, no
@@ -2985,7 +2985,7 @@ function M.tap_states()
 end
 
 --- The typing taps the watchdog could not re-enable, for the Hotstrings title
---- (hotstrings/ui/menu/hotstrings_status.lua). An in-memory read: the menu
+--- (hotstrings/ui/menu/status.lua). An in-memory read: the menu
 --- watch calls it every second.
 --- @return table|nil names Tap names in a fixed order; nil while none is down
 ---   or the engine is stopped.

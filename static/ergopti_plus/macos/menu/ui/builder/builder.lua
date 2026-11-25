@@ -94,7 +94,7 @@ end
 
 
 local HotCounter  = require("hotstrings.ui.menu.counter")
-local HotstringsStatus = require("hotstrings.ui.menu.hotstrings_status")
+local HotstringsStatus = require("hotstrings.ui.menu.status")
 local TitleStatus = require("menu.ui.title_status")
 local Timings     = require("core.timing.engine.timings")
 local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")

@@ -891,7 +891,7 @@ user_code_worker_poll_ms = 25
 # Period of the watch that repaints the Hotstrings menu title's red dot when a
 # typing event tap stays disabled, or recovers, after the menu was built. It
 # only reads in-memory state, like the Tap-Holds title's watch.
-# HS: menu/ui/builder/builder.lua (hotstrings/ui/menu/hotstrings_status.lua).
+# HS: menu/ui/builder/builder.lua (hotstrings/ui/menu/status.lua).
 title_status_watch_ms = 1000
 
 
