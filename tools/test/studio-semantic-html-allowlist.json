@@ -192,7 +192,7 @@
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
 			"element": "span.la-swatch",
-			"count": 8,
+			"count": 9,
 			"kind": "decorative",
 			"reason": "A legend's colour sample, aria-hidden: a drawn box beside the entry's words, which say what it stands for."
 		},
