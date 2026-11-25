@@ -141,7 +141,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 * The engine's layout for an editor document: its compiled ISO .keylayout,
 	 * as macOS types it; a source with levels of its own (Neo's Mod3 and Mod4
 	 * on custom held modifiers, which no .keylayout holds) is read from its
-	 * layers instead, every level kept (LAYOUT_FORMATS.fromSource).
+	 * layers instead, every level kept (LAYOUT_FORMATS.fromSource). Either way
+	 * its tap-holds are analysed as holds (LAYOUT_FORMATS.withTapHolds).
 	 * @param {object} doc - A LayoutSourceIO document.
 	 * @returns {object} The layout in the library shape.
 	 * @throws {Error} When the document cannot be compiled to an ISO .keylayout
@@ -149,9 +150,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 */
 	function layoutFromEditorDoc(doc) {
 		const formats = window.LAYOUT_FORMATS;
+		const fingering = DATA.model.fingerings.standard;
+		// Its tap-holds analysed as holds (formats.withTapHolds).
+		const held = (layout) => E.layoutFromRows(formats.withTapHolds(layout, doc, fingering));
 		if (!window.LayoutSourceIO.isPreserved(doc) && formats.sourceHoldSets(doc)) {
-			const read = formats.fromSource(doc, DATA.model.fingerings.standard, E.typingCodes());
-			return E.layoutFromRows(Object.assign(read, { origin: 'user' }));
+			const read = formats.fromSource(doc, fingering, E.typingCodes());
+			return held(E.layoutFromRows(Object.assign(read, { origin: 'user' })));
 		}
 		const file = window.LayoutSourceIO.keylayoutFile(doc, SOURCE_BOARD);
 		const source = window.LayoutComposer.parseSource(
@@ -164,7 +168,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const layout = E.layoutFromComposerSource(source, E.typingCodes());
 		layout.name = doc.layout.name || doc.layout.id;
 		layout.origin = 'user';
-		return layout;
+		return window.LayoutSourceIO.isPreserved(doc) ? layout : held(layout);
 	}
 
 	/** Reads a stored value; an unavailable storage gives none. */
@@ -324,6 +328,25 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const fingersTitle = el('h3');
 		fingersTitle.id = 'la-panel-fingers-title';
 		const fingers = el('table', 'la-panel-fingers');
+		// The tap-hold keys (an idea seen in the Layouts Wiki playground, which
+		// models tap and hold keys): taps, holds and their risks, when the
+		// layout has any.
+		const tapTitle = el('h3');
+		tapTitle.id = 'la-panel-tap-holds-title';
+		const tapNote = el('p', 'la-panel-note');
+		const tapSummary = el('p', 'la-panel-note');
+		// Its own scroll in a narrow panel, reachable from the keyboard.
+		const tapWrap = el('section', 'la-panel-table-wrap');
+		tapWrap.tabIndex = 0;
+		tapWrap.setAttribute('aria-labelledby', 'la-panel-tap-holds-title');
+		const tapTable = el('table', 'la-panel-metrics la-panel-tap-holds');
+		tapTable.id = 'la-panel-tap-holds';
+		tapTable.setAttribute('aria-labelledby', tapTitle.id);
+		tapWrap.append(tapTable);
+		const tapBox = el('section', 'la-panel-tap-box');
+		tapBox.setAttribute('aria-labelledby', tapTitle.id);
+		tapBox.hidden = true;
+		tapBox.append(tapTitle, tapNote, tapSummary, tapWrap);
 		const analysersTitle = el('h3');
 		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
 		// The sections other scripts add (addSection), under the analysers.
@@ -350,7 +373,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			: null;
 		if (swaps) scoreColumn.append(swapsBox);
 		const loadColumn = el('div', 'la-panel-column');
-		loadColumn.append(fingersTitle, fingers, analysersTitle, analysers);
+		loadColumn.append(fingersTitle, fingers, tapBox, analysersTitle, analysers);
 		const fingeringColumn = el('div', 'la-panel-column');
 		fingeringColumn.append(fingering);
 		const body = el('div', 'la-panel-body');
@@ -695,6 +718,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					: undefined
 			});
 			drawFingers(result);
+			drawTapHolds(layout, prepared, settings);
 			drawAnalysers(layout, prepared, settings, mine);
 			for (const box of extraBoxes.splice(0)) box.remove();
 			for (const draw of sections) {
@@ -820,6 +844,65 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				row.append(name, track, value);
 				fingers.append(row);
 			}
+		}
+
+		/**
+		 * The tap-hold keys of the edited layout (E.tapHoldReport): for each,
+		 * the level it holds, its taps and holds, and the shares of its taps
+		 * rolled into a key of the same hand and of its holds typed by that
+		 * hand, the two that make a tap-hold misfire or tire. Hidden for a
+		 * layout without tap-holds.
+		 */
+		function drawTapHolds(layout, prepared, settings) {
+			const report = E.tapHoldReport(layout, prepared, {
+				keyboard: state.keyboard,
+				weights: settings.weights,
+				profile: settings.profile
+			});
+			tapBox.hidden = report.keys.length === 0;
+			if (tapBox.hidden) {
+				tapTable.replaceChildren();
+				return;
+			}
+			tapTitle.textContent = t('layout_analysis.tap_hold.title');
+			tapNote.textContent = t('layout_analysis.tap_hold.note');
+			tapSummary.textContent = t('layout_analysis.tap_hold.summary', {
+				share: measure(report.holdShare, 2, '%')
+			});
+			const head = el('tr');
+			for (const id of ['key', 'level', 'taps', 'holds', 'hold_share', 'roll', 'same_hand']) {
+				const th = el('th', '', t(`layout_analysis.tap_hold.col_${id}`));
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			const pct = (value) => measure(value, 1, '%');
+			for (const key of report.keys) {
+				const tapped = (layout.rows[key.code] || [])[0];
+				const shown =
+					typeof tapped !== 'string'
+						? key.code
+						: tapped === ' '
+							? t('layout_analysis.incomplete.space')
+							: tapped;
+				const name = el('th', '', `${shown} (${key.code})`);
+				name.scope = 'row';
+				const tr = el('tr');
+				tr.dataset.code = key.code;
+				tr.append(
+					name,
+					el('td', '', key.holds.map((id) => layout.modifiers[id].label).join(', ')),
+					el('td', '', format(key.taps, 0)),
+					el('td', '', format(key.held, 0)),
+					el('td', '', pct(key.holdShare)),
+					el('td', '', pct(key.rollAfterTap)),
+					el('td', '', pct(key.sameHandHold))
+				);
+				tbody.append(tr);
+			}
+			tapTable.replaceChildren(thead, tbody);
 		}
 
 		/** One analyser's score, or the headline statistics of one without a score. */

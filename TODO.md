@@ -320,7 +320,8 @@ waits for the maintainer's review).
       Kawalyzer's « Clever Keys » (context outputs) with item (3). Also done: the library grid's Boolean filter as the
       Comparer's « Values query » (`E.compileQuery`), the Pareto spread's smoothed distribution
       (`E.densityCurve`), the Principal − Comparison difference on every frame tab and « Your metrics », user
-      queries over key windows (`E.windowMetrics`).
+      queries over key windows (`E.windowMetrics`), and tap-holds analysed as holds (`withTapHolds`,
+      `E.tapHoldReport`).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

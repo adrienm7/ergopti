@@ -369,3 +369,9 @@
 		max-width: none;
 	}
 }
+
+/* The tap-hold keys' table scrolls on its own in a narrow panel. */
+.la-panel-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}

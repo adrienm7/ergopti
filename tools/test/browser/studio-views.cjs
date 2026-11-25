@@ -47,6 +47,10 @@
  *    measured; a new metric is measured once its query reads; « Measure every
  *    compared layout » lists each layout shown; the list is kept for the next
  *    visit.
+ * 18. Tap-holds: the editor's analysis panel hides its tap-hold table for a
+ *    layout without tap-holds and, once a source with one is opened (Space
+ *    taps a space and holds a layer), lists the key with its level, taps,
+ *    holds and risks, in a scroll region reachable from the keyboard.
  * 13. Values query: a query over the values (« sfb < … & complete ») keeps
  *    only the layouts it holds for, in every figure's rows; one that does not
  *    read filters nothing and says why and where in words; the names it may
@@ -829,7 +833,45 @@ async function exerciseUserMetrics(browser, origin) {
 	await context.close();
 }
 
+async function exerciseTapHolds(browser, origin) {
+	const { page, errors, context } = await studioUx.openOnErgopti(browser, origin);
+	await page.waitForSelector('#la-panel-tap-holds', { state: 'attached' });
+	await page.waitForFunction(() => document.querySelector('.la-panel-score').textContent !== '');
+	assert.ok(
+		await page.$eval('#la-panel-tap-holds', (table) => table.closest('.la-panel-tap-box').hidden),
+		'tap-holds: hidden for a layout without one'
+	);
+	await page.setInputFiles(
+		'#le-open-file',
+		shared('tests', 'corpus', 'layouts', 'source', 'source.toml')
+	);
+	await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
+	await page.waitForSelector('#la-panel-tap-holds tbody tr[data-code="Space"]', {
+		state: 'attached'
+	});
+	const row = await page.$$eval('#la-panel-tap-holds tbody tr[data-code="Space"] > *', (cells) =>
+		cells.map((cell) => cell.textContent)
+	);
+	assert.equal(row.length, 7, `tap-holds: seven columns (${row})`);
+	assert.ok(row[0].includes('(Space)'), `tap-holds: the key named (${row[0]})`);
+	assert.equal(row[1], 'command', 'tap-holds: the layer it holds');
+	assert.ok(Number(row[2].replace(/[^0-9]/g, '')) > 0, `tap-holds: Space is tapped (${row[2]})`);
+	const region = await page.$eval('#la-panel-tap-holds', (table) => ({
+		tab: table.parentElement.tabIndex,
+		tag: table.parentElement.tagName,
+		named: table.parentElement.getAttribute('aria-labelledby')
+	}));
+	assert.deepEqual(
+		region,
+		{ tab: 0, tag: 'SECTION', named: 'la-panel-tap-holds-title' },
+		'tap-holds: its scroll is a named region the keyboard reaches'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseTapHolds,
 	exerciseUserMetrics,
 	exerciseFrameDiff,
 	exerciseDensity,

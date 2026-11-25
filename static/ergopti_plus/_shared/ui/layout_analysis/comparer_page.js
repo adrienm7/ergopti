@@ -1123,6 +1123,14 @@
 				<table id="la-rhythm" class="la-table"></table>
 			</section>
 		</details>
+		<details id="la-tap-holds-box" class="la-section" hidden>
+			<summary id="la-tap-holds-name" data-i18n="layout_analysis.tap_hold.title"></summary>
+			<p class="la-muted" data-i18n="layout_analysis.tap_hold.note"></p>
+			<p id="la-tap-holds-summary" class="la-muted"></p>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-tap-holds-name">
+				<table id="la-tap-holds" class="la-table"></table>
+			</section>
+		</details>
 		<details id="la-user-metrics-box" class="la-section">
 			<summary id="la-user-metrics-name" data-i18n="layout_analysis.user_metrics.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.user_metrics.caption"></p>
@@ -5426,6 +5434,57 @@
 		 * screen; every pair is also in a sortable table, and each cell names
 		 * its pair, share, count, kind and points to assistive technology.
 		 */
+		/**
+		 * The detailed layout's tap-hold keys (E.tapHoldReport, an idea seen in
+		 * the Layouts Wiki playground, which models tap and hold keys): the
+		 * level each holds, its taps and holds, its taps rolled on its hand and
+		 * its holds typed by its hand. Hidden for a layout without tap-holds
+		 * (every library layout: they come from the editor).
+		 */
+		function renderTapHolds(result) {
+			const layout = layoutOf(result.layout.id);
+			const box = $('la-tap-holds-box');
+			box.hidden = E.tapHoldKeys(layout).size === 0;
+			const table = $('la-tap-holds');
+			if (box.hidden) {
+				table.replaceChildren();
+				return;
+			}
+			const report = cachedFigure(result, 'tapHolds', () =>
+				E.tapHoldReport(layout, tablesOf(result), analysisOptions())
+			);
+			$('la-tap-holds-summary').textContent = t('layout_analysis.tap_hold.summary', {
+				share: measure(report.holdShare, 2, '%')
+			});
+			const head = el('tr');
+			for (const id of ['key', 'level', 'taps', 'holds', 'hold_share', 'roll', 'same_hand']) {
+				const th = el('th', '', t(`layout_analysis.tap_hold.col_${id}`));
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			const pct = (value) => measure(value, 1, '%');
+			for (const key of report.keys) {
+				const name = el('th', '', `${keyText(layout, key.code)} (${key.code})`);
+				name.scope = 'row';
+				const row = el('tr');
+				row.dataset.code = key.code;
+				row.append(
+					name,
+					el('td', '', key.holds.map((id) => layout.modifiers[id].label).join(', ')),
+					el('td', 'la-num', format(key.taps, 0)),
+					el('td', 'la-num', format(key.held, 0)),
+					el('td', 'la-num', pct(key.holdShare)),
+					el('td', 'la-num', pct(key.rollAfterTap)),
+					el('td', 'la-num', pct(key.sameHandHold))
+				);
+				body.append(row);
+			}
+			table.replaceChildren(thead, body);
+		}
+
 		// ===================================
 		// ======= User metrics ==============
 		// ===================================
@@ -6462,6 +6521,7 @@
 			renderWorst(result);
 			renderMatrix(result);
 			renderMovement(result);
+			renderTapHolds(result);
 			renderUserMetrics(result);
 			renderWords(result);
 			renderFigures(result);

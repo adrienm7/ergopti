@@ -2490,6 +2490,130 @@ var LAYOUT_FORMATS = (function () {
 	}
 
 	/**
+	 * A layout read from an Ergopti source with its tap-holds analysed as
+	 * holds (an idea seen in the Layouts Wiki playground, which models tap and
+	 * hold keys): each layer a tap-hold holds (hold_layer) that types becomes a
+	 * level of its own, held by that tap-hold's keys (the other hand's first,
+	 * as Shift), named « hold_ » and the layer's id; a tap-hold holding one of
+	 * the layout's own modifiers (hold_modifier, Right Alt as AltGr) adds its
+	 * key to that modifier's. Each such key types its tap when tapped (the
+	 * modifier's tap_keys): its tap text, else the base character of the key
+	 * it taps. A tap-hold that holds Shift, Control or another modifier with
+	 * no level here, or Right Alt on a layout of four levels with no hold
+	 * layer, changes nothing the analysis reads.
+	 * @param {object} layout - The layout read from the source (library shape).
+	 * @param {object} doc - The structured source.
+	 * @param {object} fingering - code → finger id (LAYOUT_ANALYSIS_DATA.model.fingerings.standard).
+	 * @returns {object} The same layout when no tap-hold changes it, else a copy.
+	 */
+	function withTapHolds(layout, doc, fingering) {
+		const entries = (doc.tap_holds || []).filter((entry) => typeof entry.key === 'string');
+		if (entries.length === 0) return layout;
+		const hand = (code) => String(fingering[code] || '')[0];
+		const otherFirst = (keys, side) =>
+			keys.filter((code) => hand(code) === side).concat(keys.filter((code) => hand(code) !== side));
+		const cellOf = (mapping) => {
+			if (!mapping) return NONE;
+			if (typeof mapping.text === 'string') return mapping.text === '' ? NONE : mapping.text;
+			if (typeof mapping.dead_key === 'string') return { dead: mapping.dead_key };
+			return NONE;
+		};
+		const levels = layout.levels
+			? layout.levels.map((level) => Object.assign({}, level))
+			: [
+					{ id: 'base' },
+					{ id: 'shift', shift: true },
+					{ id: 'altgr', hold: [ALTGR_MODIFIER] },
+					{ id: 'shift_altgr', shift: true, hold: [ALTGR_MODIFIER] }
+				];
+		const modifiers = {};
+		for (const [name, modifier] of Object.entries(
+			layout.modifiers || {
+				[ALTGR_MODIFIER]: {
+					label: ALTGR_LABEL,
+					for_left_hand: ['AltRight'],
+					for_right_hand: ['AltRight']
+				}
+			}
+		))
+			modifiers[name] = Object.assign({}, modifier, {
+				for_left_hand: modifier.for_left_hand.slice(),
+				for_right_hand: modifier.for_right_hand.slice()
+			});
+		const cells = [];
+		// The layers held, each with its tap-hold keys, in the source's order.
+		const holding = new Map();
+		for (const entry of entries)
+			if (typeof entry.hold_layer === 'string') {
+				if (!holding.has(entry.hold_layer)) holding.set(entry.hold_layer, []);
+				holding.get(entry.hold_layer).push(entry.key);
+			}
+		const taken = new Set(Object.keys(modifiers).concat(levels.map((level) => level.id)));
+		const tapKeys = new Set();
+		for (const layer of doc.layers || []) {
+			const codes = holding.get(layer.id);
+			if (!codes) continue;
+			const typed = Object.entries(layer.keys || {})
+				.map(([code, mapping]) => [code, cellOf(mapping)])
+				.filter(([, cell]) => cell !== NONE);
+			if (typed.length === 0) continue;
+			const base = `hold_${
+				layer.id
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, '_')
+					.replace(/^_+|_+$/g, '') || 'layer'
+			}`;
+			let name = base;
+			for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
+			taken.add(name);
+			levels.push({ id: name, hold: [name] });
+			const keys = Array.from(new Set(codes));
+			modifiers[name] = {
+				label: layer.id,
+				for_left_hand: otherFirst(keys, 'r'),
+				for_right_hand: otherFirst(keys, 'l'),
+				tap_keys: keys
+			};
+			for (const code of keys) tapKeys.add(code);
+			cells.push(new Map(typed));
+		}
+		for (const entry of entries) {
+			if (typeof entry.hold_modifier !== 'string') continue;
+			const name =
+				entry.hold_modifier === 'alt_right' || entry.hold_modifier === 'alt'
+					? ALTGR_MODIFIER
+					: entry.hold_modifier;
+			const modifier = modifiers[name];
+			if (!modifier) continue;
+			for (const side of ['for_left_hand', 'for_right_hand'])
+				if (!modifier[side].includes(entry.key)) modifier[side].push(entry.key);
+			modifier.tap_keys = Array.from(new Set((modifier.tap_keys || []).concat([entry.key])));
+			tapKeys.add(entry.key);
+		}
+		// A layout of four levels with no level held changes nothing the analysis reads.
+		if (tapKeys.size === 0 || (!layout.levels && cells.length === 0)) return layout;
+		const width = layout.levels ? layout.levels.length : LAYERS;
+		const rows = {};
+		const codes = new Set(Object.keys(layout.rows).concat(cells.flatMap((map) => [...map.keys()])));
+		for (const code of codes) {
+			const row = (layout.rows[code] || new Array(width).fill(NONE)).slice();
+			for (const map of cells) row.push(map.has(code) ? map.get(code) : NONE);
+			rows[code] = row;
+		}
+		const tapped = new Map(entries.map((entry) => [entry.key, entry.tap || {}]));
+		for (const code of tapKeys) {
+			const tap = tapped.get(code) || {};
+			const cell =
+				typeof tap.text === 'string' ? cellOf(tap) : (layout.rows[tap.key || code] || [NONE])[0];
+			if (!rows[code]) rows[code] = new Array(levels.length).fill(NONE);
+			rows[code][0] = cell === undefined ? NONE : cell;
+		}
+		for (const code of Object.keys(rows))
+			if (rows[code].every((cell) => cell === NONE)) delete rows[code];
+		return Object.assign({}, layout, { rows, levels, modifiers });
+	}
+
+	/**
 	 * Writes a layout as a Keyboard Layout Analyzer JSON on its european
 	 * (ISO) board, with the engine's standard fingering; a layout with
 	 * characters on keys only the ErgoDox has (thumb keys, board-only keys) goes
@@ -3067,6 +3191,7 @@ var LAYOUT_FORMATS = (function () {
 		toSource,
 		sourceHoldSets,
 		fromSource,
+		withTapHolds,
 		levelLabels,
 		levelLosses,
 		toKla,
