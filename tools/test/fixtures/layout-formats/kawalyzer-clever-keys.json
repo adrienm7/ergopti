@@ -1,0 +1,17 @@
+{
+	"essentialCorrections": [
+		{ "text": "à", "keys": "#" },
+		{ "text": "qu", "keys": "q" },
+		{ "text": "ée", "keys": "é#" },
+		{ "text": "'", "keys": "$" }
+	],
+	"optionalCorrections": [
+		{ "text": "sc", "keys": "s#" },
+		{ "text": "eau", "keys": "ea#" },
+		{ "text": "ment", "keys": "m#" },
+		{ "text": "ais", "keys": "ai#", "noLetterAfter": true },
+		{ "text": "sh", "keys": "s#" },
+		{ "text": "tion", "keys": "tio#" },
+		{ "text": "ôt", "keys": "*o#" }
+	]
+}

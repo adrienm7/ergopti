@@ -1124,6 +1124,30 @@ body {
 	padding: 2px 8px;
 }
 
+/* A repeat or magic key's fields: 44 px pointer targets (WCAG 2.5.5), each
+   field on its own line with its visible label. */
+.layout-editor .le-context-target {
+	min-height: 44px;
+	min-width: 44px;
+}
+
+.le-context-field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.le-magic {
+	border-top: 1px solid var(--le-border);
+	margin-top: 8px;
+	padding-top: 8px;
+}
+
+.le-magic h4 {
+	margin: 0 0 6px;
+}
+
 .le-preview {
 	background: var(--le-surface-2);
 	border: 1px solid var(--le-border);

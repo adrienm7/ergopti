@@ -4,11 +4,13 @@
 
 Status: the maintainer chose on 2026-11-25 to build this design, the analysis
 first. Built: the engine model and the analysis (step 1 below, as
-[Ways of typing](layout-analysis.md#ways-of-typing) describes it), the source
-format, the three drivers' emulation and the exports' omissions (steps 3 and
-4, [layout-source-format.md](layout-source-format.md), « Document schema »).
-Left, under « Layout repeat and magic keys » in TODO.md: the importers (step
-2), the editor's key panel and the field checks on each OS.
+[Ways of typing](layout-analysis.md#ways-of-typing) describes it), Kawalyzer's
+« Clever Keys » importer (step 2, [Importers](#importers)), the source format
+and the editor's key panel (step 3, [Key panel](#key-panel)), the three
+drivers' emulation and the exports' omissions (step 4,
+[layout-source-format.md](layout-source-format.md), « Document schema »).
+Left, under « Layout repeat and magic keys » in TODO.md: the field checks on
+each OS.
 
 Written on 2026-11-25 for the Layouts Wiki playground follow-up
 ([the comparison](../audits/layout-analysers/layouts-wiki-playground.md),
@@ -94,6 +96,51 @@ way; a new shown-only metric « repeat and magic uses » gives their share.
 - The ★ of Ergopti+ stays a hotstring trigger; a layout's own magic key is a
   separate key, and the two must not share a character unless the maintainer
   decides they should.
+
+## Importers
+
+Each analyser's licence was checked on 2026-11-25 (Paris time) before reading
+its format; a format is read only where the licence allows it, and no code is
+copied, the reader written from the format's description and its examples:
+
+- **Kawalyzer**, the web port `nbodinripert/kawalyzer` (GPL-3.0, commit
+  de03c0f, 2026-11-12; it ports Kawamashi's Excel analyser `Kawamashi/Kawalyzer`,
+  which states no licence and is not read). Its layout files are Kalamine TOML,
+  which the Studio already reads; its magic and repeat keys live in a separate
+  JSON of replacements, `essentialCorrections` and `optionalCorrections` of
+  `{text, keys}`, the keys writing the magic key `#`, the repeat key `$` and the
+  dead key `*`. `LAYOUT_FORMATS.fromKawalyzerRules` reads such a file into one
+  magic table: a rule whose keys are characters typed as themselves then `#`,
+  and whose text is those characters then one more, becomes `{after, types}`;
+  `#` alone typing one character becomes the fallback. Every other rule is
+  listed with its reason (`KAWALYZER_REASONS`): typed by other keys (a
+  correction such as `quoi` ← `qh`, or a rule on the repeat key), more than one
+  character typed (most of its « Clever Keys », such as `ion` ← `i#`), more than
+  two characters before the key, a condition on the letters around it, or a
+  second rule after the same characters. Kawalyzer's repeat key needs no
+  import: it types the last key again, which the source's `repeat = 1` does.
+- **chogalyzer** (`Lenchog/chogalyzer`, commit 874b8ba, 2026-06-06) and the
+  **Layouts Wiki playground** (layouts.wiki, its site and its author's
+  repositories): no licence is published, so neither format is read. An
+  importer waits for a licence that allows it (TODO.md, « Layout repeat and
+  magic keys »).
+
+## Key panel
+
+The editor's key panel (`layout_editor/editor_page.js`, `mappingEditor`) offers
+« Repeat key » (the last character typed, or the one before it) and « Magic key
+of the layout » beside the other kinds. A magic key names a table: one the
+layout has, or a new name, which `LayoutEditorModel.setMapping` creates empty
+with the key (decided by the agent on 2026-11-25, to review by the maintainer:
+a table belongs to the keys that name it, so the edit that changes the last of
+them removes it, since the format refuses a table no key types; undo brings it
+back, and a swap of two magic keys keeps both tables). Under a magic key, the
+table's rules (after, types), each removed by its own button, the fallback and
+« Import Kawalyzer rules », which replaces the rules in one step of the history
+and lists what it left out. Every control has a visible label and a 44 px
+target; the rules and the fallback save through the source's `magic[]` record
+(`tools/test/test-layout-editor-model.cjs`,
+`tools/test/browser/layout-editor-context-keys.cjs`).
 
 ## Order of work, once decided
 

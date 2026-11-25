@@ -76,6 +76,13 @@
  * 14. KLAnext's janiso and ergolinear boards read: janiso by KLAnext's own
  *    QWERTY on it, ergolinear by position with its thumb letter on the
  *    model's thumb key.
+ * 15. Kawalyzer « Clever Keys » (kawalyzer-clever-keys.json, written for
+ *    these tests in its replacement format): the rules typed by characters
+ *    then the magic key become a magic table's rules, the magic key alone its
+ *    fallback, and every other rule is named with its reason (a correction
+ *    typed by other keys, an output or a context too long, a letter
+ *    condition, a second rule of one context); a document that is not one is
+ *    refused; each reason has words in every locale.
  * ==============================================================================
  */
 
@@ -1905,6 +1912,73 @@ async function checkLinks() {
 			/^11 \(\\ \|\)$/.test(plain.unmapped[0].detail),
 		`ergolinear: ${JSON.stringify(plain.layout.rows)} ${JSON.stringify(plain.unmapped)}`
 	);
+}
+
+// ==========================================================
+// ======= 15/ Kawalyzer « Clever Keys » as a magic table ===
+// ==========================================================
+
+{
+	const file = path.join(__dirname, 'fixtures', 'layout-formats', 'kawalyzer-clever-keys.json');
+	const read = F.fromKawalyzerRules(fs.readFileSync(file, 'utf8'));
+	const plain = (value) => JSON.parse(JSON.stringify(value));
+	check(
+		JSON.stringify(plain(read.rules)) ===
+			JSON.stringify([
+				{ after: 'é', types: 'e' },
+				{ after: 's', types: 'c' },
+				{ after: 'ea', types: 'u' }
+			]) && read.fallback === 'à',
+		`kawalyzer: rules ${JSON.stringify(read.rules)}, fallback ${read.fallback}`
+	);
+	check(
+		JSON.stringify(plain(read.unmapped).map((entry) => [entry.text, entry.reason])) ===
+			JSON.stringify([
+				['qu', 'kawalyzer_not_magic'],
+				["'", 'kawalyzer_not_magic'],
+				['ment', 'kawalyzer_long_output'],
+				['ais', 'kawalyzer_condition'],
+				['sh', 'kawalyzer_duplicate'],
+				['tion', 'kawalyzer_long_context'],
+				['ôt', 'kawalyzer_not_magic']
+			]),
+		`kawalyzer: unmapped ${JSON.stringify(read.unmapped)}`
+	);
+	// The table's context bound is the format's own (source_model.js).
+	check(
+		F.KAWALYZER_CONTEXT_MAX === Source.CONTEXT_KEYS.context_max,
+		`kawalyzer: context bound ${F.KAWALYZER_CONTEXT_MAX} is not the source's`
+	);
+	const refusal = (input) => {
+		try {
+			F.fromKawalyzerRules(input);
+			return 'read';
+		} catch (error) {
+			return error.code;
+		}
+	};
+	for (const [input, code] of [
+		['{"rules": []}', 'format_invalid'],
+		['[]', 'format_invalid'],
+		['{"optionalCorrections": {}}', 'format_invalid'],
+		['{"optionalCorrections": [{"text": "", "keys": "#"}]}', 'format_invalid'],
+		['{"optionalCorrections": [{"text": "a"}]}', 'format_invalid'],
+		['{"optionalCorrections": [', 'format_syntax']
+	])
+		check(refusal(input) === code, `kawalyzer: ${input} gives ${refusal(input)}, not ${code}`);
+	const locales = fs
+		.readdirSync(shared('core', 'i18n', 'data', 'locales'))
+		.filter((name) => name.endsWith('.json'));
+	for (const name of locales) {
+		const strings = JSON.parse(
+			fs.readFileSync(shared('core', 'i18n', 'data', 'locales', name), 'utf8')
+		);
+		for (const reason of F.KAWALYZER_REASONS)
+			check(
+				typeof strings[`layout_editor.magic.reason.${reason}`] === 'string',
+				`kawalyzer: ${name} has no words for ${reason}`
+			);
+	}
 }
 
 checkLinks().then(report, (error) => {
