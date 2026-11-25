@@ -2511,18 +2511,18 @@ end
 --- @param reason string The row's full translated reason.
 --- @return string|nil rest Nil when the label already shows all of it.
 local function reason_rest(title, reason)
-	local trimmed = reason:match("^%s*(.-)%s*$")
+	local trimmed = TextUtils.trim(reason)
 	if trimmed == "" then return nil end
 	local cut, mark_length = nil, 0
 	for _, mark in ipairs({ ":", "\239\188\154" }) do
 		local at = trimmed:find(mark, 1, true)
 		if at and (cut == nil or at < cut) then cut, mark_length = at, #mark end
 	end
-	local head = (cut and trimmed:sub(1, cut - 1) or trimmed):match("^%s*(.-)%s*$")
+	local head = TextUtils.trim(cut and trimmed:sub(1, cut - 1) or trimmed)
 	local suffix = " — " .. head
 	if #title < #suffix or title:sub(-#suffix) ~= suffix then return trimmed end
 	if not cut then return nil end
-	local rest = trimmed:sub(cut + mark_length):match("^%s*(.-)%s*$")
+	local rest = TextUtils.trim(trimmed:sub(cut + mark_length))
 	return rest ~= "" and rest or nil
 end
 

@@ -25,6 +25,7 @@ local M = {}
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
 local ShellRunner = require("core.process.adapters.shell_runner")
+local NativePath = require("core.fs.engine.native_path")
 local RunningApplication = require("platform.focus.running_application")
 
 local LOG = "apps.adapters.launcher"
@@ -46,7 +47,7 @@ function M.program_name(target)
 	-- A URI (https:, x-apple.systempreferences:) is named by its scheme: the rest can be a query.
 	local scheme = text:match("^([A-Za-z][A-Za-z0-9+.-]+):")
 	if scheme then return scheme .. ":" end
-	local name = text:gsub("/+$", ""):match("([^/]+)$")
+	local name = NativePath.basename((text:gsub("/+$", "")))
 	return (name ~= nil and name ~= "") and name or "unknown"
 end
 
