@@ -5,6 +5,29 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## The anti-sleep mode gains an optional auto-clicker (2026-11-25)
+
+Answers to the auto-click questionnaire. The auto-clicker is integrated into
+the existing Ctrl+M anti-sleep action (`sg_actions.activity_simulation`), with
+no shortcut of its own: Ctrl+M still toggles the whole mode, and an
+« Anti-veille » submenu of the tray / menu-bar menu switches its parts, keep
+awake (on by default) and auto-click (off by default), persisted through the
+single defaults source (`_shared/shortcuts/data/auto_click_defaults.json`).
+
+- Library: a button image is added by drawing a rectangle on screen (the
+  interactive capture flow) or by importing a PNG; a shared window lists the
+  images with their tolerance, their switch and the allowed apps.
+- Scope: allowed apps only, VS Code and VS Code Insiders by default (bundle id
+  on macOS, executable on Windows, WM class on Linux), inside that window's
+  bounds; never when the screen is locked, Ergopti is paused or a secure field
+  has the focus (`_shared/shortcuts/engine/auto_click_policy.lua`).
+- Matching: deterministic normalised cross-correlation on grayscale with a
+  tolerance per image (default 0.92), tried at half, single and double size
+  for 1x/2x screens (`_shared/shortcuts/engine/auto_click_matcher.lua`), the
+  same corpus replayed by every driver
+  (`_shared/tests/corpus/keep_awake/`). Do not replace it by a learned or
+  OCR-based detector: the maintainer chose a predictable tolerance.
+
 ## The reading font draws the tray menus too (2026-11-24)
 
 The reading font chosen in Configuration › Accessibilité
