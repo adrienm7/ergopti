@@ -424,6 +424,13 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "core.i18n.engine.i18n" then return { has = function() return false end } end
 			-- Counters only: the tray counts and times each menu replacement.
 			if name == "core.logger.engine.perf_counters" then return require(name) end
+			-- The red problem rows that lead every menu; none reported here.
+			if name == "core.ui.engine.component_status" then
+				return { tray_rows = function(show)
+					assert(type(show) == "function", "the tray passes its status window opener")
+					return {}
+				end }
+			end
 			error("unexpected tray dependency: " .. name)
 		end }, { __index = _G })
 		-- adapters/tray_menu, selected by a declaration unique to it.
