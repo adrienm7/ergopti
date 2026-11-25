@@ -1640,7 +1640,6 @@ function assertInstallRows(metadata) {
 			expected.image = image;
 		}
 		if (Object.hasOwn(INSTALL_PREPARATIONS, id)) expected.prep = INSTALL_PREPARATIONS[id];
-		if (id.startsWith('first-install-fedora-')) expected.known = 'webkit';
 		assert.deepStrictEqual(row, expected, `${id} must retain its complete original execution cell`);
 	}
 }
@@ -1802,8 +1801,10 @@ for (const [key, value] of [
 	changed[installationLots[0]][key] = value;
 	assert.throws(() => installMatrix.validateMap(changed, MANIFEST));
 }
+// No lot declares a limitation today (Fedora's lua-lgi-compat now gives LuaJIT
+// lgi); a declared one must still name webkit.
 const invalidKnown = structuredClone(installationMetadata);
-Object.values(invalidKnown).find((row) => row.known === 'webkit').known = 'everything';
+Object.values(invalidKnown).find((row) => row.kind === 'first').known = 'everything';
 assert.throws(() => installMatrix.validateMap(invalidKnown, MANIFEST));
 for (const label of ['', 'Foreign\nlot', 'Foreign/lot', 'Foreign ${{ expression }}']) {
 	const changed = Object.fromEntries(

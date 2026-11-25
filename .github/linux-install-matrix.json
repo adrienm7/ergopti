@@ -72,16 +72,14 @@
 		"kind": "first",
 		"distro": "fedora-41",
 		"container": "",
-		"image": "fedora:41",
-		"known": "webkit"
+		"image": "fedora:41"
 	},
 	"Fedora latest: first installation": {
 		"id": "first-install-fedora-latest",
 		"kind": "first",
 		"distro": "fedora-latest",
 		"container": "",
-		"image": "fedora:latest",
-		"known": "webkit"
+		"image": "fedora:latest"
 	},
 	"Arch Linux: first installation": {
 		"id": "first-install-arch",
