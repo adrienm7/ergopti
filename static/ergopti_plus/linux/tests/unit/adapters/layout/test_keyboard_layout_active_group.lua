@@ -100,6 +100,24 @@ helpers.describe("keyboard_layout: follows the layout KDE has active (active-gro
 		end)
 	end)
 
+	helpers.it("publishes a fresh refresh without a capture reset (layout-change-publisher)", function()
+		-- A tray layout change refreshes the map, then the hook asks the same
+		-- publisher a device reacquisition uses. With no capture reset between
+		-- them, the republish refused the fresh receipt's provenance
+		-- (« inverse-reset-provenance-refused ») and the change was reported
+		-- as « Layout 'azerty' refused ». The current inverse is already
+		-- published: there is nothing to republish.
+		with_kde("(uint32 1,)", function(layout, refreshed)
+			helpers.assert_true(refreshed)
+			helpers.assert_true(layout.publish_current_capture(nil), "the fresh map is the current capture")
+			helpers.assert_true(layout.is_ready())
+			helpers.assert_eq(layout.resolve("a").keycode, KEY_Q, "the published inverse is still the French one")
+			local capture = require("adapters.xkb_capture")
+			helpers.assert_true(capture.reset_state(), "the reset recreates the state")
+			helpers.assert_true(layout.publish_current_capture(nil), "a later reset still republishes")
+		end)
+	end)
+
 	helpers.it("refuses a layout index the keymap does not have (active-group)", function()
 		with_kde("(uint32 5,)", function(layout, refreshed)
 			helpers.assert_eq(refreshed, false, "an index past the keymap's layouts is refused, not group 1")
