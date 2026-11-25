@@ -878,9 +878,15 @@ code, Space (decided by the agent, to review by the maintainer): Einbinder
 Orthogonal (« u ») and Yp Hina Fu (« e », with « o » on the inner key) came
 in, 787 layouts; the golden values of the 785 held before are unchanged. The
 left thumb types on one key, so each lacks that letter on the ErgoDox and is
-incomplete there, as on the boards without thumb keys. VCKB and VCKB2 stay
+incomplete there, as on the boards without thumb keys. VCKB and VCKB2 stayed
 out: they also type d (and l) on the right 2-unit outer key, the board's
-AltGr, a modifier with no code for a character.
+AltGr, a modifier with no code for a character. On 2026-11-25 that letter
+read as QMK's mod-tap (decided by the agent, to review by the maintainer):
+tapped the key types it, held it is AltGr, on the board-only code
+`RightThumbOuter` at AltGr's place, taken only when the right thumb has no
+code left (their six right thumb letters). Both came in complete on the
+ErgoDox (793 layouts); the golden values of the 791 held before are
+unchanged.
 
 The same day KLA's four standard-board files came in (791 layouts, decided by
 the agent, to review by the maintainer): Tab, Enter and the right Control are
@@ -929,7 +935,7 @@ characters, and English Alice) before and after:
   the thumb-letter layouts, 41 of those 50 moved, Blickensderfer 5 left them
   and 26 new ones joined.
 
-The library holds 791 layouts.
+The library holds 793 layouts (VCKB and VCKB2 joined on 2026-11-25).
 
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not

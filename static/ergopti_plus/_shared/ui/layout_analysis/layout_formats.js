@@ -612,7 +612,12 @@ var LAYOUT_FORMATS = (function () {
 				73: 'KanaMode',
 				74: 'Convert',
 				75: 'AltRight'
-			}
+			},
+			// A big key holding a modifier read as QMK's mod-tap (RALT_T), as the
+			// Shift keys' tapped characters: tapped it types its character, held
+			// it is AltGr. Only when its thumb has no code left (KLAnext's VCKB
+			// and VCKB2 type six right thumb letters, d or l on AltGr's key).
+			modTap: { 75: 'RightThumbOuter' }
 		},
 		matrix: { big: [] },
 		ergolinear: { big: [] }
@@ -1265,7 +1270,9 @@ var LAYOUT_FORMATS = (function () {
 	 * left free, in order; a key beyond them on the left big outer key is
 	 * typed on Space, the key the board puts there, whatever it types
 	 * (KLAnext's Einbinder Orthogonal: « u » there, its space on the inner
-	 * key; the engine's left thumb then types on the space's key alone).
+	 * key; the engine's left thumb then types on the space's key alone), and
+	 * one on the right big outer key, AltGr's, takes its mod-tap code
+	 * (spec.modTap).
 	 * @param {object} spec - KLA_THUMB_BOARDS entry.
 	 * @param {string} hand - 'left' or 'right'.
 	 * @param {Array<{index: number, cells: Array}>} kept - The thumb's typed keys.
@@ -1283,6 +1290,7 @@ var LAYOUT_FORMATS = (function () {
 			const code = physical(thumb);
 			if (own.includes(code) || boardOnly(code)) return code;
 			if (free.length > 0) return free.shift();
+			if (spec.modTap && spec.modTap[thumb.index]) return spec.modTap[thumb.index];
 			return code === 'Space' ? 'Space' : null;
 		});
 	}
@@ -2535,6 +2543,8 @@ var LAYOUT_FORMATS = (function () {
 			if (byCode[code] === undefined) byCode[code] = Number(index);
 		for (const [index, code] of Object.entries(KLA_THUMB_BOARDS.ergodox.keys))
 			if (byCode[code] === undefined && code !== 'AltRight') byCode[code] = Number(index);
+		for (const [index, code] of Object.entries(KLA_THUMB_BOARDS.ergodox.modTap))
+			byCode[code] = Number(index);
 		return Object.assign(byCode, KLA_ERGODOX.thumbs);
 	}
 

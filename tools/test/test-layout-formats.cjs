@@ -1703,6 +1703,33 @@ async function checkLinks() {
 			canonical(outerBack.layout) === canonical(outerLetter.layout),
 		`thumb keys: the left big outer key's letter: ${JSON.stringify(outerLetter.layout.rows)} ${JSON.stringify(outerLetter.unmapped)}`
 	);
+	// (ergodox-altgr-mod-tap-2026-11-25) A right thumb typing six keys
+	// (KLAnext's VCKB: b g f p t on 70 to 74, d on 75, AltGr's big key) left
+	// 75 without a code, its letter named unread: it reads as QMK's mod-tap,
+	// RightThumbOuter, and is written back at 75. With a code left free, 75
+	// still takes it (the Gold file above: Convert).
+	const sixRight = F.fromKla(
+		thumbFile([
+			key(66, 117, 5),
+			key(67, 32, 5),
+			key(70, 98, 6),
+			key(71, 103, 6),
+			key(72, 102, 6),
+			key(73, 112, 6),
+			key(74, 116, 6),
+			key(75, 100, 6)
+		])
+	);
+	const sixBack = F.fromKla(
+		JSON.parse(JSON.stringify(F.toKla(sixRight.layout, DATA.model.fingerings.standard)))
+	);
+	check(
+		(sixRight.layout.rows.RightThumbOuter || [])[0] === 'd' &&
+			sixRight.layout.rows.Convert[0] === 't' &&
+			sixRight.unmapped.length === 0 &&
+			canonical(sixBack.layout) === canonical(sixRight.layout),
+		`thumb keys: AltGr's big key's letter: ${JSON.stringify(sixRight.layout.rows)} ${JSON.stringify(sixRight.unmapped)}`
+	);
 	// The space alone on the thumbs reads as before: the shared space bar.
 	const plain = F.fromKla(thumbFile([key(66, 32, 5), key(74, 32, 6)]));
 	check(
@@ -1734,8 +1761,8 @@ async function checkLinks() {
 		`thumb keys: the ErgoDox export does not read back: ${JSON.stringify(back.layout.rows)}`
 	);
 	// The reader's thumb codes are the model's: the three every thumb board
-	// has, then the ErgoDox's board-only thumb keys (its upper pairs and small
-	// columns), each on the ErgoDox board under a thumb, but for its idle left
+	// has, then the ErgoDox's board-only thumb keys (its upper pairs, small
+	// columns and AltGr's tapped character), each on the ErgoDox board under a thumb, but for its idle left
 	// thumb keys (idle_thumb_keys, maintainer 2026-11-21): the reader still
 	// reads a file's characters there, the analysis types none of them.
 	const codes = ['NonConvert', 'Convert', 'KanaMode'];
@@ -1745,7 +1772,7 @@ async function checkLinks() {
 	);
 	check(
 		JSON.stringify(DATA.model.thumb_keys) === JSON.stringify(codes.concat(ergodoxThumbs)) &&
-			ergodoxThumbs.length === 3 &&
+			ergodoxThumbs.length === 4 &&
 			idle.length === 4 &&
 			idle.every((code) => DATA.boards.ergodox.fingers[code] === 'lt') &&
 			JSON.stringify(DATA.model.thumb_rest_keys) === JSON.stringify(codes.slice(0, 2)),
