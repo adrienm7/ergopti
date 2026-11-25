@@ -1544,6 +1544,12 @@ process_output_bytes = 65536
 # server names sit well inside it. LX: ai/engine/local_servers/ports.lua.
 proc_cmdline_bytes = 65536
 
+# Longest line of `gdbus monitor` the KDE layout watch keeps waiting for its
+# newline: one layout signal with its arguments is under 200 bytes, so a line
+# past 1 KiB is no layout signal and is dropped up to its newline.
+# LX: modules/keymap/kde_layout_watch.lua.
+kde_layout_monitor_line_bytes = 1024
+
 # Largest managed-Ollama environment declaration file the Linux driver reads.
 # LX: ai/engine/ollama/managed_ollama_environment.lua.
 declaration_file_bytes = 65536

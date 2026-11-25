@@ -1632,7 +1632,9 @@ function hostRefusalCodes() {
 			/^global LAYOUT_CATALOGUE_FAILURE_BUSY := "([a-z_]+)"/gm
 		),
 		...codesIn('macos/modules/keymap/layout_registry.lua', /^M\.FAILURE_BUSY = "([a-z_]+)"/gm),
-		...codesIn('linux/modules/keymap/layout_registry.lua', /^M\.FAILURE_BUSY = "([a-z_]+)"/gm)
+		// The Linux registry reads its codes from the layout defaults (registry.failures).
+		JSON.parse(fs.readFileSync(path.join(SHARED, 'layouts/data/defaults.json'), 'utf8')).registry
+			.failures.busy
 	];
 	assert.deepEqual(busy, ['busy', 'busy', 'busy'], 'the three registries share the busy code');
 	const defaults = JSON.parse(
@@ -1671,6 +1673,29 @@ check('(ltp-05) every refusal a host answers the Studio with has its text in eve
 	const english = { ...locale('en') };
 	delete english['layout_editor.error.use_failed'];
 	assert.deepEqual(unwordedCodes(codes, english), ['use_failed'], 'a missing text is named');
+});
+
+// A code the page words but no host answers is dead text, and a renamed code
+// falls back to the generic failure line without a word (2026-11-25).
+check('every failure the page words is a code a host answers', () => {
+	const script = fs.readFileSync(path.join(PAGE, 'script.js'), 'utf8');
+	const block = script.match(/const FAILURE_KEYS = Object\.freeze\(\{([\s\S]*?)\}\);/);
+	assert.ok(block, 'script.js declares FAILURE_KEYS');
+	const worded = [...block[1].matchAll(/^\s*([a-z_]+):/gm)].map((match) => match[1]);
+	assert.ok(worded.includes('helpers_missing'), 'the Linux helpers failure is worded');
+	const linux = Object.values(
+		JSON.parse(fs.readFileSync(path.join(SHARED, 'layouts/data/defaults.json'), 'utf8')).registry
+			.failures
+	);
+	const macos = codesIn(
+		'macos/modules/keymap/layout_registry.lua',
+		/^M\.FAILURE_\w+ = "([a-z_]+)"/gm
+	);
+	assert.deepEqual(
+		worded.filter((code) => !linux.includes(code) && !macos.includes(code)),
+		[],
+		'each worded failure is a Linux (registry.failures) or macOS registry code'
+	);
 });
 
 Promise.all(pending).then(() => {

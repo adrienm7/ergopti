@@ -86,9 +86,9 @@ local function emitted_values()
 			end
 		end
 	end
-	for code in read(ROOT .. "linux/modules/keymap/layout_registry.lua"):gmatch("M%.FAILURE_[%u_]+ = \"([%l_]+)\"") do
-		add(code)
-	end
+	-- The Linux registry's failure codes live in the layout defaults (registry.failures).
+	local defaults = Json.decode(read(SHARED .. "layouts/data/defaults.json"))
+	for _, code in pairs(defaults.registry.failures) do add(code) end
 	for code in read(ROOT .. "linux/modules/keymap/managed_python.lua"):gmatch("\"(python_[%l_]+)\"") do add(code) end
 	-- The sanitizer puts this marker in place of any private value.
 	add(Report.REDACTED)

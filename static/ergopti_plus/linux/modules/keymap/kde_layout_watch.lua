@@ -26,6 +26,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "modules.keymap.kde_layout_watch"
 -- What gdbus prints for the two signals that change the active layout.
@@ -33,7 +34,7 @@ M.SIGNALS = { "org.kde.KeyboardLayouts.layoutChanged", "org.kde.KeyboardLayouts.
 M.MONITOR_ARGS = { "monitor", "--session", "--dest", "org.kde.keyboard", "--object-path", "/Layouts" }
 -- A monitor line is one signal with its arguments; a longer partial line is
 -- no layout signal and is dropped up to its newline.
-local MAX_PENDING_BYTES = 4096
+local MAX_PENDING_BYTES = Timings.count("limits", "kde_layout_monitor_line_bytes")
 
 --- The production spawn: gdbus monitor with its stdout on a libuv pipe.
 --- @param on_exit function on_exit(code, signal)

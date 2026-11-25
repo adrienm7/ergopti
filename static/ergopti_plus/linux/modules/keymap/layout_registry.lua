@@ -95,30 +95,12 @@ local CHILD_TIMEOUT_MS = 60000
 -- The platform name registry entries list when Linux can install them.
 local PLATFORM = "linux"
 
--- Stable failure codes the layout manager translates.
-M.FAILURE_BUSY = "busy"
-M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
-M.FAILURE_NOT_INSTALLED = "not_installed"
-M.FAILURE_UNSUPPORTED = "unsupported_platform"
-M.FAILURE_DOWNLOAD = "download_failed"
-M.FAILURE_WRITE = "write_failed"
-M.FAILURE_RECORD = "record_failed"
-M.FAILURE_PYTHON = "python_missing"
-M.FAILURE_CONVERSION = "conversion_failed"
-M.FAILURE_INSTALLER = "installer_failed"
--- The conversion data or the user XKB installer is missing from this installation
--- (an install.sh run from a checkout before install/xkb_helpers.sh): reinstalling
--- is the fix, not trying again.
-M.FAILURE_HELPERS_MISSING = "helpers_missing"
-M.FAILURE_FOREIGN_FILE = "foreign_file"
-M.FAILURE_XORG_SESSION = "xorg_session"
-M.FAILURE_SELECT = "select_failed"
-M.FAILURE_INVALID = "invalid"
--- Live number-row options (apply_rows): no layout to apply them to, a session that
--- cannot load a user layout live, or the live load that the X server did not keep.
-M.FAILURE_NO_SOURCE = "no_source_layout"
-M.FAILURE_SESSION = "session_unsupported"
-M.FAILURE_LIVE = "live_apply_failed"
+-- Stable failure codes the layout manager translates: M.FAILURE_<NAME> is
+-- registry.failures.<name> of _shared/layouts/data/defaults.json, read on first
+-- use (section 3). Among them: helpers_missing, the conversion data or the user
+-- XKB installer missing from this installation (an install.sh run from a
+-- checkout before install/xkb_helpers.sh), where reinstalling is the fix; and
+-- no_source, session and live for the live number-row options (apply_rows).
 
 
 
@@ -249,6 +231,21 @@ local function read_shared_json(rel)
 	_shared_json[path] = { raw = raw, decoded = decoded }
 	return decoded, nil
 end
+
+-- M.FAILURE_<NAME> resolves registry.failures.<name>; a name the defaults do
+-- not declare raises, so a typo is a crash at its first use, never a nil code.
+setmetatable(M, { __index = function(_, key)
+	local name = type(key) == "string" and key:match("^FAILURE_([%u_]+)$") or nil
+	if name == nil then return nil end
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
+	local failures = type(layouts) == "table" and type(layouts.registry) == "table" and layouts.registry.failures or nil
+	local code = type(failures) == "table" and failures[name:lower()] or nil
+	if type(code) ~= "string" or not code:match("^[a-z_]+$") then
+		error("_shared/layouts/data/defaults.json declares no registry.failures." .. name:lower()
+			.. (layouts_err and (": " .. layouts_err) or ""), 2)
+	end
+	return code
+end })
 
 --- The registry settings, resolved from the shared defaults.
 --- @return table|nil settings
