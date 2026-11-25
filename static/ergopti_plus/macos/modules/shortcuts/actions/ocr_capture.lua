@@ -68,7 +68,9 @@ local function default_ports()
 		set_clipboard = Native.set_clipboard,
 		notify = function(key, level, lines)
 			local body = i18n.get(key)
-			if lines then body = body:gsub("{1}", tostring(lines)) end
+			-- A '%' in a gsub replacement is a capture reference, so the count is escaped.
+			local text_utils = require("core.text.engine.utils")
+			if lines then body = body:gsub("{1}", text_utils.escape_gsub_replacement(tostring(lines))) end
 			require("core.ui.engine.notifications").notify(body, nil, level)
 		end,
 		remove = function(path) FileSystem.remove_exact(path) end,

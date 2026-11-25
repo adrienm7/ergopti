@@ -80,7 +80,9 @@ local function default_ports(region_save)
 		set_clipboard = function(text) return require("clipboard.adapters.clipboard").write(text) == true end,
 		notify = function(key, level, lines)
 			local body = i18n.get(key)
-			if lines then body = body:gsub("{1}", tostring(lines)) end
+			-- A '%' in a gsub replacement is a capture reference, so the count is escaped.
+			local text_utils = require("core.text.engine.utils_core")
+			if lines then body = body:gsub("{1}", text_utils.escape_gsub_replacement(tostring(lines))) end
 			require("platform.focus.application_notifier").send(body, { level = level })
 		end,
 		remove = M.remove_capture,
