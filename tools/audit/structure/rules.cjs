@@ -353,7 +353,10 @@ const UI_FEATURES = [
 		/^(hotstring_editor|hotstrings_config_window|personal_info_editor|personal_toml_editor(_webview)?)$/
 	],
 	['layouts', /^(layer_editor|layout_manager|layout_composer|layout_editor|emulation_picker)$/],
-	['shortcuts', /^(physical_shortcuts|action_picker(_webview)?|user_action_editor)$/],
+	[
+		'shortcuts',
+		/^(physical_shortcuts|action_picker(_webview)?|user_action_editor|user_workflows_bridge)$/
+	],
 	[
 		'ai',
 		/^(model_browser|prompt_editor|llm_enable_refusal|vision_parameter_prompt|owned_runtime_install|python_runtime_offer)$/
@@ -426,7 +429,7 @@ const MENU_SECTIONS = [
 	['gestures', /^gestures?/],
 	['hotstrings', /^(hotstring|programmatic_hotstrings|magic_key)/],
 	['metrics', /^(metrics|wpm)/],
-	['shortcuts', /^(shortcuts?|shortcut_utils)/],
+	['shortcuts', /^(shortcuts?|shortcut_utils|user_workflows)/],
 	['apps', /^(apps|app_exclusion_rows)/],
 	['ai', /^(llm|ai_parent|agent|local_server_rows)/],
 	['tap_hold', /^(tap_holds?|taphold|tap_keys)/],
