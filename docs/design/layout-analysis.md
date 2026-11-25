@@ -1466,6 +1466,13 @@ marks place P10, P25, P50, P75 and P90 of the layouts shown (named under the
 strip on two alternating lines), and a table lists P0 to P100 with their
 values (linear between the two nearest ranks, `SPREAD_QUANTILES`).
 
+**Smoothed distribution of the spread** (2026-11-25, an idea seen in the
+Layouts Wiki playground's Ranking view, which draws a smoothed curve of the
+library on one metric). Above the strip, `E.densityCurve` draws a Gaussian
+kernel density of the values shown, its bandwidth by Silverman's rule of
+thumb, over the strip's range and scaled so its peak fills the band. The curve
+is decorative (`aria-hidden`): the quantiles' table says the same in numbers.
+
 **Help tab** (2026-11-25, an idea seen in the Layouts Wiki playground's Docs
 pane). « Help », before « One layout » (which stays last), holds one titled
 section per common task: compare two layouts, rank on a metric, read the

@@ -19,6 +19,9 @@
  *    and on real sentences every event count of the trace, as a share of
  *    its pairs or triples, equals analyse()'s metric on the same text, for
  *    several library layouts with dead keys and AltGr levels.
+ * 3. densityCurve: the smoothed distribution integrates to 1, peaks on the
+ *    densest cluster, draws the normal bell for one value, and refuses
+ *    invalid input.
  * ==============================================================================
  */
 
@@ -433,6 +436,45 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	refusal('sfb < 1 1', 'query_unexpected', 8);
 	refusal('sfb ~ 2', 'query_unexpected', 4);
 	refusal('sfb < 1 &', 'query_end', 9);
+}
+
+// ===========================================
+// ======= Density curve =====================
+// ===========================================
+
+// The smoothed distribution of the Pareto tab's spread (an idea seen in the
+// Layouts Wiki playground's Ranking view): a Gaussian kernel density.
+{
+	const values = [1, 1.2, 1.3, 2, 2.1, 2.2, 2.25, 4];
+	const { bandwidth, points } = E.densityCurve(values, { points: 400 });
+	check(bandwidth > 0, 'density: a bandwidth above 0');
+	const step = points[1].x - points[0].x;
+	const area = points.reduce((sum, p) => sum + p.density, 0) * step;
+	check(Math.abs(area - 1) < 0.01, `density: integrates to 1 (${area})`);
+	check(
+		points[0].x < Math.min(...values) && points[points.length - 1].x > Math.max(...values),
+		'density: the curve runs past both extremes'
+	);
+	check(
+		points.every((p, i) => i === 0 || p.x > points[i - 1].x),
+		'density: samples in increasing x'
+	);
+	// The densest cluster (2 to 2.25) carries the peak, not the lone 4.
+	const peak = points.reduce((best, p) => (p.density > best.density ? p : best));
+	check(peak.x > 1.8 && peak.x < 2.5, `density: the peak is on the densest cluster (${peak.x})`);
+	// A fixed bandwidth: one value is the normal bell, its peak 1 / (h √(2π)).
+	const bell = E.densityCurve([5], { bandwidth: 0.5, points: 7 });
+	check(
+		Math.abs(bell.points[3].density - 1 / (0.5 * Math.sqrt(2 * Math.PI))) < TOLERANCE &&
+			bell.points[3].x === 5,
+		'density: one value draws the normal bell'
+	);
+	check(E.densityCurve([3, 3, 3]).bandwidth > 0, 'density: equal values still have a width');
+	check(E.densityCurve([0, 0]).bandwidth > 0, 'density: zeros still have a width');
+	throws(() => E.densityCurve([]), 'density: no value throws');
+	throws(() => E.densityCurve([1, Number.NaN]), 'density: a value that is not finite throws');
+	throws(() => E.densityCurve([1, 2], { points: 1 }), 'density: one point throws');
+	throws(() => E.densityCurve([1, 2], { bandwidth: 0 }), 'density: a bandwidth of 0 throws');
 }
 
 if (errors.length > 0) {
