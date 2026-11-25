@@ -288,15 +288,19 @@ function M.render(content, bundle_path, icon_url)
 		escape_html(content.body), "</p></div></div>",
 		"<ol>", table.concat(steps), "</ol>",
 		"<div class=\"buttons\"><button id=\"later\">", escape_html(content.later_label),
-		"</button><button id=\"open\" class=\"default\">", escape_html(content.open_label),
+		"</button><button id=\"open\" class=\"default\" autofocus>", escape_html(content.open_label),
 		"</button></div>",
 		"<script>",
 		"function send(a){try{window.webkit.messageHandlers.", M.BRIDGE,
 		".postMessage({action:a});}catch(e){}}",
 		"document.getElementById('open').onclick=function(){send('open_settings');};",
 		"document.getElementById('later').onclick=function(){send('later');};",
+		-- Enter on a focused button is that button's click: answering it here too
+		-- sent "open_settings" before the "later" the user chose (PRM-01).
 		"document.addEventListener('keydown',function(e){",
-		"if(e.key==='Enter'){send('open_settings');}else if(e.key==='Escape'){send('later');}});",
+		"if(e.key==='Enter'){if(e.target&&e.target.tagName==='BUTTON')return;",
+		"e.preventDefault();send('open_settings');}",
+		"else if(e.key==='Escape'){e.preventDefault();send('later');}});",
 		"</script></body></html>",
 	})
 end
