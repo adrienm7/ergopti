@@ -6,7 +6,7 @@
 ; The AutoHotkey port of _shared/shortcuts/engine/workflows/screen.lua: the
 ; screen steps of a user workflow (wait_for, click_target, capture, ocr and the
 ; « visible » condition) on top of the screen vision service
-; (platform/vision/screen_vision.ahk, docs/design/screen-vision.md). This
+; (platform/system/vision/screen_vision.ahk, docs/design/screen-vision.md). This
 ; module owns what the steps mean; the vision ports only say how to capture,
 ; turn an embedded image into a template, match, read and click. It is the
 ; `screen` port of the workflow effects.
