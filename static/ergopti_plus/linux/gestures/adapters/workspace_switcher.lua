@@ -39,6 +39,8 @@
 ---    daemon tick asks four times a second; a fork per tick would double the
 ---    cost of the focus poll, so one answer is reused for
 ---    WORKSPACE_READ_INTERVAL_MS and a round trip shorter than that is missed.
+---    That tick runs on the loop that reads the keyboard, so the query is an
+---    asynchronous child the reader never waits for.
 --- ==============================================================================
 
 local M = {}
@@ -298,58 +300,88 @@ end
 
 --- The current workspace's identity for a change counter: sway's focused
 --- workspace name, Hyprland's active workspace id, KWin's desktop number.
---- One query each, the smallest the compositor answers.
+--- One query each, the smallest the compositor answers: argv names the
+--- program and its arguments, parse reads its output.
 local CURRENT_WORKSPACE = {
-	sway = function()
-		for _, workspace in ipairs(decode(query("swaymsg -t get_workspaces -r"), "swaymsg -t get_workspaces")) do
-			if workspace.focused == true then
-				if type(workspace.name) ~= "string" or workspace.name == "" then
-					error("sway reports a focused workspace without a name", 0)
+	sway = {
+		argv = function() return "swaymsg", { "-t", "get_workspaces", "-r" } end,
+		parse = function(text)
+			for _, workspace in ipairs(decode(text, "swaymsg -t get_workspaces")) do
+				if workspace.focused == true then
+					if type(workspace.name) ~= "string" or workspace.name == "" then
+						error("sway reports a focused workspace without a name", 0)
+					end
+					return workspace.name
 				end
-				return workspace.name
 			end
-		end
-		error("sway reports no focused workspace", 0)
-	end,
-	hyprland = function()
-		local active = decode(query("hyprctl -j activeworkspace"), "hyprctl activeworkspace")
-		if type(active.id) ~= "number" then error("Hyprland reports no active workspace", 0) end
-		return active.id
-	end,
-	kwin = function(backend)
-		local text = query(backend.binary .. " org.kde.KWin /KWin org.kde.KWin.currentDesktop")
-		local current = tonumber(tostring(text):match("^%s*(%d+)%s*$"))
-		if not current then error("KWin answered '" .. tostring(text) .. "'", 0) end
-		return current
-	end,
+			error("sway reports no focused workspace", 0)
+		end,
+	},
+	hyprland = {
+		argv = function() return "hyprctl", { "-j", "activeworkspace" } end,
+		parse = function(text)
+			local active = decode(text, "hyprctl activeworkspace")
+			if type(active.id) ~= "number" then error("Hyprland reports no active workspace", 0) end
+			return active.id
+		end,
+	},
+	kwin = {
+		argv = function(backend) return backend.binary, { "org.kde.KWin", "/KWin", "org.kde.KWin.currentDesktop" } end,
+		parse = function(text)
+			local current = tonumber(tostring(text):match("^%s*(%d+)%s*$"))
+			if not current then error("KWin answered '" .. tostring(text) .. "'", 0) end
+			return current
+		end,
+	},
 }
 
 --- The metrics' current-workspace reader on a Wayland session (FEATURES 4).
 --- X11 is not served here: the EWMH desktop is read in-process by x11_focus.
+--- The reader never waits: it returns the last answer and, once
+--- WORKSPACE_READ_INTERVAL_MS has passed with no query in flight, starts the
+--- next one as an asynchronous child. It runs on the daemon tick, the loop
+--- that reads the grabbed keyboard: a blocking qdbus6 call there (53 ms on
+--- average, up to its one-second bound) held every key typed meanwhile
+--- (Arch Linux KDE Wayland field report, 2026-11-25).
 --- @param now_ms function Monotonic milliseconds, the reuse clock.
 --- @return function|nil read Returns the workspace identity (number or
----   string), or nil when the compositor did not answer.
---- @return string|nil reason detect()'s reason, or "x11" on an X11 session.
+---   string), or nil while the compositor has not answered.
+--- @return string|nil reason detect()'s reason, "x11" on an X11 session, or
+---   "no_async" without an asynchronous child runner (libuv).
 function M.current_workspace_source(now_ms)
 	assert(type(now_ms) == "function", "workspace_switcher: the reader needs a millisecond clock")
 	if DisplayServer.kind() == DisplayServer.X11 then return nil, "x11" end
 	local backend, reason = M.detect()
 	if not backend then return nil, reason end
+	if Shell.HAS_ASYNC ~= true then return nil, "no_async" end
 	local key = backend == BACKENDS.sway and "sway" or backend == BACKENDS.hyprland and "hyprland" or "kwin"
-	local read_current = CURRENT_WORKSPACE[key]
-	local read_at, answer = nil, nil
-	return function()
-		local now = now_ms()
-		if read_at ~= nil and now - read_at < WORKSPACE_READ_INTERVAL_MS then return answer end
-		read_at = now
-		local ok, value = pcall(read_current, backend)
-		if not ok then
+	local spec = CURRENT_WORKSPACE[key]
+	local read_at, answer, in_flight = nil, nil, false
+	--- Settles one query; a failure is no answer, never a workspace.
+	local function settle(result)
+		in_flight = false
+		if type(result) ~= "table" or result.ok ~= true then
 			-- Reported at debug: it can repeat once a second, and the metrics
 			-- treat the gap as no answer, never as a change.
+			Logger.debug(LOG, "%s did not report its current workspace (%s).", backend.name,
+				tostring(type(result) == "table" and result.error or result))
+			answer = nil
+			return
+		end
+		local ok, value = pcall(spec.parse, result.stdout or "")
+		if not ok then
 			Logger.debug(LOG, "%s did not report its current workspace (%s).", backend.name, tostring(value))
 			value = nil
 		end
 		answer = value
+	end
+	return function()
+		local now = now_ms()
+		if in_flight or (read_at ~= nil and now - read_at < WORKSPACE_READ_INTERVAL_MS) then return answer end
+		read_at, in_flight = now, true
+		local executable, args = spec.argv(backend)
+		local handle, refusal = Shell.run_async(executable, args, { timeout_ms = TOOL_TIMEOUT_S * 1000 }, settle)
+		if handle == nil then settle({ ok = false, error = refusal or "refused" }) end
 		return answer
 	end, nil
 end

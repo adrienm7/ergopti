@@ -20,6 +20,11 @@
 --- 3. space_switches was never measured under Wayland: only the X11 EWMH
 ---    desktop fed it. current_workspace_source reads the same sway, Hyprland
 ---    and KWin interfaces, once a second at most, and keeps GNOME unmeasured.
+--- 4. That reader ran its query as a blocking child on the daemon tick, the
+---    loop that reads the grabbed keyboard: on KDE Wayland a qdbus6 call per
+---    second (53 ms on average, up to its one-second bound) held the keys
+---    typed meanwhile (Arch field report, 2026-11-25). It now starts an
+---    asynchronous child and returns the last answer without waiting.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -30,11 +35,37 @@ local SWITCHER = "gestures.adapters.workspace_switcher"
 --- @param session table { kind, desktop, env = {}, tools = {name = true},
 ---   answers = { [needle] = output string, or false for a failing query },
 ---   refuse_switch = boolean }
---- @param body function Receives (switcher, commands, pressed).
+--- @param body function Receives (switcher, commands, pressed, press, settle):
+---   settle() answers every asynchronous query started so far, as the event
+---   loop would once each child exits.
 local function in_session(session, body)
 	local Display = require("core.ui.engine.display_server")
 	local Shell = require("core.process.adapters.shell_runner")
-	local commands, pressed = {}, {}
+	local commands, pressed, waiting = {}, {}, {}
+	local real_has_async = Shell.HAS_ASYNC
+	Shell.HAS_ASYNC = session.no_async ~= true
+	Shell._set_async_runner(function(executable, args, options, callback)
+		local cmd = executable .. " " .. table.concat(args, " ")
+		commands[#commands + 1] = "async " .. cmd
+		local answer = false
+		for needle, value in pairs(session.answers or {}) do
+			if cmd:find(needle, 1, true) then answer = value end
+		end
+		waiting[#waiting + 1] = function()
+			if answer == false then
+				callback({ ok = false, error = "exit code 1" })
+			else
+				callback({ ok = true, code = 0, stdout = answer, stderr = "" })
+			end
+		end
+		helpers.assert_eq(options.timeout_ms, 1000, "every query is bounded")
+		return { cancel = function() return true end, on_settled = function() end }
+	end)
+	local function settle()
+		local due = waiting
+		waiting = {}
+		for _, deliver in ipairs(due) do deliver() end
+	end
 	local real_getenv = os.getenv
 	Display._set_for_test(session.kind, session.desktop or "")
 	os.getenv = function(name)
@@ -56,9 +87,11 @@ local function in_session(session, body)
 	package.loaded[SWITCHER] = nil
 	local ok, err = pcall(function()
 		local Switcher = require(SWITCHER)
-		body(Switcher, commands, pressed, function(combo) pressed[#pressed + 1] = combo end)
+		body(Switcher, commands, pressed, function(combo) pressed[#pressed + 1] = combo end, settle)
 	end)
 	Shell._reset_runner()
+	Shell._reset_async_runner()
+	Shell.HAS_ASYNC = real_has_async
 	os.getenv = real_getenv
 	Display._set_for_test(nil, nil)
 	if not ok then error(err, 0) end
@@ -333,19 +366,24 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 		end
 		answers["get_workspaces"] = listing()
 		in_session({ kind = "wayland", desktop = "sway", tools = { swaymsg = true }, answers = answers },
-			function(Switcher, commands)
+			function(Switcher, commands, _, _, settle)
 				local now = 0
 				local read, reason = Switcher.current_workspace_source(function() return now end)
 				helpers.assert_nil(reason)
+				helpers.assert_nil(read(), "the first read starts the query and waits for nothing")
+				settle()
 				helpers.assert_eq(read(), "1:web")
 				focused = "2"; answers["get_workspaces"] = listing()
 				now = 999
 				helpers.assert_eq(read(), "1:web", "an answer is reused within the interval")
 				helpers.assert_eq(#commands, 1, "no second fork within the interval")
 				now = 1000
+				helpers.assert_eq(read(), "1:web", "a due query starts; the last answer stands meanwhile")
+				settle()
 				helpers.assert_eq(read(), "2")
 				answers["get_workspaces"] = false
 				now = 2000
+				read(); settle()
 				helpers.assert_nil(read(), "a failed query is no answer, never a workspace")
 			end)
 	end)
@@ -355,18 +393,54 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 			kind = "wayland", desktop = "", env = { HYPRLAND_INSTANCE_SIGNATURE = "abc" },
 			tools = { hyprctl = true },
 			answers = { ["activeworkspace"] = '{"id":4,"name":"4","monitor":"DP-1"}' },
-		}, function(Switcher, commands)
+		}, function(Switcher, commands, _, _, settle)
 			local read = Switcher.current_workspace_source(function() return 0 end)
+			read(); settle()
 			helpers.assert_eq(read(), 4)
-			helpers.assert_eq(commands, { "timeout 1 hyprctl -j activeworkspace 2>/dev/null" },
+			helpers.assert_eq(commands, { "async hyprctl -j activeworkspace" },
 				"one query, not the workspace listing")
 		end)
 		in_session({
 			kind = "wayland", desktop = "KDE", tools = { qdbus6 = true },
 			answers = { ["currentDesktop"] = "3\n" },
-		}, function(Switcher)
-			helpers.assert_eq(Switcher.current_workspace_source(function() return 0 end)(), 3)
+		}, function(Switcher, commands, _, _, settle)
+			local read = Switcher.current_workspace_source(function() return 0 end)
+			read(); settle()
+			helpers.assert_eq(read(), 3)
+			helpers.assert_eq(commands, { "async qdbus6 org.kde.KWin /KWin org.kde.KWin.currentDesktop" })
 		end)
+	end)
+
+	-- The Arch tester's KDE Wayland session: the tick asked KWin through a
+	-- blocking child once a second, on the loop that reads the keyboard.
+	helpers.it("linux-space-change: a KWin read never runs a blocking child (workspace-async)", function()
+		local now = 0
+		in_session({
+			kind = "wayland", desktop = "KDE", tools = { qdbus6 = true },
+			answers = { ["currentDesktop"] = "2\n" },
+		}, function(Switcher, commands, _, _, settle)
+			local read = Switcher.current_workspace_source(function() return now end)
+			for tick = 1, 12 do
+				now = tick * 250
+				read()
+			end
+			settle()
+			for _, cmd in ipairs(commands) do
+				helpers.assert_true(cmd:find("^async ") ~= nil, "a blocking child ran on the tick: " .. cmd)
+			end
+			helpers.assert_eq(#commands, 1, "one query in flight at a time, the next one only once it answered")
+			helpers.assert_eq(read(), 2)
+			now = 3000 + 1000
+			read()
+			helpers.assert_eq(#commands, 2, "the next query once the interval passed")
+		end)
+		in_session({ kind = "wayland", desktop = "KDE", tools = { qdbus6 = true }, no_async = true },
+			function(Switcher, commands)
+				local read, reason = Switcher.current_workspace_source(function() return 0 end)
+				helpers.assert_nil(read, "no blocking reader stands in for the asynchronous one")
+				helpers.assert_eq(reason, "no_async")
+				helpers.assert_eq(commands, {})
+			end)
 	end)
 
 	helpers.it("linux-space-change: names why GNOME Wayland and X11 get no workspace reader", function()
