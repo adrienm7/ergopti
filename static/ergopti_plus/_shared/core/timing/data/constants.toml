@@ -580,6 +580,13 @@ inhibitor_ready_timeout_ms = 5000
 # AHK: platform/vision/screen_vision.ahk (the Windows.Media.Ocr bridge).
 ocr_timeout_ms = 10000
 
+# Windows: how often the driver looks for the screen vision worker's answers,
+# and how often the worker looks for new requests, in its queue folder; and how
+# long the worker may take to compile its C# and create its OCR engine before
+# the service is reported unavailable. AHK: platform/vision/screen_vision.ahk.
+worker_poll_ms = 25
+worker_start_timeout_ms = 20000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keystats
