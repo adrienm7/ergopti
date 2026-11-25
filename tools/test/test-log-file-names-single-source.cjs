@@ -384,6 +384,48 @@ function assertManagedWindowsRuntimeContract() {
 	console.log(
 		`[OK] managed Windows runtime root: exact generated owner, ${invalid.length} refusals and five valid controls.`
 	);
+
+	// The retention sweeps delete the retired topical names unconditionally, so
+	// the list may only ever hold exact undated application log names: a dated,
+	// errors or bootstrap name here would delete a live log on every boot.
+	const retired = declared.logs.files.retired_topical_logs;
+	const generatedLists = {
+		'_shared/core/fs/engine/app_dirs.lua': `retired_topical_logs = { ${retired.map((n) => `"${n}"`).join(', ')} }`,
+		'windows/_generated/app_dirs.ahk': `AppDirsRetiredTopicalLogs() {\n\treturn [${retired.map((n) => `"${n}"`).join(', ')}]\n}`,
+		'macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift': `let kRetiredTopicalLogNames: Set<String> = [\n${retired.map((n) => `\t"${n}",\n`).join('')}]`
+	};
+	for (const [file, expected] of Object.entries(generatedLists)) {
+		assert(
+			healthy.writes.get(path.join(SP, file)).includes(expected),
+			`${file} must carry the declared retired topical log names.`
+		);
+	}
+	const today = `${UNIFIED}2026-11-25${FILES.extension}`;
+	const refusedLists = [
+		undefined,
+		[],
+		[today],
+		[`${ERRORS}2026-11-25${FILES.extension}`],
+		[FILES.bootstrap_log],
+		['notes.txt'],
+		[`${UNIFIED}${FILES.extension}`],
+		[`${UNIFIED}Boot${FILES.extension}`],
+		[`${UNIFIED}../boot${FILES.extension}`],
+		[retired[0], retired[0]]
+	];
+	for (const value of refusedLists) {
+		const candidate = toml.parse(source);
+		if (value === undefined) delete candidate.logs.files.retired_topical_logs;
+		else candidate.logs.files.retired_topical_logs = value;
+		const result = generate(toml.stringify(candidate));
+		assert(result.refusal, `Unsafe retired topical list was accepted: ${JSON.stringify(value)}.`);
+		assert.equal(result.writes.size, 0, 'Refusal precedes every generated output.');
+		assert(result.messages.some((message) => message.includes('retired_topical_logs')));
+	}
+	console.log(
+		`[OK] retired topical logs: ${retired.length} exact names in the three generated owners, ` +
+			`${refusedLists.length} unsafe lists refused.`
+	);
 }
 
 assertManagedWindowsRuntimeContract();

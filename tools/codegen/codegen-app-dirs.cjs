@@ -116,6 +116,38 @@ const data = {
 	linux: logs.linux || fail('[logs.linux] is missing.')
 };
 if (data.unifiedPrefix === data.errorsPrefix) fail('the unified and errors prefixes must differ.');
+data.retiredTopicalLogs = requireRetiredTopicalLogs(files.retired_topical_logs);
+
+/**
+ * Validates the retired topical file names the retention sweeps delete. Each
+ * must be an exact undated application log name, so the cleanup can never
+ * reach the daily log, the errors mirror, the bootstrap log or a user file.
+ * @param {unknown} value The [logs.files] retired_topical_logs array.
+ * @returns {string[]} The validated names, in declaration order.
+ */
+function requireRetiredTopicalLogs(value) {
+	const where = 'logs.files.retired_topical_logs';
+	if (!Array.isArray(value) || value.length === 0) fail(`${where} must be a non-empty array.`);
+	const seen = new Set();
+	for (const name of value) {
+		const stem =
+			typeof name === 'string' &&
+			name.startsWith(data.unifiedPrefix) &&
+			name.endsWith(data.extension)
+				? name.slice(data.unifiedPrefix.length, name.length - data.extension.length)
+				: '';
+		if (
+			!/^[a-z][a-z0-9_]*$/.test(stem) ||
+			name.startsWith(data.errorsPrefix) ||
+			name === data.bootstrapLog ||
+			seen.has(name)
+		) {
+			fail(`${where} holds an invalid or repeated name ${JSON.stringify(name)}.`);
+		}
+		seen.add(name);
+	}
+	return value;
+}
 
 /**
  * Resolves one segment list of an OS into its relative path, naming the OS
@@ -361,6 +393,8 @@ function emitLua() {
 		`\t\ttopical_prefix = ${luaStr(data.topicalPrefix)},\n` +
 		`\t\textension = ${luaStr(data.extension)},\n` +
 		`\t\tbootstrap_log = ${luaStr(data.bootstrapLog)},\n` +
+		'\t\t-- Exact names the retention sweep deletes: the retired topical sub-files.\n' +
+		`\t\tretired_topical_logs = { ${data.retiredTopicalLogs.map(luaStr).join(', ')} },\n` +
 		'\t},\n' +
 		'\tmacos = {\n' +
 		`\t\tfolder_name = ${luaStr(folderName)},\n` +
@@ -485,6 +519,11 @@ function emitAhk() {
 			data.bootstrapLog,
 			'Pre-configuration log, always in the default logs folder.'
 		) +
+		'\n' +
+		'; Exact names the retention sweep deletes: the retired topical sub-files.\n' +
+		'AppDirsRetiredTopicalLogs() {\n' +
+		`\treturn [${data.retiredTopicalLogs.map(ahkStr).join(', ')}]\n` +
+		'}\n' +
 		'\n' +
 		fn(
 			'AppDirsWindowsLogsBaseEnv',
@@ -633,6 +672,11 @@ function emitSwift() {
 		) +
 		'\n' +
 		constant('kLogFileExtension', data.extension, 'Extension of every log file.') +
+		'\n' +
+		'/// Exact names the retention sweep deletes: the retired topical sub-files.\n' +
+		'let kRetiredTopicalLogNames: Set<String> = [\n' +
+		data.retiredTopicalLogs.map((name) => `\t${swiftStr(name)},\n`).join('') +
+		']\n' +
 		'\n' +
 		constant(
 			'kMacOSLogsHomeRelativePath',

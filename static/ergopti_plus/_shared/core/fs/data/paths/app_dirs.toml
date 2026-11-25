@@ -92,6 +92,27 @@ extension = ".log"
 # loaded yet. macOS has the equivalent in the native launcher: launcher_log and
 # fatal_report below.
 bootstrap_log = "bootstrap.log"
+# The topical sub-files every driver used to fan lines out to beside the daily
+# log, until one daily log became the only log (maintainer decision,
+# 2026-11-25: testers had to send dozens of files). Every line they held is
+# also in the daily log, so each driver's retention sweep deletes these exact
+# names (a regular file directly in the logs folder, never anything else) the
+# first time it runs; nothing writes them any more.
+retired_topical_logs = [
+	"ErgoptiPlus_gestures.log",
+	"ErgoptiPlus_ollama.log",
+	"ErgoptiPlus_llm.log",
+	"ErgoptiPlus_hotstrings.log",
+	"ErgoptiPlus_keystats.log",
+	"ErgoptiPlus_menu.log",
+	"ErgoptiPlus_notify.log",
+	"ErgoptiPlus_boot.log",
+	"ErgoptiPlus_layout.log",
+	"ErgoptiPlus_dispatch.log",
+	"ErgoptiPlus_tray.log",
+	"ErgoptiPlus_mlx.log",
+	"ErgoptiPlus_karabiner.log",
+]
 
 # ===================================
 # ===================================
