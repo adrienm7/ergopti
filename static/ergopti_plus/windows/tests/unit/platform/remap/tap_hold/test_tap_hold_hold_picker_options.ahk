@@ -103,3 +103,21 @@ _THPO_EveryOption() {
 }
 Test("tap-hold picker: every hold option is the hold the key gets, after Shift (hold-picker-every-option-2026-10-01)",
 	_THPO_EveryOption)
+
+; The picker reads its catalogue from the shared defaults: a mistyped path (a
+; literal tab once replaced « \t » in « \tap_hold ») emptied every hold option
+; without an error the user could see. The reader must return exactly what the
+; shared TOML parser reads from that file (tap-hold-picker-catalog-path).
+_THPO_PickerReadsTheSharedCatalogue() {
+	global _SharedDir
+	Document := TOML_ParseDocument(FileRead(_SharedDir . "\tap_hold\data\defaults.toml", "UTF-8"))
+	Section := Document["tap_hold"]["hold_picker"]
+	for Field in ["modifiers", "layers"] {
+		Expected := Section[Field]
+		AssertTrue(Expected is Array && Expected.Length > 0, "the shared catalogue declares its " . Field)
+		AssertEqual(_THPO_Flat(Expected), _THPO_Flat(_TH_ReadHoldPickerArray(Field)),
+			"the hold picker reads the shared catalogue's " . Field . " (tap-hold-picker-catalog-path)")
+	}
+}
+Test("tap-hold picker: the hold options are read from the shared catalogue (tap-hold-picker-catalog-path)",
+	_THPO_PickerReadsTheSharedCatalogue)
