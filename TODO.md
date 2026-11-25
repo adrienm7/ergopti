@@ -641,6 +641,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Keep it as described**, no row for a removal Windows does not report.
   2. Add a 🔴 row from the idle-counter comparison, accepting false alarms under remote desktop or other injectors.
   3. Reinstall the hooks periodically (`InstallKeybdHook(true, true)`), at the cost of a reset of the hook's key state.
+- [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
+      Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
+      are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script
+      fills when its screen opens), axe skips it, and the state that shows the screen is scanned with it rendered.
+      A contrast error on SVG text is counted as `.Unmeasured`: its glyphs are painted over sibling shapes the tool
+      never sees. Kept meanwhile: both, proved by the app windows gate's self-check. The other choice is to count
+      them and add a fixture state per hidden screen and a pixel check for SVG labels.
 - [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
       maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
       nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
