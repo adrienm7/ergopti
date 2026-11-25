@@ -13,22 +13,20 @@
 
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
-; The length, read once: the defaults file ships with the app.
-global _EmulationRecentsCount := 0
-
 /**
  * How many recent layouts the menu offers: emulation.recent_count of
  * _shared/layouts/data/defaults.json.
  * @returns {Integer} A whole number of at least one.
  */
 EmulationRecents_Count() {
-	global _EmulationRecentsCount
-	if _EmulationRecentsCount
-		return _EmulationRecentsCount
+	; Read once: the defaults file ships with the app.
+	static Cached := 0
+	if Cached
+		return Cached
 	Count := _LayoutRegistryReadJson("layouts\data\defaults.json")["emulation"]["recent_count"]
 	if !(Count is Integer) || Count < 1
 		throw ValueError("_shared/layouts/data/defaults.json declares no whole emulation.recent_count of at least 1.")
-	_EmulationRecentsCount := Count
+	Cached := Count
 	return Count
 }
 
