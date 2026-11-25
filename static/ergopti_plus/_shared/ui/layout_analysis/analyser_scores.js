@@ -24,6 +24,9 @@
  * 3. Constants come from LAYOUT_ANALYSIS_DATA.analysers
  *    (_shared/layouts/data/analysis/analyser_models.json); an unknown analyser
  *    or keyboard throws.
+ * 4. Fidelity is per corpus a scorer reads: a text's own counts (genkey's and
+ *    Oxeylyzer's skipgrams) or the n-gram tables alone, where the trigrams'
+ *    chain stands for them; each score names the fidelity of its own tables.
  * ==============================================================================
  */
 
@@ -90,7 +93,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * One analyser's entry of the generated data.
 	 * @param {string} id - An analyser id.
 	 * @returns {object} {name, author, url, repository, revision, licence,
-	 *   fidelity, better, unit, digits, model}.
+	 *   fidelity: {text, tables}, better, unit, digits, model}.
 	 * @throws {Error} On an unknown analyser or missing data.
 	 */
 	function entry(id) {
@@ -2675,7 +2678,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				repository: e.repository,
 				revision: e.revision,
 				licence: e.licence,
-				fidelity: e.fidelity,
+				fidelity: Object.assign({}, e.fidelity),
 				better: e.better,
 				unit: e.unit,
 				digits: e.digits,
@@ -2684,9 +2687,34 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		});
 	}
 
-	function finish(id, raw) {
+	/**
+	 * What a scorer reads in a table: « text » when it carries a text's own
+	 * counts (textTables), else « tables », the n-grams alone (a word list, a
+	 * count table, a blend, « Ma frappe »).
+	 */
+	function corpusOf(table) {
+		return table.analysers ? 'text' : 'tables';
+	}
+
+	/**
+	 * How faithful one analyser's score is on one corpus (analyser_models.json
+	 * names it per corpus: genkey is exact on a text, close on tables).
+	 * @param {string} id - An analyser id (see analysers()).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {string} exact, close or approximate.
+	 * @throws {Error} On an unknown analyser or malformed tables.
+	 */
+	function fidelity(id, ngrams) {
+		if (!SCORERS[id]) throw new Error(`analyser_scores: unknown analyser ${id}`);
+		return entry(id).fidelity[corpusOf(engine().prepareNgrams(ngrams))];
+	}
+
+	function finish(id, raw, table) {
 		const e = entry(id);
-		return Object.assign({ id, better: e.better, fidelity: e.fidelity, unit: e.unit }, raw);
+		return Object.assign(
+			{ id, better: e.better, fidelity: e.fidelity[corpusOf(table)], unit: e.unit },
+			raw
+		);
 	}
 
 	/**
@@ -2704,7 +2732,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 */
 	function score(id, layout, ngrams, options) {
 		if (!SCORERS[id]) throw new Error(`analyser_scores: unknown analyser ${id}`);
-		return finish(id, SCORERS[id](context(layout, ngrams, options)));
+		const ctx = context(layout, ngrams, options);
+		return finish(id, SCORERS[id](ctx), ctx.table);
 	}
 
 	/**
@@ -2721,7 +2750,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			const ctx = context(layout, ngrams, Object.assign({}, options, { fingering }));
 			for (const id of ORDER) {
 				if (!out[id]) out[id] = {};
-				out[id][fingering] = finish(id, SCORERS[id](ctx));
+				out[id][fingering] = finish(id, SCORERS[id](ctx), ctx.table);
 			}
 		}
 		return out;
@@ -2744,7 +2773,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		};
 	}
 
-	return { ORDER, analysers, score, scoreAll, textTables };
+	return { ORDER, analysers, fidelity, score, scoreAll, textTables };
 })();
 
 // Node (tests) reads the module through a vm context or require().

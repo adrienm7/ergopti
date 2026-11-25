@@ -99,6 +99,11 @@ body:has(> main.layout-analysis) {
 	margin: 4px 0;
 }
 
+/* An analyser's fidelity on the corpus, on its own line under its direction. */
+.la-fidelity {
+	display: block;
+}
+
 /* Running text keeps lines a reader can follow, at most about 70 characters
    (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
    average letter. */

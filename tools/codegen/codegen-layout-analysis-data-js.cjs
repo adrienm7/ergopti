@@ -1366,25 +1366,48 @@ const ANALYSER_FIELDS = [
 	'model'
 ];
 const FIDELITIES = new Set(['exact', 'close', 'approximate']);
+// What a scorer reads, each with its own fidelity: a text's own counts, or
+// n-gram tables alone (word lists, count tables, blends, « Ma frappe »).
+const FIDELITY_CORPORA = ['text', 'tables'];
 const DIRECTIONS = new Set(['higher', 'lower', 'none']);
 
 /**
- * The constants of the analyser scorers, checked.
- * @returns {object} analyser id → entry.
- * @throws {Error} On a missing field, an unknown fidelity or direction.
+ * Checks the analyser entries of analyser_models.json.
+ * @param {object} analysers - analyser id → entry.
+ * @returns {object} The same entries.
+ * @throws {Error} On a missing field, an unknown fidelity or direction, or a
+ *   fidelity that does not name each corpus a scorer reads.
  */
-function buildAnalysers() {
-	const analysers = JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers;
+function checkAnalysers(analysers) {
 	for (const [id, entry] of Object.entries(analysers)) {
 		for (const field of ANALYSER_FIELDS)
 			if (entry[field] === undefined)
 				throw new Error(`analyser_models.json: ${id} has no ${field}`);
-		if (!FIDELITIES.has(entry.fidelity))
-			throw new Error(`analyser_models.json: ${id} fidelity ${entry.fidelity}`);
+		const fidelity = entry.fidelity;
+		if (
+			!fidelity ||
+			typeof fidelity !== 'object' ||
+			Object.keys(fidelity).sort().join() !== FIDELITY_CORPORA.slice().sort().join()
+		)
+			throw new Error(
+				`analyser_models.json: ${id} fidelity must name ${FIDELITY_CORPORA.join(' and ')}`
+			);
+		for (const corpus of FIDELITY_CORPORA)
+			if (!FIDELITIES.has(fidelity[corpus]))
+				throw new Error(`analyser_models.json: ${id} fidelity ${corpus} ${fidelity[corpus]}`);
 		if (!DIRECTIONS.has(entry.better))
 			throw new Error(`analyser_models.json: ${id} better ${entry.better}`);
 	}
 	return analysers;
+}
+
+/**
+ * The constants of the analyser scorers, checked.
+ * @returns {object} analyser id → entry.
+ * @throws {Error} As checkAnalysers().
+ */
+function buildAnalysers() {
+	return checkAnalysers(JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers);
 }
 
 // ==========================
@@ -1498,6 +1521,7 @@ if (require.main === module) main();
 
 module.exports = {
 	ENGINE_PATH,
+	checkAnalysers,
 	COUNTED_AS,
 	countTableCounts,
 	loadEngine,
