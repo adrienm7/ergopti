@@ -3286,6 +3286,114 @@
 		}
 	},
 	{
+		"path": "linux_component_problems.component_problem_text_automation_atspi_unavailable",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Hotstrings sans contrôle des champs de mot de passe",
+			"en": "Hotstrings without the password-field check"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_text_automation_no_accessible_window",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Hotstrings sans contrôle des champs de mot de passe",
+			"en": "Hotstrings without the password-field check"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_text_automation_no_focus_answer",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Hotstrings sans contrôle des champs de mot de passe",
+			"en": "Hotstrings without the password-field check"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_text_automation_context_unavailable",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Hotstrings sans contrôle des champs de mot de passe",
+			"en": "Hotstrings without the password-field check"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_text_automation_no_detector",
+		"visibility": "hide",
+		"labels": { "fr": "Hotstrings suspendues", "en": "Hotstrings withheld" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
+		"path": "linux_component_problems.component_problem_text_automation_window_policy_failed",
+		"visibility": "hide",
+		"labels": { "fr": "Hotstrings suspendues", "en": "Hotstrings withheld" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			},
+			"macos": {
+				"en": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
+				"fr": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus."
+			}
+		}
+	},
+	{
 		"path": "linux_component_problems.component_problem_ergopti_layout_install_failed",
 		"visibility": "hide",
 		"labels": { "fr": "Disposition Ergopti non installée", "en": "Ergopti layout not installed" },

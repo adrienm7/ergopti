@@ -5580,7 +5580,9 @@ unavailable = "hide"
 # the Linux tray, above its title, one row per code that still holds and then a
 # separator, none when nothing is wrong (menu/ui/builder/component_status_rows.lua):
 # a missing component the windows need, an unread keyboard layout, a failed
-# Ergopti layout step. A transient notification was the only surface and KDE
+# Ergopti layout step, a desktop that reports no focus, hotstrings withheld or
+# left without the password-field check (one row per text_automation_status
+# NOTICES reason, labelled by its mode). A transient notification was the only surface and KDE
 # Plasma 6 dropped it from its history (field report, Arch Linux, 2026-11-25).
 # The label names the problem after the llm entry's unreachable health dot; the
 # click shows the problem's title and explanation in the tray's status window.
@@ -5628,6 +5630,66 @@ reason_key = "platform_reason.component_status_rows_are_linux"
 type = "command"
 id = "component_problem_gnome_focus_extension"
 i18n = "startup.linux_gnome_extension_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_atspi_unavailable"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_accessible_window"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_focus_answer"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_context_unavailable"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_detector"
+i18n = "startup.linux_text_closed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_window_policy_failed"
+i18n = "startup.linux_text_closed_label"
 caption_getter = "linux_component_health_dot"
 caption_layout = "suffix"
 caption_joiner = " "

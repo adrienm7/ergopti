@@ -6823,6 +6823,78 @@
 		},
 		{
 			"type": "command",
+			"id": "component_problem_text_automation_atspi_unavailable",
+			"i18n": "startup.linux_text_unchecked_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_text_automation_no_accessible_window",
+			"i18n": "startup.linux_text_unchecked_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_text_automation_no_focus_answer",
+			"i18n": "startup.linux_text_unchecked_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_text_automation_context_unavailable",
+			"i18n": "startup.linux_text_unchecked_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_text_automation_no_detector",
+			"i18n": "startup.linux_text_closed_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_text_automation_window_policy_failed",
+			"i18n": "startup.linux_text_closed_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
 			"id": "component_problem_ergopti_layout_install_failed",
 			"i18n": "layouts.linux_ergopti_install_failed_label",
 			"caption_getter": "linux_component_health_dot",

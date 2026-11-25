@@ -24,6 +24,17 @@ local PROBLEM = { code = "windows_lgi", title = "Ergopti+ needs a component",
 local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "kwin_focus_script",
 	"gnome_focus_extension", "ergopti_layout_install_failed", "ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
 
+-- The text automation codes are built from the reasons of the status
+-- module's notice table ("text_automation_" .. reason): they had no rows,
+-- so a withheld hotstring never reached the tray (2026-11-25).
+do
+	local Notices = helpers.load_module("platform.focus.text_automation_status").NOTICES
+	local reasons = {}
+	for reason in pairs(Notices) do reasons[#reasons + 1] = reason end
+	table.sort(reasons)
+	for _, reason in ipairs(reasons) do REPORTED_CODES[#REPORTED_CODES + 1] = "text_automation_" .. reason end
+end
+
 -- The reporters whose codes are whole literals, read for the codes above.
 local LITERAL_REPORTERS = { "platform.focus.text_automation_status", "ergopti_hotstrings" }
 
@@ -82,6 +93,14 @@ helpers.describe("component_status: a problem stays visible", function()
 			end
 		end
 		helpers.assert_true(found >= 2, "the reporters' literal codes were read")
+		-- A code built by concatenation must come from the enumerated table.
+		local status = assert(helpers.read_module_source("platform.focus.text_automation_status"))
+		local built = 0
+		for prefix in status:gmatch('\n%s*code = "([a-z0-9_]+)" %.%. reason,') do
+			built = built + 1
+			helpers.assert_eq(prefix, "text_automation_", "the built code is the one the table enumerates")
+		end
+		helpers.assert_eq(built, 1, "the text automation code is built once, from its notice table")
 	end)
 
 	helpers.it("(component-problem-rows) draws a row for every code a Linux part reports", function()
