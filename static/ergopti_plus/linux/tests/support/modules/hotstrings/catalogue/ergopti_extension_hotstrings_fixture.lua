@@ -192,13 +192,15 @@ local function with_offline_shipped_probe(body)
 		observed.network = observed.network + 1
 		error("the offline shipped source must not fetch network data")
 	end
-	FileSystem.read = function(path)
-		observed.reads[#observed.reads + 1] = path
-		if observed.refuse and path == Paths.shared(observed.refuse) then return nil end
-		return previous_read(path)
-	end
 	local ok, err = pcall(function()
+		-- Loading the registry resolves its failure codes from the layout
+		-- defaults; the reads recorded are the resolution's alone.
 		local Registry = helpers.load_module(registry_name)
+		FileSystem.read = function(path)
+			observed.reads[#observed.reads + 1] = path
+			if observed.refuse and path == Paths.shared(observed.refuse) then return nil end
+			return previous_read(path)
+		end
 		body(Registry, observed)
 	end)
 	Http.get, FileSystem.read = previous_get, previous_read
