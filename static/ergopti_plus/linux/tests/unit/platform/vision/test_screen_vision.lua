@@ -29,6 +29,7 @@ local function scripted_transport()
 	function transport.healthy() return transport.connected end
 	function transport.root() return 1 end
 	function transport.geometry(window)
+		if window == 1 then return 0, 0, 64, 48 end
 		if window ~= 4242 then return nil end
 		return 100, 50, WINDOW_W, WINDOW_H
 	end
@@ -129,6 +130,20 @@ helpers.describe("screen vision service (Linux)", function()
 		local region, region_reason = now(Service.capture_region, { x = 0, y = 0, width = 10, height = 10 })
 		helpers.assert_nil(region, "no Wayland region")
 		helpers.assert_eq(region_reason, "capture_wayland_region", "region reason")
+		Service.stop()
+	end)
+
+	helpers.it("screen vision: captures the whole screen on X11 and refuses it under Wayland (workflow-screen)", function()
+		local Service = fresh_service({ DISPLAY = ":0" })
+		local image, reason = now(Service.capture_screen)
+		helpers.assert_nil(reason, "no refusal")
+		helpers.assert_eq(image.width, 64, "the root width")
+		helpers.assert_eq(image.frame.x, 0, "the root frame")
+		Service.stop()
+		Service = fresh_service({ DISPLAY = ":0", XDG_SESSION_TYPE = "wayland" })
+		local none, wayland = now(Service.capture_screen)
+		helpers.assert_nil(none, "the Wayland root shows nothing of native windows")
+		helpers.assert_eq(wayland, "capture_wayland_region")
 		Service.stop()
 	end)
 

@@ -48,7 +48,10 @@ local function fixture(session)
 			end,
 			write = function(path, text) world.files[path] = text; return true end,
 		},
-		settings_paths = { config = function(name) return "/tmp/ergopti-workflows-test/" .. name end },
+		settings_paths = {
+			config = function(name) return "/tmp/ergopti-workflows-test/" .. name end,
+			cache = function(name) return "/tmp/ergopti-cache/" .. name end,
+		},
 		shortcuts = {
 			send_vocabulary = function() return require("modules.shortcuts.manager").send_vocabulary() end,
 			action_handlers = function()
@@ -57,24 +60,47 @@ local function fixture(session)
 			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
 		},
 		gestures = function() return { is_runnable = function() return true end,
-			get_action_parameter_spec = function() return nil end, execute_action = function() return true end } end,
+			get_action_parameter_spec = function() return nil end, execute_action = function() return true end,
+			region_screenshot_command = function(path) return "draw > " .. path end } end,
 		clipboard = { read_checked = function() return true, "clip" end, write = function() return true end },
 		notifier = { send = function(text) world.notices[#world.notices + 1] = text; return true end },
 		window_info = { getFocused = function() return { appId = "org.mozilla.firefox" } end },
 		i18n = { get = function(key) return key end },
 		session_type = function() return session or "x11" end,
 		rename = function(from, to) world.files[to] = world.files[from]; world.files[from] = nil; return true end,
+		vision = function() return {
+			capture_window = function(window, done)
+				world.captured = window
+				done({ width = 40, height = 40, pixels = {}, scale = 1, frame = { x = 100, y = 50, width = 40, height = 40 } })
+			end,
+			match = function(_, templates, _, done)
+				world.template = templates[1]
+				done({ { id = templates[1].id, x = 10, y = 10, width = 4, height = 4, score = 1, scale = 1 } }, {})
+			end,
+			recognize_file = function(path, options, done)
+				world.read = { path = path, layout = options.layout }
+				done({ { text = "Hello", line = 1 }, { text = "there", line = 1 } })
+			end,
+			find_text = function() return {} end,
+		} end,
+		focus = { query = function() return "0x2a" end },
+		locale = function() return "en" end,
+		now_ms = function() return 0 end,
 	})
 	return Workflows, world
 end
 
 --- Stores one workflow in the fake config folder.
 --- @param steps table
-local function store(steps)
+--- @param images table|nil name -> base64 PNG.
+local function store(steps, images)
 	for key in pairs(CONFIG) do CONFIG[key] = nil end
 	CONFIG["/tmp/ergopti-workflows-test/workflows.json"] = Json.encode({ schema_version = 1, workflows = Json.array({
-		{ id = "wf_1", name = "Mine", origin = "local", steps = Json.array(steps) } }) })
+		{ id = "wf_1", name = "Mine", origin = "local", steps = Json.array(steps), images = images } }) })
 end
+
+-- A 3 x 5 RGB PNG (tests/unit/platform/vision/test_png_codec.lua).
+local PNG = "iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAIAAAAPE8H1AAAAPUlEQVR4nAEyAM3/AKVNyhglMLsdbQETLN7D951YtqMCLEZB9fb26Wt2A7cQLc0r3gZuzQRK1S3evDdRDhkiXhWcM6E9PQAAAABJRU5ErkJggg=="
 
 helpers.describe("workflows on Linux (workflows-linux)", function()
 	helpers.it("keys, text and the shell step reach the Linux services (workflows-linux)", function()
@@ -87,6 +113,32 @@ helpers.describe("workflows on Linux (workflows-linux)", function()
 		helpers.assert_eq(table.concat(world.runs[1].args, "|"), "ERGOPTI_VAR_n=x y|/bin/sh|-l|-c|echo \"$ERGOPTI_VAR_n\"")
 		helpers.assert_eq(world.typed[1], "hello!")
 		helpers.assert_eq(CONFIG["/tmp/ergopti-workflows-test/workflow_approvals.json"], nil, "no prompt, no approval")
+		Workflows.stop()
+	end)
+
+	helpers.it("an embedded image is clicked where the front window shows it (workflows-linux)", function()
+		store({ { kind = "click_target", target = { type = "image", image = "send" } } }, { send = PNG })
+		local Workflows, world = fixture()
+		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.captured, "0x2a")
+		helpers.assert_eq(world.template.image.width, 3, "the PNG is decoded to the matcher's gray")
+		local click = world.runs[#world.runs]
+		helpers.assert_eq(click.program, "xdotool")
+		helpers.assert_eq(table.concat(click.args, " "), "mousemove 112 62 click --repeat 1 1")
+		helpers.assert_eq(#world.notices, 0, tostring(world.notices[1]))
+		Workflows.stop()
+	end)
+
+	helpers.it("a region OCR reads the drawn region's file (workflows-linux)", function()
+		store({ { kind = "ocr", mode = "region", into = "seen" }, { kind = "type_text", text = "{{seen}}" } })
+		local Workflows, world = fixture()
+		Workflows.run({ id = "wf_1" })
+		helpers.assert_eq(world.runs[1].program, "mkdir")
+		helpers.assert_eq(world.runs[2].program, "/bin/sh")
+		helpers.assert_true(world.runs[2].args[2]:find("/tmp/ergopti-cache/workflows/region_1.png", 1, true) ~= nil)
+		helpers.assert_eq(world.read.path, "/tmp/ergopti-cache/workflows/region_1.png")
+		helpers.assert_eq(world.read.layout, "block")
+		helpers.assert_eq(world.typed[1], "Hello there")
 		Workflows.stop()
 	end)
 

@@ -139,6 +139,15 @@ function M.capture_region(rect, callback)
 	callback(Capture.capture({ rect = rect }, Matcher.gray))
 end
 
+--- Captures the whole screen (the root window), on X11 only as a region is.
+--- @param callback function (image|nil, reason)
+function M.capture_screen(callback)
+	require_init()
+	local state = M.availability().region
+	if not state.ok then callback(nil, state.reason); return end
+	callback(Capture.capture({ root = true }, Matcher.gray))
+end
+
 --- Finds library images in a captured image, synchronously.
 --- @return table hits, table refused
 local function match_now(image, templates, options)
