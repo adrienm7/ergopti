@@ -9,7 +9,8 @@
  * (_shared/ui/workflow_model.js), replays the send_shortcut
  * vectors through its key-combination parser, holds steps.json to the timing
  * registry it names, and checks that the macOS and Linux suites replay the
- * shared Lua contracts of the same corpus.
+ * shared Lua contracts of the same corpus and that the Windows suite replays
+ * both corpora through its AutoHotkey port.
  *
  * ROOT CAUSE ENCODED:
  * User workflows had no model: the editor, an imported file and the three
@@ -170,6 +171,19 @@ check(
 		.includes('"tests.unit.modules.shortcuts.test_workflow_model"'),
 	'the Linux manifest does not list the workflow model test'
 );
+// The AutoHotkey port cannot run the Lua contracts: its suite replays both
+// corpora itself, and only a test run_all.ahk includes ever runs.
+const ahkRunAll = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
+for (const [corpusName, test] of [
+	['validation_vectors.json', 'test_workflow_model.ahk'],
+	['interpreter_vectors.json', 'test_workflow_interpreter.ahk']
+]) {
+	const relative = `unit/modules/shortcuts/workflows/${test}`;
+	const file = path.join(SP, 'windows', 'tests', ...relative.split('/'));
+	const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+	check(text.includes(corpusName), `the Windows suite does not replay ${corpusName}`);
+	check(ahkRunAll.includes(`#Include ${relative}`), `run_all.ahk does not include ${relative}`);
+}
 
 if (errors.length > 0) {
 	for (const message of errors) console.error(`FAIL ${message}`);

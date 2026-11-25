@@ -47,3 +47,19 @@ NativeTextIsWellFormedUtf16(Address, Length) {
 	return DllCall("Kernel32\WideCharToMultiByte", "UInt", 65001, "UInt", 0x80,
 		"Ptr", Address, "Int", Length, "Ptr", 0, "Int", 0, "Ptr", 0, "Ptr", 0, "Int") > 0
 }
+
+/**
+ * Measures UTF-16 text in UTF-8 bytes, embedded NULs included, as the shared
+ * byte bounds count it (StrPut stops at the first NUL). One conversion
+ * measures the text, writing nothing; a lone surrogate counts as the three
+ * bytes of U+FFFD, so callers refuse ill-formed text first.
+ * @param {Integer} Address Address of the first UTF-16 code unit.
+ * @param {Integer} Length Number of code units; embedded NULs are text.
+ * @returns {Integer} The UTF-8 size in bytes.
+ */
+NativeTextUtf8Length(Address, Length) {
+	if (Length <= 0)
+		return 0
+	return DllCall("Kernel32\WideCharToMultiByte", "UInt", 65001, "UInt", 0,
+		"Ptr", Address, "Int", Length, "Ptr", 0, "Int", 0, "Ptr", 0, "Ptr", 0, "Int")
+}
