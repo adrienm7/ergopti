@@ -4315,6 +4315,51 @@
 				"tr",
 				"uk"
 			]
+		},
+		"field_check.value.http_n": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"field_check.value.gnome_manual": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "pt"]
+		},
+		"field_check.value.kde_manual": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "pt"]
+		},
+		"field_check.value.error": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"field_check.value.direct": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl"]
+		},
+		"field_check.value.other": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl"]
 		}
 	}
 }

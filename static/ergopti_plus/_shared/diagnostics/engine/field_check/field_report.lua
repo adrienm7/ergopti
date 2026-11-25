@@ -143,7 +143,7 @@ local function report_lines(entry, titled, translate)
 	end
 	for _, step in ipairs(report.steps) do
 		local line = (STEP_MARKS[step.state] or "➖") .. " " .. tostring(step.id)
-		if step.value then line = LabelValue.compose(translate, line, step.value) end
+		if step.value then line = LabelValue.compose(translate, line, Report.display_value(step.value, translate)) end
 		table.insert(lines, line)
 	end
 	return lines

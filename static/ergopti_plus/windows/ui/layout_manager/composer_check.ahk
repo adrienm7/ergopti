@@ -163,9 +163,62 @@ ComposerCheck_Text(Report, TranslateFn) {
 	for Step in Report["steps"] {
 		Line := Marks.Get(Step["state"], "[-]") . " " . TranslateFn.Call("field_check.step." . Step["id"])
 		if Step["value"] != ""
-			Line := LabelValue(Line, Step["value"], TranslateFn)
+			Line := LabelValue(Line, ComposerCheck_DisplayValue(Step["value"], TranslateFn), TranslateFn)
 		Text .= "`n" . Line
 	}
+	return Text
+}
+
+/**
+ * One token of a step value in the user's language, as
+ * _shared/diagnostics/engine/field_check/report.lua display_token spells it.
+ * @param {string} Token
+ * @param {Func} TranslateFn - Locale key -> text.
+ * @returns {string}
+ */
+ComposerCheck_DisplayToken(Token, TranslateFn) {
+	static Prefix := "field_check.value."
+	if RegExMatch(Token, "^-?\d[\d.]*$")
+		return Token
+	Key := Prefix . Token
+	Text := TranslateFn.Call(Key)
+	if Text != Key
+		return Text
+	for Family in [["^http_(\d+)_direct$", "http_n_direct"], ["^http_(\d+)$", "http_n"], ["^required_(\w+)$", "required_scheme"]] {
+		if RegExMatch(Token, Family[1], &Found) {
+			Key := Prefix . Family[2]
+			Template := TranslateFn.Call(Key)
+			if Template != Key
+				return StrReplace(Template, "{1}", Found[1])
+		}
+	}
+	Key := Prefix . "other"
+	Template := TranslateFn.Call(Key)
+	return Template != Key ? StrReplace(Template, "{1}", Token) : Token
+}
+
+/**
+ * A step value in the user's language: "+" joins alternatives and ":" pairs a
+ * name with its detail, as the shared Lua report renders it.
+ * @param {string} Value
+ * @param {Func} TranslateFn - Locale key -> text.
+ * @returns {string}
+ */
+ComposerCheck_DisplayValue(Value, TranslateFn) {
+	Parts := []
+	for Part in StrSplit(Value, "+") {
+		if Part = ""
+			continue
+		Colon := InStr(Part, ":")
+		if Colon > 1 && Colon < StrLen(Part)
+			Parts.Push(LabelValue(ComposerCheck_DisplayToken(SubStr(Part, 1, Colon - 1), TranslateFn),
+				ComposerCheck_DisplayValue(SubStr(Part, Colon + 1), TranslateFn), TranslateFn))
+		else
+			Parts.Push(ComposerCheck_DisplayToken(RTrim(Part, ":"), TranslateFn))
+	}
+	Text := ""
+	for Index, Part in Parts
+		Text .= (Index > 1 ? ", " : "") . Part
 	return Text
 }
 

@@ -994,4 +994,5 @@ return {
 	"tests.meta.harness.test_native_child_cpath",
 	"tests.meta.harness.test_os_execute_status",
 	"tests.unit.diagnostics.engine.control.test_field_todo_coverage",
+	"tests.unit.diagnostics.engine.field_check.test_field_check_values_translated",
 }

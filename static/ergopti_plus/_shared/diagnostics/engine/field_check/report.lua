@@ -17,6 +17,10 @@
 ---    info and skip never fail it.
 --- 3. PURE Lua: no logger, no file system, no clock. The drivers' engines own
 ---    running, logging and presentation.
+--- 4. The log line keeps the closed codes the maintainer reads; the window
+---    text shows each value token through field_check.value.<token>, so no raw
+---    code follows a translated label (the Windows composer check renders the
+---    same way in ComposerCheck_DisplayValue).
 --- ==============================================================================
 
 local LabelValue = require("core.i18n.engine.label_value")
@@ -114,6 +118,85 @@ function M.format_log_line(result)
 		verdict, #result.steps, table.concat(parts, " "))
 end
 
+--- The locale key prefix of a step value token (field_check.value.<token>).
+M.VALUE_KEY_PREFIX = "field_check.value."
+
+-- Tokens that carry a number or a name inside them: the pattern, the key that
+-- spells them, and the part the key's {1} receives.
+local VALUE_FAMILIES = {
+	{ pattern = "^http_(%d+)_direct$", key = "http_n_direct" },
+	{ pattern = "^http_(%d+)$", key = "http_n" },
+	{ pattern = "^required_(%w+)$", key = "required_scheme" },
+}
+
+--- The text of a locale key, nil when the catalogue does not hold it (the
+--- lookup answers with the key itself and has already reported the miss).
+local function lookup(translate, key)
+	local text = translate(key)
+	if type(text) ~= "string" or text == key then return nil end
+	return text
+end
+
+--- Fills the {1} slot of a template with literal text.
+local function fill(template, text)
+	return (template:gsub("{1}", function() return text end))
+end
+
+--- One token of a value in the user's language.
+--- @param token string
+--- @param translate function
+--- @return string text
+--- @return boolean known Whether the catalogue spells this token itself.
+function M.display_token(token, translate)
+	-- Counts, durations and versions read the same in every language.
+	if token:match("^%-?%d[%d%.]*$") then return token, true end
+	local text = lookup(translate, M.VALUE_KEY_PREFIX .. token)
+	if text then return text, true end
+	for _, family in ipairs(VALUE_FAMILIES) do
+		local part = token:match(family.pattern)
+		if part then
+			local template = lookup(translate, M.VALUE_KEY_PREFIX .. family.key)
+			if template then return fill(template, part), true end
+		end
+	end
+	-- An open code (a native failure stage) is named as a code, never shown
+	-- bare after a translated label.
+	local other = lookup(translate, M.VALUE_KEY_PREFIX .. "other")
+	return other and fill(other, token) or token, false
+end
+
+--- The tokens of a value the catalogue does not spell (shown as « code … »).
+--- @param value string
+--- @param translate function
+--- @return table tokens
+function M.unknown_tokens(value, translate)
+	local unknown = {}
+	for token in tostring(value):gmatch("[^+:]+") do
+		local _, known = M.display_token(token, translate)
+		if not known then unknown[#unknown + 1] = token end
+	end
+	return unknown
+end
+
+--- A step value in the user's language: "+" joins alternatives and ":" pairs
+--- a name with its detail (registry:direct+blob:direct).
+--- @param value string Sanitized step value.
+--- @param translate function key → localized text.
+--- @return string
+function M.display_value(value, translate)
+	local parts = {}
+	for part in tostring(value):gmatch("[^+]+") do
+		local head, rest = part:match("^([^:]*):(.+)$")
+		if head and head ~= "" then
+			parts[#parts + 1] = LabelValue.compose(translate, (M.display_token(head, translate)),
+				M.display_value(rest, translate))
+		else
+			parts[#parts + 1] = (M.display_token((part:gsub(":$", "")), translate))
+		end
+	end
+	return table.concat(parts, ", ")
+end
+
 local MARKS = {
 	[M.STATE_PASS] = "✅", [M.STATE_FAIL] = "❌",
 	[M.STATE_INFO] = "ℹ️", [M.STATE_SKIP] = "➖",
@@ -130,7 +213,7 @@ function M.format_text(result, translate)
 	}
 	for _, step in ipairs(result.steps) do
 		local line = MARKS[step.state] .. " " .. translate("field_check.step." .. step.id)
-		if step.value then line = LabelValue.compose(translate, line, step.value) end
+		if step.value then line = LabelValue.compose(translate, line, M.display_value(step.value, translate)) end
 		lines[#lines + 1] = line
 	end
 	return table.concat(lines, "\n")

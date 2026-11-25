@@ -13,8 +13,9 @@
 ---    notification, that it watches the keyboard, and that it keeps counts only.
 --- 2. The same text goes to the window and the clipboard, built from the same
 ---    privacy-safe result as the log line.
---- 3. Localized: every sentence comes from the locales; step values are raw
----    tokens (counts, states, versions).
+--- 3. Localized: every sentence comes from the locales, step values included
+---    (field_check.value.*, _shared/diagnostics/engine/field_check/report.lua
+---    display_value); counts and versions are shown as they are.
 --- 4. « Lancer le field report » runs this app's own field run in-app in the
 ---    shared progress window (diagnostics/ui/field_check/field_report_window.lua,
 ---    M.run_field_report): each step as it goes, then the report, its folder in

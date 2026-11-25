@@ -124,10 +124,31 @@ _LCC_ReportContract() {
 		Threw := true
 	AssertTrue(Threw, "an unknown state is a bug")
 	Text := ComposerCheck_Text(Report, (Key) => Key == "common.label_value" ? "{1} = {2}" : "<" . Key . ">")
-	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> = fresh`n"
-		. "[-] <field_check.step.c> = kept`n[X] <field_check.step.d> = redacted", Text, "one line per step, joined the locale's way")
+	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> = <field_check.value.fresh>`n"
+		. "[-] <field_check.step.c> = <field_check.value.kept>`n[X] <field_check.step.d> = <field_check.value.redacted>", Text,
+		"one line per step, its value spelled by the locale")
 }
 Test("composer check: the record and the window text list every step once (composer-check)", _LCC_ReportContract)
+
+; The field report of 2026-11-25 read « Composition installée : kept » and
+; « Réglages proxy : none »: each value now goes through field_check.value.*.
+_LCC_ValuesTranslated() {
+	Translate := (Key) => Key == "common.label_value" ? "{1}: {2}"
+		: Key == "field_check.value.registry" ? "registre" : Key == "field_check.value.direct" ? "direct"
+		: Key == "field_check.value.blob" ? "fichiers" : Key == "field_check.value.kept" ? "conservée"
+		: Key == "field_check.value.http_n" ? "HTTP {1}" : Key == "field_check.value.other" ? "code {1}" : Key
+	AssertEqual("conservée", ComposerCheck_DisplayValue("kept", Translate), "a closed code is spelled out")
+	AssertEqual("registre: direct, fichiers: direct", ComposerCheck_DisplayValue("registry:direct+blob:direct", Translate),
+		"pairs and alternatives are spelled part by part")
+	AssertEqual("HTTP 200", ComposerCheck_DisplayValue("http_200", Translate), "a status family fills its number")
+	AssertEqual("12", ComposerCheck_DisplayValue("12", Translate), "a count is shown as it is")
+	AssertEqual("code xyz_stage", ComposerCheck_DisplayValue("xyz_stage", Translate), "an open code is named as a code")
+	for Value in ["existing", "kept", "unreadable", "no_copy", "none", "no_pac", "selected_direct", "trusted", "get_only"] {
+		Key := "field_check.value." . Value
+		AssertTrue(t(Key) != Key, "the catalogue spells " . Value)
+	}
+}
+Test("composer check: step values are shown in the user's language (composer-check)", _LCC_ValuesTranslated)
 
 
 
