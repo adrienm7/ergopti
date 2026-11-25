@@ -2243,6 +2243,14 @@ body:has(> main.layout-analysis) {
 	stroke-width: 1.5;
 }
 
+/* The spread's inner quantiles (P10 to P90): taller dashed marks in the
+   text colour, each named under the strip and listed in the table below. */
+.la-pareto-quantile {
+	stroke: var(--theme-text);
+	stroke-dasharray: 3 2;
+	stroke-width: 1;
+}
+
 .la-swatch-muted {
 	border: 1.5px solid var(--la-sub);
 }

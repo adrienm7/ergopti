@@ -446,6 +446,9 @@
 		'pareto',
 		'trace'
 	];
+	// The quantiles the Pareto tab's spread marks and lists (the Layouts Wiki
+	// playground's Ranking view snaps its range to these), in percent.
+	const SPREAD_QUANTILES = [0, 10, 25, 50, 75, 90, 100];
 	// Corpus blends (an idea seen in the Layouts Wiki playground): how many
 	// corpora a blend mixes, its id in the corpus list, and the first parts.
 	const BLEND_PARTS = 3;
@@ -955,6 +958,11 @@
 			<h3 id="la-pareto-spread-label"></h3>
 			<p id="la-pareto-spread-text" class="la-muted"></p>
 			<div id="la-pareto-spread" class="la-pareto-chart"></div>
+			<p id="la-pareto-quantiles-note" class="la-muted" data-i18n="layout_analysis.pareto.quantiles_note"></p>
+			<h4 id="la-pareto-quantiles-label"></h4>
+			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-pareto-quantiles-label">
+				<table id="la-pareto-quantiles" class="la-table"></table>
+			</section>
 		</section>
 		<section class="la-figure la-figure-wide">
 			<h3 id="la-pareto-table-label" data-i18n="layout_analysis.pareto.table"></h3>
@@ -2527,6 +2535,8 @@
 			const text = $('la-pareto-spread-text');
 			if (!detailed) {
 				text.textContent = '';
+				$('la-pareto-quantiles').replaceChildren();
+				$('la-pareto-quantiles-label').textContent = '';
 				return;
 			}
 			const value = paretoValue(detailed, x);
@@ -2541,7 +2551,8 @@
 				count: rows.length - 1
 			});
 			const { width, margin } = PARETO_SIZE;
-			const height = 56;
+			// Room under the strip for the quantiles' names, on two alternating lines.
+			const height = 68;
 			const sx = paretoScale(
 				rows.map((r) => paretoValue(r, x)),
 				better,
@@ -2573,8 +2584,77 @@
 						class: 'la-pareto-spread-tick'
 					})
 				);
+			const quantiles = spreadQuantiles(rows.map((r) => paretoValue(r, x)));
+			// The inner quantiles as taller dashed marks, named above (P0 and P100 are the ends).
+			const inner = quantiles.filter((q) => q.p !== 0 && q.p !== 100);
+			for (const [index, { p, value: at }] of inner.entries()) {
+				svg.append(
+					svgEl('line', {
+						x1: sx(at),
+						x2: sx(at),
+						y1: 14,
+						y2: 42,
+						class: 'la-pareto-quantile'
+					})
+				);
+				const label = svgEl('text', {
+					x: sx(at),
+					// Two lines, so close quantiles keep their names apart.
+					y: index % 2 === 0 ? 54 : 66,
+					'text-anchor': 'middle',
+					class: 'la-pareto-tick'
+				});
+				label.textContent = t('layout_analysis.percentile.chip', { percent: p });
+				svg.append(label);
+			}
 			svg.append(svgEl('circle', { cx: sx(value), cy: 28, r: 8, class: 'la-pareto-ring' }));
 			box.append(svg);
+			renderParetoQuantiles(x, quantiles, rows.length);
+		}
+
+		/**
+		 * The quantiles of values (linear between the two nearest ranks): the
+		 * value under which each SPREAD_QUANTILES share of them lies.
+		 * @param {number[]} values - At least one finite value.
+		 * @returns {{p: number, value: number}[]}
+		 */
+		function spreadQuantiles(values) {
+			const sorted = values.slice().sort((a, b) => a - b);
+			return SPREAD_QUANTILES.map((p) => {
+				const at = (p / 100) * (sorted.length - 1);
+				const low = Math.floor(at);
+				const high = Math.ceil(at);
+				return { p, value: sorted[low] + (sorted[high] - sorted[low]) * (at - low) };
+			});
+		}
+
+		/** The spread's quantiles as a table: the strip's marks in words. */
+		function renderParetoQuantiles(x, quantiles, count) {
+			const table = $('la-pareto-quantiles');
+			$('la-pareto-quantiles-label').textContent = t('layout_analysis.pareto.quantiles', {
+				name: paretoName(x),
+				count
+			});
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.pareto.quantile'),
+				t('layout_analysis.pareto.quantile_value')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const body = el('tbody');
+			for (const { p, value } of quantiles) {
+				const row = el('tr');
+				const name = el('th', '', t('layout_analysis.percentile.chip', { percent: p }));
+				name.scope = 'row';
+				row.append(name, el('td', 'la-num', paretoText(x, value)));
+				body.append(row);
+			}
+			table.replaceChildren(thead, body);
 		}
 
 		/**
