@@ -62,6 +62,9 @@ var LAYOUT_ANALYSIS_WORST = (function () {
 	function keyLabel(layout, code) {
 		const row = layout.rows[code];
 		const base = row ? row[0] : null;
+		// A repeat or magic key (the layout's own) shows its label.
+		const own = LAYOUT_ANALYSIS.contextLabel(layout, code, 0);
+		if (own !== '') return own;
 		if (typeof base === 'string' && base !== '') return KEY_LEGEND.visibleText(base);
 		if (base && typeof base === 'object') {
 			const accent = KEY_LEGEND.deadKeyText(((layout.dead || {})[base.dead] || {})[' '] || '');
