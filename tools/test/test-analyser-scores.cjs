@@ -34,6 +34,7 @@ const path = require('path');
 const vm = require('vm');
 const { shared } = require('../lib/paths.cjs');
 const { relativeSpeed, tableWalk } = require('./lib/table-walk-speed.cjs');
+const { reportMeasured } = require('./lib/bound-measurements.cjs');
 
 const DIR = shared('ui', 'layout_analysis');
 const VECTORS_DIR = shared('tests', 'corpus', 'layout_analysis');
@@ -393,6 +394,11 @@ const speed = relativeSpeed({
 	maxRounds: SPEED_ROUNDS
 });
 const walks = speed.ratio * REFERENCE_WALKS;
+reportMeasured(
+	'every analyser on one layout, reference walks of the table',
+	walks,
+	SCORES_WALKS_BOUND
+);
 check(
 	walks <= SCORES_WALKS_BOUND,
 	`every analyser costs ${walks.toFixed(0)} reference walks of the corpus per layout ` +

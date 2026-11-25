@@ -340,7 +340,8 @@ try {
 							'node:fs',
 							'node:os',
 							'./lib/js-suite-spawn.cjs',
-							'./lib/host-capabilities.cjs'
+							'./lib/host-capabilities.cjs',
+							'./lib/bound-measurements.cjs'
 						].includes(name),
 						`unexpected import ${name}`
 					);

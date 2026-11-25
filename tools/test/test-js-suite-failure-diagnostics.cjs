@@ -41,7 +41,8 @@ function run(failure, options = {}) {
 						[
 							'./lib/js-feature-inventory.cjs',
 							'./lib/js-suite-spawn.cjs',
-							'./lib/host-capabilities.cjs'
+							'./lib/host-capabilities.cjs',
+							'./lib/bound-measurements.cjs'
 						].includes(name)
 					)
 						return require(name);
@@ -504,6 +505,23 @@ assert.doesNotMatch(download, /core-js-failures/, 'raw text cannot enter the str
 	assert.match(skipped.output, /^1 case\(s\) in 1 check\(s\) were NOT EXECUTED on this host:$/m);
 	const plain = run({ status: 0, stdout: 'ok 1 - executed\n' });
 	assert.doesNotMatch(plain.output, /NOT EXECUTED/);
+}
+
+// A passing check's measured value against its bound must reach the log: the
+// Studio speed bounds are set from the ratios the hosted runners measure, and
+// the runner printed nothing of a passing check's own output.
+{
+	const measured = run({
+		status: 0,
+		stdout: 'noise\nMEASURED (bound input): synthetic walks: 25.8 (bound 120)\n'
+	});
+	assert.ifError(measured.thrown);
+	assert.equal(measured.exitCode, 0);
+	assert.match(
+		measured.output,
+		/^ {4}MEASURED \(bound input\): synthetic walks: 25\.8 \(bound 120\)$/m
+	);
+	assert.doesNotMatch(measured.output, /^ {4}noise$/m, 'only the measured lines are echoed');
 }
 
 // A Node installed under a directory with a space ("C:\Program Files\nodejs")

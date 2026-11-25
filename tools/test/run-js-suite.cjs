@@ -30,6 +30,7 @@ const { performance } = require('node:perf_hooks');
 const { loadInventory, selectFeature } = require('./lib/js-feature-inventory.cjs');
 const { spawnPlan } = require('./lib/js-suite-spawn.cjs');
 const { SKIP_PREFIX } = require('./lib/host-capabilities.cjs');
+const { MEASURED_PREFIX } = require('./lib/bound-measurements.cjs');
 const { requireCiEquivalentHost } = require('./lib/host-toolchain.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -177,6 +178,10 @@ for (const check of checks) {
 		.split(/\r?\n/)
 		.filter((line) => line.startsWith(SKIP_PREFIX));
 	for (const line of notExecuted) console.log(`    ${line}`);
+	// A value measured against a bound reaches the CI log only through here:
+	// the bound is set from what the hosted runners measure.
+	for (const line of String(r.stdout || '').split(/\r?\n/))
+		if (line.startsWith(MEASURED_PREFIX)) console.log(`    ${line}`);
 	console.log(`    duration: ${durationMs.toFixed(3)} ms (${ordinal}/${checks.length})`);
 	const result = {
 		...check,

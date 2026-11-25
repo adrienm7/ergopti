@@ -85,8 +85,11 @@ maintainer, who will try `dev.178` on the Mac first: never push `main` without t
     `prepare_owned:…<ConfigSchemaPrepareOwnedSource` 2, `settle_owned:…<ConfigSchemaSettleOwnedSource` 5 and
     `settle_owned:FinalAdmission<Func.Prototype.Call` 2. Left: count the `ConfigMigrateBoot` calls of each request
     apart from the reads, prove each owner's compares per call on a Windows run, then drop the ceiling.
-  - The two Studio speed bounds (120 and 5000 table walks) rest on ratios measured with every core busy; read the
-    ratio each test prints on a quiet PC and on CI, and set each bound to twice the highest.
+  - The two Studio speed bounds (120 and 5000 table walks) rest on ratios measured with every core busy; set each
+    bound to twice the highest of a quiet PC and CI. Since 2026-11-25 the JS runner echoes each passing check's
+    `MEASURED (bound input):` line (`tools/test/lib/bound-measurements.cjs`), so the Shared ui lane of the next CI
+    run shows both ratios; an idle 4-core Linux container measured 25.6 to 26.6 walks and 1006 to 1076 (three runs
+    each). Left: read them in that lane and on the maintainer's quiet PC, then set the bounds.
   - Kept on purpose: order-of-magnitude bounds that state their reason (the Linux e2e 3000 tray rows against the
     former 103 058), loop-progress bounds a test chooses for its own loop, frozen historical references, corpus
     floors and non-vacuity floors.
