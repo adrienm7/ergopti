@@ -37,6 +37,8 @@ const RUNS_WHILE_PAUSED = '"RunsWhilePaused", true';
 const PAUSE_POLICY = Object.freeze({
 	// Ergopti Studio: saves, installs and emulates (LTP-03).
 	'windows/ui/layout_manager/editor_window.ahk': { configuration: true },
+	// Picks the emulated layout, a setting chosen while paused as from the tray.
+	'windows/ui/emulation_picker/init.ahk': { configuration: true },
 	// Edits the physical shortcuts (LTP-10).
 	'windows/ui/physical_shortcuts/host.ahk': { configuration: true },
 	// Removes the unused keys of config.toml (LTP-10).
