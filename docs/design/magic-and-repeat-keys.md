@@ -4,8 +4,11 @@
 
 Status: the maintainer chose on 2026-11-25 to build this design, the analysis
 first. Built: the engine model and the analysis (step 1 below, as
-[Ways of typing](layout-analysis.md#ways-of-typing) describes it). The other
-steps are under « Layout repeat and magic keys » in TODO.md.
+[Ways of typing](layout-analysis.md#ways-of-typing) describes it), the source
+format, the three drivers' emulation and the exports' omissions (steps 3 and
+4, [layout-source-format.md](layout-source-format.md), « Document schema »).
+Left, under « Layout repeat and magic keys » in TODO.md: the importers (step
+2), the editor's key panel and the field checks on each OS.
 
 Written on 2026-11-25 for the Layouts Wiki playground follow-up
 ([the comparison](../audits/layout-analysers/layouts-wiki-playground.md),
@@ -77,12 +80,17 @@ way; a new shown-only metric « repeat and magic uses » gives their share.
   and a `magic[]` record; the validator refuses an unknown table, a rule
   without context or a context longer than two characters.
 - No native layout file can hold them (`.keylayout`, KLC, XKB), so every export
-  lists them in `not_exported` and the drivers emulate them, as they emulate
+  lists them as omitted (`context_key_not_in_<format>`) and the drivers emulate them, as they emulate
   levels a `.keylayout` lacks (« Emulation of what no `.keylayout` holds »): the
   three drivers already keep the last typed text for the hotstrings, the source
-  of the context. `cross-driver-parity` applies: one shared rule engine in Lua
-  (macOS, Linux) and AutoHotkey replaying shared vectors
-  (`_shared/tests/corpus/layouts/magic_vectors.json`, to write first).
+  of the context: each passes its hotstring buffer to the source emulation's
+  press (macOS `CoreState.buffer`, Linux `engine:current_buffer()`, Windows
+  `HSE_Buffer`), which types the key's output as a text key would and refuses a
+  press without it. `cross-driver-parity` applies: one shared rule engine in Lua
+  (macOS, Linux), its web twin and AutoHotkey, all replaying the shared vectors
+  (`_shared/tests/corpus/layouts/magic_vectors.json`). A tap-hold's tap cannot be
+  such a key (`context_key_tap_not_emulated`): its text would be chosen at the
+  release, after keys the context has not seen.
 - The ★ of Ergopti+ stays a hotstring trigger; a layout's own magic key is a
   separate key, and the two must not share a character unless the maintainer
   decides they should.

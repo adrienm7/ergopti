@@ -3147,6 +3147,8 @@ function M.start_layout_emulation()
 	_layout_emulation_started = true
 	return LayoutEmulation.start({
 		is_paused = function() return CoreState.processing_paused == true end,
+		-- What a layout's own repeat and magic keys read: the hotstrings' buffer.
+		typed_text = function() return CoreState.buffer end,
 	})
 end
 

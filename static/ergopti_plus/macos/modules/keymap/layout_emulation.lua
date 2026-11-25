@@ -73,7 +73,7 @@ end
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "keyboard_type",
 	"physical_code", "keycode_for_char", "is_active", "autorepeat", "now_ms", "post",
-	"option_sides" }
+	"option_sides", "typed_text" }
 
 -- Right Option (kVK_RightOption) and the key the source emulation names it.
 local RIGHT_OPTION_KEY_CODE = 61
@@ -94,7 +94,9 @@ local ALTGR = "AltRight"
 ---   keyboard_type(event), physical_code(entry, keyboard_type), keycode_for_char(char),
 ---   is_active, autorepeat(event), now_ms, post(outputs) posting { type = "text", text } and
 ---   { type = "key", key_code, flags } after the callback, in order, option_sides(event) ->
----   { left = boolean, right = boolean } the Option keys an event's device flags hold }
+---   { left = boolean, right = boolean } the Option keys an event's device flags hold,
+---   typed_text() the text typed so far (the hotstrings' buffer), which a layout's own
+---   repeat and magic keys read }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -331,7 +333,8 @@ local function source_down(e, key_code, code)
 		local late = outputs_of(e, lost)
 		if #late > 0 then _deps.post(late) end
 	end
-	local consumed, actions = SourceEmulation.press(extras, code, engine_held(merged_flags(e:getFlags())), now)
+	local consumed, actions = SourceEmulation.press(extras, code, engine_held(merged_flags(e:getFlags())), now,
+		_deps.typed_text())
 	local outputs = outputs_of(e, actions)
 	if consumed then return deliver(e, key_code, outputs), {} end
 	return nil, outputs
@@ -369,7 +372,8 @@ function M.flags_changed(e, key_code)
 	if down and not held then
 		-- A paused driver leaves the key to macOS; a key it already holds ends below.
 		if _deps.is_active() ~= true then return false end
-		actions = select(2, SourceEmulation.press(extras, ALTGR, engine_held(e:getFlags()), _deps.now_ms()))
+		actions = select(2, SourceEmulation.press(extras, ALTGR, engine_held(e:getFlags()), _deps.now_ms(),
+			_deps.typed_text()))
 	elseif not down and held then
 		actions = select(2, SourceEmulation.release(extras, ALTGR, _deps.now_ms()))
 	else
@@ -525,7 +529,7 @@ function M.us_keycode(char, keycodes)
 end
 
 --- Initializes the module with the driver's collaborators and loads the layout.
---- @param ports table { is_paused }
+--- @param ports table { is_paused, typed_text }
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	local Registry = require("modules.keymap.layout_registry")
@@ -558,6 +562,8 @@ function M.start(ports)
 			return hs.keycodes.map[char] or M.us_keycode(char, shared_json("layouts/data/mac_keycodes.json", false))
 		end,
 		is_active = function() return not ports.is_paused() end,
+		-- A layout's own repeat and magic keys type from the text typed before them.
+		typed_text = ports.typed_text,
 		autorepeat = function(e)
 			local value = e:getProperty(hs.eventtap.event.properties.keyboardEventAutorepeat)
 			return value ~= nil and value ~= 0

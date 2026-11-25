@@ -2093,11 +2093,19 @@ _KLE_SourceTick() {
 	} finally Critical(_AtCrit)
 }
 
+; What a layout's own repeat and magic keys read: the hotstrings' buffer, the
+; text typed to the left of the caret (hotstrings/engine/matcher/engine_main.ahk).
+_KLE_TypedText() {
+	global HSE_Buffer
+	return HSE_Buffer
+}
+
 _KLE_SourceOnPress(Code, Sc, *) {
 	global KLE_SourceSession
 	_AtCrit := Critical("On")
 	try {
-		Result := SourceEmulation_Press(KLE_SourceSession, Code, KeylayoutEmulation_SourceHeld(), A_TickCount)
+		Result := SourceEmulation_Press(KLE_SourceSession, Code, KeylayoutEmulation_SourceHeld(), A_TickCount,
+			_KLE_TypedText())
 		_KLE_SourcePerform(Result["actions"])
 		if !Result["consumed"] {
 			SendLevel(1)

@@ -5,7 +5,9 @@
 ; DESCRIPTION:
 ; The AutoHotkey engine (modules/keymap/keylayout/source_emulation.ahk) replays
 ; the shared typing vectors the web and Lua engines replay
-; (_shared/tests/corpus/layouts/source/emulation_vectors.json), refuses the
+; (_shared/tests/corpus/layouts/source/emulation_vectors.json, and for a
+; layout's own repeat and magic keys context_vectors.json and
+; _shared/tests/corpus/layouts/magic_vectors.json), refuses the
 ; malformed tables they refuse, and keylayout_emulation.ahk performs it for the
 ; composed layout: the composer-folder fallback of the boot, the hotkeys it
 ; registers before the layout's own, and what each action sends.
@@ -76,7 +78,7 @@ _LSE_Replay(Table, Steps) {
 			Held := Map()
 			for Id in Step["held"]
 				Held[Id] := true
-			Got := SourceEmulation_Press(Session, Step["press"], Held, Step["at"])
+			Got := SourceEmulation_Press(Session, Step["press"], Held, Step["at"], Step.Get("before", 0))
 		} else if Step.Has("release") {
 			Got := SourceEmulation_Release(Session, Step["release"], Step["at"])
 		} else if Step.Has("tick") {
@@ -173,6 +175,48 @@ _LSE_NeoLevelsCase() {
 		}
 	}
 	Assert(Replayed >= 3 * 16, "every Neo vector is replayed on the three platforms")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("layout source emulation: a layout's repeat and magic keys type from the text typed before (layout-context-keys-emulation)",
+	_LSE_ContextKeysCase)
+
+_LSE_ContextKeysCase() {
+	Vectors := JsonParse(FileRead(_LSE_CorpusDir() . "context_vectors.json", "UTF-8"))
+	Tables := JsonParse(FileRead(_LSE_CorpusDir() . Vectors["table"], "UTF-8"))
+	Replayed := 0, Failures := []
+	for Platform in Vectors["platforms"] {
+		for Vector in Vectors["cases"] {
+			Replayed += 1
+			Mismatch := _LSE_Replay(Tables[Platform], Vector["steps"])
+			if Mismatch != ""
+				Failures.Push(Platform . ": " . Vector["name"] . ": " . Mismatch)
+		}
+		Session := SourceEmulation_NewSession(SourceEmulation_Compile(Tables[Platform]))
+		Refused := false
+		try SourceEmulation_Press(Session, "Quote", Map(), 0)
+		catch Error as Err
+			Refused := InStr(Err.Message, "needs the text typed before it") > 0
+		AssertTrue(Refused, Platform . ": a magic key without the text before is refused")
+	}
+	Assert(Replayed >= 3 * 7, "every context vector is replayed on the three platforms")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("layout source emulation: a repeat or magic key types what the shared magic vectors say (layout-context-keys-emulation)",
+	_LSE_MagicVectorsCase)
+
+_LSE_MagicVectorsCase() {
+	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\magic_vectors.json", "UTF-8"))
+	Failures := []
+	for Vector in Vectors["vectors"] {
+		Action := Vector["action"]
+		Mapping := Action.Has("magic") ? Map("magic", Action["magic"]) : Map("repeat", Action["repeat"])
+		Got := SourceEmulation_ContextText(Vectors["magic"], Mapping, Vector["before"])
+		if Got !== Vector["types"]
+			Failures.Push("after [" . Vector["before"] . "]: [" . Got . "] != [" . Vector["types"] . "]")
+	}
+	Assert(Vectors["vectors"].Length >= 20, "the corpus holds at least 20 vectors")
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 

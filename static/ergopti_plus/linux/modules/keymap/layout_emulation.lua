@@ -85,7 +85,7 @@ local HOLDABLE_MODIFIER_KEYS = { [EvdevCodes.KEY_CAPSLOCK] = "CapsLock", [EvdevC
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
 	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "is_active",
-	"ergopti_family" }
+	"ergopti_family", "typed_text" }
 
 
 
@@ -101,7 +101,9 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
 ---   type_text, dispatch_char, emit_shortcut(char, code, mods), emit_key(code, modifiers) where
 ---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, is_active,
----   ergopti_family (the registry family whose layouts read the accented-letter choices) }
+---   ergopti_family (the registry family whose layouts read the accented-letter choices),
+---   typed_text (the text typed so far, the hotstrings' buffer, which a layout's own
+---   repeat and magic keys read) }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -321,7 +323,7 @@ local function source_press(detail, code, mods)
 	local now = _deps.now_ms()
 	-- A real press of a key the engine holds: its release never arrived.
 	if extras.held_keys[code] ~= nil then perform(select(2, SourceEmulation.release(extras, code, now)), detail.code) end
-	local consumed, actions = SourceEmulation.press(extras, code, engine_held(mods), now)
+	local consumed, actions = SourceEmulation.press(extras, code, engine_held(mods), now, _deps.typed_text())
 	local performed = perform(actions, detail.code)
 	if not consumed then return nil end
 	local function release(release_detail)
@@ -337,7 +339,7 @@ local function source_press(detail, code, mods)
 	return true, function(repeat_detail)
 		if type(repeat_detail) ~= "table" or repeat_detail.code ~= held or _extras ~= extras then return false end
 		local _, repeated = SourceEmulation.press(extras, code, engine_held(merged_mods(
-			type(repeat_detail.mods) == "table" and repeat_detail.mods or {})), _deps.now_ms())
+			type(repeat_detail.mods) == "table" and repeat_detail.mods or {})), _deps.now_ms(), _deps.typed_text())
 		return perform(repeated, held)
 	end, release
 end
@@ -482,7 +484,7 @@ local function shared_json(rel, lossless)
 end
 
 --- The daemon's collaborators for M.init, built from its ports.
---- @param ports table { injector, is_paused, dispatch_char, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run, typed_text }
 --- @return table deps
 function M.production_deps(ports)
 	local Registry = require("modules.keymap.layout_registry")
@@ -559,6 +561,8 @@ function M.production_deps(ports)
 		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
 		is_active = function() return not ports.is_paused() end,
+		-- A layout's own repeat and magic keys type from the text typed before them.
+		typed_text = ports.typed_text,
 		ergopti_family = function()
 			local settings, settings_err = Registry.settings()
 			if not settings then error("the layout registry settings are unreadable: " .. tostring(settings_err)) end
@@ -568,7 +572,7 @@ function M.production_deps(ports)
 end
 
 --- Initializes the module with the daemon's collaborators and loads the layout.
---- @param ports table { injector, is_paused, dispatch_char, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run, typed_text }
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	M.init(M.production_deps(ports))

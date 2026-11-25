@@ -61,6 +61,7 @@ local function fixture(layout, overrides)
 		caps_locked = function() return false end,
 		is_active = function() return not record.paused end,
 		ergopti_family = function() return "ergopti" end,
+		typed_text = function() return record.before or "" end,
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
 	M.init(deps)
@@ -340,6 +341,7 @@ end)
 
 -- evdev codes of the keys the source emulation cases press.
 local KEY_A, KEY_SPACE, KEY_TAB, KEY_HOME, KEY_INTL, KEY_INSERT = 30, 57, 15, 102, 86, 110
+local KEY_APOSTROPHE = 40
 
 --- A module emulating the source fixture's compiled layout with the emulation
 --- fixture's Linux table on top (_shared/tests/corpus/layouts/source/).
@@ -356,6 +358,24 @@ local function source_fixture(table_)
 end
 
 helpers.describe("layout emulation (Linux): a layout source's records", function()
+	-- layout-context-keys-emulation: a layout's own repeat and magic keys type
+	-- from the hotstrings' buffer, the text typed before the press.
+	helpers.it("types a layout's repeat and magic keys from the text typed before (layout-context-keys)", function()
+		local corpus = "tests/corpus/layouts/source/"
+		local M, record = source_fixture(Json.decode(read_all(Paths.shared(corpus .. "context_emulation.json"))).linux)
+		helpers.assert_true(M.reload(), "the composed layout and its table load")
+		record.before = "book"
+		helpers.assert_true(press(M, KEY_INTL), "the repeat key is the emulation's")
+		record.before = "the"
+		helpers.assert_true(press(M, KEY_APOSTROPHE), "the magic key is the emulation's")
+		record.before = "ace"
+		helpers.assert_true(press(M, KEY_APOSTROPHE))
+		helpers.assert_eq(record.typed, { "k", "d", "s" }, "each typed what its text before makes it type")
+		record.before = "x"
+		helpers.assert_true(press(M, KEY_APOSTROPHE), "a magic key typing nothing is still taken")
+		helpers.assert_eq(record.typed, { "k", "d", "s" }, "and types nothing")
+	end)
+
 	helpers.it("types a held custom modifier's layer until the key's release (source-emulation)", function()
 		local M, record = source_fixture()
 		helpers.assert_true(M.reload(), "the composed layout and its table load")
