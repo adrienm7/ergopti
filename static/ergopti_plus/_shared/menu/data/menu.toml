@@ -1478,6 +1478,17 @@ disabled_reasons = [
 	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
 ]
 
+# The user's own workflows (_shared/shortcuts/data/workflows/), each an action
+# a slot, a gesture, a tap-hold key or a hotstring can run; the shared window
+# _shared/ui/user_workflows edits them. Windows waits for the AutoHotkey port
+# of the shared runner.
+[[menu.shortcuts_menu]]
+type = "command"
+id = "user_workflows_editor"
+i18n = "menu.shortcuts.user_workflows"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.action_workflows_windows_pending"
+
 [[menu.shortcuts_menu]]
 type = "---"
 

@@ -374,6 +374,7 @@ local BRIDGE_MODULES = {
 	personal_info_editor  = "hotstrings.ui.personal_info_editor.bridge",
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
 	prompt_editor         = "ai.ui.prompt_editor.bridge",
+	user_workflows        = "ui.user_workflows_bridge",
 	update_check          = "ui.update_check.bridge",
 }
 

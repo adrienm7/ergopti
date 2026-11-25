@@ -141,9 +141,14 @@ end
 --- @param title string Window title, already composed.
 --- @param folder boolean True to choose a folder.
 --- @param start string The folder the picker opens on.
+--- @param options table|nil { save = boolean: ask for a name to write,
+---   filter = string|nil: a glob such as "*.json" }
 --- @return string command
-function M.path_picker_command(shell, title, folder, start)
+function M.path_picker_command(shell, title, folder, start, options)
+	options = options or {}
 	return require("core.ui.ui.native_dialog").command() .. " --file-selection" .. (folder and " --directory" or "")
+		.. (options.save and " --save --confirm-overwrite" or "")
+		.. (options.filter and (" --file-filter=" .. shell.quote(options.filter)) or "")
 		.. " --title=" .. shell.quote(title) .. " --filename=" .. shell.quote(start) .. " 2>/dev/null"
 end
 
@@ -153,13 +158,14 @@ end
 --- @param folder boolean True to choose a folder.
 --- @param start string The folder the picker opens on.
 --- @param modal function|nil Test seam replacing ui/modal's run.
+--- @param options table|nil See path_picker_command (a save panel, a filter).
 --- @return string|nil path The chosen path, as the picker printed it.
 --- @return string|nil error_message Why nothing was chosen.
-function M.pick_path(shell, title, folder, start, modal)
+function M.pick_path(shell, title, folder, start, modal, options)
 	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
-	local command = M.path_picker_command(shell, WindowTitles.compose(title), folder == true, start)
+	local command = M.path_picker_command(shell, WindowTitles.compose(title), folder == true, start, options)
 	local completed, output = (modal or require("core.ui.ui.modal").run)(function() return shell.exec_checked(command) end)
 	if completed ~= true or type(output) ~= "string" then return nil, "path selection was cancelled or refused" end
 	-- Remove the picker's single LF delimiter; a line break inside a chosen

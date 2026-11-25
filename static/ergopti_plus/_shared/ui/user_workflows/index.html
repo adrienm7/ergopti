@@ -1,0 +1,100 @@
+<!-- _shared/ui/user_workflows/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="workflows.editor.window_title"></title>
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
+		<link rel="stylesheet" href="../theme.css" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+		<script src="../workflow_model.js"></script>
+	</head>
+	<body>
+		<main>
+			<h1 data-i18n="workflows.editor.heading"></h1>
+			<p class="subtitle" data-i18n="workflows.editor.subtitle"></p>
+
+			<nav class="toolbar" data-i18n-aria-label="workflows.editor.toolbar">
+				<button type="button" id="btn-new" data-i18n="workflows.editor.new"></button>
+				<button type="button" id="btn-duplicate" data-i18n="workflows.editor.duplicate"></button>
+				<button type="button" id="btn-delete" data-i18n="workflows.editor.delete"></button>
+				<button type="button" id="btn-import" data-i18n="workflows.editor.import"></button>
+				<button type="button" id="btn-export" data-i18n="workflows.editor.export"></button>
+			</nav>
+
+			<section class="layout">
+				<section class="list-pane" aria-labelledby="list-heading">
+					<h2 id="list-heading" data-i18n="workflows.editor.list_heading"></h2>
+					<p id="list-empty" class="hint" data-i18n="workflows.editor.list_empty" hidden></p>
+					<ul id="workflow-list" class="workflow-list"></ul>
+				</section>
+
+				<section id="editor" class="editor-pane" aria-labelledby="editor-heading" hidden>
+					<h2 id="editor-heading" data-i18n="workflows.editor.editor_heading"></h2>
+					<p class="field">
+						<label for="input-name" data-i18n="workflows.editor.name"></label>
+						<input type="text" id="input-name" autocomplete="off" />
+					</p>
+					<section id="import-banner" class="banner" aria-labelledby="import-text" hidden>
+						<p id="import-text" data-i18n="workflows.editor.imported_shell"></p>
+						<button
+							type="button"
+							id="btn-approve"
+							data-i18n="workflows.editor.approve_shell"
+						></button>
+					</section>
+
+					<h3 data-i18n="workflows.editor.steps_heading"></h3>
+					<p class="hint" data-i18n="workflows.editor.reorder_hint"></p>
+					<ol id="steps" class="steps"></ol>
+
+					<h3 data-i18n="workflows.editor.images_heading"></h3>
+					<ul id="images" class="images"></ul>
+					<p>
+						<button
+							type="button"
+							id="btn-add-image"
+							data-i18n="workflows.editor.add_image"
+						></button>
+					</p>
+				</section>
+			</section>
+
+			<p id="status" class="status" role="status" aria-live="polite"></p>
+
+			<footer class="btns">
+				<button type="button" id="btn-run" data-i18n="workflows.editor.test_run"></button>
+				<button type="button" id="btn-stop" data-i18n="workflows.editor.stop" disabled></button>
+				<button
+					type="button"
+					id="btn-close"
+					class="cancel"
+					data-i18n="workflows.editor.close"
+				></button>
+				<button type="button" id="btn-save" class="save" data-i18n="workflows.editor.save"></button>
+			</footer>
+		</main>
+
+		<template id="step-template">
+			<li class="step" draggable="true">
+				<fieldset class="step-box">
+					<legend class="step-title"></legend>
+					<p class="step-tools">
+						<button type="button" class="btn-up" data-i18n="workflows.editor.move_up"></button>
+						<button type="button" class="btn-down" data-i18n="workflows.editor.move_down"></button>
+						<button
+							type="button"
+							class="btn-remove"
+							data-i18n="workflows.editor.remove_step"
+						></button>
+					</p>
+					<section class="step-fields"></section>
+				</fieldset>
+			</li>
+		</template>
+
+		<script src="script.js"></script>
+	</body>
+</html>

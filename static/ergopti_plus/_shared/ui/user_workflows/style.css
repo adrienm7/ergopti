@@ -1,0 +1,271 @@
+/* _shared/ui/user_workflows/style.css */
+
+/* =========================================================================== */
+/* User Workflows Editor Styles.                                               */
+/*                                                                             */
+/* The workflow list beside the step editor, theme tokens only so the light   */
+/* and dark palettes of theme.css apply, and every control at least 44 px     */
+/* tall (WCAG 2.5.5).                                                          */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: var(--theme-bg);
+	color: var(--theme-text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+	margin: 0;
+}
+
+main {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 16px 20px 14px;
+}
+
+h1 {
+	color: var(--theme-text);
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 2px;
+}
+
+h2 {
+	color: var(--theme-text);
+	font-size: 14px;
+	margin: 8px 0;
+}
+
+h3 {
+	color: var(--theme-text);
+	font-size: 13px;
+	margin: 12px 0 4px;
+}
+
+.subtitle,
+.hint,
+small {
+	color: var(--theme-sub);
+	font-size: 12px;
+	margin: 0 0 8px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 2/ Layout ============== */
+/* ================================ */
+/* ================================ */
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 4px 0 8px;
+}
+
+.layout {
+	display: flex;
+	flex: 1;
+	gap: 16px;
+	min-height: 0;
+}
+
+.list-pane {
+	flex: 0 0 220px;
+	overflow-y: auto;
+}
+
+.editor-pane {
+	flex: 1;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+.workflow-list,
+.images {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.workflow-item {
+	text-align: left;
+	width: 100%;
+}
+
+.workflow-item[aria-current='true'] {
+	background: var(--theme-accent-soft);
+	border-color: var(--theme-accent);
+	font-weight: 600;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Steps =============== */
+/* ================================ */
+/* ================================ */
+
+.steps {
+	list-style: none;
+	margin: 0;
+	padding-left: 0;
+}
+
+.step {
+	margin: 0 0 8px;
+}
+
+.step-box,
+.nested {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	margin: 0;
+	padding: 6px 10px 8px;
+}
+
+.nested {
+	margin-top: 6px;
+}
+
+.step.running > .step-box {
+	border: 2px solid var(--theme-accent);
+	box-shadow: 0 0 0 2px var(--theme-accent-soft);
+}
+
+.step-title {
+	color: var(--theme-text);
+	font-weight: 600;
+}
+
+.step-tools {
+	display: flex;
+	gap: 6px;
+	margin: 0 0 4px;
+}
+
+.field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+	margin: 4px 0;
+}
+
+.field label {
+	min-width: 140px;
+}
+
+.field small {
+	flex-basis: 100%;
+	margin: 0;
+}
+
+.add-step {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 4px 0;
+}
+
+.images li {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+	margin: 4px 0;
+}
+
+.images img {
+	border: 1px solid var(--theme-separator);
+	max-height: 44px;
+	max-width: 120px;
+}
+
+.banner {
+	background: var(--theme-accent-soft);
+	border: 1px solid var(--theme-accent);
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 4/ Controls ============ */
+/* ================================ */
+/* ================================ */
+
+button,
+select,
+input,
+textarea {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	color: var(--theme-text);
+	font: inherit;
+	min-height: 44px;
+	padding: 6px 12px;
+}
+
+input[type='text'],
+textarea {
+	flex: 1;
+	min-width: 180px;
+}
+
+input[type='number'] {
+	width: 120px;
+}
+
+button {
+	cursor: pointer;
+	min-width: 44px;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+
+:focus-visible {
+	outline: 3px solid var(--theme-accent);
+	outline-offset: 2px;
+}
+
+.status {
+	margin: 8px 0 0;
+	min-height: 20px;
+}
+
+.status.error {
+	color: var(--theme-bad-text);
+}
+
+.btns {
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 8px;
+}
+
+.save {
+	background: var(--theme-accent-fill);
+	color: var(--theme-white);
+}

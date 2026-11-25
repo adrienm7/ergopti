@@ -257,7 +257,8 @@ const MACOS_MODULES = {
 	field_report: 'diagnostics/ui/field_check/field_report_window.lua',
 	permission_dialog: 'ui/permission_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua',
-	update_check: 'ui/update_check/init.lua'
+	update_check: 'ui/update_check/init.lua',
+	user_workflows: 'ui/menu/menu_user_workflows.lua'
 };
 
 // Apps deliberately not value-checked on macOS, each with the reason. A stale
@@ -430,6 +431,9 @@ const WINDOWS_APPS = {
 
 // Same contract as MACOS_EXCLUSIONS: a reason, or a check.
 const WINDOWS_EXCLUSIONS = {
+	user_workflows:
+		'no Windows host yet — the AutoHotkey port of the shared workflow runner is pending ' +
+		'(platform_reason.action_workflows_windows_pending), so the Shortcuts row is macOS and Linux only',
 	permission_dialog:
 		'no Windows host — it walks through a macOS privacy grant (System Settings > ' +
 		'Privacy & Security), which Windows does not have',
