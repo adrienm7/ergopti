@@ -101,7 +101,8 @@
 			"xdg-utils",
 			"libsecret",
 			"glib-networking",
-			"gsettings-desktop-schemas"
+			"gsettings-desktop-schemas",
+			"webkit2gtk4.1"
 		],
 		"arch": [
 			"xclip",
@@ -123,6 +124,16 @@
 			"glib-networking",
 			"gsettings-desktop-schemas"
 		],
+		"rpm_suse_alternatives": {
+			"description": "The one .rpm installs on Fedora and openSUSE. Where openSUSE names a requirement differently, the spec requires (openSUSE name or Fedora name): no openSUSE name below exists on Fedora, and the Fedora name is not the right package on openSUSE (libsecret there is the library without secret-tool, polkit lacks pkexec). An alternative that is a path is required alone: an or would be met on openSUSE by the library or polkit another package already pulls in, never installing the command, while the path resolves to polkit or libsecret on Fedora and to pkexec or secret-tool on openSUSE. Checked by a dry-run install on Fedora 44, Fedora 45, Tumbleweed and Leap 15.6 on 2026-11-25; the native libraries pair their dnf and zypper names the same way.",
+			"libxkbcommon-utils": "libxkbcommon-tools",
+			"polkit": "/usr/bin/pkexec",
+			"systemd-udev": "udev",
+			"libayatana-appindicator-gtk3": "libayatana-appindicator3-1",
+			"shadow-utils": "shadow",
+			"libsecret": "/usr/bin/secret-tool",
+			"webkit2gtk4.1": "typelib-1_0-WebKit2-4_1"
+		},
 		"nix_library_path": [
 			"libayatana-appindicator",
 			"gtk3",
