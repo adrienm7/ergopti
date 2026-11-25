@@ -508,6 +508,22 @@ reaching the file list and the answer buttons. A window that swallows Tab
 must be refused, and is. All seven kinds pass (52 checks); CI runs the
 profile beside the dialog title profile, in the desktop-webview row.
 
+### Keyboard walk of the native windows (macOS, 2026-11-25, Paris time)
+
+The macOS driver draws one native window of its own, the Swift update
+panel (`launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift`); its other
+native windows are AppKit's (`NSAlert`, `NSOpenPanel`) or Hammerspoon's
+wrappers of them (`hs.dialog`, `hs.chooser`), whose keyboard handling is
+the system's, and its other windows are WKWebView pages, walked in the
+browser. The panel's buttons are NSButtons in one stack, so Tab follows
+the window's key view loop once Full Keyboard Access is on, and the first
+button answers Return. Escape is not bound by the panel's code: no button
+carries the Escape key equivalent and the panel has no
+`cancelOperation(_:)`. Making Escape perform the close button (« no
+choice », never a download) needs a Swift change proved by an XCTest on a
+Mac; this pass ran on Linux, so it is left in TODO.md, and the walk with
+Full Keyboard Access is a TODO-tests-macos.md check.
+
 ## Fifth pass, the app's WebView windows (2026-11-18, Paris time)
 
 `tools/test/browser/app-windows-accessibility.playwright.cjs`
