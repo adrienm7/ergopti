@@ -1381,6 +1381,44 @@ body:has(> main.layout-analysis) {
 	display: none;
 }
 
+/* The user metrics' editors: one numbered row each, its fields side by side
+   (wrapped on a phone), unframed like the filters; the query takes the room. */
+.la-user-metrics-list {
+	margin: 8px 0;
+	padding-inline-start: 1.6em;
+}
+
+.la-user-metric {
+	margin-bottom: 8px;
+}
+
+.la-user-metric-fields {
+	align-items: flex-end;
+	border: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+.la-user-metric-fields > .la-filter-field:has(.la-user-metric-query) {
+	flex: 1 1 18em;
+}
+
+.la-user-metric-query {
+	font-family: ui-monospace, monospace;
+	width: 100%;
+}
+
+.la-user-metrics-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+}
+
 .la-query-names > summary {
 	cursor: pointer;
 }

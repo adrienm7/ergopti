@@ -5081,6 +5081,184 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 	}
 
+	// ==========================================
+	// ======= User metrics over key windows =====
+	// ==========================================
+
+	// The key windows a user metric counts (an idea seen in the Layouts Wiki
+	// playground's metric queries): adjacent key pairs, skipgrams (the first
+	// and last keys of each key trigram) and key trigrams, each among the
+	// windows the metrics count (a pair with the space in none, as analyse()).
+	const WINDOW_KINDS = ['bigram', 'skipgram', 'trigram'];
+	// The values of each key of a window, suffixed by its place (finger1…):
+	// finger 1 index to 4 pinky, 0 a thumb; hand 0 left, 1 right; row against
+	// its finger's home row (−1 above, 1 below); reach the millimetres from
+	// its finger's home key; thumb and home (on its finger's home key) yes or no.
+	const WINDOW_KEY_NUMBERS = ['finger', 'hand', 'row', 'reach'];
+	const WINDOW_KEY_FLAGS = ['thumb', 'home'];
+	// The values of a pair (adjacent or skipgram): the rows and grid columns
+	// between its keys, their distance in millimetres, and yes-or-no values.
+	const WINDOW_PAIR_NUMBERS = ['rows_apart', 'columns_apart', 'distance'];
+	const WINDOW_PAIR_FLAGS = ['same_finger', 'same_hand', 'same_key'];
+	// A trigram's own yes-or-no value: its three keys on one hand.
+	const WINDOW_TRIPLE_FLAGS = ['same_hand'];
+	// The most user metrics measured at once.
+	const WINDOW_MAX_METRICS = 12;
+
+	/**
+	 * The names a user metric's query may use on a kind of window: each key's
+	 * values by place, then the window's own, then the events the stream
+	 * visitor raises on it (TRACE_PAIR_EVENTS on a pair, TRACE_TRIPLE_EVENTS
+	 * on a trigram) as yes-or-no values.
+	 * @param {string} kind - A WINDOW_KINDS id.
+	 * @returns {{numbers: string[], flags: string[]}} For compileQuery.
+	 * @throws {Error} On another kind.
+	 */
+	function windowNames(kind) {
+		if (!WINDOW_KINDS.includes(kind))
+			throw new Error(`layout_analysis: ${JSON.stringify(kind)} is not a key window`);
+		const triple = kind === 'trigram';
+		const places = triple ? [1, 2, 3] : [1, 2];
+		const each = (names) => places.flatMap((place) => names.map((name) => `${name}${place}`));
+		return {
+			numbers: each(WINDOW_KEY_NUMBERS).concat(triple ? [] : WINDOW_PAIR_NUMBERS),
+			flags: each(WINDOW_KEY_FLAGS).concat(
+				triple
+					? WINDOW_TRIPLE_FLAGS.concat(TRACE_TRIPLE_EVENTS)
+					: WINDOW_PAIR_FLAGS.concat(TRACE_PAIR_EVENTS)
+			)
+		};
+	}
+
+	/**
+	 * User metrics of a layout on a corpus (an idea seen in the Layouts Wiki
+	 * playground's metric queries): each the share of its windows (adjacent
+	 * pairs, skipgrams or trigrams of the key stream analyse() measures) for
+	 * which its query holds, a values query (compileQuery) over the names of
+	 * windowNames: « same_finger & finger1 = 4 » is the SFB of the pinkies.
+	 * Shown, never scored.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {Array<{id: string, window: string, query: string}>} metrics - At
+	 *   most WINDOW_MAX_METRICS, distinct ids.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{values: object, windows: {bigram: number, skipgram: number, trigram: number}}}
+	 *   values: id → share (%), 0 on a corpus without such windows; windows:
+	 *   how many of each the shares are over.
+	 * @throws {QueryError} On a query that does not read; Error on too many
+	 *   metrics, a duplicate id or an unknown window.
+	 */
+	function windowMetrics(layoutInput, ngrams, metrics, options) {
+		if (!Array.isArray(metrics) || metrics.length > WINDOW_MAX_METRICS)
+			throw new Error(`layout_analysis: windowMetrics takes at most ${WINDOW_MAX_METRICS} metrics`);
+		const ids = new Set();
+		const compiled = metrics.map((metric) => {
+			if (!metric || typeof metric.id !== 'string' || ids.has(metric.id))
+				throw new Error('layout_analysis: each user metric needs an id of its own');
+			ids.add(metric.id);
+			return {
+				id: metric.id,
+				window: metric.window,
+				test: compileQuery(String(metric.query), windowNames(metric.window))
+			};
+		});
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngrams),
+			planMode(opts)
+		);
+		const K = board.codes.length;
+		const unit = data().model.key_unit_mm;
+		const keyValues = (k, place, into) => {
+			const order = board.order[k];
+			const thumb = isThumbFinger(board.finger[k]);
+			into[`finger${place}`] = thumb ? 0 : INDEX_ORDER + 1 - order;
+			into[`hand${place}`] = board.hand[k];
+			into[`row${place}`] = board.relRow[k];
+			into[`reach${place}`] = board.reach[k];
+			into[`thumb${place}`] = thumb;
+			into[`home${place}`] = board.homeOf[board.finger[k]] === k;
+		};
+		// A pair's values, probed once; null when no metric counts it.
+		const pairs = new Map();
+		const pairOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!pairs.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				if (c.bigrams === 0) pairs.set(at, null);
+				else {
+					const values = {
+						rows_apart: Math.abs(board.row[k1] - board.row[k2]),
+						columns_apart: Math.abs(board.grid[k1] - board.grid[k2]),
+						distance: Math.hypot(board.x[k1] - board.x[k2], board.y[k1] - board.y[k2]) * unit,
+						same_finger: board.finger[k1] === board.finger[k2],
+						same_hand: board.hand[k1] === board.hand[k2],
+						same_key: k1 === k2
+					};
+					keyValues(k1, 1, values);
+					keyValues(k2, 2, values);
+					for (const name of TRACE_PAIR_EVENTS) values[name] = c[name] !== 0;
+					pairs.set(at, values);
+				}
+			}
+			return pairs.get(at);
+		};
+		const triples = new Map();
+		const tripleOf = (k1, k2, k3) => {
+			const at = (k1 * K + k2) * K + k3;
+			if (!triples.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).trigram(k1, k2, k3, 1);
+				if (c.trigrams === 0) triples.set(at, null);
+				else {
+					const values = {
+						same_hand: board.hand[k1] === board.hand[k2] && board.hand[k2] === board.hand[k3]
+					};
+					keyValues(k1, 1, values);
+					keyValues(k2, 2, values);
+					keyValues(k3, 3, values);
+					for (const name of TRACE_TRIPLE_EVENTS) values[name] = c[name] !== 0;
+					triples.set(at, values);
+				}
+			}
+			return triples.get(at);
+		};
+		const byWindow = Object.fromEntries(
+			WINDOW_KINDS.map((kind) => [kind, compiled.filter((m) => m.window === kind)])
+		);
+		const sums = Object.fromEntries(compiled.map((m) => [m.id, 0]));
+		const windows = { bigram: 0, skipgram: 0, trigram: 0 };
+		const count = (kind, values, n) => {
+			if (values === null) return;
+			windows[kind] += n;
+			for (const metric of byWindow[kind]) if (metric.test(values)) sums[metric.id] += n;
+		};
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				count('bigram', pairOf(k1, k2), n);
+			},
+			trigram(k1, k2, k3, n) {
+				count('trigram', tripleOf(k1, k2, k3), n);
+				count('skipgram', pairOf(k1, k3), n);
+			}
+		});
+		const values = {};
+		for (const metric of compiled) {
+			const whole = windows[metric.window];
+			values[metric.id] = whole > 0 ? (100 * sums[metric.id]) / whole : 0;
+		}
+		return { values, windows };
+	}
+
 	/**
 	 * The words of a word table whose key stream holds a key sequence (the
 	 * drill-down from an n-gram to its words, an idea seen in the Layouts Wiki
@@ -5230,7 +5408,7 @@ var LAYOUT_ANALYSIS = (function () {
 	function queryTokens(text) {
 		const tokens = [];
 		const pattern =
-			/\s*(?:(\d+(?:[.,]\d+)?|[.,]\d+)|([a-z_][a-z0-9_]*)|(<=|>=|!=|==|<|>|=|&&?|\|\|?|!|\(|\)))/iy;
+			/\s*(?:([-−]?(?:\d+(?:[.,]\d+)?|[.,]\d+))|([a-z_][a-z0-9_]*)|(<=|>=|!=|==|<|>|=|&&?|\|\|?|!|\(|\)))/iy;
 		let at = 0;
 		while (at < text.length) {
 			if (/^\s*$/.test(text.slice(at))) break;
@@ -5243,7 +5421,11 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			const start = found.index + found[0].length - found[0].trimStart().length;
 			if (found[1] !== undefined)
-				tokens.push({ kind: 'number', text: found[1].replace(',', '.'), at: start });
+				tokens.push({
+					kind: 'number',
+					text: found[1].replace(',', '.').replace('−', '-'),
+					at: start
+				});
 			else if (found[2] !== undefined) {
 				const word = found[2].toLowerCase();
 				if (QUERY_WORDS[word]) tokens.push({ kind: 'op', text: QUERY_WORDS[word], at: start });
@@ -5264,7 +5446,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * of a value with a number (« sfb < 1.2 », « roll_in >= 30 »), a yes-or-no
 	 * value alone (« complete »), joined by & (and), | (or), negated by !
 	 * (not), grouped by parentheses; & binds before |. A decimal comma reads
-	 * as a point. An empty query keeps every layout.
+	 * as a point, and a number may be negative (« row1 = -1 », a minus sign
+	 * too). An empty query keeps every layout.
 	 * @param {string} text - The query.
 	 * @param {{numbers: string[], flags: string[]}} names - The value names it may use.
 	 * @returns {function(object): boolean} A test over {name: value}: a number
@@ -8555,6 +8738,10 @@ var LAYOUT_ANALYSIS = (function () {
 		RHYTHM_CLASSES,
 		movementTable,
 		movementBetter,
+		WINDOW_KINDS,
+		WINDOW_MAX_METRICS,
+		windowNames,
+		windowMetrics,
 		rankAmong,
 		wordsWithKeys,
 		blendNgrams,

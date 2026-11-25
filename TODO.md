@@ -319,7 +319,8 @@ waits for the maintainer's review).
       measures the library on request, one layout per slice, then every movement and rhythm cell carries its chip); (8)
       Kawalyzer's « Clever Keys » (context outputs) with item (3). Also done: the library grid's Boolean filter as the
       Comparer's « Values query » (`E.compileQuery`), the Pareto spread's smoothed distribution
-      (`E.densityCurve`) and the Principal − Comparison difference on every frame tab.
+      (`E.densityCurve`), the Principal − Comparison difference on every frame tab and « Your metrics », user
+      queries over key windows (`E.windowMetrics`).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 

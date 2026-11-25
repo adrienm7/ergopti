@@ -4451,6 +4451,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioViews.exerciseQuantiles(browser, origin);
 		await studioViews.exerciseDensity(browser, origin);
 		await studioViews.exerciseFrameDiff(browser, origin);
+		await studioViews.exerciseUserMetrics(browser, origin);
 		await studioViews.exercisePanelWords(browser, origin);
 		await studioViews.exerciseFrameEverywhere(browser, origin);
 		await studioViews.exerciseHelp(browser, origin);
