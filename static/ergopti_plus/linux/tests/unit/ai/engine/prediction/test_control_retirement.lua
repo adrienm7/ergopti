@@ -25,7 +25,7 @@ local function main_callbacks(environment)
 		.. section("\tlocal function handle_char(", "\n\ton_char = input_capture_gate.guard(handle_char)")
 		.. section("\tlocal function handle_physical(", "\n\tlocal on_physical = input_capture_gate.guard(handle_physical,")
 		.. section("\t-- 8.7) Define the control-key callback.", "\n\tlocal on_control = input_capture_gate.guard(handle_control)")
-		.. section("\tlocal on_consume = input_capture_gate.guard(function(detail)", "\n\t-- Bind the same privacy owner")
+		.. section("\tlocal function consume_ordinary(detail)", "\n\t-- Bind the same privacy owner")
 		.. "\non_char=handle_char;return {char=handle_char,physical=handle_physical,control=handle_control,consume=on_consume}"
 	local first = assert(source:find("\t\t\tapply_prediction = function(", 1, true))
 	local last = assert(source:find("\n\t\t\tend,", first, true))

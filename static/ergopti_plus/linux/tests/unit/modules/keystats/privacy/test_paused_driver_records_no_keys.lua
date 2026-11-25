@@ -106,7 +106,7 @@ helpers.describe("a paused Linux driver records no keys (EDD-1)", function()
 
 	helpers.it("(paused-records-no-keys) a chord consumed while paused is not counted", function()
 		local state, recorded = { paused = true }, {}
-		local consume = compile("\tlocal function consume_bound_chord(detail)", "\n\tlocal on_consume",
+		local consume = compile("\tlocal function consume_bound_chord(detail)", "\n\tlocal function consume_ordinary",
 			"consume_bound_chord", environment_for(state, recorded))
 		helpers.assert_true(consume({ code = 31, key = "s", mods = { ctrl = true } }))
 		helpers.assert_eq(recorded, {}, "a paused driver counts no chord")
