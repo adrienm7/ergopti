@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "ה־lgi במערכת זו בנוי עבור Lua {1}; Ergopti+ פועל על LuaJIT, שזקוק לגרסה עבור Lua 5.1 ‏({2}).",
 	"startup.linux_gui_stack_windows_label": "החלונות אינם זמינים",
 	"startup.linux_layout_unresolved_label": "פריסת המקלדת לא נקראה",
-	"startup.linux_layout_unresolved_body": "Ergopti+ לא הצליח לקרוא את פריסת המקלדת של הפעלה זו, ולכן ההחלפות של ה־hotstrings אינן מוקלדות. החלפת פריסה פעם אחת עשויה להספיק; אחרת השתמשו ב־„{1}”: הדוח כולל את היומן שמסביר את הסיבה.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ לא הצליח לקרוא את פריסת המקלדת של הפעלה זו ונעצר: בלעדיה הוא אינו יכול לדעת אילו תווים מוקלדים. הוא מופעל מחדש מעצמו כמה פעמים; אם ההודעה הזו חוזרת, השתמשו ב־„{1}”: הדוח כולל את היומן שמסביר את הסיבה.",
 	"startup.linux_text_unchecked_label": "הוטסטרינגים ללא בדיקת שדות סיסמה",
 	"startup.linux_text_closed_label": "הוטסטרינגים מושהים",
 	"startup.linux_text_reason_atspi_unavailable": "שירות הנגישות (AT-SPI) אינו פועל, ולכן Ergopti+ אינו יכול לדעת אם השדה הפעיל הוא שדה סיסמה. ההוטסטרינגים עדיין מורחבים, למעט ביישומים הרשומים כמנהלי סיסמאות; הסטטיסטיקה והבינה המלאכותית נשארות כבויות. התקינו את at-spi2-core והתחברו מחדש.",

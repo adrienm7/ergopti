@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "The lgi on this system is built for Lua {1}; Ergopti+ runs on LuaJIT, which needs the Lua 5.1 build ({2}).",
 	"startup.linux_gui_stack_windows_label": "Windows unavailable",
 	"startup.linux_layout_unresolved_label": "Keyboard layout not read",
-	"startup.linux_layout_unresolved_body": "Ergopti+ could not read this session’s keyboard layout, so hotstring replacements are not typed. Switching the layout once may fix it; otherwise use « {1} »: the report carries the log that says why.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ could not read this session’s keyboard layout and stopped: without it, it cannot tell which characters are typed. It starts again on its own a few times; if this message comes back, use « {1} »: the report carries the log that says why.",
 	"startup.linux_text_unchecked_label": "Hotstrings without the password-field check",
 	"startup.linux_text_closed_label": "Hotstrings withheld",
 	"startup.linux_text_reason_atspi_unavailable": "The accessibility service (AT-SPI) is not running, so Ergopti+ cannot tell whether the focused field is a password field. Hotstrings still expand, except in the applications listed as password managers; metrics and AI stay off. Install at-spi2-core, then log in again.",

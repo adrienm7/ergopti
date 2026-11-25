@@ -443,9 +443,8 @@ function M.refresh(override_path)
 		if not _reported_absent then
 			_reported_absent = true
 			Logger.error(LOG,
-				"No keymap available (%s session) — characters cannot be typed as "
-					.. "keystrokes. Install libxkbcommon-tools, or expansions will go "
-					.. "through the clipboard.",
+				"No keymap available (%s session) — keys cannot be captured or typed. "
+					.. "Install libxkbcommon-tools (xkbcli) or check the compositor's keymap.",
 				DisplayServer.kind())
 		end
 		return false

@@ -80,7 +80,17 @@ helpers.describe("component_status: a problem stays visible", function()
 			handle:close()
 			helpers.assert_eq(type(catalogue["startup.linux_layout_unresolved_label"]), "string", code)
 			helpers.assert_true((catalogue["startup.linux_layout_unresolved_body"] or ""):find("{1}", 1, true) ~= nil, code)
+			if code == "en" then
+				-- keyboard_hook.start refuses without XKB capture, so the daemon
+				-- stops here: the notice promised a layout switch would fix a
+				-- daemon that had already exited.
+				local body = catalogue["startup.linux_layout_unresolved_body"]
+				helpers.assert_contains(body, "stopped")
+				helpers.assert_true(body:find("Switching the layout", 1, true) == nil, "no fix the stopped daemon cannot see")
+			end
 		end
+		helpers.assert_true(source:find("XKB capture cannot start, so the daemon stops", guard, true) ~= nil,
+			"the log line before the grab says the start ends")
 	end)
 
 	helpers.it("the tray adapter publishes the rows before the menu", function()

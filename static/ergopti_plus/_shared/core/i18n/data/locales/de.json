@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "Das lgi auf diesem System ist für Lua {1} gebaut; Ergopti+ läuft mit LuaJIT, das die Version für Lua 5.1 benötigt ({2}).",
 	"startup.linux_gui_stack_windows_label": "Fenster nicht verfügbar",
 	"startup.linux_layout_unresolved_label": "Tastaturbelegung nicht gelesen",
-	"startup.linux_layout_unresolved_body": "Ergopti+ konnte die Tastaturbelegung dieser Sitzung nicht lesen, daher werden die Ersetzungen der Hotstrings nicht getippt. Ein einmaliger Wechsel der Belegung kann helfen; sonst verwenden Sie „{1}“: Der Bericht enthält das Protokoll mit der Ursache.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ konnte die Tastaturbelegung dieser Sitzung nicht lesen und wurde beendet: Ohne sie kann es nicht erkennen, welche Zeichen getippt werden. Es startet von selbst noch einige Male neu; wenn diese Meldung wiederkommt, verwenden Sie „{1}“: Der Bericht enthält das Protokoll mit der Ursache.",
 	"startup.linux_text_unchecked_label": "Hotstrings ohne Passwortfeld-Prüfung",
 	"startup.linux_text_closed_label": "Hotstrings zurückgehalten",
 	"startup.linux_text_reason_atspi_unavailable": "Der Barrierefreiheitsdienst (AT-SPI) läuft nicht, daher kann Ergopti+ nicht erkennen, ob das aktive Feld ein Passwortfeld ist. Hotstrings werden weiter ersetzt, außer in den als Passwortmanager aufgeführten Anwendungen; Statistiken und KI bleiben aus. Installieren Sie at-spi2-core und melden Sie sich neu an.",

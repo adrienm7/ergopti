@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "Il lgi presente su questo sistema è compilato per Lua {1}; Ergopti+ usa LuaJIT, che richiede la versione per Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Finestre non disponibili",
 	"startup.linux_layout_unresolved_label": "Layout di tastiera non letto",
-	"startup.linux_layout_unresolved_body": "Ergopti+ non è riuscito a leggere il layout di tastiera di questa sessione, quindi le sostituzioni degli hotstring non vengono digitate. Cambiare layout una volta può bastare; altrimenti usa «{1}»: il rapporto contiene il registro che ne indica la causa.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ non è riuscito a leggere il layout di tastiera di questa sessione e si è fermato: senza di esso non può sapere quali caratteri vengono digitati. Si riavvia da solo alcune volte; se questo messaggio ritorna, usa «{1}»: il rapporto contiene il registro che ne indica la causa.",
 	"startup.linux_text_unchecked_label": "Hotstring senza controllo dei campi password",
 	"startup.linux_text_closed_label": "Hotstring sospese",
 	"startup.linux_text_reason_atspi_unavailable": "Il servizio di accessibilità (AT-SPI) non è in esecuzione, quindi Ergopti+ non può sapere se il campo attivo è un campo password. Le hotstring continuano a espandersi, tranne nelle applicazioni elencate come gestori di password; statistiche e IA restano disattivate. Installa at-spi2-core, poi accedi di nuovo.",

@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "De lgi op dit systeem is gebouwd voor Lua {1}; Ergopti+ draait op LuaJIT, dat de versie voor Lua 5.1 nodig heeft ({2}).",
 	"startup.linux_gui_stack_windows_label": "Vensters niet beschikbaar",
 	"startup.linux_layout_unresolved_label": "Toetsenbordindeling niet gelezen",
-	"startup.linux_layout_unresolved_body": "Ergopti+ kon de toetsenbordindeling van deze sessie niet lezen, dus de vervangingen van de hotstrings worden niet getypt. Eén keer van indeling wisselen kan helpen; gebruik anders ‘{1}’: het rapport bevat het logboek met de oorzaak.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ kon de toetsenbordindeling van deze sessie niet lezen en is gestopt: zonder indeling weet het niet welke tekens worden getypt. Het start zelf nog een paar keer opnieuw; komt deze melding terug, gebruik dan ‘{1}’: het rapport bevat het logboek met de oorzaak.",
 	"startup.linux_text_unchecked_label": "Hotstrings zonder controle op wachtwoordvelden",
 	"startup.linux_text_closed_label": "Hotstrings tegengehouden",
 	"startup.linux_text_reason_atspi_unavailable": "De toegankelijkheidsdienst (AT-SPI) draait niet, dus Ergopti+ kan niet zien of het actieve veld een wachtwoordveld is. Hotstrings worden nog steeds uitgevouwen, behalve in de apps die als wachtwoordbeheerder zijn opgegeven; statistieken en AI blijven uit. Installeer at-spi2-core en meld je opnieuw aan.",

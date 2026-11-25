@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "此系统上的 lgi 是为 Lua {1} 构建的；Ergopti+ 运行于 LuaJIT，需要 Lua 5.1 版本（{2}）。",
 	"startup.linux_gui_stack_windows_label": "窗口不可用",
 	"startup.linux_layout_unresolved_label": "未能读取键盘布局",
-	"startup.linux_layout_unresolved_body": "Ergopti+ 无法读取此会话的键盘布局，因此不会输入热字符串的替换内容。切换一次布局可能即可解决；否则请使用“{1}”：报告中包含说明原因的日志。",
+	"startup.linux_layout_unresolved_body": "Ergopti+ 无法读取此会话的键盘布局，已停止：没有布局，它无法判断输入的是哪些字符。它会自行重启几次；如果此消息再次出现，请使用“{1}”：报告包含说明原因的日志。",
 	"startup.linux_text_unchecked_label": "热字串未检查密码字段",
 	"startup.linux_text_closed_label": "热字串已暂停",
 	"startup.linux_text_reason_atspi_unavailable": "无障碍服务（AT-SPI）未运行，Ergopti+ 无法判断当前字段是否为密码字段。热字串仍会展开，但列为密码管理器的应用除外；统计和 AI 保持关闭。请安装 at-spi2-core，然后重新登录。",

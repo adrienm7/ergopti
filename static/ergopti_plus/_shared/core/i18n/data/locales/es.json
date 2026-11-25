@@ -3644,7 +3644,7 @@
 	"startup.linux_gui_stack_lgi_other_lua": "El lgi de este sistema está compilado para Lua {1}; Ergopti+ funciona con LuaJIT, que necesita la versión para Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Ventanas no disponibles",
 	"startup.linux_layout_unresolved_label": "Distribución de teclado no leída",
-	"startup.linux_layout_unresolved_body": "Ergopti+ no pudo leer la distribución de teclado de esta sesión, así que no se escriben los reemplazos de los hotstrings. Cambiar una vez de distribución puede bastar; si no, use «{1}»: el informe incluye el registro que explica la causa.",
+	"startup.linux_layout_unresolved_body": "Ergopti+ no pudo leer la distribución de teclado de esta sesión y se detuvo: sin ella no puede saber qué caracteres se escriben. Se reinicia solo unas cuantas veces; si este mensaje vuelve, use «{1}»: el informe incluye el registro que explica la causa.",
 	"startup.linux_text_unchecked_label": "Hotstrings sin comprobación de campos de contraseña",
 	"startup.linux_text_closed_label": "Hotstrings retenidas",
 	"startup.linux_text_reason_atspi_unavailable": "El servicio de accesibilidad (AT-SPI) no está en marcha, así que Ergopti+ no puede saber si el campo activo es de contraseña. Las hotstrings siguen expandiéndose, salvo en las aplicaciones listadas como gestores de contraseñas; las estadísticas y la IA quedan desactivadas. Instale at-spi2-core y vuelva a iniciar sesión.",
