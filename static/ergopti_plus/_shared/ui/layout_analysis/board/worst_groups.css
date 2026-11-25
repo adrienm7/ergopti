@@ -68,8 +68,10 @@
 
 /* « Corpus words » under a row: a small text button in the accent ink, its
    words in a muted paragraph once opened. Its box keeps the 44 px of WCAG
-   2.5.5 although its text is small. */
-.la-ngram-words {
+   2.5.5 although its text is small. The list's class in the selector
+   outranks a host's rule for every button, such as the editor's 32 px
+   « .layout-editor button », whatever the order of the style sheets. */
+.la-ngram-list .la-ngram-words {
 	background: transparent;
 	border: 0;
 	color: var(--theme-accent);

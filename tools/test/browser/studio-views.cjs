@@ -436,6 +436,13 @@ async function exercisePanelWords(browser, origin) {
 	const button = page.locator('.la-panel-ngrams .la-ngram-words').first();
 	await button.waitFor({ state: 'attached' });
 	await button.scrollIntoViewIfNeeded();
+	// The editor's 32 px rule for its buttons once outranked the 44 px of
+	// WCAG 2.5.5 that the button keeps in the Comparer (site accessibility gate).
+	const box = await button.boundingBox();
+	assert.ok(
+		box.height >= 44 && box.width >= 44,
+		`panel words: a 44 px target (${box.width}×${box.height})`
+	);
 	await button.click();
 	assert.equal(await button.getAttribute('aria-expanded'), 'true', 'panel words: opened');
 	const found = page.locator(`#${await button.getAttribute('aria-controls')}`);
