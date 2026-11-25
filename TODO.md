@@ -154,9 +154,11 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
 - [ ] **[CODE] AAA findings down to zero (maintainer, 2026-11-23).** axe-core's AAA rules (`wcag2aaa`,
       `wcag21aaa`, `wcag22aaa`, one list in `tools/test/lib/wcag-tags.cjs`) run in the site, Studio and app-window
       gates: any new finding fails CI. `color-contrast-enhanced` is at zero in both baselines since 2026-11-24
-      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). Left: a check that measures the 44 px
-      of 2.5.5 (axe's `target-size` stops at the AA 24 px); the public statement `/accessibilite` still names AA as
-      the target (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its
+      (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). The 44 px targets of 2.5.5, which axe's
+      `target-size` (24 px) does not check, are measured by both gates themselves (`tools/test/lib/target-size.cjs`,
+      rule `target-size-enhanced`, counted once per kind of target). Left: lower those rows to zero (220 kinds on the
+      site and in its frames, 391 in the app windows' states); the public statement `/accessibilite` still names AA
+      as the target (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its
       check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual
       audit below.
 

@@ -69,6 +69,16 @@ function checkBaseline() {
 	// The target is WCAG 2.2 AAA (maintainer, 2026-11-23): every level of every version.
 	for (const tag of ['wcag22aa', 'wcag2aaa', 'wcag21aaa', 'wcag22aaa'])
 		assert.ok(scan.WCAG_TAGS.includes(tag), 'The site scan runs ' + tag);
+	// axe stops at the 24 px of 2.5.8: the scan measures the 44 px of 2.5.5
+	// itself, in every page and frame, and counts them in the same ratchet.
+	assert.equal(scan.TARGET_SIZE_RULE, 'target-size-enhanced');
+	assert.match(
+		fs.readFileSync(path.join(__dirname, 'browser', 'site-accessibility.playwright.cjs'), 'utf8'),
+		/frame\.evaluate\(targetSize\.targetSizeProblems, targetSize\.MINIMUM_PX\)/,
+		'The site scan measures the 44 px targets in each frame'
+	);
+	const row = scan.compareWithBaseline({ ['/ | light | page | ' + scan.TARGET_SIZE_RULE]: 1 }, {});
+	assert.equal(row.regressions.length, 1, 'A new small target is a regression');
 }
 
 /** Every page of src/routes is audited, except the former addresses that redirect. */

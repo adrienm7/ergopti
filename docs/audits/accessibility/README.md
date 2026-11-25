@@ -1336,6 +1336,16 @@ surveyed and every AAA criterion, measured or checked by hand, are in
   `#6b6b6b`.
 - The tokens no page uses any more left `theme.css`, and
   `native_theme_data.lua` was regenerated from it.
+- **Target size (enhanced), 2.5.5.** axe's `target-size` measures the AA 24 px
+  of 2.5.8 only; both gates now measure the 44 px themselves
+  (`tools/test/lib/target-size.cjs`, rule `target-size-enhanced` in their
+  ratchets, proved on a small page by the app windows' self check). A link in
+  a sentence, a field together with its labels and an unstyled range or
+  colour field are the exceptions a page can show; a target is counted once
+  per kind (tag, classes, role and type), so one more row of data does not
+  move the count (the benchmarks' Comparer alone draws 13,597 small nodes).
+  First measure: 220 kinds on the site and its frames, 391 in the app
+  windows' states.
 
 ## What remains
 
