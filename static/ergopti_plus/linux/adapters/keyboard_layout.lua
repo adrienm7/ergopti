@@ -418,8 +418,12 @@ end
 
 --- Re-publishes the selected inverse after the hook resets its capture state.
 --- Keeps the current capture state, including the CapsLock seed, unchanged.
+--- A receipt still current needs no republication: a tray layout change
+--- refreshes the map and then asks this same publisher with no capture reset
+--- between them, and republishing refused the fresh receipt's provenance, so
+--- the legitimate change was reported as refused.
 --- @param override_path string|nil The unchanged selected keymap override route.
---- @return boolean True only when a fresh genuine inverse receipt is published.
+--- @return boolean True only when the published inverse holds a current genuine receipt.
 function M.publish_current_capture(override_path)
 	local cohort, epoch, source, base = _cohort, _refresh_epoch, _source, _base
 	if not cohort or not cohort.receipt or type(inverse_republish) ~= "function"
@@ -432,6 +436,12 @@ function M.publish_current_capture(override_path)
 			and XkbCapture.inverse_republish == inverse_republish
 	end
 	if not same_selection() then return false end
+	local live_checked, live = pcall(inverse_current, cohort.receipt)
+	if not same_selection() then return false end
+	if live_checked and live == true then
+		Logger.debug(LOG, "Current capture inverse already published; nothing to republish.")
+		return true
+	end
 	local ok, built, reason, receipt = pcall(inverse_republish, cohort.receipt, require_source)
 	if not same_selection() then return false end
 	if not ok or not built or not receipt then
