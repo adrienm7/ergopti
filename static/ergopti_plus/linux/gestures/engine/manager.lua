@@ -582,20 +582,9 @@ local SCREENSHOT_COMMANDS = {
 -- Windows name screen_capture_instant is this driver's window capture.
 SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_window_save"]
 
---- ocr_screenshot: the region the user draws, captured by the region cascade
---- into a private temporary file, read by tesseract in every language it has
---- installed (its own "osd" script detector is not a language), and the text
---- left on the clipboard, Wayland first as for the captures. The capture is
---- removed whatever happens; a cancelled selection leaves the clipboard alone.
-local OCR_COMMAND = '( d=$(mktemp -d "${TMPDIR:-/tmp}/ergopti-ocr.XXXXXXXX") || exit 1; '
-	.. [=[f="$d/capture.png"; trap 'rm -f "$f"; rmdir "$d"' 0; trap 'exit 1' HUP INT TERM; { ]=]
-	.. SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", '"$f"')
-	.. "; } && [ -s \"$f\" ]"
-	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
-	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
-	.. " && [ -n \"$text\" ]"
-	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
-	.. " )"
+--- ocr_screenshot (« Capture → texte », Ctrl+O): the region cascade into a
+--- private file, read by tesseract and copied by modules/ocr_capture.lua.
+local OCR_REGION_SAVE = SCREENSHOT_COMMANDS["screenshot_region_save"]
 
 --- Where a saved screenshot lands, and under what name.
 ---
@@ -633,7 +622,6 @@ local DIRECT_COMMANDS = {
 	-- guessed ~/Downloads.
 	["open_downloads"]    = 'xdg-open "$(xdg-user-dir DOWNLOAD)"',
 	["open_file_manager"] = 'xdg-open "$HOME"',
-	["ocr_screenshot"]    = OCR_COMMAND,
 }
 
 --- The settings applications open_system_settings tries, in order: GNOME, KDE,
@@ -646,6 +634,7 @@ local SETTINGS_APPLICATIONS = {
 --- Actions that need more than one fixed command, by action id. Each receives
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
+	["ocr_screenshot"] = function() return require("modules.ocr_capture").run(OCR_REGION_SAVE) end,
 	["run_program"] = function(binding) return M.run_program(binding) end,
 	-- The user's own command line and file or folder: each value is decoded by
 	-- _shared/user_action_parameter and never logged.

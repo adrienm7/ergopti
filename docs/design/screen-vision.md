@@ -70,8 +70,8 @@ corpora.
 
 - **Linux** (built): X11 GetImage through libxcb on the window's own drawable,
   so an XWayland window (VS Code's default) is captured under Wayland too; a
-  screen region needs X11, and under Wayland the Ctrl+O action keeps the
-  screenshot tool cascade and reads its file. OCR is the optional `tesseract`
+  screen region needs X11, so the Ctrl+O action uses the screenshot tool
+  cascade (grim and slurp under Wayland) and reads its file. OCR is the optional `tesseract`
   command (TSV output), with the interface language and English when
   installed; without it the text options are greyed with `ocr_engine_missing`.
 - **macOS**: capture, matching and Vision OCR run in the signed launcher
@@ -81,6 +81,19 @@ corpora.
 - **Windows**: GDI capture of the window rectangle, the matcher in the native
   DLL for speed, and Windows.Media.Ocr through one long-lived bridge so the
   engine is created once.
+
+## The « Capture → texte » action (Ctrl+O)
+
+`_shared/shortcuts/engine/ocr_capture.lua` (Windows twin
+`modules/shortcuts/ocr_capture.ahk`) runs it through five ports: `select`
+(the region, written to a file; reason `cancelled` on Escape), `recognize`,
+`set_clipboard`, `notify` and `remove`. Its outcomes are `copied`,
+`nothing_recognised` (the clipboard is left unchanged), `cancelled` (no
+notice) and `failed`; the text is never logged, only its line and character
+counts. The selection is screencapture's own on macOS, the screenshot region
+cascade on Linux, and an overlay (`platform/vision/region_select.ahk`) on
+Windows, whose rectangle `ScreenVisionCaptureRegion` captures. Pinned by
+`_shared/tests/corpus/keep_awake/ocr_capture_vectors.json`.
 
 ## Shared code and corpora
 

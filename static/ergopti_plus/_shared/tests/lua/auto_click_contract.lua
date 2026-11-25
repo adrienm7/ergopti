@@ -25,6 +25,7 @@ local Policy = require("shortcuts.engine.auto_click_policy")
 local TextTarget = require("shortcuts.engine.text_target")
 local Presets = require("shortcuts.engine.keep_awake_presets")
 local Session = require("shortcuts.engine.auto_click_session")
+local OcrCapture = require("shortcuts.engine.ocr_capture")
 
 local PARK_MILLER_MULTIPLIER = 16807
 local PARK_MILLER_MODULUS = 2147483647
@@ -121,6 +122,7 @@ function M.register(helpers, options)
 	local text_corpus = load(options.shared, "text_target_vectors.json")
 	local presets_corpus = load(options.shared, "keep_awake_presets_vectors.json")
 	local session_corpus = load(options.shared, "auto_click_session_vectors.json")
+	local ocr_corpus = load(options.shared, "ocr_capture_vectors.json")
 	local starters = read_json(options.shared, "shortcuts/data/keep_awake_presets.json")
 	local defaults = read_json(options.shared, "shortcuts/data/auto_click_defaults.json")
 	TextTarget.set_fold(read_json(options.shared, "core/text/data/text_fold.json").fold)
@@ -290,6 +292,31 @@ function M.register(helpers, options)
 				helpers.assert_eq(click, vector.click, vector.id .. " click")
 				helpers.assert_eq(reason, vector.reason, vector.id .. " reason")
 				helpers.assert_true(Policy.REASONS[reason] == reason, vector.id .. " reason is in the vocabulary")
+			end)
+		end
+	end)
+	helpers.describe("OCR capture vectors: " .. options.driver, function()
+		local function value(v) if v == nil or Json.is_null(v) then return nil end return v end
+		for _, vector in ipairs(ocr_corpus.vectors) do
+			helpers.it(vector.id, function()
+				local clipboard, notice, lines, removed, outcome, reason = nil, nil, nil, false, nil, nil
+				OcrCapture.run({
+					select = function(callback) callback(value(vector.select.path), value(vector.select.reason)) end,
+					recognize = function(_, callback)
+						callback(value(vector.recognize.words), value(vector.recognize.reason))
+					end,
+					set_clipboard = function(text) clipboard = text; return vector.clipboard_ok ~= false end,
+					notify = function(key, _, count) notice, lines = key, count end,
+					remove = function() removed = true end,
+					log = function() end,
+				}, function(o, r) outcome, reason = o, r end)
+				local expect = vector.expect
+				helpers.assert_eq(outcome, expect.outcome, vector.id .. " outcome")
+				helpers.assert_eq(reason, value(expect.reason), vector.id .. " reason")
+				helpers.assert_eq(clipboard, value(expect.clipboard), vector.id .. " clipboard")
+				helpers.assert_eq(notice, value(expect.notice), vector.id .. " notice")
+				helpers.assert_eq(lines, value(expect.lines), vector.id .. " lines")
+				helpers.assert_eq(removed, expect.removed, vector.id .. " removed")
 			end)
 		end
 	end)

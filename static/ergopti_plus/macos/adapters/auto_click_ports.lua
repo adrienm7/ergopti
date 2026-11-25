@@ -26,6 +26,13 @@ local SyntheticInput = require("platform.input.synthetic_input")
 
 local LOG = "adapters.auto_click_ports"
 
+--- The user's preferred languages for Vision; none known lets it detect them.
+--- @return table languages BCP 47 tags.
+function M.languages()
+	local ok, languages = pcall(function() return hs.host.locale.preferredLanguages() end)
+	return ok and type(languages) == "table" and languages or {}
+end
+
 --- Posts one tagged mouse event at a point.
 local function post_mouse(event_type, point)
 	local prepared, detail = SyntheticInput.prepare_mouse_event(
@@ -71,11 +78,7 @@ function M.ports(vision)
 		end,
 		now_ms = function() return math.floor(hs.timer.absoluteTime() / 1000000) end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
-		-- Vision reads the user's own languages; none known lets it detect them.
-		languages = function()
-			local ok, languages = pcall(function() return hs.host.locale.preferredLanguages() end)
-			return ok and type(languages) == "table" and languages or {}
-		end,
+		languages = M.languages,
 	}
 end
 

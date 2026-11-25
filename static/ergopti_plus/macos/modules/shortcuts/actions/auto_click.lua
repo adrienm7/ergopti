@@ -73,6 +73,9 @@ local function vision()
 	return Vision
 end
 
+--- The screen vision service, started once by this owner (the OCR capture uses it too).
+M.vision = vision
+
 --- The capture and OCR problems the menu shows, as reasons.
 local function problems()
 	if not _vision_started then return {} end

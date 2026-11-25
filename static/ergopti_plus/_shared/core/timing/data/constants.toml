@@ -596,6 +596,12 @@ ocr_timeout_ms = 10000
 worker_poll_ms = 25
 worker_start_timeout_ms = 20000
 
+# Longest the « Capture → texte » region selection (Ctrl+O) may stay open
+# before it is closed as cancelled: the user draws at their own pace, but an
+# abandoned selector must not hold the action for the whole session.
+# LX: modules/ocr_capture.lua. AHK: platform/vision/region_select.ahk.
+region_select_timeout_ms = 120000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keystats

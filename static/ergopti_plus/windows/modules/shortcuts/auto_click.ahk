@@ -279,6 +279,16 @@ AutoClickRunning() {
 	return IsObject(AutoClickOwner.session)
 }
 
+; Starts the screen vision service once; this owner starts it for the
+; auto-clicker and for the « Capture → texte » action alike.
+AutoClickVision() {
+	if !AutoClickOwner.vision_started {
+		ScreenVisionInit()
+		AutoClickOwner.vision_started := true
+	}
+	return true
+}
+
 ; Starts the auto-clicker for a plan.
 ; @param Coupled {Boolean} Whether it ends with the keep-awake session.
 AutoClickStart(Plan, Coupled := false) {
@@ -286,10 +296,8 @@ AutoClickStart(Plan, Coupled := false) {
 		return true
 	if !Plan["auto_click"]
 		return false
-	if !IsObject(AutoClickOwner.ports) && !AutoClickOwner.vision_started {
-		ScreenVisionInit()
-		AutoClickOwner.vision_started := true
-	}
+	if !IsObject(AutoClickOwner.ports)
+		AutoClickVision()
 	Ports := IsObject(AutoClickOwner.ports) ? AutoClickOwner.ports : _AutoClickDefaultPorts()
 	Defaults := _AutoClickShared("shortcuts\data\auto_click_defaults.json")
 	AutoClickOwner.session := AutoClickSession(Ports, Plan, Map("options", Defaults,

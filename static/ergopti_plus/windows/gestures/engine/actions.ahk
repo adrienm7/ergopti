@@ -263,6 +263,10 @@ global GESTURE_ACTIONS := Map(
 		"toggle_capslock", {
 				Fn: (*) => ToggleCapsLock(),
 		},
+		; « Capture → texte » (Ctrl+O): a drawn region read by Windows.Media.Ocr.
+		"ocr_screenshot", {
+				Fn: (*) => OcrCaptureAction(),
+		},
 		"microsoft_bold", {
 				Fn: (*) => (MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")),
 		},

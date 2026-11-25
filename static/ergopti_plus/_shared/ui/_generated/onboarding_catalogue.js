@@ -1230,7 +1230,7 @@
 									},
 									{
 										"path": "shortcuts.keyboard.primary_b",
-										"value": "microsoft_bold",
+										"value": "surround_parens",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1242,6 +1242,50 @@
 											},
 											{
 												"text": "B"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_o",
+										"value": "ocr_screenshot",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ocr_screenshot"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_q",
+										"value": "microsoft_bold",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "Q"
 											}
 										],
 										"value_label": [
@@ -3195,8 +3239,30 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.secondary_o",
+										"path": "shortcuts.keyboard.secondary_b",
 										"value": "surround_parens",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_o",
+										"value": "ocr_screenshot",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3212,7 +3278,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.surround_parens"
+												"key": "sg_actions.ocr_screenshot"
 											}
 										]
 									},
@@ -5026,6 +5092,50 @@
 										"value_label": [
 											{
 												"key": "sg_actions.caps_word"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_b",
+										"value": "surround_parens",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_o",
+										"value": "ocr_screenshot",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ocr_screenshot"
 											}
 										]
 									},
