@@ -5,6 +5,72 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## User workflows are actions, also run by hotstring (2026-11-25)
+
+Answers of the maintainer's QCM of 2026-11-25:
+
+- Each user workflow becomes an action assignable exactly like a built-in
+  one: to a shortcut slot (Ctrl+letter…), a gesture, a tap-hold key.
+- Any action (built-in or workflow) can also be triggered by a hotstring: the
+  trigger is erased, then the action runs.
+- The step set is complete, shell included: keys, text, wait, wait for an
+  image or a text on screen, open an app, URL or file, focus an app, screen
+  capture, OCR to a variable, clipboard get and set, click on a found image or
+  text, mouse at coordinates, any Ergopti action, a notification and a shell
+  command. A shell step asks for confirmation the first time per workflow
+  version, and a workflow imported from a file never runs a shell step
+  without the user's explicit approval in the editor.
+- Logic: a linear sequence plus « if » (image or text visible, app in front,
+  clipboard or variable matches) with else, « repeat N times » and simple
+  variables usable through placeholders in later steps. Escape or the
+  emergency stop aborts at once, a workflow never runs twice at a time, every
+  step is bounded by a timeout of the timing registry and an error stops the
+  workflow with a translated notice naming the step.
+- A shared web window creates, edits, duplicates, renames, deletes, test-runs,
+  exports and imports workflows; it opens from « Workflows personnalisés… » in
+  the Shortcuts submenu on the three OS. Workflows live in the Ergopti config
+  folder in one versioned, validated schema.
+
+The step model, validator and interpreter contract are one shared definition
+(`_shared/shortcuts/data/workflows/`) replayed by every driver from
+`_shared/tests/corpus/workflows/`; only the OS effects are per-driver
+adapters. Screen capture, OCR and image or text detection reuse the per-OS
+services of the auto-clicker and OCR capture work (`feat/keep-awake-autoclick`),
+never a second matcher.
+
+## Maintainer decisions pending
+
+Choices an agent had to make to proceed; each is the safest option and stays
+open until the maintainer confirms or changes it.
+
+- **One parameterised action, not one catalogue row per workflow** — decided
+  by the agent on 2026-11-25, to review by the maintainer. The action
+  catalogue is generated at build time from `actions.toml`; a workflow is user
+  data. A single `run_workflow` action whose parameter is the workflow id is
+  assignable everywhere an action is, and the pickers list the workflows as its
+  choices.
+- **Shell approval is bound to the commands' digest, kept outside the
+  workflow file** — decided by the agent on 2026-11-25, to review by the
+  maintainer. The « workflow version » a confirmation covers is the SHA-256 of
+  the workflow id and its shell commands in order; any edit of a command asks
+  again. Approvals live in their own file of the config folder, so an export
+  never carries one and an imported file cannot claim one.
+- **An import is marked by the editor, not by the file** — decided by the
+  agent on 2026-11-25, to review by the maintainer. The editor stamps every
+  imported workflow `origin = "import"`; its shell steps are refused at run
+  time (with a notice pointing to the editor) until the user approves them
+  there. A file copied by hand into the config folder is as trusted as
+  `config.toml`, like a `run_command` binding, and still asks on first run.
+- **Text conditions compare literally** (equals, contains, starts with, is
+  empty), never by regular expression — decided by the agent on 2026-11-25,
+  to review by the maintainer: Lua patterns, PCRE (AHK) and JavaScript regular
+  expressions disagree, and the three drivers must take the same branch.
+- **A step that needs the screen services refuses with a named notice while
+  they are absent** — decided by the agent on 2026-11-25, to review by the
+  maintainer: until the OCR and template-matching services land, the
+  validator accepts those steps and the run stops at them with
+  `workflows.error.screen_service_missing`, never a silent skip.
+
 ## The reading font draws the tray menus too (2026-11-24)
 
 The reading font chosen in Configuration › Accessibilité

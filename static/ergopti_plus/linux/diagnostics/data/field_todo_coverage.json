@@ -374,6 +374,12 @@
 			"title": "The .rpm on openSUSE (fixed 2026-11-25)",
 			"checks": [],
 			"not_testable": "Needs a person to install the release .rpm with zypper on Tumbleweed and Leap 15.6 and to install the GNOME AppIndicator extension: the field report runs from a checkout and installs no package."
+		},
+		{
+			"id": "user_workflows",
+			"title": "User workflows window, assignment, hotstring and shell approval",
+			"checks": [],
+			"not_testable": "A person edits the window and triggers the workflow on a real desktop; the step model, validator, interpreter and shell approval replay `_shared/tests/corpus/workflows/` in the unit suites."
 		}
 	]
 }
