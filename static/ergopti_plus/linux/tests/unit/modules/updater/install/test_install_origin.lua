@@ -189,7 +189,10 @@ helpers.describe("installation origin probes", function()
 			mkdirs(path:match("^(.*)/[^/]+$"))
 			local file = assert(io.open(path, "wb")); assert(file:close())
 		end
-		local files = { driver .. "/modules/updater/manager.lua",
+		-- The manager's place in the driver, found by its module name, so the
+		-- fixture tree follows the file if it moves.
+		local manager = assert(helpers.driver_module_path("modules.updater.manager"))
+		local files = { driver .. manager:sub(#helpers.driver_root() + 1),
 			root .. "/lib/ergopti/_shared/core/i18n/data/locales/en.json", root .. "/bin/ergopti-hotstrings" }
 		for _, path in ipairs(files) do touch(path) end
 		local shells = {}

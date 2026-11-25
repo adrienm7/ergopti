@@ -24,10 +24,7 @@ helpers.describe("curl HTTP client: 304 Not Modified (http-not-modified)", funct
 	helpers.it("logs the not-modified branch before the failure branch (http-not-modified)", function()
 		-- The terminal log of finish(): the 304 branch must come before the
 		-- ERROR branch, or the user sees the error window again.
-		local path = helpers.driver_root() .. "/core/network/adapters/curl_http_client.lua"
-		local handle = assert(io.open(path, "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = assert(helpers.read_module_source("core.network.adapters.curl_http_client"))
 		local answer = source:find("elseif M.is_not_modified_answer(result,", 1, true)
 		local failure = source:find('Logger.error(LOG, "HTTP request failed: %s."', 1, true)
 		helpers.assert_true(answer ~= nil and failure ~= nil and answer < failure,
