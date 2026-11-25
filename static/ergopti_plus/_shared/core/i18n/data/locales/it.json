@@ -3636,6 +3636,8 @@
 	"startup.linux_gui_stack_windows_package_body": "Le finestre di Ergopti+ (impostazioni, statistiche, editor) richiedono {1}, assente su questo sistema, quindi restano chiuse. Gli hotstring e l’icona nell’area di notifica funzionano. Per aprire le finestre, installa il pacchetto {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "Il lgi presente su questo sistema è compilato per Lua {1}; Ergopti+ usa LuaJIT, che richiede la versione per Lua 5.1 ({2}).",
 	"startup.linux_gui_stack_windows_label": "Finestre non disponibili",
+	"startup.linux_layout_unresolved_label": "Layout di tastiera non letto",
+	"startup.linux_layout_unresolved_body": "Ergopti+ non è riuscito a leggere il layout di tastiera di questa sessione, quindi le sostituzioni degli hotstring non vengono digitate. Cambiare layout una volta può bastare; altrimenti usa «{1}»: il rapporto contiene il registro che ne indica la causa.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ non ha un’icona nell’area di notifica di questo desktop",
 	"startup.linux_tray_host_missing_body": "Nessun pannello di questo desktop mostra le icone dell’area di notifica, quindi l’icona di Ergopti+ e il suo menu non sono visibili. Gli hotstring continuano a funzionare. Su GNOME installa {1}, attiva l’estensione AppIndicator, poi esci e rientra nella sessione. Su un altro desktop aggiungi un pannello o un widget che mostri le icone StatusNotifierItem.",
 	"startup.linux_input_access_body": "Ergopti+ non può ancora leggere la tastiera né scrivere in /dev/uinput. Esci e rientra nella sessione (o riavvia) perché i gruppi «input» e «uinput» aggiunti dall’installer abbiano effetto. Se il problema persiste, esegui: {1}",

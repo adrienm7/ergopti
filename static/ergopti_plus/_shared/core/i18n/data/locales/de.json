@@ -3636,6 +3636,8 @@
 	"startup.linux_gui_stack_windows_package_body": "Die Fenster von Ergopti+ (Einstellungen, Statistiken, Editoren) benötigen {1}, das auf diesem System fehlt, daher bleiben sie geschlossen. Hotstrings und das Infobereichssymbol funktionieren. Um die Fenster zu öffnen, installieren Sie das Paket {2}: {3}",
 	"startup.linux_gui_stack_lgi_other_lua": "Das lgi auf diesem System ist für Lua {1} gebaut; Ergopti+ läuft mit LuaJIT, das die Version für Lua 5.1 benötigt ({2}).",
 	"startup.linux_gui_stack_windows_label": "Fenster nicht verfügbar",
+	"startup.linux_layout_unresolved_label": "Tastaturbelegung nicht gelesen",
+	"startup.linux_layout_unresolved_body": "Ergopti+ konnte die Tastaturbelegung dieser Sitzung nicht lesen, daher werden die Ersetzungen der Hotstrings nicht getippt. Ein einmaliger Wechsel der Belegung kann helfen; sonst verwenden Sie „{1}“: Der Bericht enthält das Protokoll mit der Ursache.",
 	"startup.linux_tray_host_missing_title": "Ergopti+ hat auf diesem Desktop kein Infobereichssymbol",
 	"startup.linux_tray_host_missing_body": "Kein Panel dieses Desktops zeigt Infobereichssymbole an, daher sind das Ergopti+-Symbol und sein Menü nicht sichtbar. Die Hotstrings funktionieren weiter. Installieren Sie unter GNOME {1}, aktivieren Sie die Erweiterung AppIndicator und melden Sie sich ab und wieder an. Fügen Sie auf einem anderen Desktop ein Panel oder Widget hinzu, das StatusNotifierItem-Symbole anzeigt.",
 	"startup.linux_input_access_body": "Ergopti+ kann die Tastatur noch nicht lesen oder nicht in /dev/uinput schreiben. Melden Sie sich ab und wieder an (oder starten Sie neu), damit die vom Installationsprogramm hinzugefügten Gruppen „input“ und „uinput“ wirksam werden. Falls das Problem bleibt, führen Sie aus: {1}",
