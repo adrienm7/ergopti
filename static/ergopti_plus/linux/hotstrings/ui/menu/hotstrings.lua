@@ -196,6 +196,23 @@ local function _manifest_hotstring_rows(ctx, config)
 		return description[locale] or description.en or id
 	end
 
+	--- The display name of a section: its catalogue description in the user's
+	--- language, as the macOS and Windows menus show it. The id is the last
+	--- resort, spaced, never the row's label as it stands: the Arch tester read
+	--- « text_expansion (530) » under « ★ key and text expansion ».
+	--- @param name string Section id.
+	--- @param section table|nil The loader's section record.
+	--- @return string
+	local function section_label(name, section)
+		local description = section and section.description or nil
+		if type(description) == "table" then
+			local locale = require("core.i18n.engine.i18n").get_locale()
+			description = description[locale] or description.en
+		end
+		if type(description) == "string" and description ~= "" then return description end
+		return (tostring(name):gsub("_", " "))
+	end
+
 	--- The display name of an installed extension.
 	---
 	--- The loader stapled the extension's manifest name onto every category it
@@ -338,7 +355,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					sub[#sub + 1] = {
 						-- The count is the point of the row: a section with three entries
 						-- and one with nine hundred are the same line without it.
-						label    = string.format("%s (%d)", name, section and section.count or 0),
+						label    = string.format("%s (%d)", section_label(name, section), section and section.count or 0),
 						checked  = section_checked and true or false,
 						-- Greyed rather than hidden while the category is off: a row that
 						-- disappears reads as a bug, and the user still needs to see what
@@ -351,7 +368,7 @@ local function _manifest_hotstring_rows(ctx, config)
 								return config.toggle_section(id, name)
 							end)
 							if called and committed == true then
-								require("menu.ui.builder.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
+								require("menu.ui.builder.feature_notice").feature(section_label(name, section), config.is_section_checked and config.is_section_checked(id, name)
 									or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
 								return true
 							end
@@ -1445,12 +1462,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					local checked = config.is_section_checked
 						and config.is_section_checked(bound.category, bound.section)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
-					local description = bound.description
-					if type(description) == "table" then
-						local locale = require("core.i18n.engine.i18n").get_locale()
-						description = description[locale] or description.en
-					end
-					if type(description) ~= "string" or description == "" then description = bound.section end
+					local description = section_label(bound.section, bound)
 					bound_rows[#bound_rows + 1] = {
 						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,

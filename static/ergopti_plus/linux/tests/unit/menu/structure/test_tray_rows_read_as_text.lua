@@ -278,4 +278,36 @@ helpers.describe("the real Linux tray reads as text", function()
 		keyboard.physical_delivery_available = original
 		if not ok then error(err, 0) end
 	end)
+	-- Arch field report of 2026-11-25: Hotstrings › Français › « ★ key and text
+	-- expansion » listed « text_expansion (530) », « text_expansion_emojis
+	-- (271) »: the section ids, where macOS and Windows show the catalogue's
+	-- own description of each section.
+	helpers.it("names every hotstring section by its catalogue description, never its id", function()
+		local Config = helpers.load_module("hotstrings.engine.catalogue.config")
+		helpers.assert_true(Config.init(helpers.load_module("hotstrings.engine.engine").new(), nil, function() end))
+		helpers.assert_eq(select(2, Config.load_all(nil, true)), true, "the bundled catalogue loads")
+		local ids = {}
+		for _, group in ipairs(Config.get_groups()) do
+			Config.enable_group(group)
+			local category = Config.get_category(group)
+			for name in pairs(category and category.sections or {}) do ids[name] = true end
+		end
+		helpers.assert_true(ids.text_expansion and ids.text_expansion_emojis, "the walk reaches the reported sections")
+		local context = every_category_on()
+		context.config = Config
+		local rows = helpers.load_module("menu.ui.builder.builder").build(context)
+		local raw, sections = {}, 0
+		local function walk(items, path)
+			for _, row in ipairs(items or {}) do
+				local title = type(row.title) == "string" and row.title or ""
+				local head = title:match("^(.-) %(%d+%)") or title
+				if ids[head] then raw[#raw + 1] = path .. " > " .. title end
+				if title:find("c★ = c’est", 1, true) then sections = sections + 1 end
+				walk(row.menu, path .. " > " .. title)
+			end
+		end
+		walk(rows, "")
+		helpers.assert_eq(raw, {}, "a section row reads as text")
+		helpers.assert_true(sections >= 1, "the text expansion section is drawn by its description")
+	end)
 end)
