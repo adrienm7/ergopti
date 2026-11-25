@@ -1558,7 +1558,7 @@ _HSE_ScheduleEntryAction(Fields) {
 				return
 		}
 		Executor := WorkflowsRunEntryAction
-		SetTimer(() => Executor(Fields), -1)
+		TimerArmOneShotMs(() => Executor(Fields), 1)
 }
 
 ; The outcome of one HSE_DispatchMatch verdict for the « hotstring.expand » span
