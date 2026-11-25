@@ -6,6 +6,8 @@
 --- Validates the complete bridge document before conversion can discard fields.
 --- ==============================================================================
 
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
+
 local M = {}
 local BOOLEAN_FIELDS = { "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }
 
@@ -51,6 +53,8 @@ function M.validate(data)
 				if priority ~= nil and (type(priority) ~= "number" or priority ~= priority or math.abs(priority) == math.huge) then
 					return false, "priority"
 				end
+				local _, action_refusal = ActionEntry.fields(entry)
+				if action_refusal then return false, "action" end
 			end
 		end
 	end

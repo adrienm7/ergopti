@@ -265,6 +265,24 @@
 						</label>
 					</li>
 				</ul>
+				<!-- An action instead of, or besides, the replacement: a built-in
+				     action or one of the user's workflows (action_entry.lua). -->
+				<fieldset class="fg fg-action" id="action-box" hidden>
+					<legend data-i18n="editor.hotstrings.action_legend"></legend>
+					<p>
+						<label for="e-action" data-i18n="editor.hotstrings.action_label"></label>
+						<select id="e-action" onchange="updateActionFields()"></select>
+					</p>
+					<p id="erase-row">
+						<input type="checkbox" id="cb-erase" checked />
+						<label for="cb-erase" data-i18n="editor.hotstrings.cb_erase_trigger"></label>
+					</p>
+					<small
+						class="hint"
+						id="erase-desc"
+						data-i18n="editor.hotstrings.cb_erase_trigger_desc"
+					></small>
+				</fieldset>
 				<p class="fg fg-prio">
 					<label for="e-prio"
 						><span data-i18n="editor.hotstrings.priority_label"></span>

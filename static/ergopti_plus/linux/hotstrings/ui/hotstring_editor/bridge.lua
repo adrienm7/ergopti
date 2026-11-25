@@ -48,6 +48,7 @@ local Logger = require("core.logger.engine.shim")
 local Storage = require("core.fs.adapters.storage")
 local MagicKey = require("hotstrings.engine.magic_key")
 local Json = require("core.text.engine.json")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 
 local LOG = "bridge.hsEditor"
 local APP_NAME = "hotstring_editor"
@@ -293,6 +294,9 @@ local function build_payload(state, open_mode, parsed, opening)
 						-- the source default", and writing a number here would silently
 						-- pin every entry to whatever that default happened to be.
 						priority          = type(e.priority) == "number" and e.priority or nil,
+						action            = e.action,
+						workflow          = e.workflow,
+						erase_trigger     = ActionEntry.erase_of(e),
 					}
 				end
 				sections[#sections + 1] = {
@@ -334,6 +338,8 @@ local function build_payload(state, open_mode, parsed, opening)
 		default_section  = pref("default_section"),
 		default_priority = default_priority,
 		open_mode        = open_mode or "menu",
+		actions          = Json.array(require("gestures.engine.manager").get_hotstring_action_choices()),
+		workflows        = Json.array(require("modules.shortcuts.workflows").choices() or {}),
 	}
 end
 
@@ -480,6 +486,9 @@ local function save_all(state, data, context)
 						final_result      = e.final_result == true,
 						is_case_sensitive_strict = e.is_case_sensitive_strict == true,
 						priority          = type(e.priority) == "number" and e.priority or nil,
+						action            = e.action,
+						workflow          = e.workflow,
+						erase_trigger     = e.erase_trigger,
 					}
 				end
 			end

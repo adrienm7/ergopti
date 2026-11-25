@@ -23,6 +23,14 @@ local Json = require("core.text.engine.json")
 local function pushed_payload(content)
 	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
 	local saved_manager = package.loaded["core.ui.ui.webview_manager"]
+	local saved_gestures = package.loaded["gestures.engine.manager"]
+	local saved_workflows = package.loaded["modules.shortcuts.workflows"]
+	package.loaded["gestures.engine.manager"] = { get_hotstring_action_choices = function()
+		return { { value = "select_all", label = "Select all" } }
+	end }
+	package.loaded["modules.shortcuts.workflows"] = { choices = function()
+		return { { value = "wf_1", label = "Morning" } }
+	end }
 	local real_writer = require("core.text.engine.toml_codec.writer")
 	package.loaded["core.text.engine.toml_codec.writer"] = {
 		read_classified = function()
@@ -44,6 +52,8 @@ local function pushed_payload(content)
 	end)
 	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	package.loaded["core.ui.ui.webview_manager"] = saved_manager
+	package.loaded["gestures.engine.manager"] = saved_gestures
+	package.loaded["modules.shortcuts.workflows"] = saved_workflows
 	package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
 	if not ok then error(err, 0) end
 	local encoded = type(pushed) == "string" and pushed:match("window%.initData%((.*)%)$") or nil
@@ -65,5 +75,18 @@ helpers.describe("hotstring editor payload arrays", function()
 			"an empty section must reach the page as entries: [] — got " .. encoded)
 		helpers.assert_true(encoded:find('"alphabet"', 1, true) ~= nil,
 			"control: the section with an entry still carries it")
+	end)
+
+	helpers.it("sends an action entry's fields and the action choices", function()
+		local payload = Json.decode(pushed_payload(
+			"[[Mine]]\n\"wf\" = { output = \"\", action = \"run_workflow\", workflow = \"wf_1\", erase_trigger = false }\n"
+			.. "\"sa\" = { action = \"select_all\" }\n"))
+		local entries = payload.sections[1].entries
+		helpers.assert_eq(entries[1].workflow, "wf_1")
+		helpers.assert_eq(entries[1].erase_trigger, false)
+		helpers.assert_eq(entries[2].action, "select_all")
+		helpers.assert_eq(entries[2].erase_trigger, true, "an action entry erases its trigger by default")
+		helpers.assert_eq(payload.actions[1].value, "select_all")
+		helpers.assert_eq(payload.workflows[1].value, "wf_1")
 	end)
 end)

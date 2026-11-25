@@ -87,7 +87,11 @@ function M.load(ctx)
 			end
 		end
 	end
-	hotstring_editor.init(personal_path, keymap, nil, personal_default_priority)
+	hotstring_editor.init(personal_path, keymap, nil, personal_default_priority, {
+		-- Read when the page opens, after the shortcut engine has loaded.
+		actions = function() return require("gestures.engine.actions").get_hotstring_action_choices() end,
+		workflows = function() return require("modules.shortcuts.workflows").choices() end,
+	})
 	keymap.load_toml(keymap.PERSONAL_GROUP_NAME, personal_path)
 	table.insert(loaded, { name = "personal", path = personal_path })
 

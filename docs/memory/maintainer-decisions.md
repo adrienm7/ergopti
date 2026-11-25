@@ -124,6 +124,13 @@ Answers of the maintainer's QCM of 2026-11-25:
   exports and imports workflows; it opens from « Workflows personnalisés… » in
   the Shortcuts submenu on the three OS. Workflows live in the Ergopti config
   folder in one versioned, validated schema.
+- Each hotstring that runs an action has the option « effacer le
+  déclencheur » (maintainer change of 2026-11-25), on by default. Off, the
+  typed text and its end character stay exactly as typed and the action runs
+  after them. The hotstring editor shows it as an accessible box under the
+  action picker, the source file stores `erase_trigger = false` only when it
+  is off, and the three drivers honour it from the shared vectors
+  (`_shared/tests/corpus/hotstrings/action_entry_vectors.json`).
 
 The step model, validator and interpreter contract are one shared definition
 (`_shared/shortcuts/data/workflows/`) replayed by every driver from
@@ -167,6 +174,16 @@ open until the maintainer confirms or changes it.
   so a workflow step has no binding to carry one; text and key combinations
   have their own steps (`type_text`, `send_keys`), and a parameter field is
   refused as an unknown key rather than silently ignored.
+- **A hotstring's action picker offers the parameterless actions this OS
+  runs, plus the user's workflows** — decided by the agent on 2026-11-25, to
+  review by the maintainer. A hotstring entry has no field for an action's
+  value, so a parameterised action (other than `run_workflow`, whose value is
+  the workflow) is not offered. An entry naming an action this OS does not
+  offer keeps it through an edit, shown by its id, rather than losing it.
+- **A key the engine held back is typed back when the trigger is kept** —
+  decided by the agent on 2026-11-25, to review by the maintainer: an end
+  character the driver swallowed before matching would otherwise vanish, and
+  « exactly as typed » must hold on every driver.
 - **A step that needs the screen services refuses with a named notice while
   they are absent** — decided by the agent on 2026-11-25, to review by the
   maintainer: until the OCR and template-matching services land, the

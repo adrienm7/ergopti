@@ -36,6 +36,13 @@ local invalid = {
 	{ "invalid output", function(d) d.sections.personal.entries[1].output = {} return d end },
 	{ "invalid flag", function(d) d.sections.personal.entries[1].is_word = "false" return d end },
 	{ "invalid priority", function(d) d.sections.personal.entries[1].priority = math.huge return d end },
+	{ "invalid action", function(d) d.sections.personal.entries[1].action = "Bad id" return d end },
+	{ "workflow without action", function(d) d.sections.personal.entries[1].workflow = "wf_1" return d end },
+	{ "invalid erase_trigger", function(d)
+		d.sections.personal.entries[1].action = "select_all"
+		d.sections.personal.entries[1].erase_trigger = "no"
+		return d
+	end },
 	{ "invalid description", function(d) d.sections.personal.description = false return d end },
 	{ "mapped entry sequence", function(d) d.sections.personal.entries.extra = {} return d end },
 }
@@ -82,11 +89,29 @@ helpers.describe("hotstring editor malformed saves", function()
 			local entry = payload.sections.personal.entries[1]
 			entry.is_word, entry.auto_expand, entry.is_case_sensitive = false, true, false
 			entry.final_result, entry.is_case_sensitive_strict, entry.priority = true, false, 75
+			entry.action, entry.workflow, entry.erase_trigger = "run_workflow", "wf_1", false
 			state.callbacks[1]({ body = { action = "save", data = payload } })
 			helpers.assert_eq(state.writes, 1)
 			helpers.assert_eq(state.last_written.sections.personal.entries[1], entry)
 			helpers.assert_eq(state.last_written.sections_order[3], "-")
 			helpers.assert_eq(state.last_snapshot.content, "source")
+		end)
+	end)
+
+	helpers.it("sends action entries and the action choices to the page (hotstring-save-validation)", function()
+		with_editor(function(editor, state)
+			state.parsed = { sections_order = { "personal" }, sections = { personal = { entries = {
+				{ trigger = "wf", output = "", action = "run_workflow", workflow = "wf_1", erase_trigger = false },
+				{ trigger = "sa", output = "", action = "select_all" },
+			} } } }
+			helpers.assert_true(editor.open())
+			state.callbacks[1]({ body = { action = "ready" } })
+			local entries = state.encoded.sections[1].entries
+			helpers.assert_eq(entries[1].workflow, "wf_1")
+			helpers.assert_eq(entries[1].erase_trigger, false)
+			helpers.assert_eq(entries[2].erase_trigger, true, "an action entry erases its trigger by default")
+			helpers.assert_eq(state.encoded.actions[1].value, "select_all")
+			helpers.assert_eq(state.encoded.workflows[1].value, "wf_1")
 		end)
 	end)
 
