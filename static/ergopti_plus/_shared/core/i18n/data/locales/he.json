@@ -1744,6 +1744,7 @@
 	"linux_shell.install.gnome_extension_failed": "לא ניתן להפעיל את הרחבת AppIndicator — בלעדיה GNOME לא מציג את הסמל.",
 	"linux_shell.install.gnome_extension_missing": "הרחבת GNOME AppIndicator חסרה — מתקין את {1}…",
 	"linux_shell.install.gnome_extension_next_login": "הרחבת GNOME AppIndicator הופעלה (בתוקף מההתחברות הבאה)",
+	"linux_shell.install.gnome_extension_not_installed": "אף חבילה בהפצה זו אינה כוללת את הרחבת GNOME AppIndicator: התקינו את AppIndicator and KStatusNotifierItem Support מ־{1}, ואז התנתקו והתחברו מחדש — בלעדיה GNOME אינו מציג את הסמל.",
 	"linux_shell.install.gnome_without_extensions": "GNOME ללא gnome-extensions — הפעילו הרחבת AppIndicator כדי לראות את הסמל.",
 	"linux_shell.install.help_help": "מציג את הודעת העזרה הזו",
 	"linux_shell.install.help_no_deps": "לא מתקין אף תלות (באחריותכם)",

@@ -710,7 +710,117 @@ try {
 
 // =========================================================
 // =========================================================
-// ======= 4/ Report =======
+// ======= 4/ GNOME Tray Host Is Never Claimed Without Its Files =======
+// =========================================================
+// =========================================================
+
+// openSUSE, Alpine and Void package no AppIndicator extension. The installer
+// used to "install" a name those archives do not carry, then write the GNOME
+// setting for an extension that was not on disk and print « enabled at the next
+// login »: the next login showed no icon and nothing had said why.
+const gnomeTrayFunctions =
+	(installerSrc.match(
+		/(GNOME_TRAY_EXTENSION="[\s\S]*?_ensure_gnome_tray_host\(\) \{[\s\S]*?\n\})\n/
+	) || [])[1] || '';
+if (!gnomeTrayFunctions.includes('_gnome_tray_extension_installed()')) {
+	errors.push('the GNOME tray host fixture is incomplete; its postcondition proof did not run');
+} else {
+	const gnomeFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-gnome-tray-'));
+	const bash = bashExecutable();
+	try {
+		const bin = path.join(gnomeFixture, 'bin');
+		fs.mkdirSync(bin);
+		// The running shell knows no extension and refuses to enable one, as it
+		// does for a package installed during the session or none at all.
+		fs.writeFileSync(
+			path.join(bin, 'gnome-extensions'),
+			'#!/bin/bash\n[ "$1" = list ] && exit 0\nexit 2\n'
+		);
+		fs.writeFileSync(
+			path.join(bin, 'gsettings'),
+			'#!/bin/bash\nif [ "$1" = get ]; then echo "@as []"; exit 0; fi\n' +
+				'printf "%s\\n" "$*" >> "$ERGOPTI_GSETTINGS_LOG"\n'
+		);
+		for (const name of ['gnome-extensions', 'gsettings']) fs.chmodSync(path.join(bin, name), 0o755);
+		for (const [manager, onDisk, expectWritten, expectInstall] of [
+			['zypper', false, false, null],
+			['apk', false, false, null],
+			['xbps', false, false, null],
+			['dnf', false, false, 'gnome-shell-extension-appindicator'],
+			['dnf', true, true, 'gnome-shell-extension-appindicator'],
+			['zypper', true, true, null]
+		]) {
+			const home = path.join(gnomeFixture, `home-${manager}-${onDisk}`);
+			const extension = path.join(
+				home,
+				'.local',
+				'share',
+				'gnome-shell',
+				'extensions',
+				'appindicatorsupport@rgcjonas.gmail.com'
+			);
+			fs.mkdirSync(home, { recursive: true });
+			if (onDisk) {
+				fs.mkdirSync(extension, { recursive: true });
+				fs.writeFileSync(path.join(extension, 'metadata.json'), '{}');
+			}
+			const gsettingsLog = path.join(gnomeFixture, `gsettings-${manager}-${onDisk}`);
+			const installLog = path.join(gnomeFixture, `install-${manager}-${onDisk}`);
+			const result = spawnSync(bash, ['-s'], {
+				input:
+					`set -u\n${MESSAGES_READER}${IDENTIFIERS_READER}_detect_pkg_manager() { echo ${manager}; }\n` +
+					'_install_required_package() { printf "%s\\n" "$2" >> "$ERGOPTI_INSTALL_LOG"; return 1; }\n' +
+					dependencyFunctions.replace(/\n_install_required_package\(\) \{[\s\S]*?\n\}\n/, '\n') +
+					'\n' +
+					gnomeTrayFunctions +
+					'\n_ensure_gnome_tray_host\n',
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					HOME: bashPath(home),
+					XDG_DATA_HOME: '',
+					XDG_DATA_DIRS: bashPath(path.join(gnomeFixture, 'no-system-data')),
+					XDG_CURRENT_DESKTOP: 'GNOME',
+					LC_ALL: 'C',
+					PATH: `${bashPath(bin)}:/usr/bin:/bin`,
+					ERGOPTI_GSETTINGS_LOG: bashPath(gsettingsLog),
+					ERGOPTI_INSTALL_LOG: bashPath(installLog)
+				}
+			});
+			const label = `GNOME tray host on ${manager} (extension ${onDisk ? 'on disk' : 'absent'})`;
+			if (result.status !== 0) {
+				errors.push(`${label}: the installer step failed: ${result.stderr || result.error}`);
+				continue;
+			}
+			const written = fs.existsSync(gsettingsLog);
+			if (written !== expectWritten) {
+				errors.push(
+					`${label}: the next-login setting was ${written ? 'written' : 'not written'}, expected ${expectWritten ? 'written' : 'not written'}`
+				);
+			}
+			const installed = fs.existsSync(installLog)
+				? fs.readFileSync(installLog, 'utf8').trim()
+				: null;
+			if (!onDisk && installed !== expectInstall) {
+				errors.push(`${label}: installed '${installed}', expected '${expectInstall}'`);
+			}
+			if (!expectWritten && !result.stderr.includes('extensions.gnome.org/extension/615/')) {
+				errors.push(`${label}: the user was not sent to the extension's page: ${result.stderr}`);
+			}
+			if (/next login/i.test(result.stdout) !== expectWritten) {
+				errors.push(
+					`${label}: the next-login claim does not match what was written: ${result.stdout}`
+				);
+			}
+		}
+	} finally {
+		fs.rmSync(gnomeFixture, { recursive: true, force: true });
+	}
+}
+
+// =========================================================
+// =========================================================
+// ======= 5/ Report =======
 // =========================================================
 // =========================================================
 

@@ -1744,6 +1744,7 @@
 	"linux_shell.install.gnome_extension_failed": "AppIndicator uzantısı etkinleştirilemedi — o olmadan GNOME simgeyi göstermez.",
 	"linux_shell.install.gnome_extension_missing": "GNOME AppIndicator uzantısı eksik — {1} yükleniyor…",
 	"linux_shell.install.gnome_extension_next_login": "GNOME AppIndicator uzantısı etkinleştirildi (bir sonraki oturum açışta geçerli)",
+	"linux_shell.install.gnome_extension_not_installed": "Bu dağıtımın hiçbir paketi GNOME AppIndicator uzantısını içermiyor: AppIndicator and KStatusNotifierItem Support uzantısını {1} adresinden kurun, ardından oturumu kapatıp yeniden açın — o olmadan GNOME simgeyi göstermez.",
 	"linux_shell.install.gnome_without_extensions": "gnome-extensions olmadan GNOME — simgeyi görmek için bir AppIndicator uzantısını etkinleştirin.",
 	"linux_shell.install.help_help": "Bu yardım iletisini gösterir",
 	"linux_shell.install.help_no_deps": "Hiçbir bağımlılık yüklemez (sizin sorumluluğunuzda)",

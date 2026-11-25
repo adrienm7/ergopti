@@ -19,6 +19,7 @@ install.gnome_extension_enabled=تم تفعيل إضافة GNOME AppIndicator
 install.gnome_extension_failed=تعذّر تفعيل إضافة AppIndicator — بدونها لا يعرض GNOME الأيقونة.
 install.gnome_extension_missing=إضافة GNOME AppIndicator مفقودة — جارٍ تثبيت {1}…
 install.gnome_extension_next_login=تم تفعيل إضافة GNOME AppIndicator (تسري عند تسجيل الدخول التالي)
+install.gnome_extension_not_installed=لا توجد حزمة في هذه التوزيعة تحتوي على امتداد GNOME AppIndicator: ثبّت AppIndicator and KStatusNotifierItem Support من {1}، ثم سجّل الخروج وادخل مجددًا — بدونه لا يعرض GNOME الأيقونة.
 install.gnome_without_extensions=GNOME بدون gnome-extensions — فعّل إضافة AppIndicator لرؤية الأيقونة.
 install.help_help=يعرض رسالة المساعدة هذه
 install.help_no_deps=لا يثبّت أي تبعية (تتولاها بنفسك)

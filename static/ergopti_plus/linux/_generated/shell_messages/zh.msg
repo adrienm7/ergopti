@@ -19,6 +19,7 @@ install.gnome_extension_enabled=已启用 GNOME AppIndicator 扩展
 install.gnome_extension_failed=无法启用 AppIndicator 扩展 — 没有它，GNOME 不会显示图标。
 install.gnome_extension_missing=缺少 GNOME AppIndicator 扩展 — 正在安装 {1}…
 install.gnome_extension_next_login=已启用 GNOME AppIndicator 扩展（下次登录时生效）
+install.gnome_extension_not_installed=此发行版没有提供 GNOME AppIndicator 扩展的软件包：请从 {1} 安装 AppIndicator and KStatusNotifierItem Support，然后注销并重新登录 — 没有它，GNOME 不会显示图标。
 install.gnome_without_extensions=GNOME 缺少 gnome-extensions — 请启用 AppIndicator 扩展以显示图标。
 install.help_help=显示此帮助信息
 install.help_no_deps=不安装任何依赖项（由您自行提供）

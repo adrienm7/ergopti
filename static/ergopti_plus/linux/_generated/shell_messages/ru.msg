@@ -19,6 +19,7 @@ install.gnome_extension_enabled=расширение GNOME AppIndicator вклю
 install.gnome_extension_failed=Не удалось включить расширение AppIndicator — без него GNOME не показывает значок.
 install.gnome_extension_missing=нет расширения GNOME AppIndicator — установка {1}…
 install.gnome_extension_next_login=расширение GNOME AppIndicator включено (действует со следующего входа)
+install.gnome_extension_not_installed=Ни один пакет этого дистрибутива не содержит расширение GNOME AppIndicator: установите AppIndicator and KStatusNotifierItem Support с {1}, затем выйдите из сеанса и войдите снова — без него GNOME не показывает значок.
 install.gnome_without_extensions=GNOME без gnome-extensions — включите расширение AppIndicator, чтобы увидеть значок.
 install.help_help=Показать эту справку
 install.help_no_deps=Не устанавливать зависимости (вы устанавливаете их сами)
