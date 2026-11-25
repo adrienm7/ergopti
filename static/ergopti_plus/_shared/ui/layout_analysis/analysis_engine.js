@@ -230,6 +230,9 @@ var LAYOUT_ANALYSIS = (function () {
 	const CLOSURE_CACHE_LIMIT = 1024;
 	// Separates two tokens in a map key (no layout types this control character).
 	const TOKEN_SEP = '\u0001';
+	// Separates a character from the repeat and magic keys that type it in a
+	// context token (contextTable; no layout types this control character).
+	const CONTEXT_SEP = '\u0002';
 	// The largest stamp a Uint32Array holds: a stamp counter starts over below it.
 	const UINT32_LAST = 0xffffffff;
 	// How many times over the key stream may count a table's whole total (a
@@ -271,6 +274,8 @@ var LAYOUT_ANALYSIS = (function () {
 		modifier_usage: { unit: '%', better: 'lower', of: 'characters' },
 		altgr_usage: { unit: '%', better: 'lower', of: 'characters' },
 		dead_key_usage: { unit: '%', better: 'lower', of: 'characters' },
+		// Typed by the layout's own repeat or magic key (contextWays): shown, not scored.
+		context_key_usage: { unit: '%', better: 'none', of: 'characters' },
 		outer_column: { unit: '%', better: 'lower', of: 'keystrokes' },
 		unsupported: { unit: '%', better: 'lower', of: 'characters' },
 		compact_fit: { unit: '%', better: 'higher', of: 'characters' },
@@ -682,13 +687,124 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * Checks a layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
+	 * `context` maps a key to one action per level (null where the key types
+	 * its row's cell), `magic` maps a table id to its rules. A repeat key types
+	 * the character typed `repeat` places back (1: the last one, 2: the one
+	 * before it); a magic key types what its table gives for the text typed
+	 * so far: the rule whose `after` is the longest end of that text, else
+	 * its fallback (nothing when empty). Each `after` holds one to
+	 * context_keys.context_max characters, each `types` and fallback one.
+	 * Kept beside the rows, so every reader of the rows reads characters only.
+	 * @param {object} layout - The layout input.
+	 * @param {number} width - Its levels per key.
+	 * @returns {boolean} Whether the layout has any repeat or magic key.
+	 * @throws {Error} On a malformed action, rule or table, an unknown or
+	 *   unused table, or a level that also types its row's cell.
+	 */
+	function checkContext(layout, width) {
+		const { context, magic } = layout;
+		if (context === undefined && magic === undefined) return false;
+		const fail = (what) => {
+			throw new Error(`layout_analysis: ${layout.id} ${what}`);
+		};
+		const isMap = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+		if (!isMap(context)) fail('context must map keys to their levels');
+		const tables = magic === undefined ? {} : magic;
+		if (!isMap(tables)) fail('magic must map table ids to their rules');
+		const { repeat_depths: depths, context_max: longest } = data().model.context_keys;
+		const oneChar = (text) => typeof text === 'string' && isOneCodePoint(text) && !isBreak(text);
+		const used = new Set();
+		let any = false;
+		for (const [code, row] of Object.entries(context)) {
+			if (!Array.isArray(row) || row.length !== width)
+				fail(`context.${code} is not ${width} cells`);
+			row.forEach((action, level) => {
+				if (action === null) return;
+				if (!isMap(action) || Object.keys(action).length !== 1)
+					fail(`context.${code} has an invalid action`);
+				if (action.repeat !== undefined) {
+					if (!depths.includes(action.repeat))
+						fail(`context.${code} repeats ${action.repeat} characters back`);
+				} else if (typeof action.magic === 'string') {
+					if (!Object.prototype.hasOwnProperty.call(tables, action.magic))
+						fail(`context.${code} names the unknown magic table ${action.magic}`);
+					used.add(action.magic);
+				} else fail(`context.${code} has an invalid action`);
+				const cell = layout.rows[code] ? layout.rows[code][level] : null;
+				if (cell !== null && cell !== undefined)
+					fail(`context.${code} level ${level} also types its cell`);
+				any = true;
+			});
+		}
+		for (const [id, table] of Object.entries(tables)) {
+			if (!used.has(id)) fail(`magic table ${id} is on no key`);
+			if (!isMap(table) || !Array.isArray(table.rules)) fail(`magic table ${id} needs its rules`);
+			const seen = new Set();
+			for (const rule of table.rules) {
+				if (!isMap(rule) || typeof rule.after !== 'string' || rule.after === '')
+					fail(`magic table ${id} has a rule without context`);
+				if (codeLength(rule.after) > longest || codePoints(rule.after).some(isBreak))
+					fail(`magic table ${id}: the context ${rule.after} is longer than ${longest} characters`);
+				if (seen.has(rule.after)) fail(`magic table ${id} has the context ${rule.after} twice`);
+				seen.add(rule.after);
+				if (!oneChar(rule.types))
+					fail(`magic table ${id}: after ${rule.after} types one character`);
+			}
+			if (table.fallback !== undefined && table.fallback !== '' && !oneChar(table.fallback))
+				fail(`magic table ${id}: its fallback is one character or nothing`);
+		}
+		if (!any) fail('context holds no repeat or magic key');
+		return true;
+	}
+
+	/**
+	 * What a repeat or magic key types after a text (checkContext): the one
+	 * definition the analysis and the drivers' vectors read.
+	 * @param {{repeat: number}|{magic: string}} action - A context action.
+	 * @param {object} magic - The layout's magic tables.
+	 * @param {string} before - The text typed so far (its end is read).
+	 * @returns {string} One character, or '' when the key types nothing.
+	 */
+	function contextOutput(action, magic, before) {
+		if (action.repeat !== undefined) {
+			const points = codePoints(before.slice(-2 * action.repeat));
+			const at = points.length - action.repeat;
+			return at >= 0 ? points[at] : '';
+		}
+		const table = magic[action.magic];
+		let best = null;
+		for (const rule of table.rules)
+			if (before.endsWith(rule.after) && (best === null || rule.after.length > best.after.length))
+				best = rule;
+		return best !== null ? best.types : table.fallback || '';
+	}
+
+	/**
+	 * What a layout's repeat or magic key shows on one level (its label in
+	 * context_keys.labels), '' when that level holds no such key.
+	 * @param {object} layout - Library shape, or any layout input with context.
+	 * @param {string} code - A key.
+	 * @param {number} level - The level's index in the rows.
+	 * @returns {string}
+	 */
+	function contextLabel(layout, code, level) {
+		const action = ((layout.context || {})[code] || [])[level];
+		if (!action) return '';
+		const labels = data().model.context_keys.labels;
+		return action.repeat !== undefined ? labels[`repeat_${action.repeat}`] : labels.magic;
+	}
+
+	/**
 	 * Checks and returns a layout in the library shape.
 	 * @param {object} layout - {id, name, rows: code → [base, shift, altgr,
 	 *   shift_altgr, ...its own levels], dead?: state → {typed: output |
 	 *   {dead: state}} (typed is a character, or « dead:<state> » for the dead
 	 *   key entering <state>), command?: code → letter, fingering?: 'standard'
 	 *   | 'angle', levels? and modifiers? (checkLevels): [{id, shift?, hold?:
-	 *   modifier names}] and name → {label, for_left_hand, for_right_hand}}.
+	 *   modifier names}] and name → {label, for_left_hand, for_right_hand}},
+	 *   context? and magic? (checkContext): code → [null | {repeat: 1|2} |
+	 *   {magic: id} per level] and id → {rules: [{after, types}], fallback?}.
 	 *   A cell is a string, null, or {dead: state}.
 	 * @returns {object} The same layout, with empty dead/command maps filled in.
 	 * @throws {Error} On a malformed layout.
@@ -705,6 +821,7 @@ var LAYOUT_ANALYSIS = (function () {
 				if (!(cell === null || typeof cell === 'string' || (cell && typeof cell.dead === 'string')))
 					throw new Error(`layout_analysis: ${layout.id}.${code} has an invalid cell`);
 		}
+		const contextual = checkContext(layout, width);
 		for (const [code, letter] of Object.entries(layout.command || {}))
 			if (typeof letter !== 'string')
 				throw new Error(`layout_analysis: ${layout.id} command.${code} is not text`);
@@ -725,6 +842,9 @@ var LAYOUT_ANALYSIS = (function () {
 			// Absent for the default four levels (DEFAULT_LEVELS).
 			levels: levels || undefined,
 			modifiers: levels ? layout.modifiers : undefined,
+			// Absent without a repeat or magic key (checkContext).
+			context: contextual ? layout.context : undefined,
+			magic: contextual ? layout.magic || {} : undefined,
 			// A registry layout's family and board (iso or ansi), when its family
 			// ships one layout per board: the Comparer's default selection.
 			family: layout.family || '',
@@ -1461,7 +1581,244 @@ var LAYOUT_ANALYSIS = (function () {
 	 */
 	function compileWays(layout, board, missing) {
 		const core = compileCore(layout, board, missing);
-		return finishWays(core.ways, core.texts);
+		const out = finishWays(core.ways, core.texts);
+		out.context = contextWays(layout, board, missing);
+		return out;
+	}
+
+	/**
+	 * The ways of a layout's repeat and magic keys (checkContext): each key
+	 * on each level its board can press, as a one-key way marked with its
+	 * kind (context: 'repeat' or 'magic'). Such a way types a character only
+	 * after the text that makes the key type it, so it is no way of the
+	 * character in compileWays: planTyping offers it in that context alone.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {Set<string>|null} missing - Codes absent from a compact board.
+	 * @returns {object|null} {keys: [{code, layer, action, way}], magic,
+	 *   outputs: the characters a key can type (null: any, a repeat key),
+	 *   signature: the actions and tables as text}; null without such a key.
+	 */
+	function contextWays(layout, board, missing) {
+		if (!layout.context) return null;
+		const levels = levelTable(layout, board);
+		const keys = [];
+		for (const code of Object.keys(layout.context).sort()) {
+			const k = board.index.get(code);
+			if (k === undefined || (missing && missing.has(code))) continue;
+			const side = heldSide(board, k);
+			layout.context[code].forEach((action, layer) => {
+				if (action === null) return;
+				// A level whose modifier the board has no key for types nothing.
+				const held = levels.held[layer][side];
+				if (held === null) return;
+				const shift = levels.shift[layer];
+				keys.push({
+					code,
+					layer,
+					action,
+					way: {
+						keys: [k],
+						layers: [layer],
+						shift,
+						altgr: held.length,
+						held,
+						dead: false,
+						cost: 1 + MODIFIER_COST * (shift + held.length),
+						level: levels.ids[layer],
+						context: action.repeat !== undefined ? 'repeat' : 'magic'
+					}
+				});
+			});
+		}
+		if (keys.length === 0) return null;
+		let outputs = new Set();
+		for (const { action } of keys) {
+			if (action.repeat !== undefined) {
+				outputs = null;
+				break;
+			}
+			const table = layout.magic[action.magic];
+			for (const rule of table.rules) outputs.add(rule.types);
+			if (table.fallback) outputs.add(table.fallback);
+		}
+		const signature = JSON.stringify([keys.map((key) => key.action), layout.magic]);
+		return { keys, magic: layout.magic, outputs, signature };
+	}
+
+	const contextTableCache = new WeakMap();
+
+	/**
+	 * A token table whose characters a repeat or magic key can type carry
+	 * their context: a character after a text that makes some keys type it is
+	 * the token « char CONTEXT_SEP indexes of those keys », whose ways are the
+	 * character's own and those keys' (planTyping), so the plan chooses
+	 * between them with their neighbours. The context is the output text of
+	 * the tokens before (a chord's characters included), at most
+	 * context_max characters: a pair's first token and a triple's first two
+	 * are known; what precedes them is read from the triples (the share of
+	 * each character before), and a triple's first token takes the classes
+	 * of all its occurrences. Cached per table and keys.
+	 * @param {object} table - A prepared or token table.
+	 * @param {object} spec - contextWays().
+	 * @returns {{table: object, tokens: Map<string, {char: string, keys:
+	 *   number[]}>, classify: function(string, string): string}} The table,
+	 *   each context token's character and keys, and the token of a
+	 *   character after a text.
+	 */
+	function contextTable(table, spec) {
+		let byKeys = contextTableCache.get(table);
+		if (!byKeys) contextTableCache.set(table, (byKeys = new Map()));
+		let out = byKeys.get(spec.signature);
+		if (!out) {
+			out = buildContextTable(table, spec);
+			byKeys.set(spec.signature, out);
+		}
+		return out;
+	}
+
+	/** contextTable's work, uncached. */
+	function buildContextTable(table, spec) {
+		const longest = data().model.context_keys.context_max;
+		const tokens = new Map();
+		const capable = (t) => isOneCodePoint(t) && (spec.outputs === null || spec.outputs.has(t));
+		// The token t is after the text before: itself, or its context token.
+		const classify = (t, before) => {
+			if (!capable(t)) return { token: t, keys: null };
+			const tail = codePoints(before).slice(-longest).join('');
+			const keys = [];
+			spec.keys.forEach((key, i) => {
+				if (contextOutput(key.action, spec.magic, tail) === t) keys.push(i);
+			});
+			return keys.length === 0
+				? { token: t, keys: null }
+				: { token: t + CONTEXT_SEP + keys.join(','), keys };
+		};
+		const classMemo = new Map();
+		const tokenOf = (t, before) => {
+			const memoKey = t + TOKEN_SEP + before;
+			let token = classMemo.get(memoKey);
+			if (token !== undefined) return token;
+			const found = classify(t, before);
+			token = found.token;
+			if (found.keys !== null && !tokens.has(token))
+				tokens.set(token, { char: t, keys: found.keys });
+			classMemo.set(memoKey, token);
+			return token;
+		};
+		const pairKey = (a, b) => a + TOKEN_SEP + b;
+		const bi = new Map();
+		const biBefore = new Map();
+		const triBefore = new Map();
+		const push = (map, key, entry) => (map.get(key) || map.set(key, []).get(key)).push(entry);
+		for (const [a, b, n] of table.bi) {
+			bi.set(pairKey(a, b), n);
+			push(biBefore, b, [a, n]);
+		}
+		for (const [x, a, b, n] of table.tri) push(triBefore, pairKey(a, b), [x, n]);
+		// A distribution: token → share, one entry of share 1 when there is one.
+		const normal = (counts) => {
+			if (counts.size === 1) return [[counts.keys().next().value, 1]];
+			let total = 0;
+			for (const n of counts.values()) total += n;
+			return Array.from(counts, ([token, n]) => [token, n / total]);
+		};
+		const add = (counts, token, n) => counts.set(token, (counts.get(token) || 0) + n);
+		// The tokens t is after p (one token known before it), from the triples.
+		const givenMemo = new Map();
+		const given = (p, t) => {
+			if (!capable(t)) return [[t, 1]];
+			const key = pairKey(p, t);
+			let dist = givenMemo.get(key);
+			if (dist) return dist;
+			const counts = new Map();
+			let rest = bi.get(key) || 0;
+			for (const [y, m] of triBefore.get(key) || []) {
+				add(counts, tokenOf(t, y + p), m);
+				rest -= m;
+			}
+			// The pairs with nothing before p.
+			if (rest > 0 || counts.size === 0) add(counts, tokenOf(t, p), Math.max(rest, 1));
+			givenMemo.set(key, (dist = normal(counts)));
+			return dist;
+		};
+		// The tokens of all of t's occurrences.
+		const anyMemo = new Map();
+		const anywhere = (t, total) => {
+			if (!capable(t)) return [[t, 1]];
+			let dist = anyMemo.get(t);
+			if (dist) return dist;
+			const counts = new Map();
+			let rest = total;
+			for (const [p, m] of biBefore.get(t) || []) {
+				for (const [token, share] of given(p, t)) add(counts, token, m * share);
+				rest -= m;
+			}
+			if (rest > 0 || counts.size === 0) add(counts, tokenOf(t, ''), Math.max(rest, 1));
+			anyMemo.set(t, (dist = normal(counts)));
+			return dist;
+		};
+		const uniCount = new Map(table.uni.map(([t, n]) => [t, n]));
+		const uni = [];
+		for (const entry of table.uni) {
+			const [t, n] = entry;
+			const dist = anywhere(t, n);
+			if (dist.length === 1 && dist[0][0] === t) uni.push(entry);
+			else for (const [token, share] of dist) uni.push([token, n * share]);
+		}
+		// The tokens of a pair: its first token after each character before it
+		// (the triples), then the pairs with nothing before. A distribution of
+		// « ta TOKEN_SEP tb » over the pair's count; a triple's first two
+		// tokens share it, so the pairs a triple holds read as the pair's.
+		const pairMemo = new Map();
+		const pairTokens = (a, b) => {
+			const key = pairKey(a, b);
+			let dist = pairMemo.get(key);
+			if (dist) return dist;
+			const n = bi.get(key) || 0;
+			const before = triBefore.get(key) || [];
+			// Tables cut to their most frequent n-grams may hold more triples than their pair.
+			let known = 0;
+			for (const [, m] of before) known += m;
+			const scale = known > n ? n / known : 1;
+			const parts = new Map();
+			let rest = n;
+			for (const [x, m] of before) {
+				const tb = tokenOf(b, x + a);
+				for (const [ta, share] of given(x, a)) add(parts, pairKey(ta, tb), m * scale * share);
+				rest -= m * scale;
+			}
+			if (rest > 0 || parts.size === 0)
+				add(parts, pairKey(tokenOf(a, ''), tokenOf(b, a)), Math.max(rest, 1));
+			pairMemo.set(key, (dist = normal(parts)));
+			return dist;
+		};
+		const same = (dist, entry, size) =>
+			dist.length === 1 && dist[0][0] === entry.slice(0, size).join(TOKEN_SEP);
+		const biOut = [];
+		for (const entry of table.bi) {
+			const [a, b, n] = entry;
+			const dist = !capable(a) && !capable(b) ? null : pairTokens(a, b);
+			if (dist === null || same(dist, entry, 2)) biOut.push(entry);
+			else for (const [key, share] of dist) biOut.push(key.split(TOKEN_SEP).concat([n * share]));
+		}
+		const triOut = [];
+		for (const entry of table.tri) {
+			const [a, b, c, n] = entry;
+			if (!capable(a) && !capable(b) && !capable(c)) {
+				triOut.push(entry);
+				continue;
+			}
+			const tc = tokenOf(c, a + b);
+			const dist = pairTokens(a, b).map(([key, share]) => [key + TOKEN_SEP + tc, share]);
+			if (same(dist, entry, 3)) triOut.push(entry);
+			else for (const [key, share] of dist) triOut.push(key.split(TOKEN_SEP).concat([n * share]));
+		}
+		return {
+			table: { prepared: true, uni, bi: biOut, tri: triOut, totalChars: table.totalChars },
+			tokens,
+			classify: (t, before) => classify(t, before).token
+		};
 	}
 
 	const ruleGraphCache = new WeakMap();
@@ -2475,7 +2832,7 @@ var LAYOUT_ANALYSIS = (function () {
 				),
 				// The access weights the ways were chosen by: rescore() refuses others.
 				access: Object.assign({}, plan.access),
-				alternatives: plan.multi.size,
+				alternatives: report.alternatives,
 				changed: pct(report.changed, c.chars),
 				paths: report.paths,
 				chords: report.chords
@@ -2737,6 +3094,7 @@ var LAYOUT_ANALYSIS = (function () {
 			modifiers: 0,
 			altgr: 0,
 			dead: 0,
+			context: 0,
 			distance: 0,
 			bigrams: 0,
 			sfb: 0,
@@ -2801,6 +3159,7 @@ var LAYOUT_ANALYSIS = (function () {
 				if (seq.dead) c.dead += typed;
 				if (seq.shift + seq.altgr > 0) c.modifiers += typed;
 				if (seq.altgr > 0) c.altgr += typed;
+				if (seq.context !== undefined) c.context += typed;
 			},
 			unsupported(char, n) {
 				c.unsupported += n;
@@ -3111,6 +3470,7 @@ var LAYOUT_ANALYSIS = (function () {
 			modifier_usage: pct(c.modifiers, c.chars),
 			altgr_usage: pct(c.altgr, c.chars),
 			dead_key_usage: pct(c.dead, c.chars),
+			context_key_usage: pct(c.context, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
 			compact_fit: compact,
@@ -3739,6 +4099,7 @@ var LAYOUT_ANALYSIS = (function () {
 		// The ways before the substitutes, which a trial compiles again only in part.
 		const core = compileCore(firstLayout, board, null, 'record');
 		const compiled = finishWays(new Map(core.ways), core.texts);
+		compiled.context = contextWays(firstLayout, board, null);
 		const plan = planTyping(compiled, board, table, mode);
 		const walked = walkAll(plan);
 		const formValues = forms.map((form) => formFit(firstLayout, board, table, form));
@@ -3816,14 +4177,25 @@ var LAYOUT_ANALYSIS = (function () {
 				throw new Error('layout_analysis: a score session keeps the levels it started on');
 			trials += 1;
 			const serial = trials;
+			// A layout with repeat or magic keys, before or after, is compiled,
+			// planned and walked whole: its context tokens are no characters of
+			// the incremental steps.
+			const contextual = layout.context !== undefined || state.layout.context !== undefined;
 			// Compiled from the current layout: only the ways the changed cells and rules reach.
-			const nextCore = compileCoreFrom(state.core, layout, board, spares);
-			const nextCompiled =
-				nextCore === state.core
-					? state.compiled
-					: nextCore.whole
-						? finishWays(new Map(nextCore.ways), nextCore.texts)
-						: finishWaysFrom(state.compiled, nextCore, spares);
+			const nextCore = contextual
+				? compileCore(layout, board, null, 'record')
+				: compileCoreFrom(state.core, layout, board, spares);
+			let nextCompiled;
+			if (contextual) {
+				nextCompiled = finishWays(new Map(nextCore.ways), nextCore.texts);
+				nextCompiled.context = contextWays(layout, board, null);
+			} else
+				nextCompiled =
+					nextCore === state.core
+						? state.compiled
+						: nextCore.whole
+							? finishWays(new Map(nextCore.ways), nextCore.texts)
+							: finishWaysFrom(state.compiled, nextCore, spares);
 			// Planned from the current plan: only the choices a changed token can reach are made again.
 			const nextPlan = planTyping(nextCompiled, board, table, mode, state.plan, {
 				spare: spares.plan,
@@ -3835,7 +4207,8 @@ var LAYOUT_ANALYSIS = (function () {
 			// How the trial was walked: the changed characters' n-grams ('stream'),
 			// the changed contexts ('context'), or nothing to walk or all ('whole').
 			let walk = 'whole';
-			if (state.simple && simple(nextPlan)) {
+			if (contextual) next = Object.assign(walkAll(nextPlan), { changed: chars.length });
+			else if (state.simple && simple(nextPlan)) {
 				next = walkChanged(state.seqs, seqs);
 				walk = 'stream';
 			} else if (nextPlan.changed) {
@@ -3882,7 +4255,8 @@ var LAYOUT_ANALYSIS = (function () {
 				walk,
 				changed,
 				// How the layout was compiled: not at all (the same ways), in part, or whole.
-				compile: nextCore === state.core ? 'none' : nextCore.whole ? 'whole' : 'incremental',
+				compile:
+					nextCore === state.core ? 'none' : contextual || nextCore.whole ? 'whole' : 'incremental',
 				compiled: nextCompiled,
 				/** The plan's report (analyse()'s typing paths and chords), before the next trial. */
 				typing() {
@@ -4151,10 +4525,14 @@ var LAYOUT_ANALYSIS = (function () {
 		const rows = layoutInput.rows || {};
 		const dead = layoutInput.dead || {};
 		const prefixes = levelPrefixes(layoutInput);
+		const levelIds = (checkLevels(layoutInput) || DEFAULT_LEVELS).map((level) => level.id);
 		const label = (code, level) => {
 			const base = rows[code] ? rows[code][0] : null;
 			let name = code;
-			if (typeof base === 'string' && base !== '') name = legend.visibleText(base);
+			// The level of the step: a repeat or magic key shows its own label there.
+			const own = contextLabel(layoutInput, code, levelIds.indexOf(level));
+			if (own !== '') name = own;
+			else if (typeof base === 'string' && base !== '') name = legend.visibleText(base);
 			else if (base && base.dead) {
 				// What the dead key types alone (its terminator), as its key shows it.
 				const accent = legend.deadKeyText((dead[base.dead] || {})[' '] || '');
@@ -4771,7 +5149,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   triples: Array<{keys: [number, number, number], events: string[]}>,
 	 *   counts: object, bigrams: number, trigrams: number, unsupported: number}}
 	 *   chars: each character, kind null when the layout cannot type it (or a
-	 *   break), steps its [code, level id, level index in the rows] presses, held the modifiers held for
+	 *   break; « repeat » or « magic » when the layout's own repeat or magic
+	 *   key types it after the characters before it), steps its [code, level id, level index in the rows] presses, held the modifiers held for
 	 *   it by name (« Shift », « AltGr », a layout's own: « Mod3 »), keys its indexes in `keys`; keys: the stream, each press with
 	 *   its finger (a model.fingers id) and the character it types; pairs and
 	 *   triples: index n-grams of `keys` with their events
@@ -4798,30 +5177,48 @@ var LAYOUT_ANALYSIS = (function () {
 		const prefixes = levelPrefixes(layout);
 		const fingerIds = data().model.fingers;
 		const kindOf = (way) => {
+			if (way.context !== undefined) return way.context;
 			if (way.substituted) return 'substitution';
 			if (way.dead) return 'dead';
 			if (way.altgr > 0) return 'altgr';
 			return way.shift > 0 ? 'shift' : 'direct';
 		};
-		const typed = (char) => !TRACE_BREAK.test(char) && plan.best.has(char);
+		// Each character's token: a context token where a repeat or magic key
+		// types it after the characters typed before it in its stretch.
+		const contextual = plan.context ? plan.context.tokens : null;
+		const longest = data().model.context_keys.context_max;
+		const tokens = [];
+		let stretch = '';
+		for (const char of chars) {
+			let token = char;
+			if (contextual && !TRACE_BREAK.test(char)) token = plan.context.classify(char, stretch);
+			tokens.push(token);
+			stretch = TRACE_BREAK.test(char)
+				? ''
+				: codePoints(stretch + char)
+						.slice(-longest)
+						.join('');
+		}
+		const typed = (i) => !TRACE_BREAK.test(chars[i]) && plan.best.has(tokens[i]);
 		const outChars = [];
 		const keys = [];
 		const segments = [];
 		let segment = [];
 		let unsupported = 0;
 		chars.forEach((char, i) => {
-			if (!typed(char)) {
+			if (!typed(i)) {
 				if (!TRACE_BREAK.test(char)) unsupported++;
 				outChars.push({ char, kind: null, steps: [], held: [], keys: [] });
 				if (segment.length > 0) segments.push(segment);
 				segment = [];
 				return;
 			}
-			const before = i > 0 && typed(chars[i - 1]) ? chars[i - 1] : null;
-			const after = i + 1 < chars.length && typed(chars[i + 1]) ? chars[i + 1] : null;
-			const way = plan.multi.has(char)
-				? plan.ways.get(char)[plan.choose(before, char, after)]
-				: plan.best.get(char);
+			const before = i > 0 && typed(i - 1) ? tokens[i - 1] : null;
+			const after = i + 1 < chars.length && typed(i + 1) ? tokens[i + 1] : null;
+			const token = tokens[i];
+			const way = plan.multi.has(token)
+				? plan.ways.get(token)[plan.choose(before, token, after)]
+				: plan.best.get(token);
 			// The modifiers held for the character: its last key's level's, by name.
 			const last = way.layers[way.layers.length - 1];
 			const held = prefixes
@@ -6299,7 +6696,11 @@ var LAYOUT_ANALYSIS = (function () {
 	 *    when it costs less than them (each way's own cost plus the pair
 	 *    between the taps); outputs that would overlap keep the one that saves
 	 *    the most. Longer outputs count in distinct_chars only.
-	 * 2. Context: a character with several ways is typed, at each occurrence,
+	 * 2. Repeat and magic keys (contextWays): where the text before a
+	 *    character makes such a key type it, the character is a context token
+	 *    (contextTable) whose ways add the key's, so step 3 chooses it there
+	 *    like any other way; the fixed path never takes it.
+	 * 3. Context: a character with several ways is typed, at each occurrence,
 	 *    the way that costs least with its neighbours: its own presses, the key
 	 *    pairs and triples it forms with the characters before and after it
 	 *    (typed their cheapest way), and the skipgram triples with the
@@ -6313,20 +6714,77 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   types every character its cheapest way out of context, with no chord
 	 *   (the fixed path the best one is compared with); access holds the
 	 *   access weights the choice costs a way's modifiers and dead keys by.
-	 * @param {object} [previous] - The plan of a layout a few keys away on the
-	 *   same table (scoreSession): when both have the same chords and
+	 * @param {object} [previousPlan] - The plan of a layout a few keys away on the
+	 *   same table (scoreSession; ignored for a layout with repeat or magic keys): when both have the same chords and
 	 *   multi-way tokens, only the choices whose context holds a token whose
 	 *   ways changed are made again, and the plan records what changed
 	 *   (plan.changed) for an incremental walk. The result is the plan made
 	 *   from nothing, to the last bit.
-	 * @param {{spare: object, changed: Set<string>|null}} [from] - With
-	 *   previous (scoreSession): the spareMaps() the plan's own ways are written
+	 * @param {{spare: object, changed: Set<string>|null}} [spares] - With
+	 *   previousPlan (scoreSession): the spareMaps() the plan's own ways are written
 	 *   into, and the characters whose lists may differ from those of the
 	 *   compile previous was planned from (null: unknown).
-	 * @returns {object} {table, ways, best, multi, chords, choose, uniDist,
+	 * @returns {object} {table, ways, best, multi, chords, context?, choose, uniDist,
 	 *   leftDist, rightDist, pickAt, parts, before, after, changed?}.
 	 */
-	function planTyping(compiled, board, charTable, mode, previous, from) {
+	function planTyping(compiled, board, charTable, mode, previousPlan, spares) {
+		if (!compiled.context || mode.fixed)
+			return planWays(compiled, board, charTable, mode, previousPlan, spares);
+		// A layout with repeat or magic keys is planned from nothing: its
+		// context tokens are no characters of the incremental choice. Step 3
+		// weighs each way with its neighbours typed their cheapest way out of
+		// context, so two such ways in a row can meet on one finger unforeseen:
+		// the plan keeps them only when its whole path costs less than without.
+		const withKeys = planWays(compiled, board, charTable, mode);
+		if (!withKeys.context) return withKeys;
+		const without = planWays(
+			Object.assign({}, compiled, { context: null }),
+			board,
+			charTable,
+			mode
+		);
+		return planPoints(board, withKeys, charTable, mode.access) <
+			planPoints(board, without, charTable, mode.access)
+			? withKeys
+			: without;
+	}
+
+	/**
+	 * The points typingCost gives a plan's path: its stream walked, with the
+	 * presses measure() reads (the pinkies', the outer column's, the home
+	 * row's and the graded travel).
+	 * @param {object} board - From keyboard().
+	 * @param {object} plan - From planWays().
+	 * @param {object} charTable - From prepareNgrams().
+	 * @param {object} access - From accessWeights().
+	 * @returns {number} Points.
+	 */
+	function planPoints(board, plan, charTable, access) {
+		const c = streamCounts();
+		const keyCount = new Float64Array(board.codes.length);
+		walkTyped(board, plan, streamVisitor(board, c, keyCount, {}, null));
+		const modifierKeys = new Set(Object.values(board.modifiers));
+		let pinky = 0;
+		let outer = 0;
+		let home = 0;
+		for (let k = 0; k < keyCount.length; k++) {
+			const f = board.finger[k];
+			if (f === 0 || f === data().model.fingers.length - 1) pinky += keyCount[k];
+			if (f === LEFT_THUMB || f === RIGHT_THUMB) continue;
+			if (board.outer[k]) outer += keyCount[k];
+			if (!modifierKeys.has(k) && board.relRow[k] === 0) home += keyCount[k];
+		}
+		const parts = gradeParts(board, c, keyCount);
+		const distance = c.chars > 0 ? c.distance / c.chars : 0;
+		const travel =
+			gradedValue('distance', distance, parts.distance, data().grades.distance) * c.chars;
+		return typingCost(charTable, c, { pinky, outer, home, travel }, access);
+	}
+
+	/** planTyping's plan of one compile (its steps), never compared with another. */
+	function planWays(compiled, board, charTable, mode, previousPlan, spares) {
+		const previous = compiled.context ? undefined : previousPlan;
+		const from = compiled.context ? undefined : spares;
 		const plan = {
 			table: charTable,
 			ways: compiled.ways,
@@ -6391,6 +6849,36 @@ var LAYOUT_ANALYSIS = (function () {
 				plan.best.set(chord, compiled.texts.get(chord)[0]);
 			}
 		}
+		// 2. Repeat and magic keys: a character they type after its context is a
+		// token of its own there, with their ways beside the character's.
+		if (compiled.context) {
+			const ctx = contextTable(plan.table, compiled.context);
+			if (ctx.tokens.size > 0) {
+				plan.table = ctx.table;
+				if (plan.ways === compiled.ways) {
+					plan.ways = new Map(compiled.ways);
+					plan.best = new Map(compiled.best);
+				}
+				for (const [token, { char, keys }] of ctx.tokens) {
+					// The character's own ways first, its cheapest out of context at
+					// their head as for any token (the neighbours' choice reads it), then
+					// the keys' best first, in the room MAX_WAYS leaves (at least one).
+					const own = plan.ways.get(char) || [];
+					const lists = new Map();
+					for (const i of keys) offerWay(lists, token, compiled.context.keys[i].way);
+					const extra = lists
+						.get(token)
+						.filter((way) => !own.some((mine) => sameWayKeys(mine, way)));
+					const room = Math.max(1, MAX_WAYS - own.length);
+					const list = own
+						.slice(0, MAX_WAYS - Math.min(room, extra.length))
+						.concat(extra.slice(0, room));
+					plan.ways.set(token, list);
+					plan.best.set(token, list[0]);
+				}
+				plan.context = ctx;
+			}
+		}
 		// The alternatives: a dead key closed by a thumb key is not one. The
 		// pair metrics leave the space out, so such a way would hide an SFB
 		// behind an extra press no typist makes; it stays the way of a
@@ -6414,7 +6902,7 @@ var LAYOUT_ANALYSIS = (function () {
 		if (plan.filtered) from.spare.mark(filtered);
 		const { ways, multi } = plan;
 
-		// 2. Context (planContext, on token ids).
+		// 3. Context (planContext, on token ids).
 		for (const [token] of table.uni) {
 			const list = ways.get(token);
 			if (list && list.length > 1) multi.add(token);
@@ -7502,14 +7990,17 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} board - From keyboard().
 	 * @param {object} plan - From planTyping().
 	 * @param {object} layout - The layout planned (library shape): its level ids.
-	 * @returns {{paths: object, chords: object, changed: number}} paths: char →
-	 *   [{kind, steps: [[code, level]], count}] best way first; chords: text →
+	 * @returns {{paths: object, chords: object, changed: number, alternatives:
+	 *   number}} alternatives: the characters with several ways; paths: char →
+	 *   [{kind, steps: [[code, level]], count}] best way first, a repeat or magic
+	 *   key's (kind repeat or magic) after the character's own; chords: text →
 	 *   count; changed: characters typed otherwise than their cheapest way out
 	 *   of context (chord characters included).
 	 */
 	function typingReport(board, plan, layout) {
 		const levels = levelTable(layout, board).ids;
 		const kind = (way) => {
+			if (way.context !== undefined) return way.context;
 			if (way.substituted) return 'substitution';
 			if (way.width) return 'chord';
 			if (way.dead) return 'dead';
@@ -7521,19 +8012,58 @@ var LAYOUT_ANALYSIS = (function () {
 			steps: way.keys.map((k, i) => [board.codes[k], levels[way.layers[i]]]),
 			count
 		});
-		const paths = {};
+		// A context token's ways are its character's (contextTable): one row each.
+		const contextual = plan.context ? plan.context.tokens : new Map();
+		const charOf = (token) => (contextual.has(token) ? contextual.get(token).char : token);
+		const merged = new Map();
+		const addPath = (char, way, count) => {
+			if (!(count > 0)) return;
+			const entry = describe(way, count);
+			const id = JSON.stringify([entry.kind, entry.steps]);
+			const ways = merged.get(char) || merged.set(char, new Map()).get(char);
+			if (ways.has(id)) ways.get(id).count += count;
+			else ways.set(id, entry);
+		};
+		const uniOf = new Map(plan.table.uni);
 		let changed = 0;
+		const done = new Set();
 		for (const token of plan.multi) {
 			const st = plan.ctx;
 			const u = st.model.idOf.get(token);
 			const at = u * MAX_WAYS;
 			const dist = Array.from(st.uniDist.subarray(at, at + st.uniLen[u]));
 			const list = plan.ways.get(token);
-			paths[token] = list
-				.map((way, i) => describe(way, dist[i]))
-				.filter((entry) => entry.count > 0);
-			// A chord's characters all count as changed below.
-			if (!plan.chords.includes(token)) changed += dist.reduce((s, x) => s + x, 0) - dist[0];
+			const char = charOf(token);
+			if (!merged.has(char)) merged.set(char, new Map());
+			list.forEach((way, i) => addPath(char, way, dist[i]));
+			done.add(token);
+			// A chord's characters all count as changed below; a context token's
+			// uses count when another way than the character's own cheapest.
+			if (contextual.has(token)) {
+				const own = plan.best.get(char);
+				list.forEach((way, i) => {
+					if (way !== own) changed += dist[i];
+				});
+			} else if (!plan.chords.includes(token))
+				changed += dist.reduce((sum, x) => sum + x, 0) - dist[0];
+		}
+		// The rest of the characters a context token splits: their one way.
+		for (const [token, { char }] of contextual) {
+			for (const t of [char, token]) {
+				if (done.has(t) || !plan.best.has(t)) continue;
+				done.add(t);
+				const n = uniOf.get(t) || 0;
+				addPath(char, plan.best.get(t), n);
+				if (t === token) changed += n;
+			}
+		}
+		const paths = {};
+		for (const [char, ways] of merged) {
+			const list = Array.from(ways.values());
+			// The character's own ways first, then the repeat and magic keys'.
+			paths[char] = list
+				.filter((entry) => entry.kind !== 'repeat' && entry.kind !== 'magic')
+				.concat(list.filter((entry) => entry.kind === 'repeat' || entry.kind === 'magic'));
 		}
 		const chords = {};
 		for (const [token, n] of plan.table.uni)
@@ -7542,7 +8072,9 @@ var LAYOUT_ANALYSIS = (function () {
 				changed += codeLength(token) * n;
 				if (!paths[token]) paths[token] = [describe(plan.ways.get(token)[0], n)];
 			}
-		return { paths, chords, changed };
+		// The characters with several ways, a context token's with its character's.
+		const alternatives = new Set(Array.from(plan.multi, charOf)).size;
+		return { paths, chords, changed, alternatives };
 	}
 
 	// =======================
@@ -8432,6 +8964,8 @@ var LAYOUT_ANALYSIS = (function () {
 		layoutKeyboard,
 		fingeringProfile,
 		layoutFromRows,
+		contextOutput,
+		contextLabel,
 		levelsOf,
 		layoutFromComposerSource,
 		typingCodes,
