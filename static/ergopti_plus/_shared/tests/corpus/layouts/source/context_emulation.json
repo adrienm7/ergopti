@@ -28,7 +28,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
@@ -93,7 +95,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
@@ -158,7 +162,9 @@
 				"id": "shift",
 				"selectors": [
 					{
-						"required": ["shift"],
+						"required": [
+							"shift"
+						],
 						"optional": []
 					}
 				],
