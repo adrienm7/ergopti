@@ -1,0 +1,427 @@
+{
+	"_comment": "Text targets of the auto-clicker and the user workflows (_shared/shortcuts/engine/text_target.lua and its Windows twin). normalize pins the comparison form: lower case, accents removed through _shared/core/text/data/text_fold.json, punctuation and every space read as one space. find vectors give recognised words (boxes in image pixels, a line id grouping one line's words) and a target; expect is the hit's box and distance, or null.",
+	"normalize": [
+		{
+			"id": "case_and_accents",
+			"text": "Autoriser UNE Fois",
+			"expect": "autoriser une fois"
+		},
+		{
+			"id": "french_accents",
+			"text": "Réessayer à nouveau, ÉTÉ",
+			"expect": "reessayer a nouveau ete"
+		},
+		{
+			"id": "punctuation_and_spaces",
+			"text": "  « Allow…  once »! ",
+			"expect": "allow once"
+		},
+		{
+			"id": "no_break_spaces",
+			"text": "Autoriser une fois",
+			"expect": "autoriser une fois"
+		},
+		{
+			"id": "ligature_and_sharp_s",
+			"text": "Œuvre Straße",
+			"expect": "oeuvre strasse"
+		},
+		{
+			"id": "cyrillic_lowered",
+			"text": "Разрешить ОДИН раз",
+			"expect": "разрешить один раз"
+		},
+		{
+			"id": "cjk_kept",
+			"text": "一度だけ許可",
+			"expect": "一度だけ許可"
+		},
+		{
+			"id": "empty_after_punctuation",
+			"text": "…!?",
+			"expect": ""
+		}
+	],
+	"find": [
+		{
+			"id": "french_button",
+			"words": [
+				{
+					"text": "Copilot",
+					"x": 10,
+					"y": 10,
+					"width": 70,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "wants",
+					"x": 90,
+					"y": 10,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "to",
+					"x": 150,
+					"y": 10,
+					"width": 20,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "run",
+					"x": 180,
+					"y": 10,
+					"width": 30,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "Autoriser",
+					"x": 400,
+					"y": 300,
+					"width": 90,
+					"height": 20,
+					"line": "2.1.1"
+				},
+				{
+					"text": "une",
+					"x": 500,
+					"y": 300,
+					"width": 40,
+					"height": 20,
+					"line": "2.1.1"
+				},
+				{
+					"text": "fois",
+					"x": 550,
+					"y": 300,
+					"width": 40,
+					"height": 20,
+					"line": "2.1.1"
+				},
+				{
+					"text": "Annuler",
+					"x": 620,
+					"y": 300,
+					"width": 70,
+					"height": 20,
+					"line": "2.1.2"
+				}
+			],
+			"target": {
+				"id": "allow_once",
+				"variants": ["Allow once", "Autoriser une fois"],
+				"max_distance": 0
+			},
+			"expect": {
+				"x": 400,
+				"y": 300,
+				"width": 190,
+				"height": 20,
+				"distance": 0,
+				"variant": "Autoriser une fois"
+			}
+		},
+		{
+			"id": "ocr_misread_within_tolerance",
+			"words": [
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "onee",
+					"x": 90,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 1
+			},
+			"expect": {
+				"x": 30,
+				"y": 40,
+				"width": 100,
+				"height": 20,
+				"distance": 1,
+				"variant": "Allow once"
+			}
+		},
+		{
+			"id": "ocr_misread_beyond_tolerance",
+			"words": [
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "onee",
+					"x": 90,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 0
+			},
+			"expect": null
+		},
+		{
+			"id": "glued_words",
+			"words": [
+				{
+					"text": "Allowonce",
+					"x": 30,
+					"y": 40,
+					"width": 90,
+					"height": 20,
+					"line": "1.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 1
+			},
+			"expect": {
+				"x": 30,
+				"y": 40,
+				"width": 90,
+				"height": 20,
+				"distance": 1,
+				"variant": "Allow once"
+			}
+		},
+		{
+			"id": "split_word",
+			"words": [
+				{
+					"text": "Autori",
+					"x": 30,
+					"y": 40,
+					"width": 60,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "ser",
+					"x": 95,
+					"y": 40,
+					"width": 30,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "une",
+					"x": 130,
+					"y": 40,
+					"width": 30,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "fois",
+					"x": 170,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Autoriser une fois"],
+				"max_distance": 1
+			},
+			"expect": {
+				"x": 30,
+				"y": 40,
+				"width": 180,
+				"height": 20,
+				"distance": 1,
+				"variant": "Autoriser une fois"
+			}
+		},
+		{
+			"id": "never_across_lines",
+			"words": [
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "once",
+					"x": 30,
+					"y": 80,
+					"width": 40,
+					"height": 20,
+					"line": "1.2.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 0
+			},
+			"expect": null
+		},
+		{
+			"id": "first_in_reading_order",
+			"words": [
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "once",
+					"x": 90,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 200,
+					"width": 50,
+					"height": 20,
+					"line": "2.1.1"
+				},
+				{
+					"text": "once",
+					"x": 90,
+					"y": 200,
+					"width": 40,
+					"height": 20,
+					"line": "2.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["allow once"],
+				"max_distance": 0
+			},
+			"expect": {
+				"x": 30,
+				"y": 40,
+				"width": 100,
+				"height": 20,
+				"distance": 0,
+				"variant": "allow once"
+			}
+		},
+		{
+			"id": "exact_beats_fuzzy",
+			"words": [
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "onse",
+					"x": 90,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "Allow",
+					"x": 30,
+					"y": 200,
+					"width": 50,
+					"height": 20,
+					"line": "2.1.1"
+				},
+				{
+					"text": "once",
+					"x": 90,
+					"y": 200,
+					"width": 40,
+					"height": 20,
+					"line": "2.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 2
+			},
+			"expect": {
+				"x": 30,
+				"y": 200,
+				"width": 100,
+				"height": 20,
+				"distance": 0,
+				"variant": "Allow once"
+			}
+		},
+		{
+			"id": "theme_independent_case",
+			"words": [
+				{
+					"text": "ALLOW",
+					"x": 30,
+					"y": 40,
+					"width": 50,
+					"height": 20,
+					"line": "1.1.1"
+				},
+				{
+					"text": "ONCE",
+					"x": 90,
+					"y": 40,
+					"width": 40,
+					"height": 20,
+					"line": "1.1.1"
+				}
+			],
+			"target": {
+				"id": "t",
+				"variants": ["Allow once"],
+				"max_distance": 0
+			},
+			"expect": {
+				"x": 30,
+				"y": 40,
+				"width": 100,
+				"height": 20,
+				"distance": 0,
+				"variant": "Allow once"
+			}
+		}
+	]
+}

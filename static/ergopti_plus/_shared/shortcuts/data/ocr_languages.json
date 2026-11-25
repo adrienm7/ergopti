@@ -1,0 +1,90 @@
+{
+	"_comment": "The OCR language of each Ergopti interface locale, per engine: tesseract traineddata names on Linux, BCP 47 tags for Windows.Media.Ocr and the macOS Vision framework. The screen vision service asks for the interface language and English, kept to the languages the engine has; Linux falls back to every installed tesseract language when neither is installed.",
+	"fallback": "en",
+	"languages": {
+		"ar": {
+			"tesseract": "ara",
+			"bcp47": "ar"
+		},
+		"cs": {
+			"tesseract": "ces",
+			"bcp47": "cs"
+		},
+		"da": {
+			"tesseract": "dan",
+			"bcp47": "da"
+		},
+		"de": {
+			"tesseract": "deu",
+			"bcp47": "de"
+		},
+		"en": {
+			"tesseract": "eng",
+			"bcp47": "en"
+		},
+		"es": {
+			"tesseract": "spa",
+			"bcp47": "es"
+		},
+		"fr": {
+			"tesseract": "fra",
+			"bcp47": "fr"
+		},
+		"he": {
+			"tesseract": "heb",
+			"bcp47": "he"
+		},
+		"hi": {
+			"tesseract": "hin",
+			"bcp47": "hi"
+		},
+		"it": {
+			"tesseract": "ita",
+			"bcp47": "it"
+		},
+		"ja": {
+			"tesseract": "jpn",
+			"bcp47": "ja"
+		},
+		"ko": {
+			"tesseract": "kor",
+			"bcp47": "ko"
+		},
+		"nl": {
+			"tesseract": "nld",
+			"bcp47": "nl"
+		},
+		"no": {
+			"tesseract": "nor",
+			"bcp47": "nb"
+		},
+		"pl": {
+			"tesseract": "pol",
+			"bcp47": "pl"
+		},
+		"pt": {
+			"tesseract": "por",
+			"bcp47": "pt"
+		},
+		"ru": {
+			"tesseract": "rus",
+			"bcp47": "ru"
+		},
+		"sv": {
+			"tesseract": "swe",
+			"bcp47": "sv"
+		},
+		"tr": {
+			"tesseract": "tur",
+			"bcp47": "tr"
+		},
+		"uk": {
+			"tesseract": "ukr",
+			"bcp47": "uk"
+		},
+		"zh": {
+			"tesseract": "chi_sim",
+			"bcp47": "zh-Hans"
+		}
+	}
+}

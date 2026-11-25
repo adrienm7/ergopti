@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Auto-Click Contract
 --- DESCRIPTION:
---- Replays the anti-sleep auto-clicker corpora through the shared matcher and
---- policy (_shared/shortcuts/engine/auto_click_*.lua). The macOS suite runs it
+--- Replays the anti-sleep auto-clicker corpora through the shared matcher,
+--- text targets and policy (_shared/shortcuts/engine/auto_click_*.lua and
+--- text_target.lua). The macOS suite runs it
 --- on Lua 5.4 and the Linux suite on LuaJIT, so an integer division, a float
 --- key or a wrapped product that only one runtime tolerates fails here; the
 --- Windows twin replays the same files.
@@ -21,9 +22,21 @@ local M = {}
 local Json = require("core.text.engine.json")
 local Matcher = require("shortcuts.engine.auto_click_matcher")
 local Policy = require("shortcuts.engine.auto_click_policy")
+local TextTarget = require("shortcuts.engine.text_target")
 
 local PARK_MILLER_MULTIPLIER = 16807
 local PARK_MILLER_MODULUS = 2147483647
+
+--- Reads a JSON file under _shared/.
+--- @param shared function The driver's helper resolving a path under _shared/.
+--- @param relative string Path under _shared/.
+--- @return table decoded
+local function read_json(shared, relative)
+	local handle = assert(io.open(shared(relative), "rb"))
+	local text = handle:read("*a")
+	handle:close()
+	return assert(Json.decode_lossless(text))
+end
 
 --- Reads a corpus file under _shared/tests/corpus/keep_awake/.
 --- @param shared function The driver's helper resolving a path under _shared/.
@@ -103,6 +116,8 @@ function M.register(helpers, options)
 		"the auto-click contract needs a driver name and a _shared path resolver")
 	local match_corpus = load(options.shared, "auto_click_match_vectors.json")
 	local policy_corpus = load(options.shared, "auto_click_policy_vectors.json")
+	local text_corpus = load(options.shared, "text_target_vectors.json")
+	TextTarget.set_fold(read_json(options.shared, "core/text/data/text_fold.json").fold)
 
 	helpers.describe("auto-click matcher vectors: " .. options.driver, function()
 		for _, vector in ipairs(match_corpus.vectors) do
@@ -144,6 +159,27 @@ function M.register(helpers, options)
 			helpers.assert_eq(x, 137, "x")
 			helpers.assert_eq(y, 71, "y")
 		end)
+	end)
+
+	helpers.describe("text target vectors: " .. options.driver, function()
+		for _, vector in ipairs(text_corpus.normalize) do
+			helpers.it("normalize " .. vector.id, function()
+				helpers.assert_eq(TextTarget.normalize(vector.text), vector.expect, vector.id)
+			end)
+		end
+		for _, vector in ipairs(text_corpus.find) do
+			helpers.it("find " .. vector.id, function()
+				local hit = TextTarget.find(vector.words, vector.target)
+				if Json.is_null(vector.expect) then
+					helpers.assert_nil(hit, vector.id .. " must not match")
+				else
+					helpers.assert_not_nil(hit, vector.id .. " must match")
+					for _, key in ipairs({ "x", "y", "width", "height", "distance", "variant" }) do
+						helpers.assert_eq(hit[key], vector.expect[key], vector.id .. " " .. key)
+					end
+				end
+			end)
+		end
 	end)
 
 	helpers.describe("auto-click policy vectors: " .. options.driver, function()
