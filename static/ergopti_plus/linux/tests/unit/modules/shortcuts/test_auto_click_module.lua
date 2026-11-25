@@ -56,6 +56,18 @@ helpers.describe("anti-sleep auto-clicker module (Linux)", function()
 		end)
 	end)
 
+	helpers.it("auto-click module: the manifest's switch rows read and flip the active preset", function()
+		with_config_dir(function(AutoClick)
+			AutoClick.edit("set_active", "vscode")
+			local before = AutoClick.switch_on("auto_click")
+			helpers.assert_eq(AutoClick.toggle_switch("auto_click"), true, "the flip is saved")
+			helpers.assert_eq(AutoClick.switch_on("auto_click"), not before, "the switch row reads the new state")
+			local rows = AutoClick.status_rows()
+			helpers.assert_true(rows[1].disabled == true and rows[1].label:find("0", 1, true) ~= nil,
+				"the status list starts with the click counter")
+		end)
+	end)
+
 	helpers.it("auto-click module: a session clicks through its ports and stops", function()
 		with_config_dir(function(AutoClick)
 			AutoClick.edit("set_active", "vscode")

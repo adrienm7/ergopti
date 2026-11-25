@@ -3,18 +3,18 @@
 --- ==============================================================================
 --- MODULE: Anti-Sleep Menu Rows — Shared Lua Implementation
 --- DESCRIPTION:
---- The row DATA of the « Anti-veille » submenu's two lists
---- (_shared/menu/data/menu.toml, keep_awake_menu): the presets as one
---- single-choice group, and the active preset's switches with the click
---- counter and the reason anything cannot run. The macOS and Linux drivers
---- hand these rows to the shared renderer; the Windows driver builds the same
---- rows in its twin.
+--- The runtime parts of the « Anti-veille » submenu
+--- (_shared/menu/data/menu.toml, keep_awake_menu): the presets list as one
+--- single-choice group and the status list (the click counter and the
+--- reason anything cannot run). The macOS and Linux drivers hand them to the
+--- shared renderer; the Windows driver builds the same in its twin.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The presets are radio rows: one is always ticked, the active one, and a
 ---    click makes another active for the next Ctrl+M.
---- 2. A switch that cannot run here is greyed with its translated reason
----    (keepawake.reason.<reason>), never hidden and never silently inert.
+--- 2. The switches are `check` rows of the manifest, whose commands and
+---    getters each driver's builder names; a switch that cannot run here is
+---    greyed by its disabled_when, and its exact reason is a red status row.
 --- 3. A capture or OCR problem is a red row of its own, so the user sees why
 ---    the auto-clicker does nothing even before opening a preset.
 --- ==============================================================================
@@ -50,30 +50,22 @@ function M.preset_rows(doc, ports)
 	return rows
 end
 
---- The rows of the options list.
---- @param preset table The active preset.
+--- The rows of the status list: the click counter and every reason something
+--- cannot run, each a red row.
 --- @param ports table {
----   text = i18n getter, switch = function(name, value),
+---   text = i18n getter,
 ---   auto_click_reason = string|nil why auto-click cannot run here,
 ---   problems = { reason… } capture or OCR problems to show,
 ---   clicks = integer clicks so far }
 --- @return table rows
-function M.option_rows(preset, ports)
+function M.status_rows(ports)
 	local rows = {
-		{ label = ports.text("menu.keep_awake.keep_awake"), checked = preset.keep_awake,
-			action = function() ports.switch("keep_awake", not preset.keep_awake) end },
+		{ label = (ports.text("menu.keep_awake.click_count"):gsub("{1}", tostring(ports.clicks))), disabled = true },
 	}
-	local auto = { label = ports.text("menu.keep_awake.auto_click"), checked = preset.auto_click,
-		action = function() ports.switch("auto_click", not preset.auto_click) end }
-	if ports.auto_click_reason then
-		auto.disabled = true
-		auto.disabled_reason_key = "keepawake.reason." .. ports.auto_click_reason
-		auto.action = nil
-	end
-	rows[#rows + 1] = auto
-	rows[#rows + 1] = { label = (ports.text("menu.keep_awake.click_count"):gsub("{1}", tostring(ports.clicks))),
-		disabled = true }
-	for _, reason in ipairs(ports.problems or {}) do
+	local reasons = {}
+	if ports.auto_click_reason then reasons[1] = ports.auto_click_reason end
+	for _, reason in ipairs(ports.problems or {}) do reasons[#reasons + 1] = reason end
+	for _, reason in ipairs(reasons) do
 		rows[#rows + 1] = { label = M.PROBLEM_DOT .. " " .. ports.text("keepawake.reason." .. reason), disabled = true }
 	end
 	return rows

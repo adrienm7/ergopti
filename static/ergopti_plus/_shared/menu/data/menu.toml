@@ -997,9 +997,26 @@ id = "keep_awake_presets"
 type = "section_header"
 i18n = "menu.keep_awake.header_options"
 
+# The active preset's two switches. A Linux session that cannot click (Wayland,
+# no xdotool) greys the auto-click row; the exact reason is a red row of the
+# status list, with the click counter.
+[[menu.keep_awake_menu]]
+type = "check"
+id = "keep_awake_switch"
+i18n = "menu.keep_awake.keep_awake"
+checked_when = ["keep_awake_switch_on"]
+
+[[menu.keep_awake_menu]]
+type = "check"
+id = "keep_awake_auto_click"
+i18n = "menu.keep_awake.auto_click"
+checked_when = ["keep_awake_auto_click_on"]
+disabled_when = ["keep_awake_auto_click_available"]
+disabled_reason_key = "keepawake.auto_click_unavailable"
+
 [[menu.keep_awake_menu]]
 type = "list"
-id = "keep_awake_options"
+id = "keep_awake_status"
 
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing

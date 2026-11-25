@@ -452,6 +452,8 @@ module.exports = Object.freeze({
 		HOTSTRING_SCOPE_ALL_SECTIONS: "hotstring_scope_all_sections",
 		IDLE_RESET: "idle_reset",
 		INCLUDE_REALTIME: "include_realtime",
+		KEEP_AWAKE_AUTO_CLICK: "keep_awake_auto_click",
+		KEEP_AWAKE_SWITCH: "keep_awake_switch",
 		KEYBOARD_CORE_STATUS: "keyboard_core_status",
 		KEYBOARD_GROUP_ADD_CMD: "keyboard_group_add_cmd",
 		KEYBOARD_GROUP_ADD_CMD_SHIFT: "keyboard_group_add_cmd_shift",

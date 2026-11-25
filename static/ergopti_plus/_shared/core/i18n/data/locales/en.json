@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Keep awake in Teams",
 	"keepawake.preset_empty": "This preset neither prevents sleep nor clicks anything: turn one of its options on in the « Keep awake » menu.",
 	"keepawake.auto_click_refused": "Automatic clicks could not start: the « Keep awake » menu says why.",
+	"keepawake.auto_click_unavailable": "Not available in this session: the red row below says why.",
 	"keepawake.reason.auto_click_wayland": "Wayland lets no application move the pointer; use an X11 session to click automatically",
 	"keepawake.reason.auto_click_tool_missing": "xdotool is not installed; install it to click automatically",
 	"keepawake.reason.capture_permission_missing": "Screen recording is not allowed for Ergopti: allow it in System Settings › Privacy & Security",

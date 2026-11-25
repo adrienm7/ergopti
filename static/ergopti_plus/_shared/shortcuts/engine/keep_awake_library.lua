@@ -164,12 +164,29 @@ function M.new(ports)
 			text = ports.text, select = function(id) library.edit("set_active", id) end })
 	end
 
-	--- The rows of the menu's options list.
-	function library.option_rows()
+	--- Whether one switch of the active preset is on (the menu's check rows).
+	--- @param name string "keep_awake" or "auto_click".
+	function library.switch_on(name)
+		return Presets.active(library.document())[name] == true
+	end
+
+	--- Flips one switch of the active preset and saves the document.
+	--- @param name string "keep_awake" or "auto_click".
+	--- @return boolean ok, string|nil reason
+	function library.toggle_switch(name)
 		local current = library.document()
-		return Rows.option_rows(Presets.active(current), {
+		return library.edit("set_switch", current.active, name, not Presets.active(current)[name])
+	end
+
+	--- Whether the auto-click switch can run in this session.
+	function library.auto_click_available()
+		return ports.unavailable_reason() == nil
+	end
+
+	--- The rows of the menu's status list.
+	function library.status_rows()
+		return Rows.status_rows({
 			text = ports.text,
-			switch = function(name, value) library.edit("set_switch", current.active, name, value) end,
 			auto_click_reason = ports.unavailable_reason(),
 			problems = ports.problems(),
 			clicks = ports.clicks(),

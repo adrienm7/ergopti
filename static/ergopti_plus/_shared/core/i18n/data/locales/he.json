@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "מניעת שינה ב-Teams",
 	"keepawake.preset_empty": "הגדרה זו אינה מונעת שינה ואינה לוחצת על דבר: הפעילו אחת מהאפשרויות שלה בתפריט « מניעת שינה ».",
 	"keepawake.auto_click_refused": "לא ניתן להפעיל לחיצות אוטומטיות: הסיבה מופיעה בתפריט « מניעת שינה ».",
+	"keepawake.auto_click_unavailable": "לא זמין בהפעלה זו: השורה האדומה למטה מסבירה מדוע.",
 	"keepawake.reason.auto_click_wayland": "Wayland אינו מאפשר לאף יישום להזיז את הסמן; השתמשו בהפעלת X11 ללחיצות אוטומטיות",
 	"keepawake.reason.auto_click_tool_missing": "xdotool אינו מותקן; התקינו אותו ללחיצות אוטומטיות",
 	"keepawake.reason.capture_permission_missing": "הקלטת מסך אינה מותרת ל-Ergopti: אפשרו אותה בהגדרות המערכת › פרטיות ואבטחה",

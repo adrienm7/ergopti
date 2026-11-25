@@ -145,10 +145,6 @@ _AutoClickSelect(Id) {
 	return (*) => AutoClickEdit(KeepAwakePresetsSetActive, Id)
 }
 
-_AutoClickSwitch(Id, Name, Value) {
-	return (*) => AutoClickEdit(KeepAwakePresetsSetSwitch, Id, Name, Value)
-}
-
 ; The rows of the presets list, as _shared/shortcuts/engine/keep_awake_menu.lua builds them.
 AutoClickPresetRows() {
 	Doc := AutoClickDocument()
@@ -171,17 +167,21 @@ _AutoClickProblems() {
 	return []
 }
 
-; The rows of the options list: the switches, the click counter and the problems.
-AutoClickOptionRows() {
+; Flips one switch of the active preset (the manifest's check rows).
+_AutoClickToggleSwitch(Name, *) {
 	Doc := AutoClickDocument()
 	Preset := KeepAwakePresetsActive(Doc)
-	Rows := [
-		Map("label", t("menu.keep_awake.keep_awake"), "checked", Preset["keep_awake"],
-			"action", _AutoClickSwitch(Doc["active"], "keep_awake", Preset["keep_awake"] ? 0 : 1)),
-		Map("label", t("menu.keep_awake.auto_click"), "checked", Preset["auto_click"],
-			"action", _AutoClickSwitch(Doc["active"], "auto_click", Preset["auto_click"] ? 0 : 1)),
-		Map("label", StrReplace(t("menu.keep_awake.click_count"), "{1}", AutoClickOwner.clicks), "disabled", true)
-	]
+	return AutoClickEdit(KeepAwakePresetsSetSwitch, Doc["active"], Name, Preset[Name] ? 0 : 1)
+}
+
+; Whether one switch of the active preset is on.
+_AutoClickSwitchOn(Name, *) {
+	return KeepAwakePresetsActive(AutoClickDocument())[Name] ? true : false
+}
+
+; The rows of the status list: the click counter and the problems.
+AutoClickStatusRows() {
+	Rows := [Map("label", StrReplace(t("menu.keep_awake.click_count"), "{1}", AutoClickOwner.clicks), "disabled", true)]
 	for Reason in _AutoClickProblems()
 		Rows.Push(Map("label", "🔴 " . t("keepawake.reason." . Reason), "disabled", true))
 	return Rows
@@ -189,9 +189,15 @@ AutoClickOptionRows() {
 
 ; Builds the « Anti-veille » submenu from the manifest's keep_awake_menu.
 _MI_BuildKeepAwakeMenu() {
+	; Windows can always click: the auto-click row is never greyed here.
 	return MenuRenderer_Build("keep_awake_menu", "Anti-veille", "", "", Map(
 		"keep_awake_presets", (*) => AutoClickPresetRows(),
-		"keep_awake_options", (*) => AutoClickOptionRows()))
+		"keep_awake_status", (*) => AutoClickStatusRows()), Map(
+		"keep_awake_switch", _AutoClickToggleSwitch.Bind("keep_awake"),
+		"keep_awake_auto_click", _AutoClickToggleSwitch.Bind("auto_click")), Map(
+		"keep_awake_switch_on", _AutoClickSwitchOn.Bind("keep_awake"),
+		"keep_awake_auto_click_on", _AutoClickSwitchOn.Bind("auto_click"),
+		"keep_awake_auto_click_available", (*) => true))
 }
 
 ; The row stays live while paused: choosing a preset changes no input.

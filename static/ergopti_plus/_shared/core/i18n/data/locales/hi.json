@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Teams में जागृत रखें",
 	"keepawake.preset_empty": "यह प्रीसेट न स्लीप रोकता है न कुछ क्लिक करता है: « जागृत रखें » मेनू में इसका कोई विकल्प चालू करें।",
 	"keepawake.auto_click_refused": "स्वचालित क्लिक शुरू नहीं हो सके: कारण « जागृत रखें » मेनू में है।",
+	"keepawake.auto_click_unavailable": "इस सत्र में उपलब्ध नहीं: नीचे की लाल पंक्ति कारण बताती है।",
 	"keepawake.reason.auto_click_wayland": "Wayland किसी ऐप्लिकेशन को पॉइंटर हिलाने नहीं देता; स्वचालित क्लिक के लिए X11 सत्र का उपयोग करें",
 	"keepawake.reason.auto_click_tool_missing": "xdotool इंस्टॉल नहीं है; स्वचालित क्लिक के लिए इसे इंस्टॉल करें",
 	"keepawake.reason.capture_permission_missing": "Ergopti के लिए स्क्रीन रिकॉर्डिंग की अनुमति नहीं है: इसे सिस्टम सेटिंग्स › गोपनीयता और सुरक्षा में अनुमति दें",

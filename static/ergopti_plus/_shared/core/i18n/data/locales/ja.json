@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Teams でスリープ防止",
 	"keepawake.preset_empty": "このプリセットはスリープを防がず、何もクリックしません。« スリープ防止 » メニューでいずれかのオプションをオンにしてください。",
 	"keepawake.auto_click_refused": "自動クリックを開始できませんでした。理由は « スリープ防止 » メニューに表示されます。",
+	"keepawake.auto_click_unavailable": "このセッションでは利用できません：理由は下の赤い行に表示されます。",
 	"keepawake.reason.auto_click_wayland": "Wayland ではアプリがポインターを動かせません。自動クリックには X11 セッションを使用してください",
 	"keepawake.reason.auto_click_tool_missing": "xdotool がインストールされていません。自動クリックにはインストールしてください",
 	"keepawake.reason.capture_permission_missing": "Ergopti に画面収録が許可されていません。システム設定 › プライバシーとセキュリティで許可してください",

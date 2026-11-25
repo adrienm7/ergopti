@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Teams'te uyku engelleme",
 	"keepawake.preset_empty": "Bu ön ayar uykuyu engellemiyor ve hiçbir şeye tıklamıyor: « Uyku engelleme » menüsünden seçeneklerinden birini açın.",
 	"keepawake.auto_click_refused": "Otomatik tıklamalar başlatılamadı: nedeni « Uyku engelleme » menüsünde yazıyor.",
+	"keepawake.auto_click_unavailable": "Bu oturumda kullanılamıyor: nedeni aşağıdaki kırmızı satırda.",
 	"keepawake.reason.auto_click_wayland": "Wayland hiçbir uygulamanın işaretçiyi taşımasına izin vermez; otomatik tıklama için bir X11 oturumu kullanın",
 	"keepawake.reason.auto_click_tool_missing": "xdotool yüklü değil; otomatik tıklama için yükleyin",
 	"keepawake.reason.capture_permission_missing": "Ergopti için ekran kaydına izin verilmiyor: Sistem Ayarları › Gizlilik ve Güvenlik bölümünden izin verin",

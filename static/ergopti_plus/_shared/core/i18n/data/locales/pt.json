@@ -6636,6 +6636,7 @@
 	"keepawake.preset.teams": "Anti-suspensão no Teams",
 	"keepawake.preset_empty": "Esta predefinição não impede a suspensão nem clica em nada: ative uma das suas opções no menu « Anti-suspensão ».",
 	"keepawake.auto_click_refused": "Não foi possível iniciar os cliques automáticos: o menu « Anti-suspensão » indica o motivo.",
+	"keepawake.auto_click_unavailable": "Indisponível nesta sessão: a linha vermelha abaixo indica porquê.",
 	"keepawake.reason.auto_click_wayland": "O Wayland não deixa nenhuma aplicação mover o ponteiro; use uma sessão X11 para clicar automaticamente",
 	"keepawake.reason.auto_click_tool_missing": "O xdotool não está instalado; instale-o para clicar automaticamente",
 	"keepawake.reason.capture_permission_missing": "A gravação de ecrã não está autorizada para o Ergopti: autorize-a em Definições do Sistema › Privacidade e segurança",
