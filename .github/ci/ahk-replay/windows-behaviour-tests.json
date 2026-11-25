@@ -1,0 +1,24 @@
+{
+	"expected_count": 5,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{
+			"contains": "the staged suspend row",
+			"expected_count": 2
+		},
+		{
+			"contains": "the real altgr chord debounce is per slot",
+			"expected_count": 1
+		},
+		{
+			"contains": "the dispatch asks the slot's debounce",
+			"expected_count": 1
+		},
+		{
+			"contains": "a paused chord still reaches the physical check",
+			"expected_count": 1
+		}
+	]
+}
