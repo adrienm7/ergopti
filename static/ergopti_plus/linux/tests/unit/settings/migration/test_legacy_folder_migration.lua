@@ -88,6 +88,31 @@ helpers.describe("Linux legacy folder migration", function()
 		helpers.assert_true(report.cache_ready, "cache folder reported ready")
 	end)
 
+	helpers.it("moves a v1.0.9 logs folder beside a current one, every boot (legacy-folder-migration-linux-logs-again)", function()
+		-- The stable v1.0.9 still writes ~/.local/state/ergopti_plus/logs, so a
+		-- field user who ran it after a newer build holds both logs folders.
+		-- The old one is never merged over the new: it goes whole to the backup
+		-- folder, the old state folder is removed, and a second boot finds
+		-- nothing left to move.
+		local ports, snapshot = Contract.memory_ports({
+			"/home/u/.local/state/" .. LEGACY .. "/",
+			"/home/u/.local/state/" .. LEGACY .. "/logs/2026-11-20.log",
+			"/home/u/.local/state/" .. NAME .. "/logs/2026-11-25.log",
+		})
+		local storage = { get = function(_, default) return default end, set = function() return true end }
+		local report = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage })
+		local after = table.concat(snapshot(), " ")
+		helpers.assert_true(after:find("/home/u/.local/state/" .. NAME .. "/logs/2026-11-25.log", 1, true) ~= nil,
+			"the current logs are untouched")
+		helpers.assert_true(after:find("/home/u/.local/state/" .. NAME .. "/" .. AppDirs.migration.backup_folder
+			.. "/" .. LEGACY .. "/logs/2026-11-20.log", 1, true) ~= nil, "the old logs are kept in the backup: " .. after)
+		helpers.assert_eq(after:find("/home/u/.local/state/" .. LEGACY .. "/", 1, true), nil, "the old folder is gone")
+		helpers.assert_eq(#report.backed_up, 1)
+		helpers.assert_eq(#report.kept, 0)
+		local again = Migration.run({ config_paths = fake_paths, ports = ports, storage = storage })
+		helpers.assert_eq(#again.moved + #again.backed_up + #again.kept, 0, "a second boot has nothing to move")
+	end)
+
 	helpers.it("keeps a file published after the check, on real folders (legacy-folder-migration-linux-race)", function()
 		local dir = scratch()
 		local ok, err = pcall(function()

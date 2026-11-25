@@ -100,8 +100,13 @@ Drivers:
   `Ergopti-ollama` sibling into `%LOCALAPPDATA%\Ergopti\ollama` (the second one
   to the backup when the first already moved).
 
-The migration is for the maintainer's machines only (no published build used
-the old folders) and is deleted once they are moved.
+The migration was meant for the maintainer's machines only and to be deleted
+once they are moved, but the stable Linux v1.0.9 still writes the
+`ergopti_plus` folders under each XDG base (a field log of 2026-11-25 showed
+`~/.local/state/ergopti_plus/logs` beside `~/.local/state/ergopti/logs`). It
+stays until no supported stable release writes the old folders; a user who
+runs the stable build after a newer one gets the old folder moved, or backed
+up whole, at every boot of the newer one.
 
 ## What the maintainer checks on each machine
 

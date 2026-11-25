@@ -17,9 +17,11 @@
 ---    legacy_folder_migration.lua; this module only resolves the folders and
 ---    owns the native effects (POSIX test, libuv scandir, mkdir, rmdir) and the
 ---    no-replace rename of infra/no_replace_move.
---- 3. Maintainer Machines Only: no Linux build was published with the old
----    folders; this exists for the maintainer's own installs and goes once they
----    are moved (docs/tooling/one-folder-name-handoff.md).
+--- 3. Published Old Folders: the stable v1.0.9 still writes the old folders,
+---    so a user who runs it after a newer build holds both. The migration stays
+---    until no supported stable release writes them, and runs at every boot:
+---    an old entry whose destination is taken goes whole to the backup folder
+---    (docs/tooling/one-folder-name-handoff.md).
 --- ==============================================================================
 
 local M = {}
