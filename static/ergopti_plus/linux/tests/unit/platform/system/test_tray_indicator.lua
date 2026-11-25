@@ -72,6 +72,20 @@ local function fake_binding()
 			end
 		end,
 		gtk_init_check = function() return 1 end,
+		-- The status window: one window and its label, recorded.
+		gtk_window_new = function() return widget("window") end,
+		gtk_window_set_title = function(w, title) w.title = title end,
+		gtk_window_set_position = function() end,
+		gtk_window_set_default_size = function() end,
+		gtk_container_set_border_width = function() end,
+		gtk_label_new = function(text) return widget("label", text) end,
+		gtk_label_set_text = function(w, text) w.label = text end,
+		gtk_label_set_line_wrap = function() end,
+		gtk_label_set_max_width_chars = function() end,
+		gtk_label_set_selectable = function() end,
+		gtk_container_add = function(window, child) window.child = child end,
+		gtk_window_present = function() end,
+		gtk_widget_hide_on_delete = function() end,
 		gtk_events_pending = function()
 			log.pending_polls = (log.pending_polls or 0) + 1
 			-- Two events then quiet, so the drain both runs and terminates.
@@ -224,6 +238,21 @@ helpers.describe("tray indicator: creation", function()
 		helpers.assert_true(log.menu ~= nil,
 			"most panels hide an indicator with no menu, so waiting for the first "
 				.. "setMenu() means the icon appears late or not at all")
+		ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("shows each problem's own text in the one status window", function()
+		-- Two tray problem rows share the window; the second opened with the
+		-- first one's explanation.
+		local ind, log = with_fake()
+		ind.create("ergopti-plus", "input-keyboard", "Ergopti+")
+		helpers.assert_true(ind.show_window("Windows", "Install lua51-lgi"))
+		helpers.assert_true(ind.show_window("Keyboard", "Log out and back in"))
+		local windows = {}
+		for _, w in ipairs(log.widgets) do if w.kind == "window" then windows[#windows + 1] = w end end
+		helpers.assert_eq(#windows, 1, "the window is reused")
+		helpers.assert_eq(windows[1].title, "Keyboard")
+		helpers.assert_eq(windows[1].child.label, "Log out and back in")
 		ind._set_binding_for_test(nil)
 	end)
 
