@@ -83,6 +83,8 @@ M.CHECK_RUNNERS = {
 	composer = "diagnostics.ui.field_check.composer_check",
 	network = "diagnostics.ui.field_check.network_check",
 	setup = "diagnostics.ui.field_check.setup_check",
+	tray = "diagnostics.ui.field_check.tray_check",
+	session = "diagnostics.ui.field_check.session_check",
 }
 
 
