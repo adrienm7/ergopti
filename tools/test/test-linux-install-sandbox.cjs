@@ -173,10 +173,14 @@ function runInstaller(scenario) {
 		stubs,
 		'apt-get',
 		`${log}\nfor p in "$@"; do case " ${absent} " in *" $p "*) exit 100 ;; esac; done\n` +
-			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
+			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\n` +
+			// The extension package puts the extension where the next shell reads it.
+			'for p in "$@"; do [ "$p" = gnome-shell-extension-appindicator ] || continue\n' +
+			'\textension="${XDG_DATA_DIRS%%:*}/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com"\n' +
+			'\tmkdir -p "$extension" && : > "$extension/metadata.json"\ndone\nexit 0'
 	);
 	// Stub desktop capabilities; ownership hashes must come from real coreutils.
-	for (const name of ['notify-send', 'sqlite3', 'secret-tool', 'xkbcli'])
+	for (const name of ['notify-send', 'sqlite3', 'secret-tool', 'xkbcli', 'xclip', 'wl-copy'])
 		stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
 	// are "missing" until the package manager was asked for them.
@@ -209,7 +213,12 @@ function runInstaller(scenario) {
 
 	const env = {
 		...(scenario.configRootName ? { XDG_CONFIG_HOME: bashPath(configRoot) } : {}),
-		...(scenario.gnome ? { XDG_CURRENT_DESKTOP: 'ubuntu:GNOME' } : {}),
+		...(scenario.gnome
+			? {
+					XDG_CURRENT_DESKTOP: 'ubuntu:GNOME',
+					XDG_DATA_DIRS: bashPath(path.join(sandbox, 'system-share'))
+				}
+			: {}),
 		HOME: bashPath(home),
 		PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
 		TMPDIR: bashPath(sandbox),
@@ -917,6 +926,32 @@ for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
 			errors.push(
 				`the extension must be enabled for the next login, merged into the user's list; got ${set || '<no gsettings set>'}`
 			);
+		}
+	} finally {
+		run.cleanup();
+	}
+}
+// A failed extension install must not be reported as enabled for the next
+// login: that setting names an extension the next shell cannot find.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		gnome: true,
+		absentPackages: ['gnome-shell-extension-appindicator']
+	});
+	try {
+		if (run.status !== 0) errors.push(`install.sh exited ${run.status} on GNOME`);
+		if (
+			run.calls.some(
+				(call) =>
+					call.startsWith('gsettings set org.gnome.shell enabled-extensions') &&
+					call.includes('appindicatorsupport@rgcjonas.gmail.com')
+			)
+		) {
+			errors.push('an extension that failed to install was enabled for the next login');
+		}
+		if (!run.output.includes('extensions.gnome.org/extension/615/')) {
+			errors.push('a failed extension install did not send the user to the extension page');
 		}
 	} finally {
 		run.cleanup();
