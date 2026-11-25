@@ -55,6 +55,7 @@
 		"connector_no_input_file",
 		"connector_osascript_not_started",
 		"connector_shortcuts_not_started",
+		"context_key_not_in_keylayout",
 		"context_pending",
 		"context_unavailable",
 		"control_action_identifier",

@@ -2489,6 +2489,58 @@ var LAYOUT_FORMATS = (function () {
 		};
 	}
 
+	// The modifiers that select the four text levels of a source (macOS: Option is
+	// AltGr), in the analysis's level order: LayoutSource.TEXT_LEVELS.
+	const TEXT_LEVEL_SELECTORS = ['', 'shift', 'alt', 'alt+shift'];
+
+	/**
+	 * A source's repeat and magic keys as the analysis reads them
+	 * (LAYOUT_ANALYSIS.layoutFromRows: context and magic), on the levels of the
+	 * layout read from it: a level of its own by its layer's id (fromSource), else
+	 * the four text levels by the modifiers their layer requires. A mapping on a
+	 * layer no level reads, or in a platform's or the ANSI variant's own keys,
+	 * is not on the ISO board the Studio measures.
+	 * @param {object} doc - A validated structured source.
+	 * @param {object} layout - The layout read from it (library shape).
+	 * @returns {{context: object, magic: object}|null} null without such a key.
+	 */
+	function contextFromSource(doc, layout) {
+		const levels = layout.levels || null;
+		const width = levels ? levels.length : LAYERS;
+		const levelOf = (layer) => {
+			if (levels) return levels.findIndex((level) => level.id === layer.id);
+			if (layer.optional.length > 0) return -1;
+			return TEXT_LEVEL_SELECTORS.indexOf(layer.required.slice().sort().join('+'));
+		};
+		const context = {};
+		for (const layer of doc.layers || []) {
+			const level = levelOf(layer);
+			for (const [code, mapping] of Object.entries(layer.keys || {})) {
+				const action =
+					typeof mapping.repeat === 'number'
+						? { repeat: mapping.repeat }
+						: typeof mapping.magic === 'string'
+							? { magic: mapping.magic }
+							: null;
+				if (action === null || level < 0) continue;
+				if (!context[code]) context[code] = new Array(width).fill(NONE);
+				context[code][level] = action;
+			}
+		}
+		if (Object.keys(context).length === 0) return null;
+		const used = new Set(
+			Object.values(context).flatMap((row) => row.filter((a) => a && a.magic).map((a) => a.magic))
+		);
+		const magic = {};
+		for (const table of doc.magic || [])
+			if (used.has(table.id))
+				magic[table.id] = {
+					rules: table.rules.map((rule) => ({ after: rule.after, types: rule.types })),
+					fallback: typeof table.fallback === 'string' ? table.fallback : ''
+				};
+		return { context, magic };
+	}
+
 	/**
 	 * A layout read from an Ergopti source with its tap-holds analysed as
 	 * holds (an idea seen in the Layouts Wiki playground, which models tap and
@@ -3192,6 +3244,7 @@ var LAYOUT_FORMATS = (function () {
 		sourceHoldSets,
 		fromSource,
 		withTapHolds,
+		contextFromSource,
 		levelLabels,
 		levelLosses,
 		toKla,

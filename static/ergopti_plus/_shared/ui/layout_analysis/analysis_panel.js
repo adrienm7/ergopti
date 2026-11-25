@@ -142,7 +142,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 * as macOS types it; a source with levels of its own (Neo's Mod3 and Mod4
 	 * on custom held modifiers, which no .keylayout holds) is read from its
 	 * layers instead, every level kept (LAYOUT_FORMATS.fromSource). Either way
-	 * its tap-holds are analysed as holds (LAYOUT_FORMATS.withTapHolds).
+	 * its tap-holds are analysed as holds (LAYOUT_FORMATS.withTapHolds), and its
+	 * repeat and magic keys, which no .keylayout holds either, are added
+	 * (LAYOUT_FORMATS.contextFromSource).
 	 * @param {object} doc - A LayoutSourceIO document.
 	 * @returns {object} The layout in the library shape.
 	 * @throws {Error} When the document cannot be compiled to an ISO .keylayout
@@ -153,9 +155,21 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const fingering = DATA.model.fingerings.standard;
 		// Its tap-holds analysed as holds (formats.withTapHolds).
 		const held = (layout) => E.layoutFromRows(formats.withTapHolds(layout, doc, fingering));
+		// The source's repeat and magic keys, which no .keylayout holds, on the levels read.
+		const withContext = (layout) => {
+			const found = window.LayoutSourceIO.isPreserved(doc)
+				? null
+				: formats.contextFromSource(doc, layout);
+			if (!found) return layout;
+			// The emulation takes such a key before the .keylayout: its cell there is not typed.
+			const rows = Object.assign({}, layout.rows);
+			for (const [code, actions] of Object.entries(found.context))
+				if (rows[code]) rows[code] = rows[code].map((cell, i) => (actions[i] ? null : cell));
+			return E.layoutFromRows(Object.assign({}, layout, found, { rows }));
+		};
 		if (!window.LayoutSourceIO.isPreserved(doc) && formats.sourceHoldSets(doc)) {
 			const read = formats.fromSource(doc, fingering, E.typingCodes());
-			return held(E.layoutFromRows(Object.assign(read, { origin: 'user' })));
+			return withContext(held(E.layoutFromRows(Object.assign(read, { origin: 'user' }))));
 		}
 		const file = window.LayoutSourceIO.keylayoutFile(doc, SOURCE_BOARD);
 		const source = window.LayoutComposer.parseSource(
@@ -168,7 +182,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const layout = E.layoutFromComposerSource(source, E.typingCodes());
 		layout.name = doc.layout.name || doc.layout.id;
 		layout.origin = 'user';
-		return window.LayoutSourceIO.isPreserved(doc) ? layout : held(layout);
+		return window.LayoutSourceIO.isPreserved(doc) ? layout : withContext(held(layout));
 	}
 
 	/** Reads a stored value; an unavailable storage gives none. */

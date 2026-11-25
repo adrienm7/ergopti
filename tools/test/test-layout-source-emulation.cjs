@@ -81,7 +81,8 @@ function replay(table, steps) {
 	const session = Engine.newSession(Engine.compile(table));
 	for (const [index, step] of steps.entries()) {
 		let got;
-		if (step.press !== undefined) got = Engine.press(session, step.press, step.held, step.at);
+		if (step.press !== undefined)
+			got = Engine.press(session, step.press, step.held, step.at, step.before);
 		else if (step.release !== undefined) got = Engine.release(session, step.release, step.at);
 		else if (step.tick !== undefined) got = { actions: Engine.tick(session, step.tick) };
 		else got = { actions: Engine.reset(session) };
@@ -346,6 +347,78 @@ let neoReplayed = 0;
 	checks++;
 }
 
+// A layout's own repeat and magic keys (layout-context-keys-emulation): every
+// platform emulates them on its native layers from the text typed before, the
+// tables carry the magic tables, every native layout file leaves them out, a
+// tap-hold cannot tap one, and the engine refuses a press without that text.
+let contextReplayed = 0;
+{
+	const contextGolden = JSON.parse(read(path.join(corpus, 'context_emulation.json')));
+	const contextVectors = JSON.parse(read(path.join(corpus, 'context_vectors.json')));
+	const doc = Source.read(read(path.join(corpus, contextVectors.source)));
+	for (const platform of contextVectors.platforms) {
+		const table = clone(Source.compileEmulation(doc, { platform }));
+		assert.deepEqual(
+			table,
+			contextGolden[platform],
+			`${platform}: regenerate with node tools/codegen/codegen-layout-source-emulation.cjs`
+		);
+		assert.deepEqual(table.not_emulated, [], `${platform}: every repeat and magic key is emulated`);
+		assert.deepEqual(Object.keys(table.magic), ['sfb'], `${platform}: the magic table travels`);
+		for (const vector of contextVectors.cases) {
+			assert.equal(replay(table, vector.steps), null, `${platform}: ${vector.name}`);
+			contextReplayed++;
+		}
+		const session = Engine.newSession(Engine.compile(table));
+		assert.throws(
+			() => Engine.press(session, 'Quote', [], 0),
+			/needs the text typed before it/,
+			`${platform}: a magic key without the text before is refused`
+		);
+	}
+	const omitted = Source.compileKeylayout(doc).omitted.map(
+		(entry) => `${entry.path}:${entry.reason}`
+	);
+	for (const path_ of [
+		'layers.base.keys.IntlBackslash',
+		'layers.base.keys.Quote',
+		'layers.shift.keys.IntlBackslash'
+	])
+		assert(
+			omitted.includes(`${path_}:context_key_not_in_keylayout`),
+			`the .keylayout lists ${path_} as omitted (${omitted.join(', ')})`
+		);
+	const tapped = clone(doc);
+	tapped.tap_holds = [
+		{ key: 'Space', tap: { repeat: 1 }, hold_modifier: 'shift', threshold_ms: 200 }
+	];
+	const tappedTable = clone(
+		Source.compileEmulation(Source.validate(tapped), { platform: 'linux' })
+	);
+	assert.deepEqual(
+		tappedTable.not_emulated,
+		[{ path: 'tap_holds[0].tap', reason: 'context_key_tap_not_emulated' }],
+		'a tap-hold cannot tap a repeat key'
+	);
+	for (const [what, spoil] of [
+		['an unknown magic table', (d) => (d.layers[0].keys.Quote = { magic: 'none' })],
+		['an unused magic table', (d) => d.magic.push({ id: 'other', rules: [] })],
+		['a context of three characters', (d) => (d.magic[0].rules[0].after = 'the')],
+		['an output of two characters', (d) => (d.magic[0].rules[0].types = 'de')],
+		['a context twice', (d) => d.magic[0].rules.push({ after: 'e', types: 'f' })],
+		['a repeat three places back', (d) => (d.layers[0].keys.IntlBackslash = { repeat: 3 })]
+	]) {
+		const spoiled = clone(doc);
+		spoil(spoiled);
+		assert.throws(
+			() => Source.validate(spoiled),
+			/source_/,
+			`the source validator accepts ${what}`
+		);
+	}
+	checks++;
+}
+
 // Layouts that hold no custom modifier on Caps Lock or AltGr and type no dead
 // key on an emulated layer (ergopti-emulation-unchanged): the tables of the
 // Ergopti layouts are byte for byte those pinned before the emulation held
@@ -373,5 +446,5 @@ let neoReplayed = 0;
 }
 
 console.log(
-	`[OK] layout source emulation: ${checks} checks (golden tables, ${vectors.cases.length} shared typing vectors per platform, ${neoReplayed} Neo 2 level replays, refusals, reports, CLI)`
+	`[OK] layout source emulation: ${checks} checks (golden tables, ${vectors.cases.length} shared typing vectors per platform, ${neoReplayed} Neo 2 level replays, ${contextReplayed} repeat and magic key replays, refusals, reports, CLI)`
 );

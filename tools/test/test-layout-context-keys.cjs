@@ -31,6 +31,10 @@
  * 5. Score session: after random swaps of a contextual layout's cells, a
  *    trial's total equals the whole analysis's, compiled whole.
  * 6. Kept apart from ★: the labels never use Ergopti+'s magic key glyph.
+ * 7. Source: the layout source validator's bounds are analysis_model.json's,
+ *    and a source's repeat and magic mappings reach the analysis on their
+ *    layers' levels (contextFromSource, the editor's reading), breaking the
+ *    SFB as the same keys written in the library shape do.
  * ==============================================================================
  */
 
@@ -45,6 +49,9 @@ const DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.j
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const VECTORS_PATH = shared('tests', 'corpus', 'layouts', 'magic_vectors.json');
 const MODEL_PATH = shared('layouts', 'data', 'analysis', 'analysis_model.json');
+const FORMATS_PATH = shared('ui', 'layout_analysis', 'layout_formats.js');
+const SOURCE_PATH = shared('tests', 'corpus', 'layouts', 'source', 'context_source.toml');
+const NEO_PATH = shared('tests', 'corpus', 'layouts', 'source', 'neo2_source.toml');
 // Floors: an empty vector file must not read as a pass.
 const MIN_VECTORS = 20;
 const TOLERANCE = 1e-9;
@@ -317,6 +324,52 @@ for (const label of Object.values(
 		!ERGOPTI_GLYPHS.includes(label),
 		`apart: a layout key is labelled ${label}, Ergopti+'s glyph`
 	);
+
+// ==========================
+// ======= 7/ Source ========
+// ==========================
+
+// The layout source's repeat and magic mappings reach the analysis on the levels
+// of their layers (LAYOUT_FORMATS.contextFromSource, the editor's reading), and
+// the source validator's bounds are the analysis's.
+{
+	const { loadLayoutSource } = require('../lib/layout-source.cjs');
+	const Source = loadLayoutSource();
+	const model = JSON.parse(fs.readFileSync(MODEL_PATH, 'utf8'));
+	check(
+		JSON.stringify(Source.CONTEXT_KEYS) ===
+			JSON.stringify({
+				repeat_depths: model.context_keys.repeat_depths,
+				context_max: model.context_keys.context_max
+			}),
+		`source: the validator's bounds ${JSON.stringify(Source.CONTEXT_KEYS)} differ from analysis_model.json's`
+	);
+	vm.runInContext(fs.readFileSync(FORMATS_PATH, 'utf8'), sandbox, { filename: FORMATS_PATH });
+	const F = vm.runInContext('LAYOUT_FORMATS', sandbox);
+	const doc = Source.read(fs.readFileSync(SOURCE_PATH, 'utf8'));
+	const found = copy(F.contextFromSource(doc, { rows: {} }));
+	check(
+		JSON.stringify(found.context) ===
+			JSON.stringify({
+				IntlBackslash: [{ repeat: 1 }, { repeat: 2 }, null, null],
+				Quote: [{ magic: 'sfb' }, null, null, null]
+			}) && found.magic.sfb.rules.length === 3,
+		`source: the context read from context_source.toml is ${JSON.stringify(found)}`
+	);
+	const fromSource = copy(qwerty);
+	fromSource.id = 'qwerty_source';
+	fromSource.rows.IntlBackslash = [null, null, null, null];
+	fromSource.rows.Quote = [null, null, null, null];
+	const sourced = E.measure(Object.assign(fromSource, found), ed, { keyboard: 'iso' });
+	check(
+		near(sourced.metrics.sfb, 0) && near(sourced.metrics.context_key_usage, 50),
+		`source: the source's magic key does not break « ed » (${sourced.metrics.sfb} % SFB)`
+	);
+	check(
+		F.contextFromSource(Source.read(fs.readFileSync(NEO_PATH, 'utf8')), { rows: {} }) === null,
+		'source: a source without repeat or magic keys gains a context'
+	);
+}
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
