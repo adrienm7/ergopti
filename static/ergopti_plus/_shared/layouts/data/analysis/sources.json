@@ -71,6 +71,11 @@
 			"url": "https://github.com/O-X-E-Y/oxeylyzer",
 			"checked": "2026-11-14"
 		},
+		"keycraft": {
+			"title": "keycraft (Barend Scholtus)",
+			"url": "https://github.com/rbscholtus/keycraft",
+			"checked": "2026-11-25"
+		},
 		"cmini": {
 			"title": "cmini",
 			"url": "https://github.com/Apsu/cmini",
@@ -170,6 +175,11 @@
 			"title": "Ergopti — how the Oxeylyzer score is reproduced",
 			"path": "docs/design/analyser-scores.md",
 			"anchor": "oxeylyzer"
+		},
+		"analyser_doc_keycraft": {
+			"title": "Ergopti — how the keycraft score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "keycraft"
 		},
 		"analyser_doc_dariogoetz": {
 			"title": "Ergopti — how the Keyboard Layout Optimizer (dariogoetz) score is reproduced",
@@ -285,6 +295,7 @@
 		"analyser.dariogoetz": ["analyser_doc_dariogoetz", "dariogoetz"],
 		"analyser.cmini": ["analyser_doc_cmini", "cmini"],
 		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"],
-		"analyser.cyanophage": ["analyser_doc_cyanophage", "cyanophage"]
+		"analyser.cyanophage": ["analyser_doc_cyanophage", "cyanophage"],
+		"analyser.keycraft": ["analyser_doc_keycraft", "keycraft"]
 	}
 }

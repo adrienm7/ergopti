@@ -300,15 +300,6 @@ waits for the maintainer's review).
       its `.json`) into `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`;
       then `test-windows-lua-export-identity.cjs` checks them and the Windows lane runs the byte-equality proof.
 
-- [ ] **Other analysers, what is left (2026-11-24).** genkey and Oxeylyzer were rerun on their text corpora on
-      2026-11-24 (`verify-analyser-scores.cjs --genkey`, `--oxeylyzer`: Score within 0.005 % and 0.0003 on average,
-      docs/design/analyser-scores.md); since 2026-11-25 genkey is `exact` on texts and both stay `close` for the
-      word lists and the 12 count-table corpora (the trigrams' chain, no text to count from). keycraft (BSD-3, Go, its score scaled on its own layout set) needs its
-      own run to be checked: it builds in a cloud session (rbscholtus/keycraft f8c6419, 2026-11-25, Go 1.27 fetched by
-      `GOTOOLCHAIN=auto`, `go build ./cmd/keycraft`). Its score is Σ weight × (metric − median) / IQR over the 150
-      layouts of its `data/layouts` scored on the same corpus (`internal/keycraft/scorer.go`, weights in
-      `data/config/weights.txt`, metrics in `analyser.go`), so a scorer needs that reference set shipped and scored per
-      corpus; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Every idea of
       `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where) but two: magic
       and repeat keys with Kawalyzer's « Clever Keys », whose analysis is built (`docs/design/magic-and-repeat-keys.md`,
@@ -619,6 +610,18 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **How the Studio's keycraft score reads a layout (decided by the agent on 2026-11-25, to review by the
+      maintainer).** keycraft's grid holds three letter rows of twelve keys and six thumb keys, and its `.klf` reader
+      takes one ASCII byte per key. Kept meanwhile (docs/design/analyser-scores.md, « keycraft »): the base layer of
+      those keys on our board (Tab and Caps Lock columns, the bracket and quote column, the space bar as its fourth
+      thumb key), each character lower-cased and kept on its first key; non-ASCII keys (bépo's « é », AZERTY's « ù »)
+      are typed, as keycraft's analyser does, though no `.klf` file can hold them; under the user's fingering each
+      key takes the user's finger and that finger's hand, against the statistics of keycraft's own fingering. The
+      other choices: drop non-ASCII keys (what a `.klf` file of the layout would give, AZERTY and bépo far worse), or
+      recompute the reference statistics with the user's fingering (a different scale per user). shirolyzer is not
+      reproduced: its score is a fitted model over a per-context fingering search, documented by its configuration
+      only and refitted twice in the week read (same document, « Not covered »); to revisit once a release
+      documents its score.
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
       are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script

@@ -2337,7 +2337,8 @@ var LAYOUT_ANALYSIS = (function () {
 			bi: split(ngrams.bigrams, 2),
 			tri: split(ngrams.trigrams, 3),
 			breaks: null,
-			analysers: null
+			analysers: null,
+			references: null
 		};
 		prepared.totalChars = prepared.uni.reduce((sum, entry) => sum + entry[1], 0);
 		// The counts some analysers read from the text itself
@@ -2346,6 +2347,13 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!ngrams.analysers || typeof ngrams.analysers !== 'object')
 				throw new Error('layout_analysis: analysers must be an object');
 			prepared.analysers = ngrams.analysers;
+		}
+		// The statistics some analysers take over their own reference layouts
+		// on this corpus (LAYOUT_ANALYSER_SCORES.referenceTables), when shipped.
+		if (ngrams.references !== undefined) {
+			if (!ngrams.references || typeof ngrams.references !== 'object')
+				throw new Error('layout_analysis: references must be an object');
+			prepared.references = ngrams.references;
 		}
 		// The n-grams with a line break or a tab (ngramsFromText), when the
 		// table has them; only the analysers that type Enter and Tab read them.

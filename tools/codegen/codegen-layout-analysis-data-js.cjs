@@ -94,6 +94,8 @@ const HAND_FINGERS = [
 const HAND_SHARE = 50;
 const MAX_PINKY_SHARE = 8;
 const ANALYSERS_PATH = shared('layouts', 'data', 'analysis', 'analyser_models.json');
+// keycraft's reference layouts, written by tools/build/import-keycraft-layouts.cjs.
+const KEYCRAFT_REFERENCE_PATH = shared('layouts', 'data', 'analysis', 'keycraft_reference.json');
 // The text patterns the Windows antivirus-surface gate refuses in the shipped
 // bundle (tools/ci/windows-exe-av-surface.cjs reads the same file).
 const AV_POLICY_PATH = path.join(REPO_ROOT, 'tools', 'ci', 'windows-exe-av-surface.json');
@@ -127,7 +129,8 @@ const SOURCES = [
 	'layouts/data/analysis/board_geometries.json',
 	'static/corpus/register.json',
 	'layouts/data/analysis/analyser_models.json',
-	'ui/layout_analysis/analyser_scores.js (textTables)',
+	'layouts/data/analysis/keycraft_reference.json',
+	'ui/layout_analysis/analyser_scores.js (textTables, referenceTables)',
 	'layouts/data/keycodes/physical_keys.json',
 	'layouts/data/keycodes/keyboard_forms.json',
 	'../../layouts/registry (through layout_composer)'
@@ -262,14 +265,16 @@ function loadEngine() {
 
 /**
  * The analyser scorers (analyser_scores.js), loaded as the classic script a
- * page loads with only their constants defined: textTables() reads nothing
- * else.
+ * page loads with only their constants defined, after the engine:
+ * textTables() reads nothing else, referenceTables() the engine's
+ * prepareNgrams() only.
  * @param {object} analysers - buildAnalysers() output.
  * @returns {object} LAYOUT_ANALYSER_SCORES.
  */
 function loadAnalyserScores(analysers) {
 	const sandbox = { LAYOUT_ANALYSIS_DATA: { analysers } };
 	vm.createContext(sandbox);
+	vm.runInContext(fs.readFileSync(ENGINE_PATH, 'utf8'), sandbox, { filename: ENGINE_PATH });
 	vm.runInContext(fs.readFileSync(ANALYSER_SCORES_PATH, 'utf8'), sandbox, {
 		filename: ANALYSER_SCORES_PATH
 	});
@@ -866,6 +871,9 @@ function buildCorpora(engine, scores) {
 		// (genkey's and Oxeylyzer's skipgrams of every gap); a word list or a
 		// count table has no text to count them from.
 		const ownCounts = counts.breaks ? scores.textTables(text) : null;
+		// What keycraft takes over its reference layouts on this corpus, so the
+		// page does not score them itself (every corpus: they read the tables).
+		const references = scores.referenceTables(counts);
 		// Its most frequent words, counted from the same text by the engine's rule;
 		// a count table brings its own, counted by the importer from its source.
 		const words =
@@ -905,6 +913,7 @@ function buildCorpora(engine, scores) {
 				}
 			};
 		}
+		tables[corpus.id].references = references;
 		if (words) tables[corpus.id].words = words;
 		const characters = Object.values(counts.chars).reduce((sum, n) => sum + n, 0);
 		// A localized name, for a title that describes rather than names a work.
@@ -1063,6 +1072,7 @@ function corpusSource(id, table, licence) {
 					`"trigrams":${tableText(table.breaks.trigrams, patterns)}}`
 				: '') +
 			(table.analysers ? `,"analysers":${analyserText(table.analysers, patterns)}` : '') +
+			`,"references":${JSON.stringify(table.references)}` +
 			(table.words ? `,"words":${tableText(table.words, patterns)}` : '') +
 			'};',
 		''
@@ -1426,7 +1436,33 @@ function checkAnalysers(analysers) {
  * @throws {Error} As checkAnalysers().
  */
 function buildAnalysers() {
-	return checkAnalysers(JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers);
+	const analysers = checkAnalysers(JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers);
+	analysers.keycraft.model.reference_layouts = keycraftReferenceLayouts();
+	return analysers;
+}
+
+// Floor: a reference set read as empty must not ship statistics of nothing.
+const MIN_KEYCRAFT_LAYOUTS = 100;
+const KEYCRAFT_KEYS = 42;
+
+/**
+ * keycraft's reference layouts (keycraft_reference.json), checked.
+ * @returns {{name: string, type: string, keys: string}[]} The layouts.
+ * @throws {Error} On a malformed or short reference set.
+ */
+function keycraftReferenceLayouts() {
+	const { layouts } = JSON.parse(fs.readFileSync(KEYCRAFT_REFERENCE_PATH, 'utf8'));
+	if (!Array.isArray(layouts) || layouts.length < MIN_KEYCRAFT_LAYOUTS)
+		throw new Error('keycraft_reference.json: too few layouts');
+	return layouts.map(({ name, type, keys }) => {
+		if (
+			typeof name !== 'string' ||
+			typeof keys !== 'string' ||
+			Array.from(keys).length !== KEYCRAFT_KEYS
+		)
+			throw new Error(`keycraft_reference.json: ${name} is malformed`);
+		return { name, type, keys };
+	});
 }
 
 // ==========================

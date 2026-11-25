@@ -21,7 +21,8 @@
  *    analyser without a score, finite parts) from every analyser on a
  *    built-in corpus, at a cost of at most SCORES_WALKS_BOUND reference walks
  *    of the corpus table per layout (tools/test/lib/table-walk-speed.cjs),
- *    timed in the same process.
+ *    timed in the same process. keycraft's reference statistics shipped
+ *    with the corpus are those its reference layouts give, and are read.
  * 4. Own levels: a layout with levels beyond the four (Neo 2) is scored on
  *    its first four by every analyser, never throwing.
  * ==============================================================================
@@ -380,6 +381,116 @@ for (const layout of sample) {
 		} else check(Number.isFinite(r.value), `${layout.id} ${a.id}: ${r.value} is not finite`);
 	}
 }
+// keycraft's reference statistics: the built-in corpus ships them
+// (references.keycraft), they are what its reference layouts give on the
+// corpus, and a score reads them: a table carrying other statistics scores
+// otherwise. A table without them gets the same score from the reference set.
+{
+	const raw = vm.runInContext('LAYOUT_ANALYSIS_CORPORA', sandbox).fr_don_quichotte;
+	const shipped = raw.references && raw.references.keycraft;
+	check(
+		shipped && shipped.medians && shipped.iqrs,
+		'fr_don_quichotte ships no keycraft statistics'
+	);
+	const bare = Object.assign({}, raw);
+	delete bare.references;
+	const computed = S.referenceTables(bare).keycraft;
+	check(
+		JSON.stringify(computed) === JSON.stringify(shipped),
+		'the shipped keycraft statistics are not those of its reference layouts on the corpus'
+	);
+	const qwerty = library.get('qwerty');
+	const withShipped = S.score('keycraft', qwerty, raw).value;
+	check(
+		withShipped === S.score('keycraft', qwerty, bare).value,
+		'keycraft scores a corpus otherwise with its shipped statistics'
+	);
+	const medians = Object.assign({}, shipped.medians, { SFB: shipped.medians.SFB + 1 });
+	const moved = Object.assign({}, raw, {
+		references: { keycraft: { medians, iqrs: shipped.iqrs } }
+	});
+	check(
+		S.score('keycraft', qwerty, moved).value !== withShipped,
+		'keycraft does not read the statistics a corpus ships'
+	);
+}
+// The import of keycraft's reference layouts reads its notation as its
+// layout.go does (« ~ » empty, « _ » a space, « ~~ », « __ », « ## » the
+// characters) and refuses what it refuses: a character twice, a key of more
+// than one byte, a row of another length, an unknown geometry.
+{
+	const os = require('os');
+	const { readKlf, isReference } = require('../build/import-keycraft-layouts.cjs');
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'keycraft-klf-'));
+	const klf = (name, lines) => {
+		const file = path.join(dir, `${name}.klf`);
+		fs.writeFileSync(file, `${lines.join('\n')}\n`);
+		return file;
+	};
+	const rows = [
+		'~ q w e r t  y u i o p ~~',
+		'__ a s d f g  h j k l ; ##',
+		'~ z x c v b  n m , . / ~',
+		'      ~ ~ ~  _ ~ ~'
+	];
+	try {
+		const read = readKlf(klf('ok', ['# A test layout', 'AngleMod', ...rows]));
+		check(read.type === 'anglemod', `readKlf: geometry ${read.type}`);
+		check(read.credit === 'A test layout', `readKlf: credit ${read.credit}`);
+		const keys = Array.from(read.keys);
+		check(
+			keys.length === 42 &&
+				keys[0] === ' ' &&
+				keys[11] === '~' &&
+				keys[12] === '_' &&
+				keys[23] === '#',
+			`readKlf: keys ${JSON.stringify(read.keys)}`
+		);
+		check(keys[39] === ' ', 'readKlf: the space key is not an empty key');
+		const refused = (name, lines) => {
+			try {
+				readKlf(klf(name, lines));
+			} catch {
+				return true;
+			}
+			return false;
+		};
+		check(
+			refused('twice', ['rowstag', rows[0].replace('w', 'q'), ...rows.slice(1)]),
+			'readKlf: accepts a character twice'
+		);
+		check(
+			refused('wide', ['rowstag', rows[0].replace('w', 'é'), ...rows.slice(1)]),
+			'readKlf: accepts a key outside ASCII, which keycraft refuses'
+		);
+		check(
+			refused('long', ['rowstag', rows[0].replace('w', 'ww'), ...rows.slice(1)]),
+			'readKlf: accepts a key of two characters'
+		);
+		check(
+			refused('short', ['rowstag', rows[0].slice(2), ...rows.slice(1)]),
+			'readKlf: accepts a short row'
+		);
+		check(refused('type', ['split', ...rows]), 'readKlf: accepts an unknown geometry');
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+	check(
+		isReference('qwerty') &&
+			!isReference('_mine') &&
+			!isReference('x-opt') &&
+			!isReference('x-flipped'),
+		"isReference: does not follow keycraft's scorer"
+	);
+}
+// A corpus without a pair or a triple outside white space (the editor's
+// preview of « a ») gets a finite keycraft score: its shares count as 0
+// where keycraft divides by zero, which threw in the Studio (2026-11-25).
+for (const text of ['a', 'ab', 'a b c'])
+	check(
+		Number.isFinite(S.score('keycraft', library.get('qwerty'), E.ngramsFromText(text)).value),
+		`keycraft gives no finite score on ${JSON.stringify(text)}`
+	);
 // A copy of each layout: the engine keeps its key n-grams per layout object,
 // so every round scores from the start.
 const walk = tableWalk(corpus);
