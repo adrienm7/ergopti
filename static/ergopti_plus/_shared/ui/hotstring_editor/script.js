@@ -1136,6 +1136,7 @@ function render() {
 				if (e.auto_expand) html += tag('cb-auto', 'editor.hotstrings.tag_auto');
 				if (e.is_case_sensitive) html += tag('cb-case', 'editor.hotstrings.tag_case');
 				if (e.final_result) html += tag('cb-final', 'editor.hotstrings.tag_final');
+				if (e.action) html += tag('e-action', 'editor.hotstrings.tag_action');
 				if (typeof e.priority === 'number')
 					html += '<li class="tag on tag-prio" data-f="prio">P' + e.priority + '</li>';
 				html += '</ul>';
@@ -1309,6 +1310,87 @@ function parsePrio(raw) {
 	return Math.max(0, Math.min(100, n));
 }
 
+// ========================================
+// ======= Hotstring actions ==============
+// ========================================
+
+/**
+ * Fills the action picker from the host's lists: nothing, the parameterless
+ * actions, then the user's workflows. Hidden when the host offers none.
+ */
+function fillActionSelect() {
+	const select = document.getElementById('e-action');
+	const actions = Array.isArray(D.actions) ? D.actions : [];
+	const workflows = Array.isArray(D.workflows) ? D.workflows : [];
+	document.getElementById('action-box').hidden = actions.length === 0 && workflows.length === 0;
+	select.replaceChildren();
+	const none = document.createElement('option');
+	none.value = '';
+	none.textContent = _t('editor.hotstrings.action_none');
+	select.appendChild(none);
+	const group = (key, items, prefix) => {
+		if (items.length === 0) return;
+		const optgroup = document.createElement('optgroup');
+		optgroup.label = _t(key);
+		for (const item of items) {
+			const option = document.createElement('option');
+			option.value = prefix + item.value;
+			option.textContent = item.label;
+			optgroup.appendChild(option);
+		}
+		select.appendChild(optgroup);
+	};
+	group('editor.hotstrings.action_group_workflows', workflows, 'w:');
+	group('editor.hotstrings.action_group_actions', actions, 'a:');
+}
+
+/** Shows the erase option only when an action is chosen. */
+function updateActionFields() {
+	const chosen = document.getElementById('e-action').value !== '';
+	document.getElementById('erase-row').hidden = !chosen;
+	document.getElementById('erase-desc').hidden = !chosen;
+}
+
+/**
+ * The action picker's value for an entry.
+ * @param {object} e
+ * @returns {string}
+ */
+function actionValueOf(e) {
+	if (!e || !e.action) return '';
+	return e.action === 'run_workflow' ? 'w:' + (e.workflow || '') : 'a:' + e.action;
+}
+
+/**
+ * Selects a stored action, keeping one this OS does not offer: a missing
+ * option would blank the picker and the next save would drop the action.
+ * @param {string} value An actionValueOf() result.
+ */
+function selectActionValue(value) {
+	const select = document.getElementById('e-action');
+	if (value !== '' && ![...select.options].some((option) => option.value === value)) {
+		const option = document.createElement('option');
+		option.value = value;
+		option.textContent = value.slice(2);
+		select.appendChild(option);
+	}
+	if (value !== '') document.getElementById('action-box').hidden = false;
+	select.value = value;
+}
+
+/**
+ * Writes the picker and the erase box into an entry being saved.
+ * @param {object} entry
+ */
+function applyActionFields(entry) {
+	const value = document.getElementById('e-action').value;
+	if (value.startsWith('w:')) {
+		entry.action = 'run_workflow';
+		entry.workflow = value.slice(2);
+	} else if (value.startsWith('a:')) entry.action = value.slice(2);
+	if (entry.action && !document.getElementById('cb-erase').checked) entry.erase_trigger = false;
+}
+
 function resetEntryForm() {
 	document.getElementById('e-trig').innerHTML = '';
 	setEditorContent(document.getElementById('e-out'), '');
@@ -1317,6 +1399,9 @@ function resetEntryForm() {
 	document.getElementById('cb-case').checked = false;
 	document.getElementById('cb-final').checked = false;
 	document.getElementById('e-prio').value = '';
+	document.getElementById('e-action').value = '';
+	document.getElementById('cb-erase').checked = true;
+	updateActionFields();
 	clearEntryErrors();
 	updateHints();
 	updateCbDescs();
@@ -1350,6 +1435,9 @@ function showEditEntry(si, ei, focusField) {
 	document.getElementById('cb-case').checked = !!e.is_case_sensitive;
 	document.getElementById('cb-final').checked = !!e.final_result;
 	document.getElementById('e-prio').value = typeof e.priority === 'number' ? e.priority : '';
+	selectActionValue(actionValueOf(e));
+	document.getElementById('cb-erase').checked = e.erase_trigger !== false;
+	updateActionFields();
 
 	clearEntryErrors();
 	updateHints();
@@ -1407,7 +1495,8 @@ function saveEntry(andNew) {
 		setTimeout(() => document.getElementById('e-trig').focus(), 0);
 		return;
 	}
-	if (!out.trim()) {
+	// An entry that runs an action may type nothing.
+	if (!out.trim() && document.getElementById('e-action').value === '') {
 		setFieldError(
 			'e-out',
 			'out-err',
@@ -1449,6 +1538,7 @@ function saveEntry(andNew) {
 		// so the entry inherits the personal source default.
 		const prio = parsePrio(document.getElementById('e-prio').value);
 		if (prio !== null) entry.priority = prio;
+		applyActionFields(entry);
 
 		const si = edEntry.si;
 		if (edEntry.ei === null) {
@@ -1617,6 +1707,11 @@ function persist() {
 				if (rowIdentityMode && typeof e.origin_id === 'string') o.origin_id = e.origin_id;
 				// Carry an explicit per-hotstring priority through the save.
 				if (typeof e.priority === 'number') o.priority = e.priority;
+				if (e.action) {
+					o.action = e.action;
+					if (e.workflow) o.workflow = e.workflow;
+					if (e.erase_trigger === false) o.erase_trigger = false;
+				}
 				return o;
 			})
 		};
@@ -1642,6 +1737,7 @@ window.initData = function (d) {
 	setDefaultPrio(d.default_priority);
 
 	buildCmdGrid();
+	fillActionSelect();
 	updateHints();
 	updateCompactBtn();
 

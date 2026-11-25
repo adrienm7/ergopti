@@ -1195,6 +1195,19 @@ function M.get_picker_items()
 	return items
 end
 
+--- The actions a hotstring entry can run: the available picker actions that
+--- take no value (run_workflow is offered through the workflow list).
+--- @return table Array of { value, label }.
+function M.get_hotstring_action_choices()
+	local choices = {}
+	for _, item in ipairs(M.get_picker_items()) do
+		if item.type == "action" and not item.disabled and M.get_action_parameter_spec(item.id) == nil then
+			choices[#choices + 1] = { value = item.id, label = item.label }
+		end
+	end
+	return choices
+end
+
 
 -- =========================================
 -- =========================================

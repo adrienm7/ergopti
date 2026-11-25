@@ -3044,6 +3044,20 @@ function M.get_sg_names()
 	return out
 end
 
+--- The actions a hotstring entry can run: the listed actions this driver
+--- runs that take no value (run_workflow is offered through the workflow list).
+--- @return table Array of { value, label }.
+function M.get_hotstring_action_choices()
+	local choices = {}
+	for _, name in ipairs(M.get_sg_names()) do
+		if name:sub(1, 1) ~= "#" and name ~= "none" and SG[name] ~= nil
+			and M.get_action_parameter_spec(name) == nil then
+			choices[#choices + 1] = { value = name, label = M.get_label(name) }
+		end
+	end
+	return choices
+end
+
 --- Every id a binding may name: the listed single actions (modifier chords
 --- included), the axis actions and "none". Built once — the catalogue and the
 --- chord matrix are fixed for the life of the process.

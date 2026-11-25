@@ -834,6 +834,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-workflow-model-vectors.cjs"],
 			"repro": "npm run test:workflow-model-vectors"
+		},
+		{
+			"id": "js-hotstring-editor-action-entry",
+			"ordinal": 742,
+			"name": "hotstring editor stores an entry's action and its erase-trigger option",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-hotstring-editor-action-entry.cjs"],
+			"repro": "npm run test:hs-editor-action-entry"
 		}
 	]
 }

@@ -75,6 +75,7 @@ function loadEditor(data) {
 	vm.runInContext(
 		`
 		buildCmdGrid = function () {};
+		fillActionSelect = function () {};
 		updateHints = function () {};
 		updateCompactBtn = function () {};
 		window.initData(JSON.parse(JSON.stringify(__data)));

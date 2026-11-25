@@ -26,6 +26,7 @@ local i18n          = require("core.i18n.engine.i18n")
 local Paths         = require("core.fs.engine.paths")
 local FileSystem    = require("core.fs.adapters.file_system")
 local DeferredWork  = require("core.timing.engine.deferred_work")
+local ActionEntry   = require("hotstrings.engine.matcher.action_entry")
 local SaveValidation = require("hotstrings.ui.hotstring_editor.save_validation")
 local LOG           = "hotstring_editor"
 
@@ -82,6 +83,10 @@ local _source_snapshot = nil
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
 local _default_priority = nil
+-- { actions = fn, workflows = fn } returning the { value, label } choices an
+-- entry's action picker offers; nil until the boot wires them, and then the
+-- page shows no picker (an editor opened without the shortcut engine).
+local _choice_sources = nil
 
 --- Releases one exact native bridge callback before dropping its Lua owner.
 --- @param usercontent any Candidate or committed usercontent controller.
@@ -285,6 +290,9 @@ local function load_js_data(open_mode)
 							-- Optional per-hotstring collision priority; nil (omitted
 							-- from the JSON) when the entry inherits the source default.
 							priority          = type(e.priority) == "number" and e.priority or nil,
+							action            = e.action,
+							workflow          = e.workflow,
+							erase_trigger     = ActionEntry.erase_of(e),
 						})
 					end
 				end
@@ -318,6 +326,8 @@ local function load_js_data(open_mode)
 		default_section  = _prefs.default_section,
 		default_priority = default_priority,
 		open_mode        = open_mode or "menu",
+		actions          = _choice_sources and _choice_sources.actions() or nil,
+		workflows        = _choice_sources and (_choice_sources.workflows() or {}) or nil,
 	}
 end
 
@@ -712,11 +722,16 @@ end
 --- @param update_menu_fn function Callback to refresh the main menu UI.
 --- @param default_priority number|nil Personal source-default priority, read from
 ---        _shared/hotstrings/data/catalogue/priority.json by the caller (shown as the field placeholder).
-function M.init(toml_path, keymap_mod, update_menu_fn, default_priority)
+--- @param choice_sources table|nil { actions = fn, workflows = fn }: the action
+---        picker's { value, label } choices, read each time the page opens.
+function M.init(toml_path, keymap_mod, update_menu_fn, default_priority, choice_sources)
+	assert(choice_sources == nil or (type(choice_sources.actions) == "function"
+		and type(choice_sources.workflows) == "function"), "hotstring_editor.init: invalid choice sources")
 	_toml_path   = toml_path
 	_keymap      = keymap_mod
 	_update_menu = update_menu_fn
 	if type(default_priority) == "number" then _default_priority = default_priority end
+	_choice_sources = choice_sources
 	_file_ready = ensure_file()
 end
 
