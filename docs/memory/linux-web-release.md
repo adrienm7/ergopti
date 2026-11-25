@@ -147,6 +147,16 @@ lifetime (the Reader's `same_open`), never its input generation: the layer's
 generation once stopped the hook at the next device watchdog tick after the
 first wheel or button binding (`_source_recovery.member_custody`).
 
+### project-linux-plasma-refetches-a-submenu-only-under-a-new-id
+
+libdbusmenu-glib emits every LayoutUpdated on the root (parent 0) and answers false to every AboutToShow, and
+KDE Plasma's importer refetches only the root's own rows (GetLayout depth 1): a submenu it already holds is fetched
+again only when its row id is new. A filled submenu rebuilt under its old parent row left Plasma clicking dead ids
+until Reload (Arch, 2026-11-25). `tray/adapters/appindicator.lua` therefore replaces the top-level row holding any
+reshaped filled submenu (`fits`, `replace_row`), and `tests/hardware/plasma_panel.py` models that cache. Action: a
+tray change that rebuilds rows below the root keeps that replacement, and is proven with the caching panel, never
+with a client that refetches the whole tree.
+
 ### project-linux-the-field-run-reads-the-tray-from-a-child
 
 The field run's tray check (`diagnostics/engine/field_check/tray_check.lua`) reads the daemon's own
