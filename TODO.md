@@ -550,6 +550,30 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       shared root by `build_stamp.txt` has been out for one full release cycle. The structure step that moves
       `linux/infra/version.lua` (also required by v1.0.9) must add that probe too.
 
+## Anti-sleep auto-clicker (maintainer request, 2026-11-25)
+
+The decision is in [maintainer decisions](docs/memory/maintainer-decisions.md) (« The anti-sleep mode gains an
+optional auto-clicker »). Done: the shared matcher and policy with their corpora
+(`_shared/shortcuts/engine/auto_click_*.lua`, `_shared/tests/corpus/keep_awake/`), replayed on Lua 5.4 and LuaJIT.
+
+- [ ] **Windows twin of the matcher and policy** (`modules/shortcuts/`), replaying the same two corpora, with GDI
+      capture of the foreground window rect; AHK `ImageSearch *n` only if its variation is mapped to the tolerance
+      and documented.
+- [ ] **macOS native matcher.** The shared Lua matcher takes about 0.8 s per scale on Lua 5.4 for an 800 × 600
+      window and a 96 × 48 button, too slow for the 700 ms tick in Hammerspoon; capture (`hs.window:snapshot`) and
+      match on the Swift side, pinned by the same corpus, with Screen Recording permission shown as a red
+      `component_status` row when missing.
+- [ ] **Linux capture:** X11 through XGetImage (LuaJIT FFI) of the foreground window, Wayland through the
+      xdg-desktop-portal Screenshot where it runs unattended; elsewhere the option is greyed with a translated reason.
+- [ ] **Menu and runtime on the three OS:** the « Anti-veille » submenu (keep awake, auto-click, « Ajouter un
+      bouton… », import a PNG, the library window, the « clics automatiques » counter), the 700 ms tick and the
+      cooldown in the timings registry, the click then pointer restore, logs through the central logger with the
+      policy's closed reasons, and the library window (`_shared/ui/`, 21 locales, a11y gates, 44 px targets).
+- [ ] **Field checks, one per OS**, with a real VS Code Copilot « Autoriser une fois » / « Allow once » prompt:
+      capture the button, turn on auto-click, Ctrl+M: the prompt is clicked once, the pointer returns, the counter
+      rises by one; the same prompt in another app, a system « Allow » dialog, a locked screen and a paused Ergopti
+      are never clicked. macOS on a Retina and a 1x screen, Windows at 100 % and 150 %, Linux on X11 and Wayland.
+
 ## Dev prerelease numbering (maintainer request, 2026-11-23)
 
 - [ ] **[CI] Restart the dev counter at each new core, once `v1.0.10` stable is published.** Today `N` in
@@ -650,6 +674,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
       `erglace_jf_0_6_17`). The Kalamine rules entering another dead key are kept (1DK twice → ë), which moved the
       golden values of the eight Kalamine layouts held before. The other choice is to keep only the latest version
       of each layout.
+- [ ] **Auto-clicker details (decided by the agent on 2026-11-25, to review by the maintainer).** Kept meanwhile:
+      (1) physical input still ends the anti-sleep mode on Windows and macOS, auto-click included, as before; the
+      auto-clicker's own pointer move is not taken for the user's. (2) One click per match, then the pointer goes
+      back, and one image is not clicked again for 3 s (its cooldown). (3) Only power-of-two scales (½, 1, 2): a
+      button captured at 150 % matches at 150 %, not at 100 %; capture it again on the other screen. (4) A flat
+      image (a single colour) is refused at import, since it would match anywhere. The other choices: keep the
+      auto-clicker running through physical input, or add 1.25 / 1.5 scales at the cost of exact integer resizing.
 
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
