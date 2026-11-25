@@ -1624,6 +1624,15 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["core.lifecycle.engine.compat.utf8"] = { install = function() return false end }
 		-- Main reserves WebKit's collector signal before anything else it loads.
 		modules["core.lifecycle.engine.shutdown.signal_handlers"] = { reserve_webkit_gc_signal = function() return true end }
+		-- Main restores the session's environment for host programs before it
+		-- can start one; the isolated Main runs without a launcher record, so,
+		-- like the real owner, it installs nothing, and only once.
+		local host_environment_installs = 0
+		modules["core.process.adapters.host_environment"] = { install = function()
+			host_environment_installs = host_environment_installs + 1
+			assert(host_environment_installs == 1, "host environment restoration installed twice")
+			return false
+		end }
 		-- Main moves the legacy folders first; the isolated Main moves none.
 		modules["settings.engine.migration.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
 		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
