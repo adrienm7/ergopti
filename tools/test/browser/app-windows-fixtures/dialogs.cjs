@@ -565,6 +565,22 @@ module.exports = [
 							document.activeElement.className,
 							document.activeElement.getAttribute('aria-expanded')
 						]);
+					// The search field's second focus try must not take the focus back
+					// from a control reached meanwhile (it did, and failed this state
+					// whenever the load and this step fell inside its delay).
+					await page.evaluate(() => {
+						focusSearch();
+						document.getElementById('toc-btn').focus();
+					});
+					await page.evaluate(
+						(delay) => new Promise((resolve) => setTimeout(resolve, delay * 2)),
+						await page.evaluate(() => FOCUS_RETRY_MS)
+					);
+					assert.equal(
+						await page.evaluate(() => document.activeElement.id),
+						'toc-btn',
+						'The delayed search focus leaves a moved focus alone'
+					);
 					await page.focus('#list .heading');
 					await page.keyboard.press('Enter');
 					assert.deepEqual(await focused(), ['heading lvl1 collapsed', 'false'], 'Enter folds');

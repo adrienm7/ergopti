@@ -87,6 +87,9 @@ let listLabel = '';
 let strings = { noResults: 'No matching action' };
 // Ready and navigation completion can both push the same document payload.
 let initialized = false;
+// Delay of the search field's second focus try, for a host that gives the
+// view focus late; the app windows' keyboard-fold state waits past it.
+const FOCUS_RETRY_MS = 60;
 
 function el(id) {
 	return document.getElementById(id);
@@ -220,9 +223,11 @@ function focusSearch() {
 	const s = el('search');
 	if (!s) return;
 	s.focus();
+	// The second try is for a host that has not given the view focus yet; it
+	// must not take the focus back from a control the user moved to meanwhile.
 	setTimeout(function () {
-		s.focus();
-	}, 60);
+		if (document.activeElement === document.body || document.activeElement === null) s.focus();
+	}, FOCUS_RETRY_MS);
 }
 
 // ============================================================
