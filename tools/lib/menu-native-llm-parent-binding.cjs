@@ -1963,6 +1963,8 @@ function declaredLinuxNativeTray(unit, builder) {
 	local ctx = type(ctx) == "table" and ctx or {}
 	local rows = {}
 
+	for _, problem_row in ipairs(require("menu.ui.builder.component_status_rows").build()) do rows[#rows + 1] = problem_row end
+
 	rows[#rows + 1] = _build_header(ctx)
 
 	local builders = {

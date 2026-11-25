@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Ergopti 자판 설치됨",
 	"menu.layout.user_layout_unreadable": "Ergopti 자판: 상태를 읽을 수 없음(로그 참조)",
 	"platform_reason.layout_user_install_is_linux": "Linux 전용: 이 행들은 자판 관리자 창 없이 Ergopti 자판을 사용자 키보드 폴더에 설치하고, 활성화하거나 제거합니다. macOS는 .bundle을, Windows는 시스템 자판을 이 메뉴의 각자 행에서 설치합니다.",
+	"platform_reason.component_status_rows_are_linux": "Linux 전용: 이 빨간 행은 창에 필요한 라이브러리나 읽지 못한 키보드 자판처럼 작동하지 않는 Ergopti+의 부분을 알려 줍니다. 일부 Linux 데스크톱에서는 알림만으로는 사라졌기 때문입니다. macOS와 Windows는 이 문제를 각자의 메뉴에서 알립니다.",
 	"menu.layout.active_layouts_unsupported_desktop": "이 데스크톱에서는 사용할 수 없음 (GNOME, KDE 또는 X11만)",
 	"menu.layout.scope_system": "시스템",
 	"menu.layout.scope_user": "사용자",

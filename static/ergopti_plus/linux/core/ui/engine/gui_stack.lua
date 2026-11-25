@@ -239,8 +239,8 @@ function M.check_at_start(deps)
 		out(title)
 		out(body)
 		local status = deps.status or require("core.ui.engine.component_status")
-		status.report({ code = "windows_" .. what, label = text(deps.i18n, "startup.linux_gui_stack_windows_label"),
-			title = title, body = body }, { notifier = deps.notifier })
+		-- The tray names it by its menu.toml row (linux_component_problems).
+		status.report({ code = "windows_" .. what, title = title, body = body }, { notifier = deps.notifier })
 		return nil
 	end
 	Logger.debug(LOG, "Desktop toolkit present: GTK 3, libayatana-appindicator3, lgi and %s.", M.WEBKIT_COMPONENT)

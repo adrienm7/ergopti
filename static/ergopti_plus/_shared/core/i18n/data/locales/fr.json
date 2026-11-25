@@ -2569,6 +2569,7 @@
 	"menu.layout.user_layout_installed": "Disposition Ergopti installée",
 	"menu.layout.user_layout_unreadable": "Disposition Ergopti : état illisible (voir les journaux)",
 	"platform_reason.layout_user_install_is_linux": "Linux uniquement : ces lignes installent la disposition Ergopti dans le dossier clavier de l’utilisateur, l’activent ou la retirent sans passer par la fenêtre du gestionnaire de dispositions. macOS installe son .bundle et Windows sa disposition système depuis leurs propres lignes de ce menu.",
+	"platform_reason.component_status_rows_are_linux": "Linux uniquement : ces lignes rouges nomment une partie d’Ergopti+ qui ne fonctionne pas, comme une bibliothèque absente pour les fenêtres ou une disposition clavier non lue, car une notification seule disparaissait sur certains bureaux Linux. macOS et Windows signalent ces problèmes dans leurs propres menus.",
 	"menu.layout.active_layouts_unsupported_desktop": "Indisponible sur ce bureau (GNOME, KDE ou X11 uniquement)",
 	"menu.llm.add_custom_model": "Ajouter un modèle personnalisé",
 	"menu.llm.add_model_entry": "➕ Ajouter un modèle personnalisé…",

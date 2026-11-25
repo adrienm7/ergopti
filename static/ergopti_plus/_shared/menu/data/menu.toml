@@ -5573,6 +5573,78 @@ platforms = ["hs", "linux"]
 unavailable = "hide"
 
 # Linux keeps the version value and resume callback native; this frame owns both header kinds.
+# The problems a Linux part reported (core/ui/engine/component_status.lua) lead
+# the Linux tray, above its title, one row per code that still holds and then a
+# separator, none when nothing is wrong (menu/ui/builder/component_status_rows.lua):
+# a missing component the windows need, an unread keyboard layout, a failed
+# Ergopti layout step. A transient notification was the only surface and KDE
+# Plasma 6 dropped it from its history (field report, Arch Linux, 2026-11-25).
+# The label names the problem after the llm entry's unreachable health dot; the
+# click shows the problem's title and explanation in the tray's status window.
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_windows_lgi"
+i18n = "startup.linux_gui_stack_windows_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_windows_webkit"
+i18n = "startup.linux_gui_stack_windows_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_layout_unresolved"
+i18n = "startup.linux_layout_unresolved_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_install_failed"
+i18n = "layouts.linux_ergopti_install_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_activate_failed"
+i18n = "layouts.linux_ergopti_activate_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_uninstall_failed"
+i18n = "layouts.linux_ergopti_uninstall_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+# The separator under the problem rows, drawn only when one is shown.
+[[menu.linux_component_problems_end]]
+type = "---"
+
 [[menu.linux_tray_active_header]]
 type = "label"
 id = "linux_tray_active_header"

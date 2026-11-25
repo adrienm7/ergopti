@@ -2569,6 +2569,7 @@
 	"menu.layout.user_layout_installed": "Ergopti layout installed",
 	"menu.layout.user_layout_unreadable": "Ergopti layout: unreadable state (see the logs)",
 	"platform_reason.layout_user_install_is_linux": "Linux only: these rows install the Ergopti layout in the user keyboard folder, activate it or remove it without the layout manager window. macOS installs its .bundle and Windows its system layout from their own rows of this menu.",
+	"platform_reason.component_status_rows_are_linux": "Linux only: these red rows name a part of Ergopti+ that is not working, such as a library the windows need or a keyboard layout that could not be read, because a notification alone vanished on some Linux desktops. macOS and Windows report these problems in their own menus.",
 	"menu.layout.active_layouts_unsupported_desktop": "Not available on this desktop (GNOME, KDE or X11 only)",
 	"menu.llm.add_custom_model": "Add a custom model",
 	"menu.llm.add_model_entry": "➕ Add a custom model…",

@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Ergopti-indeling geïnstalleerd",
 	"menu.layout.user_layout_unreadable": "Ergopti-indeling: status onleesbaar (zie de logboeken)",
 	"platform_reason.layout_user_install_is_linux": "Alleen Linux: deze regels installeren de Ergopti-indeling in de toetsenbordmap van de gebruiker, activeren of verwijderen haar zonder het venster van de indelingsbeheerder. macOS installeert zijn .bundle en Windows zijn systeemindeling via hun eigen regels in dit menu.",
+	"platform_reason.component_status_rows_are_linux": "Alleen Linux: deze rode regels noemen een onderdeel van Ergopti+ dat niet werkt, zoals een bibliotheek die de vensters nodig hebben of een toetsenbordindeling die niet gelezen kon worden, omdat een melding alleen op sommige Linux-bureaubladen verdween. macOS en Windows melden deze problemen in hun eigen menu’s.",
 	"menu.layout.active_layouts_unsupported_desktop": "Niet beschikbaar op deze desktop (alleen GNOME, KDE of X11)",
 	"menu.layout.scope_system": "systeem",
 	"menu.layout.scope_user": "gebruiker",

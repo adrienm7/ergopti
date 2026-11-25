@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Distribución Ergopti instalada",
 	"menu.layout.user_layout_unreadable": "Distribución Ergopti: estado ilegible (ver los registros)",
 	"platform_reason.layout_user_install_is_linux": "Solo Linux: estas filas instalan la distribución Ergopti en la carpeta de teclado del usuario, la activan o la quitan sin pasar por la ventana del gestor de distribuciones. macOS instala su .bundle y Windows su distribución del sistema desde sus propias filas de este menú.",
+	"platform_reason.component_status_rows_are_linux": "Solo Linux: estas filas rojas nombran una parte de Ergopti+ que no funciona, como una biblioteca que necesitan las ventanas o una distribución de teclado no leída, porque una notificación sola desaparecía en algunos escritorios Linux. macOS y Windows indican estos problemas en sus propios menús.",
 	"menu.layout.active_layouts_unsupported_desktop": "No disponible en este escritorio (solo GNOME, KDE o X11)",
 	"menu.layout.scope_system": "sistema",
 	"menu.layout.scope_user": "usuario",

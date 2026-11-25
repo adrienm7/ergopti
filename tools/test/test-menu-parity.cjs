@@ -4723,6 +4723,31 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(
 	}
 }
 
+// The Linux root opens with the reported problems' declared rows: it composes
+// them through menu/ui/builder/component_status_rows.lua, which renders each
+// one from linux_component_problems and the separator under them from
+// linux_component_problems_end.
+{
+	const assert = require('node:assert/strict');
+	const spelled = (file) =>
+		scriptTokens(readSourceFile(path.join(SP, file)), '.lua')
+			.map((token) => (token.kind === 'string' ? JSON.stringify(token.value) : token.value))
+			.join(' ');
+	const root = spelled('linux/menu/ui/builder/builder.lua');
+	const rows = spelled('linux/menu/ui/builder/component_status_rows.lua');
+	const composed = root.includes('require ( "menu.ui.builder.component_status_rows" ) . build ( )');
+	const published =
+		rows.includes('ManifestMenu . command_row ( "linux_component_problems" ,') &&
+		rows.includes('ManifestMenu . template_rows ( "linux_component_problems_end" ,');
+	assert.equal(composed, true, 'the Linux root composes the component status rows');
+	assert.equal(published, true, 'the component status rows render their declared frames');
+	for (const section of ['linux_component_problems', 'linux_component_problems_end']) {
+		reachableOn[section] = combineMenuVisibility(PLATFORMS, reachableOn[section], ['linux']);
+		openedBy[section] = 'actual component status rows composed at the head of the Linux tray root';
+		reachedByKinds[section] = { linux: new Set(['compose']) };
+	}
+}
+
 // Physical withdrawal controls prevent graph entries from becoming decorative orphan exemptions.
 {
 	const assert = require('node:assert/strict');

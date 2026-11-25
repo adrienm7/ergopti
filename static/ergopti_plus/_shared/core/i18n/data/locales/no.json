@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Ergopti-oppsett installert",
 	"menu.layout.user_layout_unreadable": "Ergopti-oppsett: tilstand uleselig (se loggene)",
 	"platform_reason.layout_user_install_is_linux": "Kun Linux: disse radene installerer Ergopti-oppsettet i brukerens tastaturmappe, aktiverer eller fjerner det uten vinduet til oppsettbehandleren. macOS installerer sin .bundle og Windows sitt systemoppsett fra sine egne rader i denne menyen.",
+	"platform_reason.component_status_rows_are_linux": "Kun Linux: disse røde radene nevner en del av Ergopti+ som ikke virker, for eksempel et bibliotek vinduene trenger eller et tastaturoppsett som ikke kunne leses, fordi et varsel alene forsvant på noen Linux-skrivebord. macOS og Windows viser disse problemene i sine egne menyer.",
 	"menu.layout.active_layouts_unsupported_desktop": "Ikke tilgjengelig på dette skrivebordet (kun GNOME, KDE eller X11)",
 	"menu.layout.scope_system": "system",
 	"menu.layout.scope_user": "bruker",

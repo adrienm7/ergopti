@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Layout Ergopti installato",
 	"menu.layout.user_layout_unreadable": "Layout Ergopti: stato illeggibile (vedi i registri)",
 	"platform_reason.layout_user_install_is_linux": "Solo Linux: queste righe installano il layout Ergopti nella cartella tastiera dell’utente, lo attivano o lo rimuovono senza passare dalla finestra del gestore dei layout. macOS installa il suo .bundle e Windows il suo layout di sistema dalle proprie righe di questo menu.",
+	"platform_reason.component_status_rows_are_linux": "Solo Linux: queste righe rosse indicano una parte di Ergopti+ che non funziona, come una libreria mancante per le finestre o un layout di tastiera non letto, perché una sola notifica spariva su alcuni desktop Linux. macOS e Windows segnalano questi problemi nei propri menu.",
 	"menu.layout.active_layouts_unsupported_desktop": "Non disponibile su questo desktop (solo GNOME, KDE o X11)",
 	"menu.layout.scope_system": "sistema",
 	"menu.layout.scope_user": "utente",

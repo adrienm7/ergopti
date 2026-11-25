@@ -313,6 +313,10 @@ function M.build(ctx)
 	-- already deeper than that — would truncate it silently.
 	local rows = {}
 
+	-- The problems a Linux part reported lead the tray, above its title: the
+	-- declared linux_component_problems rows (menu/ui/builder/component_status_rows.lua).
+	for _, problem_row in ipairs(require("menu.ui.builder.component_status_rows").build()) do rows[#rows + 1] = problem_row end
+
 	-- The shared header owns inert/paused presentation; the version remains native data.
 	local header, header_current = _build_header(ctx)
 	if not header or type(header_current) ~= "function" or not header_current() then return {} end

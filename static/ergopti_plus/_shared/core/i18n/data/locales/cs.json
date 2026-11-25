@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Rozložení Ergopti nainstalováno",
 	"menu.layout.user_layout_unreadable": "Rozložení Ergopti: nečitelný stav (viz protokoly)",
 	"platform_reason.layout_user_install_is_linux": "Pouze Linux: tyto řádky instalují rozložení Ergopti do složky klávesnice uživatele, aktivují je nebo odebírají bez okna správce rozložení. macOS instaluje svůj .bundle a Windows své systémové rozložení z vlastních řádků této nabídky.",
+	"platform_reason.component_status_rows_are_linux": "Pouze Linux: tyto červené řádky uvádějí část Ergopti+, která nefunguje, například knihovnu potřebnou pro okna nebo nepřečtené rozložení klávesnice, protože samotné oznámení na některých linuxových plochách mizelo. macOS a Windows tyto problémy hlásí ve vlastních nabídkách.",
 	"menu.layout.active_layouts_unsupported_desktop": "V tomto prostředí nedostupné (pouze GNOME, KDE nebo X11)",
 	"menu.layout.scope_system": "systém",
 	"menu.layout.scope_user": "uživatel",

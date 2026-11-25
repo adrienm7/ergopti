@@ -16,9 +16,10 @@
 ---    shows a red dot on its Tap-Holds title.
 --- 2. One diagnosis line per problem in the log, with a stable code, so a
 ---    field log answers "why" without the screen the user saw.
---- 3. The tray rows are drawn by the tray adapter outside the shared renderer,
----    like the degraded menu: they report the failure of components that
----    renderer and its windows may depend on.
+--- 3. The tray rows are declared in the shared menu (menu.toml top_level
+---    component_status, one linux_component_problems row per code) and drawn
+---    by the shared renderer (menu/ui/builder/component_status_rows.lua): this
+---    module only answers which problems hold.
 --- ==============================================================================
 
 local M = {}
@@ -26,9 +27,6 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 
 local LOG = "core.ui.engine.component_status"
-
---- The red dot every problem row starts with (menu.toml health_dot "unreachable").
-M.DOT = "🔴"
 
 
 
@@ -39,7 +37,7 @@ M.DOT = "🔴"
 -- =====================================
 -- =====================================
 
--- Reported problems in report order: { code, label, title, body }.
+-- Reported problems in report order: { code, title, body, active }.
 local _problems = {}
 -- The same problems by code, so a second report of one is refused.
 local _by_code = {}
@@ -54,16 +52,16 @@ local _by_code = {}
 -- =====================================
 
 --- Records a problem, logs its diagnosis line and posts a persistent notice.
---- @param problem table { code, label, title, body, active? }: code is a stable
----   token ([a-z0-9_]+); label the short tray row text; title and body the
----   translated explanation; active, when given, answers whether the problem
----   still holds, so a state that recovers on its own (a layout read later)
----   leaves the tray once it does.
+--- @param problem table { code, title, body, active? }: code is a stable token
+---   ([a-z0-9_]+) with its own linux_component_problems row in menu.toml, which
+---   names it in the tray; title and body the translated explanation; active,
+---   when given, answers whether the problem still holds, so a state that
+---   recovers on its own (a layout read later) leaves the tray once it does.
 --- @param deps table|nil { notifier }: the notifier, optional (no session bus).
 --- @return boolean recorded false when the code was already reported.
 function M.report(problem, deps)
 	assert(type(problem) == "table", "component_status.report: a problem table is required")
-	for _, field in ipairs({ "code", "label", "title", "body" }) do
+	for _, field in ipairs({ "code", "title", "body" }) do
 		assert(type(problem[field]) == "string" and problem[field] ~= "",
 			"component_status.report: " .. field .. " is required")
 	end
@@ -73,8 +71,7 @@ function M.report(problem, deps)
 		Logger.debug(LOG, "Problem %s already reported; kept as it is.", problem.code)
 		return false
 	end
-	local entry = { code = problem.code, label = problem.label, title = problem.title, body = problem.body,
-		active = problem.active }
+	local entry = { code = problem.code, title = problem.title, body = problem.body, active = problem.active }
 	_problems[#_problems + 1] = entry
 	_by_code[entry.code] = entry
 	Logger.error(LOG, "[diagnosis] code=%s — %s", entry.code, entry.body)
@@ -91,7 +88,7 @@ end
 function M.problems()
 	local copies = {}
 	for index, entry in ipairs(_problems) do
-		copies[index] = { code = entry.code, label = entry.label, title = entry.title, body = entry.body }
+		copies[index] = { code = entry.code, title = entry.title, body = entry.body }
 	end
 	return copies
 end
@@ -108,17 +105,15 @@ end
 
 -- =====================================
 -- =====================================
--- ======= 3/ Tray rows ================
+-- ======= 3/ Current problems =========
 -- =====================================
 -- =====================================
 
---- The rows the tray menu starts with: one red row per problem, then a
---- separator; none when nothing is wrong.
---- @param show function Called with (title, body) when a row is clicked.
---- @return table Rows in the tray adapter's shape.
-function M.tray_rows(show)
-	assert(type(show) == "function", "component_status.tray_rows: a show function is required")
-	local rows = {}
+--- The problems that still hold, oldest first, as copies: the tray's
+--- component_status rows.
+--- @return table { code, title, body } entries.
+function M.current()
+	local holding = {}
 	for _, entry in ipairs(_problems) do
 		local holds = true
 		if entry.active then
@@ -127,13 +122,9 @@ function M.tray_rows(show)
 			holds = not ok or value ~= false
 			if not ok then Logger.error(LOG, "Problem %s could not be re-checked (%s).", entry.code, tostring(value)) end
 		end
-		if holds then rows[#rows + 1] = {
-			title = M.DOT .. " " .. entry.label,
-			fn = function() show(entry.title, entry.body) end,
-		} end
+		if holds then holding[#holding + 1] = { code = entry.code, title = entry.title, body = entry.body } end
 	end
-	if #rows > 0 then rows[#rows + 1] = { separator = true } end
-	return rows
+	return holding
 end
 
 return M

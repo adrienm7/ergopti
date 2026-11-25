@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "פריסת Ergopti מותקנת",
 	"menu.layout.user_layout_unreadable": "פריסת Ergopti: מצב לא קריא (ראו את היומנים)",
 	"platform_reason.layout_user_install_is_linux": "Linux בלבד: שורות אלה מתקינות את פריסת Ergopti בתיקיית המקלדת של המשתמש, מפעילות אותה או מסירות אותה ללא חלון מנהל הפריסות. macOS מתקינה את ה-.bundle שלה ו-Windows את פריסת המערכת שלה מהשורות שלהן בתפריט זה.",
+	"platform_reason.component_status_rows_are_linux": "Linux בלבד: השורות האדומות האלה מציינות חלק של Ergopti+ שאינו פועל, כמו ספרייה שהחלונות צריכים או פריסת מקלדת שלא נקראה, כי הודעה לבדה נעלמה בחלק משולחנות העבודה של Linux. macOS ו-Windows מדווחות על בעיות אלה בתפריטים שלהן.",
 	"menu.layout.active_layouts_unsupported_desktop": "לא זמין בשולחן עבודה זה (GNOME, KDE או X11 בלבד)",
 	"menu.layout.scope_system": "מערכת",
 	"menu.layout.scope_user": "משתמש",

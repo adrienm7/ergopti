@@ -43,23 +43,21 @@ M.FAILURE_KEYS = {
 	xorg_session = "layouts.linux_xorg_session",
 }
 
--- The texts of each step: its success notice, its failure notice and the red
--- tray row a failure leaves.
+-- The texts of each step: its success notice and its failure notice. The red
+-- tray row a failure leaves is menu.toml's linux_component_problems row of the
+-- step's code.
 local STEPS = {
 	install = {
 		done = "layouts.linux_ergopti_installed_active",
 		failed = "layouts.linux_ergopti_install_failed",
-		label = "layouts.linux_ergopti_install_failed_label",
 	},
 	activate = {
 		done = "layouts.linux_ergopti_activated",
 		failed = "layouts.linux_ergopti_activate_failed",
-		label = "layouts.linux_ergopti_activate_failed_label",
 	},
 	uninstall = {
 		done = "layouts.linux_ergopti_uninstalled",
 		failed = "layouts.linux_ergopti_uninstall_failed",
-		label = "layouts.linux_ergopti_uninstall_failed_label",
 	},
 }
 
@@ -216,7 +214,6 @@ local function say_failed(deps, step, code, detail)
 	local title, body = t(deps, "layouts.linux_ergopti_title"), fill(deps, STEPS[step].failed, reason)
 	local recorded = deps.status.report({
 		code = "ergopti_layout_" .. step .. "_failed",
-		label = t(deps, STEPS[step].label),
 		title = title,
 		body = body,
 		active = function() return STILL_FAILED[step](deps) end,

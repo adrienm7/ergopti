@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "Ergopti düzeni yüklü",
 	"menu.layout.user_layout_unreadable": "Ergopti düzeni: durum okunamıyor (günlüklere bakın)",
 	"platform_reason.layout_user_install_is_linux": "Yalnızca Linux: bu satırlar Ergopti düzenini kullanıcının klavye klasörüne yükler, düzen yöneticisi penceresi olmadan etkinleştirir veya kaldırır. macOS kendi .bundle dosyasını, Windows ise sistem düzenini bu menüdeki kendi satırlarından yükler.",
+	"platform_reason.component_status_rows_are_linux": "Yalnızca Linux: bu kırmızı satırlar Ergopti+’nın çalışmayan bir bölümünü, örneğin pencerelerin ihtiyaç duyduğu bir kitaplığı veya okunamayan bir klavye düzenini belirtir; çünkü yalnızca bir bildirim bazı Linux masaüstlerinde kayboluyordu. macOS ve Windows bu sorunları kendi menülerinde bildirir.",
 	"menu.layout.active_layouts_unsupported_desktop": "Bu masaüstünde kullanılamaz (yalnızca GNOME, KDE veya X11)",
 	"menu.layout.scope_system": "sistem",
 	"menu.layout.scope_user": "kullanıcı",

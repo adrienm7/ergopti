@@ -2565,6 +2565,7 @@
 	"menu.layout.user_layout_installed": "تخطيط Ergopti مثبّت",
 	"menu.layout.user_layout_unreadable": "تخطيط Ergopti: حالة غير مقروءة (راجع السجلات)",
 	"platform_reason.layout_user_install_is_linux": "Linux فقط: تثبّت هذه الصفوف تخطيط Ergopti في مجلد لوحة مفاتيح المستخدم، وتفعّله أو تزيله دون نافذة مدير التخطيطات. يثبّت macOS حزمته .bundle ويثبّت Windows تخطيط النظام من صفوفهما الخاصة في هذه القائمة.",
+	"platform_reason.component_status_rows_are_linux": "Linux فقط: تسمّي هذه الصفوف الحمراء جزءًا من Ergopti+ لا يعمل، مثل مكتبة تحتاجها النوافذ أو تخطيط لوحة مفاتيح تعذّرت قراءته، لأن الإشعار وحده كان يختفي على بعض أسطح مكتب Linux. يبلّغ macOS وWindows عن هذه المشكلات في قوائمهما الخاصة.",
 	"menu.layout.active_layouts_unsupported_desktop": "غير متاح على سطح المكتب هذا (GNOME أو KDE أو X11 فقط)",
 	"menu.layout.scope_system": "النظام",
 	"menu.layout.scope_user": "المستخدم",
