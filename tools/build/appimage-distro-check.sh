@@ -7,7 +7,7 @@
 # must do there, and checks it:
 #   - musl, or glibc older than the ceiling: --help is refused with the
 #     preflight's exit status and a sentence on stderr;
-#   - glibc at or above the ceiling: --help exits 0, and on an apt-based image
+#   - glibc at or above the ceiling: --help exits 0, and on an apt or pacman image
 #     the argument-free desktop launch, as an unprivileged user under Xvfb,
 #     maps its status window, docks its icon in an XEmbed tray (stalonetray,
 #     or trayer where the image has no stalonetray) and quits from the tray
@@ -92,7 +92,8 @@ fi
 echo "[OK] --help exits 0 on $libc."
 
 # ----------------------------------------------------------------------
-# 3. A desktop launch, where apt can install an X server and GTK 3
+# 3. A desktop launch, where the image's package manager can install an X
+#    server and GTK 3
 # ----------------------------------------------------------------------
 # The windows' binding is the image's own lgi, built for LuaJIT, beside the
 # host's typelibs (tools/build/stage-linux-network-runtime.py stage_lgi). The
@@ -124,17 +125,29 @@ if command -v pacman > /dev/null 2>&1; then
 	echo "[OK] The bundled lgi loads WebKitGTK 4.1 from the host's typelibs, without lua51-lgi."
 fi
 
-if ! command -v apt-get > /dev/null 2>&1; then
-	echo "[OK] No apt-get in this image: the desktop launch is checked on apt images only."
+# Arch carries the newest GLib and GTK of the matrix, and in the 2026-11-25
+# field report (Arch, KDE Plasma 6) luajit crashed there in the Ubuntu 22.04
+# libdconfsettings.so the image bundled. Its dconf and
+# glib-networking modules are installed so the daemon loads them, and no
+# libayatana, so the image's fallback tray library runs on Arch's GTK.
+if command -v apt-get > /dev/null 2>&1; then
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update -q > "$LOG_DIR/packages.log" 2>&1 || fail "ENVIRONMENT: apt-get update failed."
+	tray="$(xembed_tray_package)" || fail "ENVIRONMENT: apt has neither stalonetray nor trayer."
+	set -- xvfb libgtk-3-0 x11-utils "$tray" xdotool dbus procps
+	install_desktop() { apt-get install -y -q --no-install-recommends "$@"; }
+elif command -v pacman > /dev/null 2>&1; then
+	tray=stalonetray
+	set -- xorg-server-xvfb gtk3 xorg-xwininfo stalonetray xdotool dbus procps-ng dconf glib-networking \
+		gsettings-desktop-schemas
+	install_desktop() { pacman -Syu --noconfirm --needed "$@"; }
+else
+	echo "[OK] Neither apt-get nor pacman in this image: the desktop launch is checked on apt and pacman images only."
 	exit 0
 fi
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -q > "$LOG_DIR/apt.log" 2>&1 || fail "ENVIRONMENT: apt-get update failed."
-tray="$(xembed_tray_package)" || fail "ENVIRONMENT: apt has neither stalonetray nor trayer."
 echo "XEmbed tray: $tray."
-apt-get install -y -q --no-install-recommends xvfb libgtk-3-0 x11-utils "$tray" xdotool \
-	dbus procps >> "$LOG_DIR/apt.log" 2>&1 || {
-	tail -n 5 "$LOG_DIR/apt.log" >&2
+install_desktop "$@" >> "$LOG_DIR/packages.log" 2>&1 || {
+	tail -n 5 "$LOG_DIR/packages.log" >&2
 	fail "ENVIRONMENT: the desktop packages did not install."
 }
 lgi_probe 'local lgi = require("lgi"); assert(lgi.GObject.Object and lgi.GLib.MAJOR_VERSION == 2)' 2> "$LOG_DIR/lgi.err" || {

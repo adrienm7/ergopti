@@ -810,8 +810,28 @@ assert.deepEqual(Preflight.MESSAGE_KEYS, {
 // the catalogue's LTS, and takes its expectations from the same two sources.
 const matrix = read('tools/build/appimage-distro-sweep.sh');
 const matrixImages = matrix.slice(matrix.indexOf('DEFAULT_IMAGES=('), matrix.indexOf('\n)\n'));
-for (const image of ['alpine:latest', 'ubuntu:20.04', 'debian:11', Ceiling.OLDEST_LTS_IMAGE]) {
+// Arch has the newest GLib and GTK the image meets: the bundled GIO modules
+// crashed luajit there, so it stays in the sweep.
+for (const image of [
+	'alpine:latest',
+	'ubuntu:20.04',
+	'debian:11',
+	'archlinux:latest',
+	Ceiling.OLDEST_LTS_IMAGE
+]) {
 	assert.ok(matrixImages.includes(` ${image}`) || matrixImages.includes(`\t${image}`), image);
+}
+// Arch runs the desktop launch too, not only --help: with its own dconf and
+// glib-networking modules loaded and no libayatana, so the image's fallback tray
+// meets Arch's GTK.
+{
+	const check = read('tools/build/appimage-distro-check.sh');
+	const branch = check.indexOf('elif command -v pacman');
+	const pacman = check.slice(branch, check.indexOf('\nelse\n', branch));
+	for (const name of ['xorg-server-xvfb', 'gtk3', 'stalonetray', 'dconf', 'glib-networking'])
+		assert.ok(pacman.includes(` ${name}`), `the Arch desktop launch installs ${name}`);
+	assert.ok(!pacman.includes('ayatana'), 'Arch runs the bundled fallback tray');
+	assert.ok(check.indexOf('install_desktop "$@"') < check.indexOf('useradd --create-home tester'));
 }
 assert.ok(matrix.includes("check-elf-glibc-ceiling.cjs').GLIBC_CEILING"));
 assert.ok(matrix.includes("render-appimage-libc-preflight.cjs').REFUSAL_EXIT"));
@@ -1354,8 +1374,9 @@ assert.ok(!distroCheck.includes("grep -v ' 1x1+' | tail -n 1"), 'not by its size
 	assert.ok(arch.indexOf('pacman -Q lua51-lgi') >= 0, 'the image must not bring its own lgi');
 	assert.ok(arch.indexOf('require("core.ui.engine.gui_stack").windows_missing()') >= 0);
 	assert.ok(
-		distroCheck.indexOf('if command -v pacman') < distroCheck.indexOf('if ! command -v apt-get'),
-		'the Arch branch runs before the non-apt exit'
+		distroCheck.indexOf('if command -v pacman') <
+			distroCheck.indexOf('the desktop launch is checked on apt and pacman images only'),
+		'the Arch branch runs before the exit of an image with neither apt nor pacman'
 	);
 	assert.ok(distroCheck.includes('fail "The bundled lgi does not load beside the host\'s GLib."'));
 	assert.match(read('tools/build/appimage-distro-sweep.sh'), /archlinux:latest/);
