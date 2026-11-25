@@ -267,36 +267,20 @@ waits for the maintainer's review).
       found (Oxeylyzer's forks copy it; no author page, no cmini or oxeylyzer-2 entry). Re-encode it once a fuller
       source appears, then empty `KNOWN_GAPS` of `test-layout-analysis-engine.cjs` (« library-block-own-letters »),
       which checks that every letter block types its language's letters (`docs/audits/layout-analysers/report.md`,
-      « Layout library »). Not a loss: Russian JCUKEN's 80 % unsupported on a French text.
-- [ ] **Neo-family levels on the installed and emulated layouts, what is left (2026-11-20).** The Comparer's boards
-      show every level (« Level shown »), the exports name what they leave out, and the editor keeps the seven
-      levels through save and reload: Mod3 and Mod4 are held custom modifiers of the source, on Caps Lock and the
-      ISO key left of Enter, the key right of left Shift and AltGr (`docs/design/layout-analysis.md`, « Layout file
-      formats »; `tools/test/test-layout-editor-levels.cjs`). Since 2026-11-20 the drivers' emulation holds them
-      on Caps Lock and AltGr too, Caps Lock never toggling and AltGr selecting no system level (Windows: suppressed
-      SC03A and SC138, AltGr's fake LCtrl ignored; Linux: the hook's `onHeldModifierKey` keeps the grabbed key from
-      XKB; macOS: right Option's flagsChanged edges deleted and its Option flag cleared), and types the dead keys of
-      an emulated level, composing with the native base and Shift levels (`neo2_vectors.json`, replayed by the web,
-      Lua and AutoHotkey engines). macOS cannot hold Mod3 on Caps Lock, which an event tap never sees held
-      (`platform_reason.caps_lock_level_not_held_on_macos`): only a generated Karabiner rule could, still to do.
-      Left, the native files: no `.keylayout` holds a custom modifier (macOS relies on the emulation); XKB holds
-      Mod3 on Caps Lock as its fifth level and lists Mod4 (`custom_modifier_not_in_xkb`); the Neo XKB export
-      writes Mod3 and leaves Mod4 out since 2026-11-24 (Neo's dead key held only on Mod3+Mod4, `dead_belowdot`,
-      refused it as `unbound_stateful_actions`: it is now listed in `unreachable_actions`); the Neo KLC export is
-      still refused, « Caps Lock changes the roya column » (`buildModel` of
-      `tools/codegen/lib/windows-keyboard-layout.cjs`): Mod3 takes the Roya bit on Caps Lock's scan code, but its layers
-      list no `caps_lock` as optional, so Caps Lock with Mod3 falls back to the base key map, which a KLC column
-      cannot hold. Probed on 2026-11-25: listing `caps_lock` optional on the six non-base layers (Shift included;
-      on five, Caps Lock with Shift falls back to the base map and Backquote needs SGCAP) passes every Caps Lock
-      check, but the KLC export is lossless by design (`unrepresentable_dead_transitions` of
-      `layout_composer/target_export.js`) and Neo then still needs 50 chained dead-key states with an empty
-      terminator (the DLL package gives them private characters, the KLC writer refuses them), two DEADTRANS
-      conflicts (Mod3 S under `stroke`, Mod3 V under `tilde`: two keys type one character with different results)
-      and four results of two UTF-16 units (m̀ M̀ j́ J́). So no lossless Neo KLC exists; Windows users take the DLL
-      package, which states each loss. The DLL package builds since 2026-11-24 (a chained dead key with an empty terminator typed
-      `undefined`), without Mod3 and Mod4 (`no_windows_column`): `tools/lib/kbd-dll/source.cjs` gives a custom
-      modifier no Roya, Loya or Kana bit as the KLC export does, and Mod4's AltGr, an E0 key, could not hold one. The real-machine check (a user
-      tap-hold or remap on Caps Lock or AltGr against the held levels) is in the three TODO-tests files.
+      « Layout library »). Not a loss: Russian JCUKEN's 80 % unsupported on a French text. Searched again on
+      2026-11-25 (GitHub code search for `beo.dof`, its repositories, the web): no other source.
+- [ ] **Neo-family levels on the installed and emulated layouts, what is left (2026-11-25), needs a Mac.** Built:
+      every level on the Comparer's boards, the exports naming what they leave out, the editor's seven levels, and
+      the drivers' emulation holding Mod3 and Mod4 on Caps Lock and AltGr on Windows and Linux, on AltGr on macOS
+      (`docs/design/layout-analysis.md`, « Layout file formats »; `neo2_vectors.json`). Left, on a Mac: a generated
+      Karabiner rule holding Mod3 on Caps Lock, which an event tap never sees held
+      (`platform_reason.caps_lock_level_not_held_on_macos`). It changes Caps Lock for every user of the owned
+      Karabiner runtime (`macos/platform/remap/generator.lua`, its leases and sentinels), so it is written and
+      checked on a real Mac: the lock and its light off, a tap-hold on Caps Lock, CapsWord. The native files stay
+      as they are by design: no `.keylayout` holds a custom modifier, XKB holds Mod3 and lists Mod4
+      (`custom_modifier_not_in_xkb`), no lossless Neo KLC exists (50 chained dead-key states with an empty
+      terminator, two DEADTRANS conflicts, four results of two UTF-16 units: probed on 2026-11-25), and the DLL
+      package states its losses (`no_windows_column`). The real-machine checks are in the three TODO-tests files.
 - [ ] **[RELEASE] Windows export step in native Lua.** The restricted host `windows/native/ergopti_lua_export.c`
       (pinned Lua 5.4.6, built by `tools/build/build_windows_lua_export.ps1` in package-windows) is done. Left: once a
       dev run builds « Windows / Build », commit its artifact `windows-lua-export-*` (`ergopti_lua_export.exe` and
@@ -313,10 +297,9 @@ waits for the maintainer's review).
       `data/config/weights.txt`, metrics in `analyser.go`), so a scorer needs that reference set shipped and scored per
       corpus; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Every idea of
-      `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where) but two: magic
-      and repeat keys with Kawalyzer's « Clever Keys », whose analysis is built (`docs/design/magic-and-repeat-keys.md`,
-      `context_key_usage`) while the source format, the drivers' emulation and the exports' refusals are under « Layout
-      repeat and magic keys », and dockable panes (not built, see the decision of 2026-11-25 there).
+      `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where), magic and
+      repeat keys included since 2026-11-25 (`docs/design/magic-and-repeat-keys.md`; their field checks are under
+      « Layout repeat and magic keys »), but dockable panes (not built, see the decision of 2026-11-25 there).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -351,9 +334,11 @@ typing paths, the trace and the boards' labels; `tools/test/test-layout-context-
       look on each OS at a real layout with a repeat and a magic key (the AutoHotkey cases are written from source,
       never run here; the buffer is what each driver last saw typed, so a click or a navigation key that resets it
       makes the key type nothing until a character is typed).
-- [ ] **Importers and the editor's key panel.** The playground's, Kawalyzer's and chogalyzer's formats when their
-      licences allow reading them; a key panel choice to place a repeat or magic key and edit its table (the panel
-      shows and keeps such a key today, edited in the source file).
+- [ ] **chogalyzer's and the Layouts Wiki playground's formats, once licensed.** Built on 2026-11-25: Kawalyzer's
+      « Clever Keys » file read into a magic table (GPL-3.0 `nbodinripert/kawalyzer`; `fromKawalyzerRules`) and the
+      key panel's repeat and magic keys with their table of rules (`docs/design/magic-and-repeat-keys.md`,
+      « Importers », « Key panel »). Left: chogalyzer (`Lenchog/chogalyzer`) and the playground publish no licence
+      (checked on 2026-11-25), so their formats are not read; ask their authors, or wait for a licence.
 
 ## Layout generator from an Ergopti TOML source
 
@@ -629,6 +614,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
       A contrast error on SVG text is counted as `.Unmeasured`: its glyphs are painted over sibling shapes the tool
       never sees. Kept meanwhile: both, proved by the app windows gate's self-check. The other choice is to count
       them and add a fixture state per hidden screen and a pixel check for SVG labels.
+- [ ] **A layout's magic tables in the key panel (decided by the agent on 2026-11-25, to review by the
+      maintainer).** A magic table belongs to the keys that name it: the first magic key naming a new table
+      creates it empty, the edit that changes the last of them removes it (undo restores it), as the format
+      refuses a table no key types. A Kawalyzer « Clever Keys » file replaces a table's rules; its rules typing
+      more than one character (most of them, `ion` ← `i#`), with letter conditions or on the repeat key are left
+      out and listed, since a magic rule types one character after at most two. Choose: keep this, or let a table
+      outlive its keys (then the format must accept an unused table) and let a rule type a text.
 
 - [ ] **Where a tray setting shows its help (decided by the agent on 2026-11-25, to review by the maintainer).** The
       review of `docs/audits/accessibility/tray-settings-help-review.json` found 17 setting rows whose label does not say their
