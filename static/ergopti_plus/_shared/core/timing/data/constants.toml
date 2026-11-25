@@ -570,6 +570,18 @@ inhibitor_ready_timeout_ms = 5000
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Screen vision (capture, image matching, text recognition)
+# ──────────────────────────────────────────────────────────────────────
+
+[screen_vision]
+# Longest one text recognition may take before its child is stopped and the
+# caller told "ocr_timeout". LX: platform/vision/tesseract_ocr.lua.
+# HS: platform/vision/screen_vision.lua (the launcher's vision worker).
+# AHK: platform/vision/screen_vision.ahk (the Windows.Media.Ocr bridge).
+ocr_timeout_ms = 10000
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Keystats
 # ──────────────────────────────────────────────────────────────────────
 
@@ -1547,6 +1559,10 @@ proxy_relay_probe_timeout_ms = 30000
 # (every Linux process owner takes it from there; pinned to this key).
 # AHK: diagnostics/adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
+
+# What one text recognition may print: the words and boxes of a whole window
+# (768 KiB, about 20,000 words). LX: platform/vision/tesseract_ocr.lua.
+ocr_output_bytes = 786432
 
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
 # server names sit well inside it. LX: ai/engine/local_servers/ports.lua.
