@@ -376,7 +376,8 @@ _KRP_ChildrenReadThroughKnownReader() {
 		Entry := InStr(Source, Pair[2])
 		AssertTrue(Install > 0 && Entry > Install,
 			"The known reader must receive the Edits' Ctrl+V before the public entry " . Pair[2] . " sends.")
-		AssertTrue(InStr(Source, "_KRP_Uninstall()") > Entry, "The child must remove the known reader at cleanup.")
+		; From the entry on: the first occurrence is the reader's own definition.
+		AssertTrue(InStr(Source, "_KRP_Uninstall()", true, Entry) > 0, "The child must remove the known reader at cleanup.")
 	}
 }
 Test("native render-focus children paste through a known clipboard reader (gesture-transform-native-render-focus)",
