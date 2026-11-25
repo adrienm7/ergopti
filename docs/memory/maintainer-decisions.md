@@ -3033,3 +3033,32 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   (`LAYOUT_ANALYSER_SCORES.fidelity`), and « Autres analyseurs » shows it
   under each analyser's name; the codegen refuses a single value. A new
   scorer or rerun states both values in `docs/design/analyser-scores.md`.
+
+## One daily log; « Export the logs (zip) » for testers (2026-11-25)
+
+Maintainer decision (QCM, « too many log files; testers must send dozens »):
+the daily `ErgoptiPlus_YYYY-MM-DD.log` is the only log. The topical
+sub-files (`ErgoptiPlus_<topic>.log`, routed by the former
+`_shared/core/logger/data/sub_files.toml`) are gone on the three drivers and
+the macOS native worker: every line they held was a copy of a daily-log line.
+Each retention sweep deletes the exact old names of `[logs.files]
+retired_topical_logs` in `app_dirs.toml` (a regular file directly in the logs
+folder, never a link, a folder or another name), so an upgraded install loses
+them at its first start. `ErgoptiPlus_errors_YYYY-MM-DD.log` stays: the
+health check's recent issues, the error dialog and « Open today's errors
+file » read it. `karabiner_kc.log` (macOS metrics folder) is the Karabiner
+key-count ledger, not a log, and stays.
+
+Debug › « Exporter les logs (zip) » (`export_logs`, the three OS) writes one
+`Ergopti-logs_<date>_<time>.zip` to the Downloads folder (the Desktop without
+one), reveals it in the file manager, copies its path to the clipboard and
+says so in a translated notification; a failure says so too. It holds the
+daily logs and errors mirrors of the last `[archive] days` (3) days, the
+pre-logger files (`bootstrap.log`; on macOS `launcher.log`, the fatal report,
+the reload breadcrumb and the boot journal) and `crash_reports/*.json`, each
+copied through the `[scrub]` rules of `_shared/core/logger/data/log_export.toml`,
+the runtime port of `tools/dev/field-log-scrub.py`.
+Action: ask testers for that one zip (TODO-tests-\*.md); do not bring back a
+topical file or a second scrub rule set — add a rule and its vector in
+`log_export.toml` and `_shared/tests/corpus/logger/log_export_vectors.json`,
+which `test-log-export-contract.cjs` also runs through the Python scrubber.

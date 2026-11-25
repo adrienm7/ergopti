@@ -35,7 +35,13 @@
 				"threshold": 10,
 				"refused": false
 			},
-			{ "id": "info_name", "stored": "INFO", "level": "INFO", "threshold": 20, "refused": false },
+			{
+				"id": "info_name",
+				"stored": "INFO",
+				"level": "INFO",
+				"threshold": 20,
+				"refused": false
+			},
 			{
 				"id": "start_name_selects_the_info_threshold",
 				"stored": "START",
@@ -251,30 +257,6 @@
 				"file_date": "2026-11-20",
 				"retention_days": 14,
 				"purged": false
-			}
-		]
-	},
-	"topical_retention": {
-		"_comment": "LOG-04. A topical file (no date in its name) is a view of today: one last modified on another calendar day is removed by the retention pass. Linux kept it until it was N + 1 days old, so a topic that logged nothing today still showed an older day's lines. macOS retired its topical sub-files (one daily log only, 2026-11-25): its purge deletes the retired names whatever their age.",
-		"drivers": ["windows", "linux"],
-		"cases": [
-			{
-				"id": "modified_today_is_kept",
-				"now": "2026-11-20 08:00:00",
-				"modified": "2026-11-20 07:59:00",
-				"removed": false
-			},
-			{
-				"id": "modified_yesterday_evening_is_removed",
-				"now": "2026-11-20 08:00:00",
-				"modified": "2026-11-19 23:58:00",
-				"removed": true
-			},
-			{
-				"id": "modified_long_ago_is_removed",
-				"now": "2026-11-20 08:00:00",
-				"modified": "2026-10-01 12:00:00",
-				"removed": true
 			}
 		]
 	},

@@ -38,8 +38,8 @@
 #   - the daily unified log     <files.unified_prefix>YYYY-MM-DD<files.extension>
 #   - the daily errors mirror   <files.errors_prefix>YYYY-MM-DD<files.extension>
 #                               (WARNING and ERROR lines only)
-#   - the topical sub-files     <files.topical_prefix><name><files.extension>,
-#                               names from _shared/core/logger/data/sub_files.toml
+#   (the topical sub-files were retired on 2026-11-25: retired_topical_logs
+#   below names the files each retention sweep deletes)
 #   - crash reports             <logs>/<logs.crash_reports_dir>/
 #   - on macOS, the launcher's own launcher.log and fatal report
 # Metrics and keystroke data are user data, not logs: they stay in the
@@ -82,7 +82,6 @@ crash_reports_dir = "crash_reports"
 [logs.files]
 unified_prefix = "ErgoptiPlus_"
 errors_prefix = "ErgoptiPlus_errors_"
-topical_prefix = "ErgoptiPlus_"
 extension = ".log"
 # What happens before the configuration is read and the logger can start: a
 # yielding second instance, a refused configuration transition (Windows), a

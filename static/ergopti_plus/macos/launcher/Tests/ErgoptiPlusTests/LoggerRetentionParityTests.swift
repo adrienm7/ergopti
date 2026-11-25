@@ -32,8 +32,7 @@ final class LoggerRetentionParityTests: XCTestCase {
 	// ============================================
 
 	/// Replays the dated_retention cases of the shared parity corpus through a
-	/// real purge; the native worker no longer keeps topical views, so it is not
-	/// one of the topical_retention drivers. The purge compared the archive's noon
+	/// real purge (the topical views were retired on 2026-11-25). The purge compared the archive's noon
 	/// with now minus N x 86,400 s, so the N-days-old archive vanished after noon
 	/// while Windows and Linux keep it all day (logger parity audit LOG-03).
 	func testRetentionReplaysTheSharedParityCorpus() throws {
@@ -44,8 +43,7 @@ final class LoggerRetentionParityTests: XCTestCase {
 			JSONSerialization.jsonObject(with: Data(contentsOf: corpusURL)) as? [String: Any])
 		let dated = try XCTUnwrap((corpus["dated_retention"] as? [String: Any])?["cases"] as? [[String: Any]])
 		XCTAssertFalse(dated.isEmpty)
-		let topicalDrivers = (corpus["topical_retention"] as? [String: Any])?["drivers"] as? [String] ?? []
-		XCTAssertFalse(topicalDrivers.contains("macos_native"))
+		XCTAssertNil(corpus["topical_retention"], "the topical sub-files are retired")
 
 		for vector in dated {
 			let id = try XCTUnwrap(vector["id"] as? String)

@@ -622,6 +622,14 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Details of « Exporter les logs (zip) » (decided by the agent on 2026-11-25, to review by the maintainer).**
+      The archive holds 3 days (`[archive] days` in `_shared/core/logger/data/log_export.toml`), goes to Downloads
+      (the Desktop when there is none), is named `Ergopti-logs_<date>_<time>.zip`, and withholds every expansion,
+      bundled triggers included (the field report names a bundled trigger; the runtime has no list of public
+      triggers). The errors mirror stays because three readers use it. The macOS boot journal, written stage by
+      stage before the native logger commits and so not a copy of the daily log, was renamed from
+      `ErgoptiPlus_boot.log` (a retired name) to `boot_journal.log` and is archived with the launcher files. Kept
+      meanwhile: all of these. Change a value in `log_export.toml` or answer here.
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
       are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script

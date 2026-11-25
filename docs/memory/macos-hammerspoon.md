@@ -63,8 +63,9 @@ a modal alert. `configured_symlink` now requires that named refusal, and
 stay untouched, `symlink_logs_dir` points LogsDirPath through a link and checks
 the picked folder keeps its permissions, and `dangling_logs` is a LogsDirPath
 link to nothing that must be refused by name. To see where a boot stopped, read
-`~/Library/Logs/Ergopti/ErgoptiPlus_boot.log` (the default logs folder, beside
-launcher.log; it was the shared `/tmp` root until 2026-09): every `Boot.stage`/`Boot.mark` pair is appended
+`~/Library/Logs/Ergopti/boot_journal.log` (`[logs.macos] boot_journal`, the default logs folder, beside
+launcher.log; it was the shared `/tmp` root until 2026-09 and `ErgoptiPlus_boot.log` until the topical
+sub-files were retired on 2026-11-25, a name the retention sweep now deletes): every `Boot.stage`/`Boot.mark` pair is appended
 there synchronously by `core/logger/adapters/boot_journal.lua` (and to launcher.log until
 the native logger commits); the last START without SUCCESS is the stage. Log folders are resolved once with
 realpath and opened with `O_NOFOLLOW_ANY` (`OwnedLogDirectory.swift`); never
@@ -1200,7 +1201,7 @@ native poller and the one path that deploys the retained regeneration on
 
 `launcher.log` and `hammerspoon-fatal.txt` are written by the native launcher
 before any configuration is read, so they stay in `~/Library/Logs/Ergopti`
-whatever `LogsDirPath` says; only the daily and topical logs move. The macOS
+whatever `LogsDirPath` says; only the daily logs and errors mirrors move. The macOS
 field-report collector looked for them in the moved folder and skipped them
 without a trace, so no 2026-10-30 report carried `launcher.log` and the reload
 lost at 21:06 kept no record of how the launcher saw its runtime end. Read them

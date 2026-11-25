@@ -252,7 +252,7 @@ in between, or one whose arguments change. Repeat collapsing does.
   first. The next occurrence after a close is emitted and opens a new streak.
 - **Summary.** A closed streak that withheld at least one line emits one line at
   its own variant and under its own module, so a collapsed warning still reaches
-  the errors-only file and a topical file still receives it:
+  the errors-only file:
 
   ```
   TIMESTAMP [LEVEL] [module] ↑ "<text>" repeated N more time(s) between <first> and <last>[ (last: <body>)].
@@ -296,7 +296,7 @@ only by arguments, and the same check may run again a minute later. Folded by
 
 - **Rendering.** An INFO line: severity 20, label `[INFO]`, sink variant
   `info`. It is filtered by the level threshold exactly like `info`, and it
-  reaches the same files, ring buffer and topical sub-files.
+  reaches the same files and ring buffer.
 - **Exemption.** It is never withheld by § 4.1 (not even when identical to the
   previous line) and never opens or joins a § 4.2 streak. It is accepted like
   any other line, so it closes an open § 4.1 streak first; the lines around it
@@ -416,18 +416,23 @@ admission, a second start that yielded). The file name is declared once in
 `paths/app_dirs.toml`; on Linux it only ever carries the closed messages of
 `core/logger/engine/bootstrap_log.lua`, because the privacy policy is not loaded yet.
 
-### 6.2 Fan-out sub-files
+### 6.2 One log file, one export archive
 
-In addition to the main log, the logger routes each line to one or more
-topical sub-files when the line matches the sub-file's routing rule.
+Every line goes to the daily log and nowhere else, apart from the
+WARNING/ERROR mirror `ErgoptiPlus_errors_YYYY-MM-DD.log`, which the health
+check's recent issues, the error dialog and « Open today's errors file » read.
+The topical sub-files every driver used to fan lines out to were retired on
+2026-11-25 (§ 7): testers had to send dozens of files when the daily log already
+held every line.
 
-Routing rules are defined in [`sub_files.toml`](./sub_files.toml) (see § 7).
-
-Every sub-file uses the same UTF-8 encoding, CRLF/LF line endings, and
-daily rotation as the main log. A sub-file is a view of today: the retention
-pass removes one last modified on another calendar day. The `dated_retention`
-and `topical_retention` cases of `parity_vectors.json` pin both rules on the
-three drivers and the macOS native worker.
+« Export the logs (zip) » in the Debug menu hands a tester the one file to send:
+the daily logs and errors mirrors of the last `days` days, the files written
+before the logger can start (`bootstrap.log`; on macOS the launcher's
+`launcher.log`, fatal report and reload breadcrumb) and the crash reports, each
+copied through the field report's privacy rules. The selection, the archive
+name and the scrub rules are declared once in
+[`log_export.toml`](./log_export.toml) and replayed by every driver against
+[`log_export_vectors.json`](../../../tests/corpus/logger/log_export_vectors.json).
 
 ### 6.3 Write strategy
 
@@ -445,28 +450,19 @@ three drivers and the macOS native worker.
 
 ---
 
-## 7. Sub-file Routing (`sub_files.toml`)
+## 7. Retired Sub-files
 
-Each entry in [`sub_files.toml`](./sub_files.toml) defines one topical sub-file:
-
-```toml
-[[sub_files]]
-name     = "gestures"                  # suffix of ErgoptiPlus_<name>.log
-patterns = ["[gestures", "gesture"]    # substring patterns matched against the full log line
-platforms = ["ahk", "hs", "linux"]    # Windows, macOS, Linux: which drivers write it
-```
-
-A log line is routed to a sub-file if **any** of its `patterns` is found as a
-substring of the full formatted line (case-sensitive). The match is against the
-complete line including timestamp, level, and module tag.
-
-A topic that exists on several drivers is declared for all of them, so the same
-file name answers the same question on every OS. Each driver spells its module
-tags in its own style, hence one pattern list per topic that names every
-spelling. Topical files carry no date in their name: the first write of a new day
-truncates a file whose first line is from an earlier day (macOS by modification
-time, Linux by that first line). Only MLX and Karabiner (macOS products) and the
-Windows layout, dispatch and tray topics are single-platform.
+Until 2026-11-25 each driver also appended a matching line to a topical file
+(`ErgoptiPlus_hotstrings.log`, `ErgoptiPlus_llm.log`, …), routed by a table
+generated from `sub_files.toml`. Every such line was a copy of a daily-log line,
+so nothing was lost when the fan-out was removed. The old file names are
+declared once as `[logs.files] retired_topical_logs` in
+[`paths/app_dirs.toml`](../../fs/data/paths/app_dirs.toml): each driver's
+retention sweep (and the macOS native worker's) deletes a regular file of
+exactly one of those names directly in the logs folder, and nothing else, so an
+upgraded install loses its old sub-files on the first start. `karabiner_kc.log`
+in the macOS metrics folder is the Karabiner key-count ledger, not a log, and is
+not affected.
 
 ---
 
@@ -584,5 +580,5 @@ Errors caught by `try`/`pcall` on non-hot paths are logged, never discarded.
 - HS implementation: [`macos/core/logger/engine/logger.lua`](../../../../macos/core/logger/engine/logger.lua)
 - Linux sink: [`linux/core/logger/engine/sink.lua`](../../../../linux/core/logger/engine/sink.lua)
 - Parity corpus: [`parity_vectors.json`](../../../tests/corpus/logger/parity_vectors.json)
-- Sub-file routing: [`sub_files.toml`](./sub_files.toml)
+- Log export archive: [`log_export.toml`](./log_export.toml)
 - Test vectors: [`test_vectors.json`](./test_vectors.json)

@@ -12,7 +12,7 @@
  *   phase           the same shapes with `phase`
  *   log_tag         a `[TAG]` prefix opening the message of a logger call, or
  *                   opening a shell `echo` the driver runs (its output is
- *                   appended to the same logs and routed by sub_files.toml)
+ *                   appended to the same daily log)
  *   evidence_field  `name=` keys in the templates of evidence calls
  *                   (`Logger.evidence`, `LoggerEvidence`) and in the declared
  *                   evidence-record formatters

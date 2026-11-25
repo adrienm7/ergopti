@@ -150,7 +150,7 @@
 
 		{
 			"id": "level_label_warning_spelling",
-			"description": "The warn() call emits [WARNING] not [WARN] — critical for sub-file routing.",
+			"description": "The warn() call emits [WARNING] not [WARN] — the errors mirror and the field report digests match that label.",
 			"variant": "warn",
 			"module": "AnyModule",
 			"message": "Something unexpected happened.",

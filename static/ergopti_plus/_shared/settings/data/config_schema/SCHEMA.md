@@ -38,7 +38,7 @@ static/ergopti_plus/_shared/
 ├── modules/
 │  ├── features/manifest.toml       # Single source of features
 │  ├── actions/actions.toml         # Action catalogue
-│  ├── logger/                      # SPEC.md, sub_files.toml, test_vectors.json
+│  ├── logger/                      # SPEC.md, log_export.toml, test_vectors.json
 │  ├── tooltip/                     # SPEC.md and the visual constants
 │  └── llm/                         # defaults, profiles, models, inference
 ├── core/i18n/data/locales/                    # One JSON per language
