@@ -21,6 +21,7 @@
 RegistryLimitsCount(Section, Key) {
 	static Values := Map(
 		"process_output_bytes", 65536,
+		"ocr_output_bytes", 786432,
 		"proc_cmdline_bytes", 65536,
 		"kde_layout_monitor_line_bytes", 1024,
 		"declaration_file_bytes", 65536,
