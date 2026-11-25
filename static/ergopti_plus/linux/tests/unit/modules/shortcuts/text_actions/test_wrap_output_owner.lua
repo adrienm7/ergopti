@@ -249,13 +249,13 @@ helpers.describe("wrap output publication ownership", function()
 	end)
 
 	for _, failure in ipairs({ "false", "throw" }) do
-		helpers.it("keeps clipboard restoration " .. failure .. " observable and fatal", function()
+		helpers.it("keeps clipboard restoration " .. failure .. " observable but never fatal", function()
 			with_wrap({ restore_failure = failure }, function(state)
 				helpers.assert_eq(state.consumed, true, "the paste was already attempted")
 				helpers.assert_true(state.result.payload_attempted)
 				helpers.assert_eq(state.resets, 1, "attempted output invalidates the buffered caret")
-				helpers.assert_eq(state.result.ok, false)
-				helpers.assert_eq(state.stops, 1)
+				helpers.assert_eq(state.result.ok, true, "the wrapped text was delivered")
+				helpers.assert_eq(state.stops, 0, "a clipboard restoration never stops the keyboard")
 				helpers.assert_true(state.errors > 0, "restoration failures must retain the real error observer")
 				helpers.assert_true(not table.concat(state.logs, "\n"):find("selected", 1, true),
 					"the error path must not log the selection")

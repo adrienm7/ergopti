@@ -261,7 +261,14 @@ local function write_transient_checked(selected_backend, text)
 		end
 	end
 	if not _transient_owner then return write_backend_checked(selected_backend, text) end
-	return require("clipboard.adapters.owner").write(M.transient_targets(text)) == true
+	if require("clipboard.adapters.owner").write(M.transient_targets(text)) == true then return true end
+	-- A probe that passes does not prove the owner can keep the selection: on
+	-- KDE Plasma's Wayland it was refused on every paste, each refusal costing
+	-- its timeout. The session's writer carries the payload from then on.
+	_transient_owner = false
+	Logger.warn(LOG, "The multi-format clipboard owner failed: pasted text goes through %s from now on"
+		.. " and is no longer hidden from clipboard managers.", selected_backend.name)
+	return write_backend_checked(selected_backend, text)
 end
 
 --- Restores the unarmed state (test seam).
@@ -410,7 +417,16 @@ end
 --- @return boolean
 local function restore_snapshot(selected_backend, snapshot)
 	if snapshot.unowned then return selected_backend.clear() == true end
-	if snapshot.targets then return require("clipboard.adapters.owner").write(snapshot.targets) end
+	if not snapshot.targets then return write_backend_checked(selected_backend, snapshot.text) end
+	if require("clipboard.adapters.owner").write(snapshot.targets) == true then return true end
+	-- The owner's exit status is not the only proof: a clipboard manager that
+	-- takes the selection over as soon as it is set (Klipper) ends the owner
+	-- early while the saved text is back. Short of that, the text alone is
+	-- better than leaving the pasted payload in the clipboard.
+	if snapshot.text == "" or snapshot.text:find("\0", 1, true) then return false end
+	local read_ok, current = read_backend_checked(selected_backend)
+	if read_ok and current == snapshot.text then return true end
+	Logger.warn(LOG, "Only the text of the previous clipboard is put back; its other formats are lost.")
 	return write_backend_checked(selected_backend, snapshot.text)
 end
 
@@ -608,7 +624,6 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 	assert(type(text) == "string" and text ~= "" and type(key_v) == "number", "invalid clipboard preparation")
 	local stage, b, saved = {}, nil, nil
 	local busy, revoked, restore_required, prepared = false, false, false, false
-	local written, restore_attempted = false, false
 	local function current()
 		return not revoked and admitted(admission) and not revoked
 	end
@@ -622,11 +637,9 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			-- do not identify either our payload or the saved snapshot.
 			local read_ok, current = read_backend_checked(b)
 			if not read_ok then return false end
-			if current ~= text and current ~= saved.text then
-				if written and not restore_attempted then return true end
-				return false
-			end
-			restore_attempted = true
+			-- Bytes that are neither our payload nor the snapshot are another
+			-- application's copy: it is kept, never overwritten.
+			if current ~= text and current ~= saved.text then return true end
 			return restore_snapshot(b, saved)
 		end)
 		busy = false
@@ -634,10 +647,18 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 		return not restore_required
 	end
 	--- Revokes first; an in-flight set must unwind before restoration can run.
+	--- Restoration is best effort and attempted once: a refusal is logged and
+	--- given up, never kept as debt that would stop the keyboard or refuse the
+	--- daemon's shutdown (maintainer decision, 2026-11-25).
 	--- @return boolean settled
+	--- @return boolean restored False when the previous content was given up.
 	function stage.close()
 		revoked = true
-		return not busy and restore()
+		if busy then return false, false end
+		if restore() then return true, not stage.restore_failed end
+		restore_required, saved, stage.restore_failed = false, nil, true
+		Logger.error(LOG, "The previous clipboard content could not be put back; the clipboard keeps the pasted text.")
+		return true, false
 	end
 	--- Prepares the saved clipboard and canonical settle delay without key output.
 	--- @return boolean ready
@@ -655,7 +676,6 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			-- A failed/throwing setter may already have changed the clipboard.
 			restore_required = true
 			if not write_transient_checked(b, text) then return false end
-			written = true
 			if not current() then return false end
 			if not wait_checked(sleep_ms, SETTLE_MS) then return false end
 			return current()
@@ -746,20 +766,23 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	-- Restored even when it was empty: an owned "" is written back and an
 	-- unowned clipboard is cleared, which leaves it as the user left it;
 	-- skipping the restore would leave our replacement sitting there.
+	-- Best effort: a refused restore is reported to the caller and logged, and
+	-- the paste that was issued still counts as delivered.
 	local held = holds_pasted_text(b, text)
+	local restore_failure = nil
 	if held == nil or (held and not restore_snapshot(b, saved)) then
-		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
-		return false, "clipboard restoration failed"
+		Logger.error(LOG, "paste_text(): the previous clipboard content could not be put back.")
+		restore_failure = "clipboard restoration failed"
 	end
 	if not paste_ok or not issued then
 		-- An admitted transaction distinguishes expected destination retirement
 		-- from real wire failures after cleanup; only it should notify errors.
 		if admission == nil then Logger.error(LOG, "paste_text(): checked paste chord emission failed.") end
-		return false
+		return false, restore_failure
 	end
 
 	Logger.debug(LOG, "Pasted %d byte(s) via %s.", #text, b.name)
-	return true
+	return true, restore_failure
 end
 
 --- Copies the focused selection into the clipboard, which the caller restores.

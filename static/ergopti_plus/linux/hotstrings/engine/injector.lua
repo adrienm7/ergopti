@@ -98,14 +98,23 @@ local _erase_pacing = nil
 local _uinput = nil
 local _clipboard_cleanup = nil
 
+-- The failed phase of a clipboard paste the desktop refused with every key
+-- released: a healthy refusal, so the keyboard keeps running.
+local CLIPBOARD_PASTE_PHASE = "clipboard paste"
+
 --- Retires the original clipboard owner independently of output admission.
---- @return boolean acknowledged Saved bytes were physically restored.
+--- Best effort and attempted once: a restoration that does not settle is
+--- logged and given up, never kept as output debt. Holding it made one
+--- refused restore on KDE Plasma's Wayland stop the keyboard, then refuse the
+--- final and the startup output retirement, a crash loop (2026-11-25).
 local function retire_clipboard()
 	local close = _clipboard_cleanup
-	if not close then return true end
+	if not close then return end
+	_clipboard_cleanup = nil
 	local checked, closed = pcall(close)
-	if checked and closed == true and _clipboard_cleanup == close then _clipboard_cleanup = nil end
-	return _clipboard_cleanup == nil
+	if not checked or closed ~= true then
+		Logger.error(LOG, "The clipboard restoration did not settle; it is given up so typing goes on.")
+	end
 end
 
 --- Exact layout-level modifier keycodes the user is physically holding.
@@ -345,7 +354,12 @@ end
 --- @return boolean True when the whole payload was delivered.
 local function send_text(tx, text, is_private, prepared)
 	if prepared and prepared.clipboard_paste then
-		if not prepared.clipboard_paste(tx.channel()) then error("prepared clipboard paste refused", 0) end
+		if not prepared.clipboard_paste(tx.channel()) then
+			-- A wire failure during the chord already marked the transaction; this
+			-- phase only names a paste the clipboard refused (another copy landed).
+			tx.fail("prepared clipboard paste refused", CLIPBOARD_PASTE_PHASE)
+			error(tx.error(), 0)
+		end
 		return true
 	end
 	if not prepared or prepared.native then
@@ -379,11 +393,9 @@ local function send_text(tx, text, is_private, prepared)
 		if not checked then admission_error = result; error(result, 0) end
 		return result
 	end
-	local pasted, restore_failure = Clipboard.paste_text(text, channel, pause, admission)
-	if restore_failure then
-		tx.fail(restore_failure, "clipboard restoration")
-		error(tx.error(), 0)
-	end
+	-- A refused restoration was logged by the adapter and is not a delivery
+	-- failure: the paste went through and the keyboard must keep running.
+	local pasted = Clipboard.paste_text(text, channel, pause, admission)
 	if admission_error ~= nil then error(admission_error, 0) end
 	if pasted then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
@@ -585,7 +597,8 @@ local function prepare_replacement(text, publication, owner)
 	--- Cleanup uses the captured owner even after its public APIs are replaced.
 	function prepared.close_clipboard()
 		if not clip or clip_closed then return true end
-		return _clipboard_cleanup == owned_close and retire_clipboard()
+		if _clipboard_cleanup == owned_close then retire_clipboard() end
+		return true
 	end
 	return prepared
 end
@@ -727,7 +740,10 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	-- reached through the Tabs) and passes only the prepared replacement, so the
 	-- prepared batch counts as a retained destination too.
 	if not result.ok and not ((publication ~= nil or prepared ~= nil) and result.cleanup_ok == true
-		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
+		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE)
+		and not (result.cleanup_ok == true and result.failed_phase == CLIPBOARD_PASTE_PHASE) then
+		stop_after_failure(result, label)
+	end
 	return result
 end
 
@@ -872,8 +888,10 @@ end
 --- Closes the non-forking channel, if one is open.
 --- @return boolean acknowledged True when absent or strictly retired; false retains cleanup debt.
 function M.close_fast_channel()
-	local clipboard_closed = retire_clipboard()
-	if not _uinput then return clipboard_closed end
+	-- Clipboard restoration never holds the output channel open: it is best
+	-- effort, and the virtual keyboard's own retirement is the acknowledgement.
+	retire_clipboard()
+	if not _uinput then return true end
 	local Broker = require("platform.input.modifier_broker")
 	local channel, broker = _uinput, Broker.for_channel(_uinput)
 	if broker then
@@ -890,7 +908,7 @@ function M.close_fast_channel()
 	end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
-	return clipboard_closed
+	return true
 end
 
 --- Test seam: injects (or clears) the uinput channel without touching /dev.
@@ -979,9 +997,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		trace_format, trace_text = "inject(): bc=%d, private text (content withheld)…", nil
 	end
 	Logger.trace(LOG, trace_format, backspace_count, trace_text)
-	if not retire_clipboard() then
-		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
-	end
+	retire_clipboard()
 	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
 	if not checked then
 		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure (content withheld).")
@@ -990,12 +1006,9 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 	local ready, preparation_error = pcall(prepared.prepare_clipboard)
 	if not ready then
-		local closed = prepared.close_clipboard()
-		local failure = { ok = false, error = closed and private_failure(preparation_error, is_private) or "clipboard restoration failed",
-			failed_phase = "replacement preflight", cleanup_ok = closed }
-		if not closed then failure.native_cleanup_ok = true end
-		if not closed then stop_after_failure(failure, "inject()") end
-		return failure
+		prepared.close_clipboard()
+		return { ok = false, error = private_failure(preparation_error, is_private),
+			failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local payload_attempted = false
@@ -1025,17 +1038,13 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			if type(on_payload_attempt) == "function" then on_payload_attempt() end
 		end
 	end, is_private, physical_input == true and backspace_count == 0 and not is_private and replay_terminator == nil)
-	local closed_ok, clipboard_closed = pcall(prepared.close_clipboard)
-	clipboard_closed = closed_ok and clipboard_closed == true
+	-- Best effort: the replacement was delivered whatever the restoration does.
+	pcall(prepared.close_clipboard)
 	if not ran then
 		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
 			cleanup_ok = false, native_cleanup_ok = false }
+		stop_after_failure(result, "inject()")
 	end
-	if not clipboard_closed then
-		result.native_cleanup_ok = result.cleanup_ok
-		result.ok, result.cleanup_ok, result.error, result.failed_phase = false, false, "clipboard restoration failed", "clipboard restoration"
-	end
-	if not ran or not clipboard_closed then stop_after_failure(result, "inject()") end
 
 	result.payload_attempted = payload_attempted
 	if result.ok then
@@ -1121,9 +1130,7 @@ function M.inject_fields(backspace_count, values, is_private, publication)
 		return M.inject(backspace_count, values[1], is_private, nil, publication)
 	end
 	local owner = capture_replacement_owner()
-	if not retire_clipboard() then
-		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
-	end
+	retire_clipboard()
 
 	-- One TRACE per replacement, private or not; its DONE is "inject_fields(): done".
 	Logger.trace(LOG, is_private and "inject_fields(): bc=%d, %d private field(s) (content withheld)…"
@@ -1189,9 +1196,7 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 		if token.kind == "text" then values[#values + 1] = token.value end
 	end
 	local owner = capture_replacement_owner()
-	if not retire_clipboard() then
-		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
-	end
+	retire_clipboard()
 	-- A count only: this log is kept for 14 days and the text may be a secret.
 	Logger.trace(LOG, "inject_tokens(): bc=%d, %d token(s)…", backspace_count, #tokens)
 	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)

@@ -113,7 +113,7 @@ helpers.describe("clipboard paste snapshot", function()
 			local result, why = clipboard.paste_text("replacement", channel(), function(ms)
 				if ms == 120 then shell.value = "external copy" end
 			end)
-			helpers.assert_eq(result, false)
+			helpers.assert_eq(result, true, "the issued paste counts even though its restoration was given up")
 			helpers.assert_eq(why, "clipboard restoration failed")
 			helpers.assert_eq(shell.value, "external copy")
 			helpers.assert_eq(#shell.writes, 1)

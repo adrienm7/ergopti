@@ -133,6 +133,7 @@ local function fixture(options, callback)
 	Injector._set_nanosleep_for_test(function(seconds)
 		if seconds == 0.03 and options.retire_on_settle then retire() end
 		if seconds == 0.03 and options.settle_throws then error("independent settle exception") end
+		if seconds == 0.03 and options.copy_on_settle then world.clipboard = "external copy" end
 	end)
 	Injector.set_output_observer(function() world.notifications = world.notifications + 1 end)
 	local function current() return world.destination == original_destination end
@@ -257,90 +258,47 @@ helpers.describe("ordinary clipboard preparation before erasure", function()
 			helpers.assert_eq(world.down, {})
 		end)
 	end)
-	case("failed restoration retains debt until the original cleanup later acknowledges", function()
+	-- KDE Plasma 6 Wayland field crash loop (2026-11-25): one refused restore
+	-- emergency-stopped the keyboard, then refused the final and the startup
+	-- output retirement. Restoration is best effort and never output debt.
+	case("a refused restoration is given up: the payload counts, the keyboard and shutdown go on", function()
 		local options = { restore_refuses = true }
 		fixture(options, function(world)
 			local result = world.inject()
-			helpers.assert_eq(result.ok, false)
-			helpers.assert_eq(result.cleanup_ok, false)
-			helpers.assert_eq(world.notifications, 0)
+			helpers.assert_eq({ result.ok, result.cleanup_ok }, { true, true }, "the paste reached the document")
+			helpers.assert_eq(world.document, "prefix 🙂")
+			helpers.assert_eq(world.notifications, 1)
+			helpers.assert_eq(world.stops, 0, "a clipboard restoration never stops the keyboard")
 			helpers.assert_eq(world.down, {})
-			local calls = #world.calls
-			local blocked = world.inject()
-			helpers.assert_eq(blocked.ok, false)
-			helpers.assert_eq(blocked.cleanup_ok, false)
-			for index = calls + 1, #world.calls do helpers.assert_true(not world.calls[index]:match("^key:")) end
-			helpers.assert_eq(world.injector.close_fast_channel(), false)
-			options.restore_refuses = false
-			helpers.assert_eq(world.injector.close_fast_channel(), true)
-			helpers.assert_eq(world.clipboard, "saved clipboard")
+			local before = #world.calls
+			local next_result = world.inject()
+			helpers.assert_eq(next_result.ok, true, "the next replacement is not blocked by the given-up restore")
+			helpers.assert_true(#world.calls > before)
+			helpers.assert_eq(world.injector.close_fast_channel(), true, "output retirement never waits on the clipboard")
+			helpers.assert_eq(world.stops, 0)
 		end)
 	end)
-	case("retained clipboard debt blocks batch erasure even while its genuine Writer capability remains current", function()
+	case("a paste refused for another application's copy never stops the keyboard", function()
+		fixture({ copy_on_settle = true }, function(world)
+			local result = world.inject()
+			helpers.assert_eq({ result.ok, result.cleanup_ok }, { false, true })
+			helpers.assert_eq(world.clipboard, "external copy", "the other application's copy is kept")
+			helpers.assert_eq(world.down, {})
+			helpers.assert_eq(world.stops, 0, "a refused paste with every key released is a healthy refusal")
+		end)
+	end)
+	case("a refused restoration keeps the genuine Writer and lets batches erase", function()
 		local options = { real_writer = true, restore_refuses = true }
 		fixture(options, function(world)
 			local first = world.inject()
-			helpers.assert_eq(first.ok, false)
-			helpers.assert_eq(first.cleanup_ok, false)
-			helpers.assert_eq(first.native_cleanup_ok, true)
-			helpers.assert_true(world.authority_current(), "real empty-input emergency stop does not retire a healthy Writer")
-			local before, document = #world.calls, world.document
-			local refused = world.injector.inject_fields(3, { world.payload, world.payload }, true)
-			for index = before + 1, #world.calls do
-				helpers.assert_true(not world.calls[index]:match("^key:"), "unacknowledged clipboard cleanup must precede every batch key")
-			end
-			helpers.assert_eq(refused.ok, false)
-			helpers.assert_eq(refused.cleanup_ok, false)
-			helpers.assert_eq(world.document, document)
-			options.restore_refuses = false
-			helpers.assert_eq(world.injector.inject_fields(0, { world.payload, world.payload }, true).ok, true)
-			helpers.assert_true(world.authority_current(), "ACK recovery admits the same original Writer without replacement")
+			helpers.assert_eq({ first.ok, first.cleanup_ok }, { true, true })
+			helpers.assert_true(world.authority_current(), "the original output owner stays current")
+			local batch = world.injector.inject_fields(3, { world.payload, world.payload }, true)
+			helpers.assert_eq(batch.ok, true)
+			helpers.assert_eq(world.stops, 0)
 		end)
 	end)
 	for _, mode in ipairs({ "ordinary", "single", "multiple" }) do
-		for _, change in ipairs({ "writer", "broker", "none" }) do
-			case(mode .. " retains its original output while cleanup acknowledges " .. change, function()
-				local options = { real_writer = true, restore_refuses = true }
-				fixture(options, function(world)
-					local first = world.inject()
-					helpers.assert_eq({ first.ok, first.cleanup_ok, first.native_cleanup_ok }, { false, false, true })
-					helpers.assert_true(world.authority_current(), "clipboard-only debt leaves the genuine output owner current")
-					local function inject()
-						if mode == "ordinary" then return world.injector.inject(3, world.payload, true) end
-						return world.injector.inject_fields(3, mode == "single" and { world.payload } or { world.payload, world.payload }, true)
-					end
-					local restored, before, document = 0, #world.calls, world.document
-					world.on_restore = function()
-						world.on_restore = nil; restored = restored + 1
-						world.replace_output(change)
-					end
-					options.restore_refuses = false
-					local result = inject()
-					helpers.assert_eq(restored, 1, "the actual pending clipboard setter must acknowledge cleanup")
-					helpers.assert_eq(world.clipboard, "saved clipboard", "old clipboard cleanup must finish despite output succession")
-					helpers.assert_eq(result.cleanup_ok, true)
-					helpers.assert_eq(world.down, {})
-					if change == "none" then
-						helpers.assert_eq(result.ok, true)
-						helpers.assert_eq(world.notifications, 1)
-						helpers.assert_true(#world.calls > before)
-					else
-						local keys = 0
-						for index = before + 1, #world.calls do
-							if world.calls[index]:match("^key:") then keys = keys + 1 end
-						end
-						helpers.assert_eq(result.ok, false, "an old request cannot adopt the successor during restoration (emitted " .. keys .. " keys)")
-						helpers.assert_eq(world.document, document)
-						helpers.assert_eq(world.notifications, 0)
-						for index = before + 1, #world.calls do
-							helpers.assert_true(not world.calls[index]:match("^key:"), "no erase or replacement through the successor")
-						end
-						helpers.assert_eq(inject().ok, true, "a new request may use the acknowledged successor")
-						helpers.assert_eq(world.notifications, 1)
-					end
-				end)
-			end)
-		end
 		case(mode .. " without clipboard debt still completes on its original output", function()
 			fixture({ real_writer = true }, function(world)
 				local result

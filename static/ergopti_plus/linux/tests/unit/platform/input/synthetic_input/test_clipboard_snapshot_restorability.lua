@@ -50,6 +50,12 @@ local function with_snapshot(saved, body, targets, owner, unowned)
 			available = function() return owner ~= nil and owner.available == true end,
 			write = function(saved_targets)
 				s.owner_writes[#s.owner_writes + 1] = saved_targets
+				-- "refuses": nothing taken; "taken_over": a clipboard manager
+				-- re-served the saved text and ended the owner early (Klipper).
+				if owner.write == "refuses" then return false end
+				for _, target in ipairs(saved_targets) do
+					if owner.write == "taken_over" and target.name == "UTF8_STRING" then s.value = target.data; return false end
+				end
 				for _, target in ipairs(saved_targets) do
 					if target.name == "UTF8_STRING" then s.value = target.data end
 				end
@@ -290,6 +296,27 @@ helpers.describe("clipboard snapshot restorability", function()
 			end, targets, { available = true, bytes = { ["text/html"] = "<i>x</i>" } })
 		end)
 	end
+	-- KDE Plasma 6 Wayland (2026-11-25): a refused owner left the restoration
+	-- owed for good, which stopped the keyboard and then the daemon.
+	helpers.it("multi-format restore: a refused owner falls back to the saved text", function()
+		local targets = "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/html\n"
+		with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
+			helpers.assert_eq(s.invoke("paste_text"), true)
+			helpers.assert_eq(#s.owner_writes, 1)
+			helpers.assert_eq(s.writes[#s.writes], "EP79_PRIVATE_RICH_TEXT", "the text writer puts the text back")
+			helpers.assert_eq(s.value, "EP79_PRIVATE_RICH_TEXT")
+		end, targets, { available = true, write = "refuses", bytes = { ["text/html"] = "<b>x</b>" } })
+	end)
+	helpers.it("multi-format restore: an owner ended by a manager that re-served the text counts as restored", function()
+		local targets = "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/html\n"
+		with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
+			helpers.assert_eq(s.invoke("paste_text"), true)
+			for _, written in ipairs(s.writes) do
+				helpers.assert_true(written ~= "EP79_PRIVATE_RICH_TEXT", "the formats the manager serves are not overwritten")
+			end
+			helpers.assert_eq(s.value, "EP79_PRIVATE_RICH_TEXT")
+		end, targets, { available = true, write = "taken_over", bytes = { ["text/html"] = "<b>x</b>" } })
+	end)
 	for _, method in ipairs({ "read_checked", "read_primary" }) do
 		helpers.it("snapshot preflight: raw " .. method .. " retains NUL without writes", function()
 			local bytes = "EP79_PRIVATE_RAW_A\0B"

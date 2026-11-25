@@ -41,6 +41,7 @@ local function with_paste(body, options)
 		available = function() s.probes = s.probes + 1; return options.owner ~= false end,
 		write = function(targets)
 			s.owner[#s.owner + 1] = targets
+			if options.owner_refuses then return false end
 			s.value = targets[1].data
 			return true
 		end,
@@ -101,6 +102,20 @@ helpers.describe("Linux clipboard: transient hint on pasted payloads", function(
 			helpers.assert_eq(s.writer, { "one", "original", "two", "original" })
 			helpers.assert_eq(#s.infos, 1)
 		end, { owner = false })
+	end)
+
+	-- KDE Plasma 6 Wayland (2026-11-25): the owner's probe passed but every
+	-- write was refused, each refusal costing its timeout and ending in a
+	-- failed paste. The session writer carries the payload instead, for good.
+	helpers.it("falls back to the session writer for good once the owner refuses a write", function()
+		with_paste(function(s)
+			s.clipboard.arm_transient_hint()
+			helpers.assert_true(s.paste("one"), "the refused owner write must not lose the paste")
+			helpers.assert_true(s.paste("two"))
+			helpers.assert_eq(#s.owner, 1, "a refusing owner is not asked again")
+			helpers.assert_eq(s.writer, { "one", "original", "two", "original" })
+			helpers.assert_eq(s.value, "original")
+		end, { owner_refuses = true })
 	end)
 
 	helpers.it("leaves an unarmed process on the session writer without probing", function()
