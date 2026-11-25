@@ -188,8 +188,8 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: $(node "$APP_METADATA" field maintainer)
-Depends: xclip, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
-Recommends: xdotool, wmctrl, wl-clipboard
+Depends: xclip, wl-clipboard, libnotify-bin, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, xdg-utils, libsecret-tools, libxkbcommon-x11-0, libx11-6, libx11-xcb1
+Recommends: xdotool, wmctrl
 Section: utils
 Priority: optional
 Homepage: $(node "$APP_METADATA" field homepage)

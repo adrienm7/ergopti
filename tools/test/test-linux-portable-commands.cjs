@@ -438,22 +438,14 @@ const PROGRAMS = {
 	),
 	xdotool: recommendedByDeb('xdotool', 'focused window and screen geometry on X11', DRIVER_HOST),
 	wmctrl: recommendedByDeb('wmctrl', 'window list on X11'),
-	'wl-copy': why(
-		`clipboard on Wayland; declared optional dependency: ${DEB_RECIPE} Recommends, probed before use`,
-		DRIVER_HOST,
-		{
-			proof: { file: DEB_RECIPE, token: 'Recommends:.*\\bwl-clipboard\\b' },
-			probed: true
-		}
-	),
-	'wl-paste': why(
-		`clipboard on Wayland; declared optional dependency: ${DEB_RECIPE} Recommends, probed before use`,
-		DRIVER_HOST,
-		{
-			proof: { file: DEB_RECIPE, token: 'Recommends:.*\\bwl-clipboard\\b' },
-			probed: true
-		}
-	),
+	'wl-copy': why(`clipboard on Wayland; declared by ${DEB_RECIPE} Depends`, DRIVER_HOST, {
+		proof: { file: DEB_RECIPE, token: 'Depends:.*\\bwl-clipboard\\b' },
+		probed: true
+	}),
+	'wl-paste': why(`clipboard on Wayland; declared by ${DEB_RECIPE} Depends`, DRIVER_HOST, {
+		proof: { file: DEB_RECIPE, token: 'Depends:.*\\bwl-clipboard\\b' },
+		probed: true
+	}),
 	// Optional desktop and system tools: probed before use in every launching file.
 	xsel: optionalTool('clipboard fallback on X11', DRIVER_HOST),
 	gdbus: optionalTool('GNOME tooltip preview', DRIVER_HOST),

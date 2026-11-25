@@ -249,10 +249,31 @@ const expectedPackages = new Map([
 	['zypper:secret-tool', 'secret-tool'],
 	['pacman:secret-tool', 'libsecret'],
 	['xbps:secret-tool', 'libsecret'],
-	['apk:secret-tool', 'libsecret']
+	['apk:secret-tool', 'libsecret'],
+	// Both clipboard tools, as every package requires them (checked against the
+	// distribution indexes).
+	['apt:xclip', 'xclip'],
+	['dnf:xclip', 'xclip'],
+	['zypper:xclip', 'xclip'],
+	['pacman:xclip', 'xclip'],
+	['xbps:xclip', 'xclip'],
+	['apk:xclip', 'xclip'],
+	['apt:wl-copy', 'wl-clipboard'],
+	['dnf:wl-copy', 'wl-clipboard'],
+	['zypper:wl-copy', 'wl-clipboard'],
+	['pacman:wl-copy', 'wl-clipboard'],
+	['xbps:wl-copy', 'wl-clipboard'],
+	['apk:wl-copy', 'wl-clipboard']
 ]);
 // Remote API keys are refused without the secret service command, so the
 // installer admits it like every other required command.
+for (const command of ['xclip', 'wl-copy']) {
+	if (!new RegExp(`^_check_or_install ${command}$`, 'm').test(installerCode)) {
+		errors.push(
+			`the installer never admits ${command} (the clipboard the injector pastes through)`
+		);
+	}
+}
 if (!/^_check_or_install secret-tool$/m.test(installerCode)) {
 	errors.push('the installer never admits secret-tool (remote API keys)');
 }

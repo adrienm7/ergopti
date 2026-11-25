@@ -26,11 +26,10 @@ install=ergopti.install
 options=('!strip' '!debug')
 backup=('etc/udev/rules.d/99-ergopti-uinput.rules' 'etc/modules-load.d/ergopti-uinput.conf')
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
-depends=('xclip' 'libnotify' 'libxkbcommon' 'at-spi2-core' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'lua51-lgi' 'webkit2gtk-4.1' 'libsecret' 'libxkbcommon-x11' 'libx11')
+depends=('xclip' 'wl-clipboard' 'libnotify' 'libxkbcommon' 'at-spi2-core' 'xdg-utils' 'polkit' 'kmod' 'systemd' 'shadow' 'util-linux' 'glibc' 'libayatana-appindicator' 'lua51-lgi' 'webkit2gtk-4.1' 'libsecret' 'libxkbcommon-x11' 'libx11')
 # END GENERATED LINUX NATIVE REQUIREMENTS
 optdepends=('xdotool: focused-window identity on X11'
-            'wmctrl: window list of the excluded-applications picker on X11'
-            'wl-clipboard: clipboard fallback on Wayland')
+            'wmctrl: window list of the excluded-applications picker on X11')
 # The release asset keeps one name across releases; the local name carries the
 # version so makepkg's source cache never mixes two releases.
 source=("ergopti-plus-linux-${pkgver}.tar.gz::https://github.com/adrienm7/ergopti/releases/download/__TAG__/ergopti-plus-linux.tar.gz")
