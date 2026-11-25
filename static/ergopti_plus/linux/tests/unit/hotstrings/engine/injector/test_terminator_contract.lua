@@ -194,9 +194,16 @@ helpers.describe("linux daemon: output is the logical commit boundary", function
 		-- The undo record's assignment, whatever guards its value (a key output
 		-- arms none); the reset in the failure branch assigns nil, never a table.
 		local undo_at = match_path:find("_undoable = [^\n]-{")
-		local apply_guard_at = match_path:find("if expansion_committed then",
+		-- The engine state is applied by the commit follow-up owner, called only
+		-- under the committed guard; the owner itself must apply the expansion.
+		local apply_guard_at = match_path:find("if expansion_committed and CommitFollowup.apply(engine, result) then",
 			(commit_guard_at or 0) + 1, true)
-		local apply_at = match_path:find("engine:apply_expansion(result)", 1, true)
+		local apply_at = apply_guard_at and match_path:find("CommitFollowup.apply(engine, result)", apply_guard_at, true)
+		local followup = assert(io.open(helpers.driver_root() .. "/hotstrings/engine/commit_followup.lua", "r"))
+		local followup_source = followup:read("*a")
+		followup:close()
+		helpers.assert_true(followup_source:find("engine:apply_expansion(result)", 1, true) ~= nil,
+			"the commit follow-up must apply the expansion to the engine")
 
 		-- Walked by name: a nil value drops its key from a table, so pairs() over
 		-- the positions never visited a lost locator and the order checks below

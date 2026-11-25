@@ -83,10 +83,15 @@ end)
 require("tests.lua.dynamic_word_boundary_contract")(helpers)
 
 local function daemon_source()
-	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-	local source = file:read("*a")
-	file:close()
-	return source
+	-- The daemon's resets include the commit follow-up's, which main() delegates
+	-- to its own owner to stay within LuaJIT's upvalue budget.
+	local source = {}
+	for _, relative in ipairs({ "/ergopti_hotstrings.lua", "/hotstrings/engine/commit_followup.lua" }) do
+		local file = assert(io.open(helpers.driver_root() .. relative, "r"))
+		source[#source + 1] = file:read("*a")
+		file:close()
+	end
+	return table.concat(source, "\n")
 end
 
 helpers.describe("Linux owned unknown-context reset boundaries", function()

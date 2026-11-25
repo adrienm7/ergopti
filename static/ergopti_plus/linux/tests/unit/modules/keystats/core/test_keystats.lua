@@ -1131,6 +1131,7 @@ local function with_replayed_hotstring(options, callback)
         blocks_text = function() return false end, invalidate = function() world.invalidated = true end,
         text_automation = function() return true, "field", "field_admitted" end },
       WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+      CommitFollowup = require("hotstrings.engine.commit_followup"),
       RepeatKey = { is_enabled = function() return false end },
       -- Main sizes the expansion delay from the physically held modifiers.
       keyboard_hook = { held_modifiers = function() return {} end },

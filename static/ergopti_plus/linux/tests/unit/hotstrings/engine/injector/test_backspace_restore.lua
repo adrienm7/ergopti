@@ -125,6 +125,7 @@ local function with_field(case, body)
 					end,
 				},
 				MagicKey = { get = function() return case.magic_key end },
+				CommitFollowup = require("hotstrings.engine.commit_followup"),
 				RepeatKey = { is_enabled = function() return true end, resolve = RepeatKey.resolve,
 					WINDOW_CATEGORY = RepeatKey.WINDOW_CATEGORY },
 				opts = { dry_run = false },

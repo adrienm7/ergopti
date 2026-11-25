@@ -51,6 +51,7 @@ local function with_main(mappings, body, overrides)
 			terminators_mod = { is_terminator = function() return false end,
 				terminator_is_consumed = function() return false end },
 			MagicKey = { get = function() return STAR end },
+			CommitFollowup = require("hotstrings.engine.commit_followup"),
 			RepeatKey = { is_enabled = function() return true end, resolve = RepeatKey.resolve },
 			opts = { dry_run = false },
 			keystats = { is_password_app = function() return false end,
@@ -143,6 +144,7 @@ helpers.describe("Linux Main: the repeat activation window (repeat-window)", fun
 				return { delay = delay_sec }
 			end },
 			ExpansionDelay = require("hotstrings.engine.expansion_delay"),
+			CommitFollowup = require("hotstrings.engine.commit_followup"),
 			RepeatKey = { is_enabled = function() return true end,
 				resolve = helpers.load_module("hotstrings.engine.repeat_key").resolve,
 				WINDOW_CATEGORY = "magickey" },

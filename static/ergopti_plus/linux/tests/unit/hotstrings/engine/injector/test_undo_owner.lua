@@ -135,6 +135,7 @@ local function with_undo(options, body)
 					backspace_restore_enabled = function() return true end, backspace_restore_window_ms = function() return 500 end },
 				MagicKey = { get = function() return "★" end },
 				terminators_mod = { is_terminator = function() return false end },
+				CommitFollowup = require("hotstrings.engine.commit_followup"),
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 				keyboard_hook = { held_modifiers = function() return {} end },
 				keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
