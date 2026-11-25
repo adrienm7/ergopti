@@ -395,6 +395,8 @@ module.exports = Object.freeze({
 		COMPONENT_PROBLEM_GNOME_FOCUS_EXTENSION: "component_problem_gnome_focus_extension",
 		COMPONENT_PROBLEM_KWIN_FOCUS_SCRIPT: "component_problem_kwin_focus_script",
 		COMPONENT_PROBLEM_LAYOUT_UNRESOLVED: "component_problem_layout_unresolved",
+		COMPONENT_PROBLEM_SCREEN_VISION_CAPTURE: "component_problem_screen_vision_capture",
+		COMPONENT_PROBLEM_SCREEN_VISION_OCR: "component_problem_screen_vision_ocr",
 		COMPONENT_PROBLEM_TEXT_AUTOMATION_ATSPI_UNAVAILABLE: "component_problem_text_automation_atspi_unavailable",
 		COMPONENT_PROBLEM_TEXT_AUTOMATION_CONTEXT_UNAVAILABLE: "component_problem_text_automation_context_unavailable",
 		COMPONENT_PROBLEM_TEXT_AUTOMATION_NO_ACCESSIBLE_WINDOW: "component_problem_text_automation_no_accessible_window",

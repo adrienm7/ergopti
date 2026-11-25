@@ -240,7 +240,11 @@ function M.start(plan)
 		return false, reason
 	end
 	local ports = _ports or default_ports()
-	if not _ports then M.vision() end
+	if not _ports then
+		local Vision = M.vision()
+		Vision.report_problem("capture")
+		if #plan.text_targets > 0 then Vision.report_problem("ocr") end
+	end
 	local base_click = ports.on_click
 	ports.on_click = function(count, target)
 		_clicks_total = _clicks_total + 1

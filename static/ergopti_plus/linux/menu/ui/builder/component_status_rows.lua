@@ -36,6 +36,8 @@ local function commands_by_code()
 		ergopti_layout_install_failed = COMMAND.COMPONENT_PROBLEM_ERGOPTI_LAYOUT_INSTALL_FAILED,
 		ergopti_layout_activate_failed = COMMAND.COMPONENT_PROBLEM_ERGOPTI_LAYOUT_ACTIVATE_FAILED,
 		ergopti_layout_uninstall_failed = COMMAND.COMPONENT_PROBLEM_ERGOPTI_LAYOUT_UNINSTALL_FAILED,
+		screen_vision_capture = COMMAND.COMPONENT_PROBLEM_SCREEN_VISION_CAPTURE,
+		screen_vision_ocr = COMMAND.COMPONENT_PROBLEM_SCREEN_VISION_OCR,
 	}
 end
 

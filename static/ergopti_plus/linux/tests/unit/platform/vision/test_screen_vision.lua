@@ -230,6 +230,25 @@ helpers.describe("screen vision service (Linux)", function()
 		Service.stop()
 	end)
 
+	helpers.it("screen vision: a missing OCR engine a feature asked for is a red tray row", function()
+		local Service = fresh_service({ DISPLAY = ":0" })
+		local reported = {}
+		local Status = require("core.ui.engine.component_status")
+		local real = Status.report
+		Status.report = function(problem) reported[#reported + 1] = problem; return true end
+		ShellRunner._set_runner(function() return false end)
+		local ok, err = pcall(function()
+			helpers.assert_eq(Service.report_problem("ocr"), true, "the missing engine is reported")
+			helpers.assert_eq(reported[1].code, "screen_vision_ocr", "under its tray row's code")
+			helpers.assert_eq(reported[1].active(), true, "the row holds while tesseract is missing")
+			helpers.assert_eq(Service.report_problem("capture"), false, "a working capture is not reported")
+		end)
+		ShellRunner._reset_runner()
+		Status.report = real
+		Service.stop()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("screen vision: scans a window for images and text in one call", function()
 		local Service = fresh_service({ DISPLAY = ":0" })
 		ShellRunner._set_runner(function() return true end)

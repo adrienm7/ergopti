@@ -120,6 +120,32 @@ function M.availability()
 	}
 end
 
+-- The component_status code and row label of each service part that can fail.
+local PROBLEMS = {
+	capture = { code = "screen_vision_capture", label = "keepawake.reason.capture_unavailable" },
+	ocr = { code = "screen_vision_ocr", label = "keepawake.reason.ocr_engine_missing" },
+}
+
+--- Names a part the user needs that does not work as a red tray row
+--- (core.ui.engine.component_status), shown while it still does not work.
+--- Called when a feature asks for the part, never at boot: OCR and capture
+--- are optional, and a row for a feature nobody uses would be noise.
+--- @param part string "capture" or "ocr".
+--- @return boolean reported True when the part does not work.
+function M.report_problem(part)
+	local problem = assert(PROBLEMS[part], "unknown screen vision part " .. tostring(part))
+	local state = M.availability()[part]
+	if state.ok then return false end
+	local text = require("core.i18n.engine.i18n").get("keepawake.reason." .. tostring(state.reason))
+	require("core.ui.engine.component_status").report({
+		code = problem.code,
+		title = require("core.i18n.engine.i18n").get(problem.label),
+		body = text,
+		active = function() return not M.availability()[part].ok end,
+	})
+	return true
+end
+
 --- Captures one window.
 --- @param window string|number The X window id the focus query returned.
 --- @param callback function (image|nil, reason), called before this returns on Linux.
