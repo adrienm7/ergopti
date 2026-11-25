@@ -31,6 +31,8 @@ local LOG = "core.process.adapters.host_environment"
 
 -- The variables network-runtime-env.sh writes (identifiers.json linux_host_environment).
 local Record = require("core.text.engine.identifiers").linux_host_environment
+local TableUtil = require("core.text.engine.table_util")
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 --- The launcher's record: the names it changed, and each one's host value.
 M.NAMES_ENV = Record.names_env
@@ -73,13 +75,6 @@ function M.read(getenv)
 	return record
 end
 
---- Quotes one value for a POSIX shell.
---- @param value string
---- @return string
-local function quote(value)
-	return "'" .. value:gsub("'", "'\\''") .. "'"
-end
-
 --- The shell text that restores the host environment before a command.
 --- The record's own variables go too: a host program has no use for them.
 --- @param record table From M.read().
@@ -93,7 +88,7 @@ function M.shell_prefix(record)
 		if value == nil then
 			unset[#unset + 1] = name
 		else
-			exports[#exports + 1] = name .. "=" .. quote(value)
+			exports[#exports + 1] = name .. "=" .. shell_quote(value)
 		end
 	end
 	local text = "unset " .. table.concat(unset, " ") .. "; "
@@ -113,15 +108,14 @@ function M.spawn_environment(record, environ)
 		dropped[name] = true
 		if record.values[name] ~= nil then restored[name] = record.values[name] end
 	end
-	local result = {}
-	local names = {}
-	for name in pairs(environ) do
-		if not dropped[name] then names[#names + 1] = name end
+	local merged = {}
+	for name, value in pairs(environ) do
+		if not dropped[name] then merged[name] = value end
 	end
-	for name in pairs(restored) do names[#names + 1] = name end
-	table.sort(names)
-	for _, name in ipairs(names) do
-		result[#result + 1] = name .. "=" .. (restored[name] or environ[name])
+	for name, value in pairs(restored) do merged[name] = value end
+	local result = {}
+	for _, name in ipairs(TableUtil.sorted_keys(merged)) do
+		result[#result + 1] = name .. "=" .. merged[name]
 	end
 	return result
 end
