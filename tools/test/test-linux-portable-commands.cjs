@@ -458,6 +458,7 @@ const PROGRAMS = {
 	wpctl: optionalTool('PipeWire mute metric, read when pactl does not answer'),
 	amixer: optionalTool('ALSA mute metric when neither PulseAudio nor PipeWire answers'),
 	nmcli: optionalTool('network metric'),
+	tesseract: optionalTool('OCR of the screen vision text targets'),
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
 	loginctl: optionalTool('logind sessions; the live proof host enables lingering', DRIVER_HOST),
