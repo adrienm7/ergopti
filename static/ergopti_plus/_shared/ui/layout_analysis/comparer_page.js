@@ -1322,6 +1322,11 @@
 			)
 			.concat([{ id: CUSTOM_ID }]);
 		const linked = linkedChoices(corpora);
+		// A saved blend may mix the user's own texts still listed at start.
+		const savedBlendAccepts = {
+			own: true,
+			custom: Boolean(saved.custom && saved.custom.tables)
+		};
 		const state = {
 			corpus:
 				linked.corpus ||
@@ -1391,10 +1396,10 @@
 			pick: validFilters(saved.pick, ['origin', 'language']),
 			// The last blend's recipe ([{id, weight}]), rebuilt at start when it was
 			// the corpus compared or a link names it.
-			blendRecipe: linked.blend || validBlend(saved.blend, corpora),
+			blendRecipe: linked.blend || validBlend(saved.blend, corpora, savedBlendAccepts),
 			restoreBlend:
 				Boolean(linked.blend) ||
-				(saved.corpus === BLEND_ID && Boolean(validBlend(saved.blend, corpora))),
+				(saved.corpus === BLEND_ID && Boolean(validBlend(saved.blend, corpora, savedBlendAccepts))),
 			// The Pareto tab's two values and whether it shows the frontier only.
 			pareto: validPareto(
 				linked.px || linked.py
@@ -1594,7 +1599,8 @@
 						const [id, weight] = part.split(':');
 						return { id, weight: Number(weight) };
 					}),
-					known
+					known,
+					{ own: false }
 				);
 				if (recipe) out.blend = recipe;
 				else console.warn(`layout comparer: the link's blend ${blend} does not read`);
@@ -1666,15 +1672,34 @@
 		}
 
 		/**
-		 * A blend's recipe as saved or linked: one to BLEND_PARTS parts, each a
-		 * built-in corpus and a weight ≥ 0, one at least above 0; null otherwise.
+		 * Whether a corpus can be a part of a blend: a built-in corpus, or one of
+		 * the user's own texts with its tables (a loaded file, « My typing » once
+		 * read, the pasted text when there is one), never a blend.
+		 * @param {object} corpus - An entry of the corpus list.
+		 * @param {boolean} custom - Whether the pasted text has tables.
 		 */
-		function validBlend(recipe, known) {
+		function blendable(corpus, custom) {
+			if (corpus.builtin) return true;
+			if (corpus.id === BLEND_ID) return false;
+			return corpus.id === CUSTOM_ID ? custom : Boolean(corpus.host);
+		}
+
+		/**
+		 * A blend's recipe as saved or linked: one to BLEND_PARTS parts, each a
+		 * corpus of the list and a weight ≥ 0, one at least above 0; null
+		 * otherwise. A link's parts are built-in corpora only (own: false); a
+		 * saved recipe may name the user's own texts still in the list.
+		 * @param {{own: boolean, custom?: boolean}} accepts - Whether own texts are
+		 *   parts, and whether the pasted text has tables.
+		 */
+		function validBlend(recipe, known, accepts) {
 			if (!Array.isArray(recipe) || recipe.length === 0 || recipe.length > BLEND_PARTS) return null;
+			const usable = (c) =>
+				accepts.own ? blendable(c, accepts.custom === true) : Boolean(c.builtin);
 			const ok = recipe.every(
 				(part) =>
 					part &&
-					known.some((c) => c.builtin && c.id === part.id) &&
+					known.some((c) => c.id === part.id && usable(c)) &&
 					Number.isFinite(part.weight) &&
 					part.weight >= 0
 			);
@@ -1794,6 +1819,8 @@
 						words: E.wordsFromText(trimmed)
 					};
 			}
+			// The pasted text is a part a blend can mix from now on, or no longer.
+			fillBlend();
 			save();
 			analyse();
 		}
@@ -5748,7 +5775,12 @@
 			const query = new URLSearchParams();
 			const corpus = corpora.find((c) => c.id === state.corpus);
 			if (corpus && corpus.builtin) query.set('corpus', state.corpus);
-			if (state.corpus === BLEND_ID && state.blendRecipe)
+			// A blend of built-in corpora travels; one holding the user's own text does not.
+			const blendShared =
+				state.corpus === BLEND_ID &&
+				state.blendRecipe !== null &&
+				state.blendRecipe.every((part) => corpora.some((c) => c.id === part.id && c.builtin));
+			if (blendShared)
 				query.set('blend', state.blendRecipe.map((part) => `${part.id}:${part.weight}`).join(','));
 			query.set('keyboard', state.keyboard);
 			query.set('format', state.format);
@@ -5767,7 +5799,7 @@
 			return {
 				url: `${base}?${query.toString().replace(/%2C/g, ',')}`,
 				own: chosen.filter((l) => !SHAREABLE_ORIGINS.includes(l.origin)),
-				personal: !(corpus && corpus.builtin) && !(state.corpus === BLEND_ID && state.blendRecipe)
+				personal: !(corpus && corpus.builtin) && !blendShared
 			};
 		}
 
@@ -5846,9 +5878,22 @@
 			fillBlend();
 		}
 
-		/** The blend's parts: each a built-in corpus picker and its weight. */
+		/** A personal corpus's name in the pickers: the pasted text and « My typing » by their words. */
+		function ownCorpusLabel(corpus) {
+			if (corpus.id === CUSTOM_ID) return t('layout_analysis.corpus.custom');
+			if (corpus.id === MY_TYPING_ID && !corpus.title) return t('layout_analysis.corpus.my_typing');
+			return corpus.title;
+		}
+
+		/**
+		 * The blend's parts: each a corpus picker (the user's own texts that can
+		 * be mixed first, then the built-in corpora) and its weight.
+		 */
 		function fillBlend() {
 			const builtins = corpora.filter((c) => c.builtin);
+			const mine = corpora
+				.filter((c) => !c.builtin && blendable(c, Boolean(state.custom)))
+				.map((c) => ({ id: c.id, label: ownCorpusLabel(c) }));
 			for (let i = 0; i < BLEND_PARTS; i++) {
 				$(`la-blend-corpus-label-${i}`).textContent = t('layout_analysis.blend.corpus', {
 					n: i + 1
@@ -5857,9 +5902,11 @@
 					n: i + 1
 				});
 				const select = $(`la-blend-corpus-${i}`);
-				const chosen = select.value || (builtins[i] || builtins[0]).id;
+				// A part whose own text left the list goes back to a built-in corpus.
+				const kept = [...builtins, ...mine].some((c) => c.id === select.value);
+				const chosen = kept ? select.value : (builtins[i] || builtins[0]).id;
 				window.LAYOUT_ANALYSIS_FILES.fillCorpusPicker(select, {
-					mine: [],
+					mine,
 					builtins: builtins.map((c) => c.builtin),
 					value: chosen,
 					t,
@@ -5871,8 +5918,21 @@
 		}
 
 		/**
-		 * Mixes the chosen built-in corpora by their weights (E.blendNgrams) and
-		 * compares on the blend, listed with the user's own texts.
+		 * A blend part's tables: a built-in corpus loaded, the pasted text, or an
+		 * own text's typed keys (the text every other corpus is).
+		 */
+		function blendPartTables(corpus) {
+			if (corpus.builtin) return window.LAYOUT_ANALYSIS_FILES.builtinTables(corpus.builtin);
+			if (corpus.id === CUSTOM_ID) return Promise.resolve(state.custom.tables);
+			return Promise.resolve(
+				window.LAYOUT_ANALYSIS_FILES.plainTables(corpus.host.tables, TEXT_TYPED)
+			);
+		}
+
+		/**
+		 * Mixes the chosen corpora, built-in or the user's own texts, by their
+		 * weights (E.blendNgrams) and compares on the blend, listed with the
+		 * user's own texts.
 		 */
 		async function useBlend() {
 			const status = $('la-blend-status');
@@ -5893,9 +5953,7 @@
 				return;
 			}
 			status.textContent = t('layout_analysis.blend.loading');
-			const loaded = await Promise.all(
-				parts.map((part) => window.LAYOUT_ANALYSIS_FILES.builtinTables(part.corpus.builtin))
-			);
+			const loaded = await Promise.all(parts.map((part) => blendPartTables(part.corpus)));
 			const all = parts.reduce((sum, part) => sum + part.weight, 0);
 			const tables = E.blendNgrams(
 				loaded.map((ngrams, i) => ({ ngrams, weight: parts[i].weight }))
@@ -5913,7 +5971,10 @@
 			state.blendRecipe = parts.map((part) => ({ id: part.corpus.id, weight: part.weight }));
 			state.corpus = BLEND_ID;
 			setCorpus({ id: BLEND_ID, title, tables, default: true });
-			status.textContent = t('layout_analysis.blend.done', { title });
+			// A blend of the user's own text stays on this device: no link carries it.
+			status.textContent = parts.every((part) => part.corpus.builtin)
+				? t('layout_analysis.blend.done', { title })
+				: t('layout_analysis.blend.done_own', { title });
 		}
 
 		/** Fills the blend's form from a recipe and compares on it again. */
@@ -7875,6 +7936,9 @@
 					$('la-blend-status').textContent = t('layout_analysis.blend.failed');
 					throw error;
 				});
+			// The blend compared last time named an own text that is no longer listed.
+			else if (saved.corpus === BLEND_ID && !linked.blend && !linked.corpus)
+				$('la-blend-status').textContent = t('layout_analysis.blend.lost');
 			if (opts.reportHeight) reportHeight();
 			// The host's personal layouts (app data folder, site IndexedDB).
 			if (HOST.store)
