@@ -1571,6 +1571,10 @@ if KeychainTokenWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KeychainTokenWorker.run(arguments: CommandLine.arguments))
 }
 
+if ScreenVisionWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ScreenVisionWorker.run(arguments: CommandLine.arguments))
+}
+
 if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KarabinerLeaseWorker.run(arguments: CommandLine.arguments))
 }
