@@ -97,7 +97,8 @@ _NPL_FailedCoreShowsInTheTray() {
 		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Map("text", Text, "title", Title)), ""))
 		Stage[1]["target"].Call("", 1, A_TrayMenu)
 		AssertEqual(1, Shown.Length, "a click explains the problem once")
-		AssertEqual(t("menu.keyboard_core.degraded"), Shown[1]["title"])
+		AssertEqual(WindowTitle(t("menu.keyboard_core.degraded")), Shown[1]["title"],
+			"the caption is the product-titled one every native dialog gets")
 		AssertContains(Shown[1]["text"], "ergopti_nav_owner.dll", "the explanation names the component")
 		AssertContains(Shown[1]["text"], t("menu.debug.report_bug"), "and where to report it")
 		AssertTrue(KeyboardArbiterEnsureForLedger(() => true), "a later start succeeds")
