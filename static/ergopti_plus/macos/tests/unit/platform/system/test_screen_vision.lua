@@ -1,4 +1,4 @@
---- tests/unit/platform/vision/test_screen_vision.lua
+--- tests/unit/platform/system/test_screen_vision.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Service Tests (macOS)
@@ -16,8 +16,8 @@ local OPTIONS = { threshold = 0.92, scales = { 1, 0.5, 2 }, coarse_min_px = 6, c
 
 local function fresh_service(script)
 	local requests = {}
-	package.loaded["platform.vision.screen_vision"] = nil
-	local Service = require("platform.vision.screen_vision")
+	package.loaded["platform.system.vision.screen_vision"] = nil
+	local Service = require("platform.system.vision.screen_vision")
 	local dir = os.tmpname()
 	os.remove(dir)
 	Service.init({ cache_dir = dir, runner = function(request, answer)

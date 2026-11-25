@@ -17,9 +17,9 @@
 --- 2. A capability the session lacks is a named refusal: the pointer steps
 ---    need X11 (xdotool), as center_mouse does; focusing an app needs wmctrl.
 --- 4. The screen steps run on the screen vision service
----    (platform/vision/screen_vision.lua): the front window through its own
+---    (platform/system/vision/screen_vision.lua): the front window through its own
 ---    drawable, the whole screen and a drawn region on X11, an embedded image
----    decoded to the matcher's gray (platform/vision/png_codec.lua), and the
+---    decoded to the matcher's gray (platform/system/vision/png_codec.lua), and the
 ---    OCR through tesseract. A capture's file lands in the driver's cache.
 --- 3. A shell step runs `env ERGOPTI_VAR_x=… /bin/sh -l -c <command>`: the
 ---    variables are argv entries of env, never shell text.
@@ -60,9 +60,9 @@ local function default_deps()
 		i18n = require("core.i18n.engine.i18n"),
 		session_type = function() return os.getenv("XDG_SESSION_TYPE") end,
 		rename = os.rename,
-		vision = function() return require("platform.vision.vision_session").service() end,
+		vision = function() return require("platform.system.vision.session").service() end,
 		focus = require("platform.focus.x11_focus"),
-		png = require("platform.vision.png_codec"),
+		png = require("platform.system.vision.png_codec"),
 		locale = function() return require("core.i18n.engine.locale").current_locale() end,
 		now_ms = require("core.logger.engine.monotonic").now_ms,
 	}

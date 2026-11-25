@@ -18,7 +18,7 @@
 ---    holds no `hs.` call (the purity ledger).
 --- 3. A click at coordinates goes through the synthetic click owner
 ---    (platform/input/synthetic_click.lua). The screen steps run on the screen
----    vision service, started by its session (platform/vision/vision_session.lua):
+---    vision service, started by its session (platform/system/vision/session.lua):
 ---    captures, embedded images written as private template files and the
 ---    drawn region's file all live in its cache folder.
 --- 4. A shell step runs `/usr/bin/env ERGOPTI_VAR_x=… /bin/sh -l -c <command>`:
@@ -49,7 +49,7 @@ local function default_deps()
 		notifications = require("core.ui.engine.notifications"),
 		window_info = require("platform.focus.window_info"),
 		i18n = require("core.i18n.engine.i18n"),
-		vision_session = require("platform.vision.vision_session"),
+		vision_session = require("platform.system.vision.session"),
 		screen_ports = function() return require("adapters.auto_click_ports").ports() end,
 	}
 end

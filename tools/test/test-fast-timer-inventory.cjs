@@ -139,11 +139,11 @@ const INVENTORY = {
 		'AutoClickStop). Each 700 ms tick asks screen vision for one look at the allowed ' +
 		'foreground window; a slower tick leaves a permission prompt or a "continue" button ' +
 		'unanswered for seconds, which is the whole point of the mode.',
-	'platform/vision/region_select.ahk:_RegionSelectTrack':
+	'platform/system/vision/region_select.ahk:_RegionSelectTrack':
 		'Armed only while the user drags a region on the Ctrl+O or library capture overlay ' +
 		'(left button down to the button release or a cancel). 15 ms redraws the selection ' +
 		'rectangle under the pointer; a slower tick makes the frame lag visibly behind the drag.',
-	'platform/vision/screen_vision.ahk:_ScreenVisionPoll':
+	'platform/system/vision/screen_vision.ahk:_ScreenVisionPoll':
 		'Armed only while the vision worker starts or a call waits for its answer file, and ' +
 		'disarmed by the poll itself once the queue is empty. 25 ms because an auto-click tick ' +
 		'waits on that answer, and the worker writes it without a wake signal to the driver.',

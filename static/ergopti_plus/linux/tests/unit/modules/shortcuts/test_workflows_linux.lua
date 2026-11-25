@@ -99,7 +99,7 @@ local function store(steps, images)
 		{ id = "wf_1", name = "Mine", origin = "local", steps = Json.array(steps), images = images } }) })
 end
 
--- A 3 x 5 RGB PNG (tests/unit/platform/vision/test_png_codec.lua).
+-- A 3 x 5 RGB PNG (tests/unit/platform/system/vision/test_png_codec.lua).
 local PNG = "iVBORw0KGgoAAAANSUhEUgAAAAMAAAAFCAIAAAAPE8H1AAAAPUlEQVR4nAEyAM3/AKVNyhglMLsdbQETLN7D951YtqMCLEZB9fb26Wt2A7cQLc0r3gZuzQRK1S3evDdRDhkiXhWcM6E9PQAAAABJRU5ErkJggg=="
 
 helpers.describe("workflows on Linux (workflows-linux)", function()

@@ -4,7 +4,7 @@
 # MODULE: Ergopti Screen Vision Worker
 # DESCRIPTION:
 # The long-lived Windows half of the screen vision service
-# (docs/design/screen-vision.md, platform/vision/screen_vision.ahk): captures
+# (docs/design/screen-vision.md, platform/system/vision/screen_vision.ahk): captures
 # a window or a region, finds library images in it, reads its text with
 # Windows.Media.Ocr, and converts imported images to the library's PNG.
 #

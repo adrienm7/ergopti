@@ -1,4 +1,4 @@
---- platform/vision/screen_vision.lua
+--- platform/system/vision/screen_vision.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Service (Linux)
@@ -32,10 +32,10 @@ local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
 local Matcher = require("shortcuts.engine.keep_awake.auto_click_matcher")
 local TextTarget = require("shortcuts.engine.keep_awake.text_target")
-local Capture = require("platform.vision.x11_capture")
-local Ocr = require("platform.vision.tesseract_ocr")
+local Capture = require("platform.system.vision.x11_capture")
+local Ocr = require("platform.system.vision.tesseract_ocr")
 
-local LOG = "platform.vision.screen_vision"
+local LOG = "platform.system.vision.screen_vision"
 
 local _initialized = false
 local _capture_reason = nil

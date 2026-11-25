@@ -1,4 +1,4 @@
---- tests/unit/platform/vision/test_screen_vision.lua
+--- tests/unit/platform/system/vision/test_screen_vision.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Service Tests (Linux)
@@ -67,9 +67,9 @@ local function now(call, ...)
 end
 
 local function fresh_service(env)
-	package.loaded["platform.vision.x11_capture"] = nil
-	package.loaded["platform.vision.tesseract_ocr"] = nil
-	local Service = helpers.load_module("platform.vision.screen_vision")
+	package.loaded["platform.system.vision.x11_capture"] = nil
+	package.loaded["platform.system.vision.tesseract_ocr"] = nil
+	local Service = helpers.load_module("platform.system.vision.screen_vision")
 	Service.init({ transport = scripted_transport(), getenv = function(name) return env[name] end })
 	return Service
 end

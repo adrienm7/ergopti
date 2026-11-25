@@ -1,4 +1,4 @@
---- platform/vision/vision_session.lua
+--- platform/system/vision/session.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Session (Linux)
@@ -14,9 +14,9 @@ local M = {}
 local _started = false
 
 --- The started screen vision service.
---- @return table The platform.vision.screen_vision module.
+--- @return table The platform.system.vision.screen_vision module.
 function M.service()
-	local Vision = require("platform.vision.screen_vision")
+	local Vision = require("platform.system.vision.screen_vision")
 	if not _started then
 		_started = true
 		Vision.init()

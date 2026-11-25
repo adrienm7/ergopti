@@ -32,7 +32,7 @@ shared code pinned by shared corpora, so a hit means the same thing on every OS.
 
 ## Interface
 
-Lua drivers (`platform/vision/screen_vision.lua`). Every call that captures,
+Lua drivers (`platform/system/vision/screen_vision.lua`). Every call that captures,
 matches or recognises answers through a callback, so the macOS driver can run
 it in the launcher; Linux calls back before returning.
 
@@ -91,7 +91,7 @@ corpora.
 `nothing_recognised` (the clipboard is left unchanged), `cancelled` (no
 notice) and `failed`; the text is never logged, only its line and character
 counts. The selection is screencapture's own on macOS, the screenshot region
-cascade on Linux, and an overlay (`platform/vision/region_select.ahk`) on
+cascade on Linux, and an overlay (`platform/system/vision/region_select.ahk`) on
 Windows, whose rectangle `ScreenVisionCaptureRegion` captures. Pinned by
 `_shared/tests/corpus/keep_awake/ocr_capture_vectors.json`.
 

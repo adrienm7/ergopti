@@ -5722,7 +5722,7 @@ caption_joiner = " "
 platforms = ["linux"]
 reason_key = "platform_reason.component_status_rows_are_linux"
 
-# The screen vision service (platform/vision/screen_vision.lua) names the part
+# The screen vision service (platform/system/vision/screen_vision.lua) names the part
 # a feature asked for that does not work (the auto-clicker's capture, OCR).
 [[menu.linux_component_problems]]
 type = "command"
@@ -5734,7 +5734,7 @@ caption_joiner = " "
 platforms = ["linux"]
 reason_key = "platform_reason.component_status_rows_are_linux"
 
-# The screen vision service (platform/vision/screen_vision.lua) names the part
+# The screen vision service (platform/system/vision/screen_vision.lua) names the part
 # a feature asked for that does not work (the auto-clicker's capture, OCR).
 [[menu.linux_component_problems]]
 type = "command"

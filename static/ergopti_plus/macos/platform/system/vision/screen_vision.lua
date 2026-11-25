@@ -1,4 +1,4 @@
---- platform/vision/screen_vision.lua
+--- platform/system/vision/screen_vision.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Service (macOS)
@@ -37,7 +37,7 @@ local TextTarget = require("shortcuts.engine.keep_awake.text_target")
 local Paths = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 
-local LOG = "platform.vision.screen_vision"
+local LOG = "platform.system.vision.screen_vision"
 local WORKER_FLAG = "--screen-vision"
 
 local _initialized = false

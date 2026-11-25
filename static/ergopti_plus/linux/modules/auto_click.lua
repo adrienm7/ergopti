@@ -84,7 +84,7 @@ local function library()
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 		unavailable_reason = function() return M.unavailable_reason() end,
 		problems = function()
-			if M.unavailable_reason() or require("platform.vision.tesseract_ocr").available() then return {} end
+			if M.unavailable_reason() or require("platform.system.vision.tesseract_ocr").available() then return {} end
 			return { "ocr_engine_missing" }
 		end,
 		clicks = function() return _clicks_total end,
@@ -99,7 +99,7 @@ M.library = library
 --- @return table service
 function M.vision()
 	-- One session starts the service for the auto-clicker and the workflows.
-	return require("platform.vision.vision_session").service()
+	return require("platform.system.vision.session").service()
 end
 
 --- The presets document.
@@ -167,7 +167,7 @@ end
 local function default_ports()
 	local Focus = require("platform.focus.x11_focus")
 	local Secure = require("platform.focus.secure_field_detector")
-	local Vision = require("platform.vision.screen_vision")
+	local Vision = require("platform.system.vision.screen_vision")
 	return {
 		foreground = function()
 			local window = Focus.query()

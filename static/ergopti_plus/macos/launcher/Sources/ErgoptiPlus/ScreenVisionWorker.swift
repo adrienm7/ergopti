@@ -8,7 +8,7 @@
 // screen region, finds library images in it, reads its text with the Vision
 // framework, and converts an imported image to the library's PNG. One JSON
 // request arrives on stdin and one JSON answer leaves on stdout, as the
-// Keychain worker does; macos/platform/vision/screen_vision.lua is its caller.
+// Keychain worker does; macos/platform/system/vision/screen_vision.lua is its caller.
 //
 // FEATURES & RATIONALE:
 // 1. Native speed: Hammerspoon's Lua 5.4 took about 0.8 s per scale to match

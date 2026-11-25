@@ -1,9 +1,9 @@
-﻿; tests/unit/platform/vision/test_screen_vision.ahk
+﻿; tests/unit/platform/system/test_screen_vision.ahk
 
 ; ==============================================================================
 ; MODULE: Screen Vision Service (Windows)
 ; DESCRIPTION:
-; Drives platform/vision/screen_vision.ahk through a stubbed worker spawn and
+; Drives platform/system/vision/screen_vision.ahk through a stubbed worker spawn and
 ; hand-written queue files: a request is written whole into the queue, an
 ; answer file reaches its callback once, a refusal arrives as its reason, a
 ; scan finds its text targets on the worker's words, and a second start is

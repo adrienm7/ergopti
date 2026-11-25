@@ -1,4 +1,4 @@
---- platform/vision/png_codec.lua
+--- platform/system/vision/png_codec.lua
 
 --- ==============================================================================
 --- MODULE: PNG Codec (gray)

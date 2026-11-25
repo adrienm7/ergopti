@@ -4,7 +4,7 @@
 ; MODULE: OCR Capture Action (Windows)
 ; DESCRIPTION:
 ; The Windows ports of the « Capture → texte » action (sg_actions.ocr_screenshot,
-; Ctrl+O): the overlay of platform/vision/region_select.ahk, the capture and
+; Ctrl+O): the overlay of platform/system/vision/region_select.ahk, the capture and
 ; Windows.Media.Ocr through the screen vision worker, the clipboard owner and
 ; the notifier. modules/shortcuts/ocr_capture.ahk owns the steps.
 ;

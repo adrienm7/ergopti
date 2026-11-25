@@ -1,4 +1,4 @@
---- platform/vision/tesseract_ocr.lua
+--- platform/system/vision/tesseract_ocr.lua
 
 --- ==============================================================================
 --- MODULE: Tesseract OCR (Linux)
@@ -36,7 +36,7 @@ local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
 local Utils = require("core.text.engine.utils_core")
 
-local LOG = "platform.vision.tesseract_ocr"
+local LOG = "platform.system.vision.tesseract_ocr"
 
 -- Tesseract page segmentation modes, by the layout names of the service.
 local PAGE_SEGMENTATION = { sparse = "11", block = "3" }

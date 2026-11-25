@@ -20,7 +20,7 @@
 --- 3. Fail closed: an unreadable lock state, pause state or secure-field
 ---    answer counts as "do not click".
 --- 4. Capture, matching and OCR run in the launcher's vision worker
----    (platform/vision/screen_vision.lua); a missing Screen Recording grant is
+---    (platform/system/vision/screen_vision.lua); a missing Screen Recording grant is
 ---    a red row of the « Anti-veille » submenu, never a silent failure.
 --- ==============================================================================
 
@@ -63,7 +63,7 @@ local function read_shared(relative)
 end
 
 local function vision()
-	local Session = require("platform.vision.vision_session")
+	local Session = require("platform.system.vision.session")
 	if not _vision_started then
 		_vision_started = true
 		Session.on_availability(function() if _library then _library.changed() end end)

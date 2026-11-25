@@ -70,7 +70,7 @@ local function default_ports(region_save)
 	return {
 		select = function(callback) M.select_region(region_save, callback) end,
 		recognize = function(path, callback)
-			require("platform.vision.tesseract_ocr").recognize_file(path, { layout = "block",
+			require("platform.system.vision.tesseract_ocr").recognize_file(path, { layout = "block",
 				locale = require("core.i18n.engine.locale").current_locale() }, function(words, reason)
 					-- A missing engine is a red tray row too, not only this run's notice.
 					if reason == "ocr_engine_missing" then require("modules.auto_click").vision().report_problem("ocr") end

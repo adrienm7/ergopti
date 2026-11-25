@@ -395,8 +395,8 @@ InstallHotstringHooks()
 #Include ../modules/shortcuts/ocr_capture_action.ahk
 #Include ../modules/shortcuts/keep_awake_library_window.ahk
 #Include ../modules/shortcuts/auto_click.ahk
-#Include ../platform/vision/screen_vision.ahk
-#Include ../platform/vision/region_select.ahk
+#Include ../platform/system/vision/screen_vision.ahk
+#Include ../platform/system/vision/region_select.ahk
 #Include ../modules/shortcuts/workflows/model.ahk
 #Include ../modules/shortcuts/workflows/interpreter.ahk
 #Include ../modules/shortcuts/workflows/runner.ahk
@@ -748,7 +748,7 @@ InstallSendNoOps()
 #Include unit/modules/shortcuts/test_auto_click_session.ahk
 #Include unit/modules/shortcuts/test_ocr_capture.ahk
 #Include unit/modules/shortcuts/test_keep_awake_library_window.ahk
-#Include unit/platform/vision/test_screen_vision.ahk
+#Include unit/platform/system/test_screen_vision.ahk
 #Include unit/modules/shortcuts/workflows/test_workflow_model.ahk
 #Include unit/modules/shortcuts/workflows/test_workflow_interpreter.ahk
 #Include unit/modules/shortcuts/workflows/test_workflow_runner.ahk

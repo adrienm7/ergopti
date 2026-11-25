@@ -1,4 +1,4 @@
---- platform/vision/vision_session.lua
+--- platform/system/vision/session.lua
 
 --- ==============================================================================
 --- MODULE: Screen Vision Session (macOS)
@@ -20,7 +20,7 @@ local M = {}
 local AppDirs = require("core.fs.engine.app_dirs")
 local Logger = require("core.logger.engine.logger")
 
-local LOG = "platform.vision.vision_session"
+local LOG = "platform.system.vision.session"
 
 local _started = false
 local _availability = nil
@@ -39,9 +39,9 @@ function M.cache_dir()
 end
 
 --- The started screen vision service.
---- @return table The platform.vision.screen_vision module.
+--- @return table The platform.system.vision.screen_vision module.
 function M.service()
-	local Vision = require("platform.vision.screen_vision")
+	local Vision = require("platform.system.vision.screen_vision")
 	if not _started then
 		_started = true
 		Vision.init({ cache_dir = M.cache_dir() })

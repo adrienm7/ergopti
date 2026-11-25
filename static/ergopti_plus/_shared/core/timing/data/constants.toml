@@ -584,27 +584,27 @@ auto_click_cooldown_ms = 3000
 
 [screen_vision]
 # Longest one text recognition may take before its child is stopped and the
-# caller told "ocr_timeout". LX: platform/vision/tesseract_ocr.lua.
-# HS: platform/vision/screen_vision.lua (the launcher's vision worker).
-# AHK: platform/vision/screen_vision.ahk (the Windows.Media.Ocr bridge).
+# caller told "ocr_timeout". LX: platform/system/vision/tesseract_ocr.lua.
+# HS: platform/system/vision/screen_vision.lua (the launcher's vision worker).
+# AHK: platform/system/vision/screen_vision.ahk (the Windows.Media.Ocr bridge).
 ocr_timeout_ms = 10000
 
 # Windows: how often the driver looks for the screen vision worker's answers,
 # and how often the worker looks for new requests, in its queue folder; and how
 # long the worker may take to compile its C# and create its OCR engine before
-# the service is reported unavailable. AHK: platform/vision/screen_vision.ahk.
+# the service is reported unavailable. AHK: platform/system/vision/screen_vision.ahk.
 worker_poll_ms = 25
 worker_start_timeout_ms = 20000
 
 # Longest the « Capture → texte » region selection (Ctrl+O) may stay open
 # before it is closed as cancelled: the user draws at their own pace, but an
 # abandoned selector must not hold the action for the whole session.
-# LX: modules/ocr_capture.lua. AHK: platform/vision/region_select.ahk.
+# LX: modules/ocr_capture.lua. AHK: platform/system/vision/region_select.ahk.
 region_select_timeout_ms = 120000
 
 # How often the Windows region overlay redraws its frame while the user drags:
 # about 60 frames a second, smooth without loading the message loop.
-# AHK: platform/vision/region_select.ahk.
+# AHK: platform/system/vision/region_select.ahk.
 region_select_track_ms = 15
 
 
@@ -1629,7 +1629,7 @@ wait_for_poll_ms = 250
 process_output_bytes = 65536
 
 # What one text recognition may print: the words and boxes of a whole window
-# (768 KiB, about 20,000 words). LX: platform/vision/tesseract_ocr.lua.
+# (768 KiB, about 20,000 words). LX: platform/system/vision/tesseract_ocr.lua.
 ocr_output_bytes = 786432
 
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and

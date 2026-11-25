@@ -1,4 +1,4 @@
---- platform/vision/x11_capture.lua
+--- platform/system/vision/x11_capture.lua
 
 --- ==============================================================================
 --- MODULE: X11 Screen Capture (Linux)
@@ -27,7 +27,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 
-local LOG = "platform.vision.x11_capture"
+local LOG = "platform.system.vision.x11_capture"
 
 -- X11 protocol: ImageFormat ZPixmap and an all-planes mask.
 local Z_PIXMAP = 2
