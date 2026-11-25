@@ -157,10 +157,10 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
       (thirteenth pass of the [audit](docs/audits/accessibility/README.md)). The 44 px targets of 2.5.5, which axe's
       `target-size` (24 px) does not check, are measured by both gates themselves (`tools/test/lib/target-size.cjs`,
       rule `target-size-enhanced`, counted once per kind of target). Left: lower those rows to zero (220 kinds on the
-      site and in its frames, 391 in the app windows' states); the public statement `/accessibilite` still names AA
-      as the target (French text, `i18n` skill). The tool survey and every AAA criterion no tool measures, with its
-      check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks belong to the manual
-      audit below.
+      site and in its frames, 391 in the app windows' states; the public statement `/accessibilite`, which names AAA
+      as the target, lists them among its known gaps until then). The tool survey and every AAA criterion no tool
+      measures, with its check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks
+      belong to the manual audit below.
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the

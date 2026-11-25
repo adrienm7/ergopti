@@ -1346,6 +1346,9 @@ surveyed and every AAA criterion, measured or checked by hand, are in
   move the count (the benchmarks' Comparer alone draws 13,597 small nodes).
   First measure: 220 kinds on the site and its frames, 391 in the app
   windows' states.
+- **The public statement** `/accessibilite` names AAA as the target in its
+  text and description, and lists the small targets among its known gaps;
+  `test-site-accessibility-ratchet.cjs` holds it to the level the gates run.
 
 ## What remains
 
