@@ -1,5 +1,5 @@
 {
-	"expected_count": 6,
+	"expected_count": 7,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -22,6 +22,10 @@
 		},
 		{
 			"contains": "a paused live push schedules no projection",
+			"expected_count": 1
+		},
+		{
+			"contains": "(secure-field-probe-paused)",
 			"expected_count": 1
 		}
 	]

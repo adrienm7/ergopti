@@ -113,6 +113,59 @@ _SFDWCTest_ProbeAcceptsChildControlContext() {
 Test("SecureField: UIA probe accepts a distinct focused-control token (secure-field-worker-context)",
 	_SFDWCTest_ProbeAcceptsChildControlContext)
 
+; The deferred probe is a one-shot timer, which native Suspend does not stop:
+; a paused probe must consult no port and retire its pending owner, with the
+; running probe above as the positive control.
+_SFDWCTest_CountedCurrentHwnd(Calls) {
+	Calls.Focus += 1
+	return 61002
+}
+
+_SFDWCTest_ProbeIsInertWhilePaused() {
+	global SFD_FIELD_CACHE, SFD_UIA_IDLE_REQUIRED_MS
+	global _SFDWCTest_RequestCount, _SFDWCTest_StartCount
+	SavedCache := SFD_FIELD_CACHE
+	SavedIdleRequiredMs := SFD_UIA_IDLE_REQUIRED_MS
+	WasSuspended := A_IsSuspended
+	Calls := { Focus: 0 }
+	try {
+		SFD_UIA_IDLE_REQUIRED_MS := 0
+		SFD_FIELD_CACHE := Map(
+			"hwnd", 0,
+			"secure", true,
+			"at", 0,
+			"element_id", "",
+			"focus_generation", 61004,
+			"verdict_generation", 0,
+			"current_element_id", "",
+			"focus_hook", 0,
+			"focus_callback", 0,
+			"focus_tracking_active", false,
+			"pending_hwnd", 61002,
+			"pending_generation", 61004
+		)
+		_SFDWCTest_RequestCount := 0
+		_SFDWCTest_StartCount := 0
+		Suspend(1)
+		try Accepted := SFD_ProbeFocusedUia(61002, 61004,
+			_SFDWCTest_CountedCurrentHwnd.Bind(Calls), _SFDWCTest_Context, _SFDWCTest_Request,
+			_SFDWCTest_Start, _SFDWCTest_ContextMatches)
+		finally Suspend(WasSuspended ? 1 : 0)
+		AssertFalse(Accepted, "a paused UIA probe must not dispatch the password worker")
+		AssertEqual(0, Calls.Focus, "a paused UIA probe must not query the focused control")
+		AssertEqual(0, _SFDWCTest_RequestCount, "a paused UIA probe must send no worker request")
+		AssertEqual(0, _SFDWCTest_StartCount, "a paused UIA probe must not start the worker")
+		AssertEqual(0, SFD_FIELD_CACHE["pending_hwnd"], "a paused UIA probe must retire its pending owner")
+		AssertEqual(0, SFD_FIELD_CACHE["pending_generation"], "the retired owner keeps no generation")
+	} finally {
+		SFD_FIELD_CACHE := SavedCache
+		SFD_UIA_IDLE_REQUIRED_MS := SavedIdleRequiredMs
+	}
+}
+
+Test("SecureField: a paused UIA probe stays inert and retires its owner (secure-field-probe-paused)",
+	_SFDWCTest_ProbeIsInertWhilePaused)
+
 
 ; Observe native Map writes and the setter's actual thread-critical marker.
 ; The callback model below respects that marker; it never uses native timers.
