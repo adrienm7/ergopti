@@ -33,6 +33,9 @@
  *    filters or the layout frame.
  * 14. Quantiles: the Pareto tab's spread marks P10 to P90 and lists P0 to
  *    P100 in a table, in order, P0 and P100 the lowest and highest values.
+ * 15. Density: the spread draws the smoothed distribution of its values
+ *    above the strip, hidden from assistive technology (the quantiles' table
+ *    says it in numbers), within the strip's ends, its peak on its band's top.
  * 13. Values query: a query over the values (« sfb < … & complete ») keeps
  *    only the layouts it holds for, in every figure's rows; one that does not
  *    read filters nothing and says why and where in words; the names it may
@@ -616,7 +619,48 @@ async function exerciseQuantiles(browser, origin) {
 	await context.close();
 }
 
+async function exerciseDensity(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-pareto');
+	await page.waitForSelector('#la-pareto-spread .la-pareto-density');
+	const curve = await page.$eval('#la-pareto-spread svg', (svg) => {
+		const path = svg.querySelector('.la-pareto-density');
+		const group = path.parentNode;
+		const numbers = path
+			.getAttribute('d')
+			.split(/[MLZ ]+/)
+			.filter((part) => part !== '')
+			.map(Number);
+		const xs = numbers.filter((_, i) => i % 2 === 0);
+		const ys = numbers.filter((_, i) => i % 2 === 1);
+		const ticks = Array.from(svg.querySelectorAll('.la-pareto-spread-tick'), (tick) =>
+			Number(tick.getAttribute('x1'))
+		);
+		return {
+			hidden: group.getAttribute('aria-hidden'),
+			samples: xs.length,
+			left: Math.min(...xs),
+			right: Math.max(...xs),
+			top: Math.min(...ys),
+			tickLeft: Math.min(...ticks),
+			tickRight: Math.max(...ticks)
+		};
+	});
+	assert.equal(curve.hidden, 'true', 'density: decorative, hidden from assistive technology');
+	assert.ok(curve.samples > 20, `density: a smooth curve (${curve.samples} samples)`);
+	assert.ok(
+		curve.left >= curve.tickLeft - 0.01 &&
+			curve.right <= curve.tickRight + 0.01 &&
+			curve.right - curve.left > 0.9 * (curve.tickRight - curve.tickLeft),
+		`density: within the strip's ends (${JSON.stringify(curve)})`
+	);
+	assert.ok(Math.abs(curve.top - 4) < 0.01, `density: its peak at the band's top (${curve.top})`);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 module.exports = {
+	exerciseDensity,
 	exerciseQuantiles,
 	exerciseValuesQuery,
 	exerciseBlendOwnText,
