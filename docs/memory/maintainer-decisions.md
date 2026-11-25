@@ -180,6 +180,10 @@ open until the maintainer confirms or changes it.
   value, so a parameterised action (other than `run_workflow`, whose value is
   the workflow) is not offered. An entry naming an action this OS does not
   offer keeps it through an edit, shown by its id, rather than losing it.
+- **A workflow click is refused while a gesture holds a mouse button** —
+  decided by the agent on 2026-11-25, to review by the maintainer: on macOS
+  the click would release the button a « clic maintenu » gesture holds, so
+  the step stops the run with its notice instead.
 - **A key the engine held back is typed back when the trigger is kept** —
   decided by the agent on 2026-11-25, to review by the maintainer: an end
   character the driver swallowed before matching would otherwise vanish, and

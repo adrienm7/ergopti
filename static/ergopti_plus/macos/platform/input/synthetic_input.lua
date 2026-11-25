@@ -670,7 +670,7 @@ end
 --- @param owner string Stable producer/feature owner.
 --- @param event_type integer Native mouse event type.
 --- @param position table Native mouse position.
---- @param options table|nil { phase, modifiers, source_state_id }.
+--- @param options table|nil { phase, modifiers, source_state_id, click_state, button_number }.
 --- @param cleanup boolean Whether this is an already-owned release/compensation.
 --- @return table|nil prepared Opaque prepared event owner.
 --- @return string|nil detail Construction/tagging refusal detail.
@@ -719,6 +719,26 @@ local function prepare_mouse_event(owner, event_type, position, options, cleanup
 		end
 	end
 
+	-- A click sequence's state (2 on a double-click's second down and up) and a
+	-- middle button's number: without them Quartz reads two single clicks, or
+	-- the default other button.
+	for _, field in ipairs({ { "click_state", "mouseEventClickState", 1 }, { "button_number", "mouseEventButtonNumber", 0 } }) do
+		local value = options[field[1]]
+		if value ~= nil then
+			if math.tointeger(value) == nil or value < field[3] then
+				return nil, field[1] .. " must be an integer of at least " .. field[3]
+			end
+			local property = properties[field[2]]
+			if property == nil then return nil, field[2] .. " is unavailable" end
+			local set_ok, set_result = xpcall(function()
+				return set_property(event_or_error, property, value)
+			end, debug.traceback)
+			if not set_ok or set_result == nil or set_result == false then
+				return nil, tostring(set_result)
+			end
+		end
+	end
+
 	_generation = _generation + 1
 	local tag = register_record({
 		generation = _generation,
@@ -753,11 +773,20 @@ local function prepare_mouse_event(owner, event_type, position, options, cleanup
 end
 
 
+--- The native mouse event type of a name (leftMouseDown, otherMouseUp...),
+--- so a producer names its events without reaching for the OS API itself.
+--- @param name string An hs.eventtap.event.types name.
+--- @return integer event_type
+function M.mouse_event_type(name)
+	return assert(event_types[name], "synthetic_input: unknown mouse event type " .. tostring(name))
+end
+
+
 --- Prepares one forward mouse action while lifecycle admission is open.
 --- @param owner string Stable producer/feature owner.
 --- @param event_type integer Native mouse event type.
 --- @param position table Native mouse position.
---- @param options table|nil { phase, modifiers, source_state_id }.
+--- @param options table|nil { phase, modifiers, source_state_id, click_state, button_number }.
 --- @return table|nil prepared Opaque prepared event owner.
 --- @return string|nil detail Construction/tagging refusal detail.
 function M.prepare_mouse_event(owner, event_type, position, options)

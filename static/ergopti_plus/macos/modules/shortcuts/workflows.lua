@@ -42,6 +42,7 @@ local function default_deps()
 		actions = function() return require("gestures.engine.actions") end,
 		clipboard = require("clipboard.adapters.clipboard"),
 		mouse = require("adapters.mouse_control"),
+		click = require("platform.input.synthetic_click"),
 		notifications = require("core.ui.engine.notifications"),
 		window_info = require("platform.focus.window_info"),
 		i18n = require("core.i18n.engine.i18n"),
@@ -85,9 +86,9 @@ local function effect_ports(deps)
 		end,
 		clipboard_set = function(text, done) done(deps.clipboard.write(text) == true) end,
 		mouse_move = function(x, y, done) done(deps.mouse.setPos(x, y) ~= false) end,
-		mouse_click = function(_, _, _, _, done)
-			Logger.warn(LOG, "A click at coordinates is not wired on macOS yet (mouse ownership of actions_click).")
-			done(false, "step_failed")
+		mouse_click = function(x, y, button, count, done)
+			local clicked = deps.click.click(x, y, button, count)
+			if clicked then done(true) else done(false, "step_failed") end
 		end,
 		run_action = function(action, done)
 			local actions = deps.actions()
