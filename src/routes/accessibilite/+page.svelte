@@ -41,7 +41,7 @@ FEATURES & RATIONALE:
 	<meta
 		name="description"
 		content={t(
-			'Accessibilité du site Ergopti, d’Ergopti Studio et d’Ergopti+ : objectif WCAG 2.2 AA, réglages proposés, limites connues et contact'
+			'Accessibilité du site Ergopti, d’Ergopti Studio et d’Ergopti+ : objectif WCAG 2.2 AAA, réglages proposés, limites connues et contact'
 		)}
 	/>
 </svelte:head>
@@ -66,12 +66,12 @@ FEATURES & RATIONALE:
 			{t(
 				'doivent pouvoir être utilisés par tout le monde. Ils doivent fonctionner au clavier seul, avec un lecteur d’écran, avec un zoom important, sans animations ou avec une police adaptée. L’objectif est la conformité au niveau'
 			)}
-			<strong>AA</strong>
+			<strong>AAA</strong>
 			{t('des')}
 			<a href="https://www.w3.org/TR/WCAG22/" class="link" lang="en"
 				>Web Content Accessibility Guidelines 2.2</a
 			>
-			{t('(WCAG 2.2), et au niveau AAA quand cela coûte peu.')}
+			{t('(WCAG 2.2), le plus exigeant.')}
 		</p>
 		<p>
 			<strong>{t('État actuel : partiellement conforme.')}</strong>
@@ -158,6 +158,11 @@ FEATURES & RATIONALE:
 			</li>
 			<li>
 				{t('Les vidéos de démonstration n’ont pas encore de sous-titres ni de transcription.')}
+			</li>
+			<li>
+				{t(
+					'Certains boutons et certaines cases à cocher font moins de 44 pixels de côté, la taille que demande le niveau AAA.'
+				)}
 			</li>
 		</ul>
 	</section>

@@ -632,8 +632,8 @@ export default {
 	'Moteur complet sur <strong>macOS</strong> (36 slots + 3 axes, valeurs par défaut ci-dessus) ; <strong>Windows</strong> expose 10 emplacements assignables (taps et swipes 3-4 doigts). Chaque geste est réassignable depuis le menu, ou désactivable.':
 		'Full engine on <strong>macOS</strong> (36 slots + 3 axes, defaults above); <strong>Windows</strong> exposes 10 assignable slots (3- and 4-finger taps and swipes). Every gesture can be reassigned from the menu, or turned off.',
 	'Déclaration d’accessibilité — Ergopti': 'Accessibility statement — Ergopti',
-	'Accessibilité du site Ergopti, d’Ergopti Studio et d’Ergopti+ : objectif WCAG 2.2 AA, réglages proposés, limites connues et contact':
-		'Accessibility of the Ergopti website, Ergopti Studio and Ergopti+: WCAG 2.2 AA target, available settings, known gaps and contact',
+	'Accessibilité du site Ergopti, d’Ergopti Studio et d’Ergopti+ : objectif WCAG 2.2 AAA, réglages proposés, limites connues et contact':
+		'Accessibility of the Ergopti website, Ergopti Studio and Ergopti+: WCAG 2.2 AAA target, available settings, known gaps and contact',
 	'Déclaration d’accessibilité': 'Accessibility statement',
 	Objectif: 'Goal',
 	'Le site': 'The',
@@ -641,8 +641,7 @@ export default {
 	'doivent pouvoir être utilisés par tout le monde. Ils doivent fonctionner au clavier seul, avec un lecteur d’écran, avec un zoom important, sans animations ou avec une police adaptée. L’objectif est la conformité au niveau':
 		'must be usable by everyone. They must work with the keyboard alone, with a screen reader, at high zoom, without animations or with an adapted font. The goal is conformance to level',
 	des: 'of the',
-	'(WCAG 2.2), et au niveau AAA quand cela coûte peu.':
-		'(WCAG 2.2), and to level AAA where it costs little.',
+	'(WCAG 2.2), le plus exigeant.': '(WCAG 2.2), the most demanding one.',
 	'État actuel : partiellement conforme.': 'Current status: partially conformant.',
 	'Les travaux ont commencé le 16 novembre 2026 ; les limites connues sont listées plus bas.':
 		'The work started on 16 November 2026; the known gaps are listed below.',
@@ -686,6 +685,8 @@ export default {
 		'(menus, settings, tooltips) have not been checked yet with the screen readers of Windows, macOS and Linux.',
 	'Les vidéos de démonstration n’ont pas encore de sous-titres ni de transcription.':
 		'The demo videos have no captions or transcript yet.',
+	'Certains boutons et certaines cases à cocher font moins de 44 pixels de côté, la taille que demande le niveau AAA.':
+		'Some buttons and checkboxes are smaller than 44 pixels across, the size level AAA asks for.',
 	'Signaler un problème': 'Report a problem',
 	'Si une partie du site, d’Ergopti Studio ou d’':
 		'If a part of the website, of Ergopti Studio or of ',

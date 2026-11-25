@@ -81,6 +81,28 @@ function checkBaseline() {
 	assert.equal(row.regressions.length, 1, 'A new small target is a regression');
 }
 
+/**
+ * The public statement names the level the gates hold the project to: WCAG 2.2
+ * AAA since the maintainer's request of 2026-11-23, in its text and its
+ * description, and lists the 44 px targets among its known gaps while the
+ * ratchet still counts some.
+ */
+function checkStatementTarget() {
+	const statement = fs.readFileSync(
+		path.join(ROOT, 'src/routes/accessibilite/+page.svelte'),
+		'utf8'
+	);
+	assert.match(statement, /<strong>AAA<\/strong>/, 'The statement names AAA as the target');
+	assert.match(statement, /objectif WCAG 2\.2 AAA/, 'Its description names AAA too');
+	assert.doesNotMatch(
+		statement,
+		/<strong>AA<\/strong>|objectif WCAG 2\.2 AA,/,
+		'No AA target left'
+	);
+	const small = Object.keys(scan.readBaseline()).some((key) => key.endsWith(scan.TARGET_SIZE_RULE));
+	if (small) assert.match(statement, /44 pixels/, 'The known gaps name the small targets');
+}
+
 /** Every page of src/routes is audited, except the former addresses that redirect. */
 function checkRouteCoverage() {
 	const routesRoot = path.join(ROOT, 'src/routes');
@@ -477,6 +499,7 @@ function checkHeaderOffset() {
 
 checkComparison();
 checkBaseline();
+checkStatementTarget();
 checkRouteCoverage();
 checkPreferences();
 checkNoButtonInLink();
@@ -485,5 +508,5 @@ checkReadingRatchet();
 checkNoJustifiedText();
 checkHeaderOffset();
 console.log(
-	'ok - site accessibility ratchet, baseline, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
+	'ok - site accessibility ratchet, baseline, statement target, page coverage, preferences, links, hero pause, reading ratchet, no justified text and header offset'
 );
