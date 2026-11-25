@@ -24,6 +24,12 @@
 ; 4. Every collaborator is injectable, so the unit suite replays a fresh run,
 ;    an existing composition and each failure without a window or the real
 ;    configuration folder. The window is a thin shell over ComposerCheck_Text.
+; 5. A finding is a WARNING, never an ERROR: what the check observes about the
+;    layout under test (a copy that fails its record, an install the composer
+;    refused, a layout the emulation would refuse) is a failed step of the
+;    evidence record, which is the verdict. An ERROR line opens the error
+;    window. ERROR is kept for the check's own faults: shipped files missing,
+;    a host that raised, its own composition left behind.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -327,7 +333,7 @@ _ComposerCheck_Begin(Run) {
 		Existing := Installed.Has(Id) || Deps["selected"].Call() == Id
 			|| Deps["exists"].Call(LayoutComposer_DeclarationPath(Deps["config_dir"])) != ""
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The installed layouts cannot be read: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The installed layouts cannot be read: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_mode", "fail", "record_unreadable")
 		_ComposerCheck_Finish(Run)
 		return
@@ -363,7 +369,7 @@ _ComposerCheck_OnSaved(Run, Result) {
 	if Run.Settled
 		return
 	if !Result["ok"] {
-		LoggerError(COMPOSER_CHECK_TAG, "The check composition was not installed ({1}).", Result["code"])
+		LoggerWarn(COMPOSER_CHECK_TAG, "The check composition was not installed ({1}).", Result["code"])
 		_ComposerCheck_Record(Run, "composer_install", "fail", Result["code"])
 		_ComposerCheck_Cleanup(Run)
 		return
@@ -380,7 +386,7 @@ _ComposerCheck_Verify(Run) {
 	try {
 		Copy := Deps["read_local"].Call(Id, Deps["local_dir"])
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The installed composition fails its record: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The installed composition fails its record: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_copy", "fail", "unreadable")
 		_ComposerCheck_Record(Run, "composer_ready", "skip", "no_copy")
 		_ComposerCheck_Cleanup(Run)
@@ -390,7 +396,7 @@ _ComposerCheck_Verify(Run) {
 	try {
 		Keys := Deps["ready"].Call(Copy)
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The emulation would refuse the installed composition: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The emulation would refuse the installed composition: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_ready", "fail", "refused")
 		_ComposerCheck_Cleanup(Run)
 		return

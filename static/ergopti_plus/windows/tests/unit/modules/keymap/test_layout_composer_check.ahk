@@ -392,6 +392,46 @@ _LCC_HostRaisingIsAFailedStep() {
 Test("composer check: a host that raises is recorded and the check stays usable (composer-check)",
 	_LCC_HostRaisingIsAFailedStep)
 
+; The field run of 2026-11-25 (Arch Linux): a finding about the user's
+; composition was logged at ERROR, which opened the error window. Every finding
+; is the verdict's failed step and a WARNING; the logger hands only an ERROR to
+; the error window (core/logger/engine/logger.ahk).
+_LCC_ErrorLines(Deps) {
+	global COMPOSER_CHECK_TAG
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try Report := _LCC_Run(Deps)
+	finally LoggerClearTestSink()
+	Started := false, Errors := ""
+	for Line in Lines {
+		if InStr(Line, "[START] [" . COMPOSER_CHECK_TAG . "]")
+			Started := true
+		if InStr(Line, "[ERROR] [" . COMPOSER_CHECK_TAG . "]")
+			Errors .= Line . "`n"
+	}
+	AssertTrue(Started, "the sink saw the check's own lines")
+	AssertFalse(ComposerCheck_Passed(Report), "the finding fails the verdict: " . _LCC_Steps(Report))
+	return Errors
+}
+
+_LCC_FindingsAreWarnings() {
+	Dir := _LCC_TempDir()
+	try {
+		; The layout in use with no installed copy: the Arch tester's state.
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, 0, "composed")), "a missing copy is no ERROR")
+		Fixture := ComposerCheck_ReadFixture()
+		Broken := Map("fixture", () => Map("declaration", Fixture["declaration"],
+			"keylayout", StrReplace(Fixture["keylayout"], "Composer Check", "Other")))
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, Broken)), "a refused install is no ERROR")
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, Map("ready", _LCC_Refuse))), "an emulation refusal is no ERROR")
+		_LCC_InstallComposition(Dir)
+		FileAppend(" ", LayoutRegistry_LocalDir(Dir) . "composed.keylayout", "UTF-8-RAW")
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir)), "a copy that fails its record is no ERROR")
+	} finally DirDelete(Dir, true)
+}
+Test("composer check: a finding is a warning and never opens the error window (composer-finding-level)",
+	_LCC_FindingsAreWarnings)
+
 
 
 
