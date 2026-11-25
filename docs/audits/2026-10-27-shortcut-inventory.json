@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones and the 18 macOS Ctrl-letter switches are keyboard slots. The Windows slots took the same ids in schema v18 and the Windows switches became slots in schema v19. The five Windows shortcuts.personal toggles left the catalogue in schema v23 (PPT-02); a personal file registers its own switches there.",
+	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones and the 18 macOS Ctrl-letter switches are keyboard slots. The Windows slots took the same ids in schema v18 and the Windows switches became slots in schema v19. The five Windows shortcuts.personal toggles left the catalogue in schema v23 (PPT-02); a personal file registers its own switches there. Ctrl+B wraps the line in parentheses and Ctrl+O captures text on the three OS since schema v24, which dropped the Windows Microsoft bold remap.",
 	"rows": [
 		{
 			"driver": "windows",
@@ -19,8 +19,20 @@
 				"modifiers": ["ctrl"],
 				"key": "b"
 			},
-			"action": "microsoft_bold",
+			"action": "surround_parens",
 			"slot": "primary_b",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.primary_o",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "o"
+			},
+			"action": "ocr_screenshot",
+			"slot": "primary_o",
 			"note": null
 		},
 		{
@@ -326,12 +338,24 @@
 		{
 			"driver": "macos",
 			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_b",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "b"
+			},
+			"action": "surround_parens",
+			"slot": "secondary_b",
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "keyboard_slot",
 			"config_key": "shortcuts.keyboard.secondary_o",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "o"
 			},
-			"action": "surround_parens",
+			"action": "ocr_screenshot",
 			"slot": "secondary_o",
 			"note": "Was the switch shortcuts.keys.ctrl_o; migrated by schema v15."
 		},
@@ -499,6 +523,30 @@
 			"action": "open_hotstrings_editor",
 			"slot": "secondary_star",
 			"note": "The key that types ★ at its base level, when the layout has one."
+		},
+		{
+			"driver": "linux",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.primary_b",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "b"
+			},
+			"action": "surround_parens",
+			"slot": "primary_b",
+			"note": null
+		},
+		{
+			"driver": "linux",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.primary_o",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "o"
+			},
+			"action": "ocr_screenshot",
+			"slot": "primary_o",
+			"note": null
 		},
 		{
 			"driver": "linux",

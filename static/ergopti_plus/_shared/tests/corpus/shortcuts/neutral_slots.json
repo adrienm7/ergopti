@@ -250,6 +250,12 @@
 		},
 		{
 			"driver": "windows",
+			"modifiers": ["ctrl"],
+			"key": "o",
+			"slot": "primary_o"
+		},
+		{
+			"driver": "windows",
 			"modifiers": ["ctrl", "shift"],
 			"key": "v",
 			"slot": "primary_shift_v"
@@ -401,6 +407,12 @@
 		{
 			"driver": "macos",
 			"modifiers": ["ctrl"],
+			"key": "b",
+			"slot": "secondary_b"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
 			"key": "o",
 			"slot": "secondary_o"
 		},
@@ -481,6 +493,18 @@
 			"modifiers": ["ctrl"],
 			"key": "star",
 			"slot": "secondary_star"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["ctrl"],
+			"key": "b",
+			"slot": "primary_b"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["ctrl"],
+			"key": "o",
+			"slot": "primary_o"
 		},
 		{
 			"driver": "linux",
