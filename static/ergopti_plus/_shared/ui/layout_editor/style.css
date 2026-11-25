@@ -1012,6 +1012,12 @@ body {
 	gap: 6px;
 }
 
+/* The versions' branch graph: a version sits under the one it came from,
+   indented by its depth with a branch mark (the base says so in words). */
+.le-version-node {
+	padding-inline-start: calc(0.5em + var(--le-version-depth, 0) * 1.25em);
+}
+
 .le-version-shown > th {
 	font-weight: 700;
 }

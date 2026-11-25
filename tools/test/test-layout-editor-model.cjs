@@ -955,6 +955,36 @@ test('a tab keeps its saved versions in the stored workspace, at most MAX_VERSIO
 	);
 });
 
+// (layout-editor-version-branches) Each version names the one it came from
+// and one at most is the layout's base: the branch graph survives a reload.
+test('a version keeps its branch and the base mark, each checked', () => {
+	const first = IO.serialize(IO.create('mine', 'Mine'));
+	const versions = [
+		{ name: 'Root', text: first, at: 1 },
+		{ name: 'Branch A', text: first, at: 2, from: 1 },
+		{ name: 'Branch B', text: first, at: 3, from: 1, base: true }
+	];
+	const text = W.serialize([{ text: first, dirty: false, versions }], 0);
+	assert.deepEqual(plain(W.parse(text).tabs[0].versions), versions, 'from and base read back');
+	const store = (list) => () => W.serialize([{ text: first, dirty: false, versions: list }], 0);
+	refuses(store([{ name: 'v', text: first, at: 1, from: -1 }]), 'workspace_invalid');
+	refuses(store([{ name: 'v', text: first, at: 1, base: false }]), 'workspace_invalid');
+	refuses(
+		store([
+			{ name: 'a', text: first, at: 1 },
+			{ name: 'b', text: first, at: 1 }
+		]),
+		'workspace_invalid'
+	);
+	refuses(
+		store([
+			{ name: 'a', text: first, at: 1, base: true },
+			{ name: 'b', text: first, at: 2, base: true }
+		]),
+		'workspace_invalid'
+	);
+});
+
 test('the differences of two layouts list each key mapped differently, per layer and OS', () => {
 	const base = IO.create('mine', 'Mine');
 	const edited = M.setMapping(

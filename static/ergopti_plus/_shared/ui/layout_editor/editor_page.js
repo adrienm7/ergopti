@@ -2546,12 +2546,52 @@ var LayoutEditorPage = (function () {
 				);
 				return;
 			}
+			// Its id is its time, kept distinct from the last one's; it branches
+			// from the version the layout came from (the base), and becomes it.
+			const at = Math.max(Date.now(), list.length ? list[list.length - 1].at + 1 : 0);
+			const base = list.find((version) => version.base);
+			const saved = { name, text: sourceText(doc()), at, base: true };
+			if (base) saved.from = base.at;
 			// A new array, so the workspace sees the change (workspaceShape).
-			state.tabs[state.active].versions = list.concat([
-				{ name, text: sourceText(doc()), at: Date.now() }
-			]);
+			state.tabs[state.active].versions = list.map(withoutBase).concat([saved]);
 			state.versionName = '';
 			notify('ok', tl('versions.saved', { name }));
+		}
+
+		/** A version without the base mark (a copy when it had one). */
+		function withoutBase(version) {
+			if (!version.base) return version;
+			const copy = Object.assign({}, version);
+			delete copy.base;
+			return copy;
+		}
+
+		/**
+		 * The versions as their branch graph (an idea seen in the Layouts Wiki
+		 * playground's Versions pane, which draws one): each version under the
+		 * one it came from, siblings oldest first, with its depth.
+		 * @returns {{version: object, index: number, depth: number, parent: object|null}[]}
+		 */
+		function versionTree(list) {
+			const byAt = new Map(list.map((version) => [version.at, version]));
+			const children = new Map();
+			const roots = [];
+			list.forEach((version, index) => {
+				const parent = version.from !== undefined ? byAt.get(version.from) : undefined;
+				const entry = { version, index };
+				if (parent) {
+					if (!children.has(parent.at)) children.set(parent.at, []);
+					children.get(parent.at).push(entry);
+				} else roots.push(entry);
+			});
+			const out = [];
+			const walk = (entry, depth, parent) => {
+				out.push({ version: entry.version, index: entry.index, depth, parent });
+				for (const child of children.get(entry.version.at) || [])
+					walk(child, depth + 1, entry.version);
+			};
+			for (const root of roots) walk(root, 0, null);
+			return out;
 		}
 
 		/** The document a saved version holds; a version that no longer reads is refused. */
@@ -2577,6 +2617,11 @@ var LayoutEditorPage = (function () {
 			state.dirty = true;
 			state.historySaid = null;
 			resetView(next, null);
+			// The layout now comes from this version: the next one saved branches from it.
+			const tab = state.tabs[state.active];
+			tab.versions = tab.versions.map((other) =>
+				other === version ? Object.assign({}, other, { base: true }) : withoutBase(other)
+			);
 			notify('ok', tl('versions.restored', { name: version.name }));
 		}
 
@@ -2585,7 +2630,21 @@ var LayoutEditorPage = (function () {
 			const version = versions()[index];
 			ask(tl('versions.confirm_delete', { name: version.name }), () => {
 				const tab = state.tabs[state.active];
-				tab.versions = tab.versions.filter((_, at) => at !== index);
+				// Its branches hang from its own parent; its base role goes there too.
+				tab.versions = tab.versions
+					.filter((_, at) => at !== index)
+					.map((other) => {
+						if (other.from !== version.at) return other;
+						const moved = Object.assign({}, other);
+						if (version.from === undefined) delete moved.from;
+						else moved.from = version.from;
+						return moved;
+					})
+					.map((other) =>
+						version.base && other.at === version.from
+							? Object.assign({}, other, { base: true })
+							: other
+					);
 				state.versionShown = null;
 				notify('ok', tl('versions.deleted', { name: version.name }));
 			});
@@ -2692,43 +2751,73 @@ var LayoutEditorPage = (function () {
 			const list = versions();
 			const full = list.length >= LayoutEditorWorkspace.MAX_VERSIONS;
 			const kept = host.workspace ? 'versions.kept' : 'versions.kept_session';
-			const rows = list.map((version, index) =>
-				el('tr', { class: index === state.versionShown ? 'le-version-shown' : null }, [
-					el('th', { scope: 'row', text: version.name }),
-					el('td', {}, [
-						el('time', {
-							datetime: new Date(version.at).toISOString(),
-							text: versionTime(version.at)
-						})
-					]),
-					el('td', { class: 'le-version-actions' }, [
-						el('button', {
-							type: 'button',
-							id: `le-version-diff-${index}`,
-							text: tl('versions.compare'),
-							'aria-label': tl('versions.compare_named', { name: version.name }),
-							'aria-pressed': String(index === state.versionShown),
-							onclick: () => {
-								state.versionShown = state.versionShown === index ? null : index;
-								render();
-							}
-						}),
-						el('button', {
-							type: 'button',
-							id: `le-version-restore-${index}`,
-							text: tl('versions.restore'),
-							'aria-label': tl('versions.restore_named', { name: version.name }),
-							onclick: () => restoreVersion(index)
-						}),
-						el('button', {
-							type: 'button',
-							id: `le-version-delete-${index}`,
-							text: tl('versions.delete'),
-							'aria-label': tl('versions.delete_named', { name: version.name }),
-							onclick: () => deleteVersion(index)
-						})
-					])
-				])
+			const rows = versionTree(list).map(({ version, index, depth, parent }) =>
+				el(
+					'tr',
+					{
+						class:
+							[
+								index === state.versionShown ? 'le-version-shown' : '',
+								version.base ? 'le-version-base' : ''
+							]
+								.filter(Boolean)
+								.join(' ') || null
+					},
+					[
+						// Its depth drawn as an indent and a branch mark; its parent said in words.
+						el(
+							'th',
+							{
+								scope: 'row',
+								class: 'le-version-node',
+								style: `--le-version-depth: ${depth}`
+							},
+							[
+								depth > 0
+									? el('span', { class: 'le-version-branch', 'aria-hidden': 'true', text: '└ ' })
+									: null,
+								version.name,
+								version.base
+									? el('small', { class: 'le-version-current', text: ` ${tl('versions.base')}` })
+									: null
+							]
+						),
+						el('td', { text: parent ? parent.name : tl('versions.from_none') }),
+						el('td', {}, [
+							el('time', {
+								datetime: new Date(version.at).toISOString(),
+								text: versionTime(version.at)
+							})
+						]),
+						el('td', { class: 'le-version-actions' }, [
+							el('button', {
+								type: 'button',
+								id: `le-version-diff-${index}`,
+								text: tl('versions.compare'),
+								'aria-label': tl('versions.compare_named', { name: version.name }),
+								'aria-pressed': String(index === state.versionShown),
+								onclick: () => {
+									state.versionShown = state.versionShown === index ? null : index;
+									render();
+								}
+							}),
+							el('button', {
+								type: 'button',
+								id: `le-version-restore-${index}`,
+								text: tl('versions.restore'),
+								'aria-label': tl('versions.restore_named', { name: version.name }),
+								onclick: () => restoreVersion(index)
+							}),
+							el('button', {
+								type: 'button',
+								id: `le-version-delete-${index}`,
+								text: tl('versions.delete'),
+								'aria-label': tl('versions.delete_named', { name: version.name }),
+								onclick: () => deleteVersion(index)
+							})
+						])
+					]
+				)
 			);
 			return el('section', { class: 'le-panel le-versions', id: 'le-versions' }, [
 				el('h2', { text: tl('tools.versions') }),
@@ -2772,6 +2861,7 @@ var LayoutEditorPage = (function () {
 									el('thead', {}, [
 										el('tr', {}, [
 											el('th', { scope: 'col', text: tl('versions.col_name') }),
+											el('th', { scope: 'col', text: tl('versions.col_from') }),
 											el('th', { scope: 'col', text: tl('versions.col_time') }),
 											el('th', { scope: 'col', text: tl('versions.col_actions') })
 										])
