@@ -1483,6 +1483,19 @@ hook_restart_stable_ms = 60000
 # Linux: restart attempts the hook supervisor makes before it gives up and
 # keeps the run-time failure exit.
 hook_restart_attempts = 5
+# Linux: a click on the tray rebuilds its menu on a later turn, so the field
+# run's tray check reads the menu again this often, at most this many times,
+# and looks this many submenus deep under a group for a row.
+# LX: diagnostics/engine/field_check/tray_check.lua.
+field_tray_settle_ms = 250
+field_tray_settle_attempts = 12
+field_tray_search_depth = 2
+# Linux: the field run's tray and session checks run their bus requests and
+# commands one after the other; each is bounded by its step's deadline divided
+# by this share, so together they never outlast the step.
+# LX: diagnostics/adapters/tray_check_ports.lua, diagnostics/adapters/session_check_ports.lua.
+field_tray_request_share = 12
+field_session_command_share = 8
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: core/text/engine/toml/helpers.ahk StaleTempAgeMs (pinned copy).
@@ -1590,6 +1603,11 @@ number_row_level_text_bytes = 1024
 # and some 40 assets), over the former 2 MiB, and the Linux update check failed;
 # 8 MiB leaves room for about 65 such releases.
 release_list_body_bytes = 8388608
+# Linux: the output one field check command may print before it is stopped:
+# the tray's whole dbusmenu layout as busctl JSON, every submenu filled, is a
+# few hundred kilobytes, and libinput list-devices a few dozen.
+# LX: diagnostics/adapters/bus_query.lua, diagnostics/adapters/session_check_ports.lua.
+field_check_output_bytes = 4194304
 
 # Free space the managed Ollama runtime needs beyond its pinned archive and its
 # pinned unpacked size (unpacked_bytes of _shared/ai/data/ollama_release.json,

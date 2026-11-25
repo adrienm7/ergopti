@@ -22,8 +22,8 @@ local M = {}
 
 -- The check's requests share its step's deadline: about forty run one after
 -- the other, most answering in milliseconds; this bound leaves a hung one
--- room to fail by name before the step's own deadline.
-M.REQUEST_SHARE = 12
+-- room to fail by name before the step's own deadline (constants.toml [adapters]).
+M.REQUEST_SHARE = require("core.timing.engine.timings").count("adapters", "field_tray_request_share")
 
 --- Whether a declared row is drawn on Linux.
 local function for_linux(item)
