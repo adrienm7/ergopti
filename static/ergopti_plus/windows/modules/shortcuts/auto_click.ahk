@@ -19,8 +19,10 @@
 ; 3. The auto-clicker ends with the keep-awake session it started with, so the
 ;    first physical input still ends the whole mode (agent decision of
 ;    2026-11-25, as on macOS and Linux).
-; 4. The document is written atomically (a sibling file, then FileMove) and
-;    only after an edit the store accepted.
+; 4. The document is written atomically (a sibling file, then an atomic
+;    replace) and only after an edit the store accepted.
+; 5. The OS is reached through the file system, window and secure-field
+;    adapters and the timer scheduler, never directly.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,6 +34,7 @@ class AutoClickOwner {
 	static clicks := 0
 	static vision_started := false
 	static ports := 0
+	static timer := 0
 }
 
 
@@ -45,7 +48,7 @@ class AutoClickOwner {
 
 _AutoClickShared(Relative) {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\" . Relative, "UTF-8"))
+	return JsonParse(FSReadStrict(_SharedDir . "\" . Relative))
 }
 
 ; The library folder, its image folder and its document.
@@ -66,7 +69,7 @@ AutoClickDocument() {
 	AutoClickLibraryPaths(&Folder, &Images, &Index)
 	Saved := ""
 	if FileExist(Index) {
-		try Saved := JsonParse(FileRead(Index, "UTF-8"))
+		try Saved := JsonParse(FSReadStrict(Index))
 		catch
 			Saved := Map("broken", true)
 	}
@@ -85,10 +88,11 @@ _AutoClickSave(Doc) {
 	AutoClickLibraryPaths(&Folder, &Images, &Index)
 	try {
 		DirCreate(Images)
-		if FileExist(Index . ".partial")
-			FileDelete(Index . ".partial")
-		FileAppend(KeepAwakeLibraryJson(Doc), Index . ".partial", "UTF-8-RAW")
-		FileMove(Index . ".partial", Index, true)
+		Partial := Index . ".partial"
+		if !FSWriteDurable(Partial, KeepAwakeLibraryJson(Doc))
+			throw Error("the sibling file " . Partial . " could not be written")
+		if !FSAtomicMoveReplace(Partial, Index, &NativeError)
+			throw Error("the sibling file could not replace " . Index . " (error " . NativeError . ")")
 	} catch as Err {
 		LoggerError("AutoClick", "The presets document could not be written: {1}.", Err.Message)
 		return false
@@ -215,21 +219,12 @@ _MI_StageKeepAwake() {
 ; ===================================
 ; ===================================
 
-; Whether the session's input desktop is locked: no input desktop answers.
-_AutoClickLocked() {
-	Desktop := DllCall("User32\OpenInputDesktop", "UInt", 0, "Int", 0, "UInt", 0x0100, "Ptr")
-	if !Desktop
-		return true
-	DllCall("User32\CloseDesktop", "Ptr", Desktop)
-	return false
-}
-
 _AutoClickForeground(*) {
-	Hwnd := WinExist("A")
+	Hwnd := WIGetForegroundHwnd()
 	if !Hwnd
 		return ""
-	try Exe := WinGetProcessName("ahk_id " . Hwnd)
-	catch
+	Exe := WIGetProcessName(Hwnd)
+	if (Exe == "")
 		return ""
 	return Map("window", Hwnd, "app_id", Exe)
 }
@@ -238,7 +233,7 @@ _AutoClickState(*) {
 	try Secure := SFD_IsSecureField()
 	catch
 		Secure := true
-	return Map("locked", _AutoClickLocked(), "paused", A_IsSuspended, "secure_field", Secure ? 1 : 0)
+	return Map("locked", SFD_IsInputDesktopLocked(), "paused", A_IsSuspended, "secure_field", Secure ? 1 : 0)
 }
 
 _AutoClickClick(X, Y) {
@@ -268,7 +263,7 @@ _AutoClickOnClick(Count, TargetId) {
 
 _AutoClickDefaultPorts() {
 	return Map("foreground", _AutoClickForeground, "state", _AutoClickState, "scan", _AutoClickScan,
-		"click", _AutoClickClick, "now_ms", (*) => DllCall("GetTickCount64", "Int64"), "log", _AutoClickLog,
+		"click", _AutoClickClick, "now_ms", (*) => A_TickCount, "log", _AutoClickLog,
 		"on_click", _AutoClickOnClick)
 }
 
@@ -310,7 +305,7 @@ AutoClickStart(Plan, Coupled := false) {
 	AutoClickOwner.session := AutoClickSession(Ports, Plan, Map("options", Defaults,
 		"cooldown_ms", TimingsGet("keep_awake", "auto_click_cooldown_ms"), "ocr", Map("layout", "sparse")))
 	AutoClickOwner.coupled := Coupled
-	SetTimer(_AutoClickTick, TimingsGet("keep_awake", "auto_click_tick_ms"))
+	AutoClickOwner.timer := TimerEvery(TimingsGet("keep_awake", "auto_click_tick_ms") / 1000, _AutoClickTick)
 	LoggerInfo("AutoClick", "Auto-click started: {1} image(s), {2} text target(s).", Plan["templates"].Length,
 		Plan["text_targets"].Length)
 	return true
@@ -332,7 +327,8 @@ _AutoClickTick() {
 AutoClickStop() {
 	if !IsObject(AutoClickOwner.session)
 		return true
-	SetTimer(_AutoClickTick, 0)
+	TimerCancel(AutoClickOwner.timer)
+	AutoClickOwner.timer := 0
 	AutoClickOwner.session.Stop()
 	AutoClickOwner.session := 0
 	LoggerInfo("AutoClick", "Auto-click stopped.")

@@ -39,7 +39,7 @@ TextTargetFold() {
 	global _SharedDir
 	static Fold := 0
 	if !IsObject(Fold)
-		Fold := JsonParse(FileRead(_SharedDir . "\core\text\data\text_fold.json", "UTF-8"))["fold"]
+		Fold := JsonParse(FSReadStrict(_SharedDir . "\core\text\data\text_fold.json"))["fold"]
 	return Fold
 }
 

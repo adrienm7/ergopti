@@ -179,7 +179,7 @@ _KALIsPng(Bytes) {
 ; Keeps a PNG as a new image target of a preset.
 _KALKeepImage(Host, PresetId, Path, Base) {
 	try Bytes := FSReadBytesStrict(Path)
-	try FileDelete(Path)
+	FSDelete(Path)
 	if !IsSet(Bytes) || !_KALIsPng(Bytes)
 		return _KALPush(Host, "onImage", Map("ok", false, "reason", "import_failed"))
 	Doc := AutoClickDocument()
@@ -250,15 +250,9 @@ _KALExport(Host, PresetId) {
 	Data := _KALData()
 	Text := KeepAwakeLibraryJson(Map("format", Data["export_format"], "version", Data["export_version"],
 		"preset", Preset, "images", Encoded))
-	try {
-		if FileExist(Path)
-			FileDelete(Path)
-		FileAppend(Text, Path, "UTF-8-RAW")
-		Ok := true
-	} catch as Err {
-		LoggerError("KeepAwakeLibrary", "The preset export could not be written: {1}.", Err.Message)
-		Ok := false
-	}
+	Ok := FSWrite(Path, Text)
+	if !Ok
+		LoggerError("KeepAwakeLibrary", "The preset export could not be written to {1}.", Path)
 	LoggerInfo("KeepAwakeLibrary", "Preset {1} exported with {2} image(s).", Preset["id"], Preset["images"].Length)
 	_KALPush(Host, "onExported", Map("ok", Ok, "reason", Ok ? "" : "presets_write_failed"))
 }
@@ -268,7 +262,7 @@ _KALImport(Host) {
 	if (Path == "")
 		return
 	Data := _KALData()
-	try Imported := JsonParse(FileRead(Path, "UTF-8"))
+	try Imported := JsonParse(FSReadStrict(Path))
 	if !IsSet(Imported) || !(Imported is Map) || Imported.Get("format", "") != Data["export_format"]
 		|| Imported.Get("version", 0) != Data["export_version"] || !(Imported.Get("preset", 0) is Map)
 		|| !(Imported.Get("images", 0) is Map) {

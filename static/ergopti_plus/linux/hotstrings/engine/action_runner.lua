@@ -31,7 +31,7 @@ function M.run(result, deps)
 			parameter_spec = function(action) return gestures.get_action_parameter_spec(action) end,
 		})
 		if not ran then
-			Logger.warn(LOG, "The action '%s' of a hotstring did not run (%s).", fields.action, tostring(refusal or "refused"))
+			Logger.warn(LOG, "The action '%s' of a hotstring did not run: %s.", fields.action, tostring(refusal or "refused"))
 		end
 	end)
 end

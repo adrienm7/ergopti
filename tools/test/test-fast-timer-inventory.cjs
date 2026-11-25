@@ -134,11 +134,6 @@ const INVENTORY = {
 		'Armed only while keep-awake is active, to cancel it the instant the user moves the ' +
 		'mouse. 150 ms because a cancel the user has to wait for reads as the feature ignoring ' +
 		'them. Disarmed with the feature.',
-	'modules/shortcuts/auto_click.ahk:_AutoClickTick':
-		'Armed only while an anti-sleep auto-click session runs (AutoClickStart to ' +
-		'AutoClickStop). Each 700 ms tick asks screen vision for one look at the allowed ' +
-		'foreground window; a slower tick leaves a permission prompt or a "continue" button ' +
-		'unanswered for seconds, which is the whole point of the mode.',
 	'platform/system/vision/region_select.ahk:_RegionSelectTrack':
 		'Armed only while the user drags a region on the Ctrl+O or library capture overlay ' +
 		'(left button down to the button release or a cancel). 15 ms redraws the selection ' +

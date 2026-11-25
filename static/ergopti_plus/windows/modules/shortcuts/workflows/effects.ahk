@@ -626,7 +626,7 @@ WorkflowsRunEntryAction(Fields, Ports := 0) {
 	Refusal := ""
 	Ran := HSE_ActionEntryDispatch(Fields, Executors, &Refusal)
 	if !Ran
-		LoggerWarn(WORKFLOW_LOG, "The action '{1}' of a hotstring did not run ({2}).", Fields["action"],
+		LoggerWarn(WORKFLOW_LOG, "The action '{1}' of a hotstring did not run: {2}.", Fields["action"],
 			Refusal != "" ? Refusal : "refused")
 	return Ran
 }

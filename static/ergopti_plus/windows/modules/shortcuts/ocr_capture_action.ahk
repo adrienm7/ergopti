@@ -33,7 +33,7 @@ _OcrCaptureDefaultPorts() {
 		"recognize", (Path, Callback) => ScreenVisionRecognizeFile(Path, Map("layout", "block"), Callback),
 		"set_clipboard", (Text) => CB_Write(Text),
 		"notify", _OcrCaptureNotify,
-		"remove", (Path) => (FileExist(Path) ? FileDelete(Path) : 0),
+		"remove", (Path) => FSDelete(Path),
 		"log", _OcrCaptureLog)
 }
 
