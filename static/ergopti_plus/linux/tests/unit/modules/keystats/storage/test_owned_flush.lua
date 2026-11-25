@@ -417,7 +417,8 @@ helpers.describe("owned SQLite collector flush", function()
 				local startup, menu_name = "ui.menu.start_at_login", "menu.ui.builder.builder"
 				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
 				package.loaded[startup] = { command_available = function() return false end,
-					enabled = function() return false end }
+					enabled = function() return false end,
+					snapshot = function() return { command_available = false, enabled = false } end }
 				local info, failure = Logger.info, Logger.error
 				local successes, refusals = 0, 0
 				Logger.info = function(tag, message, ...)
@@ -1261,7 +1262,8 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 			if message == "Metrics session reset was refused; the session is unchanged." then refusals = refusals + 1 end
 			return previous_error(tag, message, ...)
 		end
-		package.loaded[startup] = { command_available = function() return false end, enabled = function() return false end }
+		package.loaded[startup] = { command_available = function() return false end, enabled = function() return false end,
+			snapshot = function() return { command_available = false, enabled = false } end }
 		local ok, err = pcall(function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })

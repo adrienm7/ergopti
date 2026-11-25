@@ -72,14 +72,29 @@ local function read_state(run)
 	return nil
 end
 
+--- The effective startup state of one helper answer.
+--- @param state string|nil
+--- @return boolean|nil
+local function enabled_of(state)
+	if state == "enabled" then return true end
+	if state == "disabled" or state == "stale" then return false end
+	return nil
+end
+
+--- Whether one helper answer proves this installation's startup command.
+--- @param state string|nil
+--- @return boolean|nil
+local function command_available_of(state)
+	if state == "other" then return false end
+	if state == "enabled" or state == "disabled" or state == "stale" then return true end
+	return nil
+end
+
 --- Returns the effective startup state, or nil if the query failed.
 --- @param run function|nil
 --- @return boolean|nil
 function M.enabled(run)
-	local state = read_state(run)
-	if state == "enabled" then return true end
-	if state == "disabled" or state == "stale" then return false end
-	return nil
+	return enabled_of(read_state(run))
 end
 
 --- Returns false only when the native entry proves a different startup command.
@@ -87,10 +102,17 @@ end
 --- @param run function|nil
 --- @return boolean|nil
 function M.command_available(run)
+	return command_available_of(read_state(run))
+end
+
+--- Both answers from ONE helper run. A tray build asks both, and each read
+--- starts bash and systemctl: two per build were a large part of a field
+--- menu.rebuild over its budget on every boot.
+--- @param run function|nil
+--- @return table { enabled = boolean|nil, command_available = boolean|nil }
+function M.snapshot(run)
 	local state = read_state(run)
-	if state == "other" then return false end
-	if state == "enabled" or state == "disabled" or state == "stale" then return true end
-	return nil
+	return { enabled = enabled_of(state), command_available = command_available_of(state) }
 end
 
 --- Toggles startup only after a successful query and confirms the final state.

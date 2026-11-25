@@ -348,11 +348,17 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	-- One helper run per build answers both getters (start_at_login.snapshot).
+	local startup = nil
+	local function startup_state()
+		startup = startup or require("ui.menu.start_at_login").snapshot()
+		return startup
+	end
 	getters["startup_command_available"] = function()
-		return require("ui.menu.start_at_login").command_available() ~= false
+		return startup_state().command_available ~= false
 	end
 	getters["start_at_login_enabled"] = function()
-		return require("ui.menu.start_at_login").enabled() == true
+		return startup_state().enabled == true
 	end
 	render_ctx.state_getters = getters
 

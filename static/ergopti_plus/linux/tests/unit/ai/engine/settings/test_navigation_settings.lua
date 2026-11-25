@@ -128,6 +128,7 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 				package.loaded["ui.menu.start_at_login"] = {
 					enabled = function() return false end,
 					command_available = function() return true end,
+					snapshot = function() return { enabled = false, command_available = true } end,
 				}
 				local i18n = require("core.i18n.engine.i18n")
 				if type(variant) == "table" and type(variant.translate) == "function" then
