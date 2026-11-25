@@ -23,7 +23,8 @@ export const COMPARER_LINK_PARAMS = Object.freeze([
 	'tab',
 	'px',
 	'py',
-	'text'
+	'text',
+	'blend'
 ]);
 
 /**
