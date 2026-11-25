@@ -206,16 +206,6 @@ baseline as violations go.
       behind its « i » (the AI and hotstring cards had `title` attributes only;
       `npm run test:metrics-cards-explained`), and the Studio's 37 metrics all have their definition. Left: the
       tray settings, whose rows carry no help line of their own, were not reviewed for one.
-- [ ] **Ergopti+ native UI, what is left.** The clear fixes of the code audit
-      ([table](docs/audits/accessibility/README.md#native-ergopti-ui-code-audit-2026-11-17)) are in on the three OS
-      (tray / menu-bar names with the pause, labels and named controls, tooltips under high contrast, previews told
-      to a running screen reader); on Windows the native windows' fonts follow the text size, and the WPM widget
-      and the Spotlight overlay reach a running screen reader (fourth pass); on macOS and Linux the WPM widgets,
-      the spotlight overlay and the `hs.alert` banners reach a running screen reader, and the Linux previews
-      follow the GNOME text scale (fifth pass). Left: the Swift update panel's XCTest, not yet run in CI: it is
-      in the full `swift test` of the macOS Build stage's launcher-native cell, which the dev runs since 2026-11-17
-      skipped because earlier macOS unit stages failed (run 44753533322: menu_input, ui and modules). The spoken
-      results are the « Accessibility » items of the three TODO-tests files.
 
 ## Ergopti Studio
 

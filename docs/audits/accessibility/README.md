@@ -287,6 +287,12 @@ The screen-reader checks only a real machine can answer are in
 TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md
 (« Accessibility » items).
 
+The Swift update panel's XCTest (`CatalogUpdateUserDriverTests`: the bar
+named by its step, a reused bar following its new step, the panel opening
+and closing) runs in CI: the macOS « Launcher XCTest and native probes »
+cell of dev run 45568762252 (commit 915ec5e8, 2026-11-25 08:54 Paris time)
+passed its 15 cases among 778.
+
 ### Windows fixes (third pass, 2026-11-17)
 
 Every Windows row of the table above is fixed, with the tests
