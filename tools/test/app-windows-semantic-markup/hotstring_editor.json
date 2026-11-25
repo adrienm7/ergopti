@@ -53,12 +53,6 @@
 		"script.js": [
 			{
 				"tag": "div",
-				"where": "class=\"entry-cb-wrap\"",
-				"count": 1,
-				"reason": "The selection checkbox's cell in an entry row, sized and centred apart from the trigger; the row's list item is the entry and the checkbox names itself."
-			},
-			{
-				"tag": "div",
 				"where": "class=\"e-trig\"",
 				"count": 1,
 				"reason": "The trigger button's cell in an entry row, with its own width bounds; the button inside names the trigger and edits it."
