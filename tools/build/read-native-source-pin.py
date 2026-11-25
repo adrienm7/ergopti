@@ -10,6 +10,7 @@ FIELDS = {
     "lua54": {"version", "url", "mirror_url", "sha256"},
     "luv": {"repository", "revision"},
     "lfs": {"repository", "revision"},
+    "lgi": {"repository", "revision"},
 }
 
 

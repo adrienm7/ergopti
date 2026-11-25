@@ -155,6 +155,9 @@ try {
 		'lib/lua/5.1/lfs.so',
 		'lib/lua/5.1/posix/sys/stat.so',
 		'share/lua/5.1/posix/init.lua',
+		'lib/lua/5.1/lgi/corelgilua51.so',
+		'share/lua/5.1/lgi.lua',
+		'lib/girepository-1.0/GObject-2.0.typelib',
 		`${observedLibdir}/gio/modules/libgiolibproxy.so`,
 		`${observedLibdir}/gio/modules/libgiognutls.so`,
 		'share/glib-2.0/schemas/gschemas.compiled'
@@ -527,6 +530,12 @@ if (process.platform === 'linux') {
 			'lib/lua/5.1/lfs.so',
 			'lib/lua/5.1/posix/sys/stat.so',
 			'share/lua/5.1/posix/init.lua',
+			'lib/lua/5.1/lgi/corelgilua51.so',
+			'share/lua/5.1/lgi.lua',
+			'lib/girepository-1.0/GObject-2.0.typelib',
+			'lib/lua/5.1/lgi/corelgilua51.so',
+			'share/lua/5.1/lgi.lua',
+			'lib/girepository-1.0/GObject-2.0.typelib',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {
@@ -767,7 +776,11 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
  (sources/'posix-c').mkdir();(sources/'posix-c/ctype.so').write_bytes(b'independent query control only')
  (sources/'posix-lua').mkdir();(sources/'posix-lua/init.lua').write_bytes(b'independent query control only')
- lua_modules={'luv':'luv.so','lfs':'lfs.so','posix.ctype':'posix-c/ctype.so','posix':'posix-lua/init.lua'}
+ (sources/'lgi-c').mkdir();(sources/'lgi-c/corelgilua51.so').write_bytes(b'independent query control only')
+ (sources/'lgi-lua/lgi').mkdir(parents=True);(sources/'lgi-lua/lgi.lua').write_bytes(b'independent query control only');(sources/'lgi-lua/lgi/core.lua').write_bytes(b'independent query control only')
+ typelibs=root/'typelibs';typelibs.mkdir()
+ for name in m.FALLBACK_TYPELIBS:(typelibs/name).write_bytes(b'independent query control only')
+ lua_modules={'luv':'luv.so','lfs':'lfs.so','posix.ctype':'posix-c/ctype.so','posix':'posix-lua/init.lua','lgi.corelgilua51':'lgi-c/corelgilua51.so','lgi':'lgi-lua/lgi.lua'}
  schema=root/'runtime schemas';schema.mkdir();(schema/'gschemas.compiled').write_bytes(b'independent schema acquisition control only')
  catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
  real_uname=m.os.uname;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64')
@@ -794,10 +807,11 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
     assert arguments[0]=='pkg-config' and len(arguments)==3,'Unexpected native command or schema factory'
     queries.append(arguments)
     if arguments==['pkg-config','--variable=giomoduledir','gio-2.0']:return str(sources)
+    if arguments==['pkg-config','--variable=typelibdir','gobject-introspection-1.0']:return str(typelibs)
     assert arguments==['pkg-config','--variable=schemasdir','gio-2.0'],'Desktop development metadata must not be required'
     return value
    def boundary(*arguments):
-    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','posix-c/ctype.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the owned program and Lua module seeds'
+    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','sqlite3','openssl','zstd','luv.so','lfs.so','posix-c/ctype.so','lgi-c/corelgilua51.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the owned program and Lua module seeds'
     closure.append(True);raise BoundaryReached()
    m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
    try:m.stage(str(appdir),str(catalogue),'unused owned template')
@@ -805,7 +819,7 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
    except m.RuntimeRefused as refusal:
     assert index>0 and str(refusal)=='Native schema location refused.'
    else:raise AssertionError('Query witness must terminate before native ELF or cache commands')
-   assert queries==[['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]
+   assert queries==[['pkg-config','--variable=typelibdir','gobject-introspection-1.0'],['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]
    schema_copies=[source for source,destination in copies if destination.name=='gschemas.compiled']
    assert schema_copies==([schema/'gschemas.compiled'] if index==0 else [])
    # Invalid schema values refuse before the newly explicit crypto boundary.

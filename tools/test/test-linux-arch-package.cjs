@@ -102,7 +102,10 @@ try {
 	}
 	for (const relative of [
 		'lib/gio/modules/libgiolibproxy.so',
-		'share/glib-2.0/schemas/gschemas.compiled'
+		'share/glib-2.0/schemas/gschemas.compiled',
+		'lib/lua/5.1/lgi/corelgilua51.so',
+		'share/lua/5.1/lgi.lua',
+		'lib/girepository-1.0/GObject-2.0.typelib'
 	]) {
 		fs.mkdirSync(path.dirname(path.join(prefix, relative)), { recursive: true });
 		fs.writeFileSync(path.join(prefix, relative), '');

@@ -76,6 +76,31 @@ print(source["url"]); print(source["commit"])' static/ergopti_plus/_shared/core/
 	export LUA_CPATH="$prefix/lib/lua/5.1/?.so;;"
 }
 
+# Builds lgi, the GObject Introspection binding every window is drawn through,
+# from the commit tools/build/native-source-pins.json pins, for LuaJIT's Lua 5.1
+# ABI, into a private prefix the stager finds through LuaJIT's search paths.
+# The AppImage used to leave lgi to the recipient, and a recipient's generic
+# lua-lgi is a Lua 5.4 build on Arch, Fedora and openSUSE: the windows stayed
+# closed there (field report, Arch Linux, 2026-11-25). This release's lua-lgi
+# 0.9.2 predates GLib 2.80, whose own typelibs replace gobject-introspection's,
+# so the binding is built from the upstream commit instead.
+build_owned_lgi() {
+	local prefix="/opt/ergopti-lgi" work url commit
+	url="$(python3 tools/build/read-native-source-pin.py lgi repository)"
+	commit="$(python3 tools/build/read-native-source-pin.py lgi revision)"
+	work="$(mktemp -d)"
+	git -c advice.detachedHead=false clone -q "$url" "$work/lgi"
+	git -C "$work/lgi" -c advice.detachedHead=false checkout -q "$commit"
+	[ "$(git -C "$work/lgi" rev-parse HEAD)" = "$commit" ] || { echo "lgi pin not checked out" >&2; exit 1; }
+	make -C "$work/lgi/lgi" LUA_CFLAGS=-I/usr/include/luajit-2.1 COPTFLAGS=-O2 CFLAGS=-Wall
+	make -C "$work/lgi/lgi" install PREFIX="$prefix" \
+		LUA_LIBDIR="$prefix/lib/lua/5.1" LUA_SHAREDIR="$prefix/share/lua/5.1"
+	test -f "$prefix/lib/lua/5.1/lgi/corelgilua51.so"
+	test -f "$prefix/share/lua/5.1/lgi.lua"
+	export LUA_PATH="$prefix/share/lua/5.1/?.lua;$prefix/share/lua/5.1/?/init.lua;$LUA_PATH"
+	export LUA_CPATH="$prefix/lib/lua/5.1/?.so;$LUA_CPATH"
+}
+
 container_build() {
 	# The programs and Lua modules of the private runtime every package carries
 	# are this release's packages (stage-linux-network-runtime.py), except
@@ -83,8 +108,10 @@ container_build() {
 	apt_install bash ca-certificates curl binutils file gcc libc6-dev patchelf pkg-config python3 git \
 		luajit libluajit-5.1-dev lua-luv lua-filesystem sqlite3 openssl zstd \
 		libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
-		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
+		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1 \
+		make libgirepository1.0-dev libffi-dev gir1.2-glib-2.0 gir1.2-freedesktop
 	build_owned_luaposix
+	build_owned_lgi
 	# The runner's Node executable alone, mounted read-only: the release's own is
 	# too old for the build scripts, and Node itself ships nothing into the image.
 	# /opt/node/bin holds nothing else (see the docker run below).

@@ -102,6 +102,9 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
     for name in (
         "lib/lua/5.1/posix/sys/stat.so",
         "share/lua/5.1/posix/init.lua",
+        "lib/lua/5.1/lgi/corelgilua51.so",
+        "share/lua/5.1/lgi.lua",
+        "lib/girepository-1.0/GObject-2.0.typelib",
         "lib/gio/modules/libgiolibproxy.so",
         "share/glib-2.0/schemas/gschemas.compiled",
     ):

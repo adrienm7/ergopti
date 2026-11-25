@@ -12,5 +12,9 @@
 	"lfs": {
 		"repository": "https://github.com/lunarmodules/luafilesystem.git",
 		"revision": "7c6e1b013caec0602ca4796df3b1d7253a2dd258"
+	},
+	"lgi": {
+		"repository": "https://github.com/lgi-devs/lgi.git",
+		"revision": "7a2276f9657a50ee548a636f2e646f96ec748bbd"
 	}
 }
