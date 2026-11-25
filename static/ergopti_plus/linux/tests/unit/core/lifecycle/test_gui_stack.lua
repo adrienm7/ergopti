@@ -126,6 +126,25 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 			.. "|gir1.2-webkit2-4.1|sudo apt install gir1.2-webkit2-4.1>")
 	end)
 
+	helpers.it("names Leap's lgi, which is not Tumbleweed's", function()
+		-- Leap 15.6 has lua51-lgi and no luajit-lgi: the Tumbleweed name found nothing.
+		local Stack = helpers.load_module("core.ui.engine.gui_stack")
+		local i18n = { get = function(key) return "<" .. key .. ":{2}>" end }
+		local function body(os_release)
+			return Stack.windows_body({ i18n = i18n, os_release = os_release, file_exists = function() return false end },
+				Stack.LGI_COMPONENT, "lgi")
+		end
+		helpers.assert_contains(body('ID="opensuse-leap"\nID_LIKE="suse opensuse"\nVERSION_ID="15.6"\n'), "lua51-lgi")
+		helpers.assert_contains(body('ID="opensuse-tumbleweed"\nID_LIKE="opensuse suse"\n'), "luajit-lgi")
+		-- VERSION_ID, PRETTY_NAME and ID_LIKE never stand for ID.
+		helpers.assert_contains(body('VERSION_ID="15.6"\nID_LIKE="opensuse-leap suse"\nID=sles\n'), "luajit-lgi")
+		local fh = assert(io.open(helpers.driver_root() .. "/install.sh", "r"))
+		local installer = fh:read("*a")
+		fh:close()
+		helpers.assert_true(installer:find('zypper:lgi)   echo "luajit-lgi lua51-lgi"', 1, true) ~= nil,
+			"install.sh tries both openSUSE names")
+	end)
+
 	helpers.it("maps derivatives through ID_LIKE", function()
 		local Stack = helpers.load_module("core.ui.engine.gui_stack")
 		helpers.assert_eq(Stack.distro_family('ID=endeavouros\nID_LIKE=arch\n'), "arch")

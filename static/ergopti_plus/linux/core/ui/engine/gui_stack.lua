@@ -62,6 +62,15 @@ M.HOST_PACKAGES = {
 	},
 }
 
+--- A release that names a component differently from its family, by
+--- /etc/os-release ID. Leap 15.6 carries lua51-lgi and no luajit-lgi
+--- (checked against its index on 2026-11-25): naming the Tumbleweed package
+--- sent a Leap user to a `zypper install` that found nothing. install.sh's
+--- zypper candidates already try both.
+M.RELEASE_PACKAGES = {
+	lgi = { ["opensuse-leap"] = "lua51-lgi" },
+}
+
 --- The package manager of each family, as install.sh names it.
 M.FAMILY_MANAGERS = { arch = "pacman", debian = "apt", fedora = "dnf", suse = "zypper", alpine = "apk", void = "xbps" }
 
@@ -193,8 +202,11 @@ end
 --- @param what string "lgi" or "webkit"
 --- @return string
 function M.windows_body(deps, component, what)
-	local family = M.distro_family(deps.os_release ~= nil and deps.os_release or read_os_release())
-	local package = family and M.HOST_PACKAGES[what][family]
+	local os_release = deps.os_release ~= nil and deps.os_release or read_os_release()
+	local family = M.distro_family(os_release)
+	local release = type(os_release) == "string"
+		and (os_release:match("%f[%w_]ID=[\"']?([^\"'\n]+)") or ""):lower() or ""
+	local package = family and ((M.RELEASE_PACKAGES[what] or {})[release] or M.HOST_PACKAGES[what][family])
 	local body
 	if package then
 		-- The windows body when the distribution is known: {2} the package, {3} the command
