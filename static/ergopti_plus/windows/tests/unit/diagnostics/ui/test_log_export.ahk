@@ -43,19 +43,35 @@ _LEX_Folder(Name) {
 
 ; Runs Body with the logger, the health check counters and the error dialog
 ; policy restored afterwards: the failure cases log an ERROR on purpose.
+; The export reads the logs only after LoggerFlushForRead, which refuses while
+; any line is still owed to a sink. The suite's shared logger has no errors
+; sink (test_logger.ahk), so any WARNING or ERROR queued for it stays owed
+; and made every export refuse before it looked at a file. Each case starts
+; from an empty logger writing to sinks of its own, as the log openers do.
 _LEX_Isolated(Body) {
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	global _LOGGER_REPEAT_ENABLED, _LOGGER_TEST_SINK, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	SavedLogger := _TLOG_CaptureLoggerState()
+	Repeat := _LOGGER_REPEAT_ENABLED, Sink := _LOGGER_TEST_SINK
 	SavedOptional := Map()
 	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
 		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	Sinks := _LEX_Folder("sinks")
 	try {
+		_ResetLogger()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_TEST_SINK := 0
+		LOGGER_LOG_PATH := Sinks . "main.log", LOGGER_ERRORS_LOG_PATH := Sinks . "errors.log"
+		_LoggerRefreshFastFlags()
+		AssertTrue(LoggerFlushForRead(), "the isolated logger owes nothing to a sink")
 		_ED_Policy := 0
 		Body.Call()
 	} finally {
 		_TLOG_RestoreLoggerState(SavedLogger)
+		_LOGGER_REPEAT_ENABLED := Repeat, _LOGGER_TEST_SINK := Sink
+		_LoggerRefreshFastFlags()
 		for Name, Saved in SavedOptional
 			%Name% := Saved.Present ? Saved.Value : unset
+		try DirDelete(Sinks, true)
 	}
 }
 
@@ -240,6 +256,7 @@ _LEX_RefusedTarLeavesNothingBody() {
 			LogsDir . AppDirsLogUnifiedPrefix() . "2026-11-25" . AppDirsLogExtension(), "UTF-8")
 		AssertFalse(LogExport_Command(_LEX_Seams(State, LogsDir, DefaultDir, RTrim(Destination, "\"), 1)),
 			"a refused tar is a failure")
+		AssertEqual(1, State.Commands.Length, "tar ran before it refused")
 		loop files, Destination . "*"
 			AssertTrue(false, "no partial or final archive is left: " . A_LoopFileName)
 		AssertEqual("", FileExist(RTrim(State.Staging, "\")), "the staging folder is removed")
