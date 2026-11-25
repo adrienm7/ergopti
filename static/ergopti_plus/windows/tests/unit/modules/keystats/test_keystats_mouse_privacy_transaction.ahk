@@ -516,6 +516,61 @@ _KLMS_ParkPrivacyFailure() {
 }
 Test("mouse-privacy-query-failure: park polling fails closed", _KLMS_ParkPrivacyFailure)
 
+; The park poll is a timer, which native Suspend does not stop. A paused tick
+; must ask no privacy question and accumulate no distance, only re-anchor the
+; cursor; the same tick running is the positive control
+; (mouse-park-distance-no-gate).
+_KLMS_CountedFilter(Recorder) {
+	Recorder.Calls.Push("filter")
+	return false
+}
+
+_KLMS_ParkFrom(Recorder) {
+	Recorder.Calls.Push("position")
+	return {x: 300, y: 400}
+}
+
+_KLMS_ParkTickUnderPause() {
+	Fields := ["prev_x", "prev_y", "prev_initialized", "park_initialized", "park_last_x", "park_last_y",
+		"park_still_since"]
+	Saved := Map()
+	for Field in Fields
+		Saved[Field] := KLMouse.%Field%
+	SavedInitialized := Keystats.initialized
+	SavedCollection := KLCollection.suspended
+	WasSuspended := A_IsSuspended
+	try {
+		Keystats.initialized := true
+		KLCollection.suspended := false
+		for Paused in [true, false] {
+			Recorder := {Calls: [], Distances: []}
+			KLMouse.prev_x := 0, KLMouse.prev_y := 0, KLMouse.prev_initialized := true
+			KLMouse.park_initialized := false
+			Suspend(Paused ? 1 : 0)
+			try KL_Mouse_ParkTick(_KLMS_CountedFilter.Bind(Recorder),
+				_KLMS_ParkFrom.Bind(Recorder), _KLMS_RecordDistance.Bind(Recorder))
+			finally Suspend(WasSuspended ? 1 : 0)
+			AssertEqual(300, KLMouse.prev_x, "every tick re-anchors the cursor")
+			AssertEqual(400, KLMouse.prev_y)
+			if Paused {
+				AssertEqual("position", _JoinParts(Recorder.Calls), "a paused park tick must ask no privacy question")
+				AssertEqual(0, Recorder.Distances.Length, "a paused park tick must accumulate no mouse distance")
+				AssertFalse(KLMouse.park_initialized, "a paused park tick must not start park detection")
+			} else {
+				AssertEqual("position filter", _JoinParts(Recorder.Calls), "positive control: a running tick asks privacy")
+				AssertEqual(1, Recorder.Distances.Length, "positive control: a running tick accumulates the move")
+				AssertEqual(500, Recorder.Distances[1], "the accumulated distance is the cursor move")
+			}
+		}
+	} finally {
+		for Field, Value in Saved
+			KLMouse.%Field% := Value
+		Keystats.initialized := SavedInitialized
+		KLCollection.suspended := SavedCollection
+	}
+}
+Test("keystats_mouse: a paused park tick accumulates no distance (mouse-park-distance-no-gate)", _KLMS_ParkTickUnderPause)
+
 
 _KLMS_CompensatedBurst(Recorder) {
 	_KLMS_Flush(1500, Recorder)
