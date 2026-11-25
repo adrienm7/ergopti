@@ -75,7 +75,7 @@ global _LLM_AgentConnector_ZoneFn := 0
 
 ; The Mark-of-the-Web zones (internet, untrusted site) whose unsigned scripts
 ; the RemoteSigned execution policy refuses
-global LLM_AGENT_BLOCKED_ZONE_MIN := 3
+global LLM_AGENT_INTERNET_ZONE_ID := 3
 
 
 
@@ -176,7 +176,7 @@ _LLM_AgentConnector_Mail(Action) {
 ; One of the user's tools, with the action's input as its only argument.
 ; @returns {String} "tool".
 _LLM_AgentConnector_Shortcut(Action, Config) {
-	global LLM_AGENT_CMD_UNSAFE, LLM_AGENT_BLOCKED_ZONE_MIN, _LLM_AgentConnector_ZoneFn
+	global LLM_AGENT_CMD_UNSAFE, LLM_AGENT_INTERNET_ZONE_ID, _LLM_AgentConnector_ZoneFn
 	Tools := LLM_AgentConnector_Tools(Config)
 	if !Tools["paths"].Has(Action["name"])
 		throw ValueError("the tool is no longer in the tools folder")
@@ -191,7 +191,7 @@ _LLM_AgentConnector_Shortcut(Action, Config) {
 			; error: unblocking the user's own file is the user's call, never ours.
 			Zone := HasMethod(_LLM_AgentConnector_ZoneFn, "Call")
 				? _LLM_AgentConnector_ZoneFn.Call(Path) : SystemControl().ZoneId(Path)
-			if Zone >= LLM_AGENT_BLOCKED_ZONE_MIN
+			if Zone >= LLM_AGENT_INTERNET_ZONE_ID
 				throw ValueError("the .ps1 tool came from the internet: "
 					. "unblock it in its file properties to run it")
 			Argv := ShellRunner_WinPsArgv([ShellRunner_WinPsPath(), "-NoProfile"], "-File", Path)
