@@ -118,6 +118,7 @@ const vm = require('vm');
 const { spawnSync } = require('child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 const { relativeSpeed, tableWalk } = require('./lib/table-walk-speed.cjs');
+const { reportMeasured } = require('./lib/bound-measurements.cjs');
 
 const DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
@@ -2384,6 +2385,7 @@ const speed = relativeSpeed({
 	maxRounds: SPEED_ROUNDS
 });
 const elapsedMs = speed.subjectMs;
+reportMeasured('library analysis, reference walks of the table', speed.ratio, SPEED_WALKS_BOUND);
 check(
 	speed.ratio <= SPEED_WALKS_BOUND,
 	`speed: analysing ${library.length} layouts costs ${speed.ratio.toFixed(1)} reference walks ` +
