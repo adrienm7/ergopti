@@ -457,8 +457,10 @@ thead .sort-btn:focus-visible,
 	font-size: 11px;
 }
 
+/* The active mark and the remote status are text: the lighter blue holds
+   7.6:1 on every dark row (WCAG 1.4.6), where the accent was 4.9:1 to 6.2:1. */
 .mark.on {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
 	font-weight: 700;
 }
 
@@ -469,7 +471,13 @@ thead .sort-btn:focus-visible,
 }
 
 .status.remote {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
+}
+
+/* The selection's blue takes a paler one: 7.3:1 there. */
+tbody tr.selected .mark.on,
+tbody tr.selected .status.remote {
+	color: var(--theme-hue-cfe0ff);
 }
 
 .act {
