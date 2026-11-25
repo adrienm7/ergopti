@@ -125,6 +125,8 @@ function M.new(options)
 	local receipt, last_at, sequence, request = nil, nil, 0, 0
 	local pending, received = "", false
 	local answered_request, answered_at = -1, nil
+	-- When the latest request was sent, so poll() renews one left unanswered.
+	local requested_at = nil
 	-- The kind of the answer to answered_request: "snapshot", "unknown" or
 	-- "absent" (the focused window is on no application of the bus).
 	local answered_kind = nil
@@ -182,7 +184,7 @@ function M.new(options)
 		active, ready, failed = true, false, false
 		operation = nil
 		receipt, last_at, sequence, request, pending, received = nil, nil, 0, 0, "", false
-		answered_request, answered_at, answered_kind = -1, nil, nil
+		answered_request, answered_at, answered_kind, requested_at = -1, nil, nil, nil
 		watcher.started_at = now_ms()
 		local ok, owned = pcall(create_transport)
 		if not ok or type(owned) ~= "table" then fail("transport unavailable"); return false end
@@ -297,7 +299,7 @@ function M.new(options)
 	function watcher.invalidate()
 		publish(nil)
 		if not active or failed or not transport then return false end
-		request = request + 1
+		request, requested_at = request + 1, now_ms()
 		if not transport.request(request) then fail("refresh request refused"); return false end
 		return true
 	end
@@ -315,7 +317,7 @@ function M.new(options)
 			and budget_ms % 1 == 0 and budget_ms <= lease_ms), "focus barrier budget refused")
 		watcher.pump()
 		if not ready or failed or not transport then return nil end
-		request = request + 1
+		request, requested_at = request + 1, now_ms()
 		if not transport.request(request) then fail("admission request refused"); return nil end
 		local deadline = now_ms() + (budget_ms or barrier_ms)
 		while true do
@@ -333,6 +335,31 @@ function M.new(options)
 		end
 		publish(nil)
 		return nil
+	end
+
+	--- Answers without waiting, for an input callback once the worker let a
+	--- barrier's budget pass: drains what it sent and returns the receipt of a
+	--- fresh answer to the latest request. With none, one request stays
+	--- outstanding, renewed after a lease, so a later key finds its answer.
+	--- @return table|nil receipt The fresh answer's receipt.
+	--- @return boolean answered Whether the latest request has a fresh answer.
+	function watcher.poll()
+		watcher.pump()
+		if not ready or failed or not transport then return nil, false end
+		if answered_request == request then
+			if answered_at ~= nil and now_ms() - answered_at <= lease_ms then return watcher.snapshot(), true end
+		elseif requested_at ~= nil and now_ms() - requested_at <= lease_ms then
+			return nil, false
+		end
+		request, requested_at = request + 1, now_ms()
+		if not transport.request(request) then fail("admission request refused") end
+		return nil, false
+	end
+
+	--- Whether the latest request has a fresh answer, from RAM only.
+	--- @return boolean answered
+	function watcher.answered()
+		return answered_request == request and answered_at ~= nil and now_ms() - answered_at <= lease_ms
 	end
 
 	--- Returns the last live, exact focused-control receipt without native work.

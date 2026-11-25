@@ -65,6 +65,7 @@ return {
 	"tests.unit.platform.focus.atspi.test_watch",
 	"tests.unit.platform.focus.atspi.test_watch_worker",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_async",
+	"tests.unit.modules.keystats.privacy.test_focus_guard_input_latency",
 	"tests.unit.modules.keystats.test_shared_text_cipher",
 	"tests.unit.modules.keystats.privacy.test_pointer_focus_privacy",
 	"tests.unit.core.lifecycle.shutdown.test_session_lock",

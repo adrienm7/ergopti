@@ -118,6 +118,8 @@ function M.new(opts)
 	-- A password field seen and not left for another field: it closes even the
 	-- window mode, whatever later answers fail to say (INVARIANTS 6).
 	local password_latched = false
+	-- Whether the worker left the latest input barrier unanswered (text_admission).
+	local worker_unanswered = false
 	-- Context joins that settled without a context since the last success.
 	local context_failures = 0
 	local state_mode, state_reason = "closed", "starting"
@@ -435,7 +437,21 @@ function M.new(opts)
 		if watch then
 			watch.pump()
 			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true, nil, "settling" end
-			snapshot = watch.barrier(budget_ms)
+			-- No joined field: once the worker let one barrier's budget pass, a
+			-- physical key reads its answers without waiting (KDE Wayland joins
+			-- none, and each press and release used to wait the whole budget).
+			-- Only a fresh answer to the latest request counts, as a barrier's;
+			-- an output boundary's own budget still waits.
+			if budget_ms == nil and contextual and context_pending and worker_unanswered then
+				local answered
+				snapshot, answered = watch.poll()
+				if answered then worker_unanswered = false end
+			else
+				snapshot = watch.barrier(budget_ms)
+				-- A watch without answer polling (a controlled double) keeps barriers.
+				worker_unanswered = type(watch.poll) == "function" and type(watch.answered) == "function"
+					and not watch.answered()
+			end
 			if snapshot then password_latched = snapshot.role == 40 end
 			if contextual then
 				if not snapshot or identity(snapshot) ~= observed then
