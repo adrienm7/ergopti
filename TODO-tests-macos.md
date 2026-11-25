@@ -272,7 +272,8 @@ Hands needed:
       « Ergopti+ ⏸ » (its tooltip); every row runs from the keyboard. 2. Studio, metrics, hotstring settings, onboarding and the
       update panel: VO reads the window title, the focus starts in the page, Tab and VO keys walk every control;
       the update panel's progress bar is named by its step message (checking, downloading) and VO announces each
-      new step. 3. With VoiceOver on and VoiceOver Utility > General > « Allow VoiceOver to be controlled with
+      new step; with Full Keyboard Access on, Tab walks the update offer's buttons; note whether Escape closes it
+      (its code binds no Escape yet, see TODO.md « Keyboard and motor »). 3. With VoiceOver on and VoiceOver Utility > General > « Allow VoiceOver to be controlled with
       AppleScript » checked: a hotstring preview and an AI prediction are spoken once each in VO's voice (the
       struck-through alternatives are not), nothing is spoken with VoiceOver off, and with the box unchecked a
       single warning reaches the log. 4. Same VoiceOver set-up: the mouse spotlight shortcut (and a screen
