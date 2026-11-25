@@ -59,6 +59,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	const FINGERS = ['lp', 'lr', 'lm', 'li', 'lt', 'rt', 'ri', 'rm', 'rr', 'rp'];
 	const LEFT_THUMB = 4;
 	const RIGHT_THUMB = 5;
+	// The levels the other analysers read: base, Shift, AltGr, Shift+AltGr.
+	const FOUR_LEVELS = 4;
 	// Order of the analysers in a result and in the Comparer's columns.
 	const ORDER = [
 		'kla',
@@ -2654,7 +2656,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const profile = options ? options.profile : undefined;
 		E.keyboard(keyboardId, profile);
 		return {
-			layout: E.layoutFromRows(layout),
+			layout: fourLevels(E.layoutFromRows(layout)),
 			table: E.prepareNgrams(ngrams),
 			keyboard: keyboardId,
 			profile,
@@ -2687,6 +2689,25 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	function finish(id, raw) {
 		const e = entry(id);
 		return Object.assign({ id, better: e.better, fidelity: e.fidelity, unit: e.unit }, raw);
+	}
+
+	/**
+	 * A layout as the other analysers read it: four levels (base, Shift, AltGr,
+	 * Shift+AltGr). A layout's own levels beyond them (Neo's Mod4, a tap-hold's
+	 * layer) are left out, as their own tools cannot hold them, and the third
+	 * and fourth are read as AltGr's (LAYOUT_FORMATS.levelLosses says so in
+	 * the exports).
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {object} The same layout when it has the default four levels.
+	 */
+	function fourLevels(layout) {
+		if (!layout.levels) return layout;
+		const rows = {};
+		for (const [code, row] of Object.entries(layout.rows)) {
+			const four = row.slice(0, FOUR_LEVELS);
+			if (four.some((cell) => cell !== null)) rows[code] = four;
+		}
+		return Object.assign({}, layout, { rows, levels: undefined, modifiers: undefined });
 	}
 
 	/**

@@ -21,6 +21,8 @@
  *    built-in corpus, at a cost of at most SCORES_WALKS_BOUND reference walks
  *    of the corpus table per layout (tools/test/lib/table-walk-speed.cjs),
  *    timed in the same process.
+ * 4. Own levels: a layout with levels beyond the four (Neo 2) is scored on
+ *    its first four by every analyser, never throwing.
  * ==============================================================================
  */
 
@@ -350,6 +352,37 @@ check(
 		`(bound ${SCORES_WALKS_BOUND}): ${speed.subjectMs.toFixed(0)} ms against ` +
 		`${speed.referenceMs.toFixed(0)} ms on ${sample.length} layouts, fastest of ${speed.rounds} rounds`
 );
+
+// A layout with levels of its own (Neo 2's Mod3 and Mod4, a tap-hold's
+// layer) is read on its first four levels: every scorer gives what it gives
+// for those four alone, where row cells past the fourth threw (2026-11-25).
+{
+	const neo = library.get('neo2_new');
+	check(neo && neo.levels, 'the library has Neo 2 with levels of its own');
+	if (neo && neo.levels) {
+		const rows = {};
+		for (const [code, row] of Object.entries(neo.rows)) {
+			const four = row.slice(0, 4);
+			if (four.some((cell) => cell !== null)) rows[code] = four;
+		}
+		const four = { id: neo.id, name: neo.name, rows, dead: neo.dead, command: neo.command };
+		const ngrams = E.ngramsFromText('Über die Brücke gehen große Leute schnell.');
+		for (const { id } of S.analysers()) {
+			let got = null;
+			try {
+				got = S.score(id, neo, ngrams);
+			} catch (error) {
+				errors.push(`${id} throws on a layout with levels of its own: ${error.message}`);
+				continue;
+			}
+			const expected = S.score(id, four, ngrams);
+			check(
+				JSON.stringify(got) === JSON.stringify(expected),
+				`${id} reads a layout of its own levels on its first four`
+			);
+		}
+	}
+}
 
 if (errors.length > 0) {
 	console.error(`test-analyser-scores: ${errors.length} error(s)`);
