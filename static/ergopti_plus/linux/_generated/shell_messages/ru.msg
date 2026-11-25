@@ -70,6 +70,7 @@ install.section_tray=Значок в системном лотке и окна
 install.security_warning_body=Членство в группе «input» позволяет читать ВСЕ нажатия клавиш в сеансе, включая пароли, вводимые в любом приложении. Именно это нужно движку хотстрингов, и так же работают keyd и xremap.
 install.security_warning_title=ПРЕДУПРЕЖДЕНИЕ О БЕЗОПАСНОСТИ
 install.service_started=служба ergopti-hotstrings включена и запущена
+install.session_without_graphical_target=Этот сеанс никогда не запускает graphical-session.target systemd (i3, Openbox, Xfce, sway без диспетчера сеансов), поэтому пользовательский юнит никогда бы не запустился: вместо этого Ergopti+ запускается из записи автозапуска XDG при следующем входе. Оконному менеджеру, который игнорирует автозапуск XDG (i3, sway), нужна строка exec {1} в его конфигурации.
 install.source_toolchain_unavailable=установленный компилятор не может собрать нативный модуль архивов.
 install.startup_choice_unreadable=Не удалось прочитать выбор автозапуска.
 install.summary_config=Настройки: {1}

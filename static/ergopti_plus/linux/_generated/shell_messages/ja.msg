@@ -70,6 +70,7 @@ install.section_tray=システムトレイのアイコンとウィンドウ
 install.security_warning_body='input' グループに属すると、どのアプリケーションで入力したパスワードも含め、セッションのすべてのキー入力を読み取れます。ホットストリングエンジンにはまさにこれが必要で、keyd や xremap も同じです。
 install.security_warning_title=セキュリティ警告
 install.service_started=ergopti-hotstrings サービスを有効化して起動しました
+install.session_without_graphical_target=このセッションは systemd の graphical-session.target を一度も開始しません (i3、Openbox、Xfce、セッションマネージャーなしの sway)。そのためユーザーユニットは起動しないので、Ergopti+ は次回ログイン時に XDG 自動起動エントリーから起動します。XDG 自動起動を無視するウィンドウマネージャー (i3、sway) では、設定に exec {1} の行が必要です。
 install.source_toolchain_unavailable=インストール済みのコンパイラーではネイティブアーカイブバックエンドをビルドできません。
 install.startup_choice_unreadable=起動の選択を読み取れませんでした。
 install.summary_config=設定: {1}

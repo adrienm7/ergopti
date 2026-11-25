@@ -70,6 +70,7 @@ install.section_tray=系统托盘图标和窗口
 install.security_warning_body=加入 'input' 组后可以读取会话中的所有按键，包括在任何应用中输入的密码。这正是热字符串引擎所需要的，keyd 和 xremap 也是如此。
 install.security_warning_title=安全警告
 install.service_started=已启用并启动 ergopti-hotstrings 服务
+install.session_without_graphical_target=此会话从不启动 systemd 的 graphical-session.target（i3、Openbox、Xfce、没有会话管理器的 sway），因此用户单元永远不会运行：Ergopti+ 改为在下次登录时通过 XDG 自动启动项启动。忽略 XDG 自动启动的窗口管理器（i3、sway）需要在其配置中加入 exec {1} 这一行。
 install.source_toolchain_unavailable=已安装的编译器无法构建原生归档后端。
 install.startup_choice_unreadable=无法读取启动选项。
 install.summary_config=配置：{1}

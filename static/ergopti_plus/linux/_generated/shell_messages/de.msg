@@ -70,6 +70,7 @@ install.section_tray=Symbol im Infobereich und Fenster
 install.security_warning_body=Die Mitgliedschaft in der Gruppe „input“ erlaubt, JEDEN Tastenanschlag der Sitzung zu lesen, auch in beliebigen Anwendungen eingegebene Passwörter. Genau das braucht eine Hotstring-Engine, und so arbeiten auch keyd und xremap.
 install.security_warning_title=SICHERHEITSHINWEIS
 install.service_started=Dienst ergopti-hotstrings aktiviert und gestartet
+install.session_without_graphical_target=Diese Sitzung startet systemds graphical-session.target nie (i3, Openbox, Xfce, sway ohne Sitzungsverwaltung), daher würde die Benutzer-Unit nie laufen: Ergopti+ startet stattdessen bei der nächsten Anmeldung über den XDG-Autostart-Eintrag. Ein Fenstermanager, der XDG-Autostart ignoriert (i3, sway), braucht die Zeile exec {1} in seiner Konfiguration.
 install.source_toolchain_unavailable=der installierte Compiler kann das native Archiv-Backend nicht bauen.
 install.startup_choice_unreadable=Die Startauswahl konnte nicht gelesen werden.
 install.summary_config=Konfiguration: {1}

@@ -70,6 +70,7 @@ install.section_tray=Ikon i systemfältet och fönster
 install.security_warning_body=Medlemskap i gruppen 'input' gör det möjligt att läsa VARJE tangenttryckning i sessionen, även lösenord som skrivs i vilket program som helst. Det är precis vad en hotstring-motor kräver, och så gör även keyd och xremap.
 install.security_warning_title=SÄKERHETSVARNING
 install.service_started=tjänsten ergopti-hotstrings aktiverad och startad
+install.session_without_graphical_target=Den här sessionen startar aldrig systemds graphical-session.target (i3, Openbox, Xfce, sway utan sessionshanterare), så användarenheten skulle aldrig köras: Ergopti+ startar i stället från XDG-autostartposten vid nästa inloggning. En fönsterhanterare som ignorerar XDG-autostart (i3, sway) behöver raden exec {1} i sin konfiguration.
 install.source_toolchain_unavailable=den installerade kompilatorn kan inte bygga den inbyggda arkivmotorn.
 install.startup_choice_unreadable=Startvalet kunde inte läsas.
 install.summary_config=Konfiguration: {1}

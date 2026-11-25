@@ -1517,7 +1517,8 @@ if $INSTALL_SERVICE; then
 			*) ergopti_msg install.startup_choice_unreadable >&2; exit 1 ;;
 		esac
 		STARTUP_OWNER="user-choice"
-	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 \
+		&& systemctl --user is-active --quiet graphical-session.target; then
 		# Retire a previous non-systemd fallback before enabling the unit. Leaving
 		# both files active starts two daemons at the next graphical login, and both
 		# compete for the same evdev grab.
@@ -1529,6 +1530,17 @@ if $INSTALL_SERVICE; then
 		STARTUP_OWNER="systemd"
 		ergopti_msg_with "  ✔  " install.service_started
 
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+		# A user bus whose session never starts graphical-session.target: i3,
+		# Openbox, Xfce, Cinnamon, sway without uwsm. The unit is WantedBy that
+		# target, so enabling it and retiring the XDG entry left nothing to start
+		# the daemon at the next login. XDG owns startup there; a unit enabled by
+		# an earlier install is disabled so a later GNOME or Plasma login, which
+		# runs both, does not start two daemons competing for the grab.
+		if systemctl --user is-enabled --quiet ergopti-hotstrings.service; then
+			systemctl --user disable ergopti-hotstrings.service
+		fi
+		ergopti_msg_with "  ⚠  " install.session_without_graphical_target "${BIN_DIR}/ergopti-hotstrings"
 	elif command -v systemctl >/dev/null 2>&1; then
 		ergopti_msg_with "  ⚠  " install.systemd_without_bus
 		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then

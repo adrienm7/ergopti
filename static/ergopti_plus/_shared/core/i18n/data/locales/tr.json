@@ -1795,6 +1795,7 @@
 	"linux_shell.install.security_warning_body": "'input' grubunda olmak, oturumdaki TÜM tuş vuruşlarını, herhangi bir uygulamada yazılan parolalar dahil, okumayı sağlar. Bir hotstring motorunun ihtiyacı tam olarak budur; keyd ve xremap de böyle çalışır.",
 	"linux_shell.install.security_warning_title": "GÜVENLİK UYARISI",
 	"linux_shell.install.service_started": "ergopti-hotstrings hizmeti etkinleştirildi ve başlatıldı",
+	"linux_shell.install.session_without_graphical_target": "Bu oturum systemd'nin graphical-session.target hedefini hiç başlatmıyor (i3, Openbox, Xfce, oturum yöneticisi olmadan sway), bu yüzden kullanıcı birimi hiç çalışmazdı: Ergopti+ bunun yerine bir sonraki oturum açışta XDG otomatik başlatma girdisinden başlar. XDG otomatik başlatmayı yok sayan bir pencere yöneticisinin (i3, sway) yapılandırmasında exec {1} satırı gerekir.",
 	"linux_shell.install.source_toolchain_unavailable": "yüklü derleyici yerel arşiv arka ucunu derleyemiyor.",
 	"linux_shell.install.startup_choice_unreadable": "Başlangıç seçimi okunamadı.",
 	"linux_shell.install.summary_config": "Yapılandırma: {1}",
