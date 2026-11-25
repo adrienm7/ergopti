@@ -54,8 +54,15 @@
  *    the word list of each text (and on its own English list), against our
  *    scorer on the same layouts; a second pass leaves out the bigrams with a
  *    character the layout lacks, which its worker miscounts.
- * 9. Every tool that prints sub-scores is compared metric by metric too.
- * 10. Exit status: 0 when every comparison ran, 1 when a download, a run or a
+ * 9. keycraft (--keycraft=<exe> --keycraft-data=<its source folder>): `keycraft
+ *    rank` (CSV, 2 decimals) on every built-in corpus, in a temporary copy of
+ *    its data folder: a text corpus as the text the codegen counts, a word
+ *    list or a count table as its corpus file of the same tables. On its own
+ *    layouts that our boards hold, and on library layouts written as its files
+ *    (named « _ »… so that its scorer leaves them out of the statistics),
+ *    against our scorer on the shipped tables and statistics, per corpus kind.
+ * 10. Every tool that prints sub-scores is compared metric by metric too.
+ * 11. Exit status: 0 when every comparison ran, 1 when a download, a run or a
  *    parse failed. The gaps are reported, not judged: the fidelity of each
  *    analyser is recorded in docs/design/analyser-scores.md.
  *
@@ -66,7 +73,7 @@
  *        [--perl=<exe> --carpalx-data=<dir> [--carpalx-perl5lib=<dirs>]]
  *        [--klo=<exe> --klo-data=<dir>]
  *        [--python=<exe> [--cmini-data=<dir>] [--a200-data=<dir>]]
- *        [--cyanophage=<dir>]
+ *        [--cyanophage=<dir>] [--keycraft=<exe> --keycraft-data=<dir>]
  * ==============================================================================
  */
 
@@ -1417,8 +1424,267 @@ function verifyCyanophage(dir) {
 	printMetricGaps('Cyanophage optimiser without its bigrams of a missing character', slipless, 9);
 }
 
+// =========================
+// ======= 10/ keycraft ====
+// =========================
+
+// Library layouts written as keycraft layout files: its reader takes one
+// byte per key, so only layouts whose letter rows hold ASCII alone.
+const KEYCRAFT_LIBRARY = [
+	'qwerty',
+	'dvorak',
+	'colemak',
+	'colemak_dh_angle',
+	'workman',
+	'canary',
+	'engram',
+	'halmak',
+	'norman',
+	'qgmlwy'
+];
+// Its layout file notation (layout.go keyMap): an empty key, a space, the escapes.
+const KEYCRAFT_WRITE = { '': '~', ' ': '_', '~': '~~', _: '__', '#': '##' };
+const KEYCRAFT_TIMEOUT_MS = 600000;
+
+/**
+ * keycraft's corpus file (corpus.go: its JSON fields) of n-gram tables, as its
+ * reader would count the text behind them: lower case, any n-gram with white
+ * space dropped, the skipgrams the ends of the trigrams, every total counted.
+ * Our own transcription, beside the scorer's, to check it.
+ * @param {object} table - Generated corpus tables ({chars, bigrams, trigrams}).
+ * @returns {object} The corpus file's object.
+ */
+function keycraftCorpusFile(table) {
+	const space = new Set(MODELS.keycraft.model.whitespace.map((cp) => String.fromCodePoint(cp)));
+	const lower = (gram) => {
+		const chars = Array.from(gram);
+		if (chars.some((c) => space.has(c))) return null;
+		return chars.map((c) => Array.from(c.toLowerCase())[0]).join('');
+	};
+	const out = {};
+	const totals = {};
+	for (const [field, source] of [
+		['Unigrams', table.chars],
+		['Bigrams', table.bigrams],
+		['Trigrams', table.trigrams]
+	]) {
+		const counts = {};
+		let total = 0;
+		for (const [gram, n] of Object.entries(source || {})) {
+			if (!Number.isSafeInteger(n)) throw new Error(`keycraft: the count ${n} is not whole`);
+			const key = lower(gram);
+			if (key === null) continue;
+			counts[key] = (counts[key] || 0) + n;
+			total += n;
+		}
+		out[field] = counts;
+		totals[field] = total;
+	}
+	const skipgrams = {};
+	for (const [gram, n] of Object.entries(out.Trigrams)) {
+		const [a, , c] = Array.from(gram);
+		skipgrams[a + c] = (skipgrams[a + c] || 0) + n;
+	}
+	return {
+		Name: 'tables',
+		Unigrams: out.Unigrams,
+		TotalUnigramsCount: totals.Unigrams,
+		Bigrams: out.Bigrams,
+		TotalBigramsCount: totals.Bigrams,
+		Trigrams: out.Trigrams,
+		TotalTrigramsCount: totals.Trigrams,
+		Skipgrams: skipgrams,
+		TotalSkipgramsCount: totals.Trigrams,
+		Words: {},
+		TotalWordsCount: 0
+	};
+}
+
+/**
+ * One keycraft layout as a library layout on the keys of our iso board, or
+ * null when it holds a key our boards lack (a column-staggered grid, a
+ * letter on a thumb key or right of the bottom row).
+ * @param {{name: string, type: string, keys: string}} klf - readKlf() output.
+ * @returns {{layout: object, keyboard: string}|null} The layout and its board.
+ */
+function keycraftAsLibrary(klf) {
+	if (klf.type === 'colstag') return null;
+	const positions = MODELS.keycraft.model.positions.iso;
+	const rows = {};
+	const keys = Array.from(klf.keys);
+	for (let k = 0; k < keys.length; k++) {
+		if (keys[k] === ' ') continue;
+		if (!positions[k]) return null;
+		rows[positions[k]] = [keys[k], null, null, null];
+	}
+	const fingering = klf.type === 'anglemod' ? 'angle' : 'standard';
+	return {
+		layout: { id: klf.name, name: klf.name, rows, fingering },
+		keyboard: klf.type === 'ortho' ? 'ortho' : 'iso'
+	};
+}
+
+/**
+ * A library layout as a keycraft layout file: the base character of each key
+ * of its grid on our iso board, or null when one is not ASCII.
+ * @returns {string|null} The file's text.
+ */
+function keycraftLayoutFile(layout) {
+	const model = MODELS.keycraft.model;
+	const seen = new Set();
+	const keys = model.positions.iso.map((code) => {
+		const row = code && layout.rows[code];
+		const cell = row ? row[0] : null;
+		if (typeof cell !== 'string' || Array.from(cell).length !== 1) return '';
+		const char = cell.toLowerCase();
+		if (seen.has(char)) return '';
+		seen.add(char);
+		return char;
+	});
+	if (keys.some((c) => c.length !== 0 && !/^[\x21-\x7e ]$/.test(c))) return null;
+	const token = (c) => KEYCRAFT_WRITE[c] || c;
+	const type = layout.fingering === 'angle' ? 'anglemod' : 'rowstag';
+	const lines = [type];
+	for (let r = 0; r < 3; r++)
+		lines.push(
+			keys
+				.slice(r * 12, r * 12 + 12)
+				.map(token)
+				.join(' ')
+		);
+	lines.push(keys.slice(36).map(token).join(' '));
+	return `${lines.join('\n')}\n`;
+}
+
+/**
+ * `keycraft rank` as CSV: per layout its Score and metrics (2 decimals).
+ * @returns {Map<string, object>} Layout name → {Score, metric: value}.
+ */
+function keycraftRank(exe, root, corpusName, names) {
+	const run = spawnSync(exe, ['rank', '-c', corpusName, '-o', 'csv', '-m', 'all', ...names], {
+		cwd: root,
+		encoding: 'utf8',
+		maxBuffer: 1 << 28,
+		timeout: KEYCRAFT_TIMEOUT_MS
+	});
+	if (run.status !== 0)
+		throw new Error(
+			`keycraft rank on ${corpusName}: exit ${run.status}\n${run.stderr}${run.stdout}`
+		);
+	const lines = run.stdout.split('\n').filter((line) => /^[^,]*,/.test(line));
+	const header = lines.findIndex((line) => line.startsWith('Rank,Name,'));
+	if (header < 0)
+		throw new Error(`keycraft rank on ${corpusName}: no CSV\n${run.stdout.slice(0, 400)}`);
+	const columns = lines[header].split(',');
+	const out = new Map();
+	for (const line of lines.slice(header + 1)) {
+		// Its Th column quotes the thumb keys: no comma of ours sits in it.
+		const cells = line.replace(/"[^"]*"/g, '').split(',');
+		if (cells[1] === 'Weight' || cells[1] === '') continue;
+		const row = {};
+		columns.forEach((name, i) => {
+			if (i >= 3) row[name] = Number(cells[i]);
+		});
+		out.set(cells[1], row);
+	}
+	return out;
+}
+
+/**
+ * Every built-in corpus, through keycraft itself: its `rank` on its own
+ * layouts that our boards hold and on library layouts written as its files,
+ * against our scorer on the shipped tables and statistics. A text corpus is
+ * given to keycraft as the text the codegen counts; a word list or a count
+ * table as its corpus file of the same tables.
+ */
+function verifyKeycraft(exe, data) {
+	if (!fs.existsSync(exe)) throw new Error(`no keycraft executable at ${exe}`);
+	for (const needed of [path.join('data', 'layouts'), path.join('data', 'config', 'weights.txt')])
+		if (!fs.existsSync(path.join(data, needed)))
+			throw new Error(`${data} is not keycraft's folder (no ${needed})`);
+	const { readKlf, isReference } = require('../build/import-keycraft-layouts.cjs');
+	const { corpusText } = require('../codegen/codegen-layout-analysis-data-js.cjs');
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'keycraft-'));
+	try {
+		fs.cpSync(path.join(data, 'data', 'config'), path.join(root, 'data', 'config'), {
+			recursive: true
+		});
+		fs.cpSync(path.join(data, 'data', 'layouts'), path.join(root, 'data', 'layouts'), {
+			recursive: true
+		});
+		fs.mkdirSync(path.join(root, 'data', 'corpus'));
+		const subjects = [];
+		let leftOut = 0;
+		for (const file of fs.readdirSync(path.join(data, 'data', 'layouts')).sort()) {
+			const name = file.replace(/\.klf$/i, '');
+			if (name === file || !isReference(name)) continue;
+			const ours = keycraftAsLibrary(
+				Object.assign({ name }, readKlf(path.join(data, 'data', 'layouts', file)))
+			);
+			if (ours) subjects.push(Object.assign({ name }, ours));
+			else leftOut++;
+		}
+		// Ours, named so that its scorer leaves them out of the statistics.
+		for (const id of KEYCRAFT_LIBRARY) {
+			const layout = libraryLayout(id);
+			const text = keycraftLayoutFile(layout);
+			if (text === null) throw new Error(`keycraft: ${id} is not ASCII on its letter rows`);
+			const name = `_ergopti_${id}`;
+			fs.writeFileSync(path.join(root, 'data', 'layouts', `${name}.klf`), text);
+			subjects.push({ name, layout, keyboard: 'iso' });
+		}
+		const manifest = JSON.parse(
+			fs.readFileSync(shared('layouts', 'data', 'analysis', 'corpora.json'), 'utf8')
+		);
+		const gaps = { text: [], tables: [] };
+		const metricGaps = { text: {}, tables: {} };
+		for (const corpus of manifest.corpora) {
+			const format = corpus.format || 'text';
+			const kind = format === 'text' || format === 'tsv' ? 'text' : 'tables';
+			vm.runInContext(
+				fs.readFileSync(path.join(UI, '_generated', `corpus_${corpus.id}.js`), 'utf8'),
+				sandbox
+			);
+			const raw = vm.runInContext(`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(corpus.id)}]`, sandbox);
+			vm.runInContext(`delete LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(corpus.id)}]`, sandbox);
+			const corpusName = `${corpus.id}.txt`;
+			const corpusPath = path.join(root, 'data', 'corpus', corpusName);
+			if (kind === 'text') fs.writeFileSync(corpusPath, corpusText(corpus));
+			else fs.writeFileSync(`${corpusPath}.json`, JSON.stringify(keycraftCorpusFile(raw)));
+			const theirs = keycraftRank(
+				exe,
+				root,
+				corpusName,
+				subjects.map((s) => s.name)
+			);
+			const tables = E.prepareNgrams(raw);
+			const line = [];
+			for (const subject of subjects) {
+				const published = theirs.get(subject.name);
+				if (!published) throw new Error(`keycraft on ${corpus.id}: no row for ${subject.name}`);
+				const result = S.score('keycraft', subject.layout, tables, { keyboard: subject.keyboard });
+				gaps[kind].push(result.value - published.Score);
+				addGap(metricGaps[kind], 'Score', result.value, published.Score);
+				for (const [metric, value] of Object.entries(result.parts))
+					addGap(metricGaps[kind], metric, value, published[metric]);
+				line.push(`${subject.name} ${published.Score}/${result.value.toFixed(3)}`);
+			}
+			if (verbose) console.log(`  ${corpus.id.padEnd(26)} ${line.slice(0, 6).join('  ')}`);
+		}
+		for (const kind of ['text', 'tables']) {
+			console.log(
+				`keycraft (${kind}): ${gaps[kind].length} points (${subjects.length} layouts, ` +
+					`${leftOut} of its own outside our boards), Score ${summary(gaps[kind], 4, '')}`
+			);
+			printMetricGaps(`keycraft (${kind})`, metricGaps[kind], 4);
+		}
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
 // =======================
-// ======= 10/ Main ======
+// ======= 11/ Main ======
 // =======================
 
 async function main() {
@@ -1466,6 +1732,13 @@ async function main() {
 			console.log(
 				'Cyanophage optimiser: skipped (needs --cyanophage=<folder with its optimiser.js and worker.js>)'
 			);
+	}
+	if (!only || only === 'keycraft') {
+		const exe = option('keycraft');
+		const data = option('keycraft-data');
+		if (exe && data) verifyKeycraft(exe, data);
+		else
+			console.log('keycraft: skipped (needs --keycraft=<exe> --keycraft-data=<its source folder>)');
 	}
 	const python = option('python');
 	if (!only || only === 'cmini') {
