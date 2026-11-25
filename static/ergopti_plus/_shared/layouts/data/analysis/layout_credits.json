@@ -3281,6 +3281,27 @@
 			"basis": "source",
 			"checked": "2026-11-25",
 			"evidence": "Nuclear-Squid/ergol e078a83b74, layouts/fr.contrib/hypertexte_1dk.toml: « name = HyperTexte 1DFH », « author = Adrien MOYAUX », « url = https://hypertexte.beseven.fr », « version = 1.1.2 »."
+		},
+		"ergopti_2_0_0_1dk": {
+			"authors": ["Adrien MOYAUX"],
+			"url": "https://ergopti.fr",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "This repository at 98b663bfa3, static/ergopti_plus/old/kalamine/1dk/ergo_1dk_v2.0.0.toml: « name = Ergopti », « author = Adrien MOYAUX », « url = https://ergopti.fr », « version = 2.0.0 »."
+		},
+		"ergopti_2_0_0": {
+			"authors": ["Adrien MOYAUX"],
+			"url": "https://ergopti.fr",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "This repository at 98b663bfa3, static/ergopti_plus/old/kalamine/standard/ergopti_v2.0.0.toml: « name = Ergopti », « author = Adrien MOYAUX », « url = https://ergopti.fr », « version = 2.0.0 »."
+		},
+		"ergopti_1_1_3": {
+			"authors": ["Adrien MOYAUX"],
+			"url": "https://ergopti.fr",
+			"basis": "source",
+			"checked": "2026-11-25",
+			"evidence": "This repository at 98b663bfa3, static/ergopti_plus/old/kalamine/standard/ergopti_v1.1.3.toml: « name = Ergopti », « author = Adrien MOYAUX », « url = https://ergopti.fr », « version = 1.1.3 »."
 		}
 	}
 }

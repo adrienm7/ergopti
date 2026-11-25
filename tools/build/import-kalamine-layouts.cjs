@@ -9,8 +9,10 @@
  * (_shared/layouts/data/analysis/layout_library.json): the keymaps of
  * Nuclear-Squid/ergol (WTFPL) and the earlier Ergo-L versions its history
  * keeps, and the Erglace, Ergaie and Colemak French Touch versions their
- * authors' repositories publish. Each file is read at a pinned commit and
- * checked against its SHA-256.
+ * authors' repositories publish, x-keyboard's Belgian and Swiss French
+ * layouts, and this repository's own Kalamine builds of earlier Ergopti
+ * versions (read from this checkout). Each file is read at a pinned commit
+ * and checked against its SHA-256.
  * USAGE: node tools/build/import-kalamine-layouts.cjs <folder of checkouts>
  *   [--check], the folder holding a full clone of each repository of
  *   REPOSITORIES under its key (`git clone <url> <folder>/<key>`); then
@@ -65,7 +67,10 @@ const REPOSITORIES = {
 	colemak_french_touch: {
 		url: 'https://codeberg.org/cedricr/colemak-french-touch.git',
 		source: 'colemak_french_touch'
-	}
+	},
+	x_keyboard: { url: `${GITHUB}/OneDeadKey/x-keyboard.git`, source: 'x_keyboard' },
+	// This repository's own Kalamine files, read from this checkout.
+	ergopti: { url: null, source: 'ergopti_kalamine' }
 };
 // The library sources this import owns, as the Comparer's origin filter names
 // them.
@@ -107,6 +112,21 @@ const SOURCES = {
 		commit: 'e3bfbd4385',
 		date: '2024-06-02',
 		licence: 'MIT (repository, « Copyright (c) 2024 Cédric Rossi »); arrangement re-encoded'
+	},
+	x_keyboard: {
+		name: 'x-keyboard (OneDeadKey)',
+		url: `${GITHUB}/OneDeadKey/x-keyboard/tree/554fa347b5150aa8a1eff64517a76616db5cb25a/layouts`,
+		commit: '554fa347b5',
+		date: '2019-06-05',
+		licence:
+			'MIT (repository, « Copyright (c) 2019 Fabien Cazenave »); its layouts/ JSON, generated from xkeyboard-config by its make_layouts.sh; arrangements re-encoded'
+	},
+	ergopti_kalamine: {
+		name: 'Ergopti (Kalamine files)',
+		commit: '98b663bfa3',
+		date: '2026-11-25',
+		licence:
+			"the repository's own Kalamine builds of earlier Ergopti versions (static/ergopti_plus/old/kalamine); arrangements re-encoded"
 	}
 };
 // The Ergo-L repository's current keymaps.
@@ -122,6 +142,12 @@ const CMOINARD = '5ec95161ace6f3757222050c6ef99ce5a8be3fdd';
 const LYSQUID_V010 = '285a77409df8b8e10f90979d81c4a2845c014367';
 const ERGAIE = '4bb64d98eb7b9b5f1478810e03934e14908d77bb';
 const CFT = 'e3bfbd43853a1584ec9a24c619e22df8b36a4b33';
+const X_KEYBOARD = '554fa347b5150aa8a1eff64517a76616db5cb25a';
+// An origin/dev commit holding this repository's old/kalamine builds.
+const ERGOPTI = '98b663bfa33eedfe42a24eee425ace6ee93a5612';
+const ERGOPTI_KALAMINE = 'static/ergopti_plus/old/kalamine';
+// This checkout, which the « ergopti » repository is read from.
+const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
 
 // The Kalamine check (2.): a TOML and the JSON the Ergo-L repository built
 // from it.
@@ -327,13 +353,60 @@ const LAYOUTS = [
 		sha256: 'e3930dcbd42e623311e701f68daf656edbac7f32efa2897f4412870e04df21f8'
 	},
 	{
+		// Ergopti's 1DK 1.1.3 under its earlier name: the same keymap and dead keys
+		// as this repository's old/kalamine/1dk/1.1.3/ergo_1dk.json.
 		id: 'hypertexte_1dfh',
-		name: 'HyperTexte 1DFH',
+		name: 'HyperTexte 1DFH (Ergopti 1.1.3, 1DK)',
 		version: '1.1.2',
 		repository: 'ergol',
 		commit: ERGOL_2024,
 		path: 'layouts/fr.contrib/hypertexte_1dk.json',
 		sha256: 'cde5c499c6f56ef6e247d9ae63d101950fbf25671beb6d2436c86b3e199bbd53'
+	},
+	{
+		id: 'ergopti_2_0_0_1dk',
+		name: 'Ergopti 2.0.0 (1DK)',
+		version: '2.0.0',
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/1dk/2.0.0/ergo_1dk.json`,
+		sha256: '3f91c57ea56adb172430d28e266fda6909a69b3707563be2b065dbf25079259a'
+	},
+	{
+		id: 'ergopti_2_0_0',
+		name: 'Ergopti 2.0.0',
+		version: '2.0.0',
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/standard/2.0.0/ergopti.json`,
+		sha256: 'c716fcd6c06fde45c18a03e74e1b8850130b51c17844b6630c277a034f4002ab'
+	},
+	{
+		id: 'ergopti_1_1_3',
+		name: 'Ergopti 1.1.3',
+		version: '1.1.3',
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/standard/1.1.3/ergopti.json`,
+		sha256: 'f2975eaebc0cce0be4d46225a76ed32f372e2b5a30232f2377345969b7bd536f'
+	},
+	{
+		id: 'azerty_be',
+		name: 'AZERTY (Belgian)',
+		version: '2019-06-05',
+		repository: 'x_keyboard',
+		commit: X_KEYBOARD,
+		path: 'layouts/be.json',
+		sha256: '3bd62cd422f329b89c73e8693fb1560364bafba13b172fccea55567538c87272'
+	},
+	{
+		id: 'qwertz_ch_fr',
+		name: 'QWERTZ (Swiss French)',
+		version: '2019-06-05',
+		repository: 'x_keyboard',
+		commit: X_KEYBOARD,
+		path: 'layouts/ch(fr).json',
+		sha256: 'e6917c3f89e066876e1b5d36479ed17993348437a4b44e65d5ad249b0b7eaee4'
 	}
 ];
 // Versions with the letters and digits of a layout above, which holds them.
@@ -352,6 +425,28 @@ const DUPLICATES = [
 		reason:
 			"Colemak French Touch 0.3.1, the Ergo-L repository's copy: the same letters and digits as its author's 0.4",
 		same_as: 'colemak_french_touch'
+	},
+	...['2.1.0', '2.1.2'].map((version) => ({
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/standard/${version}/ergopti.json`,
+		reason: `Ergopti ${version}, the same letters and digits as the registry Ergopti`,
+		same_as: 'ergopti'
+	})),
+	...['2.1.0', '2.1.1', '2.1.2'].map((version) => ({
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/1dk/${version}/ergo_1dk.json`,
+		reason: `Ergopti ${version} (1DK), the same letters and digits as the Ergo-L repository's Ergopti 2.1.2 (1DK)`,
+		same_as: 'ergopti_2_1_2_1dk'
+	})),
+	{
+		repository: 'ergopti',
+		commit: ERGOPTI,
+		path: `${ERGOPTI_KALAMINE}/1dk/1.1.3/ergo_1dk.json`,
+		reason:
+			"Ergopti 1.1.3 (1DK): the keymap and dead keys of the Ergo-L repository's HyperTexte 1DFH 1.1.2, which holds it",
+		same_as: 'hypertexte_1dfh'
 	}
 ];
 
@@ -369,7 +464,8 @@ const DUPLICATES = [
  * @throws {Error} When the checkout lacks the commit or the file.
  */
 function gitShow(folder, repository, commit, file) {
-	const dir = path.join(folder, repository);
+	const dir =
+		REPOSITORIES[repository].url === null ? REPOSITORY_ROOT : path.join(folder, repository);
 	if (!fs.existsSync(path.join(dir, '.git')))
 		throw new Error(`${dir}: no clone of ${REPOSITORIES[repository].url}`);
 	return childProcess.execFileSync('git', ['-C', dir, 'show', `${commit}:${file}`], {

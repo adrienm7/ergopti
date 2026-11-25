@@ -220,7 +220,7 @@ analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-an
 waits for the maintainer's review).
 
 - [ ] **Layout formats, what is left (2026-11-19).** The ErgoDox model is complete (maintainer, « Complete the
-      model »): 75 of the 91 files left out for its keys came in, the library holds 806 layouts
+      model »): 75 of the 91 files left out for its keys came in, the library holds 811 layouts
       (`docs/audits/layout-analysers/report.md` section 13, « Every ErgoDox key »). To review by the maintainer: the
       board-only codes, the Shift keys and AltGr's key read as QMK's mod-tap (`docs/design/layout-analysis.md`,
       « ErgoDox keys »; the thumb rule was settled on 2026-11-21, « The left thumb types on one key »). Since
@@ -242,7 +242,9 @@ waits for the maintainer's review).
       `tools/build/import-kalamine-layouts.cjs` (report section 13, inventory table). Left, each needing a source:
       Wismill's Erglace with the 1DK under a thumb (ergol.org names it, no file found), Hypergol (a Kanata and QMK
       configuration with combos and a magic key, no letter layout file), Adextre from its author (adextre.fr answered
-      403; the library holds KLAnext's ErgoDox copy), and a French Engram (none found). Rerun the import when
+      403; the library holds KLAnext's ErgoDox copy), a French Engram (none found), and x-keyboard's Brazilian,
+      Swiss German, Italian, Norwegian, Portuguese and Swedish layouts (best read from xkeyboard-config once the
+      Comparer lists their languages). Rerun the import when
       cmoinard/Erglace or the Ergo-L repository publishes a new version: bump the commit and SHA-256 in `LAYOUTS`.
 - [ ] **[LATER] More Leipzig languages.** Google Books' French, English, German, Spanish and Italian 1-grams ship
       (`static/corpus/frequency/google_books`, pinned in `static/corpus/count_table_sources.json`). Left: Portuguese
