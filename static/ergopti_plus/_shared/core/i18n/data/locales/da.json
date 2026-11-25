@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Diagnosevinduet kunne ikke åbne på dette system, så her er den samme rapport, gemt i en fil.",
 	"healthcheck.file_fallback.notice": "Diagnosevinduet kunne ikke åbne. Rapporten er gemt i {1} og åbner i din browser.",
 	"healthcheck.file_fallback.notice_missing": "Diagnosevinduet kræver {2}, som dette system ikke har. Rapporten er gemt i {1} og åbner i din browser.",
+	"healthcheck.file_fallback.unopened": "Diagnosevinduet kunne ikke åbne. Rapporten er gemt i {1}: åbn denne fil i din browser.",
 	"menu.caps_word.auto_off": "CapsWord: automatisk deaktivering",
 	"menu.caps_word.idle_timeout": "Deaktiver efter en pause",
 	"menu.caps_word.idle_timeout_never": "Aldrig (uendelig)",

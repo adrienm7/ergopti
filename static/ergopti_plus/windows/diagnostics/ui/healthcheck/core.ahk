@@ -18,9 +18,12 @@
 ;    schema's allowlist: the host opens only the paths it collected, by id.
 ; 3. The page asks for the first snapshot with "ready"; the probes start then
 ;    and push their answers into the same window only.
-; 4. The shared page is the only diagnostics window: without WebView2 the
-;    opening refuses with the shared message, before any probe or host runs
-;    (maintainer decision 2026-11-21).
+; 4. The shared page is the only diagnostics window (maintainer decision
+;    2026-11-21). Without WebView2 no window opens, but the diagnostics never
+;    depend on the component they diagnose: the same approved report is
+;    written as a self-contained HTML file and opened in the browser
+;    (HealthCheck_DeliverWithoutWindow, maintainer decision 2026-11-25). Only
+;    a report that cannot be written ends in the shared refusal message.
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; diagnostics/ui/healthcheck/init.ahk for the module overview. Functions and globals are
@@ -41,6 +44,9 @@ global _HealthCheckLastError := ""
 global _HealthCheckWarnCount := 0
 global _HealthCheckErrCount  := 0
 global _HealthCheckWindowControl := 0
+; Replacement side effects of the windowless delivery; 0 in production, a Map
+; of recording effects in a test, so no test writes a file or starts a browser.
+global _HC_WindowlessEffects := 0
 
 /** Owns one listener and its coalesced deferred window request. */
 class HealthCheckWindowControl {
@@ -520,40 +526,6 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	return Snapshot
 }
 
-; Formats a snapshot as plain text, one "section.field: value" line per value,
-; for the read-only field shown when WebView2 is unavailable.
-; @param Snapshot {Map} From HealthCheck_Run().
-; @returns {String}
-HealthCheck_FormatPlain(Snapshot) {
-	Out := "ErgoptiPlus — " . Snapshot["driver"] . " — " . Snapshot["generated_at"]
-	for SectionId, Section in Snapshot["sections"] {
-		if !(Section is Map)
-			continue
-		for Key, Value in Section
-			Out .= "`r`n" . SectionId . "." . Key . ": " . _HealthCheck_PlainValue(Value)
-	}
-	return Out
-}
-
-; One value of the plain-text report.
-; @param Value {Any}
-; @returns {String}
-_HealthCheck_PlainValue(Value) {
-	if (Value is Array) {
-		Parts := ""
-		for Index, Item in Value
-			Parts .= (Index > 1 ? " | " : "") . _HealthCheck_PlainValue(Item)
-		return Parts
-	}
-	if (Value is Map) {
-		Parts := ""
-		for Key, Item in Value
-			Parts .= (Parts == "" ? "" : ", ") . Key . "=" . _HealthCheck_PlainValue(Item)
-		return Parts
-	}
-	return StrReplace(StrReplace(String(Value), "`r", " "), "`n", " ")
-}
-
 ; True when a schema entry (a section, a field or a probe) applies to a driver.
 ; @param Entry {Map}
 ; @param Driver {String}
@@ -702,6 +674,20 @@ _HC_ResumePending(Serial) {
 	HealthCheck_ShowWindow()
 }
 
+; Answers a diagnostics window WebView2 cannot show: the report is written to
+; an HTML file and opened in the browser. Only when that fails too is the
+; user told, in the shared refusal message, how to get WebView2 working.
+; @param Reason {String} Why WebView2 cannot show the window, for the log.
+; @returns {Boolean} Whether the report was delivered.
+_HC_DeliverWithoutWindow(Reason) {
+	global _HC_WindowlessEffects
+	LoggerWarn("Healthcheck", "The diagnostics window cannot open ({1}); the report is delivered as a file.", Reason)
+	if HealthCheck_DeliverWithoutWindow(Reason, _HC_WindowlessEffects)
+		return true
+	WebView_RefuseUnavailable("diagnostics window", Reason)
+	return false
+}
+
 ; Keep native title construction with the GUI owner, independent of diagnostics collection.
 _HC_NewWindow() {
 	return Gui_Create("+Resize +MinSize640x480", t("menu.debug.healthcheck"))
@@ -743,9 +729,12 @@ HealthCheck_ShowWindow() {
 	try {
 		LoggerStart("Healthcheck", "Opening the diagnostics window…")
 		; The diagnostics page is the only diagnostics window: without WebView2
-		; the user is told how to recover, before any probe or host runs.
-		if !WebView_RequireAvailable("diagnostics window")
+		; the report goes to the browser instead, before any probe or host runs.
+		Unavailable := WebView_UnavailableReason()
+		if (Unavailable != "") {
+			_HC_DeliverWithoutWindow(Unavailable)
 			return
+		}
 		_HC_OpenStarted := _HealthCheck_NowMs()
 		Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs(), MenuWait: BootProfile_MenuWaitMs() }
 		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
@@ -798,9 +787,10 @@ HealthCheck_ShowWindow() {
 			else if WVC
 				WVC.Close()
 			G.WVC := 0
-			; No native view stands in for the page: retire the host and refuse.
+			; No native view stands in for the page: retire the host and hand
+			; the report to the browser.
 			_HC_Close()
-			WebView_RefuseUnavailable("diagnostics window", Err.Message)
+			_HC_DeliverWithoutWindow(Err.Message)
 			return
 		}
 

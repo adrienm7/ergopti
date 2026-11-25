@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Das Diagnosefenster konnte auf diesem System nicht geöffnet werden. Hier ist derselbe Bericht, in einer Datei gespeichert.",
 	"healthcheck.file_fallback.notice": "Das Diagnosefenster konnte nicht geöffnet werden. Der Bericht ist unter {1} gespeichert und öffnet sich in Ihrem Browser.",
 	"healthcheck.file_fallback.notice_missing": "Das Diagnosefenster benötigt {2}, das auf diesem System fehlt. Der Bericht ist unter {1} gespeichert und öffnet sich in Ihrem Browser.",
+	"healthcheck.file_fallback.unopened": "Das Diagnosefenster konnte nicht geöffnet werden. Der Bericht ist unter {1} gespeichert: Öffnen Sie diese Datei in Ihrem Browser.",
 	"menu.caps_word.auto_off": "CapsWord: automatische Deaktivierung",
 	"menu.caps_word.idle_timeout": "Nach einer Pause deaktivieren",
 	"menu.caps_word.idle_timeout_never": "Nie (unbegrenzt)",

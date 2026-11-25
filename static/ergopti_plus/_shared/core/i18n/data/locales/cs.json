@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Okno diagnostiky se v tomto systému nemohlo otevřít, proto je zde stejná zpráva uložená do souboru.",
 	"healthcheck.file_fallback.notice": "Okno diagnostiky se nemohlo otevřít. Zpráva je uložena v {1} a otevře se v prohlížeči.",
 	"healthcheck.file_fallback.notice_missing": "Okno diagnostiky potřebuje {2}, který tento systém nemá. Zpráva je uložena v {1} a otevře se v prohlížeči.",
+	"healthcheck.file_fallback.unopened": "Okno diagnostiky se nemohlo otevřít. Zpráva je uložena v {1}: otevřete tento soubor v prohlížeči.",
 	"menu.caps_word.auto_off": "CapsWord: automatické vypnutí",
 	"menu.caps_word.idle_timeout": "Vypnout po pauze",
 	"menu.caps_word.idle_timeout_never": "Nikdy (bez omezení)",

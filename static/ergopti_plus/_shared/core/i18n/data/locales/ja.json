@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "このシステムでは診断ウィンドウを開けなかったため、同じレポートをファイルに保存しました。",
 	"healthcheck.file_fallback.notice": "診断ウィンドウを開けませんでした。レポートは {1} に保存され、ブラウザーで開きます。",
 	"healthcheck.file_fallback.notice_missing": "診断ウィンドウには、このシステムにない {2} が必要です。レポートは {1} に保存され、ブラウザーで開きます。",
+	"healthcheck.file_fallback.unopened": "診断ウィンドウを開けませんでした。レポートは {1} に保存されています。このファイルをブラウザーで開いてください。",
 	"menu.caps_word.auto_off": "CapsWord：自動オフ",
 	"menu.caps_word.idle_timeout": "一時停止後にオフにする",
 	"menu.caps_word.idle_timeout_never": "しない（無制限）",

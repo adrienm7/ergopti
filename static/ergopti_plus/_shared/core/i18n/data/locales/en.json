@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "The diagnostics window could not open on this system, so here is the same report, saved to a file.",
 	"healthcheck.file_fallback.notice": "The diagnostics window could not open. The report is saved to {1} and opens in your browser.",
 	"healthcheck.file_fallback.notice_missing": "The diagnostics window needs {2}, which this system does not provide. The report is saved to {1} and opens in your browser.",
+	"healthcheck.file_fallback.unopened": "The diagnostics window could not open. The report is saved to {1}: open this file in your browser.",
 	"menu.caps_word.auto_off": "CapsWord: automatic deactivation",
 	"menu.caps_word.idle_timeout": "Deactivate after a pause",
 	"menu.caps_word.idle_timeout_never": "Never (infinite)",

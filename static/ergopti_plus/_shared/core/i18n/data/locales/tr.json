@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Tanılama penceresi bu sistemde açılamadı; aynı rapor bir dosyaya kaydedildi.",
 	"healthcheck.file_fallback.notice": "Tanılama penceresi açılamadı. Rapor {1} konumuna kaydedildi ve tarayıcınızda açılıyor.",
 	"healthcheck.file_fallback.notice_missing": "Tanılama penceresi bu sistemde bulunmayan {2} gerektiriyor. Rapor {1} konumuna kaydedildi ve tarayıcınızda açılıyor.",
+	"healthcheck.file_fallback.unopened": "Tanılama penceresi açılamadı. Rapor {1} konumuna kaydedildi: bu dosyayı tarayıcınızda açın.",
 	"menu.caps_word.auto_off": "CapsWord: otomatik kapanma",
 	"menu.caps_word.idle_timeout": "Duraklamadan sonra kapat",
 	"menu.caps_word.idle_timeout_never": "Asla (sınırsız)",

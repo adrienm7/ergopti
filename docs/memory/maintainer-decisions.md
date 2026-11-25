@@ -1628,6 +1628,24 @@ diagnostics report to an HTML file opened in the browser, when it is absent)
 have no native duplicate of a WebView page. Do not bring a native
 substitute back for a WebView window.
 
+## A report opened in the browser is not a native substitute (2026-11-25)
+
+Accepted by the maintainer as compatible with the 2026-11-21 decision above,
+first for the Linux diagnostics, then extended to Windows on 2026-11-25 after a
+Linux field report (Arch Linux, KDE Plasma 6) showed that the diagnostics
+depended on the very component they diagnose: when the diagnostics window cannot open (Windows: WebView2 missing,
+too old or refused; Linux: lgi or WebKitGTK 4.1 missing), the same approved,
+redacted report is written as a self-contained HTML file (no script, no asset)
+under the logs' `diagnostics/` folder and opened in the default browser, with
+a paired start/success log line naming the file and a translated message
+naming it (Windows: `HealthCheck_DeliverWithoutWindow`,
+`diagnostics/ui/healthcheck/report.ahk`; Linux:
+`diagnostics/ui/healthcheck/report.lua` `deliver_without_window`). A file the
+browser opens is not a native duplicate of a WebView page: it has no controls
+and no host. Only a report that cannot be written ends in the
+`webview.required` refusal. macOS needs none: `hs.webview` ships with
+Hammerspoon. Do not answer a missing diagnostics window with a refusal alone.
+
 ## Metrics rows store UTC and their recorded offset (2026-11-11)
 
 Decided by the maintainer on 2026-11-11 (KMD-1): every raw `events_*` row

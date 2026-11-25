@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "تعذّر فتح نافذة التشخيص على هذا النظام، وهذا هو التقرير نفسه محفوظًا في ملف.",
 	"healthcheck.file_fallback.notice": "تعذّر فتح نافذة التشخيص. حُفظ التقرير في {1} ويُفتح في متصفحك.",
 	"healthcheck.file_fallback.notice_missing": "تحتاج نافذة التشخيص إلى {2}، وهو غير متوفر في هذا النظام. حُفظ التقرير في {1} ويُفتح في متصفحك.",
+	"healthcheck.file_fallback.unopened": "تعذّر فتح نافذة التشخيص. حُفظ التقرير في {1}: افتح هذا الملف في متصفحك.",
 	"menu.caps_word.auto_off": "CapsWord: إيقاف تلقائي",
 	"menu.caps_word.idle_timeout": "إيقاف بعد توقف",
 	"menu.caps_word.idle_timeout_never": "أبدًا (بلا حد)",

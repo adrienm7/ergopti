@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Het diagnosevenster kon op dit systeem niet openen, dus hier is hetzelfde rapport, opgeslagen in een bestand.",
 	"healthcheck.file_fallback.notice": "Het diagnosevenster kon niet openen. Het rapport is opgeslagen in {1} en opent in je browser.",
 	"healthcheck.file_fallback.notice_missing": "Het diagnosevenster heeft {2} nodig, dat dit systeem niet heeft. Het rapport is opgeslagen in {1} en opent in je browser.",
+	"healthcheck.file_fallback.unopened": "Het diagnosevenster kon niet openen. Het rapport is opgeslagen in {1}: open dit bestand in je browser.",
 	"menu.caps_word.auto_off": "CapsWord: automatisch uitschakelen",
 	"menu.caps_word.idle_timeout": "Uitschakelen na een pauze",
 	"menu.caps_word.idle_timeout_never": "Nooit (oneindig)",

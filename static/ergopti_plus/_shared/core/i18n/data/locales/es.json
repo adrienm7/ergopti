@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "La ventana de diagnóstico no pudo abrirse en este sistema: aquí está el mismo informe, guardado en un archivo.",
 	"healthcheck.file_fallback.notice": "La ventana de diagnóstico no pudo abrirse. El informe está guardado en {1} y se abre en su navegador.",
 	"healthcheck.file_fallback.notice_missing": "La ventana de diagnóstico necesita {2}, que este sistema no tiene. El informe está guardado en {1} y se abre en su navegador.",
+	"healthcheck.file_fallback.unopened": "La ventana de diagnóstico no pudo abrirse. El informe está guardado en {1}: abra este archivo en su navegador.",
 	"menu.caps_word.auto_off": "CapsWord: desactivación automática",
 	"menu.caps_word.idle_timeout": "Desactivar tras una pausa",
 	"menu.caps_word.idle_timeout_never": "Nunca (infinito)",

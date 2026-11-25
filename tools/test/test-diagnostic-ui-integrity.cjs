@@ -348,11 +348,14 @@ report(
 	'a WMI query or a RunWait runs on the AHK thread'
 );
 report(
-	'Windows: a browser failure refuses instead of building a native view',
+	'Windows: a browser failure delivers the report as a file instead of building a native view',
 	!/_HC_ShowNativeSnapshot|"TreeView"/.test(winCore) &&
-		/WebView_RefuseUnavailable\("diagnostics window", Err\.Message\)/.test(winCore) &&
+		/_HC_DeliverWithoutWindow\(Err\.Message\)/.test(winCore) &&
+		/HealthCheck_DeliverWithoutWindow\(Reason, _HC_WindowlessEffects\)[\s\S]*?WebView_RefuseUnavailable\("diagnostics window", Reason\)/.test(
+			winCore
+		) &&
 		!/_HealthCheck_LoadDocs/.test(winCore),
-	'a native diagnostics view is back or the shared refusal is missing'
+	'a native diagnostics view is back, or the report file or the shared refusal is missing'
 );
 
 const linuxBridge = withoutComments(read('linux/diagnostics/ui/healthcheck/bridge.lua'));

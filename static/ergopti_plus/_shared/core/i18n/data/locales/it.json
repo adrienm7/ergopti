@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "La finestra della diagnostica non si è potuta aprire su questo sistema: ecco lo stesso rapporto, salvato in un file.",
 	"healthcheck.file_fallback.notice": "La finestra della diagnostica non si è potuta aprire. Il rapporto è salvato in {1} e si apre nel browser.",
 	"healthcheck.file_fallback.notice_missing": "La finestra della diagnostica ha bisogno di {2}, che questo sistema non fornisce. Il rapporto è salvato in {1} e si apre nel browser.",
+	"healthcheck.file_fallback.unopened": "La finestra della diagnostica non si è potuta aprire. Il rapporto è salvato in {1}: apri questo file nel browser.",
 	"menu.caps_word.auto_off": "CapsWord: disattivazione automatica",
 	"menu.caps_word.idle_timeout": "Disattiva dopo una pausa",
 	"menu.caps_word.idle_timeout_never": "Mai (infinito)",

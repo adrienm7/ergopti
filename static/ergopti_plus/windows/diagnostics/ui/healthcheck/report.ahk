@@ -24,6 +24,10 @@
 ; 4. Side effects are one Map so a test can observe each of them; the browser
 ;    opens last, after the clipboard holds what it asks for, and nothing
 ;    follows it that could take the focus back.
+; 5. Without WebView2 the same approved report is written as a self-contained
+;    HTML file (no script, no asset) under the diagnostics folder and opened
+;    in the default browser: the diagnostics never depend on the component
+;    they diagnose (maintainer decision 2026-11-25, as on Linux).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -619,6 +623,7 @@ _HCReport_Effects(Overrides := 0) {
 		"open",     _HCReport_Open,
 		"open_url", ExternalUrl_OpenHttp,
 		"notify",   _HCReport_Notify,
+		"alert",    (Title, Text) => Ui_MsgBox(Text, Title, "Icon!"),
 		"identity", _HCReport_Identity)
 	if (Overrides is Map) {
 		for Name, Fn in Overrides
@@ -883,5 +888,102 @@ HealthCheck_SuggestFeature(Overrides := 0) {
 		return false
 	}
 	LoggerSuccess("HealthCheckReport", "Feature request form opened.")
+	return true
+}
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 4/ Without A Window =======
+; ===================================
+; ===================================
+
+; Escapes text for an HTML element or attribute.
+; @param Text {String}
+; @returns {String}
+_HCReport_EscapeHtml(Text) {
+	for Pair in [["&", "&amp;"], ["<", "&lt;"], [">", "&gt;"], ['"', "&quot;"], ["'", "&#39;"]]
+		Text := StrReplace(Text, Pair[1], Pair[2])
+	return Text
+}
+
+; The report as one self-contained page: no script, no asset, no network, so
+; any browser shows it whatever this machine lacks.
+; @param Title {String} The page title (the diagnostics window's name).
+; @param Lead {String} The sentence that says why this is a file.
+; @param Recovery {String} How to get the window back (the WebView2 message).
+; @param Text {String} The approved report.
+; @param Locale {String} The page language.
+; @returns {String} The page, LF line endings.
+HealthCheck_RenderHtml(Title, Lead, Recovery, Text, Locale) {
+	Lines := [
+		"<!doctype html>",
+		'<html lang="' . _HCReport_EscapeHtml(Locale) . '">',
+		'<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
+		"<title>" . _HCReport_EscapeHtml(Title) . "</title>",
+		; No colour of its own: the browser's light and dark defaults apply
+		"<style>:root{color-scheme:light dark}"
+			. "body{font:15px/1.5 system-ui,sans-serif;margin:2em auto;max-width:60em;padding:0 1em}"
+			. "pre{white-space:pre-wrap;word-break:break-word;border:1px solid;padding:1em;border-radius:6px}</style>",
+		"</head><body>",
+		"<h1>" . _HCReport_EscapeHtml(Title) . "</h1>",
+		"<p>" . _HCReport_EscapeHtml(Lead) . "</p>",
+		"<p>" . _HCReport_EscapeHtml(Recovery) . "</p>",
+		"<pre>" . _HCReport_EscapeHtml(Text) . "</pre>",
+		"</body></html>",
+		""]
+	Out := ""
+	for Index, Line in Lines
+		Out .= (Index > 1 ? "`n" : "") . Line
+	return Out
+}
+
+; Delivers the diagnostics when their window cannot open (WebView2 missing,
+; too old or refused): the approved report of a fresh snapshot is written as a
+; self-contained HTML file in the diagnostics folder and opened in the default
+; browser, and a notification names the file. When the browser cannot be
+; started, a message box names the file instead, so the user can still find it.
+; @param Reason {String} Why the window cannot open, for the log.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @param VersionFn {Func|Integer} Test seam for the WebView2 runtime version.
+; @returns {Boolean} Whether the file was written.
+HealthCheck_DeliverWithoutWindow(Reason, Overrides := 0, VersionFn := 0) {
+	global _I18nLocale
+	LoggerStart("HealthCheckReport", "Writing the diagnostics report to a file: no window can show it ({1})…", Reason)
+	Effects := _HCReport_Effects(Overrides)
+	Title := t("menu.debug.healthcheck")
+	try {
+		Config := HealthCheck_Config()
+		Schema := Config["schema"]
+		Snapshot := HealthCheck_Run()
+		; No page will run the configuration probe
+		HealthCheck_CompleteConfiguration(Snapshot, Schema)
+		Paths := Snapshot["sections"]["paths"]
+		if !Paths.Has("diagnostics_dir") || Paths["diagnostics_dir"] == ""
+			throw Error("The diagnostics folder is unknown.")
+		Document := HealthCheck_ShareDocument(Snapshot, Schema)
+		Suffix := Schema["report"]["name_suffix"]
+		Name := Document["name"]
+		if !(SubStr(Name, -StrLen(Suffix)) == Suffix)
+			throw Error("The report name does not end with the schema's suffix.")
+		Name := SubStr(Name, 1, StrLen(Name) - StrLen(Suffix)) . ".html"
+		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		Html := HealthCheck_RenderHtml(Title, t("healthcheck.file_fallback.lead"), WebView_RecoveryText(VersionFn),
+			Document["text"], Locale)
+		Path := Effects["save"].Call(Paths["diagnostics_dir"], Name, Html)
+	} catch as Err {
+		LoggerError("HealthCheckReport", "The diagnostics report could not be written to a file: {1}", Err.Message)
+		return false
+	}
+	LoggerSuccess("HealthCheckReport", "Diagnostics report written to {1}.", Path)
+	if Effects["open"].Call(Path) {
+		Effects["notify"].Call(Title, StrReplace(t("healthcheck.file_fallback.notice"), "{1}", Path), "info")
+		return true
+	}
+	LoggerWarn("HealthCheckReport", "The browser did not open the diagnostics report; its path is shown in a message box.")
+	Effects["alert"].Call(Title, StrReplace(t("healthcheck.file_fallback.unopened"), "{1}", Path))
 	return true
 }

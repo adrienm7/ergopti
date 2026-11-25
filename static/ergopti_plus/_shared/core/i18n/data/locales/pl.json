@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Okno diagnostyki nie mogło się otworzyć w tym systemie, więc oto ten sam raport zapisany w pliku.",
 	"healthcheck.file_fallback.notice": "Okno diagnostyki nie mogło się otworzyć. Raport zapisano w {1} i otwiera się w przeglądarce.",
 	"healthcheck.file_fallback.notice_missing": "Okno diagnostyki wymaga {2}, którego ten system nie ma. Raport zapisano w {1} i otwiera się w przeglądarce.",
+	"healthcheck.file_fallback.unopened": "Okno diagnostyki nie mogło się otworzyć. Raport zapisano w {1}: otwórz ten plik w przeglądarce.",
 	"menu.caps_word.auto_off": "CapsWord: automatyczne wyłączanie",
 	"menu.caps_word.idle_timeout": "Wyłącz po przerwie",
 	"menu.caps_word.idle_timeout_never": "Nigdy (bez limitu)",

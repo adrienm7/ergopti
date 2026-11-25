@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "חלון האבחון לא נפתח במערכת זו, ולכן זהו אותו דוח, שמור בקובץ.",
 	"healthcheck.file_fallback.notice": "חלון האבחון לא נפתח. הדוח נשמר ב־{1} ונפתח בדפדפן שלכם.",
 	"healthcheck.file_fallback.notice_missing": "חלון האבחון זקוק ל־{2}, שאינו קיים במערכת זו. הדוח נשמר ב־{1} ונפתח בדפדפן שלכם.",
+	"healthcheck.file_fallback.unopened": "חלון האבחון לא נפתח. הדוח נשמר ב־{1}: פתחו את הקובץ הזה בדפדפן שלכם.",
 	"menu.caps_word.auto_off": "CapsWord: כיבוי אוטומטי",
 	"menu.caps_word.idle_timeout": "כיבוי אחרי הפסקה",
 	"menu.caps_word.idle_timeout_never": "אף פעם (ללא הגבלה)",

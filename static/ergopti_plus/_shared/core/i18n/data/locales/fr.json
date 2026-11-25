@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "La fenêtre du diagnostic n’a pas pu s’ouvrir sur ce système : voici le même rapport, enregistré dans un fichier.",
 	"healthcheck.file_fallback.notice": "La fenêtre du diagnostic n’a pas pu s’ouvrir. Le rapport est enregistré dans {1} et s’ouvre dans votre navigateur.",
 	"healthcheck.file_fallback.notice_missing": "La fenêtre du diagnostic a besoin de {2}, absent de ce système. Le rapport est enregistré dans {1} et s’ouvre dans votre navigateur.",
+	"healthcheck.file_fallback.unopened": "La fenêtre du diagnostic n’a pas pu s’ouvrir. Le rapport est enregistré dans {1} : ouvrez ce fichier dans votre navigateur.",
 	"menu.caps_word.auto_off": "CapsWord : désactivation automatique",
 	"menu.caps_word.idle_timeout": "Désactiver après une pause",
 	"menu.caps_word.idle_timeout_never": "Jamais (infini)",

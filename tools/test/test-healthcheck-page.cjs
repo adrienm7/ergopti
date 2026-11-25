@@ -15,7 +15,9 @@
  *    the prefilled issue fields, redacted too;
  * 4. unticking "Include details" drops the opt-in values before any export;
  * 5. a probe answer fills its fields; an action result reaches the status
- *    line; the Linux bridge response is routed to the same entry point.
+ *    line; the Linux bridge response is routed to the same entry point;
+ * 6. the Windows host without WebView2 writes the approved report to a
+ *    self-contained HTML file and opens it in the browser.
  * ==============================================================================
  */
 
@@ -541,13 +543,53 @@ function init(page, detailed) {
 		fail('diagnostics must not be gated on free memory');
 	if (host.includes('_HC_ShowNativeSnapshot') || host.includes('"TreeView"'))
 		fail('a WebView2 failure must refuse, not build a native diagnostics view');
+	if (!/Unavailable := WebView_UnavailableReason\(\)/.test(host))
+		fail('the diagnostics window must admit through the shared WebView owner');
+	// Without WebView2 the diagnostics depend on nothing they diagnose: the
+	// approved report goes to a self-contained HTML file opened in the
+	// browser (maintainer decision 2026-11-25, as on Linux), and only a
+	// report that cannot be written ends in the shared refusal message.
+	const code = host
+		.split('\n')
+		.filter((line) => !/^\s*;/.test(line))
+		.join('\n');
+	if ((code.match(/_HC_DeliverWithoutWindow\((?:Unavailable|Err\.Message)\)/g) || []).length !== 2)
+		fail('both WebView2 refusals must deliver the report as a file');
+	if (/\bWebView_RequireAvailable\("diagnostics window"\)/.test(code))
+		fail('a missing WebView2 must not end the diagnostics in a refusal alone');
 	if (
-		!host.includes('WebView_RequireAvailable("diagnostics window")') ||
-		!host.includes('WebView_RefuseUnavailable("diagnostics window", Err.Message)')
+		!/_HC_DeliverWithoutWindow\(Reason\) \{[\s\S]*?HealthCheck_DeliverWithoutWindow\(Reason, _HC_WindowlessEffects\)[\s\S]*?WebView_RefuseUnavailable\("diagnostics window", Reason\)/.test(
+			code
+		)
 	)
-		fail('the diagnostics window must admit and refuse through the shared WebView owner');
-	if (/EditCtl[\s\S]*?HealthCheck_FormatPlain\(Snapshot\)/.test(host))
-		fail('the diagnostics window must not fall back to a raw-text report');
+		fail('only a report that cannot be delivered may end in the shared refusal');
+	// The plain-text formatter had no caller and published unredacted paths.
+	if (/HealthCheck_FormatPlain|_HealthCheck_PlainValue/.test(host))
+		fail('the unredacted plain-text report must stay retired');
+	const report = fs.readFileSync(
+		path.join(SHARED, '..', 'windows', 'diagnostics', 'ui', 'healthcheck', 'report.ahk'),
+		'utf8'
+	);
+	const deliver = report.slice(report.indexOf('\nHealthCheck_DeliverWithoutWindow('));
+	const render = report.slice(
+		report.indexOf('\nHealthCheck_RenderHtml('),
+		report.indexOf('\nHealthCheck_DeliverWithoutWindow(')
+	);
+	if (!render || /<script|src=|href=/i.test(render))
+		fail('the report file must be self-contained: no script, asset or link');
+	if (
+		!/HealthCheck_ShareDocument\(Snapshot, Schema\)/.test(deliver) ||
+		!/\. "\.html"/.test(deliver) ||
+		!/Effects\["save"\]\.Call\(Paths\["diagnostics_dir"\]/.test(deliver) ||
+		!/LoggerStart\("HealthCheckReport"/.test(deliver) ||
+		!/LoggerSuccess\("HealthCheckReport", "Diagnostics report written to \{1\}\."/.test(deliver) ||
+		!/Effects\["open"\]\.Call\(Path\)/.test(deliver) ||
+		!deliver.includes('"healthcheck.file_fallback.notice"') ||
+		!deliver.includes('"healthcheck.file_fallback.unopened"')
+	)
+		fail(
+			'the windowless report must be the approved document, saved as HTML in the diagnostics folder, logged, opened and named to the user'
+		);
 }
 
 {

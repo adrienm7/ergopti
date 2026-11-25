@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "निदान विंडो इस सिस्टम पर नहीं खुल सकी, इसलिए यह वही रिपोर्ट एक फ़ाइल में सहेजी गई है।",
 	"healthcheck.file_fallback.notice": "निदान विंडो नहीं खुल सकी। रिपोर्ट {1} में सहेजी गई है और आपके ब्राउज़र में खुलती है।",
 	"healthcheck.file_fallback.notice_missing": "निदान विंडो को {2} चाहिए, जो इस सिस्टम पर नहीं है। रिपोर्ट {1} में सहेजी गई है और आपके ब्राउज़र में खुलती है।",
+	"healthcheck.file_fallback.unopened": "निदान विंडो नहीं खुल सकी। रिपोर्ट {1} में सहेजी गई है: इस फ़ाइल को अपने ब्राउज़र में खोलें।",
 	"menu.caps_word.auto_off": "CapsWord: स्वचालित बंद होना",
 	"menu.caps_word.idle_timeout": "विराम के बाद बंद करें",
 	"menu.caps_word.idle_timeout_never": "कभी नहीं (असीमित)",

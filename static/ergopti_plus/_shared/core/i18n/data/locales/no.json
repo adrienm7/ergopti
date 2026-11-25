@@ -4842,6 +4842,7 @@
 	"healthcheck.file_fallback.lead": "Diagnosevinduet kunne ikke åpnes på dette systemet, så her er den samme rapporten, lagret i en fil.",
 	"healthcheck.file_fallback.notice": "Diagnosevinduet kunne ikke åpnes. Rapporten er lagret i {1} og åpnes i nettleseren din.",
 	"healthcheck.file_fallback.notice_missing": "Diagnosevinduet trenger {2}, som dette systemet ikke har. Rapporten er lagret i {1} og åpnes i nettleseren din.",
+	"healthcheck.file_fallback.unopened": "Diagnosevinduet kunne ikke åpnes. Rapporten er lagret i {1}: åpne denne filen i nettleseren din.",
 	"menu.caps_word.auto_off": "CapsWord: automatisk deaktivering",
 	"menu.caps_word.idle_timeout": "Deaktiver etter en pause",
 	"menu.caps_word.idle_timeout_never": "Aldri (uendelig)",
