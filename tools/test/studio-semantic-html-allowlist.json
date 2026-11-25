@@ -2,6 +2,13 @@
 	"elements": [
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
+			"element": "div.la-panel-controls",
+			"count": 1,
+			"kind": "layout",
+			"reason": "The panel's labelled selects and hand-off buttons, each applied at once: a form would ask for a submit button it never has (HTML_CodeSniffer H32.2), and a fieldset for a legend the panel's heading already gives."
+		},
+		{
+			"file": "static/ergopti_plus/_shared/ui/layout_analysis/analysis_panel.js",
 			"element": "div.la-panel-ngrams",
 			"count": 1,
 			"kind": "mount",

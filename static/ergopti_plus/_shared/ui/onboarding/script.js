@@ -750,7 +750,8 @@ function _renderControls(page, state) {
 	box.innerHTML = '';
 	controls.forEach(function (control) {
 		// A fieldset: the control's choices are one group, named by its legend.
-		var group = document.createElement('fieldset');
+		// A lone checkbox is no group: its row names it, in a plain block.
+		var group = document.createElement(control.kind === 'check' ? 'div' : 'fieldset');
 		group.className = 'control-group';
 		group.dataset.control = control.id;
 		var availability = _controlState(control);
@@ -950,10 +951,13 @@ function _renderChecklist(page, state) {
  * @returns {object} The group element.
  */
 function _groupNode(page, group, state, depth) {
-	// A fieldset: the group's boxes belong together, named by its header.
-	var node = document.createElement('fieldset');
+	// A group: the boxes belong together, named by its header's text. Its
+	// header is a checkbox of its own, not a legend, so the name is ARIA's; a
+	// group without a label is a plain block.
+	var node = document.createElement('div');
 	node.className = 'checklist-group depth-' + depth;
 	if (group.label) {
+		node.setAttribute('role', 'group');
 		node.setAttribute('aria-label', _label(group.label));
 		var counts = _countItems(group, state);
 		var header = _checkRow(

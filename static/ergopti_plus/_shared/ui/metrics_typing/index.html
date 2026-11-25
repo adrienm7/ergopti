@@ -1136,6 +1136,13 @@
 											onclick="handle_sort('key')"
 											data-i18n="ui_typing.col_seq"
 										></button>
+										<!-- The placeholder vanishes as one types: the same text
+										     names the field (WCAG 1.3.1, 4.1.2). -->
+										<label
+											for="search_input"
+											class="theme-sr-only"
+											data-i18n="ui_typing.search_placeholder"
+										></label>
 										<input
 											type="text"
 											id="search_input"
@@ -1288,6 +1295,11 @@
 						data-i18n="ui_typing.modal_uncheck_all"
 					></button>
 				</div>
+				<label
+					for="app_search"
+					class="theme-sr-only"
+					data-i18n="ui_typing.modal_search_app"
+				></label>
 				<input
 					type="text"
 					id="app_search"

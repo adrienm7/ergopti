@@ -112,12 +112,18 @@ function init(data) {
 	strings.noResults = data.noResults || 'No matching action';
 
 	el('title').textContent = data.title || '';
+	// The parameter editor's heading names the picked action once one is
+	// picked; until then it holds the window's title, never an empty heading.
+	el('param-title').textContent = data.title || '';
 	listLabel = data.title || '';
 	// The window's title for assistive technology too: the native title bar is
 	// the host's, the document's own title is what a screen reader names.
 	document.title = data.title || '';
 	el('subtitle').textContent = data.label || '';
 	el('search').placeholder = data.searchPlaceholder || '';
+	// A placeholder vanishes once the user types and is no label (WCAG 1.3.1,
+	// 4.1.2): the same text names the field for assistive technology.
+	if (data.searchPlaceholder) el('search').setAttribute('aria-label', data.searchPlaceholder);
 	if (typeof data.cancelLabel !== 'string' || data.cancelLabel === '')
 		throw new Error('action picker init needs the translated cancelLabel');
 	el('btn-cancel').textContent = data.cancelLabel;

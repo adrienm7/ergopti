@@ -764,7 +764,8 @@
 		<b id="la-filters-label" class="la-filters-title" data-i18n="layout_analysis.filter.title"></b>
 		<output id="la-table-count" class="la-muted la-table-count" role="status"></output>
 	</summary>
-	<fieldset class="la-filters" aria-labelledby="la-filters-label">
+	<fieldset class="la-filters">
+		<legend class="la-sr-only" data-i18n="layout_analysis.filter.title"></legend>
 		<label class="la-filter-field la-filter-name" data-i18n-text="layout_analysis.table.filter_name">
 			<input id="la-row-name" type="search" />
 		</label>

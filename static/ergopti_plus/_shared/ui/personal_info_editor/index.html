@@ -12,16 +12,17 @@
 	</head>
 	<body>
 		<main>
-			<h1 data-i18n="editor.personal_info.window_title"></h1>
+			<h1 id="info-title" data-i18n="editor.personal_info.window_title"></h1>
 
-			<form id="info-form" onsubmit="return false;">
-				<fieldset id="rows"></fieldset>
+			<!-- The rows, not a form: Save and Cancel act on a click, never on Enter. -->
+			<div id="info-form">
+				<div id="rows" role="group" aria-labelledby="info-title"></div>
 
 				<footer class="btns">
 					<button type="button" class="save" id="btn-save" data-i18n="common.save"></button>
 					<button type="button" class="cancel" id="btn-cancel" data-i18n="common.cancel"></button>
 				</footer>
-			</form>
+			</div>
 		</main>
 
 		<script src="script.js"></script>

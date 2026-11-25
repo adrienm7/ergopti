@@ -34,7 +34,8 @@
 					<label class="reading-choice" for="reading-spacing" id="reading-spacing-label"></label>
 					<select id="reading-spacing"></select>
 				</p>
-				<fieldset class="lang-list" id="lang-list" aria-labelledby="language-title"></fieldset>
+				<!-- A group of toggle buttons named by the heading: no legend of its own. -->
+				<div class="lang-list" id="lang-list" role="group" aria-labelledby="language-title"></div>
 			</section>
 
 			<!-- Personal configuration folder -->
@@ -42,7 +43,7 @@
 				<h1 id="config-title"></h1>
 				<p class="desc" id="config-desc"></p>
 				<p class="field-group">
-					<input type="text" id="config-input" placeholder="" />
+					<input type="text" id="config-input" placeholder="" aria-labelledby="config-desc" />
 					<button type="button" id="config-browse" class="secondary"></button>
 				</p>
 				<p class="hint" id="config-hint"></p>

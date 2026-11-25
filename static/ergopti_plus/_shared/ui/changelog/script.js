@@ -848,7 +848,11 @@ function clearContent() {
 	var metaEl = document.getElementById('release-meta');
 	var bodyEl = document.getElementById('release-body');
 	var btnGh = document.getElementById('btn-github');
-	if (tagEl) tagEl.textContent = '';
+	// An empty heading is still read as one: hidden until a release names it.
+	if (tagEl) {
+		tagEl.textContent = '';
+		tagEl.hidden = true;
+	}
 	if (metaEl) metaEl.textContent = '';
 	if (bodyEl) bodyEl.replaceChildren();
 	if (btnGh) btnGh.style.display = 'none';
@@ -884,7 +888,10 @@ function selectRelease(idx) {
 	var tagEl = document.getElementById('release-tag');
 	var metaEl = document.getElementById('release-meta');
 	var btnGh = document.getElementById('btn-github');
-	if (tagEl) tagEl.textContent = release.tag_name || '';
+	if (tagEl) {
+		tagEl.textContent = release.tag_name || '';
+		tagEl.hidden = !release.tag_name;
+	}
 	if (metaEl) {
 		var parts = [];
 		if (release.published_at) parts.push(_formatDate(release.published_at));
