@@ -56,6 +56,30 @@ helpers.describe("input_access: telling the user", function()
 		helpers.assert_eq(lines[2], "Repair: '/home/u/Apps/Ergopti Plus.AppImage'")
 	end)
 
+	helpers.it("names the host's copy of the Flatpak's setup script, never the sandbox's /app", function()
+		-- /app exists only inside the sandbox, and nothing run there can add a
+		-- host group: the repair named bash '/app/lib/ergopti/install.sh'.
+		local Access = helpers.load_module("platform.input.access")
+		local deployment = "/var/lib/flatpak/app/fr.ergopti.Plus/x86_64/stable/0a1b2c/files"
+		local command = Access.setup_command({
+			script_dir = "/app/lib/ergopti",
+			getenv = function(name) return name == "FLATPAK_ID" and "fr.ergopti.Plus" or nil end,
+			read_file = function(path)
+				helpers.assert_eq(path, "/.flatpak-info")
+				return "[Application]\nname=fr.ergopti.Plus\n\n[Instance]\ninstance-id=42\napp-path="
+					.. deployment .. "\nbranch=stable\n"
+			end,
+		})
+		helpers.assert_eq(command,
+			"sudo bash '" .. deployment .. "/lib/ergopti/install/setup_permissions.sh' --user \"$(id -u)\"")
+		helpers.assert_true(command:find("'/app/", 1, true) == nil, "no sandbox path")
+		local ok = pcall(Access.setup_command, {
+			getenv = function(name) return name == "FLATPAK_ID" and "fr.ergopti.Plus" or nil end,
+			read_file = function() return "[Application]\nname=fr.ergopti.Plus\n" end,
+		})
+		helpers.assert_eq(ok, false, "a Flatpak whose deployment is unknown is refused, not sent to /app")
+	end)
+
 	helpers.it("the AppImage's tray launch goes through the permission launcher", function()
 		local fh = assert(io.open(helpers.driver_root() .. "/../../../tools/build/build-linux-appimage.sh", "r"))
 		local builder = fh:read("*a")
