@@ -700,6 +700,23 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication, within_de
 	return false
 end
 
+--- Whether a registered rule owns the buffer the magic key just ended, so the
+--- daemon's magic-key repeat leaves it to on_trigger: the repeat is the
+--- fallback when nothing matched, and it used to run before this engine, which
+--- turned « dt★ » into « dtt » (the same rule as on_trigger, without its output).
+--- @param buffer string The typing buffer, the trigger character included.
+--- @param start_is_boundary boolean|nil Input owner state captured with this buffer.
+--- @return boolean claimed
+function M.claims(buffer, start_is_boundary)
+	if not M.is_enabled() or type(buffer) ~= "string" then return false end
+	local t = _trigger_char
+	if type(t) ~= "string" or strict_codepoint_length(t) ~= 1 or buffer:sub(-#t) ~= t then return false end
+	local prefix = buffer:sub(1, -(#t + 1))
+	if prefix == "" then return false end
+	return require("hotstrings.engine.dynamic.core").match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled,
+		start_is_boundary) ~= nil
+end
+
 --- Preview rows for the @-family, in the shape `engine:candidates()` returns.
 ---
 --- WHY THE BUBBLE NEEDED A SECOND SOURCE: the daemon builds its preview from

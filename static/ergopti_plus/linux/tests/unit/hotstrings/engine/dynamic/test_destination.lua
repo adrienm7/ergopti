@@ -15,7 +15,8 @@ local root = helpers.driver_root()
 --- @param family string Personal or date rule family.
 --- @param change string Stable, retirement boundary or missing-owner contract.
 --- @param route string Static comparison or dynamic fallback.
-local function run_case(family, change, route)
+--- @param repeat_on boolean|nil The magic-key repeat switched on.
+local function run_case(family, change, route, repeat_on)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local previous_rules = saved.dynamic_hotstrings and saved.dynamic_hotstrings.get_rules()
@@ -43,7 +44,7 @@ local function run_case(family, change, route)
 			assert(dynamic.init({ trigger_char = "★", personal_info_path = path }))
 			assert(dynamic.set_enabled(true)); fixture.prefer_families(dynamic)
 			local repeat_key = helpers.load_module("hotstrings.engine.repeat_key")
-			assert(repeat_key.set_enabled(false))
+			assert(repeat_key.set_enabled(repeat_on == true))
 			local trigger = family == "date" and "dt★" or "@p★"
 			local replacement = assert(dynamic.preview(trigger, true))
 			local text_by_code = { [30] = "@", [25] = "p", [32] = "d", [20] = "t", [43] = "★",
@@ -199,6 +200,13 @@ helpers.describe("single-field dynamic expansions retain their original destinat
 	for _, change in ipairs({ "stable", "settle" }) do
 		helpers.it("dynamic-destination static comparison " .. change, function()
 			run_case("personal", change, "static")
+		end)
+	end
+	-- With « ★ repeats the last keystroke » on, the repeat claimed « dt★ »
+	-- before the dynamic engine ran, and typed « dtt » instead of the date.
+	for _, family in ipairs({ "personal", "date" }) do
+		helpers.it("dynamic-destination " .. family .. " stable with the repeat key on (repeat-yields-dynamic)", function()
+			run_case(family, "stable", "dynamic", true)
 		end)
 	end
 end)

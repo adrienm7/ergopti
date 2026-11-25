@@ -1778,7 +1778,10 @@ local function main()
 		-- The magic-key repeat, when nothing else matched: `po★` gives `poo`. A real
 		-- match always wins, which is why this is tested against `result` being nil
 		-- rather than run before the engine.
-		if not result and RepeatKey.is_enabled() then
+		-- A dynamic rule the magic key completes (« dt★ », « @p★ ») is a match the
+		-- dynamic engine owns below: the repeat must not claim it first.
+		if not result and RepeatKey.is_enabled() and not (dyn_hotstrings and dyn_hotstrings.is_enabled()
+			and dyn_hotstrings.claims(engine:current_buffer(), engine:buffer_starts_at_word_boundary())) then
 			local repeated = RepeatKey.resolve(engine:current_buffer(), MagicKey.get(), engine:buffer_starts_at_word_boundary())
 			-- The repeat answers the magic key within its category's window, the
 			-- complex-key widening included, as on macOS (decision of 2026-11-06):
