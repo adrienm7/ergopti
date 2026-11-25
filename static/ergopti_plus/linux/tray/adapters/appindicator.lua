@@ -206,6 +206,7 @@ local function bind()
 		void         gtk_check_menu_item_set_draw_as_radio(GtkWidget *item, gboolean draw_as_radio);
 		void         gtk_menu_item_set_submenu(GtkWidget *item, GtkWidget *submenu);
 		void         gtk_menu_shell_append(GtkWidget *shell, GtkWidget *child);
+		void         gtk_menu_shell_insert(GtkWidget *shell, GtkWidget *child, int position);
 		void         gtk_widget_set_sensitive(GtkWidget *widget, gboolean sensitive);
 		void         gtk_widget_show_all(GtkWidget *widget);
 		void         gtk_widget_show(GtkWidget *widget);
@@ -474,13 +475,14 @@ local function lazy_node(lib, parent, items, disabled, owned, path)
 	return node
 end
 
---- Creates the widget of one row and appends it.
+--- Creates the widget of one row and appends it, or inserts it at a position.
 --- @param lib table
 --- @param node table
 --- @param item table
 --- @param owned table
+--- @param index integer|nil The row's 1-based place when it replaces one; nil appends.
 --- @return table row
-local function add_row(lib, node, item, owned)
+local function add_row(lib, node, item, owned, index)
 	local disabled = node.disabled or item.disabled == true
 	local row = { kind = row_kind(item), has_sub = has_submenu(item) }
 	if row.kind == "separator" then
@@ -498,7 +500,7 @@ local function add_row(lib, node, item, owned)
 	end
 	if row.has_sub then
 		row.sub = lazy_node(lib, row.widget, item.menu, disabled, owned,
-			node.path .. "/" .. (#node.rows + 1))
+			node.path .. "/" .. (index or #node.rows + 1))
 	else
 		-- dbusmenu Event can activate an insensitive GTK item directly.
 		-- Unavailable rows therefore never receive an action capability.
@@ -508,7 +510,11 @@ local function add_row(lib, node, item, owned)
 	arm_row(lib, row, owned)
 	row.sensitive = not disabled
 	if disabled then lib.gtk.gtk_widget_set_sensitive(row.widget, 0) end
-	lib.gtk.gtk_menu_shell_append(node.menu, row.widget)
+	if index then
+		lib.gtk.gtk_menu_shell_insert(node.menu, row.widget, index - 1)
+	else
+		lib.gtk.gtk_menu_shell_append(node.menu, row.widget)
+	end
 	lib.gtk.gtk_widget_show(row.widget)
 	return row
 end
@@ -553,7 +559,50 @@ local function same_shape(node, items)
 	return true
 end
 
+--- Whether a node can take `items` in place, all the way down its filled
+--- submenus. A node never opened always can: no panel holds its rows yet.
+---
+--- WHY A FILLED SUBMENU IS NEVER RESHAPED IN PLACE:
+--- libdbusmenu-glib announces every layout change as LayoutUpdated on the root
+--- (parent 0), and KDE Plasma's importer then refreshes the root's own rows
+--- only (GetLayout depth 1). Its AboutToShow answer is always false, so a
+--- submenu the panel already holds is refetched only when its row id is new.
+--- A submenu rebuilt under the same parent row kept, in Plasma, the rows of
+--- before: their ids were gone, every click on them was refused as an unknown
+--- id, and the menu only answered again after Reload rebuilt the root.
+--- @param node table
+--- @param items table
+--- @param disabled boolean
+--- @return boolean
+local function fits(node, items, disabled)
+	items = items or {}
+	if not node.filled then return true end
+	if not same_shape(node, items) then return false end
+	for index, item in ipairs(items) do
+		local row = node.rows[index]
+		if row.has_sub and not fits(row.sub, item.menu, disabled or item.disabled == true) then return false end
+	end
+	return true
+end
+
 local patch_node
+
+--- Replaces a top-level row by a new widget at the same place: a new dbusmenu
+--- id the panel's root refresh sees, so it drops the stale submenu it held
+--- and asks for the new one when it is opened.
+--- @param lib table
+--- @param node table The root node.
+--- @param index integer
+--- @param item table
+--- @param owned table
+local function replace_row(lib, node, index, item, owned)
+	local old = node.rows[index]
+	if old.action_id then _actions[old.action_id] = nil end
+	if old.sub then retire_node(old.sub) end
+	node.rows[index] = add_row(lib, node, item, owned, index)
+	lib.gtk.gtk_widget_destroy(old.widget)
+	Perf.count("tray.row_replacements")
+end
 
 --- Updates one row in place: its check, its sensitivity and its action.
 --- @param lib table
@@ -581,7 +630,9 @@ end
 
 --- Brings a node to `items`: in place when the shape is unchanged, otherwise
 --- by destroying its rows and building them again. A node never opened only
---- keeps the new rows for when it is.
+--- keeps the new rows for when it is. Below the root, a reshaped filled
+--- submenu never reaches this rebuild: the root replaces the top-level row
+--- that holds it instead (see fits).
 --- @param lib table
 --- @param node table
 --- @param items table
@@ -589,11 +640,18 @@ end
 --- @param owned table
 patch_node = function(lib, node, items, disabled, owned)
 	items = items or {}
-	local reshaped = node.disabled ~= disabled
 	node.items, node.disabled = items, disabled
 	if not node.filled then return end
-	if not reshaped and same_shape(node, items) then
-		for index, item in ipairs(items) do patch_row(lib, node, node.rows[index], item, owned) end
+	if same_shape(node, items) then
+		for index, item in ipairs(items) do
+			local row = node.rows[index]
+			if node.root and row.has_sub
+				and not fits(row.sub, item.menu, disabled or item.disabled == true) then
+				replace_row(lib, node, index, item, owned)
+			else
+				patch_row(lib, node, row, item, owned)
+			end
+		end
 		return
 	end
 	retire_node(node)
@@ -614,7 +672,7 @@ end
 --- @return table node { menu = GtkMenu, ... }
 local function build_menu(lib, items, owned)
 	local node = { menu = lib.gtk.gtk_menu_new(), items = items or {}, disabled = false, filled = false,
-		rows = {}, fill_ids = {}, path = "root" }
+		rows = {}, fill_ids = {}, path = "root", root = true }
 	fill_node(lib, node, owned)
 	lib.gtk.gtk_widget_show(node.menu)
 	return node

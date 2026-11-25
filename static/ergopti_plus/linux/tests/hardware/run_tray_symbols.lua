@@ -52,6 +52,7 @@ local EXPECTED_SYMBOLS = {
 		"gtk_main_iteration_do",
 		"gtk_menu_new",
 		"gtk_menu_shell_append",
+		"gtk_menu_shell_insert",
 		"gtk_menu_item_set_submenu",
 		"gtk_widget_show_all",
 		"gtk_widget_set_sensitive",
@@ -107,6 +108,7 @@ pcall(ffi.cdef, [[
 	int   gtk_main_iteration_do(int);
 	GtkWidget* gtk_menu_new(void);
 	void  gtk_menu_shell_append(GtkWidget*, GtkWidget*);
+	void  gtk_menu_shell_insert(GtkWidget*, GtkWidget*, int);
 	void  gtk_menu_item_set_submenu(GtkWidget*, GtkWidget*);
 	void  gtk_widget_show_all(GtkWidget*);
 	void  gtk_widget_set_sensitive(GtkWidget*, int);

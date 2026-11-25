@@ -3267,6 +3267,24 @@ jobs:
             [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
             [ "$(cat "$ERGOPTI_TRAY_CLICK_FILE")" = "clicked 1" ] || { echo "::error::the replacement submenu click never reached its row"; exit 1; }
             exit "$status"'
+          # Two clicks in a row from a panel that caches the layout as KDE
+          # Plasma does: each click reshapes the switch's submenu, and the
+          # second one must still reach a live row (field report 2026-11-25).
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
+            python3 tests/hardware/plasma_panel.py --ready-file "$ready" --timeout 30 \
+              --path "Shortcuts probe > Switch probe" --clicks 2 > "$RUNNER_TEMP/plasma_panel.json" &
+            panel=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the caching panel never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_tray_cached_panel.lua 15
+            probe=$?
+            wait "$panel"; status=$?
+            cat "$RUNNER_TEMP/plasma_panel.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            [ "$(cat "$ERGOPTI_TRAY_CLICK_FILE")" = "clicks 2 on=true" ] || { echo "::error::a second tray click did not reach its row"; exit 1; }
+            exit "$status"'
           else
               exit 1
           fi

@@ -57,6 +57,34 @@ local function fake_binding()
 		end
 	end
 
+	--- Adds a child to a menu shell: at a 0-based position, as gtk_menu_shell_insert
+	--- does, or last, as gtk_menu_shell_append does.
+	--- @param shell table
+	--- @param child table
+	--- @param position integer|nil
+	local function attach(shell, child, position)
+		log.appends[#log.appends + 1] = { shell = shell, child = child, position = position }
+		-- libdbusmenu-gtk exports a check item when it is added to a menu:
+		-- toggle-type from draw-as-radio, toggle-state from active, and an
+		-- activate handler connected after the row's own that publishes
+		-- toggle-state only when it changes (parser.c).
+		if child.kind == "check" then
+			local export = { toggle_type = child.draw_as_radio and "radio" or "checkmark",
+				toggle_state = child.active, updates = 0 }
+			child.export = export
+			child.handlers = child.handlers or {}
+			child.handlers[#child.handlers + 1] = { handler = function()
+				if export.toggle_state ~= child.active then
+					export.toggle_state, export.updates = child.active, export.updates + 1
+				end
+			end }
+			child.activate = activation(child)
+		end
+		shell.children = shell.children or {}
+		table.insert(shell.children, position and position + 1 or #shell.children + 1, child)
+		child.parent = shell
+	end
+
 	local gtk = {
 		gtk_menu_new = function() return widget("menu") end,
 		gtk_menu_item_new_with_label = function(label) return widget("item", label) end,
@@ -71,33 +99,19 @@ local function fake_binding()
 			log.submenus[#log.submenus + 1] = { item = item, submenu = submenu }
 			item.submenu = submenu
 		end,
-		gtk_menu_shell_append = function(shell, child)
-			log.appends[#log.appends + 1] = { shell = shell, child = child }
-			-- libdbusmenu-gtk exports a check item when it is added to a menu:
-			-- toggle-type from draw-as-radio, toggle-state from active, and an
-			-- activate handler connected after the row's own that publishes
-			-- toggle-state only when it changes (parser.c).
-			if child.kind == "check" then
-				local export = { toggle_type = child.draw_as_radio and "radio" or "checkmark",
-					toggle_state = child.active, updates = 0 }
-				child.export = export
-				child.handlers = child.handlers or {}
-				child.handlers[#child.handlers + 1] = { handler = function()
-					if export.toggle_state ~= child.active then
-						export.toggle_state, export.updates = child.active, export.updates + 1
-					end
-				end }
-				child.activate = activation(child)
-			end
-			shell.children = shell.children or {}
-			shell.children[#shell.children + 1] = child
-			child.parent = shell
-		end,
+		gtk_menu_shell_append = function(shell, child) attach(shell, child, nil) end,
+		gtk_menu_shell_insert = function(shell, child, position) attach(shell, child, position) end,
 		gtk_widget_set_sensitive = function(w, sensitive) w.sensitive = sensitive end,
 		gtk_widget_show_all = function() log.calls[#log.calls + 1] = "show_all" end,
 		gtk_widget_show = function(w) w.shown = true end,
 		gtk_widget_destroy = function(w)
-			w.destroyed = true
+			-- GTK destroys a row's submenu and a menu's rows along with it.
+			local function release(node)
+				node.destroyed = true
+				if node.submenu then release(node.submenu) end
+				for _, child in ipairs(node.children or {}) do release(child) end
+			end
+			release(w)
 			local siblings = w.parent and w.parent.children or {}
 			for index, child in ipairs(siblings) do
 				if child == w then table.remove(siblings, index) break end
@@ -704,7 +718,12 @@ helpers.describe("tray indicator: lazy submenus and in-place rows", function()
 		ind.destroy(); ind._set_binding_for_test(nil)
 	end)
 
-	helpers.it("(tray-lazy) a changed title rebuilds only its own submenu", function()
+	-- libdbusmenu-glib announces every layout change on the root (parent 0) and
+	-- KDE Plasma then refetches the root's own rows only: a submenu it already
+	-- holds is fetched again only under a NEW row id. The field report of
+	-- 2026-11-25 (Arch, Plasma 6, Wayland): after one click the next ones did
+	-- nothing until Reload, because the submenu was rebuilt under its old row.
+	helpers.it("(tray-stale-submenu) a reshaped open submenu replaces its top-level row in place", function()
 		local ind, log = with_fake()
 		ind.create("id", "icon", "title")
 		local counter = { toggled = 0, slot = 0 }
@@ -714,16 +733,63 @@ helpers.describe("tray indicator: lazy submenus and in-place rows", function()
 		open(log, "Section 3")
 		local renamed_slot = widget_named(log, "Slot 1.5")
 		local kept = widget_named(log, "Slot 3.5")
-		local top = widget_named(log, "Section 1")
+		local top, sibling = widget_named(log, "Section 1"), widget_named(log, "Section 3")
 		tree = big_tree(false, counter)
 		tree[2].menu[5].title = "Renamed slot"
 		ind.set_menu(tree)
-		helpers.assert_true(renamed_slot.destroyed, "the changed submenu was rebuilt")
+		local replaced = widget_named(log, "Section 1")
+		helpers.assert_true(top.destroyed and replaced ~= top,
+			"the top-level row holding the reshaped submenu is a new row: a new id for the panel's root refresh")
+		helpers.assert_true(log.menu.children[2] == replaced, "at the same place in the root menu")
+		helpers.assert_eq(#rows_of(log.menu), 4, "no row is added or lost")
+		helpers.assert_true(renamed_slot.destroyed, "the stale submenu went with its row")
+		helpers.assert_nil(widget_named(log, "Renamed slot"), "the new submenu is built when it is opened")
+		open(log, "Section 1")
 		helpers.assert_eq(widget_named(log, "Renamed slot").shown, true)
-		helpers.assert_true(not kept.destroyed, "an unchanged submenu keeps its widgets")
-		helpers.assert_true(widget_named(log, "Section 1") == top, "the parent row itself stays")
+		helpers.assert_true(not kept.destroyed and widget_named(log, "Section 3") == sibling,
+			"an unchanged submenu keeps its row and its widgets")
 		renamed_slot.activate()
 		helpers.assert_eq(counter.slot, 0, "a destroyed row runs nothing")
+		widget_named(log, "Renamed slot").activate()
+		helpers.assert_eq(counter.slot, 1, "the new row runs its action")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-submenu) a reshape two submenus deep replaces the top-level ancestor", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local function tree(label)
+			return { { title = "Group", menu = { { title = "Inner", menu = { { title = label, fn = function() end } } } } },
+				{ title = "Other", menu = { { title = "Other child", fn = function() end } } } }
+		end
+		ind.set_menu(tree("Before"))
+		open(log, "Group")
+		open(log, "Inner")
+		open(log, "Other")
+		local group, inner, other = widget_named(log, "Group"), widget_named(log, "Inner"), widget_named(log, "Other")
+		ind.set_menu(tree("After"))
+		helpers.assert_true(group.destroyed and inner.destroyed,
+			"a panel refreshes no submenu it holds under an unchanged id, at any depth")
+		helpers.assert_true(widget_named(log, "Other") == other, "the sibling top-level row stays")
+		helpers.assert_true(log.menu.children[1] == widget_named(log, "Group"), "the new row takes the old one's place")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-submenu) a check change in an open submenu keeps every row", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local function tree(on)
+			return { { title = "Group", checked = on, menu = { { title = "Switch", checked = on, fn = function() end },
+				{ title = "Child", disabled = not on, fn = function() end } } } }
+		end
+		ind.set_menu(tree(true))
+		open(log, "Group")
+		local group, switch, child = widget_named(log, "Group"), widget_named(log, "Switch"), widget_named(log, "Child")
+		ind.set_menu(tree(false))
+		helpers.assert_true(widget_named(log, "Group") == group and widget_named(log, "Switch") == switch
+			and widget_named(log, "Child") == child, "a same-shaped submenu is updated in place")
+		helpers.assert_eq(switch.active, 0)
+		helpers.assert_eq(child.sensitive, 0)
 		ind.destroy(); ind._set_binding_for_test(nil)
 	end)
 
